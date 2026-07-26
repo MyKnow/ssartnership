@@ -28,7 +28,8 @@ import {
 } from "@/lib/admin-scope";
 import {
   parseAdminReviewFilters,
-  serializeAdminReviewFilters,
+  parseAdminReviewPagination,
+  serializeAdminReviewPageQuery,
 } from "@/lib/admin-reviews";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import { buildPartnerPreviewUrl } from "@/lib/partner-preview";
@@ -144,7 +145,10 @@ export default async function AdminPartnerDetailPage({
     partnerId,
     companyId: "",
   };
-  const retryParams = new URLSearchParams(serializeAdminReviewFilters(reviewFilters));
+  const reviewPagination = parseAdminReviewPagination(query);
+  const retryParams = new URLSearchParams(
+    serializeAdminReviewPageQuery(reviewFilters, reviewPagination),
+  );
   const requestedUsageBenefit = readFirstQueryValue(query.usageBenefit);
   const requestedUsagePage = readFirstQueryValue(query.usagePage);
   if (requestedUsageBenefit) retryParams.set("usageBenefit", requestedUsageBenefit);
@@ -193,11 +197,12 @@ export default async function AdminPartnerDetailPage({
     partnerId,
     managedCampusSlugs: managedCampusFilter,
     reviewFilters,
+    reviewPagination,
     canReadCoupons,
     requestedUsageBenefit,
     usagePage: requestedUsagePage,
   });
-  const reviewQueryString = serializeAdminReviewFilters(reviewFilters);
+  const reviewQueryString = serializeAdminReviewPageQuery(reviewFilters, reviewPagination);
   const returnTo = reviewQueryString ? `${detailPath}?${reviewQueryString}` : detailPath;
   const thumbnail = partner.thumbnail ?? partner.images?.[0] ?? null;
   const galleryImages = partner.thumbnail

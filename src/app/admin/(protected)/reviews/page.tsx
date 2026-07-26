@@ -7,7 +7,8 @@ import {
 import {
   getAdminReviewPageData,
   parseAdminReviewFilters,
-  serializeAdminReviewFilters,
+  parseAdminReviewPagination,
+  serializeAdminReviewPageQuery,
 } from "@/lib/admin-reviews";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { getManagedCampusFilterValues } from "@/lib/admin-scope";
@@ -28,11 +29,13 @@ export default async function AdminReviewsPage({
   });
   const params = (await searchParams) ?? {};
   const filters = parseAdminReviewFilters(params);
+  const pagination = parseAdminReviewPagination(params);
   const errorMessage = typeof params.error === "string" ? adminReviewsErrorMessages[params.error] ?? null : null;
   const data = await getAdminReviewPageData(filters, {
     managedCampusSlugs: getManagedCampusFilterValues(adminSession.account),
+    ...pagination,
   });
-  const queryString = serializeAdminReviewFilters(filters);
+  const queryString = serializeAdminReviewPageQuery(filters, pagination);
   const returnTo = queryString ? `/admin/reviews?${queryString}` : "/admin/reviews";
 
   return (

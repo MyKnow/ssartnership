@@ -146,6 +146,7 @@ export async function getAdminPartnerDetailOperationalReadModel({
   partnerId,
   managedCampusSlugs,
   reviewFilters,
+  reviewPagination = { page: 1, pageSize: 12 },
   canReadCoupons,
   requestedUsageBenefit,
   usagePage,
@@ -154,6 +155,10 @@ export async function getAdminPartnerDetailOperationalReadModel({
   partnerId: string;
   managedCampusSlugs: readonly string[] | null;
   reviewFilters: AdminReviewFilters;
+  reviewPagination?: {
+    page: number;
+    pageSize: number;
+  };
   canReadCoupons: boolean;
   requestedUsageBenefit: string;
   usagePage: string;
@@ -172,6 +177,7 @@ export async function getAdminPartnerDetailOperationalReadModel({
         getAdminReviewPageData(reviewFilters, {
           includeCounts: false,
           managedCampusSlugs,
+          ...reviewPagination,
         }),
         fetchPartnerReviewVisibilityCounts(supabase, partnerId),
         couponManagementDataPromise,
@@ -256,6 +262,7 @@ export async function getAdminPartnerDetailReadModel({
   partnerId,
   managedCampusSlugs,
   reviewFilters,
+  reviewPagination,
   canReadCoupons,
   requestedUsageBenefit,
   usagePage,
@@ -263,6 +270,10 @@ export async function getAdminPartnerDetailReadModel({
   partnerId: string;
   managedCampusSlugs: readonly string[] | null;
   reviewFilters: AdminReviewFilters;
+  reviewPagination?: {
+    page: number;
+    pageSize: number;
+  };
   canReadCoupons: boolean;
   requestedUsageBenefit: string;
   usagePage: string;
@@ -280,6 +291,7 @@ export async function getAdminPartnerDetailReadModel({
     partnerId,
     managedCampusSlugs,
     reviewFilters,
+    reviewPagination,
     canReadCoupons,
     requestedUsageBenefit,
     usagePage,

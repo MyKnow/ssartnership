@@ -263,6 +263,7 @@ export async function AdminPartnerDetailReviewSection({
     <Card tone="elevated">
       <AdminPartnerReviewManager
         reviews={detail.reviewData.reviews}
+        pagination={detail.reviewData.pagination}
         counts={{
           totalCount: totalReviewCount,
           visibleCount: visibleReviewCount,

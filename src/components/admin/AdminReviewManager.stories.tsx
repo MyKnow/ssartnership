@@ -101,6 +101,11 @@ const reviewData: AdminReviewPageData = {
       disrecommendCount: 2,
     },
   ],
+  pagination: {
+    totalCount: 2,
+    page: 1,
+    pageSize: 12,
+  },
 };
 
 const meta = {
@@ -127,6 +132,24 @@ export const Empty: Story = {
     data: {
       ...reviewData,
       reviews: [],
+      pagination: {
+        totalCount: 0,
+        page: 1,
+        pageSize: 12,
+      },
+    },
+  },
+};
+
+export const Paginated: Story = {
+  args: {
+    data: {
+      ...reviewData,
+      pagination: {
+        totalCount: 128,
+        page: 2,
+        pageSize: 12,
+      },
     },
   },
 };

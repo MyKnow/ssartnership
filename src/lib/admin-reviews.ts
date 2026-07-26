@@ -78,12 +78,27 @@ export type AdminReviewPageData = {
   companies: AdminReviewCompanyOption[];
   partners: AdminReviewPartnerOption[];
   filters: AdminReviewFilters;
+  pagination: AdminReviewPagination;
 };
 
-const ADMIN_REVIEW_RESULT_LIMIT = 200;
+export const ADMIN_REVIEW_PAGE_SIZE_OPTIONS = [12, 24, 48] as const;
+export const DEFAULT_ADMIN_REVIEW_PAGE_SIZE = ADMIN_REVIEW_PAGE_SIZE_OPTIONS[0];
+
+export type AdminReviewPaginationInput = {
+  page?: number | string | null;
+  pageSize?: number | string | null;
+};
+
+export type AdminReviewPagination = {
+  page: number;
+  pageSize: (typeof ADMIN_REVIEW_PAGE_SIZE_OPTIONS)[number];
+  totalCount: number;
+};
 
 type AdminReviewScopeOptions = {
   managedCampusSlugs?: string[] | null;
+  partnerSearchIds?: string[] | null;
+  pagination?: Omit<AdminReviewPagination, "totalCount">;
 };
 
 type MemberDirectoryRelation =
@@ -220,6 +235,39 @@ export function parseAdminReviewFilters(input: Record<string, string | string[] 
   };
 }
 
+function normalizePositiveInteger(value: number | string | null | undefined, fallback: number) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export function normalizeAdminReviewPagination(
+  input: AdminReviewPaginationInput = {},
+): Omit<AdminReviewPagination, "totalCount"> {
+  const requestedPageSize = normalizePositiveInteger(
+    input.pageSize,
+    DEFAULT_ADMIN_REVIEW_PAGE_SIZE,
+  );
+  const pageSize = ADMIN_REVIEW_PAGE_SIZE_OPTIONS.includes(
+    requestedPageSize as (typeof ADMIN_REVIEW_PAGE_SIZE_OPTIONS)[number],
+  )
+    ? (requestedPageSize as (typeof ADMIN_REVIEW_PAGE_SIZE_OPTIONS)[number])
+    : DEFAULT_ADMIN_REVIEW_PAGE_SIZE;
+
+  return {
+    page: normalizePositiveInteger(input.page, 1),
+    pageSize,
+  };
+}
+
+export function parseAdminReviewPagination(
+  input: Record<string, string | string[] | undefined>,
+) {
+  return normalizeAdminReviewPagination({
+    page: parseQueryParam(input.page),
+    pageSize: parseQueryParam(input.pageSize),
+  });
+}
+
 export function serializeAdminReviewFilters(filters: AdminReviewFilters) {
   const params = new URLSearchParams();
   if (filters.sort !== "latest") {
@@ -242,6 +290,21 @@ export function serializeAdminReviewFilters(filters: AdminReviewFilters) {
   }
   if (filters.memberQuery) {
     params.set("memberQuery", filters.memberQuery);
+  }
+  return params.toString();
+}
+
+export function serializeAdminReviewPageQuery(
+  filters: AdminReviewFilters,
+  pagination: AdminReviewPaginationInput = {},
+) {
+  const params = new URLSearchParams(serializeAdminReviewFilters(filters));
+  const normalized = normalizeAdminReviewPagination(pagination);
+  if (normalized.page > 1) {
+    params.set("page", String(normalized.page));
+  }
+  if (normalized.pageSize !== DEFAULT_ADMIN_REVIEW_PAGE_SIZE) {
+    params.set("pageSize", String(normalized.pageSize));
   }
   return params.toString();
 }
@@ -287,40 +350,63 @@ function mapAdminReviewRow(
   };
 }
 
-function applyAdminReviewFilters(
-  reviews: AdminReviewRecord[],
-  filters: AdminReviewFilters,
-) {
-  const memberQuery = filters.memberQuery.trim().toLowerCase();
-  const ratingValue = filters.rating === "all" ? null : Number(filters.rating);
+function escapeLikePattern(value: string) {
+  return value.replace(/[\\%_]/g, "\\$&");
+}
 
-  return reviews.filter((review) => {
-    if (filters.status === "visible" && review.isHidden) {
-      return false;
+async function findAdminReviewMemberIds(value: string) {
+  const normalizedValue = value.trim();
+  if (!normalizedValue) {
+    return [];
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const pattern = `%${escapeLikePattern(normalizedValue)}%`;
+  const [nameResult, directoryResult] = await Promise.all([
+    supabase
+      .from("members")
+      .select("id")
+      .ilike("display_name", pattern)
+      .limit(100),
+    supabase
+      .from("mm_user_directory")
+      .select("id")
+      .ilike("mm_username", pattern)
+      .limit(100),
+  ]);
+
+  if (nameResult.error) {
+    throw new Error(nameResult.error.message);
+  }
+  if (directoryResult.error) {
+    throw new Error(directoryResult.error.message);
+  }
+
+  const accountIds = (directoryResult.data ?? [])
+    .map((row) => (row as { id?: unknown }).id)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
+  const memberIds = (nameResult.data ?? [])
+    .map((row) => (row as { id?: unknown }).id)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+  if (accountIds.length > 0) {
+    const linkedMembersResult = await supabase
+      .from("members")
+      .select("id")
+      .in("mattermost_account_id", accountIds)
+      .limit(100);
+    if (linkedMembersResult.error) {
+      throw new Error(linkedMembersResult.error.message);
     }
-    if (filters.status === "hidden" && !review.isHidden) {
-      return false;
-    }
-    if (filters.companyId && review.companyId !== filters.companyId) {
-      return false;
-    }
-    if (filters.partnerId && review.partnerId !== filters.partnerId) {
-      return false;
-    }
-    if (ratingValue !== null && review.rating !== ratingValue) {
-      return false;
-    }
-    if (filters.imagesOnly && review.imageCount === 0) {
-      return false;
-    }
-    if (memberQuery) {
-      const searchable = `${review.memberName} ${review.memberUsername ?? ""} ${review.partnerName} ${review.companyName ?? ""}`.toLowerCase();
-      if (!searchable.includes(memberQuery)) {
-        return false;
+    for (const row of linkedMembersResult.data ?? []) {
+      const id = (row as { id?: unknown }).id;
+      if (typeof id === "string" && id.length > 0) {
+        memberIds.push(id);
       }
     }
-    return true;
-  });
+  }
+
+  return [...new Set(memberIds)];
 }
 
 async function fetchFilteredAdminReviewRows(
@@ -329,6 +415,7 @@ async function fetchFilteredAdminReviewRows(
 ) {
   const supabase = getSupabaseAdminClient();
   const managedCampusSlugs = scope.managedCampusSlugs ?? null;
+  const pagination = scope.pagination ?? normalizeAdminReviewPagination();
   let scopedPartnerIds: string[] | null = null;
 
   if (filters.companyId || managedCampusSlugs) {
@@ -359,7 +446,7 @@ async function fetchFilteredAdminReviewRows(
 
     scopedPartnerIds = (partners ?? []).map((partner) => partner.id);
     if (scopedPartnerIds.length === 0) {
-      return [];
+      return { reviews: [], totalCount: 0 };
     }
   }
 
@@ -376,14 +463,31 @@ async function fetchFilteredAdminReviewRows(
 
   if (filters.partnerId) {
     if (!isUuid(filters.partnerId)) {
-      return [];
+      return { reviews: [], totalCount: 0 };
     }
     if (scopedPartnerIds && !scopedPartnerIds.includes(filters.partnerId)) {
-      return [];
+      return { reviews: [], totalCount: 0 };
     }
     query = query.eq("partner_id", filters.partnerId);
   } else if (scopedPartnerIds) {
     query = query.in("partner_id", scopedPartnerIds);
+  }
+
+  if (filters.memberQuery) {
+    const matchingMemberIds = await findAdminReviewMemberIds(filters.memberQuery);
+    const matchingPartnerIds = scope.partnerSearchIds ?? [];
+    const searchClauses = [
+      matchingMemberIds.length > 0
+        ? `member_id.in.(${matchingMemberIds.join(",")})`
+        : null,
+      matchingPartnerIds.length > 0
+        ? `partner_id.in.(${matchingPartnerIds.join(",")})`
+        : null,
+    ].filter((clause): clause is string => Boolean(clause));
+    if (searchClauses.length === 0) {
+      return { reviews: [], totalCount: 0 };
+    }
+    query = query.or(searchClauses.join(","));
   }
 
   if (filters.rating !== "all") {
@@ -394,9 +498,10 @@ async function fetchFilteredAdminReviewRows(
     query = query.not("images", "eq", "{}");
   }
 
-  const { data, error } = await query
+  const from = (pagination.page - 1) * pagination.pageSize;
+  const { data, error, count } = await query
     .order("created_at", { ascending: filters.sort === "oldest" })
-    .limit(ADMIN_REVIEW_RESULT_LIMIT);
+    .range(from, from + pagination.pageSize - 1);
 
   if (error) {
     throw new Error(error.message);
@@ -405,7 +510,10 @@ async function fetchFilteredAdminReviewRows(
   const rows = (data ?? []) as unknown as AdminReviewRow[];
 
   const reactionStates = await fetchAdminReviewReactionStates(rows.map((row) => row.id));
-  return rows.map((row) => mapAdminReviewRow(row, reactionStates.get(row.id)));
+  return {
+    reviews: rows.map((row) => mapAdminReviewRow(row, reactionStates.get(row.id))),
+    totalCount: count ?? 0,
+  };
 }
 
 async function fetchAdminReviewReactionStates(reviewIds: string[]) {
@@ -447,16 +555,59 @@ export async function getAdminReviewCounts(): Promise<AdminReviewCounts> {
   };
 }
 
+async function getAdminReviewCountsForPartnerIds(
+  partnerIds: string[],
+): Promise<AdminReviewCounts> {
+  if (partnerIds.length === 0) {
+    return { totalCount: 0, visibleCount: 0, hiddenCount: 0 };
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const createCountQuery = (status: "all" | "visible" | "hidden") => {
+    let query = supabase
+      .from("partner_reviews")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null)
+      .in("partner_id", partnerIds);
+    if (status === "visible") {
+      query = query.is("hidden_at", null);
+    } else if (status === "hidden") {
+      query = query.not("hidden_at", "is", null);
+    }
+    return query;
+  };
+
+  const [totalResult, visibleResult, hiddenResult] = await Promise.all([
+    createCountQuery("all"),
+    createCountQuery("visible"),
+    createCountQuery("hidden"),
+  ]);
+  if (totalResult.error || visibleResult.error || hiddenResult.error) {
+    return { totalCount: 0, visibleCount: 0, hiddenCount: 0 };
+  }
+  return {
+    totalCount: totalResult.count ?? 0,
+    visibleCount: visibleResult.count ?? 0,
+    hiddenCount: hiddenResult.count ?? 0,
+  };
+}
+
 export async function getAdminReviewPageData(
   input: AdminReviewFilters,
   options?: {
     includeCounts?: boolean;
     managedCampusSlugs?: string[] | null;
+    page?: number | string | null;
+    pageSize?: number | string | null;
   },
 ): Promise<AdminReviewPageData> {
   const supabase = getSupabaseAdminClient();
   const includeCounts = options?.includeCounts ?? true;
   const managedCampusSlugs = options?.managedCampusSlugs ?? null;
+  const paginationInput = normalizeAdminReviewPagination({
+    page: options?.page,
+    pageSize: options?.pageSize,
+  });
   let companiesQuery = supabase
     .from("partner_companies")
     .select("id,name,slug,managed_campus_slugs")
@@ -471,17 +622,9 @@ export async function getAdminReviewPageData(
     partnersQuery = partnersQuery.overlaps("managed_campus_slugs", managedCampusSlugs);
   }
 
-  const [companiesResult, partnersResult, counts, reviews] = await Promise.all([
+  const [companiesResult, partnersResult] = await Promise.all([
     companiesQuery,
     partnersQuery,
-    includeCounts
-      ? getAdminReviewCounts()
-      : Promise.resolve({
-          totalCount: 0,
-          visibleCount: 0,
-          hiddenCount: 0,
-        } satisfies AdminReviewCounts),
-    fetchFilteredAdminReviewRows(input, { managedCampusSlugs }),
   ]);
 
   const companies = (companiesResult.data ?? []) as AdminReviewCompanyOption[];
@@ -498,21 +641,42 @@ export async function getAdminReviewPageData(
     },
   );
 
-  const filteredReviews = applyAdminReviewFilters(reviews, input);
-  const scopedCounts = managedCampusSlugs
-    ? {
-        totalCount: reviews.length,
-        visibleCount: reviews.filter((review) => !review.isHidden).length,
-        hiddenCount: reviews.filter((review) => review.isHidden).length,
-      }
-    : counts;
+  const normalizedMemberQuery = input.memberQuery.toLowerCase();
+  const partnerSearchIds = normalizedMemberQuery
+    ? partners
+        .filter((partner) => {
+          const searchable = `${partner.name} ${partner.companyName ?? ""}`.toLowerCase();
+          return searchable.includes(normalizedMemberQuery);
+        })
+        .map((partner) => partner.id)
+    : null;
+  const [counts, reviewResult] = await Promise.all([
+    includeCounts
+      ? managedCampusSlugs
+        ? getAdminReviewCountsForPartnerIds(partners.map((partner) => partner.id))
+        : getAdminReviewCounts()
+      : Promise.resolve({
+          totalCount: 0,
+          visibleCount: 0,
+          hiddenCount: 0,
+        } satisfies AdminReviewCounts),
+    fetchFilteredAdminReviewRows(input, {
+      managedCampusSlugs,
+      partnerSearchIds,
+      pagination: paginationInput,
+    }),
+  ]);
 
   return {
-    counts: scopedCounts,
-    reviews: filteredReviews,
+    counts,
+    reviews: reviewResult.reviews,
     companies,
     partners,
     filters: input,
+    pagination: {
+      ...paginationInput,
+      totalCount: reviewResult.totalCount,
+    },
   };
 }
 
