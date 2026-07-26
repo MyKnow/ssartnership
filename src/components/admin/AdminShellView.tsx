@@ -122,13 +122,13 @@ export default function AdminShellView({
     <AdminQuickNavigatorProvider navGroups={navGroups}>
       <div className="min-h-screen bg-background">
       <a
-        href="#admin-mobile-main-content"
+        href="#admin-main-content"
         className={cn(skipLinkClassName, "md:hidden")}
       >
         주요 내용으로 건너뛰기
       </a>
       <a
-        href="#admin-desktop-main-content"
+        href="#admin-main-content"
         className={cn(skipLinkClassName, "hidden md:inline-flex")}
       >
         주요 내용으로 건너뛰기
@@ -164,19 +164,12 @@ export default function AdminShellView({
           </div>
         </header>
 
-        <FloatingActionGroup className="!bottom-[calc(5rem+env(safe-area-inset-bottom))] md:!bottom-safe-bottom-5">
-          <ScrollToTopFab />
-          <main id="admin-mobile-main-content" tabIndex={-1}>
-            <Container className="pb-[calc(5.75rem+env(safe-area-inset-bottom))] pt-8" size="dashboard">
-              {children}
-            </Container>
-          </main>
-        </FloatingActionGroup>
+      </div>
 
-        <nav
-          aria-label="관리자 주요 탐색"
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-surface-overlay/95 pb-safe-bottom shadow-floating backdrop-blur-xl"
-        >
+      <nav
+        aria-label="관리자 주요 탐색"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-surface-overlay/95 pb-safe-bottom shadow-floating backdrop-blur-xl md:hidden"
+      >
           <Container size="dashboard" className="flex items-stretch">
             <Link
               href="/admin"
@@ -227,11 +220,10 @@ export default function AdminShellView({
               }
             />
           </Container>
-        </nav>
-      </div>
+      </nav>
 
-      <div className="hidden min-h-screen md:grid md:grid-cols-[5.5rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)]">
-        <aside className="sticky top-0 h-screen border-r border-border/70 bg-surface/95 backdrop-blur-xl">
+      <div className="md:grid md:min-h-screen md:grid-cols-[5.5rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)]">
+        <aside className="hidden border-r border-border/70 bg-surface/95 backdrop-blur-xl md:sticky md:top-0 md:block md:h-screen">
           <div className="flex h-full flex-col gap-6 px-3 py-4 xl:px-4 xl:py-5">
             <Link
               href="/admin"
@@ -258,7 +250,7 @@ export default function AdminShellView({
         </aside>
 
         <div className="min-w-0">
-          <header className="sticky top-0 z-30 border-b border-border/70 bg-background/90 backdrop-blur-xl">
+          <header className="sticky top-0 z-30 hidden border-b border-border/70 bg-background/90 backdrop-blur-xl md:block">
             <Container className="flex min-h-[4.75rem] items-center justify-between gap-4 py-4" size="dashboard">
               <div className="min-w-0">
                 {activeNavItem?.href !== "/admin" ? (
@@ -291,10 +283,13 @@ export default function AdminShellView({
             </Container>
           </header>
 
-          <FloatingActionGroup>
+          <FloatingActionGroup className="!bottom-[calc(5rem+env(safe-area-inset-bottom))] md:!bottom-safe-bottom-5">
             <ScrollToTopFab />
-            <main id="admin-desktop-main-content" tabIndex={-1}>
-              <Container className="pb-16 pt-8" size="dashboard">
+            <main id="admin-main-content" tabIndex={-1}>
+              <Container
+                className="pb-[calc(5.75rem+env(safe-area-inset-bottom))] pt-8 md:pb-16"
+                size="dashboard"
+              >
                 {children}
               </Container>
             </main>

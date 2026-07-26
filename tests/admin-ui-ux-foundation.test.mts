@@ -116,10 +116,8 @@ test("관리 셸은 반복 탐색을 건너뛰고 빠른 찾기 전환 중 즉�
     ),
   ]);
 
-  assert.match(shellSource, /href="#admin-mobile-main-content"/);
-  assert.match(shellSource, /href="#admin-desktop-main-content"/);
-  assert.match(shellSource, /id="admin-mobile-main-content" tabIndex=\{-1\}/);
-  assert.match(shellSource, /id="admin-desktop-main-content" tabIndex=\{-1\}/);
+  assert.match(shellSource, /href="#admin-main-content"/);
+  assert.match(shellSource, /id="admin-main-content" tabIndex=\{-1\}/);
   assert.match(navigatorSource, /useTransition/);
   assert.match(navigatorSource, /aria-busy=\{isRoutePending \|\| undefined\}/);
   assert.match(navigatorSource, /role="status" aria-live="polite"/);
