@@ -79,6 +79,8 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+const shouldLoadVercelTelemetry = process.env.VERCEL === "1";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -100,8 +102,12 @@ export default function RootLayout({
             {children}
           </ToastProvider>
         </ThemeProvider>
-        <Analytics />
-        <SpeedInsights />
+        {shouldLoadVercelTelemetry ? (
+          <>
+            <Analytics />
+            <SpeedInsights />
+          </>
+        ) : null}
       </body>
     </html>
   );

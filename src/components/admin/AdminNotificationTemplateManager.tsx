@@ -13,7 +13,10 @@ import type {
   NotificationTemplateSource,
 } from "@/lib/notification-templates/catalog";
 import type { NotificationTemplateTestRecipientOption } from "@/lib/notification-templates/test-delivery";
-import type { ResolvedNotificationTemplate } from "@/lib/notification-templates/repository.server";
+import type {
+  NotificationTemplateSummary,
+  ResolvedNotificationTemplate,
+} from "@/lib/notification-templates/repository.server";
 import { renderNotificationTemplate } from "@/lib/notification-templates/template";
 
 type FormAction = (formData: FormData) => void | Promise<void>;
@@ -23,6 +26,13 @@ type TemplateChannelFilter = "all" | NotificationTemplateChannel;
 type TemplateSourceFilter = "all" | NotificationTemplateSource;
 type TemplateAudienceFilter = "all" | NotificationTemplateAudience;
 type RequiredVariableFilter = "all" | string;
+type TemplateListItem = NotificationTemplateSummary | ResolvedNotificationTemplate;
+
+function hasTemplateBody(
+  template: TemplateListItem,
+): template is ResolvedNotificationTemplate {
+  return "bodyTemplate" in template && typeof template.bodyTemplate === "string";
+}
 
 const channelLabels: Record<NotificationTemplateChannel, string> = {
   email: "이메일",
@@ -105,7 +115,7 @@ function TemplateEditor({
   canUpdate,
   canDelete,
 }: {
-  template: ResolvedNotificationTemplate;
+  template: TemplateListItem;
   updateAction: FormAction;
   resetAction: FormAction;
   testAction: FormAction;
@@ -114,12 +124,73 @@ function TemplateEditor({
   canUpdate: boolean;
   canDelete: boolean;
 }) {
-  const [titleTemplate, setTitleTemplate] = useState(template.titleTemplate);
-  const [bodyTemplate, setBodyTemplate] = useState(template.bodyTemplate);
+  const initialDetail = hasTemplateBody(template) ? template : null;
+  const [detail, setDetail] = useState<ResolvedNotificationTemplate | null>(
+    initialDetail,
+  );
+  const [detailState, setDetailState] = useState<
+    "idle" | "loading" | "loaded" | "error"
+  >(initialDetail ? "loaded" : "idle");
+  const [titleTemplate, setTitleTemplate] = useState(
+    initialDetail?.titleTemplate ?? template.titleTemplate,
+  );
+  const [bodyTemplate, setBodyTemplate] = useState(
+    initialDetail?.bodyTemplate ?? "",
+  );
   const [bodyFormat, setBodyFormat] = useState(template.bodyFormat);
   const [isOpen, setIsOpen] = useState(false);
+  const [detailRequestKey, setDetailRequestKey] = useState(0);
+  useEffect(() => {
+    if (!isOpen || detail) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const params = new URLSearchParams({
+      eventKey: template.eventKey,
+      channel: template.channel,
+    });
+
+    void fetch(`/api/admin/notification-templates/detail?${params}`, {
+      headers: { Accept: "application/json" },
+      credentials: "same-origin",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = (await response.json().catch(() => null)) as
+          | ResolvedNotificationTemplate
+          | null;
+        return response.ok &&
+          payload &&
+          typeof payload.bodyTemplate === "string"
+          ? payload
+          : null;
+      })
+      .then((payload) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        if (!payload) {
+          setDetailState("error");
+          return;
+        }
+        setDetail(payload);
+        setDetailState("loaded");
+        setTitleTemplate(payload.titleTemplate);
+        setBodyTemplate(payload.bodyTemplate);
+        setBodyFormat(payload.bodyFormat);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setDetailState("error");
+        }
+      });
+
+    return () => controller.abort();
+  }, [detail, detailRequestKey, isOpen, template.channel, template.eventKey]);
+
   const emailPreview =
-    template.channel === "email"
+    detail?.channel === "email"
       ? renderEmailSample(bodyTemplate, bodyFormat, template.variables)
       : null;
 
@@ -132,7 +203,15 @@ function TemplateEditor({
   return (
     <details
       open={isOpen}
-      onToggle={(event) => setIsOpen(event.currentTarget.open)}
+      onToggle={(event) => {
+        const open = event.currentTarget.open;
+        setIsOpen(open);
+        if (open && !detail) {
+          setDetailState("loading");
+        } else if (!open && !detail) {
+          setDetailState("idle");
+        }
+      }}
       className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface shadow-flat"
     >
       <summary className="flex min-w-0 cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 outline-none transition hover:bg-surface-control/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden sm:px-5">
@@ -187,6 +266,8 @@ function TemplateEditor({
       </summary>
 
       <div className="grid min-w-0 gap-4 border-t border-border px-4 py-4 sm:px-5">
+        {detail ? (
+          <>
         <div className="flex justify-end">
           {canDelete ? (
             <form action={resetAction}>
@@ -423,6 +504,33 @@ function TemplateEditor({
             ) : null}
           </form>
         ) : null}
+          </>
+        ) : detailState === "error" ? (
+          <div className="grid gap-3" role="alert">
+            <p className="text-sm font-semibold text-foreground">
+              템플릿 상세를 불러오지 못했습니다.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              목록은 계속 사용할 수 있습니다. 다시 시도해 주세요.
+            </p>
+            <div>
+              <button
+                type="button"
+                className="min-h-11 rounded-control border border-border px-3 text-sm font-semibold text-foreground transition hover:bg-surface-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                onClick={() => {
+                  setDetailState("loading");
+                  setDetailRequestKey((current) => current + 1);
+                }}
+              >
+                다시 불러오기
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
+            템플릿 상세를 불러오는 중입니다.
+          </p>
+        )}
       </div>
     </details>
   );
@@ -440,7 +548,7 @@ export default function AdminNotificationTemplateManager({
   canUpdate = true,
   canDelete = true,
 }: {
-  templates: ResolvedNotificationTemplate[];
+  templates: TemplateListItem[];
   updateAction: FormAction;
   resetAction: FormAction;
   testAction: FormAction;
@@ -546,7 +654,6 @@ export default function AdminNotificationTemplateManager({
         template.group,
         template.eventKey,
         template.titleTemplate,
-        template.bodyTemplate,
         ...template.variables.flatMap((variable) => [
           variable.name,
           variable.label,
@@ -612,7 +719,7 @@ export default function AdminNotificationTemplateManager({
     ) ?? null;
 
   const groups = useMemo(() => {
-    const grouped = new Map<string, ResolvedNotificationTemplate[]>();
+    const grouped = new Map<string, TemplateListItem[]>();
     for (const template of filteredTemplates) {
       const entries = grouped.get(template.group) ?? [];
       entries.push(template);
@@ -653,7 +760,7 @@ export default function AdminNotificationTemplateManager({
           <div className="min-w-0">
             <h2 className="ui-section-title text-ko-title">템플릿 찾기</h2>
             <p className="ui-body mt-1 text-sm text-muted-foreground">
-              이름, 설명, 이벤트 키, 제목·내용의 변수까지 검색할 수 있습니다.
+              이름, 설명, 이벤트 키, 제목 템플릿과 변수를 검색할 수 있습니다.
             </p>
           </div>
           <p className="text-xs text-muted-foreground" aria-live="polite">
@@ -667,7 +774,7 @@ export default function AdminNotificationTemplateManager({
               aria-label="템플릿 검색"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="이름, 설명, 이벤트 키, 제목·내용 검색"
+              placeholder="이름, 설명, 이벤트 키, 제목 템플릿 검색"
               className="min-h-11 w-full min-w-0 rounded-2xl border border-border bg-surface-control px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </label>

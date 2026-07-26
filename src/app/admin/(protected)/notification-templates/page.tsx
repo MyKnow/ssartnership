@@ -12,7 +12,7 @@ import {
 } from "./actions";
 import { requireNotificationTemplateAdmin } from "@/lib/admin-access";
 import { canAdmin } from "@/lib/admin-permissions";
-import { listNotificationTemplates } from "@/lib/notification-templates/repository.server";
+import { listNotificationTemplateSummaries } from "@/lib/notification-templates/repository.server";
 import { getNotificationTemplateFeedback } from "@/lib/notification-templates/admin-feedback";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ async function AdminNotificationTemplatesContent({
   session: Awaited<ReturnType<typeof requireNotificationTemplateAdmin>>;
   params: { status?: string; error?: string };
 }) {
-  const templates = await listNotificationTemplates();
+  const templates = await listNotificationTemplateSummaries();
   const feedback = getNotificationTemplateFeedback(params);
 
   return (
