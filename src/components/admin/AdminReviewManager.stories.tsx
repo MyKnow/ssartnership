@@ -1,3 +1,4 @@
+import { expect, within } from "storybook/test";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import type { AdminReviewPageData } from "@/lib/admin-reviews";
 import AdminReviewManagerView from "./AdminReviewManagerView";
@@ -168,10 +169,38 @@ export const WithImageReview: Story = {
         reviewData.reviews[0]!,
         {
           ...reviewData.reviews[1]!,
-          images: ["https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=900&q=80"],
+          images: [
+            "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=900&q=80",
+          ],
           imageCount: 1,
         },
       ],
     },
+  },
+};
+
+export const ReadOnly: Story = {
+  args: {
+    canUpdate: false,
+    canDelete: false,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(
+      canvas.queryByRole("button", { name: "비공개 처리" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "다시 공개" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "삭제" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "리뷰 수정" }),
+    ).not.toBeInTheDocument();
+    await expect(canvas.getAllByText("조회 전용 권한").length).toBeGreaterThan(
+      0,
+    );
   },
 };

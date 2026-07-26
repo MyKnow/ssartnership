@@ -1,9 +1,7 @@
 import AdminReviewManager from "@/components/admin/AdminReviewManager";
 import AdminShell from "@/components/admin/AdminShell";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
-import {
-  adminActionErrorMessages,
-} from "@/lib/admin-action-errors";
+import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import {
   getAdminReviewPageData,
   parseAdminReviewFilters,
@@ -11,6 +9,7 @@ import {
   serializeAdminReviewPageQuery,
 } from "@/lib/admin-reviews";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { canAdmin } from "@/lib/admin-permissions";
 import { getManagedCampusFilterValues } from "@/lib/admin-scope";
 
 export const dynamic = "force-dynamic";
@@ -30,13 +29,28 @@ export default async function AdminReviewsPage({
   const params = (await searchParams) ?? {};
   const filters = parseAdminReviewFilters(params);
   const pagination = parseAdminReviewPagination(params);
-  const errorMessage = typeof params.error === "string" ? adminReviewsErrorMessages[params.error] ?? null : null;
+  const errorMessage =
+    typeof params.error === "string"
+      ? (adminReviewsErrorMessages[params.error] ?? null)
+      : null;
   const data = await getAdminReviewPageData(filters, {
     managedCampusSlugs: getManagedCampusFilterValues(adminSession.account),
     ...pagination,
   });
   const queryString = serializeAdminReviewPageQuery(filters, pagination);
-  const returnTo = queryString ? `/admin/reviews?${queryString}` : "/admin/reviews";
+  const returnTo = queryString
+    ? `/admin/reviews?${queryString}`
+    : "/admin/reviews";
+  const canUpdate = canAdmin(
+    adminSession.account.permissions,
+    "reviews",
+    "update",
+  );
+  const canDelete = canAdmin(
+    adminSession.account.permissions,
+    "reviews",
+    "delete",
+  );
 
   return (
     <AdminShell title="리뷰 관리" backHref="/admin" backLabel="관리 홈">
@@ -46,7 +60,13 @@ export default async function AdminReviewsPage({
           title="리뷰 관리"
           description="회원 리뷰를 검토하고 공개 상태와 삭제를 관리합니다."
         />
-        <AdminReviewManager data={data} returnTo={returnTo} errorMessage={errorMessage} />
+        <AdminReviewManager
+          data={data}
+          returnTo={returnTo}
+          errorMessage={errorMessage}
+          canUpdate={canUpdate}
+          canDelete={canDelete}
+        />
       </div>
     </AdminShell>
   );
