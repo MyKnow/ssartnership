@@ -181,7 +181,10 @@ export async function confirmPartnerPlanBankTransferPaymentAction(formData: Form
   } catch (error) {
     redirectAdminActionError(
       ADMIN_BRAND_PLANS_PATH,
-      error instanceof Error ? error.message : "partner_company_plan_invalid_request",
+      getSafeAdminActionErrorCode(
+        error,
+        "partner_company_plan_invalid_request",
+      ),
       {
         action: "partner_plan_bank_transfer_confirmed",
         targetType: "partner_plan_upgrade_request",
