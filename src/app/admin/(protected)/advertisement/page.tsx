@@ -7,6 +7,7 @@ import {
 } from "@/app/admin/(protected)/_actions/ad-package-actions";
 import { savePromotionSlidesAction } from "@/app/admin/(protected)/_actions/promotion-actions";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { canAdmin } from "@/lib/admin-permissions";
 import { adPackageRepository, partnerRepository } from "@/lib/repositories";
 import {
   getPromotionCampaignState,
@@ -43,7 +44,9 @@ export default async function AdminAdvertisementPage({
 }: {
   searchParams?: Promise<{ status?: string }>;
 }) {
-  await requireAdminPermission("home_ads", "read", { path: "/admin/advertisement" });
+  const session = await requireAdminPermission("home_ads", "read", {
+    path: "/admin/advertisement",
+  });
   const params = (await searchParams) ?? {};
   const message = statusMessage(params.status);
   const [slides, eventCampaigns, adCampaignOptions] = await Promise.all([
@@ -80,6 +83,8 @@ export default async function AdminAdvertisementPage({
         eventPageOptions={eventPageOptions}
         adCampaignOptions={adCampaignOptions}
         saveAction={savePromotionSlidesAction}
+        canCreate={canAdmin(session.account.permissions, "home_ads", "create")}
+        canUpdate={canAdmin(session.account.permissions, "home_ads", "update")}
         message={message}
         clearPromotionDraft={params.status === "updated"}
       />

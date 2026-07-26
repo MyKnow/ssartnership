@@ -23,6 +23,8 @@ const meta = {
     ],
     adCampaignOptions: [],
     saveAction: async () => {},
+    canCreate: true,
+    canUpdate: true,
     message: null,
   },
   parameters: {
@@ -44,5 +46,29 @@ export const Default: Story = {
     await expect(
       canvas.getByRole("heading", { name: "캠페인 생성" }),
     ).toBeInTheDocument();
+  },
+};
+
+export const ReadOnly: Story = {
+  args: {
+    canCreate: false,
+    canUpdate: false,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole("heading", { name: "캠페인 생성 권한 없음" }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByText(
+        "현재 계정은 광고 카드를 조회할 수 있지만 수정할 수 없습니다.",
+      ),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "카드 추가" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "저장" }),
+    ).not.toBeInTheDocument();
   },
 };

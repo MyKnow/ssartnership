@@ -34,6 +34,8 @@ export type AdminAdvertisementViewProps = Pick<
     campaigns?: AdManagerProps["campaigns"];
     partners?: AdManagerProps["partners"];
     campaignsPromise?: DeferredCampaignData;
+    canCreate?: boolean;
+    canUpdate?: boolean;
     message?: string | null;
     clearPromotionDraft?: boolean;
   };
@@ -42,10 +44,14 @@ async function DeferredCampaignManager({
   campaignsPromise,
   createCampaignAction,
   updateCampaignStatusAction,
+  canCreate,
+  canUpdate,
 }: {
   campaignsPromise: DeferredCampaignData;
   createCampaignAction: AdManagerProps["createCampaignAction"];
   updateCampaignStatusAction: AdManagerProps["updateCampaignStatusAction"];
+  canCreate: boolean;
+  canUpdate: boolean;
 }) {
   const result = await campaignsPromise;
   if (result.status === "error") {
@@ -54,7 +60,11 @@ async function DeferredCampaignManager({
         kind="error"
         title="광고 패키지 운영 정보를 불러오지 못했습니다."
         description="캐러셀 편집은 사용할 수 있습니다. 잠시 후 다시 확인해 주세요."
-        action={<Button href="/admin/advertisement" variant="secondary">다시 확인</Button>}
+        action={
+          <Button href="/admin/advertisement" variant="secondary">
+            다시 확인
+          </Button>
+        }
       />
     );
   }
@@ -65,6 +75,8 @@ async function DeferredCampaignManager({
       partners={result.partners}
       createCampaignAction={createCampaignAction}
       updateCampaignStatusAction={updateCampaignStatusAction}
+      canCreate={canCreate}
+      canUpdate={canUpdate}
     />
   );
 }
@@ -79,6 +91,8 @@ export default function AdminAdvertisementView({
   eventPageOptions,
   adCampaignOptions,
   saveAction,
+  canCreate = true,
+  canUpdate = true,
   message,
   clearPromotionDraft = false,
 }: AdminAdvertisementViewProps) {
@@ -107,10 +121,26 @@ export default function AdminAdvertisementView({
       />
       <StatsRow
         items={[
-          { label: "전체 카드", value: `${initialSlides.length}개`, hint: "운영 중인 광고 카드" },
-          { label: "활성 카드", value: `${activeSlides}개`, hint: "홈 노출 기준" },
-          { label: "편집 가능", value: `${databaseSlides}개`, hint: "DB 기반 카드" },
-          { label: "카탈로그", value: `${catalogSlides}개`, hint: "코드 정의 카드" },
+          {
+            label: "전체 카드",
+            value: `${initialSlides.length}개`,
+            hint: "운영 중인 광고 카드",
+          },
+          {
+            label: "활성 카드",
+            value: `${activeSlides}개`,
+            hint: "홈 노출 기준",
+          },
+          {
+            label: "편집 가능",
+            value: `${databaseSlides}개`,
+            hint: "DB 기반 카드",
+          },
+          {
+            label: "카탈로그",
+            value: `${catalogSlides}개`,
+            hint: "코드 정의 카드",
+          },
         ]}
         minItemWidth="13rem"
       />
@@ -146,6 +176,7 @@ export default function AdminAdvertisementView({
           eventPageOptions={eventPageOptions}
           adCampaignOptions={adCampaignOptions}
           saveAction={saveAction}
+          canUpdate={canUpdate}
         />
       </section>
       <section className="grid gap-4">
@@ -171,6 +202,8 @@ export default function AdminAdvertisementView({
             campaignsPromise={resolvedCampaignsPromise}
             createCampaignAction={createCampaignAction}
             updateCampaignStatusAction={updateCampaignStatusAction}
+            canCreate={canCreate}
+            canUpdate={canUpdate}
           />
         </Suspense>
       </section>
