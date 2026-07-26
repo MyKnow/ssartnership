@@ -54,6 +54,11 @@ const meta = {
         ],
       },
     ],
+    accountSummary: {
+      totalCount: 1,
+      activeCount: 1,
+      totalLinks: 1,
+    },
     partnerCount: 4,
     initialTab: "companies",
     actions: {

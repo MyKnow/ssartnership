@@ -1,4 +1,5 @@
 import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import Input from "@/components/ui/Input";
@@ -8,11 +9,6 @@ import Textarea from "@/components/ui/Textarea";
 import { cn } from "@/lib/cn";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import type { AdminCompanyFormActions } from "@/components/admin/admin-form-actions";
-import CompanyAccountConnections, {
-  type CompanyAccountOption,
-  type LinkedCompanyAccount,
-} from "@/components/admin/company-manager/CompanyAccountConnections";
-import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
 
 type AdminCompany = {
   id: string;
@@ -55,45 +51,11 @@ function formatDateTime(value?: string | null) {
 
 export default function AdminCompanyManager({
   companies,
-  accounts,
   actions,
 }: {
   companies: AdminCompany[];
-  accounts: AdminPartnerAccount[];
   actions: AdminCompanyFormActions;
 }) {
-  const accountSummaries = accounts.map((account) => ({
-    id: account.id,
-    display_name: account.display_name,
-    login_id: account.login_id,
-  }));
-  const linkedAccountsByCompanyId = new Map<string, LinkedCompanyAccount[]>();
-  const linkedAccountIdsByCompanyId = new Map<string, Set<string>>();
-
-  for (const account of accounts) {
-    for (const link of account.links) {
-      const companyId = link.company?.id;
-      if (!companyId) {
-        continue;
-      }
-
-      const links = linkedAccountsByCompanyId.get(companyId) ?? [];
-      links.push({
-        account: {
-          id: account.id,
-          display_name: account.display_name,
-          login_id: account.login_id,
-        },
-        link,
-      });
-      linkedAccountsByCompanyId.set(companyId, links);
-
-      const linkedIds = linkedAccountIdsByCompanyId.get(companyId) ?? new Set<string>();
-      linkedIds.add(account.id);
-      linkedAccountIdsByCompanyId.set(companyId, linkedIds);
-    }
-  }
-
   return (
     <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] md:items-start xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]">
       <aside className="md:sticky md:top-24 md:order-2">
@@ -171,14 +133,6 @@ export default function AdminCompanyManager({
             const deleteFormId = `company-delete-${company.id}`;
             const isActive = company.is_active !== false;
             const hasLinkedData = company.brandCount > 0 || company.accountCount > 0;
-            const linkedAccountIds =
-              linkedAccountIdsByCompanyId.get(company.id) ?? new Set<string>();
-            const accountOptions: CompanyAccountOption[] = accountSummaries.map(
-              (account) => ({
-                ...account,
-                isLinked: linkedAccountIds.has(account.id),
-              }),
-            );
 
             return (
               <Card key={company.id} padding="none" className="overflow-hidden">
@@ -322,12 +276,17 @@ export default function AdminCompanyManager({
                   </div>
                 </div>
 
-                  <CompanyAccountConnections
-                    company={company}
-                    accountOptions={accountOptions}
-                    linkedAccounts={linkedAccountsByCompanyId.get(company.id) ?? []}
-                    updateConnectionAction={actions.updateConnectionAction}
-                  />
+                  <div className="grid gap-3 rounded-2xl border border-border/70 bg-surface-inset/80 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-semibold text-foreground">계정 연결</h4>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        계정 탭에서 담당 계정과 파트너사 연결을 추가하거나 상태를 조정할 수 있습니다.
+                      </p>
+                    </div>
+                    <Button href="/admin/companies?tab=accounts" variant="secondary" size="sm">
+                      계정 탭 열기
+                    </Button>
+                  </div>
                 </details>
               </Card>
             );

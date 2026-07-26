@@ -1,5 +1,11 @@
 export type AdminCompanyTab = "companies" | "accounts";
 
+export type AdminCompanyAccountSummary = {
+  totalCount: number;
+  activeCount: number;
+  totalLinks: number;
+};
+
 export function buildAdminCompanyTabHref(
   pathname: string,
   currentSearch: string,

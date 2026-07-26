@@ -50,6 +50,7 @@ export default async function AdminCompaniesPage({
 
   const readModel = await getAdminCompanyWorkspaceReadModel({
     managedCampusSlugs: managedCampusFilter,
+    tab: initialTab,
   });
 
   return (
@@ -57,6 +58,7 @@ export default async function AdminCompaniesPage({
       <AdminCompaniesView
         companies={readModel.companies}
         accounts={readModel.accounts}
+        accountSummary={readModel.accountSummary}
         partnerCount={readModel.partnerCount}
         errorMessage={companyError}
         loadError={readModel.loadError}

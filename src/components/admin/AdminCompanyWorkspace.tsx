@@ -10,6 +10,7 @@ import type { AdminPartnerAccount } from "@/components/admin/partner-account-man
 import type { AdminCompanyFormActions } from "@/components/admin/admin-form-actions";
 import {
   buildAdminCompanyTabHref,
+  type AdminCompanyAccountSummary,
   type AdminCompanyTab,
 } from "@/lib/admin-company-workspace";
 
@@ -26,6 +27,7 @@ export type AdminCompanyWorkspaceProps = {
     accountCount: number;
   }>;
   accounts: AdminPartnerAccount[];
+  accountSummary: AdminCompanyAccountSummary;
   generatedSetupUrl?: string | null;
   generatedSetupAccountId?: string | null;
   initialTab?: AdminCompanyTab;
@@ -87,7 +89,6 @@ export default function AdminCompanyWorkspace({
           />
           <AdminCompanyManager
             companies={companies}
-            accounts={accounts}
             actions={actions}
           />
         </section>

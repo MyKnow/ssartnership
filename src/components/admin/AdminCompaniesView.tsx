@@ -10,6 +10,7 @@ import FormMessage from "@/components/ui/FormMessage";
 export default function AdminCompaniesView({
   companies,
   accounts,
+  accountSummary,
   partnerCount,
   errorMessage,
   generatedSetupUrl,
@@ -25,13 +26,6 @@ export default function AdminCompaniesView({
   const activeCompanyCount = companies.filter(
     (company) => company.is_active !== false,
   ).length;
-  const activeAccountCount = accounts.filter(
-    (account) => account.is_active !== false,
-  ).length;
-  const totalAccountLinks = accounts.reduce(
-    (sum, account) => sum + account.links.length,
-    0,
-  );
 
   return (
     <section className="grid gap-6">
@@ -70,12 +64,12 @@ export default function AdminCompaniesView({
           },
           {
             label: "계정",
-            value: `${accounts.length}개`,
-            detail: `활성 ${activeAccountCount}개`,
+            value: `${accountSummary.totalCount}개`,
+            detail: `활성 ${accountSummary.activeCount}개`,
           },
           {
             label: "연결",
-            value: `${totalAccountLinks}건`,
+            value: `${accountSummary.totalLinks}건`,
             detail: "계정과 파트너사 전체 연결 수",
           },
         ]}
