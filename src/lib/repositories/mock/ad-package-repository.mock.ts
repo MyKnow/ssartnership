@@ -552,7 +552,7 @@ export class MockAdPackageRepository implements AdPackageRepository {
     return cloneCoupon(duplicate);
   }
 
-  async deleteCoupon(couponId: string): Promise<void> {
+  async deleteCoupon(couponId: string) {
     if (!this.coupons.some((coupon) => coupon.id === couponId)) {
       throw new Error("쿠폰을 찾을 수 없습니다.");
     }
@@ -560,11 +560,12 @@ export class MockAdPackageRepository implements AdPackageRepository {
       this.issues.some((issue) => issue.couponId === couponId) ||
       this.redemptions.some((redemption) => redemption.couponId === couponId)
     ) {
-      throw new Error("사용 이력이 있는 쿠폰은 삭제할 수 없습니다. 상태를 종료로 변경해 주세요.");
+      return { ok: false, reason: "usage_history" } as const;
     }
     this.coupons = this.coupons.filter((coupon) => coupon.id !== couponId);
     this.couponCodes.delete(couponId);
     this.couponPasswords.delete(couponId);
+    return { ok: true } as const;
   }
 
   async issueCoupon(input: IssueAdCouponInput): Promise<IssueAdCouponResult> {

@@ -269,7 +269,7 @@ describe("mock ad package repository", () => {
     assert.equal(duplicated.hasOnsitePassword, true);
   });
 
-  it("deletes an unused coupon and protects coupons with usage history", async () => {
+  it("deletes an unused coupon and returns a safe result for coupons with usage history", async () => {
     const repository = new MockAdPackageRepository();
     const unused = await repository.createCoupon({
       partnerId: "restaurant-001",
@@ -278,7 +278,7 @@ describe("mock ad package repository", () => {
       startsAt: "2026-07-01T00:00:00.000Z",
       endsAt: "2026-07-31T23:59:59.000Z",
     });
-    await repository.deleteCoupon(unused.id);
+    assert.deepEqual(await repository.deleteCoupon(unused.id), { ok: true });
     assert.equal(
       (await repository.listAdminCouponsForPartner("restaurant-001")).some(
         (coupon) => coupon.id === unused.id,
@@ -292,7 +292,10 @@ describe("mock ad package repository", () => {
       memberId: "member-delete-guard",
       sessionId: "session-delete-guard",
     });
-    await assert.rejects(() => repository.deleteCoupon(used.id));
+    assert.deepEqual(await repository.deleteCoupon(used.id), {
+      ok: false,
+      reason: "usage_history",
+    });
   });
 
   it("lists active coupons for a partner", async () => {
