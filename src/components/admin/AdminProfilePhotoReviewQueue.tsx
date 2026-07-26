@@ -48,7 +48,15 @@ function formatMemberLabel(member: {
   return member.year ? `${name} · ${member.year}기` : name;
 }
 
-function PhotoPreview({ src, alt }: { src: string; alt: string }) {
+function PhotoPreview({
+  src,
+  alt,
+  loading = "lazy",
+}: {
+  src: string;
+  alt: string;
+  loading?: "eager" | "lazy";
+}) {
   return (
     <div className="relative aspect-square w-24 shrink-0 overflow-hidden rounded-card border border-border bg-surface-inset sm:w-28">
       <Image
@@ -56,6 +64,7 @@ function PhotoPreview({ src, alt }: { src: string; alt: string }) {
         alt={alt}
         fill
         unoptimized
+        loading={loading}
         className="object-cover"
         sizes="(max-width: 640px) 96px, 112px"
       />
@@ -178,6 +187,7 @@ function CurrentPhotoSection({
                 <PhotoPreview
                   src={currentPhotoUrl(member.id)}
                   alt={`${formatMemberLabel(member)}의 현재 본인 사진`}
+                  loading="lazy"
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -444,7 +454,7 @@ export default function AdminProfilePhotoReviewQueue({
               />
             ) : (
               <div className="grid gap-4">
-                {replacements.map((replacement) => {
+                {replacements.map((replacement, index) => {
                   const member = replacement.member;
                   if (!member) return null;
                   return (
@@ -457,6 +467,7 @@ export default function AdminProfilePhotoReviewQueue({
                         <PhotoPreview
                           src={replacementImageUrl(replacement.id)}
                           alt={`${formatMemberLabel(member)}이 제출한 새 본인 사진`}
+                          loading={index === 0 ? "eager" : "lazy"}
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
