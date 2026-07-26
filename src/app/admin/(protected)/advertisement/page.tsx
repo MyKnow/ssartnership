@@ -46,11 +46,10 @@ export default async function AdminAdvertisementPage({
   await requireAdminPermission("home_ads", "read", { path: "/admin/advertisement" });
   const params = (await searchParams) ?? {};
   const message = statusMessage(params.status);
-  const [slides, eventCampaigns, adCampaigns, partners] = await Promise.all([
+  const [slides, eventCampaigns, adCampaignOptions] = await Promise.all([
     listManagedPromotionSlides({ includeInactive: true }),
     listManagedEventCampaigns({ includeInactive: false }),
-    adPackageRepository.listAdminCampaigns(),
-    partnerRepository.getPartners({ authenticated: true }),
+    adPackageRepository.listAdminCampaignOptions(),
   ]);
   const eventPageOptions = eventCampaigns
     .filter((campaign) => getPromotionCampaignState(campaign).key === "active")
@@ -59,17 +58,22 @@ export default async function AdminAdvertisementPage({
       slug: campaign.slug,
       label: `${campaign.title} (${campaign.pagePath})`,
     }));
-  const adCampaignOptions = adCampaigns.map((campaign) => ({
-    id: campaign.id,
-    label: `${campaign.sponsorLabel || campaign.partnerName} · ${campaign.title}`,
-  }));
+  const campaignsPromise = Promise.all([
+    adPackageRepository.listAdminCampaigns(),
+    partnerRepository.getPartners({ authenticated: true }),
+  ])
+    .then(([campaigns, partners]) => ({
+      status: "ready" as const,
+      campaigns,
+      partners: partners
+        .filter((partner) => partner.name)
+        .map((partner) => ({ id: partner.id, name: partner.name })),
+    }))
+    .catch(() => ({ status: "error" as const }));
   return (
     <AdminShell title="홈 광고 관리" backHref="/admin" backLabel="관리 홈">
       <AdminAdvertisementView
-        campaigns={adCampaigns}
-        partners={partners
-          .filter((partner) => partner.name)
-          .map((partner) => ({ id: partner.id, name: partner.name }))}
+        campaignsPromise={campaignsPromise}
         createCampaignAction={createAdCampaignAction}
         updateCampaignStatusAction={updateAdCampaignStatusAction}
         initialSlides={slides}
