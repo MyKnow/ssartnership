@@ -51,6 +51,46 @@ type Story = StoryObj<typeof meta>;
 
 export const Metrics: Story = {};
 
+export const InsufficientSamples: Story = {
+  args: {
+    metrics: [
+      {
+        metric: "INP",
+        label: "상호작용 응답",
+        threshold: 200,
+        sampleCount: 12,
+        p75Value: 164,
+        goodCount: 10,
+        needsImprovementCount: 2,
+        poorCount: 0,
+        status: "insufficient_sample",
+      },
+      {
+        metric: "LCP",
+        label: "첫 유용 콘텐츠",
+        threshold: 2500,
+        sampleCount: 0,
+        p75Value: null,
+        goodCount: 0,
+        needsImprovementCount: 0,
+        poorCount: 0,
+        status: "unknown",
+      },
+      {
+        metric: "TTFB",
+        label: "서버 응답",
+        threshold: 800,
+        sampleCount: 45,
+        p75Value: 124,
+        goodCount: 41,
+        needsImprovementCount: 4,
+        poorCount: 0,
+        status: "met",
+      },
+    ],
+  },
+};
+
 export const LoadError: Story = {
   args: {
     loadError: true,

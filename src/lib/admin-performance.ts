@@ -1,6 +1,12 @@
 const ADMIN_WEB_VITAL_NAMES = ["CLS", "FCP", "INP", "LCP", "TTFB"] as const;
 const ADMIN_WEB_VITAL_TARGET_METRICS = ["INP", "LCP", "TTFB"] as const;
 
+/**
+ * A release-confidence floor, not a replacement for a larger RUM cohort.
+ * Smaller samples stay visible but never appear as a confirmed target pass.
+ */
+export const ADMIN_WEB_VITAL_MIN_SAMPLE_COUNT = 30;
+
 export const ADMIN_WEB_VITAL_TARGETS = {
   INP: { threshold: 200, unit: "ms", label: "상호작용 응답" },
   LCP: { threshold: 2_500, unit: "ms", label: "첫 유용 콘텐츠" },
@@ -27,7 +33,7 @@ export type AdminWebVitalSummaryMetric = {
   goodCount: number;
   needsImprovementCount: number;
   poorCount: number;
-  status: "unknown" | "met" | "exceeded";
+  status: "unknown" | "insufficient_sample" | "met" | "exceeded";
 };
 
 type AdminWebVitalInput = {
@@ -90,9 +96,11 @@ export function toAdminWebVitalSummary(
       status:
         sampleCount === 0 || p75Value === null
           ? "unknown"
-          : p75Value <= threshold
-            ? "met"
-            : "exceeded",
+          : sampleCount < ADMIN_WEB_VITAL_MIN_SAMPLE_COUNT
+            ? "insufficient_sample"
+            : p75Value <= threshold
+              ? "met"
+              : "exceeded",
     };
   });
 }
