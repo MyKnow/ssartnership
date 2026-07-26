@@ -13,6 +13,7 @@ import {
   shouldNotifyPartnerBecamePublic,
 } from "@/lib/partner-visibility";
 import { hashCouponVerificationPassword } from "@/lib/coupon-verification-password";
+import { getSafeAdminActionErrorCode } from "@/lib/admin-action-errors";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   cleanupPartnerCompanyProvision,
@@ -24,6 +25,7 @@ import {
   logAdminAction,
   revalidateAdminAndPublicPaths,
   revalidatePartnerData,
+  redirectAdminActionError,
 } from "@/app/admin/(protected)/_actions/shared-helpers";
 import {
   parsePartnerCompanyPayloadOrRedirect,
@@ -55,7 +57,7 @@ export async function updatePartnerAction(formData: FormData) {
   });
   const id = String(formData.get("id") || "").trim();
   if (!id) {
-    throw new Error("수정할 제휴처를 찾을 수 없습니다.");
+    redirectAdminActionError("/admin/partners", "partner_update_failed");
   }
 
   const redirectPath = getSafeAdminPartnerPath(
@@ -74,10 +76,20 @@ export async function updatePartnerAction(formData: FormData) {
     .maybeSingle();
 
   if (previousPartnerError) {
-    throw new Error(previousPartnerError.message);
+    redirectAdminActionError(redirectPath, "partner_update_failed", {
+      action: "partner_update",
+      targetType: "partner",
+      targetId: id,
+      properties: { stage: "load" },
+    });
   }
   if (!previousPartner) {
-    throw new Error("수정할 제휴처를 찾을 수 없습니다.");
+    redirectAdminActionError(redirectPath, "partner_update_failed", {
+      action: "partner_update",
+      targetType: "partner",
+      targetId: id,
+      properties: { stage: "load" },
+    });
   }
   const previousVisibility = normalizePartnerVisibility(previousPartner.visibility);
   const previousVisibilityState = getPartnerVisibilityState(
@@ -97,10 +109,14 @@ export async function updatePartnerAction(formData: FormData) {
   const previousManagedCampusSlugs =
     (previousPartner as { managed_campus_slugs?: string[] | null }).managed_campus_slugs ??
     [];
-  assertAdminCanAccessManagedCampuses(
-    adminSession.account,
-    previousManagedCampusSlugs,
-  );
+  try {
+    assertAdminCanAccessManagedCampuses(
+      adminSession.account,
+      previousManagedCampusSlugs,
+    );
+  } catch {
+    redirectAdminActionError(redirectPath, "regional_admin_scope_denied");
+  }
 
   const previousCompany = normalizeRelation<{
     id: string;
@@ -141,11 +157,25 @@ export async function updatePartnerAction(formData: FormData) {
     formData,
     redirectPath,
   );
-  const media = await resolvePartnerMediaPayload(
-    formData,
-    id,
-    collectPartnerMediaUrls(previousPartner),
-  );
+  let media: Awaited<ReturnType<typeof resolvePartnerMediaPayload>>;
+  try {
+    media = await resolvePartnerMediaPayload(
+      formData,
+      id,
+      collectPartnerMediaUrls(previousPartner),
+    );
+  } catch (error) {
+    redirectAdminActionError(
+      redirectPath,
+      getSafeAdminActionErrorCode(error, "partner_update_failed"),
+      {
+        action: "partner_update",
+        targetType: "partner",
+        targetId: id,
+        properties: { stage: "media" },
+      },
+    );
+  }
   const previousBenefitVerificationPinHash =
     (previousPartner as { benefit_verification_pin_hash?: string | null })
       .benefit_verification_pin_hash ?? null;
@@ -174,12 +204,25 @@ export async function updatePartnerAction(formData: FormData) {
   let nextCompanyId = previousPartner.company_id ?? null;
 
   if (hasCompanyPayload) {
-    companyProvision = await ensurePartnerCompanyRow(
-      supabase,
-      companyPayload,
-      Boolean(previousPartner.company_id || hasCompanyPayload),
-      { managedCampusSlugs: previousManagedCampusSlugs },
-    );
+    try {
+      companyProvision = await ensurePartnerCompanyRow(
+        supabase,
+        companyPayload,
+        Boolean(previousPartner.company_id || hasCompanyPayload),
+        { managedCampusSlugs: previousManagedCampusSlugs },
+      );
+    } catch (error) {
+      redirectAdminActionError(
+        redirectPath,
+        getSafeAdminActionErrorCode(error, "partner_update_failed"),
+        {
+          action: "partner_update",
+          targetType: "partner",
+          targetId: id,
+          properties: { stage: "company" },
+        },
+      );
+    }
     if (companyProvision.company) {
       assertAdminCanAccessManagedCampuses(
         adminSession.account,
@@ -250,7 +293,16 @@ export async function updatePartnerAction(formData: FormData) {
   } catch (error) {
     await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
     await cleanupPartnerCompanyProvision(supabase, companyProvision);
-    throw error;
+    redirectAdminActionError(
+      redirectPath,
+      getSafeAdminActionErrorCode(error, "partner_update_failed"),
+      {
+        action: "partner_update",
+        targetType: "partner",
+        targetId: id,
+        properties: { stage: "mutation" },
+      },
+    );
   }
 
   const previousUrls = collectPartnerMediaUrls(previousPartner);
@@ -426,22 +478,26 @@ export async function updatePartnerAction(formData: FormData) {
   ]);
 
   if (partnerAudit.changedFields.length > 0) {
-    await logAdminAction("partner_update", {
-      targetType: "partner",
-      targetId: id,
-      properties: {
-        summary: partnerAudit.summary,
-        changedFields: partnerAudit.changedFields,
-        changes: partnerAudit.changes,
-        fieldChanges: partnerAudit.fieldChanges,
-        companyName: nextCompanyLabel,
-        categoryLabel: nextCategoryLabel,
-        visibility: payload.visibility,
-        benefitVisibility: payload.benefitVisibility,
-        benefitActionType: payload.benefitActionType,
-        hasBenefitActionLink: Boolean(payload.benefitActionLink),
-      },
-    });
+    try {
+      await logAdminAction("partner_update", {
+        targetType: "partner",
+        targetId: id,
+        properties: {
+          summary: partnerAudit.summary,
+          changedFields: partnerAudit.changedFields,
+          changes: partnerAudit.changes,
+          fieldChanges: partnerAudit.fieldChanges,
+          companyName: nextCompanyLabel,
+          categoryLabel: nextCategoryLabel,
+          visibility: payload.visibility,
+          benefitVisibility: payload.benefitVisibility,
+          benefitActionType: payload.benefitActionType,
+          hasBenefitActionLink: Boolean(payload.benefitActionLink),
+        },
+      });
+    } catch (error) {
+      console.error("[partner-update] audit log failed", error);
+    }
   }
   revalidatePartnerData();
   revalidateAdminAndPublicPaths(id);

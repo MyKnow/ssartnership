@@ -8,6 +8,7 @@ export const adminActionErrorMessages: Record<string, string> = {
   company_missing_name: "파트너사명을 입력해 주세요.",
   company_invalid_email: "담당자 이메일 형식이 올바르지 않습니다.",
   company_invalid_request: "파트너사 입력값을 확인해 주세요.",
+  partner_update_failed: "제휴처를 저장하지 못했습니다. 입력값과 권한을 확인한 뒤 다시 시도해 주세요.",
   cycle_missing_fields: "기준 기수, 기준 연도, 기준 월을 모두 입력해 주세요.",
   cycle_invalid_number: "기준값은 허용된 범위의 숫자로 입력해 주세요.",
   cycle_invalid_request: "기수 기준 입력값을 확인해 주세요.",
