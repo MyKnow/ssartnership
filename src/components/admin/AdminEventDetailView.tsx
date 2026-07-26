@@ -8,6 +8,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import StatsRow from "@/components/ui/StatsRow";
+import Surface from "@/components/ui/Surface";
 import type { EventCampaign } from "@/lib/promotions/catalog";
 import type { ManagedEventCampaign } from "@/lib/promotions/events";
 
@@ -21,6 +22,9 @@ export type AdminEventDetailViewProps = {
   message?: string | null;
   registrationAction: FormAction;
   deleteAction: FormAction;
+  canCreate?: boolean;
+  canUpdate?: boolean;
+  canDelete?: boolean;
   rewardContent?: ReactNode;
   rewardContentPromise?: Promise<ReactNode> | null;
 };
@@ -79,10 +83,14 @@ export default function AdminEventDetailView({
   message,
   registrationAction,
   deleteAction,
+  canCreate = true,
+  canUpdate = true,
+  canDelete = true,
   rewardContent,
   rewardContentPromise,
 }: AdminEventDetailViewProps) {
-  const isRegistered = registration?.source === "database" && Boolean(registration.id);
+  const isRegistered =
+    registration?.source === "database" && Boolean(registration.id);
 
   return (
     <div className="grid min-w-0 gap-6">
@@ -99,7 +107,11 @@ export default function AdminEventDetailView({
             hint: registration ? "운영 등록 기준" : "아직 미등록",
           },
           { label: "대상", value: targetLabel, hint: "현재 노출 대상" },
-          { label: "규칙", value: `${definition.conditions.length}개`, hint: "보상 조건 수" },
+          {
+            label: "규칙",
+            value: `${definition.conditions.length}개`,
+            hint: "보상 조건 수",
+          },
         ]}
         minItemWidth="13rem"
       />
@@ -153,8 +165,8 @@ export default function AdminEventDetailView({
                 공개 기간
               </p>
               <p className="mt-1 break-words text-sm font-semibold text-foreground">
-                {formatEventDate(registration?.startsAt ?? definition.startsAt)} -{" "}
-                {formatEventDate(registration?.endsAt ?? definition.endsAt)}
+                {formatEventDate(registration?.startsAt ?? definition.startsAt)}{" "}
+                - {formatEventDate(registration?.endsAt ?? definition.endsAt)}
               </p>
             </div>
             <div className="min-w-0 rounded-[1rem] border border-border/70 bg-surface-inset px-4 py-3">
@@ -180,7 +192,8 @@ export default function AdminEventDetailView({
 
       {!isRegistered ? (
         <FormMessage variant="info">
-          아직 운영 등록되지 않은 이벤트입니다. 아래에서 공개 링크, 노출 대상, 기간을 입력해 등록할 수 있습니다.
+          아직 운영 등록되지 않은 이벤트입니다. 아래에서 공개 링크, 노출 대상,
+          기간을 입력해 등록할 수 있습니다.
         </FormMessage>
       ) : null}
 
@@ -195,13 +208,44 @@ export default function AdminEventDetailView({
               공개 링크와 대상, 이벤트 기간만 관리합니다.
             </p>
           </div>
-          <EventRegistrationForm
-            definition={definition}
-            registration={registration}
-            action={registrationAction}
-            submitLabel={isRegistered ? "이벤트 수정" : "이벤트 등록"}
-          />
-          {isRegistered && registration ? (
+          {isRegistered ? (
+            canUpdate ? (
+              <EventRegistrationForm
+                definition={definition}
+                registration={registration}
+                action={registrationAction}
+                submitLabel="이벤트 수정"
+              />
+            ) : (
+              <Surface level="inset" className="p-4">
+                <p className="text-sm font-semibold text-foreground">
+                  조회 전용 권한
+                </p>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  이벤트 상태와 공개 설정은 확인할 수 있지만, 수정은 이벤트 운영
+                  권한이 있는 관리자만 할 수 있습니다.
+                </p>
+              </Surface>
+            )
+          ) : canCreate ? (
+            <EventRegistrationForm
+              definition={definition}
+              registration={registration}
+              action={registrationAction}
+              submitLabel="이벤트 등록"
+            />
+          ) : (
+            <Surface level="inset" className="p-4">
+              <p className="text-sm font-semibold text-foreground">
+                이벤트 등록 권한이 없습니다.
+              </p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                공개 이벤트 정의와 운영 조건은 확인할 수 있지만, 운영 등록은
+                이벤트 생성 권한이 있는 관리자만 할 수 있습니다.
+              </p>
+            </Surface>
+          )}
+          {isRegistered && registration && canDelete ? (
             <form action={deleteAction} className="flex justify-end">
               <input type="hidden" name="id" value={registration.id ?? ""} />
               <input type="hidden" name="slug" value={registration.slug} />
@@ -214,7 +258,9 @@ export default function AdminEventDetailView({
 
         <Card tone="muted" className="grid min-w-0 gap-4 2xl:sticky 2xl:top-24">
           <div>
-            <h3 className="text-base font-semibold text-foreground">코드 정의 미리보기</h3>
+            <h3 className="text-base font-semibold text-foreground">
+              코드 정의 미리보기
+            </h3>
             <p className="mt-1 text-sm text-muted-foreground">
               본문, 조건, 보상 로직은 코드에 고정되어 있습니다.
             </p>
