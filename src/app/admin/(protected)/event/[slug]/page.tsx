@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 import AdminEventDetailView from "@/components/admin/AdminEventDetailView";
 import AdminShell from "@/components/admin/AdminShell";
 import Button from "@/components/ui/Button";
@@ -558,20 +559,81 @@ function SignupRewardOverviewSection({
   );
 }
 
+type AdminEventDetailSearchParams = {
+  status?: string;
+  drawError?: string;
+  drawWinnerCount?: string;
+  drawSeed?: string;
+  previewError?: string;
+  previewWinnerCount?: string;
+  previewSeed?: string;
+};
+
+async function getSignupRewardContent({
+  campaign,
+  params,
+}: {
+  campaign: EventCampaign;
+  params: AdminEventDetailSearchParams;
+}): Promise<ReactNode> {
+  let rewardOverview: EventRewardAdminOverview | null = null;
+  let rewardDraw: EventRewardStoredDraw | null = null;
+  let rewardDrawPreview: EventRewardDrawPlan | null = null;
+  let rewardDrawPreviewError: string | null = null;
+  let rewardDrawError: string | null = null;
+  let rewardDrawInputWinnerCount: string | null = null;
+  let rewardDrawInputSeed: string | null = null;
+  let rewardWarningMessage: string | null = null;
+
+  rewardDrawError = params.drawError ?? null;
+  rewardDrawInputWinnerCount = params.drawWinnerCount ?? null;
+  rewardDrawInputSeed = params.drawSeed ?? null;
+  try {
+    [rewardOverview, rewardDraw] = await Promise.all([
+      getEventRewardAdminOverview(campaign),
+      getLatestEventRewardDrawWithWinners("signup-reward"),
+    ]);
+  } catch (error) {
+    console.error("[admin-event] reward overview query failed", error);
+    rewardOverview = buildEventRewardAdminOverview(campaign, []);
+    rewardWarningMessage =
+      "추첨권 현황 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  }
+  if (rewardOverview && !rewardDraw) {
+    if (params.previewError) {
+      rewardDrawPreviewError = params.previewError;
+    } else {
+      const preview = getEventRewardDrawPreview({
+        overview: rewardOverview,
+        winnerCount: params.previewWinnerCount,
+        seed: params.previewSeed,
+      });
+      rewardDrawPreview = preview.plan;
+      rewardDrawPreviewError = preview.error;
+    }
+  }
+
+  return rewardOverview ? (
+    <SignupRewardOverviewSection
+      campaign={campaign}
+      overview={rewardOverview}
+      draw={rewardDraw}
+      drawPreview={rewardDrawPreview}
+      drawPreviewError={rewardDrawPreviewError}
+      drawError={rewardDrawError}
+      drawInputWinnerCount={rewardDrawInputWinnerCount}
+      drawInputSeed={rewardDrawInputSeed}
+      warningMessage={rewardWarningMessage}
+    />
+  ) : null;
+}
+
 export default async function AdminEventDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams?: Promise<{
-    status?: string;
-    drawError?: string;
-    drawWinnerCount?: string;
-    drawSeed?: string;
-    previewError?: string;
-    previewWinnerCount?: string;
-    previewSeed?: string;
-  }>;
+  searchParams?: Promise<AdminEventDetailSearchParams>;
 }) {
   await requireAdminPermission("events", "read", { path: "/admin/event" });
   const { slug } = await params;
@@ -587,43 +649,10 @@ export default async function AdminEventDetailPage({
   const isRegistered = registration?.source === "database" && Boolean(registration.id);
   const state = getEventState(isRegistered ? registration : null);
   const message = statusMessage(paramsData.status);
-  let rewardOverview: EventRewardAdminOverview | null = null;
-  let rewardDraw: EventRewardStoredDraw | null = null;
-  let rewardDrawPreview: EventRewardDrawPlan | null = null;
-  let rewardDrawPreviewError: string | null = null;
-  let rewardDrawError: string | null = null;
-  let rewardDrawInputWinnerCount: string | null = null;
-  let rewardDrawInputSeed: string | null = null;
-  let rewardWarningMessage: string | null = null;
-  if (slug === "signup-reward") {
-    rewardDrawError = paramsData.drawError ?? null;
-    rewardDrawInputWinnerCount = paramsData.drawWinnerCount ?? null;
-    rewardDrawInputSeed = paramsData.drawSeed ?? null;
-    try {
-      [rewardOverview, rewardDraw] = await Promise.all([
-        getEventRewardAdminOverview(campaign),
-        getLatestEventRewardDrawWithWinners(slug),
-      ]);
-    } catch (error) {
-      console.error("[admin-event] reward overview query failed", error);
-      rewardOverview = buildEventRewardAdminOverview(campaign, []);
-      rewardWarningMessage =
-        "추첨권 현황 데이터를 불러오지 못했습니다. Supabase 연결과 이벤트 보상 테이블 상태를 확인해 주세요.";
-    }
-    if (rewardOverview && !rewardDraw) {
-      if (paramsData.previewError) {
-        rewardDrawPreviewError = paramsData.previewError;
-      } else {
-        const preview = getEventRewardDrawPreview({
-          overview: rewardOverview,
-          winnerCount: paramsData.previewWinnerCount,
-          seed: paramsData.previewSeed,
-        });
-        rewardDrawPreview = preview.plan;
-        rewardDrawPreviewError = preview.error;
-      }
-    }
-  }
+  const rewardContentPromise =
+    slug === "signup-reward"
+      ? getSignupRewardContent({ campaign, params: paramsData })
+      : null;
   const targetLabel =
     registration?.targetAudiences?.map(
       (audience) => PROMOTION_AUDIENCE_OPTIONS.find((option) => option.key === audience)?.label ?? audience,
@@ -645,19 +674,7 @@ export default async function AdminEventDetailPage({
           isRegistered ? updatePromotionEventAction : createPromotionEventAction
         }
         deleteAction={deletePromotionEventAction}
-        rewardContent={rewardOverview ? (
-          <SignupRewardOverviewSection
-            campaign={campaign}
-            overview={rewardOverview}
-            draw={rewardDraw}
-            drawPreview={rewardDrawPreview}
-            drawPreviewError={rewardDrawPreviewError}
-            drawError={rewardDrawError}
-            drawInputWinnerCount={rewardDrawInputWinnerCount}
-            drawInputSeed={rewardDrawInputSeed}
-            warningMessage={rewardWarningMessage}
-          />
-        ) : null}
+        rewardContentPromise={rewardContentPromise}
       />
     </AdminShell>
   );

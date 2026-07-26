@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import type { ReactNode } from "react";
 import Image from "next/image";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminOperationFlow from "@/components/admin/AdminOperationFlow";
@@ -19,8 +21,41 @@ export type AdminEventDetailViewProps = {
   message?: string | null;
   registrationAction: FormAction;
   deleteAction: FormAction;
-  rewardContent?: React.ReactNode;
+  rewardContent?: ReactNode;
+  rewardContentPromise?: Promise<ReactNode> | null;
 };
+
+function RewardContentFallback() {
+  return (
+    <section className="grid min-w-0 gap-4" aria-label="추첨권 현황">
+      <div>
+        <p className="ui-kicker">추첨권 운영</p>
+        <h3 className="mt-2 text-xl font-semibold text-foreground">
+          추첨권 현황
+        </h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          이벤트 참여 현황과 추첨 결과를 불러오는 중입니다.
+        </p>
+      </div>
+      <div
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+        className="rounded-card border border-border bg-surface-inset px-4 py-5 text-sm text-muted-foreground"
+      >
+        추첨권 현황을 불러오는 중입니다.
+      </div>
+    </section>
+  );
+}
+
+async function DeferredRewardContent({
+  rewardContentPromise,
+}: {
+  rewardContentPromise: Promise<ReactNode>;
+}) {
+  return await rewardContentPromise;
+}
 
 function formatEventDate(value: string) {
   const date = new Date(value);
@@ -45,6 +80,7 @@ export default function AdminEventDetailView({
   registrationAction,
   deleteAction,
   rewardContent,
+  rewardContentPromise,
 }: AdminEventDetailViewProps) {
   const isRegistered = registration?.source === "database" && Boolean(registration.id);
 
@@ -203,7 +239,13 @@ export default function AdminEventDetailView({
         </Card>
       </div>
 
-      {rewardContent}
+      {rewardContentPromise ? (
+        <Suspense fallback={<RewardContentFallback />}>
+          <DeferredRewardContent rewardContentPromise={rewardContentPromise} />
+        </Suspense>
+      ) : (
+        rewardContent
+      )}
     </div>
   );
 }
