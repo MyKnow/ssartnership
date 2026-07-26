@@ -261,12 +261,18 @@ export function AdminCompaniesSkeletonContent() {
 export function AdminCycleSkeleton() {
   return (
     <AdminShell title="기수 관리" backHref="/admin" backLabel="관리 홈">
-      <div className="grid min-w-0 gap-6">
-        <PageHeaderSkeleton />
-        <MetricRowSkeleton count={3} />
-        <FormSkeleton sections={1} />
-      </div>
+      <AdminCycleSkeletonContent />
     </AdminShell>
+  );
+}
+
+export function AdminCycleSkeletonContent() {
+  return (
+    <div className="grid min-w-0 gap-6">
+      <PageHeaderSkeleton />
+      <MetricRowSkeleton count={3} />
+      <FormSkeleton sections={1} />
+    </div>
   );
 }
 
@@ -300,4 +306,12 @@ export function AdminLogsSkeletonContent() {
 
 export function AdminNotificationsSkeletonContent() {
   return <AdminListSkeletonContent filterFields={0} rows={3} />;
+}
+
+export function AdminAdvertisementSkeletonContent() {
+  return <AdminListSkeletonContent filterFields={0} rows={4} />;
+}
+
+export function AdminEventSkeletonContent() {
+  return <AdminListSkeletonContent filterFields={0} rows={4} />;
 }

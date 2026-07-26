@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import {
   deleteCohortCardTheme,
   disableMattermostSender,
@@ -11,6 +12,7 @@ import {
 } from "@/app/admin/(protected)/actions";
 import AdminCycleView from "@/components/admin/AdminCycleView";
 import AdminShell from "@/components/admin/AdminShell";
+import { AdminCycleSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { canManageMattermostSenders } from "@/lib/mattermost-senders/access";
@@ -31,19 +33,17 @@ export const metadata: Metadata = {
   robots: { index: false, follow: true },
 };
 
-export default async function AdminCyclePage({
-  searchParams,
+async function AdminCycleContent({
+  session,
+  params,
 }: {
-  searchParams?: Promise<{
+  session: Awaited<ReturnType<typeof requireAdminPermission>>;
+  params: {
     status?: string;
     error?: string;
     generation?: string;
-  }>;
+  };
 }) {
-  const session = await requireAdminPermission("cycles", "read", {
-    path: "/admin/cycle",
-  });
-  const params = (await searchParams) ?? {};
   const canManageSenders = canManageMattermostSenders(session.account, "read");
   const canUpdate = canAdmin(session.account.permissions, "cycles", "update");
   const canDelete = canAdmin(session.account.permissions, "cycles", "delete");
@@ -59,8 +59,7 @@ export default async function AdminCyclePage({
   ]);
 
   return (
-    <AdminShell title="기수 관리" backHref="/admin" backLabel="관리 홈">
-      <AdminCycleView
+    <AdminCycleView
         settings={settings}
         overview={getSsafyCycleOverview(settings)}
         themes={themes}
@@ -103,7 +102,29 @@ export default async function AdminCyclePage({
         disableMattermostSenderAction={
           canManageSenders ? disableMattermostSender : undefined
         }
-      />
+    />
+  );
+}
+
+export default async function AdminCyclePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{
+    status?: string;
+    error?: string;
+    generation?: string;
+  }>;
+}) {
+  const session = await requireAdminPermission("cycles", "read", {
+    path: "/admin/cycle",
+  });
+  const params = (await searchParams) ?? {};
+
+  return (
+    <AdminShell title="기수 관리" backHref="/admin" backLabel="관리 홈">
+      <Suspense fallback={<AdminCycleSkeletonContent />}>
+        <AdminCycleContent session={session} params={params} />
+      </Suspense>
     </AdminShell>
   );
 }

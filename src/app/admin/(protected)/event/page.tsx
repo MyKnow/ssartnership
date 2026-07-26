@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import AdminShell from "@/components/admin/AdminShell";
 import AdminEventListView, {
   type AdminEventListItem,
 } from "@/components/admin/AdminEventListView";
+import { AdminEventSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import { listEventPageDefinitions } from "@/lib/event-pages";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { canAdmin } from "@/lib/admin-permissions";
@@ -85,17 +87,15 @@ function buildEventListItem({
   };
 }
 
-export default async function AdminEventPage({
-  searchParams,
+async function AdminEventContent({
+  session,
+  params,
 }: {
-  searchParams?: Promise<{ status?: string }>;
+  session: Awaited<ReturnType<typeof requireAdminPermission>>;
+  params: { status?: string };
 }) {
-  const session = await requireAdminPermission("events", "read", {
-    path: "/admin/event",
-  });
   const canCreate = canAdmin(session.account.permissions, "events", "create");
   const canUpdate = canAdmin(session.account.permissions, "events", "update");
-  const params = (await searchParams) ?? {};
   const definitions = listEventPageDefinitions();
   const registrations = await listManagedEventCampaigns({
     includeInactive: true,
@@ -127,13 +127,30 @@ export default async function AdminEventPage({
   }));
 
   return (
-    <AdminShell title="이벤트 관리" backHref="/admin" backLabel="관리 홈">
-      <AdminEventListView
+    <AdminEventListView
         sections={sections}
         statusMessage={statusMessage(params.status)}
         canCreate={canCreate}
         canUpdate={canUpdate}
-      />
+    />
+  );
+}
+
+export default async function AdminEventPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ status?: string }>;
+}) {
+  const session = await requireAdminPermission("events", "read", {
+    path: "/admin/event",
+  });
+  const params = (await searchParams) ?? {};
+
+  return (
+    <AdminShell title="이벤트 관리" backHref="/admin" backLabel="관리 홈">
+      <Suspense fallback={<AdminEventSkeletonContent />}>
+        <AdminEventContent session={session} params={params} />
+      </Suspense>
     </AdminShell>
   );
 }

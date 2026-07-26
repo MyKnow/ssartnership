@@ -46,7 +46,7 @@ const listRoutes = [
     fallback: "AdminCategoriesSkeletonContent",
   },
   {
-    label: "리뷰 조회",
+    label: "운영 로그",
     page: "../src/app/admin/(protected)/logs/page.tsx",
     content: "AdminLogsContent",
     fallback: "AdminLogsSkeletonContent",
@@ -62,6 +62,24 @@ const listRoutes = [
     page: "../src/app/admin/(protected)/notifications/page.tsx",
     content: "AdminNotificationsContent",
     fallback: "AdminNotificationsSkeletonContent",
+  },
+  {
+    label: "홈 광고 관리",
+    page: "../src/app/admin/(protected)/advertisement/page.tsx",
+    content: "AdminAdvertisementContent",
+    fallback: "AdminAdvertisementSkeletonContent",
+  },
+  {
+    label: "기수 관리",
+    page: "../src/app/admin/(protected)/cycle/page.tsx",
+    content: "AdminCycleContent",
+    fallback: "AdminCycleSkeletonContent",
+  },
+  {
+    label: "이벤트 관리",
+    page: "../src/app/admin/(protected)/event/page.tsx",
+    content: "AdminEventContent",
+    fallback: "AdminEventSkeletonContent",
   },
 ];
 

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import AdminAdvertisementView from "@/components/admin/AdminAdvertisementView";
 import AdminShell from "@/components/admin/AdminShell";
+import { AdminAdvertisementSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import {
   createAdCampaignAction,
   updateAdCampaignStatusAction,
@@ -39,15 +41,13 @@ function statusMessage(status?: string) {
   return null;
 }
 
-export default async function AdminAdvertisementPage({
-  searchParams,
+async function AdminAdvertisementContent({
+  session,
+  params,
 }: {
-  searchParams?: Promise<{ status?: string }>;
+  session: Awaited<ReturnType<typeof requireAdminPermission>>;
+  params: { status?: string };
 }) {
-  const session = await requireAdminPermission("home_ads", "read", {
-    path: "/admin/advertisement",
-  });
-  const params = (await searchParams) ?? {};
   const message = statusMessage(params.status);
   const [slides, eventCampaigns, adCampaignOptions] = await Promise.all([
     listManagedPromotionSlides({ includeInactive: true }),
@@ -74,8 +74,7 @@ export default async function AdminAdvertisementPage({
     }))
     .catch(() => ({ status: "error" as const }));
   return (
-    <AdminShell title="홈 광고 관리" backHref="/admin" backLabel="관리 홈">
-      <AdminAdvertisementView
+    <AdminAdvertisementView
         campaignsPromise={campaignsPromise}
         createCampaignAction={createAdCampaignAction}
         updateCampaignStatusAction={updateAdCampaignStatusAction}
@@ -87,7 +86,25 @@ export default async function AdminAdvertisementPage({
         canUpdate={canAdmin(session.account.permissions, "home_ads", "update")}
         message={message}
         clearPromotionDraft={params.status === "updated"}
-      />
+    />
+  );
+}
+
+export default async function AdminAdvertisementPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ status?: string }>;
+}) {
+  const session = await requireAdminPermission("home_ads", "read", {
+    path: "/admin/advertisement",
+  });
+  const params = (await searchParams) ?? {};
+
+  return (
+    <AdminShell title="홈 광고 관리" backHref="/admin" backLabel="관리 홈">
+      <Suspense fallback={<AdminAdvertisementSkeletonContent />}>
+        <AdminAdvertisementContent session={session} params={params} />
+      </Suspense>
     </AdminShell>
   );
 }
