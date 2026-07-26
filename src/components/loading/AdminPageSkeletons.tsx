@@ -335,3 +335,20 @@ export function AdminMemberDetailSkeletonContent() {
 export function AdminMemberSignupRequestsSkeletonContent() {
   return <AdminListSkeletonContent filterFields={0} rows={4} />;
 }
+
+export function AdminAccountsSkeletonContent() {
+  return <AdminListSkeletonContent filterFields={0} rows={4} />;
+}
+
+export function AdminNotificationTemplatesSkeletonContent() {
+  return <AdminListSkeletonContent filterFields={0} rows={3} />;
+}
+
+export function AdminPartnerNewSkeletonContent() {
+  return (
+    <div className="grid min-w-0 gap-6">
+      <PageHeaderSkeleton />
+      <FormSkeleton sections={2} />
+    </div>
+  );
+}

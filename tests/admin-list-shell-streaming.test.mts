@@ -111,6 +111,30 @@ const listRoutes = [
     content: "AdminMemberSignupRequestsContent",
     fallback: "AdminMemberSignupRequestsSkeletonContent",
   },
+  {
+    label: "관리자 관리",
+    page: "../src/app/admin/(protected)/admins/page.tsx",
+    content: "AdminAccountsContent",
+    fallback: "AdminAccountsSkeletonContent",
+  },
+  {
+    label: "알림 템플릿",
+    page: "../src/app/admin/(protected)/notification-templates/page.tsx",
+    content: "AdminNotificationTemplatesContent",
+    fallback: "AdminNotificationTemplatesSkeletonContent",
+  },
+  {
+    label: "통합 검색",
+    page: "../src/app/admin/(protected)/search/page.tsx",
+    content: "AdminGlobalSearchContent",
+    fallback: "AdminGlobalSearchSkeletonContent",
+  },
+  {
+    label: "제휴처 추가",
+    page: "../src/app/admin/(protected)/partners/new/page.tsx",
+    content: "AdminPartnerNewContent",
+    fallback: "AdminPartnerNewSkeletonContent",
+  },
 ];
 
 test("대표 관리자 목록은 셸과 read model 콘텐츠를 분리해 스트리밍한다", async () => {

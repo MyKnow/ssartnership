@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import AdminAccountsView from "@/components/admin/AdminAccountsView";
 import AdminShell from "@/components/admin/AdminShell";
+import { AdminAccountsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import {
   applyAdminPermissionTemplate,
   grantMemberAdminPermission,
@@ -15,20 +17,13 @@ import { canAdmin } from "@/lib/admin-permissions";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminAccountsPage({
-  searchParams,
+async function AdminAccountsContent({
+  adminSession,
+  status,
 }: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  adminSession: Awaited<ReturnType<typeof requireAdminPermission>>;
+  status?: string;
 }) {
-  const adminSession = await requireAdminPermission(
-    "admin_management",
-    "read",
-    {
-      path: "/admin/admins",
-    },
-  );
-  const params = (await searchParams) ?? {};
-  const status = typeof params.status === "string" ? params.status : undefined;
   let accounts: Awaited<ReturnType<typeof listAdminAccounts>> = [];
   let loadError = false;
   try {
@@ -40,8 +35,7 @@ export default async function AdminAccountsPage({
   const feedback = getAdminAccountFeedback(status);
 
   return (
-    <AdminShell title="관리자 관리" backHref="/admin" backLabel="관리 홈">
-      <AdminAccountsView
+    <AdminAccountsView
         accounts={accounts}
         templates={templates}
         feedback={feedback?.message}
@@ -65,7 +59,30 @@ export default async function AdminAccountsPage({
         grantAction={grantMemberAdminPermission}
         applyTemplateAction={applyAdminPermissionTemplate}
         updateStatusAction={updateAdminAccountStatus}
-      />
+    />
+  );
+}
+
+export default async function AdminAccountsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const adminSession = await requireAdminPermission(
+    "admin_management",
+    "read",
+    {
+      path: "/admin/admins",
+    },
+  );
+  const params = (await searchParams) ?? {};
+  const status = typeof params.status === "string" ? params.status : undefined;
+
+  return (
+    <AdminShell title="관리자 관리" backHref="/admin" backLabel="관리 홈">
+      <Suspense fallback={<AdminAccountsSkeletonContent />}>
+        <AdminAccountsContent adminSession={adminSession} status={status} />
+      </Suspense>
     </AdminShell>
   );
 }

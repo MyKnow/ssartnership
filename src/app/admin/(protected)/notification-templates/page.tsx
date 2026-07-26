@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import AdminNotificationTemplateManager from "@/components/admin/AdminNotificationTemplateManager";
 import AdminOperationFlow from "@/components/admin/AdminOperationFlow";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminShell from "@/components/admin/AdminShell";
+import { AdminNotificationTemplatesSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import Button from "@/components/ui/Button";
 import {
   sendNotificationTemplateTestAction,
@@ -15,21 +17,18 @@ import { getNotificationTemplateFeedback } from "@/lib/notification-templates/ad
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminNotificationTemplatesPage({
-  searchParams,
+async function AdminNotificationTemplatesContent({
+  session,
+  params,
 }: {
-  searchParams?: Promise<{ status?: string; error?: string }>;
+  session: Awaited<ReturnType<typeof requireNotificationTemplateAdmin>>;
+  params: { status?: string; error?: string };
 }) {
-  const session = await requireNotificationTemplateAdmin("read", {
-    path: "/admin/notification-templates",
-  });
-  const params = (await searchParams) ?? {};
   const templates = await listNotificationTemplates();
   const feedback = getNotificationTemplateFeedback(params);
 
   return (
-    <AdminShell title="알림 템플릿" backHref="/admin" backLabel="관리 홈">
-      <div className="grid min-w-0 gap-6">
+    <div className="grid min-w-0 gap-6">
         <AdminPageHeader
           eyebrow="자동화"
           title="알림 템플릿 관리"
@@ -81,7 +80,25 @@ export default async function AdminNotificationTemplatesPage({
             "delete",
           )}
         />
-      </div>
+    </div>
+  );
+}
+
+export default async function AdminNotificationTemplatesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ status?: string; error?: string }>;
+}) {
+  const session = await requireNotificationTemplateAdmin("read", {
+    path: "/admin/notification-templates",
+  });
+  const params = (await searchParams) ?? {};
+
+  return (
+    <AdminShell title="알림 템플릿" backHref="/admin" backLabel="관리 홈">
+      <Suspense fallback={<AdminNotificationTemplatesSkeletonContent />}>
+        <AdminNotificationTemplatesContent session={session} params={params} />
+      </Suspense>
     </AdminShell>
   );
 }
