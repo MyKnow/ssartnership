@@ -75,7 +75,7 @@ export default function AdminPartnerListItem({
             <Link
               href={`/admin/partners/${partner.id}`}
               prefetch={false}
-              className="flex min-w-0 items-start gap-2 text-lg font-semibold text-foreground hover:text-primary"
+              className="flex min-h-11 min-w-0 items-center gap-2 text-lg font-semibold text-foreground hover:text-primary"
             >
               <span className="min-w-0 text-ko-title">{partner.name}</span>
               <ChevronRightIcon className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -87,7 +87,7 @@ export default function AdminPartnerListItem({
                   href={partner.map_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface text-foreground hover:border-strong"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-control border border-border bg-surface text-foreground hover:border-strong"
                   aria-label={placeLinkLabel}
                   title={placeLinkLabel}
                 >

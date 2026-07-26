@@ -52,6 +52,19 @@ test("제휴처 목록은 보조 집계를 기다리지 않고 찾기·상세 �
   assert.match(itemSource, /운영 지표는 상세 화면에서 확인/);
 });
 
+test("제휴처 목록의 제목·지도 링크는 44px 터치 영역을 제공한다", async () => {
+  const itemSource = await readFile(
+    new URL(
+      "../src/components/admin/partner-manager/AdminPartnerListItem.tsx",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  assert.match(itemSource, /min-h-11 min-w-0 items-center/);
+  assert.match(itemSource, /h-11 w-11 items-center justify-center rounded-control/);
+});
+
 test("목록 오류는 내부 오류 대신 재시도 가능한 안전한 안내를 제공한다", async () => {
   const managerSource = await readFile(partnerManagerPath, "utf8");
 
