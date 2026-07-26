@@ -18,6 +18,18 @@ test("통합 검색어는 공백을 정리하고 안전한 관리자 URL로만 �
   assert.equal(buildAdminGlobalSearchHref("   "), "/admin/search");
 });
 
+test("UUID 관리 식별자는 회원·제휴처의 정확한 ID 검색 경로를 사용한다", async () => {
+  const searchServiceSource = await readFile(
+    new URL("../src/lib/admin-global-search.server.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(searchServiceSource, /import \{ isUuid \} from "@\/lib\/uuid"/);
+  assert.match(searchServiceSource, /isUuid\(normalizedQuery\)/);
+  assert.match(searchServiceSource, /canSearchPartners && isIdentifierQuery/);
+  assert.match(searchServiceSource, /\.eq\("id", normalizedQuery\)/);
+});
+
 test("빠른 찾기는 Enter로 실제 대상 검색으로 이동하고 검색 결과는 서비스 경계에서 최소 필드만 조회한다", async () => {
   const [navigatorSource, pageSource, searchServiceSource] = await Promise.all([
     readFile(
