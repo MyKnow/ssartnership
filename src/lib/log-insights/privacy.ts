@@ -66,11 +66,30 @@ function maskSecurityRecord(log: AuthSecurityLogRecord): AuthSecurityLogRecord {
   };
 }
 
+function stripProductProperties(log: ProductLogRecord): ProductLogRecord {
+  return { ...log, properties: null };
+}
+
+function stripAuditProperties(log: AdminAuditLogRecord): AdminAuditLogRecord {
+  return { ...log, properties: null };
+}
+
+function stripSecurityProperties(log: AuthSecurityLogRecord): AuthSecurityLogRecord {
+  return { ...log, properties: null };
+}
+
 export function applyAdminLogsPrivacy(
   data: AdminLogsPageData,
 ): AdminLogsPageData {
+  const listWithoutDetails = {
+    ...data.list,
+    productLogs: data.list.productLogs.map(stripProductProperties),
+    auditLogs: data.list.auditLogs.map(stripAuditProperties),
+    securityLogs: data.list.securityLogs.map(stripSecurityProperties),
+  };
+
   if (data.access.includePii) {
-    return data;
+    return { ...data, list: listWithoutDetails };
   }
 
   return {
@@ -82,10 +101,10 @@ export function applyAdminLogsPrivacy(
       topPaths: [],
     },
     list: {
-      ...data.list,
-      productLogs: data.list.productLogs.map(maskProductRecord),
-      auditLogs: data.list.auditLogs.map(maskAuditRecord),
-      securityLogs: data.list.securityLogs.map(maskSecurityRecord),
+      ...listWithoutDetails,
+      productLogs: listWithoutDetails.productLogs.map(maskProductRecord),
+      auditLogs: listWithoutDetails.auditLogs.map(maskAuditRecord),
+      securityLogs: listWithoutDetails.securityLogs.map(maskSecurityRecord),
     },
   };
 }
