@@ -1,15 +1,12 @@
 import AdminShell from "@/components/admin/AdminShell";
-import AdminTaskInboxView from "@/components/admin/AdminTaskInboxView";
+import { AdminTaskInboxStreamingView } from "@/components/admin/AdminTaskInboxView";
 import {
   ADMIN_NAV_GROUPS,
   filterAdminNavGroupsByPermissions,
 } from "@/components/admin/admin-navigation";
 import { getAdminSession } from "@/lib/auth";
 import { isRegionalAdminAccount } from "@/lib/admin-scope";
-import {
-  getAdminTaskQueueCounts,
-  prioritizeAdminTaskItems,
-} from "@/lib/admin-task-inbox";
+import { getAdminTaskQueueCounts } from "@/lib/admin-task-inbox";
 
 export default async function AdminTasksPage() {
   const session = await getAdminSession();
@@ -24,19 +21,17 @@ export default async function AdminTasksPage() {
   const tasks = (taskGroup?.items ?? []).filter(
     (item) => item.href !== "/admin/tasks",
   );
-  const queueCounts = session
-    ? await getAdminTaskQueueCounts({
-        adminId: session.adminId,
-        account: session.account,
-      })
-    : {};
+  const queueCounts =
+    session && tasks.length > 0
+      ? getAdminTaskQueueCounts({
+          adminId: session.adminId,
+          account: session.account,
+        })
+      : null;
 
   return (
     <AdminShell title="작업함" backHref="/admin" backLabel="관리 홈">
-      <AdminTaskInboxView
-        tasks={prioritizeAdminTaskItems(tasks, queueCounts)}
-        queueCounts={queueCounts}
-      />
+      <AdminTaskInboxStreamingView tasks={tasks} queueCounts={queueCounts} />
     </AdminShell>
   );
 }
