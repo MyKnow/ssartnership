@@ -29,6 +29,9 @@ test("관리자 제휴처 목록은 read-model의 서버 count/range와 안전�
   assert.match(readModelSource, /partnersQuery = partnersQuery\.range\(/);
   assert.match(readModelSource, /from \+ normalizedFilters\.pageSize - 1/);
   assert.match(readModelSource, /getPartnerNameSearchPattern\(normalizedFilters\.searchValue\)/);
+  assert.match(readModelSource, /applies_to/);
+  assert.doesNotMatch(readModelSource, /conditions,benefits,applies_to,images,tags/);
+  assert.doesNotMatch(readModelSource, /thumbnail,map_url,benefit_action_type/);
   assert.doesNotMatch(managerSource, /filterAndSortAdminPartners/);
   assert.match(managerSource, /router\.replace\(/);
   assert.match(managerSource, /조건에 맞는 제휴처/);

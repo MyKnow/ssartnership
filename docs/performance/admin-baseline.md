@@ -83,6 +83,12 @@ build의 실제 관리자 QA에서 `/admin/reviews` 초기 응답은 약 578KB�
 동일한 제휴처와 데이터량으로 전후 비교해야 한다. 360px·820px·1366px에서 가로
 overflow와 page error 없이 확인했다.
 
+제휴처 목록 read-model은 목록에서 쓰지 않는 편집·혜택·이미지 필드를 제거하고, 플랜 탭과
+일반 목록에 필요한 projection을 분리했다. 같은 production build와 관리자 데이터에서
+`/admin/partners` 초기 응답은 이전 약 513KB에서 약 476KB로 줄었고, 360px·820px·1366px
+가로 overflow 없이 검색 URL 반영까지 확인했다. 이 값은 공통 셸과 RSC runtime을 포함하므로
+다음 단계에서는 실제 서버 query timing과 목록 paint 시점을 함께 분리해 기록한다.
+
 ## 다음 기준선 작업
 
 - 대표 과업을 `작업함 처리`, `회원 검색·상세`, `제휴처 검색·상세`, `심사 큐 결정`으로 고정한다.

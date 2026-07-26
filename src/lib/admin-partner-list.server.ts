@@ -98,8 +98,9 @@ export async function getAdminPartnerListReadModel({
     ...filters,
     categoryKey: selectedCategory?.key ?? "all",
   };
-  const partnerFields =
-    "id,name,category_id,company_id,location,campus_slugs,managed_campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,plan_tier,plan_started_at,plan_expires_at,plan_updated_at,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,company:partner_companies(id,name,slug,description,is_active,managed_campus_slugs)";
+  const partnerFields = showPlans
+    ? "id,name,company_id,location,period_start,period_end,plan_tier,plan_started_at,plan_expires_at,plan_updated_at,visibility,company:partner_companies(id,name,slug)"
+    : "id,name,category_id,company_id,location,managed_campus_slugs,map_url,period_start,period_end,applies_to,visibility,company:partner_companies(id,name,slug)";
   let partnersQuery = showPlans
     ? supabase.from("partners").select(partnerFields)
     : supabase.from("partners").select(partnerFields, { count: "exact" });
