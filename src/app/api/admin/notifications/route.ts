@@ -5,6 +5,7 @@ import {
   type AdminNotificationRecipientRow,
 } from "@/lib/admin-notification-inbox";
 import { getAdminSession } from "@/lib/auth";
+import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -81,10 +82,18 @@ export async function GET(request: NextRequest) {
       .range(offset, offset + limit),
   ]);
   if (unreadResult.error) {
-    return NextResponse.json({ message: unreadResult.error.message }, { status: 500 });
+    console.error("[admin-notifications] unread count query failed", unreadResult.error);
+    return NextResponse.json(
+      { message: "알림을 불러오지 못했습니다." },
+      { status: 500 },
+    );
   }
   if (inboxResult.error) {
-    return NextResponse.json({ message: inboxResult.error.message }, { status: 500 });
+    console.error("[admin-notifications] inbox query failed", inboxResult.error);
+    return NextResponse.json(
+      { message: "알림을 불러오지 못했습니다." },
+      { status: 500 },
+    );
   }
 
   const result = buildAdminNotificationListResult({
@@ -124,8 +133,7 @@ export async function PATCH(request: NextRequest) {
     const unreadCount = await getUnreadCount(auth.adminId);
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "알림을 처리하지 못했습니다.";
+    const message = getSafeAdminMessage(error, "알림을 처리하지 못했습니다.");
     return NextResponse.json({ message }, { status: 400 });
   }
 }
@@ -150,8 +158,7 @@ export async function DELETE(request: NextRequest) {
     const unreadCount = await getUnreadCount(auth.adminId);
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "알림을 삭제하지 못했습니다.";
+    const message = getSafeAdminMessage(error, "알림을 삭제하지 못했습니다.");
     return NextResponse.json({ message }, { status: 400 });
   }
 }

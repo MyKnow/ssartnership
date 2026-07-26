@@ -33,6 +33,9 @@ const SAFE_ADMIN_MESSAGE_PATTERNS = [
   "대상자 미리보기를 다시 시도해 주세요.",
   "이 브라우저에서는 푸시 알림을 사용할 수 없습니다.",
   "브라우저 알림 권한이 필요합니다.",
+  "알림을 불러오지 못했습니다.",
+  "알림을 처리하지 못했습니다.",
+  "알림을 삭제하지 못했습니다.",
 ] as const;
 
 export function getSafeAdminMessage(error: unknown, fallback: string) {

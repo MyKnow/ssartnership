@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { getSafeAdminMessage } from "../src/lib/admin-safe-messages";
 
 type AdminNotificationInboxModule = typeof import("../src/lib/admin-notification-inbox.ts");
 
@@ -132,4 +134,29 @@ test("admin navigation separates personal inbox from notification operations", a
   assert.equal(inboxItem?.href, "/admin/notifications");
   assert.equal(operationsItem?.label, "발송 관리");
   assert.equal(operationsItem?.href, "/admin/push");
+});
+
+test("admin notification API never returns storage errors to the browser", async () => {
+  const [listSource, itemSource] = await Promise.all([
+    readFile(
+      new URL("../src/app/api/admin/notifications/route.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/app/api/admin/notifications/[id]/route.ts", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.equal(
+    getSafeAdminMessage(new Error("relation admin_notification_recipients does not exist"), "알림을 불러오지 못했습니다."),
+    "알림을 불러오지 못했습니다.",
+  );
+  assert.match(listSource, /알림을 불러오지 못했습니다\./);
+  assert.match(listSource, /getSafeAdminMessage/);
+  assert.match(itemSource, /getSafeAdminMessage/);
+  assert.doesNotMatch(listSource, /message:\s*unreadResult\.error\.message/);
+  assert.doesNotMatch(listSource, /message:\s*inboxResult\.error\.message/);
+  assert.doesNotMatch(listSource, /error instanceof Error \? error\.message/);
+  assert.doesNotMatch(itemSource, /error instanceof Error \? error\.message/);
 });

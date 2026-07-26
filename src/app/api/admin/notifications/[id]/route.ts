@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
+import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -57,8 +58,7 @@ export async function PATCH(
     const unreadCount = await getUnreadCount(session.adminId);
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "알림을 처리하지 못했습니다.";
+    const message = getSafeAdminMessage(error, "알림을 처리하지 못했습니다.");
     return NextResponse.json({ message }, { status: 400 });
   }
 }
@@ -99,8 +99,7 @@ export async function DELETE(
     const unreadCount = await getUnreadCount(session.adminId);
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "알림을 삭제하지 못했습니다.";
+    const message = getSafeAdminMessage(error, "알림을 삭제하지 못했습니다.");
     return NextResponse.json({ message }, { status: 400 });
   }
 }
