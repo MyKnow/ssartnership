@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import Badge from '@/components/ui/Badge';
-import Button from '@/components/ui/Button';
-import FormMessage from '@/components/ui/FormMessage';
-import Input from '@/components/ui/Input';
-import AdminSectionHeading from '@/components/admin/AdminSectionHeading';
+import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import FormMessage from "@/components/ui/FormMessage";
+import Input from "@/components/ui/Input";
+import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import {
   ActivityChart,
   ExportDialog,
@@ -12,28 +12,27 @@ import {
   MetricCard,
   RangePresetButton,
   SecurityStatusCard,
-} from '@/components/admin/logs/AdminLogsPanels';
-import { AdminLogsExplorer } from '@/components/admin/logs/AdminLogsExplorer';
-import { RANGE_PRESET_OPTIONS } from '@/components/admin/logs/utils';
-import type { AdminLogsPageData } from '@/lib/log-insights';
-import { useAdminLogsManager } from '@/components/admin/logs-manager/useAdminLogsManager';
-import AdminForwardActivityPanel from '@/components/admin/logs/AdminForwardActivityPanel';
-import { emptyForwardActivityMetrics, type ForwardActivityMetrics } from '@/lib/platform-activity-forward-metrics';
+} from "@/components/admin/logs/AdminLogsPanels";
+import { AdminLogsExplorer } from "@/components/admin/logs/AdminLogsExplorer";
+import { RANGE_PRESET_OPTIONS } from "@/components/admin/logs/utils";
+import type { AdminLogsPageData } from "@/lib/log-insights";
+import { useAdminLogsManager } from "@/components/admin/logs-manager/useAdminLogsManager";
 
 export default function AdminLogsManagerContent({
   initialData,
-  activityMetrics = emptyForwardActivityMetrics(),
 }: {
   initialData: AdminLogsPageData;
-  activityMetrics?: ForwardActivityMetrics;
 }) {
   const logs = useAdminLogsManager(initialData);
 
   return (
     <>
-      <div className="grid min-w-0 gap-6 overflow-x-clip" aria-busy={logs.isLoading}>
+      <div
+        className="grid min-w-0 gap-6 overflow-x-clip"
+        aria-busy={logs.isLoading}
+      >
         <p className="sr-only" aria-live="polite">
-          {logs.isLoading ? '로그 결과를 새로 불러오는 중입니다.' : ''}
+          {logs.isLoading ? "로그 결과를 새로 불러오는 중입니다." : ""}
         </p>
         <section className="grid gap-4 rounded-panel border border-border/70 bg-surface-elevated px-5 py-5 shadow-flat sm:px-6 sm:py-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -42,13 +41,19 @@ export default function AdminLogsManagerContent({
               description="조회 범위를 바꾸면 카드, 대시보드, 원본 로그가 모두 같은 범위 기준으로 다시 집계됩니다."
             />
             {logs.canExport ? (
-              <Button variant="ghost" onClick={logs.handleOpenExport} className="self-end sm:self-auto">
+              <Button
+                variant="ghost"
+                onClick={logs.handleOpenExport}
+                className="self-end sm:self-auto"
+              >
                 CSV 다운로드
               </Button>
             ) : null}
           </div>
 
-          {logs.errorMessage ? <FormMessage variant="error">{logs.errorMessage}</FormMessage> : null}
+          {logs.errorMessage ? (
+            <FormMessage variant="error">{logs.errorMessage}</FormMessage>
+          ) : null}
 
           <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
             {RANGE_PRESET_OPTIONS.map((option) => (
@@ -66,8 +71,12 @@ export default function AdminLogsManagerContent({
           <div className="rounded-2xl border border-border bg-surface-inset px-4 py-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="grid gap-1">
-                <p className="text-sm font-semibold text-foreground">현재 조회 범위</p>
-                <p className="text-token text-sm text-muted-foreground">{logs.data.range.label}</p>
+                <p className="text-sm font-semibold text-foreground">
+                  현재 조회 범위
+                </p>
+                <p className="text-token text-sm text-muted-foreground">
+                  {logs.data.range.label}
+                </p>
               </div>
               <Badge className="bg-surface-muted text-muted-foreground">
                 {logs.data.range.bucketLabel}
@@ -75,26 +84,33 @@ export default function AdminLogsManagerContent({
             </div>
           </div>
 
-          {logs.data.truncated.any && logs.data.truncated.limitPerGroup !== null ? (
+          {logs.data.truncated.any &&
+          logs.data.truncated.limitPerGroup !== null ? (
             <FormMessage variant="error">
-              조회 범위의 로그가 많아 그룹별 최근 {logs.data.truncated.limitPerGroup.toLocaleString()}건만 불러왔습니다. 권한이 있는 경우 CSV 다운로드에서 더 넓은 원본을 확인할 수 있습니다.
+              조회 범위의 로그가 많아 그룹별 최근{" "}
+              {logs.data.truncated.limitPerGroup.toLocaleString()}건만
+              불러왔습니다. 권한이 있는 경우 CSV 다운로드에서 더 넓은 원본을
+              확인할 수 있습니다.
             </FormMessage>
           ) : null}
 
           {logs.data.partialFailure.any ? (
             <FormMessage variant="error">
-              일부 로그 페이지 조회가 실패해 결과가 불완전할 수 있습니다. 조회 범위를 좁히거나 잠시 후 다시 시도해 주세요.
+              일부 로그 페이지 조회가 실패해 결과가 불완전할 수 있습니다. 조회
+              범위를 좁히거나 잠시 후 다시 시도해 주세요.
             </FormMessage>
           ) : null}
 
-          {logs.activePreset === 'custom' ? (
+          {logs.activePreset === "custom" ? (
             <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 시작 시각
                 <Input
                   type="datetime-local"
                   value={logs.customStartInput}
-                  onChange={(event) => logs.setCustomStartInput(event.target.value)}
+                  onChange={(event) =>
+                    logs.setCustomStartInput(event.target.value)
+                  }
                 />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground">
@@ -102,7 +118,9 @@ export default function AdminLogsManagerContent({
                 <Input
                   type="datetime-local"
                   value={logs.customEndInput}
-                  onChange={(event) => logs.setCustomEndInput(event.target.value)}
+                  onChange={(event) =>
+                    logs.setCustomEndInput(event.target.value)
+                  }
                 />
               </label>
               <div className="flex items-end justify-end">
@@ -119,29 +137,27 @@ export default function AdminLogsManagerContent({
           ) : null}
         </section>
 
-        <AdminForwardActivityPanel metrics={activityMetrics} />
-
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             title="전체 로그"
             value={`${logs.totalLogs.toLocaleString()}건`}
             description="현재 조회 범위 안에서 적재된 전체 로그 수입니다."
           />
-          {logs.readGroups.includes('product') ? (
+          {logs.readGroups.includes("product") ? (
             <MetricCard
               title="사용자 이벤트"
               value={`${logs.data.counts.product.toLocaleString()}건`}
               description="페이지 조회, 클릭, 검색, 푸시 설정 등 제품 로그입니다."
             />
           ) : null}
-          {logs.readGroups.includes('audit') ? (
+          {logs.readGroups.includes("audit") ? (
             <MetricCard
               title="관리자 감사"
               value={`${logs.data.counts.audit.toLocaleString()}건`}
               description="관리자 CRUD와 푸시 발송/삭제 같은 조작 이력입니다."
             />
           ) : null}
-          {logs.readGroups.includes('security') ? (
+          {logs.readGroups.includes("security") ? (
             <MetricCard
               title="인증·보안"
               value={`${logs.data.counts.security.toLocaleString()}건`}
@@ -161,14 +177,14 @@ export default function AdminLogsManagerContent({
           </div>
 
           <div className="grid min-w-0 gap-4 md:grid-cols-2 2xl:grid-cols-1">
-            {logs.readGroups.includes('security') ? (
+            {logs.readGroups.includes("security") ? (
               <SecurityStatusCard
                 success={logs.securityStatusCounts.success}
                 failure={logs.securityStatusCounts.failure}
                 blocked={logs.securityStatusCounts.blocked}
               />
             ) : null}
-            {logs.readGroups.includes('product') ? (
+            {logs.readGroups.includes("product") ? (
               <InsightListCard
                 title="상위 사용자 이벤트"
                 description="조회 범위 안에서 가장 많이 발생한 사용자 이벤트입니다."
@@ -179,7 +195,7 @@ export default function AdminLogsManagerContent({
         </section>
 
         <section className="grid min-w-0 gap-4 md:grid-cols-2 2xl:grid-cols-4">
-          {logs.readGroups.includes('audit') ? (
+          {logs.readGroups.includes("audit") ? (
             <InsightListCard
               title="상위 관리자 액션"
               description="조회 범위 안에서 많이 발생한 관리자 작업입니다."
