@@ -2,7 +2,6 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { ensureAdminApiPermission } from "@/lib/admin-access";
 import { downloadPrivateMemberProfileImage } from "@/lib/graduate-verification-storage";
-import { syncMemberMattermostProfile } from "@/lib/member-mattermost-profile-sync";
 import { getActiveMemberProfileImage } from "@/lib/member-profile-images";
 
 const UUID_PATTERN =
@@ -28,15 +27,7 @@ export async function GET(
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  let image = await getActiveMemberProfileImage(id);
-  if (!image) {
-    try {
-      await syncMemberMattermostProfile(id);
-      image = await getActiveMemberProfileImage(id);
-    } catch {
-      console.warn("[admin-member-avatar] profile sync failed");
-    }
-  }
+  const image = await getActiveMemberProfileImage(id);
   if (!image) {
     return NextResponse.json(
       { message: "아바타를 찾을 수 없습니다." },

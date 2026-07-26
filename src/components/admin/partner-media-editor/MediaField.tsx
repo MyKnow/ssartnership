@@ -229,6 +229,8 @@ export default function MediaField({
                     <img
                       src={item.kind === "existing" ? getCachedImageUrl(item.url) : item.url}
                       alt=""
+                      loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover"
                     />
                     <MediaStatusBadge kind={item.kind} />
@@ -286,6 +288,8 @@ export default function MediaField({
                     <img
                       src={item.kind === "existing" ? getCachedImageUrl(item.url) : item.url}
                       alt=""
+                      loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover"
                     />
                     <MediaStatusBadge kind={item.kind} />
