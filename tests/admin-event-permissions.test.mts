@@ -36,4 +36,8 @@ test("이벤트 목록·상세는 조회·생성·수정·삭제 권한에 맞�
   assert.match(detailView, /canUpdate = true/);
   assert.match(detailView, /canDelete = true/);
   assert.match(detailView, /조회 전용 권한/);
+  assert.match(detailPage, /admin_event_create_failed/);
+  assert.match(detailPage, /admin_event_update_failed/);
+  assert.match(detailPage, /admin_event_delete_failed/);
+  assert.match(detailView, /errorMessage/);
 });

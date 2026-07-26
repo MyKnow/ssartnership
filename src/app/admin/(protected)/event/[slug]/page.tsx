@@ -70,6 +70,19 @@ function statusMessage(status?: string) {
   return null;
 }
 
+function errorMessage(error?: string) {
+  if (error === "admin_event_create_failed") {
+    return "이벤트를 등록하지 못했습니다. 입력값과 운영 권한을 확인한 뒤 다시 시도해 주세요.";
+  }
+  if (error === "admin_event_update_failed") {
+    return "이벤트를 수정하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  }
+  if (error === "admin_event_delete_failed") {
+    return "이벤트를 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  }
+  return null;
+}
+
 function formatEventDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -678,6 +691,7 @@ function SignupRewardOverviewSection({
 
 type AdminEventDetailSearchParams = {
   status?: string;
+  error?: string;
   drawError?: string;
   drawWinnerCount?: string;
   drawSeed?: string;
@@ -773,6 +787,7 @@ async function AdminEventDetailContent({
   const canDelete = canAdmin(session.account.permissions, "events", "delete");
   const state = getEventState(isRegistered ? registration : null);
   const message = statusMessage(paramsData.status);
+  const actionErrorMessage = errorMessage(paramsData.error);
   const rewardContentPromise =
     slug === "signup-reward"
       ? getSignupRewardContent({
@@ -798,6 +813,7 @@ async function AdminEventDetailContent({
         state={state}
         targetLabel={targetLabel}
         message={message}
+        errorMessage={actionErrorMessage}
         registrationAction={
           isRegistered ? updatePromotionEventAction : createPromotionEventAction
         }

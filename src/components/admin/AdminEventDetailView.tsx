@@ -20,6 +20,7 @@ export type AdminEventDetailViewProps = {
   state: { label: string; className: string };
   targetLabel: string;
   message?: string | null;
+  errorMessage?: string | null;
   registrationAction: FormAction;
   deleteAction: FormAction;
   canCreate?: boolean;
@@ -81,6 +82,7 @@ export default function AdminEventDetailView({
   state,
   targetLabel,
   message,
+  errorMessage,
   registrationAction,
   deleteAction,
   canCreate = true,
@@ -137,6 +139,7 @@ export default function AdminEventDetailView({
         ]}
       />
       {message ? <FormMessage variant="info">{message}</FormMessage> : null}
+      {errorMessage ? <FormMessage variant="error">{errorMessage}</FormMessage> : null}
 
       <Card
         tone="elevated"

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getAdminSession } from "@/lib/auth";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { getSafeAdminActionErrorCode } from "@/lib/admin-action-errors";
 import { AD_PACKAGE_FORM_LIMITS } from "@/lib/ad-package-validation";
 import {
   DEFAULT_PROMOTION_AUDIENCES,
@@ -71,6 +72,15 @@ function adminEventUrl(
   }
   const query = params.toString();
   return `/admin/event/${slug}${query ? `?${query}` : ""}`;
+}
+
+function redirectEventRegistrationError(slug: string, fallback: string, error?: unknown): never {
+  const safeSlug = normalizeSlug(slug);
+  const path = safeSlug ? `/admin/event/${encodeURIComponent(safeSlug)}` : "/admin/event";
+  const code = error
+    ? getSafeAdminActionErrorCode(error, fallback)
+    : fallback;
+  redirect(`${path}?error=${encodeURIComponent(code)}`);
 }
 
 function redirectEventRewardDrawError(params: {
@@ -295,23 +305,28 @@ function revalidateAdvertisementPaths() {
 
 export async function createPromotionEventAction(formData: FormData) {
   await requireAdminPermission("events", "create", { path: "/admin/event" });
-  const slug = normalizeSlug(getRequiredString(formData, "slug"));
-  const payload = parsePromotionEventRegistration(formData, slug);
-  const supabase = getSupabaseAdminClient();
-  const { data: existing, error: existingError } = await supabase
-    .from("promotion_events")
-    .select("id")
-    .eq("slug", slug)
-    .maybeSingle();
-  if (existingError) {
-    throw new Error(existingError.message);
-  }
-  if (existing) {
-    throw new Error("이미 등록된 이벤트입니다.");
-  }
-  const { error } = await supabase.from("promotion_events").insert(payload);
-  if (error) {
-    throw new Error(error.message);
+  const slug = normalizeSlug(getString(formData, "slug"));
+  let payload: ReturnType<typeof parsePromotionEventRegistration>;
+  try {
+    payload = parsePromotionEventRegistration(formData, slug);
+    const supabase = getSupabaseAdminClient();
+    const { data: existing, error: existingError } = await supabase
+      .from("promotion_events")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle();
+    if (existingError) {
+      throw new Error(existingError.message);
+    }
+    if (existing) {
+      throw new Error("이미 등록된 이벤트입니다.");
+    }
+    const { error } = await supabase.from("promotion_events").insert(payload);
+    if (error) {
+      throw new Error(error.message);
+    }
+  } catch (error) {
+    redirectEventRegistrationError(slug, "admin_event_create_failed", error);
   }
   await logAdminAction("promotion_event_create", {
     targetType: "promotion_event",
@@ -328,36 +343,42 @@ export async function createPromotionEventAction(formData: FormData) {
 
 export async function updatePromotionEventAction(formData: FormData) {
   await requireAdminPermission("events", "update", { path: "/admin/event" });
-  const id = getRequiredString(formData, "id");
-  const slug = normalizeSlug(getRequiredString(formData, "slug"));
-  const supabase = getSupabaseAdminClient();
-  const { data: existing, error: existingError } = await supabase
-    .from("promotion_events")
-    .select("id,slug")
-    .eq("id", id)
-    .maybeSingle();
-  if (existingError) {
-    throw new Error(existingError.message);
-  }
+  const id = getString(formData, "id");
+  const slug = normalizeSlug(getString(formData, "slug"));
+  let payload: ReturnType<typeof parsePromotionEventRegistration>;
+  let target: { id?: string | null; slug?: string | null } | null;
+  try {
+    const supabase = getSupabaseAdminClient();
+    const { data: existing, error: existingError } = await supabase
+      .from("promotion_events")
+      .select("id,slug")
+      .eq("id", id)
+      .maybeSingle();
+    if (existingError) {
+      throw new Error(existingError.message);
+    }
 
-  const { data: existingBySlug, error: existingBySlugError } = existing?.slug
-    ? { data: null, error: null }
-    : await supabase
-        .from("promotion_events")
-        .select("id,slug")
-        .eq("slug", slug)
-        .maybeSingle();
-  if (existingBySlugError) {
-    throw new Error(existingBySlugError.message);
-  }
+    const { data: existingBySlug, error: existingBySlugError } = existing?.slug
+      ? { data: null, error: null }
+      : await supabase
+          .from("promotion_events")
+          .select("id,slug")
+          .eq("slug", slug)
+          .maybeSingle();
+    if (existingBySlugError) {
+      throw new Error(existingBySlugError.message);
+    }
 
-  const target = existing ?? existingBySlug;
-  const payload = parsePromotionEventRegistration(formData, target?.slug ?? slug);
-  const { error } = target?.id
-    ? await supabase.from("promotion_events").update(payload).eq("id", target.id)
-    : await supabase.from("promotion_events").insert(payload);
-  if (error) {
-    throw new Error(error.message);
+    target = existing ?? existingBySlug;
+    payload = parsePromotionEventRegistration(formData, target?.slug ?? slug);
+    const { error } = target?.id
+      ? await supabase.from("promotion_events").update(payload).eq("id", target.id)
+      : await supabase.from("promotion_events").insert(payload);
+    if (error) {
+      throw new Error(error.message);
+    }
+  } catch (error) {
+    redirectEventRegistrationError(slug, "admin_event_update_failed", error);
   }
   await logAdminAction("promotion_event_update", {
     targetType: "promotion_event",
@@ -375,12 +396,19 @@ export async function updatePromotionEventAction(formData: FormData) {
 
 export async function deletePromotionEventAction(formData: FormData) {
   await requireAdminPermission("events", "delete", { path: "/admin/event" });
-  const id = getRequiredString(formData, "id");
+  const id = getString(formData, "id");
   const slug = getString(formData, "slug") || id;
-  const supabase = getSupabaseAdminClient();
-  const { error } = await supabase.from("promotion_events").delete().eq("id", id);
-  if (error) {
-    throw new Error(error.message);
+  try {
+    if (!id) {
+      throw new Error("이벤트 식별자를 확인해 주세요.");
+    }
+    const supabase = getSupabaseAdminClient();
+    const { error } = await supabase.from("promotion_events").delete().eq("id", id);
+    if (error) {
+      throw new Error(error.message);
+    }
+  } catch (error) {
+    redirectEventRegistrationError(slug, "admin_event_delete_failed", error);
   }
   await logAdminAction("promotion_event_delete", {
     targetType: "promotion_event",
