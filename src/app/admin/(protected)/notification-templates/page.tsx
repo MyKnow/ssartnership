@@ -9,6 +9,7 @@ import {
   resetNotificationTemplateAction,
 } from "./actions";
 import { requireNotificationTemplateAdmin } from "@/lib/admin-access";
+import { canAdmin } from "@/lib/admin-permissions";
 import { listNotificationTemplates } from "@/lib/notification-templates/repository.server";
 import { getNotificationTemplateFeedback } from "@/lib/notification-templates/admin-feedback";
 
@@ -19,7 +20,9 @@ export default async function AdminNotificationTemplatesPage({
 }: {
   searchParams?: Promise<{ status?: string; error?: string }>;
 }) {
-  await requireNotificationTemplateAdmin("read", { path: "/admin/notification-templates" });
+  const session = await requireNotificationTemplateAdmin("read", {
+    path: "/admin/notification-templates",
+  });
   const params = (await searchParams) ?? {};
   const templates = await listNotificationTemplates();
   const feedback = getNotificationTemplateFeedback(params);
@@ -31,7 +34,11 @@ export default async function AdminNotificationTemplatesPage({
           eyebrow="자동화"
           title="알림 템플릿 관리"
           description="이메일, Mattermost, 푸시, 인앱 알림의 기본 문구를 확인하고 채널별로 수정합니다. 민감한 실제 값은 저장하지 않고 {변수이름} 자리표시자만 관리합니다."
-          actions={<Button href="/admin/push" variant="secondary">발송 관리</Button>}
+          actions={
+            <Button href="/admin/push" variant="secondary">
+              발송 관리
+            </Button>
+          }
         />
         <AdminOperationFlow
           steps={[
@@ -63,6 +70,16 @@ export default async function AdminNotificationTemplatesPage({
           defaultTestRecipientId={null}
           statusMessage={feedback?.tone === "info" ? feedback.message : null}
           errorMessage={feedback?.tone === "error" ? feedback.message : null}
+          canUpdate={canAdmin(
+            session.account.permissions,
+            "notification_templates",
+            "update",
+          )}
+          canDelete={canAdmin(
+            session.account.permissions,
+            "notification_templates",
+            "delete",
+          )}
         />
       </div>
     </AdminShell>
