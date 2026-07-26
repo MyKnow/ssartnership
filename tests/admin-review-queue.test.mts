@@ -132,6 +132,35 @@ test("가입 승인 상세의 반려 입력은 같은 화면 복구와 접근 �
   assert.match(pageSource, /focusRejectReason=\{query\.error === "invalid_reason"\}/);
 });
 
+test("프로필 사진 반려 입력은 실패한 카드로 복구하고 접근 가능한 한국어 안내를 제공한다", async () => {
+  const [queueSource, pageSource, actionSource] = await Promise.all([
+    readFile(queueSourcePaths[3], "utf8"),
+    readFile(
+      new URL(
+        "../src/app/admin/(protected)/profile-photos/page.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/app/admin/(protected)/profile-photos/actions.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(queueSource, /from "@\/components\/ui\/Textarea"/);
+  assert.match(queueSource, /focusReasonTarget/);
+  assert.match(queueSource, /반려 사유를 1~500자로 입력해 주세요/);
+  assert.match(queueSource, /aria-invalid=\{isReasonInvalid \|\| undefined\}/);
+  assert.match(queueSource, /autoFocus=\{isReasonInvalid\}/);
+  assert.doesNotMatch(queueSource, /<input\s+id=\{`(?:replacement|current-photo)-reason-/);
+  assert.match(pageSource, /focusReasonTarget=\{params\.focus/);
+  assert.match(actionSource, /appendAdminReviewQueueQuery\(returnTo, \{ focus: reasonFieldId \}\)/);
+});
+
 test("관리자 라우트 오류 화면은 내부 오류 메시지를 렌더링하지 않는다", async () => {
   const source = await readFile(
     new URL("../src/app/admin/(protected)/error.tsx", import.meta.url),

@@ -48,6 +48,12 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+export const InvalidReason: Story = {
+  args: {
+    focusReasonTarget: "replacement-reason-00000000-0000-4000-8000-000000000201",
+  },
+};
+
 export const Empty: Story = {
   args: { replacements: [], currentPhotos: [] },
 };

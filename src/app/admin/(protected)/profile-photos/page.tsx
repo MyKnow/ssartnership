@@ -15,7 +15,12 @@ export const dynamic = "force-dynamic";
 export default async function AdminProfilePhotosPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ error?: string; success?: string; returnTo?: string }>;
+  searchParams?: Promise<{
+    error?: string;
+    success?: string;
+    returnTo?: string;
+    focus?: string;
+  }>;
 }) {
   await requireAdminPermission("profile_images", "read", { path: "/admin/profile-photos" });
   const { replacements, currentPhotos, queueLoadError } =
@@ -39,6 +44,7 @@ export default async function AdminProfilePhotosPage({
         })}
         returnTo={returnTo}
         loadError={queueLoadError}
+        focusReasonTarget={params.focus}
       />
     </AdminShell>
   );
