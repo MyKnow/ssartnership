@@ -171,6 +171,7 @@
 
 - 목표·위계: 검색/핵심 필터 → 서버가 필터한 제휴처 목록 → 상태 요약 → 생성/상세 이동 순이다.
 - 액션·흐름: primary는 제휴처 추가, 각 행의 보조 액션은 상세 열기다. 변경 요청·카테고리 작업은 전용 화면으로 이동한다.
+- 응답성 경계: 목록 첫 응답은 찾기·상태 확인·상세 이동에 필요한 데이터만 기다리며, 즐겨찾기·조회·CTA·리뷰 집계 같은 보조 운영 지표는 상세 화면에서 필요할 때 확인한다.
 - 경계·상태: brands permission과 campus scope를 적용한다. `q`(제휴처명), `category`, `visibility`, `sort`, `page`, `pageSize`가 목록 URL의 단일 기준이며, page size는 12·24·48 중 하나다. filter가 바뀌면 page를 1로 되돌린다. 기본, 빈 결과, 다건, filter, pagination, loading, 오류를 제공한다.
 - 반응형·분석: 모바일 compact entity row, 데스크톱 dense list를 쓴다. 조회·상세 이동·생성을 기록한다.
 - 수용 기준: 서버가 현재 page만 조회하고, 범위를 벗어난 page는 현재 filter를 보존한 canonical URL로 정규화한다. 오류는 내부 DB 오류를 노출하지 않고 같은 filter에서 재시도할 수 있어야 한다. `tab=requests|categories|category` 구 query는 전용 canonical route로 이동하고 목록 화면에 해당 편집 UI를 중복 렌더하지 않는다. `tab=plans`는 플랜 기능 보존용 conditional legacy 상태로만 유지한다.

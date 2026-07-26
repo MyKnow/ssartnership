@@ -4,6 +4,7 @@ import PartnerAudienceChips from "@/components/PartnerAudienceChips";
 import CategoryColorBadge from "@/components/ui/CategoryColorBadge";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import Surface from "@/components/ui/Surface";
 import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
@@ -119,11 +120,21 @@ export default function AdminPartnerListItem({
         </div>
       </div>
 
-      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {summaryMetrics.map((metric) => (
-          <MetricPill key={metric.label} {...metric} />
-        ))}
-      </div>
+      {partner.metrics === undefined ? (
+        <Surface level="inset" padding="sm" className="text-sm text-muted-foreground">
+          운영 지표는 상세 화면에서 확인할 수 있습니다. 목록은 제휴처 찾기와 상태 확인에 집중합니다.
+        </Surface>
+      ) : partner.metrics === null ? (
+        <Surface level="inset" padding="sm" className="text-sm text-muted-foreground">
+          운영 지표를 불러오지 못했습니다. 상세 화면에서 다시 확인해 주세요.
+        </Surface>
+      ) : (
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {summaryMetrics.map((metric) => (
+            <MetricPill key={metric.label} {...metric} />
+          ))}
+        </div>
+      )}
     </article>
   );
 }
