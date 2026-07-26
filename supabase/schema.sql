@@ -1062,7 +1062,12 @@ create index if not exists admin_notification_recipients_unread_admin_idx
 
 create or replace function public.get_admin_dashboard_home_snapshot(
   input_admin_id uuid,
-  input_managed_campus_slugs text[] default null
+  input_managed_campus_slugs text[] default null,
+  input_include_brand_queues boolean default false,
+  input_include_graduate_verifications boolean default false,
+  input_include_signup_requests boolean default false,
+  input_include_profile_photos boolean default false,
+  input_include_notifications boolean default false
 )
 returns table (
   member_count bigint,
@@ -1078,6 +1083,9 @@ returns table (
   registration_pending_count bigint,
   change_request_pending_count bigint,
   plan_request_pending_count bigint,
+  graduate_verification_pending_count bigint,
+  signup_request_pending_count bigint,
+  profile_photo_pending_count bigint,
   unread_notification_count bigint
 )
 language sql
@@ -1122,7 +1130,7 @@ as $$
       coalesce((select reltuples::bigint from pg_class where oid = 'public.auth_security_logs'::regclass), 0),
       0
     ) else 0::bigint end,
-    (
+    case when input_include_brand_queues then (
       select count(*)::bigint
       from public.partner_registration_requests as request
       left join public.partner_companies as company on company.id = request.company_id
@@ -1139,33 +1147,50 @@ as $$
             and public.infer_partner_campus_slugs(request.location) && scope.managed_campus_slugs
           )
         )
-    ),
-    (
+    ) else 0::bigint end,
+    case when input_include_brand_queues then (
       select count(*)::bigint
       from public.partner_change_requests as request
       join public.partners as partner on partner.id = request.partner_id
       where request.status = 'pending'
         and (scope.is_global or partner.managed_campus_slugs && scope.managed_campus_slugs)
-    ),
-    case when scope.is_global then (
+    ) else 0::bigint end,
+    case when input_include_brand_queues and scope.is_global then (
       select count(*)::bigint
       from public.partner_plan_upgrade_requests
       where status = 'pending'
     ) else 0::bigint end,
-    (
+    case when input_include_graduate_verifications then (
+      select count(*)::bigint
+      from public.graduate_verification_requests
+      where status in ('submitted', 'in_review')
+    ) else 0::bigint end,
+    case when input_include_signup_requests then (
+      select count(*)::bigint
+      from public.member_signup_approval_requests
+      where status = 'pending'
+    ) else 0::bigint end,
+    case when input_include_profile_photos then (
+      select count(*)::bigint
+      from public.member_profile_images
+      where graduate_verification_request_id is null
+        and member_id is not null
+        and status = 'pending'
+    ) else 0::bigint end,
+    case when input_include_notifications then (
       select count(*)::bigint
       from public.admin_notification_recipients
       where admin_id = input_admin_id
         and deleted_at is null
         and read_at is null
-    )
+    ) else 0::bigint end
   from scope;
 $$;
 
-revoke all on function public.get_admin_dashboard_home_snapshot(uuid, text[]) from public;
-revoke all on function public.get_admin_dashboard_home_snapshot(uuid, text[]) from anon;
-revoke all on function public.get_admin_dashboard_home_snapshot(uuid, text[]) from authenticated;
-grant execute on function public.get_admin_dashboard_home_snapshot(uuid, text[]) to service_role;
+revoke all on function public.get_admin_dashboard_home_snapshot(uuid, text[], boolean, boolean, boolean, boolean, boolean) from public;
+revoke all on function public.get_admin_dashboard_home_snapshot(uuid, text[], boolean, boolean, boolean, boolean, boolean) from anon;
+revoke all on function public.get_admin_dashboard_home_snapshot(uuid, text[], boolean, boolean, boolean, boolean, boolean) from authenticated;
+grant execute on function public.get_admin_dashboard_home_snapshot(uuid, text[], boolean, boolean, boolean, boolean, boolean) to service_role;
 
 create or replace function public.get_admin_partner_registration_request_page(
   input_status text default null,

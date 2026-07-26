@@ -151,6 +151,20 @@ test("홈의 다음 작업은 실제 대기 건이 있는 권한 내 작업만 �
   );
 });
 
+test("관리 홈은 모든 권한 내 검토 큐를 다음 작업 후보에 포함한다", async () => {
+  const source = await readFile(
+    new URL("../src/components/admin/AdminDashboardView.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /href: "\/admin\/graduate-verifications"/);
+  assert.match(source, /count: queueCounts\.graduateVerificationPendingCount/);
+  assert.match(source, /href: "\/admin\/member-signup-requests"/);
+  assert.match(source, /count: queueCounts\.signupRequestPendingCount/);
+  assert.match(source, /href: "\/admin\/profile-photos"/);
+  assert.match(source, /count: queueCounts\.profilePhotoPendingCount/);
+});
+
 test("관리 홈은 다음 작업을 우선 표시하고, 활동 지표 조회가 첫 화면을 막지 않는다", async () => {
   const [dashboardSource, pageSource] = await Promise.all([
     readFile(
