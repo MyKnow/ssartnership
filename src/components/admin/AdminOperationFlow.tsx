@@ -23,7 +23,11 @@ export default function AdminOperationFlow({
       <ol
         className={cn(
           "grid min-w-0 gap-2",
-          steps.length === 4 ? "sm:grid-cols-4" : "sm:grid-cols-3",
+          steps.length === 2
+            ? "sm:grid-cols-2"
+            : steps.length === 4
+              ? "sm:grid-cols-4"
+              : "sm:grid-cols-3",
         )}
       >
         {steps.map((step, index) => {
@@ -54,7 +58,9 @@ export default function AdminOperationFlow({
                 {state === "complete" ? "✓" : index + 1}
               </span>
               <span className="min-w-0">
-                <span className="block text-sm font-semibold text-foreground">{step.label}</span>
+                <span className="block text-sm font-semibold text-foreground">
+                  {step.label}
+                </span>
                 <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
                   {step.description}
                 </span>
@@ -65,7 +71,10 @@ export default function AdminOperationFlow({
           return (
             <li key={`${step.label}-${index}`} className="min-w-0">
               {step.href && state !== "current" ? (
-                <Link href={step.href} className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                <Link
+                  href={step.href}
+                  className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                >
                   {content}
                 </Link>
               ) : (

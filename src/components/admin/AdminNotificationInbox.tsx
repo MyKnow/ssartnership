@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import IconActionButton, { IconActionGroup } from "@/components/ui/IconActionButton";
+import IconActionButton, {
+  IconActionGroup,
+} from "@/components/ui/IconActionButton";
 import { useToast } from "@/components/ui/Toast";
 import {
   getAdminNotificationTypeLabel,
@@ -57,7 +59,9 @@ export default function AdminNotificationInbox({
   const [state, setState] = useState(initialState);
   const [loadingMore, setLoadingMore] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
-  const [pendingAction, setPendingAction] = useState<"read-all" | "delete-all" | null>(null);
+  const [pendingAction, setPendingAction] = useState<
+    "read-all" | "delete-all" | null
+  >(null);
 
   const unreadLabel = useMemo(
     () => (state.unreadCount > 99 ? "99+" : String(state.unreadCount)),
@@ -304,15 +308,17 @@ export default function AdminNotificationInbox({
       padding="none"
       className={cn("mx-auto w-full max-w-3xl overflow-hidden", className)}
     >
-      <div className="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-3.5 sm:px-5 sm:py-4">
+      <div className="grid gap-3 border-b border-border/70 px-4 py-3.5 sm:flex sm:items-center sm:justify-between sm:gap-3 sm:px-5 sm:py-4">
         <div className="flex min-w-0 items-center gap-2">
-          <h2 className="text-base font-semibold text-foreground sm:text-lg">관리자 수신함</h2>
+          <h2 className="min-w-0 text-base font-semibold text-foreground sm:text-lg">
+            관리자 수신함
+          </h2>
           {state.items.length > 0 && state.unreadCount > 0 ? (
             <Badge variant="danger">안 읽음 {unreadLabel}</Badge>
           ) : null}
         </div>
         {state.items.length > 0 ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Button
               variant="secondary"
               size="sm"
@@ -320,7 +326,11 @@ export default function AdminNotificationInbox({
               onClick={() => {
                 void markAllAsRead();
               }}
-              disabled={state.unreadCount === 0 || isBulkActionPending || Boolean(pendingId)}
+              disabled={
+                state.unreadCount === 0 ||
+                isBulkActionPending ||
+                Boolean(pendingId)
+              }
             >
               전체 읽음
             </Button>
@@ -331,7 +341,11 @@ export default function AdminNotificationInbox({
               onClick={() => {
                 void deleteAllNotifications();
               }}
-              disabled={state.items.length === 0 || isBulkActionPending || Boolean(pendingId)}
+              disabled={
+                state.items.length === 0 ||
+                isBulkActionPending ||
+                Boolean(pendingId)
+              }
             >
               전체 삭제
             </Button>
@@ -368,7 +382,9 @@ export default function AdminNotificationInbox({
                     aria-hidden="true"
                     className={cn(
                       "block h-2.5 w-2.5 rounded-full",
-                      item.isUnread ? "bg-danger shadow-[0_0_0_4px_rgba(194,65,92,0.12)]" : "bg-border/75",
+                      item.isUnread
+                        ? "bg-danger shadow-[0_0_0_4px_rgba(194,65,92,0.12)]"
+                        : "bg-border/75",
                     )}
                   />
                 </div>
@@ -389,7 +405,9 @@ export default function AdminNotificationInbox({
                     <span
                       className={cn(
                         "text-xs text-muted-foreground",
-                        item.isUnread ? "text-foreground-soft" : "text-muted-foreground/65",
+                        item.isUnread
+                          ? "text-foreground-soft"
+                          : "text-muted-foreground/65",
                       )}
                     >
                       {formatNotificationDate(item.createdAt)}
@@ -399,7 +417,9 @@ export default function AdminNotificationInbox({
                     <h3
                       className={cn(
                         "text-sm font-semibold leading-6 text-foreground sm:text-[15px]",
-                        item.isUnread ? "text-foreground" : "text-foreground-soft/75",
+                        item.isUnread
+                          ? "text-foreground"
+                          : "text-foreground-soft/75",
                       )}
                     >
                       {item.title}
@@ -407,7 +427,9 @@ export default function AdminNotificationInbox({
                     <p
                       className={cn(
                         "line-clamp-2 text-sm leading-5 text-muted-foreground sm:leading-6",
-                        item.isUnread ? "text-muted-foreground" : "text-muted-foreground/60",
+                        item.isUnread
+                          ? "text-muted-foreground"
+                          : "text-muted-foreground/60",
                       )}
                     >
                       {item.body}
@@ -451,7 +473,8 @@ export default function AdminNotificationInbox({
                 아직 도착한 관리자 알림이 없습니다
               </p>
               <p className="text-sm text-muted-foreground">
-                파트너 변경 요청, 제휴 종료 임박, 보안 이벤트가 이곳에 표시됩니다.
+                파트너 변경 요청, 제휴 종료 임박, 보안 이벤트가 이곳에
+                표시됩니다.
               </p>
             </div>
             <Button
