@@ -10,6 +10,7 @@ import {
 } from "@/components/admin/AdminMemberDetailDeferredPanels";
 import AdminMemberDetailStatusMessages from "@/components/admin/member-detail/AdminMemberDetailStatusMessages";
 import AdminStatePanel from "@/components/admin/AdminStatePanel";
+import { AdminMemberDetailSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import Button from "@/components/ui/Button";
 import { parseSsafyProfile } from "@/lib/mm-profile";
 import { requireAdminPermission } from "@/lib/admin-access";
@@ -84,27 +85,24 @@ function buildMemberDetailRetryHref({
   return query ? `/admin/members/${memberId}?${query}` : `/admin/members/${memberId}`;
 }
 
-export default async function AdminMemberDetailPage({
-  params,
-  searchParams,
+async function AdminMemberDetailContent({
+  adminSession,
+  memberId,
+  query,
+  backHref,
 }: {
-  params: Promise<{ memberId: string }>;
-  searchParams?: Promise<AdminMemberDetailSearchParams>;
+  adminSession: Awaited<ReturnType<typeof requireAdminPermission>>;
+  memberId: string;
+  query: AdminMemberDetailSearchParams;
+  backHref: string;
 }) {
-  const adminSession = await requireAdminPermission("members", "read", {
-    path: "/admin/members",
-  });
   const canUpdateMembers = canAdmin(
     adminSession.account.permissions,
     "members",
     "update",
   );
-  const { memberId } = await params;
-  const query = (await searchParams) ?? {};
   const securityLogPage = parsePositiveInteger(query.logPage, 1);
   const securityLogPageSize = parseSecurityLogPageSize(query.logPageSize);
-  const backHref = sanitizeAdminReturnTo(query.returnTo, "/admin/members");
-  const backLabel = backHref.startsWith("/admin/search") ? "검색 결과" : "회원 관리";
   const retryHref = buildMemberDetailRetryHref({
     memberId,
     securityLogPage,
@@ -122,14 +120,12 @@ export default async function AdminMemberDetailPage({
   if (!detail.member) {
     if (detail.memberLoadError) {
       return (
-        <AdminShell title="회원 상세" backHref={backHref} backLabel={backLabel}>
-          <AdminStatePanel
-            kind="error"
-            title="회원 정보를 불러오지 못했습니다."
-            description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 기록을 확인해 주세요."
-            action={<Button href={retryHref} variant="secondary">다시 확인</Button>}
-          />
-        </AdminShell>
+        <AdminStatePanel
+          kind="error"
+          title="회원 정보를 불러오지 못했습니다."
+          description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 기록을 확인해 주세요."
+          action={<Button href={retryHref} variant="secondary">다시 확인</Button>}
+        />
       );
     }
     notFound();
@@ -187,8 +183,7 @@ export default async function AdminMemberDetailPage({
       : {}),
   };
   return (
-    <AdminShell title="회원 상세" backHref={backHref} backLabel={backLabel}>
-      <div className="grid gap-4">
+    <div className="grid gap-4">
         <AdminMemberDetailStatusMessages
           errorCode={query.error}
           emailTransition={query.emailTransition}
@@ -288,7 +283,37 @@ export default async function AdminMemberDetailPage({
           </Suspense>
         }
       />
-      </div>
+    </div>
+  );
+}
+
+export default async function AdminMemberDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ memberId: string }>;
+  searchParams?: Promise<AdminMemberDetailSearchParams>;
+}) {
+  const adminSession = await requireAdminPermission("members", "read", {
+    path: "/admin/members",
+  });
+  const { memberId } = await params;
+  const query = (await searchParams) ?? {};
+  const backHref = sanitizeAdminReturnTo(query.returnTo, "/admin/members");
+  const backLabel = backHref.startsWith("/admin/search")
+    ? "검색 결과"
+    : "회원 관리";
+
+  return (
+    <AdminShell title="회원 상세" backHref={backHref} backLabel={backLabel}>
+      <Suspense fallback={<AdminMemberDetailSkeletonContent />}>
+        <AdminMemberDetailContent
+          adminSession={adminSession}
+          memberId={memberId}
+          query={query}
+          backHref={backHref}
+        />
+      </Suspense>
     </AdminShell>
   );
 }

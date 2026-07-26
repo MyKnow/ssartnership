@@ -327,3 +327,11 @@ export function AdminGraduateVerificationsSkeletonContent() {
 export function AdminProfilePhotosSkeletonContent() {
   return <AdminListSkeletonContent filterFields={0} rows={4} />;
 }
+
+export function AdminMemberDetailSkeletonContent() {
+  return <AdminListSkeletonContent filterFields={0} rows={4} />;
+}
+
+export function AdminMemberSignupRequestsSkeletonContent() {
+  return <AdminListSkeletonContent filterFields={0} rows={4} />;
+}
