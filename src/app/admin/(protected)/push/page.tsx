@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import AdminPushManager from "@/components/admin/AdminPushManager";
 import AdminShell from "@/components/admin/AdminShell";
+import { AdminPushSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -14,19 +16,13 @@ import { getAdminPushReadModel } from "@/lib/admin-push-read-model.server";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminPushPage({
-  searchParams,
+async function AdminPushContent({
+  session,
+  initialTab,
 }: {
-  searchParams?: Promise<{ tab?: string }>;
+  session: Awaited<ReturnType<typeof requireAdminPermission>>;
+  initialTab: "send" | "logs" | "center";
 }) {
-  const session = await requireAdminPermission("notifications", "read", {
-    path: "/admin/push",
-  });
-  const params = (await searchParams) ?? {};
-  const initialTab =
-    params.tab === "send" || params.tab === "logs" || params.tab === "center"
-      ? params.tab
-      : "center";
   const canSend = canAdmin(
     session.account.permissions,
     "notifications",
@@ -47,8 +43,7 @@ export default async function AdminPushPage({
   const automaticSummaryCount = readModel.automaticSummaries.length;
 
   return (
-    <AdminShell title="발송 관리" backHref="/admin" backLabel="관리 홈">
-      <div className="grid gap-6">
+    <div className="grid gap-6">
         <AdminPageHeader
           eyebrow="발송"
           title="발송 관리"
@@ -150,7 +145,29 @@ export default async function AdminPushPage({
             </Card>
           </div>
         </div>
-      </div>
+    </div>
+  );
+}
+
+export default async function AdminPushPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ tab?: string }>;
+}) {
+  const session = await requireAdminPermission("notifications", "read", {
+    path: "/admin/push",
+  });
+  const params = (await searchParams) ?? {};
+  const initialTab =
+    params.tab === "send" || params.tab === "logs" || params.tab === "center"
+      ? params.tab
+      : "center";
+
+  return (
+    <AdminShell title="발송 관리" backHref="/admin" backLabel="관리 홈">
+      <Suspense fallback={<AdminPushSkeletonContent />}>
+        <AdminPushContent session={session} initialTab={initialTab} />
+      </Suspense>
     </AdminShell>
   );
 }

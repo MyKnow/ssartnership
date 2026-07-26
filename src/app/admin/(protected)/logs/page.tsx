@@ -10,21 +10,22 @@ import { getAdminLogAccessPolicy } from "@/lib/admin-log-access";
 import { getAdminLogsPageData } from "@/lib/log-insights";
 import { fetchForwardActivityMetrics } from "@/lib/platform-activity-forward-metrics";
 import { getAdminWebVitalSummary } from "@/lib/admin-web-vitals-summary.server";
+import { AdminLogsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminLogsPage() {
-  const session = await requireAdminPermission("logs", "read", {
-    path: "/admin/logs",
-  });
+async function AdminLogsContent({
+  session,
+}: {
+  session: Awaited<ReturnType<typeof requireAdminPermission>>;
+}) {
   const access = getAdminLogAccessPolicy(session.account);
   const activityPromise = fetchForwardActivityMetrics();
   const webVitalsPromise = getAdminWebVitalSummary();
   const data = await getAdminLogsPageData({ preset: "24h" }, access);
 
   return (
-    <AdminShell title="로그 조회" backHref="/admin" backLabel="관리 홈">
-      <div className="grid gap-6">
+    <div className="grid gap-6">
         <AdminPageHeader
           eyebrow="운영 기록"
           title="운영 로그 조회"
@@ -37,7 +38,20 @@ export default async function AdminLogsPage() {
             webVitals={webVitalsPromise}
           />
         </Suspense>
-      </div>
+    </div>
+  );
+}
+
+export default async function AdminLogsPage() {
+  const session = await requireAdminPermission("logs", "read", {
+    path: "/admin/logs",
+  });
+
+  return (
+    <AdminShell title="로그 조회" backHref="/admin" backLabel="관리 홈">
+      <Suspense fallback={<AdminLogsSkeletonContent />}>
+        <AdminLogsContent session={session} />
+      </Suspense>
     </AdminShell>
   );
 }

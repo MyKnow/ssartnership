@@ -286,6 +286,18 @@ export function AdminPushSkeleton() {
   return <AdminListSkeleton title="발송 관리" filterFields={3} rows={3} />;
 }
 
+export function AdminPushSkeletonContent() {
+  return <AdminListSkeletonContent filterFields={3} rows={3} />;
+}
+
 export function AdminLogsSkeleton() {
   return <AdminListSkeleton title="로그 조회" filterFields={4} rows={5} />;
+}
+
+export function AdminLogsSkeletonContent() {
+  return <AdminListSkeletonContent filterFields={4} rows={5} />;
+}
+
+export function AdminNotificationsSkeletonContent() {
+  return <AdminListSkeletonContent filterFields={0} rows={3} />;
 }

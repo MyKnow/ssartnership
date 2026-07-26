@@ -45,6 +45,24 @@ const listRoutes = [
     content: "AdminCategoriesContent",
     fallback: "AdminCategoriesSkeletonContent",
   },
+  {
+    label: "리뷰 조회",
+    page: "../src/app/admin/(protected)/logs/page.tsx",
+    content: "AdminLogsContent",
+    fallback: "AdminLogsSkeletonContent",
+  },
+  {
+    label: "발송 관리",
+    page: "../src/app/admin/(protected)/push/page.tsx",
+    content: "AdminPushContent",
+    fallback: "AdminPushSkeletonContent",
+  },
+  {
+    label: "내 알림",
+    page: "../src/app/admin/(protected)/notifications/page.tsx",
+    content: "AdminNotificationsContent",
+    fallback: "AdminNotificationsSkeletonContent",
+  },
 ];
 
 test("대표 관리자 목록은 셸과 read model 콘텐츠를 분리해 스트리밍한다", async () => {
