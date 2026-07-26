@@ -83,6 +83,13 @@ function redirectEventRegistrationError(slug: string, fallback: string, error?: 
   redirect(`${path}?error=${encodeURIComponent(code)}`);
 }
 
+function redirectAdvertisementError(fallback: string, error?: unknown): never {
+  const code = error
+    ? getSafeAdminActionErrorCode(error, fallback)
+    : fallback;
+  redirect(`/admin/advertisement?error=${encodeURIComponent(code)}`);
+}
+
 function redirectEventRewardDrawError(params: {
   slug: string;
   message: string;
@@ -421,6 +428,16 @@ export async function deletePromotionEventAction(formData: FormData) {
 
 export async function savePromotionSlidesAction(formData: FormData) {
   await requireAdminPermission("home_ads", "update", { path: "/admin/advertisement" });
+  try {
+    await savePromotionSlidesMutation(formData);
+  } catch (error) {
+    console.error("[admin-advertisement] promotion slide save failed", error);
+    redirectAdvertisementError("promotion_slide_save_failed", error);
+  }
+  redirect("/admin/advertisement?status=updated");
+}
+
+async function savePromotionSlidesMutation(formData: FormData) {
   const slides = parsePromotionSlideDrafts(formData);
   const supabase = getSupabaseAdminClient();
 
@@ -565,7 +582,6 @@ export async function savePromotionSlidesAction(formData: FormData) {
   });
 
   revalidateAdvertisementPaths();
-  redirect("/admin/advertisement?status=updated");
 }
 
 export async function createEventRewardDrawAction(formData: FormData) {
@@ -669,12 +685,26 @@ export async function previewEventRewardDrawAction(formData: FormData) {
 
 export async function sendEventRewardWinnerNotificationsAction(formData: FormData) {
   await requireAdminPermission("events", "update", { path: "/admin/event" });
-  const slug = normalizeSlug(getRequiredString(formData, "slug"));
-  const drawId = getRequiredString(formData, "drawId");
-  const result = await sendEventRewardWinnerNotifications(drawId, {
-    eventSlug: slug,
-    confirmationText: getString(formData, "confirmationText"),
-  });
+  const slug = normalizeSlug(getString(formData, "slug"));
+  const drawId = getString(formData, "drawId");
+  let result: Awaited<ReturnType<typeof sendEventRewardWinnerNotifications>>;
+  try {
+    if (!slug || !drawId) {
+      throw new Error("당첨 안내 대상 정보를 확인해 주세요.");
+    }
+    result = await sendEventRewardWinnerNotifications(drawId, {
+      eventSlug: slug,
+      confirmationText: getString(formData, "confirmationText"),
+    });
+  } catch (error) {
+    redirectEventRewardDrawError({
+      slug: slug || "signup-reward",
+      message: eventRewardActionErrorMessage(
+        error,
+        "당첨 안내를 발송하지 못했습니다. 발송 조건과 설정을 확인해 주세요.",
+      ),
+    });
+  }
 
   await logAdminAction("event_reward_winner_notification_send", {
     targetType: "event_reward_draw",
@@ -692,13 +722,27 @@ export async function sendEventRewardWinnerNotificationsAction(formData: FormDat
 
 export async function sendEventRewardWinnerTestNotificationAction(formData: FormData) {
   await requireAdminPermission("events", "update", { path: "/admin/event" });
-  const slug = normalizeSlug(getRequiredString(formData, "slug"));
+  const slug = normalizeSlug(getString(formData, "slug"));
   const drawId = getString(formData, "drawId") || null;
-  const memberId = getRequiredString(formData, "memberId");
-  const result = await sendEventRewardWinnerTestNotification(drawId, {
-    eventSlug: slug,
-    memberId,
-  });
+  const memberId = getString(formData, "memberId");
+  let result: Awaited<ReturnType<typeof sendEventRewardWinnerTestNotification>>;
+  try {
+    if (!slug || !memberId) {
+      throw new Error("테스트 안내 대상 정보를 확인해 주세요.");
+    }
+    result = await sendEventRewardWinnerTestNotification(drawId, {
+      eventSlug: slug,
+      memberId,
+    });
+  } catch (error) {
+    redirectEventRewardDrawError({
+      slug: slug || "signup-reward",
+      message: eventRewardActionErrorMessage(
+        error,
+        "당첨 안내 테스트를 발송하지 못했습니다. 대상 회원과 설정을 확인해 주세요.",
+      ),
+    });
+  }
 
   await logAdminAction("event_reward_winner_notification_test_send", {
     targetType: "event_reward_draw",

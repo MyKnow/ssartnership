@@ -41,6 +41,13 @@ function statusMessage(status?: string) {
   return null;
 }
 
+function errorMessage(error?: string) {
+  if (error === "promotion_slide_save_failed") {
+    return "광고 카드 저장에 실패했습니다. 이미지와 입력값을 확인한 뒤 다시 시도해 주세요.";
+  }
+  return null;
+}
+
 async function AdminAdvertisementContent({
   session,
   params,
@@ -49,6 +56,7 @@ async function AdminAdvertisementContent({
   params: { status?: string };
 }) {
   const message = statusMessage(params.status);
+  const actionErrorMessage = errorMessage(params.error);
   const [slides, eventCampaigns, adCampaignOptions] = await Promise.all([
     listManagedPromotionSlides({ includeInactive: true }),
     listManagedEventCampaigns({ includeInactive: false }),
@@ -85,6 +93,7 @@ async function AdminAdvertisementContent({
         canCreate={canAdmin(session.account.permissions, "home_ads", "create")}
         canUpdate={canAdmin(session.account.permissions, "home_ads", "update")}
         message={message}
+        errorMessage={actionErrorMessage}
         clearPromotionDraft={params.status === "updated"}
     />
   );
@@ -93,7 +102,7 @@ async function AdminAdvertisementContent({
 export default async function AdminAdvertisementPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ status?: string }>;
+  searchParams?: Promise<{ status?: string; error?: string }>;
 }) {
   const session = await requireAdminPermission("home_ads", "read", {
     path: "/admin/advertisement",

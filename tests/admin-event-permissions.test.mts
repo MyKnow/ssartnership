@@ -40,4 +40,10 @@ test("이벤트 목록·상세는 조회·생성·수정·삭제 권한에 맞�
   assert.match(detailPage, /admin_event_update_failed/);
   assert.match(detailPage, /admin_event_delete_failed/);
   assert.match(detailView, /errorMessage/);
+  const promotionActions = await read(
+    "src/app/admin/(protected)/_actions/promotion-actions.ts",
+  );
+  assert.match(promotionActions, /redirectAdvertisementError/);
+  assert.match(promotionActions, /당첨 안내를 발송하지 못했습니다/);
+  assert.match(promotionActions, /당첨 안내 테스트를 발송하지 못했습니다/);
 });

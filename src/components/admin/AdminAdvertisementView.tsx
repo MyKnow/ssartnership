@@ -37,6 +37,7 @@ export type AdminAdvertisementViewProps = Pick<
     canCreate?: boolean;
     canUpdate?: boolean;
     message?: string | null;
+    errorMessage?: string | null;
     clearPromotionDraft?: boolean;
   };
 
@@ -94,6 +95,7 @@ export default function AdminAdvertisementView({
   canCreate = true,
   canUpdate = true,
   message,
+  errorMessage,
   clearPromotionDraft = false,
 }: AdminAdvertisementViewProps) {
   const resolvedCampaignsPromise =
@@ -166,6 +168,7 @@ export default function AdminAdvertisementView({
         ]}
       />
       {message ? <FormMessage variant="info">{message}</FormMessage> : null}
+      {errorMessage ? <FormMessage variant="error">{errorMessage}</FormMessage> : null}
       <section className="grid gap-4">
         <AdminSectionHeading
           title="캐러셀 편집기"
