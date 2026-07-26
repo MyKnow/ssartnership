@@ -66,6 +66,8 @@ export type AdminReviewRecord = {
   disrecommendCount: number;
 };
 
+export type AdminReviewSummary = Omit<AdminReviewRecord, "body" | "images">;
+
 export type AdminReviewCounts = {
   totalCount: number;
   visibleCount: number;
@@ -74,7 +76,7 @@ export type AdminReviewCounts = {
 
 export type AdminReviewPageData = {
   counts: AdminReviewCounts;
-  reviews: AdminReviewRecord[];
+  reviews: AdminReviewSummary[];
   companies: AdminReviewCompanyOption[];
   partners: AdminReviewPartnerOption[];
   filters: AdminReviewFilters;
@@ -136,6 +138,7 @@ type AdminReviewRow = {
     id: string;
     name: string;
     company_id: string | null;
+    managed_campus_slugs?: string[] | null;
     company?: {
       id: string;
       name: string;
@@ -145,6 +148,7 @@ type AdminReviewRow = {
     id: string;
     name: string;
     company_id: string | null;
+    managed_campus_slugs?: string[] | null;
     company?: {
       id: string;
       name: string;
@@ -188,7 +192,7 @@ function getSingleRelation<T>(value: T | T[] | null | undefined): T | null {
 }
 
 const REVIEW_SELECT =
-  "id,partner_id,member_id,rating,title,body,images,created_at,updated_at,deleted_at,deleted_by_member_id,hidden_at,partner:partners(id,name,company_id,company:partner_companies(id,name,slug)),member:members!partner_reviews_member_id_fkey(id,display_name,generation,campus,mattermost_account_id,directory:mm_user_directory!members_mattermost_account_id_fkey(mm_username))";
+  "id,partner_id,member_id,rating,title,body,images,created_at,updated_at,deleted_at,deleted_by_member_id,hidden_at,partner:partners(id,name,company_id,managed_campus_slugs,company:partner_companies(id,name,slug)),member:members!partner_reviews_member_id_fkey(id,display_name,generation,campus,mattermost_account_id,directory:mm_user_directory!members_mattermost_account_id_fkey(mm_username))";
 
 function parseBooleanParam(value: string | string[] | undefined) {
   const input = Array.isArray(value) ? value[0] : value;
@@ -348,6 +352,13 @@ function mapAdminReviewRow(
     recommendCount: reactionState.recommendCount,
     disrecommendCount: reactionState.disrecommendCount,
   };
+}
+
+function toAdminReviewSummary(review: AdminReviewRecord): AdminReviewSummary {
+  const { body, images, ...summary } = review;
+  void body;
+  void images;
+  return summary;
 }
 
 function escapeLikePattern(value: string) {
@@ -511,7 +522,9 @@ async function fetchFilteredAdminReviewRows(
 
   const reactionStates = await fetchAdminReviewReactionStates(rows.map((row) => row.id));
   return {
-    reviews: rows.map((row) => mapAdminReviewRow(row, reactionStates.get(row.id))),
+    reviews: rows.map((row) =>
+      toAdminReviewSummary(mapAdminReviewRow(row, reactionStates.get(row.id))),
+    ),
     totalCount: count ?? 0,
   };
 }
@@ -535,6 +548,43 @@ async function fetchAdminReviewReactionStates(reviewIds: string[]) {
     reviewIds,
     (data ?? []) as AdminReviewReactionRow[],
   );
+}
+
+export async function getAdminReviewById(
+  reviewId: string,
+  managedCampusSlugs?: readonly string[] | null,
+): Promise<AdminReviewRecord | null> {
+  if (!isUuid(reviewId)) {
+    return null;
+  }
+
+  const { data, error } = await getSupabaseAdminClient()
+    .from("partner_reviews")
+    .select(REVIEW_SELECT)
+    .eq("id", reviewId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) {
+    throw new Error("admin_review_detail_unavailable");
+  }
+  if (!data) {
+    return null;
+  }
+
+  const row = data as unknown as AdminReviewRow;
+  const partner = getSingleRelation(row.partner);
+  if (
+    managedCampusSlugs &&
+    (!partner ||
+      !managedCampusSlugs.some((campus) =>
+        (partner.managed_campus_slugs ?? []).includes(campus),
+      ))
+  ) {
+    return null;
+  }
+
+  const reactionStates = await fetchAdminReviewReactionStates([row.id]);
+  return mapAdminReviewRow(row, reactionStates.get(row.id));
 }
 
 export async function getAdminReviewCounts(): Promise<AdminReviewCounts> {

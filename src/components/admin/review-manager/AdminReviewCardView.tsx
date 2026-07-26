@@ -2,14 +2,14 @@ import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import { StarIcon as StarIconOutline } from "@heroicons/react/24/outline";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
-import Input from "@/components/ui/Input";
-import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
-import Textarea from "@/components/ui/Textarea";
-import type { AdminReviewRecord } from "@/lib/admin-reviews";
 import { formatPartnerReviewDate } from "@/components/partner-reviews/helpers";
+import type {
+  AdminReviewRecord,
+  AdminReviewSummary,
+} from "@/lib/admin-reviews";
 import { cn } from "@/lib/cn";
-import AdminReviewImageGallery from "./AdminReviewImageGallery";
+import AdminReviewDetailDisclosure from "./AdminReviewDetailDisclosure";
 
 export type AdminReviewFormAction = (
   formData: FormData,
@@ -35,15 +35,6 @@ function StarRow({ rating }: { rating: number }) {
   );
 }
 
-function MetaItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="grid gap-0.5">
-      <dt className="ui-caption">{label}</dt>
-      <dd className="truncate text-sm font-medium text-foreground">{value}</dd>
-    </div>
-  );
-}
-
 export default function AdminReviewCardView({
   review,
   returnTo,
@@ -55,7 +46,7 @@ export default function AdminReviewCardView({
   canUpdate = true,
   canDelete = true,
 }: {
-  review: AdminReviewRecord;
+  review: AdminReviewSummary | AdminReviewRecord;
   returnTo: string;
   editable?: boolean;
   hideAction: AdminReviewFormAction;
@@ -66,7 +57,6 @@ export default function AdminReviewCardView({
   canDelete?: boolean;
 }) {
   const statusLabel = review.isHidden ? "비공개" : "공개";
-  const hiddenReason = review.isHidden ? "비공개 처리" : "공개 중";
 
   return (
     <Card padding="md" className="grid gap-5">
@@ -162,90 +152,12 @@ export default function AdminReviewCardView({
         )}
       </div>
 
-      <p className="whitespace-pre-wrap text-sm leading-6 text-foreground">
-        {review.body}
-      </p>
-
-      {editable && canUpdate ? (
-        <details className="rounded-xl border border-border bg-surface-muted/60 p-3">
-          <summary className="cursor-pointer text-sm font-semibold text-foreground">
-            리뷰 수정
-          </summary>
-          <form action={updateAction} className="mt-3 grid gap-3">
-            <input type="hidden" name="reviewId" value={review.id} />
-            <input type="hidden" name="returnTo" value={returnTo} />
-            <div className="grid gap-3 sm:grid-cols-[9rem_minmax(0,1fr)]">
-              <label className="grid gap-2 text-sm font-medium text-foreground">
-                별점
-                <Select name="rating" defaultValue={String(review.rating)}>
-                  <option value="5">5점</option>
-                  <option value="4">4점</option>
-                  <option value="3">3점</option>
-                  <option value="2">2점</option>
-                  <option value="1">1점</option>
-                </Select>
-              </label>
-              <label className="grid gap-2 text-sm font-medium text-foreground">
-                제목
-                <Input
-                  name="title"
-                  defaultValue={review.title}
-                  maxLength={80}
-                />
-              </label>
-            </div>
-            <label className="grid gap-2 text-sm font-medium text-foreground">
-              내용
-              <Textarea
-                name="body"
-                defaultValue={review.body}
-                rows={4}
-                maxLength={1000}
-              />
-            </label>
-            <div className="flex justify-end">
-              <SubmitButton variant="secondary" pendingText="수정 중">
-                리뷰 수정
-              </SubmitButton>
-            </div>
-          </form>
-        </details>
-      ) : null}
-
-      <details className="group min-w-0 rounded-xl border border-border bg-surface-muted/60">
-        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
-          <span>작성자·운영 정보</span>
-          <span className="text-right text-xs font-normal leading-5 text-muted-foreground">
-            {review.memberName} ·{" "}
-            {review.imageCount > 0
-              ? `사진 ${review.imageCount}장`
-              : "사진 없음"}
-          </span>
-        </summary>
-        <div className="grid min-w-0 gap-4 border-t border-border/70 p-3">
-          <dl className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <MetaItem label="상태" value={hiddenReason} />
-            <MetaItem
-              label="작성자"
-              value={`${review.memberName} · ${review.memberId}`}
-            />
-            <MetaItem label="MM" value={review.memberUsername ?? "미등록"} />
-            <MetaItem label="캠퍼스" value={review.memberCampus ?? "미상"} />
-            <MetaItem label="파트너사" value={review.companyName ?? "미상"} />
-            <MetaItem label="제휴처" value={review.partnerName} />
-            <MetaItem
-              label="작성"
-              value={formatPartnerReviewDate(review.createdAt)}
-            />
-            <MetaItem
-              label="수정"
-              value={formatPartnerReviewDate(review.updatedAt)}
-            />
-          </dl>
-
-          <AdminReviewImageGallery images={review.images} />
-        </div>
-      </details>
+      <AdminReviewDetailDisclosure
+        review={review}
+        returnTo={returnTo}
+        editable={editable && canUpdate}
+        updateAction={updateAction}
+      />
     </Card>
   );
 }

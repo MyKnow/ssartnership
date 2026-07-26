@@ -61,8 +61,6 @@ const reviewData: AdminReviewPageData = {
       memberCampus: "서울",
       rating: 5,
       title: "점심 회전이 빨라 반복 방문하기 좋았습니다",
-      body: "학생 인증 흐름이 빠르고 포장 대기 시간이 짧아서 수업 사이에 이용하기 편했습니다.",
-      images: [],
       createdAt: "2026-04-25T10:00:00.000Z",
       updatedAt: "2026-04-25T10:15:00.000Z",
       deletedAt: null,
@@ -88,8 +86,6 @@ const reviewData: AdminReviewPageData = {
       memberCampus: "서울",
       rating: 3,
       title: "좌석은 넉넉하지만 피크 시간은 다소 혼잡합니다",
-      body: "혜택 자체는 명확했고, 매장 응대는 안정적이었습니다. 다만 피크 시간 혼잡도는 체크가 필요합니다.",
-      images: [],
       createdAt: "2026-04-24T09:00:00.000Z",
       updatedAt: "2026-04-24T09:20:00.000Z",
       deletedAt: null,
@@ -169,9 +165,6 @@ export const WithImageReview: Story = {
         reviewData.reviews[0]!,
         {
           ...reviewData.reviews[1]!,
-          images: [
-            "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=900&q=80",
-          ],
           imageCount: 1,
         },
       ],

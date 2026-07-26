@@ -477,6 +477,8 @@ describe("admin review helpers", () => {
         disrecommendCount: 1,
       }),
     ]);
+    expect("body" in result.reviews[0]).toBe(false);
+    expect("images" in result.reviews[0]).toBe(false);
     expect(result.pagination).toEqual({ page: 1, pageSize: 12, totalCount: 1 });
   });
 

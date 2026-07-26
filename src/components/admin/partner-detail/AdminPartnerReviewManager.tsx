@@ -12,7 +12,7 @@ import type {
   AdminReviewCounts,
   AdminReviewFilters,
   AdminReviewPagination,
-  AdminReviewRecord,
+  AdminReviewSummary,
 } from "@/lib/admin-reviews";
 import {
   ADMIN_REVIEW_PAGE_SIZE_OPTIONS,
@@ -46,7 +46,7 @@ export default function AdminPartnerReviewManager({
   canUpdate = true,
   canDelete = true,
 }: {
-  reviews: AdminReviewRecord[];
+  reviews: AdminReviewSummary[];
   pagination: AdminReviewPagination;
   counts: AdminReviewCounts;
   filters: AdminReviewFilters;
