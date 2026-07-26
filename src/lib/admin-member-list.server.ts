@@ -39,6 +39,12 @@ type MemberMarketingPreferenceRow = {
   marketing_enabled: boolean | null;
 };
 
+export type AdminMemberTrendReadModel = {
+  createdAts: string[];
+  isSampled: boolean;
+  hasError: boolean;
+};
+
 export type AdminMemberSearchParams = {
   backfill?: string;
   checked?: string;
@@ -535,8 +541,11 @@ function createEmptyReadModel(filters: AdminMemberListFilters) {
     totalCount: 0,
     totalPages: 1,
     shouldRedirectToLastPage: false,
-    memberTrendCreatedAts: [],
-    isMemberTrendSampled: false,
+    memberTrend: Promise.resolve<AdminMemberTrendReadModel>({
+      createdAts: [],
+      isSampled: false,
+      hasError: true,
+    }),
     options: { campuses: [], years: [] },
     mustChangePasswordCount: 0,
     pendingPolicyCount: 0,
@@ -668,12 +677,17 @@ export async function getAdminMemberListReadModel({
     );
     const from = (page - 1) * pageSize;
     memberQuery = memberQuery.range(from, from + pageSize - 1);
-    const [memberResult, memberTrendResult] = await Promise.all([
-      memberQuery,
-      memberTrendQuery,
-    ]);
+    const memberTrendResultPromise = memberTrendQuery
+      .then((result) => ({
+        createdAts: (result.data ?? [])
+          .map((row) => row.created_at)
+          .filter((value): value is string => Boolean(value)),
+        hasError: Boolean(result.error),
+      }))
+      .catch(() => ({ createdAts: [], hasError: true }));
+    const memberResult = await memberQuery;
 
-    if (memberResult.error || memberTrendResult.error || optionsResult.error) {
+    if (memberResult.error || optionsResult.error) {
       return {
         ...createEmptyReadModel(filters),
         cycleSettings,
@@ -757,9 +771,10 @@ export async function getAdminMemberListReadModel({
     });
     const totalCount = memberResult.count ?? safeMembers.length;
     const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-    const memberTrendCreatedAts = (memberTrendResult.data ?? [])
-      .map((row) => row.created_at)
-      .filter((value): value is string => Boolean(value));
+    const memberTrend = memberTrendResultPromise.then((result) => ({
+      ...result,
+      isSampled: totalCount > result.createdAts.length,
+    }));
     const optionRows = optionsResult.data ?? [];
     const options = {
       campuses: Array.from(
@@ -804,8 +819,7 @@ export async function getAdminMemberListReadModel({
       totalCount,
       totalPages,
       shouldRedirectToLastPage: page > totalPages,
-      memberTrendCreatedAts,
-      isMemberTrendSampled: totalCount > memberTrendCreatedAts.length,
+      memberTrend,
       options,
       mustChangePasswordCount,
       pendingPolicyCount,

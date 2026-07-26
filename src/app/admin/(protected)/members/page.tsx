@@ -1,8 +1,9 @@
 import AdminShell from "@/components/admin/AdminShell";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import AdminMemberManualAddPanel from "@/components/admin/AdminMemberManualAddPanel";
 import AdminMemberManager from "@/components/admin/AdminMemberManager";
-import AdminMemberTrendChart from "@/components/admin/AdminMemberTrendChart";
+import AdminMemberTrendSection from "@/components/admin/AdminMemberTrendSection";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import Card from "@/components/ui/Card";
@@ -10,6 +11,8 @@ import FormMessage from "@/components/ui/FormMessage";
 import InlineMessage from "@/components/ui/InlineMessage";
 import StatsRow from "@/components/ui/StatsRow";
 import SubmitButton from "@/components/ui/SubmitButton";
+import Skeleton from "@/components/ui/Skeleton";
+import Surface from "@/components/ui/Surface";
 import {
   backfillMemberProfiles,
   disableGenerationMattermostLogin,
@@ -17,7 +20,6 @@ import {
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
 import {
-  ADMIN_MEMBER_TREND_SAMPLE_LIMIT,
   getAdminMemberListReadModel,
   getAdminMemberSearchParam,
   parseAdminMemberListFilters,
@@ -51,6 +53,22 @@ function formatAdminMemberSummaryDate(value?: string | null) {
   }
 
   return formatKoreanDateTimeToMinute(parsed);
+}
+
+function AdminMemberTrendFallback() {
+  return (
+    <Surface
+      level="elevated"
+      padding="lg"
+      aria-busy="true"
+      aria-label="회원 유입 추이를 불러오는 중"
+      className="grid gap-3"
+    >
+      <Skeleton className="h-5 w-32" />
+      <Skeleton className="h-4 w-full max-w-xl" />
+      <Skeleton className="h-48 w-full" />
+    </Surface>
+  );
 }
 
 export default async function AdminMembersPage({
@@ -89,8 +107,7 @@ export default async function AdminMembersPage({
     totalCount,
     shouldRedirectToLastPage,
     totalPages,
-    memberTrendCreatedAts,
-    isMemberTrendSampled,
+    memberTrend,
     options,
     mustChangePasswordCount,
     pendingPolicyCount,
@@ -134,14 +151,9 @@ export default async function AdminMembersPage({
           ]}
           minItemWidth="13rem"
         />
-        <AdminMemberTrendChart createdAts={memberTrendCreatedAts} />
-        {isMemberTrendSampled ? (
-          <InlineMessage
-            tone="warning"
-            title="회원 유입 추이는 최근 샘플 기준입니다."
-            description={`성능 보호를 위해 현재 필터의 최근 ${ADMIN_MEMBER_TREND_SAMPLE_LIMIT.toLocaleString("ko-KR")}명 생성 이력만 차트에 반영합니다.`}
-          />
-        ) : null}
+        <Suspense fallback={<AdminMemberTrendFallback />}>
+          <AdminMemberTrendSection trend={memberTrend} />
+        </Suspense>
         {hasMemberLoadError ? (
           <InlineMessage
             tone="danger"
