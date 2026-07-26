@@ -16,12 +16,18 @@ export default function AdminCompaniesView({
   generatedSetupUrl,
   generatedSetupAccountId,
   initialTab,
+  canCreate = false,
+  canUpdate = false,
+  canDelete = false,
   actions,
   loadError = false,
 }: AdminCompanyWorkspaceProps & {
   partnerCount: number;
   errorMessage?: string | null;
   loadError?: boolean;
+  canCreate?: boolean;
+  canUpdate?: boolean;
+  canDelete?: boolean;
 }) {
   const activeCompanyCount = companies.filter(
     (company) => company.is_active !== false,
@@ -42,47 +48,54 @@ export default function AdminCompaniesView({
           kind="error"
           title="파트너사와 계정 정보를 불러오지 못했습니다."
           description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 기록을 확인해 주세요."
-          action={<Button href="/admin/companies" variant="secondary">다시 확인</Button>}
+          action={
+            <Button href="/admin/companies" variant="secondary">
+              다시 확인
+            </Button>
+          }
         />
       ) : null}
       {!loadError ? (
         <>
-      <AdminWorkspaceSummary
-        eyebrow="운영"
-        title="파트너사 운영 현황"
-        description="처리할 회사·계정 연결을 먼저 확인하고, 아래 탭에서 한 가지 작업을 이어갑니다."
-        items={[
-          {
-            label: "파트너사",
-            value: `${companies.length}개`,
-            detail: `활성 ${activeCompanyCount}개`,
-          },
-          {
-            label: "제휴처",
-            value: `${partnerCount}개`,
-            detail: "파트너사에 연결된 전체 제휴처",
-          },
-          {
-            label: "계정",
-            value: `${accountSummary.totalCount}개`,
-            detail: `활성 ${accountSummary.activeCount}개`,
-          },
-          {
-            label: "연결",
-            value: `${accountSummary.totalLinks}건`,
-            detail: "계정과 파트너사 전체 연결 수",
-          },
-        ]}
-      />
+          <AdminWorkspaceSummary
+            eyebrow="운영"
+            title="파트너사 운영 현황"
+            description="처리할 회사·계정 연결을 먼저 확인하고, 아래 탭에서 한 가지 작업을 이어갑니다."
+            items={[
+              {
+                label: "파트너사",
+                value: `${companies.length}개`,
+                detail: `활성 ${activeCompanyCount}개`,
+              },
+              {
+                label: "제휴처",
+                value: `${partnerCount}개`,
+                detail: "파트너사에 연결된 전체 제휴처",
+              },
+              {
+                label: "계정",
+                value: `${accountSummary.totalCount}개`,
+                detail: `활성 ${accountSummary.activeCount}개`,
+              },
+              {
+                label: "연결",
+                value: `${accountSummary.totalLinks}건`,
+                detail: "계정과 파트너사 전체 연결 수",
+              },
+            ]}
+          />
 
-      <AdminCompanyWorkspace
-        companies={companies}
-        accounts={accounts}
-        generatedSetupUrl={generatedSetupUrl}
-        generatedSetupAccountId={generatedSetupAccountId}
-        initialTab={initialTab}
-        actions={actions}
-      />
+          <AdminCompanyWorkspace
+            companies={companies}
+            accounts={accounts}
+            generatedSetupUrl={generatedSetupUrl}
+            generatedSetupAccountId={generatedSetupAccountId}
+            initialTab={initialTab}
+            canCreate={canCreate}
+            canUpdate={canUpdate}
+            canDelete={canDelete}
+            actions={actions}
+          />
         </>
       ) : null}
     </section>

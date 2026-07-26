@@ -14,11 +14,13 @@ export default function PartnerAccountHeader({
   generatedSetupUrl,
   createSetupUrlAction,
   sendSetupUrlAction,
+  canUpdate = false,
 }: {
   account: AdminPartnerAccount;
   generatedSetupUrl?: string | null;
   createSetupUrlAction: AdminFormAction;
   sendSetupUrlAction: AdminFormAction;
+  canUpdate?: boolean;
 }) {
   const hasIssuedSetupLink = hasIssuedPartnerInitialSetupLink(account);
   const setupBadge = getPartnerInitialSetupBadge(account);
@@ -39,7 +41,9 @@ export default function PartnerAccountHeader({
           <Badge variant={setupBadge.variant}>{setupBadge.label}</Badge>
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-foreground">{account.display_name}</h3>
+          <h3 className="text-lg font-semibold text-foreground">
+            {account.display_name}
+          </h3>
           <p className="mt-1 text-sm text-muted-foreground">
             로그인 아이디: {account.login_id}
           </p>
@@ -47,46 +51,54 @@ export default function PartnerAccountHeader({
             계정 ID: {account.id}
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
-            이메일 인증: {formatPartnerAccountDateTime(account.email_verified_at)}
+            이메일 인증:{" "}
+            {formatPartnerAccountDateTime(account.email_verified_at)}
             {" · "}
             마지막 로그인: {formatPartnerAccountDateTime(account.last_login_at)}
           </p>
         </div>
       </div>
 
-      <div className="grid gap-2 xl:justify-items-end">
-        <div className="flex flex-wrap gap-2 xl:justify-end">
-          {!account.initial_setup_completed_at && account.is_active !== false ? (
-            <form action={createSetupUrlAction}>
-              <input type="hidden" name="id" value={account.id} />
-              <SubmitButton
-                pendingText="생성 중"
-                variant="ghost"
-                className="w-full sm:w-auto"
-              >
-                {hasIssuedSetupLink ? "초기설정 URL 재생성" : "초기설정 URL 생성"}
-              </SubmitButton>
-            </form>
-          ) : null}
+      {canUpdate ? (
+        <div className="grid gap-2 xl:justify-items-end">
+          <div className="flex flex-wrap gap-2 xl:justify-end">
+            {!account.initial_setup_completed_at &&
+            account.is_active !== false ? (
+              <form action={createSetupUrlAction}>
+                <input type="hidden" name="id" value={account.id} />
+                <SubmitButton
+                  pendingText="생성 중"
+                  variant="ghost"
+                  className="w-full sm:w-auto"
+                >
+                  {hasIssuedSetupLink
+                    ? "초기설정 URL 재생성"
+                    : "초기설정 URL 생성"}
+                </SubmitButton>
+              </form>
+            ) : null}
 
-          {generatedSetupUrl ? (
-            <PartnerInitialSetupUrlCopyButton
-              setupUrl={generatedSetupUrl}
-            />
-          ) : null}
+            {generatedSetupUrl ? (
+              <PartnerInitialSetupUrlCopyButton setupUrl={generatedSetupUrl} />
+            ) : null}
 
-          {!account.initial_setup_completed_at && account.is_active !== false ? (
-            <form action={sendSetupUrlAction}>
-              <input type="hidden" name="id" value={account.id} />
-              <SubmitButton pendingText="전송 중" className="w-full sm:w-auto">
-                {hasIssuedSetupLink
-                  ? "초기설정 URL 재전송"
-                  : "초기설정 URL 메일 전송"}
-              </SubmitButton>
-            </form>
-          ) : null}
+            {!account.initial_setup_completed_at &&
+            account.is_active !== false ? (
+              <form action={sendSetupUrlAction}>
+                <input type="hidden" name="id" value={account.id} />
+                <SubmitButton
+                  pendingText="전송 중"
+                  className="w-full sm:w-auto"
+                >
+                  {hasIssuedSetupLink
+                    ? "초기설정 URL 재전송"
+                    : "초기설정 URL 메일 전송"}
+                </SubmitButton>
+              </form>
+            ) : null}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

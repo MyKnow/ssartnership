@@ -31,6 +31,9 @@ export type AdminCompanyWorkspaceProps = {
   generatedSetupUrl?: string | null;
   generatedSetupAccountId?: string | null;
   initialTab?: AdminCompanyTab;
+  canCreate?: boolean;
+  canUpdate?: boolean;
+  canDelete?: boolean;
   actions: AdminCompanyFormActions;
 };
 
@@ -53,6 +56,9 @@ export default function AdminCompanyWorkspace({
   generatedSetupUrl,
   generatedSetupAccountId,
   initialTab = "companies",
+  canCreate = false,
+  canUpdate = false,
+  canDelete = false,
   actions,
 }: AdminCompanyWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<AdminCompanyTab>(initialTab);
@@ -89,6 +95,9 @@ export default function AdminCompanyWorkspace({
           />
           <AdminCompanyManager
             companies={companies}
+            canCreate={canCreate}
+            canUpdate={canUpdate}
+            canDelete={canDelete}
             actions={actions}
           />
         </section>
@@ -104,6 +113,8 @@ export default function AdminCompanyWorkspace({
             companies={companies}
             generatedSetupUrl={generatedSetupUrl}
             generatedSetupAccountId={generatedSetupAccountId}
+            canCreate={canCreate}
+            canUpdate={canUpdate}
             actions={actions}
           />
         </section>

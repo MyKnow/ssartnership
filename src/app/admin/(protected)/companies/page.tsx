@@ -12,6 +12,7 @@ import {
 } from "@/app/admin/(protected)/actions";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { canAdmin } from "@/lib/admin-permissions";
 import { getAdminCompanyWorkspaceReadModel } from "@/lib/admin-company-workspace.server";
 import { getManagedCampusFilterValues } from "@/lib/admin-scope";
 
@@ -34,11 +35,17 @@ export default async function AdminCompaniesPage({
   const adminSession = await requireAdminPermission("companies", "read", {
     path: "/admin/companies",
   });
-  const managedCampusFilter = getManagedCampusFilterValues(adminSession.account);
+  const managedCampusFilter = getManagedCampusFilterValues(
+    adminSession.account,
+  );
   const params = (await searchParams) ?? {};
-  const companyError = params.error ? adminCompaniesErrorMessages[params.error] : null;
+  const companyError = params.error
+    ? adminCompaniesErrorMessages[params.error]
+    : null;
   const generatedSetupUrl =
-    typeof params.generatedSetupUrl === "string" ? params.generatedSetupUrl : null;
+    typeof params.generatedSetupUrl === "string"
+      ? params.generatedSetupUrl
+      : null;
   const generatedSetupAccountId =
     typeof params.generatedSetupAccountId === "string"
       ? params.generatedSetupAccountId
@@ -54,7 +61,11 @@ export default async function AdminCompaniesPage({
   });
 
   return (
-    <AdminShell title="파트너사/계정 관리" backHref="/admin" backLabel="관리 홈">
+    <AdminShell
+      title="파트너사/계정 관리"
+      backHref="/admin"
+      backLabel="관리 홈"
+    >
       <AdminCompaniesView
         companies={readModel.companies}
         accounts={readModel.accounts}
@@ -65,6 +76,21 @@ export default async function AdminCompaniesPage({
         generatedSetupUrl={generatedSetupUrl}
         generatedSetupAccountId={generatedSetupAccountId}
         initialTab={initialTab}
+        canCreate={canAdmin(
+          adminSession.account.permissions,
+          "companies",
+          "create",
+        )}
+        canUpdate={canAdmin(
+          adminSession.account.permissions,
+          "companies",
+          "update",
+        )}
+        canDelete={canAdmin(
+          adminSession.account.permissions,
+          "companies",
+          "delete",
+        )}
         actions={{
           createCompanyAction: createPartnerCompany,
           updateCompanyAction: updatePartnerCompany,
