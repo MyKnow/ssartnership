@@ -32,9 +32,12 @@ function statusMessage(status?: string | null) {
   if (status === "restored") return "자동 계산으로 복구했습니다.";
   if (status === "theme-saved") return "기수별 카드 색상을 저장했습니다.";
   if (status === "theme-deleted") return "기수별 카드 색상을 삭제했습니다.";
-  if (status === "mattermost-sender-saved") return "Mattermost Sender 후보를 암호화해 저장했습니다. 테스트 DM 성공 후 활성화해 주세요.";
-  if (status === "mattermost-sender-activated") return "테스트 DM이 성공해 Mattermost Sender를 활성화했습니다.";
-  if (status === "mattermost-sender-disabled") return "Mattermost Sender를 비활성화하고 자격 증명을 삭제했습니다.";
+  if (status === "mattermost-sender-saved")
+    return "Mattermost Sender 후보를 암호화해 저장했습니다. 테스트 DM 성공 후 활성화해 주세요.";
+  if (status === "mattermost-sender-activated")
+    return "테스트 DM이 성공해 Mattermost Sender를 활성화했습니다.";
+  if (status === "mattermost-sender-disabled")
+    return "Mattermost Sender를 비활성화하고 자격 증명을 삭제했습니다.";
   return status ? "기수 관리 작업을 완료했습니다." : null;
 }
 
@@ -57,6 +60,11 @@ export default function AdminCycleView({
   testMattermostSenderAction,
   disableMattermostSenderAction,
   requestedGeneration,
+  canUpdate = false,
+  canDelete = false,
+  canManageSenderCreate = false,
+  canManageSenderUpdate = false,
+  canManageSenderDelete = false,
 }: {
   settings: SsafyCycleSettings;
   overview: SsafyCycleOverview;
@@ -76,6 +84,11 @@ export default function AdminCycleView({
   testMattermostSenderAction?: AdminFormAction;
   disableMattermostSenderAction?: AdminFormAction;
   requestedGeneration?: string | null;
+  canUpdate?: boolean;
+  canDelete?: boolean;
+  canManageSenderCreate?: boolean;
+  canManageSenderUpdate?: boolean;
+  canManageSenderDelete?: boolean;
 }) {
   const overrideActive = settings.manualCurrentYear !== null;
   const currentYearLabel = `${overview.currentYear}기`;
@@ -83,11 +96,13 @@ export default function AdminCycleView({
     formatSsafyMemberLifecycleLabel(year),
   );
   const cardThemeYears = Array.from(
-    new Set([
-      overview.currentYear,
-      ...overview.studentYears,
-      overview.graduateThresholdYear,
-    ].filter((year) => year > 0)),
+    new Set(
+      [
+        overview.currentYear,
+        ...overview.studentYears,
+        overview.graduateThresholdYear,
+      ].filter((year) => year > 0),
+    ),
   );
   const generationGroups = Array.from(
     new Set([
@@ -96,7 +111,9 @@ export default function AdminCycleView({
       ...themes.map((theme) => theme.cohortYear),
       ...(mattermostSenders ?? []).map((sender) => sender.generation),
     ]),
-  ).filter((year) => year >= 0).sort((left, right) => right - left);
+  )
+    .filter((year) => year >= 0)
+    .sort((left, right) => right - left);
   const requestedGenerationNumber =
     typeof requestedGeneration === "string" && /^\d+$/.test(requestedGeneration)
       ? Number(requestedGeneration)
@@ -105,42 +122,94 @@ export default function AdminCycleView({
     requestedGenerationNumber !== null &&
     generationGroups.includes(requestedGenerationNumber)
       ? requestedGenerationNumber
-      : generationGroups[0] ?? 0;
+      : (generationGroups[0] ?? 0);
 
   return (
     <div className="grid gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-3"><AdminPageHeader eyebrow="설정" title="기수 계산 기준 관리" description="기수 전환 기준, 기수별 인증 카드 색상, 카드 목업을 한 화면에서 관리합니다." /><Link href="/admin/cycle/mock" className="rounded-xl border border-border bg-surface-control px-4 py-2 text-sm font-semibold text-foreground hover:bg-surface-muted">전체 목업보기</Link></div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <AdminPageHeader
+          eyebrow="설정"
+          title="기수 계산 기준 관리"
+          description="기수 전환 기준, 기수별 인증 카드 색상, 카드 목업을 한 화면에서 관리합니다."
+        />
+        <Link
+          href="/admin/cycle/mock"
+          className="rounded-xl border border-border bg-surface-control px-4 py-2 text-sm font-semibold text-foreground hover:bg-surface-muted"
+        >
+          전체 목업보기
+        </Link>
+      </div>
       <StatsRow
         items={[
-          { label: "현재 기수", value: currentYearLabel, hint: `${currentSemester}학기 기준` },
-          { label: "자동/수동", value: overrideActive ? "수동" : "자동", hint: overrideActive ? "조기 시작 적용 중" : "날짜 기준 계산" },
-          { label: "교육생 범위", value: studentLabels.join(" · "), hint: "현재 활성 교육생 구간" },
+          {
+            label: "현재 기수",
+            value: currentYearLabel,
+            hint: `${currentSemester}학기 기준`,
+          },
+          {
+            label: "자동/수동",
+            value: overrideActive ? "수동" : "자동",
+            hint: overrideActive ? "조기 시작 적용 중" : "날짜 기준 계산",
+          },
+          {
+            label: "교육생 범위",
+            value: studentLabels.join(" · "),
+            hint: "현재 활성 교육생 구간",
+          },
         ]}
         minItemWidth="13rem"
       />
       <AdminOperationFlow
         steps={[
-          { label: "기준값", description: "기수 계산 기준을 확인합니다.", state: "current" },
-          { label: "기수별 운영", description: "Sender와 카드 설정을 관리합니다.", state: "upcoming" },
-          { label: "검증", description: "목업과 적용 상태를 확인합니다.", href: "/admin/cycle/mock", state: "upcoming" },
+          {
+            label: "기준값",
+            description: "기수 계산 기준을 확인합니다.",
+            state: "current",
+          },
+          {
+            label: "기수별 운영",
+            description: "Sender와 카드 설정을 관리합니다.",
+            state: "upcoming",
+          },
+          {
+            label: "검증",
+            description: "목업과 적용 상태를 확인합니다.",
+            href: "/admin/cycle/mock",
+            state: "upcoming",
+          },
         ]}
       />
 
       <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)] 2xl:items-start">
         <Card tone="elevated" className="grid gap-5">
-          <AdminSectionHeading title="현재 기준과 예정 작업" description="기수 전환 기준과 현재 계산 결과를 확인합니다." />
-          {errorMessage ? <FormMessage variant="error">{errorMessage}</FormMessage> : null}
-          {statusMessage(status) ? <FormMessage variant="muted">{statusMessage(status)}</FormMessage> : null}
+          <AdminSectionHeading
+            title="현재 기준과 예정 작업"
+            description="기수 전환 기준과 현재 계산 결과를 확인합니다."
+          />
+          {errorMessage ? (
+            <FormMessage variant="error">{errorMessage}</FormMessage>
+          ) : null}
+          {statusMessage(status) ? (
+            <FormMessage variant="muted">{statusMessage(status)}</FormMessage>
+          ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-2xl border border-border bg-surface-muted px-4 py-4">
               <p className="ui-kicker">현재 계산</p>
-              <p className="mt-3 text-2xl font-semibold text-foreground">{currentYearLabel} · {currentSemester}학기</p>
-              <p className="mt-2 text-sm text-muted-foreground">{overrideActive ? "조기 시작 수동 기준" : "날짜 기준 자동 계산"}</p>
+              <p className="mt-3 text-2xl font-semibold text-foreground">
+                {currentYearLabel} · {currentSemester}학기
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {overrideActive ? "조기 시작 수동 기준" : "날짜 기준 자동 계산"}
+              </p>
             </div>
             <div className="rounded-2xl border border-border bg-surface-muted px-4 py-4">
               <p className="ui-kicker">현재 범위</p>
-              <p className="mt-3 text-sm font-semibold text-foreground">교육생 {studentLabels.join(" · ")}</p>
-              <p className="mt-2 text-sm text-muted-foreground">수료생 {overview.graduateThresholdYear}기 이하 · 운영진 0기</p>
+              <p className="mt-3 text-sm font-semibold text-foreground">
+                교육생 {studentLabels.join(" · ")}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                수료생 {overview.graduateThresholdYear}기 이하 · 운영진 0기
+              </p>
             </div>
           </div>
           <div className="grid gap-3 rounded-3xl border border-border bg-surface-inset px-4 py-4 text-sm text-muted-foreground">
@@ -152,23 +221,85 @@ export default function AdminCycleView({
         </Card>
 
         <Card tone="elevated" className="grid gap-5 2xl:sticky 2xl:top-24">
-          <AdminSectionHeading title="기준값 수정" description="기준 기수와 시작 시점을 조정하고 조기 시작 또는 복구를 실행합니다." />
-          <form action={updateSettingsAction} className="grid gap-4">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <label className="grid gap-2 text-sm font-medium text-foreground">기준 기수<Input type="number" name="anchorYear" min={1} max={99} defaultValue={settings.anchorYear} /></label>
-              <label className="grid gap-2 text-sm font-medium text-foreground">기준 연도<Input type="number" name="anchorCalendarYear" min={2000} max={3000} defaultValue={settings.anchorCalendarYear} /></label>
-              <label className="grid gap-2 text-sm font-medium text-foreground">기준 월<Input type="number" name="anchorMonth" min={1} max={12} defaultValue={settings.anchorMonth} /></label>
+          <AdminSectionHeading
+            title={canUpdate ? "기준값 수정" : "기준값 조회"}
+            description={
+              canUpdate
+                ? "기준 기수와 시작 시점을 조정하고 조기 시작 또는 복구를 실행합니다."
+                : "현재 적용된 기준값을 확인할 수 있지만 변경은 허용되지 않습니다."
+            }
+          />
+          {canUpdate ? (
+            <>
+              <form action={updateSettingsAction} className="grid gap-4">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <label className="grid gap-2 text-sm font-medium text-foreground">
+                    기준 기수
+                    <Input
+                      type="number"
+                      name="anchorYear"
+                      min={1}
+                      max={99}
+                      defaultValue={settings.anchorYear}
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm font-medium text-foreground">
+                    기준 연도
+                    <Input
+                      type="number"
+                      name="anchorCalendarYear"
+                      min={2000}
+                      max={3000}
+                      defaultValue={settings.anchorCalendarYear}
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm font-medium text-foreground">
+                    기준 월
+                    <Input
+                      type="number"
+                      name="anchorMonth"
+                      min={1}
+                      max={12}
+                      defaultValue={settings.anchorMonth}
+                    />
+                  </label>
+                </div>
+                <SubmitButton pendingText="저장 중">기준값 저장</SubmitButton>
+              </form>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <form action={earlyStartAction}>
+                  <SubmitButton
+                    variant="ghost"
+                    pendingText="적용 중"
+                    className="w-full"
+                  >
+                    조기 시작
+                  </SubmitButton>
+                </form>
+                <form action={restoreAction}>
+                  <SubmitButton
+                    variant="danger"
+                    pendingText="복구 중"
+                    className="w-full"
+                  >
+                    복구
+                  </SubmitButton>
+                </form>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-2xl border border-border bg-surface-inset px-4 py-4 text-sm leading-6 text-muted-foreground">
+              현재 계정은 기수 기준을 조회할 수 있지만 변경할 수 없습니다.
             </div>
-            <SubmitButton pendingText="저장 중">기준값 저장</SubmitButton>
-          </form>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <form action={earlyStartAction}><SubmitButton variant="ghost" pendingText="적용 중" className="w-full">조기 시작</SubmitButton></form>
-            <form action={restoreAction}><SubmitButton variant="danger" pendingText="복구 중" className="w-full">복구</SubmitButton></form>
-          </div>
+          )}
           <div className="rounded-2xl border border-border bg-surface-muted px-4 py-4">
-            <p className="text-sm font-semibold text-foreground">현재 적용 상태</p>
+            <p className="text-sm font-semibold text-foreground">
+              현재 적용 상태
+            </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <Badge variant={overrideActive ? "success" : "neutral"}>{overrideActive ? "조기 시작 적용 중" : "자동 계산"}</Badge>
+              <Badge variant={overrideActive ? "success" : "neutral"}>
+                {overrideActive ? "조기 시작 적용 중" : "자동 계산"}
+              </Badge>
               <Badge variant="neutral">현재 {currentYearLabel}</Badge>
               <Badge variant="neutral">{currentSemester}학기</Badge>
             </div>
@@ -191,80 +322,123 @@ export default function AdminCycleView({
           {generationGroups
             .filter((generation) => generation === selectedGeneration)
             .map((generation, index) => {
-            const generationLabel = formatSsafyYearLabel(generation);
-            const isStaff = generation === 0;
-            const generationSenders = (mattermostSenders ?? []).filter(
-              (sender) => sender.generation === generation,
-            );
-            const hasActiveSender = generationSenders.some(
-              (sender) => sender.status === "active",
-            );
-            const hasTheme = themes.some((theme) => theme.cohortYear === generation);
+              const generationLabel = formatSsafyYearLabel(generation);
+              const isStaff = generation === 0;
+              const generationSenders = (mattermostSenders ?? []).filter(
+                (sender) => sender.generation === generation,
+              );
+              const hasActiveSender = generationSenders.some(
+                (sender) => sender.status === "active",
+              );
+              const hasTheme = themes.some(
+                (theme) => theme.cohortYear === generation,
+              );
 
-            return (
-              <section
-                key={generation}
-                id={`cycle-generation-${generation}`}
-                aria-labelledby={`cycle-generation-${generation}-heading`}
-                className="grid gap-5 border-t border-border pt-8 first:border-t-0 first:pt-0"
-              >
-                <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0">
-                    <p className="ui-kicker">기수 운영 그룹</p>
-                    <h3 id={`cycle-generation-${generation}-heading`} className="mt-2 text-xl font-semibold text-foreground">
-                      {generationLabel} 운영
-                    </h3>
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-                      {isStaff
-                        ? "운영진 인증 카드 목업을 확인합니다. 운영진은 학생 기수별 Sender·색상 설정 대상에서 제외됩니다."
-                        : `${generationLabel}의 Sender, 인증 카드 색상, 카드 목업을 한 곳에서 관리합니다.`}
-                    </p>
-                  </div>
-                  <div className="flex min-w-0 flex-wrap gap-2 lg:justify-end">
-                    {mattermostSenders ? (
-                      <Badge variant={hasActiveSender ? "success" : generationSenders.length > 0 ? "warning" : "neutral"}>
-                        {hasActiveSender ? "Sender 활성" : generationSenders.length > 0 ? "Sender 검증 필요" : "Sender 미등록"}
+              return (
+                <section
+                  key={generation}
+                  id={`cycle-generation-${generation}`}
+                  aria-labelledby={`cycle-generation-${generation}-heading`}
+                  className="grid gap-5 border-t border-border pt-8 first:border-t-0 first:pt-0"
+                >
+                  <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <p className="ui-kicker">기수 운영 그룹</p>
+                      <h3
+                        id={`cycle-generation-${generation}-heading`}
+                        className="mt-2 text-xl font-semibold text-foreground"
+                      >
+                        {generationLabel} 운영
+                      </h3>
+                      <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                        {isStaff
+                          ? "운영진 인증 카드 목업을 확인합니다. 운영진은 학생 기수별 Sender·색상 설정 대상에서 제외됩니다."
+                          : `${generationLabel}의 Sender, 인증 카드 색상, 카드 목업을 한 곳에서 관리합니다.`}
+                      </p>
+                    </div>
+                    <div className="flex min-w-0 flex-wrap gap-2 lg:justify-end">
+                      {mattermostSenders ? (
+                        <Badge
+                          variant={
+                            hasActiveSender
+                              ? "success"
+                              : generationSenders.length > 0
+                                ? "warning"
+                                : "neutral"
+                          }
+                        >
+                          {hasActiveSender
+                            ? "Sender 활성"
+                            : generationSenders.length > 0
+                              ? "Sender 검증 필요"
+                              : "Sender 미등록"}
+                        </Badge>
+                      ) : null}
+                      <Badge
+                        variant={
+                          isStaff ? "neutral" : hasTheme ? "success" : "warning"
+                        }
+                      >
+                        {isStaff
+                          ? "운영진 카드"
+                          : hasTheme
+                            ? "카드 색상 저장"
+                            : "기본 색상 사용"}
                       </Badge>
-                    ) : null}
-                    <Badge variant={isStaff ? "neutral" : hasTheme ? "success" : "warning"}>
-                      {isStaff ? "운영진 카드" : hasTheme ? "카드 색상 저장" : "기본 색상 사용"}
-                    </Badge>
+                    </div>
                   </div>
-                </div>
 
-                {!isStaff ? (
-                  <div className="grid gap-5 2xl:grid-cols-2">
-                    {mattermostSenders && saveMattermostSenderAction && testMattermostSenderAction && disableMattermostSenderAction ? (
-                      <MattermostSenderManager
-                        senders={mattermostSenders}
-                        generation={generation}
-                        anchorId={index === 0 ? "mattermost-sender" : undefined}
-                        loadError={mattermostSenderLoadError}
-                        saveAction={saveMattermostSenderAction}
-                        testAction={testMattermostSenderAction}
-                        disableAction={disableMattermostSenderAction}
+                  {!isStaff ? (
+                    <div className="grid gap-5 2xl:grid-cols-2">
+                      {mattermostSenders ? (
+                        <MattermostSenderManager
+                          senders={mattermostSenders}
+                          generation={generation}
+                          anchorId={
+                            index === 0 ? "mattermost-sender" : undefined
+                          }
+                          loadError={mattermostSenderLoadError}
+                          saveAction={
+                            canManageSenderCreate
+                              ? saveMattermostSenderAction
+                              : undefined
+                          }
+                          testAction={
+                            canManageSenderUpdate
+                              ? testMattermostSenderAction
+                              : undefined
+                          }
+                          disableAction={
+                            canManageSenderDelete
+                              ? disableMattermostSenderAction
+                              : undefined
+                          }
+                        />
+                      ) : null}
+                      <AdminCohortCardThemeManager
+                        themes={themes}
+                        suggestedYears={[generation]}
+                        cohortYear={generation}
+                        showCreateForm={false}
+                        anchorId={
+                          index === 0 ? "card-theme-manager" : undefined
+                        }
+                        upsertAction={upsertThemeAction}
+                        deleteAction={deleteThemeAction}
+                        canUpdate={canUpdate}
+                        canDelete={canDelete}
                       />
-                    ) : null}
-                    <AdminCohortCardThemeManager
-                      themes={themes}
-                      suggestedYears={[generation]}
-                      cohortYear={generation}
-                      showCreateForm={false}
-                      anchorId={index === 0 ? "card-theme-manager" : undefined}
-                      upsertAction={upsertThemeAction}
-                      deleteAction={deleteThemeAction}
-                    />
-                  </div>
-                ) : null}
+                    </div>
+                  ) : null}
 
-                <AdminCertificationCardPreviewGrid
-                  themes={themes}
-                  generation={generation}
-                  anchorId={index === 0 ? "card-preview" : undefined}
-                  initialTimestamp={initialTimestamp}
-                />
-              </section>
-            );
+                  <AdminCertificationCardPreviewGrid
+                    themes={themes}
+                    generation={generation}
+                    anchorId={index === 0 ? "card-preview" : undefined}
+                    initialTimestamp={initialTimestamp}
+                  />
+                </section>
+              );
             })}
         </div>
       </div>

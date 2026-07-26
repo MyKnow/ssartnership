@@ -74,6 +74,8 @@ export function AdminCohortCardThemeManager({
   cohortYear,
   showCreateForm = true,
   anchorId,
+  canUpdate = true,
+  canDelete = true,
 }: {
   themes: readonly CohortCardTheme[];
   suggestedYears: readonly number[];
@@ -82,29 +84,52 @@ export function AdminCohortCardThemeManager({
   cohortYear?: number;
   showCreateForm?: boolean;
   anchorId?: string;
+  canUpdate?: boolean;
+  canDelete?: boolean;
 }) {
-  const themeYears = typeof cohortYear === "number"
-    ? [cohortYear]
-    : Array.from(
-        new Set([...suggestedYears, ...themes.map((theme) => theme.cohortYear)]),
-      ).sort((left, right) => right - left);
+  const themeYears =
+    typeof cohortYear === "number"
+      ? [cohortYear]
+      : Array.from(
+          new Set([
+            ...suggestedYears,
+            ...themes.map((theme) => theme.cohortYear),
+          ]),
+        ).sort((left, right) => right - left);
   const themeMap = new Map(themes.map((theme) => [theme.cohortYear, theme]));
-  const createDefaultYear = suggestedYears.find((year) => !themeMap.has(year)) ?? themeYears[0] ?? 16;
-  const generationLabel = typeof cohortYear === "number" ? formatSsafyYearLabel(cohortYear) : null;
+  const createDefaultYear =
+    suggestedYears.find((year) => !themeMap.has(year)) ?? themeYears[0] ?? 16;
+  const generationLabel =
+    typeof cohortYear === "number" ? formatSsafyYearLabel(cohortYear) : null;
 
   return (
-    <Card id={anchorId ?? (generationLabel ? `card-theme-manager-${cohortYear}` : "card-theme-manager")} tone="elevated" className="grid gap-5">
+    <Card
+      id={
+        anchorId ??
+        (generationLabel
+          ? `card-theme-manager-${cohortYear}`
+          : "card-theme-manager")
+      }
+      tone="elevated"
+      className="grid gap-5"
+    >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <SectionHeading
-          title={generationLabel ? `${generationLabel} 카드 색상` : "기수별 카드 색상"}
-          description={generationLabel
-            ? `${generationLabel} 인증 카드 색상을 관리합니다. 글자 대비는 카드 렌더러가 자동 보정합니다.`
-            : "기수별 인증 카드 색상은 DB에 저장됩니다. 배경 3색과 강조색만 저장하고, 글자 대비는 카드 렌더러가 자동 보정합니다."}
+          title={
+            generationLabel
+              ? `${generationLabel} 카드 색상`
+              : "기수별 카드 색상"
+          }
+          description={
+            generationLabel
+              ? `${generationLabel} 인증 카드 색상을 관리합니다. 글자 대비는 카드 렌더러가 자동 보정합니다.`
+              : "기수별 인증 카드 색상은 DB에 저장됩니다. 배경 3색과 강조색만 저장하고, 글자 대비는 카드 렌더러가 자동 보정합니다."
+          }
         />
         <Badge variant="primary">DB 관리</Badge>
       </div>
 
-      {showCreateForm ? (
+      {showCreateForm && canUpdate ? (
         <form
           action={upsertAction}
           className="grid gap-3 rounded-2xl border border-border bg-surface-inset p-4 lg:grid-cols-[7rem_minmax(0,1fr)_repeat(4,minmax(5rem,6.5rem))_auto] lg:items-end"
@@ -159,66 +184,80 @@ export function AdminCohortCardThemeManager({
               </div>
 
               <div className="grid gap-3 lg:grid-cols-[7rem_minmax(0,1fr)_repeat(4,minmax(5rem,6.5rem))_auto_auto] lg:items-end">
-                <form id={updateFormId} action={upsertAction} className="contents">
-                  <label className="grid min-w-0 gap-2 text-sm font-medium text-foreground">
-                    기수
-                    <Input
-                      type="number"
-                      name="cohortYear"
-                      min={1}
-                      max={99}
-                      defaultValue={year}
-                      readOnly={cohortYear !== undefined}
-                      required
+                {canUpdate ? (
+                  <form
+                    id={updateFormId}
+                    action={upsertAction}
+                    className="contents"
+                  >
+                    <label className="grid min-w-0 gap-2 text-sm font-medium text-foreground">
+                      기수
+                      <Input
+                        type="number"
+                        name="cohortYear"
+                        min={1}
+                        max={99}
+                        defaultValue={year}
+                        readOnly={cohortYear !== undefined}
+                        required
+                      />
+                    </label>
+                    <label className="grid min-w-0 gap-2 text-sm font-medium text-foreground">
+                      표시 이름
+                      <Input
+                        name="displayName"
+                        defaultValue={
+                          theme?.displayName ?? formatSsafyYearLabel(year)
+                        }
+                      />
+                    </label>
+                    <ColorField
+                      label="시작"
+                      name="backgroundFrom"
+                      value={getThemeValue(theme, "backgroundFrom")}
                     />
-                  </label>
-                  <label className="grid min-w-0 gap-2 text-sm font-medium text-foreground">
-                    표시 이름
-                    <Input
-                      name="displayName"
-                      defaultValue={theme?.displayName ?? formatSsafyYearLabel(year)}
+                    <ColorField
+                      label="중간"
+                      name="backgroundVia"
+                      value={getThemeValue(theme, "backgroundVia")}
                     />
-                  </label>
-                  <ColorField
-                    label="시작"
-                    name="backgroundFrom"
-                    value={getThemeValue(theme, "backgroundFrom")}
-                  />
-                  <ColorField
-                    label="중간"
-                    name="backgroundVia"
-                    value={getThemeValue(theme, "backgroundVia")}
-                  />
-                  <ColorField
-                    label="끝"
-                    name="backgroundTo"
-                    value={getThemeValue(theme, "backgroundTo")}
-                  />
-                  <ColorField
-                    label="강조"
-                    name="accentColor"
-                    value={getThemeValue(theme, "accentColor")}
-                  />
-                </form>
-                <form id={deleteFormId} action={deleteAction}>
-                  <input type="hidden" name="cohortYear" value={year} />
-                </form>
-                <SubmitButton
-                  form={updateFormId}
-                  variant="ghost"
-                  pendingText="저장 중"
-                  className="w-full lg:w-auto"
-                >
-                  저장
-                </SubmitButton>
-                <SubmitButton
-                  form={deleteFormId}
-                  variant="danger"
-                  pendingText="삭제 중"
-                  className="w-full lg:w-auto"
-                >
-                  삭제
-                </SubmitButton>
+                    <ColorField
+                      label="끝"
+                      name="backgroundTo"
+                      value={getThemeValue(theme, "backgroundTo")}
+                    />
+                    <ColorField
+                      label="강조"
+                      name="accentColor"
+                      value={getThemeValue(theme, "accentColor")}
+                    />
+                  </form>
+                ) : null}
+                {canDelete ? (
+                  <form id={deleteFormId} action={deleteAction}>
+                    <input type="hidden" name="cohortYear" value={year} />
+                  </form>
+                ) : null}
+                {canUpdate ? (
+                  <SubmitButton
+                    form={updateFormId}
+                    variant="ghost"
+                    pendingText="저장 중"
+                    className="w-full lg:w-auto"
+                  >
+                    저장
+                  </SubmitButton>
+                ) : null}
+                {canDelete ? (
+                  <SubmitButton
+                    form={deleteFormId}
+                    variant="danger"
+                    pendingText="삭제 중"
+                    className="w-full lg:w-auto"
+                  >
+                    삭제
+                  </SubmitButton>
+                ) : null}
               </div>
             </div>
           );
@@ -265,38 +304,53 @@ export function AdminCertificationCardPreviewGrid({
       member: mockPreviewCertificationMembers.staff,
     },
   ];
-  const visiblePreviews = typeof generation === "number"
-    ? previews.filter((preview) => preview.member.generation === generation)
-    : previews;
-  const generationLabel = typeof generation === "number" ? formatSsafyYearLabel(generation) : null;
+  const visiblePreviews =
+    typeof generation === "number"
+      ? previews.filter((preview) => preview.member.generation === generation)
+      : previews;
+  const generationLabel =
+    typeof generation === "number" ? formatSsafyYearLabel(generation) : null;
 
   return (
-    <Card id={anchorId ?? (generationLabel ? `card-preview-${generation}` : "card-preview")} tone="elevated" className="grid gap-5">
+    <Card
+      id={
+        anchorId ??
+        (generationLabel ? `card-preview-${generation}` : "card-preview")
+      }
+      tone="elevated"
+      className="grid gap-5"
+    >
       <SectionHeading
-        title={generationLabel ? `${generationLabel} 인증 카드 목업` : "인증 카드 목업"}
-        description={generationLabel
-          ? `${generationLabel} 카드 색상과 인증 정보를 실제 카드 컴포넌트로 확인합니다.`
-          : "기수별 색상과 수료생 대비를 실제 카드 컴포넌트로 확인합니다."}
+        title={
+          generationLabel
+            ? `${generationLabel} 인증 카드 목업`
+            : "인증 카드 목업"
+        }
+        description={
+          generationLabel
+            ? `${generationLabel} 카드 색상과 인증 정보를 실제 카드 컴포넌트로 확인합니다.`
+            : "기수별 색상과 수료생 대비를 실제 카드 컴포넌트로 확인합니다."
+        }
       />
       {visiblePreviews.length > 0 ? (
         <div className="grid gap-6 xl:grid-cols-2">
           {visiblePreviews.map((preview) => (
-          <div
-            key={preview.key}
-            className="grid gap-4 rounded-2xl border border-border bg-surface-muted p-4"
-          >
-            <SectionHeading
-              title={preview.title}
-              description={preview.description}
-              size="section"
-            />
-            <CertificationView
-              member={preview.member}
-              initialTimestamp={initialTimestamp}
-              disableTracking
-              cohortCardThemes={themes}
-            />
-          </div>
+            <div
+              key={preview.key}
+              className="grid gap-4 rounded-2xl border border-border bg-surface-muted p-4"
+            >
+              <SectionHeading
+                title={preview.title}
+                description={preview.description}
+                size="section"
+              />
+              <CertificationView
+                member={preview.member}
+                initialTimestamp={initialTimestamp}
+                disableTracking
+                cohortCardThemes={themes}
+              />
+            </div>
           ))}
         </div>
       ) : (

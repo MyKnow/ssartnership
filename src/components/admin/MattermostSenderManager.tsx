@@ -74,20 +74,25 @@ export default function MattermostSenderManager({
 }: {
   senders: MattermostSenderMetadata[];
   loadError?: boolean;
-  saveAction: AdminFormAction;
-  testAction: AdminFormAction;
-  disableAction: AdminFormAction;
+  saveAction?: AdminFormAction;
+  testAction?: AdminFormAction;
+  disableAction?: AdminFormAction;
   generation?: number;
   anchorId?: string;
 }) {
-  const [fieldErrors, setFieldErrors] = useState<MattermostSenderCredentialFieldErrors>({});
+  const [fieldErrors, setFieldErrors] =
+    useState<MattermostSenderCredentialFieldErrors>({});
   const formRef = useRef<HTMLFormElement>(null);
-  const generationLabel = typeof generation === "number" ? formatSsafyYearLabel(generation) : null;
-  const visibleSenders = typeof generation === "number"
-    ? senders.filter((sender) => sender.generation === generation)
-    : senders;
+  const generationLabel =
+    typeof generation === "number" ? formatSsafyYearLabel(generation) : null;
+  const visibleSenders =
+    typeof generation === "number"
+      ? senders.filter((sender) => sender.generation === generation)
+      : senders;
 
-  function focusFirstInvalidField(errors: MattermostSenderCredentialFieldErrors) {
+  function focusFirstInvalidField(
+    errors: MattermostSenderCredentialFieldErrors,
+  ) {
     const fieldName = (["generation", "loginId", "password"] as const).find(
       (name) => errors[name],
     );
@@ -117,10 +122,23 @@ export default function MattermostSenderManager({
   }
 
   return (
-    <Card id={anchorId ?? (generationLabel ? `mattermost-sender-${generation}` : "mattermost-sender")} tone="elevated" className="grid gap-6">
+    <Card
+      id={
+        anchorId ??
+        (generationLabel
+          ? `mattermost-sender-${generation}`
+          : "mattermost-sender")
+      }
+      tone="elevated"
+      className="grid gap-6"
+    >
       <div className="grid gap-2">
-        <p className="ui-kicker">{generationLabel ? `${generationLabel} 운영` : "Super Admin only"}</p>
-        <h2 className="text-lg font-semibold text-foreground">Mattermost Sender</h2>
+        <p className="ui-kicker">
+          {generationLabel ? `${generationLabel} 운영` : "Super Admin only"}
+        </p>
+        <h2 className="text-lg font-semibold text-foreground">
+          Mattermost Sender
+        </h2>
         <p className="text-sm leading-6 text-muted-foreground">
           {generationLabel
             ? `${generationLabel} 가입·알림에 사용할 Sender를 관리합니다. 로그인 정보는 서버에서 암호화되고 테스트 DM 성공 후에만 활성화됩니다.`
@@ -130,78 +148,129 @@ export default function MattermostSenderManager({
 
       {loadError ? (
         <FormMessage variant="error">
-          Sender 목록을 불러오지 못했습니다. 데이터베이스 마이그레이션과 서버 설정을 확인해 주세요.
+          Sender 목록을 불러오지 못했습니다. 데이터베이스 마이그레이션과 서버
+          설정을 확인해 주세요.
         </FormMessage>
       ) : null}
 
-      <form
-        ref={formRef}
-        action={saveAction}
-        className="grid gap-4 rounded-3xl border border-border bg-surface-inset p-4 sm:p-5"
-        onSubmit={validateCandidateForm}
-      >
-        <div className="grid gap-2">
-          <h3 className="text-sm font-semibold text-foreground">
-            {generationLabel ? `${generationLabel} 신규 또는 교체 후보 등록` : "신규 또는 교체 후보 등록"}
-          </h3>
-          <p className="text-xs leading-5 text-muted-foreground">
-            {generationLabel
-              ? "팀과 채널은 " + generationLabel + " 기준으로 자동 계산됩니다. 로그인 ID와 비밀번호는 저장 이후 다시 표시되지 않습니다."
-              : "팀과 채널은 기수 기준으로 자동 계산됩니다. 로그인 ID와 비밀번호는 저장 이후 다시 표시되지 않습니다."}
-          </p>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-[minmax(7rem,0.45fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
-          <label className="grid gap-2 text-sm font-medium text-foreground">
-            기수
-            <Input
-              type="number"
-              name="generation"
-              min={1}
-              max={99}
-              inputMode="numeric"
-              defaultValue={generation}
-              readOnly={generation !== undefined}
-              aria-invalid={Boolean(fieldErrors.generation)}
-              aria-describedby={fieldErrors.generation ? "mattermost-sender-generation-error" : undefined}
-              required
-            />
-            {fieldErrors.generation ? <span id="mattermost-sender-generation-error" className="text-xs font-normal text-danger">{fieldErrors.generation}</span> : null}
-          </label>
-          <label className="grid gap-2 text-sm font-medium text-foreground">
-            Mattermost 로그인 ID
-            <Input
-              name="loginId"
-              autoComplete="off"
-              aria-invalid={Boolean(fieldErrors.loginId)}
-              aria-describedby={fieldErrors.loginId ? "mattermost-sender-login-id-error" : undefined}
-              required
-            />
-            {fieldErrors.loginId ? <span id="mattermost-sender-login-id-error" className="text-xs font-normal text-danger">{fieldErrors.loginId}</span> : null}
-          </label>
-          <label className="grid gap-2 text-sm font-medium text-foreground">
-            Mattermost 비밀번호
-            <Input
-              type="password"
-              name="password"
-              autoComplete="new-password"
-              aria-invalid={Boolean(fieldErrors.password)}
-              aria-describedby={fieldErrors.password ? "mattermost-sender-password-error" : undefined}
-              required
-            />
-            {fieldErrors.password ? <span id="mattermost-sender-password-error" className="text-xs font-normal text-danger">{fieldErrors.password}</span> : null}
-          </label>
-          <SubmitButton pendingText="암호화해 저장 중" className="lg:mb-0.5">
-            후보 저장
-          </SubmitButton>
-        </div>
-      </form>
+      {!saveAction && !testAction && !disableAction ? (
+        <FormMessage variant="muted">
+          현재 계정은 Sender 상태를 조회할 수 있지만 자격 증명이나 활성 상태를
+          변경할 수 없습니다.
+        </FormMessage>
+      ) : null}
+
+      {saveAction ? (
+        <form
+          ref={formRef}
+          action={saveAction}
+          className="grid gap-4 rounded-3xl border border-border bg-surface-inset p-4 sm:p-5"
+          onSubmit={validateCandidateForm}
+        >
+          <div className="grid gap-2">
+            <h3 className="text-sm font-semibold text-foreground">
+              {generationLabel
+                ? `${generationLabel} 신규 또는 교체 후보 등록`
+                : "신규 또는 교체 후보 등록"}
+            </h3>
+            <p className="text-xs leading-5 text-muted-foreground">
+              {generationLabel
+                ? "팀과 채널은 " +
+                  generationLabel +
+                  " 기준으로 자동 계산됩니다. 로그인 ID와 비밀번호는 저장 이후 다시 표시되지 않습니다."
+                : "팀과 채널은 기수 기준으로 자동 계산됩니다. 로그인 ID와 비밀번호는 저장 이후 다시 표시되지 않습니다."}
+            </p>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-[minmax(7rem,0.45fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
+            <label className="grid gap-2 text-sm font-medium text-foreground">
+              기수
+              <Input
+                type="number"
+                name="generation"
+                min={1}
+                max={99}
+                inputMode="numeric"
+                defaultValue={generation}
+                readOnly={generation !== undefined}
+                aria-invalid={Boolean(fieldErrors.generation)}
+                aria-describedby={
+                  fieldErrors.generation
+                    ? "mattermost-sender-generation-error"
+                    : undefined
+                }
+                required
+              />
+              {fieldErrors.generation ? (
+                <span
+                  id="mattermost-sender-generation-error"
+                  className="text-xs font-normal text-danger"
+                >
+                  {fieldErrors.generation}
+                </span>
+              ) : null}
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-foreground">
+              Mattermost 로그인 ID
+              <Input
+                name="loginId"
+                autoComplete="off"
+                aria-invalid={Boolean(fieldErrors.loginId)}
+                aria-describedby={
+                  fieldErrors.loginId
+                    ? "mattermost-sender-login-id-error"
+                    : undefined
+                }
+                required
+              />
+              {fieldErrors.loginId ? (
+                <span
+                  id="mattermost-sender-login-id-error"
+                  className="text-xs font-normal text-danger"
+                >
+                  {fieldErrors.loginId}
+                </span>
+              ) : null}
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-foreground">
+              Mattermost 비밀번호
+              <Input
+                type="password"
+                name="password"
+                autoComplete="new-password"
+                aria-invalid={Boolean(fieldErrors.password)}
+                aria-describedby={
+                  fieldErrors.password
+                    ? "mattermost-sender-password-error"
+                    : undefined
+                }
+                required
+              />
+              {fieldErrors.password ? (
+                <span
+                  id="mattermost-sender-password-error"
+                  className="text-xs font-normal text-danger"
+                >
+                  {fieldErrors.password}
+                </span>
+              ) : null}
+            </label>
+            <SubmitButton pendingText="암호화해 저장 중" className="lg:mb-0.5">
+              후보 저장
+            </SubmitButton>
+          </div>
+        </form>
+      ) : null}
 
       <div className="grid gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-foreground">
-            {generationLabel ? `${generationLabel} 등록된 Sender` : "등록된 Sender"}
+            {generationLabel
+              ? `${generationLabel} 등록된 Sender`
+              : "등록된 Sender"}
           </h3>
-          <p className="text-xs text-muted-foreground">식별자 일부와 검증 상태만 표시합니다.</p>
+          <p className="text-xs text-muted-foreground">
+            식별자 일부와 검증 상태만 표시합니다.
+          </p>
         </div>
         {visibleSenders.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border bg-surface-muted px-4 py-5 text-sm text-muted-foreground">
@@ -212,8 +281,11 @@ export default function MattermostSenderManager({
         ) : (
           <div className="grid gap-3">
             {visibleSenders.map((sender) => {
-              const canTest = sender.status === "pending";
-              const canDisable = sender.status === "pending" || sender.status === "active";
+              const canTest =
+                sender.status === "pending" && Boolean(testAction);
+              const canDisable =
+                (sender.status === "pending" || sender.status === "active") &&
+                Boolean(disableAction);
               const confirmationText = `${sender.generation}기 비활성화`;
               return (
                 <article
@@ -222,57 +294,98 @@ export default function MattermostSenderManager({
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="grid gap-1">
-                      <p className="text-base font-semibold text-foreground">{sender.generation}기 · {sender.loginIdHint}</p>
+                      <p className="text-base font-semibold text-foreground">
+                        {sender.generation}기 · {sender.loginIdHint}
+                      </p>
                       <p className="text-xs text-muted-foreground">
-                        최근 검증 {formatTimestamp(sender.verifiedAt)} · {formatLastTest(sender)} ·
-                        상태 확인 {formatTimestamp(sender.healthCheckedAt)}
+                        최근 검증 {formatTimestamp(sender.verifiedAt)} ·{" "}
+                        {formatLastTest(sender)} · 상태 확인{" "}
+                        {formatTimestamp(sender.healthCheckedAt)}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <Badge variant={STATUS_VARIANTS[sender.status]}>{STATUS_LABELS[sender.status]}</Badge>
+                      <Badge variant={STATUS_VARIANTS[sender.status]}>
+                        {STATUS_LABELS[sender.status]}
+                      </Badge>
                       <Badge variant={HEALTH_VARIANTS[sender.healthStatus]}>
                         {HEALTH_LABELS[sender.healthStatus]}
                       </Badge>
-                      {sender.senderUsernameHint ? <Badge variant="neutral">{sender.senderUsernameHint}</Badge> : null}
+                      {sender.senderUsernameHint ? (
+                        <Badge variant="neutral">
+                          {sender.senderUsernameHint}
+                        </Badge>
+                      ) : null}
                     </div>
                   </div>
 
                   {sender.status === "pending" && sender.expiresAt ? (
                     <p className="rounded-2xl bg-warning/10 px-3 py-2 text-xs leading-5 text-warning">
-                      후보 만료 예정: {formatTimestamp(sender.expiresAt)}. 테스트 DM 성공 전에는 기존 활성 Sender가 계속 사용됩니다.
+                      후보 만료 예정: {formatTimestamp(sender.expiresAt)}.
+                      테스트 DM 성공 전에는 기존 활성 Sender가 계속 사용됩니다.
                     </p>
                   ) : null}
 
                   {sender.lastErrorCode ? (
                     <p className="rounded-2xl bg-danger/10 px-3 py-2 text-xs leading-5 text-danger">
-                      마지막 테스트는 완료되지 않았습니다. 안전한 오류 코드: {sender.lastErrorCode}
+                      마지막 테스트는 완료되지 않았습니다. 안전한 오류 코드:{" "}
+                      {sender.lastErrorCode}
                     </p>
                   ) : null}
 
-                  {sender.healthStatus === "cooldown" || sender.healthStatus === "blocked" ? (
+                  {sender.healthStatus === "cooldown" ||
+                  sender.healthStatus === "blocked" ? (
                     <p className="rounded-2xl bg-warning/10 px-3 py-2 text-xs leading-5 text-warning">
-                      런타임 접근 실패 {sender.healthFailureCount}회 · 다음 재시도 {formatTimestamp(sender.healthBlockedUntil)}
+                      런타임 접근 실패 {sender.healthFailureCount}회 · 다음
+                      재시도 {formatTimestamp(sender.healthBlockedUntil)}
                     </p>
                   ) : null}
 
-                  {(canTest || canDisable) ? (
+                  {canTest || canDisable ? (
                     <div className="grid gap-3 border-t border-border pt-4 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-end">
                       {canTest ? (
                         <form action={testAction}>
-                          <input type="hidden" name="candidateId" value={sender.id} />
-                          <SubmitButton pendingText="테스트 DM 발송 중" variant="secondary">
+                          <input
+                            type="hidden"
+                            name="candidateId"
+                            value={sender.id}
+                          />
+                          <SubmitButton
+                            pendingText="테스트 DM 발송 중"
+                            variant="secondary"
+                          >
                             테스트 후 활성화
                           </SubmitButton>
                         </form>
-                      ) : <div />}
+                      ) : (
+                        <div />
+                      )}
                       {canDisable ? (
-                        <form action={disableAction} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                        <form
+                          action={disableAction}
+                          className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
+                        >
                           <label className="grid gap-2 text-xs font-medium text-muted-foreground">
-                            비활성화하려면 <span className="font-semibold text-foreground">{confirmationText}</span> 입력
-                            <Input name="confirmationText" placeholder={confirmationText} autoComplete="off" required />
+                            비활성화하려면{" "}
+                            <span className="font-semibold text-foreground">
+                              {confirmationText}
+                            </span>{" "}
+                            입력
+                            <Input
+                              name="confirmationText"
+                              placeholder={confirmationText}
+                              autoComplete="off"
+                              required
+                            />
                           </label>
-                          <input type="hidden" name="candidateId" value={sender.id} />
-                          <SubmitButton pendingText="비활성화 중" variant="danger">
+                          <input
+                            type="hidden"
+                            name="candidateId"
+                            value={sender.id}
+                          />
+                          <SubmitButton
+                            pendingText="비활성화 중"
+                            variant="danger"
+                          >
                             비활성화
                           </SubmitButton>
                         </form>

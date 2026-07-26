@@ -14,6 +14,7 @@ import AdminShell from "@/components/admin/AdminShell";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { canManageMattermostSenders } from "@/lib/mattermost-senders/access";
+import { canAdmin } from "@/lib/admin-permissions";
 import { mattermostSenderRepository } from "@/lib/mattermost-senders/repository";
 import { listCohortCardThemes } from "@/lib/cohort-card-themes";
 import {
@@ -39,9 +40,13 @@ export default async function AdminCyclePage({
     generation?: string;
   }>;
 }) {
-  const session = await requireAdminPermission("cycles", "read", { path: "/admin/cycle" });
+  const session = await requireAdminPermission("cycles", "read", {
+    path: "/admin/cycle",
+  });
   const params = (await searchParams) ?? {};
   const canManageSenders = canManageMattermostSenders(session.account, "read");
+  const canUpdate = canAdmin(session.account.permissions, "cycles", "update");
+  const canDelete = canAdmin(session.account.permissions, "cycles", "delete");
   const [settings, themes, senderResult] = await Promise.all([
     getSsafyCycleSettings(),
     listCohortCardThemes(),
@@ -63,6 +68,20 @@ export default async function AdminCyclePage({
         initialTimestamp={new Date().toISOString()}
         status={params.status}
         requestedGeneration={params.generation}
+        canUpdate={canUpdate}
+        canDelete={canDelete}
+        canManageSenderCreate={canManageMattermostSenders(
+          session.account,
+          "create",
+        )}
+        canManageSenderUpdate={canManageMattermostSenders(
+          session.account,
+          "update",
+        )}
+        canManageSenderDelete={canManageMattermostSenders(
+          session.account,
+          "delete",
+        )}
         errorMessage={
           params.error ? adminActionErrorMessages[params.error] : null
         }
@@ -72,10 +91,18 @@ export default async function AdminCyclePage({
         upsertThemeAction={upsertCohortCardTheme}
         deleteThemeAction={deleteCohortCardTheme}
         mattermostSenders={canManageSenders ? senderResult.senders : undefined}
-        mattermostSenderLoadError={canManageSenders ? senderResult.loadError : undefined}
-        saveMattermostSenderAction={canManageSenders ? saveMattermostSenderCandidate : undefined}
-        testMattermostSenderAction={canManageSenders ? testMattermostSenderCandidate : undefined}
-        disableMattermostSenderAction={canManageSenders ? disableMattermostSender : undefined}
+        mattermostSenderLoadError={
+          canManageSenders ? senderResult.loadError : undefined
+        }
+        saveMattermostSenderAction={
+          canManageSenders ? saveMattermostSenderCandidate : undefined
+        }
+        testMattermostSenderAction={
+          canManageSenders ? testMattermostSenderCandidate : undefined
+        }
+        disableMattermostSenderAction={
+          canManageSenders ? disableMattermostSender : undefined
+        }
       />
     </AdminShell>
   );
