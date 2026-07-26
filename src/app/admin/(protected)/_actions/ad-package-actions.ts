@@ -11,11 +11,12 @@ import {
   parseUpdateAdCouponForm,
 } from "@/lib/ad-package-validation";
 import type { AdCampaignStatus } from "@/lib/ad-packages";
+import type { DeleteAdCouponResult } from "@/lib/repositories/ad-package-repository";
 import { adPackageRepository } from "@/lib/repositories";
 import { normalizeCouponCodeRows } from "@/lib/ad-coupon-domain";
 import { isUuid } from "@/lib/uuid";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import { logAdminAction } from "./shared-helpers";
+import { logAdminAction, redirectAdminActionError } from "./shared-helpers";
 
 function getString(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -253,18 +254,64 @@ export async function duplicateAdCouponAction(formData: FormData) {
 }
 
 export async function deleteAdCouponAction(formData: FormData) {
-  const couponId = requireCouponId(formData);
-  const session = await requireAdminPermission("home_ads", "delete", { path: "/admin/partners" });
-  const existing = await adPackageRepository.getAdminCouponById(couponId);
-  if (!existing) {
-    throw new Error("쿠폰을 찾을 수 없습니다.");
-  }
   const submittedPartnerId = getString(formData, "partnerId");
-  if (submittedPartnerId !== existing.partnerId) {
-    throw new Error("다른 제휴처의 쿠폰은 삭제할 수 없습니다.");
+  const fallbackPath = isUuid(submittedPartnerId)
+    ? `/admin/partners/${encodeURIComponent(submittedPartnerId)}`
+    : "/admin/partners";
+  const session = await requireAdminPermission("home_ads", "delete", { path: "/admin/partners" });
+  let couponId: string;
+  try {
+    couponId = requireCouponId(formData);
+  } catch {
+    redirectAdminActionError(fallbackPath, "ad_coupon_delete_invalid_request");
   }
-  await assertManagedAdPartner(session, existing.partnerId);
-  await adPackageRepository.deleteCoupon(couponId);
+  let existing: Awaited<ReturnType<typeof adPackageRepository.getAdminCouponById>>;
+  try {
+    existing = await adPackageRepository.getAdminCouponById(couponId);
+  } catch {
+    redirectAdminActionError(fallbackPath, "ad_coupon_delete_failed");
+  }
+  if (!existing) {
+    redirectAdminActionError(fallbackPath, "ad_coupon_delete_not_found");
+  }
+  const detailPath = `/admin/partners/${encodeURIComponent(existing.partnerId)}`;
+  if (submittedPartnerId !== existing.partnerId) {
+    redirectAdminActionError(detailPath, "ad_coupon_delete_invalid_request", {
+      action: "ad_coupon_delete",
+      targetType: "ad_coupon",
+      targetId: couponId,
+      properties: { issue: 236, partnerId: existing.partnerId },
+    });
+  }
+  try {
+    await assertManagedAdPartner(session, existing.partnerId);
+  } catch {
+    redirectAdminActionError(detailPath, "ad_coupon_delete_failed", {
+      action: "ad_coupon_delete",
+      targetType: "ad_coupon",
+      targetId: couponId,
+      properties: { issue: 236, partnerId: existing.partnerId },
+    });
+  }
+  let deletion: DeleteAdCouponResult;
+  try {
+    deletion = await adPackageRepository.deleteCoupon(couponId);
+  } catch {
+    redirectAdminActionError(detailPath, "ad_coupon_delete_failed", {
+      action: "ad_coupon_delete",
+      targetType: "ad_coupon",
+      targetId: couponId,
+      properties: { issue: 236, partnerId: existing.partnerId },
+    });
+  }
+  if (!deletion.ok) {
+    redirectAdminActionError(detailPath, "ad_coupon_delete_has_history", {
+      action: "ad_coupon_delete",
+      targetType: "ad_coupon",
+      targetId: couponId,
+      properties: { issue: 236, partnerId: existing.partnerId },
+    });
+  }
   await logAdminAction("ad_coupon_delete", {
     targetType: "ad_coupon",
     targetId: couponId,

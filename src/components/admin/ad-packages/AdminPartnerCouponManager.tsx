@@ -1,6 +1,7 @@
 import { ChevronDownIcon } from "@heroicons/react/24/outline";
 import Card from "@/components/ui/Card";
 import FormSubmitButton from "@/components/ui/FormSubmitButton";
+import InlineMessage from "@/components/ui/InlineMessage";
 import SectionHeading from "@/components/ui/SectionHeading";
 import StatsRow from "@/components/ui/StatsRow";
 import type { AdCouponStatus } from "@/lib/ad-packages";
@@ -79,6 +80,8 @@ function CouponManagementActions({
   if (!canUpdateCoupon && !canCreateCoupon && !canDeleteCoupon) {
     return null;
   }
+  const deleteBlockedByHistory =
+    coupon.issuedCount > 0 || coupon.usedCount > 0;
 
   return (
     <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
@@ -110,7 +113,14 @@ function CouponManagementActions({
           </FormSubmitButton>
         </form>
       ) : null}
-      {canDeleteCoupon && deleteCouponAction ? (
+      {canDeleteCoupon && deleteCouponAction && deleteBlockedByHistory ? (
+        <p className="basis-full text-ko-pretty text-sm text-muted-foreground sm:text-right">
+          발급 또는 사용 이력이 있어 삭제할 수 없습니다. {canUpdateCoupon
+            ? "수정에서 상태를 종료로 변경하세요."
+            : "상태를 종료하려면 수정 권한이 필요합니다."}
+        </p>
+      ) : null}
+      {canDeleteCoupon && deleteCouponAction && !deleteBlockedByHistory ? (
         <form action={deleteCouponAction}>
           <input type="hidden" name="partnerId" value={partnerId} readOnly />
           <input type="hidden" name="couponId" value={coupon.id} readOnly />
@@ -133,6 +143,7 @@ export default function AdminPartnerCouponManager({
   updateCouponAction,
   duplicateCouponAction,
   deleteCouponAction,
+  errorMessage,
   canCreateCoupon = true,
   canUpdateCoupon = false,
   canDeleteCoupon = false,
@@ -146,6 +157,7 @@ export default function AdminPartnerCouponManager({
   updateCouponAction?: ServerAction;
   duplicateCouponAction?: ServerAction;
   deleteCouponAction?: ServerAction;
+  errorMessage?: string | null;
   canCreateCoupon?: boolean;
   canUpdateCoupon?: boolean;
   canDeleteCoupon?: boolean;
@@ -170,6 +182,14 @@ export default function AdminPartnerCouponManager({
         ]}
         minItemWidth="12rem"
       />
+
+      {errorMessage ? (
+        <InlineMessage
+          tone="error"
+          title="쿠폰을 삭제하지 못했습니다."
+          description={errorMessage}
+        />
+      ) : null}
 
       {canCreateCoupon ? (
         <details className="group min-w-0 overflow-hidden rounded-panel border border-border bg-surface shadow-flat">
