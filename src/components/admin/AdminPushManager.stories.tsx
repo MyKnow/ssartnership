@@ -118,7 +118,8 @@ function installPushFetchMock() {
   const fetchMock = fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url.startsWith("/api/admin/push/recipients?")) {
-      const query = new URL(url, "https://storybook.local").searchParams.get("query") ?? "";
+      const query =
+        new URL(url, "https://storybook.local").searchParams.get("query") ?? "";
       const recipients = [
         {
           id: "member-1",
@@ -136,9 +137,9 @@ function installPushFetchMock() {
         },
       ].filter((member) =>
         query
-          ? `${member.display_name} ${member.mm_username}`.toLocaleLowerCase("ko-KR").includes(
-              query.toLocaleLowerCase("ko-KR"),
-            )
+          ? `${member.display_name} ${member.mm_username}`
+              .toLocaleLowerCase("ko-KR")
+              .includes(query.toLocaleLowerCase("ko-KR"))
           : true,
       );
       return {
@@ -190,7 +191,9 @@ function installPushFetchMock() {
                 label: "푸시",
                 eligibleCount: 1,
                 excludedCount: 1,
-                reasons: [{ code: "push_unsubscribed", label: "푸시 미구독", count: 1 }],
+                reasons: [
+                  { code: "push_unsubscribed", label: "푸시 미구독", count: 1 },
+                ],
               },
             ],
             canSend: true,
@@ -229,7 +232,9 @@ function installPushFetchMock() {
   return fetchMock;
 }
 
-function installPreviewFailureFetchMock(message = "발송 검토 정보를 불러오지 못했습니다.") {
+function installPreviewFailureFetchMock(
+  message = "발송 검토 정보를 불러오지 못했습니다.",
+) {
   const fetchMock = fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url === "/api/push/admin/preview") {
@@ -268,11 +273,36 @@ function installDeleteLogFetchMock() {
 export const Default: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.type(canvas.getByPlaceholderText("제목, 내용, URL, 대상 검색"), "분식랩");
+    await userEvent.type(
+      canvas.getByPlaceholderText("제목, 내용, URL, 대상 검색"),
+      "분식랩",
+    );
     await expect(canvas.getByText("오늘 제휴 안내")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "불러오기" }));
     await expect(canvas.getByText("통합 발송 관리")).toBeInTheDocument();
-    await expect(canvas.getByDisplayValue("오늘 제휴 안내")).toBeInTheDocument();
+    await expect(
+      canvas.getByDisplayValue("오늘 제휴 안내"),
+    ).toBeInTheDocument();
+  },
+};
+
+export const ReadOnlySend: Story = {
+  args: {
+    initialTab: "send",
+    canSend: false,
+    canDeleteLogs: false,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText("알림 발송 권한이 없습니다.", { exact: true }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByRole("button", { name: "알림센터로 돌아가기" }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("heading", { name: "통합 발송 관리" }),
+    ).not.toBeInTheDocument();
   },
 };
 
@@ -294,14 +324,30 @@ export const SendAnnouncement: Story = {
     const fetchMock = installPushFetchMock();
 
     await userEvent.click(canvas.getByRole("tab", { name: /알림 전송/ }));
-    await userEvent.click(canvas.getByRole("button", { name: "3. 대상자 검색" }));
+    await userEvent.click(
+      canvas.getByRole("button", { name: "3. 대상자 검색" }),
+    );
     await expect(await canvas.findByText("발송 가능 대상")).toBeInTheDocument();
-    await userEvent.type(canvas.getByPlaceholderText("알림 제목"), "신규 제휴 안내");
-    await userEvent.type(canvas.getByPlaceholderText("알림 내용"), "역삼 분식랩 신규 혜택이 적용되었습니다.");
-    await userEvent.click(canvas.getByRole("button", { name: "3. 대상자 검색" }));
+    await userEvent.type(
+      canvas.getByPlaceholderText("알림 제목"),
+      "신규 제휴 안내",
+    );
+    await userEvent.type(
+      canvas.getByPlaceholderText("알림 내용"),
+      "역삼 분식랩 신규 혜택이 적용되었습니다.",
+    );
+    await userEvent.click(
+      canvas.getByRole("button", { name: "3. 대상자 검색" }),
+    );
     await userEvent.click(canvas.getByRole("button", { name: "마지막 확인" }));
-    await expect(await within(document.body).findByRole("button", { name: "메시지 보내기" })).toBeInTheDocument();
-    await userEvent.click(within(document.body).getByRole("button", { name: "메시지 보내기" }));
+    await expect(
+      await within(document.body).findByRole("button", {
+        name: "메시지 보내기",
+      }),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      within(document.body).getByRole("button", { name: "메시지 보내기" }),
+    );
 
     await expect(fetchMock).toHaveBeenCalledWith(
       "/api/push/admin/preview",
@@ -327,7 +373,9 @@ export const PersonalRecipientSearch: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "개인 선택" }));
 
     const dialog = within(
-      await within(document.body).findByRole("dialog", { name: "개인 대상 선택" }),
+      await within(document.body).findByRole("dialog", {
+        name: "개인 대상 선택",
+      }),
     );
     const closeButton = dialog.getByRole("button", { name: "모달 닫기" });
     await waitFor(() => {
@@ -341,7 +389,9 @@ export const PersonalRecipientSearch: Story = {
     await expect(await dialog.findByText("검색 결과 1명")).toBeInTheDocument();
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining("/api/admin/push/recipients?limit=30&query=%EA%B9%80"),
+        expect.stringContaining(
+          "/api/admin/push/recipients?limit=30&query=%EA%B9%80",
+        ),
         expect.objectContaining({ signal: expect.anything() }),
       );
     });
@@ -355,10 +405,14 @@ export const PersonalRecipientSearch: Story = {
 export const PreviewFailure: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const fetchMock = installPreviewFailureFetchMock("대상자 미리보기를 다시 시도해 주세요.");
+    const fetchMock = installPreviewFailureFetchMock(
+      "대상자 미리보기를 다시 시도해 주세요.",
+    );
 
     await userEvent.click(canvas.getByRole("tab", { name: /알림 전송/ }));
-    await userEvent.click(canvas.getByRole("button", { name: "3. 대상자 검색" }));
+    await userEvent.click(
+      canvas.getByRole("button", { name: "3. 대상자 검색" }),
+    );
 
     await expect(
       await canvas.findByText("대상자 미리보기를 다시 시도해 주세요."),
@@ -384,7 +438,9 @@ export const DeleteLog: Story = {
         "/api/push/admin/logs/log-1",
         expect.objectContaining({ method: "DELETE" }),
       );
-      await expect(canvas.queryByText("오늘 제휴 안내")).not.toBeInTheDocument();
+      await expect(
+        canvas.queryByText("오늘 제휴 안내"),
+      ).not.toBeInTheDocument();
     } finally {
       window.confirm = originalConfirm;
     }

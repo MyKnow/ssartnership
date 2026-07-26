@@ -95,6 +95,8 @@ export function useAdminPushManager({
   recentLogs,
   availableYearOptions,
   availableCampusOptions,
+  canSend = true,
+  canDeleteLogs = true,
 }: Pick<
   AdminPushManagerProps,
   | "pushConfigured"
@@ -103,13 +105,17 @@ export function useAdminPushManager({
   | "recentLogs"
   | "availableYearOptions"
   | "availableCampusOptions"
+  | "canSend"
+  | "canDeleteLogs"
 >) {
   const { notify } = useToast();
   const router = useRouter();
   const [logs, setLogs] = useState(recentLogs);
   const [composer, setComposer] = useState(initialComposerState);
   const [filters, setFilters] = useState(initialLogFilterState);
-  const [reviewState, setReviewState] = useState<AdminPushReviewState | null>(null);
+  const [reviewState, setReviewState] = useState<AdminPushReviewState | null>(
+    null,
+  );
   const [pending, setPending] = useState(false);
   const [previewPending, setPreviewPending] = useState(false);
   const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
@@ -129,12 +135,20 @@ export function useAdminPushManager({
 
   useEffect(() => {
     setReviewState((current) =>
-      current && current.lastSubmittedPayload !== composerFingerprint ? null : current,
+      current && current.lastSubmittedPayload !== composerFingerprint
+        ? null
+        : current,
     );
   }, [composerFingerprint]);
 
-  const derivedCampusOptions = useMemo(() => createCampusOptions(members), [members]);
-  const derivedYearOptions = useMemo(() => createYearOptions(members), [members]);
+  const derivedCampusOptions = useMemo(
+    () => createCampusOptions(members),
+    [members],
+  );
+  const derivedYearOptions = useMemo(
+    () => createYearOptions(members),
+    [members],
+  );
   const campusOptions = availableCampusOptions ?? derivedCampusOptions;
   const yearOptions = availableYearOptions ?? derivedYearOptions;
   const audienceYearOptions = useMemo(
@@ -169,7 +183,10 @@ export function useAdminPushManager({
     setFilters((current) => ({ ...current, [key]: value }));
   }
 
-  function updateChannel(channel: keyof AdminPushComposerState["channels"], next: boolean) {
+  function updateChannel(
+    channel: keyof AdminPushComposerState["channels"],
+    next: boolean,
+  ) {
     setComposer((current) => ({
       ...current,
       channels: {
@@ -207,7 +224,9 @@ export function useAdminPushManager({
     setComposer((current) => ({
       ...current,
       url: nextUrl,
-      selectedPartnerId: partners.some((partner) => partner.id === matchedPartnerId)
+      selectedPartnerId: partners.some(
+        (partner) => partner.id === matchedPartnerId,
+      )
         ? matchedPartnerId
         : "",
     }));
@@ -251,6 +270,9 @@ export function useAdminPushManager({
   }
 
   async function reviewComposer() {
+    if (!canSend) {
+      return;
+    }
     setPreviewPending(true);
     setErrorMessage(null);
     try {
@@ -269,14 +291,23 @@ export function useAdminPushManager({
             scope: composer.audienceScope,
             year: composer.selectedYear || undefined,
             campus: composer.selectedCampus || undefined,
-            memberIds: composer.selectedMemberIds.length > 0 ? composer.selectedMemberIds : undefined,
+            memberIds:
+              composer.selectedMemberIds.length > 0
+                ? composer.selectedMemberIds
+                : undefined,
           },
         }),
       });
-      const data = await parseAdminResponse<{ message?: string; preview?: AdminNotificationPreview }>(response);
+      const data = await parseAdminResponse<{
+        message?: string;
+        preview?: AdminNotificationPreview;
+      }>(response);
       if (!response.ok || !data?.preview) {
         setErrorMessage(
-          getSafeAdminResponseMessage(data?.message, "발송 검토 정보를 불러오지 못했습니다."),
+          getSafeAdminResponseMessage(
+            data?.message,
+            "발송 검토 정보를 불러오지 못했습니다.",
+          ),
         );
         return;
       }
@@ -286,9 +317,13 @@ export function useAdminPushManager({
         lastSendResult: null,
       });
       setComposer((current) => ({ ...current, confirmationText: "" }));
-      notify(`발송 가능 대상 ${data.preview.eligibleMemberCount}명을 찾았습니다.`);
+      notify(
+        `발송 가능 대상 ${data.preview.eligibleMemberCount}명을 찾았습니다.`,
+      );
     } catch (error) {
-      setErrorMessage(getSafeAdminMessage(error, "발송 검토 정보를 불러오지 못했습니다."));
+      setErrorMessage(
+        getSafeAdminMessage(error, "발송 검토 정보를 불러오지 못했습니다."),
+      );
     } finally {
       setPreviewPending(false);
     }
@@ -301,7 +336,10 @@ export function useAdminPushManager({
       setErrorMessage("푸시 채널이 아직 설정되지 않았습니다.");
       return;
     }
-    if (!reviewState || reviewState.lastSubmittedPayload !== composerFingerprint) {
+    if (
+      !reviewState ||
+      reviewState.lastSubmittedPayload !== composerFingerprint
+    ) {
       setErrorMessage("먼저 발송 대상 섹션에서 대상자 검색을 완료해 주세요.");
       return;
     }
@@ -314,8 +352,18 @@ export function useAdminPushManager({
   }
 
   async function confirmSubmit() {
-    if (!reviewState || reviewState.lastSubmittedPayload !== composerFingerprint) {
-      setErrorMessage("발송 대상이 변경되었습니다. 다시 대상자 검색을 진행해 주세요.");
+    if (!canSend) {
+      setErrorMessage("현재 계정은 알림을 발송할 수 없습니다.");
+      setSendConfirmOpen(false);
+      return;
+    }
+    if (
+      !reviewState ||
+      reviewState.lastSubmittedPayload !== composerFingerprint
+    ) {
+      setErrorMessage(
+        "발송 대상이 변경되었습니다. 다시 대상자 검색을 진행해 주세요.",
+      );
       setSendConfirmOpen(false);
       return;
     }
@@ -337,14 +385,25 @@ export function useAdminPushManager({
             scope: composer.audienceScope,
             year: composer.selectedYear || undefined,
             campus: composer.selectedCampus || undefined,
-            memberIds: composer.selectedMemberIds.length > 0 ? composer.selectedMemberIds : undefined,
+            memberIds:
+              composer.selectedMemberIds.length > 0
+                ? composer.selectedMemberIds
+                : undefined,
           },
           confirmationText: composer.confirmationText,
         }),
       });
-      const data = await parseAdminResponse<{ message?: string; result?: AdminNotificationSendResult }>(response);
+      const data = await parseAdminResponse<{
+        message?: string;
+        result?: AdminNotificationSendResult;
+      }>(response);
       if (!response.ok || !data?.result) {
-        setErrorMessage(getSafeAdminResponseMessage(data?.message, "알림 발송에 실패했습니다."));
+        setErrorMessage(
+          getSafeAdminResponseMessage(
+            data?.message,
+            "알림 발송에 실패했습니다.",
+          ),
+        );
         return;
       }
 
@@ -396,11 +455,14 @@ export function useAdminPushManager({
       title: log.title,
       body: log.body,
       url: log.url ?? "",
-      selectedPartnerId: partners.some((partner) => partner.id === matchedPartnerId)
+      selectedPartnerId: partners.some(
+        (partner) => partner.id === matchedPartnerId,
+      )
         ? matchedPartnerId
         : "",
       audienceScope: log.targetScope,
-      selectedYear: typeof log.targetYear === "number" ? String(log.targetYear) : "",
+      selectedYear:
+        typeof log.targetYear === "number" ? String(log.targetYear) : "",
       selectedCampus: log.targetCampus ?? "",
       selectedMemberIds: log.targetMemberId ? [log.targetMemberId] : [],
       confirmationText: "",
@@ -413,6 +475,9 @@ export function useAdminPushManager({
   }
 
   async function deleteLog(logId: string) {
+    if (!canDeleteLogs) {
+      return;
+    }
     if (deletingLogId) {
       return;
     }
@@ -430,14 +495,21 @@ export function useAdminPushManager({
       const data = await parseAdminResponse<{ message?: string }>(response);
 
       if (!response.ok) {
-        setErrorMessage(getSafeAdminResponseMessage(data?.message, "발송 로그 삭제에 실패했습니다."));
+        setErrorMessage(
+          getSafeAdminResponseMessage(
+            data?.message,
+            "발송 로그 삭제에 실패했습니다.",
+          ),
+        );
         return;
       }
 
       setLogs((current) => current.filter((log) => log.id !== logId));
       notify("발송 로그를 삭제했습니다.");
     } catch (error) {
-      setErrorMessage(getSafeAdminMessage(error, "발송 로그 삭제에 실패했습니다."));
+      setErrorMessage(
+        getSafeAdminMessage(error, "발송 로그 삭제에 실패했습니다."),
+      );
     } finally {
       setDeletingLogId(null);
     }

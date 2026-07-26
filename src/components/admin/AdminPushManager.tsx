@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import AdminNotificationCenter from "@/components/admin/notification-center/AdminNotificationCenter";
 import AdminOperationFlow from "@/components/admin/AdminOperationFlow";
+import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import AdminTabs from "@/components/admin/AdminTabs";
 import { buildAdminPushTabHref } from "@/lib/admin-operation-paths";
 import { getMemberLabel } from "./push-manager/constants";
@@ -62,15 +63,20 @@ export default function AdminPushManager({
   availableYearOptions,
   availableCampusOptions,
   initialTab = "center",
+  canSend = true,
+  canDeleteLogs = true,
 }: AdminPushManagerProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [recipientOptions, setRecipientOptions] = useState(members);
 
-  const onRecipientOptionsLoaded = useCallback((next: AdminPushManagerProps["members"]) => {
-    setRecipientOptions((current) => mergeRecipientOptions(current, next));
-  }, []);
+  const onRecipientOptionsLoaded = useCallback(
+    (next: AdminPushManagerProps["members"]) => {
+      setRecipientOptions((current) => mergeRecipientOptions(current, next));
+    },
+    [],
+  );
 
   const controller = useAdminPushManager({
     pushConfigured,
@@ -79,18 +85,24 @@ export default function AdminPushManager({
     recentLogs,
     availableYearOptions,
     availableCampusOptions,
+    canSend,
+    canDeleteLogs,
   });
   const [selectedTab, setSelectedTab] = useState<AdminPushTab>(initialTab);
   const requestedTab = searchParams.get("tab");
   const activeTab: AdminPushTab =
-    requestedTab === "center" || requestedTab === "logs" || requestedTab === "send"
+    requestedTab === "center" ||
+    requestedTab === "logs" ||
+    requestedTab === "send"
       ? requestedTab
       : selectedTab;
 
   function changeTab(nextTab: AdminPushTab) {
     setSelectedTab(nextTab);
     if (pathname === "/admin/push") {
-      router.replace(buildAdminPushTabHref(searchParams, nextTab), { scroll: false });
+      router.replace(buildAdminPushTabHref(searchParams, nextTab), {
+        scroll: false,
+      });
     }
   }
 
@@ -123,10 +135,7 @@ export default function AdminPushManager({
             label: "검토",
             description: "채널별 발송 가능 대상을 확인합니다.",
             href: buildAdminPushTabHref(searchParams, "send"),
-            state:
-              activeTab === "logs"
-                ? "complete"
-                : reviewStepState,
+            state: activeTab === "logs" ? "complete" : reviewStepState,
           },
           {
             label: "결과",
@@ -137,13 +146,18 @@ export default function AdminPushManager({
         ]}
       />
 
-      <AdminTabs value={activeTab} onChange={changeTab} options={adminPushTabOptions} />
+      <AdminTabs
+        value={activeTab}
+        onChange={changeTab}
+        options={adminPushTabOptions}
+      />
 
       {activeTab === "center" ? (
         <AdminNotificationCenter
           automaticSummaries={automaticSummaries}
           recentLogs={recentLogs}
-          onMoveToSend={() => changeTab("send")}
+          canSend={canSend}
+          onMoveToSend={canSend ? () => changeTab("send") : undefined}
         />
       ) : activeTab === "logs" ? (
         <PushLogsSection
@@ -152,11 +166,30 @@ export default function AdminPushManager({
           filters={controller.filters}
           deletingLogId={controller.deletingLogId}
           onUpdateFilter={controller.updateFilter}
-          onLoadLog={(log) => {
-            changeTab("send");
-            controller.loadLog(log);
-          }}
-          onDeleteLog={controller.deleteLog}
+          onLoadLog={
+            canSend
+              ? (log) => {
+                  changeTab("send");
+                  controller.loadLog(log);
+                }
+              : undefined
+          }
+          onDeleteLog={canDeleteLogs ? controller.deleteLog : undefined}
+        />
+      ) : !canSend ? (
+        <AdminStatePanel
+          kind="forbidden"
+          title="알림 발송 권한이 없습니다."
+          description="발송 결과와 자동 알림 상태는 조회할 수 있지만 새 알림 발송은 최고 관리자에게 요청해야 합니다."
+          action={
+            <button
+              type="button"
+              className="min-h-11 rounded-2xl border border-border bg-surface-control px-4 py-2 text-sm font-semibold text-foreground"
+              onClick={() => changeTab("center")}
+            >
+              알림센터로 돌아가기
+            </button>
+          }
         />
       ) : (
         <PushComposerSection
