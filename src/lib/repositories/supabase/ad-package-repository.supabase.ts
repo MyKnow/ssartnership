@@ -955,7 +955,7 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
     return mapCouponRow(data as AdCouponRow);
   }
 
-  async deleteCoupon(couponId: string): Promise<void> {
+  async deleteCoupon(couponId: string) {
     const supabase = getSupabaseAdminClient();
     const [issueResult, redemptionResult] = await Promise.all([
       supabase
@@ -974,7 +974,7 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
       throw new Error(redemptionResult.error.message);
     }
     if ((issueResult.count ?? 0) > 0 || (redemptionResult.count ?? 0) > 0) {
-      throw new Error("사용 이력이 있는 쿠폰은 삭제할 수 없습니다. 상태를 종료로 변경해 주세요.");
+      return { ok: false, reason: "usage_history" } as const;
     }
     const { error } = await supabase
       .from("ad_coupons")
@@ -983,6 +983,7 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
     if (error) {
       throw new Error(error.message);
     }
+    return { ok: true } as const;
   }
 
   async issueCoupon(input: IssueAdCouponInput): Promise<IssueAdCouponResult> {
