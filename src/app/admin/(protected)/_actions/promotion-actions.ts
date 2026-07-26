@@ -54,8 +54,8 @@ function eventRewardActionSlug(formData: FormData) {
   return normalizeSlug(getString(formData, "slug")) || "signup-reward";
 }
 
-function eventRewardActionErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error && error.message.trim() ? error.message : fallback;
+function eventRewardActionErrorMessage(_error: unknown, fallback: string) {
+  return fallback;
 }
 
 function adminEventUrl(

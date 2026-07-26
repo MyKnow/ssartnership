@@ -77,3 +77,15 @@ export const adminActionErrorMessages: Record<string, string> = {
   admin_usage_count_exceeded: "선택한 혜택의 최대 적용 횟수를 초과했습니다.",
   admin_usage_database_failed: "혜택 적용 이력을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
 };
+
+const ADMIN_ACTION_ERROR_CODE_PATTERN = /^[a-z][a-z0-9_]{0,79}$/;
+
+/**
+ * Server actions may receive either a stable domain error code or an internal
+ * provider/database message. Only code-shaped values are allowed to cross the
+ * redirect boundary; pages still map unknown codes to their generic message.
+ */
+export function getSafeAdminActionErrorCode(error: unknown, fallback: string) {
+  const candidate = error instanceof Error ? error.message.trim() : "";
+  return ADMIN_ACTION_ERROR_CODE_PATTERN.test(candidate) ? candidate : fallback;
+}

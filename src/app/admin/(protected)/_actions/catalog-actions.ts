@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getSafeAdminActionErrorCode } from "@/lib/admin-action-errors";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { requireAdminPermission } from "@/lib/admin-access";
 import {
@@ -134,7 +135,7 @@ export async function createPartnerCompanyAction(formData: FormData) {
   } catch (error) {
     redirectAdminActionError(
       "/admin/companies",
-      error instanceof Error ? error.message : "company_invalid_request",
+      getSafeAdminActionErrorCode(error, "company_invalid_request"),
     );
   }
 
@@ -190,7 +191,7 @@ export async function updatePartnerCompanyAction(formData: FormData) {
   } catch (error) {
     redirectAdminActionError(
       "/admin/companies",
-      error instanceof Error ? error.message : "company_invalid_request",
+      getSafeAdminActionErrorCode(error, "company_invalid_request"),
     );
   }
 

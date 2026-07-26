@@ -4,6 +4,7 @@ import {
   getSafeAdminMessage,
   getSafeAdminResponseMessage,
 } from "../src/lib/admin-safe-messages";
+import { getSafeAdminActionErrorCode } from "../src/lib/admin-action-errors";
 
 test("관리자 UI는 서버 내부 오류 메시지를 fallback으로 치환한다", () => {
   assert.equal(
@@ -13,6 +14,17 @@ test("관리자 UI는 서버 내부 오류 메시지를 fallback으로 치환한
   assert.equal(
     getSafeAdminResponseMessage("relation does not exist", "발송 검토에 실패했습니다."),
     "발송 검토에 실패했습니다.",
+  );
+});
+
+test("관리자 redirect 경계는 내부 오류 문장을 오류 코드로 전달하지 않는다", () => {
+  assert.equal(
+    getSafeAdminActionErrorCode(new Error("relation ad_coupons does not exist"), "admin_action_failed"),
+    "admin_action_failed",
+  );
+  assert.equal(
+    getSafeAdminActionErrorCode(new Error("partner_form_missing_name"), "partner_form_invalid_request"),
+    "partner_form_missing_name",
   );
 });
 
