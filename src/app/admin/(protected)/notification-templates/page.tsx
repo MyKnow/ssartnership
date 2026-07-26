@@ -10,7 +10,6 @@ import {
 } from "./actions";
 import { requireNotificationTemplateAdmin } from "@/lib/admin-access";
 import { listNotificationTemplates } from "@/lib/notification-templates/repository.server";
-import { listNotificationTemplateTestRecipients } from "@/lib/notification-templates/test-delivery.server";
 import { getNotificationTemplateFeedback } from "@/lib/notification-templates/admin-feedback";
 
 export const dynamic = "force-dynamic";
@@ -22,10 +21,7 @@ export default async function AdminNotificationTemplatesPage({
 }) {
   await requireNotificationTemplateAdmin("read", { path: "/admin/notification-templates" });
   const params = (await searchParams) ?? {};
-  const [templates, testRecipients] = await Promise.all([
-    listNotificationTemplates(),
-    listNotificationTemplateTestRecipients(),
-  ]);
+  const templates = await listNotificationTemplates();
   const feedback = getNotificationTemplateFeedback(params);
 
   return (
@@ -63,8 +59,8 @@ export default async function AdminNotificationTemplatesPage({
           updateAction={updateNotificationTemplateAction}
           resetAction={resetNotificationTemplateAction}
           testAction={sendNotificationTemplateTestAction}
-          testRecipients={testRecipients.recipients}
-          defaultTestRecipientId={testRecipients.defaultId}
+          testRecipients={[]}
+          defaultTestRecipientId={null}
           statusMessage={feedback?.tone === "info" ? feedback.message : null}
           errorMessage={feedback?.tone === "error" ? feedback.message : null}
         />

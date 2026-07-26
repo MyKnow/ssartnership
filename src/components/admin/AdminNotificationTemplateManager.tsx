@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Badge from "@/components/ui/Badge";
 import FormMessage from "@/components/ui/FormMessage";
 import SubmitButton from "@/components/ui/SubmitButton";
@@ -329,6 +329,59 @@ export default function AdminNotificationTemplateManager({
   const [audienceFilter, setAudienceFilter] = useState<TemplateAudienceFilter>("all");
   const [requiredVariableFilter, setRequiredVariableFilter] = useState<RequiredVariableFilter>("all");
   const [testRecipientId, setTestRecipientId] = useState(defaultTestRecipientId ?? "");
+  const [availableTestRecipients, setAvailableTestRecipients] = useState(testRecipients);
+  const [testRecipientsLoading, setTestRecipientsLoading] = useState(testRecipients.length === 0);
+  const [testRecipientsError, setTestRecipientsError] = useState(false);
+
+  useEffect(() => {
+    if (testRecipients.length > 0) {
+      return;
+    }
+
+    let cancelled = false;
+    void fetch("/api/admin/notification-templates/test-recipients", {
+      headers: { Accept: "application/json" },
+      credentials: "same-origin",
+    })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => null) as {
+          defaultId?: unknown;
+          recipients?: unknown;
+        } | null;
+        return response.ok && payload && Array.isArray(payload.recipients)
+          ? payload
+          : null;
+      })
+      .then((payload) => {
+        if (cancelled) {
+          return;
+        }
+        if (!payload) {
+          setTestRecipientsError(true);
+          return;
+        }
+        const recipients = payload.recipients as NotificationTemplateTestRecipientOption[];
+        setAvailableTestRecipients(recipients);
+        setTestRecipientId((current) =>
+          current || (typeof payload.defaultId === "string" ? payload.defaultId : ""),
+        );
+        setTestRecipientsError(false);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTestRecipientsError(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setTestRecipientsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [testRecipients]);
 
   const groupOptions = useMemo(
     () => [...new Set(templates.map((template) => template.group))],
@@ -381,7 +434,7 @@ export default function AdminNotificationTemplateManager({
     });
   }, [audienceFilter, channelFilter, groupFilter, requiredVariableFilter, searchQuery, sourceFilter, statusFilter, templates]);
 
-  const selectedTestRecipient = testRecipients.find(
+  const selectedTestRecipient = availableTestRecipients.find(
     (recipient) => recipient.id === testRecipientId,
   ) ?? null;
 
@@ -551,17 +604,25 @@ export default function AdminNotificationTemplateManager({
             value={testRecipientId}
             onChange={(event) => setTestRecipientId(event.target.value)}
             className="min-h-11 w-full min-w-0 rounded-2xl border border-border bg-surface-control px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-            disabled={testRecipients.length === 0}
+            disabled={testRecipientsLoading || testRecipientsError || availableTestRecipients.length === 0}
           >
             <option value="">수신 회원을 선택해 주세요</option>
-            {testRecipients.map((recipient) => (
+            {availableTestRecipients.map((recipient) => (
               <option key={recipient.id} value={recipient.id}>
                 {recipient.label}
               </option>
             ))}
           </select>
         </label>
-        {selectedTestRecipient ? (
+        {testRecipientsLoading ? (
+          <p role="status" className="text-xs text-muted-foreground">
+            테스트 수신 회원을 불러오는 중입니다.
+          </p>
+        ) : testRecipientsError ? (
+          <p role="alert" className="text-xs text-warning">
+            테스트 수신 회원을 불러오지 못했습니다. 템플릿 편집은 계속 사용할 수 있습니다.
+          </p>
+        ) : selectedTestRecipient ? (
           <p className="text-xs text-muted-foreground">
             사용 가능한 경로: {selectedTestRecipient.channels.map((channel) => channelLabels[channel]).join(", ")}
           </p>
