@@ -143,8 +143,8 @@ export default function AdminPartnerManager({
       }
     });
     const query = next.toString();
+    setRequestedPage(pendingPage);
     startTransition(() => {
-      setRequestedPage(pendingPage);
       router.replace(query ? `${pathname}?${query}` : pathname, {
         scroll: false,
       });

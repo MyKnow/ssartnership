@@ -167,8 +167,8 @@ export default function AdminMemberManager({
         next.set(key, String(value));
       }
     });
+    setRequestedPage(pendingPage);
     startTransition(() => {
-      setRequestedPage(pendingPage);
       router.replace(`${pathname}?${next.toString()}`, { scroll: false });
     });
   };
