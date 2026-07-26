@@ -7,7 +7,6 @@ import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
 import Surface from "@/components/ui/Surface";
 import {
-  getManagedCampusFilterValues,
   isRegionalAdminAccount,
 } from "@/lib/admin-scope";
 import { getAdminSession } from "@/lib/auth";
@@ -68,7 +67,7 @@ export default async function AdminPage() {
   const dashboardSnapshotPromise = adminSession
     ? getAdminDashboardHomeData({
         adminId: adminSession.adminId,
-        managedCampusSlugs: getManagedCampusFilterValues(adminSession.account),
+        account: adminSession.account,
       })
     : Promise.resolve({
         snapshot: toAdminDashboardHomeSnapshot(),

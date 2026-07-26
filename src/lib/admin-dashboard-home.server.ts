@@ -2,6 +2,9 @@ import {
   fetchAdminDashboardHomeSnapshot,
   type AdminDashboardHomeSnapshot,
 } from "@/lib/partner-counts";
+import type { AdminAccount } from "@/lib/admin-accounts";
+import { canAdmin } from "@/lib/admin-permissions";
+import { getManagedCampusFilterValues } from "@/lib/admin-scope";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export type AdminDashboardHomeData = {
@@ -18,13 +21,29 @@ export type AdminDashboardHomeData = {
  */
 export async function getAdminDashboardHomeData({
   adminId,
-  managedCampusSlugs,
+  account,
 }: {
   adminId: string;
-  managedCampusSlugs: readonly string[] | null;
+  account: Pick<
+    AdminAccount,
+    "permissionId" | "permissions" | "managedCampusSlugs"
+  >;
 }): Promise<AdminDashboardHomeData> {
   return fetchAdminDashboardHomeSnapshot(getSupabaseAdminClient(), {
     adminId,
-    managedCampusSlugs,
+    managedCampusSlugs: getManagedCampusFilterValues(account),
+    includeBrandQueues: canAdmin(account.permissions, "brands", "read"),
+    includeGraduateVerifications: canAdmin(
+      account.permissions,
+      "graduate_verifications",
+      "read",
+    ),
+    includeSignupRequests: canAdmin(
+      account.permissions,
+      "member_signup_requests",
+      "read",
+    ),
+    includeProfilePhotos: canAdmin(account.permissions, "profile_images", "read"),
+    includeNotifications: canAdmin(account.permissions, "notifications", "read"),
   });
 }

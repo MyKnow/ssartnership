@@ -79,6 +79,9 @@ test("toAdminDashboardHomeSnapshot keeps dashboard counts and queue counts in on
     registration_pending_count: "4",
     change_request_pending_count: 3,
     plan_request_pending_count: null,
+    graduate_verification_pending_count: "6",
+    signup_request_pending_count: 2,
+    profile_photo_pending_count: "1",
     unread_notification_count: "2",
   });
 
@@ -99,12 +102,15 @@ test("toAdminDashboardHomeSnapshot keeps dashboard counts and queue counts in on
       registrationPendingCount: 4,
       changeRequestPendingCount: 3,
       planRequestPendingCount: 0,
+      graduateVerificationPendingCount: 6,
+      signupRequestPendingCount: 2,
+      profilePhotoPendingCount: 1,
       unreadNotificationCount: 2,
     },
   });
 });
 
-test("fetchAdminDashboardHomeSnapshot sends only the admin id and validated campus scope to one RPC", async () => {
+test("fetchAdminDashboardHomeSnapshot sends validated scope and permission flags to one RPC", async () => {
   const calls: Array<{ name: string; input: unknown }> = [];
   const result = await fetchAdminDashboardHomeSnapshot(
     {
@@ -116,7 +122,15 @@ test("fetchAdminDashboardHomeSnapshot sends only the admin id and validated camp
         };
       },
     } as never,
-    { adminId: "admin-1", managedCampusSlugs: ["seoul"] },
+    {
+      adminId: "admin-1",
+      managedCampusSlugs: ["seoul"],
+      includeBrandQueues: true,
+      includeGraduateVerifications: true,
+      includeSignupRequests: false,
+      includeProfilePhotos: true,
+      includeNotifications: false,
+    },
   );
 
   assert.deepEqual(calls, [{
@@ -124,6 +138,11 @@ test("fetchAdminDashboardHomeSnapshot sends only the admin id and validated camp
     input: {
       input_admin_id: "admin-1",
       input_managed_campus_slugs: ["seoul"],
+      input_include_brand_queues: true,
+      input_include_graduate_verifications: true,
+      input_include_signup_requests: false,
+      input_include_profile_photos: true,
+      input_include_notifications: false,
     },
   }]);
   assert.equal(result.hasError, false);
@@ -136,7 +155,15 @@ test("fetchAdminDashboardHomeSnapshot marks a failed aggregate as unavailable wi
     {
       rpc: async () => ({ data: null, error: { message: "database details" } }),
     } as never,
-    { adminId: "admin-1", managedCampusSlugs: null },
+    {
+      adminId: "admin-1",
+      managedCampusSlugs: null,
+      includeBrandQueues: false,
+      includeGraduateVerifications: false,
+      includeSignupRequests: false,
+      includeProfilePhotos: false,
+      includeNotifications: false,
+    },
   );
 
   assert.equal(result.snapshot.queueCounts.changeRequestPendingCount, 0);

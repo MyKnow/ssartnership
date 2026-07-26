@@ -39,6 +39,9 @@ type AdminDashboardHomeSnapshotRpcRow = AdminDashboardCountRpcRow & {
   registration_pending_count: number | string | null;
   change_request_pending_count: number | string | null;
   plan_request_pending_count: number | string | null;
+  graduate_verification_pending_count: number | string | null;
+  signup_request_pending_count: number | string | null;
+  profile_photo_pending_count: number | string | null;
   unread_notification_count: number | string | null;
 };
 
@@ -65,6 +68,9 @@ export type AdminDashboardHomeQueueCounts = {
   registrationPendingCount: number;
   changeRequestPendingCount: number;
   planRequestPendingCount: number;
+  graduateVerificationPendingCount: number;
+  signupRequestPendingCount: number;
+  profilePhotoPendingCount: number;
   unreadNotificationCount: number;
 };
 
@@ -130,6 +136,11 @@ export function toAdminDashboardHomeSnapshot(
       registrationPendingCount: parseCount(row?.registration_pending_count),
       changeRequestPendingCount: parseCount(row?.change_request_pending_count),
       planRequestPendingCount: parseCount(row?.plan_request_pending_count),
+      graduateVerificationPendingCount: parseCount(
+        row?.graduate_verification_pending_count,
+      ),
+      signupRequestPendingCount: parseCount(row?.signup_request_pending_count),
+      profilePhotoPendingCount: parseCount(row?.profile_photo_pending_count),
       unreadNotificationCount: parseCount(row?.unread_notification_count),
     },
   };
@@ -372,14 +383,29 @@ export async function fetchAdminDashboardHomeSnapshot(
   {
     adminId,
     managedCampusSlugs,
+    includeBrandQueues,
+    includeGraduateVerifications,
+    includeSignupRequests,
+    includeProfilePhotos,
+    includeNotifications,
   }: {
     adminId: string;
     managedCampusSlugs: readonly string[] | null;
+    includeBrandQueues: boolean;
+    includeGraduateVerifications: boolean;
+    includeSignupRequests: boolean;
+    includeProfilePhotos: boolean;
+    includeNotifications: boolean;
   },
 ) {
   const { data, error } = await supabase.rpc("get_admin_dashboard_home_snapshot", {
     input_admin_id: adminId,
     input_managed_campus_slugs: managedCampusSlugs,
+    input_include_brand_queues: includeBrandQueues,
+    input_include_graduate_verifications: includeGraduateVerifications,
+    input_include_signup_requests: includeSignupRequests,
+    input_include_profile_photos: includeProfilePhotos,
+    input_include_notifications: includeNotifications,
   });
 
   if (error) {

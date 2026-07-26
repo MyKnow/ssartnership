@@ -124,6 +124,9 @@ function DashboardOverviewState({
           registrationPendingCount: 3,
           changeRequestPendingCount: 2,
           planRequestPendingCount: 1,
+          graduateVerificationPendingCount: 4,
+          signupRequestPendingCount: 2,
+          profilePhotoPendingCount: 1,
           unreadNotificationCount: 4,
         }}
         permissions={permissions}
@@ -335,6 +338,15 @@ export const DashboardOverview: Story = {
         "href",
         "/admin/partner-registrations?status=pending",
       );
+    }
+    for (const [name, href] of [
+      [/수료생 인증.*4건/, "/admin/graduate-verifications"],
+      [/가입 승인.*2건/, "/admin/member-signup-requests"],
+      [/프로필 사진.*1건/, "/admin/profile-photos"],
+    ] as const) {
+      for (const link of canvas.getAllByRole("link", { name })) {
+        await expect(link).toHaveAttribute("href", href);
+      }
     }
   },
 };
