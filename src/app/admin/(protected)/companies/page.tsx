@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import AdminShell from "@/components/admin/AdminShell";
 import AdminCompaniesView from "@/components/admin/AdminCompaniesView";
+import { AdminCompaniesSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import {
   createPartnerAccount,
   createPartnerAccountInitialSetupUrl,
@@ -22,23 +24,23 @@ const adminCompaniesErrorMessages: Record<string, string> = {
   ...adminActionErrorMessages,
 };
 
-export default async function AdminCompaniesPage({
-  searchParams,
+async function AdminCompaniesContent({
+  adminSession,
+  params,
+  initialTab,
 }: {
-  searchParams?: Promise<{
+  adminSession: Awaited<ReturnType<typeof requireAdminPermission>>;
+  params: {
     error?: string;
     generatedSetupUrl?: string;
     generatedSetupAccountId?: string;
     tab?: string;
-  }>;
+  };
+  initialTab: "companies" | "accounts";
 }) {
-  const adminSession = await requireAdminPermission("companies", "read", {
-    path: "/admin/companies",
-  });
   const managedCampusFilter = getManagedCampusFilterValues(
     adminSession.account,
   );
-  const params = (await searchParams) ?? {};
   const companyError = params.error
     ? adminCompaniesErrorMessages[params.error]
     : null;
@@ -50,23 +52,13 @@ export default async function AdminCompaniesPage({
     typeof params.generatedSetupAccountId === "string"
       ? params.generatedSetupAccountId
       : null;
-  const initialTab =
-    params.tab === "accounts" || generatedSetupAccountId || generatedSetupUrl
-      ? "accounts"
-      : "companies";
-
   const readModel = await getAdminCompanyWorkspaceReadModel({
     managedCampusSlugs: managedCampusFilter,
     tab: initialTab,
   });
 
   return (
-    <AdminShell
-      title="파트너사/계정 관리"
-      backHref="/admin"
-      backLabel="관리 홈"
-    >
-      <AdminCompaniesView
+    <AdminCompaniesView
         companies={readModel.companies}
         accounts={readModel.accounts}
         accountSummary={readModel.accountSummary}
@@ -102,6 +94,41 @@ export default async function AdminCompaniesPage({
           sendSetupUrlAction: sendPartnerAccountInitialSetupUrl,
         }}
       />
+  );
+}
+
+export default async function AdminCompaniesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{
+    error?: string;
+    generatedSetupUrl?: string;
+    generatedSetupAccountId?: string;
+    tab?: string;
+  }>;
+}) {
+  const adminSession = await requireAdminPermission("companies", "read", {
+    path: "/admin/companies",
+  });
+  const params = (await searchParams) ?? {};
+  const initialTab =
+    params.tab === "accounts" || params.generatedSetupAccountId || params.generatedSetupUrl
+      ? "accounts"
+      : "companies";
+
+  return (
+    <AdminShell
+      title="파트너사/계정 관리"
+      backHref="/admin"
+      backLabel="관리 홈"
+    >
+      <Suspense fallback={<AdminCompaniesSkeletonContent />}>
+        <AdminCompaniesContent
+          adminSession={adminSession}
+          params={params}
+          initialTab={initialTab}
+        />
+      </Suspense>
     </AdminShell>
   );
 }

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import AdminCategoryManager from "@/components/admin/AdminCategoryManager";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminWorkspaceSummary from "@/components/admin/AdminWorkspaceSummary";
@@ -15,23 +16,17 @@ import { requireAdminPermission } from "@/lib/admin-access";
 import { canAdmin } from "@/lib/admin-permissions";
 import { getAdminCategoryReadModel } from "@/lib/admin-category-read-model.server";
 import { isRegionalAdminAccount } from "@/lib/admin-scope";
+import { AdminCategoriesSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminCategoriesPage({
-  searchParams,
+async function AdminCategoriesContent({
+  adminSession,
+  params,
 }: {
-  searchParams?: Promise<{ error?: string }>;
+  adminSession: Awaited<ReturnType<typeof requireAdminPermission>>;
+  params: { error?: string };
 }) {
-  const adminSession = await requireAdminPermission("brands", "read", {
-    path: "/admin/categories",
-  });
-
-  if (isRegionalAdminAccount(adminSession.account)) {
-    redirect("/admin/partners");
-  }
-
-  const params = (await searchParams) ?? {};
   const errorMessage = params.error
     ? adminActionErrorMessages[params.error] ?? null
     : null;
@@ -45,8 +40,7 @@ export default async function AdminCategoriesPage({
   ).length;
 
   return (
-    <AdminShell title="카테고리" backHref="/admin/partners" backLabel="제휴처">
-      <div className="grid min-w-0 gap-6">
+    <div className="grid min-w-0 gap-6">
         <AdminPageHeader
           eyebrow="데이터"
           title="카테고리 관리"
@@ -87,7 +81,30 @@ export default async function AdminCategoriesPage({
             />
           </>
         )}
-      </div>
+    </div>
+  );
+}
+
+export default async function AdminCategoriesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ error?: string }>;
+}) {
+  const adminSession = await requireAdminPermission("brands", "read", {
+    path: "/admin/categories",
+  });
+
+  if (isRegionalAdminAccount(adminSession.account)) {
+    redirect("/admin/partners");
+  }
+
+  const params = (await searchParams) ?? {};
+
+  return (
+    <AdminShell title="카테고리" backHref="/admin/partners" backLabel="제휴처">
+      <Suspense fallback={<AdminCategoriesSkeletonContent />}>
+        <AdminCategoriesContent adminSession={adminSession} params={params} />
+      </Suspense>
     </AdminShell>
   );
 }

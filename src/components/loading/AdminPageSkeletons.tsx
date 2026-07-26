@@ -217,6 +217,10 @@ export function AdminCategoriesSkeleton() {
   return <AdminListSkeleton title="카테고리" actionCount={1} filterFields={4} rows={3} />;
 }
 
+export function AdminCategoriesSkeletonContent() {
+  return <AdminListSkeletonContent actionCount={1} filterFields={4} rows={3} />;
+}
+
 export function AdminPartnerDetailSkeleton() {
   return (
     <AdminShell title="제휴처 상세" backHref="/admin/partners" backLabel="제휴처">
@@ -250,6 +254,10 @@ export function AdminCompaniesSkeleton() {
   return <AdminListSkeleton title="파트너사/계정" actionCount={2} />;
 }
 
+export function AdminCompaniesSkeletonContent() {
+  return <AdminListSkeletonContent actionCount={2} />;
+}
+
 export function AdminCycleSkeleton() {
   return (
     <AdminShell title="기수 관리" backHref="/admin" backLabel="관리 홈">
@@ -264,6 +272,10 @@ export function AdminCycleSkeleton() {
 
 export function AdminReviewsSkeleton() {
   return <AdminListSkeleton title="리뷰 관리" filterFields={4} />;
+}
+
+export function AdminReviewsSkeletonContent() {
+  return <AdminListSkeletonContent filterFields={4} />;
 }
 
 export function AdminStyleGuideSkeleton() {

@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import AdminReviewManager from "@/components/admin/AdminReviewManager";
 import AdminShell from "@/components/admin/AdminShell";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import { AdminReviewsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import {
   getAdminReviewPageData,
@@ -18,15 +20,13 @@ const adminReviewsErrorMessages: Record<string, string> = {
   ...adminActionErrorMessages,
 };
 
-export default async function AdminReviewsPage({
-  searchParams,
+async function AdminReviewsContent({
+  adminSession,
+  params,
 }: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  adminSession: Awaited<ReturnType<typeof requireAdminPermission>>;
+  params: Record<string, string | string[] | undefined>;
 }) {
-  const adminSession = await requireAdminPermission("reviews", "read", {
-    path: "/admin/reviews",
-  });
-  const params = (await searchParams) ?? {};
   const filters = parseAdminReviewFilters(params);
   const pagination = parseAdminReviewPagination(params);
   const errorMessage =
@@ -53,8 +53,7 @@ export default async function AdminReviewsPage({
   );
 
   return (
-    <AdminShell title="리뷰 관리" backHref="/admin" backLabel="관리 홈">
-      <div className="grid gap-6">
+    <div className="grid gap-6">
         <AdminPageHeader
           eyebrow="데이터"
           title="리뷰 관리"
@@ -67,7 +66,25 @@ export default async function AdminReviewsPage({
           canUpdate={canUpdate}
           canDelete={canDelete}
         />
-      </div>
+    </div>
+  );
+}
+
+export default async function AdminReviewsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const adminSession = await requireAdminPermission("reviews", "read", {
+    path: "/admin/reviews",
+  });
+  const params = (await searchParams) ?? {};
+
+  return (
+    <AdminShell title="리뷰 관리" backHref="/admin" backLabel="관리 홈">
+      <Suspense fallback={<AdminReviewsSkeletonContent />}>
+        <AdminReviewsContent adminSession={adminSession} params={params} />
+      </Suspense>
     </AdminShell>
   );
 }
