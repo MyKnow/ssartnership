@@ -1,39 +1,24 @@
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import AdminShell from "@/components/admin/AdminShell";
-import AdminPartnerReviewManager from "@/components/admin/partner-detail/AdminPartnerReviewManager";
-import AdminPartnerChangeHistory from "@/components/admin/partner-detail/AdminPartnerChangeHistory";
-import AdminPartnerCouponManager from "@/components/admin/ad-packages/AdminPartnerCouponManager";
+import {
+  AdminPartnerDetailDeferredFallback,
+  AdminPartnerDetailHistorySections,
+  AdminPartnerDetailOperationalSections,
+  AdminPartnerDetailReviewSection,
+} from "@/components/admin/AdminPartnerDetailDeferredSections";
 import AdminPartnerPreviewLinkPanel from "@/components/admin/AdminPartnerPreviewLinkPanel";
 import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import PartnerCardForm from "@/components/PartnerCardForm";
-import CategoryColorBadge from "@/components/ui/CategoryColorBadge";
-import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
-import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
-import InlineMessage from "@/components/ui/InlineMessage";
-import Surface from "@/components/ui/Surface";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
-import StatsRow from "@/components/ui/StatsRow";
-import PartnerMetricTimeseriesPanel from "@/components/partner/PartnerMetricTimeseriesPanel";
-import PartnerBenefitUsageHistory from "@/components/partner/PartnerBenefitUsageHistory";
 import { updatePartner } from "@/app/admin/(protected)/actions";
-import {
-  createAdCouponAction,
-  deleteAdCouponAction,
-  duplicateAdCouponAction,
-  updateAdCouponAction,
-} from "@/app/admin/(protected)/_actions/ad-package-actions";
 import {
   generatePartnerPreviewLink,
   removePartnerPreviewLink,
 } from "@/app/admin/(protected)/_actions/partner-actions/preview";
-import {
-  createPartnerBenefitUsageAction,
-  deleteBenefitUsageAction,
-  updatePartnerBenefitUsageAction,
-} from "@/app/admin/(protected)/_actions/partner-benefit-usage-actions";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { canAdmin } from "@/lib/admin-permissions";
@@ -46,15 +31,13 @@ import {
   serializeAdminReviewFilters,
 } from "@/lib/admin-reviews";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
-import {
-  getPartnerVisibilityBadgeClass,
-  getPartnerVisibilityLabel,
-  getPartnerVisibilityState,
-} from "@/lib/partner-visibility";
 import { buildPartnerPreviewUrl } from "@/lib/partner-preview";
 import { decryptPartnerPreviewToken } from "@/lib/partner-preview-token-crypto";
 import { sanitizeAdminReturnTo } from "@/lib/admin-session-bridge";
-import { getAdminPartnerDetailReadModel } from "@/lib/admin-partner-detail.server";
+import {
+  getAdminPartnerDetailCoreReadModel,
+  getAdminPartnerDetailOperationalReadModel,
+} from "@/lib/admin-partner-detail.server";
 
 export const dynamic = "force-dynamic";
 
@@ -169,13 +152,9 @@ export default async function AdminPartnerDetailPage({
   if (searchBackHref !== "/admin/partners") retryParams.set("returnTo", searchBackHref);
   const retryQueryString = retryParams.toString();
   const retryHref = retryQueryString ? `${detailPath}?${retryQueryString}` : detailPath;
-  const detail = await getAdminPartnerDetailReadModel({
+  const detail = await getAdminPartnerDetailCoreReadModel({
     partnerId,
     managedCampusSlugs: managedCampusFilter,
-    reviewFilters,
-    canReadCoupons,
-    requestedUsageBenefit,
-    usagePage: requestedUsagePage,
   });
 
   if (detail.status === "not_found") {
@@ -197,20 +176,9 @@ export default async function AdminPartnerDetailPage({
   const {
     partner,
     company,
-    category,
     categories,
     companies,
-    metricsResult,
-    reviewData,
-    reviewCountResult,
     previewToken,
-    adCampaigns,
-    adCoupons,
-    selectedUsageBenefit,
-    usageHistory,
-    metricTimeseries,
-    partnerAuditLogs,
-    partnerRequestHistory,
   } = detail;
   try {
     assertAdminCanAccessManagedCampuses(
@@ -220,21 +188,21 @@ export default async function AdminPartnerDetailPage({
   } catch {
     notFound();
   }
-  const metrics = metricsResult.metricsByPartnerId.get(partnerId);
-  const visibilityState = getPartnerVisibilityState(
-    partner.visibility,
-    partner.period_start,
-    partner.period_end,
-  );
+  const operationalPromise = getAdminPartnerDetailOperationalReadModel({
+    core: detail,
+    partnerId,
+    managedCampusSlugs: managedCampusFilter,
+    reviewFilters,
+    canReadCoupons,
+    requestedUsageBenefit,
+    usagePage: requestedUsagePage,
+  });
   const reviewQueryString = serializeAdminReviewFilters(reviewFilters);
   const returnTo = reviewQueryString ? `${detailPath}?${reviewQueryString}` : detailPath;
   const thumbnail = partner.thumbnail ?? partner.images?.[0] ?? null;
   const galleryImages = partner.thumbnail
     ? partner.images ?? []
     : (partner.images ?? []).slice(1);
-  const totalReviewCount = reviewCountResult.errorMessage ? 0 : reviewCountResult.counts.totalCount;
-  const visibleReviewCount = reviewCountResult.errorMessage ? 0 : reviewCountResult.counts.visibleCount;
-  const hiddenReviewCount = reviewCountResult.errorMessage ? 0 : reviewCountResult.counts.hiddenCount;
   const previewTokenRow = previewToken;
   let initialPreviewUrl: string | null = null;
   if (
@@ -280,98 +248,27 @@ export default async function AdminPartnerDetailPage({
           removeAction={removePartnerPreviewLink}
         />
 
-        <Surface level="elevated" padding="lg">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge className={getPartnerVisibilityBadgeClass(visibilityState)}>
-              {getPartnerVisibilityLabel(visibilityState)}
-            </Badge>
-            <CategoryColorBadge
-              label={category?.label ?? "미분류"}
-              color={category?.color}
-            />
-            <Badge>{company?.name ?? "회사 미연결"}</Badge>
-          </div>
-
-          <div className="mt-6">
-            <StatsRow
-              minItemWidth="11rem"
-              items={[
-                {
-                  label: "즐겨찾기",
-                  value: `${metrics?.favoriteCount ?? 0}`,
-                  hint: "저장한 회원 수",
-                },
-                {
-                  label: "PV",
-                  value: `${metrics?.detailViews ?? 0}`,
-                  hint: "상세 페이지 조회",
-                },
-                {
-                  label: "CTA",
-                  value: `${metrics?.totalClicks ?? 0}`,
-                  hint: "전체 클릭 합계",
-                },
-                {
-                  label: "리뷰",
-                  value: `${metrics?.reviewCount ?? 0}`,
-                  hint: "삭제 제외",
-                },
-              ]}
-            />
-          </div>
-
-          {metricsResult.warningMessage ? (
-            <InlineMessage
-              className="mt-6"
-              tone="warning"
-              title="제휴처 집계 일부를 불러오지 못했습니다."
-              description="일부 최신 수치는 잠시 표시되지 않을 수 있습니다. 잠시 후 다시 확인해 주세요."
-            />
-          ) : null}
-        </Surface>
-
-        <PartnerMetricTimeseriesPanel data={metricTimeseries} />
-
-        <PartnerBenefitUsageHistory
-          benefits={(partner.partner_benefits ?? []).map((benefit: { id: string; title: string; max_apply_count: number | null; display_order?: number | null }) => ({
-            id: benefit.id,
-            title: benefit.title,
-            maxApplyCount: benefit.max_apply_count,
-            displayOrder: benefit.display_order ?? undefined,
-          }))}
-          selectedBenefit={selectedUsageBenefit}
-          history={usageHistory}
-          createHref={({ benefit, page }) => {
-            const params = new URLSearchParams();
-            if (benefit) params.set("usageBenefit", benefit);
-            if (page && page > 1) params.set("usagePage", String(page));
-            const queryString = params.toString();
-            return `${detailPath}${queryString ? `?${queryString}` : ""}`;
-          }}
-          memberHref={(memberId) => `/admin/members/${encodeURIComponent(memberId)}`}
-          adminActions={canCreateBenefitUsage && canUpdateBenefitUsage && canDeleteBenefitUsage ? {
-            partnerId: partner.id,
-            create: createPartnerBenefitUsageAction,
-            update: updatePartnerBenefitUsageAction,
-            delete: deleteBenefitUsageAction,
-          } : undefined}
-        />
-
-        <AdminPartnerCouponManager
-          partnerId={partner.id}
-          partnerName={partner.name ?? "제휴처"}
-          partnerPeriodEnd={partner.period_end}
-          campaigns={adCampaigns.filter((campaign) => campaign.partnerId === partner.id)}
-          coupons={adCoupons}
-          createCouponAction={createAdCouponAction}
-          updateCouponAction={updateAdCouponAction}
-          duplicateCouponAction={duplicateAdCouponAction}
-          deleteCouponAction={deleteAdCouponAction}
-          errorMessage={couponError}
-          canCreateCoupon={canCreateCoupons}
-          canUpdateCoupon={canUpdateCoupons}
-          canDeleteCoupon={canDeleteCoupons}
-        />
+        <Suspense
+          fallback={
+            <AdminPartnerDetailDeferredFallback label="운영 지표와 혜택·쿠폰 정보를 불러오는 중입니다." />
+          }
+        >
+          <AdminPartnerDetailOperationalSections
+            operational={operationalPromise}
+            core={detail}
+            partnerId={partnerId}
+            detailPath={detailPath}
+            retryHref={retryHref}
+            partnerPeriodEnd={partner.period_end}
+            canCreateBenefitUsage={canCreateBenefitUsage}
+            canUpdateBenefitUsage={canUpdateBenefitUsage}
+            canDeleteBenefitUsage={canDeleteBenefitUsage}
+            canCreateCoupons={canCreateCoupons}
+            canUpdateCoupons={canUpdateCoupons}
+            canDeleteCoupons={canDeleteCoupons}
+            couponError={couponError}
+          />
+        </Suspense>
 
         <div
           id="partner-edit"
@@ -448,26 +345,30 @@ export default async function AdminPartnerDetailPage({
           </div>
 
           <div className="2xl:sticky 2xl:top-24">
-            <AdminPartnerChangeHistory
-              logs={partnerAuditLogs}
-              requests={partnerRequestHistory}
-            />
+            <Suspense
+              fallback={
+                <AdminPartnerDetailDeferredFallback label="수정 이력을 불러오는 중입니다." />
+              }
+            >
+              <AdminPartnerDetailHistorySections
+                operational={operationalPromise}
+              />
+            </Suspense>
           </div>
         </div>
 
-        <Card tone="elevated">
-          <AdminPartnerReviewManager
-            reviews={reviewData.reviews}
-            counts={{
-              totalCount: totalReviewCount,
-              visibleCount: visibleReviewCount,
-              hiddenCount: hiddenReviewCount,
-            }}
-            filters={reviewFilters}
-            basePath={detailPath}
+        <Suspense
+          fallback={
+            <AdminPartnerDetailDeferredFallback label="리뷰를 불러오는 중입니다." />
+          }
+        >
+          <AdminPartnerDetailReviewSection
+            operational={operationalPromise}
+            detailPath={detailPath}
+            reviewFilters={reviewFilters}
             returnTo={returnTo}
           />
-        </Card>
+        </Suspense>
       </section>
     </AdminShell>
   );

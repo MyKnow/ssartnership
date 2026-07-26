@@ -64,24 +64,16 @@ function parseUsagePage(value: string) {
 }
 
 /**
- * Provides the partner-detail route with a scoped, page-sized read model.
- * Database error details remain on the server; routes only receive a stable
- * state they can recover from without leaking implementation details.
+ * Reads only the partner record and the options needed to render the first
+ * actionable part of the detail route. Expensive operational panels are
+ * intentionally kept out of this promise so the core view can stream first.
  */
-export async function getAdminPartnerDetailReadModel({
+export async function getAdminPartnerDetailCoreReadModel({
   partnerId,
   managedCampusSlugs,
-  reviewFilters,
-  canReadCoupons,
-  requestedUsageBenefit,
-  usagePage,
 }: {
   partnerId: string;
   managedCampusSlugs: readonly string[] | null;
-  reviewFilters: AdminReviewFilters;
-  canReadCoupons: boolean;
-  requestedUsageBenefit: string;
-  usagePage: string;
 }) {
   try {
     const supabase = getSupabaseAdminClient();
@@ -95,22 +87,7 @@ export async function getAdminPartnerDetailReadModel({
       ]);
     }
 
-    const couponManagementDataPromise = canReadCoupons
-      ? Promise.all([
-          adPackageRepository.listAdminCampaigns(),
-          adPackageRepository.listAdminCouponsForPartner(partnerId),
-        ])
-      : Promise.resolve<[AdCampaignWithStats[], AdCoupon[]]>([[], []]);
-    const [
-      categoriesResult,
-      companiesResult,
-      partnerResult,
-      metricsResult,
-      reviewData,
-      reviewCountResult,
-      previewTokenResult,
-      couponManagementData,
-    ] = await Promise.all([
+    const [categoriesResult, companiesResult, partnerResult, previewTokenResult] = await Promise.all([
       supabase
         .from("categories")
         .select("id,key,label,description,color")
@@ -121,18 +98,11 @@ export async function getAdminPartnerDetailReadModel({
         .select(PARTNER_DETAIL_SELECT)
         .eq("id", partnerId)
         .maybeSingle(),
-      getAdminPartnerMetrics([partnerId]),
-      getAdminReviewPageData(reviewFilters, {
-        includeCounts: false,
-        managedCampusSlugs,
-      }),
-      fetchPartnerReviewVisibilityCounts(supabase, partnerId),
       supabase
         .from("partner_preview_tokens")
         .select("created_at,token_ciphertext,token_nonce,token_auth_tag,token_key_version")
         .eq("partner_id", partnerId)
         .maybeSingle(),
-      couponManagementDataPromise,
     ]);
 
     if (partnerResult.error || categoriesResult.error || companiesResult.error) {
@@ -151,12 +121,67 @@ export async function getAdminPartnerDetailReadModel({
         categories?: PartnerCategoryRow | PartnerCategoryRow[] | null;
       }).categories,
     );
-    const selectedUsageBenefit = (partner.benefits ?? []).includes(requestedUsageBenefit)
+    return {
+      status: "ready" as const,
+      partner,
+      company,
+      category,
+      categories: (categoriesResult.data ?? []) as PartnerCategoryRow[],
+      companies: (companiesResult.data ?? []) as PartnerCompanyRow[],
+      previewToken: previewTokenResult.error ? null : previewTokenResult.data,
+    };
+  } catch (error) {
+    console.error("[admin-partner-detail] core read model failed", error);
+    return { status: "error" as const };
+  }
+}
+
+export type AdminPartnerDetailCoreReady = Extract<
+  Awaited<ReturnType<typeof getAdminPartnerDetailCoreReadModel>>,
+  { status: "ready" }
+>;
+
+export async function getAdminPartnerDetailOperationalReadModel({
+  core,
+  partnerId,
+  managedCampusSlugs,
+  reviewFilters,
+  canReadCoupons,
+  requestedUsageBenefit,
+  usagePage,
+}: {
+  core: AdminPartnerDetailCoreReady;
+  partnerId: string;
+  managedCampusSlugs: readonly string[] | null;
+  reviewFilters: AdminReviewFilters;
+  canReadCoupons: boolean;
+  requestedUsageBenefit: string;
+  usagePage: string;
+}) {
+  try {
+    const supabase = getSupabaseAdminClient();
+    const couponManagementDataPromise = canReadCoupons
+      ? Promise.all([
+          adPackageRepository.listAdminCampaigns(),
+          adPackageRepository.listAdminCouponsForPartner(partnerId),
+        ])
+      : Promise.resolve<[AdCampaignWithStats[], AdCoupon[]]>([[], []]);
+    const [metricsResult, reviewData, reviewCountResult, couponManagementData] =
+      await Promise.all([
+        getAdminPartnerMetrics([partnerId]),
+        getAdminReviewPageData(reviewFilters, {
+          includeCounts: false,
+          managedCampusSlugs,
+        }),
+        fetchPartnerReviewVisibilityCounts(supabase, partnerId),
+        couponManagementDataPromise,
+      ]);
+    const selectedUsageBenefit = (core.partner.benefits ?? []).includes(requestedUsageBenefit)
       ? requestedUsageBenefit
       : null;
     const auditTargetIds = Array.from(
       new Set(
-        [partner.id, company?.id ?? partner.company_id ?? null].filter(
+        [core.partner.id, core.company?.id ?? core.partner.company_id ?? null].filter(
           (value): value is string => Boolean(value),
         ),
       ),
@@ -169,7 +194,7 @@ export async function getAdminPartnerDetailReadModel({
           page: parseUsagePage(usagePage),
           pageSize: 25,
         }),
-        getPartnerMetricTimeseriesSnapshot(partnerId, partner.created_at),
+        getPartnerMetricTimeseriesSnapshot(partnerId, core.partner.created_at),
         supabase
           .from("admin_audit_logs")
           .select("id,actor_id,action,target_type,target_id,properties,created_at")
@@ -190,22 +215,16 @@ export async function getAdminPartnerDetailReadModel({
 
       return (
         auditTargetIds.includes(log.target_id ?? "") ||
-        logPartnerId === partner.id ||
-        logCompanyId === (company?.id ?? null)
+        logPartnerId === core.partner.id ||
+        logCompanyId === (core.company?.id ?? null)
       );
     });
 
     return {
       status: "ready" as const,
-      partner,
-      company,
-      category,
-      categories: (categoriesResult.data ?? []) as PartnerCategoryRow[],
-      companies: (companiesResult.data ?? []) as PartnerCompanyRow[],
       metricsResult,
       reviewData,
       reviewCountResult,
-      previewToken: previewTokenResult.error ? null : previewTokenResult.data,
       adCampaigns: couponManagementData[0],
       adCoupons: couponManagementData[1],
       selectedUsageBenefit,
@@ -215,7 +234,62 @@ export async function getAdminPartnerDetailReadModel({
       partnerRequestHistory,
     };
   } catch (error) {
-    console.error("[admin-partner-detail] read model failed", error);
+    console.error("[admin-partner-detail] operational read model failed", error);
     return { status: "error" as const };
   }
+}
+
+export type AdminPartnerDetailOperationalReady = Extract<
+  Awaited<ReturnType<typeof getAdminPartnerDetailOperationalReadModel>>,
+  { status: "ready" }
+>;
+
+export type AdminPartnerDetailOperationalResult = Awaited<
+  ReturnType<typeof getAdminPartnerDetailOperationalReadModel>
+>;
+
+/**
+ * Backward-compatible aggregate read model for callers that still need the
+ * complete detail payload in one promise.
+ */
+export async function getAdminPartnerDetailReadModel({
+  partnerId,
+  managedCampusSlugs,
+  reviewFilters,
+  canReadCoupons,
+  requestedUsageBenefit,
+  usagePage,
+}: {
+  partnerId: string;
+  managedCampusSlugs: readonly string[] | null;
+  reviewFilters: AdminReviewFilters;
+  canReadCoupons: boolean;
+  requestedUsageBenefit: string;
+  usagePage: string;
+}) {
+  const core = await getAdminPartnerDetailCoreReadModel({
+    partnerId,
+    managedCampusSlugs,
+  });
+  if (core.status !== "ready") {
+    return core;
+  }
+
+  const operational = await getAdminPartnerDetailOperationalReadModel({
+    core,
+    partnerId,
+    managedCampusSlugs,
+    reviewFilters,
+    canReadCoupons,
+    requestedUsageBenefit,
+    usagePage,
+  });
+  if (operational.status !== "ready") {
+    return operational;
+  }
+
+  return {
+    ...core,
+    ...operational,
+  };
 }
