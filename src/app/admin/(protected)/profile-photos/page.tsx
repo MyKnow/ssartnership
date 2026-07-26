@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import AdminProfilePhotoReviewQueue from "@/components/admin/AdminProfilePhotoReviewQueue";
 import AdminShell from "@/components/admin/AdminShell";
+import { AdminProfilePhotosSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { canAdmin } from "@/lib/admin-permissions";
 import {
@@ -16,28 +18,25 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminProfilePhotosPage({
-  searchParams,
+async function AdminProfilePhotosContent({
+  session,
+  params,
 }: {
-  searchParams?: Promise<{
+  session: Awaited<ReturnType<typeof requireAdminPermission>>;
+  params: {
     error?: string;
     success?: string;
     returnTo?: string;
     focus?: string;
-  }>;
+  };
 }) {
-  const session = await requireAdminPermission("profile_images", "read", {
-    path: "/admin/profile-photos",
-  });
   const currentPhotosPromise = getAdminCurrentProfilePhotoQueueReadModel();
   const { replacements, queueLoadError } =
     await getAdminProfilePhotoReplacementQueueReadModel();
-  const params = (await searchParams) ?? {};
   const returnTo = sanitizeReturnTo(params.returnTo, "/admin/profile-photos");
 
   return (
-    <AdminShell title="프로필 사진">
-      <AdminProfilePhotoReviewQueue
+    <AdminProfilePhotoReviewQueue
         replacements={replacements}
         currentPhotosPromise={currentPhotosPromise}
         actions={{
@@ -57,7 +56,30 @@ export default async function AdminProfilePhotosPage({
           "profile_images",
           "update",
         )}
-      />
+    />
+  );
+}
+
+export default async function AdminProfilePhotosPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{
+    error?: string;
+    success?: string;
+    returnTo?: string;
+    focus?: string;
+  }>;
+}) {
+  const session = await requireAdminPermission("profile_images", "read", {
+    path: "/admin/profile-photos",
+  });
+  const params = (await searchParams) ?? {};
+
+  return (
+    <AdminShell title="프로필 사진">
+      <Suspense fallback={<AdminProfilePhotosSkeletonContent />}>
+        <AdminProfilePhotosContent session={session} params={params} />
+      </Suspense>
     </AdminShell>
   );
 }

@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import AdminGraduateVerificationQueue from "@/components/admin/AdminGraduateVerificationQueue";
 import AdminShell from "@/components/admin/AdminShell";
+import { AdminGraduateVerificationsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { canAdmin } from "@/lib/admin-permissions";
 import {
@@ -53,19 +55,13 @@ function getTotalPages(pagination: AdminGraduateQueuePagination) {
   return Math.max(1, Math.ceil(pagination.totalCount / pagination.pageSize));
 }
 
-export default async function AdminGraduateVerificationsPage({
-  searchParams,
+async function AdminGraduateVerificationsContent({
+  session,
+  params,
 }: {
-  searchParams?: Promise<GraduateVerificationSearchParams>;
+  session: Awaited<ReturnType<typeof requireAdminPermission>>;
+  params: GraduateVerificationSearchParams;
 }) {
-  const session = await requireAdminPermission(
-    "graduate_verifications",
-    "read",
-    {
-      path: "/admin/graduate-verifications",
-    },
-  );
-  const params = (await searchParams) ?? {};
   const requestPagination = parseAdminReviewQueuePagination({
     page: getOneSearchParam(params.requestPage),
   });
@@ -103,8 +99,7 @@ export default async function AdminGraduateVerificationsPage({
   });
 
   return (
-    <AdminShell title="수료생 인증">
-      <AdminGraduateVerificationQueue
+    <AdminGraduateVerificationQueue
         requests={requestQueue.requests}
         setupEmailRetryQueue={setupEmailRetryQueuePromise}
         actions={{
@@ -126,7 +121,29 @@ export default async function AdminGraduateVerificationsPage({
           "graduate_verifications",
           "update",
         )}
-      />
+    />
+  );
+}
+
+export default async function AdminGraduateVerificationsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<GraduateVerificationSearchParams>;
+}) {
+  const session = await requireAdminPermission(
+    "graduate_verifications",
+    "read",
+    {
+      path: "/admin/graduate-verifications",
+    },
+  );
+  const params = (await searchParams) ?? {};
+
+  return (
+    <AdminShell title="수료생 인증">
+      <Suspense fallback={<AdminGraduateVerificationsSkeletonContent />}>
+        <AdminGraduateVerificationsContent session={session} params={params} />
+      </Suspense>
     </AdminShell>
   );
 }

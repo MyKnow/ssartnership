@@ -315,3 +315,15 @@ export function AdminAdvertisementSkeletonContent() {
 export function AdminEventSkeletonContent() {
   return <AdminListSkeletonContent filterFields={0} rows={4} />;
 }
+
+export function AdminPartnerRegistrationsSkeletonContent() {
+  return <AdminListSkeletonContent filterFields={0} rows={4} />;
+}
+
+export function AdminGraduateVerificationsSkeletonContent() {
+  return <AdminListSkeletonContent filterFields={0} rows={4} />;
+}
+
+export function AdminProfilePhotosSkeletonContent() {
+  return <AdminListSkeletonContent filterFields={0} rows={4} />;
+}
