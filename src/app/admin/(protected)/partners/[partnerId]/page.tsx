@@ -7,16 +7,15 @@ import {
   AdminPartnerDetailOperationalSections,
   AdminPartnerDetailReviewSection,
 } from "@/components/admin/AdminPartnerDetailDeferredSections";
+import AdminPartnerDetailEditSection, {
+  AdminPartnerDetailEditSectionFallback,
+} from "@/components/admin/AdminPartnerDetailEditSection";
 import AdminPartnerPreviewLinkPanel from "@/components/admin/AdminPartnerPreviewLinkPanel";
 import AdminStatePanel from "@/components/admin/AdminStatePanel";
-import PartnerCardForm from "@/components/PartnerCardForm";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
-import Surface from "@/components/ui/Surface";
-import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { AdminPartnerDetailSkeletonContent } from "@/components/loading/AdminPageSkeletons";
-import { updatePartner } from "@/app/admin/(protected)/actions";
 import {
   generatePartnerPreviewLink,
   removePartnerPreviewLink,
@@ -186,10 +185,7 @@ async function AdminPartnerDetailContent({
   const retryHref = retryQueryString
     ? `${detailPath}?${retryQueryString}`
     : detailPath;
-  const detail = await getAdminPartnerDetailCoreReadModel({
-    partnerId,
-    managedCampusSlugs: managedCampusFilter,
-  });
+  const detail = await getAdminPartnerDetailCoreReadModel({ partnerId });
 
   if (detail.status === "not_found") {
     notFound();
@@ -209,7 +205,7 @@ async function AdminPartnerDetailContent({
     );
   }
 
-  const { partner, company, categories, companies, previewToken } = detail;
+  const { partner, previewToken } = detail;
   try {
     assertAdminCanAccessManagedCampuses(
       adminSession.account,
@@ -320,129 +316,18 @@ async function AdminPartnerDetailContent({
           id="partner-edit"
           className="grid scroll-mt-24 gap-6 2xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.72fr)] 2xl:items-start"
         >
-          <div className="grid min-w-0 gap-4">
-            <AdminSectionHeading
-              title={canUpdatePartner ? "제휴처 수정" : "제휴처 기본 정보"}
-              description={
-                canUpdatePartner
-                  ? "목록에서는 핵심 정보만 확인하고 이 상세 화면에서 제휴처 정보를 수정합니다."
-                  : "기본 정보는 확인할 수 있지만 제휴처 수정 권한이 없어 변경할 수 없습니다."
-              }
+          <Suspense fallback={<AdminPartnerDetailEditSectionFallback />}>
+            <AdminPartnerDetailEditSection
+              detail={detail}
+              managedCampusSlugs={managedCampusFilter}
+              canUpdatePartner={canUpdatePartner}
+              partnerSaved={partnerSaved}
+              detailPath={detailPath}
+              retryHref={retryHref}
+              thumbnail={thumbnail}
+              galleryImages={galleryImages}
             />
-            {canUpdatePartner ? (
-              <PartnerCardForm
-                mode="edit"
-                partner={{
-                  id: partner.id,
-                  name: partner.name ?? "",
-                  visibility: partner.visibility,
-                  benefitVisibility: partner.benefit_visibility ?? "public",
-                  location: partner.location ?? "",
-                  detailDescription: partner.detail_description ?? "",
-                  campusSlugs: partner.campus_slugs ?? [],
-                  mapUrl: partner.map_url ?? "",
-                  benefitActionType: partner.benefit_action_type ?? undefined,
-                  benefitActionLink: partner.benefit_action_link ?? undefined,
-                  benefitItems: (partner.partner_benefits ?? []).map(
-                    (benefit: {
-                      id: string;
-                      title: string;
-                      max_apply_count: number | null;
-                      display_order?: number | null;
-                    }) => ({
-                      id: benefit.id,
-                      title: benefit.title,
-                      maxApplyCount: benefit.max_apply_count,
-                      displayOrder: benefit.display_order ?? undefined,
-                    }),
-                  ),
-                  benefitVerificationPinConfigured: Boolean(
-                    partner.benefit_verification_pin_hash &&
-                    partner.benefit_verification_pin_salt,
-                  ),
-                  reservationLink: partner.reservation_link ?? "",
-                  inquiryLink: partner.inquiry_link ?? "",
-                  period: {
-                    start: partner.period_start ?? "",
-                    end: partner.period_end ?? "",
-                  },
-                  conditions: partner.conditions ?? [],
-                  benefits: partner.benefits ?? [],
-                  appliesTo: partner.applies_to ?? [],
-                  thumbnail,
-                  images: galleryImages,
-                  tags: partner.tags ?? [],
-                  company: company
-                    ? {
-                        id: company.id,
-                        name: company.name,
-                        description: company.description ?? "",
-                        contactName: "",
-                        contactEmail: "",
-                        contactPhone: "",
-                      }
-                    : null,
-                }}
-                categoryOptions={categories.map((item) => ({
-                  id: item.id,
-                  label: item.label,
-                }))}
-                companyOptions={companies.map((item) => ({
-                  id: item.id,
-                  name: item.name,
-                  slug: item.slug,
-                }))}
-                categoryId={partner.category_id}
-                formAction={updatePartner}
-                submitLabel="제휴처 저장"
-                clearDraftOnSuccess={partnerSaved}
-                hiddenFields={[{ name: "updateRedirectTo", value: detailPath }]}
-              />
-            ) : (
-              <Surface
-                level="inset"
-                padding="lg"
-                className="grid min-w-0 gap-5"
-              >
-                <div>
-                  <p className="text-sm font-semibold text-foreground">
-                    조회 전용 권한
-                  </p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    제휴처 기본 정보와 운영 상태는 확인할 수 있지만, 수정은
-                    제휴처 운영 권한이 있는 관리자만 할 수 있습니다.
-                  </p>
-                </div>
-                <dl className="grid min-w-0 gap-4 sm:grid-cols-2">
-                  <div className="min-w-0">
-                    <dt className="ui-caption">제휴처명</dt>
-                    <dd className="mt-1 break-words text-sm font-semibold text-foreground">
-                      {partner.name}
-                    </dd>
-                  </div>
-                  <div className="min-w-0">
-                    <dt className="ui-caption">파트너사</dt>
-                    <dd className="mt-1 break-words text-sm font-semibold text-foreground">
-                      {company?.name ?? "회사 미연결"}
-                    </dd>
-                  </div>
-                  <div className="min-w-0">
-                    <dt className="ui-caption">노출 상태</dt>
-                    <dd className="mt-1 text-sm font-semibold text-foreground">
-                      {partner.visibility === "public" ? "공개" : "비공개"}
-                    </dd>
-                  </div>
-                  <div className="min-w-0">
-                    <dt className="ui-caption">운영 기간</dt>
-                    <dd className="mt-1 text-sm font-semibold text-foreground">
-                      {partner.period_start ?? "시작일 미입력"} ~{" "}
-                      {partner.period_end ?? "종료일 미입력"}
-                    </dd>
-                  </div>
-                </dl>
-              </Surface>
-            )}
-          </div>
+          </Suspense>
 
           <div className="2xl:sticky 2xl:top-24">
             <Suspense
@@ -456,7 +341,6 @@ async function AdminPartnerDetailContent({
             </Suspense>
           </div>
         </div>
-
         <Suspense
           fallback={
             <AdminPartnerDetailDeferredFallback label="리뷰를 불러오는 중입니다." />

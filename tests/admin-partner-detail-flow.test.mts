@@ -14,16 +14,24 @@ const deferredSectionsPath = new URL(
   "../src/components/admin/AdminPartnerDetailDeferredSections.tsx",
   import.meta.url,
 );
+const editSectionPath = new URL(
+  "../src/components/admin/AdminPartnerDetailEditSection.tsx",
+  import.meta.url,
+);
 
 test("제휴처 상세는 편집 진입점과 안전한 읽기 모델을 사용한다", async () => {
-  const [pageSource, readModelSource, deferredSectionsSource] = await Promise.all([
+  const [pageSource, readModelSource, deferredSectionsSource, editSectionSource] = await Promise.all([
     readFile(detailPagePath, "utf8"),
     readFile(detailReadModelPath, "utf8"),
     readFile(deferredSectionsPath, "utf8"),
+    readFile(editSectionPath, "utf8"),
   ]);
 
   assert.match(pageSource, /<Button href="#partner-edit">기본 정보 수정<\/Button>/);
+  assert.match(pageSource, /AdminPartnerDetailEditSection/);
   assert.match(pageSource, /<div\s+id="partner-edit"\s+className="grid scroll-mt-24/);
+  assert.match(editSectionSource, /getAdminPartnerFormOptionsReadModel/);
+  assert.match(pageSource, /AdminPartnerDetailEditSectionFallback/);
   assert.match(pageSource, /getAdminPartnerDetailCoreReadModel\(/);
   assert.match(pageSource, /detail\.status === "error"/);
   assert.match(pageSource, /const retryHref = retryQueryString/);
@@ -33,6 +41,8 @@ test("제휴처 상세는 편집 진입점과 안전한 읽기 모델을 사용�
   assert.match(readModelSource, /status: "error" as const/);
   assert.match(readModelSource, /getAdminPartnerDetailCoreReadModel/);
   assert.match(readModelSource, /getAdminPartnerDetailOperationalReadModel/);
+  assert.doesNotMatch(readModelSource, /\.from\("partner_companies"\)/);
+  assert.doesNotMatch(readModelSource, /\.from\("categories"\)/);
   assert.match(pageSource, /const operationalPromise/);
   assert.match(pageSource, /await getAdminPartnerDetailCoreReadModel/);
   assert.match(pageSource, /<Suspense/);

@@ -6,8 +6,9 @@ const read = (path: string) =>
   readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
 test("제휴처 상세는 수정·리뷰·미리보기 작업을 권한에 맞춰 노출한다", async () => {
-  const [page, preview, deferred, reviewManager] = await Promise.all([
+  const [page, edit, preview, deferred, reviewManager] = await Promise.all([
     read("src/app/admin/(protected)/partners/[partnerId]/page.tsx"),
+    read("src/components/admin/AdminPartnerDetailEditSection.tsx"),
     read("src/components/admin/AdminPartnerPreviewLinkPanel.tsx"),
     read("src/components/admin/AdminPartnerDetailDeferredSections.tsx"),
     read("src/components/admin/partner-detail/AdminPartnerReviewManager.tsx"),
@@ -18,8 +19,8 @@ test("제휴처 상세는 수정·리뷰·미리보기 작업을 권한에 맞�
     /canAdmin\(\s*adminSession\.account\.permissions,\s*"brands",\s*"update"/,
   );
   assert.match(page, /canUpdate=\{canUpdatePartner\}/);
-  assert.match(page, /canUpdatePartner \?/);
-  assert.match(page, /조회 전용 권한/);
+  assert.match(edit, /canUpdatePartner \?/);
+  assert.match(edit, /조회 전용 권한/);
   assert.match(preview, /canUpdate = true/);
   assert.match(
     preview,

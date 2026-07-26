@@ -70,29 +70,12 @@ function parseUsagePage(value: string) {
  */
 export async function getAdminPartnerDetailCoreReadModel({
   partnerId,
-  managedCampusSlugs,
 }: {
   partnerId: string;
-  managedCampusSlugs: readonly string[] | null;
 }) {
   try {
     const supabase = getSupabaseAdminClient();
-    let companiesQuery = supabase
-      .from("partner_companies")
-      .select("id,name,slug,description,is_active,managed_campus_slugs")
-      .order("name", { ascending: true });
-    if (managedCampusSlugs) {
-      companiesQuery = companiesQuery.overlaps("managed_campus_slugs", [
-        ...managedCampusSlugs,
-      ]);
-    }
-
-    const [categoriesResult, companiesResult, partnerResult, previewTokenResult] = await Promise.all([
-      supabase
-        .from("categories")
-        .select("id,key,label,description,color")
-        .order("created_at", { ascending: true }),
-      companiesQuery,
+    const [partnerResult, previewTokenResult] = await Promise.all([
       supabase
         .from("partners")
         .select(PARTNER_DETAIL_SELECT)
@@ -105,7 +88,7 @@ export async function getAdminPartnerDetailCoreReadModel({
         .maybeSingle(),
     ]);
 
-    if (partnerResult.error || categoriesResult.error || companiesResult.error) {
+    if (partnerResult.error) {
       return { status: "error" as const };
     }
     if (!partnerResult.data) {
@@ -126,8 +109,6 @@ export async function getAdminPartnerDetailCoreReadModel({
       partner,
       company,
       category,
-      categories: (categoriesResult.data ?? []) as PartnerCategoryRow[],
-      companies: (companiesResult.data ?? []) as PartnerCompanyRow[],
       previewToken: previewTokenResult.error ? null : previewTokenResult.data,
     };
   } catch (error) {
@@ -278,10 +259,7 @@ export async function getAdminPartnerDetailReadModel({
   requestedUsageBenefit: string;
   usagePage: string;
 }) {
-  const core = await getAdminPartnerDetailCoreReadModel({
-    partnerId,
-    managedCampusSlugs,
-  });
+  const core = await getAdminPartnerDetailCoreReadModel({ partnerId });
   if (core.status !== "ready") {
     return core;
   }
