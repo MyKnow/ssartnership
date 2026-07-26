@@ -30,7 +30,8 @@ test("수료생 인증의 두 운영 큐는 독립적인 서버 페이지네이�
   assert.match(pageSource, /parseAdminReviewQueuePagination/);
   assert.match(pageSource, /requestPage/);
   assert.match(pageSource, /setupEmailRetryPage/);
-  assert.match(pageSource, /getAdminGraduateVerificationQueueReadModel/);
+  assert.match(pageSource, /getAdminGraduateVerificationRequestQueueReadModel/);
+  assert.match(pageSource, /getAdminGraduateSetupEmailRetryQueueReadModel/);
   assert.doesNotMatch(pageSource, /getSupabaseAdminClient/);
   assert.match(readModelSource, /\.range\(/);
   assert.match(readModelSource, /count: "exact"/);
@@ -40,4 +41,6 @@ test("수료생 인증의 두 운영 큐는 독립적인 서버 페이지네이�
   assert.match(viewSource, /QueuePagination/);
   assert.match(viewSource, /수료생 인증 요청을 불러오지 못했습니다/);
   assert.match(viewSource, /setupEmailRetryPagination/);
+  assert.match(viewSource, /AdminGraduateVerificationRetryLoading/);
+  assert.match(viewSource, /aria-busy="true"/);
 });
