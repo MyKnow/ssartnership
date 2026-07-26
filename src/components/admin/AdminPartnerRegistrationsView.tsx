@@ -278,6 +278,16 @@ export default function AdminPartnerRegistrationsView({
           ) : null}
           {rows.map((row) => {
             const rowStatus = normalizeStatus(row.status);
+            const attachmentCount = [
+              row.thumbnail_url,
+              ...(row.image_urls ?? []),
+            ].filter(Boolean).length;
+            const noteCount = [
+              row.branch_scope_note,
+              row.detail_description,
+              row.company_description,
+              row.memo,
+            ].filter(Boolean).length;
             return (
               <Card key={row.id} tone="elevated" padding="md" className="grid min-w-0 gap-5">
                 <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -293,53 +303,61 @@ export default function AdminPartnerRegistrationsView({
                     <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
                       {row.company_name} · {row.category_label} · {ADMIN_PARTNER_FILE_SERVICE_MODE_LABELS[row.service_mode]} · {ADMIN_PARTNER_FILE_BENEFIT_ACTION_LABELS[row.benefit_action_type]}
                     </p>
+                    <p className="mt-2 break-words text-sm text-foreground">{row.location}</p>
                     <p className="mt-1 text-sm text-muted-foreground">{branchSummary(row.branches)} · 혜택 그룹 {(row.benefit_groups ?? []).length || 1}개</p>
                   </div>
                 </div>
 
-                <div className="grid min-w-0 gap-3 lg:grid-cols-3">
-                  <ValueList title="위치/링크" values={[row.location, row.map_url, row.site_link].filter((value): value is string => Boolean(value))} />
-                  <ValueList title="연락처" values={[`제휴처: ${row.brand_phone || row.inquiry_link || "입력 없음"}`, `담당자: ${row.contact_name} · ${row.contact_email}`, row.contact_phone].filter((value): value is string => Boolean(value))} />
-                  <ValueList title="기간/상태" values={[`${row.period_start || "미정"} ~ ${row.period_end || "미정"}`, `최근 검토: ${formatDateTime(row.reviewed_at)}`]} />
-                </div>
+                <details className="group min-w-0 rounded-2xl border border-border/70 bg-surface-inset/55">
+                  <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
+                    <span>신청 상세 확인</span>
+                    <span className="text-right text-xs font-normal leading-5 text-muted-foreground">
+                      혜택 {(row.benefits ?? []).length}개 · 조건 {(row.conditions ?? []).length}개 · 메모 {noteCount}개 · 첨부 {attachmentCount}개
+                    </span>
+                  </summary>
+                  <div className="grid min-w-0 gap-4 border-t border-border/70 px-4 py-4">
+                    <div className="grid min-w-0 gap-3 lg:grid-cols-3">
+                      <ValueList title="링크" values={[row.map_url, row.site_link].filter((value): value is string => Boolean(value))} />
+                      <ValueList title="연락처" values={[`제휴처: ${row.brand_phone || row.inquiry_link || "입력 없음"}`, `담당자: ${row.contact_name} · ${row.contact_email}`, row.contact_phone].filter((value): value is string => Boolean(value))} />
+                      <ValueList title="기간/상태" values={[`${row.period_start || "미정"} ~ ${row.period_end || "미정"}`, `최근 검토: ${formatDateTime(row.reviewed_at)}`]} />
+                    </div>
 
-                {row.thumbnail_url || (row.image_urls ?? []).length > 0 ? (
-                  <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-                    {[row.thumbnail_url, ...(row.image_urls ?? [])].filter((url): url is string => Boolean(url)).map((url, index) => (
-                      <a key={`${url}-${index}`} href={url} target="_blank" rel="noreferrer" className="aspect-square min-w-0 overflow-hidden rounded-2xl border border-border bg-surface-muted">
-                        {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary admin review URL */}
-                        <img src={url} alt={`첨부 이미지 ${index + 1}`} className="h-full w-full object-cover" />
-                      </a>
-                    ))}
+                    {attachmentCount > 0 ? (
+                      <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                        {[row.thumbnail_url, ...(row.image_urls ?? [])].filter((url): url is string => Boolean(url)).map((url, index) => (
+                          <a key={`${url}-${index}`} href={url} target="_blank" rel="noreferrer" className="aspect-square min-w-0 overflow-hidden rounded-2xl border border-border bg-surface-muted">
+                            {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary admin review URL */}
+                            <img src={url} alt={`첨부 이미지 ${index + 1}`} className="h-full w-full object-cover" />
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {noteCount > 0 ? (
+                      <dl className="grid min-w-0 gap-2 rounded-2xl border border-border/70 bg-surface-inset px-4 py-3 text-sm leading-6">
+                        {[
+                          ["지점 범위", row.branch_scope_note],
+                          ["제휴처 설명", row.detail_description],
+                          ["파트너사 설명", row.company_description],
+                          ["메모", row.memo],
+                        ].map(([label, value]) =>
+                          value ? (
+                            <div key={label} className="grid min-w-0 gap-1 sm:grid-cols-[7rem_minmax(0,1fr)]">
+                              <dt className="font-semibold text-foreground">{label}</dt>
+                              <dd className="min-w-0 break-words text-muted-foreground">{value}</dd>
+                            </div>
+                          ) : null,
+                        )}
+                      </dl>
+                    ) : null}
+
+                    <div className="grid min-w-0 gap-3 lg:grid-cols-3">
+                      <ValueList title="혜택" values={row.benefits ?? []} />
+                      <ValueList title="이용 조건" values={row.conditions ?? []} />
+                      <ValueList title="태그" values={row.tags ?? []} />
+                    </div>
                   </div>
-                ) : null}
-
-                {row.branch_scope_note ||
-                row.detail_description ||
-                row.company_description ||
-                row.memo ? (
-                  <dl className="grid min-w-0 gap-2 rounded-2xl border border-border/70 bg-surface-inset px-4 py-3 text-sm leading-6">
-                    {[
-                      ["지점 범위", row.branch_scope_note],
-                      ["제휴처 설명", row.detail_description],
-                      ["파트너사 설명", row.company_description],
-                      ["메모", row.memo],
-                    ].map(([label, value]) =>
-                      value ? (
-                        <div key={label} className="grid min-w-0 gap-1 sm:grid-cols-[7rem_minmax(0,1fr)]">
-                          <dt className="font-semibold text-foreground">{label}</dt>
-                          <dd className="min-w-0 break-words text-muted-foreground">{value}</dd>
-                        </div>
-                      ) : null,
-                    )}
-                  </dl>
-                ) : null}
-
-                <div className="grid min-w-0 gap-3 lg:grid-cols-3">
-                  <ValueList title="혜택" values={row.benefits ?? []} />
-                  <ValueList title="이용 조건" values={row.conditions ?? []} />
-                  <ValueList title="태그" values={row.tags ?? []} />
-                </div>
+                </details>
 
                 <form action={updateStatusAction} className="grid min-w-0 gap-3 border-t border-border/70 pt-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
                   <input type="hidden" name="id" value={row.id} />
