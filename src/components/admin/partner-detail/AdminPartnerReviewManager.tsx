@@ -20,11 +20,7 @@ import {
   getAdminReviewStatusOptions,
 } from "@/lib/admin-reviews";
 
-function buildReviewPageHref(
-  returnTo: string,
-  page: number,
-  pageSize: number,
-) {
+function buildReviewPageHref(returnTo: string, page: number, pageSize: number) {
   const url = new URL(returnTo, "https://admin.local");
   if (page > 1) {
     url.searchParams.set("page", String(page));
@@ -46,6 +42,8 @@ export default function AdminPartnerReviewManager({
   filters,
   basePath,
   returnTo,
+  canUpdate = true,
+  canDelete = true,
 }: {
   reviews: AdminReviewRecord[];
   pagination: AdminReviewPagination;
@@ -53,8 +51,13 @@ export default function AdminPartnerReviewManager({
   filters: AdminReviewFilters;
   basePath: string;
   returnTo: string;
+  canUpdate?: boolean;
+  canDelete?: boolean;
 }) {
-  const totalPages = Math.max(1, Math.ceil(pagination.totalCount / pagination.pageSize));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(pagination.totalCount / pagination.pageSize),
+  );
   const currentPage = Math.min(pagination.page, totalPages);
   const pageStart = (currentPage - 1) * pagination.pageSize;
   return (
@@ -155,15 +158,26 @@ export default function AdminPartnerReviewManager({
 
       {reviews.length === 0 ? (
         <EmptyState
-          title={pagination.totalCount > 0 ? "이 페이지에 리뷰가 없습니다." : "조건에 맞는 리뷰가 없습니다."}
-          description={pagination.totalCount > 0
-            ? "첫 페이지로 돌아가 다른 리뷰를 확인해 주세요."
-            : "필터를 조정하거나 다른 정렬로 다시 확인해 주세요."}
-          action={pagination.totalCount > 0 ? (
-            <Button href={buildReviewPageHref(returnTo, 1, pagination.pageSize)} variant="secondary">
-              첫 페이지 보기
-            </Button>
-          ) : undefined}
+          title={
+            pagination.totalCount > 0
+              ? "이 페이지에 리뷰가 없습니다."
+              : "조건에 맞는 리뷰가 없습니다."
+          }
+          description={
+            pagination.totalCount > 0
+              ? "첫 페이지로 돌아가 다른 리뷰를 확인해 주세요."
+              : "필터를 조정하거나 다른 정렬로 다시 확인해 주세요."
+          }
+          action={
+            pagination.totalCount > 0 ? (
+              <Button
+                href={buildReviewPageHref(returnTo, 1, pagination.pageSize)}
+                variant="secondary"
+              >
+                첫 페이지 보기
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <div className="grid gap-4">
@@ -175,15 +189,22 @@ export default function AdminPartnerReviewManager({
             >
               <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
                 <span>
-                  {pageStart + 1}-{Math.min(pageStart + reviews.length, pagination.totalCount)} / {pagination.totalCount.toLocaleString("ko-KR")}
+                  {pageStart + 1}-
+                  {Math.min(pageStart + reviews.length, pagination.totalCount)}{" "}
+                  / {pagination.totalCount.toLocaleString("ko-KR")}
                 </span>
-                <span className="text-xs text-muted-foreground/80">페이지당</span>
-                <div className="flex flex-wrap gap-1.5" aria-label="페이지당 표시 건수">
+                <span className="text-xs text-muted-foreground">페이지당</span>
+                <div
+                  className="flex flex-wrap gap-1.5"
+                  aria-label="페이지당 표시 건수"
+                >
                   {ADMIN_REVIEW_PAGE_SIZE_OPTIONS.map((option) => (
                     <Button
                       key={option}
                       href={buildReviewPageHref(returnTo, 1, option)}
-                      variant={option === pagination.pageSize ? "secondary" : "ghost"}
+                      variant={
+                        option === pagination.pageSize ? "secondary" : "ghost"
+                      }
                       size="sm"
                       prefetch
                     >
@@ -194,7 +215,11 @@ export default function AdminPartnerReviewManager({
               </div>
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                 <Button
-                  href={buildReviewPageHref(returnTo, currentPage - 1, pagination.pageSize)}
+                  href={buildReviewPageHref(
+                    returnTo,
+                    currentPage - 1,
+                    pagination.pageSize,
+                  )}
                   variant="secondary"
                   size="sm"
                   prefetch
@@ -206,7 +231,11 @@ export default function AdminPartnerReviewManager({
                   {currentPage} / {totalPages}
                 </span>
                 <Button
-                  href={buildReviewPageHref(returnTo, currentPage + 1, pagination.pageSize)}
+                  href={buildReviewPageHref(
+                    returnTo,
+                    currentPage + 1,
+                    pagination.pageSize,
+                  )}
                   variant="secondary"
                   size="sm"
                   prefetch
@@ -223,6 +252,8 @@ export default function AdminPartnerReviewManager({
               review={review}
               returnTo={returnTo}
               editable
+              canUpdate={canUpdate}
+              canDelete={canDelete}
             />
           ))}
         </div>

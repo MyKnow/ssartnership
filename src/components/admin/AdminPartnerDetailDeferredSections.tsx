@@ -36,17 +36,19 @@ import {
 type AsyncFormAction = (formData: FormData) => Promise<void>;
 
 function partnerBenefits(partner: AdminPartnerDetailCoreReady["partner"]) {
-  return (partner.partner_benefits ?? []).map((benefit: {
-    id: string;
-    title: string;
-    max_apply_count: number | null;
-    display_order?: number | null;
-  }) => ({
-    id: benefit.id,
-    title: benefit.title,
-    maxApplyCount: benefit.max_apply_count,
-    displayOrder: benefit.display_order ?? undefined,
-  }));
+  return (partner.partner_benefits ?? []).map(
+    (benefit: {
+      id: string;
+      title: string;
+      max_apply_count: number | null;
+      display_order?: number | null;
+    }) => ({
+      id: benefit.id,
+      title: benefit.title,
+      maxApplyCount: benefit.max_apply_count,
+      displayOrder: benefit.display_order ?? undefined,
+    }),
+  );
 }
 
 export function AdminPartnerDetailDeferredFallback({
@@ -103,7 +105,11 @@ export async function AdminPartnerDetailOperationalSections({
         kind="error"
         title="제휴처 운영 정보를 불러오지 못했습니다."
         description="기본 정보는 표시하고 있습니다. 잠시 후 다시 확인해 주세요."
-        action={<Button href={retryHref} variant="secondary">다시 확인</Button>}
+        action={
+          <Button href={retryHref} variant="secondary">
+            다시 확인
+          </Button>
+        }
       />
     );
   }
@@ -183,7 +189,9 @@ export async function AdminPartnerDetailOperationalSections({
           const queryString = params.toString();
           return `${detailPath}${queryString ? `?${queryString}` : ""}`;
         }}
-        memberHref={(memberId) => `/admin/members/${encodeURIComponent(memberId)}`}
+        memberHref={(memberId) =>
+          `/admin/members/${encodeURIComponent(memberId)}`
+        }
         adminActions={
           hasUsageActions
             ? {
@@ -200,7 +208,9 @@ export async function AdminPartnerDetailOperationalSections({
         partnerId={partnerId}
         partnerName={core.partner.name ?? "제휴처"}
         partnerPeriodEnd={partnerPeriodEnd}
-        campaigns={detail.adCampaigns.filter((campaign) => campaign.partnerId === partnerId)}
+        campaigns={detail.adCampaigns.filter(
+          (campaign) => campaign.partnerId === partnerId,
+        )}
         coupons={detail.adCoupons}
         createCouponAction={createAdCouponAction}
         updateCouponAction={updateAdCouponAction}
@@ -238,11 +248,15 @@ export async function AdminPartnerDetailReviewSection({
   detailPath,
   reviewFilters,
   returnTo,
+  canUpdate = true,
+  canDelete = true,
 }: {
   operational: Promise<AdminPartnerDetailOperationalResult>;
   detailPath: string;
   reviewFilters: AdminReviewFilters;
   returnTo: string;
+  canUpdate?: boolean;
+  canDelete?: boolean;
 }) {
   const detail = await operational;
   if (detail.status !== "ready") {
@@ -272,6 +286,8 @@ export async function AdminPartnerDetailReviewSection({
         filters={reviewFilters}
         basePath={detailPath}
         returnTo={returnTo}
+        canUpdate={canUpdate}
+        canDelete={canDelete}
       />
     </Card>
   );
