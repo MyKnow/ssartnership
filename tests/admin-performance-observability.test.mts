@@ -85,6 +85,8 @@ test("관리자 레이아웃은 전역 성능 계측을 관리자 route로 한�
   assert.match(layoutSource, /<AdminNavigationTiming\s*\/>/);
   assert.match(navigationSource, /admin_route_timing/);
   assert.match(navigationSource, /history\.pushState/);
+  assert.match(navigationSource, /useSearchParams/);
+  assert.match(navigationSource, /window\.location\.search/);
 });
 
 test("한 관리자 요청 안의 세션 조회는 재사용해 셸·페이지의 중복 계정 조회를 막는다", async () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { trackProductEvent } from "@/lib/product-events";
 import {
   getAdminRouteDescriptor,
@@ -32,7 +32,7 @@ function consumePendingNavigation() {
   return current;
 }
 
-function resolveNavigationPath(value: string | URL | null) {
+function resolveAdminLocationKey(value: string | URL | null) {
   if (!value || typeof window === "undefined") {
     return null;
   }
@@ -42,10 +42,18 @@ function resolveNavigationPath(value: string | URL | null) {
     if (url.origin !== window.location.origin || !url.pathname.startsWith("/admin")) {
       return null;
     }
-    return url.pathname;
+    return `${url.pathname}${url.search}`;
   } catch {
     return null;
   }
+}
+
+function getCurrentAdminLocationKey() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return `${window.location.pathname}${window.location.search}`;
 }
 
 function getInitialNavigationDuration() {
@@ -57,7 +65,10 @@ function getInitialNavigationDuration() {
 
 export default function AdminNavigationTiming() {
   const pathname = usePathname();
-  const lastReportedPathRef = useRef<string | null>(null);
+  const searchParams = useSearchParams();
+  const serializedSearchParams = searchParams.toString();
+  const locationKey = `${pathname}${serializedSearchParams ? `?${serializedSearchParams}` : ""}`;
+  const lastReportedLocationRef = useRef<string | null>(null);
 
   useEffect(() => {
     const markFromClick = (event: MouseEvent) => {
@@ -78,8 +89,11 @@ export default function AdminNavigationTiming() {
         return;
       }
 
-      const targetPath = resolveNavigationPath(anchor.href);
-      if (targetPath && targetPath !== window.location.pathname) {
+      const targetLocationKey = resolveAdminLocationKey(anchor.href);
+      if (
+        targetLocationKey &&
+        targetLocationKey !== getCurrentAdminLocationKey()
+      ) {
         markAdminNavigationStart("link");
       }
     };
@@ -91,15 +105,21 @@ export default function AdminNavigationTiming() {
     const originalPushState = window.history.pushState;
     const originalReplaceState = window.history.replaceState;
     window.history.pushState = function pushState(state, unused, url) {
-      const targetPath = resolveNavigationPath(url ? String(url) : null);
-      if (targetPath && targetPath !== window.location.pathname) {
+      const targetLocationKey = resolveAdminLocationKey(url ? String(url) : null);
+      if (
+        targetLocationKey &&
+        targetLocationKey !== getCurrentAdminLocationKey()
+      ) {
         markAdminNavigationStart("programmatic");
       }
       return originalPushState.call(window.history, state, unused, url);
     };
     window.history.replaceState = function replaceState(state, unused, url) {
-      const targetPath = resolveNavigationPath(url ? String(url) : null);
-      if (targetPath && targetPath !== window.location.pathname) {
+      const targetLocationKey = resolveAdminLocationKey(url ? String(url) : null);
+      if (
+        targetLocationKey &&
+        targetLocationKey !== getCurrentAdminLocationKey()
+      ) {
         markAdminNavigationStart("programmatic");
       }
       return originalReplaceState.call(window.history, state, unused, url);
@@ -118,7 +138,7 @@ export default function AdminNavigationTiming() {
 
   useEffect(() => {
     const descriptor = getAdminRouteDescriptor(pathname);
-    if (!descriptor || lastReportedPathRef.current === pathname) {
+    if (!descriptor || lastReportedLocationRef.current === locationKey) {
       return;
     }
 
@@ -133,7 +153,7 @@ export default function AdminNavigationTiming() {
       trigger,
     });
 
-    lastReportedPathRef.current = pathname;
+    lastReportedLocationRef.current = locationKey;
     trackProductEvent({
       eventName: "admin_route_timing",
       path: descriptor.path,
@@ -141,7 +161,7 @@ export default function AdminNavigationTiming() {
       targetId: descriptor.key,
       properties,
     });
-  }, [pathname]);
+  }, [locationKey, pathname]);
 
   return null;
 }
