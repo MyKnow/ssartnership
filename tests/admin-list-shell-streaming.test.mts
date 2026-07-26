@@ -135,6 +135,18 @@ const listRoutes = [
     content: "AdminPartnerNewContent",
     fallback: "AdminPartnerNewSkeletonContent",
   },
+  {
+    label: "이벤트 상세",
+    page: "../src/app/admin/(protected)/event/[slug]/page.tsx",
+    content: "AdminEventDetailContent",
+    fallback: "AdminEventDetailSkeletonContent",
+  },
+  {
+    label: "가입 승인 상세",
+    page: "../src/app/admin/(protected)/member-signup-requests/[requestId]/page.tsx",
+    content: "AdminMemberSignupRequestDetailContent",
+    fallback: "AdminMemberSignupRequestDetailSkeletonContent",
+  },
 ];
 
 test("대표 관리자 목록은 셸과 read model 콘텐츠를 분리해 스트리밍한다", async () => {

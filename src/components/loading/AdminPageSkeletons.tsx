@@ -352,3 +352,22 @@ export function AdminPartnerNewSkeletonContent() {
     </div>
   );
 }
+
+export function AdminEventDetailSkeletonContent() {
+  return (
+    <div className="grid min-w-0 gap-6">
+      <PageHeaderSkeleton />
+      <MetricRowSkeleton count={3} />
+      <FormSkeleton sections={2} />
+    </div>
+  );
+}
+
+export function AdminMemberSignupRequestDetailSkeletonContent() {
+  return (
+    <div className="grid min-w-0 gap-6">
+      <PageHeaderSkeleton />
+      <FormSkeleton sections={1} />
+    </div>
+  );
+}

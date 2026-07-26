@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import type { ReactNode } from "react";
 import AdminEventDetailView from "@/components/admin/AdminEventDetailView";
 import AdminShell from "@/components/admin/AdminShell";
+import { AdminEventDetailSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
@@ -749,23 +751,17 @@ async function getSignupRewardContent({
   ) : null;
 }
 
-export default async function AdminEventDetailPage({
-  params,
-  searchParams,
+async function AdminEventDetailContent({
+  session,
+  slug,
+  paramsData,
+  definition,
 }: {
-  params: Promise<{ slug: string }>;
-  searchParams?: Promise<AdminEventDetailSearchParams>;
+  session: Awaited<ReturnType<typeof requireAdminPermission>>;
+  slug: string;
+  paramsData: AdminEventDetailSearchParams;
+  definition: NonNullable<ReturnType<typeof getEventPageDefinition>>;
 }) {
-  const session = await requireAdminPermission("events", "read", {
-    path: "/admin/event",
-  });
-  const { slug } = await params;
-  const paramsData = (await searchParams) ?? {};
-  const definition = getEventPageDefinition(slug);
-  if (!definition) {
-    notFound();
-  }
-
   const campaigns = await listManagedEventCampaigns({ includeInactive: true });
   const registration =
     campaigns.find((campaign) => campaign.slug === slug) ?? null;
@@ -796,12 +792,7 @@ export default async function AdminEventDetailPage({
       .join(" · ") ?? "전체";
 
   return (
-    <AdminShell
-      title={registration ? definition.title : "이벤트 운영 등록"}
-      backHref="/admin/event"
-      backLabel="이벤트 목록"
-    >
-      <AdminEventDetailView
+    <AdminEventDetailView
         definition={definition}
         registration={registration}
         state={state}
@@ -815,7 +806,41 @@ export default async function AdminEventDetailPage({
         canCreate={canCreate}
         canUpdate={canUpdate}
         canDelete={canDelete}
-      />
+    />
+  );
+}
+
+export default async function AdminEventDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams?: Promise<AdminEventDetailSearchParams>;
+}) {
+  const session = await requireAdminPermission("events", "read", {
+    path: "/admin/event",
+  });
+  const { slug } = await params;
+  const paramsData = (await searchParams) ?? {};
+  const definition = getEventPageDefinition(slug);
+  if (!definition) {
+    notFound();
+  }
+
+  return (
+    <AdminShell
+      title="이벤트 상세"
+      backHref="/admin/event"
+      backLabel="이벤트 목록"
+    >
+      <Suspense fallback={<AdminEventDetailSkeletonContent />}>
+        <AdminEventDetailContent
+          session={session}
+          slug={slug}
+          paramsData={paramsData}
+          definition={definition}
+        />
+      </Suspense>
     </AdminShell>
   );
 }
