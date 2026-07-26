@@ -1,6 +1,7 @@
 import AdminGraduateVerificationQueue from "@/components/admin/AdminGraduateVerificationQueue";
 import AdminShell from "@/components/admin/AdminShell";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { canAdmin } from "@/lib/admin-permissions";
 import {
   getAdminGraduateSetupEmailRetryQueueReadModel,
   getAdminGraduateVerificationRequestQueueReadModel,
@@ -57,9 +58,13 @@ export default async function AdminGraduateVerificationsPage({
 }: {
   searchParams?: Promise<GraduateVerificationSearchParams>;
 }) {
-  await requireAdminPermission("graduate_verifications", "read", {
-    path: "/admin/graduate-verifications",
-  });
+  const session = await requireAdminPermission(
+    "graduate_verifications",
+    "read",
+    {
+      path: "/admin/graduate-verifications",
+    },
+  );
   const params = (await searchParams) ?? {};
   const requestPagination = parseAdminReviewQueuePagination({
     page: getOneSearchParam(params.requestPage),
@@ -67,23 +72,23 @@ export default async function AdminGraduateVerificationsPage({
   const setupEmailRetryPagination = parseAdminReviewQueuePagination({
     page: getOneSearchParam(params.setupEmailRetryPage),
   });
-  const requestQueuePromise = getAdminGraduateVerificationRequestQueueReadModel({
-    requestPage: requestPagination.page,
-    requestPageSize: requestPagination.pageSize,
-  });
-  const setupEmailRetryQueuePromise = getAdminGraduateSetupEmailRetryQueueReadModel({
-    setupEmailRetryPage: setupEmailRetryPagination.page,
-    setupEmailRetryPageSize: setupEmailRetryPagination.pageSize,
-  });
+  const requestQueuePromise = getAdminGraduateVerificationRequestQueueReadModel(
+    {
+      requestPage: requestPagination.page,
+      requestPageSize: requestPagination.pageSize,
+    },
+  );
+  const setupEmailRetryQueuePromise =
+    getAdminGraduateSetupEmailRetryQueueReadModel({
+      setupEmailRetryPage: setupEmailRetryPagination.page,
+      setupEmailRetryPageSize: setupEmailRetryPagination.pageSize,
+    });
   const requestQueue = await requestQueuePromise;
   const { queueLoadError } = requestQueue;
   const resolvedRequestPagination = requestQueue.requestPagination;
   const requestTotalPages = getTotalPages(resolvedRequestPagination);
 
-  if (
-    !queueLoadError &&
-    requestPagination.page > requestTotalPages
-  ) {
+  if (!queueLoadError && requestPagination.page > requestTotalPages) {
     redirect(
       buildGraduateQueueHref({
         requestPage: Math.min(requestPagination.page, requestTotalPages),
@@ -116,6 +121,11 @@ export default async function AdminGraduateVerificationsPage({
         returnTo={returnTo}
         requestPagination={resolvedRequestPagination}
         loadError={queueLoadError}
+        canUpdate={canAdmin(
+          session.account.permissions,
+          "graduate_verifications",
+          "update",
+        )}
       />
     </AdminShell>
   );

@@ -43,6 +43,7 @@ const meta = {
       rejectRequest: noop,
       resendSetupEmail: noop,
     },
+    canUpdate: true,
   },
   parameters: {
     nextjs: { appDirectory: true },
@@ -57,6 +58,32 @@ export const Default: Story = {};
 
 export const Empty: Story = {
   args: { requests: [], setupEmailRetries: [] },
+};
+
+export const ReadOnly: Story = {
+  args: { canUpdate: false },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(
+      canvas.queryByRole("button", { name: "검토 시작" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "승인 및 비밀번호 설정 메일" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "보완 요청 보내기" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "요청 반려" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "설정 메일 다시 보내기" }),
+    ).not.toBeInTheDocument();
+    await expect(canvas.getAllByText("조회 전용 권한").length).toBeGreaterThan(
+      0,
+    );
+  },
 };
 
 export const Paginated: Story = {
@@ -86,12 +113,20 @@ export const MediaViewer: Story = {
     const canvas = within(canvasElement);
     const body = within(document.body);
 
-    await expect(canvas.getByRole("button", { name: "수료증 보기" })).toBeInTheDocument();
-    await expect(canvas.queryByRole("link", { name: "수료증 보기" })).not.toBeInTheDocument();
+    await expect(
+      canvas.getByRole("button", { name: "수료증 보기" }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("link", { name: "수료증 보기" }),
+    ).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "사진 보기" }));
-    await expect(body.getByRole("dialog", { name: "본인 사진 미리보기" })).toBeInTheDocument();
+    await expect(
+      body.getByRole("dialog", { name: "본인 사진 미리보기" }),
+    ).toBeInTheDocument();
     await userEvent.click(body.getByRole("button", { name: "닫기" }));
-    await expect(body.queryByRole("dialog", { name: "본인 사진 미리보기" })).not.toBeInTheDocument();
+    await expect(
+      body.queryByRole("dialog", { name: "본인 사진 미리보기" }),
+    ).not.toBeInTheDocument();
   },
 };
 

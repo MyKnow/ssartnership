@@ -171,10 +171,12 @@ function GraduateVerificationDecisionCard({
   request,
   actions,
   returnTo,
+  canUpdate,
 }: {
   request: AdminGraduateVerificationRequest;
   actions: QueueActions;
   returnTo: string;
+  canUpdate: boolean;
 }) {
   const isExistingMemberRecovery =
     request.request_kind === "existing_member_recovery";
@@ -226,221 +228,247 @@ function GraduateVerificationDecisionCard({
         />
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <form action={actions.startReview}>
-          <QueueActionFields requestId={request.id} returnTo={returnTo} />
-          <SubmitButton variant="secondary" pendingText="검토를 시작하는 중">
-            검토 시작
-          </SubmitButton>
-        </form>
-      </div>
+      {canUpdate ? (
+        <div className="flex flex-wrap gap-2">
+          <form action={actions.startReview}>
+            <QueueActionFields requestId={request.id} returnTo={returnTo} />
+            <SubmitButton variant="secondary" pendingText="검토를 시작하는 중">
+              검토 시작
+            </SubmitButton>
+          </form>
+        </div>
+      ) : null}
 
-      <Surface level="inset" padding="md" className="grid min-w-0 gap-4">
-        <form
-          action={actions.approveRequest}
-          className="grid min-w-0 gap-4"
-          aria-labelledby={`${requestHeadingId}-approval-title`}
-        >
-          <QueueActionFields requestId={request.id} returnTo={returnTo} />
-          <fieldset className="grid min-w-0 gap-4">
-            <legend
-              id={`${requestHeadingId}-approval-title`}
-              className="text-sm font-semibold text-foreground"
-            >
-              결정 전 확인
-            </legend>
-            <p className="text-sm leading-6 text-muted-foreground">
-              증빙을 확인한 뒤 아래 정보를 입력하면 이 요청을 승인합니다.
-            </p>
-            <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-              <div className="grid min-w-0 gap-1.5">
-                <label
-                  htmlFor={documentNumberInputId}
-                  className="text-sm font-medium text-foreground"
-                >
-                  수료증 문서 번호
-                </label>
-                <Input
-                  id={documentNumberInputId}
-                  name="documentNumber"
-                  required
-                  maxLength={160}
-                  aria-describedby={documentNumberHelpId}
-                  placeholder="예: SSAFY-15-2026-0001"
-                />
-                <p
-                  id={documentNumberHelpId}
-                  className="text-xs leading-5 text-muted-foreground"
-                >
-                  수료증에 적힌 문서 번호를 입력하세요. 원문은 승인 이력에 표시하지 않습니다.
-                </p>
-              </div>
-
-              {isExistingMemberRecovery ? (
+      {canUpdate ? (
+        <Surface level="inset" padding="md" className="grid min-w-0 gap-4">
+          <form
+            action={actions.approveRequest}
+            className="grid min-w-0 gap-4"
+            aria-labelledby={`${requestHeadingId}-approval-title`}
+          >
+            <QueueActionFields requestId={request.id} returnTo={returnTo} />
+            <fieldset className="grid min-w-0 gap-4">
+              <legend
+                id={`${requestHeadingId}-approval-title`}
+                className="text-sm font-semibold text-foreground"
+              >
+                결정 전 확인
+              </legend>
+              <p className="text-sm leading-6 text-muted-foreground">
+                증빙을 확인한 뒤 아래 정보를 입력하면 이 요청을 승인합니다.
+              </p>
+              <div className="grid min-w-0 gap-4 lg:grid-cols-2">
                 <div className="grid min-w-0 gap-1.5">
                   <label
-                    htmlFor={existingMemberIdInputId}
+                    htmlFor={documentNumberInputId}
                     className="text-sm font-medium text-foreground"
                   >
-                    연결할 기존 회원 ID
+                    수료증 문서 번호
                   </label>
                   <Input
-                    id={existingMemberIdInputId}
-                    name="existingMemberId"
+                    id={documentNumberInputId}
+                    name="documentNumber"
                     required
-                    pattern="[0-9a-fA-F-]{36}"
-                    aria-describedby={existingMemberIdHelpId}
-                    placeholder="00000000-0000-0000-0000-000000000000"
+                    maxLength={160}
+                    aria-describedby={documentNumberHelpId}
+                    placeholder="예: SSAFY-15-2026-0001"
                   />
                   <p
-                    id={existingMemberIdHelpId}
+                    id={documentNumberHelpId}
                     className="text-xs leading-5 text-muted-foreground"
                   >
-                    회원 상세에서 복사한 UUID를 입력하세요. 새 회원은 만들지 않습니다.
+                    수료증에 적힌 문서 번호를 입력하세요. 원문은 승인 이력에
+                    표시하지 않습니다.
                   </p>
                 </div>
-              ) : null}
-            </div>
-            {isExistingMemberRecovery ? (
-              <p
-                className="border-l-2 border-danger/50 pl-3 text-sm leading-6 text-muted-foreground"
-                role="note"
-              >
-                신청 이메일과 기존 회원을 함께 확인한 뒤 승인하세요. 잘못 연결하면 기존 인증 정보에 영향을 줄 수 있습니다.
-              </p>
-            ) : null}
-            <div>
-              <SubmitButton
-                pendingText={
-                  isExistingMemberRecovery
-                    ? "기존 회원을 연결하는 중"
-                    : "승인하는 중"
-                }
-              >
-                {isExistingMemberRecovery
-                  ? "기존 회원 연결 및 설정 메일"
-                  : "승인 및 비밀번호 설정 메일"}
-              </SubmitButton>
-            </div>
-          </fieldset>
-        </form>
-      </Surface>
 
-      <Surface level="inset" padding="md" className="min-w-0">
-        <details>
-          <summary className="flex min-h-11 cursor-pointer items-center rounded-control px-2 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20">
-            보완 요청 또는 반려
-          </summary>
-          <div className="mt-4 grid min-w-0 gap-6 lg:grid-cols-2">
-            <form
-              action={actions.requestResubmission}
-              className="grid min-w-0 gap-4"
-            >
-              <QueueActionFields requestId={request.id} returnTo={returnTo} />
-              <fieldset className="grid min-w-0 gap-3">
-                <legend className="text-sm font-semibold text-foreground">
-                  보완 요청
-                </legend>
-                <p className="text-sm leading-6 text-muted-foreground">
-                  보완이 필요한 항목을 하나 이상 고르고, 회원에게 전달할 안내를 입력하세요.
-                </p>
-                <div
-                  className="grid gap-2 sm:grid-cols-3"
-                  role="group"
-                  aria-label="보완이 필요한 항목"
-                >
-                  {[
-                    { value: "education_period", label: "교육 기간" },
-                    { value: "certificate", label: "수료증" },
-                    { value: "profile_image", label: "본인 사진" },
-                  ].map((target) => (
+                {isExistingMemberRecovery ? (
+                  <div className="grid min-w-0 gap-1.5">
                     <label
-                      key={target.value}
-                      className="flex min-h-11 items-center gap-2 rounded-control border border-border bg-surface-control px-3 text-sm font-medium text-foreground"
+                      htmlFor={existingMemberIdInputId}
+                      className="text-sm font-medium text-foreground"
                     >
-                      <input
-                        type="checkbox"
-                        name="target"
-                        value={target.value}
-                        className="size-5 shrink-0 accent-primary"
-                      />
-                      <span>{target.label}</span>
+                      연결할 기존 회원 ID
                     </label>
-                  ))}
-                </div>
-                <div className="grid min-w-0 gap-1.5">
-                  <label
-                    htmlFor={resubmissionNoteId}
-                    className="text-sm font-medium text-foreground"
-                  >
-                    보완 요청 사유
-                  </label>
-                  <Textarea
-                    id={resubmissionNoteId}
-                    name="note"
-                    maxLength={500}
-                    aria-describedby={resubmissionNoteHelpId}
-                    placeholder="예: 수료증의 교육 기간이 신청 내용과 다릅니다."
-                  />
-                  <p
-                    id={resubmissionNoteHelpId}
-                    className="text-xs leading-5 text-muted-foreground"
-                  >
-                    최대 500자까지 입력할 수 있습니다. 개인정보나 내부 운영 메모는 적지 마세요.
-                  </p>
-                </div>
-                <div>
-                  <SubmitButton variant="secondary" pendingText="보완을 요청하는 중">
-                    보완 요청 보내기
-                  </SubmitButton>
-                </div>
-              </fieldset>
-            </form>
-
-            <form
-              action={actions.rejectRequest}
-              className="grid min-w-0 gap-4 border-t border-border pt-6 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"
-            >
-              <QueueActionFields requestId={request.id} returnTo={returnTo} />
-              <fieldset className="grid min-w-0 gap-3">
-                <legend className="text-sm font-semibold text-foreground">
-                  반려
-                </legend>
-                <p className="text-sm leading-6 text-muted-foreground">
-                  반려하면 이 요청은 다시 승인할 수 없습니다. 사유를 구체적으로 남겨 주세요.
+                    <Input
+                      id={existingMemberIdInputId}
+                      name="existingMemberId"
+                      required
+                      pattern="[0-9a-fA-F-]{36}"
+                      aria-describedby={existingMemberIdHelpId}
+                      placeholder="00000000-0000-0000-0000-000000000000"
+                    />
+                    <p
+                      id={existingMemberIdHelpId}
+                      className="text-xs leading-5 text-muted-foreground"
+                    >
+                      회원 상세에서 복사한 UUID를 입력하세요. 새 회원은 만들지
+                      않습니다.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+              {isExistingMemberRecovery ? (
+                <p
+                  className="border-l-2 border-danger/50 pl-3 text-sm leading-6 text-muted-foreground"
+                  role="note"
+                >
+                  신청 이메일과 기존 회원을 함께 확인한 뒤 승인하세요. 잘못
+                  연결하면 기존 인증 정보에 영향을 줄 수 있습니다.
                 </p>
-                <div className="grid min-w-0 gap-1.5">
-                  <label
-                    htmlFor={rejectionReasonId}
-                    className="text-sm font-medium text-foreground"
-                  >
-                    반려 사유
-                  </label>
-                  <Textarea
-                    id={rejectionReasonId}
-                    name="reason"
-                    required
-                    maxLength={500}
-                    aria-describedby={rejectionReasonHelpId}
-                    placeholder="반려 사유를 입력하세요"
-                  />
-                  <p
-                    id={rejectionReasonHelpId}
-                    className="text-xs leading-5 text-muted-foreground"
-                  >
-                    1자 이상 500자 이하로 입력하세요. 회원이 이해할 수 있는 표현을 사용하세요.
+              ) : null}
+              <div>
+                <SubmitButton
+                  pendingText={
+                    isExistingMemberRecovery
+                      ? "기존 회원을 연결하는 중"
+                      : "승인하는 중"
+                  }
+                >
+                  {isExistingMemberRecovery
+                    ? "기존 회원 연결 및 설정 메일"
+                    : "승인 및 비밀번호 설정 메일"}
+                </SubmitButton>
+              </div>
+            </fieldset>
+          </form>
+        </Surface>
+      ) : null}
+
+      {canUpdate ? (
+        <Surface level="inset" padding="md" className="min-w-0">
+          <details>
+            <summary className="flex min-h-11 cursor-pointer items-center rounded-control px-2 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20">
+              보완 요청 또는 반려
+            </summary>
+            <div className="mt-4 grid min-w-0 gap-6 lg:grid-cols-2">
+              <form
+                action={actions.requestResubmission}
+                className="grid min-w-0 gap-4"
+              >
+                <QueueActionFields requestId={request.id} returnTo={returnTo} />
+                <fieldset className="grid min-w-0 gap-3">
+                  <legend className="text-sm font-semibold text-foreground">
+                    보완 요청
+                  </legend>
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    보완이 필요한 항목을 하나 이상 고르고, 회원에게 전달할
+                    안내를 입력하세요.
                   </p>
-                </div>
-                <div>
-                  <SubmitButton variant="danger" pendingText="반려하는 중">
-                    요청 반려
-                  </SubmitButton>
-                </div>
-              </fieldset>
-            </form>
-          </div>
-        </details>
-      </Surface>
+                  <div
+                    className="grid gap-2 sm:grid-cols-3"
+                    role="group"
+                    aria-label="보완이 필요한 항목"
+                  >
+                    {[
+                      { value: "education_period", label: "교육 기간" },
+                      { value: "certificate", label: "수료증" },
+                      { value: "profile_image", label: "본인 사진" },
+                    ].map((target) => (
+                      <label
+                        key={target.value}
+                        className="flex min-h-11 items-center gap-2 rounded-control border border-border bg-surface-control px-3 text-sm font-medium text-foreground"
+                      >
+                        <input
+                          type="checkbox"
+                          name="target"
+                          value={target.value}
+                          className="size-5 shrink-0 accent-primary"
+                        />
+                        <span>{target.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="grid min-w-0 gap-1.5">
+                    <label
+                      htmlFor={resubmissionNoteId}
+                      className="text-sm font-medium text-foreground"
+                    >
+                      보완 요청 사유
+                    </label>
+                    <Textarea
+                      id={resubmissionNoteId}
+                      name="note"
+                      maxLength={500}
+                      aria-describedby={resubmissionNoteHelpId}
+                      placeholder="예: 수료증의 교육 기간이 신청 내용과 다릅니다."
+                    />
+                    <p
+                      id={resubmissionNoteHelpId}
+                      className="text-xs leading-5 text-muted-foreground"
+                    >
+                      최대 500자까지 입력할 수 있습니다. 개인정보나 내부 운영
+                      메모는 적지 마세요.
+                    </p>
+                  </div>
+                  <div>
+                    <SubmitButton
+                      variant="secondary"
+                      pendingText="보완을 요청하는 중"
+                    >
+                      보완 요청 보내기
+                    </SubmitButton>
+                  </div>
+                </fieldset>
+              </form>
+
+              <form
+                action={actions.rejectRequest}
+                className="grid min-w-0 gap-4 border-t border-border pt-6 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"
+              >
+                <QueueActionFields requestId={request.id} returnTo={returnTo} />
+                <fieldset className="grid min-w-0 gap-3">
+                  <legend className="text-sm font-semibold text-foreground">
+                    반려
+                  </legend>
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    반려하면 이 요청은 다시 승인할 수 없습니다. 사유를
+                    구체적으로 남겨 주세요.
+                  </p>
+                  <div className="grid min-w-0 gap-1.5">
+                    <label
+                      htmlFor={rejectionReasonId}
+                      className="text-sm font-medium text-foreground"
+                    >
+                      반려 사유
+                    </label>
+                    <Textarea
+                      id={rejectionReasonId}
+                      name="reason"
+                      required
+                      maxLength={500}
+                      aria-describedby={rejectionReasonHelpId}
+                      placeholder="반려 사유를 입력하세요"
+                    />
+                    <p
+                      id={rejectionReasonHelpId}
+                      className="text-xs leading-5 text-muted-foreground"
+                    >
+                      1자 이상 500자 이하로 입력하세요. 회원이 이해할 수 있는
+                      표현을 사용하세요.
+                    </p>
+                  </div>
+                  <div>
+                    <SubmitButton variant="danger" pendingText="반려하는 중">
+                      요청 반려
+                    </SubmitButton>
+                  </div>
+                </fieldset>
+              </form>
+            </div>
+          </details>
+        </Surface>
+      ) : (
+        <Surface level="inset" padding="md">
+          <p className="text-sm font-semibold text-foreground">
+            조회 전용 권한
+          </p>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            신청 정보와 증빙은 확인할 수 있지만, 검토 시작·승인·보완 요청·반려는
+            수료생 인증 운영 권한이 있는 관리자만 할 수 있습니다.
+          </p>
+        </Surface>
+      )}
     </Card>
   );
 }
@@ -450,11 +478,13 @@ function GraduateVerificationHeader({
   requestPagination,
   setupEmailRetryCount,
   feedback,
+  canUpdate,
 }: {
   requests: AdminGraduateVerificationRequest[];
   requestPagination: QueuePaginationState;
   setupEmailRetryCount: number | null;
   feedback?: AdminReviewQueueFeedback | null;
+  canUpdate: boolean;
 }) {
   const submittedCount = requests.filter(
     (request) => request.status === "submitted",
@@ -503,12 +533,14 @@ function GraduateVerificationHeader({
       ]}
       feedback={feedback}
       nextAction={{
-        title:
-          requests.length > 0
+        title: canUpdate
+          ? requests.length > 0
             ? "증빙과 요청 유형을 확인한 뒤 검토를 시작하세요."
-            : "새 인증 요청이 들어오면 증빙과 요청 유형부터 확인하세요.",
-        description:
-          "기존 회원 복구 요청은 대상 회원 ID와 신청 이메일을 함께 확인해야 새 회원이 중복 생성되지 않습니다.",
+            : "새 인증 요청이 들어오면 증빙과 요청 유형부터 확인하세요."
+          : "신청 정보와 증빙을 확인하세요.",
+        description: canUpdate
+          ? "기존 회원 복구 요청은 대상 회원 ID와 신청 이메일을 함께 확인해야 새 회원이 중복 생성되지 않습니다."
+          : "현재 계정은 요청과 증빙을 확인할 수 있지만 검토 결과를 변경할 수 없습니다.",
       }}
     />
   );
@@ -519,11 +551,13 @@ function GraduateVerificationRequestSection({
   actions,
   returnTo,
   pagination,
+  canUpdate,
 }: {
   requests: AdminGraduateVerificationRequest[];
   actions: QueueActions;
   returnTo: string;
   pagination: QueuePaginationState;
+  canUpdate: boolean;
 }) {
   return (
     <section
@@ -563,6 +597,7 @@ function GraduateVerificationRequestSection({
               request={request}
               actions={actions}
               returnTo={returnTo}
+              canUpdate={canUpdate}
             />
           ))}
         </div>
@@ -577,12 +612,14 @@ function GraduateSetupEmailRetrySection({
   actions,
   returnTo,
   loadError,
+  canUpdate,
 }: {
   setupEmailRetries: AdminGraduateSetupEmailRetry[];
   pagination: QueuePaginationState;
   actions: QueueActions;
   returnTo: string;
   loadError: boolean;
+  canUpdate: boolean;
 }) {
   return (
     <section
@@ -611,6 +648,17 @@ function GraduateSetupEmailRetrySection({
         />
       ) : (
         <>
+          {!canUpdate ? (
+            <Surface level="inset" padding="md">
+              <p className="text-sm font-semibold text-foreground">
+                조회 전용 권한
+              </p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                재발송 대상과 실패 상태는 확인할 수 있지만, 설정 메일 재발송은
+                수료생 인증 운영 권한이 있는 관리자만 할 수 있습니다.
+              </p>
+            </Surface>
+          ) : null}
           <QueuePagination
             label="메일 재발송"
             pagination={pagination}
@@ -622,7 +670,10 @@ function GraduateSetupEmailRetrySection({
               title="재발송할 비밀번호 설정 메일이 없습니다."
               description="승인 직후 메일 전송에 실패한 수료생 계정만 이곳에 표시됩니다."
               action={
-                <Button href="/admin/graduate-verifications" variant="secondary">
+                <Button
+                  href="/admin/graduate-verifications"
+                  variant="secondary"
+                >
                   큐 새로고침
                 </Button>
               }
@@ -647,15 +698,17 @@ function GraduateSetupEmailRetrySection({
                       이전 비밀번호 설정 메일 전송에 실패했습니다.
                     </p>
                   </div>
-                  <form action={actions.resendSetupEmail}>
-                    <QueueActionFields
-                      requestId={request.id}
-                      returnTo={returnTo}
-                    />
-                    <SubmitButton pendingText="설정 메일을 다시 보내는 중">
-                      설정 메일 다시 보내기
-                    </SubmitButton>
-                  </form>
+                  {canUpdate ? (
+                    <form action={actions.resendSetupEmail}>
+                      <QueueActionFields
+                        requestId={request.id}
+                        returnTo={returnTo}
+                      />
+                      <SubmitButton pendingText="설정 메일을 다시 보내는 중">
+                        설정 메일 다시 보내기
+                      </SubmitButton>
+                    </form>
+                  ) : null}
                 </Card>
               ))}
             </div>
@@ -691,6 +744,7 @@ export default function AdminGraduateVerificationQueue({
   requestPagination,
   setupEmailRetryPagination,
   loadError = false,
+  canUpdate = true,
 }: {
   requests: AdminGraduateVerificationRequest[];
   setupEmailRetries?: AdminGraduateSetupEmailRetry[];
@@ -701,6 +755,7 @@ export default function AdminGraduateVerificationQueue({
   requestPagination?: QueuePaginationState;
   setupEmailRetryPagination?: QueuePaginationState;
   loadError?: boolean;
+  canUpdate?: boolean;
 }) {
   if (setupEmailRetryQueue) {
     return (
@@ -712,6 +767,7 @@ export default function AdminGraduateVerificationQueue({
         returnTo={returnTo}
         requestPagination={requestPagination}
         loadError={loadError}
+        canUpdate={canUpdate}
       />
     );
   }
@@ -735,6 +791,7 @@ export default function AdminGraduateVerificationQueue({
         requestPagination={effectiveRequestPagination}
         setupEmailRetryCount={effectiveSetupEmailRetryPagination.totalCount}
         feedback={feedback}
+        canUpdate={canUpdate}
       />
 
       {loadError ? (
@@ -746,6 +803,7 @@ export default function AdminGraduateVerificationQueue({
             actions={actions}
             returnTo={returnTo}
             pagination={effectiveRequestPagination}
+            canUpdate={canUpdate}
           />
 
           <GraduateSetupEmailRetrySection
@@ -754,6 +812,7 @@ export default function AdminGraduateVerificationQueue({
             actions={actions}
             returnTo={returnTo}
             loadError={false}
+            canUpdate={canUpdate}
           />
         </>
       )}
@@ -779,7 +838,9 @@ export function AdminGraduateVerificationRetryLoading() {
       </div>
       <Surface level="inset" padding="md">
         <p role="status" className="text-sm text-muted-foreground">
-          메일 재발송 대상을 확인하는 중입니다. 신규 인증 검토는 지금 바로 시작할 수 있습니다.
+          {
+            "메일 재발송 대상을 확인하는 중입니다. 신규 인증 검토는 지금 바로 시작할 수 있습니다."
+          }
         </p>
       </Surface>
     </section>
@@ -790,10 +851,12 @@ async function GraduateVerificationRetryBoundary({
   setupEmailRetryQueue,
   actions,
   returnTo,
+  canUpdate,
 }: {
   setupEmailRetryQueue: Promise<SetupEmailRetryQueue>;
   actions: QueueActions;
   returnTo: string;
+  canUpdate: boolean;
 }) {
   const queue = await setupEmailRetryQueue;
 
@@ -804,6 +867,7 @@ async function GraduateVerificationRetryBoundary({
       actions={actions}
       returnTo={returnTo}
       loadError={queue.queueLoadError}
+      canUpdate={canUpdate}
     />
   );
 }
@@ -816,6 +880,7 @@ function AdminGraduateVerificationStreamingView({
   returnTo,
   requestPagination,
   loadError,
+  canUpdate,
 }: {
   requests: AdminGraduateVerificationRequest[];
   setupEmailRetryQueue: Promise<SetupEmailRetryQueue>;
@@ -824,6 +889,7 @@ function AdminGraduateVerificationStreamingView({
   returnTo: string;
   requestPagination?: QueuePaginationState;
   loadError: boolean;
+  canUpdate: boolean;
 }) {
   const effectiveRequestPagination = requestPagination ?? {
     totalCount: requests.length,
@@ -838,6 +904,7 @@ function AdminGraduateVerificationStreamingView({
         requestPagination={effectiveRequestPagination}
         setupEmailRetryCount={null}
         feedback={feedback}
+        canUpdate={canUpdate}
       />
 
       {loadError ? (
@@ -849,6 +916,7 @@ function AdminGraduateVerificationStreamingView({
             actions={actions}
             returnTo={returnTo}
             pagination={effectiveRequestPagination}
+            canUpdate={canUpdate}
           />
 
           <Suspense fallback={<AdminGraduateVerificationRetryLoading />}>
@@ -856,6 +924,7 @@ function AdminGraduateVerificationStreamingView({
               setupEmailRetryQueue={setupEmailRetryQueue}
               actions={actions}
               returnTo={returnTo}
+              canUpdate={canUpdate}
             />
           </Suspense>
         </>
