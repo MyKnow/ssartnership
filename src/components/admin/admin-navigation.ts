@@ -69,7 +69,7 @@ export const ADMIN_NAV_ICON_BY_KEY: Record<AdminNavIconKey, AdminNavIcon> = {
 
 export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   {
-    label: "홈",
+    label: "개요",
     items: [
       {
         href: "/admin",
@@ -80,11 +80,6 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         permission: { resource: "members" },
         alwaysVisible: true,
       },
-    ],
-  },
-  {
-    label: "작업함",
-    items: [
       {
         href: "/admin/tasks",
         label: "작업함",
@@ -94,58 +89,10 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         permission: { resource: "members" },
         alwaysVisible: true,
       },
-      {
-        href: "/admin/partner-registrations",
-        label: "등록 신청",
-        description: "공개 신청 검토 큐",
-        keywords: ["제휴처 신청", "신청", "등록", "검토"],
-        iconKey: "queue",
-        permission: { resource: "brands" },
-      },
-      {
-        href: "/admin/partner-requests",
-        label: "변경 요청",
-        description: "제휴처 변경 승인 큐",
-        keywords: ["제휴처 변경", "승인", "검토", "수정 요청"],
-        iconKey: "queue",
-        permission: { resource: "brands" },
-      },
-      {
-        href: "/admin/graduate-verifications",
-        label: "수료생 인증",
-        description: "수료증과 교육 이수 정보 검토",
-        keywords: ["졸업", "수료", "인증", "증명서"],
-        iconKey: "shield",
-        permission: { resource: "graduate_verifications" },
-      },
-      {
-        href: "/admin/member-signup-requests",
-        label: "가입 승인",
-        description: "Mattermost 프로필 파싱 실패 회원 검토",
-        keywords: ["가입", "회원가입", "승인", "파싱"],
-        iconKey: "queue",
-        permission: { resource: "member_signup_requests" },
-      },
-      {
-        href: "/admin/profile-photos",
-        label: "프로필 사진",
-        description: "사진 변경과 기존 사진 점검",
-        keywords: ["사진", "이미지", "검수", "프로필"],
-        iconKey: "users",
-        permission: { resource: "profile_images" },
-      },
-      {
-        href: "/admin/notifications",
-        label: "내 알림",
-        description: "운영 알림을 읽고 후속 작업으로 이동",
-        keywords: ["알림", "읽음", "통지", "메시지"],
-        iconKey: "bell",
-        permission: { resource: "notifications" },
-      },
     ],
   },
   {
-    label: "데이터",
+    label: "회원·검토",
     items: [
       {
         href: "/admin/members",
@@ -162,6 +109,51 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         keywords: ["후기", "평점", "검수", "댓글"],
         iconKey: "star",
         permission: { resource: "reviews" },
+      },
+      {
+        href: "/admin/member-signup-requests",
+        label: "가입 승인",
+        description: "Mattermost 프로필 파싱 실패 회원 검토",
+        keywords: ["가입", "회원가입", "승인", "파싱"],
+        iconKey: "queue",
+        permission: { resource: "member_signup_requests" },
+      },
+      {
+        href: "/admin/graduate-verifications",
+        label: "수료생 인증",
+        description: "수료증과 교육 이수 정보 검토",
+        keywords: ["졸업", "수료", "인증", "증명서"],
+        iconKey: "shield",
+        permission: { resource: "graduate_verifications" },
+      },
+      {
+        href: "/admin/profile-photos",
+        label: "프로필 사진",
+        description: "사진 변경과 기존 사진 점검",
+        keywords: ["사진", "이미지", "검수", "프로필"],
+        iconKey: "users",
+        permission: { resource: "profile_images" },
+      },
+    ],
+  },
+  {
+    label: "제휴 운영",
+    items: [
+      {
+        href: "/admin/partner-registrations",
+        label: "등록 신청",
+        description: "공개 신청 검토 큐",
+        keywords: ["제휴처 신청", "신청", "등록", "검토"],
+        iconKey: "queue",
+        permission: { resource: "brands" },
+      },
+      {
+        href: "/admin/partner-requests",
+        label: "변경 요청",
+        description: "제휴처 변경 승인 큐",
+        keywords: ["제휴처 변경", "승인", "검토", "수정 요청"],
+        iconKey: "queue",
+        permission: { resource: "brands" },
       },
       {
         href: "/admin/partners",
@@ -190,33 +182,23 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         href: "/admin/companies",
         label: "파트너사/계정",
         description: "회사와 담당 계정 연결",
-        keywords: [
-          "파트너",
-          "회사",
-          `${["업", "체"].join("")} 계정`,
-          "담당자",
-        ],
+        keywords: ["파트너", "회사", `${["업", "체"].join("")} 계정`, "담당자"],
         iconKey: "building",
         permission: { resource: "companies" },
       },
     ],
   },
   {
-    label: "리포트",
+    label: "메시지·노출",
     items: [
       {
-        href: "/admin/logs",
-        label: "운영 로그",
-        description: "제품·감사·보안 기록을 탐색",
-        keywords: ["기록", "감사", "보안", "이력", "로그"],
-        iconKey: "chart",
-        permission: { resource: "logs" },
+        href: "/admin/notifications",
+        label: "내 알림",
+        description: "운영 알림을 읽고 후속 작업으로 이동",
+        keywords: ["알림", "읽음", "통지", "메시지"],
+        iconKey: "bell",
+        permission: { resource: "notifications" },
       },
-    ],
-  },
-  {
-    label: "자동화",
-    items: [
       {
         href: "/admin/push",
         label: "발송 관리",
@@ -252,8 +234,16 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     ],
   },
   {
-    label: "설정",
+    label: "운영 기록·설정",
     items: [
+      {
+        href: "/admin/logs",
+        label: "운영 로그",
+        description: "제품·감사·보안 기록을 탐색",
+        keywords: ["기록", "감사", "보안", "이력", "로그"],
+        iconKey: "chart",
+        permission: { resource: "logs" },
+      },
       {
         href: "/admin/cycle",
         label: "기수 관리",
@@ -273,6 +263,22 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     ],
   },
 ];
+
+export const ADMIN_TASK_HREFS = [
+  "/admin/partner-registrations",
+  "/admin/partner-requests",
+  "/admin/member-signup-requests",
+  "/admin/graduate-verifications",
+  "/admin/profile-photos",
+  "/admin/notifications",
+] as const;
+
+export function getAdminTaskItems(groups: AdminNavGroup[]) {
+  const taskHrefs = new Set<string>(ADMIN_TASK_HREFS);
+  return groups
+    .flatMap((group) => group.items)
+    .filter((item) => taskHrefs.has(item.href));
+}
 
 export const ADMIN_NAV_ITEMS = ADMIN_NAV_GROUPS.flatMap((group) => group.items);
 

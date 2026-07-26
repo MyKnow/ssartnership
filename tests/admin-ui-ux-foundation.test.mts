@@ -8,16 +8,16 @@ import {
 } from "../src/components/admin/admin-navigation.ts";
 import { ADMIN_PERMISSION_TEMPLATES } from "../src/lib/admin-permissions.ts";
 
-test("관리 메뉴는 작업 중심 여섯 그룹과 기존 권한 필터를 유지한다", () => {
+test("관리 메뉴는 다섯 업무 그룹과 기존 권한 필터를 유지한다", () => {
   assert.deepEqual(
     ADMIN_NAV_GROUPS.map((group) => group.label),
-    ["홈", "작업함", "데이터", "리포트", "자동화", "설정"],
+    ["개요", "회원·검토", "제휴 운영", "메시지·노출", "운영 기록·설정"],
   );
 
-  const reportsGroup = ADMIN_NAV_GROUPS.find(
-    (group) => group.label === "리포트",
+  const operationsGroup = ADMIN_NAV_GROUPS.find(
+    (group) => group.label === "운영 기록·설정",
   );
-  assert.ok(reportsGroup?.items.some((item) => item.href === "/admin/logs"));
+  assert.ok(operationsGroup?.items.some((item) => item.href === "/admin/logs"));
 
   const regionalPermissions = ADMIN_PERMISSION_TEMPLATES.find(
     (template) => template.key === "regional_partner_manager",

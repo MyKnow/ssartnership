@@ -60,10 +60,12 @@ export default function AdminShellView({
   const taskNavItem = navGroups
     .flatMap((group) => group.items)
     .find((item) => item.href === "/admin/tasks");
-  const dataGroup = navGroups.find((group) => group.label === "데이터");
-  const dataNavItem = dataGroup?.items[0];
-  const isDataActive = Boolean(
-    dataGroup?.items.some((item) => isAdminNavActive(pathname, item.href)),
+  const memberReviewGroup = navGroups.find(
+    (group) => group.label === "회원·검토",
+  );
+  const memberReviewNavItem = memberReviewGroup?.items[0];
+  const isMemberReviewActive = Boolean(
+    memberReviewGroup?.items.some((item) => isAdminNavActive(pathname, item.href)),
   );
   const mobileNavItemClassName = (active: boolean) =>
     cn(
@@ -191,15 +193,15 @@ export default function AdminShellView({
                 <span>작업함</span>
               </Link>
             ) : null}
-            {dataNavItem ? (
+            {memberReviewNavItem ? (
               <Link
-                href={dataNavItem.href}
-                title={dataNavItem.label}
-                aria-current={isDataActive ? "page" : undefined}
-                className={mobileNavItemClassName(isDataActive)}
+                href={memberReviewNavItem.href}
+                title={memberReviewNavItem.label}
+                aria-current={isMemberReviewActive ? "page" : undefined}
+                className={mobileNavItemClassName(isMemberReviewActive)}
               >
                 <Squares2X2Icon className="h-5 w-5" aria-hidden="true" />
-                <span>데이터</span>
+                <span>회원·검토</span>
               </Link>
             ) : null}
             <AdminMobileNav

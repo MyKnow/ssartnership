@@ -77,7 +77,7 @@ export const MobilePrimaryNavigation: Story = {
       "href",
       "/admin/tasks",
     );
-    await expect(within(navigation).getByRole("link", { name: "데이터" })).toHaveAttribute(
+    await expect(within(navigation).getByRole("link", { name: "회원·검토" })).toHaveAttribute(
       "href",
       "/admin/members",
     );

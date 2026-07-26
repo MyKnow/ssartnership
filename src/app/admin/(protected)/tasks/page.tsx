@@ -2,6 +2,7 @@ import AdminShell from "@/components/admin/AdminShell";
 import { AdminTaskInboxStreamingView } from "@/components/admin/AdminTaskInboxView";
 import {
   ADMIN_NAV_GROUPS,
+  getAdminTaskItems,
   filterAdminNavGroupsByPermissions,
 } from "@/components/admin/admin-navigation";
 import { getAdminSession } from "@/lib/auth";
@@ -10,17 +11,14 @@ import { getAdminTaskQueueCounts } from "@/lib/admin-task-inbox";
 
 export default async function AdminTasksPage() {
   const session = await getAdminSession();
-  const taskGroup = session
+  const visibleGroups = session
     ? filterAdminNavGroupsByPermissions(
         ADMIN_NAV_GROUPS,
         session.account.permissions,
         { includeGlobalItems: !isRegionalAdminAccount(session.account) },
-      ).find((group) => group.label === "작업함")
-    : undefined;
-
-  const tasks = (taskGroup?.items ?? []).filter(
-    (item) => item.href !== "/admin/tasks",
-  );
+      )
+    : [];
+  const tasks = getAdminTaskItems(visibleGroups);
   const queueCounts =
     session && tasks.length > 0
       ? getAdminTaskQueueCounts({

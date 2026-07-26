@@ -1,14 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
-import { ADMIN_NAV_GROUPS } from "./admin-navigation";
+import { ADMIN_NAV_GROUPS, getAdminTaskItems } from "./admin-navigation";
 import AdminTaskInboxView, {
   AdminTaskInboxLoading,
 } from "./AdminTaskInboxView";
 
-const tasks =
-  ADMIN_NAV_GROUPS.find((group) => group.label === "작업함")?.items.filter(
-    (item) => item.href !== "/admin/tasks",
-  ) ?? [];
+const tasks = getAdminTaskItems(ADMIN_NAV_GROUPS);
 
 const meta = {
   title: "Domains/Admin/AdminTaskInboxView",

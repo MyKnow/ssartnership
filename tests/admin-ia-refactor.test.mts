@@ -94,17 +94,29 @@ test("legacy admin partner tabs resolve to their canonical routes", async () => 
   assert.equal(resolveAdminPartnerTabRedirect(undefined), null);
 });
 
-test("관리자 탐색은 작업 의도 여섯 그룹과 작업함 진입점을 제공한다", async () => {
-  const { ADMIN_NAV_GROUPS, ADMIN_NAV_ITEMS } = await adminNavigationModulePromise;
+test("관리자 탐색은 다섯 업무 그룹과 독립적인 작업함 항목을 제공한다", async () => {
+  const { ADMIN_NAV_GROUPS, ADMIN_NAV_ITEMS, getAdminTaskItems } =
+    await adminNavigationModulePromise;
 
   assert.deepEqual(
     ADMIN_NAV_GROUPS.map((group) => group.label),
-    ["홈", "작업함", "데이터", "리포트", "자동화", "설정"],
+    ["개요", "회원·검토", "제휴 운영", "메시지·노출", "운영 기록·설정"],
   );
 
   const taskInbox = ADMIN_NAV_ITEMS.find((item) => item.href === "/admin/tasks");
   assert.equal(taskInbox?.label, "작업함");
   assert.equal(taskInbox?.alwaysVisible, true);
+  assert.deepEqual(
+    getAdminTaskItems(ADMIN_NAV_GROUPS).map((item) => item.href),
+    [
+      "/admin/member-signup-requests",
+      "/admin/graduate-verifications",
+      "/admin/profile-photos",
+      "/admin/partner-registrations",
+      "/admin/partner-requests",
+      "/admin/notifications",
+    ],
+  );
 });
 
 test("admin navigation separates list, request, category, inbox, and send tasks", async () => {
