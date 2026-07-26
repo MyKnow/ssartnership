@@ -1,7 +1,10 @@
 import AdminProfilePhotoReviewQueue from "@/components/admin/AdminProfilePhotoReviewQueue";
 import AdminShell from "@/components/admin/AdminShell";
 import { requireAdminPermission } from "@/lib/admin-access";
-import { getAdminProfilePhotoQueueReadModel } from "@/lib/admin-profile-photo-queue.server";
+import {
+  getAdminCurrentProfilePhotoQueueReadModel,
+  getAdminProfilePhotoReplacementQueueReadModel,
+} from "@/lib/admin-profile-photo-queue.server";
 import { getAdminReviewQueueFeedback } from "@/lib/admin-review-queue";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import {
@@ -23,8 +26,9 @@ export default async function AdminProfilePhotosPage({
   }>;
 }) {
   await requireAdminPermission("profile_images", "read", { path: "/admin/profile-photos" });
-  const { replacements, currentPhotos, queueLoadError } =
-    await getAdminProfilePhotoQueueReadModel();
+  const currentPhotosPromise = getAdminCurrentProfilePhotoQueueReadModel();
+  const { replacements, queueLoadError } =
+    await getAdminProfilePhotoReplacementQueueReadModel();
   const params = (await searchParams) ?? {};
   const returnTo = sanitizeReturnTo(params.returnTo, "/admin/profile-photos");
 
@@ -32,7 +36,7 @@ export default async function AdminProfilePhotosPage({
     <AdminShell title="프로필 사진">
       <AdminProfilePhotoReviewQueue
         replacements={replacements}
-        currentPhotos={currentPhotos}
+        currentPhotosPromise={currentPhotosPromise}
         actions={{
           approveReplacement: approveMemberProfilePhotoAction,
           rejectReplacement: rejectMemberProfilePhotoAction,

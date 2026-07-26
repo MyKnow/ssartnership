@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { Suspense } from "react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -32,6 +33,11 @@ type QueueActions = {
   rejectReplacement: (formData: FormData) => Promise<void>;
   rejectCurrentPhoto: (formData: FormData) => Promise<void>;
 };
+
+type DeferredCurrentPhotoQueue = Promise<{
+  currentPhotos: AdminExistingProfilePhoto[];
+  queueLoadError: boolean;
+}>;
 
 function formatMemberLabel(member: {
   display_name: string | null;
@@ -109,9 +115,152 @@ function RejectionReasonField({
   );
 }
 
+function CurrentPhotoSection({
+  currentPhotos,
+  actions,
+  currentPhotoUrl,
+  returnTo,
+  focusReasonTarget,
+}: {
+  currentPhotos: AdminExistingProfilePhoto[];
+  actions: QueueActions;
+  currentPhotoUrl: (memberId: string) => string;
+  returnTo: string;
+  focusReasonTarget?: string | null;
+}) {
+  return (
+    <section className="space-y-4" aria-labelledby="profile-photo-current-heading">
+      <div>
+        <p className="ui-kicker">현재 사진</p>
+        <h2 id="profile-photo-current-heading" className="text-xl font-semibold">
+          기존 사진 점검
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          최근 변경된 승인 사진 50개를 확인합니다. 반려하면 회원은 새 사진이 승인될 때까지 인증 서비스를 이용할 수 없습니다.
+        </p>
+      </div>
+
+      {currentPhotos.length === 0 ? (
+        <EmptyState
+          title="점검할 기존 사진이 없습니다."
+          description="승인 상태이며 사진이 있는 회원이 표시됩니다."
+          action={<Button href="/admin/profile-photos" variant="secondary">큐 새로고침</Button>}
+        />
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {currentPhotos.map((member) => (
+            <Card key={member.id} padding="md" className="min-w-0 space-y-4">
+              <div className="flex min-w-0 items-start gap-3">
+                <PhotoPreview
+                  src={currentPhotoUrl(member.id)}
+                  alt={`${formatMemberLabel(member)}의 현재 본인 사진`}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-semibold">{formatMemberLabel(member)}</h3>
+                    <Badge variant="success">승인됨</Badge>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    변경일 {new Date(member.updated_at).toLocaleDateString("ko-KR")}
+                  </p>
+                </div>
+              </div>
+              <form action={actions.rejectCurrentPhoto} className="grid min-w-0 gap-2">
+                <input type="hidden" name="memberId" value={member.id} />
+                <input type="hidden" name="returnTo" value={returnTo} />
+                <RejectionReasonField
+                  id={`current-photo-reason-${member.id}`}
+                  title="기존 사진 반려"
+                  description="인증 중지 사유를 회원이 이해할 수 있게 구체적으로 남겨 주세요."
+                  placeholder="예: 사진에 여러 사람이 있어 본인 확인이 어렵습니다."
+                  focusReasonTarget={focusReasonTarget}
+                />
+                <div>
+                  <SubmitButton variant="danger" pendingText="처리 중">
+                    사진 반려 및 인증 중지
+                  </SubmitButton>
+                </div>
+              </form>
+            </Card>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CurrentPhotoSectionFallback() {
+  return (
+    <section className="space-y-4" aria-labelledby="profile-photo-current-heading">
+      <div>
+        <p className="ui-kicker">현재 사진</p>
+        <h2 id="profile-photo-current-heading" className="text-xl font-semibold">
+          기존 사진 점검
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          최근 승인 사진 상태를 확인하는 중입니다.
+        </p>
+      </div>
+      <div
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+        className="rounded-card border border-border bg-surface-inset px-4 py-5 text-sm text-muted-foreground"
+      >
+        현재 승인 사진을 불러오는 중입니다.
+      </div>
+    </section>
+  );
+}
+
+async function DeferredCurrentPhotoSection({
+  currentPhotosPromise,
+  actions,
+  currentPhotoUrl,
+  returnTo,
+  focusReasonTarget,
+}: {
+  currentPhotosPromise: DeferredCurrentPhotoQueue;
+  actions: QueueActions;
+  currentPhotoUrl: (memberId: string) => string;
+  returnTo: string;
+  focusReasonTarget?: string | null;
+}) {
+  const { currentPhotos, queueLoadError } = await currentPhotosPromise;
+  if (queueLoadError) {
+    return (
+      <section className="space-y-4" aria-labelledby="profile-photo-current-heading">
+        <div>
+          <p className="ui-kicker">현재 사진</p>
+          <h2 id="profile-photo-current-heading" className="text-xl font-semibold">
+            기존 사진 점검
+          </h2>
+        </div>
+        <AdminStatePanel
+          kind="error"
+          title="현재 승인 사진을 불러오지 못했습니다."
+          description="사진 변경 요청은 먼저 확인할 수 있습니다. 잠시 후 다시 시도해 주세요."
+          action={<Button href={returnTo} variant="secondary">다시 확인</Button>}
+        />
+      </section>
+    );
+  }
+
+  return (
+    <CurrentPhotoSection
+      currentPhotos={currentPhotos}
+      actions={actions}
+      currentPhotoUrl={currentPhotoUrl}
+      returnTo={returnTo}
+      focusReasonTarget={focusReasonTarget}
+    />
+  );
+}
+
 export default function AdminProfilePhotoReviewQueue({
   replacements,
   currentPhotos,
+  currentPhotosPromise,
   actions,
   replacementImageUrl = (imageId) =>
     `/api/admin/profile-photos/images/${encodeURIComponent(imageId)}`,
@@ -123,7 +272,8 @@ export default function AdminProfilePhotoReviewQueue({
   focusReasonTarget,
 }: {
   replacements: AdminProfilePhotoReplacement[];
-  currentPhotos: AdminExistingProfilePhoto[];
+  currentPhotos?: AdminExistingProfilePhoto[];
+  currentPhotosPromise?: DeferredCurrentPhotoQueue;
   actions: QueueActions;
   replacementImageUrl?: (imageId: string) => string;
   currentPhotoUrl?: (memberId: string) => string;
@@ -132,7 +282,14 @@ export default function AdminProfilePhotoReviewQueue({
   loadError?: boolean;
   focusReasonTarget?: string | null;
 }) {
-  const totalReviewCount = replacements.length + currentPhotos.length;
+  const resolvedCurrentPhotosPromise = currentPhotosPromise ?? Promise.resolve({
+    currentPhotos: currentPhotos ?? [],
+    queueLoadError: false,
+  });
+  const currentPhotoCount = currentPhotos?.length;
+  const totalReviewCount = currentPhotoCount === undefined
+    ? "확인 중"
+    : `${replacements.length + currentPhotoCount}건`;
 
   return (
     <div className="grid min-w-0 gap-8">
@@ -150,8 +307,8 @@ export default function AdminProfilePhotoReviewQueue({
         }
         metrics={[
           { label: "교체 요청", value: `${replacements.length}건`, hint: "새 사진 승인 대기" },
-          { label: "현재 사진", value: `${currentPhotos.length}건`, hint: "최근 승인 사진 점검" },
-          { label: "검토 대상", value: `${totalReviewCount}건`, hint: "현재 화면 기준" },
+          { label: "현재 사진", value: currentPhotoCount === undefined ? "확인 중" : `${currentPhotoCount}건`, hint: "최근 승인 사진 점검" },
+          { label: "검토 대상", value: totalReviewCount, hint: "현재 화면 기준" },
         ]}
         feedback={feedback}
         nextAction={{
@@ -241,63 +398,15 @@ export default function AdminProfilePhotoReviewQueue({
         )}
       </section>
 
-      <section className="space-y-4" aria-labelledby="profile-photo-current-heading">
-        <div>
-          <p className="ui-kicker">현재 사진</p>
-          <h2 id="profile-photo-current-heading" className="text-xl font-semibold">
-            기존 사진 점검
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            최근 변경된 승인 사진 50개를 확인합니다. 반려하면 회원은 새 사진이 승인될 때까지 인증 서비스를 이용할 수 없습니다.
-          </p>
-        </div>
-
-        {currentPhotos.length === 0 ? (
-          <EmptyState
-            title="점검할 기존 사진이 없습니다."
-            description="승인 상태이며 사진이 있는 회원이 표시됩니다."
-            action={<Button href="/admin/profile-photos" variant="secondary">큐 새로고침</Button>}
-          />
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {currentPhotos.map((member) => (
-              <Card key={member.id} padding="md" className="min-w-0 space-y-4">
-                <div className="flex min-w-0 items-start gap-3">
-                  <PhotoPreview
-                    src={currentPhotoUrl(member.id)}
-                    alt={`${formatMemberLabel(member)}의 현재 본인 사진`}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-semibold">{formatMemberLabel(member)}</h3>
-                      <Badge variant="success">승인됨</Badge>
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      변경일 {new Date(member.updated_at).toLocaleDateString("ko-KR")}
-                    </p>
-                  </div>
-                </div>
-                <form action={actions.rejectCurrentPhoto} className="grid min-w-0 gap-2">
-                  <input type="hidden" name="memberId" value={member.id} />
-                  <input type="hidden" name="returnTo" value={returnTo} />
-                  <RejectionReasonField
-                    id={`current-photo-reason-${member.id}`}
-                    title="기존 사진 반려"
-                    description="인증 중지 사유를 회원이 이해할 수 있게 구체적으로 남겨 주세요."
-                    placeholder="예: 사진에 여러 사람이 있어 본인 확인이 어렵습니다."
-                    focusReasonTarget={focusReasonTarget}
-                  />
-                  <div>
-                    <SubmitButton variant="danger" pendingText="처리 중">
-                      사진 반려 및 인증 중지
-                    </SubmitButton>
-                  </div>
-                </form>
-              </Card>
-            ))}
-          </div>
-        )}
-      </section>
+      <Suspense fallback={<CurrentPhotoSectionFallback />}>
+        <DeferredCurrentPhotoSection
+          currentPhotosPromise={resolvedCurrentPhotosPromise}
+          actions={actions}
+          currentPhotoUrl={currentPhotoUrl}
+          returnTo={returnTo}
+          focusReasonTarget={focusReasonTarget}
+        />
+      </Suspense>
         </>
       )}
     </div>
