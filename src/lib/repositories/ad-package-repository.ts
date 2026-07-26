@@ -132,6 +132,10 @@ export type DuplicateAdCouponInput = {
   couponId: string;
 };
 
+export type DeleteAdCouponResult =
+  | { ok: true }
+  | { ok: false; reason: "usage_history" };
+
 export type UpdateAdCampaignStatusInput = {
   campaignId: string;
   status: AdCampaignStatus;
@@ -196,7 +200,7 @@ export interface AdPackageRepository {
   createCoupon(input: CreateAdCouponInput): Promise<AdCoupon>;
   updateCoupon(input: UpdateAdCouponInput): Promise<AdCoupon>;
   duplicateCoupon(input: DuplicateAdCouponInput): Promise<AdCoupon>;
-  deleteCoupon(couponId: string): Promise<void>;
+  deleteCoupon(couponId: string): Promise<DeleteAdCouponResult>;
   issueCoupon(input: IssueAdCouponInput): Promise<IssueAdCouponResult>;
   listIssuedCouponsForMember(input: ListIssuedCouponsForMemberInput): Promise<AvailableAdCoupon[]>;
   addCouponCodes(input: AddAdCouponCodesInput): Promise<AddAdCouponCodesResult>;

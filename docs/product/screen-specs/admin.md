@@ -180,7 +180,7 @@
 
 - 목표·위계: 기본 정보 수정 → 공개/검토 상태·핵심 요약 → 운영 지표·혜택 이력·쿠폰 → 리뷰·감사 이력 순이다. 헤더의 `기본 정보 수정`은 같은 화면의 편집 영역으로 이동한다.
 - 액션·흐름: primary는 저장, 보조는 기본 정보 수정으로 바로 이동, 미디어 편집·리뷰 조치·목록 복귀다.
-- 경계·상태: brands permission과 campus scope, 공용 FE/BE validation을 적용한다. 기본, not-found, validation error, 이미지 오류, 저장 중, 충돌을 제공한다.
+- 경계·상태: brands permission과 campus scope, 공용 FE/BE validation을 적용한다. 기본, not-found, validation error, 이미지 오류, 저장 중, 충돌을 제공한다. 발급 또는 사용 이력이 있는 쿠폰은 삭제하지 않고 수정에서 상태 종료를 안내하며, 동시성으로 삭제가 거부돼도 안전한 안내로 같은 상세 화면에 복귀한다.
 - 반응형·분석: 모바일 section stack과 sticky save 1개, 데스크톱 edit workspace를 쓴다. 변경을 field-level before/after로 audit한다.
 - 수용 기준: `파트너사/제휴처/지점/혜택` 용어를 구분하고 민감 링크·visibility 규칙을 server boundary에서 재검증한다.
 

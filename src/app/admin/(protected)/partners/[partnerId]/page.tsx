@@ -101,6 +101,17 @@ export default async function AdminPartnerDetailPage({
   const couponSuccess = query.success
     ? couponSuccessMessages[String(query.success)] ?? null
     : null;
+  const couponErrorMessages: Record<string, string> = {
+    ad_coupon_delete_invalid_request: "쿠폰 삭제 요청을 다시 확인해 주세요.",
+    ad_coupon_delete_not_found: "삭제할 쿠폰을 찾지 못했습니다. 목록을 다시 확인해 주세요.",
+    ad_coupon_delete_has_history:
+      "발급 또는 사용 이력이 있는 쿠폰은 삭제할 수 없습니다. 수정에서 상태를 종료로 변경해 주세요.",
+    ad_coupon_delete_failed:
+      "쿠폰을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  };
+  const couponError = query.error
+    ? couponErrorMessages[String(query.error)] ?? null
+    : null;
   const usageSuccessMessages: Record<string, string> = {
     "usage-created": "혜택 적용 이력을 추가했습니다.",
     "usage-updated": "혜택 적용 이력을 수정했습니다.",
@@ -356,6 +367,7 @@ export default async function AdminPartnerDetailPage({
           updateCouponAction={updateAdCouponAction}
           duplicateCouponAction={duplicateAdCouponAction}
           deleteCouponAction={deleteAdCouponAction}
+          errorMessage={couponError}
           canCreateCoupon={canCreateCoupons}
           canUpdateCoupon={canUpdateCoupons}
           canDeleteCoupon={canDeleteCoupons}

@@ -3,10 +3,12 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("쿠폰 다운로드와 관리자 CRUD 버튼은 제출 중 상태를 표시한다", async () => {
-  const [detail, form, manager] = await Promise.all([
+  const [detail, form, manager, actions, partnerDetail] = await Promise.all([
     readFile(new URL("../src/app/(site)/partners/[id]/_page/PartnerDetailCoupons.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/components/admin/ad-packages/AdminPartnerCouponForm.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/components/admin/ad-packages/AdminPartnerCouponManager.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/admin/(protected)/_actions/ad-package-actions.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/admin/(protected)/partners/[partnerId]/page.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(detail, /loading=\{issuingId === coupon\.id\}/);
@@ -18,6 +20,14 @@ test("쿠폰 다운로드와 관리자 CRUD 버튼은 제출 중 상태를 표�
   assert.match(manager, /md:grid-cols-\[minmax\(0,1fr\)_auto\]/);
   assert.match(manager, /break-words text-lg font-semibold/);
   assert.match(manager, /flex min-w-0 flex-wrap items-center justify-end gap-2/);
+  assert.match(manager, /coupon\.issuedCount > 0 \|\| coupon\.usedCount > 0/);
+  assert.match(manager, /발급 또는 사용 이력이 있어 삭제할 수 없습니다\./);
+  assert.match(manager, /수정에서 상태를 종료로 변경하세요\./);
+  assert.match(actions, /ad_coupon_delete_has_history/);
+  assert.match(actions, /ad_coupon_delete_failed/);
+  assert.match(actions, /ad_coupon_delete_invalid_request/);
+  assert.match(actions, /ad_coupon_delete_not_found/);
+  assert.match(partnerDetail, /ad_coupon_delete_has_history/);
   assert.doesNotMatch(manager, /제휴처를 바꾸지 않고 현재 상세 페이지의 쿠폰만 등록합니다/);
   assert.doesNotMatch(form, /from "@\/components\/ui\/Card"/);
 });
