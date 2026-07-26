@@ -103,6 +103,35 @@ test("결정 액션은 대상 항목의 제출 상태를 표시하고 목록 맥
   assert.doesNotMatch(photoActions, /throw new Error/);
 });
 
+test("가입 승인 상세의 반려 입력은 같은 화면 복구와 접근 가능한 한국어 안내를 제공한다", async () => {
+  const [detailSource, pageSource] = await Promise.all([
+    readFile(
+      new URL(
+        "../src/components/admin/AdminMemberSignupApprovalDetail.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/app/admin/(protected)/member-signup-requests/[requestId]/page.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(detailSource, /from "@\/components\/ui\/Textarea"/);
+  assert.match(detailSource, /<fieldset/);
+  assert.match(detailSource, /<legend/);
+  assert.match(detailSource, /htmlFor=\{rejectionReasonId\}/);
+  assert.match(detailSource, /반려 사유를 1~500자로 입력해 주세요/);
+  assert.match(detailSource, /aria-invalid=\{focusRejectReason \|\| undefined\}/);
+  assert.match(detailSource, /autoFocus=\{focusRejectReason\}/);
+  assert.doesNotMatch(detailSource, /<textarea name="reason"/);
+  assert.match(pageSource, /focusRejectReason=\{query\.error === "invalid_reason"\}/);
+});
+
 test("관리자 라우트 오류 화면은 내부 오류 메시지를 렌더링하지 않는다", async () => {
   const source = await readFile(
     new URL("../src/app/admin/(protected)/error.tsx", import.meta.url),

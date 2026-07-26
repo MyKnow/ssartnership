@@ -40,6 +40,7 @@ export default async function AdminMemberSignupRequestDetailPage({
         approveAction={approveMemberSignupRequestAction}
         rejectAction={rejectMemberSignupRequestAction}
         returnTo={returnTo}
+        focusRejectReason={query.error === "invalid_reason"}
         feedback={getAdminReviewQueueFeedback({
           error: query.error,
           success: query.success,
