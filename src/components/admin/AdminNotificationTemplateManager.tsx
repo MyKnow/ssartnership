@@ -195,7 +195,7 @@ function TemplateEditor({
               <SubmitButton
                 variant="ghost"
                 pendingText="복원 중"
-                className="min-h-9 px-3 text-xs"
+                className="min-h-11 px-3 text-xs"
               >
                 기본값 복원
               </SubmitButton>
@@ -409,7 +409,7 @@ function TemplateEditor({
                 variant="soft"
                 pendingText="발송 중"
                 disabled={!canTestSend}
-                className="min-h-10 px-3 text-xs"
+                className="min-h-11 px-3 text-xs"
               >
                 테스트 발송
               </SubmitButton>

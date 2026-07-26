@@ -61,7 +61,7 @@ function MediaIconButton({
     <button
       type="button"
       className={cn(
-        "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.9rem] border text-foreground shadow-flat transition-interactive duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[0.9rem] border text-foreground shadow-flat transition-interactive duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         variant === "danger"
           ? "border-danger/20 bg-danger/10 text-danger hover:-translate-y-px hover:border-danger/35 hover:bg-danger/12"
           : "border-border bg-surface-control hover:-translate-y-px hover:border-strong hover:bg-surface-elevated",
@@ -331,7 +331,7 @@ export default function MediaField({
                         onClick={() => replaceItemAt(index)}
                         ariaLabel="구도 수정"
                         title="구도 수정"
-                        className={cn(allowUrl ? "h-10 w-10 min-h-10 min-w-10" : "min-w-0")}
+                        className={cn(allowUrl ? "h-11 w-11 min-h-11 min-w-11" : "min-w-0")}
                       >
                         <PencilIcon className="h-4 w-4" />
                         {!allowUrl ? "구도 수정" : null}
@@ -343,7 +343,7 @@ export default function MediaField({
                         onClick={() => removeItem(index)}
                         ariaLabel="삭제"
                         title="삭제"
-                        className={cn(allowUrl ? "h-10 w-10 min-h-10 min-w-10" : "min-w-0")}
+                        className={cn(allowUrl ? "h-11 w-11 min-h-11 min-w-11" : "min-w-0")}
                       >
                         <TrashIcon className="h-4 w-4" />
                         {!allowUrl ? "삭제" : null}

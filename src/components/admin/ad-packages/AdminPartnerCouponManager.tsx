@@ -87,7 +87,7 @@ function CouponManagementActions({
     <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
       {canUpdateCoupon && updateCouponAction ? (
         <details className="min-w-0">
-          <summary className="flex min-h-10 cursor-pointer list-none items-center justify-center whitespace-nowrap rounded-[0.95rem] border border-border bg-surface-control px-4 text-sm font-semibold text-foreground transition-interactive hover:border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 [&::-webkit-details-marker]:hidden">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center whitespace-nowrap rounded-[0.95rem] border border-border bg-surface-control px-4 text-sm font-semibold text-foreground transition-interactive hover:border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 [&::-webkit-details-marker]:hidden">
             수정
           </summary>
           <div className="mt-3 w-full min-w-0 sm:min-w-[min(42rem,calc(100vw-3rem))]">
