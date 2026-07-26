@@ -21,6 +21,12 @@ const listRoutes = [
     content: "AdminPartnerRequestsContent",
     fallback: "AdminPartnerRequestsSkeletonContent",
   },
+  {
+    label: "제휴처 상세",
+    page: "../src/app/admin/(protected)/partners/[partnerId]/page.tsx",
+    content: "AdminPartnerDetailContent",
+    fallback: "AdminPartnerDetailSkeletonContent",
+  },
 ];
 
 test("대표 관리자 목록은 셸과 read model 콘텐츠를 분리해 스트리밍한다", async () => {

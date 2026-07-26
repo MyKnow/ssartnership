@@ -220,12 +220,18 @@ export function AdminCategoriesSkeleton() {
 export function AdminPartnerDetailSkeleton() {
   return (
     <AdminShell title="제휴처 상세" backHref="/admin/partners" backLabel="제휴처">
-      <div className="grid min-w-0 gap-6">
-        <PageHeaderSkeleton />
-        <MetricRowSkeleton />
-        <FormSkeleton sections={3} />
-      </div>
+      <AdminPartnerDetailSkeletonContent />
     </AdminShell>
+  );
+}
+
+export function AdminPartnerDetailSkeletonContent() {
+  return (
+    <div className="grid min-w-0 gap-6">
+      <PageHeaderSkeleton />
+      <MetricRowSkeleton />
+      <FormSkeleton sections={3} />
+    </div>
   );
 }
 

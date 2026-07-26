@@ -15,6 +15,7 @@ import FormMessage from "@/components/ui/FormMessage";
 import Surface from "@/components/ui/Surface";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import { AdminPartnerDetailSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import { updatePartner } from "@/app/admin/(protected)/actions";
 import {
   generatePartnerPreviewLink,
@@ -52,29 +53,23 @@ function readFirstQueryValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
 
-export default async function AdminPartnerDetailPage({
-  params,
-  searchParams,
+async function AdminPartnerDetailContent({
+  adminSession,
+  partnerId,
+  query,
 }: {
-  params: Promise<{ partnerId: string }>;
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  adminSession: Awaited<ReturnType<typeof requireAdminPermission>>;
+  partnerId: string;
+  query: Record<string, string | string[] | undefined>;
 }) {
-  const adminSession = await requireAdminPermission("brands", "read", {
-    path: "/admin/partners",
-  });
-  const { partnerId } = await params;
   const managedCampusFilter = getManagedCampusFilterValues(
     adminSession.account,
   );
-  const query = (await searchParams) ?? {};
   const detailPath = `/admin/partners/${partnerId}`;
   const searchBackHref = sanitizeAdminReturnTo(
     readFirstQueryValue(query.returnTo),
     "/admin/partners",
   );
-  const searchBackLabel = searchBackHref.startsWith("/admin/search")
-    ? "검색 결과"
-    : "제휴처";
   const partnerError = query.error
     ? (adminPartnerDetailErrorMessages[String(query.error)] ?? null)
     : null;
@@ -189,22 +184,16 @@ export default async function AdminPartnerDetailPage({
   }
   if (detail.status === "error") {
     return (
-      <AdminShell
-        title="제휴처 상세"
-        backHref={searchBackHref}
-        backLabel={searchBackLabel}
-      >
-        <AdminStatePanel
-          kind="error"
-          title="제휴처 정보를 불러오지 못했습니다."
-          description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 기록을 확인해 주세요."
-          action={
-            <Button href={retryHref} variant="secondary">
-              다시 확인
-            </Button>
-          }
-        />
-      </AdminShell>
+      <AdminStatePanel
+        kind="error"
+        title="제휴처 정보를 불러오지 못했습니다."
+        description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 기록을 확인해 주세요."
+        action={
+          <Button href={retryHref} variant="secondary">
+            다시 확인
+          </Button>
+        }
+      />
     );
   }
 
@@ -262,12 +251,7 @@ export default async function AdminPartnerDetailPage({
   }
 
   return (
-    <AdminShell
-      title={partner.name}
-      backHref={searchBackHref}
-      backLabel={searchBackLabel}
-    >
-      <section className="grid min-w-0 gap-6">
+    <section className="grid min-w-0 gap-6">
         <AdminPageHeader
           eyebrow="제휴처"
           title={partner.name}
@@ -475,7 +459,43 @@ export default async function AdminPartnerDetailPage({
             canDelete={canDeleteReviews}
           />
         </Suspense>
-      </section>
+    </section>
+  );
+}
+
+export default async function AdminPartnerDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ partnerId: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const adminSession = await requireAdminPermission("brands", "read", {
+    path: "/admin/partners",
+  });
+  const { partnerId } = await params;
+  const query = (await searchParams) ?? {};
+  const searchBackHref = sanitizeAdminReturnTo(
+    readFirstQueryValue(query.returnTo),
+    "/admin/partners",
+  );
+  const searchBackLabel = searchBackHref.startsWith("/admin/search")
+    ? "검색 결과"
+    : "제휴처";
+
+  return (
+    <AdminShell
+      title="제휴처 상세"
+      backHref={searchBackHref}
+      backLabel={searchBackLabel}
+    >
+      <Suspense fallback={<AdminPartnerDetailSkeletonContent />}>
+        <AdminPartnerDetailContent
+          adminSession={adminSession}
+          partnerId={partnerId}
+          query={query}
+        />
+      </Suspense>
     </AdminShell>
   );
 }
