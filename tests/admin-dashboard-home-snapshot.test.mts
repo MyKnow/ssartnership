@@ -27,3 +27,17 @@ test("관리 홈 집계 RPC는 권한 범위별 수치만 반환하고 service r
   assert.match(migration, /grant execute on function public\.get_admin_dashboard_home_snapshot\(uuid, text\[\], boolean, boolean, boolean, boolean, boolean\) to service_role/);
   assert.doesNotMatch(migration, /security definer/);
 });
+
+test("관리 홈은 read model이 준비되는 동안 관리자 셸을 먼저 스트리밍한다", async () => {
+  const pageSource = await readFile(
+    new URL("../src/app/admin/(protected)/page.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(pageSource, /<AdminShell title="관리 홈">/);
+  assert.match(
+    pageSource,
+    /<Suspense fallback=\{<AdminDashboardSkeletonContent \/>\}>/,
+  );
+  assert.match(pageSource, /async function AdminDashboardContent/);
+});

@@ -130,25 +130,31 @@ export function AdminLoginSkeleton() {
   );
 }
 
+export function AdminDashboardSkeletonContent() {
+  return (
+    <div className="grid min-w-0 gap-6">
+      <PageHeaderSkeleton />
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,0.8fr)]">
+        <Surface level="elevated" padding="lg" className="grid gap-3">
+          <Skeleton className="h-6 w-28" />
+          <ListRowsSkeleton rows={3} />
+        </Surface>
+        <Surface level="default" padding="lg" className="grid gap-3">
+          <Skeleton className="h-6 w-24" />
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton key={index} className="h-14 w-full rounded-2xl" />
+          ))}
+        </Surface>
+      </div>
+      <MetricRowSkeleton />
+    </div>
+  );
+}
+
 export function AdminOverviewSkeleton() {
   return (
     <AdminShell title="관리 홈">
-      <div className="grid min-w-0 gap-6">
-        <PageHeaderSkeleton />
-        <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,0.8fr)]">
-          <Surface level="elevated" padding="lg" className="grid gap-3">
-            <Skeleton className="h-6 w-28" />
-            <ListRowsSkeleton rows={3} />
-          </Surface>
-          <Surface level="default" padding="lg" className="grid gap-3">
-            <Skeleton className="h-6 w-24" />
-            {Array.from({ length: 4 }).map((_, index) => (
-              <Skeleton key={index} className="h-14 w-full rounded-2xl" />
-            ))}
-          </Surface>
-        </div>
-        <MetricRowSkeleton />
-      </div>
+      <AdminDashboardSkeletonContent />
     </AdminShell>
   );
 }

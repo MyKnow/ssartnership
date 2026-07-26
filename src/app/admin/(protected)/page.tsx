@@ -19,6 +19,9 @@ import {
   getSsafyCycleOverview,
   getSsafyCycleSettings,
 } from "@/lib/ssafy-cycle-settings";
+import {
+  AdminDashboardSkeletonContent,
+} from "@/components/loading/AdminPageSkeletons";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +36,59 @@ function AdminPlatformActivityFallback() {
       <Skeleton className="h-5 w-32" />
       <Skeleton className="mt-3 h-4 max-w-xl" />
     </Surface>
+  );
+}
+
+async function AdminDashboardContent({
+  adminSession,
+}: {
+  adminSession: Awaited<ReturnType<typeof getAdminSession>>;
+}) {
+  const cycleSettingsPromise = getSsafyCycleSettings();
+  const dashboardSnapshotPromise = adminSession
+    ? getAdminDashboardHomeData({
+        adminId: adminSession.adminId,
+        account: adminSession.account,
+      })
+    : Promise.resolve({
+        snapshot: toAdminDashboardHomeSnapshot(),
+        hasError: false,
+      });
+  const [cycleSettings, dashboardSnapshotResult] = await Promise.all([
+    cycleSettingsPromise,
+    dashboardSnapshotPromise,
+  ]);
+  const cycleOverview = getSsafyCycleOverview(cycleSettings);
+  const includeGlobalTasks = adminSession
+    ? !isRegionalAdminAccount(adminSession.account)
+    : false;
+  const canViewPlatformActivity =
+    !!adminSession &&
+    includeGlobalTasks &&
+    canAdmin(adminSession.account.permissions, "logs", "read");
+
+  const cycleMeta = cycleSettings.manualCurrentYear
+    ? `${cycleOverview.currentYear}기 · 조기 시작`
+    : `${cycleOverview.currentYear}기 · ${cycleOverview.currentSemester}학기`;
+
+  return (
+    <AdminDashboardView
+      counts={dashboardSnapshotResult.snapshot.counts}
+      queueCounts={dashboardSnapshotResult.snapshot.queueCounts}
+      permissions={
+        adminSession?.account.permissions ?? createEmptyAdminPermissionMatrix()
+      }
+      cycleMeta={cycleMeta}
+      includeGlobalTasks={includeGlobalTasks}
+      isDataUnavailable={dashboardSnapshotResult.hasError}
+      platformActivity={
+        canViewPlatformActivity ? (
+          <Suspense fallback={<AdminPlatformActivityFallback />}>
+            <AdminDashboardPlatformActivitySection />
+          </Suspense>
+        ) : null
+      }
+    />
   );
 }
 
@@ -62,53 +118,13 @@ export default async function AdminPage() {
     );
   }
 
-  const cycleSettingsPromise = getSsafyCycleSettings();
   const adminSession = await getAdminSession();
-  const dashboardSnapshotPromise = adminSession
-    ? getAdminDashboardHomeData({
-        adminId: adminSession.adminId,
-        account: adminSession.account,
-      })
-    : Promise.resolve({
-        snapshot: toAdminDashboardHomeSnapshot(),
-        hasError: false,
-      });
-  const [cycleSettings, dashboardSnapshotResult] = await Promise.all([
-    cycleSettingsPromise,
-    dashboardSnapshotPromise,
-  ]);
-  const cycleOverview = getSsafyCycleOverview(cycleSettings);
-  const includeGlobalTasks = adminSession
-    ? !isRegionalAdminAccount(adminSession.account)
-    : false;
-  const canViewPlatformActivity =
-    !!adminSession &&
-    includeGlobalTasks &&
-    canAdmin(adminSession.account.permissions, "logs", "read");
-
-  const cycleMeta = cycleSettings.manualCurrentYear
-    ? `${cycleOverview.currentYear}기 · 조기 시작`
-    : `${cycleOverview.currentYear}기 · ${cycleOverview.currentSemester}학기`;
 
   return (
     <AdminShell title="관리 홈">
-      <AdminDashboardView
-        counts={dashboardSnapshotResult.snapshot.counts}
-        queueCounts={dashboardSnapshotResult.snapshot.queueCounts}
-        permissions={
-          adminSession?.account.permissions ?? createEmptyAdminPermissionMatrix()
-        }
-        cycleMeta={cycleMeta}
-        includeGlobalTasks={includeGlobalTasks}
-        isDataUnavailable={dashboardSnapshotResult.hasError}
-        platformActivity={
-          canViewPlatformActivity ? (
-            <Suspense fallback={<AdminPlatformActivityFallback />}>
-              <AdminDashboardPlatformActivitySection />
-            </Suspense>
-          ) : null
-        }
-      />
+      <Suspense fallback={<AdminDashboardSkeletonContent />}>
+        <AdminDashboardContent adminSession={adminSession} />
+      </Suspense>
     </AdminShell>
   );
 }
