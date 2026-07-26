@@ -1,5 +1,47 @@
+import { normalizeProductEventLocation } from "@/lib/product-event-path";
+
 const ADMIN_WEB_VITAL_NAMES = ["CLS", "FCP", "INP", "LCP", "TTFB"] as const;
 const ADMIN_WEB_VITAL_TARGET_METRICS = ["INP", "LCP", "TTFB"] as const;
+const ADMIN_ROUTE_TIMING_OUTCOMES = ["complete", "unknown", "error"] as const;
+const ADMIN_ROUTE_TIMING_TRIGGERS = [
+  "initial-load",
+  "link",
+  "history",
+  "programmatic",
+] as const;
+
+const ADMIN_ROUTE_PATH_RULES = [
+  { pattern: /^\/admin$/, path: "/admin", key: "admin" },
+  { pattern: /^\/admin\/admins$/, path: "/admin/admins", key: "admin.admins" },
+  { pattern: /^\/admin\/tasks$/, path: "/admin/tasks", key: "admin.tasks" },
+  { pattern: /^\/admin\/search$/, path: "/admin/search", key: "admin.search" },
+  { pattern: /^\/admin\/advertisement$/, path: "/admin/advertisement", key: "admin.advertisement" },
+  { pattern: /^\/admin\/companies$/, path: "/admin/companies", key: "admin.companies" },
+  { pattern: /^\/admin\/categories$/, path: "/admin/categories", key: "admin.categories" },
+  { pattern: /^\/admin\/cycle$/, path: "/admin/cycle", key: "admin.cycle" },
+  { pattern: /^\/admin\/cycle\/mock$/, path: "/admin/cycle/mock", key: "admin.cycle.mock" },
+  { pattern: /^\/admin\/denied$/, path: "/admin/denied", key: "admin.denied" },
+  { pattern: /^\/admin\/event$/, path: "/admin/event", key: "admin.event" },
+  { pattern: /^\/admin\/event\/[^/]+$/, path: "/admin/event/[slug]", key: "admin.event.detail" },
+  { pattern: /^\/admin\/logs$/, path: "/admin/logs", key: "admin.logs" },
+  { pattern: /^\/admin\/members$/, path: "/admin/members", key: "admin.members" },
+  { pattern: /^\/admin\/members\/mock$/, path: "/admin/members/mock", key: "admin.members.mock" },
+  { pattern: /^\/admin\/members\/[^/]+$/, path: "/admin/members/[memberId]", key: "admin.members.detail" },
+  { pattern: /^\/admin\/graduate-verifications$/, path: "/admin/graduate-verifications", key: "admin.graduate-verifications" },
+  { pattern: /^\/admin\/profile-photos$/, path: "/admin/profile-photos", key: "admin.profile-photos" },
+  { pattern: /^\/admin\/member-signup-requests$/, path: "/admin/member-signup-requests", key: "admin.member-signup-requests" },
+  { pattern: /^\/admin\/member-signup-requests\/[^/]+$/, path: "/admin/member-signup-requests/[requestId]", key: "admin.member-signup-requests.detail" },
+  { pattern: /^\/admin\/notifications$/, path: "/admin/notifications", key: "admin.notifications" },
+  { pattern: /^\/admin\/notification-templates$/, path: "/admin/notification-templates", key: "admin.notification-templates" },
+  { pattern: /^\/admin\/partner-registrations$/, path: "/admin/partner-registrations", key: "admin.partner-registrations" },
+  { pattern: /^\/admin\/partner-requests$/, path: "/admin/partner-requests", key: "admin.partner-requests" },
+  { pattern: /^\/admin\/partners$/, path: "/admin/partners", key: "admin.partners" },
+  { pattern: /^\/admin\/partners\/new$/, path: "/admin/partners/new", key: "admin.partners.new" },
+  { pattern: /^\/admin\/partners\/[^/]+$/, path: "/admin/partners/[partnerId]", key: "admin.partners.detail" },
+  { pattern: /^\/admin\/push$/, path: "/admin/push", key: "admin.push" },
+  { pattern: /^\/admin\/reviews$/, path: "/admin/reviews", key: "admin.reviews" },
+  { pattern: /^\/admin\/setup\/[^/]+$/, path: "/admin/setup/[token]", key: "admin.setup" },
+] as const;
 
 /**
  * A release-confidence floor, not a replacement for a larger RUM cohort.
@@ -16,6 +58,12 @@ export const ADMIN_WEB_VITAL_TARGETS = {
 export type AdminWebVitalName = (typeof ADMIN_WEB_VITAL_NAMES)[number];
 export type AdminWebVitalTargetMetric = (typeof ADMIN_WEB_VITAL_TARGET_METRICS)[number];
 export type AdminWebVitalRating = "good" | "needs-improvement" | "poor";
+export type AdminRouteTimingOutcome = (typeof ADMIN_ROUTE_TIMING_OUTCOMES)[number];
+export type AdminRouteTimingTrigger = (typeof ADMIN_ROUTE_TIMING_TRIGGERS)[number];
+export type AdminRouteDescriptor = {
+  path: string;
+  key: string;
+};
 export type AdminWebVitalSummaryInput = {
   metric?: string | null;
   sampleCount?: number | string | null;
@@ -41,6 +89,60 @@ type AdminWebVitalInput = {
   rating: string;
   value: number;
 };
+
+type AdminRouteTimingInput = {
+  durationMs: number;
+  outcome: string;
+  trigger: string;
+};
+
+function extractPathname(value: string) {
+  if (value.includes("://")) {
+    try {
+      return new URL(value).pathname;
+    } catch {
+      return null;
+    }
+  }
+  return value.split(/[?#]/, 1)[0] ?? null;
+}
+
+/**
+ * Returns a route template rather than a raw admin URL. Dynamic identifiers
+ * are intentionally replaced with fixed templates before client telemetry is
+ * sent, and unknown admin paths collapse to the admin root.
+ */
+export function getAdminRouteDescriptor(
+  value?: string | null,
+): AdminRouteDescriptor | null {
+  const normalized = normalizeProductEventLocation(value);
+  const pathname = normalized ? extractPathname(normalized) : null;
+  if (!pathname?.startsWith("/admin")) {
+    return null;
+  }
+
+  const rule = ADMIN_ROUTE_PATH_RULES.find((candidate) => candidate.pattern.test(pathname));
+  return rule ? { path: rule.path, key: rule.key } : { path: "/admin", key: "admin.unknown" };
+}
+
+export function toAdminRouteTimingProperties({
+  durationMs,
+  outcome,
+  trigger,
+}: AdminRouteTimingInput) {
+  return {
+    durationMs:
+      Number.isFinite(durationMs)
+        ? Math.min(120_000, Math.max(0, Math.round(durationMs)))
+        : 0,
+    outcome: (ADMIN_ROUTE_TIMING_OUTCOMES as readonly string[]).includes(outcome)
+      ? (outcome as AdminRouteTimingOutcome)
+      : "unknown",
+    trigger: (ADMIN_ROUTE_TIMING_TRIGGERS as readonly string[]).includes(trigger)
+      ? (trigger as AdminRouteTimingTrigger)
+      : "programmatic",
+  } as const;
+}
 
 export function isAdminWebVitalName(value: string): value is AdminWebVitalName {
   return (ADMIN_WEB_VITAL_NAMES as readonly string[]).includes(value);

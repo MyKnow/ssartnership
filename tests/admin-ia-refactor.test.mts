@@ -135,3 +135,20 @@ test("관리자 빠른 찾기는 이름과 설명으로 권한 내 화면을 찾
   );
   assert.deepEqual(findAdminNavItems("존재하지 않는 화면", ADMIN_NAV_GROUPS), []);
 });
+
+test("관리자 빠른 찾기는 운영자가 쓰는 검색 별칭으로 같은 화면을 찾는다", async () => {
+  const { ADMIN_NAV_GROUPS, findAdminNavItems } = await adminNavigationModulePromise;
+
+  assert.deepEqual(
+    findAdminNavItems("업체", ADMIN_NAV_GROUPS).map((item) => item.href),
+    ["/admin/partners", "/admin/companies"],
+  );
+  assert.deepEqual(
+    findAdminNavItems("후기", ADMIN_NAV_GROUPS).map((item) => item.href),
+    ["/admin/reviews"],
+  );
+  assert.deepEqual(
+    findAdminNavItems("권한", ADMIN_NAV_GROUPS).map((item) => item.href),
+    ["/admin/admins"],
+  );
+});

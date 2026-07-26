@@ -46,8 +46,11 @@ export const Default: Story = {
     await expect(canvas.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     await expect(canvas.getByRole("heading", { level: 1 })).toHaveTextContent("운영 홈");
     await expect(
-      canvas.getByRole("link", { name: "주요 내용으로 건너뛰기" }),
-    ).toHaveAttribute("href", "#admin-desktop-main-content");
+      canvasElement.querySelector('a[href="#admin-desktop-main-content"]'),
+    ).toBeInTheDocument();
+    await expect(
+      canvasElement.querySelector('a[href="#admin-mobile-main-content"]'),
+    ).toBeInTheDocument();
   },
 };
 

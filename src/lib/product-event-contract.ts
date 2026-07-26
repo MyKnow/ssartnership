@@ -29,6 +29,7 @@ export const CLIENT_PRODUCT_EVENT_NAMES = [
   "coupon_view",
   "coupon_copy",
   "admin_web_vital",
+  "admin_route_timing",
 ] as const satisfies readonly ProductEventName[];
 
 export type ClientProductEventName = (typeof CLIENT_PRODUCT_EVENT_NAMES)[number];
@@ -205,6 +206,15 @@ function parseProperties(
         })
         .strip()
         .parse(rawProperties);
+    case "admin_route_timing":
+      return z
+        .object({
+          durationMs: z.number().int().min(0).max(120_000),
+          outcome: z.enum(["complete", "unknown", "error"]),
+          trigger: z.enum(["initial-load", "link", "history", "programmatic"]),
+        })
+        .strip()
+        .parse(rawProperties);
     default:
       return {};
   }
@@ -351,6 +361,14 @@ function parseProductEventTarget(
         targetId: "safe",
       });
     case "admin_web_vital":
+      return parseFixedTarget(
+        eventName,
+        targetType,
+        targetId,
+        "admin_performance",
+        { targetId: "safe" },
+      );
+    case "admin_route_timing":
       return parseFixedTarget(
         eventName,
         targetType,

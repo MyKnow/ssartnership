@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import AdminNavigationTiming from '@/components/analytics/AdminNavigationTiming';
 import AdminWebVitals from '@/components/analytics/AdminWebVitals';
 import RoutePageViewTracker from '@/components/analytics/RoutePageViewTracker';
 
@@ -12,6 +13,7 @@ export default function AdminLayout({
       <Suspense fallback={null}>
         <RoutePageViewTracker area="admin" />
         <AdminWebVitals />
+        <AdminNavigationTiming />
       </Suspense>
       {children}
     </>

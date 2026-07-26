@@ -153,7 +153,7 @@ export default function AdminShellView({
                   {SITE_NAME}
                 </p>
                 <p className="mt-1 truncate text-lg font-semibold tracking-[-0.02em] text-foreground">
-                  관리자 콘솔
+                  {activeNavItem?.label ?? title}
                 </p>
               </div>
               <div className="flex items-center gap-2">

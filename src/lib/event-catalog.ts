@@ -41,6 +41,7 @@ export const PRODUCT_EVENT_NAMES = [
   'coupon_redeem',
   'ad_push_send',
   'admin_web_vital',
+  'admin_route_timing',
 ] as const;
 
 export type ProductEventName = (typeof PRODUCT_EVENT_NAMES)[number];
