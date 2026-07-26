@@ -31,10 +31,17 @@ function getRequiredId(formData: FormData, name: string, returnTo: string) {
   return value;
 }
 
-function getRequiredReason(formData: FormData, returnTo: string) {
+function getRequiredReason(
+  formData: FormData,
+  returnTo: string,
+  reasonFieldId: string,
+) {
   const reason = String(formData.get("reason") ?? "").trim();
   if (!reason || reason.length > 500) {
-    redirectAdminActionError(returnTo, "invalid_reason");
+    redirectAdminActionError(
+      appendAdminReviewQueueQuery(returnTo, { focus: reasonFieldId }),
+      "invalid_reason",
+    );
   }
   return reason;
 }
@@ -82,7 +89,8 @@ export async function approveMemberProfilePhotoAction(formData: FormData) {
 export async function rejectMemberProfilePhotoAction(formData: FormData) {
   const returnTo = getReturnTo(formData);
   const imageId = getRequiredId(formData, "imageId", returnTo);
-  const reason = getRequiredReason(formData, returnTo);
+  const reasonFieldId = `replacement-reason-${imageId}`;
+  const reason = getRequiredReason(formData, returnTo, reasonFieldId);
   const memberId = getOptionalMemberId(formData);
   const session = await requireAdminPermission("profile_images", "update", {
     path: returnTo,
@@ -110,7 +118,8 @@ export async function rejectMemberProfilePhotoAction(formData: FormData) {
 export async function rejectMemberCurrentProfilePhotoAction(formData: FormData) {
   const returnTo = getReturnTo(formData);
   const memberId = getRequiredId(formData, "memberId", returnTo);
-  const reason = getRequiredReason(formData, returnTo);
+  const reasonFieldId = `current-photo-reason-${memberId}`;
+  const reason = getRequiredReason(formData, returnTo, reasonFieldId);
   const session = await requireAdminPermission("profile_images", "update", {
     path: returnTo,
   });

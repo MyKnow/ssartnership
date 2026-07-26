@@ -6,6 +6,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import AdminReviewQueueHeader from "@/components/admin/AdminReviewQueueHeader";
 import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import SubmitButton from "@/components/ui/SubmitButton";
+import Textarea from "@/components/ui/Textarea";
 import type { AdminReviewQueueFeedback } from "@/lib/admin-review-queue";
 
 export type AdminProfilePhotoReplacement = {
@@ -61,6 +62,53 @@ function PhotoPreview({
   );
 }
 
+function RejectionReasonField({
+  id,
+  title,
+  description,
+  placeholder,
+  focusReasonTarget,
+}: {
+  id: string;
+  title: string;
+  description: string;
+  placeholder: string;
+  focusReasonTarget?: string | null;
+}) {
+  const helpId = `${id}-help`;
+  const errorId = `${id}-error`;
+  const isReasonInvalid = focusReasonTarget === id;
+  const describedBy = isReasonInvalid ? `${helpId} ${errorId}` : helpId;
+
+  return (
+    <fieldset className="grid min-w-0 gap-2">
+      <legend className="text-sm font-semibold text-foreground">{title}</legend>
+      <p className="text-sm leading-6 text-muted-foreground">{description}</p>
+      <label htmlFor={id} className="text-sm font-medium text-foreground">
+        반려 사유 입력
+      </label>
+      <Textarea
+        id={id}
+        name="reason"
+        required
+        maxLength={500}
+        autoFocus={isReasonInvalid}
+        aria-invalid={isReasonInvalid || undefined}
+        aria-describedby={describedBy}
+        placeholder={placeholder}
+      />
+      <p id={helpId} className="text-xs leading-5 text-muted-foreground">
+        반려 사유를 1~500자로 입력해 주세요. 개인정보나 내부 운영 메모는 적지 마세요.
+      </p>
+      {isReasonInvalid ? (
+        <p id={errorId} className="text-sm font-medium text-danger" role="alert">
+          반려 사유를 1~500자로 입력해 주세요.
+        </p>
+      ) : null}
+    </fieldset>
+  );
+}
+
 export default function AdminProfilePhotoReviewQueue({
   replacements,
   currentPhotos,
@@ -72,6 +120,7 @@ export default function AdminProfilePhotoReviewQueue({
   feedback,
   returnTo = "/admin/profile-photos",
   loadError = false,
+  focusReasonTarget,
 }: {
   replacements: AdminProfilePhotoReplacement[];
   currentPhotos: AdminExistingProfilePhoto[];
@@ -81,6 +130,7 @@ export default function AdminProfilePhotoReviewQueue({
   feedback?: AdminReviewQueueFeedback | null;
   returnTo?: string;
   loadError?: boolean;
+  focusReasonTarget?: string | null;
 }) {
   const totalReviewCount = replacements.length + currentPhotos.length;
 
@@ -167,21 +217,21 @@ export default function AdminProfilePhotoReviewQueue({
                       <input type="hidden" name="returnTo" value={returnTo} />
                       <SubmitButton pendingText="승인 중">사진 승인</SubmitButton>
                     </form>
-                    <form action={actions.rejectReplacement} className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                    <form action={actions.rejectReplacement} className="grid min-w-0 gap-3">
                       <input type="hidden" name="imageId" value={replacement.id} />
                       <input type="hidden" name="returnTo" value={returnTo} />
-                      <label className="sr-only" htmlFor={`replacement-reason-${replacement.id}`}>
-                        반려 사유
-                      </label>
-                      <input
+                      <RejectionReasonField
                         id={`replacement-reason-${replacement.id}`}
-                        name="reason"
-                        required
-                        maxLength={500}
-                        className="h-11 min-w-0 rounded-[1rem] border border-border bg-surface px-3 text-sm"
-                        placeholder="반려 사유를 입력해 주세요"
+                        title="사진 변경 요청 반려"
+                        description="회원이 다시 제출할 수 있도록 사진에서 확인한 문제를 구체적으로 남겨 주세요."
+                        placeholder="예: 얼굴이 흐리게 보여 본인 확인이 어렵습니다."
+                        focusReasonTarget={focusReasonTarget}
                       />
-                      <SubmitButton variant="danger" pendingText="반려 중">반려</SubmitButton>
+                      <div>
+                        <SubmitButton variant="danger" pendingText="반려 중">
+                          사진 변경 요청 반려
+                        </SubmitButton>
+                      </div>
                     </form>
                   </div>
                 </Card>
@@ -230,18 +280,18 @@ export default function AdminProfilePhotoReviewQueue({
                 <form action={actions.rejectCurrentPhoto} className="grid min-w-0 gap-2">
                   <input type="hidden" name="memberId" value={member.id} />
                   <input type="hidden" name="returnTo" value={returnTo} />
-                  <label className="sr-only" htmlFor={`current-photo-reason-${member.id}`}>
-                    사진 반려 사유
-                  </label>
-                  <input
+                  <RejectionReasonField
                     id={`current-photo-reason-${member.id}`}
-                    name="reason"
-                    required
-                    maxLength={500}
-                    className="h-11 min-w-0 rounded-[1rem] border border-border bg-surface px-3 text-sm"
-                    placeholder="사진 반려 사유"
+                    title="기존 사진 반려"
+                    description="인증 중지 사유를 회원이 이해할 수 있게 구체적으로 남겨 주세요."
+                    placeholder="예: 사진에 여러 사람이 있어 본인 확인이 어렵습니다."
+                    focusReasonTarget={focusReasonTarget}
                   />
-                  <SubmitButton variant="danger" pendingText="처리 중">사진 반려 및 인증 중지</SubmitButton>
+                  <div>
+                    <SubmitButton variant="danger" pendingText="처리 중">
+                      사진 반려 및 인증 중지
+                    </SubmitButton>
+                  </div>
                 </form>
               </Card>
             ))}
