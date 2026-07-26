@@ -34,6 +34,24 @@ test("관리자 제휴처 목록은 read-model의 서버 count/range와 안전�
   assert.match(managerSource, /조건에 맞는 제휴처/);
 });
 
+test("제휴처 목록은 보조 집계를 기다리지 않고 찾기·상세 이동을 먼저 제공한다", async () => {
+  const [pageSource, itemSource] = await Promise.all([
+    readFile(partnerPagePath, "utf8"),
+    readFile(
+      new URL(
+        "../src/components/admin/partner-manager/AdminPartnerListItem.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.doesNotMatch(pageSource, /getAdminPartnerMetrics/);
+  assert.doesNotMatch(pageSource, /metricsByPartnerId/);
+  assert.match(itemSource, /partner\.metrics === undefined/);
+  assert.match(itemSource, /운영 지표는 상세 화면에서 확인/);
+});
+
 test("목록 오류는 내부 오류 대신 재시도 가능한 안전한 안내를 제공한다", async () => {
   const managerSource = await readFile(partnerManagerPath, "utf8");
 

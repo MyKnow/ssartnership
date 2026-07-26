@@ -16,7 +16,6 @@ import {
   resolveAdminPartnerTabRedirect,
 } from "@/lib/admin-ia";
 import { getAdminPartnerListReadModel } from "@/lib/admin-partner-list.server";
-import { getAdminPartnerMetrics } from "@/lib/admin-partner-metrics";
 import { canAdmin } from "@/lib/admin-permissions";
 import {
   getManagedCampusFilterValues,
@@ -129,11 +128,6 @@ export default async function AdminPartnersPage({
     "brands",
     "create",
   );
-  const partnerMetrics = await getAdminPartnerMetrics(
-    partnerList.hasPartnerLoadError
-      ? []
-      : partnerList.partners.map((partner) => partner.id),
-  );
 
   return (
     <AdminShell
@@ -232,19 +226,9 @@ export default async function AdminPartnersPage({
           </section>
         ) : (
           <section className="grid min-w-0 gap-4">
-            {partnerMetrics.warningMessage ? (
-              <InlineMessage
-                tone="warning"
-                title="제휴처 집계 일부를 불러오지 못했습니다."
-                description={partnerMetrics.warningMessage}
-              />
-            ) : null}
             <AdminPartnerManager
               categories={partnerList.categories}
-              partners={partnerList.partners.map((partner) => ({
-                ...partner,
-                metrics: partnerMetrics.metricsByPartnerId.get(partner.id) ?? null,
-              }))}
+              partners={partnerList.partners}
               pagination={{
                 totalCount: partnerList.totalPartnerCount,
                 page: partnerList.filters.page,
