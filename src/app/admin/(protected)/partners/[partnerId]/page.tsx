@@ -84,6 +84,18 @@ async function AdminPartnerDetailContent({
     ? (couponSuccessMessages[String(query.success)] ?? null)
     : null;
   const couponErrorMessages: Record<string, string> = {
+    ad_coupon_create_failed:
+      "쿠폰을 생성하지 못했습니다. 입력값과 제휴처 상태를 확인한 뒤 다시 시도해 주세요.",
+    ad_coupon_update_failed:
+      "쿠폰을 수정하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    ad_coupon_update_invalid_request: "쿠폰 수정 요청을 다시 확인해 주세요.",
+    ad_coupon_update_not_found:
+      "수정할 쿠폰을 찾지 못했습니다. 목록을 다시 확인해 주세요.",
+    ad_coupon_duplicate_failed:
+      "쿠폰을 복제하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    ad_coupon_duplicate_invalid_request: "쿠폰 복제 요청을 다시 확인해 주세요.",
+    ad_coupon_duplicate_not_found:
+      "복제할 쿠폰을 찾지 못했습니다. 목록을 다시 확인해 주세요.",
     ad_coupon_delete_invalid_request: "쿠폰 삭제 요청을 다시 확인해 주세요.",
     ad_coupon_delete_not_found:
       "삭제할 쿠폰을 찾지 못했습니다. 목록을 다시 확인해 주세요.",

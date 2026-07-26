@@ -186,7 +186,7 @@ export default function AdminPartnerCouponManager({
       {errorMessage ? (
         <InlineMessage
           tone="error"
-          title="쿠폰을 삭제하지 못했습니다."
+          title="쿠폰 작업을 처리하지 못했습니다."
           description={errorMessage}
         />
       ) : null}

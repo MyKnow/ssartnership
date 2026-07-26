@@ -17,6 +17,7 @@ test("쿠폰 다운로드와 관리자 CRUD 버튼은 제출 중 상태를 표�
   assert.match(form, /loadingText=\{mode === "edit" \? "저장 중" : "생성 중"\}/);
   assert.match(manager, /loadingText="복제 중"/);
   assert.match(manager, /loadingText="삭제 중"/);
+  assert.match(manager, /쿠폰 작업을 처리하지 못했습니다\./);
   assert.match(manager, /md:grid-cols-\[minmax\(0,1fr\)_auto\]/);
   assert.match(manager, /break-words text-lg font-semibold/);
   assert.match(manager, /flex min-w-0 flex-wrap items-center justify-end gap-2/);
@@ -27,7 +28,13 @@ test("쿠폰 다운로드와 관리자 CRUD 버튼은 제출 중 상태를 표�
   assert.match(actions, /ad_coupon_delete_failed/);
   assert.match(actions, /ad_coupon_delete_invalid_request/);
   assert.match(actions, /ad_coupon_delete_not_found/);
+  assert.match(actions, /ad_coupon_create_failed/);
+  assert.match(actions, /ad_coupon_update_failed/);
+  assert.match(actions, /ad_coupon_duplicate_failed/);
   assert.match(partnerDetail, /ad_coupon_delete_has_history/);
+  assert.match(partnerDetail, /ad_coupon_create_failed/);
+  assert.match(partnerDetail, /ad_coupon_update_failed/);
+  assert.match(partnerDetail, /ad_coupon_duplicate_failed/);
   assert.doesNotMatch(manager, /제휴처를 바꾸지 않고 현재 상세 페이지의 쿠폰만 등록합니다/);
   assert.doesNotMatch(form, /from "@\/components\/ui\/Card"/);
 });

@@ -10,6 +10,7 @@ import {
   parseCreateAdCouponForm,
   parseUpdateAdCouponForm,
 } from "@/lib/ad-package-validation";
+import { getSafeAdminActionErrorCode } from "@/lib/admin-action-errors";
 import type { AdCampaignStatus } from "@/lib/ad-packages";
 import type { DeleteAdCouponResult } from "@/lib/repositories/ad-package-repository";
 import { adPackageRepository } from "@/lib/repositories";
@@ -107,6 +108,12 @@ function requireCouponId(formData: FormData) {
   return couponId;
 }
 
+function getCouponDetailPath(partnerId: string) {
+  return isUuid(partnerId)
+    ? `/admin/partners/${encodeURIComponent(partnerId)}`
+    : "/admin/partners";
+}
+
 export async function createAdCampaignAction(formData: FormData) {
   await requireAdminPermission("home_ads", "create", { path: "/admin/advertisement" });
   const adminSession = await getAdminSession();
@@ -154,17 +161,31 @@ export async function updateAdCampaignStatusAction(formData: FormData) {
 export async function createAdCouponAction(formData: FormData) {
   const partnerId = getString(formData, "partnerId");
   const session = await requireAdminPermission("home_ads", "create", { path: "/admin/partners" });
-  const managedPartner = await assertManagedAdPartner(session, partnerId);
-  const input = parseCreateAdCouponForm(formData, {
-    partnerPeriodEnd: managedPartner.periodEnd,
-  });
-  await assertCampaignBelongsToPartner(input.campaignId, input.partnerId);
-  const coupon = await adPackageRepository.createCoupon(input);
-  const codePool = normalizeCouponCodeRows(
-    String(formData.get("codePool") ?? "").split(/\r?\n/),
-  );
-  if (coupon.issuanceType === "partner_code_pool" && codePool.codes.length > 0) {
-    await adPackageRepository.addCouponCodes({ couponId: coupon.id, codes: codePool.codes });
+  const detailPath = getCouponDetailPath(partnerId);
+  let coupon: Awaited<ReturnType<typeof adPackageRepository.createCoupon>>;
+  try {
+    const managedPartner = await assertManagedAdPartner(session, partnerId);
+    const input = parseCreateAdCouponForm(formData, {
+      partnerPeriodEnd: managedPartner.periodEnd,
+    });
+    await assertCampaignBelongsToPartner(input.campaignId, input.partnerId);
+    coupon = await adPackageRepository.createCoupon(input);
+    const codePool = normalizeCouponCodeRows(
+      String(formData.get("codePool") ?? "").split(/\r?\n/),
+    );
+    if (coupon.issuanceType === "partner_code_pool" && codePool.codes.length > 0) {
+      await adPackageRepository.addCouponCodes({ couponId: coupon.id, codes: codePool.codes });
+    }
+  } catch (error) {
+    redirectAdminActionError(
+      detailPath,
+      getSafeAdminActionErrorCode(error, "ad_coupon_create_failed"),
+      {
+        action: "ad_coupon_create",
+        targetType: "ad_coupon",
+        properties: { issue: 236, partnerId: isUuid(partnerId) ? partnerId : null },
+      },
+    );
   }
 
   await logAdminAction("ad_coupon_create", {
@@ -185,36 +206,67 @@ export async function createAdCouponAction(formData: FormData) {
 }
 
 export async function updateAdCouponAction(formData: FormData) {
-  const couponId = requireCouponId(formData);
-  const session = await requireAdminPermission("home_ads", "update", { path: "/admin/partners" });
-  const existing = await adPackageRepository.getAdminCouponById(couponId);
-  if (!existing) {
-    throw new Error("쿠폰을 찾을 수 없습니다.");
-  }
   const submittedPartnerId = getString(formData, "partnerId");
-  if (submittedPartnerId !== existing.partnerId) {
-    throw new Error("다른 제휴처의 쿠폰은 수정할 수 없습니다.");
+  const fallbackPath = getCouponDetailPath(submittedPartnerId);
+  let couponId: string;
+  try {
+    couponId = requireCouponId(formData);
+  } catch (error) {
+    redirectAdminActionError(
+      fallbackPath,
+      getSafeAdminActionErrorCode(error, "ad_coupon_update_invalid_request"),
+    );
   }
-  const managedPartner = await assertManagedAdPartner(session, existing.partnerId);
-  const parsedInput = parseUpdateAdCouponForm(formData, {
-    partnerPeriodEnd: managedPartner.periodEnd,
-  });
-  const input = {
-    ...parsedInput,
-    // The legacy static code is no longer editable in the UI, but must not be
-    // erased when an existing coupon is otherwise updated.
-    code: formData.has("code") ? parsedInput.code : existing.code,
-  };
-  await assertCampaignBelongsToPartner(input.campaignId, existing.partnerId);
-  const coupon = await adPackageRepository.updateCoupon({
-    ...input,
-    partnerId: existing.partnerId,
-  });
-  const codePool = normalizeCouponCodeRows(
-    String(formData.get("codePool") ?? "").split(/\r?\n/),
-  );
-  if (coupon.issuanceType === "partner_code_pool" && codePool.codes.length > 0) {
-    await adPackageRepository.addCouponCodes({ couponId: coupon.id, codes: codePool.codes });
+  const session = await requireAdminPermission("home_ads", "update", { path: "/admin/partners" });
+  let existing: Awaited<ReturnType<typeof adPackageRepository.getAdminCouponById>>;
+  try {
+    existing = await adPackageRepository.getAdminCouponById(couponId);
+  } catch {
+    redirectAdminActionError(fallbackPath, "ad_coupon_update_failed");
+  }
+  if (!existing) {
+    redirectAdminActionError(fallbackPath, "ad_coupon_update_not_found");
+  }
+  if (submittedPartnerId !== existing.partnerId) {
+    redirectAdminActionError(
+      getCouponDetailPath(existing.partnerId),
+      "ad_coupon_update_invalid_request",
+    );
+  }
+  let coupon: Awaited<ReturnType<typeof adPackageRepository.updateCoupon>>;
+  try {
+    const managedPartner = await assertManagedAdPartner(session, existing.partnerId);
+    const parsedInput = parseUpdateAdCouponForm(formData, {
+      partnerPeriodEnd: managedPartner.periodEnd,
+    });
+    const input = {
+      ...parsedInput,
+      // The legacy static code is no longer editable in the UI, but must not be
+      // erased when an existing coupon is otherwise updated.
+      code: formData.has("code") ? parsedInput.code : existing.code,
+    };
+    await assertCampaignBelongsToPartner(input.campaignId, existing.partnerId);
+    coupon = await adPackageRepository.updateCoupon({
+      ...input,
+      partnerId: existing.partnerId,
+    });
+    const codePool = normalizeCouponCodeRows(
+      String(formData.get("codePool") ?? "").split(/\r?\n/),
+    );
+    if (coupon.issuanceType === "partner_code_pool" && codePool.codes.length > 0) {
+      await adPackageRepository.addCouponCodes({ couponId: coupon.id, codes: codePool.codes });
+    }
+  } catch (error) {
+    redirectAdminActionError(
+      getCouponDetailPath(existing.partnerId),
+      getSafeAdminActionErrorCode(error, "ad_coupon_update_failed"),
+      {
+        action: "ad_coupon_update",
+        targetType: "ad_coupon",
+        targetId: couponId,
+        properties: { issue: 236, partnerId: existing.partnerId },
+      },
+    );
   }
   await logAdminAction("ad_coupon_update", {
     targetType: "ad_coupon",
@@ -232,14 +284,43 @@ export async function updateAdCouponAction(formData: FormData) {
 }
 
 export async function duplicateAdCouponAction(formData: FormData) {
-  const couponId = requireCouponId(formData);
-  const session = await requireAdminPermission("home_ads", "create", { path: "/admin/partners" });
-  const existing = await adPackageRepository.getAdminCouponById(couponId);
-  if (!existing) {
-    throw new Error("쿠폰을 찾을 수 없습니다.");
+  const submittedPartnerId = getString(formData, "partnerId");
+  const fallbackPath = getCouponDetailPath(submittedPartnerId);
+  let couponId: string;
+  try {
+    couponId = requireCouponId(formData);
+  } catch (error) {
+    redirectAdminActionError(
+      fallbackPath,
+      getSafeAdminActionErrorCode(error, "ad_coupon_duplicate_invalid_request"),
+    );
   }
-  await assertManagedAdPartner(session, existing.partnerId);
-  const coupon = await adPackageRepository.duplicateCoupon({ couponId });
+  const session = await requireAdminPermission("home_ads", "create", { path: "/admin/partners" });
+  let existing: Awaited<ReturnType<typeof adPackageRepository.getAdminCouponById>>;
+  try {
+    existing = await adPackageRepository.getAdminCouponById(couponId);
+  } catch {
+    redirectAdminActionError(fallbackPath, "ad_coupon_duplicate_failed");
+  }
+  if (!existing) {
+    redirectAdminActionError(fallbackPath, "ad_coupon_duplicate_not_found");
+  }
+  let coupon: Awaited<ReturnType<typeof adPackageRepository.duplicateCoupon>>;
+  try {
+    await assertManagedAdPartner(session, existing.partnerId);
+    coupon = await adPackageRepository.duplicateCoupon({ couponId });
+  } catch (error) {
+    redirectAdminActionError(
+      getCouponDetailPath(existing.partnerId),
+      getSafeAdminActionErrorCode(error, "ad_coupon_duplicate_failed"),
+      {
+        action: "ad_coupon_duplicate",
+        targetType: "ad_coupon",
+        targetId: couponId,
+        properties: { issue: 236, partnerId: existing.partnerId },
+      },
+    );
+  }
   await logAdminAction("ad_coupon_duplicate", {
     targetType: "ad_coupon",
     targetId: coupon.id,
