@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
@@ -85,6 +85,11 @@ export default function AdminMemberSecurityLogExplorer({
   const [sortFilter, setSortFilter] = useState<SortFilter>("newest");
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(25);
   const [currentPage, setCurrentPage] = useState(1);
+  const [requestedPagination, setRequestedPagination] = useState<{
+    page: number;
+    pageSize: number;
+  } | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   const eventOptions = useMemo(
     () => Array.from(new Set(logs.map((log) => log.eventName).filter(Boolean))).sort(),
@@ -158,6 +163,14 @@ export default function AdminMemberSecurityLogExplorer({
           pagination?.totalCount ?? filteredLogs.length,
         )} / ${(pagination?.totalCount ?? filteredLogs.length).toLocaleString("ko-KR")}`;
 
+  const isServerPaginationPending = Boolean(
+    pagination &&
+      isPending &&
+      requestedPagination &&
+      (requestedPagination.page !== pagination.page ||
+        requestedPagination.pageSize !== pagination.pageSize),
+  );
+
   function updateServerPagination(nextPage: number, nextPageSize = effectivePageSize) {
     if (!pagination) {
       return;
@@ -175,8 +188,11 @@ export default function AdminMemberSecurityLogExplorer({
       next.set("logPageSize", String(nextPageSize));
     }
     const queryString = next.toString();
-    router.replace(queryString ? `${pathname}?${queryString}` : pathname, {
-      scroll: false,
+    setRequestedPagination({ page: safePage, pageSize: nextPageSize });
+    startTransition(() => {
+      router.replace(queryString ? `${pathname}?${queryString}` : pathname, {
+        scroll: false,
+      });
     });
   }
 
@@ -296,13 +312,22 @@ export default function AdminMemberSecurityLogExplorer({
         </Card>
 
         <div className="grid gap-4">
-          <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-surface-muted/40 px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <div
+            className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-surface-muted/40 px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between"
+            aria-busy={isServerPaginationPending}
+          >
             <p>{rangeLabel}</p>
             <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end">
+              <p className="sr-only" aria-live="polite">
+                {isServerPaginationPending
+                  ? `${requestedPagination?.page ?? safeCurrentPage}페이지를 불러오는 중입니다.`
+                  : ""}
+              </p>
               <label className="flex items-center justify-between gap-2 whitespace-nowrap sm:justify-start">
                 <span>페이지당</span>
                 <Select
                   value={String(effectivePageSize)}
+                  disabled={isServerPaginationPending}
                   onChange={(event) => {
                     const nextPageSize = Number(event.target.value) as
                       (typeof PAGE_SIZE_OPTIONS)[number];
@@ -329,10 +354,13 @@ export default function AdminMemberSecurityLogExplorer({
                       ? updateServerPagination(safeCurrentPage - 1)
                       : setCurrentPage((page) => Math.max(1, page - 1))
                   }
-                  disabled={safeCurrentPage === 1}
+                  disabled={safeCurrentPage === 1 || isServerPaginationPending}
                   className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  이전
+                  {isServerPaginationPending &&
+                  requestedPagination?.page === safeCurrentPage - 1
+                    ? "불러오는 중"
+                    : "이전"}
                 </button>
                 <span className="min-w-[5.5rem] text-center text-xs sm:text-sm">
                   {safeCurrentPage} / {totalPages}
@@ -344,10 +372,13 @@ export default function AdminMemberSecurityLogExplorer({
                       ? updateServerPagination(safeCurrentPage + 1)
                       : setCurrentPage((page) => Math.min(totalPages, page + 1))
                   }
-                  disabled={safeCurrentPage === totalPages}
+                  disabled={safeCurrentPage === totalPages || isServerPaginationPending}
                   className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  다음
+                  {isServerPaginationPending &&
+                  requestedPagination?.page === safeCurrentPage + 1
+                    ? "불러오는 중"
+                    : "다음"}
                 </button>
               </div>
             </div>

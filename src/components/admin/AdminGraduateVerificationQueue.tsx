@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import AdminGraduateVerificationMediaViewer from "@/components/admin/AdminGraduateVerificationMediaViewer";
+import AdminPaginationLink from "@/components/admin/AdminPaginationLink";
 import AdminReviewQueueHeader from "@/components/admin/AdminReviewQueueHeader";
 import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import Badge from "@/components/ui/Badge";
@@ -133,35 +134,31 @@ function QueuePagination({
         {pagination.totalCount.toLocaleString("ko-KR")}
       </p>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-        <Button
+        <AdminPaginationLink
           href={buildGraduateQueuePageHref(
             returnTo,
             pageParam,
             currentPage - 1,
           )}
-          variant="secondary"
-          size="sm"
           prefetch
           disabled={currentPage === 1}
         >
           이전
-        </Button>
+        </AdminPaginationLink>
         <span className="min-w-[5.5rem] text-center text-xs sm:text-sm">
           {currentPage} / {totalPages}
         </span>
-        <Button
+        <AdminPaginationLink
           href={buildGraduateQueuePageHref(
             returnTo,
             pageParam,
             currentPage + 1,
           )}
-          variant="secondary"
-          size="sm"
           prefetch
           disabled={currentPage === totalPages}
         >
           다음
-        </Button>
+        </AdminPaginationLink>
       </div>
     </Surface>
   );

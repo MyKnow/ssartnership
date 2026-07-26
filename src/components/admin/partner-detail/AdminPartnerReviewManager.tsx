@@ -1,3 +1,4 @@
+import AdminPaginationLink from "@/components/admin/AdminPaginationLink";
 import AdminReviewCard from "@/components/admin/review-manager/AdminReviewCard";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
@@ -199,50 +200,45 @@ export default function AdminPartnerReviewManager({
                   aria-label="페이지당 표시 건수"
                 >
                   {ADMIN_REVIEW_PAGE_SIZE_OPTIONS.map((option) => (
-                    <Button
+                    <AdminPaginationLink
                       key={option}
                       href={buildReviewPageHref(returnTo, 1, option)}
                       variant={
                         option === pagination.pageSize ? "secondary" : "ghost"
                       }
-                      size="sm"
                       prefetch
                     >
                       {option}개
-                    </Button>
+                    </AdminPaginationLink>
                   ))}
                 </div>
               </div>
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                <Button
+                <AdminPaginationLink
                   href={buildReviewPageHref(
                     returnTo,
                     currentPage - 1,
                     pagination.pageSize,
                   )}
-                  variant="secondary"
-                  size="sm"
                   prefetch
                   disabled={currentPage === 1}
                 >
                   이전
-                </Button>
+                </AdminPaginationLink>
                 <span className="min-w-[5.5rem] text-center text-xs sm:text-sm">
                   {currentPage} / {totalPages}
                 </span>
-                <Button
+                <AdminPaginationLink
                   href={buildReviewPageHref(
                     returnTo,
                     currentPage + 1,
                     pagination.pageSize,
                   )}
-                  variant="secondary"
-                  size="sm"
                   prefetch
                   disabled={currentPage === totalPages}
                 >
                   다음
-                </Button>
+                </AdminPaginationLink>
               </div>
             </Surface>
           ) : null}
