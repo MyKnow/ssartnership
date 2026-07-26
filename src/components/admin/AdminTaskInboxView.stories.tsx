@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 import { ADMIN_NAV_GROUPS } from "./admin-navigation";
-import AdminTaskInboxView from "./AdminTaskInboxView";
+import AdminTaskInboxView, {
+  AdminTaskInboxLoading,
+} from "./AdminTaskInboxView";
 
 const tasks =
   ADMIN_NAV_GROUPS.find((group) => group.label === "작업함")?.items.filter(
@@ -31,11 +33,12 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole("heading", { name: "작업함" })).toBeInTheDocument();
-    await expect(canvas.getByRole("link", { name: /등록 신청/ })).toHaveAttribute(
-      "href",
-      "/admin/partner-registrations",
-    );
+    await expect(
+      canvas.getByRole("heading", { name: "작업함" }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByRole("link", { name: /등록 신청/ }),
+    ).toHaveAttribute("href", "/admin/partner-registrations");
     await expect(canvas.getByText("5건 대기")).toBeInTheDocument();
   },
 };
@@ -44,4 +47,8 @@ export const Empty: Story = {
   args: {
     tasks: [],
   },
+};
+
+export const Loading: Story = {
+  render: () => <AdminTaskInboxLoading tasks={tasks} />,
 };
