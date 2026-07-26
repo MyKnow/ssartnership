@@ -48,6 +48,9 @@ const ADMIN_ROUTE_PATH_RULES = [
  * Smaller samples stay visible but never appear as a confirmed target pass.
  */
 export const ADMIN_WEB_VITAL_MIN_SAMPLE_COUNT = 30;
+export const ADMIN_ROUTE_TIMING_MIN_SAMPLE_COUNT =
+  ADMIN_WEB_VITAL_MIN_SAMPLE_COUNT;
+export const ADMIN_ROUTE_TIMING_TARGET_MS = 200;
 
 export const ADMIN_WEB_VITAL_TARGETS = {
   INP: { threshold: 200, unit: "ms", label: "상호작용 응답" },
@@ -81,6 +84,27 @@ export type AdminWebVitalSummaryMetric = {
   goodCount: number;
   needsImprovementCount: number;
   poorCount: number;
+  status: "unknown" | "insufficient_sample" | "met" | "exceeded";
+};
+
+export type AdminRouteTimingSummaryInput = {
+  routeKey?: string | null;
+  sampleCount?: number | string | null;
+  p75DurationMs?: number | string | null;
+  completeCount?: number | string | null;
+  unknownCount?: number | string | null;
+  errorCount?: number | string | null;
+};
+
+export type AdminRouteTimingSummaryMetric = {
+  routeKey: string;
+  label: string;
+  threshold: number;
+  sampleCount: number;
+  p75DurationMs: number | null;
+  completeCount: number;
+  unknownCount: number;
+  errorCount: number;
   status: "unknown" | "insufficient_sample" | "met" | "exceeded";
 };
 
@@ -205,6 +229,90 @@ export function toAdminWebVitalSummary(
               : "exceeded",
     };
   });
+}
+
+const ADMIN_ROUTE_TIMING_LABELS: Record<string, string> = {
+  admin: "관리 홈",
+  "admin.admins": "관리자 관리",
+  "admin.tasks": "작업함",
+  "admin.search": "통합 검색",
+  "admin.advertisement": "홈 광고 관리",
+  "admin.companies": "파트너사·계정",
+  "admin.categories": "카테고리",
+  "admin.cycle": "기수 관리",
+  "admin.cycle.mock": "기수 미리보기",
+  "admin.denied": "접근 안내",
+  "admin.event": "이벤트 관리",
+  "admin.event.detail": "이벤트 상세",
+  "admin.logs": "운영 로그",
+  "admin.members": "회원 관리",
+  "admin.members.mock": "회원 목록 미리보기",
+  "admin.members.detail": "회원 상세",
+  "admin.graduate-verifications": "수료생 인증",
+  "admin.profile-photos": "프로필 사진",
+  "admin.member-signup-requests": "가입 승인",
+  "admin.member-signup-requests.detail": "가입 승인 상세",
+  "admin.notifications": "내 알림",
+  "admin.notification-templates": "알림 템플릿",
+  "admin.partner-registrations": "등록 신청",
+  "admin.partner-requests": "변경 요청",
+  "admin.partners": "제휴처",
+  "admin.partners.new": "제휴처 추가",
+  "admin.partners.detail": "제휴처 상세",
+  "admin.push": "발송 관리",
+  "admin.reviews": "리뷰 관리",
+  "admin.setup": "초기 설정",
+  "admin.unknown": "기타 관리자 화면",
+};
+
+export function getAdminRouteTimingLabel(routeKey: string) {
+  return ADMIN_ROUTE_TIMING_LABELS[routeKey] ?? "기타 관리자 화면";
+}
+
+export function toAdminRouteTimingSummary(
+  rows: AdminRouteTimingSummaryInput[] | null | undefined,
+): AdminRouteTimingSummaryMetric[] {
+  return (rows ?? [])
+    .map((row) => {
+      const routeKey =
+        typeof row.routeKey === "string" &&
+        Object.prototype.hasOwnProperty.call(
+          ADMIN_ROUTE_TIMING_LABELS,
+          row.routeKey,
+        )
+          ? row.routeKey
+          : "admin.unknown";
+      const sampleCount = Math.round(toNonNegativeNumber(row.sampleCount));
+      const p75DurationMs = toOptionalNonNegativeNumber(row.p75DurationMs);
+
+      return {
+        routeKey,
+        label: getAdminRouteTimingLabel(routeKey),
+        threshold: ADMIN_ROUTE_TIMING_TARGET_MS,
+        sampleCount,
+        p75DurationMs,
+        completeCount: Math.round(toNonNegativeNumber(row.completeCount)),
+        unknownCount: Math.round(toNonNegativeNumber(row.unknownCount)),
+        errorCount: Math.round(toNonNegativeNumber(row.errorCount)),
+        status:
+          sampleCount === 0 || p75DurationMs === null
+            ? "unknown"
+            : sampleCount < ADMIN_ROUTE_TIMING_MIN_SAMPLE_COUNT
+              ? "insufficient_sample"
+              : p75DurationMs <= ADMIN_ROUTE_TIMING_TARGET_MS
+                ? "met"
+                : "exceeded",
+      } satisfies AdminRouteTimingSummaryMetric;
+    })
+    .sort((left, right) => {
+      if (left.p75DurationMs === null) {
+        return 1;
+      }
+      if (right.p75DurationMs === null) {
+        return -1;
+      }
+      return right.p75DurationMs - left.p75DurationMs;
+    });
 }
 
 function normalizeRating(value: string): AdminWebVitalRating {

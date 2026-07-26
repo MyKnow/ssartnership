@@ -3283,6 +3283,48 @@ revoke all on function public.get_admin_web_vitals_summary(timestamp with time z
 revoke all on function public.get_admin_web_vitals_summary(timestamp with time zone, timestamp with time zone) from authenticated;
 grant execute on function public.get_admin_web_vitals_summary(timestamp with time zone, timestamp with time zone) to service_role;
 
+create or replace function public.get_admin_route_timing_summary(
+  input_start timestamp with time zone,
+  input_end timestamp with time zone
+)
+returns table (
+  route_key text,
+  sample_count bigint,
+  p75_duration_ms double precision,
+  complete_count bigint,
+  unknown_count bigint,
+  error_count bigint
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  select
+    event_log.target_id as route_key,
+    count(*)::bigint as sample_count,
+    percentile_cont(0.75) within group (
+      order by (event_log.properties ->> 'durationMs')::double precision
+    )::double precision as p75_duration_ms,
+    count(*) filter (where event_log.properties ->> 'outcome' = 'complete')::bigint as complete_count,
+    count(*) filter (where event_log.properties ->> 'outcome' = 'unknown')::bigint as unknown_count,
+    count(*) filter (where event_log.properties ->> 'outcome' = 'error')::bigint as error_count
+  from public.event_logs as event_log
+  where event_log.event_name = 'admin_route_timing'
+    and event_log.target_type = 'admin_performance'
+    and event_log.target_id is not null
+    and event_log.created_at >= input_start
+    and event_log.created_at <= input_end
+    and event_log.properties ->> 'durationMs' ~ '^[0-9]+$'
+  group by event_log.target_id
+  order by p75_duration_ms desc nulls last;
+$$;
+
+revoke all on function public.get_admin_route_timing_summary(timestamp with time zone, timestamp with time zone) from public;
+revoke all on function public.get_admin_route_timing_summary(timestamp with time zone, timestamp with time zone) from anon;
+revoke all on function public.get_admin_route_timing_summary(timestamp with time zone, timestamp with time zone) from authenticated;
+grant execute on function public.get_admin_route_timing_summary(timestamp with time zone, timestamp with time zone) to service_role;
+
 revoke all on function public.get_partner_engagement_counts(uuid[]) from public;
 revoke all on function public.get_partner_engagement_counts(uuid[]) from anon;
 revoke all on function public.get_partner_engagement_counts(uuid[]) from authenticated;
@@ -3915,6 +3957,9 @@ create index if not exists event_logs_name_created_at_idx
 create index if not exists event_logs_admin_web_vital_created_at_idx
   on event_logs(created_at desc)
   where event_name = 'admin_web_vital';
+create index if not exists event_logs_admin_route_timing_created_at_idx
+  on event_logs(target_id, created_at desc)
+  where event_name = 'admin_route_timing';
 create index if not exists event_logs_actor_id_idx on event_logs(actor_id);
 create index if not exists event_logs_actor_type_created_at_idx
   on event_logs(actor_type, created_at desc);

@@ -10,6 +10,7 @@ import { getAdminLogAccessPolicy } from "@/lib/admin-log-access";
 import { getAdminLogsPageData } from "@/lib/log-insights";
 import { fetchForwardActivityMetrics } from "@/lib/platform-activity-forward-metrics";
 import { getAdminWebVitalSummary } from "@/lib/admin-web-vitals-summary.server";
+import { getAdminRouteTimingSummary } from "@/lib/admin-route-timing-summary.server";
 import { AdminLogsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ async function AdminLogsContent({
   const access = getAdminLogAccessPolicy(session.account);
   const activityPromise = fetchForwardActivityMetrics();
   const webVitalsPromise = getAdminWebVitalSummary();
+  const routeTimingPromise = getAdminRouteTimingSummary();
   const data = await getAdminLogsPageData({ preset: "24h" }, access);
 
   return (
@@ -36,6 +38,7 @@ async function AdminLogsContent({
           <AdminLogsAncillaryPanels
             activity={activityPromise}
             webVitals={webVitalsPromise}
+            routeTiming={routeTimingPromise}
           />
         </Suspense>
     </div>

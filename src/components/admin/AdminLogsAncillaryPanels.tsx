@@ -1,4 +1,5 @@
 import AdminWebVitalSummaryPanel from "@/components/admin/AdminWebVitalSummaryPanel";
+import AdminRouteTimingSummaryPanel from "@/components/admin/AdminRouteTimingSummaryPanel";
 import AdminForwardActivityPanel from "@/components/admin/logs/AdminForwardActivityPanel";
 import InlineMessage from "@/components/ui/InlineMessage";
 import Skeleton from "@/components/ui/Skeleton";
@@ -8,6 +9,7 @@ import {
   type ForwardActivityMetrics,
 } from "@/lib/platform-activity-forward-metrics";
 import type { AdminWebVitalSummaryMetric } from "@/lib/admin-performance";
+import type { AdminRouteTimingSummaryMetric } from "@/lib/admin-performance";
 
 type ActivityLoadResult = {
   metrics: ForwardActivityMetrics;
@@ -16,6 +18,12 @@ type ActivityLoadResult = {
 
 type WebVitalLoadResult = {
   metrics: AdminWebVitalSummaryMetric[];
+  windowDays: number;
+  loadError: boolean;
+};
+
+type RouteTimingLoadResult = {
+  metrics: AdminRouteTimingSummaryMetric[];
   windowDays: number;
   loadError: boolean;
 };
@@ -70,16 +78,33 @@ async function resolveWebVitals(
   }
 }
 
+async function resolveRouteTiming(
+  promise: Promise<RouteTimingLoadResult>,
+): Promise<RouteTimingLoadResult> {
+  try {
+    return await promise;
+  } catch {
+    return {
+      metrics: [],
+      windowDays: 7,
+      loadError: true,
+    };
+  }
+}
+
 export default async function AdminLogsAncillaryPanels({
   activity,
   webVitals,
+  routeTiming,
 }: {
   activity: Promise<ActivityLoadResult>;
   webVitals: Promise<WebVitalLoadResult>;
+  routeTiming: Promise<RouteTimingLoadResult>;
 }) {
-  const [activityResult, webVitalResult] = await Promise.all([
+  const [activityResult, webVitalResult, routeTimingResult] = await Promise.all([
     resolveActivity(activity),
     resolveWebVitals(webVitals),
+    resolveRouteTiming(routeTiming),
   ]);
 
   return (
@@ -93,6 +118,7 @@ export default async function AdminLogsAncillaryPanels({
         />
       ) : null}
       <AdminWebVitalSummaryPanel {...webVitalResult} />
+      <AdminRouteTimingSummaryPanel {...routeTimingResult} />
     </>
   );
 }
