@@ -38,3 +38,24 @@ test("관리자 미디어 액션은 새 탭 링크 대신 이미지 뷰어를 �
   assert.match(viewerSource, /getDocument/);
   assert.match(viewerSource, /credentials:\s*["']same-origin["']/);
 });
+
+test("수료생 검토의 결정 입력은 레이블·도움말·공용 폼 제어를 제공한다", async () => {
+  const queueSource = await readFile(queuePath, "utf8");
+
+  assert.match(queueSource, /from "@\/components\/ui\/Input"/);
+  assert.match(queueSource, /from "@\/components\/ui\/Textarea"/);
+  assert.match(queueSource, /<fieldset/);
+  assert.match(queueSource, /<legend/);
+  assert.match(queueSource, /htmlFor=\{documentNumberInputId\}/);
+  assert.match(queueSource, /수료증에 적힌 문서 번호를 입력하세요/);
+  assert.match(queueSource, /htmlFor=\{existingMemberIdInputId\}/);
+  assert.match(queueSource, /회원 상세에서 복사한 UUID를 입력하세요/);
+  assert.match(queueSource, /보완이 필요한 항목/);
+  assert.match(queueSource, /보완 요청 사유/);
+  assert.match(queueSource, /반려 사유/);
+  assert.match(queueSource, /min-h-11 cursor-pointer/);
+  assert.doesNotMatch(
+    queueSource,
+    /className="h-11 min-w-56 rounded-\[1rem\] border border-border bg-surface px-3 text-sm"/,
+  );
+});
