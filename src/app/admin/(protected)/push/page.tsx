@@ -25,7 +25,9 @@ export default async function AdminPushPage({
       ? params.tab
       : "center";
 
-  const readModel = await getAdminPushReadModel();
+  const readModel = await getAdminPushReadModel({
+    includeAudience: initialTab === "send",
+  });
   const pushConfigured = isPushConfigured();
   const mattermostConfigured = isMattermostNotificationConfigured();
   const recentLogCount = readModel.recentLogs.length;
@@ -50,7 +52,7 @@ export default async function AdminPushPage({
         <StatsRow
           items={[
             { label: "회원 대상", value: `${readModel.memberCount.toLocaleString()}명`, hint: "개인·기수·캠퍼스 기준" },
-            { label: "제휴처 대상", value: `${readModel.partners.length.toLocaleString()}개`, hint: "신규 제휴/종료 임박 연결" },
+            { label: "제휴처 대상", value: `${readModel.partnerCount.toLocaleString()}개`, hint: "신규 제휴/종료 임박 연결" },
             { label: "최근 로그", value: `${recentLogCount.toLocaleString()}건`, hint: "최근 30일 운영 로그" },
             { label: "자동 규칙", value: `${automaticSummaryCount.toLocaleString()}개`, hint: "예약/자동 발송 요약" },
           ]}

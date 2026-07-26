@@ -13,9 +13,13 @@ test("푸시 운영 첫 화면은 대상자 전체 목록 대신 서버 read-mod
   ]);
 
   assert.match(page, /getAdminPushReadModel/);
+  assert.match(page, /includeAudience: initialTab === "send"/);
   assert.doesNotMatch(page, /getSupabaseAdminClient/);
   assert.doesNotMatch(page, /getMmUserDirectoryEntriesByAccountIds/);
   assert.match(readModel, /select\("generation,campus", \{ count: "exact" \}\)/);
+  assert.match(readModel, /select\("id", \{ count: "exact", head: true \}\)/);
+  assert.match(readModel, /partnerCount/);
+  assert.match(readModel, /includeAudience = true/);
   assert.match(readModel, /getAdminNotificationOverview/);
   assert.match(manager, /recipientOptions/);
   assert.match(manager, /onRecipientOptionsLoaded/);
