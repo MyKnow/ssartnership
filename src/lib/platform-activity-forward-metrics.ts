@@ -1,5 +1,7 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
+const ADMIN_FORWARD_ACTIVITY_TIMEOUT_MS = 500;
+
 export type ForwardActivityPoint = {
   date: string;
   memberActiveCount: number;
@@ -40,7 +42,7 @@ export async function fetchForwardActivityMetrics(anchorDate?: string) {
       {
         p_anchor_date: anchorDate ?? null,
       },
-    );
+    ).abortSignal(AbortSignal.timeout(ADMIN_FORWARD_ACTIVITY_TIMEOUT_MS));
     if (error) {
       console.error("[admin-activity] metrics query failed", error.message);
       return {
