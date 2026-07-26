@@ -94,6 +94,25 @@ function FormSkeleton({ sections = 2 }: { sections?: number }) {
   );
 }
 
+function AdminListSkeletonContent({
+  actionCount = 2,
+  filterFields = 4,
+  rows = 4,
+}: {
+  actionCount?: number;
+  filterFields?: number;
+  rows?: number;
+}) {
+  return (
+    <div className="grid min-w-0 gap-6">
+      <PageHeaderSkeleton actionCount={actionCount} />
+      <MetricRowSkeleton />
+      <FilterSkeleton fields={filterFields} />
+      <ListRowsSkeleton rows={rows} />
+    </div>
+  );
+}
+
 function AdminListSkeleton({
   title,
   actionCount = 2,
@@ -107,12 +126,11 @@ function AdminListSkeleton({
 }) {
   return (
     <AdminShell title={title} backHref="/admin" backLabel="관리 홈">
-      <div className="grid min-w-0 gap-6">
-        <PageHeaderSkeleton actionCount={actionCount} />
-        <MetricRowSkeleton />
-        <FilterSkeleton fields={filterFields} />
-        <ListRowsSkeleton rows={rows} />
-      </div>
+      <AdminListSkeletonContent
+        actionCount={actionCount}
+        filterFields={filterFields}
+        rows={rows}
+      />
     </AdminShell>
   );
 }
@@ -175,12 +193,24 @@ export function AdminMembersSkeleton() {
   return <AdminListSkeleton title="회원 관리" filterFields={4} rows={5} />;
 }
 
+export function AdminMembersSkeletonContent() {
+  return <AdminListSkeletonContent filterFields={4} rows={5} />;
+}
+
 export function AdminPartnersSkeleton() {
   return <AdminListSkeleton title="제휴처" actionCount={3} />;
 }
 
+export function AdminPartnersSkeletonContent() {
+  return <AdminListSkeletonContent actionCount={3} />;
+}
+
 export function AdminPartnerRequestsSkeleton() {
   return <AdminListSkeleton title="변경 요청" actionCount={1} filterFields={0} />;
+}
+
+export function AdminPartnerRequestsSkeletonContent() {
+  return <AdminListSkeletonContent actionCount={1} filterFields={0} />;
 }
 
 export function AdminCategoriesSkeleton() {

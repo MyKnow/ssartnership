@@ -13,6 +13,7 @@ import StatsRow from "@/components/ui/StatsRow";
 import SubmitButton from "@/components/ui/SubmitButton";
 import Skeleton from "@/components/ui/Skeleton";
 import Surface from "@/components/ui/Surface";
+import { AdminMembersSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import {
   backfillMemberProfiles,
   disableGenerationMattermostLogin,
@@ -71,15 +72,13 @@ function AdminMemberTrendFallback() {
   );
 }
 
-export default async function AdminMembersPage({
-  searchParams,
+async function AdminMembersContent({
+  adminSession,
+  params,
 }: {
-  searchParams?: Promise<AdminMemberSearchParams>;
+  adminSession: Awaited<ReturnType<typeof requireAdminPermission>>;
+  params: AdminMemberSearchParams;
 }) {
-  const adminSession = await requireAdminPermission("members", "read", {
-    path: "/admin/members",
-  });
-  const params = (await searchParams) ?? {};
   const memberError = params.error ? adminMembersErrorMessages[params.error] : null;
   const hasMoreBackfill =
     getAdminMemberSearchParam(params, "hasMore") === "1"
@@ -131,12 +130,7 @@ export default async function AdminMembersPage({
   }
 
   return (
-    <AdminShell
-      title="회원 관리"
-      backHref="/admin"
-      backLabel="관리 홈"
-    >
-      <div className="grid gap-6">
+    <div className="grid gap-6">
         <AdminPageHeader
           eyebrow="회원"
           title="회원 계정 관리"
@@ -323,7 +317,25 @@ export default async function AdminMembersPage({
             <p>인증 카드 색상과 목업은 기수 관리 화면에서 확인합니다.</p>
           </div>
         </Card>
-      </div>
+    </div>
+  );
+}
+
+export default async function AdminMembersPage({
+  searchParams,
+}: {
+  searchParams?: Promise<AdminMemberSearchParams>;
+}) {
+  const adminSession = await requireAdminPermission("members", "read", {
+    path: "/admin/members",
+  });
+  const params = (await searchParams) ?? {};
+
+  return (
+    <AdminShell title="회원 관리" backHref="/admin" backLabel="관리 홈">
+      <Suspense fallback={<AdminMembersSkeletonContent />}>
+        <AdminMembersContent adminSession={adminSession} params={params} />
+      </Suspense>
     </AdminShell>
   );
 }

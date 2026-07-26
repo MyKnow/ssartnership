@@ -1,4 +1,5 @@
 import { permanentRedirect, redirect } from "next/navigation";
+import { Suspense } from "react";
 import AdminCompanyPlanManager from "@/components/admin/AdminCompanyPlanManager";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminPartnerCreateToast from "@/components/admin/AdminPartnerCreateToast";
@@ -22,6 +23,7 @@ import {
   isRegionalAdminAccount,
 } from "@/lib/admin-scope";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
+import { AdminPartnersSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 
 export const dynamic = "force-dynamic";
 
@@ -71,30 +73,22 @@ function buildPartnerListHref(input: {
   return query ? `/admin/partners?${query}` : "/admin/partners";
 }
 
-export default async function AdminPartnersPage({
-  searchParams,
+async function AdminPartnersContent({
+  adminSession,
+  params,
+  showPlans,
+  canCreatePartner,
 }: {
-  searchParams?: Promise<AdminPartnersSearchParams>;
+  adminSession: Awaited<ReturnType<typeof requireAdminPermission>>;
+  params: AdminPartnersSearchParams;
+  showPlans: boolean;
+  canCreatePartner: boolean;
 }) {
-  const adminSession = await requireAdminPermission("brands", "read", {
-    path: "/admin/partners",
-  });
   const managedCampusFilter = getManagedCampusFilterValues(adminSession.account);
   const canManageGlobalSections = !isRegionalAdminAccount(adminSession.account);
-  const params = (await searchParams) ?? {};
-  const tab = getOneSearchParam(params.tab);
   const partnerFormError = getOneSearchParam(params.error)
     ? adminPartnersErrorMessages[getOneSearchParam(params.error) ?? ""]
     : null;
-  const legacyTabRedirect = resolveAdminPartnerTabRedirect(tab);
-  if (legacyTabRedirect) {
-    permanentRedirect(legacyTabRedirect);
-  }
-
-  const showPlans = tab === "plans" && canManageGlobalSections;
-  if (tab === "plans" && !canManageGlobalSections) {
-    redirect("/admin/partners");
-  }
 
   const requestedFilters = parseAdminPartnerListFilters({
     q: getOneSearchParam(params.q),
@@ -123,19 +117,8 @@ export default async function AdminPartnersPage({
     );
   }
 
-  const canCreatePartner = canAdmin(
-    adminSession.account.permissions,
-    "brands",
-    "create",
-  );
-
   return (
-    <AdminShell
-      title={showPlans ? "플랜/과금" : "제휴처"}
-      backHref="/admin"
-      backLabel="관리 홈"
-    >
-      <section className="grid gap-6">
+    <section className="grid gap-6">
         <AdminPartnerCreateToast />
         <AdminPageHeader
           eyebrow="제휴 운영"
@@ -239,7 +222,50 @@ export default async function AdminPartnersPage({
             />
           </section>
         )}
-      </section>
+    </section>
+  );
+}
+
+export default async function AdminPartnersPage({
+  searchParams,
+}: {
+  searchParams?: Promise<AdminPartnersSearchParams>;
+}) {
+  const adminSession = await requireAdminPermission("brands", "read", {
+    path: "/admin/partners",
+  });
+  const canManageGlobalSections = !isRegionalAdminAccount(adminSession.account);
+  const params = (await searchParams) ?? {};
+  const tab = getOneSearchParam(params.tab);
+  const legacyTabRedirect = resolveAdminPartnerTabRedirect(tab);
+  if (legacyTabRedirect) {
+    permanentRedirect(legacyTabRedirect);
+  }
+
+  const showPlans = tab === "plans" && canManageGlobalSections;
+  if (tab === "plans" && !canManageGlobalSections) {
+    redirect("/admin/partners");
+  }
+  const canCreatePartner = canAdmin(
+    adminSession.account.permissions,
+    "brands",
+    "create",
+  );
+
+  return (
+    <AdminShell
+      title={showPlans ? "플랜/과금" : "제휴처"}
+      backHref="/admin"
+      backLabel="관리 홈"
+    >
+      <Suspense fallback={<AdminPartnersSkeletonContent />}>
+        <AdminPartnersContent
+          adminSession={adminSession}
+          params={params}
+          showPlans={showPlans}
+          canCreatePartner={canCreatePartner}
+        />
+      </Suspense>
     </AdminShell>
   );
 }
