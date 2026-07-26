@@ -261,51 +261,48 @@ async function getPreferenceFilteredMemberIds(
     return null;
   }
 
+  const filterResults = await Promise.all(
+    activeFilters.map(async (filter) => {
+      const shouldInclude =
+        (filter.value === "enabled" && !filter.defaultEnabled) ||
+        (filter.value === "disabled" && filter.defaultEnabled);
+      const expectedValue = shouldInclude
+        ? filter.value === "enabled"
+        : filter.value === "disabled";
+      const { data, error } = await supabase
+        .from("push_preferences")
+        .select("member_id")
+        .eq(filter.column, expectedValue);
+
+      if (error) {
+        return undefined;
+      }
+
+      return {
+        filter,
+        shouldInclude,
+        ids: getMemberIdSet(
+          (data ?? []) as Array<{ member_id: string | null }>,
+        ),
+      };
+    }),
+  );
+  if (filterResults.some((result) => result === undefined)) {
+    return undefined;
+  }
+
   const excludedIds = new Set<string>();
   let includedIds: Set<string> | null = null;
 
-  for (const filter of activeFilters) {
-    if (filter.value === "enabled" && !filter.defaultEnabled) {
-      const { data, error } = await supabase
-        .from("push_preferences")
-        .select("member_id")
-        .eq(filter.column, true);
-      if (error) {
-        return undefined;
-      }
-      includedIds = intersectMemberIdSets(
-        includedIds,
-        getMemberIdSet((data ?? []) as Array<{ member_id: string | null }>),
-      );
+  for (const result of filterResults) {
+    if (!result) {
       continue;
     }
-
-    if (filter.value === "disabled" && filter.defaultEnabled) {
-      const { data, error } = await supabase
-        .from("push_preferences")
-        .select("member_id")
-        .eq(filter.column, false);
-      if (error) {
-        return undefined;
-      }
-      includedIds = intersectMemberIdSets(
-        includedIds,
-        getMemberIdSet((data ?? []) as Array<{ member_id: string | null }>),
-      );
+    if (result.shouldInclude) {
+      includedIds = intersectMemberIdSets(includedIds, result.ids);
       continue;
     }
-
-    const excludedValue = filter.value === "disabled";
-    const { data, error } = await supabase
-      .from("push_preferences")
-      .select("member_id")
-      .eq(filter.column, excludedValue);
-    if (error) {
-      return undefined;
-    }
-    getMemberIdSet((data ?? []) as Array<{ member_id: string | null }>).forEach(
-      (id) => excludedIds.add(id),
-    );
+    result.ids.forEach((id) => excludedIds.add(id));
   }
 
   return {
@@ -335,40 +332,57 @@ async function getPolicyConsentFilteredMemberIds(
     return null;
   }
 
+  const filterResults = await Promise.all(
+    activeFilters.map(async (filter) => {
+      const consentPromise = supabase
+        .from("member_policy_consents")
+        .select("member_id")
+        .eq("policy_document_id", filter.policyDocumentId);
+      const marketingPreferencesPromise =
+        filter.kind === "marketing"
+          ? supabase
+              .from("push_preferences")
+              .select("member_id,marketing_enabled")
+              .eq("marketing_enabled", true)
+          : Promise.resolve(null);
+      const [consentResult, marketingPreferencesResult] = await Promise.all([
+        consentPromise,
+        marketingPreferencesPromise,
+      ]);
+
+      if (consentResult.error || marketingPreferencesResult?.error) {
+        return undefined;
+      }
+
+      let effectiveIds = getMemberIdSet(
+        (consentResult.data ?? []) as Array<{ member_id: string | null }>,
+      );
+      if (filter.kind === "marketing") {
+        effectiveIds = getEffectiveMarketingConsentMemberIds(
+          effectiveIds,
+          (marketingPreferencesResult?.data ?? []) as MemberMarketingPreferenceRow[],
+        );
+      }
+
+      return { filter, effectiveIds };
+    }),
+  );
+  if (filterResults.some((result) => result === undefined)) {
+    return undefined;
+  }
+
   const excludedIds = new Set<string>();
   let includedIds: Set<string> | null = null;
 
-  for (const filter of activeFilters) {
-    const { data, error } = await supabase
-      .from("member_policy_consents")
-      .select("member_id")
-      .eq("policy_document_id", filter.policyDocumentId);
-    if (error) {
-      return undefined;
-    }
-    const ids = getMemberIdSet(
-      (data ?? []) as Array<{ member_id: string | null }>,
-    );
-    let effectiveIds = ids;
-    if (filter.kind === "marketing") {
-      const { data: marketingPreferences, error: marketingPreferencesError } =
-        await supabase
-          .from("push_preferences")
-          .select("member_id,marketing_enabled")
-          .eq("marketing_enabled", true);
-      if (marketingPreferencesError) {
-        return undefined;
-      }
-      effectiveIds = getEffectiveMarketingConsentMemberIds(
-        ids,
-        (marketingPreferences ?? []) as MemberMarketingPreferenceRow[],
-      );
+  for (const result of filterResults) {
+    if (!result) {
+      continue;
     }
 
-    if (filter.value === "agreed") {
-      includedIds = intersectMemberIdSets(includedIds, effectiveIds);
+    if (result.filter.value === "agreed") {
+      includedIds = intersectMemberIdSets(includedIds, result.effectiveIds);
     } else {
-      effectiveIds.forEach((id) => excludedIds.add(id));
+      result.effectiveIds.forEach((id) => excludedIds.add(id));
     }
   }
 

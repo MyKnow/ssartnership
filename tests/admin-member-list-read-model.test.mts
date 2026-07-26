@@ -59,6 +59,16 @@ test("회원 목록 read-model은 오류를 안전한 상태로 돌려준다", a
   assert.doesNotMatch(source, /Error\.message/);
 });
 
+test("회원 고급 필터는 독립적인 설정·동의 조회를 병렬화한다", async () => {
+  const source = await readFile(memberReadModelPath, "utf8");
+
+  assert.equal(
+    (source.match(/Promise\.all\(\s*activeFilters\.map/g) ?? []).length,
+    2,
+  );
+  assert.match(source, /filterResults\.some\(\(result\) => result === undefined\)/);
+});
+
 test("회원 목록 URL 필터는 알려진 값만 수용하고 검색 입력을 제한한다", () => {
   const filters = parseAdminMemberListFilters({
     q: `  ${"가".repeat(120)}  `,
