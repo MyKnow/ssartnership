@@ -32,6 +32,26 @@ test("관리자 회원 목록은 페이지에서 DB 조회를 분리하고 서�
   assert.match(pageSource, /redirect\(`\/admin\/members\?/);
 });
 
+test("회원 목록은 추이 query를 핵심 목록과 분리해 먼저 렌더링할 수 있다", async () => {
+  const [pageSource, readModelSource, trendSectionSource] = await Promise.all([
+    readFile(memberPagePath, "utf8"),
+    readFile(memberReadModelPath, "utf8"),
+    readFile(
+      new URL(
+        "../src/components/admin/AdminMemberTrendSection.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(pageSource, /<Suspense/);
+  assert.match(pageSource, /<AdminMemberTrendSection/);
+  assert.match(readModelSource, /memberTrendQuery\s*\.then/);
+  assert.doesNotMatch(readModelSource, /\[memberResult, memberTrendResult\]/);
+  assert.match(trendSectionSource, /await trend/);
+});
+
 test("회원 목록 read-model은 오류를 안전한 상태로 돌려준다", async () => {
   const source = await readFile(memberReadModelPath, "utf8");
 
