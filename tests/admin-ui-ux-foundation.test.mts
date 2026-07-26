@@ -170,6 +170,10 @@ test("관리자 공통 진입점은 외래어 대신 한국어 업무 맥락을 
   assert.match(shellSource, />\s*관리자\s*</);
   assert.match(shellSource, /activeNavItem\?\.label \?\? title/);
   assert.match(mobileNavSource, />\s*관리자 메뉴\s*</);
+  assert.doesNotMatch(
+    mobileNavSource,
+    /className="fixed inset-0 isolate z-\[70\] md:hidden" aria-hidden=/,
+  );
   assert.match(quickNavigatorSource, />\s*바로 이동\s*</);
   assert.match(taskInboxSource, /eyebrow="업무"/);
   assert.match(dashboardSource, /eyebrow="운영"/);

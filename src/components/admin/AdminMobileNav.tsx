@@ -186,7 +186,7 @@ export default function AdminMobileNav({
 
       {open && typeof document !== "undefined"
         ? createPortal(
-            <div className="fixed inset-0 isolate z-[70] md:hidden" aria-hidden={!open}>
+            <div className="fixed inset-0 isolate z-[70] md:hidden">
               <button
                 type="button"
                 className="absolute inset-0 z-0 bg-black/55"
