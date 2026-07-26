@@ -151,18 +151,28 @@ export default function AdminReviewCardView({
         </details>
       ) : null}
 
-      <dl className="grid gap-3 rounded-xl border border-border bg-surface-muted/60 p-3 sm:grid-cols-2 lg:grid-cols-4">
-        <MetaItem label="상태" value={hiddenReason} />
-        <MetaItem label="작성자" value={`${review.memberName} · ${review.memberId}`} />
-        <MetaItem label="MM" value={review.memberUsername ?? "미등록"} />
-        <MetaItem label="캠퍼스" value={review.memberCampus ?? "미상"} />
-        <MetaItem label="파트너사" value={review.companyName ?? "미상"} />
-        <MetaItem label="제휴처" value={review.partnerName} />
-        <MetaItem label="작성" value={formatPartnerReviewDate(review.createdAt)} />
-        <MetaItem label="수정" value={formatPartnerReviewDate(review.updatedAt)} />
-      </dl>
+      <details className="group min-w-0 rounded-xl border border-border bg-surface-muted/60">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
+          <span>작성자·운영 정보</span>
+          <span className="text-right text-xs font-normal leading-5 text-muted-foreground">
+            {review.memberName} · {review.imageCount > 0 ? `사진 ${review.imageCount}장` : "사진 없음"}
+          </span>
+        </summary>
+        <div className="grid min-w-0 gap-4 border-t border-border/70 p-3">
+          <dl className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <MetaItem label="상태" value={hiddenReason} />
+            <MetaItem label="작성자" value={`${review.memberName} · ${review.memberId}`} />
+            <MetaItem label="MM" value={review.memberUsername ?? "미등록"} />
+            <MetaItem label="캠퍼스" value={review.memberCampus ?? "미상"} />
+            <MetaItem label="파트너사" value={review.companyName ?? "미상"} />
+            <MetaItem label="제휴처" value={review.partnerName} />
+            <MetaItem label="작성" value={formatPartnerReviewDate(review.createdAt)} />
+            <MetaItem label="수정" value={formatPartnerReviewDate(review.updatedAt)} />
+          </dl>
 
-      <AdminReviewImageGallery images={review.images} />
+          <AdminReviewImageGallery images={review.images} />
+        </div>
+      </details>
     </Card>
   );
 }
