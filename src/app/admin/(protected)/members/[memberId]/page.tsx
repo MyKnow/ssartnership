@@ -1,6 +1,13 @@
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import AdminShell from "@/components/admin/AdminShell";
 import AdminMemberDetailView from "@/components/admin/AdminMemberDetailView";
+import {
+  AdminMemberAccountBoundary,
+  AdminMemberDetailDeferredFallback,
+  AdminMemberOperationalBoundary,
+  AdminMemberProfilePhotoBoundary,
+} from "@/components/admin/AdminMemberDetailDeferredPanels";
 import AdminMemberDetailStatusMessages from "@/components/admin/member-detail/AdminMemberDetailStatusMessages";
 import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import Button from "@/components/ui/Button";
@@ -8,7 +15,11 @@ import { parseSsafyProfile } from "@/lib/mm-profile";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { formatSsafyMemberLifecycleLabel, getCurrentSsafyYear } from "@/lib/ssafy-year";
 import { canAdmin } from "@/lib/admin-permissions";
-import { getAdminMemberDetailReadModel } from "@/lib/admin-member-detail.server";
+import { normalizeAdminMemberNotificationPreferences } from "@/lib/admin-member-detail";
+import {
+  getAdminMemberDetailCoreReadModel,
+  getAdminMemberDetailOperationalReadModel,
+} from "@/lib/admin-member-detail.server";
 import {
   deleteMember,
   issueMemberEmailLoginTransition,
@@ -100,12 +111,13 @@ export default async function AdminMemberDetailPage({
     securityLogPageSize,
     backHref,
   });
-  const detail = await getAdminMemberDetailReadModel({
+  const operationalPromise = getAdminMemberDetailOperationalReadModel({
     memberId,
     canUpdateMembers,
     securityLogPage,
     securityLogPageSize,
   });
+  const detail = await getAdminMemberDetailCoreReadModel({ memberId });
 
   if (!detail.member) {
     if (detail.memberLoadError) {
@@ -151,6 +163,29 @@ export default async function AdminMemberDetailPage({
     "profile_images",
     "update",
   );
+  const canDeleteMembers = canAdmin(
+    adminSession.account.permissions,
+    "members",
+    "delete",
+  );
+  const accountManagerMember = {
+    id: member.id,
+    displayName,
+    campus,
+    generation,
+    mmUsername: member.mattermostUsername ?? "",
+    manualLoginId: member.manualLoginId,
+    mustChangePassword: member.mustChangePassword,
+    hasMattermostAccount: Boolean(member.mattermostAccountId),
+    mattermostLoginDisabledAt: member.mattermostLoginDisabledAt,
+    mattermostLoginDisabledReason: member.mattermostLoginDisabledReason,
+    ...(canUpdateMembers
+      ? {
+          email: member.email,
+          emailVerifiedAt: member.emailVerifiedAt,
+        }
+      : {}),
+  };
   return (
     <AdminShell title="회원 상세" backHref={backHref} backLabel={backLabel}>
       <div className="grid gap-4">
@@ -159,14 +194,6 @@ export default async function AdminMemberDetailPage({
           emailTransition={query.emailTransition}
           memberSync={query.memberSync}
         />
-      {detail.detailLoadError ? (
-        <AdminStatePanel
-          kind="error"
-          title="일부 회원 운영 정보를 불러오지 못했습니다."
-          description="기본 프로필은 표시하고 있습니다. 잠시 후 다시 확인해 주세요."
-          action={<Button href={retryHref} variant="secondary">다시 확인</Button>}
-        />
-      ) : null}
       <AdminMemberDetailView
         member={{
           id: member.id,
@@ -185,7 +212,6 @@ export default async function AdminMemberDetailPage({
             ? {
                 email: member.email,
                 emailVerifiedAt: member.emailVerifiedAt,
-                emailLoginTransition: detail.emailLoginTransition,
               }
             : {}),
           createdAt: member.createdAt,
@@ -193,35 +219,74 @@ export default async function AdminMemberDetailPage({
           hasAvatar,
           avatarUrl,
         }}
-        activeDeviceCount={detail.activeDeviceCount}
-        securityLogs={detail.securityLogs}
+        activeDeviceCount={null}
+        securityLogs={[]}
         securityLogPagination={{
-          totalCount: detail.securityLogTotalCount,
+          totalCount: 0,
           page: securityLogPage,
           pageSize: securityLogPageSize,
           pageSizeOptions: SECURITY_LOG_PAGE_SIZE_OPTIONS,
         }}
-        preferences={detail.preferences}
-        policyStates={detail.policyOverview.states}
-        consentTimeline={detail.policyOverview.timeline}
+        preferences={normalizeAdminMemberNotificationPreferences(null, 0)}
+        policyStates={[]}
+        consentTimeline={[]}
         updateAction={updateMember}
         deleteAction={deleteMember}
         emailLoginTransitionAction={issueMemberEmailLoginTransition}
         syncMemberProfileAction={syncMemberProfile}
         canUpdate={canUpdateMembers}
-        canDelete={canAdmin(
-          adminSession.account.permissions,
-          "members",
-          "delete",
-        )}
-        profilePhoto={canReadProfilePhotos ? {
-          reviewStatus: member.profilePhotoReviewStatus,
-          pendingImageId: detail.pendingProfilePhotoId,
-          canUpdate: canUpdateProfilePhotos,
-          approveAction: approveMemberProfilePhotoAction,
-          rejectReplacementAction: rejectMemberProfilePhotoAction,
-          rejectCurrentAction: rejectMemberCurrentProfilePhotoAction,
-        } : null}
+        canDelete={canDeleteMembers}
+        profilePhoto={null}
+        deferredProfilePhoto={canReadProfilePhotos ? (
+          <Suspense
+            fallback={
+              <AdminMemberDetailDeferredFallback label="프로필 사진 운영 정보를 불러오는 중입니다." />
+            }
+          >
+            <AdminMemberProfilePhotoBoundary
+              operational={operationalPromise}
+              memberId={member.id}
+              reviewStatus={member.profilePhotoReviewStatus}
+              canUpdate={canUpdateProfilePhotos}
+              approveAction={approveMemberProfilePhotoAction}
+              rejectReplacementAction={rejectMemberProfilePhotoAction}
+              rejectCurrentAction={rejectMemberCurrentProfilePhotoAction}
+            />
+          </Suspense>
+        ) : null}
+        deferredAccountManager={canUpdateMembers || canDeleteMembers ? (
+          <Suspense
+            fallback={
+              <AdminMemberDetailDeferredFallback label="계정 운영 도구를 불러오는 중입니다." />
+            }
+          >
+            <AdminMemberAccountBoundary
+              operational={operationalPromise}
+              member={accountManagerMember}
+              updateAction={updateMember}
+              deleteAction={deleteMember}
+              emailLoginTransitionAction={issueMemberEmailLoginTransition}
+              syncMemberProfileAction={syncMemberProfile}
+              canUpdate={canUpdateMembers}
+              canDelete={canDeleteMembers}
+            />
+          </Suspense>
+        ) : null}
+        deferredOperationalPanels={
+          <Suspense
+            fallback={
+              <AdminMemberDetailDeferredFallback label="알림·약관·보안 정보를 불러오는 중입니다." />
+            }
+          >
+            <AdminMemberOperationalBoundary
+              operational={operationalPromise}
+              retryHref={retryHref}
+              securityLogPage={securityLogPage}
+              securityLogPageSize={securityLogPageSize}
+              securityLogPageSizeOptions={SECURITY_LOG_PAGE_SIZE_OPTIONS}
+            />
+          </Suspense>
+        }
       />
       </div>
     </AdminShell>
