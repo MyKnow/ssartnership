@@ -2,7 +2,8 @@ import AdminGraduateVerificationQueue from "@/components/admin/AdminGraduateVeri
 import AdminShell from "@/components/admin/AdminShell";
 import { requireAdminPermission } from "@/lib/admin-access";
 import {
-  getAdminGraduateVerificationQueueReadModel,
+  getAdminGraduateSetupEmailRetryQueueReadModel,
+  getAdminGraduateVerificationRequestQueueReadModel,
   type AdminGraduateQueuePagination,
 } from "@/lib/admin-graduate-verification-queue.server";
 import { parseAdminReviewQueuePagination } from "@/lib/admin-ia";
@@ -66,32 +67,27 @@ export default async function AdminGraduateVerificationsPage({
   const setupEmailRetryPagination = parseAdminReviewQueuePagination({
     page: getOneSearchParam(params.setupEmailRetryPage),
   });
-  const queue = await getAdminGraduateVerificationQueueReadModel({
+  const requestQueuePromise = getAdminGraduateVerificationRequestQueueReadModel({
     requestPage: requestPagination.page,
     requestPageSize: requestPagination.pageSize,
+  });
+  const setupEmailRetryQueuePromise = getAdminGraduateSetupEmailRetryQueueReadModel({
     setupEmailRetryPage: setupEmailRetryPagination.page,
     setupEmailRetryPageSize: setupEmailRetryPagination.pageSize,
   });
-  const { queueLoadError } = queue;
-  const resolvedRequestPagination = queue.requestPagination;
-  const resolvedSetupEmailRetryPagination = queue.setupEmailRetryPagination;
+  const requestQueue = await requestQueuePromise;
+  const { queueLoadError } = requestQueue;
+  const resolvedRequestPagination = requestQueue.requestPagination;
   const requestTotalPages = getTotalPages(resolvedRequestPagination);
-  const setupEmailRetryTotalPages = getTotalPages(
-    resolvedSetupEmailRetryPagination,
-  );
 
   if (
     !queueLoadError &&
-    (requestPagination.page > requestTotalPages ||
-      setupEmailRetryPagination.page > setupEmailRetryTotalPages)
+    requestPagination.page > requestTotalPages
   ) {
     redirect(
       buildGraduateQueueHref({
         requestPage: Math.min(requestPagination.page, requestTotalPages),
-        setupEmailRetryPage: Math.min(
-          setupEmailRetryPagination.page,
-          setupEmailRetryTotalPages,
-        ),
+        setupEmailRetryPage: setupEmailRetryPagination.page,
       }),
     );
   }
@@ -104,8 +100,8 @@ export default async function AdminGraduateVerificationsPage({
   return (
     <AdminShell title="수료생 인증">
       <AdminGraduateVerificationQueue
-        requests={queue.requests}
-        setupEmailRetries={queue.setupEmailRetries}
+        requests={requestQueue.requests}
+        setupEmailRetryQueue={setupEmailRetryQueuePromise}
         actions={{
           startReview: startGraduateVerificationReviewAction,
           requestResubmission: requestGraduateVerificationResubmissionAction,
@@ -119,7 +115,6 @@ export default async function AdminGraduateVerificationsPage({
         })}
         returnTo={returnTo}
         requestPagination={resolvedRequestPagination}
-        setupEmailRetryPagination={resolvedSetupEmailRetryPagination}
         loadError={queueLoadError}
       />
     </AdminShell>

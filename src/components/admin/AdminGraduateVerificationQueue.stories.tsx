@@ -1,6 +1,8 @@
 import { expect, userEvent, within } from "storybook/test";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import AdminGraduateVerificationQueue from "./AdminGraduateVerificationQueue";
+import AdminGraduateVerificationQueue, {
+  AdminGraduateVerificationRetryLoading,
+} from "./AdminGraduateVerificationQueue";
 
 const noop = async () => undefined;
 
@@ -91,4 +93,8 @@ export const MediaViewer: Story = {
     await userEvent.click(body.getByRole("button", { name: "닫기" }));
     await expect(body.queryByRole("dialog", { name: "본인 사진 미리보기" })).not.toBeInTheDocument();
   },
+};
+
+export const AncillaryQueueLoading: Story = {
+  render: () => <AdminGraduateVerificationRetryLoading />,
 };

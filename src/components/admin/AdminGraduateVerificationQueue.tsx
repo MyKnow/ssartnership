@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import AdminGraduateVerificationMediaViewer from "@/components/admin/AdminGraduateVerificationMediaViewer";
 import AdminReviewQueueHeader from "@/components/admin/AdminReviewQueueHeader";
 import AdminStatePanel from "@/components/admin/AdminStatePanel";
@@ -43,10 +44,16 @@ type QueueActions = {
   resendSetupEmail: (formData: FormData) => Promise<void>;
 };
 
-type QueuePaginationState = {
+export type QueuePaginationState = {
   totalCount: number;
   page: number;
   pageSize: number;
+};
+
+type SetupEmailRetryQueue = {
+  setupEmailRetries: AdminGraduateSetupEmailRetry[];
+  setupEmailRetryPagination: QueuePaginationState;
+  queueLoadError: boolean;
 };
 
 function statusBadgeVariant(status: string) {
@@ -438,24 +445,16 @@ function GraduateVerificationDecisionCard({
   );
 }
 
-export default function AdminGraduateVerificationQueue({
+function GraduateVerificationHeader({
   requests,
-  setupEmailRetries,
-  actions,
-  feedback,
-  returnTo = "/admin/graduate-verifications",
   requestPagination,
-  setupEmailRetryPagination,
-  loadError = false,
+  setupEmailRetryCount,
+  feedback,
 }: {
   requests: AdminGraduateVerificationRequest[];
-  setupEmailRetries: AdminGraduateSetupEmailRetry[];
-  actions: QueueActions;
+  requestPagination: QueuePaginationState;
+  setupEmailRetryCount: number | null;
   feedback?: AdminReviewQueueFeedback | null;
-  returnTo?: string;
-  requestPagination?: QueuePaginationState;
-  setupEmailRetryPagination?: QueuePaginationState;
-  loadError?: boolean;
 }) {
   const submittedCount = requests.filter(
     (request) => request.status === "submitted",
@@ -463,66 +462,147 @@ export default function AdminGraduateVerificationQueue({
   const inReviewCount = requests.filter(
     (request) => request.status === "in_review",
   ).length;
-  const effectiveRequestPagination = requestPagination ?? {
-    totalCount: requests.length,
-    page: 1,
-    pageSize: Math.max(1, requests.length),
-  };
-  const effectiveSetupEmailRetryPagination = setupEmailRetryPagination ?? {
-    totalCount: setupEmailRetries.length,
-    page: 1,
-    pageSize: Math.max(1, setupEmailRetries.length),
-  };
 
   return (
-    <div className="grid min-w-0 gap-8">
-      <AdminReviewQueueHeader
-        eyebrow="검토"
-        title="수료생 인증 검토"
-        description="신규 수료생과 기존 회원 복구 요청의 증빙을 확인하고, 다음 상태로 안전하게 전환합니다."
-        actions={
-          <Button href="#graduate-request-queue-heading" variant="secondary">
-            신규 인증으로
-          </Button>
-        }
-        metrics={[
-          {
-            label: "검토 대기",
-            value: `${effectiveRequestPagination.totalCount.toLocaleString("ko-KR")}건`,
-            hint: "현재 큐에 있는 요청",
-          },
-          {
-            label: "신규 접수",
-            value: `${submittedCount}건`,
-            hint: "현재 페이지에서 아직 검토 전",
-          },
-          {
-            label: "검토 중",
-            value: `${inReviewCount}건`,
-            hint: "현재 페이지에서 관리자 확인 중",
-          },
-          {
-            label: "메일 재발송",
-            value: `${effectiveSetupEmailRetryPagination.totalCount.toLocaleString("ko-KR")}건`,
-            hint: "설정 메일 실패 건",
-          },
-        ]}
-        feedback={feedback}
-        nextAction={{
-          title:
-            requests.length > 0
-              ? "증빙과 요청 유형을 확인한 뒤 검토를 시작하세요."
-              : "새 인증 요청이 들어오면 증빙과 요청 유형부터 확인하세요.",
-          description:
-            "기존 회원 복구 요청은 대상 회원 ID와 신청 이메일을 함께 확인해야 새 회원이 중복 생성되지 않습니다.",
-        }}
-      />
+    <AdminReviewQueueHeader
+      eyebrow="검토"
+      title="수료생 인증 검토"
+      description="신규 수료생과 기존 회원 복구 요청의 증빙을 확인하고, 다음 상태로 안전하게 전환합니다."
+      actions={
+        <Button href="#graduate-request-queue-heading" variant="secondary">
+          신규 인증으로
+        </Button>
+      }
+      metrics={[
+        {
+          label: "검토 대기",
+          value: `${requestPagination.totalCount.toLocaleString("ko-KR")}건`,
+          hint: "현재 큐에 있는 요청",
+        },
+        {
+          label: "신규 접수",
+          value: `${submittedCount}건`,
+          hint: "현재 페이지에서 아직 검토 전",
+        },
+        {
+          label: "검토 중",
+          value: `${inReviewCount}건`,
+          hint: "현재 페이지에서 관리자 확인 중",
+        },
+        {
+          label: "메일 재발송",
+          value:
+            setupEmailRetryCount === null
+              ? "확인 중"
+              : `${setupEmailRetryCount.toLocaleString("ko-KR")}건`,
+          hint:
+            setupEmailRetryCount === null
+              ? "보조 큐를 불러오는 중"
+              : "설정 메일 실패 건",
+        },
+      ]}
+      feedback={feedback}
+      nextAction={{
+        title:
+          requests.length > 0
+            ? "증빙과 요청 유형을 확인한 뒤 검토를 시작하세요."
+            : "새 인증 요청이 들어오면 증빙과 요청 유형부터 확인하세요.",
+        description:
+          "기존 회원 복구 요청은 대상 회원 ID와 신청 이메일을 함께 확인해야 새 회원이 중복 생성되지 않습니다.",
+      }}
+    />
+  );
+}
 
+function GraduateVerificationRequestSection({
+  requests,
+  actions,
+  returnTo,
+  pagination,
+}: {
+  requests: AdminGraduateVerificationRequest[];
+  actions: QueueActions;
+  returnTo: string;
+  pagination: QueuePaginationState;
+}) {
+  return (
+    <section
+      className="space-y-4"
+      aria-labelledby="graduate-request-queue-heading"
+    >
+      <div>
+        <p className="ui-kicker">New verification</p>
+        <h2
+          id="graduate-request-queue-heading"
+          className="text-xl font-semibold"
+        >
+          신규 인증
+        </h2>
+      </div>
+      <QueuePagination
+        label="신규 인증"
+        pagination={pagination}
+        returnTo={returnTo}
+        pageParam="requestPage"
+      />
+      {requests.length === 0 ? (
+        <EmptyState
+          title="검토할 신규 인증이 없습니다."
+          description="새 수료생 신청이 제출되면 이곳에서 수료증과 사진을 함께 검토합니다."
+          action={
+            <Button href="/admin/graduate-verifications" variant="secondary">
+              큐 새로고침
+            </Button>
+          }
+        />
+      ) : (
+        <div className="grid gap-4">
+          {requests.map((request) => (
+            <GraduateVerificationDecisionCard
+              key={request.id}
+              request={request}
+              actions={actions}
+              returnTo={returnTo}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function GraduateSetupEmailRetrySection({
+  setupEmailRetries,
+  pagination,
+  actions,
+  returnTo,
+  loadError,
+}: {
+  setupEmailRetries: AdminGraduateSetupEmailRetry[];
+  pagination: QueuePaginationState;
+  actions: QueueActions;
+  returnTo: string;
+  loadError: boolean;
+}) {
+  return (
+    <section
+      className="space-y-4"
+      aria-labelledby="graduate-setup-email-retry-heading"
+    >
+      <div>
+        <p className="ui-kicker">Account setup</p>
+        <h2
+          id="graduate-setup-email-retry-heading"
+          className="text-xl font-semibold"
+        >
+          비밀번호 설정 메일 재발송
+        </h2>
+      </div>
       {loadError ? (
         <AdminStatePanel
           kind="error"
-          title="수료생 인증 요청을 불러오지 못했습니다."
-          description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 담당자에게 알려 주세요."
+          title="메일 재발송 대상을 불러오지 못했습니다."
+          description="인증 검토는 계속할 수 있습니다. 잠시 후 다시 확인해 주세요."
           action={
             <Button href={returnTo} variant="secondary">
               다시 확인
@@ -531,118 +611,253 @@ export default function AdminGraduateVerificationQueue({
         />
       ) : (
         <>
-          <section
-            className="space-y-4"
-            aria-labelledby="graduate-request-queue-heading"
-          >
-            <div>
-              <p className="ui-kicker">New verification</p>
-              <h2
-                id="graduate-request-queue-heading"
-                className="text-xl font-semibold"
-              >
-                신규 인증
-              </h2>
-            </div>
-            <QueuePagination
-              label="신규 인증"
-              pagination={effectiveRequestPagination}
-              returnTo={returnTo}
-              pageParam="requestPage"
+          <QueuePagination
+            label="메일 재발송"
+            pagination={pagination}
+            returnTo={returnTo}
+            pageParam="setupEmailRetryPage"
+          />
+          {setupEmailRetries.length === 0 ? (
+            <EmptyState
+              title="재발송할 비밀번호 설정 메일이 없습니다."
+              description="승인 직후 메일 전송에 실패한 수료생 계정만 이곳에 표시됩니다."
+              action={
+                <Button href="/admin/graduate-verifications" variant="secondary">
+                  큐 새로고침
+                </Button>
+              }
             />
-            {requests.length === 0 ? (
-              <EmptyState
-                title="검토할 신규 인증이 없습니다."
-                description="새 수료생 신청이 제출되면 이곳에서 수료증과 사진을 함께 검토합니다."
-                action={
-                  <Button
-                    href="/admin/graduate-verifications"
-                    variant="secondary"
-                  >
-                    큐 새로고침
-                  </Button>
-                }
-              />
-            ) : (
-              <div className="grid gap-4">
-                {requests.map((request) => (
-                  <GraduateVerificationDecisionCard
-                    key={request.id}
-                    request={request}
-                    actions={actions}
-                    returnTo={returnTo}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
+          ) : (
+            <div className="grid gap-4">
+              {setupEmailRetries.map((request) => (
+                <Card
+                  key={request.id}
+                  padding="md"
+                  className="flex min-w-0 flex-wrap items-center justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <h3 className="font-semibold">{request.legal_name}</h3>
+                    <p
+                      className="mt-1 max-w-full truncate text-sm text-muted-foreground"
+                      title={request.email}
+                    >
+                      {request.email}
+                    </p>
+                    <p className="mt-1 text-xs text-danger">
+                      이전 비밀번호 설정 메일 전송에 실패했습니다.
+                    </p>
+                  </div>
+                  <form action={actions.resendSetupEmail}>
+                    <QueueActionFields
+                      requestId={request.id}
+                      returnTo={returnTo}
+                    />
+                    <SubmitButton pendingText="설정 메일을 다시 보내는 중">
+                      설정 메일 다시 보내기
+                    </SubmitButton>
+                  </form>
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
 
-          <section
-            className="space-y-4"
-            aria-labelledby="graduate-setup-email-retry-heading"
-          >
-            <div>
-              <p className="ui-kicker">Account setup</p>
-              <h2
-                id="graduate-setup-email-retry-heading"
-                className="text-xl font-semibold"
-              >
-                비밀번호 설정 메일 재발송
-              </h2>
-            </div>
-            <QueuePagination
-              label="메일 재발송"
-              pagination={effectiveSetupEmailRetryPagination}
+function GraduateVerificationLoadError({ returnTo }: { returnTo: string }) {
+  return (
+    <AdminStatePanel
+      kind="error"
+      title="수료생 인증 요청을 불러오지 못했습니다."
+      description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 담당자에게 알려 주세요."
+      action={
+        <Button href={returnTo} variant="secondary">
+          다시 확인
+        </Button>
+      }
+    />
+  );
+}
+
+export default function AdminGraduateVerificationQueue({
+  requests,
+  setupEmailRetries,
+  setupEmailRetryQueue,
+  actions,
+  feedback,
+  returnTo = "/admin/graduate-verifications",
+  requestPagination,
+  setupEmailRetryPagination,
+  loadError = false,
+}: {
+  requests: AdminGraduateVerificationRequest[];
+  setupEmailRetries?: AdminGraduateSetupEmailRetry[];
+  setupEmailRetryQueue?: Promise<SetupEmailRetryQueue>;
+  actions: QueueActions;
+  feedback?: AdminReviewQueueFeedback | null;
+  returnTo?: string;
+  requestPagination?: QueuePaginationState;
+  setupEmailRetryPagination?: QueuePaginationState;
+  loadError?: boolean;
+}) {
+  if (setupEmailRetryQueue) {
+    return (
+      <AdminGraduateVerificationStreamingView
+        requests={requests}
+        setupEmailRetryQueue={setupEmailRetryQueue}
+        actions={actions}
+        feedback={feedback}
+        returnTo={returnTo}
+        requestPagination={requestPagination}
+        loadError={loadError}
+      />
+    );
+  }
+
+  const safeSetupEmailRetries = setupEmailRetries ?? [];
+  const effectiveRequestPagination = requestPagination ?? {
+    totalCount: requests.length,
+    page: 1,
+    pageSize: Math.max(1, requests.length),
+  };
+  const effectiveSetupEmailRetryPagination = setupEmailRetryPagination ?? {
+    totalCount: safeSetupEmailRetries.length,
+    page: 1,
+    pageSize: Math.max(1, safeSetupEmailRetries.length),
+  };
+
+  return (
+    <div className="grid min-w-0 gap-8">
+      <GraduateVerificationHeader
+        requests={requests}
+        requestPagination={effectiveRequestPagination}
+        setupEmailRetryCount={effectiveSetupEmailRetryPagination.totalCount}
+        feedback={feedback}
+      />
+
+      {loadError ? (
+        <GraduateVerificationLoadError returnTo={returnTo} />
+      ) : (
+        <>
+          <GraduateVerificationRequestSection
+            requests={requests}
+            actions={actions}
+            returnTo={returnTo}
+            pagination={effectiveRequestPagination}
+          />
+
+          <GraduateSetupEmailRetrySection
+            setupEmailRetries={safeSetupEmailRetries}
+            pagination={effectiveSetupEmailRetryPagination}
+            actions={actions}
+            returnTo={returnTo}
+            loadError={false}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+export function AdminGraduateVerificationRetryLoading() {
+  return (
+    <section
+      className="space-y-4"
+      aria-labelledby="graduate-setup-email-retry-heading"
+      aria-busy="true"
+    >
+      <div>
+        <p className="ui-kicker">Account setup</p>
+        <h2
+          id="graduate-setup-email-retry-heading"
+          className="text-xl font-semibold"
+        >
+          비밀번호 설정 메일 재발송
+        </h2>
+      </div>
+      <Surface level="inset" padding="md">
+        <p role="status" className="text-sm text-muted-foreground">
+          메일 재발송 대상을 확인하는 중입니다. 신규 인증 검토는 지금 바로 시작할 수 있습니다.
+        </p>
+      </Surface>
+    </section>
+  );
+}
+
+async function GraduateVerificationRetryBoundary({
+  setupEmailRetryQueue,
+  actions,
+  returnTo,
+}: {
+  setupEmailRetryQueue: Promise<SetupEmailRetryQueue>;
+  actions: QueueActions;
+  returnTo: string;
+}) {
+  const queue = await setupEmailRetryQueue;
+
+  return (
+    <GraduateSetupEmailRetrySection
+      setupEmailRetries={queue.setupEmailRetries}
+      pagination={queue.setupEmailRetryPagination}
+      actions={actions}
+      returnTo={returnTo}
+      loadError={queue.queueLoadError}
+    />
+  );
+}
+
+function AdminGraduateVerificationStreamingView({
+  requests,
+  setupEmailRetryQueue,
+  actions,
+  feedback,
+  returnTo,
+  requestPagination,
+  loadError,
+}: {
+  requests: AdminGraduateVerificationRequest[];
+  setupEmailRetryQueue: Promise<SetupEmailRetryQueue>;
+  actions: QueueActions;
+  feedback?: AdminReviewQueueFeedback | null;
+  returnTo: string;
+  requestPagination?: QueuePaginationState;
+  loadError: boolean;
+}) {
+  const effectiveRequestPagination = requestPagination ?? {
+    totalCount: requests.length,
+    page: 1,
+    pageSize: Math.max(1, requests.length),
+  };
+
+  return (
+    <div className="grid min-w-0 gap-8">
+      <GraduateVerificationHeader
+        requests={requests}
+        requestPagination={effectiveRequestPagination}
+        setupEmailRetryCount={null}
+        feedback={feedback}
+      />
+
+      {loadError ? (
+        <GraduateVerificationLoadError returnTo={returnTo} />
+      ) : (
+        <>
+          <GraduateVerificationRequestSection
+            requests={requests}
+            actions={actions}
+            returnTo={returnTo}
+            pagination={effectiveRequestPagination}
+          />
+
+          <Suspense fallback={<AdminGraduateVerificationRetryLoading />}>
+            <GraduateVerificationRetryBoundary
+              setupEmailRetryQueue={setupEmailRetryQueue}
+              actions={actions}
               returnTo={returnTo}
-              pageParam="setupEmailRetryPage"
             />
-            {setupEmailRetries.length === 0 ? (
-              <EmptyState
-                title="재발송할 비밀번호 설정 메일이 없습니다."
-                description="승인 직후 메일 전송에 실패한 수료생 계정만 이곳에 표시됩니다."
-                action={
-                  <Button
-                    href="/admin/graduate-verifications"
-                    variant="secondary"
-                  >
-                    큐 새로고침
-                  </Button>
-                }
-              />
-            ) : (
-              <div className="grid gap-4">
-                {setupEmailRetries.map((request) => (
-                  <Card
-                    key={request.id}
-                    padding="md"
-                    className="flex min-w-0 flex-wrap items-center justify-between gap-3"
-                  >
-                    <div className="min-w-0">
-                      <h3 className="font-semibold">{request.legal_name}</h3>
-                      <p
-                        className="mt-1 max-w-full truncate text-sm text-muted-foreground"
-                        title={request.email}
-                      >
-                        {request.email}
-                      </p>
-                      <p className="mt-1 text-xs text-danger">
-                        이전 비밀번호 설정 메일 전송에 실패했습니다.
-                      </p>
-                    </div>
-                    <form action={actions.resendSetupEmail}>
-                      <QueueActionFields
-                        requestId={request.id}
-                        returnTo={returnTo}
-                      />
-                      <SubmitButton pendingText="설정 메일을 다시 보내는 중">
-                        설정 메일 다시 보내기
-                      </SubmitButton>
-                    </form>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </section>
+          </Suspense>
         </>
       )}
     </div>
