@@ -29,9 +29,9 @@ test("관리 메뉴는 작업 중심 여섯 그룹과 기존 권한 필터를 �
     { includeGlobalItems: false },
   );
   assert.equal(
-    regionalGroups.flatMap((group) => group.items).some(
-      (item) => item.href === "/admin/categories",
-    ),
+    regionalGroups
+      .flatMap((group) => group.items)
+      .some((item) => item.href === "/admin/categories"),
     false,
   );
 });
@@ -52,11 +52,17 @@ test("회원 화면은 내부 오류를 노출하지 않고 목록 이후에 보
 test("회원과 제휴처 목록은 URL 페이지 전환을 즉시 상태로 알리고 중복 요청을 막는다", async () => {
   const [memberSource, partnerSource] = await Promise.all([
     readFile(
-      new URL("../src/components/admin/AdminMemberManager.tsx", import.meta.url),
+      new URL(
+        "../src/components/admin/AdminMemberManager.tsx",
+        import.meta.url,
+      ),
       "utf8",
     ),
     readFile(
-      new URL("../src/components/admin/AdminPartnerManager.tsx", import.meta.url),
+      new URL(
+        "../src/components/admin/AdminPartnerManager.tsx",
+        import.meta.url,
+      ),
       "utf8",
     ),
   ]);
@@ -64,8 +70,13 @@ test("회원과 제휴처 목록은 URL 페이지 전환을 즉시 상태로 알
   for (const source of [memberSource, partnerSource]) {
     assert.match(source, /useTransition/);
     assert.match(source, /requestedPage/);
+    assert.match(source, /router\.prefetch/);
+    assert.match(source, /prefetchPage/);
     assert.match(source, /페이지 결과를 불러오는 중입니다/);
-    assert.match(source, /aria-busy=\{isPageNavigationPending \|\| undefined\}/);
+    assert.match(
+      source,
+      /aria-busy=\{isPageNavigationPending \|\| undefined\}/,
+    );
     assert.match(source, /router\.replace/);
   }
 
@@ -97,7 +108,10 @@ test("관리 셸은 반복 탐색을 건너뛰고 빠른 찾기 전환 중 즉�
       "utf8",
     ),
     readFile(
-      new URL("../src/components/admin/AdminQuickNavigator.tsx", import.meta.url),
+      new URL(
+        "../src/components/admin/AdminQuickNavigator.tsx",
+        import.meta.url,
+      ),
       "utf8",
     ),
   ]);
@@ -110,7 +124,10 @@ test("관리 셸은 반복 탐색을 건너뛰고 빠른 찾기 전환 중 즉�
   assert.match(navigatorSource, /aria-busy=\{isRoutePending \|\| undefined\}/);
   assert.match(navigatorSource, /role="status" aria-live="polite"/);
   assert.match(navigatorSource, /선택한 관리 화면을 여는 중입니다\./);
-  assert.match(navigatorSource, /aria-disabled=\{isRoutePending \|\| undefined\}/);
+  assert.match(
+    navigatorSource,
+    /aria-disabled=\{isRoutePending \|\| undefined\}/,
+  );
 });
 
 test("관리자 공통 진입점은 외래어 대신 한국어 업무 맥락을 표시한다", async () => {
@@ -120,29 +137,37 @@ test("관리자 공통 진입점은 외래어 대신 한국어 업무 맥락을 
     quickNavigatorSource,
     taskInboxSource,
     dashboardSource,
-  ] =
-    await Promise.all([
-      readFile(
-        new URL("../src/components/admin/AdminShellView.tsx", import.meta.url),
-        "utf8",
+  ] = await Promise.all([
+    readFile(
+      new URL("../src/components/admin/AdminShellView.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/components/admin/AdminMobileNav.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/components/admin/AdminQuickNavigator.tsx",
+        import.meta.url,
       ),
-      readFile(
-        new URL("../src/components/admin/AdminMobileNav.tsx", import.meta.url),
-        "utf8",
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/components/admin/AdminTaskInboxView.tsx",
+        import.meta.url,
       ),
-      readFile(
-        new URL("../src/components/admin/AdminQuickNavigator.tsx", import.meta.url),
-        "utf8",
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/components/admin/AdminDashboardView.tsx",
+        import.meta.url,
       ),
-      readFile(
-        new URL("../src/components/admin/AdminTaskInboxView.tsx", import.meta.url),
-        "utf8",
-      ),
-      readFile(
-        new URL("../src/components/admin/AdminDashboardView.tsx", import.meta.url),
-        "utf8",
-      ),
-    ]);
+      "utf8",
+    ),
+  ]);
 
   assert.match(shellSource, />\s*관리자\s*</);
   assert.match(shellSource, /activeNavItem\?\.label \?\? title/);
