@@ -1,6 +1,7 @@
 import AdminProfilePhotoReviewQueue from "@/components/admin/AdminProfilePhotoReviewQueue";
 import AdminShell from "@/components/admin/AdminShell";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { canAdmin } from "@/lib/admin-permissions";
 import {
   getAdminCurrentProfilePhotoQueueReadModel,
   getAdminProfilePhotoReplacementQueueReadModel,
@@ -25,7 +26,9 @@ export default async function AdminProfilePhotosPage({
     focus?: string;
   }>;
 }) {
-  await requireAdminPermission("profile_images", "read", { path: "/admin/profile-photos" });
+  const session = await requireAdminPermission("profile_images", "read", {
+    path: "/admin/profile-photos",
+  });
   const currentPhotosPromise = getAdminCurrentProfilePhotoQueueReadModel();
   const { replacements, queueLoadError } =
     await getAdminProfilePhotoReplacementQueueReadModel();
@@ -49,6 +52,11 @@ export default async function AdminProfilePhotosPage({
         returnTo={returnTo}
         loadError={queueLoadError}
         focusReasonTarget={params.focus}
+        canUpdate={canAdmin(
+          session.account.permissions,
+          "profile_images",
+          "update",
+        )}
       />
     </AdminShell>
   );
