@@ -76,3 +76,27 @@ export const SearchActualTarget: Story = {
     ).toHaveAttribute("href", "/admin/search?q=%EB%A5%B4%EB%B8%94%EB%9D%BC%EC%8D%B8+%EA%B0%95%EB%82%A8%EC%A0%90");
   },
 };
+
+export const KeyboardSelectsResult: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      canvas.getByRole("button", { name: "빠른 찾기 열기" }),
+    );
+
+    const body = within(document.body);
+    const query = body.getByRole("searchbox", { name: "관리 화면 찾기" });
+    await userEvent.type(query, "변경 승인");
+    await userEvent.keyboard("{ArrowDown}");
+
+    const result = body.getByRole("option", { name: /변경 요청/ });
+    await expect(result).toHaveAttribute("aria-selected", "true");
+    await expect(query).toHaveAttribute(
+      "aria-activedescendant",
+      result.getAttribute("id") ?? "",
+    );
+
+    await userEvent.keyboard("{Enter}");
+    await expect(body.queryByRole("dialog")).not.toBeInTheDocument();
+  },
+};
