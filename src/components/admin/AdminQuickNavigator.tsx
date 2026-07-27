@@ -78,6 +78,7 @@ export default function AdminQuickNavigatorProvider({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [activeItemIndex, setActiveItemIndex] = useState(-1);
   const [pendingDestination, setPendingDestination] = useState<string | null>(null);
   const [isRoutePending, startRouteTransition] = useTransition();
   const router = useRouter();
@@ -94,6 +95,7 @@ export default function AdminQuickNavigatorProvider({
     openerRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setQuery("");
+    setActiveItemIndex(-1);
     setPendingDestination(null);
     setOpen(true);
   };
@@ -115,6 +117,32 @@ export default function AdminQuickNavigatorProvider({
       return;
     }
     navigateTo(href);
+  };
+
+  const handleQueryKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (isRoutePending || items.length === 0) {
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveItemIndex((current) => Math.min(current + 1, items.length - 1));
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveItemIndex((current) => Math.max(current - 1, -1));
+      return;
+    }
+
+    if (event.key === "Enter" && activeItemIndex >= 0) {
+      event.preventDefault();
+      const item = items[activeItemIndex];
+      if (item) {
+        navigateTo(item.href);
+      }
+    }
   };
 
   useEffect(() => {
@@ -243,9 +271,19 @@ export default function AdminQuickNavigatorProvider({
                       id="admin-quick-navigator-query"
                       type="search"
                       value={query}
-                      onChange={(event) => setQuery(event.target.value)}
+                      onChange={(event) => {
+                        setQuery(event.target.value);
+                        setActiveItemIndex(-1);
+                      }}
+                      onKeyDown={handleQueryKeyDown}
                       placeholder="예: 변경 승인, 회원, 발송"
                       disabled={isRoutePending}
+                      aria-controls="admin-quick-navigator-results"
+                      aria-activedescendant={
+                        activeItemIndex >= 0
+                          ? `admin-quick-navigator-option-${activeItemIndex}`
+                          : undefined
+                      }
                       className="h-12 min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground"
                     />
                     <Button
@@ -298,47 +336,68 @@ export default function AdminQuickNavigatorProvider({
                       <ArrowRightIcon className="h-5 w-5 shrink-0 text-primary transition-transform group-hover:translate-x-0.5" />
                     </Link>
                   ) : null}
-                  {items.length > 0 ? (
-                    <div className="grid gap-2" aria-label="찾은 관리 화면">
-                      {items.map((item) => {
+                  <div
+                    id="admin-quick-navigator-results"
+                    className="grid gap-2"
+                    role={items.length > 0 ? "listbox" : undefined}
+                    aria-label={items.length > 0 ? "찾은 관리 화면" : undefined}
+                  >
+                    {items.length > 0 ? (
+                      items.map((item, itemIndex) => {
                         const Icon = ADMIN_NAV_ICON_BY_KEY[item.iconKey];
                         return (
-                          <Link
+                          <div
                             key={item.href}
-                            href={item.href}
-                            prefetch={false}
-                            aria-disabled={isRoutePending || undefined}
-                            tabIndex={isRoutePending ? -1 : undefined}
-                            onClick={(event) => {
-                              event.preventDefault();
-                              navigateTo(item.href);
-                            }}
+                            id={`admin-quick-navigator-option-${itemIndex}`}
+                            role="option"
+                            aria-selected={activeItemIndex === itemIndex}
+                            onMouseEnter={() => setActiveItemIndex(itemIndex)}
                             className={cn(
-                              "group flex min-w-0 items-center gap-3 rounded-card border border-border/70 bg-surface-inset p-3 text-left transition-colors hover:border-strong hover:bg-surface-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                              isRoutePending ? "pointer-events-none opacity-60" : null,
+                              "rounded-card",
+                              activeItemIndex === itemIndex
+                                ? "ring-2 ring-primary/20 ring-offset-2 ring-offset-background"
+                                : null,
                             )}
                           >
-                            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-surface-muted text-foreground">
-                              <Icon className="h-5 w-5" />
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate font-semibold text-foreground">
-                                {item.label}
+                            <Link
+                              href={item.href}
+                              prefetch={false}
+                              aria-disabled={isRoutePending || undefined}
+                              tabIndex={isRoutePending ? -1 : undefined}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                navigateTo(item.href);
+                              }}
+                              className={cn(
+                                "group flex min-w-0 items-center gap-3 rounded-card border border-border/70 bg-surface-inset p-3 text-left transition-colors hover:border-strong hover:bg-surface-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                                activeItemIndex === itemIndex
+                                  ? "border-primary/45 bg-primary-soft/60"
+                                  : null,
+                                isRoutePending ? "pointer-events-none opacity-60" : null,
+                              )}
+                            >
+                              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-surface-muted text-foreground">
+                                <Icon className="h-5 w-5" />
                               </span>
-                              <span className="mt-0.5 block text-sm text-muted-foreground">
-                                {item.description}
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate font-semibold text-foreground">
+                                  {item.label}
+                                </span>
+                                <span className="mt-0.5 block text-sm text-muted-foreground">
+                                  {item.description}
+                                </span>
                               </span>
-                            </span>
-                            <ArrowRightIcon className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-                          </Link>
+                              <ArrowRightIcon className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                            </Link>
+                          </div>
                         );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="rounded-card border border-border/70 bg-surface-inset p-5 text-sm text-muted-foreground">
-                      일치하는 관리 화면이 없습니다. 다른 단어로 다시 찾아보세요.
-                    </div>
-                  )}
+                      })
+                    ) : (
+                      <div className="rounded-card border border-border/70 bg-surface-inset p-5 text-sm text-muted-foreground">
+                        일치하는 관리 화면이 없습니다. 다른 단어로 다시 찾아보세요.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>,
