@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { trackProductEvent } from "@/lib/product-events";
 import {
@@ -16,18 +16,71 @@ type PendingNavigation = {
 };
 
 let pendingNavigation: PendingNavigation | null = null;
-const ADMIN_NAVIGATION_START_EVENT = "admin:navigation-start";
+let navigationIndicatorTimer: number | null = null;
+let navigationExpiryTimer: number | null = null;
+const ADMIN_NAVIGATION_PROGRESS_ID = "admin-navigation-progress";
+
+function clearNavigationIndicatorTimer() {
+  if (navigationIndicatorTimer === null || typeof window === "undefined") {
+    return;
+  }
+
+  window.clearTimeout(navigationIndicatorTimer);
+  navigationIndicatorTimer = null;
+}
+
+function clearNavigationExpiryTimer() {
+  if (navigationExpiryTimer === null || typeof window === "undefined") {
+    return;
+  }
+
+  window.clearTimeout(navigationExpiryTimer);
+  navigationExpiryTimer = null;
+}
+
+function setNavigationIndicatorVisible(visible: boolean) {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const indicator = document.getElementById(ADMIN_NAVIGATION_PROGRESS_ID);
+  if (indicator) {
+    indicator.toggleAttribute("hidden", !visible);
+  }
+}
 
 function clearPendingNavigation() {
   pendingNavigation = null;
+  clearNavigationIndicatorTimer();
+  clearNavigationExpiryTimer();
+  setNavigationIndicatorVisible(false);
 }
 
 export function markAdminNavigationStart(trigger: AdminRouteTimingTrigger) {
   if (typeof window === "undefined" || !Number.isFinite(performance.now())) {
     return;
   }
-  pendingNavigation = { startedAt: performance.now(), trigger };
-  window.dispatchEvent(new Event(ADMIN_NAVIGATION_START_EVENT));
+  const startedAt = performance.now();
+  pendingNavigation = { startedAt, trigger };
+  clearNavigationIndicatorTimer();
+  clearNavigationExpiryTimer();
+
+  // Next.js can call history.pushState from an insertion effect. Keep the
+  // progress affordance outside React state so this instrumentation never
+  // schedules a render from that lifecycle, while fast navigations avoid a
+  // visible flash.
+  navigationIndicatorTimer = window.setTimeout(() => {
+    navigationIndicatorTimer = null;
+    if (pendingNavigation?.startedAt !== startedAt) {
+      return;
+    }
+    setNavigationIndicatorVisible(true);
+  }, 80);
+  navigationExpiryTimer = window.setTimeout(() => {
+    if (pendingNavigation?.startedAt === startedAt) {
+      clearPendingNavigation();
+    }
+  }, 15_000);
 }
 
 function consumePendingNavigation() {
@@ -73,55 +126,22 @@ function getInitialNavigationDuration() {
 export default function AdminNavigationTiming() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [isNavigationPending, setIsNavigationPending] = useState(false);
   const serializedSearchParams = searchParams.toString();
   const locationKey = `${pathname}${serializedSearchParams ? `?${serializedSearchParams}` : ""}`;
   const lastReportedLocationRef = useRef<string | null>(null);
   const lastNavigationLocationRef = useRef(locationKey);
 
   useEffect(() => {
-    const handleNavigationStart = () => {
-      setIsNavigationPending(true);
-    };
-
-    window.addEventListener(
-      ADMIN_NAVIGATION_START_EVENT,
-      handleNavigationStart,
-    );
-    return () =>
-      window.removeEventListener(
-        ADMIN_NAVIGATION_START_EVENT,
-        handleNavigationStart,
-      );
-  }, []);
-
-  useEffect(() => {
-    if (!isNavigationPending) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      clearPendingNavigation();
-      setIsNavigationPending(false);
-    }, 15_000);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [isNavigationPending]);
-
-  useEffect(() => {
     const locationChanged = lastNavigationLocationRef.current !== locationKey;
     lastNavigationLocationRef.current = locationKey;
-    if (!isNavigationPending || !locationChanged) {
+    if (!pendingNavigation || !locationChanged) {
       return;
     }
 
-    clearPendingNavigation();
-    const clearIndicatorId = window.setTimeout(() => {
-      setIsNavigationPending(false);
-    }, 0);
-
-    return () => window.clearTimeout(clearIndicatorId);
-  }, [isNavigationPending, locationKey]);
+    clearNavigationIndicatorTimer();
+    clearNavigationExpiryTimer();
+    setNavigationIndicatorVisible(false);
+  }, [locationKey]);
 
   useEffect(() => {
     const markFromClick = (event: MouseEvent) => {
@@ -219,8 +239,10 @@ export default function AdminNavigationTiming() {
     });
   }, [locationKey, pathname]);
 
-  return isNavigationPending ? (
+  return (
     <div
+      id={ADMIN_NAVIGATION_PROGRESS_ID}
+      hidden
       role="status"
       aria-live="polite"
       aria-atomic="true"
@@ -232,5 +254,5 @@ export default function AdminNavigationTiming() {
         className="block h-full w-2/5 origin-left animate-pulse bg-primary motion-reduce:animate-none"
       />
     </div>
-  ) : null;
+  );
 }

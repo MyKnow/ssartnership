@@ -140,6 +140,25 @@ test("관리 셸은 반복 탐색을 건너뛰고 빠른 찾기 전환 중 즉�
   assert.match(shellSource, /onPointerEnter=\{\(\) => prefetchOnIntent/);
 });
 
+test("관리자 전환 계측은 Next.js insertion effect 중 동기 상태 갱신을 피한다", async () => {
+  const source = await readFile(
+    new URL(
+      "../src/components/analytics/AdminNavigationTiming.tsx",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  assert.match(source, /navigationIndicatorTimer/);
+  assert.match(source, /ADMIN_NAVIGATION_PROGRESS_ID/);
+  assert.match(source, /window\.setTimeout\(\(\) => \{/);
+  assert.match(source, /\}, 80\);/);
+  assert.doesNotMatch(
+    source,
+    /ADMIN_NAVIGATION_START_EVENT|setIsNavigationPending|useState\(/,
+  );
+});
+
 test("관리자 공통 진입점은 외래어 대신 한국어 업무 맥락을 표시한다", async () => {
   const [
     shellSource,
