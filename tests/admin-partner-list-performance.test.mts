@@ -31,6 +31,9 @@ test("관리자 제휴처 목록은 read-model의 서버 count/range와 안전�
   assert.match(readModelSource, /getPartnerNameSearchPattern\(normalizedFilters\.searchValue\)/);
   assert.match(readModelSource, /withAdminReadModelTimeout/);
   assert.match(readModelSource, /ADMIN_PARTNER_LIST_READ_MODEL_TIMEOUT_MS/);
+  assert.match(readModelSource, /unstable_cache/);
+  assert.match(readModelSource, /ADMIN_PARTNER_CATEGORIES_CACHE_REVALIDATE_SECONDS = 60/);
+  assert.match(readModelSource, /tags: \["categories"\]/);
   assert.match(readModelSource, /createEmptyAdminPartnerListReadModel/);
   assert.match(readModelSource, /applies_to/);
   assert.doesNotMatch(readModelSource, /conditions,benefits,applies_to,images,tags/);

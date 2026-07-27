@@ -8,8 +8,10 @@ import { normalizePartnerVisibility } from "@/lib/partner-visibility";
 import type { AdminPartnerListFilters } from "@/lib/admin-ia";
 import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
 
 export const ADMIN_PARTNER_LIST_READ_MODEL_TIMEOUT_MS = 3_000;
+export const ADMIN_PARTNER_CATEGORIES_CACHE_REVALIDATE_SECONDS = 60;
 
 type PartnerCompanyRow = {
   id: string;
@@ -72,6 +74,30 @@ type AdminPartnerListRow = {
   company?: PartnerCompanyRow | PartnerCompanyRow[] | null;
 };
 
+type AdminPartnerCategoryRow = {
+  id: string;
+  key: string;
+  label: string;
+  description: string | null;
+  color: string | null;
+};
+
+const getCachedAdminPartnerCategories = unstable_cache(
+  async (): Promise<AdminPartnerCategoryRow[]> => {
+    const { data } = await getSupabaseAdminClient()
+      .from("categories")
+      .select("id,key,label,description,color")
+      .order("created_at", { ascending: true });
+
+    return (data ?? []) as AdminPartnerCategoryRow[];
+  },
+  ["admin-partner-categories"],
+  {
+    revalidate: ADMIN_PARTNER_CATEGORIES_CACHE_REVALIDATE_SECONDS,
+    tags: ["categories"],
+  },
+);
+
 function normalizePartnerCompany(value: unknown): PartnerCompanyRow | null {
   if (!value) {
     return null;
@@ -133,15 +159,10 @@ async function getAdminPartnerListReadModelUnbounded({
   managedCampusSlugs: readonly string[] | null;
 }) {
   const supabase = getSupabaseAdminClient();
-  const categoriesPromise = Promise.resolve(
-    supabase
-      .from("categories")
-      .select("id,key,label,description,color")
-      .order("created_at", { ascending: true }),
-  );
+  const categoriesPromise = getCachedAdminPartnerCategories();
   const categoriesResultForFilter =
     filters.categoryKey === "all" ? null : await categoriesPromise;
-  const categoriesForFilter = categoriesResultForFilter?.data ?? [];
+  const categoriesForFilter = categoriesResultForFilter ?? [];
   const selectedCategory =
     filters.categoryKey === "all"
       ? null
@@ -209,7 +230,7 @@ async function getAdminPartnerListReadModelUnbounded({
       : Promise.resolve({ data: [], error: null }),
     categoriesPromise,
   ]);
-  const categories = categoriesResult.data ?? [];
+  const categories = categoriesResult;
 
   const partnerRows = (partnersResult.data ?? []) as unknown as AdminPartnerListRow[];
   const partners = partnerRows.map((partner) => ({
