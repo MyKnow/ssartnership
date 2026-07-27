@@ -133,15 +133,19 @@ async function getAdminPartnerListReadModelUnbounded({
   managedCampusSlugs: readonly string[] | null;
 }) {
   const supabase = getSupabaseAdminClient();
-  const categoriesResult = await supabase
-    .from("categories")
-    .select("id,key,label,description,color")
-    .order("created_at", { ascending: true });
-  const categories = categoriesResult.data ?? [];
+  const categoriesPromise = Promise.resolve(
+    supabase
+      .from("categories")
+      .select("id,key,label,description,color")
+      .order("created_at", { ascending: true }),
+  );
+  const categoriesResultForFilter =
+    filters.categoryKey === "all" ? null : await categoriesPromise;
+  const categoriesForFilter = categoriesResultForFilter?.data ?? [];
   const selectedCategory =
     filters.categoryKey === "all"
       ? null
-      : categories.find((category) => category.key === filters.categoryKey) ?? null;
+      : categoriesForFilter.find((category) => category.key === filters.categoryKey) ?? null;
   const normalizedFilters = {
     ...filters,
     categoryKey: selectedCategory?.key ?? "all",
@@ -183,7 +187,7 @@ async function getAdminPartnerListReadModelUnbounded({
     );
   }
 
-  const [partnersResult, planRequestsResult, planEventsResult] = await Promise.all([
+  const [partnersResult, planRequestsResult, planEventsResult, categoriesResult] = await Promise.all([
     partnersQuery,
     showPlans
       ? supabase
@@ -203,7 +207,9 @@ async function getAdminPartnerListReadModelUnbounded({
           .order("created_at", { ascending: false })
           .limit(100)
       : Promise.resolve({ data: [], error: null }),
+    categoriesPromise,
   ]);
+  const categories = categoriesResult.data ?? [];
 
   const partnerRows = (partnersResult.data ?? []) as unknown as AdminPartnerListRow[];
   const partners = partnerRows.map((partner) => ({
