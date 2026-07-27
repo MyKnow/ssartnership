@@ -70,6 +70,29 @@ test("회원 목록은 추이 query를 핵심 목록과 분리해 먼저 렌더�
   assert.match(trendSectionSource, /await trend/);
 });
 
+test("회원 목록 운영 요약은 핵심 목록과 분리해 스트리밍한다", async () => {
+  const [pageSource, readModelSource, summarySectionSource] = await Promise.all([
+    readFile(memberPagePath, "utf8"),
+    readFile(memberReadModelPath, "utf8"),
+    readFile(
+      new URL(
+        "../src/components/admin/AdminMemberSummarySection.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(pageSource, /AdminMemberSummaryFallback/);
+  assert.match(pageSource, /<AdminMemberSummarySection/);
+  assert.match(readModelSource, /memberSummary/);
+  assert.match(readModelSource, /memberEnrichmentPromise/);
+  assert.match(readModelSource, /hasPolicyConsentFilter/);
+  assert.match(summarySectionSource, /await summary/);
+  assert.match(summarySectionSource, /확인 불가/);
+  assert.match(summarySectionSource, /정책 상태 요약을 불러오지 못했습니다/);
+});
+
 test("회원 목록 read-model은 오류를 안전한 상태로 돌려준다", async () => {
   const source = await readFile(memberReadModelPath, "utf8");
 

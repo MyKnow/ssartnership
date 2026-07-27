@@ -4,13 +4,13 @@ import { Suspense } from "react";
 import AdminMemberManualAddPanel from "@/components/admin/AdminMemberManualAddPanel";
 import AdminMemberManager from "@/components/admin/AdminMemberManager";
 import AdminMemberOperationsPanel from "@/components/admin/AdminMemberOperationsPanel";
+import AdminMemberSummarySection from "@/components/admin/AdminMemberSummarySection";
 import AdminMemberTrendSection from "@/components/admin/AdminMemberTrendSection";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import InlineMessage from "@/components/ui/InlineMessage";
-import StatsRow from "@/components/ui/StatsRow";
 import Skeleton from "@/components/ui/Skeleton";
 import Surface from "@/components/ui/Surface";
 import { AdminMembersSkeletonContent } from "@/components/loading/AdminPageSkeletons";
@@ -29,7 +29,6 @@ import {
 } from "@/lib/admin-member-list.server";
 import { canAdmin } from "@/lib/admin-permissions";
 import { parseAdminMemberPageSize } from "@/lib/admin-ia";
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import {
   DEFAULT_MEMBER_SYNC_BATCH_SIZE,
   MAX_MEMBER_SYNC_BATCH_SIZE,
@@ -47,19 +46,6 @@ const adminMembersErrorMessages: Record<string, string> = {
   ...adminActionErrorMessages,
 };
 
-function formatAdminMemberSummaryDate(value?: string | null) {
-  if (!value) {
-    return "-";
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return "-";
-  }
-
-  return formatKoreanDateTimeToMinute(parsed);
-}
-
 function AdminMemberTrendFallback() {
   return (
     <Surface
@@ -72,6 +58,23 @@ function AdminMemberTrendFallback() {
       <Skeleton className="h-5 w-32" />
       <Skeleton className="h-4 w-full max-w-xl" />
       <Skeleton className="h-48 w-full" />
+    </Surface>
+  );
+}
+
+function AdminMemberSummaryFallback() {
+  return (
+    <Surface
+      level="elevated"
+      padding="lg"
+      aria-busy="true"
+      aria-label="회원 운영 요약을 불러오는 중"
+    >
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton key={index} className="h-24 w-full" />
+        ))}
+      </div>
     </Surface>
   );
 }
@@ -154,10 +157,9 @@ async function AdminMembersContent({
     shouldRedirectToLastPage,
     totalPages,
     memberTrend,
+    memberSummary,
     options,
     mustChangePasswordCount,
-    pendingPolicyCount,
-    latestUpdatedAt,
     generationMattermostLoginTargetCount,
     hasMemberLoadError,
   } = await getAdminMemberListReadModel({
@@ -273,15 +275,16 @@ async function AdminMembersContent({
             title="운영 요약"
             description="목록을 확인한 뒤 현재 필터와 회원 상태를 요약해서 확인합니다."
           />
-          <StatsRow
-            items={[
-              { label: "전체 회원", value: `${totalCount.toLocaleString()}명`, hint: "현재 필터 기준 결과 수" },
-              { label: "현재 페이지", value: `${members.length.toLocaleString()}명`, hint: `${page} / ${totalPages} 페이지` },
-              { label: "비밀번호 변경 필요", value: `${mustChangePasswordCount.toLocaleString()}명`, hint: "현재 페이지 기준" },
-              { label: "정책 확인 필요", value: `${pendingPolicyCount.toLocaleString()}명`, hint: `최근 갱신 ${formatAdminMemberSummaryDate(latestUpdatedAt)}` },
-            ]}
-            minItemWidth="13rem"
-          />
+          <Suspense fallback={<AdminMemberSummaryFallback />}>
+            <AdminMemberSummarySection
+              summary={memberSummary}
+              totalCount={totalCount}
+              currentPageCount={members.length}
+              page={page}
+              totalPages={totalPages}
+              mustChangePasswordCount={mustChangePasswordCount}
+            />
+          </Suspense>
           <Suspense fallback={<AdminMemberTrendFallback />}>
             <AdminMemberTrendSection trend={memberTrend} />
           </Suspense>
