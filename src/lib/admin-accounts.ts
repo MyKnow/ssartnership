@@ -75,6 +75,20 @@ type AdminProfileSessionRow = AdminProfileRow & {
     | null;
 };
 
+type AdminSessionSnapshotRow = {
+  id: string;
+  login_id: string;
+  display_name: string | null;
+  email: string | null;
+  must_change_password: boolean;
+  is_active: boolean;
+  permission_version: number;
+  permission_template_key: string;
+  managed_campus_slugs: string[] | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
 const ADMIN_MEMBER_SELECT =
   "id,mattermost_account_id,display_name,email,must_change_password,deleted_at,created_at,updated_at";
 const ADMIN_DIRECTORY_SELECT = "id,mm_username,display_name,is_active";
@@ -130,6 +144,50 @@ function mapAdminProfile(
     ),
     createdAt: profile.created_at,
     updatedAt: profile.updated_at,
+    permissions: normalizeAdminPermissionMatrix(template.permissions),
+  };
+}
+
+function mapAdminSessionSnapshot(value: unknown): AdminAccount | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const snapshot = value as Partial<AdminSessionSnapshotRow>;
+  if (
+    typeof snapshot.id !== "string" ||
+    typeof snapshot.login_id !== "string" ||
+    snapshot.login_id.length === 0 ||
+    typeof snapshot.permission_template_key !== "string" ||
+    typeof snapshot.permission_version !== "number" ||
+    typeof snapshot.must_change_password !== "boolean" ||
+    typeof snapshot.is_active !== "boolean"
+  ) {
+    return null;
+  }
+
+  const template = getTemplateOrNull(snapshot.permission_template_key);
+  if (!template) {
+    return null;
+  }
+
+  return {
+    id: snapshot.id,
+    loginId: snapshot.login_id,
+    displayName: snapshot.display_name?.trim() || snapshot.login_id,
+    email: snapshot.email ?? null,
+    isActive: snapshot.is_active,
+    mustChangePassword: snapshot.must_change_password,
+    initialSetupExpiresAt: null,
+    initialSetupCompletedAt: snapshot.created_at ?? new Date(0).toISOString(),
+    lastLoginAt: null,
+    permissionVersion: snapshot.permission_version,
+    permissionId: template.key,
+    managedCampusSlugs: normalizeAdminManagedCampusSlugs(
+      snapshot.managed_campus_slugs ?? [],
+    ),
+    createdAt: snapshot.created_at ?? null,
+    updatedAt: snapshot.updated_at ?? null,
     permissions: normalizeAdminPermissionMatrix(template.permissions),
   };
 }
@@ -222,6 +280,16 @@ export async function getAdminAccountById(memberId: string) {
     return mockAccount;
   }
 
+  const { data, error } = await getSupabaseAdminClient().rpc(
+    "get_admin_session_snapshot",
+    { p_member_id: memberId },
+  );
+  if (!error) {
+    return mapAdminSessionSnapshot(data);
+  }
+
+  // Keep the nested PostgREST read during a rolling deploy before the RPC is
+  // available in the target database or schema cache.
   return getAdminAccountFromProfile(memberId);
 }
 
