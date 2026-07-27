@@ -136,6 +136,11 @@ export function summarizeViewportTaskOutcome(rows = []) {
 
 export function summarizeHttpSamples(samples) {
   const successful = samples.filter((sample) => sample.status >= 200 && sample.status < 400);
+  const statusCounts = new Map();
+  for (const sample of samples) {
+    const status = Number.isInteger(sample.status) ? String(sample.status) : "unknown";
+    statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1);
+  }
   const phaseNames = ["auth", "session", "query", "storage", "total"].filter(
     (phase) => samples.some((sample) => sample.serverTiming?.[phase] !== undefined),
   );
@@ -144,6 +149,13 @@ export function summarizeHttpSamples(samples) {
     requestCount: samples.length,
     successCount: successful.length,
     errorCount: samples.length - successful.length,
+    statusCounts: Object.fromEntries(
+      [...statusCounts.entries()].sort(([left], [right]) => {
+        if (left === "unknown") return 1;
+        if (right === "unknown") return -1;
+        return Number(left) - Number(right);
+      }),
+    ),
     totalP95Ms: percentile(samples.map((sample) => sample.totalMs), 0.95),
     serverTimingP95Ms: Object.fromEntries(
       phaseNames.map((phase) => [

@@ -62,6 +62,7 @@ test("관리자 Preview HTTP runner는 Server-Timing의 허용 phase만 요약�
     requestCount: 3,
     successCount: 2,
     errorCount: 1,
+    statusCounts: { "200": 2, "503": 1 },
     totalP95Ms: 290,
     serverTimingP95Ms: { auth: 19.5, query: 240 },
   });
