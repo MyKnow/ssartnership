@@ -9,10 +9,6 @@ import type {
 import type { AdminMemberPageSize } from "@/lib/admin-ia";
 import { getCurrentMemberProfileImageMemberIds } from "@/lib/member-profile-images";
 import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
-import {
-  getActiveRequiredPolicies,
-  getPolicyDocumentByKind,
-} from "@/lib/policy-documents";
 import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { unstable_cache } from "next/cache";
@@ -21,6 +17,7 @@ export const ADMIN_MEMBER_OPTION_SAMPLE_LIMIT = 5_000;
 export const ADMIN_MEMBER_TREND_SAMPLE_LIMIT = 5_000;
 export const ADMIN_MEMBER_READ_MODEL_TIMEOUT_MS = 3_000;
 export const ADMIN_MEMBER_OPTIONS_CACHE_REVALIDATE_SECONDS = 60;
+export const ADMIN_MEMBER_POLICY_CACHE_REVALIDATE_SECONDS = 3;
 
 const EMPTY_MEMBER_ID = "00000000-0000-0000-0000-000000000000";
 
@@ -63,9 +60,72 @@ type AdminMemberOptionDatabaseRow = {
   campus: string | null;
 };
 
+type AdminMemberPolicyDatabaseRow = {
+  id: string;
+  kind: "service" | "privacy" | "marketing";
+  version: number | null;
+};
+
+type AdminMemberPolicyContext = {
+  requiredPolicies: {
+    service: Pick<AdminMemberPolicyDatabaseRow, "id">;
+    privacy: Pick<AdminMemberPolicyDatabaseRow, "id">;
+  } | null;
+  marketingPolicy: Pick<AdminMemberPolicyDatabaseRow, "id"> | null;
+  hasError: boolean;
+};
+
 const ADMIN_MEMBER_LIST_SELECT: string =
   "id,mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at,mattermost_login_disabled_at,mattermost_login_disabled_reason";
 const ADMIN_MEMBER_TREND_SELECT: string = "created_at";
+
+const getCachedAdminMemberPolicyContext = unstable_cache(
+  async (): Promise<AdminMemberPolicyContext> => {
+    const { data, error } = await getSupabaseAdminClient()
+      .from("policy_documents")
+      .select("id,kind,version")
+      .in("kind", ["service", "privacy", "marketing"])
+      .eq("is_active", true)
+      .order("version", { ascending: false });
+
+    if (error) {
+      return {
+        requiredPolicies: null,
+        marketingPolicy: null,
+        hasError: true,
+      };
+    }
+
+    const latestByKind = new Map<string, AdminMemberPolicyDatabaseRow>();
+    for (const row of (data ?? []) as AdminMemberPolicyDatabaseRow[]) {
+      if (!row.id || latestByKind.has(row.kind)) {
+        continue;
+      }
+      latestByKind.set(row.kind, row);
+    }
+
+    const servicePolicy = latestByKind.get("service");
+    const privacyPolicy = latestByKind.get("privacy");
+    if (!servicePolicy || !privacyPolicy) {
+      return {
+        requiredPolicies: null,
+        marketingPolicy: latestByKind.get("marketing") ?? null,
+        hasError: true,
+      };
+    }
+
+    return {
+      requiredPolicies: {
+        service: { id: servicePolicy.id },
+        privacy: { id: privacyPolicy.id },
+      },
+      marketingPolicy: latestByKind.get("marketing") ?? null,
+      hasError: false,
+    };
+  },
+  ["admin-member-policy-context"],
+  { revalidate: ADMIN_MEMBER_POLICY_CACHE_REVALIDATE_SECONDS },
+);
 
 const getCachedAdminMemberOptions = unstable_cache(
   async () => {
@@ -643,15 +703,13 @@ async function getAdminMemberListReadModelUnbounded({
   try {
     const supabase = getSupabaseAdminClient();
     const [
-      activePolicies,
-      activeMarketingPolicy,
+      policyContext,
       optionsResult,
       preferenceFilter,
       searchMemberIds,
       generationMattermostLoginTargetResult,
     ] = await Promise.all([
-      getActiveRequiredPolicies(),
-      getPolicyDocumentByKind("marketing").catch(() => null),
+      getCachedAdminMemberPolicyContext(),
       getCachedAdminMemberOptions(),
       getPreferenceFilteredMemberIds(supabase, [
         { column: "enabled", value: filters.pushEnabledFilter, defaultEnabled: false },
@@ -689,9 +747,16 @@ async function getAdminMemberListReadModelUnbounded({
             .not("mattermost_account_id", "is", null)
             .is("mattermost_login_disabled_at", null),
     ]);
-    if (preferenceFilter === undefined || searchMemberIds === undefined) {
+    if (
+      policyContext.hasError
+      || !policyContext.requiredPolicies
+      || preferenceFilter === undefined
+      || searchMemberIds === undefined
+    ) {
       return createEmptyReadModel(filters);
     }
+    const activePolicies = policyContext.requiredPolicies;
+    const activeMarketingPolicy = policyContext.marketingPolicy;
     const policyConsentFilter = await getPolicyConsentFilteredMemberIds(supabase, [
       {
         kind: "service",
