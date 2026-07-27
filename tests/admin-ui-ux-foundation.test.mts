@@ -48,9 +48,11 @@ test("회원 화면은 내부 오류를 노출하지 않고 목록 이후에 보
     ),
   ]);
   const memberListIndex = source.indexOf('title="회원 목록"');
+  const summaryIndex = source.indexOf('aria-label="회원 운영 요약"');
   const operationsToolIndex = source.indexOf("<AdminMemberOperationsPanel");
 
   assert.ok(memberListIndex >= 0);
+  assert.ok(summaryIndex > memberListIndex);
   assert.ok(operationsToolIndex > memberListIndex);
   assert.doesNotMatch(source, /membersError\.message/);
   assert.match(operationsSource, /title="운영 도구"/);

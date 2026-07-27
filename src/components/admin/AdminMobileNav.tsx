@@ -57,6 +57,8 @@ function NavButton({
         "w-full justify-start rounded-2xl px-4",
         active ? "border-strong bg-surface-elevated text-foreground shadow-flat" : null,
       )}
+      ariaLabel={label}
+      ariaCurrent={active ? "page" : undefined}
       onClick={onNavigate}
     >
       <span className="grid min-w-0 justify-items-start gap-0.5 text-left">

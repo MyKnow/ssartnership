@@ -42,8 +42,12 @@ function useAdminQuickNavigator() {
 
 export function AdminQuickNavigatorTrigger({
   compact = false,
+  compactLabel,
+  className,
 }: {
   compact?: boolean;
+  compactLabel?: string;
+  className?: string;
 }) {
   const { openNavigator } = useAdminQuickNavigator();
 
@@ -54,10 +58,15 @@ export function AdminQuickNavigatorTrigger({
       ariaLabel="빠른 찾기 열기"
       title="빠른 찾기 (⌘K 또는 Ctrl+K)"
       onClick={openNavigator}
-      className={cn(compact ? "shrink-0" : "min-w-[10.5rem] justify-between")}
+      className={cn(
+        compact ? "shrink-0" : "min-w-[10.5rem] justify-between",
+        className,
+      )}
     >
       <MagnifyingGlassIcon className="h-5 w-5 shrink-0" />
-      {compact ? null : (
+      {compact ? (
+        compactLabel ? <span>{compactLabel}</span> : null
+      ) : (
         <span className="inline-flex items-center gap-3">
           빠른 찾기
           <kbd className="hidden rounded-md border border-border/80 bg-surface-inset px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground lg:inline">

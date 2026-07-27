@@ -49,6 +49,7 @@ export type AdminNavItem = {
 
 export type AdminNavGroup = {
   label: string;
+  description: string;
   items: AdminNavItem[];
 };
 
@@ -70,6 +71,7 @@ export const ADMIN_NAV_ICON_BY_KEY: Record<AdminNavIconKey, AdminNavIcon> = {
 export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   {
     label: "홈",
+    description: "오늘의 운영 상태와 바로 처리할 작업",
     items: [
       {
         href: "/admin",
@@ -84,6 +86,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   },
   {
     label: "작업함",
+    description: "승인·검토·예외 처리가 필요한 항목",
     items: [
       {
         href: "/admin/tasks",
@@ -154,6 +157,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   },
   {
     label: "데이터",
+    description: "회원·제휴처·파트너사 정보를 찾고 관리",
     items: [
       {
         href: "/admin/members",
@@ -198,6 +202,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   },
   {
     label: "리포트",
+    description: "운영 기록과 서비스 상태를 확인",
     items: [
       {
         href: "/admin/logs",
@@ -211,6 +216,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   },
   {
     label: "자동화",
+    description: "발송·광고·이벤트 운영을 실행",
     items: [
       {
         href: "/admin/push",
@@ -248,6 +254,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   },
   {
     label: "설정",
+    description: "기수·관리자 계정과 권한을 관리",
     items: [
       {
         href: "/admin/cycle",
