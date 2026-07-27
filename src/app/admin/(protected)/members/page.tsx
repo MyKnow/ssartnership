@@ -183,18 +183,6 @@ async function AdminMembersContent({
           title="회원 계정 관리"
           description="회원 상태와 인증 이력을 먼저 확인하고, 필요한 운영 작업은 목록 아래에서 실행합니다."
         />
-        <StatsRow
-          items={[
-            { label: "전체 회원", value: `${totalCount.toLocaleString()}명`, hint: "현재 필터 기준 결과 수" },
-            { label: "현재 페이지", value: `${members.length.toLocaleString()}명`, hint: `${page} / ${totalPages} 페이지` },
-            { label: "비밀번호 변경 필요", value: `${mustChangePasswordCount.toLocaleString()}명`, hint: "현재 페이지 기준" },
-            { label: "정책 확인 필요", value: `${pendingPolicyCount.toLocaleString()}명`, hint: `최근 갱신 ${formatAdminMemberSummaryDate(latestUpdatedAt)}` },
-          ]}
-          minItemWidth="13rem"
-        />
-        <Suspense fallback={<AdminMemberTrendFallback />}>
-          <AdminMemberTrendSection trend={memberTrend} />
-        </Suspense>
         {hasMemberLoadError ? (
           <InlineMessage
             tone="danger"
@@ -278,6 +266,25 @@ async function AdminMembersContent({
               options={options}
             />
           </div>
+        </section>
+
+        <section className="grid min-w-0 gap-4" aria-label="회원 운영 요약">
+          <AdminSectionHeading
+            title="운영 요약"
+            description="목록을 확인한 뒤 현재 필터와 회원 상태를 요약해서 확인합니다."
+          />
+          <StatsRow
+            items={[
+              { label: "전체 회원", value: `${totalCount.toLocaleString()}명`, hint: "현재 필터 기준 결과 수" },
+              { label: "현재 페이지", value: `${members.length.toLocaleString()}명`, hint: `${page} / ${totalPages} 페이지` },
+              { label: "비밀번호 변경 필요", value: `${mustChangePasswordCount.toLocaleString()}명`, hint: "현재 페이지 기준" },
+              { label: "정책 확인 필요", value: `${pendingPolicyCount.toLocaleString()}명`, hint: `최근 갱신 ${formatAdminMemberSummaryDate(latestUpdatedAt)}` },
+            ]}
+            minItemWidth="13rem"
+          />
+          <Suspense fallback={<AdminMemberTrendFallback />}>
+            <AdminMemberTrendSection trend={memberTrend} />
+          </Suspense>
         </section>
 
         {canUpdateMembers ? (

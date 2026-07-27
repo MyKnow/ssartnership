@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ArrowLeftIcon,
   ArrowTopRightOnSquareIcon,
   Bars3Icon,
   ChevronRightIcon,
@@ -92,13 +93,18 @@ export default function AdminShellView({
   );
 
   const renderDesktopNav = (expanded: boolean) => (
-    <nav className="grid gap-6">
+    <nav aria-label="관리자 영역 탐색" className="grid gap-6">
       {navGroups.map((group) => (
-        <section key={group.label} className="grid gap-2">
+        <section key={group.label} className="grid gap-2" aria-label={group.label}>
           {expanded ? (
-            <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              {group.label}
-            </p>
+            <div className="px-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                {group.label}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground/80">
+                {group.description}
+              </p>
+            </div>
           ) : null}
           <div className="grid gap-1.5">
             {group.items.map((item) => {
@@ -113,6 +119,7 @@ export default function AdminShellView({
                   onPointerEnter={() => prefetchOnIntent(item.href)}
                   onFocus={() => prefetchOnIntent(item.href)}
                   title={expanded ? undefined : item.label}
+                  aria-current={active ? "page" : undefined}
                   className={cn(
                     "group flex items-center gap-3 rounded-2xl border px-3 py-3 text-sm transition-colors",
                     active
@@ -218,6 +225,14 @@ export default function AdminShellView({
                 <span>작업함</span>
               </Link>
             ) : null}
+            <AdminQuickNavigatorTrigger
+              compact
+              compactLabel="검색"
+              className={cn(
+                mobileNavItemClassName(false),
+                "h-auto w-auto rounded-none border-0 bg-transparent shadow-none",
+              )}
+            />
             {memberNavItem ? (
               <Link
                 href={memberNavItem.href}
@@ -304,13 +319,44 @@ export default function AdminShellView({
               </div>
 
               <div className="flex shrink-0 items-center gap-2">
-                <AdminQuickNavigatorTrigger />
+                <span className="xl:hidden">
+                  <AdminQuickNavigatorTrigger compact />
+                </span>
+                <span className="hidden xl:inline-flex">
+                  <AdminQuickNavigatorTrigger />
+                </span>
                 {backHref && backLabel ? (
-                  <Button variant="secondary" href={backHref}>
-                    {backLabel}
-                  </Button>
+                  <>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      href={backHref}
+                      ariaLabel={backLabel}
+                      title={backLabel}
+                      className="xl:hidden"
+                    >
+                      <ArrowLeftIcon className="h-5 w-5" aria-hidden="true" />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      href={backHref}
+                      className="hidden xl:inline-flex"
+                    >
+                      {backLabel}
+                    </Button>
+                  </>
                 ) : null}
-                <Button variant="secondary" href="/">
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  href="/"
+                  ariaLabel="사용자 화면 열기"
+                  title="사용자 화면"
+                  className="xl:hidden"
+                >
+                  <ArrowTopRightOnSquareIcon className="h-4 w-4" aria-hidden="true" />
+                </Button>
+                <Button variant="secondary" href="/" className="hidden xl:inline-flex">
                   <span className="inline-flex items-center gap-2">
                     사용자 화면
                     <ArrowTopRightOnSquareIcon className="h-4 w-4" />

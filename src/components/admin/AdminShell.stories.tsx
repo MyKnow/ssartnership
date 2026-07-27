@@ -119,6 +119,10 @@ export const MobilePrimaryNavigation: Story = {
       await within(navigation).findByRole("button", { name: "관리 메뉴 열기" }),
     ).toBeInTheDocument();
     await expect(
+      within(navigation).getByRole("button", { name: "빠른 찾기 열기" }),
+    ).toBeInTheDocument();
+    await expect(within(navigation).getByText("검색")).toBeInTheDocument();
+    await expect(
       canvas.getByRole("link", { name: "주요 내용으로 건너뛰기" }),
     ).toHaveAttribute("href", "#admin-main-content");
   },

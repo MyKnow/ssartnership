@@ -62,6 +62,7 @@ type ButtonProps = {
   loading?: boolean;
   loadingText?: string;
   ariaLabel?: string;
+  ariaCurrent?: "page" | "step" | "location" | "date" | "time" | "true" | "false";
   ariaPressed?: boolean;
   title?: string;
   style?: React.CSSProperties;
@@ -101,6 +102,7 @@ export default function Button({
   loading,
   loadingText,
   ariaLabel,
+  ariaCurrent,
   ariaPressed,
   title,
   style,
@@ -145,6 +147,7 @@ export default function Button({
     const sharedProps = {
       className: classes,
       "aria-label": ariaLabel,
+      "aria-current": ariaCurrent,
       "aria-pressed": ariaPressed,
       title,
       target,
