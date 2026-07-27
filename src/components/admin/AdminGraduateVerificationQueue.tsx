@@ -177,6 +177,8 @@ function GraduateVerificationDecisionCard({
 }) {
   const isExistingMemberRecovery =
     request.request_kind === "existing_member_recovery";
+  const isSubmitted = request.status === "submitted";
+  const isInReview = request.status === "in_review";
   const requestHeadingId = `graduate-request-${request.id}`;
   const documentNumberInputId = `graduate-document-number-${request.id}`;
   const documentNumberHelpId = `${documentNumberInputId}-help`;
@@ -225,18 +227,31 @@ function GraduateVerificationDecisionCard({
         />
       </div>
 
-      {canUpdate ? (
-        <div className="flex flex-wrap gap-2">
+      {canUpdate && isSubmitted ? (
+        <Surface
+          level="inset"
+          padding="md"
+          className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">
+              다음 행동: 검토 시작
+            </p>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              증빙을 확인할 준비가 되면 검토를 시작하세요. 시작한 뒤 승인·보완
+              요청·반려 결정을 입력할 수 있습니다.
+            </p>
+          </div>
           <form action={actions.startReview}>
             <QueueActionFields requestId={request.id} returnTo={returnTo} />
             <SubmitButton variant="secondary" pendingText="검토를 시작하는 중">
               검토 시작
             </SubmitButton>
           </form>
-        </div>
+        </Surface>
       ) : null}
 
-      {canUpdate ? (
+      {canUpdate && isInReview ? (
         <Surface level="inset" padding="md" className="grid min-w-0 gap-4">
           <form
             action={actions.approveRequest}
@@ -332,7 +347,7 @@ function GraduateVerificationDecisionCard({
         </Surface>
       ) : null}
 
-      {canUpdate ? (
+      {canUpdate && isInReview ? (
         <Surface level="inset" padding="md" className="min-w-0">
           <details>
             <summary className="flex min-h-11 cursor-pointer items-center rounded-control px-2 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20">
@@ -455,7 +470,17 @@ function GraduateVerificationDecisionCard({
             </div>
           </details>
         </Surface>
-      ) : (
+      ) : canUpdate && !isSubmitted && !isInReview ? (
+        <Surface level="inset" padding="md">
+          <p className="text-sm font-semibold text-foreground">
+            현재 상태에서는 추가 결정을 할 수 없습니다.
+          </p>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            상태가 바뀌었을 수 있습니다. 작업함을 새로고침한 뒤 다시 확인해
+            주세요.
+          </p>
+        </Surface>
+      ) : !canUpdate ? (
         <Surface level="inset" padding="md">
           <p className="text-sm font-semibold text-foreground">
             조회 전용 권한
@@ -465,7 +490,7 @@ function GraduateVerificationDecisionCard({
             수료생 인증 운영 권한이 있는 관리자만 할 수 있습니다.
           </p>
         </Surface>
-      )}
+      ) : null}
     </Card>
   );
 }
@@ -489,6 +514,20 @@ function GraduateVerificationHeader({
   const inReviewCount = requests.filter(
     (request) => request.status === "in_review",
   ).length;
+  const nextActionTitle = !canUpdate
+    ? "신청 정보와 증빙을 확인하세요."
+    : inReviewCount > 0
+      ? "검토 중인 요청의 결정을 입력하세요."
+      : submittedCount > 0
+        ? "증빙과 요청 유형을 확인한 뒤 검토를 시작하세요."
+        : "새 인증 요청이 들어오면 증빙과 요청 유형부터 확인하세요.";
+  const nextActionDescription = !canUpdate
+    ? "현재 계정은 요청과 증빙을 확인할 수 있지만 검토 결과를 변경할 수 없습니다."
+    : inReviewCount > 0
+      ? "수료증과 사진을 확인한 뒤 승인·보완 요청·반려 중 하나의 결과를 선택하세요. 기존 회원 복구는 회원 ID와 신청 이메일을 함께 확인해야 합니다."
+      : submittedCount > 0
+        ? "기존 회원 복구 요청은 대상 회원 ID와 신청 이메일을 함께 확인해야 새 회원이 중복 생성되지 않습니다."
+        : "새 요청이 도착하면 이 화면에서 증빙을 확인하고 검토를 시작할 수 있습니다.";
 
   return (
     <AdminReviewQueueHeader
@@ -530,14 +569,8 @@ function GraduateVerificationHeader({
       ]}
       feedback={feedback}
       nextAction={{
-        title: canUpdate
-          ? requests.length > 0
-            ? "증빙과 요청 유형을 확인한 뒤 검토를 시작하세요."
-            : "새 인증 요청이 들어오면 증빙과 요청 유형부터 확인하세요."
-          : "신청 정보와 증빙을 확인하세요.",
-        description: canUpdate
-          ? "기존 회원 복구 요청은 대상 회원 ID와 신청 이메일을 함께 확인해야 새 회원이 중복 생성되지 않습니다."
-          : "현재 계정은 요청과 증빙을 확인할 수 있지만 검토 결과를 변경할 수 없습니다.",
+        title: nextActionTitle,
+        description: nextActionDescription,
       }}
     />
   );

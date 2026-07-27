@@ -19,6 +19,9 @@ test("쿠폰 다운로드와 관리자 CRUD 버튼은 제출 중 상태를 표�
   assert.match(manager, /loadingText="삭제 중"/);
   assert.match(manager, /label: "발급"/);
   assert.match(manager, /issuedCount/);
+  assert.match(manager, /회원별 누적 보유·사용/);
+  assert.match(manager, /전체 사용/);
+  assert.match(manager, /한도 무제한/);
   assert.match(manager, /쿠폰 작업을 처리하지 못했습니다\./);
   assert.match(manager, /md:grid-cols-\[minmax\(0,1fr\)_auto\]/);
   assert.match(manager, /break-words text-lg font-semibold/);

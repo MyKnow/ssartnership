@@ -140,4 +140,18 @@ describe("admin member detail selectors", () => {
     assert.match(deferredSource, /await operational/);
     assert.match(deferredSource, /AdminMemberSecurityLogExplorer/);
   });
+
+  it("does not present deferred operational values as core profile facts", async () => {
+    const source = await readFile(
+      new URL(
+        "../src/components/admin/AdminMemberDetailView.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    assert.doesNotMatch(source, /activeDeviceCount === null/);
+    assert.doesNotMatch(source, /보안 로그.*securityLogPagination\.totalCount/);
+    assert.match(source, /deferredOperationalPanels/);
+  });
 });

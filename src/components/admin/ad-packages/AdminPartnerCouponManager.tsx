@@ -250,9 +250,14 @@ export default function AdminPartnerCouponManager({
                   <p className="mt-2 break-words text-xs leading-5 text-muted-foreground">
                     다운로드 {formatDateTime(coupon.downloadStartsAt)} - {formatDateTime(coupon.downloadEndsAt)}
                   </p>
-                  <p className="break-words text-xs leading-5 text-muted-foreground">
-                    회원별 발급 · 일 {formatIssueLimit(coupon.perMemberDailyIssueLimit)} · 주 {formatIssueLimit(coupon.perMemberWeeklyIssueLimit)} · 월 {formatIssueLimit(coupon.perMemberMonthlyIssueLimit)}
-                  </p>
+                  <div className="mt-2 grid gap-0.5 break-words text-xs leading-5 text-muted-foreground">
+                    <p>
+                      회원별 누적 보유·사용 {formatIssueLimit(coupon.perMemberLimit)}
+                    </p>
+                    <p>
+                      회원별 발급 · 일 {formatIssueLimit(coupon.perMemberDailyIssueLimit)} · 주 {formatIssueLimit(coupon.perMemberWeeklyIssueLimit)} · 월 {formatIssueLimit(coupon.perMemberMonthlyIssueLimit)}
+                    </p>
+                  </div>
                   {coupon.redemptionType === "onsite" ? (
                     <p className="mt-1 text-xs font-medium text-primary">
                       {coupon.hasOnsitePassword ? "현장 확인 PIN 설정됨" : "현장 확인 PIN 미설정"}
@@ -261,8 +266,10 @@ export default function AdminPartnerCouponManager({
                 </div>
                 <div className="flex min-w-0 flex-wrap items-center justify-start gap-3 md:col-start-2 md:min-w-[13rem] md:flex-col md:items-end md:justify-start">
                   <span className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">
-                    {coupon.usedCount}
-                    {coupon.usageLimit !== null ? `/${coupon.usageLimit}` : "회 사용"}
+                    전체 사용 {coupon.usedCount.toLocaleString("ko-KR")}회
+                    {coupon.usageLimit !== null
+                      ? ` / ${coupon.usageLimit.toLocaleString("ko-KR")}회`
+                      : " · 한도 무제한"}
                   </span>
                 </div>
               </div>

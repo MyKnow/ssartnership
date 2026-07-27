@@ -146,7 +146,7 @@ function AudienceResultCard({
     <button
       type="button"
       onClick={onOpen}
-      className="grid w-full gap-4 rounded-2xl border border-primary/15 bg-primary-soft/55 px-4 py-4 text-left shadow-flat transition-colors hover:bg-primary-soft/70"
+      className="grid w-full gap-4 rounded-2xl border border-primary/15 bg-primary-soft/55 px-4 py-4 text-left shadow-flat transition-colors hover:bg-primary-soft/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="grid gap-1">
@@ -446,7 +446,9 @@ function MemberPickerModal({
         <div className="grid gap-2 rounded-2xl border border-border bg-surface-inset px-3 py-2">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 grid gap-0.5 text-sm text-muted-foreground">
-              <p className="truncate">{searchPending ? "대상자 검색 중" : `검색 결과 ${filteredMembers.length}명`}</p>
+              <p className="truncate" role="status" aria-live="polite">
+                {searchPending ? "대상자 검색 중" : `검색 결과 ${filteredMembers.length}명`}
+              </p>
               <p className="truncate">현재 선택 {selectedMembers.length}명</p>
             </div>
             <Button
@@ -456,7 +458,7 @@ function MemberPickerModal({
               className="shrink-0"
               onClick={() => onSelectAllFiltered(filteredMembers.map((member) => member.id))}
             >
-              전체 선택
+              현재 결과 전체 선택
             </Button>
           </div>
 
@@ -496,7 +498,7 @@ function MemberPickerModal({
           <p className="whitespace-normal break-words text-sm text-muted-foreground" title={selectedSummary}>
             선택된 인원 {selectedSummary}
           </p>
-          <p className="text-xs text-muted-foreground">검색 결과는 최대 50명까지 표시합니다.</p>
+          <p className="text-xs text-muted-foreground">검색 결과는 한 번에 최대 30명까지 표시합니다.</p>
         </div>
       </div>
 

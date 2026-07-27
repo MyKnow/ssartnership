@@ -97,9 +97,19 @@ async function callSummaryRpc(supabase, functionName, window) {
   return data ?? [];
 }
 
-async function measureHttpTarget(baseUrl, cookie, target, iterations) {
+async function measureHttpTarget(baseUrl, cookie, protectionBypass, target, iterations) {
   const samples = [];
   const url = new URL(target.path, baseUrl);
+  const headers = {
+    Accept: "application/json",
+    Cookie: cookie,
+    Origin: url.origin,
+    Referer: `${url.origin}/admin`,
+  };
+  if (protectionBypass) {
+    headers["x-vercel-protection-bypass"] = protectionBypass;
+  }
+
   for (let index = 0; index < iterations; index += 1) {
     const startedAt = performance.now();
     let status = 0;
@@ -107,12 +117,7 @@ async function measureHttpTarget(baseUrl, cookie, target, iterations) {
     try {
       const response = await fetch(url, {
         redirect: "manual",
-        headers: {
-          Accept: "application/json",
-          Cookie: cookie,
-          Origin: url.origin,
-          Referer: `${url.origin}/admin`,
-        },
+        headers,
       });
       status = response.status;
       serverTiming = parseServerTiming(response.headers.get("server-timing"));
@@ -132,6 +137,7 @@ async function measureHttpTarget(baseUrl, cookie, target, iterations) {
 async function measureHttpTargets() {
   const baseUrl = process.env.ADMIN_PREVIEW_URL?.trim();
   const cookie = process.env.ADMIN_PREVIEW_SESSION_COOKIE?.trim();
+  const protectionBypass = process.env.ADMIN_PREVIEW_PROTECTION_BYPASS?.trim();
   if (!baseUrl || !cookie) {
     return {
       skipped: "ADMIN_PREVIEW_URL_OR_SESSION_COOKIE_MISSING",
@@ -148,7 +154,7 @@ async function measureHttpTargets() {
   const targets = parseTargets();
   const results = [];
   for (const target of targets) {
-    results.push(await measureHttpTarget(parsedBaseUrl, cookie, target, iterations));
+    results.push(await measureHttpTarget(parsedBaseUrl, cookie, protectionBypass, target, iterations));
   }
   return { iterations, targets: results };
 }

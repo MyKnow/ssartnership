@@ -61,6 +61,17 @@ test("수료생 검토의 결정 입력은 레이블·도움말·공용 폼 제�
   );
 });
 
+test("수료생 검토 카드는 현재 상태에 맞는 다음 행동만 노출한다", async () => {
+  const queueSource = await readFile(queuePath, "utf8");
+
+  assert.match(queueSource, /const isSubmitted = request\.status === "submitted"/);
+  assert.match(queueSource, /const isInReview = request\.status === "in_review"/);
+  assert.match(queueSource, /canUpdate && isSubmitted/);
+  assert.match(queueSource, /canUpdate && isInReview/);
+  assert.match(queueSource, /다음 행동: 검토 시작/);
+  assert.match(queueSource, /현재 상태에서는 추가 결정을 할 수 없습니다\./);
+});
+
 test("수료생 검토는 주 큐를 메일 재발송 보조 큐보다 먼저 렌더링한다", async () => {
   const [pageSource, queueSource] = await Promise.all([
     readFile(pagePath, "utf8"),

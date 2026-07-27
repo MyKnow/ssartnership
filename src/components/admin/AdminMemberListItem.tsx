@@ -24,8 +24,10 @@ function formatDateTime(value?: string | null) {
 
 export default function AdminMemberListItem({
   member,
+  returnTo,
 }: {
   member: AdminMember;
+  returnTo?: string;
 }) {
   const profile = parseSsafyProfile(member.displayName ?? member.mmUsername);
   const displayName =
@@ -66,6 +68,17 @@ export default function AdminMemberListItem({
       : "";
     return `/api/admin/members/${member.id}/avatar${query}`;
   }, [member.id, member.updatedAt]);
+  const detailHref = useMemo(() => {
+    const memberPath = `/admin/members/${encodeURIComponent(member.id)}`;
+    const normalizedReturnTo = returnTo?.trim();
+
+    if (!normalizedReturnTo || normalizedReturnTo === "/admin/members") {
+      return memberPath;
+    }
+
+    const query = new URLSearchParams({ returnTo: normalizedReturnTo });
+    return `${memberPath}?${query.toString()}`;
+  }, [member.id, returnTo]);
 
   return (
     <article className="grid min-w-0 gap-4 rounded-2xl border border-border/80 bg-surface-inset p-4 sm:grid-cols-[3.5rem_minmax(0,1fr)_auto] sm:items-center">
@@ -115,7 +128,7 @@ export default function AdminMemberListItem({
       </div>
 
       <Link
-        href={`/admin/members/${member.id}`}
+        href={detailHref}
         prefetch={false}
         className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-[1rem] border border-primary/10 bg-primary-soft px-4 text-sm font-semibold text-primary shadow-flat transition-interactive hover:-translate-y-px hover:border-primary/20"
       >

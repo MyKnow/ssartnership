@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { mergeSelectedMemberIds } from "../src/components/admin/push-manager/selectors.ts";
 
 const root = new URL("..", import.meta.url);
 const read = (path: string) => readFile(new URL(path, root), "utf8");
@@ -43,7 +44,15 @@ test("개인 수신자 검색은 권한 검증된 제한 API와 안전한 입력
   assert.match(searchService, /ilike/);
   assert.doesNotMatch(searchService, /Error\.message/);
   assert.match(composer, /\/api\/admin\/push\/recipients/);
-  assert.match(composer, /검색 결과는 최대/);
+  assert.match(composer, /검색 결과는.*최대 30명/);
+});
+
+test("개인 대상 전체 선택은 다른 검색 결과에서 이미 선택한 회원을 유지한다", () => {
+  assert.deepEqual(
+    mergeSelectedMemberIds(["member-1"], ["member-2", "member-1"]),
+    ["member-1", "member-2"],
+  );
+  assert.deepEqual(mergeSelectedMemberIds(["member-1"], []), []);
 });
 
 test("mock 개인 대상 검색은 실패 대신 재사용 가능한 안전한 결과를 반환한다", async () => {

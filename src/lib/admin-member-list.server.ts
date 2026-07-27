@@ -596,6 +596,7 @@ function createEmptyReadModel(filters: AdminMemberListFilters) {
     mustChangePasswordCount: 0,
     pendingPolicyCount: 0,
     latestUpdatedAt: null,
+    generationMattermostLoginTargetCount: null,
     hasMemberLoadError: true,
   };
 }
@@ -622,6 +623,7 @@ async function getAdminMemberListReadModelUnbounded({
       optionsResult,
       preferenceFilter,
       searchMemberIds,
+      generationMattermostLoginTargetResult,
     ] = await Promise.all([
       getActiveRequiredPolicies(),
       getPolicyDocumentByKind("marketing").catch(() => null),
@@ -657,6 +659,15 @@ async function getAdminMemberListReadModelUnbounded({
         },
       ]),
       getMemberSearchIds(supabase, filters.searchValue),
+      filters.yearFilter === "all"
+        ? Promise.resolve(null)
+        : supabase
+            .from("members")
+            .select("id", { count: "exact", head: true })
+            .is("deleted_at", null)
+            .eq("generation", Number(filters.yearFilter))
+            .not("mattermost_account_id", "is", null)
+            .is("mattermost_login_disabled_at", null),
     ]);
     if (preferenceFilter === undefined || searchMemberIds === undefined) {
       return createEmptyReadModel(filters);
@@ -870,6 +881,10 @@ async function getAdminMemberListReadModelUnbounded({
       mustChangePasswordCount,
       pendingPolicyCount,
       latestUpdatedAt,
+      generationMattermostLoginTargetCount:
+        generationMattermostLoginTargetResult?.error
+          ? null
+          : generationMattermostLoginTargetResult?.count ?? null,
       hasMemberLoadError: false,
     };
   } catch {

@@ -39,6 +39,7 @@ jobs:
       SUPABASE_PREVIEW_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_PREVIEW_SERVICE_ROLE_KEY }}
       ADMIN_PREVIEW_URL: ${{ inputs.admin_url }}
       ADMIN_PREVIEW_SESSION_COOKIE: ${{ secrets.ADMIN_PREVIEW_SESSION_COOKIE }}
+      ADMIN_PREVIEW_PROTECTION_BYPASS: ${{ secrets.ADMIN_PREVIEW_PROTECTION_BYPASS }}
       ADMIN_PREVIEW_ITERATIONS: ${{ inputs.iterations }}
     steps:
       - name: Checkout selected dev revision

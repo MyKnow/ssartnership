@@ -27,7 +27,6 @@ const meta = {
       hasAvatar: false,
       avatarUrl: "/api/admin/members/member-seoul-15-001/avatar",
     },
-    activeDeviceCount: 2,
     preferences: {
       enabled: true,
       announcementEnabled: true,

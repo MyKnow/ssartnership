@@ -77,6 +77,7 @@ test("Preview 성능 workflow는 dev와 명시적 확인 문자열에서만 실�
   assert.match(source, /MEASURE_ADMIN_PERFORMANCE/);
   assert.match(source, /SUPABASE_PREVIEW_SERVICE_ROLE_KEY/);
   assert.match(source, /ADMIN_PREVIEW_SESSION_COOKIE/);
+  assert.match(source, /ADMIN_PREVIEW_PROTECTION_BYPASS/);
   assert.match(source, /npm run measure:admin:preview/);
 });
 

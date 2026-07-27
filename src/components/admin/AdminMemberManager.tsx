@@ -86,6 +86,10 @@ export default function AdminMemberManager({
     value: filters.searchValue,
   });
   const searchParamsValue = searchParams.toString();
+  const returnTo = useMemo(
+    () => (searchParamsValue ? `${pathname}?${searchParamsValue}` : pathname),
+    [pathname, searchParamsValue],
+  );
 
   const normalizedMembers = useMemo(
     () => normalizeAdminMembers(members),
@@ -687,7 +691,11 @@ export default function AdminMemberManager({
 
           <div className="grid min-w-0 gap-3">
             {normalizedMembers.map((member) => (
-              <AdminMemberListItem key={member.id} member={member} />
+              <AdminMemberListItem
+                key={member.id}
+                member={member}
+                returnTo={returnTo}
+              />
             ))}
           </div>
         </div>

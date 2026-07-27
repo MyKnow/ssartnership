@@ -118,6 +118,8 @@ export const Default: Story = {
     await expect(createAccordionButton).toBeInTheDocument();
     await expect(createAccordionButton.closest("details")).not.toHaveAttribute("open");
     await expect(canvas.getByText("신규 회원 디저트 세트")).toBeInTheDocument();
+    await expect(canvas.getAllByText(/회원별 누적 보유·사용 1회/)).toHaveLength(2);
+    await expect(canvas.getByText(/전체 사용 21회 \/ 300회/)).toBeInTheDocument();
     await expect(canvas.getAllByText("수정").length).toBeGreaterThan(0);
     await expect(canvas.getAllByRole("button", { name: "복제" }).length).toBeGreaterThan(0);
     await expect(canvas.getByText(/발급 또는 사용 이력이 있어 삭제할 수 없습니다/)).toBeInTheDocument();

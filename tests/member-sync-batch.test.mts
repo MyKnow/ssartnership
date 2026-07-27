@@ -37,18 +37,19 @@ test("회원 MM 백필은 범위를 벗어난 배치 크기와 잘못된 cursor�
   assert.equal(parseMemberSyncBatchOptions({ cursor: "not-a-uuid" }), null);
 });
 
-test("관리자 백필 action과 화면은 이어하기 cursor 계약을 사용한다", async () => {
-  const [actions, page, sync] = await Promise.all([
+test("관리자 백필 action과 운영 도구는 이어하기 cursor 계약을 사용한다", async () => {
+  const [actions, page, operations, sync] = await Promise.all([
     read("src/app/admin/(protected)/_actions/member-actions.ts"),
     read("src/app/admin/(protected)/members/page.tsx"),
+    read("src/components/admin/AdminMemberOperationsPanel.tsx"),
     read("src/lib/mm-member-sync/sync.ts"),
   ]);
 
   assert.match(actions, /parseMemberSyncBatchOptions/);
   assert.match(actions, /nextCursor/);
   assert.match(actions, /hasMore/);
-  assert.match(page, /name="batchSize"/);
-  assert.match(page, /name="cursor"/);
+  assert.match(operations, /name="batchSize"/);
+  assert.match(operations, /name="cursor"/);
   assert.match(page, /nextCursor/);
   assert.match(page, /hasMore/);
   assert.match(sync, /order\("id", \{ ascending: true \}\)/);

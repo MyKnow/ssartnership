@@ -89,6 +89,28 @@ test("회원 목록 read-model은 오류를 안전한 상태로 돌려준다", a
   assert.doesNotMatch(source, /Error\.message/);
 });
 
+test("기수 전체 MM 중단은 실제 변경 대상 수를 별도로 계산해 UI에 전달한다", async () => {
+  const [pageSource, readModelSource, operationsSource] = await Promise.all([
+    readFile(memberPagePath, "utf8"),
+    readFile(memberReadModelPath, "utf8"),
+    readFile(
+      new URL(
+        "../src/components/admin/AdminMemberOperationsPanel.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(readModelSource, /generationMattermostLoginTargetCount/);
+  assert.match(readModelSource, /count: "exact", head: true/);
+  assert.match(readModelSource, /\.not\("mattermost_account_id", "is", null\)/);
+  assert.match(readModelSource, /\.is\("mattermost_login_disabled_at", null\)/);
+  assert.match(pageSource, /generationMattermostLoginTargetCount/);
+  assert.match(operationsSource, /실행 대상/);
+  assert.match(operationsSource, /이미 MM 이용이 중단된 회원은 다시 변경하지 않습니다/);
+});
+
 test("회원 수동 추가의 기수 설정은 핵심 목록과 분리해 스트리밍한다", async () => {
   const pageSource = await readFile(memberPagePath, "utf8");
 

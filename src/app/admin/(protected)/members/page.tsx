@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import AdminMemberManualAddPanel from "@/components/admin/AdminMemberManualAddPanel";
 import AdminMemberManager from "@/components/admin/AdminMemberManager";
+import AdminMemberOperationsPanel from "@/components/admin/AdminMemberOperationsPanel";
 import AdminMemberTrendSection from "@/components/admin/AdminMemberTrendSection";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
@@ -10,7 +11,6 @@ import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import InlineMessage from "@/components/ui/InlineMessage";
 import StatsRow from "@/components/ui/StatsRow";
-import SubmitButton from "@/components/ui/SubmitButton";
 import Skeleton from "@/components/ui/Skeleton";
 import Surface from "@/components/ui/Surface";
 import { AdminMembersSkeletonContent } from "@/components/loading/AdminPageSkeletons";
@@ -158,6 +158,7 @@ async function AdminMembersContent({
     mustChangePasswordCount,
     pendingPolicyCount,
     latestUpdatedAt,
+    generationMattermostLoginTargetCount,
     hasMemberLoadError,
   } = await getAdminMemberListReadModel({
     filters,
@@ -280,64 +281,17 @@ async function AdminMembersContent({
         </section>
 
         {canUpdateMembers ? (
-          <section className="grid min-w-0 gap-4">
-            <AdminSectionHeading
-              title="운영 도구"
-              description="목록 확인 후 실행하는 유지보수 작업입니다. 위험한 일괄 변경은 별도 확인이 필요합니다."
-            />
-            <Card className="grid min-w-0 gap-5">
-              <div className="grid min-w-0 gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">회원 프로필 백필</p>
-                  <p className="mt-1 text-sm text-muted-foreground">사진과 프로필 메타데이터가 필요한 회원을 배치 단위로 정비합니다.</p>
-                </div>
-                <form action={backfillMemberProfiles} className="flex flex-wrap items-end gap-2">
-                  <input type="hidden" name="cursor" value={backfillCursor} />
-                  <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
-                    백필 배치
-                    <select
-                      name="batchSize"
-                      defaultValue={String(backfillBatchSize)}
-                      className="h-11 rounded-input border border-border bg-surface-control px-3 text-sm text-foreground"
-                    >
-                      {[25, DEFAULT_MEMBER_SYNC_BATCH_SIZE, MAX_MEMBER_SYNC_BATCH_SIZE].map((size) => (
-                        <option key={size} value={size}>
-                          {size}명
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <SubmitButton pendingText={hasMoreBackfill ? "다음 배치 중" : "백필 중"}>
-                    {hasMoreBackfill ? "다음 배치 실행" : "백필 실행"}
-                  </SubmitButton>
-                </form>
-              </div>
-              {selectedGeneration !== null ? (
-                <div className="grid min-w-0 gap-3 border-t border-border/70 pt-5">
-                  <div>
-                    <p className="text-sm font-semibold text-danger">{selectedGeneration}기 Mattermost 로그인 중단</p>
-                    <p className="mt-1 text-sm text-muted-foreground">현재 기수 전체의 기존 Mattermost 로그인만 중단합니다. 이메일 인증 계정은 계속 사용할 수 있습니다.</p>
-                  </div>
-                  <form action={disableGenerationMattermostLogin} className="flex flex-wrap items-center gap-2">
-                    <input type="hidden" name="generation" value={selectedGeneration} />
-                    <label className="flex min-h-11 items-center gap-2 text-sm font-medium text-foreground">
-                      <input
-                        type="checkbox"
-                        name="confirmedGeneration"
-                        value={selectedGeneration}
-                        required
-                        className="size-4"
-                      />
-                      전체 중단 확인
-                    </label>
-                    <SubmitButton variant="danger" pendingText="전환 중">
-                      {selectedGeneration}기 MM 로그인 중단
-                    </SubmitButton>
-                  </form>
-                </div>
-              ) : null}
-            </Card>
-          </section>
+          <AdminMemberOperationsPanel
+            backfillAction={backfillMemberProfiles}
+            disableGenerationAction={disableGenerationMattermostLogin}
+            hasMoreBackfill={hasMoreBackfill}
+            backfillCursor={backfillCursor}
+            backfillBatchSize={backfillBatchSize}
+            defaultBatchSize={DEFAULT_MEMBER_SYNC_BATCH_SIZE}
+            maxBatchSize={MAX_MEMBER_SYNC_BATCH_SIZE}
+            selectedGeneration={selectedGeneration}
+            generationMattermostLoginTargetCount={generationMattermostLoginTargetCount}
+          />
         ) : null}
 
         <Suspense fallback={<AdminMemberManualAddFallback />}>
