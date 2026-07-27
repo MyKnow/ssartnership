@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import {
+  parseAdminPreviewTargetList,
   summarizeHttpSamples,
   summarizeRouteTiming,
   summarizeTaskOutcome,
@@ -15,6 +16,15 @@ const DEFAULT_API_TARGETS = [
   { key: "admin.logs", path: "/api/admin/logs?page=1&pageSize=50&sort=newest" },
   { key: "admin.notifications", path: "/api/admin/notifications?offset=0&limit=20" },
   { key: "admin.push.recipients", path: "/api/admin/push/recipients?limit=20" },
+];
+const DEFAULT_PAGE_TARGETS = [
+  { key: "admin.page", path: "/admin" },
+  { key: "admin.members.page", path: "/admin/members" },
+  { key: "admin.admins.page", path: "/admin/admins" },
+  { key: "admin.tasks.page", path: "/admin/tasks" },
+  { key: "admin.push.page", path: "/admin/push" },
+  { key: "admin.partners.page", path: "/admin/partners" },
+  { key: "admin.logs.page", path: "/admin/logs" },
 ];
 
 function getRequiredEnv(name) {
@@ -60,32 +70,19 @@ function parseServerTiming(value) {
 
 function parseTargets() {
   const raw = process.env.ADMIN_PREVIEW_API_TARGETS?.trim();
-  if (!raw) {
-    return DEFAULT_API_TARGETS;
-  }
+  return parseAdminPreviewTargetList(raw, {
+    defaultTargets: DEFAULT_API_TARGETS,
+    errorCode: "ADMIN_PREVIEW_API_TARGETS_INVALID",
+    pathPrefix: "/api/admin/",
+  });
+}
 
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error("ADMIN_PREVIEW_API_TARGETS_INVALID");
-  }
-  if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 20) {
-    throw new Error("ADMIN_PREVIEW_API_TARGETS_INVALID");
-  }
-
-  return parsed.map((target) => {
-    if (
-      !target ||
-      typeof target.key !== "string" ||
-      !/^admin\.[a-z0-9._-]+$/.test(target.key) ||
-      typeof target.path !== "string" ||
-      !target.path.startsWith("/api/admin/") ||
-      target.path.includes("?") && target.path.includes("#")
-    ) {
-      throw new Error("ADMIN_PREVIEW_API_TARGETS_INVALID");
-    }
-    return { key: target.key, path: target.path };
+function parsePageTargets() {
+  const raw = process.env.ADMIN_PREVIEW_PAGE_TARGETS?.trim();
+  return parseAdminPreviewTargetList(raw, {
+    defaultTargets: DEFAULT_PAGE_TARGETS,
+    errorCode: "ADMIN_PREVIEW_PAGE_TARGETS_INVALID",
+    pathPrefix: "/admin",
   });
 }
 
@@ -97,11 +94,11 @@ async function callSummaryRpc(supabase, functionName, window) {
   return data ?? [];
 }
 
-async function measureHttpTarget(baseUrl, cookie, protectionBypass, target, iterations) {
+async function measureHttpTarget(baseUrl, cookie, protectionBypass, target, iterations, accept, options) {
   const samples = [];
   const url = new URL(target.path, baseUrl);
   const headers = {
-    Accept: "application/json",
+    Accept: accept,
     Cookie: cookie,
     Origin: url.origin,
     Referer: `${url.origin}/admin`,
@@ -131,10 +128,10 @@ async function measureHttpTarget(baseUrl, cookie, protectionBypass, target, iter
       serverTiming,
     });
   }
-  return { key: target.key, ...summarizeHttpSamples(samples) };
+  return { key: target.key, ...summarizeHttpSamples(samples, options) };
 }
 
-async function measureHttpTargets() {
+async function measureHttpTargets(targets, accept, options) {
   const baseUrl = process.env.ADMIN_PREVIEW_URL?.trim();
   const cookie = process.env.ADMIN_PREVIEW_SESSION_COOKIE?.trim();
   const protectionBypass = process.env.ADMIN_PREVIEW_PROTECTION_BYPASS?.trim();
@@ -151,12 +148,21 @@ async function measureHttpTargets() {
   }
 
   const iterations = parsePositiveInteger(process.env.ADMIN_PREVIEW_ITERATIONS, DEFAULT_ITERATIONS);
-  const targets = parseTargets();
   const results = [];
   for (const target of targets) {
-    results.push(await measureHttpTarget(parsedBaseUrl, cookie, protectionBypass, target, iterations));
+    results.push(await measureHttpTarget(parsedBaseUrl, cookie, protectionBypass, target, iterations, accept, options));
   }
   return { iterations, targets: results };
+}
+
+function measureApiTargets() {
+  return measureHttpTargets(parseTargets(), "application/json");
+}
+
+function measurePageTargets() {
+  return measureHttpTargets(parsePageTargets(), "text/html", {
+    isSuccessful: (sample) => sample.status === 200,
+  });
 }
 
 function printTextReport(report) {
@@ -183,9 +189,9 @@ function printTextReport(report) {
   }
 
   if (report.http.skipped) {
-    console.log(`\nHTTP Server-Timing: skipped (${report.http.skipped})`);
+    console.log(`\nHTTP API Server-Timing: skipped (${report.http.skipped})`);
   } else {
-    console.log("\nHTTP Server-Timing p95");
+    console.log("\nHTTP API Server-Timing p95");
     for (const target of report.http.targets) {
       const phases = Object.entries(target.serverTimingP95Ms)
         .map(([phase, value]) => `${phase}=${value ?? "n/a"}ms`)
@@ -195,6 +201,20 @@ function printTextReport(report) {
         .join(", ");
       console.log(
         `- ${target.key}: total=${target.totalP95Ms ?? "n/a"}ms, success=${target.successCount}/${target.requestCount}, statuses=${statuses || "none"}${phases ? `, ${phases}` : ""}`,
+      );
+    }
+  }
+
+  if (report.pages.skipped) {
+    console.log(`\nHTTP page response p95: skipped (${report.pages.skipped})`);
+  } else {
+    console.log("\nHTTP page response p95 (authenticated HTML, status 200)");
+    for (const page of report.pages.targets) {
+      const statuses = Object.entries(page.statusCounts)
+        .map(([status, count]) => `${status}=${count}`)
+        .join(", ");
+      console.log(
+        `- ${page.key}: total=${page.totalP95Ms ?? "n/a"}ms, status200=${page.successCount}/${page.requestCount}, statuses=${statuses || "none"}`,
       );
     }
   }
@@ -228,6 +248,7 @@ async function main() {
     viewportRouteTiming,
     viewportTaskOutcome,
     http,
+    pages,
   ] = await Promise.all([
     callSummaryRpc(supabase, "get_admin_web_vitals_summary", window),
     callSummaryRpc(supabase, "get_admin_route_timing_summary", window),
@@ -235,7 +256,8 @@ async function main() {
     callSummaryRpc(supabase, "get_admin_web_vitals_dimension_summary", window),
     callSummaryRpc(supabase, "get_admin_route_timing_dimension_summary", window),
     callSummaryRpc(supabase, "get_admin_task_outcome_dimension_summary", window),
-    measureHttpTargets(),
+    measureApiTargets(),
+    measurePageTargets(),
   ]);
 
   const report = {
@@ -249,6 +271,7 @@ async function main() {
       taskOutcome: summarizeViewportTaskOutcome(viewportTaskOutcome),
     },
     http,
+    pages,
   };
 
   if (process.argv.includes("--json")) {

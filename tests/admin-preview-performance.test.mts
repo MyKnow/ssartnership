@@ -68,6 +68,54 @@ test("관리자 Preview HTTP runner는 Server-Timing의 허용 phase만 요약�
   });
 });
 
+test("관리자 Preview 페이지 target은 관리자 경로와 고유 key만 허용한다", async () => {
+  const { parseAdminPreviewTargetList } = await performanceModulePromise;
+  const defaults = [{ key: "admin.page", path: "/admin" }];
+
+  assert.deepEqual(parseAdminPreviewTargetList("", {
+    defaultTargets: defaults,
+    errorCode: "INVALID",
+    pathPrefix: "/admin",
+  }), defaults);
+  assert.deepEqual(parseAdminPreviewTargetList(JSON.stringify([
+    { key: "admin.members.page", path: "/admin/members" },
+  ]), {
+    defaultTargets: defaults,
+    errorCode: "INVALID",
+    pathPrefix: "/admin",
+  }), [{ key: "admin.members.page", path: "/admin/members" }]);
+
+  for (const invalid of [
+    [{ key: "admin.page", path: "/administrator" }],
+    [{ key: "admin.page", path: "/admin#fragment" }],
+    [
+      { key: "admin.page", path: "/admin" },
+      { key: "admin.page", path: "/admin/members" },
+    ],
+  ]) {
+    assert.throws(() => parseAdminPreviewTargetList(JSON.stringify(invalid), {
+      defaultTargets: defaults,
+      errorCode: "INVALID",
+      pathPrefix: "/admin",
+    }), /INVALID/);
+  }
+});
+
+test("페이지 응답은 인증 redirect를 성공으로 세지 않는다", async () => {
+  const { summarizeHttpSamples } = await performanceModulePromise;
+  assert.deepEqual(summarizeHttpSamples([
+    { status: 200, totalMs: 100, serverTiming: {} },
+    { status: 302, totalMs: 20, serverTiming: {} },
+  ], { isSuccessful: (sample) => sample.status === 200 }), {
+    requestCount: 2,
+    successCount: 1,
+    errorCount: 1,
+    statusCounts: { "200": 1, "302": 1 },
+    totalP95Ms: 96,
+    serverTimingP95Ms: {},
+  });
+});
+
 test("Preview 성능 workflow는 dev와 명시적 확인 문자열에서만 실행된다", async () => {
   const source = await readFile(
     new URL("../.github/workflows/admin-performance.yml", import.meta.url),
@@ -77,6 +125,7 @@ test("Preview 성능 workflow는 dev와 명시적 확인 문자열에서만 실�
   assert.match(source, /github\.ref == 'refs\/heads\/dev'/);
   assert.match(source, /MEASURE_ADMIN_PERFORMANCE/);
   assert.match(source, /SUPABASE_PREVIEW_SERVICE_ROLE_KEY/);
+  assert.match(source, /authenticated page and API probes/);
   assert.match(source, /ADMIN_PREVIEW_SESSION_COOKIE/);
   assert.match(source, /ADMIN_PREVIEW_PROTECTION_BYPASS/);
   assert.match(source, /npm run measure:admin:preview/);

@@ -134,8 +134,49 @@ export function summarizeViewportTaskOutcome(rows = []) {
   }));
 }
 
-export function summarizeHttpSamples(samples) {
-  const successful = samples.filter((sample) => sample.status >= 200 && sample.status < 400);
+export function parseAdminPreviewTargetList(raw, {
+  defaultTargets,
+  errorCode,
+  pathPrefix,
+}) {
+  if (!raw) {
+    return defaultTargets;
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(errorCode);
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 20) {
+    throw new Error(errorCode);
+  }
+
+  const keys = new Set();
+  return parsed.map((target) => {
+    const pathMatches = pathPrefix === "/admin"
+      ? target?.path === "/admin" || target?.path?.startsWith("/admin/")
+      : target?.path?.startsWith(pathPrefix);
+    if (
+      !target ||
+      typeof target.key !== "string" ||
+      !/^admin\.[a-z0-9._-]+$/.test(target.key) ||
+      keys.has(target.key) ||
+      typeof target.path !== "string" ||
+      !pathMatches ||
+      target.path.includes("#")
+    ) {
+      throw new Error(errorCode);
+    }
+    keys.add(target.key);
+    return { key: target.key, path: target.path };
+  });
+}
+
+export function summarizeHttpSamples(samples, options = {}) {
+  const isSuccessful = options.isSuccessful ?? ((sample) => sample.status >= 200 && sample.status < 400);
+  const successful = samples.filter(isSuccessful);
   const statusCounts = new Map();
   for (const sample of samples) {
     const status = Number.isInteger(sample.status) ? String(sample.status) : "unknown";

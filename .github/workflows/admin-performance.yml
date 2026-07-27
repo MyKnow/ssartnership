@@ -8,11 +8,11 @@ on:
         required: true
         type: string
       admin_url:
-        description: Optional Preview application URL for authenticated API Server-Timing probes.
+        description: Optional Preview application URL for authenticated page and API probes.
         required: false
         type: string
       iterations:
-        description: Number of sequential requests per API target (1-100).
+        description: Number of sequential requests per page/API target (1-100).
         required: false
         default: "30"
         type: string
