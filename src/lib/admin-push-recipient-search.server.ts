@@ -1,4 +1,3 @@
-import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
 import {
   getMockMemberById,
   isMockDataSource,
@@ -24,6 +23,14 @@ type RecipientMemberRow = {
   mattermost_account_id: string | null;
   generation: number | null;
   campus: string | null;
+  directory:
+    | {
+        mm_username: string | null;
+      }
+    | {
+        mm_username: string | null;
+      }[]
+    | null;
 };
 
 type DirectoryMatchRow = {
@@ -71,6 +78,13 @@ function mergeMemberRows(...groups: RecipientMemberRow[][]) {
   return [...byId.values()];
 }
 
+function resolveDirectoryUsername(
+  directory: RecipientMemberRow["directory"],
+) {
+  const entry = Array.isArray(directory) ? directory[0] : directory;
+  return entry?.mm_username ?? "";
+}
+
 /**
  * Searchable recipient options for the personal notification audience picker.
  * The public admin page never ships the entire member directory to the browser.
@@ -102,7 +116,8 @@ export async function listAdminPushRecipientOptions({
 
   try {
     const supabase = getSupabaseAdminClient();
-    const memberFields = "id,display_name,mattermost_account_id,generation,campus";
+    const memberFields =
+      "id,display_name,mattermost_account_id,generation,campus,directory:mm_user_directory!members_mattermost_account_id_fkey(mm_username)";
     const memberQuery = supabase
       .from("members")
       .select(memberFields)
@@ -157,19 +172,11 @@ export async function listAdminPushRecipientOptions({
       (memberResult.data ?? []) as RecipientMemberRow[],
       accountMatchedMembers,
     ).slice(0, safeLimit);
-    const directoryByAccountId = await getMmUserDirectoryEntriesByAccountIds(
-      members
-        .map((member) => member.mattermost_account_id)
-        .filter((accountId): accountId is string => Boolean(accountId)),
-    );
-
     return {
       recipients: members.map((member) => ({
         id: member.id,
         display_name: member.display_name,
-        mm_username: member.mattermost_account_id
-          ? directoryByAccountId.get(member.mattermost_account_id)?.mm_username ?? ""
-          : "",
+        mm_username: resolveDirectoryUsername(member.directory),
         year: member.generation,
         campus: member.campus,
       })),

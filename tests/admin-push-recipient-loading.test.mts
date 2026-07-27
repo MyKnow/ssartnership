@@ -42,6 +42,11 @@ test("개인 수신자 검색은 권한 검증된 제한 API와 안전한 입력
   assert.match(route, /listAdminPushRecipientOptions/);
   assert.match(searchService, /MAX_RECIPIENT_LIMIT = 50/);
   assert.match(searchService, /ilike/);
+  assert.match(
+    searchService,
+    /directory:mm_user_directory!members_mattermost_account_id_fkey\(mm_username\)/,
+  );
+  assert.doesNotMatch(searchService, /getMmUserDirectoryEntriesByAccountIds/);
   assert.doesNotMatch(searchService, /Error\.message/);
   assert.match(composer, /\/api\/admin\/push\/recipients/);
   assert.match(composer, /검색 결과는.*최대 30명/);
