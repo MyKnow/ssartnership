@@ -4,10 +4,12 @@ import {
   MOCK_MEMBER_ID,
 } from "@/lib/mock/member";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
 
 const DEFAULT_RECIPIENT_LIMIT = 30;
 const MAX_RECIPIENT_LIMIT = 50;
 const MAX_RECIPIENT_QUERY_LENGTH = 80;
+const INITIAL_RECIPIENT_CACHE_SECONDS = 3;
 
 export type AdminPushRecipientOption = {
   id: string;
@@ -85,6 +87,96 @@ function resolveDirectoryUsername(
   return entry?.mm_username ?? "";
 }
 
+async function querySupabaseRecipientOptions({
+  supabase,
+  query,
+  limit,
+}: {
+  supabase: ReturnType<typeof getSupabaseAdminClient>;
+  query: string;
+  limit: number;
+}): Promise<{ recipients: AdminPushRecipientOption[]; failed: boolean }> {
+  const memberFields =
+    "id,display_name,mattermost_account_id,generation,campus,directory:mm_user_directory!members_mattermost_account_id_fkey(mm_username)";
+  const memberQuery = supabase
+    .from("members")
+    .select(memberFields)
+    .is("deleted_at", null)
+    .order("display_name", { ascending: true })
+    .limit(limit);
+
+  let accountMatchedMembers: RecipientMemberRow[] = [];
+  let memberResult: Awaited<typeof memberQuery>;
+  if (query) {
+    const [nameResult, directoryResult] = await Promise.all([
+      memberQuery.ilike("display_name", getSafeSearchPattern(query)),
+      supabase
+        .from("mm_user_directory")
+        .select("id")
+        .eq("is_active", true)
+        .ilike("mm_username", getSafeSearchPattern(query))
+        .limit(limit),
+    ]);
+    memberResult = nameResult;
+    if (memberResult.error || directoryResult.error) {
+      return { recipients: [], failed: true };
+    }
+
+    const matchingAccountIds = (directoryResult.data ?? []).map(
+      (entry: DirectoryMatchRow) => entry.id,
+    );
+    if (matchingAccountIds.length > 0) {
+      const accountMemberResult = await supabase
+        .from("members")
+        .select(memberFields)
+        .is("deleted_at", null)
+        .in("mattermost_account_id", matchingAccountIds)
+        .order("display_name", { ascending: true })
+        .limit(limit);
+      if (accountMemberResult.error) {
+        return { recipients: [], failed: true };
+      }
+      accountMatchedMembers = (accountMemberResult.data ?? []) as RecipientMemberRow[];
+    }
+  } else {
+    memberResult = await memberQuery;
+    if (memberResult.error) {
+      return { recipients: [], failed: true };
+    }
+  }
+
+  const members = mergeMemberRows(
+    (memberResult.data ?? []) as RecipientMemberRow[],
+    accountMatchedMembers,
+  ).slice(0, limit);
+  return {
+    recipients: members.map((member) => ({
+      id: member.id,
+      display_name: member.display_name,
+      mm_username: resolveDirectoryUsername(member.directory),
+      year: member.generation,
+      campus: member.campus,
+    })),
+    failed: false,
+  };
+}
+
+const getCachedInitialRecipientOptions = unstable_cache(
+  async (limit: number) => {
+    try {
+      return await querySupabaseRecipientOptions({
+        supabase: getSupabaseAdminClient(),
+        query: "",
+        limit,
+      });
+    } catch {
+      return { recipients: [], failed: true };
+    }
+  },
+  ["admin-push-initial-recipient-options"],
+  { revalidate: INITIAL_RECIPIENT_CACHE_SECONDS },
+);
+
 /**
  * Searchable recipient options for the personal notification audience picker.
  * The public admin page never ships the entire member directory to the browser.
@@ -115,73 +207,15 @@ export async function listAdminPushRecipientOptions({
   }
 
   try {
-    const supabase = getSupabaseAdminClient();
-    const memberFields =
-      "id,display_name,mattermost_account_id,generation,campus,directory:mm_user_directory!members_mattermost_account_id_fkey(mm_username)";
-    const memberQuery = supabase
-      .from("members")
-      .select(memberFields)
-      .is("deleted_at", null)
-      .order("display_name", { ascending: true })
-      .limit(safeLimit);
-
-    let accountMatchedMembers: RecipientMemberRow[] = [];
-    let memberResult: Awaited<typeof memberQuery>;
-    if (normalizedQuery) {
-      const [nameResult, directoryResult] = await Promise.all([
-        memberQuery.ilike("display_name", getSafeSearchPattern(normalizedQuery)),
-        supabase
-          .from("mm_user_directory")
-          .select("id")
-          .eq("is_active", true)
-          .ilike("mm_username", getSafeSearchPattern(normalizedQuery))
-          .limit(safeLimit),
-      ]);
-      memberResult = nameResult;
-      if (memberResult.error) {
-        return { recipients: [], failed: true };
-      }
-      if (directoryResult.error) {
-        return { recipients: [], failed: true };
-      }
-
-      const matchingAccountIds = (directoryResult.data ?? []).map(
-        (entry: DirectoryMatchRow) => entry.id,
-      );
-      if (matchingAccountIds.length > 0) {
-        const accountMemberResult = await supabase
-          .from("members")
-          .select(memberFields)
-          .is("deleted_at", null)
-          .in("mattermost_account_id", matchingAccountIds)
-          .order("display_name", { ascending: true })
-          .limit(safeLimit);
-        if (accountMemberResult.error) {
-          return { recipients: [], failed: true };
-        }
-        accountMatchedMembers = (accountMemberResult.data ?? []) as RecipientMemberRow[];
-      }
-    } else {
-      memberResult = await memberQuery;
-      if (memberResult.error) {
-        return { recipients: [], failed: true };
-      }
+    if (!normalizedQuery) {
+      return await getCachedInitialRecipientOptions(safeLimit);
     }
 
-    const members = mergeMemberRows(
-      (memberResult.data ?? []) as RecipientMemberRow[],
-      accountMatchedMembers,
-    ).slice(0, safeLimit);
-    return {
-      recipients: members.map((member) => ({
-        id: member.id,
-        display_name: member.display_name,
-        mm_username: resolveDirectoryUsername(member.directory),
-        year: member.generation,
-        campus: member.campus,
-      })),
-      failed: false,
-    };
+    return await querySupabaseRecipientOptions({
+      supabase: getSupabaseAdminClient(),
+      query: normalizedQuery,
+      limit: safeLimit,
+    });
   } catch {
     return { recipients: [], failed: true };
   }
