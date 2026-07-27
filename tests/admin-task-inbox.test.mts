@@ -274,6 +274,9 @@ test("관리 홈은 다음 작업을 우선 표시하고, 활동 지표 조회�
     /href=\{nextQueueItem\.href\}\s+prefetch=\{false\}/,
   );
   assert.match(dashboardSource, /href=\{item\.href\}\s+prefetch=\{false\}/);
+  assert.match(dashboardSource, /remainingQueueItems\.map\(\(item, index\)/);
+  assert.match(dashboardSource, /index >= 2 \? "hidden sm:grid" : "grid"/);
+  assert.match(dashboardSource, /전체 업무는 작업함에서 보기/);
   assert.match(pageSource, /AdminDashboardPlatformActivitySection/);
   assert.doesNotMatch(
     pageSource,
