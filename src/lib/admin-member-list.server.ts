@@ -15,10 +15,12 @@ import {
 } from "@/lib/policy-documents";
 import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
 
 export const ADMIN_MEMBER_OPTION_SAMPLE_LIMIT = 5_000;
 export const ADMIN_MEMBER_TREND_SAMPLE_LIMIT = 5_000;
 export const ADMIN_MEMBER_READ_MODEL_TIMEOUT_MS = 3_000;
+export const ADMIN_MEMBER_OPTIONS_CACHE_REVALIDATE_SECONDS = 60;
 
 const EMPTY_MEMBER_ID = "00000000-0000-0000-0000-000000000000";
 
@@ -56,9 +58,32 @@ type AdminMemberTrendDatabaseRow = {
   created_at: string | null;
 };
 
+type AdminMemberOptionDatabaseRow = {
+  generation: number | null;
+  campus: string | null;
+};
+
 const ADMIN_MEMBER_LIST_SELECT: string =
   "id,mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at,mattermost_login_disabled_at,mattermost_login_disabled_reason";
 const ADMIN_MEMBER_TREND_SELECT: string = "created_at";
+
+const getCachedAdminMemberOptions = unstable_cache(
+  async () => {
+    const { data, error } = await getSupabaseAdminClient()
+      .from("members")
+      .select("generation,campus")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT);
+
+    return {
+      data: (data ?? []) as AdminMemberOptionDatabaseRow[],
+      hasError: Boolean(error),
+    };
+  },
+  ["admin-member-options"],
+  { revalidate: ADMIN_MEMBER_OPTIONS_CACHE_REVALIDATE_SECONDS },
+);
 
 export type AdminMemberTrendReadModel = {
   createdAts: string[];
@@ -627,12 +652,7 @@ async function getAdminMemberListReadModelUnbounded({
     ] = await Promise.all([
       getActiveRequiredPolicies(),
       getPolicyDocumentByKind("marketing").catch(() => null),
-      supabase
-        .from("members")
-        .select("generation,campus")
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
-        .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
+      getCachedAdminMemberOptions(),
       getPreferenceFilteredMemberIds(supabase, [
         { column: "enabled", value: filters.pushEnabledFilter, defaultEnabled: false },
         {
@@ -750,7 +770,7 @@ async function getAdminMemberListReadModelUnbounded({
       error: unknown | null;
     };
 
-    if (memberResult.error || optionsResult.error) {
+    if (memberResult.error || optionsResult.hasError) {
       return createEmptyReadModel(filters);
     }
 
@@ -832,7 +852,7 @@ async function getAdminMemberListReadModelUnbounded({
       ...result,
       isSampled: totalCount > result.createdAts.length,
     }));
-    const optionRows = optionsResult.data ?? [];
+    const optionRows = optionsResult.data;
     const options = {
       campuses: Array.from(
         new Set(
