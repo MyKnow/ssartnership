@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureAdminApiPermission } from '@/lib/admin-access';
+import { getAdminApiPermissionSession } from '@/lib/admin-access';
 import { getAdminLogAccessPolicy, isAllowedLogGroup } from '@/lib/admin-log-access';
-import { getAdminSession } from '@/lib/auth';
 import { conditionalJsonResponse } from '@/lib/conditional-json-response';
 import { getAdminLogsPageData } from '@/lib/log-insights';
 import { withServerTiming } from '@/lib/server-timing';
@@ -10,19 +9,14 @@ export const runtime = 'nodejs';
 
 export async function GET(request: NextRequest) {
   return withServerTiming(async (timing) => {
-    const accessDenied = await timing.measure('auth', () =>
-      ensureAdminApiPermission(request, 'logs', 'read'),
+    const auth = await timing.measure('auth', () =>
+      getAdminApiPermissionSession(request, 'logs', 'read'),
     );
-    if (accessDenied) {
-      return accessDenied;
+    if ('response' in auth) {
+      return auth.response;
     }
 
-    const session = await timing.measure('session', () => getAdminSession());
-    if (!session) {
-      return NextResponse.json({ message: '관리자 인증이 필요합니다.' }, { status: 401 });
-    }
-
-    const access = getAdminLogAccessPolicy(session.account);
+    const access = getAdminLogAccessPolicy(auth.session.account);
 
     const searchParams = request.nextUrl.searchParams;
     if (!isAllowedLogGroup(searchParams.get('group'), access.readGroups)) {

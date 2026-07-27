@@ -113,7 +113,7 @@ export async function isAdminSession() {
   return (await getAdminSession()) !== null;
 }
 
-type AdminSession = {
+export type AdminSession = {
   adminId: string;
   loginId: string;
   issuedAt: number;
