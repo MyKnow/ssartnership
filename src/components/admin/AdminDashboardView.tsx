@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import {
+  ArrowRightIcon,
   BellAlertIcon,
   QueueListIcon,
   TagIcon,
@@ -32,6 +33,7 @@ import {
   prioritizeAdminTaskItems,
 } from "@/lib/admin-task-inbox";
 import { getAdminRouteDescriptor } from "@/lib/admin-performance";
+import { cn } from "@/lib/cn";
 
 export type AdminDashboardQueueCounts = AdminDashboardHomeQueueCounts;
 
@@ -391,14 +393,17 @@ export default function AdminDashboardView({
                   </span>
                 </Link>
               ) : null}
-              {remainingQueueItems.map((item) => (
+              {remainingQueueItems.map((item, index) => (
                 <Link
                   key={item.href}
                   href={item.href}
                   prefetch={false}
                   data-admin-task-key={getAdminRouteDescriptor(item.href)?.key}
                   data-admin-task-source="home"
-                  className="grid min-w-0 gap-3 rounded-2xl border border-border/80 bg-surface-inset p-4 transition-colors hover:border-strong hover:bg-surface-control sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                  className={cn(
+                    "min-w-0 gap-3 rounded-2xl border border-border/80 bg-surface-inset p-4 transition-colors hover:border-strong hover:bg-surface-control sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center",
+                    index >= 2 ? "hidden sm:grid" : "grid",
+                  )}
                 >
                   <div className="min-w-0">
                     <p className="font-semibold text-foreground">
@@ -415,6 +420,16 @@ export default function AdminDashboardView({
                   </span>
                 </Link>
               ))}
+              {remainingQueueItems.length > 2 ? (
+                <div className="sm:hidden">
+                  <Button href="/admin/tasks" prefetch={false} variant="secondary" className="w-full">
+                    <span className="flex w-full items-center justify-between gap-3">
+                      <span>전체 업무는 작업함에서 보기</span>
+                      <ArrowRightIcon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                    </span>
+                  </Button>
+                </div>
+              ) : null}
             </div>
           )}
         </Surface>
