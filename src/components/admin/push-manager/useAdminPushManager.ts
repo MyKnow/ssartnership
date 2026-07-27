@@ -15,6 +15,7 @@ import {
   createCampusOptions,
   createYearOptions,
   filterPushLogs,
+  mergeSelectedMemberIds,
 } from "./selectors";
 import type {
   AdminPushComposerState,
@@ -275,7 +276,10 @@ export function useAdminPushManager({
     sendIdempotencyKeyRef.current = null;
     setComposer((current) => ({
       ...current,
-      selectedMemberIds: Array.from(new Set(memberIds)),
+      selectedMemberIds: mergeSelectedMemberIds(
+        current.selectedMemberIds,
+        memberIds,
+      ),
     }));
   }
 

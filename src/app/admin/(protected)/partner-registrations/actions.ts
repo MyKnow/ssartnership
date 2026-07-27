@@ -480,16 +480,23 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
     payload.reviewed_at = new Date().toISOString();
   }
 
-  const { error: updateError } = await supabase
+  const { data: updatedRequest, error: updateError } = await supabase
     .from("partner_registration_requests")
     .update(payload)
-    .eq("id", id);
+    .eq("id", id)
+    .eq("status", previousStatus)
+    .select("id")
+    .maybeSingle();
   if (updateError) {
     console.error(
       "[partner-registration] status update failed",
       updateError.message,
     );
     redirectAdminActionError(returnTo, "partner_form_invalid_request");
+  }
+
+  if (!updatedRequest) {
+    redirect(appendAdminReviewQueueQuery(returnTo, { success: "already-updated" }));
   }
 
   if (status === "converted" && previousStatus !== "converted") {

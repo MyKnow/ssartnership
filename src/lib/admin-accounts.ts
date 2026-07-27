@@ -10,6 +10,7 @@ import {
   getDefaultManagedCampusSlugsForTemplate,
   normalizeAdminManagedCampusSlugs,
 } from "@/lib/admin-scope";
+import { getMockAdminAccountById } from "@/lib/mock/admin";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export type AdminAccount = {
@@ -170,6 +171,11 @@ async function getAdminAccountFromProfile(memberId: string) {
 export async function getAdminAccountById(memberId: string) {
   if (!memberId) {
     return null;
+  }
+
+  const mockAccount = getMockAdminAccountById(memberId);
+  if (mockAccount) {
+    return mockAccount;
   }
 
   return getAdminAccountFromProfile(memberId);

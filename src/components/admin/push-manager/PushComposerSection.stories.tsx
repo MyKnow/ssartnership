@@ -173,7 +173,13 @@ function StatefulPushComposerSection({
         }));
       }}
       onSelectAllFilteredMembers={(memberIds) => {
-        setComposer((current) => ({ ...current, selectedMemberIds: memberIds }));
+        setComposer((current) => ({
+          ...current,
+          selectedMemberIds:
+            memberIds.length === 0
+              ? []
+              : Array.from(new Set([...current.selectedMemberIds, ...memberIds])),
+        }));
       }}
       onOpenRecipientModal={() => setRecipientModalOpen(true)}
       onCloseRecipientModal={() => setRecipientModalOpen(false)}
@@ -251,16 +257,14 @@ export const InteractiveComposer: Story = {
     const body = within(document.body);
     const memberPicker = within(await body.findByRole("dialog"));
     await expect(memberPicker.getByText("개인 대상 선택")).toBeInTheDocument();
-    await userEvent.type(
-      memberPicker.getByPlaceholderText("이름, Mattermost 아이디, 기수, 캠퍼스"),
-      "김",
-    );
+    const memberSearch = memberPicker.getByPlaceholderText("이름, Mattermost 아이디, 기수, 캠퍼스");
+    await userEvent.click(memberPicker.getAllByRole("checkbox")[0]);
+    await userEvent.type(memberSearch, "박");
     await expect(memberPicker.getByText(/검색 결과\s*1\s*명/)).toBeInTheDocument();
     await userEvent.click(memberPicker.getByRole("button", { name: "기수순" }));
     await userEvent.click(memberPicker.getByRole("button", { name: "캠퍼스순" }));
-    await userEvent.click(memberPicker.getAllByRole("checkbox")[0]);
-    await userEvent.click(memberPicker.getByRole("button", { name: "전체 선택" }));
-    await expect(memberPicker.getByText(/현재 선택\s*1\s*명/)).toBeInTheDocument();
+    await userEvent.click(memberPicker.getByRole("button", { name: "현재 결과 전체 선택" }));
+    await expect(memberPicker.getByText(/현재 선택\s*2\s*명/)).toBeInTheDocument();
     await userEvent.click(memberPicker.getByRole("button", { name: "완료" }));
 
     await waitFor(
@@ -269,7 +273,7 @@ export const InteractiveComposer: Story = {
       },
       { timeout: 4000 },
     );
-    await expect(canvas.getByRole("button", { name: /김싸피/ })).toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: /김싸피.*외 1명/ })).toBeInTheDocument();
 
     await userEvent.click(canvas.getByRole("button", { name: "3. 대상자 검색" }));
     await expect(args.onReview).toHaveBeenCalled();

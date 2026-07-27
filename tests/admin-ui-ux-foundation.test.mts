@@ -37,16 +37,23 @@ test("관리 메뉴는 의도 기반 여섯 업무 그룹과 기존 권한 필�
 });
 
 test("회원 화면은 내부 오류를 노출하지 않고 목록 이후에 보조 운영 도구를 둔다", async () => {
-  const source = await readFile(
-    new URL("../src/app/admin/(protected)/members/page.tsx", import.meta.url),
-    "utf8",
-  );
+  const [source, operationsSource] = await Promise.all([
+    readFile(
+      new URL("../src/app/admin/(protected)/members/page.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/components/admin/AdminMemberOperationsPanel.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
   const memberListIndex = source.indexOf('title="회원 목록"');
-  const operationsToolIndex = source.indexOf('title="운영 도구"');
+  const operationsToolIndex = source.indexOf("<AdminMemberOperationsPanel");
 
   assert.ok(memberListIndex >= 0);
   assert.ok(operationsToolIndex > memberListIndex);
   assert.doesNotMatch(source, /membersError\.message/);
+  assert.match(operationsSource, /title="운영 도구"/);
 });
 
 test("회원과 제휴처 목록은 URL 페이지 전환을 즉시 상태로 알리고 중복 요청을 막는다", async () => {

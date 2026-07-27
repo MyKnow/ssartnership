@@ -43,7 +43,6 @@ export type AdminMemberDetailViewProps = {
     hasAvatar: boolean;
     avatarUrl: string;
   };
-  activeDeviceCount: number | null;
   securityLogs: AdminMemberSecurityLog[];
   securityLogPagination: {
     totalCount: number;
@@ -79,7 +78,6 @@ function formatDate(value: string | null) {
 
 export default function AdminMemberDetailView({
   member,
-  activeDeviceCount,
   securityLogs,
   securityLogPagination,
   preferences,
@@ -144,10 +142,9 @@ export default function AdminMemberDetailView({
           {
             label: "비밀번호 상태",
             value: member.mustChangePassword ? "변경 필요" : "정상",
-            hint:
-              activeDeviceCount === null
-                ? "활성 기기 확인 중"
-                : `활성 기기 ${activeDeviceCount}개`,
+            hint: canUpdate
+              ? "계정 관리에서 변경 필요 여부를 조정합니다."
+              : "현재 계정 상태",
           },
           {
             label: "최근 갱신",
@@ -207,18 +204,6 @@ export default function AdminMemberDetailView({
                 <span>{member.manualLoginId ? "직접 로그인 ID" : "MM User ID"}</span>
                 <span className="max-w-[13rem] break-all text-right font-medium text-foreground">
                   {member.manualLoginId ?? member.mmUserId ?? "-"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span>활성 푸시 기기</span>
-                <span className="font-medium text-foreground">
-                  {activeDeviceCount === null ? "확인 중" : `${activeDeviceCount}개`}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span>보안 로그</span>
-                <span className="font-medium text-foreground">
-                  {securityLogPagination.totalCount.toLocaleString("ko-KR")}건
                 </span>
               </div>
             </div>

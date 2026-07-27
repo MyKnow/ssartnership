@@ -214,7 +214,6 @@ async function AdminMemberDetailContent({
           hasAvatar,
           avatarUrl,
         }}
-        activeDeviceCount={null}
         securityLogs={[]}
         securityLogPagination={{
           totalCount: 0,

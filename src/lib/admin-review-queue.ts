@@ -27,6 +27,11 @@ const SUCCESS_MESSAGES: Record<string, AdminReviewQueueFeedback> = {
     title: "저장 완료",
     description: "검토 상태를 저장했습니다.",
   },
+  "already-updated": {
+    tone: "info",
+    title: "최신 상태를 확인했습니다",
+    description: "다른 관리자가 먼저 상태를 변경했습니다. 현재 목록에서 최신 내용을 확인하세요.",
+  },
 };
 
 const ERROR_MESSAGES: Record<string, AdminReviewQueueFeedback> = {
