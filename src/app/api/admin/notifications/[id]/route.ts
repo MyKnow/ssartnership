@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
+import { invalidateAdminNotificationReadCache } from "@/lib/admin-notifications.server";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { withServerTiming } from "@/lib/server-timing";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -60,6 +61,7 @@ export async function PATCH(
         if (!data) {
           return null;
         }
+        invalidateAdminNotificationReadCache(session.adminId);
         return { unreadCount: await getUnreadCount(session.adminId) };
       });
       if (!result) {
@@ -109,6 +111,7 @@ export async function DELETE(
         if (!data) {
           return null;
         }
+        invalidateAdminNotificationReadCache(session.adminId);
         return { unreadCount: await getUnreadCount(session.adminId) };
       });
       if (!result) {

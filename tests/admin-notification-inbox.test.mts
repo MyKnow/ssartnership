@@ -155,8 +155,10 @@ test("admin notification API never returns storage errors to the browser", async
   assert.match(listSource, /알림을 불러오지 못했습니다\./);
   assert.match(listSource, /getSafeAdminMessage/);
   assert.match(listSource, /includeSummary/);
-  assert.match(listSource, /includeSummary\s*\n\s*\?\s*supabase/);
+  assert.match(listSource, /includeUnreadCount: includeSummary/);
   assert.match(listSource, /includeSummary \? \{ summary:/);
+  assert.match(listSource, /getCachedAdminNotificationInboxReadModel/);
+  assert.match(listSource, /invalidateAdminNotificationReadCache/);
   assert.match(itemSource, /getSafeAdminMessage/);
   assert.doesNotMatch(listSource, /message:\s*unreadResult\.error\.message/);
   assert.doesNotMatch(listSource, /message:\s*inboxResult\.error\.message/);

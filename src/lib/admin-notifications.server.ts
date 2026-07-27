@@ -1,6 +1,8 @@
+import { revalidateTag, unstable_cache } from "next/cache";
 import {
   buildAdminNotificationListResult,
   type AdminNotificationRecipientRow,
+  type AdminNotificationListResult,
 } from "@/lib/admin-notification-inbox";
 import {
   getAdminOperationalNotificationPreferences,
@@ -24,21 +26,39 @@ function createUnavailableAdminNotificationsReadModel() {
   };
 }
 
-/**
- * Server read model for one administrator's inbox and notification controls.
- * It deliberately turns expected read failures into a safe UI state rather
- * than leaking a database error through the route error boundary.
- */
-export async function getAdminNotificationsReadModel(adminId: string) {
+const ADMIN_NOTIFICATION_READ_CACHE_REVALIDATE_SECONDS = 3;
+
+type AdminNotificationInboxReadModel = {
+  notificationResult: AdminNotificationListResult;
+  loadError: boolean;
+};
+
+function getAdminNotificationReadCacheTag(adminId: string) {
+  return `admin-notifications:${adminId}`;
+}
+
+async function getAdminNotificationInboxReadModelUncached({
+  adminId,
+  offset,
+  limit,
+  includeUnreadCount,
+}: {
+  adminId: string;
+  offset: number;
+  limit: number;
+  includeUnreadCount: boolean;
+}): Promise<AdminNotificationInboxReadModel> {
   try {
     const supabase = getSupabaseAdminClient();
-    const [unreadResult, inboxResult, preferences, devices] = await Promise.all([
-      supabase
-        .from("admin_notification_recipients")
-        .select("id", { count: "exact", head: true })
-        .eq("admin_id", adminId)
-        .is("deleted_at", null)
-        .is("read_at", null),
+    const [unreadResult, inboxResult] = await Promise.all([
+      includeUnreadCount
+        ? supabase
+            .from("admin_notification_recipients")
+            .select("id", { count: "exact", head: true })
+            .eq("admin_id", adminId)
+            .is("deleted_at", null)
+            .is("read_at", null)
+        : Promise.resolve({ count: 0, error: null }),
       supabase
         .from("admin_notification_recipients")
         .select(
@@ -47,24 +67,108 @@ export async function getAdminNotificationsReadModel(adminId: string) {
         .eq("admin_id", adminId)
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
-        .range(0, 10),
-      getAdminOperationalNotificationPreferences(adminId),
-      listOperationalPushSubscriptionDevices({
-        ownerType: "admin",
-        ownerId: adminId,
-      }),
+        .range(offset, offset + limit),
     ]);
+
     if (unreadResult.error || inboxResult.error) {
-      return createUnavailableAdminNotificationsReadModel();
+      return {
+        notificationResult: buildAdminNotificationListResult({
+          unreadCount: 0,
+          rows: [],
+          offset,
+          limit,
+          hasMore: false,
+        }),
+        loadError: true,
+      };
     }
 
     return {
       notificationResult: buildAdminNotificationListResult({
         unreadCount: unreadResult.count ?? 0,
         rows: (inboxResult.data ?? []) as AdminNotificationRecipientRow[],
+        offset,
+        limit,
+      }),
+      loadError: false,
+    };
+  } catch {
+    return {
+      notificationResult: buildAdminNotificationListResult({
+        unreadCount: 0,
+        rows: [],
+        offset,
+        limit,
+        hasMore: false,
+      }),
+      loadError: true,
+    };
+  }
+}
+
+export async function getCachedAdminNotificationInboxReadModel({
+  adminId,
+  offset = 0,
+  limit = 10,
+  includeUnreadCount = true,
+}: {
+  adminId: string;
+  offset?: number;
+  limit?: number;
+  includeUnreadCount?: boolean;
+}) {
+  return unstable_cache(
+    () =>
+      getAdminNotificationInboxReadModelUncached({
+        adminId,
+        offset,
+        limit,
+        includeUnreadCount,
+      }),
+    [
+      "admin-notification-inbox",
+      adminId,
+      String(offset),
+      String(limit),
+      includeUnreadCount ? "with-unread-count" : "without-unread-count",
+    ],
+    {
+      revalidate: ADMIN_NOTIFICATION_READ_CACHE_REVALIDATE_SECONDS,
+      tags: [getAdminNotificationReadCacheTag(adminId)],
+    },
+  )();
+}
+
+export function invalidateAdminNotificationReadCache(adminId: string) {
+  revalidateTag(getAdminNotificationReadCacheTag(adminId), "max");
+}
+
+/**
+ * Server read model for one administrator's inbox and notification controls.
+ * It deliberately turns expected read failures into a safe UI state rather
+ * than leaking a database error through the route error boundary.
+ */
+export async function getAdminNotificationsReadModel(adminId: string) {
+  try {
+    const [notificationReadModel, preferences, devices] = await Promise.all([
+      getCachedAdminNotificationInboxReadModel({
+        adminId,
         offset: 0,
         limit: 10,
+        includeUnreadCount: true,
       }),
+      getAdminOperationalNotificationPreferences(adminId),
+      listOperationalPushSubscriptionDevices({
+        ownerType: "admin",
+        ownerId: adminId,
+      }),
+    ]);
+    if (notificationReadModel.loadError) {
+      return createUnavailableAdminNotificationsReadModel();
+    }
+
+    return {
+      notificationResult: notificationReadModel.notificationResult,
       preferences,
       deviceCount: devices.length,
       loadError: false,
