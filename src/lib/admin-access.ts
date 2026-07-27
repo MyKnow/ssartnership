@@ -240,7 +240,7 @@ export async function getAdminApiPermissionSession(
   request: NextRequest,
   resource: AdminPermissionResource,
   action: AdminPermissionAction,
-) {
+): Promise<AdminApiPermissionResult> {
   const session = await getAdminSession();
   if (!session) {
     await logAuthSecurity({

@@ -26,8 +26,9 @@ test("UUID 관리 식별자는 회원·제휴처의 정확한 ID 검색 경로�
 
   assert.match(searchServiceSource, /import \{ isUuid \} from "@\/lib\/uuid"/);
   assert.match(searchServiceSource, /isUuid\(normalizedQuery\)/);
-  assert.match(searchServiceSource, /canSearchPartners && isIdentifierQuery/);
+  assert.match(searchServiceSource, /canSearchPartners[\s\S]*isIdentifierQuery/);
   assert.match(searchServiceSource, /\.eq\("id", normalizedQuery\)/);
+  assert.match(searchServiceSource, /canUseAdminGlobalSearchOrFilter/);
 });
 
 test("빠른 찾기는 Enter로 실제 대상 검색으로 이동하고 검색 결과는 서비스 경계에서 최소 필드만 조회한다", async () => {
@@ -57,9 +58,10 @@ test("빠른 찾기는 Enter로 실제 대상 검색으로 이동하고 검색 �
   assert.doesNotMatch(pageSource, /getSupabaseAdminClient/);
   assert.match(
     searchServiceSource,
-    /\.overlaps\(\s*"managed_campus_slugs",\s*managedCampusSlugs,\s*\)/,
+    /\.overlaps\(\s*"managed_campus_slugs",\s*managedCampusSlugs\s*\)/,
   );
-  assert.match(searchServiceSource, /\.limit\(8\)/);
+  assert.match(searchServiceSource, /\.or\(`display_name\.ilike\.\$\{pattern\},manual_login_id\.ilike\.\$\{pattern\}`\)/);
+  assert.match(searchServiceSource, /const SEARCH_RESULT_LIMIT = 8/);
   assert.doesNotMatch(searchServiceSource, /\.select\("\*"\)/);
   assert.doesNotMatch(searchServiceSource, /Error\.message/);
 });

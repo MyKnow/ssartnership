@@ -54,6 +54,15 @@ function dedupePartners(rows: AdminGlobalSearchPartner[]) {
   return Array.from(found.values()).slice(0, SEARCH_RESULT_LIMIT);
 }
 
+/**
+ * PostgREST's `or` expression is a small filter language. Only use the
+ * combined query for values that cannot introduce filter delimiters; unusual
+ * input falls back to independent `ilike` filters below.
+ */
+function canUseAdminGlobalSearchOrFilter(value: string) {
+  return /^[\p{L}\p{N}\s@_.-]+$/u.test(value);
+}
+
 export async function searchAdminGlobalEntities({
   query,
   canSearchMembers,
@@ -76,64 +85,68 @@ export async function searchAdminGlobalEntities({
   const normalizedQuery = query.trim();
   const pattern = getAdminGlobalSearchLikePattern(normalizedQuery);
   const isIdentifierQuery = isUuid(normalizedQuery);
+  const canUseOrFilter = canUseAdminGlobalSearchOrFilter(normalizedQuery);
   const memberQueries = canSearchMembers
-    ? [
-        supabase
-          .from("members")
-          .select("id,display_name,manual_login_id,generation,campus")
-          .is("deleted_at", null)
-          .ilike("display_name", pattern)
-          .order("updated_at", { ascending: false })
-          .limit(8),
-        supabase
-          .from("members")
-          .select("id,display_name,manual_login_id,generation,campus")
-          .is("deleted_at", null)
-          .ilike("manual_login_id", pattern)
-          .order("updated_at", { ascending: false })
-          .limit(8),
-        ...(isIdentifierQuery
-          ? [
-              supabase
-                .from("members")
-                .select("id,display_name,manual_login_id,generation,campus")
-                .is("deleted_at", null)
-                .eq("id", normalizedQuery)
-                .limit(1),
-            ]
-          : []),
-      ]
+    ? isIdentifierQuery
+      ? [
+          supabase
+            .from("members")
+            .select("id,display_name,manual_login_id,generation,campus")
+            .is("deleted_at", null)
+            .eq("id", normalizedQuery)
+            .limit(1),
+        ]
+      : canUseOrFilter
+        ? [
+            supabase
+              .from("members")
+              .select("id,display_name,manual_login_id,generation,campus")
+              .is("deleted_at", null)
+              .or(`display_name.ilike.${pattern},manual_login_id.ilike.${pattern}`)
+              .order("updated_at", { ascending: false })
+              .limit(SEARCH_RESULT_LIMIT),
+          ]
+        : [
+            supabase
+              .from("members")
+              .select("id,display_name,manual_login_id,generation,campus")
+              .is("deleted_at", null)
+              .ilike("display_name", pattern)
+              .order("updated_at", { ascending: false })
+              .limit(SEARCH_RESULT_LIMIT),
+            supabase
+              .from("members")
+              .select("id,display_name,manual_login_id,generation,campus")
+              .is("deleted_at", null)
+              .ilike("manual_login_id", pattern)
+              .order("updated_at", { ascending: false })
+              .limit(SEARCH_RESULT_LIMIT),
+          ]
     : [];
-  let partnerQuery = canSearchPartners
-    ? supabase
-        .from("partners")
-        .select("id,name,location,campus_slugs")
-        .ilike("name", pattern)
-        .order("updated_at", { ascending: false })
-        .limit(8)
-    : null;
-  let partnerIdQuery = canSearchPartners && isIdentifierQuery
-    ? supabase
-        .from("partners")
-        .select("id,name,location,campus_slugs")
-        .eq("id", normalizedQuery)
-        .limit(1)
-    : null;
-  if (partnerQuery && managedCampusSlugs) {
-    partnerQuery = partnerQuery.overlaps(
-      "managed_campus_slugs",
-      managedCampusSlugs,
-    );
-  }
-  if (partnerIdQuery && managedCampusSlugs) {
-    partnerIdQuery = partnerIdQuery.overlaps(
-      "managed_campus_slugs",
-      managedCampusSlugs,
-    );
-  }
-  const scopedPartnerQueries = [partnerQuery, partnerIdQuery].filter(
-    (query): query is NonNullable<typeof partnerQuery> => Boolean(query),
-  );
+  const partnerQueries = canSearchPartners
+    ? isIdentifierQuery
+      ? [
+          supabase
+            .from("partners")
+            .select("id,name,location,campus_slugs")
+            .eq("id", normalizedQuery)
+            .limit(1),
+        ]
+      : [
+          supabase
+            .from("partners")
+            .select("id,name,location,campus_slugs")
+            .ilike("name", pattern)
+            .order("updated_at", { ascending: false })
+            .limit(SEARCH_RESULT_LIMIT),
+        ]
+    : [];
+
+  const scopedPartnerQueries = managedCampusSlugs
+    ? partnerQueries.map((partnerQuery) =>
+        partnerQuery.overlaps("managed_campus_slugs", managedCampusSlugs),
+      )
+    : partnerQueries;
 
   const [memberResults, partnerResults] = await Promise.all([
     withAdminReadModelTimeout(
