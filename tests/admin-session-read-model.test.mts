@@ -15,6 +15,9 @@ test("관리자 세션은 좁은 snapshot RPC를 우선 사용하고 rolling dep
   assert.match(accounts, /get_admin_session_snapshot/);
   assert.match(accounts, /getAdminAccountFromProfile\(memberId\)/);
   assert.match(accounts, /mapAdminSessionSnapshot/);
+  assert.match(accounts, /unstable_cache/);
+  assert.match(accounts, /revalidateTag\(getAdminAccountCacheTag\(memberId\), "max"\)/);
+  assert.match(accounts, /revalidate: ADMIN_ACCOUNT_CACHE_REVALIDATE_SECONDS/);
   assert.match(auth, /getAdminAccountById\(payload\.adminId\)/);
   assert.match(migration, /create or replace function public\.get_admin_session_snapshot\(p_member_id uuid\)/);
   assert.match(migration, /'permission_version'/);
