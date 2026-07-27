@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import AdminMemberSignupApprovalQueue, {
   getSignupApprovalStatusMessage,
 } from "@/components/admin/AdminMemberSignupApprovalQueue";
 import AdminShell from "@/components/admin/AdminShell";
+import { AdminMemberSignupRequestsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import { requireMemberSignupRequestAdmin } from "@/lib/admin-access";
 import { parseAdminReviewQueuePagination } from "@/lib/admin-ia";
 import {
@@ -35,15 +37,11 @@ function buildMemberSignupQueueHref(page: number, pageSize: number) {
     : "/admin/member-signup-requests";
 }
 
-export default async function AdminMemberSignupRequestsPage({
-  searchParams,
+async function AdminMemberSignupRequestsContent({
+  params,
 }: {
-  searchParams?: Promise<MemberSignupRequestsSearchParams>;
+  params: MemberSignupRequestsSearchParams;
 }) {
-  await requireMemberSignupRequestAdmin("read", {
-    path: "/admin/member-signup-requests",
-  });
-  const params = (await searchParams) ?? {};
   const pagination = parseAdminReviewQueuePagination({
     page: getOneSearchParam(params.page),
     pageSize: getOneSearchParam(params.pageSize),
@@ -87,8 +85,7 @@ export default async function AdminMemberSignupRequestsPage({
   );
 
   return (
-    <AdminShell title="가입 승인">
-      <AdminMemberSignupApprovalQueue
+    <AdminMemberSignupApprovalQueue
         requests={requestPage.requests}
         statusMessage={getSignupApprovalStatusMessage(getOneSearchParam(params.status))}
         returnTo={returnTo}
@@ -98,7 +95,25 @@ export default async function AdminMemberSignupRequestsPage({
         })}
         pagination={requestPage}
         loadError={queueLoadError}
-      />
+    />
+  );
+}
+
+export default async function AdminMemberSignupRequestsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<MemberSignupRequestsSearchParams>;
+}) {
+  await requireMemberSignupRequestAdmin("read", {
+    path: "/admin/member-signup-requests",
+  });
+  const params = (await searchParams) ?? {};
+
+  return (
+    <AdminShell title="가입 승인">
+      <Suspense fallback={<AdminMemberSignupRequestsSkeletonContent />}>
+        <AdminMemberSignupRequestsContent params={params} />
+      </Suspense>
     </AdminShell>
   );
 }

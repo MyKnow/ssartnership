@@ -27,3 +27,48 @@ test("관리 홈 집계 RPC는 권한 범위별 수치만 반환하고 service r
   assert.match(migration, /grant execute on function public\.get_admin_dashboard_home_snapshot\(uuid, text\[\], boolean, boolean, boolean, boolean, boolean\) to service_role/);
   assert.doesNotMatch(migration, /security definer/);
 });
+
+test("관리 홈은 read model이 준비되는 동안 관리자 셸을 먼저 스트리밍한다", async () => {
+  const pageSource = await readFile(
+    new URL("../src/app/admin/(protected)/page.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(pageSource, /<AdminShell title="관리 홈">/);
+  assert.match(
+    pageSource,
+    /<Suspense fallback=\{<AdminDashboardSkeletonContent \/>\}>/,
+  );
+  assert.match(pageSource, /function AdminDashboardContent/);
+  assert.match(pageSource, /async function AdminDashboardData/);
+  assert.match(pageSource, /const cycleSettingsPromise = getSsafyCycleSettings\(\);/);
+  assert.match(pageSource, /<AdminDashboardCycleMeta settingsPromise=\{cycleSettingsPromise\} \/>/);
+  assert.doesNotMatch(pageSource, /Promise\.all\(\[\s*cycleSettingsPromise/);
+});
+
+test("관리 홈 read-model은 느린 RPC를 안전한 오류 상태로 제한한다", async () => {
+  const source = await readFile(
+    new URL("../src/lib/admin-dashboard-home.server.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /withAdminReadModelTimeout/);
+  assert.match(source, /ADMIN_DASHBOARD_READ_MODEL_TIMEOUT_MS/);
+  assert.match(source, /hasError: true/);
+});
+
+test("기수 설정은 짧은 서버 캐시를 사용하고 cycle 변경 시 즉시 무효화한다", async () => {
+  const [settingsSource, helpersSource] = await Promise.all([
+    readFile(new URL("../src/lib/ssafy-cycle-settings.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../src/app/admin/(protected)/_actions/shared-helpers.ts", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(settingsSource, /unstable_cache/);
+  assert.match(settingsSource, /revalidate: SSAFY_CYCLE_SETTINGS_CACHE_SECONDS/);
+  assert.match(settingsSource, /tags: \[SSAFY_CYCLE_SETTINGS_CACHE_TAG\]/);
+  assert.match(settingsSource, /const SSAFY_CYCLE_SETTINGS_CACHE_SECONDS = 60/);
+  assert.match(helpersSource, /revalidateTag\("ssafy-cycle-settings", "max"\)/);
+});

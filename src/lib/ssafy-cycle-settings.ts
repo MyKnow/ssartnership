@@ -1,3 +1,5 @@
+import { unstable_cache } from "next/cache";
+
 export type SsafyYearRule = {
   anchorYear: number;
   anchorCalendarYear: number;
@@ -59,6 +61,9 @@ async function loadSupabaseAdminClient() {
   const { getSupabaseAdminClient } = await import("./supabase/server");
   return getSupabaseAdminClient();
 }
+
+const SSAFY_CYCLE_SETTINGS_CACHE_TAG = "ssafy-cycle-settings";
+const SSAFY_CYCLE_SETTINGS_CACHE_SECONDS = 60;
 
 export type SsafyCycleSettings = SsafyYearRule & {
   manualCurrentYear: number | null;
@@ -178,7 +183,7 @@ export function normalizeSsafyCycleSettings(
   };
 }
 
-export async function getSsafyCycleSettings() {
+async function fetchSsafyCycleSettings() {
   const supabase = await loadSupabaseAdminClient();
   const { data, error } = await supabase
     .from("ssafy_cycle_settings")
@@ -193,6 +198,19 @@ export async function getSsafyCycleSettings() {
   }
 
   return normalizeSsafyCycleSettings(data as Partial<Record<string, unknown>> | null);
+}
+
+const getCachedSsafyCycleSettings = unstable_cache(
+  fetchSsafyCycleSettings,
+  [SSAFY_CYCLE_SETTINGS_CACHE_TAG],
+  {
+    revalidate: SSAFY_CYCLE_SETTINGS_CACHE_SECONDS,
+    tags: [SSAFY_CYCLE_SETTINGS_CACHE_TAG],
+  },
+);
+
+export async function getSsafyCycleSettings() {
+  return getCachedSsafyCycleSettings();
 }
 
 export function getConfiguredCurrentSsafyYear(

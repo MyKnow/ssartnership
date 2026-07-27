@@ -16,12 +16,12 @@ export default function AdminPartnerNewView(
   return (
     <section className="grid gap-6">
       <AdminPageHeader
-        eyebrow="제휴 운영"
+        eyebrow="데이터"
         title="제휴처 추가"
         description="사용자에게 노출할 제휴처 정보와 혜택 조건을 입력하고 파트너사에 연결합니다."
       />
       <AdminWorkspaceSummary
-        eyebrow="제휴 운영"
+        eyebrow="데이터"
         title="생성 전 확인"
         description="필수 분류와 연결 대상을 확인한 뒤, 제휴처 정보를 한 번 검토하고 저장합니다."
         items={[

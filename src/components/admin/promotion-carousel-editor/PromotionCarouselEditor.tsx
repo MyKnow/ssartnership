@@ -51,7 +51,10 @@ import {
 } from "./draft";
 
 const PROMOTION_ASPECT_RATIO = 21 / 9;
-const PROMOTION_IMAGE_POLICY = resolveImageTransformPolicy("promotion", "slide");
+const PROMOTION_IMAGE_POLICY = resolveImageTransformPolicy(
+  "promotion",
+  "slide",
+);
 
 type SlideDraft = PromotionCarouselDraftSlide;
 
@@ -109,7 +112,9 @@ function normalizeCampusSlug(value: string) {
 function toDraftSlide(slide: ManagedPromotionSlide): SlideDraft {
   const allowedCampuses = slide.allowedCampuses
     .map((campus) => normalizeCampusSlug(campus))
-    .filter((campus): campus is CampusSlug => Boolean(CAMPUS_DIRECTORY.find((item) => item.slug === campus)));
+    .filter((campus): campus is CampusSlug =>
+      Boolean(CAMPUS_DIRECTORY.find((item) => item.slug === campus)),
+    );
 
   return {
     id: slide.id,
@@ -121,7 +126,9 @@ function toDraftSlide(slide: ManagedPromotionSlide): SlideDraft {
     href: slide.href,
     isActive: slide.isActive,
     audiences:
-      slide.audiences.length > 0 ? [...slide.audiences] : [...DEFAULT_PROMOTION_AUDIENCES],
+      slide.audiences.length > 0
+        ? [...slide.audiences]
+        : [...DEFAULT_PROMOTION_AUDIENCES],
     allowedCampuses,
     eventSlug: slide.eventSlug,
     adCampaignId: slide.adCampaignId,
@@ -131,7 +138,9 @@ function toDraftSlide(slide: ManagedPromotionSlide): SlideDraft {
 }
 
 function extractEventSlugFromHref(href: string) {
-  const match = href.trim().match(/^\/events\/([a-z0-9]+(?:-[a-z0-9]+)*)(?:[/?#]|$)/);
+  const match = href
+    .trim()
+    .match(/^\/events\/([a-z0-9]+(?:-[a-z0-9]+)*)(?:[/?#]|$)/);
   return match?.[1] ?? null;
 }
 
@@ -161,7 +170,10 @@ function SlideBadge({
 }
 
 function getAudienceLabel(value: PromotionAudience) {
-  return PROMOTION_AUDIENCE_OPTIONS.find((item) => item.key === value)?.label ?? value;
+  return (
+    PROMOTION_AUDIENCE_OPTIONS.find((item) => item.key === value)?.label ??
+    value
+  );
 }
 
 function toggleAudience(
@@ -180,14 +192,16 @@ export default function PromotionCarouselEditor({
   eventPageOptions,
   adCampaignOptions,
   saveAction,
+  canUpdate = true,
 }: {
   initialSlides: ManagedPromotionSlide[];
   eventPageOptions: PromotionEventPageOption[];
   adCampaignOptions: PromotionAdCampaignOption[];
   saveAction: (formData: FormData) => void | Promise<void>;
+  canUpdate?: boolean;
 }) {
-  const [slides, setSlides] = useState<SlideDraft[]>(
-    () => initialSlides.map((slide) => toDraftSlide(slide)),
+  const [slides, setSlides] = useState<SlideDraft[]>(() =>
+    initialSlides.map((slide) => toDraftSlide(slide)),
   );
   const [pendingCrop, setPendingCrop] = useState<PendingCrop | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -220,12 +234,14 @@ export default function PromotionCarouselEditor({
     saveImageUploadDraft({
       formKey: PROMOTION_CAROUSEL_DRAFT_KEY,
       values: {
-        [getPromotionCarouselDraftValueKey()]: serializePromotionCarouselDraft(nextSlides),
+        [getPromotionCarouselDraftValueKey()]:
+          serializePromotionCarouselDraft(nextSlides),
       },
-      manifests: files
-        .flatMap((file) => file.uploadId
+      manifests: files.flatMap((file) =>
+        file.uploadId
           ? [{ uploadId: file.uploadId, role: file.role, order: file.order }]
-          : []),
+          : [],
+      ),
     });
     await saveImageUploadDraftFiles(PROMOTION_CAROUSEL_DRAFT_KEY, files);
   }, []);
@@ -239,7 +255,9 @@ export default function PromotionCarouselEditor({
           draft?.values[getPromotionCarouselDraftValueKey()],
         );
         if (!restoredSlides) return;
-        const files = await loadImageUploadDraftFiles(PROMOTION_CAROUSEL_DRAFT_KEY);
+        const files = await loadImageUploadDraftFiles(
+          PROMOTION_CAROUSEL_DRAFT_KEY,
+        );
         if (cancelled) return;
         const filesBySlideId = new Map(
           files
@@ -359,9 +377,12 @@ export default function PromotionCarouselEditor({
     return issues;
   }, [slides]);
 
-  const editableCount = slides.filter((slide) => slide.source === "database").length;
-  const canEdit = editableCount > 0;
+  const editableCount = slides.filter(
+    (slide) => slide.source === "database",
+  ).length;
+  const canEdit = canUpdate && editableCount > 0;
   const canSave =
+    canUpdate &&
     slides.length > 0 &&
     slides.every((slide) => slide.source === "database") &&
     validationErrors.length === 0;
@@ -394,6 +415,9 @@ export default function PromotionCarouselEditor({
   }
 
   function addSlide() {
+    if (!canUpdate) {
+      return;
+    }
     const id = crypto.randomUUID();
     const fallback = createPlaceholderImage("새 광고 카드");
     setSlides((current) => [
@@ -455,13 +479,19 @@ export default function PromotionCarouselEditor({
     if (!file) {
       return;
     }
-    const validationError = getImageUploadSourceError(file, PROMOTION_IMAGE_POLICY);
+    const validationError = getImageUploadSourceError(
+      file,
+      PROMOTION_IMAGE_POLICY,
+    );
     if (validationError) {
       setError(validationError);
       return;
     }
     try {
-      const sourceFile = await prepareImageUploadSource(file, PROMOTION_IMAGE_POLICY);
+      const sourceFile = await prepareImageUploadSource(
+        file,
+        PROMOTION_IMAGE_POLICY,
+      );
       const sourceUrl = URL.createObjectURL(sourceFile);
       setPendingCrop({ slideId: id, sourceUrl, sourceFile });
     } catch (error) {
@@ -512,10 +542,14 @@ export default function PromotionCarouselEditor({
   }
 
   function isEditable(slide: SlideDraft) {
-    return slide.source === "database";
+    return canUpdate && slide.source === "database";
   }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    if (!canUpdate) {
+      event.preventDefault();
+      return;
+    }
     if (allowUploadedFormSubmitRef.current) {
       allowUploadedFormSubmitRef.current = false;
       return;
@@ -560,18 +594,20 @@ export default function PromotionCarouselEditor({
       );
       const nextSlides = slides.map((slide) => {
         const uploadId = uploadIdsBySlideId.get(slide.id);
-        return uploadId
-          ? { ...slide, uploadId, imageFile: undefined }
-          : slide;
+        return uploadId ? { ...slide, uploadId, imageFile: undefined } : slide;
       });
       setSlides(nextSlides);
-      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+      await new Promise<void>((resolve) =>
+        window.requestAnimationFrame(() => resolve()),
+      );
       await persistDraft(nextSlides);
       allowUploadedFormSubmitRef.current = true;
       form.requestSubmit();
     } catch (uploadError) {
       void uploadError;
-      setError("광고 이미지를 업로드하지 못했습니다. 입력한 내용은 유지됩니다.");
+      setError(
+        "광고 이미지를 업로드하지 못했습니다. 입력한 내용은 유지됩니다.",
+      );
     } finally {
       isSubmittingImagesRef.current = false;
     }
@@ -582,8 +618,10 @@ export default function PromotionCarouselEditor({
       <Card tone="elevated" className="grid gap-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="ui-kicker">Preview</p>
-            <h2 className="mt-2 text-xl font-semibold text-foreground">홈 캐러셀 미리보기</h2>
+            <p className="ui-kicker">미리보기</p>
+            <h2 className="mt-2 text-xl font-semibold text-foreground">
+              홈 캐러셀 미리보기
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               드래프트가 바로 반영되며, 저장 전까지는 로컬에서만 보입니다.
             </p>
@@ -596,49 +634,66 @@ export default function PromotionCarouselEditor({
           <PromotionCarousel slides={previewSlides} className="mt-0" />
         ) : (
           <div className="rounded-overlay border border-dashed border-border bg-surface-inset px-4 py-10 text-center text-sm font-medium text-muted-foreground">
-            활성 광고 카드가 없습니다. 카드를 활성화하면 실제 홈 배너와 같은 기준으로 미리볼 수 있습니다.
+            활성 광고 카드가 없습니다. 카드를 활성화하면 실제 홈 배너와 같은
+            기준으로 미리볼 수 있습니다.
           </div>
         )}
       </Card>
 
-      <form ref={formRef} action={saveAction} onSubmit={handleSubmit} className="grid gap-6">
+      <form
+        ref={formRef}
+        action={saveAction}
+        onSubmit={handleSubmit}
+        className="grid gap-6"
+      >
         <input type="hidden" name="slidesJson" value={serializedSlides} />
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="ui-kicker">Editor</p>
-            <h2 className="mt-2 text-xl font-semibold text-foreground">광고 카드 편집</h2>
+            <p className="ui-kicker">편집</p>
+            <h2 className="mt-2 text-xl font-semibold text-foreground">
+              광고 카드 편집
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               순서, 노출 권한, 문구, 이미지 편집을 한 화면에서 처리합니다.
             </p>
           </div>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={addSlide}
-            className="w-full sm:w-auto"
-          >
-            <PlusIcon className="size-4" />
-            카드 추가
-          </Button>
+          {canUpdate ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={addSlide}
+              className="w-full sm:w-auto"
+            >
+              <PlusIcon className="size-4" />
+              카드 추가
+            </Button>
+          ) : null}
         </div>
 
         {error ? <FormMessage variant="error">{error}</FormMessage> : null}
         {validationErrors.length > 0 ? (
           <FormMessage variant="info">
-            저장 전 확인이 필요한 항목이 {validationErrors.length}개 있습니다. 첫 번째 항목:{" "}
-            {validationErrors[0]}
+            저장 전 확인이 필요한 항목이 {validationErrors.length}개 있습니다.
+            첫 번째 항목: {validationErrors[0]}
           </FormMessage>
         ) : null}
-        {!canEdit ? (
+        {!canUpdate ? (
           <FormMessage variant="info">
-            현재 로드된 카드가 모두 미리보기용이라 기존 카드 수정은 막혀 있습니다. 새 카드는 추가할 수 있습니다.
+            현재 계정은 광고 카드를 조회할 수 있지만 수정할 수 없습니다.
+          </FormMessage>
+        ) : null}
+        {canUpdate && !canEdit ? (
+          <FormMessage variant="info">
+            현재 로드된 카드가 모두 미리보기용이라 기존 카드 수정은 막혀
+            있습니다. 새 카드는 추가할 수 있습니다.
           </FormMessage>
         ) : null}
 
         <section className="grid gap-4" aria-label="광고 카드 목록">
           {slides.map((slide, index) => {
-            const previewSrc = slide.imageSrc || createPlaceholderImage(slide.title);
+            const previewSrc =
+              slide.imageSrc || createPlaceholderImage(slide.title);
             const editable = isEditable(slide);
             const titleInvalid = !slide.title.trim();
             const subtitleInvalid = !slide.subtitle.trim();
@@ -646,17 +701,26 @@ export default function PromotionCarouselEditor({
             const altInvalid = !slide.imageAlt.trim();
             const audienceInvalid = slide.audiences.length === 0;
             const sponsorInvalid =
-              slide.sponsorLabel.length > AD_PACKAGE_FORM_LIMITS.sponsorLabelMax;
+              slide.sponsorLabel.length >
+              AD_PACKAGE_FORM_LIMITS.sponsorLabelMax;
             return (
               <Card key={slide.id} tone="default" className="grid gap-5">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <SlideBadge>순번 {index + 1}</SlideBadge>
-                      <SlideBadge active={slide.isActive}>{slide.isActive ? "활성" : "비활성"}</SlideBadge>
-                      <SlideBadge muted>{editable ? "DB" : "Catalog"}</SlideBadge>
-                      {slide.adCampaignId ? <SlideBadge active>제휴 캠페인</SlideBadge> : null}
-                      {slide.sponsorLabel ? <SlideBadge muted>{slide.sponsorLabel}</SlideBadge> : null}
+                      <SlideBadge active={slide.isActive}>
+                        {slide.isActive ? "활성" : "비활성"}
+                      </SlideBadge>
+                      <SlideBadge muted>
+                        {editable ? "DB" : "Catalog"}
+                      </SlideBadge>
+                      {slide.adCampaignId ? (
+                        <SlideBadge active>제휴 캠페인</SlideBadge>
+                      ) : null}
+                      {slide.sponsorLabel ? (
+                        <SlideBadge muted>{slide.sponsorLabel}</SlideBadge>
+                      ) : null}
                       {slide.audiences.map((audience) => (
                         <SlideBadge key={audience} muted>
                           {getAudienceLabel(audience)}
@@ -665,7 +729,12 @@ export default function PromotionCarouselEditor({
                       {slide.allowedCampuses.length > 0 ? (
                         <SlideBadge muted>
                           {slide.allowedCampuses
-                            .map((campus) => CAMPUS_DIRECTORY.find((item) => item.slug === campus)?.label ?? campus)
+                            .map(
+                              (campus) =>
+                                CAMPUS_DIRECTORY.find(
+                                  (item) => item.slug === campus,
+                                )?.label ?? campus,
+                            )
                             .join(", ")}
                         </SlideBadge>
                       ) : null}
@@ -674,21 +743,35 @@ export default function PromotionCarouselEditor({
                       <Input
                         value={slide.title}
                         onChange={(event) =>
-                          updateSlide(slide.id, (current) => ({ ...current, title: event.target.value }))
+                          updateSlide(slide.id, (current) => ({
+                            ...current,
+                            title: event.target.value,
+                          }))
                         }
                         placeholder="카드 타이틀"
                         disabled={!editable}
-                        className={titleInvalid ? "border-danger/40 bg-danger/5 focus:border-danger" : undefined}
+                        className={
+                          titleInvalid
+                            ? "border-danger/40 bg-danger/5 focus:border-danger"
+                            : undefined
+                        }
                       />
                       <Textarea
                         value={slide.subtitle}
                         onChange={(event) =>
-                          updateSlide(slide.id, (current) => ({ ...current, subtitle: event.target.value }))
+                          updateSlide(slide.id, (current) => ({
+                            ...current,
+                            subtitle: event.target.value,
+                          }))
                         }
                         placeholder="카드 부제"
                         rows={3}
                         disabled={!editable}
-                        className={subtitleInvalid ? "border-danger/40 bg-danger/5 focus:border-danger" : undefined}
+                        className={
+                          subtitleInvalid
+                            ? "border-danger/40 bg-danger/5 focus:border-danger"
+                            : undefined
+                        }
                       />
                     </div>
                   </div>
@@ -736,7 +819,9 @@ export default function PromotionCarouselEditor({
                       {/* eslint-disable-next-line @next/next/no-img-element -- live preview can use blob/object URLs */}
                       <img
                         src={previewSrc}
-                        alt={slide.imageAlt || slide.title || "광고 카드 이미지"}
+                        alt={
+                          slide.imageAlt || slide.title || "광고 카드 이미지"
+                        }
                         className="h-full w-full object-contain"
                         draggable={false}
                       />
@@ -754,11 +839,19 @@ export default function PromotionCarouselEditor({
                       <Input
                         value={slide.imageAlt}
                         onChange={(event) =>
-                          updateSlide(slide.id, (current) => ({ ...current, imageAlt: event.target.value }))
+                          updateSlide(slide.id, (current) => ({
+                            ...current,
+                            imageAlt: event.target.value,
+                          }))
                         }
                         placeholder="이미지 대체 텍스트"
                         disabled={!editable}
-                        className={cn("min-w-0", altInvalid ? "border-danger/40 bg-danger/5 focus:border-danger" : null)}
+                        className={cn(
+                          "min-w-0",
+                          altInvalid
+                            ? "border-danger/40 bg-danger/5 focus:border-danger"
+                            : null,
+                        )}
                       />
                       <input
                         ref={(element) => registerFileInput(slide.id, element)}
@@ -766,30 +859,45 @@ export default function PromotionCarouselEditor({
                         accept={IMAGE_SOURCE_ACCEPT}
                         className="hidden"
                         onChange={(event) => {
-                          void onFileChange(slide.id, event.target.files?.[0] ?? null);
+                          void onFileChange(
+                            slide.id,
+                            event.target.files?.[0] ?? null,
+                          );
                         }}
                       />
                     </div>
                     <p className="text-xs leading-6 text-muted-foreground">
-                      모든 이미지는 공통 편집 팝업에서 21:9 구도로 조정한 뒤 WebP로 저장됩니다.
+                      모든 이미지는 공통 편집 팝업에서 21:9 구도로 조정한 뒤
+                      WebP로 저장됩니다.
                     </p>
                   </div>
 
                   <div className="grid gap-4 rounded-panel border border-border/70 bg-surface-inset p-4">
                     <div className="grid gap-2">
-                      <label className="text-sm font-medium text-foreground" htmlFor={`event-page-${slide.id}`}>
+                      <label
+                        className="text-sm font-medium text-foreground"
+                        htmlFor={`event-page-${slide.id}`}
+                      >
                         이벤트 페이지에서 선택
                       </label>
                       <Select
                         id={`event-page-${slide.id}`}
-                        value={eventPageOptions.some((option) => option.href === slide.href) ? slide.href : ""}
+                        value={
+                          eventPageOptions.some(
+                            (option) => option.href === slide.href,
+                          )
+                            ? slide.href
+                            : ""
+                        }
                         disabled={!editable || eventPageOptions.length === 0}
                         onChange={(event) => {
                           const href = event.target.value;
                           if (!href) {
                             return;
                           }
-                          const option = eventPageOptions.find((item) => item.href === href);
+                          const option = eventPageOptions.find(
+                            (item) => item.href === href,
+                          );
                           updateSlide(slide.id, (current) => ({
                             ...current,
                             href,
@@ -811,7 +919,10 @@ export default function PromotionCarouselEditor({
                     </div>
 
                     <div className="grid gap-2">
-                      <label className="text-sm font-medium text-foreground" htmlFor={`ad-campaign-${slide.id}`}>
+                      <label
+                        className="text-sm font-medium text-foreground"
+                        htmlFor={`ad-campaign-${slide.id}`}
+                      >
                         제휴 캠페인 연결
                       </label>
                       <Select
@@ -820,11 +931,16 @@ export default function PromotionCarouselEditor({
                         disabled={!editable || adCampaignOptions.length === 0}
                         onChange={(event) => {
                           const campaignId = event.target.value || null;
-                          const option = adCampaignOptions.find((item) => item.id === campaignId);
+                          const option = adCampaignOptions.find(
+                            (item) => item.id === campaignId,
+                          );
                           updateSlide(slide.id, (current) => ({
                             ...current,
                             adCampaignId: campaignId,
-                            sponsorLabel: current.sponsorLabel || option?.label.split(" · ")[0] || "",
+                            sponsorLabel:
+                              current.sponsorLabel ||
+                              option?.label.split(" · ")[0] ||
+                              "",
                           }));
                         }}
                       >
@@ -854,7 +970,11 @@ export default function PromotionCarouselEditor({
                         placeholder="예: 역삼 국밥집 제공"
                         disabled={!editable}
                         maxLength={AD_PACKAGE_FORM_LIMITS.sponsorLabelMax}
-                        className={sponsorInvalid ? "border-danger/40 bg-danger/5 focus:border-danger" : undefined}
+                        className={
+                          sponsorInvalid
+                            ? "border-danger/40 bg-danger/5 focus:border-danger"
+                            : undefined
+                        }
                       />
                       <span className="text-xs font-normal leading-5 text-muted-foreground">
                         홈 배너에 광고 표기로 함께 노출됩니다.
@@ -871,16 +991,22 @@ export default function PromotionCarouselEditor({
                             ...current,
                             href,
                             eventSlug:
-                              eventPageOptions.find((option) => option.href === href)?.slug ??
-                              extractEventSlugFromHref(href),
+                              eventPageOptions.find(
+                                (option) => option.href === href,
+                              )?.slug ?? extractEventSlugFromHref(href),
                           }));
                         }}
                         placeholder="/events/signup-reward"
                         disabled={!editable}
-                        className={hrefInvalid ? "border-danger/40 bg-danger/5 focus:border-danger" : undefined}
+                        className={
+                          hrefInvalid
+                            ? "border-danger/40 bg-danger/5 focus:border-danger"
+                            : undefined
+                        }
                       />
                       <span className="text-xs font-normal leading-5 text-muted-foreground">
-                        직접 입력하거나 위의 활성 이벤트 페이지 목록에서 선택할 수 있습니다.
+                        직접 입력하거나 위의 활성 이벤트 페이지 목록에서 선택할
+                        수 있습니다.
                       </span>
                     </label>
 
@@ -894,7 +1020,10 @@ export default function PromotionCarouselEditor({
                           type="checkbox"
                           checked={slide.isActive}
                           onChange={(event) =>
-                            updateSlide(slide.id, (current) => ({ ...current, isActive: event.target.checked }))
+                            updateSlide(slide.id, (current) => ({
+                              ...current,
+                              isActive: event.target.checked,
+                            }))
                           }
                           className="h-4 w-4 accent-primary"
                           disabled={!editable}
@@ -904,9 +1033,12 @@ export default function PromotionCarouselEditor({
 
                     <div className="grid gap-2">
                       <div className="grid gap-1">
-                        <p className="text-sm font-medium text-foreground">노출 대상</p>
+                        <p className="text-sm font-medium text-foreground">
+                          노출 대상
+                        </p>
                         <p className="text-xs leading-5 text-muted-foreground">
-                          로그인 여부와 허용 기수를 통합해 대상군별로 선택합니다.
+                          로그인 여부와 허용 기수를 통합해 대상군별로
+                          선택합니다.
                         </p>
                       </div>
                       <div className="grid gap-2 sm:grid-cols-2">
@@ -929,7 +1061,11 @@ export default function PromotionCarouselEditor({
                                   onChange={(event) =>
                                     updateSlide(slide.id, (current) => ({
                                       ...current,
-                                      audiences: toggleAudience(current.audiences, option.key, event.target.checked),
+                                      audiences: toggleAudience(
+                                        current.audiences,
+                                        option.key,
+                                        event.target.checked,
+                                      ),
                                     }))
                                   }
                                   className="h-4 w-4 accent-primary"
@@ -937,21 +1073,29 @@ export default function PromotionCarouselEditor({
                                 />
                                 {option.label}
                               </span>
-                              <span className="text-xs leading-5 text-muted-foreground">{option.description}</span>
+                              <span className="text-xs leading-5 text-muted-foreground">
+                                {option.description}
+                              </span>
                             </label>
                           );
                         })}
                       </div>
                       {audienceInvalid ? (
-                        <p className="text-xs font-medium text-danger">노출 대상을 하나 이상 선택해 주세요.</p>
+                        <p className="text-xs font-medium text-danger">
+                          노출 대상을 하나 이상 선택해 주세요.
+                        </p>
                       ) : null}
                     </div>
 
                     <div className="grid gap-2">
-                      <p className="text-sm font-medium text-foreground">허용 캠퍼스</p>
+                      <p className="text-sm font-medium text-foreground">
+                        허용 캠퍼스
+                      </p>
                       <div className="grid gap-2 sm:grid-cols-2">
                         {CAMPUS_DIRECTORY.map((campus) => {
-                          const checked = slide.allowedCampuses.includes(campus.slug);
+                          const checked = slide.allowedCampuses.includes(
+                            campus.slug,
+                          );
                           return (
                             <label
                               key={campus.slug}
@@ -964,8 +1108,13 @@ export default function PromotionCarouselEditor({
                                   updateSlide(slide.id, (current) => ({
                                     ...current,
                                     allowedCampuses: event.target.checked
-                                      ? [...current.allowedCampuses, campus.slug]
-                                      : current.allowedCampuses.filter((item) => item !== campus.slug),
+                                      ? [
+                                          ...current.allowedCampuses,
+                                          campus.slug,
+                                        ]
+                                      : current.allowedCampuses.filter(
+                                          (item) => item !== campus.slug,
+                                        ),
                                   }))
                                 }
                                 className="h-4 w-4 accent-primary"
@@ -984,16 +1133,18 @@ export default function PromotionCarouselEditor({
           })}
         </section>
 
-        <div className="fixed bottom-safe-bottom-5 left-5 z-40 md:left-auto md:right-[5.5rem]">
-          <Button
-            type="submit"
-            variant="primary"
-            className="rounded-full px-6 shadow-floating"
-            disabled={!canSave}
-          >
-            저장
-          </Button>
-        </div>
+        {canUpdate ? (
+          <div className="fixed bottom-safe-bottom-5 left-5 z-40 md:left-auto md:right-[5.5rem]">
+            <Button
+              type="submit"
+              variant="primary"
+              className="rounded-full px-6 shadow-floating"
+              disabled={!canSave}
+            >
+              저장
+            </Button>
+          </div>
+        ) : null}
       </form>
 
       <MediaCropModal

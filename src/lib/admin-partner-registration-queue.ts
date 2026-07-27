@@ -59,7 +59,38 @@ type RegistrationQueueIndexRow = {
 };
 
 const PARTNER_REGISTRATION_QUEUE_SELECT = [
-  "*",
+  "id",
+  "status",
+  "source",
+  "service_mode",
+  "benefit_action_type",
+  "branch_scope_type",
+  "branch_scope_note",
+  "brand_name",
+  "category_id",
+  "category_label",
+  "period_start",
+  "period_end",
+  "inquiry_link",
+  "brand_phone",
+  "detail_description",
+  "company_name",
+  "contact_name",
+  "contact_email",
+  "contact_phone",
+  "company_description",
+  "benefits",
+  "conditions",
+  "tags",
+  "location",
+  "map_url",
+  "site_link",
+  "thumbnail_url",
+  "image_urls",
+  "memo",
+  "admin_note",
+  "reviewed_at",
+  "created_at",
   "company:partner_companies(managed_campus_slugs)",
   "branches:partner_registration_branches(id,branch_type,campus_slugs)",
   "benefit_groups:partner_registration_benefit_groups(id,group_key,label)",
@@ -126,7 +157,7 @@ export async function listAdminPartnerRegistrationRequestPage({
   }
 
   const rowsById = new Map(
-    ((rowsResult.data ?? []) as AdminPartnerRegistrationRequestDataRow[]).map(
+    ((rowsResult.data ?? []) as unknown as AdminPartnerRegistrationRequestDataRow[]).map(
       (row) => [row.id, row],
     ),
   );

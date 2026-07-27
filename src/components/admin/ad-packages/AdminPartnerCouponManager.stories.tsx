@@ -130,7 +130,7 @@ export const Default: Story = {
       name: /^쿠폰 생성$/,
     });
     await userEvent.click(createSubmitButtons[createSubmitButtons.length - 1]);
-    await expect(canvas.getByText("Error", { exact: true })).toBeInTheDocument();
+    await expect(canvas.getByText("입력 오류", { exact: true })).toBeInTheDocument();
   },
 };
 
@@ -141,7 +141,7 @@ export const DeleteBlockedByHistory: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText("쿠폰을 삭제하지 못했습니다.")).toBeInTheDocument();
+    await expect(canvas.getByText("쿠폰 작업을 처리하지 못했습니다.")).toBeInTheDocument();
     await expect(
       canvas.getByText(/발급 또는 사용 이력이 있는 쿠폰은 삭제할 수 없습니다/),
     ).toBeInTheDocument();

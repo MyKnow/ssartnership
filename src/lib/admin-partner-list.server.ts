@@ -4,8 +4,12 @@ import {
 } from "@/lib/partner-company-plans";
 import { normalizePartnerPlanUpgradeRequestStatus } from "@/lib/partner-plan-upgrades";
 import { getPartnerBillingInvoiceSummariesForUpgradeRequests } from "@/lib/partner-plan-service";
+import { normalizePartnerVisibility } from "@/lib/partner-visibility";
 import type { AdminPartnerListFilters } from "@/lib/admin-ia";
+import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+
+export const ADMIN_PARTNER_LIST_READ_MODEL_TIMEOUT_MS = 3_000;
 
 type PartnerCompanyRow = {
   id: string;
@@ -49,6 +53,25 @@ type PartnerPlanEventRow = {
   brand?: { id: string; name: string } | { id: string; name: string }[] | null;
 };
 
+type AdminPartnerListRow = {
+  id: string;
+  name: string;
+  category_id?: string | null;
+  company_id?: string | null;
+  location?: string | null;
+  managed_campus_slugs?: string[] | null;
+  map_url?: string | null;
+  period_start?: string | null;
+  period_end?: string | null;
+  applies_to?: string[] | null;
+  visibility?: string | null;
+  plan_tier?: string | null;
+  plan_started_at?: string | null;
+  plan_expires_at?: string | null;
+  plan_updated_at?: string | null;
+  company?: PartnerCompanyRow | PartnerCompanyRow[] | null;
+};
+
 function normalizePartnerCompany(value: unknown): PartnerCompanyRow | null {
   if (!value) {
     return null;
@@ -75,7 +98,32 @@ function getPartnerNameSearchPattern(value: string) {
  * It keeps pagination, campus scope, minimal projections, and relationship
  * normalization out of the route component.
  */
-export async function getAdminPartnerListReadModel({
+function createEmptyAdminPartnerListReadModel({
+  filters,
+  showPlans,
+}: {
+  filters: AdminPartnerListFilters;
+  showPlans: boolean;
+}) {
+  return {
+    categories: [],
+    filters,
+    partners: [],
+    totalPartnerCount: 0,
+    totalPartnerPages: 1,
+    shouldRedirectToLastPage: false,
+    hasPartnerLoadError: true,
+    hasPlanLoadError: showPlans,
+    publicCount: 0,
+    confidentialCount: 0,
+    privateCount: 0,
+    planBrands: [],
+    planRequests: [],
+    planEvents: [],
+  };
+}
+
+async function getAdminPartnerListReadModelUnbounded({
   filters,
   showPlans,
   managedCampusSlugs,
@@ -98,8 +146,9 @@ export async function getAdminPartnerListReadModel({
     ...filters,
     categoryKey: selectedCategory?.key ?? "all",
   };
-  const partnerFields =
-    "id,name,category_id,company_id,location,campus_slugs,managed_campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,plan_tier,plan_started_at,plan_expires_at,plan_updated_at,conditions,benefits,applies_to,images,tags,visibility,benefit_visibility,company:partner_companies(id,name,slug,description,is_active,managed_campus_slugs)";
+  const partnerFields = showPlans
+    ? "id,name,company_id,location,period_start,period_end,plan_tier,plan_started_at,plan_expires_at,plan_updated_at,visibility,company:partner_companies(id,name,slug)"
+    : "id,name,category_id,company_id,location,managed_campus_slugs,map_url,period_start,period_end,applies_to,visibility,company:partner_companies(id,name,slug)";
   let partnersQuery = showPlans
     ? supabase.from("partners").select(partnerFields)
     : supabase.from("partners").select(partnerFields, { count: "exact" });
@@ -156,9 +205,14 @@ export async function getAdminPartnerListReadModel({
       : Promise.resolve({ data: [], error: null }),
   ]);
 
-  const partners = (partnersResult.data ?? []).map((partner) => ({
+  const partnerRows = (partnersResult.data ?? []) as unknown as AdminPartnerListRow[];
+  const partners = partnerRows.map((partner) => ({
     ...partner,
-    company: normalizePartnerCompany((partner as { company?: unknown }).company),
+    category_id: partner.category_id ?? "",
+    company_id: partner.company_id ?? null,
+    location: partner.location ?? "",
+    visibility: normalizePartnerVisibility(partner.visibility),
+    company: normalizePartnerCompany(partner.company),
   }));
   const totalPartnerCount = showPlans ? partners.length : partnersResult.count ?? 0;
   const totalPartnerPages = Math.max(
@@ -292,4 +346,24 @@ export async function getAdminPartnerListReadModel({
     planRequests,
     planEvents,
   };
+}
+
+export async function getAdminPartnerListReadModel({
+  filters,
+  showPlans,
+  managedCampusSlugs,
+}: {
+  filters: AdminPartnerListFilters;
+  showPlans: boolean;
+  managedCampusSlugs: readonly string[] | null;
+}) {
+  return withAdminReadModelTimeout(
+    getAdminPartnerListReadModelUnbounded({
+      filters,
+      showPlans,
+      managedCampusSlugs,
+    }),
+    createEmptyAdminPartnerListReadModel({ filters, showPlans }),
+    ADMIN_PARTNER_LIST_READ_MODEL_TIMEOUT_MS,
+  );
 }

@@ -48,16 +48,11 @@ type ChannelDeliveryResult = {
   bookkeepingErrors: string[];
 };
 
-function toErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
-}
-
 function createBookkeepingWarning(
   channel: "push" | "mm",
   memberId: string,
-  message: string,
 ) {
-  return `[admin-notification-ops] ${channel} bookkeeping failed for member ${memberId}: ${message}`;
+  return `${channel === "push" ? "푸시" : "Mattermost"} 발송 기록을 저장하지 못했습니다. (회원 ${memberId})`;
 }
 
 async function runBookkeepingTasks(
@@ -72,10 +67,9 @@ async function runBookkeepingTasks(
       const warning = createBookkeepingWarning(
         channel,
         memberId,
-        toErrorMessage(result.reason, "알 수 없는 후처리 오류"),
       );
       bookkeepingErrors.push(warning);
-      console.error(warning);
+      console.error(`[admin-notification-ops] ${warning}`, result.reason);
     }
   }
 }
@@ -347,24 +341,32 @@ export async function sendPushCampaignDeliveries(params: {
         typeof error === "object" && error && "statusCode" in error
           ? Number((error as { statusCode?: number }).statusCode)
           : null;
-      const errorMessage =
-        error instanceof Error ? error.message : "푸시 알림 전송에 실패했습니다.";
+      console.error("[admin-notification-ops] push delivery failed", {
+        subscriptionId: subscription.id,
+        memberId: subscription.member_id,
+        error,
+      });
+      const safeErrorMessage = "푸시 알림 전송에 실패했습니다.";
       await runBookkeepingTasks([
-        markPushFailure(subscription, errorMessage, statusCode === 404 || statusCode === 410),
+        markPushFailure(
+          subscription,
+          safeErrorMessage,
+          statusCode === 404 || statusCode === 410,
+        ),
         logPushDelivery({
           messageLogId: messageLog.id,
           memberId: subscription.member_id,
           subscriptionId: subscription.id,
           payload,
           status: "failed",
-          errorMessage,
+          errorMessage: safeErrorMessage,
         }),
         notificationRepository.recordNotificationDelivery({
           notificationId: params.notificationId,
           memberId: subscription.member_id,
           channel: "push",
           status: "failed",
-          errorMessage,
+          errorMessage: safeErrorMessage,
         }),
       ], "push", subscription.member_id, bookkeepingErrors);
     }

@@ -10,6 +10,7 @@ import type { AdminPartnerAccount } from "@/components/admin/partner-account-man
 import type { AdminCompanyFormActions } from "@/components/admin/admin-form-actions";
 import {
   buildAdminCompanyTabHref,
+  type AdminCompanyAccountSummary,
   type AdminCompanyTab,
 } from "@/lib/admin-company-workspace";
 
@@ -26,9 +27,13 @@ export type AdminCompanyWorkspaceProps = {
     accountCount: number;
   }>;
   accounts: AdminPartnerAccount[];
+  accountSummary: AdminCompanyAccountSummary;
   generatedSetupUrl?: string | null;
   generatedSetupAccountId?: string | null;
   initialTab?: AdminCompanyTab;
+  canCreate?: boolean;
+  canUpdate?: boolean;
+  canDelete?: boolean;
   actions: AdminCompanyFormActions;
 };
 
@@ -51,6 +56,9 @@ export default function AdminCompanyWorkspace({
   generatedSetupUrl,
   generatedSetupAccountId,
   initialTab = "companies",
+  canCreate = false,
+  canUpdate = false,
+  canDelete = false,
   actions,
 }: AdminCompanyWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<AdminCompanyTab>(initialTab);
@@ -87,7 +95,9 @@ export default function AdminCompanyWorkspace({
           />
           <AdminCompanyManager
             companies={companies}
-            accounts={accounts}
+            canCreate={canCreate}
+            canUpdate={canUpdate}
+            canDelete={canDelete}
             actions={actions}
           />
         </section>
@@ -103,6 +113,8 @@ export default function AdminCompanyWorkspace({
             companies={companies}
             generatedSetupUrl={generatedSetupUrl}
             generatedSetupAccountId={generatedSetupAccountId}
+            canCreate={canCreate}
+            canUpdate={canUpdate}
             actions={actions}
           />
         </section>

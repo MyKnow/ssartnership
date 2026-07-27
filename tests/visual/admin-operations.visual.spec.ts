@@ -2,6 +2,10 @@ import { expect, test } from "@playwright/test";
 
 const screens = [
   {
+    key: "shell-ia",
+    storyId: "domains-admin-adminshell--default",
+  },
+  {
     key: "operation-flow",
     storyId: "domains-admin-adminoperationflow--current-step",
   },

@@ -1,9 +1,24 @@
 import type { AdminAccount } from "@/lib/admin-accounts";
 import { canAdmin } from "@/lib/admin-permissions";
 import { getManagedCampusFilterValues } from "@/lib/admin-scope";
+import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
+export const ADMIN_TASK_INBOX_READ_MODEL_TIMEOUT_MS = 2_000;
+
 export type AdminTaskQueueCounts = Partial<Record<string, number | null>>;
+
+export function getAdminTaskQueueCount(
+  queueCounts: AdminTaskQueueCounts,
+  href: string,
+) {
+  if (Object.prototype.hasOwnProperty.call(queueCounts, href)) {
+    return queueCounts[href];
+  }
+
+  const canonicalPath = href.split(/[?#]/, 1)[0] ?? href;
+  return queueCounts[canonicalPath];
+}
 
 type CountResult = {
   count: number | string | null;
@@ -37,8 +52,8 @@ export function prioritizeAdminTaskItems<T extends { href: string }>(
   queueCounts: AdminTaskQueueCounts,
 ) {
   return [...tasks].sort((left, right) => {
-    const leftCount = queueCounts[left.href];
-    const rightCount = queueCounts[right.href];
+    const leftCount = getAdminTaskQueueCount(queueCounts, left.href);
+    const rightCount = getAdminTaskQueueCount(queueCounts, right.href);
     const rankDifference = getTaskRank(leftCount) - getTaskRank(rightCount);
     if (rankDifference !== 0) {
       return rankDifference;
@@ -57,13 +72,16 @@ export function getNextAdminTaskItem<
   queueCounts: AdminTaskQueueCounts,
 ) {
   return tasks
-    .filter((task) => (queueCounts[task.href] ?? 0) > 0)
+    .filter((task) => (getAdminTaskQueueCount(queueCounts, task.href) ?? 0) > 0)
     .sort((left, right) => {
       const priorityDifference = (left.priority ?? 0) - (right.priority ?? 0);
       if (priorityDifference !== 0) {
         return priorityDifference;
       }
-      return (queueCounts[right.href] ?? 0) - (queueCounts[left.href] ?? 0);
+      return (
+        (getAdminTaskQueueCount(queueCounts, right.href) ?? 0)
+        - (getAdminTaskQueueCount(queueCounts, left.href) ?? 0)
+      );
     })[0] ?? null;
 }
 
@@ -73,6 +91,29 @@ export function toSafeAdminTaskQueueCount({ count, error }: CountResult) {
   }
   const normalizedCount = typeof count === "number" ? count : Number(count);
   return Number.isFinite(normalizedCount) ? Math.max(0, normalizedCount) : 0;
+}
+
+export function createUnavailableAdminTaskQueueCounts(
+  account: Pick<AdminAccount, "permissions">,
+): AdminTaskQueueCounts {
+  const queueCounts: AdminTaskQueueCounts = {};
+  if (canAdmin(account.permissions, "brands", "read")) {
+    queueCounts["/admin/partner-registrations"] = null;
+    queueCounts["/admin/partner-requests"] = null;
+  }
+  if (canAdmin(account.permissions, "graduate_verifications", "read")) {
+    queueCounts["/admin/graduate-verifications"] = null;
+  }
+  if (canAdmin(account.permissions, "member_signup_requests", "read")) {
+    queueCounts["/admin/member-signup-requests"] = null;
+  }
+  if (canAdmin(account.permissions, "profile_images", "read")) {
+    queueCounts["/admin/profile-photos"] = null;
+  }
+  if (canAdmin(account.permissions, "notifications", "read")) {
+    queueCounts["/admin/notifications"] = null;
+  }
+  return queueCounts;
 }
 
 export async function fetchAdminTaskInboxQueueCounts(
@@ -166,8 +207,12 @@ export async function getAdminTaskQueueCounts({
     "permissionId" | "permissions" | "managedCampusSlugs"
   >;
 }): Promise<AdminTaskQueueCounts> {
-  return fetchAdminTaskInboxQueueCounts(getSupabaseAdminClient(), {
-    adminId,
-    account,
-  });
+  return withAdminReadModelTimeout(
+    fetchAdminTaskInboxQueueCounts(getSupabaseAdminClient(), {
+      adminId,
+      account,
+    }),
+    createUnavailableAdminTaskQueueCounts(account),
+    ADMIN_TASK_INBOX_READ_MODEL_TIMEOUT_MS,
+  );
 }

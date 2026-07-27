@@ -21,6 +21,7 @@ import {
 } from "./normalizers.ts";
 import {
   normalizeSupabaseCompanyIds,
+  ADMIN_PENDING_REQUEST_SELECT,
   REQUEST_SELECT,
   type PartnerChangeRequestContext,
   type PartnerChangeRequestListInput,
@@ -168,7 +169,7 @@ export async function getSupabasePendingRequestPage(
   const pageSize = Math.max(1, input.pageSize);
   let query = supabase
     .from("partner_change_requests")
-    .select(REQUEST_SELECT, { count: "exact" })
+    .select(ADMIN_PENDING_REQUEST_SELECT, { count: "exact" })
     .eq("status", "pending")
     .order("created_at", { ascending: true });
 

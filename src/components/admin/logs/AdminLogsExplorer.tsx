@@ -9,9 +9,9 @@ import type { GroupFilter, NormalizedLog, SortFilter, StatusFilter } from './typ
 import {
   formatDateTime,
   getGroupBadgeClass,
-  getPropertyEntries,
   getStatusBadgeClass,
 } from './utils';
+import AdminLogDetailDisclosure from './AdminLogDetailDisclosure';
 
 export function AdminLogsExplorer({
   filteredLogs,
@@ -317,9 +317,6 @@ export function AdminLogsExplorer({
           </Card>
         ) : (
           filteredLogs.map((log) => {
-            const propertyEntries = includePii
-              ? getPropertyEntries(log.properties).slice(0, 8)
-              : [];
             return (
               <Card
                 key={`${log.group}-${log.id}`}
@@ -381,121 +378,7 @@ export function AdminLogsExplorer({
                   </Badge>
                 </div>
 
-                {propertyEntries.length > 0 ? (
-                  <div className="mt-4 grid gap-2 rounded-2xl border border-border/70 bg-surface-muted/50 px-3 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      속성 요약
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {propertyEntries.map(([key, value]) => (
-                        <Badge
-                          key={key}
-                          className="max-w-full text-token whitespace-normal bg-surface-muted text-foreground"
-                        >
-                          {key}: {Array.isArray(value) ? value.join(', ') : String(value)}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                <details className="mt-4 rounded-2xl border border-border bg-surface-inset px-4 py-3">
-                  <summary className="cursor-pointer select-none text-sm font-semibold text-foreground">
-                    상세 보기
-                  </summary>
-                  <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-                    <div className="grid gap-2 text-xs text-muted-foreground">
-                      <div className="flex items-center justify-between gap-3">
-                        <span>그룹</span>
-                        <span className="font-medium text-foreground">{log.group}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span>이벤트</span>
-                        <span className="max-w-full text-token font-medium text-foreground">
-                          {log.name}
-                        </span>
-                      </div>
-                      {includePii ? (
-                        <div className="flex items-center justify-between gap-3">
-                          <span>주체</span>
-                          <span className="max-w-full text-token text-right font-medium text-foreground">
-                            {log.actorType === 'member' && log.actorId ? (
-                              <Link
-                                href={`/admin/members/${log.actorId}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                prefetch={false}
-                                className="text-primary hover:underline"
-                              >
-                                {log.actorSearchLabel}
-                              </Link>
-                            ) : (
-                              log.actorSearchLabel
-                            )}
-                          </span>
-                        </div>
-                      ) : null}
-                      <div className="flex items-center justify-between gap-3">
-                        <span>상태</span>
-                        <span className="font-medium text-foreground">
-                          {log.status ?? '-'}
-                        </span>
-                      </div>
-                      {includePii ? (
-                        <div className="flex items-center justify-between gap-3">
-                          <span>경로</span>
-                          <span className="max-w-full text-token font-medium text-foreground">
-                            {log.path ?? '-'}
-                          </span>
-                        </div>
-                      ) : null}
-                      <div className="flex items-center justify-between gap-3">
-                        <span>대상</span>
-                        <span className="max-w-full text-token font-medium text-foreground">
-                          {log.targetType ?? '-'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span>대상 ID</span>
-                        <span className="max-w-full text-token font-medium text-foreground">
-                          {includePii ? log.targetId ?? '-' : '-'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span>제휴처</span>
-                        <span className="max-w-full text-token text-right font-medium text-foreground">
-                          {log.partnerId && log.partnerName ? (
-                            <Link
-                              href={`/admin/partners/${log.partnerId}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              prefetch={false}
-                              className="text-primary hover:underline"
-                            >
-                              {log.partnerName}
-                            </Link>
-                          ) : (
-                            '-'
-                          )}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span>생성 시각</span>
-                        <span className="font-medium text-foreground">
-                          {formatDateTime(log.createdAt)}
-                        </span>
-                      </div>
-                    </div>
-                    {includePii ? <div className="rounded-2xl border border-border bg-surface-muted p-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        properties
-                      </p>
-                      <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-xs leading-5 text-foreground">
-                        {JSON.stringify(log.properties ?? {}, null, 2)}
-                      </pre>
-                    </div> : null}
-                  </div>
-                </details>
+                <AdminLogDetailDisclosure log={log} includePii={includePii} />
               </Card>
             );
           })

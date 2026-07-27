@@ -9,6 +9,7 @@ import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import StatsRow from "@/components/ui/StatsRow";
+import type { ReactNode } from "react";
 import type {
   AdminMemberNotificationPreferences,
   AdminMemberPolicyEvent,
@@ -42,7 +43,7 @@ export type AdminMemberDetailViewProps = {
     hasAvatar: boolean;
     avatarUrl: string;
   };
-  activeDeviceCount: number;
+  activeDeviceCount: number | null;
   securityLogs: AdminMemberSecurityLog[];
   securityLogPagination: {
     totalCount: number;
@@ -67,6 +68,9 @@ export type AdminMemberDetailViewProps = {
     rejectReplacementAction: FormAction;
     rejectCurrentAction: FormAction;
   } | null;
+  deferredProfilePhoto?: ReactNode;
+  deferredAccountManager?: ReactNode;
+  deferredOperationalPanels?: ReactNode;
 };
 
 function formatDate(value: string | null) {
@@ -88,6 +92,9 @@ export default function AdminMemberDetailView({
   canUpdate,
   canDelete,
   profilePhoto = null,
+  deferredProfilePhoto,
+  deferredAccountManager,
+  deferredOperationalPanels,
 }: AdminMemberDetailViewProps) {
   const loginIdentifier = member.manualLoginId ?? member.mmUsername;
   const avatarLabel = (member.displayName || loginIdentifier || "?")
@@ -137,7 +144,10 @@ export default function AdminMemberDetailView({
           {
             label: "비밀번호 상태",
             value: member.mustChangePassword ? "변경 필요" : "정상",
-            hint: `활성 기기 ${activeDeviceCount}개`,
+            hint:
+              activeDeviceCount === null
+                ? "활성 기기 확인 중"
+                : `활성 기기 ${activeDeviceCount}개`,
           },
           {
             label: "최근 갱신",
@@ -201,7 +211,9 @@ export default function AdminMemberDetailView({
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span>활성 푸시 기기</span>
-                <span className="font-medium text-foreground">{activeDeviceCount}개</span>
+                <span className="font-medium text-foreground">
+                  {activeDeviceCount === null ? "확인 중" : `${activeDeviceCount}개`}
+                </span>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span>보안 로그</span>
@@ -211,7 +223,7 @@ export default function AdminMemberDetailView({
               </div>
             </div>
           </Card>
-          {profilePhoto ? (
+          {deferredProfilePhoto ?? (profilePhoto ? (
             <AdminMemberProfilePhotoPanel
               memberId={member.id}
               reviewStatus={profilePhoto.reviewStatus}
@@ -221,7 +233,7 @@ export default function AdminMemberDetailView({
               rejectReplacementAction={profilePhoto.rejectReplacementAction}
               rejectCurrentAction={profilePhoto.rejectCurrentAction}
             />
-          ) : null}
+          ) : null)}
 
           <Card tone="default" className="grid gap-4">
             <AdminSectionHeading
@@ -244,27 +256,33 @@ export default function AdminMemberDetailView({
             </div>
           </Card>
 
-          <AdminMemberAccountManager
-            member={accountManagerMember}
-            updateAction={updateAction}
-            deleteAction={deleteAction}
-            emailLoginTransitionAction={emailLoginTransitionAction}
-            syncMemberProfileAction={syncMemberProfileAction}
-            canUpdate={canUpdate}
-            canDelete={canDelete}
-          />
+          {deferredAccountManager ?? (
+            <AdminMemberAccountManager
+              member={accountManagerMember}
+              updateAction={updateAction}
+              deleteAction={deleteAction}
+              emailLoginTransitionAction={emailLoginTransitionAction}
+              syncMemberProfileAction={syncMemberProfileAction}
+              canUpdate={canUpdate}
+              canDelete={canDelete}
+            />
+          )}
         </div>
 
         <div className="grid min-w-0 gap-6">
-          <AdminMemberCommunicationPanel
-            preferences={preferences}
-            policyStates={policyStates}
-            consentTimeline={consentTimeline}
-          />
-          <AdminMemberSecurityLogExplorer
-            logs={securityLogs}
-            pagination={securityLogPagination}
-          />
+          {deferredOperationalPanels ?? (
+            <>
+              <AdminMemberCommunicationPanel
+                preferences={preferences}
+                policyStates={policyStates}
+                consentTimeline={consentTimeline}
+              />
+              <AdminMemberSecurityLogExplorer
+                logs={securityLogs}
+                pagination={securityLogPagination}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>

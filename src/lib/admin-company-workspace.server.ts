@@ -1,4 +1,8 @@
 import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
+import type {
+  AdminCompanyAccountSummary,
+  AdminCompanyTab,
+} from "@/lib/admin-company-workspace";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 type PartnerCompanyRow = {
@@ -15,14 +19,27 @@ type PartnerCompanyRow = {
 type PartnerAccountCompanyLinkRow = {
   id: string;
   account_id: string;
+  company_id?: string | null;
   is_active?: boolean | null;
   created_at?: string | null;
   company?: PartnerCompanyRow | null;
 };
 
+type PartnerAccountSummaryRow = {
+  id: string;
+  is_active?: boolean | null;
+};
+
+type PartnerAccountSummaryLinkRow = {
+  id: string;
+  account_id: string;
+  company_id?: string | null;
+};
+
 type PartnerAccountCompanyLinkRowRecord = {
   id: string;
   account_id: string;
+  company_id?: string | null;
   is_active?: boolean | null;
   created_at?: string | null;
   company?: unknown;
@@ -44,6 +61,15 @@ type PartnerAccountRowRecord = {
   updated_at?: string | null;
   links?: PartnerAccountCompanyLinkRow[] | PartnerAccountCompanyLinkRow | null;
 };
+
+const PARTNER_ACCOUNT_SUMMARY_SELECT =
+  "id,is_active";
+const PARTNER_ACCOUNT_DETAIL_SELECT =
+  "id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_expires_at,last_login_at,created_at,updated_at";
+const PARTNER_ACCOUNT_SUMMARY_LINK_SELECT =
+  "id,account_id,company_id";
+const PARTNER_ACCOUNT_DETAIL_LINK_SELECT =
+  "id,account_id,company_id,is_active,created_at,company:partner_companies(id,name,slug,description,is_active,managed_campus_slugs)";
 
 function normalizePartnerCompany(value: unknown): PartnerCompanyRow | null {
   if (!value) {
@@ -78,6 +104,8 @@ function normalizePartnerAccount(value: unknown): AdminPartnerAccount | null {
     updated_at: row.updated_at ?? null,
     links: links.map((link) => ({
       id: link.id,
+      account_id: link.account_id ?? null,
+      company_id: link.company_id ?? link.company?.id ?? null,
       is_active: link.is_active ?? null,
       created_at: link.created_at ?? null,
       company: normalizePartnerCompany(link.company),
@@ -89,6 +117,11 @@ function emptyReadModel() {
   return {
     companies: [] as Array<PartnerCompanyRow & { brandCount: number; accountCount: number }>,
     accounts: [] as AdminPartnerAccount[],
+    accountSummary: {
+      totalCount: 0,
+      activeCount: 0,
+      totalLinks: 0,
+    } satisfies AdminCompanyAccountSummary,
     partnerCount: 0,
     loadError: true,
   };
@@ -101,8 +134,10 @@ function emptyReadModel() {
  */
 export async function getAdminCompanyWorkspaceReadModel({
   managedCampusSlugs,
+  tab = "companies",
 }: {
   managedCampusSlugs: readonly string[] | null;
+  tab?: AdminCompanyTab;
 }) {
   try {
     const supabase = getSupabaseAdminClient();
@@ -123,29 +158,11 @@ export async function getAdminCompanyWorkspaceReadModel({
       ]);
     }
 
-    const [partnersResult, companiesResult, accountsResult, accountLinksResult] =
-      await Promise.all([
-        partnersQuery,
-        companiesQuery,
-        supabase
-          .from("partner_accounts")
-          .select(
-            "id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_expires_at,last_login_at,created_at,updated_at",
-          )
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("partner_account_companies")
-          .select(
-            "id,account_id,is_active,created_at,company:partner_companies(id,name,slug,description,is_active,managed_campus_slugs)",
-          )
-          .order("created_at", { ascending: false }),
-      ]);
-    if (
-      partnersResult.error ||
-      companiesResult.error ||
-      accountsResult.error ||
-      accountLinksResult.error
-    ) {
+    const [partnersResult, companiesResult] = await Promise.all([
+      partnersQuery,
+      companiesQuery,
+    ]);
+    if (partnersResult.error || companiesResult.error) {
       return emptyReadModel();
     }
 
@@ -155,6 +172,92 @@ export async function getAdminCompanyWorkspaceReadModel({
     }));
     const companies = (companiesResult.data ?? []) as PartnerCompanyRow[];
     const scopedCompanyIds = new Set(companies.map((company) => company.id));
+    const scopedCompanyIdList = [...scopedCompanyIds];
+    const brandCountByCompanyId = new Map<string, number>();
+    for (const partner of partners) {
+      const companyId = partner.company_id ?? partner.company?.id ?? null;
+      if (companyId) {
+        brandCountByCompanyId.set(companyId, (brandCountByCompanyId.get(companyId) ?? 0) + 1);
+      }
+    }
+    const accountsQuery =
+      tab === "accounts"
+        ? supabase
+            .from("partner_accounts")
+            .select(PARTNER_ACCOUNT_DETAIL_SELECT)
+            .order("created_at", { ascending: false })
+        : supabase
+            .from("partner_accounts")
+            .select(PARTNER_ACCOUNT_SUMMARY_SELECT)
+            .order("created_at", { ascending: false });
+    const accountLinksQuery =
+      tab === "accounts"
+        ? supabase
+            .from("partner_account_companies")
+            .select(PARTNER_ACCOUNT_DETAIL_LINK_SELECT)
+            .order("created_at", { ascending: false })
+        : supabase
+            .from("partner_account_companies")
+            .select(PARTNER_ACCOUNT_SUMMARY_LINK_SELECT)
+            .order("created_at", { ascending: false });
+
+    // The company scope is already known from the first pair of queries. Keep
+    // regional reads narrow at the database boundary instead of fetching every
+    // account-company link and filtering it only after the response arrives.
+    const scopedAccountLinksResult =
+      managedCampusSlugs !== null && scopedCompanyIdList.length === 0
+        ? Promise.resolve({ data: [], error: null })
+        : managedCampusSlugs !== null
+          ? accountLinksQuery.in("company_id", scopedCompanyIdList)
+          : accountLinksQuery;
+    const scopedAccountsResult =
+      managedCampusSlugs !== null && scopedCompanyIdList.length === 0
+        ? Promise.resolve({ data: [], error: null })
+        : accountsQuery;
+    const [accountsResult, accountLinksResult] = await Promise.all([
+      scopedAccountsResult,
+      scopedAccountLinksResult,
+    ]);
+    if (accountsResult.error || accountLinksResult.error) {
+      return emptyReadModel();
+    }
+
+    if (tab !== "accounts") {
+      const summaryAccounts = (accountsResult.data ?? []) as PartnerAccountSummaryRow[];
+      const summaryLinks = (accountLinksResult.data ?? []) as PartnerAccountSummaryLinkRow[];
+      const visibleLinks = summaryLinks.filter(
+        (link) => !managedCampusSlugs || scopedCompanyIds.has(link.company_id ?? ""),
+      );
+      const visibleAccountIds = new Set(visibleLinks.map((link) => link.account_id));
+      const visibleAccounts = managedCampusSlugs
+        ? summaryAccounts.filter((account) => visibleAccountIds.has(account.id))
+        : summaryAccounts;
+      const accountIdsByCompanyId = new Map<string, Set<string>>();
+      for (const link of visibleLinks) {
+        if (!link.company_id) {
+          continue;
+        }
+        const accountIds = accountIdsByCompanyId.get(link.company_id) ?? new Set<string>();
+        accountIds.add(link.account_id);
+        accountIdsByCompanyId.set(link.company_id, accountIds);
+      }
+      return {
+        companies: companies.map((company) => ({
+          ...company,
+          brandCount: brandCountByCompanyId.get(company.id) ?? 0,
+          accountCount: accountIdsByCompanyId.get(company.id)?.size ?? 0,
+        })),
+        accounts: [],
+        accountSummary: {
+          totalCount: visibleAccounts.length,
+          activeCount: visibleAccounts.filter((account) => account.is_active !== false).length,
+          totalLinks: visibleLinks.length,
+        },
+        partnerCount: partners.length,
+        loadError: false,
+      };
+    }
+
     const accountLinksByAccountId = new Map<string, PartnerAccountCompanyLinkRow[]>();
     for (const rawLink of accountLinksResult.data ?? []) {
       const link = rawLink as PartnerAccountCompanyLinkRowRecord;
@@ -166,6 +269,7 @@ export async function getAdminCompanyWorkspaceReadModel({
       links.push({
         id: link.id,
         account_id: link.account_id,
+        company_id: link.company_id ?? company?.id ?? null,
         is_active: link.is_active ?? null,
         created_at: link.created_at ?? null,
         company,
@@ -182,18 +286,10 @@ export async function getAdminCompanyWorkspaceReadModel({
       )
       .filter((account): account is AdminPartnerAccount => Boolean(account))
       .filter((account) => !managedCampusSlugs || account.links.length > 0);
-    const brandCountByCompanyId = new Map<string, number>();
-    for (const partner of partners) {
-      const companyId = partner.company_id ?? partner.company?.id ?? null;
-      if (companyId) {
-        brandCountByCompanyId.set(companyId, (brandCountByCompanyId.get(companyId) ?? 0) + 1);
-      }
-    }
-
     const accountIdsByCompanyId = new Map<string, Set<string>>();
     for (const account of accounts) {
       for (const link of account.links) {
-        const companyId = link.company?.id;
+        const companyId = link.company_id ?? link.company?.id;
         if (!companyId) {
           continue;
         }
@@ -210,6 +306,11 @@ export async function getAdminCompanyWorkspaceReadModel({
         accountCount: accountIdsByCompanyId.get(company.id)?.size ?? 0,
       })),
       accounts,
+      accountSummary: {
+        totalCount: accounts.length,
+        activeCount: accounts.filter((account) => account.is_active !== false).length,
+        totalLinks: accounts.reduce((sum, account) => sum + account.links.length, 0),
+      },
       partnerCount: partners.length,
       loadError: false,
     };

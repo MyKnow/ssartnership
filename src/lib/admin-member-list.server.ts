@@ -7,20 +7,18 @@ import type {
   YearFilterOption,
 } from "@/components/admin/member-manager/selectors";
 import type { AdminMemberPageSize } from "@/lib/admin-ia";
-import { getMemberProfilePhotoStates } from "@/lib/member-profile-images";
+import { getCurrentMemberProfileImageMemberIds } from "@/lib/member-profile-images";
 import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
 import {
   getActiveRequiredPolicies,
   getPolicyDocumentByKind,
 } from "@/lib/policy-documents";
-import {
-  getSsafyCycleSettings,
-  normalizeSsafyCycleSettings,
-} from "@/lib/ssafy-cycle-settings";
+import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const ADMIN_MEMBER_OPTION_SAMPLE_LIMIT = 5_000;
 export const ADMIN_MEMBER_TREND_SAMPLE_LIMIT = 5_000;
+export const ADMIN_MEMBER_READ_MODEL_TIMEOUT_MS = 3_000;
 
 const EMPTY_MEMBER_ID = "00000000-0000-0000-0000-000000000000";
 
@@ -37,6 +35,35 @@ type MemberPolicyConsentRow = {
 type MemberMarketingPreferenceRow = {
   member_id: string | null;
   marketing_enabled: boolean | null;
+};
+
+type AdminMemberDatabaseRow = {
+  id: string;
+  mattermost_account_id: string | null;
+  manual_login_id: string | null;
+  display_name: string | null;
+  generation: number | null;
+  staff_source_generation: number | null;
+  campus: string | null;
+  must_change_password: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+  mattermost_login_disabled_at: string | null;
+  mattermost_login_disabled_reason: string | null;
+};
+
+type AdminMemberTrendDatabaseRow = {
+  created_at: string | null;
+};
+
+const ADMIN_MEMBER_LIST_SELECT: string =
+  "id,mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at,mattermost_login_disabled_at,mattermost_login_disabled_reason";
+const ADMIN_MEMBER_TREND_SELECT: string = "created_at";
+
+export type AdminMemberTrendReadModel = {
+  createdAts: string[];
+  isSampled: boolean;
+  hasError: boolean;
 };
 
 export type AdminMemberSearchParams = {
@@ -242,6 +269,10 @@ function escapeLikePattern(value: string) {
     .replaceAll("_", "\\_");
 }
 
+function canUseMemberSearchOrFilter(value: string) {
+  return /^[\p{L}\p{N}\s@_-]+$/u.test(value);
+}
+
 async function getPreferenceFilteredMemberIds(
   supabase: ReturnType<typeof getSupabaseAdminClient>,
   filters: Array<{
@@ -255,51 +286,48 @@ async function getPreferenceFilteredMemberIds(
     return null;
   }
 
+  const filterResults = await Promise.all(
+    activeFilters.map(async (filter) => {
+      const shouldInclude =
+        (filter.value === "enabled" && !filter.defaultEnabled) ||
+        (filter.value === "disabled" && filter.defaultEnabled);
+      const expectedValue = shouldInclude
+        ? filter.value === "enabled"
+        : filter.value === "disabled";
+      const { data, error } = await supabase
+        .from("push_preferences")
+        .select("member_id")
+        .eq(filter.column, expectedValue);
+
+      if (error) {
+        return undefined;
+      }
+
+      return {
+        filter,
+        shouldInclude,
+        ids: getMemberIdSet(
+          (data ?? []) as Array<{ member_id: string | null }>,
+        ),
+      };
+    }),
+  );
+  if (filterResults.some((result) => result === undefined)) {
+    return undefined;
+  }
+
   const excludedIds = new Set<string>();
   let includedIds: Set<string> | null = null;
 
-  for (const filter of activeFilters) {
-    if (filter.value === "enabled" && !filter.defaultEnabled) {
-      const { data, error } = await supabase
-        .from("push_preferences")
-        .select("member_id")
-        .eq(filter.column, true);
-      if (error) {
-        return undefined;
-      }
-      includedIds = intersectMemberIdSets(
-        includedIds,
-        getMemberIdSet((data ?? []) as Array<{ member_id: string | null }>),
-      );
+  for (const result of filterResults) {
+    if (!result) {
       continue;
     }
-
-    if (filter.value === "disabled" && filter.defaultEnabled) {
-      const { data, error } = await supabase
-        .from("push_preferences")
-        .select("member_id")
-        .eq(filter.column, false);
-      if (error) {
-        return undefined;
-      }
-      includedIds = intersectMemberIdSets(
-        includedIds,
-        getMemberIdSet((data ?? []) as Array<{ member_id: string | null }>),
-      );
+    if (result.shouldInclude) {
+      includedIds = intersectMemberIdSets(includedIds, result.ids);
       continue;
     }
-
-    const excludedValue = filter.value === "disabled";
-    const { data, error } = await supabase
-      .from("push_preferences")
-      .select("member_id")
-      .eq(filter.column, excludedValue);
-    if (error) {
-      return undefined;
-    }
-    getMemberIdSet((data ?? []) as Array<{ member_id: string | null }>).forEach(
-      (id) => excludedIds.add(id),
-    );
+    result.ids.forEach((id) => excludedIds.add(id));
   }
 
   return {
@@ -329,40 +357,57 @@ async function getPolicyConsentFilteredMemberIds(
     return null;
   }
 
+  const filterResults = await Promise.all(
+    activeFilters.map(async (filter) => {
+      const consentPromise = supabase
+        .from("member_policy_consents")
+        .select("member_id")
+        .eq("policy_document_id", filter.policyDocumentId);
+      const marketingPreferencesPromise =
+        filter.kind === "marketing"
+          ? supabase
+              .from("push_preferences")
+              .select("member_id,marketing_enabled")
+              .eq("marketing_enabled", true)
+          : Promise.resolve(null);
+      const [consentResult, marketingPreferencesResult] = await Promise.all([
+        consentPromise,
+        marketingPreferencesPromise,
+      ]);
+
+      if (consentResult.error || marketingPreferencesResult?.error) {
+        return undefined;
+      }
+
+      let effectiveIds = getMemberIdSet(
+        (consentResult.data ?? []) as Array<{ member_id: string | null }>,
+      );
+      if (filter.kind === "marketing") {
+        effectiveIds = getEffectiveMarketingConsentMemberIds(
+          effectiveIds,
+          (marketingPreferencesResult?.data ?? []) as MemberMarketingPreferenceRow[],
+        );
+      }
+
+      return { filter, effectiveIds };
+    }),
+  );
+  if (filterResults.some((result) => result === undefined)) {
+    return undefined;
+  }
+
   const excludedIds = new Set<string>();
   let includedIds: Set<string> | null = null;
 
-  for (const filter of activeFilters) {
-    const { data, error } = await supabase
-      .from("member_policy_consents")
-      .select("member_id")
-      .eq("policy_document_id", filter.policyDocumentId);
-    if (error) {
-      return undefined;
-    }
-    const ids = getMemberIdSet(
-      (data ?? []) as Array<{ member_id: string | null }>,
-    );
-    let effectiveIds = ids;
-    if (filter.kind === "marketing") {
-      const { data: marketingPreferences, error: marketingPreferencesError } =
-        await supabase
-          .from("push_preferences")
-          .select("member_id,marketing_enabled")
-          .eq("marketing_enabled", true);
-      if (marketingPreferencesError) {
-        return undefined;
-      }
-      effectiveIds = getEffectiveMarketingConsentMemberIds(
-        ids,
-        (marketingPreferences ?? []) as MemberMarketingPreferenceRow[],
-      );
+  for (const result of filterResults) {
+    if (!result) {
+      continue;
     }
 
-    if (filter.value === "agreed") {
-      includedIds = intersectMemberIdSets(includedIds, effectiveIds);
+    if (result.filter.value === "agreed") {
+      includedIds = intersectMemberIdSets(includedIds, result.effectiveIds);
     } else {
-      effectiveIds.forEach((id) => excludedIds.add(id));
+      result.effectiveIds.forEach((id) => excludedIds.add(id));
     }
   }
 
@@ -399,65 +444,68 @@ async function getMemberSearchIds(
   }
 
   const pattern = `%${escapeLikePattern(searchValue)}%`;
-  const [memberResult, directLoginIdResult, usernameResult, userIdResult] = await Promise.all([
-    supabase
-      .from("members")
-      .select("id")
-      .is("deleted_at", null)
-      .ilike("display_name", pattern)
-      .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
-    supabase
-      .from("members")
-      .select("id")
-      .is("deleted_at", null)
-      .ilike("manual_login_id", pattern)
-      .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
-    supabase
-      .from("mm_user_directory")
-      .select("id")
-      .ilike("mm_username", pattern)
-      .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
-    supabase
-      .from("mm_user_directory")
-      .select("id")
-      .ilike("mm_user_id", pattern)
-      .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
+  const useOrFilter = canUseMemberSearchOrFilter(searchValue);
+  const directSearchQueries = useOrFilter
+    ? [
+        supabase
+          .from("members")
+          .select("id")
+          .is("deleted_at", null)
+          .or(`display_name.ilike.${pattern},manual_login_id.ilike.${pattern}`)
+          .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
+      ]
+    : [
+        supabase
+          .from("members")
+          .select("id")
+          .is("deleted_at", null)
+          .ilike("display_name", pattern)
+          .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
+        supabase
+          .from("members")
+          .select("id")
+          .is("deleted_at", null)
+          .ilike("manual_login_id", pattern)
+          .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
+      ];
+  const directorySearchQueries = useOrFilter
+    ? [
+        supabase
+          .from("members")
+          .select("id,mm_user_directory!inner(id)")
+          .is("deleted_at", null)
+          .or(
+            `mm_username.ilike.${pattern},mm_user_id.ilike.${pattern}`,
+            { referencedTable: "mm_user_directory" },
+          )
+          .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
+      ]
+    : [
+        supabase
+          .from("members")
+          .select("id,mm_user_directory!inner(id)")
+          .is("deleted_at", null)
+          .ilike("mm_user_directory.mm_username", pattern)
+          .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
+        supabase
+          .from("members")
+          .select("id,mm_user_directory!inner(id)")
+          .is("deleted_at", null)
+          .ilike("mm_user_directory.mm_user_id", pattern)
+          .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
+      ];
+  const searchResults = await Promise.all([
+    ...directSearchQueries,
+    ...directorySearchQueries,
   ]);
-  if (
-    memberResult.error ||
-    directLoginIdResult.error ||
-    usernameResult.error ||
-    userIdResult.error
-  ) {
-    return undefined;
-  }
-
-  const accountIds = Array.from(
-    new Set(
-      [...(usernameResult.data ?? []), ...(userIdResult.data ?? [])]
-        .map((row) => row.id)
-        .filter((id): id is string => Boolean(id)),
-    ),
-  );
-  const accountMemberResult = accountIds.length
-    ? await supabase
-        .from("members")
-        .select("id")
-        .is("deleted_at", null)
-        .in("mattermost_account_id", accountIds)
-        .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT)
-    : null;
-  if (accountMemberResult?.error) {
+  if (searchResults.some((result) => Boolean(result.error))) {
     return undefined;
   }
 
   return Array.from(
     new Set(
-      [
-        ...(memberResult.data ?? []),
-        ...(directLoginIdResult.data ?? []),
-        ...(accountMemberResult?.data ?? []),
-      ]
+      searchResults
+        .flatMap((result) => result.data ?? [])
         .map((row) => row.id)
         .filter((id): id is string => Boolean(id)),
     ),
@@ -484,38 +532,43 @@ async function getCurrentMemberPolicyConsents(
   return (data ?? []) as MemberPolicyConsentRow[];
 }
 
-function applyMemberFilters<T extends ReturnType<ReturnType<typeof getSupabaseAdminClient>["from"]>>(
-  query: T,
+type MemberFilterQuery = {
+  eq(column: string, value: unknown): MemberFilterQuery;
+  not(column: string, operator: string, value: unknown): MemberFilterQuery;
+  in(column: string, values: ReadonlyArray<unknown>): MemberFilterQuery;
+};
+
+function applyMemberFilters(
+  query: MemberFilterQuery,
   filters: AdminMemberListFilters,
   memberIdFilter: MemberIdFilter,
 ) {
-  let filteredQuery = query;
   if (filters.yearFilter !== "all") {
-    filteredQuery = filteredQuery.eq("generation", Number(filters.yearFilter));
+    query.eq("generation", Number(filters.yearFilter));
   }
   if (filters.campusFilter !== "all") {
-    filteredQuery = filteredQuery.eq("campus", filters.campusFilter);
+    query.eq("campus", filters.campusFilter);
   }
   if (filters.filterValue === "mustChangePassword") {
-    filteredQuery = filteredQuery.eq("must_change_password", true);
+    query.eq("must_change_password", true);
   } else if (filters.filterValue === "normal") {
-    filteredQuery = filteredQuery.eq("must_change_password", false);
+    query.eq("must_change_password", false);
   }
   if (filters.mattermostLifecycleFilter === "disabled") {
-    filteredQuery = filteredQuery.not("mattermost_login_disabled_at", "is", null);
+    query.not("mattermost_login_disabled_at", "is", null);
   } else if (filters.mattermostLifecycleFilter === "graduated") {
-    filteredQuery = filteredQuery.eq(
+    query.eq(
       "mattermost_login_disabled_reason",
       "generation_completed",
     );
   } else if (filters.mattermostLifecycleFilter === "departed") {
-    filteredQuery = filteredQuery.eq(
+    query.eq(
       "mattermost_login_disabled_reason",
       "member_departed",
     );
   }
   if (memberIdFilter.included) {
-    filteredQuery = filteredQuery.in(
+    query.in(
       "id",
       memberIdFilter.included.length > 0
         ? memberIdFilter.included
@@ -523,9 +576,8 @@ function applyMemberFilters<T extends ReturnType<ReturnType<typeof getSupabaseAd
     );
   }
   if (memberIdFilter.excluded.length > 0) {
-    filteredQuery = filteredQuery.not("id", "in", toInList(memberIdFilter.excluded));
+    query.not("id", "in", toInList(memberIdFilter.excluded));
   }
-  return filteredQuery;
 }
 
 function createEmptyReadModel(filters: AdminMemberListFilters) {
@@ -535,13 +587,15 @@ function createEmptyReadModel(filters: AdminMemberListFilters) {
     totalCount: 0,
     totalPages: 1,
     shouldRedirectToLastPage: false,
-    memberTrendCreatedAts: [],
-    isMemberTrendSampled: false,
+    memberTrend: Promise.resolve<AdminMemberTrendReadModel>({
+      createdAts: [],
+      isSampled: false,
+      hasError: true,
+    }),
     options: { campuses: [], years: [] },
     mustChangePasswordCount: 0,
     pendingPolicyCount: 0,
     latestUpdatedAt: null,
-    cycleSettings: normalizeSsafyCycleSettings(),
     hasMemberLoadError: true,
   };
 }
@@ -551,7 +605,7 @@ function createEmptyReadModel(filters: AdminMemberListFilters) {
  * The route owns authorization and presentation while this model owns
  * filter parsing, database projections, pagination, and enrichment.
  */
-export async function getAdminMemberListReadModel({
+async function getAdminMemberListReadModelUnbounded({
   filters,
   page,
   pageSize,
@@ -568,7 +622,6 @@ export async function getAdminMemberListReadModel({
       optionsResult,
       preferenceFilter,
       searchMemberIds,
-      cycleSettings,
     ] = await Promise.all([
       getActiveRequiredPolicies(),
       getPolicyDocumentByKind("marketing").catch(() => null),
@@ -604,10 +657,9 @@ export async function getAdminMemberListReadModel({
         },
       ]),
       getMemberSearchIds(supabase, filters.searchValue),
-      getSsafyCycleSettings().catch(() => normalizeSsafyCycleSettings()),
     ]);
     if (preferenceFilter === undefined || searchMemberIds === undefined) {
-      return { ...createEmptyReadModel(filters), cycleSettings };
+      return createEmptyReadModel(filters);
     }
     const policyConsentFilter = await getPolicyConsentFilteredMemberIds(supabase, [
       {
@@ -627,7 +679,7 @@ export async function getAdminMemberListReadModel({
       },
     ]);
     if (policyConsentFilter === undefined) {
-      return { ...createEmptyReadModel(filters), cycleSettings };
+      return createEmptyReadModel(filters);
     }
     const memberIdFilter = mergeMemberIdFilters([
       searchMemberIds === null
@@ -637,14 +689,16 @@ export async function getAdminMemberListReadModel({
       policyConsentFilter,
     ]);
 
-    let memberQuery = applyMemberFilters(
-      supabase
-        .from("members")
-        .select(
-          "id,mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at,mattermost_login_disabled_at,mattermost_login_disabled_reason",
-          { count: "exact" },
-        )
-        .is("deleted_at", null),
+    const memberBaseQuery = supabase
+      .from("members")
+      .select(
+        ADMIN_MEMBER_LIST_SELECT,
+        { count: "exact" },
+      )
+      .is("deleted_at", null);
+    let memberQuery = memberBaseQuery;
+    applyMemberFilters(
+      memberQuery as unknown as MemberFilterQuery,
       filters,
       memberIdFilter,
     );
@@ -656,28 +710,37 @@ export async function getAdminMemberListReadModel({
       memberQuery = memberQuery.order("created_at", { ascending: false });
     }
 
-    const memberTrendQuery = applyMemberFilters(
-      supabase
-        .from("members")
-        .select("created_at")
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
-        .limit(ADMIN_MEMBER_TREND_SAMPLE_LIMIT),
+    const memberTrendBaseQuery = supabase
+      .from("members")
+      .select(ADMIN_MEMBER_TREND_SELECT)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(ADMIN_MEMBER_TREND_SAMPLE_LIMIT);
+    const memberTrendQuery = memberTrendBaseQuery;
+    applyMemberFilters(
+      memberTrendQuery as unknown as MemberFilterQuery,
       filters,
       memberIdFilter,
     );
     const from = (page - 1) * pageSize;
     memberQuery = memberQuery.range(from, from + pageSize - 1);
-    const [memberResult, memberTrendResult] = await Promise.all([
-      memberQuery,
-      memberTrendQuery,
-    ]);
+    const memberTrendResultPromise = Promise.resolve(
+      memberTrendQuery.then((result) => ({
+        createdAts: ((result.data ?? []) as unknown as AdminMemberTrendDatabaseRow[])
+          .map((row) => row.created_at)
+          .filter((value): value is string => Boolean(value)),
+        hasError: Boolean(result.error),
+      })),
+    )
+      .catch(() => ({ createdAts: [], hasError: true }));
+    const memberResult = (await memberQuery) as unknown as {
+      data: AdminMemberDatabaseRow[] | null;
+      count: number | null;
+      error: unknown | null;
+    };
 
-    if (memberResult.error || memberTrendResult.error || optionsResult.error) {
-      return {
-        ...createEmptyReadModel(filters),
-        cycleSettings,
-      };
+    if (memberResult.error || optionsResult.error) {
+      return createEmptyReadModel(filters);
     }
 
     const safeMembers = memberResult.data ?? [];
@@ -687,7 +750,7 @@ export async function getAdminMemberListReadModel({
       activePolicies.privacy.id,
       activeMarketingPolicy?.id,
     ].filter((id): id is string => Boolean(id));
-    const [directoryByAccountId, currentPolicyConsents, marketingPreferences, profilePhotoStates] = await Promise.all([
+    const [directoryByAccountId, currentPolicyConsents, marketingPreferences, currentProfileImageMemberIds] = await Promise.all([
       getMmUserDirectoryEntriesByAccountIds(
         safeMembers.flatMap((member) =>
           member.mattermost_account_id ? [member.mattermost_account_id] : [],
@@ -695,13 +758,13 @@ export async function getAdminMemberListReadModel({
       ),
       getCurrentMemberPolicyConsents(supabase, memberIds, policyDocumentIds),
       getMemberMarketingPreferences(supabase, memberIds),
-      getMemberProfilePhotoStates(memberIds),
+      getCurrentMemberProfileImageMemberIds(memberIds),
     ]);
     if (
       currentPolicyConsents === undefined
       || marketingPreferences === undefined
     ) {
-      return { ...createEmptyReadModel(filters), cycleSettings };
+      return createEmptyReadModel(filters);
     }
     const policyDocumentIdsByMember = new Map<string, Set<string>>();
     for (const consent of currentPolicyConsents) {
@@ -729,8 +792,6 @@ export async function getAdminMemberListReadModel({
         : null;
       const consentedPolicyDocumentIds =
         policyDocumentIdsByMember.get(member.id) ?? new Set<string>();
-      const profilePhotoState = profilePhotoStates.get(member.id);
-
       return {
         id: member.id,
         mmUserId: directory?.mm_user_id ?? "",
@@ -749,17 +810,17 @@ export async function getAdminMemberListReadModel({
           ? effectiveMarketingConsentMemberIds.has(member.id)
           : null,
         hasProfileImage:
-          profilePhotoState?.reviewStatus === "approved"
-          && Boolean(profilePhotoState.activeProfileImageId),
+          currentProfileImageMemberIds.has(member.id),
         createdAt: member.created_at,
         updatedAt: member.updated_at,
       };
     });
     const totalCount = memberResult.count ?? safeMembers.length;
     const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-    const memberTrendCreatedAts = (memberTrendResult.data ?? [])
-      .map((row) => row.created_at)
-      .filter((value): value is string => Boolean(value));
+    const memberTrend = memberTrendResultPromise.then((result) => ({
+      ...result,
+      isSampled: totalCount > result.createdAts.length,
+    }));
     const optionRows = optionsResult.data ?? [];
     const options = {
       campuses: Array.from(
@@ -804,16 +865,30 @@ export async function getAdminMemberListReadModel({
       totalCount,
       totalPages,
       shouldRedirectToLastPage: page > totalPages,
-      memberTrendCreatedAts,
-      isMemberTrendSampled: totalCount > memberTrendCreatedAts.length,
+      memberTrend,
       options,
       mustChangePasswordCount,
       pendingPolicyCount,
       latestUpdatedAt,
-      cycleSettings,
       hasMemberLoadError: false,
     };
   } catch {
     return createEmptyReadModel(filters);
   }
+}
+
+export async function getAdminMemberListReadModel({
+  filters,
+  page,
+  pageSize,
+}: {
+  filters: AdminMemberListFilters;
+  page: number;
+  pageSize: AdminMemberPageSize;
+}) {
+  return withAdminReadModelTimeout(
+    getAdminMemberListReadModelUnbounded({ filters, page, pageSize }),
+    createEmptyReadModel(filters),
+    ADMIN_MEMBER_READ_MODEL_TIMEOUT_MS,
+  );
 }

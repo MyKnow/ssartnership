@@ -29,6 +29,10 @@ export const CLIENT_PRODUCT_EVENT_NAMES = [
   "coupon_view",
   "coupon_copy",
   "admin_web_vital",
+  "admin_route_timing",
+  "admin_task_start",
+  "admin_task_complete",
+  "admin_task_recovery",
 ] as const satisfies readonly ProductEventName[];
 
 export type ClientProductEventName = (typeof CLIENT_PRODUCT_EVENT_NAMES)[number];
@@ -198,10 +202,48 @@ function parseProperties(
         .parse(rawProperties);
     case "admin_web_vital":
       return z
-        .object({
+      .object({
           metric: z.enum(["CLS", "FCP", "INP", "LCP", "TTFB"]),
           rating: z.enum(["good", "needs-improvement", "poor"]),
           value: z.number().finite().min(0).max(120_000),
+          viewport: z.enum(["mobile", "tablet", "desktop"]).nullable().optional(),
+        })
+        .strip()
+        .parse(rawProperties);
+    case "admin_route_timing":
+      return z
+        .object({
+          durationMs: z.number().int().min(0).max(120_000),
+          outcome: z.enum(["complete", "unknown", "error"]),
+          trigger: z.enum(["initial-load", "link", "history", "programmatic"]),
+          viewport: z.enum(["mobile", "tablet", "desktop"]).nullable().optional(),
+        })
+        .strip()
+        .parse(rawProperties);
+    case "admin_task_start":
+      return z
+      .object({
+          source: z.enum(["task_inbox", "home", "search", "navigation", "direct"]),
+          viewport: z.enum(["mobile", "tablet", "desktop"]).nullable().optional(),
+        })
+        .strip()
+        .parse(rawProperties);
+    case "admin_task_complete":
+      return z
+        .object({
+          durationMs: z.number().int().min(0).max(120_000).optional(),
+          outcome: z.enum(["success", "unknown"]),
+          viewport: z.enum(["mobile", "tablet", "desktop"]).nullable().optional(),
+        })
+        .strip()
+        .parse(rawProperties);
+    case "admin_task_recovery":
+      return z
+        .object({
+          durationMs: z.number().int().min(0).max(120_000).optional(),
+          reason: z.enum(["validation", "permission", "not_found", "timeout", "server", "unknown"]),
+          retryAvailable: z.boolean(),
+          viewport: z.enum(["mobile", "tablet", "desktop"]).nullable().optional(),
         })
         .strip()
         .parse(rawProperties);
@@ -358,6 +400,20 @@ function parseProductEventTarget(
         "admin_performance",
         { targetId: "safe" },
       );
+    case "admin_route_timing":
+      return parseFixedTarget(
+        eventName,
+        targetType,
+        targetId,
+        "admin_performance",
+        { targetId: "safe" },
+      );
+    case "admin_task_start":
+    case "admin_task_complete":
+    case "admin_task_recovery":
+      return parseFixedTarget(eventName, targetType, targetId, "admin_task", {
+        targetId: "safe",
+      });
   }
 }
 

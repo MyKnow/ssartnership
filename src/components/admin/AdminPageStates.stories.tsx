@@ -175,14 +175,14 @@ function CompanyBillingState() {
     <AdminPageStateFrame title="파트너사 관리">
       <div className="grid gap-4">
         <AdminPageHeader
-          eyebrow="Companies"
+          eyebrow="데이터"
           title="파트너사와 계정"
           description="계약 회사와 담당자 계정을 관리합니다."
         />
         <Card className="grid min-w-0 gap-4">
           <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="ui-kicker">Plan & Billing</p>
+              <p className="ui-kicker">플랜·과금</p>
               <h2 className="truncate text-xl font-semibold text-foreground">
                 카페 싸피 플랜/과금 검토
               </h2>
@@ -237,13 +237,13 @@ function PartnerEditorState() {
     <AdminPageStateFrame title="제휴처 편집">
       <div className="grid min-w-0 gap-5">
         <AdminPageHeader
-          eyebrow="Partner"
+          eyebrow="데이터"
           title="제휴처 상세"
           description="혜택과 공개 상태를 검토합니다."
         />
         <Card className="grid min-w-0 gap-5">
         <div className="min-w-0">
-          <p className="ui-kicker">Brand Editor</p>
+          <p className="ui-kicker">제휴처 편집</p>
           <h2 className="truncate text-xl font-semibold text-foreground">
             카페 싸피 강남점 정보 검토
           </h2>
@@ -292,7 +292,7 @@ function NotificationsInboxState() {
       <AdminPageStateFrame title="관리자 알림">
         <div className="grid gap-6">
           <AdminPageHeader
-            eyebrow="Notifications"
+            eyebrow="작업함"
             title="내 알림"
             description="현재 관리자 계정으로 수신한 운영 알림입니다."
           />

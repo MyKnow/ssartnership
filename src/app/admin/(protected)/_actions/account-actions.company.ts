@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getSafeAdminActionErrorCode } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { parsePartnerAccountCompanyPayload } from "./shared-parsers";
 import {
@@ -23,7 +24,7 @@ export async function updatePartnerAccountCompanyConnectionAction(formData: Form
   } catch (error) {
     redirectAdminActionError(
       "/admin/companies",
-      error instanceof Error ? error.message : "partner_account_company_invalid_request",
+      getSafeAdminActionErrorCode(error, "partner_account_company_invalid_request"),
     );
   }
 

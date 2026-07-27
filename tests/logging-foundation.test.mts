@@ -164,6 +164,97 @@ test("product event input accepts the repository's bounded mock partner identifi
   assert.equal(event.targetId, "health-001");
 });
 
+test("admin route timing accepts only bounded performance properties and safe route keys", async () => {
+  const { parseProductEventRequest } = await productEventContractModulePromise;
+
+  const event = parseProductEventRequest({
+    eventId: "d46d0f71-fb92-4a73-b0b6-40c44e5e18d6",
+    schemaVersion: 1,
+    occurredAt: "2026-07-14T12:44:03.000Z",
+    eventName: "admin_route_timing",
+    path: "/admin/partners/[partnerId]",
+    targetType: "admin_performance",
+    targetId: "admin.partners.detail",
+    properties: {
+      durationMs: 184,
+      outcome: "complete",
+      trigger: "link",
+      rawUrl: "/admin/partners/private-id",
+    },
+  });
+
+  assert.deepEqual(event.properties, {
+    durationMs: 184,
+    outcome: "complete",
+    trigger: "link",
+  });
+  assert.equal(event.targetId, "admin.partners.detail");
+  assert.throws(() =>
+    parseProductEventRequest({
+      eventId: "d46d0f71-fb92-4a73-b0b6-40c44e5e18d6",
+      schemaVersion: 1,
+      occurredAt: "2026-07-14T12:44:03.000Z",
+      eventName: "admin_route_timing",
+      targetType: "admin_performance",
+      targetId: "admin/partners/private-id",
+      properties: {
+        durationMs: 184,
+        outcome: "complete",
+        trigger: "link",
+      },
+    }),
+  );
+});
+
+test("admin task telemetry keeps task outcomes bounded and identifier-free", async () => {
+  const { parseProductEventRequest } = await productEventContractModulePromise;
+  const baseEvent = {
+    eventId: "d46d0f71-fb92-4a73-b0b6-40c44e5e18d6",
+    schemaVersion: 1,
+    occurredAt: "2026-07-14T12:44:03.000Z",
+    path: "/admin/partner-requests",
+    targetType: "admin_task",
+    targetId: "admin.partner-requests",
+  };
+
+  assert.deepEqual(
+    parseProductEventRequest({
+      ...baseEvent,
+      eventName: "admin_task_start",
+      properties: { source: "task_inbox", rawMemberId: "do-not-store" },
+    }).properties,
+    { source: "task_inbox" },
+  );
+  assert.deepEqual(
+    parseProductEventRequest({
+      ...baseEvent,
+      eventName: "admin_task_complete",
+      properties: { durationMs: 184, outcome: "success", detail: "private" },
+    }).properties,
+    { durationMs: 184, outcome: "success" },
+  );
+  assert.deepEqual(
+    parseProductEventRequest({
+      ...baseEvent,
+      eventName: "admin_task_recovery",
+      properties: {
+        reason: "validation",
+        retryAvailable: true,
+        errorMessage: "internal database details",
+      },
+    }).properties,
+    { reason: "validation", retryAvailable: true },
+  );
+  assert.throws(() =>
+    parseProductEventRequest({
+      ...baseEvent,
+      eventName: "admin_task_complete",
+      targetId: "admin/partners/private-id",
+      properties: { outcome: "success" },
+    }),
+  );
+});
+
 test("product ingestion stops reading and cancels a streaming body above its byte limit", async () => {
   const { RequestBodyTooLargeError, readRequestBodyWithinLimit } =
     await requestBodyLimitModulePromise;

@@ -9,6 +9,7 @@ Files:
 - `before.md`: current baseline metrics captured before the next optimization cycle
 - `audit.md`: project-wide bottleneck audit and prioritized improvement backlog
 - `after.md`: iteration log for deployed changes and measured results after rollout
+- `admin-baseline.md`: 관리자 콘솔의 안전한 route timing·Web Vitals 기준선과 해석 규칙
 
 Rules for updating:
 

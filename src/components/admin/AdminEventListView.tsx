@@ -26,6 +26,8 @@ export type AdminEventListSection = {
 export type AdminEventListViewProps = {
   sections: AdminEventListSection[];
   statusMessage?: string | null;
+  canCreate?: boolean;
+  canUpdate?: boolean;
 };
 
 function EventPill({
@@ -44,7 +46,15 @@ function EventPill({
   );
 }
 
-function EventCard({ item }: { item: AdminEventListItem }) {
+function EventCard({
+  item,
+  canCreate,
+  canUpdate,
+}: {
+  item: AdminEventListItem;
+  canCreate: boolean;
+  canUpdate: boolean;
+}) {
   return (
     <article className="grid min-w-0 gap-4 rounded-panel border border-border bg-surface p-5 shadow-flat">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -90,12 +100,20 @@ function EventCard({ item }: { item: AdminEventListItem }) {
       <div className="flex flex-wrap gap-3">
         <Link
           href={`/admin/event/${item.slug}`}
+          prefetch={false}
           className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-surface px-4 text-sm font-semibold text-foreground transition hover:border-strong hover:bg-surface-elevated"
         >
-          {item.isRegistered ? "운영 설정" : "등록하기"}
+          {item.isRegistered
+            ? canUpdate
+              ? "운영 설정"
+              : "운영 설정 보기"
+            : canCreate
+              ? "등록하기"
+              : "등록 정보 보기"}
         </Link>
         <Link
           href={`/events/${item.slug}`}
+          prefetch={false}
           className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-surface-muted px-4 text-sm font-semibold text-foreground transition hover:border-strong hover:bg-surface-elevated"
         >
           랜딩 보기
@@ -108,6 +126,8 @@ function EventCard({ item }: { item: AdminEventListItem }) {
 export default function AdminEventListView({
   sections,
   statusMessage,
+  canCreate = true,
+  canUpdate = true,
 }: AdminEventListViewProps) {
   const count = (bucket: string) =>
     sections.find((section) => section.bucket === bucket)?.items.length ?? 0;
@@ -121,9 +141,21 @@ export default function AdminEventListView({
       />
       <StatsRow
         items={[
-          { label: "진행 전", value: `${count("진행 전")}개`, hint: "오픈 대기" },
-          { label: "진행 중", value: `${count("진행 중")}개`, hint: "현재 노출 중" },
-          { label: "진행 후", value: `${count("진행 후")}개`, hint: "종료 후 보관" },
+          {
+            label: "진행 전",
+            value: `${count("진행 전")}개`,
+            hint: "오픈 대기",
+          },
+          {
+            label: "진행 중",
+            value: `${count("진행 중")}개`,
+            hint: "현재 노출 중",
+          },
+          {
+            label: "진행 후",
+            value: `${count("진행 후")}개`,
+            hint: "종료 후 보관",
+          },
           {
             label: "미등록/비활성",
             value: `${count("등록 필요") + count("비활성")}개`,
@@ -153,7 +185,9 @@ export default function AdminEventListView({
           },
         ]}
       />
-      {statusMessage ? <FormMessage variant="info">{statusMessage}</FormMessage> : null}
+      {statusMessage ? (
+        <FormMessage variant="info">{statusMessage}</FormMessage>
+      ) : null}
 
       {sections.map((section) => (
         <section
@@ -163,7 +197,7 @@ export default function AdminEventListView({
         >
           <div className="flex min-w-0 items-end justify-between gap-3 px-1">
             <div className="min-w-0">
-              <p className="ui-kicker">Events</p>
+              <p className="ui-kicker">이벤트</p>
               <h2 className="mt-2 break-words text-xl font-semibold text-foreground">
                 {section.bucket}
               </h2>
@@ -176,7 +210,12 @@ export default function AdminEventListView({
           {section.items.length > 0 ? (
             <div className="grid min-w-0 gap-5">
               {section.items.map((item) => (
-                <EventCard key={item.slug} item={item} />
+                <EventCard
+                  key={item.slug}
+                  item={item}
+                  canCreate={canCreate}
+                  canUpdate={canUpdate}
+                />
               ))}
             </div>
           ) : (

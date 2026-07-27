@@ -1,7 +1,10 @@
+import { Suspense } from "react";
 import AdminPartnerRegistrationsView from "@/components/admin/AdminPartnerRegistrationsView";
+import { AdminPartnerRegistrationsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import { updatePartnerRegistrationRequestStatus } from "@/app/admin/(protected)/partner-registrations/actions";
 import AdminShell from "@/components/admin/AdminShell";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { canAdmin } from "@/lib/admin-permissions";
 import { getManagedCampusFilterValues } from "@/lib/admin-scope";
 import { parseAdminReviewQueuePagination } from "@/lib/admin-ia";
 import { listAdminPartnerRegistrationRequestPage } from "@/lib/admin-partner-registration-queue";
@@ -37,19 +40,31 @@ function buildPartnerRegistrationHref({
   if (page > 1) params.set("page", String(page));
   if (pageSize !== 12) params.set("pageSize", String(pageSize));
   const query = params.toString();
-  return query ? `/admin/partner-registrations?${query}` : "/admin/partner-registrations";
+  return query
+    ? `/admin/partner-registrations?${query}`
+    : "/admin/partner-registrations";
 }
 
-export default async function AdminPartnerRegistrationsPage({
-  searchParams,
+async function AdminPartnerRegistrationsContent({
+  adminSession,
+  params,
 }: {
-  searchParams?: Promise<PartnerRegistrationSearchParams>;
+  adminSession: Awaited<ReturnType<typeof requireAdminPermission>>;
+  params: PartnerRegistrationSearchParams;
 }) {
-  const adminSession = await requireAdminPermission("brands", "read", {
-    path: "/admin/partner-registrations",
-  });
-  const managedCampusFilter = getManagedCampusFilterValues(adminSession.account);
-  const params = (await searchParams) ?? {};
+  const managedCampusFilter = getManagedCampusFilterValues(
+    adminSession.account,
+  );
+  const canReview = canAdmin(
+    adminSession.account.permissions,
+    "brands",
+    "update",
+  );
+  const canCreate = canAdmin(
+    adminSession.account.permissions,
+    "brands",
+    "create",
+  );
   const pagination = parseAdminReviewQueuePagination({
     page: getOneSearchParam(params.page),
     pageSize: getOneSearchParam(params.pageSize),
@@ -65,13 +80,22 @@ export default async function AdminPartnerRegistrationsPage({
     pageSize: pagination.pageSize,
     managedCampusSlugs: managedCampusFilter,
   });
-  const totalPages = Math.max(1, Math.ceil(requestPage.totalCount / pagination.pageSize));
-  if (!requestPage.loadError && requestPage.totalCount > 0 && pagination.page > totalPages) {
-    redirect(buildPartnerRegistrationHref({
-      status,
-      page: totalPages,
-      pageSize: pagination.pageSize,
-    }));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(requestPage.totalCount / pagination.pageSize),
+  );
+  if (
+    !requestPage.loadError &&
+    requestPage.totalCount > 0 &&
+    pagination.page > totalPages
+  ) {
+    redirect(
+      buildPartnerRegistrationHref({
+        status,
+        page: totalPages,
+        pageSize: pagination.pageSize,
+      }),
+    );
   }
   const feedback = getAdminReviewQueueFeedback({
     error: getOneSearchParam(params.error),
@@ -84,12 +108,7 @@ export default async function AdminPartnerRegistrationsPage({
   });
 
   return (
-    <AdminShell
-      title="제휴 등록 신청"
-      backHref="/admin/partners"
-      backLabel="제휴처"
-    >
-      <AdminPartnerRegistrationsView
+    <AdminPartnerRegistrationsView
         rows={requestPage.rows}
         updateStatusAction={updatePartnerRegistrationRequestStatus}
         status={status}
@@ -101,7 +120,34 @@ export default async function AdminPartnerRegistrationsPage({
           pageSize: pagination.pageSize,
         }}
         loadError={requestPage.loadError}
-      />
+        canReview={canReview}
+        canCreate={canCreate}
+    />
+  );
+}
+
+export default async function AdminPartnerRegistrationsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<PartnerRegistrationSearchParams>;
+}) {
+  const adminSession = await requireAdminPermission("brands", "read", {
+    path: "/admin/partner-registrations",
+  });
+  const params = (await searchParams) ?? {};
+
+  return (
+    <AdminShell
+      title="제휴 등록 신청"
+      backHref="/admin/partners"
+      backLabel="제휴처"
+    >
+      <Suspense fallback={<AdminPartnerRegistrationsSkeletonContent />}>
+        <AdminPartnerRegistrationsContent
+          adminSession={adminSession}
+          params={params}
+        />
+      </Suspense>
     </AdminShell>
   );
 }

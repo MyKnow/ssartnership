@@ -4,9 +4,12 @@ import {
   type AdminGlobalSearchMember,
   type AdminGlobalSearchPartner,
 } from "@/lib/admin-global-search";
+import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { isUuid } from "@/lib/uuid";
 
 const SEARCH_RESULT_LIMIT = 8;
+export const ADMIN_GLOBAL_SEARCH_READ_MODEL_TIMEOUT_MS = 2_000;
 
 type AdminGlobalSearchMemberRow = {
   id: string;
@@ -45,6 +48,12 @@ function dedupeMembers(rows: AdminGlobalSearchMember[]) {
   return Array.from(found.values()).slice(0, SEARCH_RESULT_LIMIT);
 }
 
+function dedupePartners(rows: AdminGlobalSearchPartner[]) {
+  const found = new Map<string, AdminGlobalSearchPartner>();
+  rows.forEach((partner) => found.set(partner.id, partner));
+  return Array.from(found.values()).slice(0, SEARCH_RESULT_LIMIT);
+}
+
 export async function searchAdminGlobalEntities({
   query,
   canSearchMembers,
@@ -64,7 +73,9 @@ export async function searchAdminGlobalEntities({
   }
 
   const supabase = getSupabaseAdminClient();
-  const pattern = getAdminGlobalSearchLikePattern(query);
+  const normalizedQuery = query.trim();
+  const pattern = getAdminGlobalSearchLikePattern(normalizedQuery);
+  const isIdentifierQuery = isUuid(normalizedQuery);
   const memberQueries = canSearchMembers
     ? [
         supabase
@@ -81,6 +92,16 @@ export async function searchAdminGlobalEntities({
           .ilike("manual_login_id", pattern)
           .order("updated_at", { ascending: false })
           .limit(8),
+        ...(isIdentifierQuery
+          ? [
+              supabase
+                .from("members")
+                .select("id,display_name,manual_login_id,generation,campus")
+                .is("deleted_at", null)
+                .eq("id", normalizedQuery)
+                .limit(1),
+            ]
+          : []),
       ]
     : [];
   let partnerQuery = canSearchPartners
@@ -91,20 +112,45 @@ export async function searchAdminGlobalEntities({
         .order("updated_at", { ascending: false })
         .limit(8)
     : null;
+  let partnerIdQuery = canSearchPartners && isIdentifierQuery
+    ? supabase
+        .from("partners")
+        .select("id,name,location,campus_slugs")
+        .eq("id", normalizedQuery)
+        .limit(1)
+    : null;
   if (partnerQuery && managedCampusSlugs) {
     partnerQuery = partnerQuery.overlaps(
       "managed_campus_slugs",
       managedCampusSlugs,
     );
   }
+  if (partnerIdQuery && managedCampusSlugs) {
+    partnerIdQuery = partnerIdQuery.overlaps(
+      "managed_campus_slugs",
+      managedCampusSlugs,
+    );
+  }
+  const scopedPartnerQueries = [partnerQuery, partnerIdQuery].filter(
+    (query): query is NonNullable<typeof partnerQuery> => Boolean(query),
+  );
 
-  const [memberResults, partnerResult] = await Promise.all([
-    Promise.all(memberQueries).catch(() => null),
-    (partnerQuery ?? Promise.resolve({ data: [], error: null })).catch(() => null),
+  const [memberResults, partnerResults] = await Promise.all([
+    withAdminReadModelTimeout(
+      Promise.all(memberQueries).catch(() => null),
+      null,
+      ADMIN_GLOBAL_SEARCH_READ_MODEL_TIMEOUT_MS,
+    ),
+    withAdminReadModelTimeout(
+      Promise.all(scopedPartnerQueries).catch(() => null),
+      null,
+      ADMIN_GLOBAL_SEARCH_READ_MODEL_TIMEOUT_MS,
+    ),
   ]);
   const memberSearchFailed =
     memberResults === null || memberResults.some((result) => Boolean(result.error));
-  const partnerSearchFailed = partnerResult === null || Boolean(partnerResult.error);
+  const partnerSearchFailed =
+    partnerResults === null || partnerResults.some((result) => Boolean(result.error));
   const members = memberResults
     ? dedupeMembers(
         memberResults.flatMap((result) =>
@@ -122,16 +168,22 @@ export async function searchAdminGlobalEntities({
         ),
       )
     : [];
-  const partners = partnerResult?.error
-    ? []
-    : ((partnerResult?.data ?? []) as AdminGlobalSearchPartnerRow[]).map(
-        (partner) => ({
-          id: partner.id,
-          name: partner.name,
-          location: partner.location,
-          campusSlugs: partner.campus_slugs,
-        }),
-      );
+  const partners = partnerResults
+    ? dedupePartners(
+        partnerResults.flatMap((result) =>
+          result.error
+            ? []
+            : ((result.data ?? []) as AdminGlobalSearchPartnerRow[]).map(
+                (partner) => ({
+                  id: partner.id,
+                  name: partner.name,
+                  location: partner.location,
+                  campusSlugs: partner.campus_slugs,
+                }),
+              ),
+        ),
+      )
+    : [];
 
   return { members, partners, memberSearchFailed, partnerSearchFailed };
 }

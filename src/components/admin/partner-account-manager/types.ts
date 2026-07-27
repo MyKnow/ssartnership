@@ -1,5 +1,7 @@
 export type AdminPartnerAccountCompany = {
   id: string;
+  account_id?: string | null;
+  company_id?: string | null;
   is_active?: boolean | null;
   created_at?: string | null;
   company?:

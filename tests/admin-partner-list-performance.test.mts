@@ -29,9 +29,46 @@ test("관리자 제휴처 목록은 read-model의 서버 count/range와 안전�
   assert.match(readModelSource, /partnersQuery = partnersQuery\.range\(/);
   assert.match(readModelSource, /from \+ normalizedFilters\.pageSize - 1/);
   assert.match(readModelSource, /getPartnerNameSearchPattern\(normalizedFilters\.searchValue\)/);
+  assert.match(readModelSource, /withAdminReadModelTimeout/);
+  assert.match(readModelSource, /ADMIN_PARTNER_LIST_READ_MODEL_TIMEOUT_MS/);
+  assert.match(readModelSource, /createEmptyAdminPartnerListReadModel/);
+  assert.match(readModelSource, /applies_to/);
+  assert.doesNotMatch(readModelSource, /conditions,benefits,applies_to,images,tags/);
+  assert.doesNotMatch(readModelSource, /thumbnail,map_url,benefit_action_type/);
   assert.doesNotMatch(managerSource, /filterAndSortAdminPartners/);
   assert.match(managerSource, /router\.replace\(/);
   assert.match(managerSource, /조건에 맞는 제휴처/);
+});
+
+test("제휴처 목록은 보조 집계를 기다리지 않고 찾기·상세 이동을 먼저 제공한다", async () => {
+  const [pageSource, itemSource] = await Promise.all([
+    readFile(partnerPagePath, "utf8"),
+    readFile(
+      new URL(
+        "../src/components/admin/partner-manager/AdminPartnerListItem.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.doesNotMatch(pageSource, /getAdminPartnerMetrics/);
+  assert.doesNotMatch(pageSource, /metricsByPartnerId/);
+  assert.match(itemSource, /partner\.metrics === undefined/);
+  assert.match(itemSource, /운영 지표는 상세 화면에서 확인/);
+});
+
+test("제휴처 목록의 제목·지도 링크는 44px 터치 영역을 제공한다", async () => {
+  const itemSource = await readFile(
+    new URL(
+      "../src/components/admin/partner-manager/AdminPartnerListItem.tsx",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  assert.match(itemSource, /min-h-11 min-w-0 items-center/);
+  assert.match(itemSource, /h-11 w-11 items-center justify-center rounded-control/);
 });
 
 test("목록 오류는 내부 오류 대신 재시도 가능한 안전한 안내를 제공한다", async () => {
@@ -39,5 +76,7 @@ test("목록 오류는 내부 오류 대신 재시도 가능한 안전한 안내
 
   assert.match(managerSource, /제휴처 목록을 불러오지 못했습니다/);
   assert.match(managerSource, /router\.refresh\(\)/);
+  assert.match(managerSource, /loadingText="다시 불러오는 중"/);
+  assert.match(managerSource, /startTransition\(\(\) => router\.refresh\(\)\)/);
   assert.doesNotMatch(managerSource, /Error\.message/);
 });

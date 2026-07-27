@@ -15,7 +15,10 @@ export type PartnerPreviewLinkPanelProps = {
   partnerId: string;
   hasActiveLink: boolean;
   initialPreviewUrl?: string | null;
-  generateAction: (partnerId: string) => Promise<PartnerPreviewLinkActionResult>;
+  canUpdate?: boolean;
+  generateAction: (
+    partnerId: string,
+  ) => Promise<PartnerPreviewLinkActionResult>;
   removeAction: (partnerId: string) => Promise<void>;
 };
 
@@ -23,14 +26,37 @@ export default function AdminPartnerPreviewLinkPanel({
   partnerId,
   hasActiveLink: initialHasActiveLink,
   initialPreviewUrl = null,
+  canUpdate = true,
   generateAction,
   removeAction,
 }: PartnerPreviewLinkPanelProps) {
   const [hasActiveLink, setHasActiveLink] = useState(initialHasActiveLink);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(initialPreviewUrl);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(
+    initialPreviewUrl,
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const { notify } = useToast();
+
+  if (!canUpdate) {
+    return (
+      <Card tone="elevated" padding="md">
+        <div className="grid gap-3">
+          <div className="grid gap-2">
+            <p className="ui-kicker">제휴처 미리보기</p>
+            <h3 className="ui-section-title text-ko-title">미리보기 링크</h3>
+            <p className="ui-body text-ko-pretty">
+              현재 계정은 미리보기 링크 상태를 확인할 수 있지만 링크를
+              생성하거나 제거할 수 없습니다.
+            </p>
+          </div>
+          <div className="rounded-control border border-border bg-surface-inset px-3 py-3 text-sm leading-6 text-muted-foreground">
+            링크 관리는 제휴처 수정 권한이 있는 관리자만 할 수 있습니다.
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   const handleGenerate = () => {
     setMessage(null);
@@ -42,7 +68,9 @@ export default function AdminPartnerPreviewLinkPanel({
           notify("미리보기 링크를 생성했습니다.");
         })
         .catch((error: unknown) => {
-          setMessage(getSafeAdminMessage(error, "미리보기 링크 생성에 실패했습니다."));
+          setMessage(
+            getSafeAdminMessage(error, "미리보기 링크 생성에 실패했습니다."),
+          );
         });
     });
   };
@@ -74,7 +102,9 @@ export default function AdminPartnerPreviewLinkPanel({
           notify("미리보기 링크를 제거했습니다.");
         })
         .catch((error: unknown) => {
-          setMessage(getSafeAdminMessage(error, "미리보기 링크 제거에 실패했습니다."));
+          setMessage(
+            getSafeAdminMessage(error, "미리보기 링크 제거에 실패했습니다."),
+          );
         });
     });
   };
@@ -83,18 +113,28 @@ export default function AdminPartnerPreviewLinkPanel({
     <Card tone="elevated" padding="md">
       <div className="grid gap-4">
         <div className="grid gap-2">
-          <p className="ui-kicker">Partner Preview</p>
+          <p className="ui-kicker">제휴처 미리보기</p>
           <h3 className="ui-section-title text-ko-title">미리보기 링크</h3>
           <p className="ui-body text-ko-pretty">
-            제휴사에 실제 사용자 화면을 안내할 때 사용하는 비공개 링크입니다. 새 링크를 생성하면 기존 링크는 즉시 사용할 수 없게 됩니다.
+            제휴사에 실제 사용자 화면을 안내할 때 사용하는 비공개 링크입니다. 새
+            링크를 생성하면 기존 링크는 즉시 사용할 수 없게 됩니다.
           </p>
         </div>
 
-        {message ? <InlineMessage tone="danger" title="처리하지 못했습니다." description={message} /> : null}
+        {message ? (
+          <InlineMessage
+            tone="danger"
+            title="처리하지 못했습니다."
+            description={message}
+          />
+        ) : null}
 
         {previewUrl ? (
           <div className="grid gap-3">
-            <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="partner-preview-url">
+            <label
+              className="grid gap-2 text-sm font-semibold text-foreground"
+              htmlFor="partner-preview-url"
+            >
               현재 링크
               <input
                 id="partner-preview-url"
@@ -104,13 +144,30 @@ export default function AdminPartnerPreviewLinkPanel({
               />
             </label>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="primary" onClick={handleCopy} disabled={isPending}>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={handleCopy}
+                disabled={isPending}
+              >
                 링크 복사
               </Button>
-              <Button type="button" variant="secondary" onClick={handleGenerate} loading={isPending} loadingText="생성 중">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleGenerate}
+                loading={isPending}
+                loadingText="생성 중"
+              >
                 새 링크 생성
               </Button>
-              <Button type="button" variant="danger" onClick={handleRemove} loading={isPending} loadingText="제거 중">
+              <Button
+                type="button"
+                variant="danger"
+                onClick={handleRemove}
+                loading={isPending}
+                loadingText="제거 중"
+              >
                 링크 제거
               </Button>
             </div>
@@ -122,7 +179,13 @@ export default function AdminPartnerPreviewLinkPanel({
                 ? "현재 발급된 링크가 있습니다. 이전 발급 링크는 보안상 다시 표시할 수 없으므로 새 링크를 생성해 주세요."
                 : "아직 발급된 미리보기 링크가 없습니다."}
             </p>
-            <Button type="button" variant="secondary" onClick={handleGenerate} loading={isPending} loadingText="생성 중">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleGenerate}
+              loading={isPending}
+              loadingText="생성 중"
+            >
               {hasActiveLink ? "새 링크 생성" : "링크 생성"}
             </Button>
           </div>

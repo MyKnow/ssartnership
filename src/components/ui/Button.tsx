@@ -57,7 +57,7 @@ type ButtonProps = {
   prefetch?: boolean;
   target?: string;
   rel?: string;
-  onClick?: () => void;
+  onClick?: (event: React.MouseEvent<HTMLElement>) => void;
   disabled?: boolean;
   loading?: boolean;
   loadingText?: string;
@@ -134,7 +134,7 @@ export default function Button({
             event.preventDefault();
             return;
           }
-          onClick();
+          onClick(event);
         }
       : isDisabled
         ? (event: React.MouseEvent<HTMLAnchorElement>) => {

@@ -3,6 +3,8 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowTopRightOnSquareIcon,
   Bars3Icon,
@@ -51,6 +53,8 @@ export default function AdminShellView({
   navGroups: AdminNavGroup[];
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const prefetchedHrefsRef = useRef(new Set<string>());
   const { hidden, headerHeight, headerRef } = useAutoHideHeader();
   const activeNavItem =
     navGroups
@@ -60,10 +64,14 @@ export default function AdminShellView({
   const taskNavItem = navGroups
     .flatMap((group) => group.items)
     .find((item) => item.href === "/admin/tasks");
-  const dataGroup = navGroups.find((group) => group.label === "데이터");
-  const dataNavItem = dataGroup?.items[0];
-  const isDataActive = Boolean(
-    dataGroup?.items.some((item) => isAdminNavActive(pathname, item.href)),
+  const dataGroup = navGroups.find(
+    (group) => group.label === "데이터",
+  );
+  const memberNavItem = dataGroup?.items.find(
+    (item) => item.href === "/admin/members",
+  );
+  const isMemberDataActive = Boolean(
+    memberNavItem && isAdminNavActive(pathname, memberNavItem.href),
   );
   const mobileNavItemClassName = (active: boolean) =>
     cn(
@@ -72,6 +80,16 @@ export default function AdminShellView({
     );
   const skipLinkClassName =
     "sr-only fixed left-4 top-4 z-[90] rounded-control border border-border bg-surface-overlay px-4 py-3 text-sm font-semibold text-foreground shadow-overlay focus:not-sr-only focus:!fixed focus:inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  const prefetchOnIntent = useCallback(
+    (href: string) => {
+      if (prefetchedHrefsRef.current.has(href)) {
+        return;
+      }
+      prefetchedHrefsRef.current.add(href);
+      router.prefetch(href);
+    },
+    [router],
+  );
 
   const renderDesktopNav = (expanded: boolean) => (
     <nav className="grid gap-6">
@@ -91,6 +109,9 @@ export default function AdminShellView({
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={false}
+                  onPointerEnter={() => prefetchOnIntent(item.href)}
+                  onFocus={() => prefetchOnIntent(item.href)}
                   title={expanded ? undefined : item.label}
                   className={cn(
                     "group flex items-center gap-3 rounded-2xl border px-3 py-3 text-sm transition-colors",
@@ -122,13 +143,13 @@ export default function AdminShellView({
     <AdminQuickNavigatorProvider navGroups={navGroups}>
       <div className="min-h-screen bg-background">
       <a
-        href="#admin-mobile-main-content"
+        href="#admin-main-content"
         className={cn(skipLinkClassName, "md:hidden")}
       >
         주요 내용으로 건너뛰기
       </a>
       <a
-        href="#admin-desktop-main-content"
+        href="#admin-main-content"
         className={cn(skipLinkClassName, "hidden md:inline-flex")}
       >
         주요 내용으로 건너뛰기
@@ -153,7 +174,7 @@ export default function AdminShellView({
                   {SITE_NAME}
                 </p>
                 <p className="mt-1 truncate text-lg font-semibold tracking-[-0.02em] text-foreground">
-                  관리자 콘솔
+                  {activeNavItem?.label ?? title}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -164,22 +185,18 @@ export default function AdminShellView({
           </div>
         </header>
 
-        <FloatingActionGroup className="!bottom-[calc(5rem+env(safe-area-inset-bottom))] md:!bottom-safe-bottom-5">
-          <ScrollToTopFab />
-          <main id="admin-mobile-main-content" tabIndex={-1}>
-            <Container className="pb-[calc(5.75rem+env(safe-area-inset-bottom))] pt-8" size="dashboard">
-              {children}
-            </Container>
-          </main>
-        </FloatingActionGroup>
+      </div>
 
-        <nav
-          aria-label="관리자 주요 탐색"
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-surface-overlay/95 pb-safe-bottom shadow-floating backdrop-blur-xl"
-        >
+      <nav
+        aria-label="관리자 주요 탐색"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-surface-overlay/95 pb-safe-bottom shadow-floating backdrop-blur-xl md:hidden"
+      >
           <Container size="dashboard" className="flex items-stretch">
             <Link
               href="/admin"
+              prefetch={false}
+              onPointerEnter={() => prefetchOnIntent("/admin")}
+              onFocus={() => prefetchOnIntent("/admin")}
               aria-current={pathname === "/admin" ? "page" : undefined}
               className={mobileNavItemClassName(pathname === "/admin")}
             >
@@ -189,6 +206,9 @@ export default function AdminShellView({
             {taskNavItem ? (
               <Link
                 href={taskNavItem.href}
+                prefetch={false}
+                onPointerEnter={() => prefetchOnIntent(taskNavItem.href)}
+                onFocus={() => prefetchOnIntent(taskNavItem.href)}
                 aria-current={isAdminNavActive(pathname, taskNavItem.href) ? "page" : undefined}
                 className={mobileNavItemClassName(
                   isAdminNavActive(pathname, taskNavItem.href),
@@ -198,15 +218,18 @@ export default function AdminShellView({
                 <span>작업함</span>
               </Link>
             ) : null}
-            {dataNavItem ? (
+            {memberNavItem ? (
               <Link
-                href={dataNavItem.href}
-                title={dataNavItem.label}
-                aria-current={isDataActive ? "page" : undefined}
-                className={mobileNavItemClassName(isDataActive)}
+                href={memberNavItem.href}
+                prefetch={false}
+                onPointerEnter={() => prefetchOnIntent(memberNavItem.href)}
+                onFocus={() => prefetchOnIntent(memberNavItem.href)}
+                title={memberNavItem.label}
+                aria-current={isMemberDataActive ? "page" : undefined}
+                className={mobileNavItemClassName(isMemberDataActive)}
               >
                 <Squares2X2Icon className="h-5 w-5" aria-hidden="true" />
-                <span>데이터</span>
+                <span>회원</span>
               </Link>
             ) : null}
             <AdminMobileNav
@@ -227,14 +250,16 @@ export default function AdminShellView({
               }
             />
           </Container>
-        </nav>
-      </div>
+      </nav>
 
-      <div className="hidden min-h-screen md:grid md:grid-cols-[5.5rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)]">
-        <aside className="sticky top-0 h-screen border-r border-border/70 bg-surface/95 backdrop-blur-xl">
+      <div className="md:grid md:min-h-screen md:grid-cols-[5.5rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)]">
+        <aside className="hidden border-r border-border/70 bg-surface/95 backdrop-blur-xl md:sticky md:top-0 md:block md:h-screen">
           <div className="flex h-full flex-col gap-6 px-3 py-4 xl:px-4 xl:py-5">
             <Link
               href="/admin"
+              prefetch={false}
+              onPointerEnter={() => prefetchOnIntent("/admin")}
+              onFocus={() => prefetchOnIntent("/admin")}
               aria-label="관리 홈"
               className={cn(
                 "flex items-center rounded-2xl border border-border/70 bg-surface-elevated px-3 py-3 text-foreground shadow-flat",
@@ -258,12 +283,18 @@ export default function AdminShellView({
         </aside>
 
         <div className="min-w-0">
-          <header className="sticky top-0 z-30 border-b border-border/70 bg-background/90 backdrop-blur-xl">
+          <header className="sticky top-0 z-30 hidden border-b border-border/70 bg-background/90 backdrop-blur-xl md:block">
             <Container className="flex min-h-[4.75rem] items-center justify-between gap-4 py-4" size="dashboard">
               <div className="min-w-0">
                 {activeNavItem?.href !== "/admin" ? (
                   <div className="flex flex-wrap items-center gap-1 text-xs font-medium text-muted-foreground">
-                    <Link href="/admin" className="hover:text-foreground">
+                    <Link
+                      href="/admin"
+                      prefetch={false}
+                      onPointerEnter={() => prefetchOnIntent("/admin")}
+                      onFocus={() => prefetchOnIntent("/admin")}
+                      className="hover:text-foreground"
+                    >
                       관리 홈
                     </Link>
                     <ChevronRightIcon className="h-3.5 w-3.5" />
@@ -291,10 +322,13 @@ export default function AdminShellView({
             </Container>
           </header>
 
-          <FloatingActionGroup>
+          <FloatingActionGroup className="!bottom-[calc(5rem+env(safe-area-inset-bottom))] md:!bottom-safe-bottom-5">
             <ScrollToTopFab />
-            <main id="admin-desktop-main-content" tabIndex={-1}>
-              <Container className="pb-16 pt-8" size="dashboard">
+            <main id="admin-main-content" tabIndex={-1}>
+              <Container
+                className="pb-[calc(5.75rem+env(safe-area-inset-bottom))] pt-8 md:pb-16"
+                size="dashboard"
+              >
                 {children}
               </Container>
             </main>

@@ -52,6 +52,7 @@ function NavButton({
     <Button
       variant="ghost"
       href={href}
+      prefetch={false}
       className={cn(
         "w-full justify-start rounded-2xl px-4",
         active ? "border-strong bg-surface-elevated text-foreground shadow-flat" : null,
@@ -186,11 +187,11 @@ export default function AdminMobileNav({
 
       {open && typeof document !== "undefined"
         ? createPortal(
-            <div className="fixed inset-0 isolate z-[70] md:hidden" aria-hidden={!open}>
+            <div className="fixed inset-0 isolate z-[70] md:hidden">
               <button
                 type="button"
                 className="absolute inset-0 z-0 bg-black/55"
-                aria-label="관리 메뉴 닫기"
+                aria-label="관리 메뉴 배경 닫기"
                 onClick={closeMenu}
               />
 

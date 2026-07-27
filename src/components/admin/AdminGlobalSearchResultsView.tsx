@@ -60,6 +60,7 @@ function ResultLink({
   return (
     <Link
       href={href}
+      prefetch={false}
       className="group flex min-h-14 min-w-0 items-center gap-3 rounded-control border border-border/70 bg-surface-inset px-3 py-3 transition-colors hover:border-strong hover:bg-surface-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
       <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-surface-muted text-foreground">
@@ -104,7 +105,7 @@ export default function AdminGlobalSearchResultsView({
       <AdminPageHeader
         eyebrow="검색"
         title="통합 검색"
-        description="회원과 제휴처를 이름 또는 관리 ID로 찾아 바로 상세 화면을 엽니다. 표시되는 대상은 현재 권한과 담당 캠퍼스 범위로 제한됩니다."
+        description="회원과 제휴처를 이름·로그인 ID·관리 ID로 찾아 바로 상세 화면을 엽니다. 표시되는 대상은 현재 권한과 담당 캠퍼스 범위로 제한됩니다."
       />
 
       <Surface level="default" padding="lg">
@@ -114,7 +115,7 @@ export default function AdminGlobalSearchResultsView({
               찾을 대상
             </label>
             <p id="admin-global-search-query-help" className="mt-1 text-sm leading-6 text-muted-foreground">
-              두 글자 이상 입력하세요. 예: 르블라썸 강남점, 홍길동, member-id
+              두 글자 이상 입력하세요. 예: 르블라썸 강남점, 홍길동, 로그인 ID, 관리 ID
             </p>
             <div className="relative mt-3">
               <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />

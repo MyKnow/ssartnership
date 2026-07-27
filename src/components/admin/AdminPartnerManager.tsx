@@ -1,7 +1,14 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import FilterBar from "@/components/ui/FilterBar";
 import Input from "@/components/ui/Input";
@@ -18,7 +25,10 @@ import type {
   AdminPartner,
 } from "@/components/admin/partner-manager/types";
 
-export type { AdminCategory, AdminPartner } from "@/components/admin/partner-manager/types";
+export type {
+  AdminCategory,
+  AdminPartner,
+} from "@/components/admin/partner-manager/types";
 
 const sortOptions = [
   { value: "recent", label: "최근 등록순" },
@@ -55,12 +65,20 @@ export default function AdminPartnerManager({
     value: String(pagination.page),
   });
   const [requestedPage, setRequestedPage] = useState<number | null>(null);
+  const searchParamsValue = searchParams.toString();
 
   const categoryOptions = useMemo(
-    () => categories.map((category) => ({ key: category.key, label: category.label })),
+    () =>
+      categories.map((category) => ({
+        key: category.key,
+        label: category.label,
+      })),
     [categories],
   );
-  const totalPages = Math.max(1, Math.ceil(pagination.totalCount / pagination.pageSize));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(pagination.totalCount / pagination.pageSize),
+  );
   const currentPage = Math.min(pagination.page, totalPages);
   const pageStart = (currentPage - 1) * pagination.pageSize;
   const isPageNavigationPending = isPending && requestedPage !== null;
@@ -80,6 +98,39 @@ export default function AdminPartnerManager({
     filters.visibility !== "all" ||
     filters.sort !== "recent";
 
+  const buildPageHref = useCallback(
+    (targetPage: number) => {
+      const next = new URLSearchParams(searchParamsValue);
+      if (targetPage <= 1) {
+        next.delete("page");
+      } else {
+        next.set("page", String(targetPage));
+      }
+      const query = next.toString();
+      return query ? `${pathname}?${query}` : pathname;
+    },
+    [pathname, searchParamsValue],
+  );
+
+  const prefetchPage = useCallback(
+    (targetPage: number) => {
+      const safePage = Math.min(Math.max(1, targetPage), totalPages);
+      if (safePage === currentPage) {
+        return;
+      }
+      router.prefetch(buildPageHref(safePage));
+    },
+    [buildPageHref, currentPage, router, totalPages],
+  );
+
+  useEffect(() => {
+    if (totalPages <= 1) {
+      return;
+    }
+    prefetchPage(currentPage - 1);
+    prefetchPage(currentPage + 1);
+  }, [currentPage, prefetchPage, totalPages]);
+
   const updateQuery = (
     updates: Record<string, string | number | null>,
     pendingPage: number | null = null,
@@ -93,13 +144,18 @@ export default function AdminPartnerManager({
       }
     });
     const query = next.toString();
+    setRequestedPage(pendingPage);
     startTransition(() => {
-      setRequestedPage(pendingPage);
-      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+      router.replace(query ? `${pathname}?${query}` : pathname, {
+        scroll: false,
+      });
     });
   };
 
-  const updateFilter = (key: "category" | "visibility" | "sort", value: string) => {
+  const updateFilter = (
+    key: "category" | "visibility" | "sort",
+    value: string,
+  ) => {
     setPageInputDraft({ sourcePage: pagination.page, value: "1" });
     updateQuery({ [key]: value, page: null });
   };
@@ -126,6 +182,7 @@ export default function AdminPartnerManager({
   const updatePage = (nextPage: number) => {
     const safePage = Math.min(Math.max(1, nextPage), totalPages);
     if (safePage === currentPage) return;
+    prefetchPage(safePage);
     setPageInputDraft({ sourcePage: pagination.page, value: String(safePage) });
     updateQuery({ page: safePage }, safePage);
   };
@@ -137,13 +194,16 @@ export default function AdminPartnerManager({
           title="제휴처 목록을 불러오지 못했습니다."
           description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 담당자에게 알려 주세요."
         />
-        <button
+        <Button
           type="button"
-          onClick={() => router.refresh()}
-          className="min-h-11 justify-self-center rounded-xl border border-border bg-surface-control px-4 text-sm font-semibold text-foreground"
+          variant="secondary"
+          loading={isPending}
+          loadingText="다시 불러오는 중"
+          onClick={() => startTransition(() => router.refresh())}
+          className="justify-self-center"
         >
           다시 확인
-        </button>
+        </Button>
       </Surface>
     );
   }
@@ -161,6 +221,7 @@ export default function AdminPartnerManager({
               <span className="ui-caption">검색</span>
               <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                 <Input
+                  aria-label="제휴처명 검색"
                   value={searchInputValue}
                   onChange={(event) => {
                     setSearchInputDraft({
@@ -175,7 +236,6 @@ export default function AdminPartnerManager({
                     }
                   }}
                   placeholder="제휴처명으로 검색"
-                  aria-label="제휴처명 검색"
                 />
                 <button
                   type="button"
@@ -203,7 +263,9 @@ export default function AdminPartnerManager({
               <Select
                 aria-label="제휴처 카테고리"
                 value={filters.categoryKey}
-                onChange={(event) => updateFilter("category", event.target.value)}
+                onChange={(event) =>
+                  updateFilter("category", event.target.value)
+                }
                 disabled={isPending}
               >
                 <option value="all">전체 카테고리</option>
@@ -220,7 +282,9 @@ export default function AdminPartnerManager({
               <Select
                 aria-label="제휴처 노출 상태"
                 value={filters.visibility}
-                onChange={(event) => updateFilter("visibility", event.target.value)}
+                onChange={(event) =>
+                  updateFilter("visibility", event.target.value)
+                }
                 disabled={isPending}
               >
                 <option value="all">전체 상태</option>
@@ -249,7 +313,10 @@ export default function AdminPartnerManager({
         </div>
       </FilterBar>
 
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground" aria-live="polite">
+      <div
+        className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground"
+        aria-live="polite"
+      >
         <p>
           조건에 맞는 제휴처 {pagination.totalCount.toLocaleString("ko-KR")}개
           {isPending ? " · 결과 갱신 중" : ""}
@@ -263,10 +330,19 @@ export default function AdminPartnerManager({
           description="검색어나 필터를 조정해 다시 확인해 주세요."
         />
       ) : (
-        <div className="grid min-w-0 gap-4" aria-busy={isPageNavigationPending || undefined}>
-          <Surface level="inset" padding="sm" className="flex min-w-0 flex-col gap-3 text-sm text-muted-foreground lg:flex-row lg:items-center lg:justify-between">
+        <div
+          className="grid min-w-0 gap-4"
+          aria-busy={isPageNavigationPending || undefined}
+        >
+          <Surface
+            level="inset"
+            padding="sm"
+            className="flex min-w-0 flex-col gap-3 text-sm text-muted-foreground lg:flex-row lg:items-center lg:justify-between"
+          >
             <p>
-              {pageStart + 1}-{Math.min(pageStart + partners.length, pagination.totalCount)} / {pagination.totalCount.toLocaleString("ko-KR")}
+              {pageStart + 1}-
+              {Math.min(pageStart + partners.length, pagination.totalCount)} /{" "}
+              {pagination.totalCount.toLocaleString("ko-KR")}
             </p>
             <div className="grid min-w-0 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end">
               <label className="flex min-h-11 items-center justify-between gap-2 whitespace-nowrap sm:justify-start">
@@ -274,14 +350,21 @@ export default function AdminPartnerManager({
                 <Select
                   value={String(pagination.pageSize)}
                   onChange={(event) => {
-                    const nextPageSize = Number(event.target.value) as AdminPartnerPageSize;
-                    setPageInputDraft({ sourcePage: pagination.page, value: "1" });
+                    const nextPageSize = Number(
+                      event.target.value,
+                    ) as AdminPartnerPageSize;
+                    setPageInputDraft({
+                      sourcePage: pagination.page,
+                      value: "1",
+                    });
                     updateQuery({ pageSize: nextPageSize, page: null });
                   }}
                   disabled={isPending}
                 >
                   {ADMIN_PARTNER_PAGE_SIZE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>{option}개</option>
+                    <option key={option} value={option}>
+                      {option}개
+                    </option>
                   ))}
                 </Select>
               </label>
@@ -294,7 +377,10 @@ export default function AdminPartnerManager({
                 >
                   이전
                 </button>
-                <span className="min-w-[5.5rem] text-center text-xs sm:text-sm" aria-live="polite">
+                <span
+                  className="min-w-[5.5rem] text-center text-xs sm:text-sm"
+                  aria-live="polite"
+                >
                   {isPageNavigationPending
                     ? `${displayedPage}페이지 불러오는 중`
                     : `${currentPage} / ${totalPages}`}
@@ -315,7 +401,12 @@ export default function AdminPartnerManager({
                   min={1}
                   max={totalPages}
                   value={pageInputValue}
-                  onChange={(event) => setPageInputDraft({ sourcePage: pagination.page, value: event.target.value })}
+                  onChange={(event) =>
+                    setPageInputDraft({
+                      sourcePage: pagination.page,
+                      value: event.target.value,
+                    })
+                  }
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       event.preventDefault();
@@ -343,10 +434,15 @@ export default function AdminPartnerManager({
               </div>
             </div>
             <p className="sr-only" aria-live="polite">
-              {isPageNavigationPending ? `${displayedPage}페이지 결과를 불러오는 중입니다.` : ""}
+              {isPageNavigationPending
+                ? `${displayedPage}페이지 결과를 불러오는 중입니다.`
+                : ""}
             </p>
           </Surface>
-          <AdminPartnerManagerList partners={partners} categories={categories} />
+          <AdminPartnerManagerList
+            partners={partners}
+            categories={categories}
+          />
         </div>
       )}
     </div>

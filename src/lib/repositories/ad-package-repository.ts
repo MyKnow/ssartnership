@@ -68,6 +68,12 @@ export type AdCampaignWithStats = AdCampaign & {
   metrics: AdPackageMetrics;
 };
 
+export type AdCampaignOption = {
+  id: string;
+  partnerId: string;
+  label: string;
+};
+
 export type AdCouponRedemption = {
   id: string;
   couponId: string;
@@ -186,6 +192,7 @@ export type RedeemAdCouponResult =
 
 export interface AdPackageRepository {
   listAdminCampaigns(options?: { now?: Date }): Promise<AdCampaignWithStats[]>;
+  listAdminCampaignOptions(): Promise<AdCampaignOption[]>;
   listAdminCouponsForPartner(partnerId: string): Promise<AdCoupon[]>;
   getAdminCouponById(couponId: string): Promise<AdCoupon | null>;
   listActiveCouponsForPartner(

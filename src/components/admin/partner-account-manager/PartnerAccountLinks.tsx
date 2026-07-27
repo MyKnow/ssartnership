@@ -2,6 +2,7 @@ import Badge from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
 import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
+import Surface from "@/components/ui/Surface";
 import type { AdminFormAction } from "@/components/admin/admin-form-actions";
 import FieldGroup from "@/components/admin/partner-account-manager/FieldGroup";
 import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
@@ -16,18 +17,68 @@ export default function PartnerAccountLinks({
   account,
   companies,
   updateConnectionAction,
+  canUpdate = false,
 }: {
   account: AdminPartnerAccount;
   companies: AdminCompany[];
   updateConnectionAction: AdminFormAction;
+  canUpdate?: boolean;
 }) {
   const connectionFormId = `partner-account-company-connection-${account.id}`;
+
+  if (!canUpdate) {
+    return (
+      <Surface level="inset" className="grid gap-4 p-4">
+        <div>
+          <h4 className="text-sm font-semibold text-foreground">
+            파트너사 연결
+          </h4>
+          <p className="mt-1 text-xs text-muted-foreground">
+            연결된 파트너사와 현재 상태를 확인합니다.
+          </p>
+        </div>
+        {account.links.length === 0 ? (
+          <EmptyState
+            title="연결된 파트너사가 없습니다."
+            description="현재 계정에는 연결된 파트너사가 없습니다."
+          />
+        ) : (
+          <div className="grid gap-3">
+            {account.links.map((link) => (
+              <div
+                key={link.id}
+                className="rounded-2xl border border-border/70 bg-surface-muted/70 p-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-foreground">
+                      {link.company?.name ?? "파트너사 정보 없음"}
+                    </p>
+                    <p className="mt-1 break-all text-xs text-muted-foreground">
+                      {link.company?.slug ?? link.company?.id ?? link.id}
+                    </p>
+                  </div>
+                  <Badge
+                    variant={link.is_active !== false ? "success" : "danger"}
+                  >
+                    {link.is_active !== false ? "활성" : "비활성"}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Surface>
+    );
+  }
 
   return (
     <div className="rounded-2xl border border-border/70 bg-surface-inset/80 p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h4 className="text-sm font-semibold text-foreground">파트너사 연결</h4>
+          <h4 className="text-sm font-semibold text-foreground">
+            파트너사 연결
+          </h4>
           <p className="mt-1 text-xs text-muted-foreground">
             연결된 파트너사마다 활성 상태를 조정할 수 있습니다.
           </p>
@@ -41,7 +92,12 @@ export default function PartnerAccountLinks({
       >
         <input type="hidden" name="accountId" value={account.id} />
         <FieldGroup label="파트너사 선택">
-          <Select name="companyId" defaultValue="" required disabled={companies.length === 0}>
+          <Select
+            name="companyId"
+            defaultValue=""
+            required
+            disabled={companies.length === 0}
+          >
             <option value="" disabled>
               파트너사를 선택해 주세요
             </option>
@@ -115,7 +171,9 @@ export default function PartnerAccountLinks({
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant={link.is_active !== false ? "success" : "danger"}>
+                  <Badge
+                    variant={link.is_active !== false ? "success" : "danger"}
+                  >
                     {link.is_active !== false ? "활성" : "비활성"}
                   </Badge>
                 </div>
@@ -127,7 +185,11 @@ export default function PartnerAccountLinks({
                 className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]"
               >
                 <input type="hidden" name="accountId" value={account.id} />
-                <input type="hidden" name="companyId" value={link.company?.id ?? ""} />
+                <input
+                  type="hidden"
+                  name="companyId"
+                  value={link.company?.id ?? ""}
+                />
                 <FieldGroup label="연결 상태">
                   <div className="flex items-center gap-3 text-sm font-medium text-foreground">
                     <input type="hidden" name="isActive" value="false" />

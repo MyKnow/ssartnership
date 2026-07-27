@@ -17,6 +17,7 @@ import {
 } from "@/lib/coupon-verification-password";
 import type {
   AdCampaign,
+  AdCampaignOption,
   AdCampaignWithStats,
   AdCoupon,
   AdCouponRedemption,
@@ -234,6 +235,14 @@ export class MockAdPackageRepository implements AdPackageRepository {
     this.couponCodes = new Map();
     this.couponPasswords = new Map();
     this.events = [];
+  }
+
+  async listAdminCampaignOptions(): Promise<AdCampaignOption[]> {
+    return this.campaigns.map((campaign) => ({
+      id: campaign.id,
+      partnerId: campaign.partnerId,
+      label: `${campaign.sponsorLabel || campaign.partnerName} · ${campaign.title}`,
+    }));
   }
 
   async listAdminCampaigns(options?: { now?: Date }): Promise<AdCampaignWithStats[]> {

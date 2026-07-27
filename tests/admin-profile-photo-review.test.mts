@@ -36,7 +36,8 @@ test("공통 프로필 사진 검토는 수료생 인증과 별도 권한 및 �
   ]);
 
   assert.match(pageSource, /requireAdminPermission\("profile_images", "read"/);
-  assert.match(pageSource, /getAdminProfilePhotoQueueReadModel/);
+  assert.match(pageSource, /getAdminProfilePhotoReplacementQueueReadModel/);
+  assert.match(pageSource, /currentPhotosPromise/);
   assert.match(readModelSource, /graduate_verification_request_id", null/);
   assert.match(actionSource, /requireAdminPermission\("profile_images", "update"/);
   assert.match(actionSource, /rejectMemberActiveProfilePhoto/);

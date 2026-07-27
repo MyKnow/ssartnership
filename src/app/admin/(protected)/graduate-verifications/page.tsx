@@ -1,8 +1,12 @@
+import { Suspense } from "react";
 import AdminGraduateVerificationQueue from "@/components/admin/AdminGraduateVerificationQueue";
 import AdminShell from "@/components/admin/AdminShell";
+import { AdminGraduateVerificationsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { canAdmin } from "@/lib/admin-permissions";
 import {
-  getAdminGraduateVerificationQueueReadModel,
+  getAdminGraduateSetupEmailRetryQueueReadModel,
+  getAdminGraduateVerificationRequestQueueReadModel,
   type AdminGraduateQueuePagination,
 } from "@/lib/admin-graduate-verification-queue.server";
 import { parseAdminReviewQueuePagination } from "@/lib/admin-ia";
@@ -51,47 +55,40 @@ function getTotalPages(pagination: AdminGraduateQueuePagination) {
   return Math.max(1, Math.ceil(pagination.totalCount / pagination.pageSize));
 }
 
-export default async function AdminGraduateVerificationsPage({
-  searchParams,
+async function AdminGraduateVerificationsContent({
+  session,
+  params,
 }: {
-  searchParams?: Promise<GraduateVerificationSearchParams>;
+  session: Awaited<ReturnType<typeof requireAdminPermission>>;
+  params: GraduateVerificationSearchParams;
 }) {
-  await requireAdminPermission("graduate_verifications", "read", {
-    path: "/admin/graduate-verifications",
-  });
-  const params = (await searchParams) ?? {};
   const requestPagination = parseAdminReviewQueuePagination({
     page: getOneSearchParam(params.requestPage),
   });
   const setupEmailRetryPagination = parseAdminReviewQueuePagination({
     page: getOneSearchParam(params.setupEmailRetryPage),
   });
-  const queue = await getAdminGraduateVerificationQueueReadModel({
-    requestPage: requestPagination.page,
-    requestPageSize: requestPagination.pageSize,
-    setupEmailRetryPage: setupEmailRetryPagination.page,
-    setupEmailRetryPageSize: setupEmailRetryPagination.pageSize,
-  });
-  const { queueLoadError } = queue;
-  const resolvedRequestPagination = queue.requestPagination;
-  const resolvedSetupEmailRetryPagination = queue.setupEmailRetryPagination;
-  const requestTotalPages = getTotalPages(resolvedRequestPagination);
-  const setupEmailRetryTotalPages = getTotalPages(
-    resolvedSetupEmailRetryPagination,
+  const requestQueuePromise = getAdminGraduateVerificationRequestQueueReadModel(
+    {
+      requestPage: requestPagination.page,
+      requestPageSize: requestPagination.pageSize,
+    },
   );
+  const setupEmailRetryQueuePromise =
+    getAdminGraduateSetupEmailRetryQueueReadModel({
+      setupEmailRetryPage: setupEmailRetryPagination.page,
+      setupEmailRetryPageSize: setupEmailRetryPagination.pageSize,
+    });
+  const requestQueue = await requestQueuePromise;
+  const { queueLoadError } = requestQueue;
+  const resolvedRequestPagination = requestQueue.requestPagination;
+  const requestTotalPages = getTotalPages(resolvedRequestPagination);
 
-  if (
-    !queueLoadError &&
-    (requestPagination.page > requestTotalPages ||
-      setupEmailRetryPagination.page > setupEmailRetryTotalPages)
-  ) {
+  if (!queueLoadError && requestPagination.page > requestTotalPages) {
     redirect(
       buildGraduateQueueHref({
         requestPage: Math.min(requestPagination.page, requestTotalPages),
-        setupEmailRetryPage: Math.min(
-          setupEmailRetryPagination.page,
-          setupEmailRetryTotalPages,
-        ),
+        setupEmailRetryPage: setupEmailRetryPagination.page,
       }),
     );
   }
@@ -102,10 +99,9 @@ export default async function AdminGraduateVerificationsPage({
   });
 
   return (
-    <AdminShell title="수료생 인증">
-      <AdminGraduateVerificationQueue
-        requests={queue.requests}
-        setupEmailRetries={queue.setupEmailRetries}
+    <AdminGraduateVerificationQueue
+        requests={requestQueue.requests}
+        setupEmailRetryQueue={setupEmailRetryQueuePromise}
         actions={{
           startReview: startGraduateVerificationReviewAction,
           requestResubmission: requestGraduateVerificationResubmissionAction,
@@ -119,9 +115,35 @@ export default async function AdminGraduateVerificationsPage({
         })}
         returnTo={returnTo}
         requestPagination={resolvedRequestPagination}
-        setupEmailRetryPagination={resolvedSetupEmailRetryPagination}
         loadError={queueLoadError}
-      />
+        canUpdate={canAdmin(
+          session.account.permissions,
+          "graduate_verifications",
+          "update",
+        )}
+    />
+  );
+}
+
+export default async function AdminGraduateVerificationsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<GraduateVerificationSearchParams>;
+}) {
+  const session = await requireAdminPermission(
+    "graduate_verifications",
+    "read",
+    {
+      path: "/admin/graduate-verifications",
+    },
+  );
+  const params = (await searchParams) ?? {};
+
+  return (
+    <AdminShell title="수료생 인증">
+      <Suspense fallback={<AdminGraduateVerificationsSkeletonContent />}>
+        <AdminGraduateVerificationsContent session={session} params={params} />
+      </Suspense>
     </AdminShell>
   );
 }

@@ -47,17 +47,17 @@
 
 | 그룹 | canonical 화면 | 목적 |
 | --- | --- | --- |
-| 홈 | `/admin` | 오늘의 운영 상태와 다음 작업으로 이동 |
-| 작업함 | `/admin/tasks` | 권한 내 검토·승인·운영 큐를 한 곳에서 찾아 연다 |
-| 데이터 | 회원, 리뷰, 제휴처, 카테고리, 파트너사/계정 | 사람·제휴처·분류 데이터를 탐색하고 관리 |
-| 리포트 | `/admin/logs` | 제품·감사·보안 기록과 운영 지표를 탐색 |
-| 자동화 | 발송 관리, 알림 템플릿, 홈 광고, 이벤트 | 메시지·노출·반복 운영을 관리 |
-| 설정 | 기수 관리, 관리자 관리 | 전역 운영 기준과 관리자 권한 관리 |
+| 홈 | `/admin` | 오늘의 운영 상태와 가장 중요한 다음 작업으로 이동 |
+| 작업함 | `/admin/tasks`, 가입 승인, 수료생 인증, 프로필 사진, 등록·변경 요청, 리뷰, 내 알림 | 처리할 대기 항목을 우선순위와 복구 맥락으로 처리 |
+| 데이터 | 회원, 제휴처, 카테고리, 파트너사/계정 | 운영 대상과 기준 데이터를 찾고 관리 |
+| 리포트 | 운영 로그 | 제품·감사·보안 기록과 성능 지표를 탐색 |
+| 자동화 | 발송 관리, 알림 템플릿, 홈 광고, 이벤트 | 반복 발송과 공개 노출을 설정·운영 |
+| 설정 | 기수 관리, 관리자 관리 | 전역 운영 기준과 관리자 권한을 관리 |
 
 ### Shell 계약
 
 - 데스크톱은 `AdminShell`의 고정 좌측 navigation과 상단 utility bar를 사용한다. 중간 폭에서는 아이콘 rail, 넓은 화면에서는 그룹명·라벨·설명이 있는 확장 rail을 사용한다.
-- 모바일은 고정 헤더의 빠른 찾기·테마 전환, 하단의 `홈·작업함·데이터·더보기` 탐색, 권한 기반 drawer navigation을 함께 사용한다. 현재 화면의 title과 back context는 drawer에서 확인할 수 있어야 한다. 하단 탐색은 최소 44px touch target과 safe area를 보장하며, scroll-to-top 같은 floating action은 그 위에 배치한다.
+- 모바일은 고정 헤더의 빠른 찾기·테마 전환, 하단의 `홈·작업함·회원·더보기` 탐색, 권한 기반 drawer navigation을 함께 사용한다. 현재 화면의 title과 back context는 drawer에서 확인할 수 있어야 한다. 하단 탐색은 최소 44px touch target과 safe area를 보장하며, scroll-to-top 같은 floating action은 그 위에 배치한다.
 - desktop과 mobile 헤더는 `빠른 찾기`를 제공한다. `⌘K` 또는 `Ctrl+K`로 권한 내 navigation label·설명을 검색하고, 선택하면 그 목적지로 이동한다. dialog는 focus trap, Escape, overlay close, opener focus return, 기존 body overflow 복원을 보장한다.
 - shell은 위치·권한 내비게이션·전역 utility만 담당한다. 각 page는 의미상 `h1` 하나, 사용자 과업을 수행하는 primary CTA 하나를 가진 `PageHeader`를 렌더한다. shell title을 페이지 `h1`으로 반복하지 않는다.
 - breadcrumb는 `관리 홈 → 현재 영역`까지만 표시한다. 상세 편집 화면은 목록 query를 보존하는 `목록으로` 보조 이동을 제공한다.
@@ -161,7 +161,7 @@ generic UI 자기점검과 제거할 장식:
 | `/admin/reviews` | reviews read/update/delete, campus scope | 신고·검토 우선 리뷰의 공개 상태를 조정 | 검색·상태·rating·company/partner filter, 이미지 실패, hidden/deleted 이력. 이미지 URL과 회원 정보 최소 노출. |
 | `/admin/logs` | logs read, export 별도 capability | preset과 query로 제품·감사·보안 로그를 탐색·내보내기 | 제한된 기본 기간, cursor pagination, 결과 유지, source partial failure, export pending. 조회·export를 audit하고 민감 payload redaction 유지. |
 
-### 제휴 운영
+### 데이터
 
 | route | 권한·범위 | 사용자 과업과 primary action | 필수 상태·수용 기준 |
 | --- | --- | --- | --- |
@@ -173,7 +173,7 @@ generic UI 자기점검과 제거할 장식:
 | `/admin/categories` | global brands 관리 | 카테고리 생성·이름·순서를 관리하고 삭제 영향을 판단 | 지역 관리자에게 숨김. 현재는 삭제를 잠그고 연결 수·차단 이유를 보여줌. `/admin/partners?tab=categories`는 canonical redirect. |
 | `/admin/companies` | companies read/update, campus scope | 파트너사·담당 계정·플랜·증빙을 관리 | 회사와 제휴처 용어 구분. 결제 대기/미납, setup token one-time display, 부분 실패, audit. |
 
-### 메시지·노출·이벤트
+### 자동화·이벤트
 
 | route | 권한·범위 | 사용자 과업과 primary action | 필수 상태·수용 기준 |
 | --- | --- | --- | --- |

@@ -1,8 +1,9 @@
 import AdminShell from "@/components/admin/AdminShell";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import AdminMemberManualAddPanel from "@/components/admin/AdminMemberManualAddPanel";
 import AdminMemberManager from "@/components/admin/AdminMemberManager";
-import AdminMemberTrendChart from "@/components/admin/AdminMemberTrendChart";
+import AdminMemberTrendSection from "@/components/admin/AdminMemberTrendSection";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import Card from "@/components/ui/Card";
@@ -10,6 +11,9 @@ import FormMessage from "@/components/ui/FormMessage";
 import InlineMessage from "@/components/ui/InlineMessage";
 import StatsRow from "@/components/ui/StatsRow";
 import SubmitButton from "@/components/ui/SubmitButton";
+import Skeleton from "@/components/ui/Skeleton";
+import Surface from "@/components/ui/Surface";
+import { AdminMembersSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import {
   backfillMemberProfiles,
   disableGenerationMattermostLogin,
@@ -17,7 +21,6 @@ import {
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
 import {
-  ADMIN_MEMBER_TREND_SAMPLE_LIMIT,
   getAdminMemberListReadModel,
   getAdminMemberSearchParam,
   parseAdminMemberListFilters,
@@ -32,7 +35,11 @@ import {
   MAX_MEMBER_SYNC_BATCH_SIZE,
   parseMemberSyncBatchOptions,
 } from "@/lib/mm-member-sync";
-import { getConfiguredCurrentSsafyYear } from "@/lib/ssafy-cycle-settings";
+import {
+  getConfiguredCurrentSsafyYear,
+  getSsafyCycleSettings,
+  normalizeSsafyCycleSettings,
+} from "@/lib/ssafy-cycle-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -53,15 +60,72 @@ function formatAdminMemberSummaryDate(value?: string | null) {
   return formatKoreanDateTimeToMinute(parsed);
 }
 
-export default async function AdminMembersPage({
-  searchParams,
+function AdminMemberTrendFallback() {
+  return (
+    <Surface
+      level="elevated"
+      padding="lg"
+      aria-busy="true"
+      aria-label="회원 유입 추이를 불러오는 중"
+      className="grid gap-3"
+    >
+      <Skeleton className="h-5 w-32" />
+      <Skeleton className="h-4 w-full max-w-xl" />
+      <Skeleton className="h-48 w-full" />
+    </Surface>
+  );
+}
+
+function AdminMemberManualAddFallback() {
+  return (
+    <section className="grid min-w-0 gap-4">
+      <AdminSectionHeading
+        title="수동 추가"
+        description="행을 직접 추가하거나 XLSX로 입력 행을 만든 뒤, 사진 ZIP 검증과 계정 초대를 진행합니다."
+      />
+      <Card tone="elevated" aria-busy="true" aria-label="수동 추가 기능을 불러오는 중">
+        <div className="grid gap-3">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-4 w-full max-w-xl" />
+          <Skeleton className="h-11 w-full max-w-sm" />
+        </div>
+      </Card>
+    </section>
+  );
+}
+
+async function AdminMemberManualAddSection({
+  canReissueManualSetup,
 }: {
-  searchParams?: Promise<AdminMemberSearchParams>;
+  canReissueManualSetup: boolean;
 }) {
-  const adminSession = await requireAdminPermission("members", "read", {
-    path: "/admin/members",
-  });
-  const params = (await searchParams) ?? {};
+  const cycleSettings = await getSsafyCycleSettings().catch(() =>
+    normalizeSsafyCycleSettings(),
+  );
+
+  return (
+    <section className="grid min-w-0 gap-4">
+      <AdminSectionHeading
+        title="수동 추가"
+        description="행을 직접 추가하거나 XLSX로 입력 행을 만든 뒤, 사진 ZIP 검증과 계정 초대를 진행합니다."
+      />
+      <Card tone="elevated">
+        <AdminMemberManualAddPanel
+          currentGeneration={getConfiguredCurrentSsafyYear(cycleSettings)}
+          canReissueManualSetup={canReissueManualSetup}
+        />
+      </Card>
+    </section>
+  );
+}
+
+async function AdminMembersContent({
+  adminSession,
+  params,
+}: {
+  adminSession: Awaited<ReturnType<typeof requireAdminPermission>>;
+  params: AdminMemberSearchParams;
+}) {
   const memberError = params.error ? adminMembersErrorMessages[params.error] : null;
   const hasMoreBackfill =
     getAdminMemberSearchParam(params, "hasMore") === "1"
@@ -89,13 +153,11 @@ export default async function AdminMembersPage({
     totalCount,
     shouldRedirectToLastPage,
     totalPages,
-    memberTrendCreatedAts,
-    isMemberTrendSampled,
+    memberTrend,
     options,
     mustChangePasswordCount,
     pendingPolicyCount,
     latestUpdatedAt,
-    cycleSettings,
     hasMemberLoadError,
   } = await getAdminMemberListReadModel({
     filters,
@@ -114,12 +176,7 @@ export default async function AdminMembersPage({
   }
 
   return (
-    <AdminShell
-      title="회원 관리"
-      backHref="/admin"
-      backLabel="관리 홈"
-    >
-      <div className="grid gap-6">
+    <div className="grid gap-6">
         <AdminPageHeader
           eyebrow="회원"
           title="회원 계정 관리"
@@ -134,14 +191,9 @@ export default async function AdminMembersPage({
           ]}
           minItemWidth="13rem"
         />
-        <AdminMemberTrendChart createdAts={memberTrendCreatedAts} />
-        {isMemberTrendSampled ? (
-          <InlineMessage
-            tone="warning"
-            title="회원 유입 추이는 최근 샘플 기준입니다."
-            description={`성능 보호를 위해 현재 필터의 최근 ${ADMIN_MEMBER_TREND_SAMPLE_LIMIT.toLocaleString("ko-KR")}명 생성 이력만 차트에 반영합니다.`}
-          />
-        ) : null}
+        <Suspense fallback={<AdminMemberTrendFallback />}>
+          <AdminMemberTrendSection trend={memberTrend} />
+        </Suspense>
         {hasMemberLoadError ? (
           <InlineMessage
             tone="danger"
@@ -288,18 +340,9 @@ export default async function AdminMembersPage({
           </section>
         ) : null}
 
-        <section className="grid min-w-0 gap-4">
-          <AdminSectionHeading
-            title="수동 추가"
-            description="행을 직접 추가하거나 XLSX로 입력 행을 만든 뒤, 사진 ZIP 검증과 계정 초대를 진행합니다."
-          />
-          <Card tone="elevated">
-            <AdminMemberManualAddPanel
-              currentGeneration={getConfiguredCurrentSsafyYear(cycleSettings)}
-              canReissueManualSetup={canAdmin(adminSession.account.permissions, "members", "update")}
-            />
-          </Card>
-        </section>
+        <Suspense fallback={<AdminMemberManualAddFallback />}>
+          <AdminMemberManualAddSection canReissueManualSetup={canUpdateMembers} />
+        </Suspense>
 
         <Card tone="elevated">
           <AdminSectionHeading
@@ -311,7 +354,25 @@ export default async function AdminMembersPage({
             <p>인증 카드 색상과 목업은 기수 관리 화면에서 확인합니다.</p>
           </div>
         </Card>
-      </div>
+    </div>
+  );
+}
+
+export default async function AdminMembersPage({
+  searchParams,
+}: {
+  searchParams?: Promise<AdminMemberSearchParams>;
+}) {
+  const adminSession = await requireAdminPermission("members", "read", {
+    path: "/admin/members",
+  });
+  const params = (await searchParams) ?? {};
+
+  return (
+    <AdminShell title="회원 관리" backHref="/admin" backLabel="관리 홈">
+      <Suspense fallback={<AdminMembersSkeletonContent />}>
+        <AdminMembersContent adminSession={adminSession} params={params} />
+      </Suspense>
     </AdminShell>
   );
 }

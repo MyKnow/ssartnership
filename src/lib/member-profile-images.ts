@@ -322,6 +322,67 @@ export async function getMemberProfilePhotoStates(memberIds: readonly string[]) 
   return states;
 }
 
+/**
+ * The member list only needs to know whether the latest reviewable image is
+ * active. Keep the pending/rejected rows needed for that decision, but avoid
+ * loading storage paths and other payload that the list never renders.
+ */
+export async function getCurrentMemberProfileImageMemberIds(
+  memberIds: readonly string[],
+) {
+  const uniqueMemberIds = [...new Set(memberIds.filter(Boolean))];
+  if (uniqueMemberIds.length === 0) {
+    return new Set<string>();
+  }
+
+  if (isMockDataSource()) {
+    return new Set(
+      uniqueMemberIds.filter((memberId) => Boolean(getMockMemberById(memberId))),
+    );
+  }
+
+  const { data, error } = await getSupabaseAdminClient()
+    .from("member_profile_images")
+    .select("id,member_id,status,updated_at,created_at")
+    .in("member_id", uniqueMemberIds)
+    .in("status", [...REVIEWABLE_IMAGE_STATUSES])
+    .is("deleted_at", null);
+  if (error) {
+    throw new Error("프로필 사진 상태를 불러오지 못했습니다.");
+  }
+
+  const imagesByMemberId = new Map<string, MemberProfilePhotoStateImage[]>();
+  for (const row of (data ?? []) as Array<{
+    id: string;
+    member_id: string | null;
+    status: MemberProfileImageStatus;
+    updated_at: string | null;
+    created_at: string | null;
+  }>) {
+    if (!row.member_id) {
+      continue;
+    }
+    const images = imagesByMemberId.get(row.member_id) ?? [];
+    images.push({
+      id: row.id,
+      status: row.status,
+      storagePath: null,
+      updatedAt: row.updated_at,
+      createdAt: row.created_at,
+    });
+    imagesByMemberId.set(row.member_id, images);
+  }
+
+  return new Set(
+    uniqueMemberIds.filter((memberId) => {
+      const state = resolveMemberProfilePhotoState(
+        imagesByMemberId.get(memberId) ?? [],
+      );
+      return state.reviewStatus === "approved" && Boolean(state.activeProfileImageId);
+    }),
+  );
+}
+
 export async function getMemberProfilePhotoState(memberId: string) {
   const states = await getMemberProfilePhotoStates([memberId]);
   return states.get(memberId) ?? { ...DEFAULT_MEMBER_PROFILE_PHOTO_STATE };

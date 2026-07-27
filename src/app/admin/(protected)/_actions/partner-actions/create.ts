@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getSafeAdminActionErrorCode } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
 import {
   assertAdminCanAccessManagedCampuses,
@@ -481,8 +482,7 @@ export async function createPartnerFormActionImpl(
   } catch (error) {
     return {
       status: "error",
-      errorCode:
-        error instanceof Error ? error.message : "partner_form_invalid_request",
+      errorCode: getSafeAdminActionErrorCode(error, "partner_form_invalid_request"),
     };
   }
 

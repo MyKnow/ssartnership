@@ -92,3 +92,49 @@ test("PII 권한이 없는 페이지 응답은 목록과 상위 식별자 집계
   assert.deepEqual(masked.summary.topIps, []);
   assert.deepEqual(masked.summary.topPaths, []);
 });
+
+test("PII 권한이 있는 페이지도 로그 상세 속성은 펼칠 때 조회하도록 목록에서 제거한다", () => {
+  const pageData = {
+    access: { readGroups: ["security"], exportGroups: ["security"], includePii: true },
+    range: { preset: "24h", start: rawRow.createdAt, end: rawRow.createdAt, label: "24시간", bucketLabel: "2시간", durationMs: 1 },
+    counts: { product: 0, audit: 0, security: 1 },
+    truncated: { product: false, audit: false, security: false, any: false, limitPerGroup: null },
+    partialFailure: { product: false, audit: false, security: false, any: false },
+    chartBuckets: [],
+    filters: { availableNames: [], actorOptions: ["member"] },
+    summary: {
+      topProductEvents: [],
+      topAuditActions: [],
+      topActors: [],
+      topIps: [],
+      topPaths: [],
+      securityStatusCounts: { success: 1, failure: 0, blocked: 0 },
+    },
+    list: {
+      productLogs: [],
+      auditLogs: [],
+      securityLogs: [{
+        id: "security-1",
+        event_name: "member_login",
+        status: "success",
+        actor_type: "member",
+        actor_id: rawRow.actorId,
+        actor_name: rawRow.actorName,
+        actor_mm_username: rawRow.actorMmUsername,
+        identifier: rawRow.identifier,
+        path: rawRow.path,
+        properties: rawRow.properties,
+        ip_address: rawRow.ipAddress,
+        created_at: rawRow.createdAt,
+        partner_name: null,
+      }],
+      total: 1,
+      page: 1,
+      pageSize: 50,
+    },
+  } satisfies AdminLogsPageData;
+
+  const sanitized = applyAdminLogsPrivacy(pageData);
+  assert.equal(sanitized.list.securityLogs[0]?.properties, null);
+  assert.equal(sanitized.list.securityLogs[0]?.ip_address, rawRow.ipAddress);
+});

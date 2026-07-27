@@ -7,11 +7,13 @@ const templates: ResolvedNotificationTemplate[] = [
   {
     eventKey: "email.graduate_rejection",
     label: "수료생 인증 반려",
-    description: "관리자가 수료생 인증 신청을 반려했을 때 전송하는 이메일입니다.",
+    description:
+      "관리자가 수료생 인증 신청을 반려했을 때 전송하는 이메일입니다.",
     group: "회원·수료생 이메일",
     channel: "email",
     titleTemplate: "[{siteName}] 수료생 인증 신청 반려",
-    bodyTemplate: "{displayName}님, 신청이 반려되었습니다.\n반려 사유: {reason}\n{applicationUrl}",
+    bodyTemplate:
+      "{displayName}님, 신청이 반려되었습니다.\n반려 사유: {reason}\n{applicationUrl}",
     bodyFormat: "markdown",
     variables: [
       { name: "siteName", label: "서비스 이름" },
@@ -119,10 +121,18 @@ export const Default: Story = {};
 export const VariableInsertion: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByText("수료생 인증 반려", { exact: true }));
+    await userEvent.click(
+      canvas.getByText("수료생 인증 반려", { exact: true }),
+    );
     const reasonLabel = canvas.getByText("반려 사유", { exact: true });
-    await userEvent.click(reasonLabel.parentElement?.querySelector("button:last-child") as HTMLButtonElement);
-    const body = canvas.getAllByLabelText("내용 템플릿")[0] as HTMLTextAreaElement;
+    await userEvent.click(
+      reasonLabel.parentElement?.querySelector(
+        "button:last-child",
+      ) as HTMLButtonElement,
+    );
+    const body = canvas.getAllByLabelText(
+      "내용 템플릿",
+    )[0] as HTMLTextAreaElement;
     expect(body.value).toContain("{reason}");
   },
 };
@@ -134,7 +144,9 @@ export const FilterAndSearch: Story = {
 
     await userEvent.type(search, "반려");
     expect(canvas.getByText("수료생 인증 반려")).toBeInTheDocument();
-    expect(canvas.queryByText("Mattermost 회원가입 인증 코드")).not.toBeInTheDocument();
+    expect(
+      canvas.queryByText("Mattermost 회원가입 인증 코드"),
+    ).not.toBeInTheDocument();
 
     await userEvent.clear(search);
     const channel = canvas.getByRole("combobox", { name: "채널 필터" });
@@ -145,7 +157,35 @@ export const FilterAndSearch: Story = {
     await userEvent.selectOptions(channel, "all");
     const status = canvas.getByRole("combobox", { name: "상태 필터" });
     await userEvent.selectOptions(status, "customized");
-    expect(canvas.getByText("Mattermost 회원가입 인증 코드")).toBeInTheDocument();
+    expect(
+      canvas.getByText("Mattermost 회원가입 인증 코드"),
+    ).toBeInTheDocument();
     expect(canvas.queryByText("수료생 인증 반려")).not.toBeInTheDocument();
+  },
+};
+
+export const ReadOnly: Story = {
+  args: {
+    canUpdate: false,
+    canDelete: false,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(
+      canvas.queryByRole("button", { name: "저장" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "기본값 복원" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "테스트 발송" }),
+    ).not.toBeInTheDocument();
+    await expect(canvas.getAllByText("조회 전용 권한").length).toBeGreaterThan(
+      0,
+    );
+    await expect(
+      canvas.getByText("테스트 발송 권한이 없습니다.", { exact: true }),
+    ).toBeInTheDocument();
   },
 };

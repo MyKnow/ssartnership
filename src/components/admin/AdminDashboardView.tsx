@@ -31,6 +31,7 @@ import {
   getNextAdminTaskItem,
   prioritizeAdminTaskItems,
 } from "@/lib/admin-task-inbox";
+import { getAdminRouteDescriptor } from "@/lib/admin-performance";
 
 export type AdminDashboardQueueCounts = AdminDashboardHomeQueueCounts;
 
@@ -83,7 +84,7 @@ export default function AdminDashboardView({
   counts: AdminDashboardCounts;
   queueCounts: AdminDashboardQueueCounts;
   permissions: AdminPermissionMatrix;
-  cycleMeta: string;
+  cycleMeta: ReactNode;
   includeGlobalTasks?: boolean;
   platformActivityMetrics?: AdminPlatformActivityMetrics | null;
   platformActivityErrorMessage?: string | null;
@@ -100,7 +101,7 @@ export default function AdminDashboardView({
     return (
       <div className="grid min-w-0 gap-6" aria-busy={state === "loading" || undefined}>
         <AdminPageHeader
-          eyebrow="운영"
+          eyebrow="홈"
           title="관리 홈"
           description="처리가 필요한 항목부터 확인하고 자주 쓰는 운영 화면으로 이동합니다."
         />
@@ -313,7 +314,7 @@ export default function AdminDashboardView({
   return (
     <div className="grid min-w-0 gap-6">
       <AdminPageHeader
-        eyebrow="운영"
+        eyebrow="홈"
         title="관리 홈"
         description="처리가 필요한 항목부터 확인하고 자주 쓰는 운영 화면으로 이동합니다."
         actions={
@@ -343,10 +344,20 @@ export default function AdminDashboardView({
               title="처리 필요"
               description="대기 중인 운영 작업을 오래된 항목부터 확인하세요."
             />
-            <Badge variant={totalPendingCount > 0 ? "warning" : "success"}>
-              {totalPendingCount > 0
-                ? `${totalPendingCount.toLocaleString("ko-KR")}건 대기`
-                : "대기 없음"}
+            <Badge
+              variant={
+                isDataUnavailable
+                  ? "warning"
+                  : totalPendingCount > 0
+                    ? "warning"
+                    : "success"
+              }
+            >
+              {isDataUnavailable
+                ? "확인 필요"
+                : totalPendingCount > 0
+                  ? `${totalPendingCount.toLocaleString("ko-KR")}건 대기`
+                  : "대기 없음"}
             </Badge>
           </div>
           {queueItems.length === 0 ? (
@@ -359,6 +370,11 @@ export default function AdminDashboardView({
               {nextQueueItem ? (
                 <Link
                   href={nextQueueItem.href}
+                  prefetch={false}
+                  data-admin-task-key={
+                    getAdminRouteDescriptor(nextQueueItem.href)?.key
+                  }
+                  data-admin-task-source="home"
                   className="grid min-w-0 gap-3 rounded-2xl border border-primary/35 bg-primary-soft/70 p-4 transition-colors hover:border-primary/60 hover:bg-primary-soft sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
                 >
                   <div className="min-w-0">
@@ -379,6 +395,9 @@ export default function AdminDashboardView({
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={false}
+                  data-admin-task-key={getAdminRouteDescriptor(item.href)?.key}
+                  data-admin-task-source="home"
                   className="grid min-w-0 gap-3 rounded-2xl border border-border/80 bg-surface-inset p-4 transition-colors hover:border-strong hover:bg-surface-control sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
                 >
                   <div className="min-w-0">
@@ -390,7 +409,9 @@ export default function AdminDashboardView({
                     </p>
                   </div>
                   <span className="text-xl font-semibold tracking-[-0.03em] text-foreground">
-                    {item.count.toLocaleString("ko-KR")}건
+                    {isDataUnavailable
+                      ? "확인 필요"
+                      : `${item.count.toLocaleString("ko-KR")}건`}
                   </span>
                 </Link>
               ))}
@@ -410,6 +431,7 @@ export default function AdminDashboardView({
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={false}
                   className="flex min-w-0 items-center gap-3 rounded-2xl border border-border/70 bg-surface-inset p-3 transition-colors hover:border-strong hover:bg-surface-control"
                 >
                   <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-muted text-foreground">
@@ -424,7 +446,7 @@ export default function AdminDashboardView({
                     </span>
                   </span>
                   <span className="shrink-0 text-xs font-semibold text-muted-foreground">
-                    {item.meta}
+                    {isDataUnavailable ? "확인 필요" : item.meta}
                   </span>
                 </Link>
               );
@@ -443,7 +465,7 @@ export default function AdminDashboardView({
             <Surface key={item.label} level="inset" padding="md" className="min-w-0">
               <p className="ui-kicker">{item.label}</p>
               <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-foreground">
-                {item.value}
+                {isDataUnavailable ? "확인 필요" : item.value}
               </p>
               <p className="mt-1 truncate text-sm text-muted-foreground">
                 {item.description}
@@ -457,8 +479,8 @@ export default function AdminDashboardView({
             현재 기수 <span className="font-semibold text-foreground">{cycleMeta}</span>
             {includeGlobalTasks ? (
               <>
-                {" · "}파트너사 {counts.companyCount.toLocaleString("ko-KR")}개
-                {" · "}담당 계정 {counts.accountCount.toLocaleString("ko-KR")}개
+                {" · "}파트너사 {isDataUnavailable ? "확인 필요" : `${counts.companyCount.toLocaleString("ko-KR")}개`}
+                {" · "}담당 계정 {isDataUnavailable ? "확인 필요" : `${counts.accountCount.toLocaleString("ko-KR")}개`}
               </>
             ) : (
               <> · 배정된 캠퍼스 범위의 제휴처만 집계합니다.</>

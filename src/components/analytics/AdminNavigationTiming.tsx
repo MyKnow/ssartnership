@@ -1,0 +1,236 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { trackProductEvent } from "@/lib/product-events";
+import {
+  getAdminRouteDescriptor,
+  toAdminRouteTimingProperties,
+  type AdminRouteTimingTrigger,
+} from "@/lib/admin-performance";
+import { getCurrentAdminViewport } from "@/lib/admin-viewport";
+
+type PendingNavigation = {
+  startedAt: number;
+  trigger: AdminRouteTimingTrigger;
+};
+
+let pendingNavigation: PendingNavigation | null = null;
+const ADMIN_NAVIGATION_START_EVENT = "admin:navigation-start";
+
+function clearPendingNavigation() {
+  pendingNavigation = null;
+}
+
+export function markAdminNavigationStart(trigger: AdminRouteTimingTrigger) {
+  if (typeof window === "undefined" || !Number.isFinite(performance.now())) {
+    return;
+  }
+  pendingNavigation = { startedAt: performance.now(), trigger };
+  window.dispatchEvent(new Event(ADMIN_NAVIGATION_START_EVENT));
+}
+
+function consumePendingNavigation() {
+  const current = pendingNavigation;
+  clearPendingNavigation();
+  if (!current || performance.now() - current.startedAt > 120_000) {
+    return null;
+  }
+  return current;
+}
+
+function resolveAdminLocationKey(value: string | URL | null) {
+  if (!value || typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const url = new URL(String(value), window.location.href);
+    if (url.origin !== window.location.origin || !url.pathname.startsWith("/admin")) {
+      return null;
+    }
+    return `${url.pathname}${url.search}`;
+  } catch {
+    return null;
+  }
+}
+
+function getCurrentAdminLocationKey() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return `${window.location.pathname}${window.location.search}`;
+}
+
+function getInitialNavigationDuration() {
+  const entry = performance.getEntriesByType("navigation")[0];
+  return entry && entry.entryType === "navigation" && entry.duration > 0
+    ? entry.duration
+    : null;
+}
+
+export default function AdminNavigationTiming() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [isNavigationPending, setIsNavigationPending] = useState(false);
+  const serializedSearchParams = searchParams.toString();
+  const locationKey = `${pathname}${serializedSearchParams ? `?${serializedSearchParams}` : ""}`;
+  const lastReportedLocationRef = useRef<string | null>(null);
+  const lastNavigationLocationRef = useRef(locationKey);
+
+  useEffect(() => {
+    const handleNavigationStart = () => {
+      setIsNavigationPending(true);
+    };
+
+    window.addEventListener(
+      ADMIN_NAVIGATION_START_EVENT,
+      handleNavigationStart,
+    );
+    return () =>
+      window.removeEventListener(
+        ADMIN_NAVIGATION_START_EVENT,
+        handleNavigationStart,
+      );
+  }, []);
+
+  useEffect(() => {
+    if (!isNavigationPending) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      clearPendingNavigation();
+      setIsNavigationPending(false);
+    }, 15_000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isNavigationPending]);
+
+  useEffect(() => {
+    const locationChanged = lastNavigationLocationRef.current !== locationKey;
+    lastNavigationLocationRef.current = locationKey;
+    if (!isNavigationPending || !locationChanged) {
+      return;
+    }
+
+    clearPendingNavigation();
+    const clearIndicatorId = window.setTimeout(() => {
+      setIsNavigationPending(false);
+    }, 0);
+
+    return () => window.clearTimeout(clearIndicatorId);
+  }, [isNavigationPending, locationKey]);
+
+  useEffect(() => {
+    const markFromClick = (event: MouseEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey ||
+        !(event.target instanceof Element)
+      ) {
+        return;
+      }
+
+      const anchor = event.target.closest("a[href]");
+      if (!(anchor instanceof HTMLAnchorElement) || anchor.target === "_blank" || anchor.hasAttribute("download")) {
+        return;
+      }
+
+      const targetLocationKey = resolveAdminLocationKey(anchor.href);
+      if (
+        targetLocationKey &&
+        targetLocationKey !== getCurrentAdminLocationKey()
+      ) {
+        markAdminNavigationStart("link");
+      }
+    };
+
+    const markFromHistory = () => {
+      markAdminNavigationStart("history");
+    };
+
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+    window.history.pushState = function pushState(state, unused, url) {
+      const targetLocationKey = resolveAdminLocationKey(url ? String(url) : null);
+      if (
+        targetLocationKey &&
+        targetLocationKey !== getCurrentAdminLocationKey()
+      ) {
+        markAdminNavigationStart("programmatic");
+      }
+      return originalPushState.call(window.history, state, unused, url);
+    };
+    window.history.replaceState = function replaceState(state, unused, url) {
+      const targetLocationKey = resolveAdminLocationKey(url ? String(url) : null);
+      if (
+        targetLocationKey &&
+        targetLocationKey !== getCurrentAdminLocationKey()
+      ) {
+        markAdminNavigationStart("programmatic");
+      }
+      return originalReplaceState.call(window.history, state, unused, url);
+    };
+
+    document.addEventListener("click", markFromClick);
+    window.addEventListener("popstate", markFromHistory);
+
+    return () => {
+      document.removeEventListener("click", markFromClick);
+      window.removeEventListener("popstate", markFromHistory);
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+    };
+  }, []);
+
+  useEffect(() => {
+    const descriptor = getAdminRouteDescriptor(pathname);
+    if (!descriptor || lastReportedLocationRef.current === locationKey) {
+      return;
+    }
+
+    const pending = consumePendingNavigation();
+    const durationMs = pending
+      ? performance.now() - pending.startedAt
+      : getInitialNavigationDuration() ?? 0;
+    const trigger = pending?.trigger ?? "initial-load";
+    const properties = toAdminRouteTimingProperties({
+      durationMs,
+      outcome: pending || durationMs > 0 ? "complete" : "unknown",
+      trigger,
+    });
+
+    lastReportedLocationRef.current = locationKey;
+    trackProductEvent({
+      eventName: "admin_route_timing",
+      path: descriptor.path,
+      targetType: "admin_performance",
+      targetId: descriptor.key,
+      properties: {
+        ...properties,
+        viewport: getCurrentAdminViewport(),
+      },
+    });
+  }, [locationKey, pathname]);
+
+  return isNavigationPending ? (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className="pointer-events-none fixed inset-x-0 top-0 z-[100] h-1 bg-primary/15"
+    >
+      <span className="sr-only">화면을 불러오는 중입니다.</span>
+      <span
+        aria-hidden="true"
+        className="block h-full w-2/5 origin-left animate-pulse bg-primary motion-reduce:animate-none"
+      />
+    </div>
+  ) : null;
+}

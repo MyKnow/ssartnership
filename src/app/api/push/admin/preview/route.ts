@@ -7,50 +7,65 @@ import {
   type AdminNotificationChannelSelection,
   type AdminNotificationType,
 } from "@/lib/admin-notification-ops";
+import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
+import { withServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
-  if (!isSameOriginPushRequest(request)) {
-    return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
-  }
+  return withServerTiming(async (timing) => {
+    if (!isSameOriginPushRequest(request)) {
+      return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
+    }
 
-  const accessDenied = await ensureAdminApiPermission(
-    request,
-    "notifications",
-    "read",
-  );
-  if (accessDenied) {
-    return accessDenied;
-  }
+    const accessDenied = await timing.measure("auth", () =>
+      ensureAdminApiPermission(request, "notifications", "read"),
+    );
+    if (accessDenied) {
+      return accessDenied;
+    }
 
-  try {
-    const body = (await request.json()) as {
-      notificationType?: AdminNotificationType;
-      title?: string;
-      body?: string;
-      url?: string | null;
-      channels?: Partial<AdminNotificationChannelSelection>;
-      audience?: unknown;
-    };
+    try {
+      const body = (await request.json()) as {
+        notificationType?: AdminNotificationType;
+        title?: string;
+        body?: string;
+        url?: string | null;
+        channels?: Partial<AdminNotificationChannelSelection>;
+        audience?: unknown;
+      };
 
-    const preview = await previewAdminNotificationCampaign({
-      notificationType: body.notificationType ?? "announcement",
-      title: body.title ?? "",
-      body: body.body ?? "",
-      url: body.url ?? null,
-      audience: parsePushAudience(body.audience),
-      channels: {
-        in_app: Boolean(body.channels?.in_app),
-        push: Boolean(body.channels?.push),
-        mm: Boolean(body.channels?.mm),
-      },
-    });
+      const preview = await timing.measure("query", () =>
+        previewAdminNotificationCampaign({
+          notificationType: body.notificationType ?? "announcement",
+          title: body.title ?? "",
+          body: body.body ?? "",
+          url: body.url ?? null,
+          audience: parsePushAudience(body.audience),
+          channels: {
+            in_app: Boolean(body.channels?.in_app),
+            push: Boolean(body.channels?.push),
+            mm: Boolean(body.channels?.mm),
+          },
+        }),
+      );
 
     return NextResponse.json({ ok: true, preview });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "알림 검토 정보를 불러오지 못했습니다.";
-    return NextResponse.json({ message }, { status: 400 });
-  }
+    } catch (error) {
+      console.error("[push-admin-preview] preview failed", error);
+      const message = getSafeAdminMessage(
+        error,
+        "알림 검토 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      );
+      return NextResponse.json(
+        { message },
+        {
+          status:
+            message === "알림 검토 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+              ? 503
+              : 400,
+        },
+      );
+    }
+  });
 }

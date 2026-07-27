@@ -459,7 +459,15 @@ const mockRouteInventoryBase = [
     routePath: "/admin/partners/[partnerId]",
     surface: "admin",
     authScope: "admin",
-    viewComponent: "AdminPartnerEditPage",
+    viewComponent: "AdminPartnerDetailPage",
+    dataSources: ["repository", "service"],
+    requiredScenarioIds: ["admin.partners.editor"],
+  },
+  {
+    routePath: "/admin/partners/[partnerId]/edit",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "AdminPartnerDetailEditPage",
     dataSources: ["repository", "service", "storybook"],
     requiredScenarioIds: ["admin.partners.editor"],
   },
@@ -661,7 +669,7 @@ const mockRouteInventoryBase = [
   },
 ] as const satisfies RouteInventoryInput[];
 
-const routeContracts = {
+const routeContracts: Record<string, RouteContractDefinition> = {
   "/": {
     routeKind: "canonical",
     screenContractId: "public.home",
@@ -925,7 +933,12 @@ const routeContracts = {
   "/admin/partners/[partnerId]": {
     routeKind: "canonical",
     screenContractId: "admin.partner-editor",
-    primaryTask: "제휴처 정보와 혜택·미디어를 수정한다.",
+    primaryTask: "제휴처 운영 현황과 혜택·미디어를 확인한다.",
+  },
+  "/admin/partners/[partnerId]/edit": {
+    routeKind: "canonical",
+    screenContractId: "admin.partner-editor",
+    primaryTask: "제휴처 기본 정보와 혜택·미디어를 수정한다.",
   },
   "/admin/partners/new": {
     routeKind: "canonical",
@@ -1047,10 +1060,7 @@ const routeContracts = {
     screenContractId: "partner.support",
     primaryTask: "지원 유형과 문의 템플릿을 확인해 운영진에게 요청한다.",
   },
-} as const satisfies Record<
-  (typeof mockRouteInventoryBase)[number]["routePath"],
-  RouteContractDefinition
->;
+};
 
 const partnerBenefitUseRouteInput = {
   routePath: "/partners/[id]/benefit-use",
@@ -1071,6 +1081,9 @@ const partnerBenefitUseRoute: MockRouteInventoryItem = {
 
 const baseRouteInventory: MockRouteInventoryItem[] = mockRouteInventoryBase.map((route) => {
   const contract = routeContracts[route.routePath];
+  if (!contract) {
+    throw new Error(`Missing route contract: ${route.routePath}`);
+  }
   const routeWithContract = {
     ...route,
     ...contract,

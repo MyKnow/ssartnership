@@ -889,7 +889,7 @@ const mockStorybookScenarioCoverageBase = [
     viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
   },
   {
-    routePath: "/admin/partners/[partnerId]",
+    routePath: "/admin/partners/[partnerId]/edit",
     scenarioId: "admin.partners.editor",
     storyId: "domains-admin-adminpartnereditview--default",
     storyFile: "src/components/admin/AdminPartnerEditView.stories.tsx",

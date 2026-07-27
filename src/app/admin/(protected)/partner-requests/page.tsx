@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import AdminShell from "@/components/admin/AdminShell";
 import AdminReviewQueueHeader from "@/components/admin/AdminReviewQueueHeader";
 import PartnerChangeRequestQueue from "@/components/admin/PartnerChangeRequestQueue";
@@ -14,6 +15,7 @@ import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import { getManagedCampusFilterValues } from "@/lib/admin-scope";
 import { parseAdminReviewQueuePagination } from "@/lib/admin-ia";
 import { getAdminPartnerChangeRequestQueueReadModel } from "@/lib/admin-partner-change-request-queue.server";
+import { AdminPartnerRequestsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 
 export const dynamic = "force-dynamic";
 
@@ -36,15 +38,13 @@ function buildPartnerRequestQueueHref(page: number, pageSize: number) {
   return query ? `/admin/partner-requests?${query}` : "/admin/partner-requests";
 }
 
-export default async function AdminPartnerRequestsPage({
-  searchParams,
+async function AdminPartnerRequestsContent({
+  adminSession,
+  params,
 }: {
-  searchParams?: Promise<PartnerRequestsSearchParams>;
+  adminSession: Awaited<ReturnType<typeof requireAdminPermission>>;
+  params: PartnerRequestsSearchParams;
 }) {
-  const adminSession = await requireAdminPermission("brands", "read", {
-    path: "/admin/partner-requests",
-  });
-  const params = (await searchParams) ?? {};
   const pagination = parseAdminReviewQueuePagination({
     page: getOneSearchParam(params.page),
     pageSize: getOneSearchParam(params.pageSize),
@@ -78,10 +78,9 @@ export default async function AdminPartnerRequestsPage({
   const returnTo = buildPartnerRequestQueueHref(pagination.page, pagination.pageSize);
 
   return (
-    <AdminShell title="변경 요청" backHref="/admin/partners" backLabel="제휴처">
-      <div className="grid min-w-0 gap-6">
+    <div className="grid min-w-0 gap-6">
         <AdminReviewQueueHeader
-          eyebrow="제휴 운영"
+          eyebrow="작업함"
           title="제휴처 변경 요청"
           description="파트너사 담당자가 요청한 변경 항목을 현재 값과 비교해 승인하거나 거절합니다."
           actions={
@@ -114,7 +113,25 @@ export default async function AdminPartnerRequestsPage({
           }}
           loadError={queueLoadError}
         />
-      </div>
+    </div>
+  );
+}
+
+export default async function AdminPartnerRequestsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<PartnerRequestsSearchParams>;
+}) {
+  const adminSession = await requireAdminPermission("brands", "read", {
+    path: "/admin/partner-requests",
+  });
+  const params = (await searchParams) ?? {};
+
+  return (
+    <AdminShell title="변경 요청" backHref="/admin/partners" backLabel="제휴처">
+      <Suspense fallback={<AdminPartnerRequestsSkeletonContent />}>
+        <AdminPartnerRequestsContent adminSession={adminSession} params={params} />
+      </Suspense>
     </AdminShell>
   );
 }

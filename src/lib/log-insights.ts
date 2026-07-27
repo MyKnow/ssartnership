@@ -38,11 +38,14 @@ import type {
   ResolvedLogRange,
 } from './log-insights/shared';
 import {
+  DEFAULT_LOG_PAGE_SIZE,
   EXPORT_MAX_LOG_ROWS_PER_GROUP,
+  LOG_PAGE_SIZE_OPTIONS,
   PAGE_MAX_LOG_ROWS_PER_GROUP,
 } from './log-insights/shared';
 
 export type {
+  AdminLogsCursor,
   AdminLogsAccessCapabilities,
   AdminAuditLogRecord,
   AdminLogsLoadedData,
@@ -64,8 +67,6 @@ export type {
 export { iterateAdminLogsCsvRows } from './log-insights/csv';
 export { resolveLogRange } from './log-insights/range';
 
-const LOG_PAGE_SIZE_OPTIONS = [50, 100, 250] as const;
-
 function parsePage(value: string | number | null | undefined) {
   const parsed = typeof value === 'number' ? value : Number.parseInt(value ?? '', 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
@@ -75,7 +76,7 @@ function parsePageSize(value: string | number | null | undefined) {
   const parsed = typeof value === 'number' ? value : Number.parseInt(value ?? '', 10);
   return LOG_PAGE_SIZE_OPTIONS.includes(parsed as (typeof LOG_PAGE_SIZE_OPTIONS)[number])
     ? parsed
-    : 100;
+    : DEFAULT_LOG_PAGE_SIZE;
 }
 
 function resolveGroupFilter(value: string | null | undefined): GroupFilter {
@@ -361,6 +362,8 @@ function buildAdminLogsPageDataFromRows({
       total: effectiveFilteredTotal,
       page,
       pageSize,
+      nextCursor: listSourceData.nextCursor ?? null,
+      hasMore: listSourceData.hasMore ?? false,
     },
   };
 }
@@ -501,6 +504,8 @@ export async function getAdminLogsPageData(
         total: listTotal,
         page,
         pageSize,
+        nextCursor: listSourceData.nextCursor ?? null,
+        hasMore: listSourceData.hasMore ?? false,
       },
     });
   }

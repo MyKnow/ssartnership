@@ -34,6 +34,16 @@ export type AdminMemberDetailReadModel = {
   emailLoginTransition: MemberEmailLoginTransition | null;
 };
 
+export type AdminMemberDetailCoreReadModel = {
+  member: MemberCanonicalProfile | null;
+  memberLoadError: boolean;
+};
+
+export type AdminMemberDetailOperationalReadModel = Omit<
+  AdminMemberDetailReadModel,
+  "member" | "memberLoadError"
+>;
+
 type SafeResult<T> = {
   value: T | null;
   failed: boolean;
@@ -94,11 +104,11 @@ function buildPolicyOverview({
   });
 }
 
-function buildMemberUnavailableReadModel(memberLoadError: boolean): AdminMemberDetailReadModel {
+function createEmptyOperationalReadModel(
+  detailLoadError = false,
+): AdminMemberDetailOperationalReadModel {
   return {
-    member: null,
-    memberLoadError,
-    detailLoadError: false,
+    detailLoadError,
     activeDeviceCount: 0,
     securityLogs: [],
     securityLogTotalCount: 0,
@@ -114,14 +124,25 @@ function buildMemberUnavailableReadModel(memberLoadError: boolean): AdminMemberD
   };
 }
 
-/**
- * View-ready server read model for a single admin member detail route.
- *
- * A missing member remains distinct from a temporary read failure. Optional
- * operational panels degrade to their safe defaults while the core member
- * profile stays actionable.
- */
-export async function getAdminMemberDetailReadModel({
+export async function getAdminMemberDetailCoreReadModel({
+  memberId,
+}: {
+  memberId: string;
+}): Promise<AdminMemberDetailCoreReadModel> {
+  try {
+    return {
+      member: await getMemberCanonicalProfile(memberId),
+      memberLoadError: false,
+    };
+  } catch {
+    return {
+      member: null,
+      memberLoadError: true,
+    };
+  }
+}
+
+export async function getAdminMemberDetailOperationalReadModel({
   memberId,
   canUpdateMembers,
   securityLogPage,
@@ -131,41 +152,28 @@ export async function getAdminMemberDetailReadModel({
   canUpdateMembers: boolean;
   securityLogPage: number;
   securityLogPageSize: number;
-}): Promise<AdminMemberDetailReadModel> {
-  const memberResultPromise = readSafely(getMemberCanonicalProfile(memberId));
+}): Promise<AdminMemberDetailOperationalReadModel> {
   const activePoliciesResultPromise = readSafely(getActiveRequiredPolicies());
   const activeMarketingPolicyResultPromise = readSafely(
     getPolicyDocumentByKind("marketing"),
   );
 
   if (isMockDataSource()) {
-    const [memberResult, activePoliciesResult, activeMarketingPolicyResult] =
-      await Promise.all([
-        memberResultPromise,
-        activePoliciesResultPromise,
-        activeMarketingPolicyResultPromise,
-      ]);
-    if (!memberResult.value) {
-      return buildMemberUnavailableReadModel(memberResult.failed);
-    }
+    const [activePoliciesResult, activeMarketingPolicyResult] = await Promise.all([
+      activePoliciesResultPromise,
+      activeMarketingPolicyResultPromise,
+    ]);
 
     return {
-      member: memberResult.value,
-      memberLoadError: false,
-      detailLoadError:
+      ...createEmptyOperationalReadModel(
         activePoliciesResult.failed || activeMarketingPolicyResult.failed,
-      activeDeviceCount: 0,
-      securityLogs: [],
-      securityLogTotalCount: 0,
-      preferences: normalizeAdminMemberNotificationPreferences(null, 0),
+      ),
       policyOverview: buildPolicyOverview({
         activePolicies: activePoliciesResult.value,
         activeMarketingPolicy: activeMarketingPolicyResult.value,
         consentHistory: [],
         consentActivity: [],
       }),
-      pendingProfilePhotoId: null,
-      emailLoginTransition: null,
     };
   }
 
@@ -173,20 +181,18 @@ export async function getAdminMemberDetailReadModel({
   try {
     supabase = getSupabaseAdminClient();
   } catch {
-    const [memberResult] = await Promise.all([
-      memberResultPromise,
+    const [activePoliciesResult, activeMarketingPolicyResult] = await Promise.all([
       activePoliciesResultPromise,
       activeMarketingPolicyResultPromise,
     ]);
-    if (!memberResult.value) {
-      return buildMemberUnavailableReadModel(memberResult.failed);
-    }
-
     return {
-      ...buildMemberUnavailableReadModel(true),
-      member: memberResult.value,
-      detailLoadError: true,
-      memberLoadError: false,
+      ...createEmptyOperationalReadModel(true),
+      policyOverview: buildPolicyOverview({
+        activePolicies: activePoliciesResult.value,
+        activeMarketingPolicy: activeMarketingPolicyResult.value,
+        consentHistory: [],
+        consentActivity: [],
+      }),
     };
   }
 
@@ -242,7 +248,6 @@ export async function getAdminMemberDetailReadModel({
       : Promise.resolve({ value: null, failed: false }),
   ]);
   const [
-    memberResult,
     activePoliciesResult,
     activeMarketingPolicyResult,
     [
@@ -255,14 +260,10 @@ export async function getAdminMemberDetailReadModel({
       emailLoginTransitionResult,
     ],
   ] = await Promise.all([
-    memberResultPromise,
     activePoliciesResultPromise,
     activeMarketingPolicyResultPromise,
     detailResultsPromise,
   ]);
-  if (!memberResult.value) {
-    return buildMemberUnavailableReadModel(memberResult.failed);
-  }
 
   const consentActivity: AdminMemberConsentActivityRow[] = (
     consentActivityResult.data ?? []
@@ -276,8 +277,6 @@ export async function getAdminMemberDetailReadModel({
   const securityLogs = toSecurityLogs(securityLogsResult.data ?? []);
 
   return {
-    member: memberResult.value,
-    memberLoadError: false,
     detailLoadError: Boolean(
       preferenceResult.error ||
         subscriptionsResult.error ||
@@ -304,5 +303,47 @@ export async function getAdminMemberDetailReadModel({
     }),
     pendingProfilePhotoId: pendingProfilePhotoResult.data?.id ?? null,
     emailLoginTransition: emailLoginTransitionResult.value,
+  };
+}
+
+/**
+ * View-ready server read model for a single admin member detail route.
+ *
+ * A missing member remains distinct from a temporary read failure. Optional
+ * operational panels degrade to their safe defaults while the core member
+ * profile stays actionable.
+ */
+export async function getAdminMemberDetailReadModel({
+  memberId,
+  canUpdateMembers,
+  securityLogPage,
+  securityLogPageSize,
+}: {
+  memberId: string;
+  canUpdateMembers: boolean;
+  securityLogPage: number;
+  securityLogPageSize: number;
+}): Promise<AdminMemberDetailReadModel> {
+  const [core, operational] = await Promise.all([
+    getAdminMemberDetailCoreReadModel({ memberId }),
+    getAdminMemberDetailOperationalReadModel({
+      memberId,
+      canUpdateMembers,
+      securityLogPage,
+      securityLogPageSize,
+    }),
+  ]);
+
+  if (!core.member) {
+    return {
+      member: null,
+      memberLoadError: core.memberLoadError,
+      ...createEmptyOperationalReadModel(),
+    };
+  }
+
+  return {
+    ...core,
+    ...operational,
   };
 }

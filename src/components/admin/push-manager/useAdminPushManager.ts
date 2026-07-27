@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import type { PushAudienceScope } from "@/lib/push";
@@ -95,6 +95,8 @@ export function useAdminPushManager({
   recentLogs,
   availableYearOptions,
   availableCampusOptions,
+  canSend = true,
+  canDeleteLogs = true,
 }: Pick<
   AdminPushManagerProps,
   | "pushConfigured"
@@ -103,20 +105,26 @@ export function useAdminPushManager({
   | "recentLogs"
   | "availableYearOptions"
   | "availableCampusOptions"
+  | "canSend"
+  | "canDeleteLogs"
 >) {
   const { notify } = useToast();
   const router = useRouter();
   const [logs, setLogs] = useState(recentLogs);
   const [composer, setComposer] = useState(initialComposerState);
   const [filters, setFilters] = useState(initialLogFilterState);
-  const [reviewState, setReviewState] = useState<AdminPushReviewState | null>(null);
+  const [reviewState, setReviewState] = useState<AdminPushReviewState | null>(
+    null,
+  );
   const [pending, setPending] = useState(false);
   const [previewPending, setPreviewPending] = useState(false);
   const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
+  const [deleteLogConfirmId, setDeleteLogConfirmId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [memberPickerOpen, setMemberPickerOpen] = useState(false);
   const [recipientModalOpen, setRecipientModalOpen] = useState(false);
   const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
+  const sendIdempotencyKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     setLogs(recentLogs);
@@ -129,12 +137,20 @@ export function useAdminPushManager({
 
   useEffect(() => {
     setReviewState((current) =>
-      current && current.lastSubmittedPayload !== composerFingerprint ? null : current,
+      current && current.lastSubmittedPayload !== composerFingerprint
+        ? null
+        : current,
     );
   }, [composerFingerprint]);
 
-  const derivedCampusOptions = useMemo(() => createCampusOptions(members), [members]);
-  const derivedYearOptions = useMemo(() => createYearOptions(members), [members]);
+  const derivedCampusOptions = useMemo(
+    () => createCampusOptions(members),
+    [members],
+  );
+  const derivedYearOptions = useMemo(
+    () => createYearOptions(members),
+    [members],
+  );
   const campusOptions = availableCampusOptions ?? derivedCampusOptions;
   const yearOptions = availableYearOptions ?? derivedYearOptions;
   const audienceYearOptions = useMemo(
@@ -159,6 +175,7 @@ export function useAdminPushManager({
     key: Key,
     value: AdminPushComposerState[Key],
   ) {
+    sendIdempotencyKeyRef.current = null;
     setComposer((current) => ({ ...current, [key]: value }));
   }
 
@@ -169,7 +186,11 @@ export function useAdminPushManager({
     setFilters((current) => ({ ...current, [key]: value }));
   }
 
-  function updateChannel(channel: keyof AdminPushComposerState["channels"], next: boolean) {
+  function updateChannel(
+    channel: keyof AdminPushComposerState["channels"],
+    next: boolean,
+  ) {
+    sendIdempotencyKeyRef.current = null;
     setComposer((current) => ({
       ...current,
       channels: {
@@ -180,6 +201,7 @@ export function useAdminPushManager({
   }
 
   function updateNotificationType(next: AdminNotificationType) {
+    sendIdempotencyKeyRef.current = null;
     setComposer((current) => ({
       ...current,
       notificationType: next,
@@ -195,6 +217,7 @@ export function useAdminPushManager({
   }
 
   function handlePartnerChange(partnerId: string) {
+    sendIdempotencyKeyRef.current = null;
     setComposer((current) => ({
       ...current,
       selectedPartnerId: partnerId,
@@ -203,17 +226,21 @@ export function useAdminPushManager({
   }
 
   function handleUrlChange(nextUrl: string) {
+    sendIdempotencyKeyRef.current = null;
     const matchedPartnerId = extractPartnerIdFromUrl(nextUrl);
     setComposer((current) => ({
       ...current,
       url: nextUrl,
-      selectedPartnerId: partners.some((partner) => partner.id === matchedPartnerId)
+      selectedPartnerId: partners.some(
+        (partner) => partner.id === matchedPartnerId,
+      )
         ? matchedPartnerId
         : "",
     }));
   }
 
   function handleAudienceScopeChange(scope: PushAudienceScope) {
+    sendIdempotencyKeyRef.current = null;
     setComposer((current) => ({
       ...current,
       audienceScope: scope,
@@ -235,6 +262,7 @@ export function useAdminPushManager({
   }
 
   function selectMember(memberId: string) {
+    sendIdempotencyKeyRef.current = null;
     setComposer((current) => ({
       ...current,
       selectedMemberIds: current.selectedMemberIds.includes(memberId)
@@ -244,6 +272,7 @@ export function useAdminPushManager({
   }
 
   function selectAllFilteredMembers(memberIds: string[]) {
+    sendIdempotencyKeyRef.current = null;
     setComposer((current) => ({
       ...current,
       selectedMemberIds: Array.from(new Set(memberIds)),
@@ -251,6 +280,9 @@ export function useAdminPushManager({
   }
 
   async function reviewComposer() {
+    if (!canSend) {
+      return;
+    }
     setPreviewPending(true);
     setErrorMessage(null);
     try {
@@ -269,14 +301,23 @@ export function useAdminPushManager({
             scope: composer.audienceScope,
             year: composer.selectedYear || undefined,
             campus: composer.selectedCampus || undefined,
-            memberIds: composer.selectedMemberIds.length > 0 ? composer.selectedMemberIds : undefined,
+            memberIds:
+              composer.selectedMemberIds.length > 0
+                ? composer.selectedMemberIds
+                : undefined,
           },
         }),
       });
-      const data = await parseAdminResponse<{ message?: string; preview?: AdminNotificationPreview }>(response);
+      const data = await parseAdminResponse<{
+        message?: string;
+        preview?: AdminNotificationPreview;
+      }>(response);
       if (!response.ok || !data?.preview) {
         setErrorMessage(
-          getSafeAdminResponseMessage(data?.message, "발송 검토 정보를 불러오지 못했습니다."),
+          getSafeAdminResponseMessage(
+            data?.message,
+            "발송 검토 정보를 불러오지 못했습니다.",
+          ),
         );
         return;
       }
@@ -286,9 +327,13 @@ export function useAdminPushManager({
         lastSendResult: null,
       });
       setComposer((current) => ({ ...current, confirmationText: "" }));
-      notify(`발송 가능 대상 ${data.preview.eligibleMemberCount}명을 찾았습니다.`);
+      notify(
+        `발송 가능 대상 ${data.preview.eligibleMemberCount}명을 찾았습니다.`,
+      );
     } catch (error) {
-      setErrorMessage(getSafeAdminMessage(error, "발송 검토 정보를 불러오지 못했습니다."));
+      setErrorMessage(
+        getSafeAdminMessage(error, "발송 검토 정보를 불러오지 못했습니다."),
+      );
     } finally {
       setPreviewPending(false);
     }
@@ -301,7 +346,10 @@ export function useAdminPushManager({
       setErrorMessage("푸시 채널이 아직 설정되지 않았습니다.");
       return;
     }
-    if (!reviewState || reviewState.lastSubmittedPayload !== composerFingerprint) {
+    if (
+      !reviewState ||
+      reviewState.lastSubmittedPayload !== composerFingerprint
+    ) {
       setErrorMessage("먼저 발송 대상 섹션에서 대상자 검색을 완료해 주세요.");
       return;
     }
@@ -314,13 +362,25 @@ export function useAdminPushManager({
   }
 
   async function confirmSubmit() {
-    if (!reviewState || reviewState.lastSubmittedPayload !== composerFingerprint) {
-      setErrorMessage("발송 대상이 변경되었습니다. 다시 대상자 검색을 진행해 주세요.");
+    if (!canSend) {
+      setErrorMessage("현재 계정은 알림을 발송할 수 없습니다.");
+      setSendConfirmOpen(false);
+      return;
+    }
+    if (
+      !reviewState ||
+      reviewState.lastSubmittedPayload !== composerFingerprint
+    ) {
+      setErrorMessage(
+        "발송 대상이 변경되었습니다. 다시 대상자 검색을 진행해 주세요.",
+      );
       setSendConfirmOpen(false);
       return;
     }
 
     setPending(true);
+    const idempotencyKey = sendIdempotencyKeyRef.current ?? crypto.randomUUID();
+    sendIdempotencyKeyRef.current = idempotencyKey;
     try {
       const response = await fetch("/api/push/admin/broadcast", {
         method: "POST",
@@ -337,18 +397,37 @@ export function useAdminPushManager({
             scope: composer.audienceScope,
             year: composer.selectedYear || undefined,
             campus: composer.selectedCampus || undefined,
-            memberIds: composer.selectedMemberIds.length > 0 ? composer.selectedMemberIds : undefined,
+            memberIds:
+              composer.selectedMemberIds.length > 0
+                ? composer.selectedMemberIds
+                : undefined,
           },
           confirmationText: composer.confirmationText,
+          idempotencyKey,
         }),
       });
-      const data = await parseAdminResponse<{ message?: string; result?: AdminNotificationSendResult }>(response);
+      const data = await parseAdminResponse<{
+        message?: string;
+        result?: AdminNotificationSendResult;
+      }>(response);
       if (!response.ok || !data?.result) {
-        setErrorMessage(getSafeAdminResponseMessage(data?.message, "알림 발송에 실패했습니다."));
+        setErrorMessage(
+          getSafeAdminResponseMessage(
+            data?.message,
+            "알림 발송에 실패했습니다.",
+          ),
+        );
+        return;
+      }
+
+      if (data.result.alreadyExists) {
+        setSendConfirmOpen(false);
+        setErrorMessage("같은 발송 요청이 이미 처리 중이거나 완료되었습니다.");
         return;
       }
 
       setComposer(initialComposerState);
+      sendIdempotencyKeyRef.current = null;
       setReviewState(null);
       setRecipientModalOpen(false);
       setSendConfirmOpen(false);
@@ -396,11 +475,14 @@ export function useAdminPushManager({
       title: log.title,
       body: log.body,
       url: log.url ?? "",
-      selectedPartnerId: partners.some((partner) => partner.id === matchedPartnerId)
+      selectedPartnerId: partners.some(
+        (partner) => partner.id === matchedPartnerId,
+      )
         ? matchedPartnerId
         : "",
       audienceScope: log.targetScope,
-      selectedYear: typeof log.targetYear === "number" ? String(log.targetYear) : "",
+      selectedYear:
+        typeof log.targetYear === "number" ? String(log.targetYear) : "",
       selectedCampus: log.targetCampus ?? "",
       selectedMemberIds: log.targetMemberId ? [log.targetMemberId] : [],
       confirmationText: "",
@@ -412,12 +494,23 @@ export function useAdminPushManager({
     notify("기존 알림 구성을 작성 폼으로 불러왔습니다.");
   }
 
-  async function deleteLog(logId: string) {
-    if (deletingLogId) {
+  function requestDeleteLog(logId: string) {
+    if (!canDeleteLogs) {
       return;
     }
-    const ok = window.confirm("이 발송 로그를 삭제하시겠습니까?");
-    if (!ok) {
+    if (deletingLogId || deleteLogConfirmId) {
+      return;
+    }
+    setDeleteLogConfirmId(logId);
+  }
+
+  function closeDeleteLogConfirm() {
+    setDeleteLogConfirmId(null);
+  }
+
+  async function confirmDeleteLog() {
+    const logId = deleteLogConfirmId;
+    if (!logId || deletingLogId) {
       return;
     }
 
@@ -430,14 +523,22 @@ export function useAdminPushManager({
       const data = await parseAdminResponse<{ message?: string }>(response);
 
       if (!response.ok) {
-        setErrorMessage(getSafeAdminResponseMessage(data?.message, "발송 로그 삭제에 실패했습니다."));
+        setErrorMessage(
+          getSafeAdminResponseMessage(
+            data?.message,
+            "발송 로그 삭제에 실패했습니다.",
+          ),
+        );
         return;
       }
 
       setLogs((current) => current.filter((log) => log.id !== logId));
       notify("발송 로그를 삭제했습니다.");
+      setDeleteLogConfirmId(null);
     } catch (error) {
-      setErrorMessage(getSafeAdminMessage(error, "발송 로그 삭제에 실패했습니다."));
+      setErrorMessage(
+        getSafeAdminMessage(error, "발송 로그 삭제에 실패했습니다."),
+      );
     } finally {
       setDeletingLogId(null);
     }
@@ -454,6 +555,7 @@ export function useAdminPushManager({
     pending,
     previewPending,
     deletingLogId,
+    deleteLogConfirmId,
     errorMessage,
     recipientModalOpen,
     memberPickerOpen,
@@ -477,6 +579,8 @@ export function useAdminPushManager({
     closeRecipientModal,
     closeSendConfirm,
     loadLog,
-    deleteLog,
+    requestDeleteLog,
+    closeDeleteLogConfirm,
+    confirmDeleteLog,
   };
 }

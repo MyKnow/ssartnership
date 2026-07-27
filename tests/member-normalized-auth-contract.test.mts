@@ -344,7 +344,7 @@ test("관리자 회원 화면과 수정 액션은 정규화된 회원 관계만 
     memberListReadModel,
     /\.eq\("generation", Number\(filters\.yearFilter\)\)/,
   );
-  assert.match(memberDetailPage, /getAdminMemberDetailReadModel/);
+  assert.match(memberDetailPage, /getAdminMemberDetailCoreReadModel/);
   assert.match(memberDetailReadModel, /getMemberCanonicalProfile/);
   assert.match(memberActions, /generation,/);
   assert.match(memberActions, /mattermost_account_id/);

@@ -94,8 +94,9 @@ test("legacy admin partner tabs resolve to their canonical routes", async () => 
   assert.equal(resolveAdminPartnerTabRedirect(undefined), null);
 });
 
-test("관리자 탐색은 작업 의도 여섯 그룹과 작업함 진입점을 제공한다", async () => {
-  const { ADMIN_NAV_GROUPS, ADMIN_NAV_ITEMS } = await adminNavigationModulePromise;
+test("관리자 탐색은 의도 기반 여섯 업무 그룹과 작업함 항목을 제공한다", async () => {
+  const { ADMIN_NAV_GROUPS, ADMIN_NAV_ITEMS, getAdminTaskItems } =
+    await adminNavigationModulePromise;
 
   assert.deepEqual(
     ADMIN_NAV_GROUPS.map((group) => group.label),
@@ -105,6 +106,17 @@ test("관리자 탐색은 작업 의도 여섯 그룹과 작업함 진입점을 
   const taskInbox = ADMIN_NAV_ITEMS.find((item) => item.href === "/admin/tasks");
   assert.equal(taskInbox?.label, "작업함");
   assert.equal(taskInbox?.alwaysVisible, true);
+  assert.deepEqual(
+    getAdminTaskItems(ADMIN_NAV_GROUPS).map((item) => item.href),
+    [
+      "/admin/member-signup-requests",
+      "/admin/graduate-verifications",
+      "/admin/profile-photos",
+      "/admin/partner-registrations",
+      "/admin/partner-requests",
+      "/admin/notifications",
+    ],
+  );
 });
 
 test("admin navigation separates list, request, category, inbox, and send tasks", async () => {
@@ -122,6 +134,26 @@ test("admin navigation separates list, request, category, inbox, and send tasks"
   assert.equal(byHref.get("/admin/push")?.permission.resource, "notifications");
 });
 
+test("관리자 화면은 업무 목적에 맞는 그룹에 배치되고 로그는 리포트로 모인다", async () => {
+  const { ADMIN_NAV_GROUPS } = await adminNavigationModulePromise;
+  const groupByHref = new Map(
+    ADMIN_NAV_GROUPS.flatMap((group) =>
+      group.items.map((item) => [item.href, group.label] as const),
+    ),
+  );
+
+  assert.equal(groupByHref.get("/admin"), "홈");
+  assert.equal(groupByHref.get("/admin/tasks"), "작업함");
+  assert.equal(groupByHref.get("/admin/members"), "데이터");
+  assert.equal(groupByHref.get("/admin/reviews"), "작업함");
+  assert.equal(groupByHref.get("/admin/partners"), "데이터");
+  assert.equal(groupByHref.get("/admin/partner-requests"), "작업함");
+  assert.equal(groupByHref.get("/admin/push"), "자동화");
+  assert.equal(groupByHref.get("/admin/notifications"), "작업함");
+  assert.equal(groupByHref.get("/admin/logs"), "리포트");
+  assert.equal(groupByHref.get("/admin/admins"), "설정");
+});
+
 test("관리자 빠른 찾기는 이름과 설명으로 권한 내 화면을 찾는다", async () => {
   const { ADMIN_NAV_GROUPS, findAdminNavItems } = await adminNavigationModulePromise;
 
@@ -134,4 +166,21 @@ test("관리자 빠른 찾기는 이름과 설명으로 권한 내 화면을 찾
     ["/admin", "/admin/tasks", "/admin/notifications"],
   );
   assert.deepEqual(findAdminNavItems("존재하지 않는 화면", ADMIN_NAV_GROUPS), []);
+});
+
+test("관리자 빠른 찾기는 운영자가 쓰는 검색 별칭으로 같은 화면을 찾는다", async () => {
+  const { ADMIN_NAV_GROUPS, findAdminNavItems } = await adminNavigationModulePromise;
+
+  assert.deepEqual(
+    findAdminNavItems("업체", ADMIN_NAV_GROUPS).map((item) => item.href),
+    ["/admin/partners", "/admin/companies"],
+  );
+  assert.deepEqual(
+    findAdminNavItems("후기", ADMIN_NAV_GROUPS).map((item) => item.href),
+    ["/admin/reviews"],
+  );
+  assert.deepEqual(
+    findAdminNavItems("권한", ADMIN_NAV_GROUPS).map((item) => item.href),
+    ["/admin/admins"],
+  );
 });

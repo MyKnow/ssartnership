@@ -321,6 +321,13 @@ test("repository benefit and infrastructure errors keep distinct service codes",
         throw new Error(repositoryMessage);
       },
       listUsageHistory: async () => ({ items: [], total: 0, page: 1, pageSize: 25 }),
+      createAdminUsage: async () => {
+        throw new Error("unused");
+      },
+      updateAdminUsage: async () => {
+        throw new Error("unused");
+      },
+      deleteAdminUsage: async () => undefined,
     };
 
     await assert.rejects(

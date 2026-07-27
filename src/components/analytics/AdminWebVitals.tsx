@@ -6,6 +6,7 @@ import {
   isAdminWebVitalName,
   toAdminWebVitalProperties,
 } from "@/lib/admin-performance";
+import { getCurrentAdminViewport } from "@/lib/admin-viewport";
 
 const reportedMetricIds = new Set<string>();
 
@@ -33,7 +34,10 @@ function reportAdminWebVital(metric: {
     eventName: "admin_web_vital",
     targetType: "admin_performance",
     targetId: metric.name.toLowerCase(),
-    properties: toAdminWebVitalProperties(metric),
+    properties: {
+      ...toAdminWebVitalProperties(metric),
+      viewport: getCurrentAdminViewport(),
+    },
   });
 }
 

@@ -29,8 +29,13 @@ export type AdminPushManagerProps = {
   availableCampusOptions?: string[];
   recentLogs: AdminNotificationOperationLog[];
   initialTab?: "center" | "logs" | "send";
+  canSend?: boolean;
+  canDeleteLogs?: boolean;
   automaticSummaries: Array<{
-    notificationType: Extract<AdminNotificationType, "new_partner" | "expiring_partner">;
+    notificationType: Extract<
+      AdminNotificationType,
+      "new_partner" | "expiring_partner"
+    >;
     label: string;
     lastRunAt: string | null;
     recentCount: number;
