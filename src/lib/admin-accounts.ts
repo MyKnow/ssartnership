@@ -103,6 +103,8 @@ const ADMIN_PROFILE_SESSION_SELECT = [
 const SUPER_ADMIN_USERNAME = "myknow";
 const DEFAULT_ADMIN_PERMISSION_ID = "readonly";
 const ADMIN_ACCOUNT_CACHE_REVALIDATE_SECONDS = 5;
+const ADMIN_ACCOUNTS_LIST_CACHE_REVALIDATE_SECONDS = 5;
+const ADMIN_ACCOUNTS_LIST_CACHE_TAG = "admin-accounts-list";
 
 function getAdminAccountCacheTag(memberId: string) {
   return `admin-account:${memberId}`;
@@ -332,6 +334,7 @@ export function invalidateAdminAccountCache(memberId: string) {
   }
 
   revalidateTag(getAdminAccountCacheTag(memberId), "max");
+  revalidateTag(ADMIN_ACCOUNTS_LIST_CACHE_TAG, "max");
 }
 
 export async function getAdminAccountByLoginId(loginId: string) {
@@ -446,9 +449,20 @@ async function listAdminAccountsLegacy() {
 }
 
 export async function listAdminAccounts() {
-  const relationAccounts = await listAdminAccountsFromRelation();
-  return relationAccounts ?? listAdminAccountsLegacy();
+  return getCachedAdminAccounts();
 }
+
+const getCachedAdminAccounts = unstable_cache(
+  async () => {
+    const relationAccounts = await listAdminAccountsFromRelation();
+    return relationAccounts ?? listAdminAccountsLegacy();
+  },
+  [ADMIN_ACCOUNTS_LIST_CACHE_TAG],
+  {
+    revalidate: ADMIN_ACCOUNTS_LIST_CACHE_REVALIDATE_SECONDS,
+    tags: [ADMIN_ACCOUNTS_LIST_CACHE_TAG],
+  },
+);
 
 export async function countActivePrivilegedAdmins() {
   const accounts = await listAdminAccounts();

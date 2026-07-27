@@ -1,6 +1,12 @@
 import type { AdminPushRecipientOption } from "@/lib/admin-push-recipient-search.server";
 import { getAdminNotificationOverview } from "@/lib/admin-notification-ops";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
+
+const ADMIN_PUSH_READ_MODEL_CACHE_REVALIDATE_SECONDS = 3;
+const ADMIN_PUSH_AUDIENCE_FACETS_CACHE_TAG = "admin-push-audience-facets";
+const ADMIN_PUSH_NOTIFICATION_OVERVIEW_CACHE_TAG =
+  "admin-push-notification-overview";
 
 type MemberFacetRow = {
   generation: number | null;
@@ -150,6 +156,33 @@ async function loadAdminPushAudienceSummary(
   };
 }
 
+const getCachedAdminPushAudienceFacets = unstable_cache(
+  () => loadAdminPushAudienceFacets(getSupabaseAdminClient()),
+  [ADMIN_PUSH_AUDIENCE_FACETS_CACHE_TAG, "facets"],
+  {
+    revalidate: ADMIN_PUSH_READ_MODEL_CACHE_REVALIDATE_SECONDS,
+    tags: [ADMIN_PUSH_AUDIENCE_FACETS_CACHE_TAG],
+  },
+);
+
+const getCachedAdminPushAudienceSummary = unstable_cache(
+  () => loadAdminPushAudienceSummary(getSupabaseAdminClient()),
+  [ADMIN_PUSH_AUDIENCE_FACETS_CACHE_TAG, "summary"],
+  {
+    revalidate: ADMIN_PUSH_READ_MODEL_CACHE_REVALIDATE_SECONDS,
+    tags: [ADMIN_PUSH_AUDIENCE_FACETS_CACHE_TAG],
+  },
+);
+
+const getCachedAdminNotificationOverview = unstable_cache(
+  () => getAdminNotificationOverview(50, 30),
+  [ADMIN_PUSH_NOTIFICATION_OVERVIEW_CACHE_TAG],
+  {
+    revalidate: ADMIN_PUSH_READ_MODEL_CACHE_REVALIDATE_SECONDS,
+    tags: [ADMIN_PUSH_NOTIFICATION_OVERVIEW_CACHE_TAG],
+  },
+);
+
 /**
  * Initial data for the admin push workspace.
  *
@@ -161,19 +194,18 @@ export async function getAdminPushReadModel({
 }: {
   includeAudience?: boolean;
 } = {}) {
-  let supabase: ReturnType<typeof getSupabaseAdminClient>;
   try {
-    supabase = getSupabaseAdminClient();
+    getSupabaseAdminClient();
   } catch {
     return createEmptyReadModel(true);
   }
 
-  const notificationOverviewPromise = getAdminNotificationOverview(50, 30)
+  const notificationOverviewPromise = getCachedAdminNotificationOverview()
     .then((value) => ({ value, failed: false as const }))
     .catch(() => ({ value: null, failed: true as const }));
   const audiencePromise = includeAudience
-    ? loadAdminPushAudienceFacets(supabase)
-    : loadAdminPushAudienceSummary(supabase);
+    ? getCachedAdminPushAudienceFacets()
+    : getCachedAdminPushAudienceSummary();
   const [audience, notificationOverviewResult] =
     await Promise.all([
       audiencePromise,

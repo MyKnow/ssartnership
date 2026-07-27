@@ -18,6 +18,9 @@ test("관리자 세션은 좁은 snapshot RPC를 우선 사용하고 rolling dep
   assert.match(accounts, /listAdminAccountsFromRelation/);
   assert.match(accounts, /listAdminAccountsLegacy/);
   assert.match(accounts, /unstable_cache/);
+  assert.match(accounts, /ADMIN_ACCOUNTS_LIST_CACHE_REVALIDATE_SECONDS = 5/);
+  assert.match(accounts, /ADMIN_ACCOUNTS_LIST_CACHE_TAG = "admin-accounts-list"/);
+  assert.match(accounts, /revalidateTag\(ADMIN_ACCOUNTS_LIST_CACHE_TAG, "max"\)/);
   assert.match(accounts, /revalidateTag\(getAdminAccountCacheTag\(memberId\), "max"\)/);
   assert.match(accounts, /revalidate: ADMIN_ACCOUNT_CACHE_REVALIDATE_SECONDS/);
   assert.match(auth, /getAdminAccountById\(payload\.adminId\)/);
