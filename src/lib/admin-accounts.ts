@@ -242,6 +242,14 @@ function resolveRelation<T>(value: T | T[] | null | undefined) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
 }
 
+function mapAdminProfileSessionRow(
+  row: AdminProfileSessionRow,
+): AdminAccount | null {
+  const member = resolveRelation(row.member);
+  const directory = resolveRelation(member?.directory);
+  return member && directory ? mapAdminProfile(row, member, directory) : null;
+}
+
 async function getAdminAccountFromProfileLegacy(memberId: string) {
   const [profile, member] = await Promise.all([
     getAdminProfileByMemberId(memberId),
@@ -266,9 +274,7 @@ async function getAdminAccountFromProfile(memberId: string) {
     if (!row) {
       return null;
     }
-    const member = resolveRelation(row.member);
-    const directory = resolveRelation(member?.directory);
-    return member && directory ? mapAdminProfile(row, member, directory) : null;
+    return mapAdminProfileSessionRow(row);
   }
 
   // Keep a compatibility fallback for a rolling deploy where the PostgREST
@@ -367,7 +373,21 @@ export async function authenticateAdminCredentials(
   return null;
 }
 
-export async function listAdminAccounts() {
+async function listAdminAccountsFromRelation() {
+  const { data, error } = await getSupabaseAdminClient()
+    .from("admin_profiles")
+    .select(ADMIN_PROFILE_SESSION_SELECT)
+    .order("updated_at", { ascending: false });
+  if (error) {
+    return null;
+  }
+
+  return ((data ?? []) as unknown as AdminProfileSessionRow[])
+    .map(mapAdminProfileSessionRow)
+    .filter((account): account is AdminAccount => account !== null);
+}
+
+async function listAdminAccountsLegacy() {
   const supabase = getSupabaseAdminClient();
   const { data: profiles, error: profileError } = await supabase
     .from("admin_profiles")
@@ -423,6 +443,11 @@ export async function listAdminAccounts() {
       return member && directory ? mapAdminProfile(profile, member, directory) : null;
     })
     .filter((account): account is AdminAccount => account !== null);
+}
+
+export async function listAdminAccounts() {
+  const relationAccounts = await listAdminAccountsFromRelation();
+  return relationAccounts ?? listAdminAccountsLegacy();
 }
 
 export async function countActivePrivilegedAdmins() {
