@@ -7,7 +7,7 @@ import AdminShell from "@/components/admin/AdminShell";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { getAdminLogAccessPolicy } from "@/lib/admin-log-access";
-import { getAdminLogsPageData } from "@/lib/log-insights";
+import { getCachedAdminLogsPageData } from "@/lib/log-insights";
 import { fetchForwardActivityMetrics } from "@/lib/platform-activity-forward-metrics";
 import { getAdminWebVitalSummary } from "@/lib/admin-web-vitals-summary.server";
 import { getAdminRouteTimingSummary } from "@/lib/admin-route-timing-summary.server";
@@ -29,7 +29,7 @@ async function AdminLogsContent({
   const webVitalsPromise = getAdminWebVitalSummary();
   const routeTimingPromise = getAdminRouteTimingSummary();
   const taskOutcomePromise = getAdminTaskOutcomeSummary();
-  const data = await getAdminLogsPageData(initialQuery, access);
+  const data = await getCachedAdminLogsPageData(initialQuery, access);
 
   return (
     <div className="grid gap-6">

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminApiPermissionSession } from '@/lib/admin-access';
 import { getAdminLogAccessPolicy, isAllowedLogGroup } from '@/lib/admin-log-access';
 import { conditionalJsonResponse } from '@/lib/conditional-json-response';
-import { getAdminLogsPageData } from '@/lib/log-insights';
+import { getCachedAdminLogsPageData } from '@/lib/log-insights';
 import { withServerTiming } from '@/lib/server-timing';
 
 export const runtime = 'nodejs';
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     }
     try {
       const data = await timing.measure('query', () =>
-        getAdminLogsPageData({
+        getCachedAdminLogsPageData({
           preset: searchParams.get('preset'),
           start: searchParams.get('start'),
           end: searchParams.get('end'),
