@@ -25,6 +25,10 @@ test("푸시 운영 첫 화면은 대상자 전체 목록 대신 서버 read-mod
   assert.match(readModel, /partnerCount/);
   assert.match(readModel, /includeAudience = true/);
   assert.match(readModel, /getAdminNotificationOverview/);
+  assert.match(readModel, /unstable_cache/);
+  assert.match(readModel, /ADMIN_PUSH_READ_MODEL_CACHE_REVALIDATE_SECONDS = 3/);
+  assert.match(readModel, /admin-push-audience-facets/);
+  assert.match(readModel, /admin-push-notification-overview/);
   assert.match(manager, /recipientOptions/);
   assert.match(manager, /onRecipientOptionsLoaded/);
   assert.match(migration, /create or replace function public\.get_admin_push_audience_facets/);
