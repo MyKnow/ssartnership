@@ -104,11 +104,11 @@ as $$
   select
     dimensioned_events.viewport,
     dimensioned_events.route_key,
-    count(*)::bigint,
-    percentile_cont(0.75) within group (order by dimensioned_events.duration_ms)::double precision,
-    count(*) filter (where dimensioned_events.outcome = 'complete')::bigint,
-    count(*) filter (where dimensioned_events.outcome = 'unknown')::bigint,
-    count(*) filter (where dimensioned_events.outcome = 'error')::bigint
+    count(*)::bigint as sample_count,
+    percentile_cont(0.75) within group (order by dimensioned_events.duration_ms)::double precision as p75_duration_ms,
+    count(*) filter (where dimensioned_events.outcome = 'complete')::bigint as complete_count,
+    count(*) filter (where dimensioned_events.outcome = 'unknown')::bigint as unknown_count,
+    count(*) filter (where dimensioned_events.outcome = 'error')::bigint as error_count
   from dimensioned_events
   group by dimensioned_events.viewport, dimensioned_events.route_key
   order by dimensioned_events.viewport, p75_duration_ms desc nulls last;
@@ -162,9 +162,9 @@ as $$
   select
     task_events.viewport,
     task_events.task_key,
-    count(*) filter (where task_events.event_name = 'admin_task_start')::bigint,
-    count(*) filter (where task_events.event_name = 'admin_task_complete')::bigint,
-    count(*) filter (where task_events.event_name = 'admin_task_recovery')::bigint,
+    count(*) filter (where task_events.event_name = 'admin_task_start')::bigint as start_count,
+    count(*) filter (where task_events.event_name = 'admin_task_complete')::bigint as complete_count,
+    count(*) filter (where task_events.event_name = 'admin_task_recovery')::bigint as recovery_count,
     (
       count(*) filter (where task_events.event_name = 'admin_task_complete')::numeric
       / nullif(count(*) filter (where task_events.event_name = 'admin_task_start'), 0)::numeric
@@ -174,9 +174,10 @@ as $$
       count(*) filter (where task_events.event_name = 'admin_task_recovery')::numeric
       / nullif(count(*) filter (where task_events.event_name = 'admin_task_start'), 0)::numeric
       * 100
-    ),
+    ) as recovery_rate,
     percentile_cont(0.75) within group (order by task_events.duration_ms)
       filter (where task_events.duration_ms is not null)
+      as p75_duration_ms
   from task_events
   group by task_events.viewport, task_events.task_key
   order by task_events.viewport, start_count desc, task_events.task_key;

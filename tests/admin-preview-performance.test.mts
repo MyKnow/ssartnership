@@ -94,5 +94,7 @@ test("Preview 성능 dimension 집계는 viewport별 p75 계약을 유지한다"
   assert.match(migrationSource, /get_admin_task_outcome_dimension_summary/);
   assert.match(migrationSource, /'mobile', 'tablet', 'desktop'/);
   assert.match(migrationSource, /percentile_cont\(0\.75\)/);
+  assert.match(migrationSource, /as p75_duration_ms[\s\S]*order by dimensioned_events\.viewport, p75_duration_ms/);
+  assert.match(migrationSource, /as start_count[\s\S]*order by task_events\.viewport, start_count/);
   assert.match(migrationSource, /grant execute .* to service_role/i);
 });
