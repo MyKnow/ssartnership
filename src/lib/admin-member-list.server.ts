@@ -7,8 +7,6 @@ import type {
   YearFilterOption,
 } from "@/components/admin/member-manager/selectors";
 import type { AdminMemberPageSize } from "@/lib/admin-ia";
-import { getCurrentMemberProfileImageMemberIds } from "@/lib/member-profile-images";
-import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
 import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { unstable_cache } from "next/cache";
@@ -49,6 +47,19 @@ type AdminMemberDatabaseRow = {
   updated_at: string | null;
   mattermost_login_disabled_at: string | null;
   mattermost_login_disabled_reason: string | null;
+  active_profile_image_id: string | null;
+  directory:
+    | {
+        id: string;
+        mm_user_id: string;
+        mm_username: string;
+      }
+    | {
+        id: string;
+        mm_user_id: string;
+        mm_username: string;
+      }[]
+    | null;
 };
 
 type AdminMemberTrendDatabaseRow = {
@@ -76,7 +87,7 @@ type AdminMemberPolicyContext = {
 };
 
 const ADMIN_MEMBER_LIST_SELECT: string =
-  "id,mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at,mattermost_login_disabled_at,mattermost_login_disabled_reason";
+  "id,mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at,mattermost_login_disabled_at,mattermost_login_disabled_reason,active_profile_image_id,directory:mm_user_directory!members_mattermost_account_id_fkey(id,mm_user_id,mm_username)";
 const ADMIN_MEMBER_TREND_SELECT: string = "created_at";
 
 const getCachedAdminMemberPolicyContext = unstable_cache(
@@ -846,15 +857,9 @@ async function getAdminMemberListReadModelUnbounded({
       activePolicies.privacy.id,
       activeMarketingPolicy?.id,
     ].filter((id): id is string => Boolean(id));
-    const [directoryByAccountId, currentPolicyConsents, marketingPreferences, currentProfileImageMemberIds] = await Promise.all([
-      getMmUserDirectoryEntriesByAccountIds(
-        safeMembers.flatMap((member) =>
-          member.mattermost_account_id ? [member.mattermost_account_id] : [],
-        ),
-      ),
+    const [currentPolicyConsents, marketingPreferences] = await Promise.all([
       getCurrentMemberPolicyConsents(supabase, memberIds, policyDocumentIds),
       getMemberMarketingPreferences(supabase, memberIds),
-      getCurrentMemberProfileImageMemberIds(memberIds),
     ]);
     if (
       currentPolicyConsents === undefined
@@ -883,9 +888,9 @@ async function getAdminMemberListReadModelUnbounded({
       marketingPreferences,
     );
     const members = safeMembers.map((member) => {
-      const directory = member.mattermost_account_id
-        ? directoryByAccountId.get(member.mattermost_account_id)
-        : null;
+      const directory = Array.isArray(member.directory)
+        ? member.directory[0] ?? null
+        : member.directory;
       const consentedPolicyDocumentIds =
         policyDocumentIdsByMember.get(member.id) ?? new Set<string>();
       return {
@@ -906,7 +911,7 @@ async function getAdminMemberListReadModelUnbounded({
           ? effectiveMarketingConsentMemberIds.has(member.id)
           : null,
         hasProfileImage:
-          currentProfileImageMemberIds.has(member.id),
+          Boolean(member.active_profile_image_id),
         createdAt: member.created_at,
         updatedAt: member.updated_at,
       };

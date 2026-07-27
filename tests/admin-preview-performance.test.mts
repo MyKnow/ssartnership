@@ -106,7 +106,7 @@ test("페이지 응답은 인증 redirect를 성공으로 세지 않는다", asy
   assert.deepEqual(summarizeHttpSamples([
     { status: 200, totalMs: 100, serverTiming: {} },
     { status: 302, totalMs: 20, serverTiming: {} },
-  ], { isSuccessful: (sample) => sample.status === 200 }), {
+  ], { isSuccessful: (sample: { status: number }) => sample.status === 200 }), {
     requestCount: 2,
     successCount: 1,
     errorCount: 1,
