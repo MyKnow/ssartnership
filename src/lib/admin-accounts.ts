@@ -1,3 +1,4 @@
+import { revalidateTag, unstable_cache } from "next/cache";
 import {
   ADMIN_PERMISSION_TEMPLATES,
   type AdminPermissionMatrix,
@@ -101,6 +102,11 @@ const ADMIN_PROFILE_SESSION_SELECT = [
 
 const SUPER_ADMIN_USERNAME = "myknow";
 const DEFAULT_ADMIN_PERMISSION_ID = "readonly";
+const ADMIN_ACCOUNT_CACHE_REVALIDATE_SECONDS = 5;
+
+function getAdminAccountCacheTag(memberId: string) {
+  return `admin-account:${memberId}`;
+}
 
 function normalizeMemberUsername(value: string) {
   return value.trim().toLowerCase();
@@ -270,7 +276,7 @@ async function getAdminAccountFromProfile(memberId: string) {
   return getAdminAccountFromProfileLegacy(memberId);
 }
 
-export async function getAdminAccountById(memberId: string) {
+async function getAdminAccountByIdUncached(memberId: string) {
   if (!memberId) {
     return null;
   }
@@ -291,6 +297,35 @@ export async function getAdminAccountById(memberId: string) {
   // Keep the nested PostgREST read during a rolling deploy before the RPC is
   // available in the target database or schema cache.
   return getAdminAccountFromProfile(memberId);
+}
+
+/**
+ * The signed cookie still carries the permission version and the cached
+ * snapshot is invalidated whenever this application changes an admin profile.
+ * A short bounded cache avoids paying the remote Supabase round trip on every
+ * API request while keeping permission changes visible within five seconds.
+ */
+export async function getAdminAccountById(memberId: string) {
+  if (!memberId) {
+    return null;
+  }
+
+  return unstable_cache(
+    () => getAdminAccountByIdUncached(memberId),
+    ["admin-account-by-id", memberId],
+    {
+      revalidate: ADMIN_ACCOUNT_CACHE_REVALIDATE_SECONDS,
+      tags: [getAdminAccountCacheTag(memberId)],
+    },
+  )();
+}
+
+export function invalidateAdminAccountCache(memberId: string) {
+  if (!memberId) {
+    return;
+  }
+
+  revalidateTag(getAdminAccountCacheTag(memberId), "max");
 }
 
 export async function getAdminAccountByLoginId(loginId: string) {
@@ -425,6 +460,7 @@ async function persistAdminProfile(input: {
   if (error) {
     throw new Error("관리자 권한 프로필을 저장하지 못했습니다.");
   }
+  invalidateAdminAccountCache(input.memberId);
 }
 
 export async function grantMemberAdminPermission(input: {
