@@ -3,8 +3,10 @@ import { canAdmin } from "@/lib/admin-permissions";
 import { getManagedCampusFilterValues } from "@/lib/admin-scope";
 import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
 
 export const ADMIN_TASK_INBOX_READ_MODEL_TIMEOUT_MS = 2_000;
+export const ADMIN_TASK_INBOX_CACHE_REVALIDATE_SECONDS = 3;
 
 export type AdminTaskQueueCounts = Partial<Record<string, number | null>>;
 
@@ -197,6 +199,22 @@ export async function fetchAdminTaskInboxQueueCounts(
   return queueCounts;
 }
 
+const getCachedAdminTaskInboxQueueCounts = unstable_cache(
+  (input: {
+    adminId: string;
+    account: Pick<
+      AdminAccount,
+      "permissionId" | "permissions" | "managedCampusSlugs"
+    >;
+  }) =>
+    fetchAdminTaskInboxQueueCounts(getSupabaseAdminClient(), {
+      adminId: input.adminId,
+      account: input.account,
+    }),
+  ["admin-task-inbox-queue-counts"],
+  { revalidate: ADMIN_TASK_INBOX_CACHE_REVALIDATE_SECONDS },
+);
+
 export async function getAdminTaskQueueCounts({
   adminId,
   account,
@@ -208,7 +226,7 @@ export async function getAdminTaskQueueCounts({
   >;
 }): Promise<AdminTaskQueueCounts> {
   return withAdminReadModelTimeout(
-    fetchAdminTaskInboxQueueCounts(getSupabaseAdminClient(), {
+    getCachedAdminTaskInboxQueueCounts({
       adminId,
       account,
     }),
