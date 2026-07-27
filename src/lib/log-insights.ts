@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache';
 import { createAdminLogsCsvStream } from './log-insights/csv';
 import { applyAdminLogsPrivacy } from './log-insights/privacy';
 import {
@@ -43,6 +44,8 @@ import {
   LOG_PAGE_SIZE_OPTIONS,
   PAGE_MAX_LOG_ROWS_PER_GROUP,
 } from './log-insights/shared';
+
+const ADMIN_LOGS_READ_CACHE_REVALIDATE_SECONDS = 3;
 
 export type {
   AdminLogsCursor,
@@ -534,6 +537,40 @@ export async function getAdminLogsPageData(
     useDbPagedList,
     useSplitLoading,
   }));
+}
+
+function getAdminLogsReadCacheKey(
+  options: GetAdminLogsPageDataOptions,
+  access: AdminLogsAccessCapabilities,
+) {
+  const optionKey = Object.entries(options)
+    .filter(([, value]) => value !== undefined && value !== null)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `${key}=${String(value)}`)
+    .join('&');
+  const accessKey = [
+    [...access.readGroups].sort().join(','),
+    access.includePii ? 'pii' : 'redacted',
+  ].join(':');
+  return `${optionKey}|access=${accessKey}`;
+}
+
+/**
+ * Log exploration is a read-only report. Reuse the same scoped result for a
+ * short window so refreshes and repeated filter transitions do not repeat the
+ * two remote aggregate/page reads. The cache key keeps permission groups and
+ * PII visibility isolated; a few seconds of freshness is acceptable for a
+ * report that already labels its data as an operational snapshot.
+ */
+export async function getCachedAdminLogsPageData(
+  options: GetAdminLogsPageDataOptions = {},
+  access: AdminLogsAccessCapabilities,
+) {
+  return unstable_cache(
+    () => getAdminLogsPageData(options, access),
+    ['admin-logs-page', getAdminLogsReadCacheKey(options, access)],
+    { revalidate: ADMIN_LOGS_READ_CACHE_REVALIDATE_SECONDS },
+  )();
 }
 
 export async function exportAdminLogsCsv(options: CsvExportOptions = {}) {
