@@ -340,7 +340,10 @@ test("관리자 회원 화면과 수정 액션은 정규화된 회원 관계만 
     "src/app/admin/(protected)/_actions/member-actions.ts");
 
   assert.match(membersPage, /getAdminMemberListReadModel/);
-  assert.match(memberListReadModel, /getMmUserDirectoryEntriesByAccountIds/);
+  assert.match(
+    memberListReadModel,
+    /directory:mm_user_directory!members_mattermost_account_id_fkey\(id,mm_user_id,mm_username\)/,
+  );
   assert.match(memberListReadModel, /\.from\("member_policy_consents"\)/);
   assert.match(memberListReadModel, /getEffectiveMarketingConsentMemberIds/);
   assert.match(memberListReadModel, /marketing_enabled/);
