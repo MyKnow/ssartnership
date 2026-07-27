@@ -1,0 +1,63 @@
+name: Measure Admin Preview Performance
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type MEASURE_ADMIN_PERFORMANCE to collect Preview administrator performance.
+        required: true
+        type: string
+      admin_url:
+        description: Optional Preview application URL for authenticated API Server-Timing probes.
+        required: false
+        type: string
+      iterations:
+        description: Number of sequential requests per API target (1-100).
+        required: false
+        default: "30"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-preview-performance
+  cancel-in-progress: false
+
+jobs:
+  measure:
+    if: >-
+      ${{
+        github.ref == 'refs/heads/dev' &&
+        inputs.confirmation == 'MEASURE_ADMIN_PERFORMANCE'
+      }}
+    name: Collect Preview administrator performance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_PREVIEW_URL: ${{ secrets.SUPABASE_PREVIEW_URL }}
+      SUPABASE_PREVIEW_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_PREVIEW_SERVICE_ROLE_KEY }}
+      ADMIN_PREVIEW_URL: ${{ inputs.admin_url }}
+      ADMIN_PREVIEW_SESSION_COOKIE: ${{ secrets.ADMIN_PREVIEW_SESSION_COOKIE }}
+      ADMIN_PREVIEW_PROTECTION_BYPASS: ${{ secrets.ADMIN_PREVIEW_PROTECTION_BYPASS }}
+      ADMIN_PREVIEW_ITERATIONS: ${{ inputs.iterations }}
+    steps:
+      - name: Checkout selected dev revision
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate migration files
+        run: npm run validate:migrations
+
+      - name: Measure Preview administrator performance
+        run: npm run measure:admin:preview
