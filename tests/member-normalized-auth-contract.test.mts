@@ -61,6 +61,10 @@ test("관리자 권한은 admin_profiles와 MM 디렉터리만 기준으로 관�
   assert.match(adminAccounts, /\.from\("mm_user_directory"\)/);
   assert.match(
     adminAccounts,
+    /member:members!admin_profiles_member_id_fkey\([\s\S]*directory:mm_user_directory!members_mattermost_account_id_fkey\(/,
+  );
+  assert.match(
+    adminAccounts,
     /\.eq\("mattermost_account_id", directory\.id\)/,
   );
   assert.doesNotMatch(

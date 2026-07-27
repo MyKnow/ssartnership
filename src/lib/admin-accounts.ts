@@ -61,11 +61,29 @@ type AdminProfileRow = {
   updated_at: string | null;
 };
 
+type AdminMemberWithDirectoryRow = AdminMemberRow & {
+  directory:
+    | AdminDirectoryRow
+    | AdminDirectoryRow[]
+    | null;
+};
+
+type AdminProfileSessionRow = AdminProfileRow & {
+  member:
+    | AdminMemberWithDirectoryRow
+    | AdminMemberWithDirectoryRow[]
+    | null;
+};
+
 const ADMIN_MEMBER_SELECT =
   "id,mattermost_account_id,display_name,email,must_change_password,deleted_at,created_at,updated_at";
 const ADMIN_DIRECTORY_SELECT = "id,mm_username,display_name,is_active";
 const ADMIN_PROFILE_SELECT =
   "id,member_id,permission_template_key,managed_campus_slugs,is_active,permission_version,created_at,updated_at";
+const ADMIN_PROFILE_SESSION_SELECT = [
+  ADMIN_PROFILE_SELECT,
+  `member:members!admin_profiles_member_id_fkey(${ADMIN_MEMBER_SELECT},directory:mm_user_directory!members_mattermost_account_id_fkey(${ADMIN_DIRECTORY_SELECT}))`,
+].join(",");
 
 const SUPER_ADMIN_USERNAME = "myknow";
 const DEFAULT_ADMIN_PERMISSION_ID = "readonly";
@@ -156,7 +174,11 @@ async function getDirectoryById(directoryId: string | null) {
   return data as AdminDirectoryRow;
 }
 
-async function getAdminAccountFromProfile(memberId: string) {
+function resolveRelation<T>(value: T | T[] | null | undefined) {
+  return Array.isArray(value) ? value[0] ?? null : value ?? null;
+}
+
+async function getAdminAccountFromProfileLegacy(memberId: string) {
   const [profile, member] = await Promise.all([
     getAdminProfileByMemberId(memberId),
     getMemberById(memberId),
@@ -166,6 +188,28 @@ async function getAdminAccountFromProfile(memberId: string) {
   }
   const directory = await getDirectoryById(member.mattermost_account_id);
   return directory ? mapAdminProfile(profile, member, directory) : null;
+}
+
+async function getAdminAccountFromProfile(memberId: string) {
+  const { data, error } = await getSupabaseAdminClient()
+    .from("admin_profiles")
+    .select(ADMIN_PROFILE_SESSION_SELECT)
+    .eq("member_id", memberId)
+    .maybeSingle();
+
+  if (!error) {
+    const row = data as AdminProfileSessionRow | null;
+    if (!row) {
+      return null;
+    }
+    const member = resolveRelation(row.member);
+    const directory = resolveRelation(member?.directory);
+    return member && directory ? mapAdminProfile(row, member, directory) : null;
+  }
+
+  // Keep a compatibility fallback for a rolling deploy where the PostgREST
+  // schema cache has not learned the nested relationship yet.
+  return getAdminAccountFromProfileLegacy(memberId);
 }
 
 export async function getAdminAccountById(memberId: string) {
