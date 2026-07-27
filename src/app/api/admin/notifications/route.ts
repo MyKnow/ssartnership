@@ -68,15 +68,10 @@ export async function GET(request: NextRequest) {
       offset: request.nextUrl.searchParams.get("offset"),
       limit: request.nextUrl.searchParams.get("limit"),
     });
+    const includeSummary = request.nextUrl.searchParams.get("includeSummary") !== "0";
     const supabase = getSupabaseAdminClient();
-    const [unreadResult, inboxResult] = await timing.measure("query", () =>
+    const { inboxResult, unreadResult } = await timing.measure("query", () =>
       Promise.all([
-        supabase
-          .from("admin_notification_recipients")
-          .select("id", { count: "exact", head: true })
-          .eq("admin_id", auth.adminId)
-          .is("deleted_at", null)
-          .is("read_at", null),
         supabase
           .from("admin_notification_recipients")
           .select(
@@ -86,15 +81,16 @@ export async function GET(request: NextRequest) {
           .is("deleted_at", null)
           .order("created_at", { ascending: false })
           .range(offset, offset + limit),
-      ]),
+        includeSummary
+          ? supabase
+              .from("admin_notification_recipients")
+              .select("id", { count: "exact", head: true })
+              .eq("admin_id", auth.adminId)
+              .is("deleted_at", null)
+              .is("read_at", null)
+          : Promise.resolve(null),
+      ]).then(([inboxResult, unreadResult]) => ({ inboxResult, unreadResult })),
     );
-    if (unreadResult.error) {
-      console.error("[admin-notifications] unread count query failed", unreadResult.error);
-      return NextResponse.json(
-        { message: "알림을 불러오지 못했습니다." },
-        { status: 500 },
-      );
-    }
     if (inboxResult.error) {
       console.error("[admin-notifications] inbox query failed", inboxResult.error);
       return NextResponse.json(
@@ -102,21 +98,30 @@ export async function GET(request: NextRequest) {
         { status: 500 },
       );
     }
+    if (unreadResult?.error) {
+      console.error("[admin-notifications] unread count query failed", unreadResult.error);
+      return NextResponse.json(
+        { message: "알림을 불러오지 못했습니다." },
+        { status: 500 },
+      );
+    }
+    const unreadCount = unreadResult?.count ?? 0;
 
     const result = buildAdminNotificationListResult({
-      unreadCount: unreadResult.count ?? 0,
+      unreadCount,
       rows: (inboxResult.data ?? []) as AdminNotificationRecipientRow[],
       offset,
       limit,
     });
 
-    return conditionalJsonResponse(request, {
+    const response = {
       ok: true,
-      summary: { unreadCount: result.unreadCount },
       items: result.items,
       nextOffset: result.nextOffset,
       hasMore: result.hasMore,
-    });
+      ...(includeSummary ? { summary: { unreadCount: result.unreadCount } } : {}),
+    };
+    return conditionalJsonResponse(request, response);
   });
 }
 

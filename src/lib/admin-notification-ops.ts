@@ -238,6 +238,21 @@ type NotificationDeliveryRow = {
   status: "pending" | "sent" | "failed" | "skipped";
 };
 
+function hasCompleteChannelResults(
+  metadata: ReturnType<typeof parseLogMetadata>,
+) {
+  return Boolean(metadata.selectedChannels.every((channel) => {
+    const result = metadata.channelResults?.[channel];
+    return (
+      result &&
+      Number.isFinite(result.targeted) &&
+      Number.isFinite(result.sent) &&
+      Number.isFinite(result.failed) &&
+      Number.isFinite(result.skipped)
+    );
+  }));
+}
+
 type PushMessageLogRow = {
   id: string;
   type: string;
@@ -782,27 +797,36 @@ export async function getRecentAdminNotificationOperationLogs(limit = 50) {
   } else {
     const rows = (notifications ?? []) as NotificationRow[];
     if (rows.length) {
-      const { data: deliveries, error: deliveryError } = await supabase
-        .from("notification_deliveries")
-        .select("notification_id,channel,status")
-        .in("notification_id", rows.map((row) => row.id));
-      if (deliveryError) {
-        console.error(
-          "[admin-notification-ops] notification_deliveries query failed",
-          deliveryError.message,
-        );
-      }
+      const parsedRows = rows.map((row) => ({
+        row,
+        metadata: parseLogMetadata(row.metadata, ADMIN_NOTIFICATION_TYPES),
+      }));
+      const rowsNeedingDeliveryLookup = parsedRows
+        .filter(({ metadata }) => !hasCompleteChannelResults(metadata))
+        .map(({ row }) => row.id);
 
       const deliveriesByNotification = new Map<string, NotificationDeliveryRow[]>();
-      for (const delivery of (deliveries ?? []) as NotificationDeliveryRow[]) {
-        const current = deliveriesByNotification.get(delivery.notification_id) ?? [];
-        current.push(delivery);
-        deliveriesByNotification.set(delivery.notification_id, current);
+      if (rowsNeedingDeliveryLookup.length > 0) {
+        const { data: deliveries, error: deliveryError } = await supabase
+          .from("notification_deliveries")
+          .select("notification_id,channel,status")
+          .in("notification_id", rowsNeedingDeliveryLookup);
+        if (deliveryError) {
+          console.error(
+            "[admin-notification-ops] notification_deliveries query failed",
+            deliveryError.message,
+          );
+        }
+
+        for (const delivery of (deliveries ?? []) as NotificationDeliveryRow[]) {
+          const current = deliveriesByNotification.get(delivery.notification_id) ?? [];
+          current.push(delivery);
+          deliveriesByNotification.set(delivery.notification_id, current);
+        }
       }
 
-      return rows
-        .map((row) => {
-          const metadata = parseLogMetadata(row.metadata, ADMIN_NOTIFICATION_TYPES);
+      return parsedRows
+        .map(({ row, metadata }) => {
           const notificationType =
             metadata.notificationType ??
             (isAdminNotificationType(row.type, ADMIN_NOTIFICATION_TYPES) ? row.type : "announcement");

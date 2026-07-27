@@ -154,6 +154,9 @@ test("admin notification API never returns storage errors to the browser", async
   );
   assert.match(listSource, /알림을 불러오지 못했습니다\./);
   assert.match(listSource, /getSafeAdminMessage/);
+  assert.match(listSource, /includeSummary/);
+  assert.match(listSource, /includeSummary\s*\n\s*\?\s*supabase/);
+  assert.match(listSource, /includeSummary \? \{ summary:/);
   assert.match(itemSource, /getSafeAdminMessage/);
   assert.doesNotMatch(listSource, /message:\s*unreadResult\.error\.message/);
   assert.doesNotMatch(listSource, /message:\s*inboxResult\.error\.message/);
@@ -178,6 +181,17 @@ test("관리자 알림 설정 API는 실패 원문을 숨기고 응답 시간을
   assert.match(source, /알림 설정을 저장하지 못했습니다\./);
   assert.doesNotMatch(source, /message:\s*error\.message/);
   assert.doesNotMatch(source, /return NextResponse\.json\(\{\s*preferences:\s*await/);
+});
+
+test("발송 로그는 완료 메타데이터가 있으면 delivery 재조회 없이 표시한다", async () => {
+  const source = await readFile(
+    new URL("../src/lib/admin-notification-ops.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /hasCompleteChannelResults/);
+  assert.match(source, /rowsNeedingDeliveryLookup/);
+  assert.match(source, /if \(rowsNeedingDeliveryLookup\.length > 0\)/);
 });
 
 test("관리자 발송 API는 요청 재시도 키와 안전한 오류 매핑을 사용한다", async () => {
