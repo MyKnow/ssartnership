@@ -261,7 +261,11 @@ test("푸시 대상과 발송 화면은 세대·MM 디렉터리 관계만 사용
     assert.doesNotMatch(source, /\.eq\("year"|\.select\("id,display_name,mm_username,year,campus"/);
   }
   assert.match(audience, /getMmUserDirectoryEntriesByAccountIds/);
-  assert.match(recipientSearch, /getMmUserDirectoryEntriesByAccountIds/);
+  assert.match(
+    recipientSearch,
+    /directory:mm_user_directory!members_mattermost_account_id_fkey\(mm_username\)/,
+  );
+  assert.doesNotMatch(recipientSearch, /getMmUserDirectoryEntriesByAccountIds/);
   assert.match(adminPushReadModel, /generation,campus/);
   assert.match(audience, /\.eq\("generation", audience\.year\)/);
   assert.match(send, /\.eq\("generation", resolvedAudience\.year\)/);
