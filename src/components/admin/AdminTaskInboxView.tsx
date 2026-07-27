@@ -5,6 +5,7 @@ import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import Badge from "@/components/ui/Badge";
+import InlineMessage from "@/components/ui/InlineMessage";
 import Surface from "@/components/ui/Surface";
 import {
   ADMIN_NAV_ICON_BY_KEY,
@@ -12,6 +13,7 @@ import {
 } from "@/components/admin/admin-navigation";
 import {
   getAdminTaskQueueCount,
+  getNextAdminTaskItem,
   prioritizeAdminTaskItems,
   type AdminTaskQueueCounts,
 } from "@/lib/admin-task-inbox";
@@ -45,10 +47,14 @@ function AdminTaskInboxTaskList({
   tasks,
   queueCounts,
   loading = false,
+  nextTask,
+  queueCountsUnavailable = false,
 }: {
   tasks: AdminNavItem[];
   queueCounts: AdminTaskQueueCounts;
   loading?: boolean;
+  nextTask?: AdminNavItem | null;
+  queueCountsUnavailable?: boolean;
 }) {
   if (tasks.length === 0) {
     return (
@@ -81,8 +87,44 @@ function AdminTaskInboxTaskList({
         title="처리할 업무"
         description="승인·검토 업무부터 열어 현재 상태와 필요한 다음 행동을 확인하세요."
       />
+      {queueCountsUnavailable ? (
+        <InlineMessage
+          tone="warning"
+          role="status"
+          ariaLive="polite"
+          title="대기 수를 확인하지 못했습니다."
+          description="업무 화면은 열 수 있지만 현재 대기 수는 표시할 수 없습니다. 잠시 후 다시 확인해 주세요."
+          actionHref="/admin/tasks"
+          actionLabel="다시 확인"
+        />
+      ) : null}
+      {nextTask ? (
+        <Link
+          href={nextTask.href}
+          prefetch={false}
+          data-admin-task-key={getAdminRouteDescriptor(nextTask.href)?.key}
+          data-admin-task-source="task_inbox_next"
+          className="grid min-w-0 gap-3 rounded-2xl border border-primary/35 bg-primary-soft/70 p-4 transition-colors hover:border-primary/60 hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+        >
+          <span className="min-w-0">
+            <span className="ui-kicker text-primary">다음으로 처리</span>
+            <span className="mt-1 block font-semibold text-foreground">
+              {nextTask.label}
+            </span>
+            <span className="text-ko-pretty mt-1 block text-sm text-muted-foreground">
+              {nextTask.description}
+            </span>
+          </span>
+          <span className="shrink-0 text-sm font-semibold text-primary">
+            {getAdminTaskQueueCount(queueCounts, nextTask.href)?.toLocaleString(
+              "ko-KR",
+            )}
+            건 검토 시작
+          </span>
+        </Link>
+      ) : null}
       <div className="grid min-w-0 gap-3 lg:grid-cols-2">
-        {tasks.map((task) => {
+        {tasks.filter((task) => task.href !== nextTask?.href).map((task) => {
           const Icon = ADMIN_NAV_ICON_BY_KEY[task.iconKey];
 
           return (
@@ -153,10 +195,20 @@ export default function AdminTaskInboxView({
   tasks: AdminNavItem[];
   queueCounts?: AdminTaskQueueCounts;
 }) {
+  const nextTask = getNextAdminTaskItem(tasks, queueCounts);
+  const queueCountsUnavailable = Object.values(queueCounts).some(
+    (count) => count === null,
+  );
+
   return (
     <div className="grid min-w-0 gap-6">
       <AdminTaskInboxHeader />
-      <AdminTaskInboxTaskList tasks={tasks} queueCounts={queueCounts} />
+      <AdminTaskInboxTaskList
+        tasks={prioritizeAdminTaskItems(tasks, queueCounts)}
+        queueCounts={queueCounts}
+        nextTask={nextTask}
+        queueCountsUnavailable={queueCountsUnavailable}
+      />
       <AdminTaskInboxFooter />
     </div>
   );
@@ -170,9 +222,11 @@ async function AdminTaskInboxResolvedList({
   queueCounts: Promise<AdminTaskQueueCounts>;
 }) {
   let resolvedCounts: AdminTaskQueueCounts;
+  let queueCountsUnavailable = false;
   try {
     resolvedCounts = await queueCounts;
   } catch {
+    queueCountsUnavailable = true;
     resolvedCounts = Object.fromEntries(tasks.map((task) => [task.href, null]));
   }
 
@@ -180,6 +234,8 @@ async function AdminTaskInboxResolvedList({
     <AdminTaskInboxTaskList
       tasks={prioritizeAdminTaskItems(tasks, resolvedCounts)}
       queueCounts={resolvedCounts}
+      nextTask={getNextAdminTaskItem(tasks, resolvedCounts)}
+      queueCountsUnavailable={queueCountsUnavailable}
     />
   );
 }
