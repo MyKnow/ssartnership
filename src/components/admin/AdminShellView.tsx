@@ -3,12 +3,14 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeftIcon,
   ArrowTopRightOnSquareIcon,
   Bars3Icon,
+  ChevronDoubleLeftIcon,
+  ChevronDoubleRightIcon,
   ChevronRightIcon,
   HomeIcon,
   QueueListIcon,
@@ -56,6 +58,7 @@ export default function AdminShellView({
   const pathname = usePathname();
   const router = useRouter();
   const prefetchedHrefsRef = useRef(new Set<string>());
+  const [isTabletNavExpanded, setIsTabletNavExpanded] = useState(false);
   const { hidden, headerHeight, headerRef } = useAutoHideHeader();
   const activeNavItem =
     navGroups
@@ -267,9 +270,21 @@ export default function AdminShellView({
           </Container>
       </nav>
 
-      <div className="md:grid md:min-h-screen md:grid-cols-[5.5rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)]">
+      <div
+        className={cn(
+          "md:grid md:min-h-screen xl:grid-cols-[18rem_minmax(0,1fr)]",
+          isTabletNavExpanded
+            ? "md:grid-cols-[18rem_minmax(0,1fr)]"
+            : "md:grid-cols-[5.5rem_minmax(0,1fr)]",
+        )}
+      >
         <aside className="hidden border-r border-border/70 bg-surface/95 backdrop-blur-xl md:sticky md:top-0 md:block md:h-screen">
-          <div className="flex h-full flex-col gap-6 px-3 py-4 xl:px-4 xl:py-5">
+          <div
+            className={cn(
+              "flex h-full flex-col gap-4 py-4 xl:gap-6 xl:px-4 xl:py-5",
+              isTabletNavExpanded ? "px-4" : "px-3",
+            )}
+          >
             <Link
               href="/admin"
               prefetch={false}
@@ -278,20 +293,47 @@ export default function AdminShellView({
               aria-label="관리 홈"
               className={cn(
                 "flex items-center rounded-2xl border border-border/70 bg-surface-elevated px-3 py-3 text-foreground shadow-flat",
-                "justify-center xl:justify-start xl:gap-3",
+                isTabletNavExpanded
+                  ? "justify-start gap-3"
+                  : "justify-center xl:justify-start xl:gap-3",
               )}
             >
               <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border/70 bg-surface-muted">
                 <HomeIcon className="h-5 w-5" />
               </span>
-              <span className="hidden min-w-0 xl:grid">
+              <span
+                className={cn(
+                  "min-w-0",
+                  isTabletNavExpanded ? "grid" : "hidden xl:grid",
+                )}
+              >
                 <span className="truncate text-sm font-semibold">{SITE_NAME}</span>
                 <span className="truncate text-xs text-muted-foreground">관리자</span>
               </span>
             </Link>
 
+            <button
+              type="button"
+              className={cn(
+                "hidden min-h-11 items-center rounded-2xl border border-border/70 bg-surface-control px-3 text-sm font-semibold text-foreground shadow-flat transition-colors hover:border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 xl:hidden md:flex",
+                isTabletNavExpanded ? "justify-between" : "justify-center",
+              )}
+              aria-label={isTabletNavExpanded ? "관리 메뉴 접기" : "관리 메뉴 펼치기"}
+              aria-expanded={isTabletNavExpanded}
+              onClick={() => setIsTabletNavExpanded((expanded) => !expanded)}
+            >
+              {isTabletNavExpanded ? (
+                <>
+                  <span>메뉴 접기</span>
+                  <ChevronDoubleLeftIcon className="h-4 w-4" aria-hidden="true" />
+                </>
+              ) : (
+                <ChevronDoubleRightIcon className="h-5 w-5" aria-hidden="true" />
+              )}
+            </button>
+
             <div className="flex-1 overflow-y-auto pr-1">
-              <div className="xl:hidden">{renderDesktopNav(false)}</div>
+              <div className="xl:hidden">{renderDesktopNav(isTabletNavExpanded)}</div>
               <div className="hidden xl:block">{renderDesktopNav(true)}</div>
             </div>
           </div>

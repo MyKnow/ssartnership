@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, within } from "storybook/test";
+import { expect, userEvent, within } from "storybook/test";
 import Link from "next/link";
 import Surface from "@/components/ui/Surface";
 import { ADMIN_NAV_GROUPS } from "./admin-navigation";
@@ -125,5 +125,40 @@ export const MobilePrimaryNavigation: Story = {
     await expect(
       canvas.getByRole("link", { name: "주요 내용으로 건너뛰기" }),
     ).toHaveAttribute("href", "#admin-main-content");
+  },
+};
+
+export const TabletExpandableNavigation: Story = {
+  parameters: {
+    viewport: {
+      defaultViewport: "tablet",
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const expandButton = canvas.getByRole("button", { name: "관리 메뉴 펼치기" });
+
+    await expect(expandButton).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(expandButton);
+
+    await expect(
+      canvas.getByRole("button", { name: "관리 메뉴 접기" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    const desktopNavigation = canvas.getByRole("navigation", {
+      name: "관리자 영역 탐색",
+    });
+    await expect(
+      within(desktopNavigation).getByRole("link", { name: /^작업함/ }),
+    ).toBeInTheDocument();
+    await expect(
+      within(desktopNavigation).getByRole("link", { name: /^회원 관리/ }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "관리 메뉴 접기" }),
+    );
+    await expect(
+      canvas.getByRole("button", { name: "관리 메뉴 펼치기" }),
+    ).toHaveAttribute("aria-expanded", "false");
   },
 };
