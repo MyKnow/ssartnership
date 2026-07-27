@@ -286,7 +286,7 @@ export default function AdminNotificationInbox({
     setLoadingMore(true);
     try {
       const response = await fetch(
-        `/api/admin/notifications?offset=${state.nextOffset}&limit=10`,
+        `/api/admin/notifications?offset=${state.nextOffset}&limit=10&includeSummary=0`,
       );
       const data = await parseAdminNotificationResponse(response);
       setState((current) => ({

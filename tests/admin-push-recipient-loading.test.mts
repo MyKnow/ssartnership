@@ -7,23 +7,30 @@ const root = new URL("..", import.meta.url);
 const read = (path: string) => readFile(new URL(path, root), "utf8");
 
 test("푸시 운영 첫 화면은 대상자 전체 목록 대신 서버 read-model의 집계만 사용한다", async () => {
-  const [page, readModel, manager] = await Promise.all([
+  const [page, readModel, manager, migration] = await Promise.all([
     read("src/app/admin/(protected)/push/page.tsx"),
     read("src/lib/admin-push-read-model.server.ts"),
     read("src/components/admin/AdminPushManager.tsx"),
+    read("supabase/migrations/20260728030545_optimize_admin_push_audience_read_model.sql"),
   ]);
 
   assert.match(page, /getAdminPushReadModel/);
   assert.match(page, /includeAudience: initialTab === "send"/);
   assert.doesNotMatch(page, /getSupabaseAdminClient/);
   assert.doesNotMatch(page, /getMmUserDirectoryEntriesByAccountIds/);
+  assert.match(readModel, /get_admin_push_audience_facets/);
   assert.match(readModel, /select\("generation,campus", \{ count: "exact" \}\)/);
   assert.match(readModel, /select\("id", \{ count: "exact", head: true \}\)/);
+  assert.match(readModel, /Keep the old read path during rolling deploys/);
   assert.match(readModel, /partnerCount/);
   assert.match(readModel, /includeAudience = true/);
   assert.match(readModel, /getAdminNotificationOverview/);
   assert.match(manager, /recipientOptions/);
   assert.match(manager, /onRecipientOptionsLoaded/);
+  assert.match(migration, /create or replace function public\.get_admin_push_audience_facets/);
+  assert.match(migration, /availableYears/);
+  assert.match(migration, /availableCampuses/);
+  assert.match(migration, /grant execute on function public\.get_admin_push_audience_facets\(\) to service_role/);
 });
 
 test("개인 수신자 검색은 권한 검증된 제한 API와 안전한 입력 정규화를 사용한다", async () => {

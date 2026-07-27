@@ -12,10 +12,12 @@ type PartnerOptionRow = {
   name: string;
 };
 
-type ReadModelQueryResult<Row> = {
-  data: Row[] | null;
-  count: number | null;
-  error: unknown | null;
+type AdminPushAudienceFacetsPayload = {
+  memberCount?: number | string | null;
+  availableYears?: unknown;
+  availableCampuses?: unknown;
+  partners?: unknown;
+  partnerCount?: number | string | null;
 };
 
 function createEmptyReadModel(loadError = false) {
@@ -29,6 +31,122 @@ function createEmptyReadModel(loadError = false) {
     recentLogs: [],
     automaticSummaries: [],
     loadError,
+  };
+}
+
+function parseCount(
+  value: number | string | null | undefined,
+  fallback: number,
+): number {
+  const parsed = typeof value === "string" ? Number(value) : value;
+  return typeof parsed === "number" && Number.isInteger(parsed) && parsed >= 0
+    ? parsed
+    : fallback;
+}
+
+function normalizeYears(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return Array.from(
+    new Set(
+      value
+        .map((item) => (typeof item === "string" ? Number(item) : item))
+        .filter((item): item is number => Number.isInteger(item)),
+    ),
+  ).sort((left, right) => right - left);
+}
+
+function normalizeCampuses(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return Array.from(
+    new Set(
+      value
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  ).sort((left, right) => left.localeCompare(right, "ko-KR"));
+}
+
+function normalizePartners(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [] as Array<{ id: string; name: string }>;
+  }
+  return value.filter(
+    (item): item is PartnerOptionRow =>
+      typeof item === "object" &&
+      item !== null &&
+      typeof (item as PartnerOptionRow).id === "string" &&
+      typeof (item as PartnerOptionRow).name === "string",
+  );
+}
+
+async function loadAdminPushAudienceFacets(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+) {
+  const { data, error } = await supabase.rpc("get_admin_push_audience_facets");
+  if (!error) {
+    const payload = (data ?? {}) as AdminPushAudienceFacetsPayload;
+    const partners = normalizePartners(payload.partners);
+    return {
+      members: [] as AdminPushRecipientOption[],
+      memberCount: parseCount(payload.memberCount, 0),
+      availableYears: normalizeYears(payload.availableYears),
+      availableCampuses: normalizeCampuses(payload.availableCampuses),
+      partners,
+      partnerCount: parseCount(payload.partnerCount, partners.length),
+      failed: false,
+    };
+  }
+
+  // Keep the old read path during rolling deploys before the RPC exists in
+  // the target database. The fallback is also useful for local development.
+  const [memberResult, partnerResult] = await Promise.all([
+    supabase
+      .from("members")
+      .select("generation,campus", { count: "exact" })
+      .is("deleted_at", null),
+    supabase
+      .from("partners")
+      .select("id,name", { count: "exact" })
+      .order("name", { ascending: true }),
+  ]);
+  const memberFacets = (memberResult.data ?? []) as MemberFacetRow[];
+  const partners = (partnerResult.data ?? []) as PartnerOptionRow[];
+
+  return {
+    members: [] as AdminPushRecipientOption[],
+    memberCount: memberResult.count ?? memberFacets.length,
+    availableYears: normalizeYears(memberFacets.map((member) => member.generation)),
+    availableCampuses: normalizeCampuses(memberFacets.map((member) => member.campus)),
+    partners,
+    partnerCount: partnerResult.count ?? partners.length,
+    failed: Boolean(memberResult.error || partnerResult.error),
+  };
+}
+
+async function loadAdminPushAudienceSummary(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+) {
+  const [memberResult, partnerResult] = await Promise.all([
+    supabase
+      .from("members")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null),
+    supabase.from("partners").select("id", { count: "exact", head: true }),
+  ]);
+
+  return {
+    members: [] as AdminPushRecipientOption[],
+    memberCount: memberResult.count ?? 0,
+    availableYears: [] as number[],
+    availableCampuses: [] as string[],
+    partners: [] as Array<{ id: string; name: string }>,
+    partnerCount: partnerResult.count ?? 0,
+    failed: Boolean(memberResult.error || partnerResult.error),
   };
 }
 
@@ -53,62 +171,27 @@ export async function getAdminPushReadModel({
   const notificationOverviewPromise = getAdminNotificationOverview(50, 30)
     .then((value) => ({ value, failed: false as const }))
     .catch(() => ({ value: null, failed: true as const }));
-  const memberFacetPromise = (includeAudience
-    ? supabase
-        .from("members")
-        .select("generation,campus", { count: "exact" })
-        .is("deleted_at", null)
-    : supabase
-        .from("members")
-        .select("id", { count: "exact", head: true })
-        .is("deleted_at", null)) as unknown as Promise<
-    ReadModelQueryResult<MemberFacetRow>
-  >;
-  const partnerPromise = (includeAudience
-    ? supabase
-        .from("partners")
-        .select("id,name", { count: "exact" })
-        .order("name", { ascending: true })
-    : supabase.from("partners").select("id", { count: "exact", head: true })) as unknown as Promise<
-    ReadModelQueryResult<PartnerOptionRow>
-  >;
-  const [memberFacetResult, partnerResult, notificationOverviewResult] =
+  const audiencePromise = includeAudience
+    ? loadAdminPushAudienceFacets(supabase)
+    : loadAdminPushAudienceSummary(supabase);
+  const [audience, notificationOverviewResult] =
     await Promise.all([
-      memberFacetPromise,
-      partnerPromise,
+      audiencePromise,
       notificationOverviewPromise,
     ]);
-
-  const memberFacets = includeAudience ? memberFacetResult.data ?? [] : [];
-  const availableYears = Array.from(
-    new Set(
-      memberFacets
-        .map((member) => member.generation)
-        .filter((generation): generation is number => Number.isInteger(generation)),
-    ),
-  ).sort((left, right) => right - left);
-  const availableCampuses = Array.from(
-    new Set(
-      memberFacets
-        .map((member) => member.campus?.trim())
-        .filter((campus): campus is string => Boolean(campus)),
-    ),
-  ).sort((left, right) => left.localeCompare(right, "ko-KR"));
   const notificationOverview = notificationOverviewResult.value;
 
   return {
-    members: [] as AdminPushRecipientOption[],
-    memberCount: memberFacetResult.count ?? memberFacets.length,
-    availableYears,
-    availableCampuses,
-    partners: partnerResult.data ?? [],
-    partnerCount: partnerResult.count ?? (partnerResult.data ?? []).length,
+    members: audience.members,
+    memberCount: audience.memberCount,
+    availableYears: audience.availableYears,
+    availableCampuses: audience.availableCampuses,
+    partners: audience.partners,
+    partnerCount: audience.partnerCount,
     recentLogs: notificationOverview?.recentLogs ?? [],
     automaticSummaries: notificationOverview?.automaticSummaries ?? [],
     loadError: Boolean(
-      memberFacetResult.error ||
-        partnerResult.error ||
-        notificationOverviewResult.failed,
+      audience.failed || notificationOverviewResult.failed,
     ),
   };
 }
