@@ -62,6 +62,11 @@ type AdminMemberDatabaseRow = {
     | null;
 };
 
+type AdminMemberEnrichment = {
+  currentPolicyConsents: MemberPolicyConsentRow[];
+  marketingPreferences: MemberMarketingPreferenceRow[];
+};
+
 type AdminMemberTrendDatabaseRow = {
   created_at: string | null;
 };
@@ -159,6 +164,12 @@ const getCachedAdminMemberOptions = unstable_cache(
 export type AdminMemberTrendReadModel = {
   createdAts: string[];
   isSampled: boolean;
+  hasError: boolean;
+};
+
+export type AdminMemberSummaryReadModel = {
+  pendingPolicyCount: number;
+  latestUpdatedAt: string | null;
   hasError: boolean;
 };
 
@@ -688,13 +699,97 @@ function createEmptyReadModel(filters: AdminMemberListFilters) {
       isSampled: false,
       hasError: true,
     }),
+    memberSummary: Promise.resolve<AdminMemberSummaryReadModel>({
+      pendingPolicyCount: 0,
+      latestUpdatedAt: null,
+      hasError: true,
+    }),
     options: { campuses: [], years: [] },
     mustChangePasswordCount: 0,
-    pendingPolicyCount: 0,
-    latestUpdatedAt: null,
     generationMattermostLoginTargetCount: null,
     hasMemberLoadError: true,
   };
+}
+
+function getLatestMemberUpdatedAt(safeMembers: AdminMemberDatabaseRow[]) {
+  return safeMembers.reduce<string | null>((latest, member) => {
+    if (!member.updated_at) {
+      return latest;
+    }
+    if (!latest) {
+      return member.updated_at;
+    }
+    return new Date(member.updated_at).getTime() > new Date(latest).getTime()
+      ? member.updated_at
+      : latest;
+  }, null);
+}
+
+function mapAdminMemberRows({
+  safeMembers,
+  activePolicies,
+  activeMarketingPolicy,
+  enrichment,
+}: {
+  safeMembers: AdminMemberDatabaseRow[];
+  activePolicies: {
+    service: { id: string };
+    privacy: { id: string };
+  };
+  activeMarketingPolicy: { id: string } | null;
+  enrichment: AdminMemberEnrichment | null;
+}) {
+  const currentPolicyConsents = enrichment?.currentPolicyConsents ?? [];
+  const marketingPreferences = enrichment?.marketingPreferences ?? [];
+  const policyDocumentIdsByMember = new Map<string, Set<string>>();
+  for (const consent of currentPolicyConsents) {
+    if (!consent.member_id || !consent.policy_document_id) {
+      continue;
+    }
+    const current = policyDocumentIdsByMember.get(consent.member_id) ?? new Set();
+    current.add(consent.policy_document_id);
+    policyDocumentIdsByMember.set(consent.member_id, current);
+  }
+  const marketingPolicyConsentMemberIds = new Set(
+    currentPolicyConsents.flatMap((consent) =>
+      consent.member_id && consent.policy_document_id === activeMarketingPolicy?.id
+        ? [consent.member_id]
+        : [],
+    ),
+  );
+  const effectiveMarketingConsentMemberIds = getEffectiveMarketingConsentMemberIds(
+    marketingPolicyConsentMemberIds,
+    marketingPreferences,
+  );
+
+  return safeMembers.map((member) => {
+    const directory = Array.isArray(member.directory)
+      ? member.directory[0] ?? null
+      : member.directory;
+    const consentedPolicyDocumentIds =
+      policyDocumentIdsByMember.get(member.id) ?? new Set<string>();
+    return {
+      id: member.id,
+      mmUserId: directory?.mm_user_id ?? "",
+      mmUsername: directory?.mm_username ?? "",
+      manualLoginId: member.manual_login_id,
+      displayName: member.display_name,
+      generation: member.generation,
+      staffSourceGeneration: member.staff_source_generation,
+      campus: member.campus,
+      mustChangePassword: member.must_change_password,
+      mattermostLoginDisabledAt: member.mattermost_login_disabled_at,
+      mattermostLoginDisabledReason: member.mattermost_login_disabled_reason,
+      serviceConsent: Boolean(enrichment) && consentedPolicyDocumentIds.has(activePolicies.service.id),
+      privacyConsent: Boolean(enrichment) && consentedPolicyDocumentIds.has(activePolicies.privacy.id),
+      marketingConsent: activeMarketingPolicy
+        ? Boolean(enrichment) && effectiveMarketingConsentMemberIds.has(member.id)
+        : null,
+      hasProfileImage: Boolean(member.active_profile_image_id),
+      createdAt: member.created_at,
+      updatedAt: member.updated_at,
+    };
+  });
 }
 
 /**
@@ -857,64 +952,36 @@ async function getAdminMemberListReadModelUnbounded({
       activePolicies.privacy.id,
       activeMarketingPolicy?.id,
     ].filter((id): id is string => Boolean(id));
-    const [currentPolicyConsents, marketingPreferences] = await Promise.all([
+    const memberEnrichmentPromise = Promise.all([
       getCurrentMemberPolicyConsents(supabase, memberIds, policyDocumentIds),
       getMemberMarketingPreferences(supabase, memberIds),
-    ]);
-    if (
-      currentPolicyConsents === undefined
-      || marketingPreferences === undefined
-    ) {
+    ])
+      .then(([currentPolicyConsents, marketingPreferences]) => {
+        if (
+          currentPolicyConsents === undefined
+          || marketingPreferences === undefined
+        ) {
+          return undefined;
+        }
+        return { currentPolicyConsents, marketingPreferences };
+      })
+      .catch(() => undefined);
+    const hasPolicyConsentFilter =
+      filters.serviceConsentFilter !== "all"
+      || filters.privacyConsentFilter !== "all"
+      || filters.marketingConsentFilter !== "all";
+    const memberEnrichment = hasPolicyConsentFilter
+      ? await memberEnrichmentPromise
+      : null;
+    if (hasPolicyConsentFilter && !memberEnrichment) {
       return createEmptyReadModel(filters);
     }
-    const policyDocumentIdsByMember = new Map<string, Set<string>>();
-    for (const consent of currentPolicyConsents) {
-      if (!consent.member_id || !consent.policy_document_id) {
-        continue;
-      }
-      const current = policyDocumentIdsByMember.get(consent.member_id) ?? new Set();
-      current.add(consent.policy_document_id);
-      policyDocumentIdsByMember.set(consent.member_id, current);
-    }
-    const marketingPolicyConsentMemberIds = new Set(
-      currentPolicyConsents.flatMap((consent) =>
-        consent.member_id && consent.policy_document_id === activeMarketingPolicy?.id
-          ? [consent.member_id]
-          : [],
-      ),
-    );
-    const effectiveMarketingConsentMemberIds = getEffectiveMarketingConsentMemberIds(
-      marketingPolicyConsentMemberIds,
-      marketingPreferences,
-    );
-    const members = safeMembers.map((member) => {
-      const directory = Array.isArray(member.directory)
-        ? member.directory[0] ?? null
-        : member.directory;
-      const consentedPolicyDocumentIds =
-        policyDocumentIdsByMember.get(member.id) ?? new Set<string>();
-      return {
-        id: member.id,
-        mmUserId: directory?.mm_user_id ?? "",
-        mmUsername: directory?.mm_username ?? "",
-        manualLoginId: member.manual_login_id,
-        displayName: member.display_name,
-        generation: member.generation,
-        staffSourceGeneration: member.staff_source_generation,
-        campus: member.campus,
-        mustChangePassword: member.must_change_password,
-        mattermostLoginDisabledAt: member.mattermost_login_disabled_at,
-        mattermostLoginDisabledReason: member.mattermost_login_disabled_reason,
-        serviceConsent: consentedPolicyDocumentIds.has(activePolicies.service.id),
-        privacyConsent: consentedPolicyDocumentIds.has(activePolicies.privacy.id),
-        marketingConsent: activeMarketingPolicy
-          ? effectiveMarketingConsentMemberIds.has(member.id)
-          : null,
-        hasProfileImage:
-          Boolean(member.active_profile_image_id),
-        createdAt: member.created_at,
-        updatedAt: member.updated_at,
-      };
+    const resolvedMemberEnrichment = memberEnrichment ?? null;
+    const members = mapAdminMemberRows({
+      safeMembers,
+      activePolicies,
+      activeMarketingPolicy,
+      enrichment: resolvedMemberEnrichment,
     });
     const totalCount = memberResult.count ?? safeMembers.length;
     const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -922,6 +989,7 @@ async function getAdminMemberListReadModelUnbounded({
       ...result,
       isSampled: totalCount > result.createdAts.length,
     }));
+    const latestUpdatedAt = getLatestMemberUpdatedAt(safeMembers);
     const optionRows = optionsResult.data;
     const options = {
       campuses: Array.from(
@@ -942,23 +1010,31 @@ async function getAdminMemberListReadModelUnbounded({
     const mustChangePasswordCount = members.filter(
       (member) => member.mustChangePassword,
     ).length;
-    const pendingPolicyCount = members.filter(
-      (member) =>
-        !member.serviceConsent ||
-        !member.privacyConsent ||
-        (activeMarketingPolicy && !member.marketingConsent),
-    ).length;
-    const latestUpdatedAt = members.reduce<string | null>((latest, member) => {
-      if (!member.updatedAt) {
-        return latest;
+    const memberSummary = memberEnrichmentPromise.then((enrichment) => {
+      if (!enrichment) {
+        return {
+          pendingPolicyCount: 0,
+          latestUpdatedAt,
+          hasError: true,
+        } satisfies AdminMemberSummaryReadModel;
       }
-      if (!latest) {
-        return member.updatedAt;
-      }
-      return new Date(member.updatedAt).getTime() > new Date(latest).getTime()
-        ? member.updatedAt
-        : latest;
-    }, null);
+      const enrichedMembers = mapAdminMemberRows({
+        safeMembers,
+        activePolicies,
+        activeMarketingPolicy,
+        enrichment,
+      });
+      return {
+        pendingPolicyCount: enrichedMembers.filter(
+          (member) =>
+            !member.serviceConsent
+            || !member.privacyConsent
+            || (activeMarketingPolicy && !member.marketingConsent),
+        ).length,
+        latestUpdatedAt,
+        hasError: false,
+      } satisfies AdminMemberSummaryReadModel;
+    });
 
     return {
       filters,
@@ -967,10 +1043,9 @@ async function getAdminMemberListReadModelUnbounded({
       totalPages,
       shouldRedirectToLastPage: page > totalPages,
       memberTrend,
+      memberSummary,
       options,
       mustChangePasswordCount,
-      pendingPolicyCount,
-      latestUpdatedAt,
       generationMattermostLoginTargetCount:
         generationMattermostLoginTargetResult?.error
           ? null
