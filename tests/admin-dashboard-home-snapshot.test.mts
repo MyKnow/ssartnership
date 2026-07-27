@@ -57,6 +57,18 @@ test("관리 홈 read-model은 느린 RPC를 안전한 오류 상태로 제한�
   assert.match(source, /hasError: true/);
 });
 
+test("관리 홈 snapshot은 권한 범위를 포함한 짧은 서버 캐시를 사용한다", async () => {
+  const source = await readFile(
+    new URL("../src/lib/admin-dashboard-home.server.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /unstable_cache/);
+  assert.match(source, /ADMIN_DASHBOARD_HOME_CACHE_REVALIDATE_SECONDS = 3/);
+  assert.match(source, /getCachedAdminDashboardHomeSnapshot\(\{/);
+  assert.match(source, /managedCampusSlugs: getManagedCampusFilterValues\(account\)/);
+});
+
 test("기수 설정은 짧은 서버 캐시를 사용하고 cycle 변경 시 즉시 무효화한다", async () => {
   const [settingsSource, helpersSource] = await Promise.all([
     readFile(new URL("../src/lib/ssafy-cycle-settings.ts", import.meta.url), "utf8"),

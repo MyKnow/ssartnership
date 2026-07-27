@@ -188,6 +188,17 @@ test("작업함은 count 조회를 기다리지 않고 업무 링크를 먼저 �
   assert.match(layoutSource, /AdminTaskTelemetry/);
 });
 
+test("작업함 큐 집계는 짧은 서버 캐시로 반복 RPC를 줄인다", async () => {
+  const source = await readFile(
+    new URL("../src/lib/admin-task-inbox.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /unstable_cache/);
+  assert.match(source, /ADMIN_TASK_INBOX_CACHE_REVALIDATE_SECONDS = 3/);
+  assert.match(source, /getCachedAdminTaskInboxQueueCounts\(\{/);
+});
+
 test("홈의 다음 작업은 실제 대기 건이 있는 권한 내 작업만 선택한다", async () => {
   const { getAdminTaskQueueCount, getNextAdminTaskItem } = await taskInboxModulePromise;
   const tasks = [

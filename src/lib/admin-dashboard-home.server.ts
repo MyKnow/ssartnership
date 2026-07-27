@@ -8,13 +8,32 @@ import { canAdmin } from "@/lib/admin-permissions";
 import { getManagedCampusFilterValues } from "@/lib/admin-scope";
 import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
 
 export const ADMIN_DASHBOARD_READ_MODEL_TIMEOUT_MS = 2_000;
+export const ADMIN_DASHBOARD_HOME_CACHE_REVALIDATE_SECONDS = 3;
 
 export type AdminDashboardHomeData = {
   snapshot: AdminDashboardHomeSnapshot;
   hasError: boolean;
 };
+
+type AdminDashboardHomeSnapshotInput = {
+  adminId: string;
+  managedCampusSlugs: readonly string[] | null;
+  includeBrandQueues: boolean;
+  includeGraduateVerifications: boolean;
+  includeSignupRequests: boolean;
+  includeProfilePhotos: boolean;
+  includeNotifications: boolean;
+};
+
+const getCachedAdminDashboardHomeSnapshot = unstable_cache(
+  (input: AdminDashboardHomeSnapshotInput) =>
+    fetchAdminDashboardHomeSnapshot(getSupabaseAdminClient(), input),
+  ["admin-dashboard-home-snapshot"],
+  { revalidate: ADMIN_DASHBOARD_HOME_CACHE_REVALIDATE_SECONDS },
+);
 
 /**
  * Server read model for the administrator home screen.
@@ -34,7 +53,7 @@ export async function getAdminDashboardHomeData({
   >;
 }): Promise<AdminDashboardHomeData> {
   return withAdminReadModelTimeout(
-    fetchAdminDashboardHomeSnapshot(getSupabaseAdminClient(), {
+    getCachedAdminDashboardHomeSnapshot({
       adminId,
       managedCampusSlugs: getManagedCampusFilterValues(account),
       includeBrandQueues: canAdmin(account.permissions, "brands", "read"),
