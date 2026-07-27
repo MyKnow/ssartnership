@@ -190,8 +190,11 @@ function printTextReport(report) {
       const phases = Object.entries(target.serverTimingP95Ms)
         .map(([phase, value]) => `${phase}=${value ?? "n/a"}ms`)
         .join(", ");
+      const statuses = Object.entries(target.statusCounts)
+        .map(([status, count]) => `${status}=${count}`)
+        .join(", ");
       console.log(
-        `- ${target.key}: total=${target.totalP95Ms ?? "n/a"}ms, success=${target.successCount}/${target.requestCount}${phases ? `, ${phases}` : ""}`,
+        `- ${target.key}: total=${target.totalP95Ms ?? "n/a"}ms, success=${target.successCount}/${target.requestCount}, statuses=${statuses || "none"}${phases ? `, ${phases}` : ""}`,
       );
     }
   }
