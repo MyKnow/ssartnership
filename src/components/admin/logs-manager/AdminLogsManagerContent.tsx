@@ -15,15 +15,20 @@ import {
 } from "@/components/admin/logs/AdminLogsPanels";
 import { AdminLogsExplorer } from "@/components/admin/logs/AdminLogsExplorer";
 import { RANGE_PRESET_OPTIONS } from "@/components/admin/logs/utils";
-import type { AdminLogsPageData } from "@/lib/log-insights";
+import type {
+  AdminLogsPageData,
+  GetAdminLogsPageDataOptions,
+} from "@/lib/log-insights";
 import { useAdminLogsManager } from "@/components/admin/logs-manager/useAdminLogsManager";
 
 export default function AdminLogsManagerContent({
   initialData,
+  initialQuery,
 }: {
   initialData: AdminLogsPageData;
+  initialQuery?: GetAdminLogsPageDataOptions;
 }) {
-  const logs = useAdminLogsManager(initialData);
+  const logs = useAdminLogsManager(initialData, initialQuery);
 
   return (
     <>

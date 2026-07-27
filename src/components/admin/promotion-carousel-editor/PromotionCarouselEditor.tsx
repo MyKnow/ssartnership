@@ -618,7 +618,7 @@ export default function PromotionCarouselEditor({
       <Card tone="elevated" className="grid gap-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="ui-kicker">Preview</p>
+            <p className="ui-kicker">미리보기</p>
             <h2 className="mt-2 text-xl font-semibold text-foreground">
               홈 캐러셀 미리보기
             </h2>
@@ -650,7 +650,7 @@ export default function PromotionCarouselEditor({
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="ui-kicker">Editor</p>
+            <p className="ui-kicker">편집</p>
             <h2 className="mt-2 text-xl font-semibold text-foreground">
               광고 카드 편집
             </h2>

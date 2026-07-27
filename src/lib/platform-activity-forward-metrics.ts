@@ -1,6 +1,7 @@
+import { logAdminDataUnavailable } from "@/lib/admin-observability";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
-const ADMIN_FORWARD_ACTIVITY_TIMEOUT_MS = 500;
+const ADMIN_FORWARD_ACTIVITY_TIMEOUT_MS = 200;
 
 export type ForwardActivityPoint = {
   date: string;
@@ -44,7 +45,7 @@ export async function fetchForwardActivityMetrics(anchorDate?: string) {
       },
     ).abortSignal(AbortSignal.timeout(ADMIN_FORWARD_ACTIVITY_TIMEOUT_MS));
     if (error) {
-      console.error("[admin-activity] metrics query failed", error.message);
+      logAdminDataUnavailable("admin-activity", error);
       return {
         metrics: emptyForwardActivityMetrics(),
         errorMessage: "unavailable",
@@ -85,9 +86,7 @@ export async function fetchForwardActivityMetrics(anchorDate?: string) {
       errorMessage: null as string | null,
     };
   } catch {
-    console.error("[admin-activity] metrics query failed", {
-      reasonCode: "unexpected_failure",
-    });
+    logAdminDataUnavailable("admin-activity", null);
     return {
       metrics: emptyForwardActivityMetrics(),
       errorMessage: "unavailable",

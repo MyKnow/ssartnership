@@ -34,6 +34,10 @@ test("기수 운영 화면은 조회 권한과 변경 CTA를 분리한다", asyn
   assert.match(cycleView, /canUpdate \? "기준값 수정" : "기준값 조회"/);
   assert.match(
     cycleView,
+    /href="\/admin\/cycle\/mock"\s+prefetch=\{false\}/,
+  );
+  assert.match(
+    cycleView,
     /canManageSenderCreate\s+\?\s+saveMattermostSenderAction/,
   );
   assert.match(senderView, /saveAction\?: AdminFormAction/);

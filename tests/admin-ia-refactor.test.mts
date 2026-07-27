@@ -94,13 +94,13 @@ test("legacy admin partner tabs resolve to their canonical routes", async () => 
   assert.equal(resolveAdminPartnerTabRedirect(undefined), null);
 });
 
-test("관리자 탐색은 다섯 업무 그룹과 독립적인 작업함 항목을 제공한다", async () => {
+test("관리자 탐색은 의도 기반 여섯 업무 그룹과 작업함 항목을 제공한다", async () => {
   const { ADMIN_NAV_GROUPS, ADMIN_NAV_ITEMS, getAdminTaskItems } =
     await adminNavigationModulePromise;
 
   assert.deepEqual(
     ADMIN_NAV_GROUPS.map((group) => group.label),
-    ["개요", "회원·검토", "제휴 운영", "메시지·노출", "운영 기록·설정"],
+    ["홈", "작업함", "데이터", "리포트", "자동화", "설정"],
   );
 
   const taskInbox = ADMIN_NAV_ITEMS.find((item) => item.href === "/admin/tasks");
@@ -132,6 +132,26 @@ test("admin navigation separates list, request, category, inbox, and send tasks"
   assert.equal(byHref.get("/admin/notifications")?.label, "내 알림");
   assert.equal(byHref.get("/admin/push")?.label, "발송 관리");
   assert.equal(byHref.get("/admin/push")?.permission.resource, "notifications");
+});
+
+test("관리자 화면은 업무 목적에 맞는 그룹에 배치되고 로그는 리포트로 모인다", async () => {
+  const { ADMIN_NAV_GROUPS } = await adminNavigationModulePromise;
+  const groupByHref = new Map(
+    ADMIN_NAV_GROUPS.flatMap((group) =>
+      group.items.map((item) => [item.href, group.label] as const),
+    ),
+  );
+
+  assert.equal(groupByHref.get("/admin"), "홈");
+  assert.equal(groupByHref.get("/admin/tasks"), "작업함");
+  assert.equal(groupByHref.get("/admin/members"), "데이터");
+  assert.equal(groupByHref.get("/admin/reviews"), "작업함");
+  assert.equal(groupByHref.get("/admin/partners"), "데이터");
+  assert.equal(groupByHref.get("/admin/partner-requests"), "작업함");
+  assert.equal(groupByHref.get("/admin/push"), "자동화");
+  assert.equal(groupByHref.get("/admin/notifications"), "작업함");
+  assert.equal(groupByHref.get("/admin/logs"), "리포트");
+  assert.equal(groupByHref.get("/admin/admins"), "설정");
 });
 
 test("관리자 빠른 찾기는 이름과 설명으로 권한 내 화면을 찾는다", async () => {

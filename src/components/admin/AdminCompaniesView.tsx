@@ -58,7 +58,7 @@ export default function AdminCompaniesView({
       {!loadError ? (
         <>
           <AdminWorkspaceSummary
-            eyebrow="운영"
+            eyebrow="데이터"
             title="파트너사 운영 현황"
             description="처리할 회사·계정 연결을 먼저 확인하고, 아래 탭에서 한 가지 작업을 이어갑니다."
             items={[
@@ -94,6 +94,7 @@ export default function AdminCompaniesView({
             canCreate={canCreate}
             canUpdate={canUpdate}
             canDelete={canDelete}
+            accountSummary={accountSummary}
             actions={actions}
           />
         </>

@@ -80,7 +80,7 @@ async function AdminPartnerRequestsContent({
   return (
     <div className="grid min-w-0 gap-6">
         <AdminReviewQueueHeader
-          eyebrow="제휴 운영"
+          eyebrow="작업함"
           title="제휴처 변경 요청"
           description="파트너사 담당자가 요청한 변경 항목을 현재 값과 비교해 승인하거나 거절합니다."
           actions={

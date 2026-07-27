@@ -32,6 +32,14 @@ test("이벤트 목록·상세는 조회·생성·수정·삭제 권한에 맞�
   assert.match(detailPage, /canDelete=\{canDelete\}/);
   assert.match(listView, /canCreate = true/);
   assert.match(listView, /canUpdate = true/);
+  assert.match(
+    listView,
+    /href=\{`\/admin\/event\/\$\{item\.slug\}`\}\s+prefetch=\{false\}/,
+  );
+  assert.match(
+    listView,
+    /href=\{`\/events\/\$\{item\.slug\}`\}\s+prefetch=\{false\}/,
+  );
   assert.match(detailView, /canCreate = true/);
   assert.match(detailView, /canUpdate = true/);
   assert.match(detailView, /canDelete = true/);

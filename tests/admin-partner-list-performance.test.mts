@@ -29,6 +29,9 @@ test("관리자 제휴처 목록은 read-model의 서버 count/range와 안전�
   assert.match(readModelSource, /partnersQuery = partnersQuery\.range\(/);
   assert.match(readModelSource, /from \+ normalizedFilters\.pageSize - 1/);
   assert.match(readModelSource, /getPartnerNameSearchPattern\(normalizedFilters\.searchValue\)/);
+  assert.match(readModelSource, /withAdminReadModelTimeout/);
+  assert.match(readModelSource, /ADMIN_PARTNER_LIST_READ_MODEL_TIMEOUT_MS/);
+  assert.match(readModelSource, /createEmptyAdminPartnerListReadModel/);
   assert.match(readModelSource, /applies_to/);
   assert.doesNotMatch(readModelSource, /conditions,benefits,applies_to,images,tags/);
   assert.doesNotMatch(readModelSource, /thumbnail,map_url,benefit_action_type/);
@@ -73,5 +76,7 @@ test("목록 오류는 내부 오류 대신 재시도 가능한 안전한 안내
 
   assert.match(managerSource, /제휴처 목록을 불러오지 못했습니다/);
   assert.match(managerSource, /router\.refresh\(\)/);
+  assert.match(managerSource, /loadingText="다시 불러오는 중"/);
+  assert.match(managerSource, /startTransition\(\(\) => router\.refresh\(\)\)/);
   assert.doesNotMatch(managerSource, /Error\.message/);
 });

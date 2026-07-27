@@ -5,7 +5,7 @@ import test from "node:test";
 import { shouldUseDbPagedAdminLogList } from "@/lib/log-insights";
 
 test("로그 explorer는 보조 집계보다 먼저 렌더링할 수 있다", async () => {
-  const [pageSource, ancillarySource] = await Promise.all([
+  const [pageSource, ancillarySource, dataSource] = await Promise.all([
     readFile(
       new URL("../src/app/admin/(protected)/logs/page.tsx", import.meta.url),
       "utf8",
@@ -17,14 +17,20 @@ test("로그 explorer는 보조 집계보다 먼저 렌더링할 수 있다", as
       ),
       "utf8",
     ),
+    readFile(
+      new URL("../src/lib/log-insights/data.ts", import.meta.url),
+      "utf8",
+    ),
   ]);
 
   assert.match(pageSource, /<Suspense/);
   assert.match(pageSource, /<AdminLogsAncillaryPanels/);
   assert.ok(
-    pageSource.indexOf("<AdminLogsManager initialData={data} />") <
+    pageSource.indexOf("<AdminLogsManager initialData={data} initialQuery={initialQuery} />") <
       pageSource.indexOf("<Suspense"),
   );
+  assert.match(pageSource, /searchParams\?: AdminLogsSearchParams/);
+  assert.match(pageSource, /getFirstSearchParam/);
   assert.match(
     pageSource,
     /const activityPromise = fetchForwardActivityMetrics\(\)/,
@@ -33,22 +39,47 @@ test("로그 explorer는 보조 집계보다 먼저 렌더링할 수 있다", as
     pageSource,
     /const webVitalsPromise = getAdminWebVitalSummary\(\)/,
   );
+  assert.match(
+    pageSource,
+    /const routeTimingPromise = getAdminRouteTimingSummary\(\)/,
+  );
+  assert.match(
+    pageSource,
+    /const taskOutcomePromise = getAdminTaskOutcomeSummary\(\)/,
+  );
+  assert.match(pageSource, /taskOutcome=\{taskOutcomePromise\}/);
   assert.doesNotMatch(
     pageSource,
     /const \[data, activity, webVitals\] = await Promise\.all/,
   );
   assert.match(ancillarySource, /await Promise\.all/);
+  assert.match(ancillarySource, /resolveTaskOutcome/);
   assert.match(ancillarySource, /로그 탐색은 계속 사용할 수 있습니다/);
 
-  const managerSource = await readFile(
-    new URL(
-      "../src/components/admin/logs-manager/AdminLogsManagerContent.tsx",
-      import.meta.url,
+  const [managerSource, hookSource] = await Promise.all([
+    readFile(
+      new URL(
+        "../src/components/admin/logs-manager/AdminLogsManagerContent.tsx",
+        import.meta.url,
+      ),
+      "utf8",
     ),
-    "utf8",
-  );
+    readFile(
+      new URL(
+        "../src/components/admin/logs-manager/useAdminLogsManager.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
   assert.doesNotMatch(managerSource, /AdminForwardActivityPanel/);
   assert.doesNotMatch(managerSource, /activityMetrics/);
+  assert.match(managerSource, /initialQuery\?: GetAdminLogsPageDataOptions/);
+  assert.match(hookSource, /nextCursor/);
+  assert.match(hookSource, /cursorByPageRef/);
+  assert.match(hookSource, /history\.replaceState/);
+  assert.match(dataSource, /get_admin_logs_cursor_scoped/);
+  assert.match(dataSource, /cursor rpc unavailable, falling back to page rpc/);
 });
 
 test("shouldUseDbPagedAdminLogList allows newest queries including all-group and search filters", () => {

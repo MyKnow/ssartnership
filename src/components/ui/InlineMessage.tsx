@@ -24,6 +24,8 @@ export default function InlineMessage({
   action,
   actionHref,
   actionLabel,
+  role,
+  ariaLive,
 }: {
   title?: string;
   description?: string;
@@ -32,6 +34,8 @@ export default function InlineMessage({
   action?: React.ReactNode;
   actionHref?: string;
   actionLabel?: string;
+  role?: "alert" | "status";
+  ariaLive?: "assertive" | "polite" | "off";
 }) {
   const resolvedAction =
     action ??
@@ -43,6 +47,8 @@ export default function InlineMessage({
 
   return (
     <div
+      role={role ?? (tone === "danger" ? "alert" : undefined)}
+      aria-live={ariaLive}
       className={cn(
         "rounded-[1.35rem] border px-4 py-4 shadow-flat",
         tones[tone],

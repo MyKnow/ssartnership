@@ -4,10 +4,12 @@ import {
   type AdminGlobalSearchMember,
   type AdminGlobalSearchPartner,
 } from "@/lib/admin-global-search";
+import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/uuid";
 
 const SEARCH_RESULT_LIMIT = 8;
+export const ADMIN_GLOBAL_SEARCH_READ_MODEL_TIMEOUT_MS = 2_000;
 
 type AdminGlobalSearchMemberRow = {
   id: string;
@@ -134,8 +136,16 @@ export async function searchAdminGlobalEntities({
   );
 
   const [memberResults, partnerResults] = await Promise.all([
-    Promise.all(memberQueries).catch(() => null),
-    Promise.all(scopedPartnerQueries).catch(() => null),
+    withAdminReadModelTimeout(
+      Promise.all(memberQueries).catch(() => null),
+      null,
+      ADMIN_GLOBAL_SEARCH_READ_MODEL_TIMEOUT_MS,
+    ),
+    withAdminReadModelTimeout(
+      Promise.all(scopedPartnerQueries).catch(() => null),
+      null,
+      ADMIN_GLOBAL_SEARCH_READ_MODEL_TIMEOUT_MS,
+    ),
   ]);
   const memberSearchFailed =
     memberResults === null || memberResults.some((result) => Boolean(result.error));

@@ -8,6 +8,7 @@ import {
   useTransition,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import FilterBar from "@/components/ui/FilterBar";
 import Input from "@/components/ui/Input";
@@ -193,13 +194,16 @@ export default function AdminPartnerManager({
           title="제휴처 목록을 불러오지 못했습니다."
           description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 담당자에게 알려 주세요."
         />
-        <button
+        <Button
           type="button"
-          onClick={() => router.refresh()}
-          className="min-h-11 justify-self-center rounded-xl border border-border bg-surface-control px-4 text-sm font-semibold text-foreground"
+          variant="secondary"
+          loading={isPending}
+          loadingText="다시 불러오는 중"
+          onClick={() => startTransition(() => router.refresh())}
+          className="justify-self-center"
         >
           다시 확인
-        </button>
+        </Button>
       </Surface>
     );
   }
@@ -217,6 +221,7 @@ export default function AdminPartnerManager({
               <span className="ui-caption">검색</span>
               <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                 <Input
+                  aria-label="제휴처명 검색"
                   value={searchInputValue}
                   onChange={(event) => {
                     setSearchInputDraft({
@@ -231,7 +236,6 @@ export default function AdminPartnerManager({
                     }
                   }}
                   placeholder="제휴처명으로 검색"
-                  aria-label="제휴처명 검색"
                 />
                 <button
                   type="button"

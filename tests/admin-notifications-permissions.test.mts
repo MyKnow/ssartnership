@@ -21,4 +21,5 @@ test("관리자 알림 수신함은 발송 권한이 없으면 작성 흐름을 
   assert.match(view, /canSend\s*\?/);
   assert.match(view, /\/admin\/push\?tab=send/);
   assert.match(flow, /steps\.length === 2/);
+  assert.match(flow, /href=\{step\.href\}\s+prefetch=\{false\}/);
 });

@@ -17,6 +17,8 @@ test("쿠폰 다운로드와 관리자 CRUD 버튼은 제출 중 상태를 표�
   assert.match(form, /loadingText=\{mode === "edit" \? "저장 중" : "생성 중"\}/);
   assert.match(manager, /loadingText="복제 중"/);
   assert.match(manager, /loadingText="삭제 중"/);
+  assert.match(manager, /label: "발급"/);
+  assert.match(manager, /issuedCount/);
   assert.match(manager, /쿠폰 작업을 처리하지 못했습니다\./);
   assert.match(manager, /md:grid-cols-\[minmax\(0,1fr\)_auto\]/);
   assert.match(manager, /break-words text-lg font-semibold/);
@@ -54,11 +56,13 @@ test("쿠폰 생성 UI는 발급·사용 방식에 맞는 필드만 렌더링한
   assert.match(source, /title="발급·사용 방식"/);
   assert.match(source, /title="운영 기간"/);
   assert.match(source, /title="발급 한도 및 상태"/);
+  assert.match(source, /모든 회원 합산 사용 횟수입니다/);
+  assert.match(source, /회원별 누적 보유·사용 한도/);
   assert.match(source, /title="사용 안내"/);
   assert.match(source, /parseCreateAdCouponForm/);
   assert.match(source, /onInvalidCapture={handleNativeInvalid}/);
   assert.match(source, /aria-describedby=\{formError \? formErrorId : undefined\}/);
-  assert.match(source, />\s*Error\s*<\/span>/);
+  assert.match(source, />\s*입력 오류\s*<\/span>/);
 });
 
 test("제휴처 상세 쿠폰 Chip에는 전체 사용량 문구를 다시 노출하지 않는다", async () => {

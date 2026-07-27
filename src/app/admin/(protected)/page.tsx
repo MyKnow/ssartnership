@@ -39,7 +39,7 @@ function AdminPlatformActivityFallback() {
   );
 }
 
-async function AdminDashboardContent({
+function AdminDashboardContent({
   adminSession,
 }: {
   adminSession: Awaited<ReturnType<typeof getAdminSession>>;
@@ -54,11 +54,30 @@ async function AdminDashboardContent({
         snapshot: toAdminDashboardHomeSnapshot(),
         hasError: false,
       });
-  const [cycleSettings, dashboardSnapshotResult] = await Promise.all([
-    cycleSettingsPromise,
-    dashboardSnapshotPromise,
-  ]);
-  const cycleOverview = getSsafyCycleOverview(cycleSettings);
+  return (
+    <Suspense fallback={<AdminDashboardSkeletonContent />}>
+      <AdminDashboardData
+        adminSession={adminSession}
+        cycleSettingsPromise={cycleSettingsPromise}
+        dashboardSnapshotPromise={dashboardSnapshotPromise}
+      />
+    </Suspense>
+  );
+}
+
+async function AdminDashboardData({
+  adminSession,
+  cycleSettingsPromise,
+  dashboardSnapshotPromise,
+}: {
+  adminSession: Awaited<ReturnType<typeof getAdminSession>>;
+  cycleSettingsPromise: ReturnType<typeof getSsafyCycleSettings>;
+  dashboardSnapshotPromise: ReturnType<typeof getAdminDashboardHomeData> | Promise<{
+    snapshot: ReturnType<typeof toAdminDashboardHomeSnapshot>;
+    hasError: boolean;
+  }>;
+}) {
+  const dashboardSnapshotResult = await dashboardSnapshotPromise;
   const includeGlobalTasks = adminSession
     ? !isRegionalAdminAccount(adminSession.account)
     : false;
@@ -67,9 +86,17 @@ async function AdminDashboardContent({
     includeGlobalTasks &&
     canAdmin(adminSession.account.permissions, "logs", "read");
 
-  const cycleMeta = cycleSettings.manualCurrentYear
-    ? `${cycleOverview.currentYear}기 · 조기 시작`
-    : `${cycleOverview.currentYear}기 · ${cycleOverview.currentSemester}학기`;
+  const cycleMeta = (
+    <Suspense
+      fallback={
+        <span role="status" aria-label="기수 설정을 확인하는 중">
+          확인 중
+        </span>
+      }
+    >
+      <AdminDashboardCycleMeta settingsPromise={cycleSettingsPromise} />
+    </Suspense>
+  );
 
   return (
     <AdminDashboardView
@@ -92,6 +119,31 @@ async function AdminDashboardContent({
   );
 }
 
+async function AdminDashboardCycleMeta({
+  settingsPromise,
+}: {
+  settingsPromise: ReturnType<typeof getSsafyCycleSettings>;
+}) {
+  let cycleMeta: string | null = null;
+  try {
+    const settings = await settingsPromise;
+    const cycleOverview = getSsafyCycleOverview(settings);
+    cycleMeta = settings.manualCurrentYear
+      ? `${cycleOverview.currentYear}기 · 조기 시작`
+      : `${cycleOverview.currentYear}기 · ${cycleOverview.currentSemester}학기`;
+  } catch {
+    cycleMeta = null;
+  }
+
+  return cycleMeta ? (
+    <>{cycleMeta}</>
+  ) : (
+    <span role="status" aria-label="기수 설정을 확인하지 못함">
+      확인 불가
+    </span>
+  );
+}
+
 export default async function AdminPage() {
   const hasSupabaseEnv =
     !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -101,7 +153,7 @@ export default async function AdminPage() {
       <AdminShell title="관리 홈">
         <div className="grid gap-6">
           <AdminPageHeader
-            eyebrow="운영"
+            eyebrow="홈"
             title="관리 홈"
             description="운영 정보를 준비하지 못했습니다. 잠시 후 다시 확인해 주세요."
           />

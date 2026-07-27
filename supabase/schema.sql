@@ -2203,6 +2203,7 @@ create table if not exists notifications (
   body text not null,
   target_url text not null,
   metadata jsonb not null default '{}'::jsonb,
+  idempotency_key text unique,
   created_by_member_id uuid references members(id) on delete set null,
   created_at timestamp with time zone default now()
 );

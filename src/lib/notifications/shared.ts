@@ -46,6 +46,7 @@ export type NotificationBroadcastInput = {
   targetUrl: string;
   metadata?: Record<string, unknown>;
   createdByMemberId?: string | null;
+  idempotencyKey?: string | null;
   recipientMemberIds: string[];
 };
 

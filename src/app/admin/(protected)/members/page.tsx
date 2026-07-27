@@ -35,7 +35,11 @@ import {
   MAX_MEMBER_SYNC_BATCH_SIZE,
   parseMemberSyncBatchOptions,
 } from "@/lib/mm-member-sync";
-import { getConfiguredCurrentSsafyYear } from "@/lib/ssafy-cycle-settings";
+import {
+  getConfiguredCurrentSsafyYear,
+  getSsafyCycleSettings,
+  normalizeSsafyCycleSettings,
+} from "@/lib/ssafy-cycle-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +73,49 @@ function AdminMemberTrendFallback() {
       <Skeleton className="h-4 w-full max-w-xl" />
       <Skeleton className="h-48 w-full" />
     </Surface>
+  );
+}
+
+function AdminMemberManualAddFallback() {
+  return (
+    <section className="grid min-w-0 gap-4">
+      <AdminSectionHeading
+        title="수동 추가"
+        description="행을 직접 추가하거나 XLSX로 입력 행을 만든 뒤, 사진 ZIP 검증과 계정 초대를 진행합니다."
+      />
+      <Card tone="elevated" aria-busy="true" aria-label="수동 추가 기능을 불러오는 중">
+        <div className="grid gap-3">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-4 w-full max-w-xl" />
+          <Skeleton className="h-11 w-full max-w-sm" />
+        </div>
+      </Card>
+    </section>
+  );
+}
+
+async function AdminMemberManualAddSection({
+  canReissueManualSetup,
+}: {
+  canReissueManualSetup: boolean;
+}) {
+  const cycleSettings = await getSsafyCycleSettings().catch(() =>
+    normalizeSsafyCycleSettings(),
+  );
+
+  return (
+    <section className="grid min-w-0 gap-4">
+      <AdminSectionHeading
+        title="수동 추가"
+        description="행을 직접 추가하거나 XLSX로 입력 행을 만든 뒤, 사진 ZIP 검증과 계정 초대를 진행합니다."
+      />
+      <Card tone="elevated">
+        <AdminMemberManualAddPanel
+          currentGeneration={getConfiguredCurrentSsafyYear(cycleSettings)}
+          canReissueManualSetup={canReissueManualSetup}
+        />
+      </Card>
+    </section>
   );
 }
 
@@ -111,7 +158,6 @@ async function AdminMembersContent({
     mustChangePasswordCount,
     pendingPolicyCount,
     latestUpdatedAt,
-    cycleSettings,
     hasMemberLoadError,
   } = await getAdminMemberListReadModel({
     filters,
@@ -294,18 +340,9 @@ async function AdminMembersContent({
           </section>
         ) : null}
 
-        <section className="grid min-w-0 gap-4">
-          <AdminSectionHeading
-            title="수동 추가"
-            description="행을 직접 추가하거나 XLSX로 입력 행을 만든 뒤, 사진 ZIP 검증과 계정 초대를 진행합니다."
-          />
-          <Card tone="elevated">
-            <AdminMemberManualAddPanel
-              currentGeneration={getConfiguredCurrentSsafyYear(cycleSettings)}
-              canReissueManualSetup={canAdmin(adminSession.account.permissions, "members", "update")}
-            />
-          </Card>
-        </section>
+        <Suspense fallback={<AdminMemberManualAddFallback />}>
+          <AdminMemberManualAddSection canReissueManualSetup={canUpdateMembers} />
+        </Suspense>
 
         <Card tone="elevated">
           <AdminSectionHeading

@@ -117,7 +117,7 @@ export default async function AdminPartnerDetailEditSection({
                 name: item.name,
                 slug: item.slug,
               }))}
-              categoryId={partner.category_id}
+              categoryId={partner.category_id ?? undefined}
               formAction={updatePartner}
               submitLabel="제휴처 저장"
               clearDraftOnSuccess={partnerSaved}

@@ -4,10 +4,12 @@ import {
   parseAdminNotificationPaging,
   type AdminNotificationRecipientRow,
 } from "@/lib/admin-notification-inbox";
+import { conditionalJsonResponse } from "@/lib/conditional-json-response";
 import { getAdminSession } from "@/lib/auth";
 import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { withServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
 
@@ -54,61 +56,67 @@ async function getUnreadCount(adminId: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const auth = await requireAdminNotificationSession(request);
-  if ("response" in auth) {
-    return auth.response;
-  }
-
-  const { offset, limit } = parseAdminNotificationPaging({
-    offset: request.nextUrl.searchParams.get("offset"),
-    limit: request.nextUrl.searchParams.get("limit"),
-  });
-  const supabase = getSupabaseAdminClient();
-  const [unreadResult, inboxResult] = await Promise.all([
-    supabase
-      .from("admin_notification_recipients")
-      .select("id", { count: "exact", head: true })
-      .eq("admin_id", auth.adminId)
-      .is("deleted_at", null)
-      .is("read_at", null),
-    supabase
-      .from("admin_notification_recipients")
-      .select(
-        "id,read_at,deleted_at,created_at,updated_at,notification:admin_notifications(id,type,title,body,target_url,metadata,created_at)",
-      )
-      .eq("admin_id", auth.adminId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit),
-  ]);
-  if (unreadResult.error) {
-    console.error("[admin-notifications] unread count query failed", unreadResult.error);
-    return NextResponse.json(
-      { message: "알림을 불러오지 못했습니다." },
-      { status: 500 },
+  return withServerTiming(async (timing) => {
+    const auth = await timing.measure("auth", () =>
+      requireAdminNotificationSession(request),
     );
-  }
-  if (inboxResult.error) {
-    console.error("[admin-notifications] inbox query failed", inboxResult.error);
-    return NextResponse.json(
-      { message: "알림을 불러오지 못했습니다." },
-      { status: 500 },
+    if (!("adminId" in auth)) {
+      return auth.response;
+    }
+
+    const { offset, limit } = parseAdminNotificationPaging({
+      offset: request.nextUrl.searchParams.get("offset"),
+      limit: request.nextUrl.searchParams.get("limit"),
+    });
+    const supabase = getSupabaseAdminClient();
+    const [unreadResult, inboxResult] = await timing.measure("query", () =>
+      Promise.all([
+        supabase
+          .from("admin_notification_recipients")
+          .select("id", { count: "exact", head: true })
+          .eq("admin_id", auth.adminId)
+          .is("deleted_at", null)
+          .is("read_at", null),
+        supabase
+          .from("admin_notification_recipients")
+          .select(
+            "id,read_at,deleted_at,created_at,updated_at,notification:admin_notifications(id,type,title,body,target_url,metadata,created_at)",
+          )
+          .eq("admin_id", auth.adminId)
+          .is("deleted_at", null)
+          .order("created_at", { ascending: false })
+          .range(offset, offset + limit),
+      ]),
     );
-  }
+    if (unreadResult.error) {
+      console.error("[admin-notifications] unread count query failed", unreadResult.error);
+      return NextResponse.json(
+        { message: "알림을 불러오지 못했습니다." },
+        { status: 500 },
+      );
+    }
+    if (inboxResult.error) {
+      console.error("[admin-notifications] inbox query failed", inboxResult.error);
+      return NextResponse.json(
+        { message: "알림을 불러오지 못했습니다." },
+        { status: 500 },
+      );
+    }
 
-  const result = buildAdminNotificationListResult({
-    unreadCount: unreadResult.count ?? 0,
-    rows: (inboxResult.data ?? []) as AdminNotificationRecipientRow[],
-    offset,
-    limit,
-  });
+    const result = buildAdminNotificationListResult({
+      unreadCount: unreadResult.count ?? 0,
+      rows: (inboxResult.data ?? []) as AdminNotificationRecipientRow[],
+      offset,
+      limit,
+    });
 
-  return NextResponse.json({
-    ok: true,
-    summary: { unreadCount: result.unreadCount },
-    items: result.items,
-    nextOffset: result.nextOffset,
-    hasMore: result.hasMore,
+    return conditionalJsonResponse(request, {
+      ok: true,
+      summary: { unreadCount: result.unreadCount },
+      items: result.items,
+      nextOffset: result.nextOffset,
+      hasMore: result.hasMore,
+    });
   });
 }
 

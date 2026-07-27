@@ -18,7 +18,9 @@ test("관리자 활성도 보조 집계는 로그 탐색을 오래 붙잡지 않
   ]);
 
   assert.match(serverSource, /abortSignal\(AbortSignal\.timeout\(/);
-  assert.match(serverSource, /ADMIN_FORWARD_ACTIVITY_TIMEOUT_MS = 500/);
+  assert.match(serverSource, /ADMIN_FORWARD_ACTIVITY_TIMEOUT_MS = 200/);
+  assert.match(serverSource, /logAdminDataUnavailable/);
+  assert.doesNotMatch(serverSource, /console\.error/);
   assert.match(migrationSource, /rolling_activity as \(/);
   assert.match(migrationSource, /count\(distinct identities\.identity_hash\)/);
   assert.doesNotMatch(

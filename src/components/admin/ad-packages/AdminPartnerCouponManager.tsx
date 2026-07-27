@@ -163,6 +163,7 @@ export default function AdminPartnerCouponManager({
   canDeleteCoupon?: boolean;
 }) {
   const activeCouponCount = coupons.filter((coupon) => coupon.status === "active").length;
+  const issuedCount = coupons.reduce((sum, coupon) => sum + coupon.issuedCount, 0);
   const usedCount = coupons.reduce((sum, coupon) => sum + coupon.usedCount, 0);
   const campaignOptions = campaigns.filter((campaign) => campaign.partnerId === partnerId);
 
@@ -178,14 +179,15 @@ export default function AdminPartnerCouponManager({
         items={[
           { label: "전체 쿠폰", value: `${coupons.length}개`, hint: "이 제휴처 등록 쿠폰" },
           { label: "활성 쿠폰", value: `${activeCouponCount}개`, hint: "회원에게 노출 가능" },
-          { label: "사용", value: `${usedCount}건`, hint: "누적 사용 횟수" },
+          { label: "발급", value: `${issuedCount.toLocaleString("ko-KR")}건`, hint: "누적 발급 횟수" },
+          { label: "사용", value: `${usedCount.toLocaleString("ko-KR")}건`, hint: "누적 사용 횟수" },
         ]}
         minItemWidth="12rem"
       />
 
       {errorMessage ? (
-        <InlineMessage
-          tone="error"
+          <InlineMessage
+            tone="danger"
           title="쿠폰 작업을 처리하지 못했습니다."
           description={errorMessage}
         />

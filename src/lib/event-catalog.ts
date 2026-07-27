@@ -42,6 +42,9 @@ export const PRODUCT_EVENT_NAMES = [
   'ad_push_send',
   'admin_web_vital',
   'admin_route_timing',
+  'admin_task_start',
+  'admin_task_complete',
+  'admin_task_recovery',
 ] as const;
 
 export type ProductEventName = (typeof PRODUCT_EVENT_NAMES)[number];
@@ -143,6 +146,7 @@ export const ADMIN_AUDIT_ACTIONS = [
   'notification_template_reset',
   'notification_template_test_send',
   'admin_log_export_requested',
+  'log_retention_purge',
 ] as const;
 
 export type AdminAuditAction = (typeof ADMIN_AUDIT_ACTIONS)[number];

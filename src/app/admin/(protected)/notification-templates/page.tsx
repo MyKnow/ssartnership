@@ -3,6 +3,7 @@ import AdminNotificationTemplateManager from "@/components/admin/AdminNotificati
 import AdminOperationFlow from "@/components/admin/AdminOperationFlow";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminShell from "@/components/admin/AdminShell";
+import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import { AdminNotificationTemplatesSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import Button from "@/components/ui/Button";
 import {
@@ -24,8 +25,31 @@ async function AdminNotificationTemplatesContent({
   session: Awaited<ReturnType<typeof requireNotificationTemplateAdmin>>;
   params: { status?: string; error?: string };
 }) {
-  const templates = await listNotificationTemplateSummaries();
   const feedback = getNotificationTemplateFeedback(params);
+  let templates;
+  try {
+    templates = await listNotificationTemplateSummaries();
+  } catch {
+    return (
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="자동화"
+          title="알림 템플릿 관리"
+          description="채널별 기본 문구와 허용 변수만 관리합니다."
+        />
+        <AdminStatePanel
+          kind="error"
+          title="알림 템플릿을 불러오지 못했습니다."
+          description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 기록을 확인해 주세요."
+          action={
+            <Button href="/admin/notification-templates" variant="secondary">
+              다시 확인
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="grid min-w-0 gap-6">

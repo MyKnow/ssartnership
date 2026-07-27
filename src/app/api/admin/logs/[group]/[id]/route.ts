@@ -3,6 +3,7 @@ import { ensureAdminApiPermission } from "@/lib/admin-access";
 import { getAdminLogAccessPolicy } from "@/lib/admin-log-access";
 import { getAdminSession } from "@/lib/auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { withServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
 
@@ -23,77 +24,83 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ group: string; id: string }> },
 ) {
-  const accessDenied = await ensureAdminApiPermission(request, "logs", "read");
-  if (accessDenied) {
-    return accessDenied;
-  }
-
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json(
-      { message: "관리자 인증이 필요합니다." },
-      { status: 401 },
+  return withServerTiming(async (timing) => {
+    const accessDenied = await timing.measure("auth", () =>
+      ensureAdminApiPermission(request, "logs", "read"),
     );
-  }
+    if (accessDenied) {
+      return accessDenied;
+    }
 
-  const { group: rawGroup, id } = await params;
-  if (!isLogGroup(rawGroup) || !isUuid(id)) {
-    return NextResponse.json(
-      { message: "로그 상세 대상을 확인해 주세요." },
-      { status: 400 },
-    );
-  }
+    const session = await timing.measure("session", () => getAdminSession());
+    if (!session) {
+      return NextResponse.json(
+        { message: "관리자 인증이 필요합니다." },
+        { status: 401 },
+      );
+    }
 
-  const access = getAdminLogAccessPolicy({
-    permissionId: session.account.permissionId,
-    permissions: session.account.permissions,
-  });
-  if (!access.readGroups.includes(rawGroup)) {
-    return NextResponse.json(
-      { message: "요청한 로그 그룹 조회 권한이 없습니다." },
-      { status: 403 },
-    );
-  }
+    const { group: rawGroup, id } = await params;
+    if (!isLogGroup(rawGroup) || !isUuid(id)) {
+      return NextResponse.json(
+        { message: "로그 상세 대상을 확인해 주세요." },
+        { status: 400 },
+      );
+    }
 
-  const table =
-    rawGroup === "product"
-      ? "event_logs"
-      : rawGroup === "audit"
-        ? "admin_audit_logs"
-        : "auth_security_logs";
+    const access = getAdminLogAccessPolicy({
+      permissionId: session.account.permissionId,
+      permissions: session.account.permissions,
+    });
+    if (!access.readGroups.includes(rawGroup)) {
+      return NextResponse.json(
+        { message: "요청한 로그 그룹 조회 권한이 없습니다." },
+        { status: 403 },
+      );
+    }
 
-  try {
-    const { data, error } = await getSupabaseAdminClient()
-      .from(table)
-      .select("id,properties")
-      .eq("id", id)
-      .maybeSingle();
+    const table =
+      rawGroup === "product"
+        ? "event_logs"
+        : rawGroup === "audit"
+          ? "admin_audit_logs"
+          : "auth_security_logs";
 
-    if (error) {
+    try {
+      const { data, error } = await timing.measure("query", () =>
+        getSupabaseAdminClient()
+          .from(table)
+          .select("id,properties")
+          .eq("id", id)
+          .maybeSingle(),
+      );
+
+      if (error) {
+        return NextResponse.json(
+          { message: "로그 상세를 불러오지 못했습니다." },
+          { status: 503 },
+        );
+      }
+      if (!data) {
+        return NextResponse.json(
+          { message: "로그 상세를 찾지 못했습니다." },
+          { status: 404 },
+        );
+      }
+
+      return NextResponse.json(
+        {
+          properties: access.includePii
+            ? ((data as { properties?: Record<string, unknown> | null }).properties ?? null)
+            : null,
+        },
+        { headers: { "Cache-Control": "private, no-store" } },
+      );
+    } catch {
       return NextResponse.json(
         { message: "로그 상세를 불러오지 못했습니다." },
         { status: 503 },
       );
     }
-    if (!data) {
-      return NextResponse.json(
-        { message: "로그 상세를 찾지 못했습니다." },
-        { status: 404 },
-      );
-    }
-
-    return NextResponse.json(
-      {
-        properties: access.includePii
-          ? ((data as { properties?: Record<string, unknown> | null }).properties ?? null)
-          : null,
-      },
-      { headers: { "Cache-Control": "private, no-store" } },
-    );
-  } catch {
-    return NextResponse.json(
-      { message: "로그 상세를 불러오지 못했습니다." },
-      { status: 503 },
-    );
-  }
+  });
 }

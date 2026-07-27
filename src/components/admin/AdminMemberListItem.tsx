@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { AdminMember } from "@/components/admin/member-manager/selectors";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import { parseSsafyProfile } from "@/lib/mm-profile";
@@ -39,6 +40,26 @@ export default function AdminMemberListItem({
     .charAt(0)
     .toUpperCase();
   const [avatarFailed, setAvatarFailed] = useState(false);
+  const [avatarInView, setAvatarInView] = useState(false);
+  const avatarContainerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const container = avatarContainerRef.current;
+    if (!container || !member.hasProfileImage) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setAvatarInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "96px" },
+    );
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [member.hasProfileImage]);
   const avatarUrl = useMemo(() => {
     const query = member.updatedAt
       ? `?v=${encodeURIComponent(member.updatedAt)}`
@@ -48,13 +69,17 @@ export default function AdminMemberListItem({
 
   return (
     <article className="grid min-w-0 gap-4 rounded-2xl border border-border/80 bg-surface-inset p-4 sm:grid-cols-[3.5rem_minmax(0,1fr)_auto] sm:items-center">
-      <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface-muted text-lg font-semibold text-foreground">
-        {member.hasProfileImage && !avatarFailed ? (
+      <div
+        ref={avatarContainerRef}
+        className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface-muted text-lg font-semibold text-foreground"
+      >
+        {member.hasProfileImage && avatarInView && !avatarFailed ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={avatarUrl}
             alt=""
             loading="lazy"
+            fetchPriority="low"
             decoding="async"
             className="h-full w-full object-cover"
             onError={() => setAvatarFailed(true)}
@@ -91,6 +116,7 @@ export default function AdminMemberListItem({
 
       <Link
         href={`/admin/members/${member.id}`}
+        prefetch={false}
         className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-[1rem] border border-primary/10 bg-primary-soft px-4 text-sm font-semibold text-primary shadow-flat transition-interactive hover:-translate-y-px hover:border-primary/20"
       >
         상세 보기

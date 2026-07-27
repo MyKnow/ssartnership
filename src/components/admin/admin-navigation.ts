@@ -69,7 +69,7 @@ export const ADMIN_NAV_ICON_BY_KEY: Record<AdminNavIconKey, AdminNavIcon> = {
 
 export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   {
-    label: "개요",
+    label: "홈",
     items: [
       {
         href: "/admin",
@@ -80,6 +80,11 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         permission: { resource: "members" },
         alwaysVisible: true,
       },
+    ],
+  },
+  {
+    label: "작업함",
+    items: [
       {
         href: "/admin/tasks",
         label: "작업함",
@@ -88,27 +93,6 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         iconKey: "queue",
         permission: { resource: "members" },
         alwaysVisible: true,
-      },
-    ],
-  },
-  {
-    label: "회원·검토",
-    items: [
-      {
-        href: "/admin/members",
-        label: "회원 관리",
-        description: "회원 검색, 수정, 추가",
-        keywords: ["사람", "계정", "검색", "추가", "회원"],
-        iconKey: "users",
-        permission: { resource: "members" },
-      },
-      {
-        href: "/admin/reviews",
-        label: "리뷰 관리",
-        description: "리뷰 검수와 공개 상태",
-        keywords: ["후기", "평점", "검수", "댓글"],
-        iconKey: "star",
-        permission: { resource: "reviews" },
       },
       {
         href: "/admin/member-signup-requests",
@@ -134,11 +118,6 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         iconKey: "users",
         permission: { resource: "profile_images" },
       },
-    ],
-  },
-  {
-    label: "제휴 운영",
-    items: [
       {
         href: "/admin/partner-registrations",
         label: "등록 신청",
@@ -156,6 +135,35 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         permission: { resource: "brands" },
       },
       {
+        href: "/admin/reviews",
+        label: "리뷰 관리",
+        description: "리뷰 검수와 공개 상태",
+        keywords: ["후기", "평점", "검수", "댓글"],
+        iconKey: "star",
+        permission: { resource: "reviews" },
+      },
+      {
+        href: "/admin/notifications",
+        label: "내 알림",
+        description: "운영 알림을 읽고 후속 작업으로 이동",
+        keywords: ["알림", "읽음", "통지", "메시지"],
+        iconKey: "bell",
+        permission: { resource: "notifications" },
+      },
+    ],
+  },
+  {
+    label: "데이터",
+    items: [
+      {
+        href: "/admin/members",
+        label: "회원 관리",
+        description: "회원 검색, 수정, 추가",
+        keywords: ["사람", "계정", "검색", "추가", "회원"],
+        iconKey: "users",
+        permission: { resource: "members" },
+      },
+      {
         href: "/admin/partners",
         label: "제휴처",
         description: "노출 카드와 혜택 정보",
@@ -170,6 +178,14 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         permission: { resource: "brands" },
       },
       {
+        href: "/admin/companies",
+        label: "파트너사/계정",
+        description: "회사와 담당 계정 연결",
+        keywords: ["파트너", "회사", `${["업", "체"].join("")} 계정`, "담당자"],
+        iconKey: "building",
+        permission: { resource: "companies" },
+      },
+      {
         href: "/admin/categories",
         label: "카테고리",
         description: "제휴처 분류 체계",
@@ -178,27 +194,24 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         permission: { resource: "brands" },
         globalOnly: true,
       },
+    ],
+  },
+  {
+    label: "리포트",
+    items: [
       {
-        href: "/admin/companies",
-        label: "파트너사/계정",
-        description: "회사와 담당 계정 연결",
-        keywords: ["파트너", "회사", `${["업", "체"].join("")} 계정`, "담당자"],
-        iconKey: "building",
-        permission: { resource: "companies" },
+        href: "/admin/logs",
+        label: "운영 로그",
+        description: "제품·감사·보안 기록과 성능 지표를 탐색",
+        keywords: ["기록", "감사", "보안", "이력", "로그", "지표"],
+        iconKey: "chart",
+        permission: { resource: "logs" },
       },
     ],
   },
   {
-    label: "메시지·노출",
+    label: "자동화",
     items: [
-      {
-        href: "/admin/notifications",
-        label: "내 알림",
-        description: "운영 알림을 읽고 후속 작업으로 이동",
-        keywords: ["알림", "읽음", "통지", "메시지"],
-        iconKey: "bell",
-        permission: { resource: "notifications" },
-      },
       {
         href: "/admin/push",
         label: "발송 관리",
@@ -234,16 +247,8 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     ],
   },
   {
-    label: "운영 기록·설정",
+    label: "설정",
     items: [
-      {
-        href: "/admin/logs",
-        label: "운영 로그",
-        description: "제품·감사·보안 기록을 탐색",
-        keywords: ["기록", "감사", "보안", "이력", "로그"],
-        iconKey: "chart",
-        permission: { resource: "logs" },
-      },
       {
         href: "/admin/cycle",
         label: "기수 관리",

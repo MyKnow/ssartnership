@@ -157,7 +157,7 @@ export async function listAdminPartnerRegistrationRequestPage({
   }
 
   const rowsById = new Map(
-    ((rowsResult.data ?? []) as AdminPartnerRegistrationRequestDataRow[]).map(
+    ((rowsResult.data ?? []) as unknown as AdminPartnerRegistrationRequestDataRow[]).map(
       (row) => [row.id, row],
     ),
   );

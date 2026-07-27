@@ -2,6 +2,22 @@ import type { AdminPushRecipientOption } from "@/lib/admin-push-recipient-search
 import { getAdminNotificationOverview } from "@/lib/admin-notification-ops";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
+type MemberFacetRow = {
+  generation: number | null;
+  campus: string | null;
+};
+
+type PartnerOptionRow = {
+  id: string;
+  name: string;
+};
+
+type ReadModelQueryResult<Row> = {
+  data: Row[] | null;
+  count: number | null;
+  error: unknown | null;
+};
+
 function createEmptyReadModel(loadError = false) {
   return {
     members: [] as AdminPushRecipientOption[],
@@ -37,7 +53,7 @@ export async function getAdminPushReadModel({
   const notificationOverviewPromise = getAdminNotificationOverview(50, 30)
     .then((value) => ({ value, failed: false as const }))
     .catch(() => ({ value: null, failed: true as const }));
-  const memberFacetPromise = includeAudience
+  const memberFacetPromise = (includeAudience
     ? supabase
         .from("members")
         .select("generation,campus", { count: "exact" })
@@ -45,13 +61,17 @@ export async function getAdminPushReadModel({
     : supabase
         .from("members")
         .select("id", { count: "exact", head: true })
-        .is("deleted_at", null);
-  const partnerPromise = includeAudience
+        .is("deleted_at", null)) as unknown as Promise<
+    ReadModelQueryResult<MemberFacetRow>
+  >;
+  const partnerPromise = (includeAudience
     ? supabase
         .from("partners")
         .select("id,name", { count: "exact" })
         .order("name", { ascending: true })
-    : supabase.from("partners").select("id", { count: "exact", head: true });
+    : supabase.from("partners").select("id", { count: "exact", head: true })) as unknown as Promise<
+    ReadModelQueryResult<PartnerOptionRow>
+  >;
   const [memberFacetResult, partnerResult, notificationOverviewResult] =
     await Promise.all([
       memberFacetPromise,

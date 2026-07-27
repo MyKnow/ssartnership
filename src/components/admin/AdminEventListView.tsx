@@ -100,6 +100,7 @@ function EventCard({
       <div className="flex flex-wrap gap-3">
         <Link
           href={`/admin/event/${item.slug}`}
+          prefetch={false}
           className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-surface px-4 text-sm font-semibold text-foreground transition hover:border-strong hover:bg-surface-elevated"
         >
           {item.isRegistered
@@ -112,6 +113,7 @@ function EventCard({
         </Link>
         <Link
           href={`/events/${item.slug}`}
+          prefetch={false}
           className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-surface-muted px-4 text-sm font-semibold text-foreground transition hover:border-strong hover:bg-surface-elevated"
         >
           랜딩 보기
@@ -195,7 +197,7 @@ export default function AdminEventListView({
         >
           <div className="flex min-w-0 items-end justify-between gap-3 px-1">
             <div className="min-w-0">
-              <p className="ui-kicker">Events</p>
+              <p className="ui-kicker">이벤트</p>
               <h2 className="mt-2 break-words text-xl font-semibold text-foreground">
                 {section.bucket}
               </h2>

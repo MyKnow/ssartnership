@@ -50,6 +50,7 @@ test("빠른 찾기는 Enter로 실제 대상 검색으로 이동하고 검색 �
   assert.match(navigatorSource, /router\.push\(/);
   assert.match(navigatorSource, /onSubmit=/);
   assert.match(navigatorSource, /ariaLabel="회원·제휴처 검색"/);
+  assert.match(navigatorSource, /router\.push\(href\);\s*closeNavigator\(\);/);
   assert.match(pageSource, /canAdmin\(adminSession\.account\.permissions, "members", "read"\)/);
   assert.match(pageSource, /canAdmin\(adminSession\.account\.permissions, "brands", "read"\)/);
   assert.match(pageSource, /searchAdminGlobalEntities/);
@@ -82,6 +83,7 @@ test("검색 결과 상세 이동은 검증된 returnTo로 검색 맥락을 보�
   assert.match(memberDetailSource, /sanitizeAdminReturnTo/);
   assert.match(partnerDetailSource, /sanitizeAdminReturnTo/);
   assert.match(resultsSource, /URLSearchParams\(\{ returnTo \}\)/);
+  assert.match(resultsSource, /<Link\s+href=\{href\}\s+prefetch=\{false\}/);
 });
 
 test("통합 검색은 느린 조회 중에도 검색 구조를 유지하는 전용 skeleton을 제공한다", async () => {
@@ -107,4 +109,16 @@ test("통합 검색은 느린 조회 중에도 검색 구조를 유지하는 전
   assert.match(skeletonSource, /AdminGlobalSearchSkeletonContent/);
   assert.match(skeletonSource, /AdminShell title="통합 검색"/);
   assert.match(contentSource, /export function AdminGlobalSearchSkeletonContent/);
+});
+
+test("통합 검색의 병렬 읽기는 timeout 후 안전한 부분 실패 상태로 복구한다", async () => {
+  const searchServiceSource = await readFile(
+    new URL("../src/lib/admin-global-search.server.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(searchServiceSource, /withAdminReadModelTimeout/);
+  assert.match(searchServiceSource, /ADMIN_GLOBAL_SEARCH_READ_MODEL_TIMEOUT_MS/);
+  assert.match(searchServiceSource, /memberResults === null/);
+  assert.match(searchServiceSource, /partnerResults === null/);
 });

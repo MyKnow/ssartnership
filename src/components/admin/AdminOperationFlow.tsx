@@ -73,6 +73,7 @@ export default function AdminOperationFlow({
               {step.href && state !== "current" ? (
                 <Link
                   href={step.href}
+                  prefetch={false}
                   className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                 >
                   {content}

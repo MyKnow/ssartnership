@@ -1,10 +1,17 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import AdminNotificationCenter from "@/components/admin/notification-center/AdminNotificationCenter";
 import AdminOperationFlow from "@/components/admin/AdminOperationFlow";
 import AdminStatePanel from "@/components/admin/AdminStatePanel";
+import AdminConfirmDialog from "@/components/admin/AdminConfirmDialog";
 import AdminTabs from "@/components/admin/AdminTabs";
 import { buildAdminPushTabHref } from "@/lib/admin-operation-paths";
 import { getMemberLabel } from "./push-manager/constants";
@@ -30,6 +37,10 @@ export {
 } from "./push-manager/selectors";
 
 export type AdminPushTab = "center" | "logs" | "send";
+
+function isAdminPushTab(value: string | null): value is AdminPushTab {
+  return value === "center" || value === "logs" || value === "send";
+}
 
 const adminPushTabOptions = [
   {
@@ -88,14 +99,23 @@ export default function AdminPushManager({
     canSend,
     canDeleteLogs,
   });
-  const [selectedTab, setSelectedTab] = useState<AdminPushTab>(initialTab);
   const requestedTab = searchParams.get("tab");
-  const activeTab: AdminPushTab =
-    requestedTab === "center" ||
-    requestedTab === "logs" ||
-    requestedTab === "send"
-      ? requestedTab
-      : selectedTab;
+  const urlTab = isAdminPushTab(requestedTab) ? requestedTab : null;
+  const [selectedTab, setSelectedTab] = useState<AdminPushTab>(
+    urlTab ?? initialTab,
+  );
+  const lastSyncedUrlTabRef = useRef<AdminPushTab | null>(urlTab);
+  const [, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (urlTab === lastSyncedUrlTabRef.current) {
+      return;
+    }
+    lastSyncedUrlTabRef.current = urlTab;
+    startTransition(() => setSelectedTab(urlTab ?? initialTab));
+  }, [initialTab, startTransition, urlTab]);
+
+  const activeTab = selectedTab;
 
   function changeTab(nextTab: AdminPushTab) {
     setSelectedTab(nextTab);
@@ -116,7 +136,7 @@ export default function AdminPushManager({
     activeTab === "send" && controller.reviewState ? "current" : "upcoming";
 
   return (
-    <div className="grid min-w-0 gap-8 overflow-x-hidden">
+    <div className="grid min-w-0 gap-8">
       <AdminOperationFlow
         steps={[
           {
@@ -174,7 +194,7 @@ export default function AdminPushManager({
                 }
               : undefined
           }
-          onDeleteLog={canDeleteLogs ? controller.deleteLog : undefined}
+          onDeleteLog={canDeleteLogs ? controller.requestDeleteLog : undefined}
         />
       ) : !canSend ? (
         <AdminStatePanel
@@ -228,6 +248,18 @@ export default function AdminPushManager({
           onAudienceScopeChange={controller.handleAudienceScopeChange}
         />
       )}
+      <AdminConfirmDialog
+        open={controller.deleteLogConfirmId !== null}
+        title="발송 로그 삭제"
+        description="선택한 발송 로그를 삭제합니다. 삭제 후에는 관리자 화면에서 다시 확인할 수 없습니다."
+        confirmLabel="로그 삭제"
+        danger
+        pending={controller.deletingLogId !== null}
+        onClose={controller.closeDeleteLogConfirm}
+        onConfirm={() => {
+          void controller.confirmDeleteLog();
+        }}
+      />
     </div>
   );
 }

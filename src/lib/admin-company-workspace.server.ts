@@ -172,6 +172,7 @@ export async function getAdminCompanyWorkspaceReadModel({
     }));
     const companies = (companiesResult.data ?? []) as PartnerCompanyRow[];
     const scopedCompanyIds = new Set(companies.map((company) => company.id));
+    const scopedCompanyIdList = [...scopedCompanyIds];
     const brandCountByCompanyId = new Map<string, number>();
     for (const partner of partners) {
       const companyId = partner.company_id ?? partner.company?.id ?? null;
@@ -179,29 +180,44 @@ export async function getAdminCompanyWorkspaceReadModel({
         brandCountByCompanyId.set(companyId, (brandCountByCompanyId.get(companyId) ?? 0) + 1);
       }
     }
-    const [accountsResult, accountLinksResult] = await Promise.all(
+    const accountsQuery =
       tab === "accounts"
-        ? [
-            supabase
-              .from("partner_accounts")
-              .select(PARTNER_ACCOUNT_DETAIL_SELECT)
-              .order("created_at", { ascending: false }),
-            supabase
-              .from("partner_account_companies")
-              .select(PARTNER_ACCOUNT_DETAIL_LINK_SELECT)
-              .order("created_at", { ascending: false }),
-          ]
-        : [
-            supabase
-              .from("partner_accounts")
-              .select(PARTNER_ACCOUNT_SUMMARY_SELECT)
-              .order("created_at", { ascending: false }),
-            supabase
-              .from("partner_account_companies")
-              .select(PARTNER_ACCOUNT_SUMMARY_LINK_SELECT)
-              .order("created_at", { ascending: false }),
-          ],
-    );
+        ? supabase
+            .from("partner_accounts")
+            .select(PARTNER_ACCOUNT_DETAIL_SELECT)
+            .order("created_at", { ascending: false })
+        : supabase
+            .from("partner_accounts")
+            .select(PARTNER_ACCOUNT_SUMMARY_SELECT)
+            .order("created_at", { ascending: false });
+    const accountLinksQuery =
+      tab === "accounts"
+        ? supabase
+            .from("partner_account_companies")
+            .select(PARTNER_ACCOUNT_DETAIL_LINK_SELECT)
+            .order("created_at", { ascending: false })
+        : supabase
+            .from("partner_account_companies")
+            .select(PARTNER_ACCOUNT_SUMMARY_LINK_SELECT)
+            .order("created_at", { ascending: false });
+
+    // The company scope is already known from the first pair of queries. Keep
+    // regional reads narrow at the database boundary instead of fetching every
+    // account-company link and filtering it only after the response arrives.
+    const scopedAccountLinksResult =
+      managedCampusSlugs !== null && scopedCompanyIdList.length === 0
+        ? Promise.resolve({ data: [], error: null })
+        : managedCampusSlugs !== null
+          ? accountLinksQuery.in("company_id", scopedCompanyIdList)
+          : accountLinksQuery;
+    const scopedAccountsResult =
+      managedCampusSlugs !== null && scopedCompanyIdList.length === 0
+        ? Promise.resolve({ data: [], error: null })
+        : accountsQuery;
+    const [accountsResult, accountLinksResult] = await Promise.all([
+      scopedAccountsResult,
+      scopedAccountLinksResult,
+    ]);
     if (accountsResult.error || accountLinksResult.error) {
       return emptyReadModel();
     }

@@ -344,6 +344,35 @@ export function AdminNotificationTemplatesSkeletonContent() {
   return <AdminListSkeletonContent filterFields={0} rows={3} />;
 }
 
+export function AdminTaskInboxSkeletonContent() {
+  return (
+    <div className="grid min-w-0 gap-6">
+      <PageHeaderSkeleton actionCount={0} />
+      <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <Surface
+            key={index}
+            level="elevated"
+            padding="md"
+            className="grid min-w-0 grid-cols-[2.75rem_minmax(0,1fr)_4rem] items-center gap-3"
+          >
+            <Skeleton className="h-11 w-11 rounded-control" />
+            <div className="grid min-w-0 gap-2">
+              <Skeleton className="h-5 w-28 max-w-full" />
+              <Skeleton className="h-4 w-full max-w-sm" />
+            </div>
+            <Skeleton className="h-6 w-14 rounded-full" />
+          </Surface>
+        ))}
+      </div>
+      <Surface level="inset" padding="md" className="grid gap-2">
+        <Skeleton className="h-5 w-5 rounded-full" />
+        <Skeleton className="h-4 w-full max-w-3xl" />
+      </Surface>
+    </div>
+  );
+}
+
 export function AdminPartnerNewSkeletonContent() {
   return (
     <div className="grid min-w-0 gap-6">

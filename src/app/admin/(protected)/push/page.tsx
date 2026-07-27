@@ -45,7 +45,7 @@ async function AdminPushContent({
   return (
     <div className="grid gap-6">
         <AdminPageHeader
-          eyebrow="발송"
+          eyebrow="자동화"
           title="발송 관리"
           description="메시지 작성, 발송 결과, 자동 발송 상태를 한 작업 영역에서 관리합니다."
         />

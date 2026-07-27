@@ -10,10 +10,15 @@ import {
   type ManualMemberImportPhotoManifestEntry,
   type ManualMemberImportRawRow,
 } from "@/lib/member-manual-import/shared";
+import { withServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
 
-async function requireImportAdmin(request: NextRequest) {
+type ImportAdminResult =
+  | { response: NextResponse }
+  | { adminId: string };
+
+async function requireImportAdmin(request: NextRequest): Promise<ImportAdminResult> {
   if (!isTrustedSameOriginRequest(request, {
     expectedOrigin: request.nextUrl.origin,
     allowedContentTypes: ["application/json"],
@@ -66,25 +71,27 @@ function parseRows(value: unknown) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireImportAdmin(request);
-  if ("response" in auth) return auth.response;
-  try {
-    const contentType = request.headers.get("content-type") ?? "";
-    const payload = contentType.includes("application/json")
-      ? await request.json().catch(() => null)
-      : null;
-    const rows = parseRows(payload && typeof payload === "object" ? payload.rows : null);
-    const photos = parsePhotoManifest(payload && typeof payload === "object" ? payload.photos : null);
-    if (!rows || !photos) {
-      return NextResponse.json({ ok: false, errors: ["회원 행과 사진 목록을 확인해 주세요."] }, { status: 400 });
+  return withServerTiming(async (timing) => {
+    const auth = await timing.measure("auth", () => requireImportAdmin(request));
+    if ("response" in auth) return auth.response;
+    try {
+      const contentType = request.headers.get("content-type") ?? "";
+      const payload = contentType.includes("application/json")
+        ? await request.json().catch(() => null)
+        : null;
+      const rows = parseRows(payload && typeof payload === "object" ? payload.rows : null);
+      const photos = parsePhotoManifest(payload && typeof payload === "object" ? payload.photos : null);
+      if (!rows || !photos) {
+        return NextResponse.json({ ok: false, errors: ["회원 행과 사진 목록을 확인해 주세요."] }, { status: 400 });
+      }
+      const result = await timing.measure("query", () => prepareManualMemberImport({
+        adminId: auth.adminId,
+        rows,
+        photos,
+      }));
+      return NextResponse.json(result, { status: result.ok ? 200 : 400 });
+    } catch {
+      return NextResponse.json({ ok: false, errors: ["가져오기 준비에 실패했습니다."] }, { status: 400 });
     }
-    const result = await prepareManualMemberImport({
-      adminId: auth.adminId,
-      rows,
-      photos,
-    });
-    return NextResponse.json(result, { status: result.ok ? 200 : 400 });
-  } catch {
-    return NextResponse.json({ ok: false, errors: ["가져오기 준비에 실패했습니다."] }, { status: 400 });
-  }
+  });
 }

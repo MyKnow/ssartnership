@@ -2,6 +2,11 @@ import {
   toAdminRouteTimingSummary,
   type AdminRouteTimingSummaryInput,
 } from "@/lib/admin-performance";
+import { logAdminDataUnavailable } from "@/lib/admin-observability";
+import {
+  ADMIN_AUXILIARY_READ_MODEL_TIMEOUT_MS,
+  withAdminReadModelTimeout,
+} from "@/lib/admin-read-model-timeout";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 const ADMIN_ROUTE_TIMING_WINDOW_DAYS = 7;
@@ -28,11 +33,17 @@ function toSummaryInput(
   };
 }
 
+const EMPTY_ROUTE_TIMING_SUMMARY = {
+  metrics: [],
+  windowDays: ADMIN_ROUTE_TIMING_WINDOW_DAYS,
+  loadError: true,
+};
+
 /**
  * Aggregates safe route timing fields on the server. Raw paths, identifiers,
  * query strings, and event properties never cross the server/UI boundary.
  */
-export async function getAdminRouteTimingSummary() {
+async function loadAdminRouteTimingSummary() {
   const end = new Date();
   const start = new Date(end);
   start.setDate(start.getDate() - ADMIN_ROUTE_TIMING_WINDOW_DAYS);
@@ -47,31 +58,29 @@ export async function getAdminRouteTimingSummary() {
     );
 
     if (error) {
-      console.error("[admin-route-timing] summary query failed", error.message);
-      return {
-        metrics: [],
-        windowDays: ADMIN_ROUTE_TIMING_WINDOW_DAYS,
-        loadError: true,
-      };
+      logAdminDataUnavailable("admin-route-timing", error);
+      return EMPTY_ROUTE_TIMING_SUMMARY;
     }
 
     return {
       metrics: toAdminRouteTimingSummary(
-        (data ?? []).map((row) =>
+        (data ?? []).map((row: unknown) =>
           toSummaryInput(row as AdminRouteTimingSummaryRpcRow),
         ),
       ),
       windowDays: ADMIN_ROUTE_TIMING_WINDOW_DAYS,
       loadError: false,
     };
-  } catch {
-    console.error("[admin-route-timing] summary query failed", {
-      reasonCode: "unexpected_failure",
-    });
-    return {
-      metrics: [],
-      windowDays: ADMIN_ROUTE_TIMING_WINDOW_DAYS,
-      loadError: true,
-    };
+  } catch (error) {
+    logAdminDataUnavailable("admin-route-timing", error);
+    return EMPTY_ROUTE_TIMING_SUMMARY;
   }
+}
+
+export function getAdminRouteTimingSummary() {
+  return withAdminReadModelTimeout(
+    loadAdminRouteTimingSummary(),
+    EMPTY_ROUTE_TIMING_SUMMARY,
+    ADMIN_AUXILIARY_READ_MODEL_TIMEOUT_MS,
+  );
 }

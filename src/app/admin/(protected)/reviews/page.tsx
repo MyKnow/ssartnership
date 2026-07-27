@@ -2,7 +2,9 @@ import { Suspense } from "react";
 import AdminReviewManager from "@/components/admin/AdminReviewManager";
 import AdminShell from "@/components/admin/AdminShell";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import { AdminReviewsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
+import Button from "@/components/ui/Button";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import {
   getAdminReviewPageData,
@@ -33,14 +35,33 @@ async function AdminReviewsContent({
     typeof params.error === "string"
       ? (adminReviewsErrorMessages[params.error] ?? null)
       : null;
-  const data = await getAdminReviewPageData(filters, {
-    managedCampusSlugs: getManagedCampusFilterValues(adminSession.account),
-    ...pagination,
-  });
   const queryString = serializeAdminReviewPageQuery(filters, pagination);
   const returnTo = queryString
     ? `/admin/reviews?${queryString}`
     : "/admin/reviews";
+  let data;
+  try {
+    data = await getAdminReviewPageData(filters, {
+      managedCampusSlugs: getManagedCampusFilterValues(adminSession.account),
+      ...pagination,
+    });
+  } catch {
+    return (
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="작업함"
+          title="리뷰 관리"
+          description="회원 리뷰를 검토하고 공개 상태와 삭제를 관리합니다."
+        />
+        <AdminStatePanel
+          kind="error"
+          title="리뷰 목록을 불러오지 못했습니다."
+          description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 담당자에게 알려 주세요."
+          action={<Button href={returnTo} variant="secondary">다시 확인</Button>}
+        />
+      </div>
+    );
+  }
   const canUpdate = canAdmin(
     adminSession.account.permissions,
     "reviews",
@@ -55,7 +76,7 @@ async function AdminReviewsContent({
   return (
     <div className="grid gap-6">
         <AdminPageHeader
-          eyebrow="데이터"
+          eyebrow="작업함"
           title="리뷰 관리"
           description="회원 리뷰를 검토하고 공개 상태와 삭제를 관리합니다."
         />

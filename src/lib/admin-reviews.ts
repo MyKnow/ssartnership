@@ -432,7 +432,7 @@ async function fetchFilteredAdminReviewRows(
   if (filters.companyId || managedCampusSlugs) {
     if (!isUuid(filters.companyId)) {
       if (filters.companyId) {
-        return [];
+        return { reviews: [], totalCount: 0 };
       }
     }
     let partnersQuery = supabase
@@ -444,7 +444,7 @@ async function fetchFilteredAdminReviewRows(
     }
     if (managedCampusSlugs) {
       if (managedCampusSlugs.length === 0) {
-        return [];
+        return { reviews: [], totalCount: 0 };
       }
       partnersQuery = partnersQuery.overlaps("managed_campus_slugs", managedCampusSlugs);
     }

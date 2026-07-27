@@ -32,13 +32,28 @@ test("작업함은 대기 건수가 있는 업무를 먼저 보여주고 확인 
 });
 
 test("작업함의 DB 실패는 안전한 미확인 상태로 표현한다", async () => {
-  const { toSafeAdminTaskQueueCount } = await taskInboxModulePromise;
+  const { createUnavailableAdminTaskQueueCounts, toSafeAdminTaskQueueCount } =
+    await taskInboxModulePromise;
 
   assert.equal(toSafeAdminTaskQueueCount({ count: 3, error: null }), 3);
   assert.equal(toSafeAdminTaskQueueCount({ count: null, error: null }), 0);
   assert.equal(
     toSafeAdminTaskQueueCount({ count: 11, error: { message: "internal" } }),
     null,
+  );
+  assert.deepEqual(
+    createUnavailableAdminTaskQueueCounts({ permissions: {
+      brands: { read: true, create: false, update: false, delete: false },
+      graduate_verifications: { read: false, create: false, update: false, delete: false },
+      member_signup_requests: { read: false, create: false, update: false, delete: false },
+      profile_images: { read: false, create: false, update: false, delete: false },
+      notifications: { read: true, create: false, update: false, delete: false },
+    } as never }),
+    {
+      "/admin/partner-registrations": null,
+      "/admin/partner-requests": null,
+      "/admin/notifications": null,
+    },
   );
 });
 
@@ -125,7 +140,7 @@ test("작업함 집계 RPC는 권한 없는 큐를 계산하지 않고 service r
 });
 
 test("작업함은 count 조회를 기다리지 않고 업무 링크를 먼저 렌더링한다", async () => {
-  const [pageSource, viewSource] = await Promise.all([
+  const [pageSource, viewSource, telemetrySource, layoutSource] = await Promise.all([
     readFile(
       new URL("../src/app/admin/(protected)/tasks/page.tsx", import.meta.url),
       "utf8",
@@ -137,6 +152,14 @@ test("작업함은 count 조회를 기다리지 않고 업무 링크를 먼저 �
       ),
       "utf8",
     ),
+    readFile(
+      new URL(
+        "../src/components/analytics/AdminTaskTelemetry.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(new URL("../src/app/admin/layout.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(pageSource, /const queueCounts =\s+session && tasks\.length > 0/);
@@ -144,11 +167,27 @@ test("작업함은 count 조회를 기다리지 않고 업무 링크를 먼저 �
   assert.match(pageSource, /AdminTaskInboxStreamingView/);
   assert.match(viewSource, /<Suspense fallback={<AdminTaskInboxLoading/);
   assert.match(viewSource, /prioritizeAdminTaskItems\(tasks, resolvedCounts\)/);
+  assert.match(viewSource, /<Link\s+href="\/admin"\s+prefetch=\{false\}/);
+  assert.match(
+    viewSource,
+    /<Link\s+key=\{task\.href\}\s+href=\{task\.href\}\s+prefetch=\{false\}/,
+  );
   assert.match(viewSource, /상태 확인 필요/);
+  assert.match(pageSource, /getAdminTaskQueueCounts/);
+  assert.match(
+    await readFile(new URL("../src/lib/admin-task-inbox.ts", import.meta.url), "utf8"),
+    /withAdminReadModelTimeout/,
+  );
+  assert.match(viewSource, /data-admin-task-key/);
+  assert.match(telemetrySource, /admin_task_start/);
+  assert.match(telemetrySource, /admin_task_complete/);
+  assert.match(telemetrySource, /admin_task_recovery/);
+  assert.match(telemetrySource, /retryAvailable: true/);
+  assert.match(layoutSource, /AdminTaskTelemetry/);
 });
 
 test("홈의 다음 작업은 실제 대기 건이 있는 권한 내 작업만 선택한다", async () => {
-  const { getNextAdminTaskItem } = await taskInboxModulePromise;
+  const { getAdminTaskQueueCount, getNextAdminTaskItem } = await taskInboxModulePromise;
   const tasks = [
     {
       href: "/admin/partner-registrations?status=pending",
@@ -159,8 +198,15 @@ test("홈의 다음 작업은 실제 대기 건이 있는 권한 내 작업만 �
   ];
 
   assert.equal(
+    getAdminTaskQueueCount(
+      { "/admin/partner-registrations": 2 },
+      "/admin/partner-registrations?status=pending",
+    ),
+    2,
+  );
+  assert.equal(
     getNextAdminTaskItem(tasks, {
-      "/admin/partner-registrations?status=pending": 2,
+      "/admin/partner-registrations": 2,
       "/admin/partner-requests": 4,
       "/admin/notifications": 0,
     })?.href,
@@ -221,6 +267,11 @@ test("관리 홈은 다음 작업을 우선 표시하고, 활동 지표 조회�
 
   assert.match(dashboardSource, /getNextAdminTaskItem/);
   assert.match(dashboardSource, /다음으로 처리/);
+  assert.match(
+    dashboardSource,
+    /href=\{nextQueueItem\.href\}\s+prefetch=\{false\}/,
+  );
+  assert.match(dashboardSource, /href=\{item\.href\}\s+prefetch=\{false\}/);
   assert.match(pageSource, /AdminDashboardPlatformActivitySection/);
   assert.doesNotMatch(
     pageSource,

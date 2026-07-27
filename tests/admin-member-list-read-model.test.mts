@@ -32,6 +32,24 @@ test("관리자 회원 목록은 페이지에서 DB 조회를 분리하고 서�
   assert.match(pageSource, /redirect\(`\/admin\/members\?/);
 });
 
+test("회원 부분 검색은 한국어·Mattermost 필드용 trigram 인덱스를 사용한다", async () => {
+  const migrationSource = await readFile(
+    new URL(
+      "../supabase/migrations/20260727113746_optimize_admin_member_search.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  assert.match(migrationSource, /create extension if not exists pg_trgm/i);
+  assert.match(migrationSource, /members_admin_display_name_trgm_idx/);
+  assert.match(migrationSource, /members_admin_manual_login_id_trgm_idx/);
+  assert.match(migrationSource, /mm_user_directory_admin_username_trgm_idx/);
+  assert.match(migrationSource, /mm_user_directory_admin_user_id_trgm_idx/);
+  assert.match(migrationSource, /using gin \(display_name gin_trgm_ops\)/);
+  assert.match(migrationSource, /where deleted_at is null/);
+});
+
 test("회원 목록은 추이 query를 핵심 목록과 분리해 먼저 렌더링할 수 있다", async () => {
   const [pageSource, readModelSource, trendSectionSource] = await Promise.all([
     readFile(memberPagePath, "utf8"),
@@ -56,7 +74,27 @@ test("회원 목록 read-model은 오류를 안전한 상태로 돌려준다", a
   const source = await readFile(memberReadModelPath, "utf8");
 
   assert.match(source, /hasMemberLoadError/);
+  assert.match(source, /withAdminReadModelTimeout/);
+  assert.match(source, /ADMIN_MEMBER_READ_MODEL_TIMEOUT_MS/);
+  assert.match(source, /getCurrentMemberProfileImageMemberIds/);
+  assert.doesNotMatch(source, /getMemberProfilePhotoStates\(memberIds\)/);
+  assert.match(source, /mm_user_directory!inner\(id\)/);
+  assert.match(source, /ilike\("mm_user_directory\.mm_username"/);
+  assert.match(source, /ilike\("mm_user_directory\.mm_user_id"/);
+  assert.match(source, /canUseMemberSearchOrFilter/);
+  assert.match(source, /referencedTable: "mm_user_directory"/);
+  assert.match(source, /searchResults\.some\(\(result\) => Boolean\(result\.error\)\)/);
+  assert.doesNotMatch(source, /getSsafyCycleSettings/);
+  assert.doesNotMatch(source, /cycleSettings/);
   assert.doesNotMatch(source, /Error\.message/);
+});
+
+test("회원 수동 추가의 기수 설정은 핵심 목록과 분리해 스트리밍한다", async () => {
+  const pageSource = await readFile(memberPagePath, "utf8");
+
+  assert.match(pageSource, /AdminMemberManualAddFallback/);
+  assert.match(pageSource, /<AdminMemberManualAddSection/);
+  assert.match(pageSource, /getSsafyCycleSettings\(\)\.catch/);
 });
 
 test("회원 고급 필터는 독립적인 설정·동의 조회를 병렬화한다", async () => {

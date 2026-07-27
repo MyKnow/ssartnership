@@ -101,6 +101,7 @@ export default function AdminPartnerReviewManager({
           <div className="grid min-w-[14rem] flex-1 gap-1">
             <span className="ui-caption">작성자 검색</span>
             <Input
+              aria-label="제휴처 리뷰 작성자 검색"
               name="memberQuery"
               defaultValue={filters.memberQuery}
               placeholder="이름 또는 MM 아이디"
@@ -109,7 +110,7 @@ export default function AdminPartnerReviewManager({
 
           <div className="grid min-w-[10rem] gap-1">
             <span className="ui-caption">별점</span>
-            <Select name="rating" defaultValue={filters.rating}>
+            <Select aria-label="제휴처 리뷰 별점" name="rating" defaultValue={filters.rating}>
               {getAdminReviewRatingOptions().map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -120,7 +121,7 @@ export default function AdminPartnerReviewManager({
 
           <div className="grid min-w-[10rem] gap-1">
             <span className="ui-caption">상태</span>
-            <Select name="status" defaultValue={filters.status}>
+            <Select aria-label="제휴처 리뷰 상태" name="status" defaultValue={filters.status}>
               {getAdminReviewStatusOptions().map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -131,7 +132,7 @@ export default function AdminPartnerReviewManager({
 
           <div className="grid min-w-[10rem] gap-1">
             <span className="ui-caption">정렬</span>
-            <Select name="sort" defaultValue={filters.sort}>
+            <Select aria-label="제휴처 리뷰 정렬" name="sort" defaultValue={filters.sort}>
               {getAdminReviewSortOptions().map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}

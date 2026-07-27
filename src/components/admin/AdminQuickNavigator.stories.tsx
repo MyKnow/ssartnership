@@ -46,7 +46,7 @@ export const SearchAndRestoreFocus: Story = {
     await expect(body.queryByRole("link", { name: /회원 관리/ })).not.toBeInTheDocument();
 
     await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
-    const closeButton = body.getAllByRole("button", { name: "빠른 찾기 닫기" })[1]!;
+    const closeButton = body.getByRole("button", { name: "빠른 찾기 닫기" });
     await expect(closeButton).toHaveFocus();
     await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
     await expect(result).toHaveFocus();

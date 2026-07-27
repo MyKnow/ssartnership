@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { Suspense } from "react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -10,6 +9,7 @@ import SubmitButton from "@/components/ui/SubmitButton";
 import Surface from "@/components/ui/Surface";
 import Textarea from "@/components/ui/Textarea";
 import type { AdminReviewQueueFeedback } from "@/lib/admin-review-queue";
+import DeferredImagePreview from "@/components/admin/DeferredImagePreview";
 
 export type AdminProfilePhotoReplacement = {
   id: string;
@@ -58,17 +58,7 @@ function PhotoPreview({
   loading?: "eager" | "lazy";
 }) {
   return (
-    <div className="relative aspect-square w-24 shrink-0 overflow-hidden rounded-card border border-border bg-surface-inset sm:w-28">
-      <Image
-        src={src}
-        alt={alt}
-        fill
-        unoptimized
-        loading={loading}
-        className="object-cover"
-        sizes="(max-width: 640px) 96px, 112px"
-      />
-    </div>
+    <DeferredImagePreview src={src} alt={alt} loading={loading} />
   );
 }
 
@@ -360,7 +350,7 @@ export default function AdminProfilePhotoReviewQueue({
   return (
     <div className="grid min-w-0 gap-8">
       <AdminReviewQueueHeader
-        eyebrow="검토"
+        eyebrow="작업함"
         title="프로필 사진 검토"
         description="새 사진 교체 요청과 현재 승인 사진 점검을 분리해, 회원 인증에 영향을 주는 작업을 안전하게 처리합니다."
         actions={

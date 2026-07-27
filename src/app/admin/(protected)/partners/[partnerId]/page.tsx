@@ -7,9 +7,6 @@ import {
   AdminPartnerDetailOperationalSections,
   AdminPartnerDetailReviewSection,
 } from "@/components/admin/AdminPartnerDetailDeferredSections";
-import AdminPartnerDetailEditSection, {
-  AdminPartnerDetailEditSectionFallback,
-} from "@/components/admin/AdminPartnerDetailEditSection";
 import AdminPartnerPreviewLinkPanel from "@/components/admin/AdminPartnerPreviewLinkPanel";
 import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import Button from "@/components/ui/Button";
@@ -232,10 +229,6 @@ async function AdminPartnerDetailContent({
   const returnTo = reviewQueryString
     ? `${detailPath}?${reviewQueryString}`
     : detailPath;
-  const thumbnail = partner.thumbnail ?? partner.images?.[0] ?? null;
-  const galleryImages = partner.thumbnail
-    ? (partner.images ?? [])
-    : (partner.images ?? []).slice(1);
   const previewTokenRow = previewToken;
   let initialPreviewUrl: string | null = null;
   if (
@@ -263,16 +256,27 @@ async function AdminPartnerDetailContent({
         <AdminPageHeader
           eyebrow="제휴처"
           title={partner.name}
-          description="기본 정보를 바로 수정하고, 운영 지표·혜택 이력·쿠폰은 아래에서 필요할 때 확인합니다."
+          description="운영 지표·혜택 이력·쿠폰을 확인하고, 기본 정보는 별도 화면에서 안전하게 수정합니다."
           actions={
             canUpdatePartner ? (
-              <Button href="#partner-edit">기본 정보 수정</Button>
+              <Button
+                href={`${detailPath}/edit${
+                  searchBackHref === "/admin/partners"
+                    ? ""
+                    : `?returnTo=${encodeURIComponent(searchBackHref)}`
+                }`}
+              >
+                기본 정보 수정
+              </Button>
             ) : null
           }
         />
 
         {partnerError ? (
           <FormMessage variant="error">{partnerError}</FormMessage>
+        ) : null}
+        {partnerSaved ? (
+          <FormMessage variant="info">제휴처 정보를 저장했습니다.</FormMessage>
         ) : null}
         {couponSuccess ? (
           <FormMessage variant="info">{couponSuccess}</FormMessage>
@@ -312,35 +316,15 @@ async function AdminPartnerDetailContent({
           />
         </Suspense>
 
-        <div
-          id="partner-edit"
-          className="grid scroll-mt-24 gap-6 2xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.72fr)] 2xl:items-start"
+        <Suspense
+          fallback={
+            <AdminPartnerDetailDeferredFallback label="수정 이력을 불러오는 중입니다." />
+          }
         >
-          <Suspense fallback={<AdminPartnerDetailEditSectionFallback />}>
-            <AdminPartnerDetailEditSection
-              detail={detail}
-              managedCampusSlugs={managedCampusFilter}
-              canUpdatePartner={canUpdatePartner}
-              partnerSaved={partnerSaved}
-              detailPath={detailPath}
-              retryHref={retryHref}
-              thumbnail={thumbnail}
-              galleryImages={galleryImages}
-            />
-          </Suspense>
-
-          <div className="2xl:sticky 2xl:top-24">
-            <Suspense
-              fallback={
-                <AdminPartnerDetailDeferredFallback label="수정 이력을 불러오는 중입니다." />
-              }
-            >
-              <AdminPartnerDetailHistorySections
-                operational={operationalPromise}
-              />
-            </Suspense>
-          </div>
-        </div>
+          <AdminPartnerDetailHistorySections
+            operational={operationalPromise}
+          />
+        </Suspense>
         <Suspense
           fallback={
             <AdminPartnerDetailDeferredFallback label="리뷰를 불러오는 중입니다." />

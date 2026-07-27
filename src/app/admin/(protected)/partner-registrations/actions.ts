@@ -547,6 +547,17 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
           ? error.message
           : "제휴처 등록 신청 승인 후처리에 실패했습니다.";
       console.error("[partner-registration] converted follow-up failed", message);
+      revalidatePath("/admin/partner-registrations");
+      redirectAdminActionError(returnTo, "partner_form_conversion_failed", {
+        action: "partner_create",
+        targetType: "partner_registration_request",
+        targetId: registrationRequest.id,
+        properties: {
+          previousStatus,
+          requestedStatus: status,
+          stage: "conversion_follow_up",
+        },
+      });
     }
   }
 

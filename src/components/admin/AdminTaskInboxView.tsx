@@ -11,9 +11,11 @@ import {
   type AdminNavItem,
 } from "@/components/admin/admin-navigation";
 import {
+  getAdminTaskQueueCount,
   prioritizeAdminTaskItems,
   type AdminTaskQueueCounts,
 } from "@/lib/admin-task-inbox";
+import { getAdminRouteDescriptor } from "@/lib/admin-performance";
 
 function QueueStatus({
   queueCount,
@@ -58,6 +60,7 @@ function AdminTaskInboxTaskList({
           action={
             <Link
               href="/admin"
+              prefetch={false}
               className="inline-flex min-h-11 items-center justify-center rounded-control border border-border bg-surface-control px-4 text-sm font-semibold text-foreground shadow-flat transition-colors hover:border-strong hover:bg-surface-elevated"
             >
               관리 홈으로 이동
@@ -86,6 +89,9 @@ function AdminTaskInboxTaskList({
             <Link
               key={task.href}
               href={task.href}
+              prefetch={false}
+              data-admin-task-key={getAdminRouteDescriptor(task.href)?.key}
+              data-admin-task-source="task_inbox"
               className="group grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-card border border-border/80 bg-surface-elevated p-4 shadow-flat transition-colors hover:border-strong hover:bg-surface-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-control bg-primary-soft text-primary">
@@ -100,7 +106,7 @@ function AdminTaskInboxTaskList({
                 </span>
               </span>
               <span className="grid shrink-0 justify-items-end gap-2">
-                <QueueStatus queueCount={queueCounts[task.href]} />
+                <QueueStatus queueCount={getAdminTaskQueueCount(queueCounts, task.href)} />
                 <ArrowRightIcon className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
               </span>
             </Link>
@@ -114,7 +120,7 @@ function AdminTaskInboxTaskList({
 function AdminTaskInboxHeader() {
   return (
     <AdminPageHeader
-      eyebrow="업무"
+      eyebrow="작업함"
       title="작업함"
       description="처리할 운영 업무를 열고, 해당 화면에서 근거를 확인한 뒤 한 건씩 안전하게 처리합니다."
     />

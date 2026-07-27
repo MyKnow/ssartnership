@@ -9,7 +9,9 @@ test("회원 관리 화면은 회원 목록 뒤에 보조 운영 도구와 수�
   );
   const memberListIndex = source.indexOf('title="회원 목록"');
   const operationsToolIndex = source.indexOf('title="운영 도구"');
-  const manualAddIndex = source.indexOf('title="수동 추가"');
+  const manualAddIndex = source.indexOf(
+    "<AdminMemberManualAddSection canReissueManualSetup={canUpdateMembers} />",
+  );
   const operationsNoteIndex = source.indexOf('title="운영 메모"');
 
   assert.ok(manualAddIndex >= 0);

@@ -3,7 +3,6 @@
 import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 const focusableSelector = [
   "a[href]",
@@ -37,7 +36,6 @@ export default function Modal({
   panelClassName?: string;
   bodyClassName?: string;
 }) {
-  const shouldReduceMotion = useReducedMotion();
   const portalRoot = typeof document === "undefined" ? null : document.body;
   const panelRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
@@ -126,36 +124,27 @@ export default function Modal({
   }
 
   return createPortal(
-    <AnimatePresence>
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:px-4 sm:py-6">
-          <motion.button
-            type="button"
-            className="absolute inset-0 bg-slate-950/52 backdrop-blur-md"
-            onClick={onClose}
-            aria-hidden="true"
-            tabIndex={-1}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: shouldReduceMotion ? 0 : 0.18 }}
-          />
-          <motion.div
-            ref={panelRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            aria-describedby={description ? descriptionId : undefined}
-            tabIndex={-1}
-            initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 16, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 12, scale: 0.99 }}
-            transition={{ duration: shouldReduceMotion ? 0 : 0.22, ease: [0.2, 0.8, 0.2, 1] }}
-            className={cn(
-              "relative flex w-full max-w-lg flex-col overflow-hidden rounded-overlay border border-border/80 bg-surface-overlay p-4 shadow-overlay backdrop-blur-xl sm:p-6",
-              panelClassName,
-            )}
-          >
+    open ? (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:px-4 sm:py-6">
+        <button
+          type="button"
+          className="absolute inset-0 bg-slate-950/52 backdrop-blur-md"
+          onClick={onClose}
+          aria-hidden="true"
+          tabIndex={-1}
+        />
+        <div
+          ref={panelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          aria-describedby={description ? descriptionId : undefined}
+          tabIndex={-1}
+          className={cn(
+            "relative flex w-full max-w-lg flex-col overflow-hidden rounded-overlay border border-border/80 bg-surface-overlay p-4 shadow-overlay backdrop-blur-xl sm:p-6",
+            panelClassName,
+          )}
+        >
             <div className="flex min-w-0 items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 id={titleId} className="text-xl font-semibold tracking-[-0.02em] text-foreground">
@@ -179,10 +168,9 @@ export default function Modal({
             <div className={cn("mt-4 min-h-0 flex-1", bodyClassName)}>
               {children}
             </div>
-          </motion.div>
         </div>
-      ) : null}
-    </AnimatePresence>,
+      </div>
+    ) : null,
     portalRoot,
   );
 }

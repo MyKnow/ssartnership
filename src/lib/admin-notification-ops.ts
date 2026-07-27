@@ -68,6 +68,7 @@ export type AdminNotificationComposerInput = {
   audience: PushAudience;
   channels: AdminNotificationChannelSelection;
   confirmationText?: string | null;
+  idempotencyKey?: string | null;
   templateContext?: NotificationTemplateContext;
 };
 
@@ -132,6 +133,7 @@ export type AdminNotificationSendResult = {
     }
   >;
   warnings: string[];
+  alreadyExists?: boolean;
 };
 
 export type AdminNotificationOperationLog = {
@@ -212,6 +214,7 @@ type NotificationCampaignMetadata = {
     confirmationPhrase: string;
     channels: AdminNotificationChannelPreview[];
   };
+  adminOperationIdempotencyKey?: string;
   channelResults?: AdminNotificationSendResult["channelResults"];
   warnings?: string[];
   campaignStatus?: AdminNotificationOperationLog["status"];
@@ -631,6 +634,9 @@ export async function sendAdminNotificationCampaign(
       channels: context.preview.channels,
     },
   };
+  if (input.idempotencyKey) {
+    metadata.adminOperationIdempotencyKey = input.idempotencyKey;
+  }
   if (input.templateContext) {
     metadata.templateContextKind = input.templateContext.kind;
   }
@@ -661,10 +667,21 @@ export async function sendAdminNotificationCampaign(
     body: renderedInAppBody,
     targetUrl: context.destinationUrl,
     metadata,
+    idempotencyKey: input.idempotencyKey,
     recipientMemberIds: context.selectedChannels.includes("in_app")
       ? context.eligibleMemberIds.in_app
       : [],
   });
+
+  if (created.alreadyExists) {
+    return {
+      notificationId: created.notification.id,
+      preview: context.preview,
+      channelResults: structuredClone(EMPTY_CHANNEL_RESULTS),
+      warnings: ["같은 발송 요청이 이미 처리 중이거나 완료되었습니다."],
+      alreadyExists: true,
+    };
+  }
 
   const channelResults: AdminNotificationSendResult["channelResults"] = structuredClone(EMPTY_CHANNEL_RESULTS);
   const warnings: string[] = [];
@@ -736,11 +753,12 @@ export async function sendAdminNotificationCampaign(
       completedMetadata,
     );
   } catch (error) {
-    const warning = `[admin-notification-ops] final metadata update failed for notification ${
-      created.notification.id
-    }: ${error instanceof Error ? error.message : "알 수 없는 후처리 오류"}`;
+    const warning = "발송 결과 기록을 저장하지 못했습니다.";
     warnings.push(warning);
-    console.error(warning);
+    console.error(
+      `[admin-notification-ops] final metadata update failed for notification ${created.notification.id}`,
+      error,
+    );
   }
 
   return {

@@ -71,68 +71,110 @@ export default function AdminRouteTimingSummaryPanel({
           </p>
         </Surface>
       ) : (
-        <div
-          className="min-w-0 overflow-x-auto rounded-card border border-border/70"
-          role="region"
-          tabIndex={0}
-          aria-label="화면별 이동 응답 표. 좌우로 이동할 수 있습니다."
-        >
-          <table className="w-full min-w-[42rem] border-collapse text-left text-sm">
-            <caption className="sr-only">
-              화면별 이동 응답 시간과 표본, 측정 결과
-            </caption>
-            <thead className="bg-surface-inset text-xs text-muted-foreground">
-              <tr>
-                <th scope="col" className="px-4 py-3 font-semibold">
-                  화면
-                </th>
-                <th scope="col" className="px-4 py-3 font-semibold">
-                  p75
-                </th>
-                <th scope="col" className="px-4 py-3 font-semibold">
-                  표본
-                </th>
-                <th scope="col" className="px-4 py-3 font-semibold">
-                  결과
-                </th>
-                <th scope="col" className="px-4 py-3 font-semibold">
-                  상태
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/70">
-              {metrics.map((metric) => {
-                const status = getStatus(metric);
-                return (
-                  <tr key={metric.routeKey}>
-                    <th
-                      scope="row"
-                      className="whitespace-nowrap px-4 py-3 font-semibold text-foreground"
-                    >
+        <>
+          <div
+            className="hidden min-w-0 overflow-x-auto rounded-card border border-border/70 md:block"
+            role="region"
+            tabIndex={0}
+            aria-label="화면별 이동 응답 표. 좌우로 이동할 수 있습니다."
+          >
+            <table className="w-full min-w-[42rem] border-collapse text-left text-sm">
+              <caption className="sr-only">
+                화면별 이동 응답 시간과 표본, 측정 결과
+              </caption>
+              <thead className="bg-surface-inset text-xs text-muted-foreground">
+                <tr>
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    화면
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    p75
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    표본
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    결과
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    상태
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/70">
+                {metrics.map((metric) => {
+                  const status = getStatus(metric);
+                  return (
+                    <tr key={metric.routeKey}>
+                      <th
+                        scope="row"
+                        className="whitespace-nowrap px-4 py-3 font-semibold text-foreground"
+                      >
+                        {metric.label}
+                      </th>
+                      <td className="whitespace-nowrap px-4 py-3 font-semibold text-foreground">
+                        {metric.p75DurationMs === null
+                          ? "–"
+                          : formatMilliseconds(metric.p75DurationMs)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                        {metric.sampleCount.toLocaleString("ko-KR")}건
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                        완료 {metric.completeCount.toLocaleString("ko-KR")} · 확인 불가{" "}
+                        {metric.unknownCount.toLocaleString("ko-KR")} · 오류{" "}
+                        {metric.errorCount.toLocaleString("ko-KR")}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge className={status.className}>{status.label}</Badge>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="grid min-w-0 gap-3 md:hidden" aria-label="화면별 이동 응답 목록">
+            {metrics.map((metric) => {
+              const status = getStatus(metric);
+              return (
+                <article
+                  key={metric.routeKey}
+                  className="grid min-w-0 gap-3 rounded-card border border-border/70 bg-surface-inset p-4"
+                >
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <h3 className="min-w-0 truncate font-semibold text-foreground">
                       {metric.label}
-                    </th>
-                    <td className="whitespace-nowrap px-4 py-3 font-semibold text-foreground">
-                      {metric.p75DurationMs === null
-                        ? "–"
-                        : formatMilliseconds(metric.p75DurationMs)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
-                      {metric.sampleCount.toLocaleString("ko-KR")}건
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
-                      완료 {metric.completeCount.toLocaleString("ko-KR")} · 확인 불가{" "}
-                      {metric.unknownCount.toLocaleString("ko-KR")} · 오류{" "}
-                      {metric.errorCount.toLocaleString("ko-KR")}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge className={status.className}>{status.label}</Badge>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </h3>
+                    <Badge className={status.className}>{status.label}</Badge>
+                  </div>
+                  <div className="grid min-w-0 grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">p75</p>
+                      <p className="mt-1 font-semibold text-foreground">
+                        {metric.p75DurationMs === null
+                          ? "–"
+                          : formatMilliseconds(metric.p75DurationMs)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">표본</p>
+                      <p className="mt-1 font-semibold text-foreground">
+                        {metric.sampleCount.toLocaleString("ko-KR")}건
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    완료 {metric.completeCount.toLocaleString("ko-KR")} · 확인 불가{" "}
+                    {metric.unknownCount.toLocaleString("ko-KR")} · 오류{" "}
+                    {metric.errorCount.toLocaleString("ko-KR")}
+                  </p>
+                </article>
+              );
+            })}
+          </div>
+        </>
       )}
     </section>
   );

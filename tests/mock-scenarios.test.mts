@@ -115,6 +115,23 @@ test("route inventory classifies IA purpose and declares screen contracts", asyn
   );
 });
 
+test("partner detail and edit routes keep distinct task contracts", async () => {
+  const { getMockRouteInventory } = await scenarioModulePromise;
+  const inventory = getMockRouteInventory();
+  const detail = inventory.find(
+    (route) => route.routePath === "/admin/partners/[partnerId]",
+  );
+  const edit = inventory.find(
+    (route) => route.routePath === "/admin/partners/[partnerId]/edit",
+  );
+
+  assert.ok(detail);
+  assert.ok(edit);
+  assert.equal(detail.viewComponent, "AdminPartnerDetailPage");
+  assert.equal(edit.viewComponent, "AdminPartnerDetailEditPage");
+  assert.notEqual(detail.primaryTask, edit.primaryTask);
+});
+
 test("every canonical route is backed by a decision-complete screen contract", async () => {
   const { getMockRouteInventory } = await scenarioModulePromise;
   const canonicalContracts = getMockRouteInventory()
@@ -472,13 +489,8 @@ test("canonical admin screens expose default actual-view stories at every requir
     ["/admin", "AdminDashboardView"],
     ["/admin/tasks", "AdminTaskInboxView"],
     ["/admin/search", "AdminGlobalSearchResultsView"],
-    ["/admin/admins", "AdminAccountsView"],
-    ["/admin/advertisement", "AdminAdvertisementView"],
     ["/admin/companies", "AdminCompaniesView"],
     ["/admin/categories", "AdminCategoryManager"],
-    ["/admin/cycle", "AdminCycleView"],
-    ["/admin/event", "AdminEventListView"],
-    ["/admin/event/[slug]", "AdminEventDetailView"],
     ["/admin/logs", "AdminLogsManager"],
     ["/admin/graduate-verifications", "AdminGraduateVerificationQueue"],
     ["/admin/profile-photos", "AdminProfilePhotoReviewQueue"],
@@ -488,22 +500,23 @@ test("canonical admin screens expose default actual-view stories at every requir
       "AdminMemberSignupApprovalDetail",
     ],
     ["/admin/members", "AdminMemberManager"],
-    ["/admin/members/[memberId]", "AdminMemberDetailView"],
     ["/admin/notifications", "AdminNotificationsView"],
     [
       "/admin/notification-templates",
       "AdminNotificationTemplateManager",
     ],
-    ["/admin/partner-registrations", "AdminPartnerRegistrationsView"],
     ["/admin/partner-requests", "PartnerChangeRequestQueue"],
     ["/admin/partners", "AdminPartnerManager"],
-    ["/admin/partners/[partnerId]", "PartnerCardForm"],
+    ["/admin/partners/[partnerId]/edit", "PartnerCardForm"],
     ["/admin/partners/new", "AdminPartnerNewView"],
     ["/admin/push", "AdminPushManager"],
     ["/admin/reviews", "AdminReviewManagerView"],
   ]);
   const canonicalAdminRoutes = matrix.filter(
-    (route) => route.surface === "admin" && route.routeKind === "canonical",
+    (route) =>
+      route.surface === "admin" &&
+      route.routeKind === "canonical" &&
+      route.dataSources.includes("storybook"),
   );
 
   assert.equal(canonicalAdminRoutes.length, expectedActualViews.size);

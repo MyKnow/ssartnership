@@ -22,6 +22,8 @@ test("파트너사·계정 운영 화면은 범위가 적용된 read-model과 �
   assert.match(readModel, /PARTNER_ACCOUNT_SUMMARY_LINK_SELECT/);
   assert.match(readModel, /tab === "accounts"/);
   assert.match(readModel, /PARTNER_ACCOUNT_DETAIL_SELECT/);
+  assert.match(readModel, /accountLinksQuery\.in\("company_id", scopedCompanyIdList\)/);
+  assert.match(readModel, /scopedCompanyIdList\.length === 0/);
   assert.match(readModel, /accounts: \[\]/);
   assert.match(readModel, /accountSummary/);
   assert.doesNotMatch(readModel, /Error\.message/);

@@ -203,7 +203,7 @@ export default function AdminEventDetailView({
       <div className="grid min-w-0 gap-6 2xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.72fr)] 2xl:items-start">
         <Card tone="elevated" className="grid min-w-0 gap-5">
           <div>
-            <p className="ui-kicker">Registration</p>
+        <p className="ui-kicker">등록</p>
             <h3 className="mt-2 text-xl font-semibold text-foreground">
               {registration ? "운영 등록 수정" : "운영 등록"}
             </h3>

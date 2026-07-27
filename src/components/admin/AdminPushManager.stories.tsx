@@ -428,38 +428,28 @@ export const DeleteLog: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const fetchMock = installDeleteLogFetchMock();
-    const originalConfirm = window.confirm;
-    window.confirm = fn(() => true);
-
-    try {
-      await expect(canvas.getByText("오늘 제휴 안내")).toBeInTheDocument();
-      await userEvent.click(canvas.getByRole("button", { name: "삭제" }));
-      await expect(fetchMock).toHaveBeenCalledWith(
-        "/api/push/admin/logs/log-1",
-        expect.objectContaining({ method: "DELETE" }),
-      );
-      await expect(
-        canvas.queryByText("오늘 제휴 안내"),
-      ).not.toBeInTheDocument();
-    } finally {
-      window.confirm = originalConfirm;
-    }
+    await expect(canvas.getByText("오늘 제휴 안내")).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "삭제" }));
+    const body = within(document.body);
+    await expect(body.getByRole("dialog", { name: "발송 로그 삭제" })).toBeInTheDocument();
+    await userEvent.click(body.getByRole("button", { name: "로그 삭제" }));
+    await expect(fetchMock).toHaveBeenCalledWith(
+      "/api/push/admin/logs/log-1",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+    await expect(
+      canvas.queryByText("오늘 제휴 안내"),
+    ).not.toBeInTheDocument();
   },
 };
 
 export const DeleteLogCancelled: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const originalConfirm = window.confirm;
-    const confirmMock = fn(() => false);
-    window.confirm = confirmMock;
-
-    try {
-      await userEvent.click(canvas.getByRole("button", { name: "삭제" }));
-      await expect(confirmMock).toHaveBeenCalled();
-      await expect(canvas.getByText("오늘 제휴 안내")).toBeInTheDocument();
-    } finally {
-      window.confirm = originalConfirm;
-    }
+    await userEvent.click(canvas.getByRole("button", { name: "삭제" }));
+    const body = within(document.body);
+    await expect(body.getByRole("dialog", { name: "발송 로그 삭제" })).toBeInTheDocument();
+    await userEvent.click(body.getByRole("button", { name: "취소" }));
+    await expect(canvas.getByText("오늘 제휴 안내")).toBeInTheDocument();
   },
 };

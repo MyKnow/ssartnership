@@ -298,6 +298,7 @@ export default function AdminMemberManager({
               <span className="ui-caption">검색</span>
               <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                 <Input
+                  aria-label="회원 검색"
                   value={searchInputValue}
                   onChange={(event) => {
                     setSearchInputDraft({

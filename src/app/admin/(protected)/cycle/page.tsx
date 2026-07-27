@@ -11,8 +11,11 @@ import {
   upsertCohortCardTheme,
 } from "@/app/admin/(protected)/actions";
 import AdminCycleView from "@/components/admin/AdminCycleView";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminShell from "@/components/admin/AdminShell";
+import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import { AdminCycleSkeletonContent } from "@/components/loading/AdminPageSkeletons";
+import Button from "@/components/ui/Button";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { canManageMattermostSenders } from "@/lib/mattermost-senders/access";
@@ -47,16 +50,41 @@ async function AdminCycleContent({
   const canManageSenders = canManageMattermostSenders(session.account, "read");
   const canUpdate = canAdmin(session.account.permissions, "cycles", "update");
   const canDelete = canAdmin(session.account.permissions, "cycles", "delete");
-  const [settings, themes, senderResult] = await Promise.all([
-    getSsafyCycleSettings(),
-    listCohortCardThemes(),
-    canManageSenders
-      ? mattermostSenderRepository
-          .listMetadata()
-          .then((senders) => ({ senders, loadError: false }))
-          .catch(() => ({ senders: [], loadError: true }))
-      : Promise.resolve({ senders: [], loadError: false }),
-  ]);
+  let settings: Awaited<ReturnType<typeof getSsafyCycleSettings>>;
+  let themes: Awaited<ReturnType<typeof listCohortCardThemes>>;
+  let senderResult: {
+    senders: Awaited<ReturnType<typeof mattermostSenderRepository.listMetadata>>;
+    loadError: boolean;
+  };
+
+  try {
+    [settings, themes, senderResult] = await Promise.all([
+      getSsafyCycleSettings(),
+      listCohortCardThemes(),
+      canManageSenders
+        ? mattermostSenderRepository
+            .listMetadata()
+            .then((senders) => ({ senders, loadError: false }))
+            .catch(() => ({ senders: [], loadError: true }))
+        : Promise.resolve({ senders: [], loadError: false }),
+    ]);
+  } catch {
+    return (
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="설정"
+          title="기수 계산 기준 관리"
+          description="현재 기수와 전환 기준을 확인하고 운영 기준을 관리합니다."
+        />
+        <AdminStatePanel
+          kind="error"
+          title="기수 설정을 불러오지 못했습니다."
+          description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 기록을 확인해 주세요."
+          action={<Button href="/admin/cycle" variant="secondary">다시 확인</Button>}
+        />
+      </div>
+    );
+  }
 
   return (
     <AdminCycleView

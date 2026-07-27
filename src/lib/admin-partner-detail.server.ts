@@ -16,6 +16,11 @@ import type {
   AdCampaignWithStats,
   AdCoupon,
 } from "@/lib/repositories/ad-package-repository";
+import type { PartnerAudienceKey } from "@/lib/partner-audience";
+import type { CampusSlug } from "@/lib/campuses";
+import type { PartnerBenefitActionType } from "@/lib/partner-benefit-action";
+import type { PartnerBenefitVisibility } from "@/lib/partner-benefit-visibility";
+import type { PartnerVisibility } from "@/lib/types";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 type PartnerCompanyRow = {
@@ -35,6 +40,45 @@ type PartnerCategoryRow = {
   description?: string | null;
 };
 
+type AdminPartnerDetailBenefitRow = {
+  id: string;
+  title: string;
+  max_apply_count: number | null;
+  display_order?: number | null;
+};
+
+export type AdminPartnerDetailRow = {
+  id: string;
+  created_at: string;
+  name: string;
+  category_id?: string | null;
+  company_id?: string | null;
+  location?: string | null;
+  detail_description?: string | null;
+  campus_slugs?: CampusSlug[] | null;
+  managed_campus_slugs?: string[] | null;
+  thumbnail?: string | null;
+  map_url?: string | null;
+  benefit_action_type?: PartnerBenefitActionType | null;
+  benefit_action_link?: string | null;
+  reservation_link?: string | null;
+  inquiry_link?: string | null;
+  period_start?: string | null;
+  period_end?: string | null;
+  conditions?: string[] | null;
+  benefits?: string[] | null;
+  partner_benefits?: AdminPartnerDetailBenefitRow[] | null;
+  applies_to?: PartnerAudienceKey[] | null;
+  images?: string[] | null;
+  tags?: string[] | null;
+  visibility: PartnerVisibility;
+  benefit_visibility?: PartnerBenefitVisibility | null;
+  benefit_verification_pin_hash?: string | null;
+  benefit_verification_pin_salt?: string | null;
+  company?: PartnerCompanyRow | PartnerCompanyRow[] | null;
+  categories?: PartnerCategoryRow | PartnerCategoryRow[] | null;
+};
+
 function normalizeRelation<T>(value: T | T[] | null | undefined): T | null {
   if (!value) {
     return null;
@@ -42,7 +86,10 @@ function normalizeRelation<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
 }
 
-const PARTNER_DETAIL_SELECT =
+const PARTNER_DETAIL_OVERVIEW_SELECT =
+  "id,created_at,name,company_id,managed_campus_slugs,period_start,period_end,benefits,visibility,partner_benefits(id,title,max_apply_count,display_order),company:partner_companies(id,name,slug),categories(id,key,label,color)";
+
+const PARTNER_DETAIL_EDIT_SELECT =
   "id,created_at,name,category_id,company_id,location,detail_description,campus_slugs,managed_campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,partner_benefits(id,title,max_apply_count,display_order),applies_to,images,tags,visibility,benefit_visibility,benefit_verification_pin_hash,benefit_verification_pin_salt,company:partner_companies(id,name,slug,description,is_active,managed_campus_slugs),categories(id,key,label,color,description)";
 
 const PARTNER_AUDIT_ACTIONS = [
@@ -70,15 +117,21 @@ function parseUsagePage(value: string) {
  */
 export async function getAdminPartnerDetailCoreReadModel({
   partnerId,
+  includeEditFields = false,
 }: {
   partnerId: string;
+  includeEditFields?: boolean;
 }) {
   try {
     const supabase = getSupabaseAdminClient();
     const [partnerResult, previewTokenResult] = await Promise.all([
       supabase
         .from("partners")
-        .select(PARTNER_DETAIL_SELECT)
+        .select(
+          includeEditFields
+            ? PARTNER_DETAIL_EDIT_SELECT
+            : PARTNER_DETAIL_OVERVIEW_SELECT,
+        )
         .eq("id", partnerId)
         .maybeSingle(),
       supabase
@@ -91,18 +144,16 @@ export async function getAdminPartnerDetailCoreReadModel({
     if (partnerResult.error) {
       return { status: "error" as const };
     }
-    if (!partnerResult.data) {
+    const partner = partnerResult.data as unknown as AdminPartnerDetailRow | null;
+    if (!partner) {
       return { status: "not_found" as const };
     }
 
-    const partner = partnerResult.data;
     const company = normalizeRelation<PartnerCompanyRow>(
-      (partner as { company?: PartnerCompanyRow | PartnerCompanyRow[] | null }).company,
+      partner.company,
     );
     const category = normalizeRelation<PartnerCategoryRow>(
-      (partner as {
-        categories?: PartnerCategoryRow | PartnerCategoryRow[] | null;
-      }).categories,
+      partner.categories,
     );
     return {
       status: "ready" as const,
@@ -152,17 +203,6 @@ export async function getAdminPartnerDetailOperationalReadModel({
           adPackageRepository.listAdminCouponsForPartner(partnerId),
         ])
       : Promise.resolve<[AdCampaignWithStats[], AdCoupon[]]>([[], []]);
-    const [metricsResult, reviewData, reviewCountResult, couponManagementData] =
-      await Promise.all([
-        getAdminPartnerMetrics([partnerId]),
-        getAdminReviewPageData(reviewFilters, {
-          includeCounts: false,
-          managedCampusSlugs,
-          ...reviewPagination,
-        }),
-        fetchPartnerReviewVisibilityCounts(supabase, partnerId),
-        couponManagementDataPromise,
-      ]);
     const selectedUsageBenefit = (core.partner.benefits ?? []).includes(requestedUsageBenefit)
       ? requestedUsageBenefit
       : null;
@@ -173,24 +213,40 @@ export async function getAdminPartnerDetailOperationalReadModel({
         ),
       ),
     );
-    const [usageHistory, metricTimeseries, partnerAuditLogsResult, partnerRequestHistory] =
-      await Promise.all([
-        partnerBenefitUsageRepository.listUsageHistory({
-          partnerId,
-          benefit: selectedUsageBenefit,
-          page: parseUsagePage(usagePage),
-          pageSize: 25,
-        }),
-        getPartnerMetricTimeseriesSnapshot(partnerId, core.partner.created_at),
-        supabase
-          .from("admin_audit_logs")
-          .select("id,actor_id,action,target_type,target_id,properties,created_at")
-          .in("action", PARTNER_AUDIT_ACTIONS as unknown as string[])
-          .in("target_type", ["partner", "partner_company", "partner_change_request"])
-          .order("created_at", { ascending: false })
-          .limit(200),
-        fetchRequestSummariesForPartner(supabase, partnerId, { limit: 50 }),
-      ]);
+    const [
+      metricsResult,
+      reviewData,
+      reviewCountResult,
+      couponManagementData,
+      usageHistory,
+      metricTimeseries,
+      partnerAuditLogsResult,
+      partnerRequestHistory,
+    ] = await Promise.all([
+      getAdminPartnerMetrics([partnerId]),
+      getAdminReviewPageData(reviewFilters, {
+        includeCounts: false,
+        managedCampusSlugs: managedCampusSlugs ? [...managedCampusSlugs] : null,
+        ...reviewPagination,
+      }),
+      fetchPartnerReviewVisibilityCounts(supabase, partnerId),
+      couponManagementDataPromise,
+      partnerBenefitUsageRepository.listUsageHistory({
+        partnerId,
+        benefit: selectedUsageBenefit,
+        page: parseUsagePage(usagePage),
+        pageSize: 25,
+      }),
+      getPartnerMetricTimeseriesSnapshot(partnerId, core.partner.created_at),
+      supabase
+        .from("admin_audit_logs")
+        .select("id,actor_id,action,target_type,target_id,properties,created_at")
+        .in("action", PARTNER_AUDIT_ACTIONS as unknown as string[])
+        .in("target_type", ["partner", "partner_company", "partner_change_request"])
+        .order("created_at", { ascending: false })
+        .limit(200),
+      fetchRequestSummariesForPartner(supabase, partnerId, { limit: 50 }),
+    ]);
     const partnerAuditLogs = (partnerAuditLogsResult.data ?? []).filter((log) => {
       const properties = log.properties && typeof log.properties === "object"
         ? (log.properties as Record<string, unknown>)
@@ -259,7 +315,10 @@ export async function getAdminPartnerDetailReadModel({
   requestedUsageBenefit: string;
   usagePage: string;
 }) {
-  const core = await getAdminPartnerDetailCoreReadModel({ partnerId });
+  const core = await getAdminPartnerDetailCoreReadModel({
+    partnerId,
+    includeEditFields: true,
+  });
   if (core.status !== "ready") {
     return core;
   }

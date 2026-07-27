@@ -66,7 +66,7 @@ test("관리자 route timing 요약은 안전한 한국어 화면명과 표본 �
 });
 
 test("route timing 집계는 service role 서버 경계와 bounded table을 사용한다", async () => {
-  const [serverSource, migrationSource, pageSource, panelSource] =
+  const [serverSource, migrationSource, pageSource, panelSource, timingSource] =
     await Promise.all([
       readFile(
         new URL(
@@ -96,10 +96,20 @@ test("route timing 집계는 service role 서버 경계와 bounded table을 사�
         ),
         "utf8",
       ),
+      readFile(
+        new URL(
+          "../src/components/analytics/AdminNavigationTiming.tsx",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
     ]);
 
   assert.match(serverSource, /get_admin_route_timing_summary/);
   assert.match(serverSource, /toAdminRouteTimingSummary/);
+  assert.match(serverSource, /logAdminDataUnavailable/);
+  assert.match(serverSource, /withAdminReadModelTimeout/);
+  assert.doesNotMatch(serverSource, /console\.error/);
   assert.match(migrationSource, /percentile_cont\(0\.75\)/);
   assert.match(migrationSource, /grant execute .* to service_role/i);
   assert.match(pageSource, /getAdminRouteTimingSummary/);
@@ -107,4 +117,9 @@ test("route timing 집계는 service role 서버 경계와 bounded table을 사�
   assert.match(panelSource, /overflow-x-auto/);
   assert.match(panelSource, /role="region"/);
   assert.doesNotMatch(panelSource, /rawPath|memberId|partnerId/);
+  assert.match(timingSource, /role="status"/);
+  assert.match(timingSource, /aria-live="polite"/);
+  assert.match(timingSource, /화면을 불러오는 중입니다/);
+  assert.match(timingSource, /motion-reduce:animate-none/);
+  assert.match(timingSource, /15_000/);
 });

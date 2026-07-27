@@ -105,6 +105,7 @@ export default function AdminQuickNavigatorProvider({
     setPendingDestination(href);
     startRouteTransition(() => {
       router.push(href);
+      closeNavigator();
     });
   };
   const handleGlobalSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -199,7 +200,7 @@ export default function AdminQuickNavigatorProvider({
               <button
                 type="button"
                 className="absolute inset-0 bg-foreground/30"
-                aria-label="빠른 찾기 닫기"
+                aria-label="빠른 찾기 배경 닫기"
                 onClick={closeNavigator}
               />
               <div
@@ -271,6 +272,7 @@ export default function AdminQuickNavigatorProvider({
                   {query.trim() ? (
                     <Link
                       href={buildAdminGlobalSearchHref(query)}
+                      prefetch={false}
                       aria-disabled={isRoutePending || undefined}
                       tabIndex={isRoutePending ? -1 : undefined}
                       onClick={(event) => {
@@ -304,6 +306,7 @@ export default function AdminQuickNavigatorProvider({
                           <Link
                             key={item.href}
                             href={item.href}
+                            prefetch={false}
                             aria-disabled={isRoutePending || undefined}
                             tabIndex={isRoutePending ? -1 : undefined}
                             onClick={(event) => {

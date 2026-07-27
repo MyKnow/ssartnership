@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { trackProductEvent } from "@/lib/product-events";
 import {
@@ -8,6 +8,7 @@ import {
   toAdminRouteTimingProperties,
   type AdminRouteTimingTrigger,
 } from "@/lib/admin-performance";
+import { getCurrentAdminViewport } from "@/lib/admin-viewport";
 
 type PendingNavigation = {
   startedAt: number;
@@ -15,17 +16,23 @@ type PendingNavigation = {
 };
 
 let pendingNavigation: PendingNavigation | null = null;
+const ADMIN_NAVIGATION_START_EVENT = "admin:navigation-start";
+
+function clearPendingNavigation() {
+  pendingNavigation = null;
+}
 
 export function markAdminNavigationStart(trigger: AdminRouteTimingTrigger) {
   if (typeof window === "undefined" || !Number.isFinite(performance.now())) {
     return;
   }
   pendingNavigation = { startedAt: performance.now(), trigger };
+  window.dispatchEvent(new Event(ADMIN_NAVIGATION_START_EVENT));
 }
 
 function consumePendingNavigation() {
   const current = pendingNavigation;
-  pendingNavigation = null;
+  clearPendingNavigation();
   if (!current || performance.now() - current.startedAt > 120_000) {
     return null;
   }
@@ -66,9 +73,55 @@ function getInitialNavigationDuration() {
 export default function AdminNavigationTiming() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [isNavigationPending, setIsNavigationPending] = useState(false);
   const serializedSearchParams = searchParams.toString();
   const locationKey = `${pathname}${serializedSearchParams ? `?${serializedSearchParams}` : ""}`;
   const lastReportedLocationRef = useRef<string | null>(null);
+  const lastNavigationLocationRef = useRef(locationKey);
+
+  useEffect(() => {
+    const handleNavigationStart = () => {
+      setIsNavigationPending(true);
+    };
+
+    window.addEventListener(
+      ADMIN_NAVIGATION_START_EVENT,
+      handleNavigationStart,
+    );
+    return () =>
+      window.removeEventListener(
+        ADMIN_NAVIGATION_START_EVENT,
+        handleNavigationStart,
+      );
+  }, []);
+
+  useEffect(() => {
+    if (!isNavigationPending) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      clearPendingNavigation();
+      setIsNavigationPending(false);
+    }, 15_000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isNavigationPending]);
+
+  useEffect(() => {
+    const locationChanged = lastNavigationLocationRef.current !== locationKey;
+    lastNavigationLocationRef.current = locationKey;
+    if (!isNavigationPending || !locationChanged) {
+      return;
+    }
+
+    clearPendingNavigation();
+    const clearIndicatorId = window.setTimeout(() => {
+      setIsNavigationPending(false);
+    }, 0);
+
+    return () => window.clearTimeout(clearIndicatorId);
+  }, [isNavigationPending, locationKey]);
 
   useEffect(() => {
     const markFromClick = (event: MouseEvent) => {
@@ -159,9 +212,25 @@ export default function AdminNavigationTiming() {
       path: descriptor.path,
       targetType: "admin_performance",
       targetId: descriptor.key,
-      properties,
+      properties: {
+        ...properties,
+        viewport: getCurrentAdminViewport(),
+      },
     });
   }, [locationKey, pathname]);
 
-  return null;
+  return isNavigationPending ? (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className="pointer-events-none fixed inset-x-0 top-0 z-[100] h-1 bg-primary/15"
+    >
+      <span className="sr-only">화면을 불러오는 중입니다.</span>
+      <span
+        aria-hidden="true"
+        className="block h-full w-2/5 origin-left animate-pulse bg-primary motion-reduce:animate-none"
+      />
+    </div>
+  ) : null;
 }

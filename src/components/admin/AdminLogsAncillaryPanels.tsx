@@ -1,5 +1,6 @@
 import AdminWebVitalSummaryPanel from "@/components/admin/AdminWebVitalSummaryPanel";
 import AdminRouteTimingSummaryPanel from "@/components/admin/AdminRouteTimingSummaryPanel";
+import AdminTaskOutcomeSummaryPanel from "@/components/admin/AdminTaskOutcomeSummaryPanel";
 import AdminForwardActivityPanel from "@/components/admin/logs/AdminForwardActivityPanel";
 import InlineMessage from "@/components/ui/InlineMessage";
 import Skeleton from "@/components/ui/Skeleton";
@@ -10,6 +11,7 @@ import {
 } from "@/lib/platform-activity-forward-metrics";
 import type { AdminWebVitalSummaryMetric } from "@/lib/admin-performance";
 import type { AdminRouteTimingSummaryMetric } from "@/lib/admin-performance";
+import type { AdminTaskOutcomeSummaryMetric } from "@/lib/admin-task-outcome";
 
 type ActivityLoadResult = {
   metrics: ForwardActivityMetrics;
@@ -24,6 +26,12 @@ type WebVitalLoadResult = {
 
 type RouteTimingLoadResult = {
   metrics: AdminRouteTimingSummaryMetric[];
+  windowDays: number;
+  loadError: boolean;
+};
+
+type TaskOutcomeLoadResult = {
+  metrics: AdminTaskOutcomeSummaryMetric[];
   windowDays: number;
   loadError: boolean;
 };
@@ -92,19 +100,41 @@ async function resolveRouteTiming(
   }
 }
 
+async function resolveTaskOutcome(
+  promise: Promise<TaskOutcomeLoadResult>,
+): Promise<TaskOutcomeLoadResult> {
+  try {
+    return await promise;
+  } catch {
+    return {
+      metrics: [],
+      windowDays: 7,
+      loadError: true,
+    };
+  }
+}
+
 export default async function AdminLogsAncillaryPanels({
   activity,
   webVitals,
   routeTiming,
+  taskOutcome,
 }: {
   activity: Promise<ActivityLoadResult>;
   webVitals: Promise<WebVitalLoadResult>;
   routeTiming: Promise<RouteTimingLoadResult>;
+  taskOutcome: Promise<TaskOutcomeLoadResult>;
 }) {
-  const [activityResult, webVitalResult, routeTimingResult] = await Promise.all([
+  const [
+    activityResult,
+    webVitalResult,
+    routeTimingResult,
+    taskOutcomeResult,
+  ] = await Promise.all([
     resolveActivity(activity),
     resolveWebVitals(webVitals),
     resolveRouteTiming(routeTiming),
+    resolveTaskOutcome(taskOutcome),
   ]);
 
   return (
@@ -119,6 +149,7 @@ export default async function AdminLogsAncillaryPanels({
       ) : null}
       <AdminWebVitalSummaryPanel {...webVitalResult} />
       <AdminRouteTimingSummaryPanel {...routeTimingResult} />
+      <AdminTaskOutcomeSummaryPanel {...taskOutcomeResult} />
     </>
   );
 }

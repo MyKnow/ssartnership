@@ -44,7 +44,7 @@ type Props = {
     value: string,
   ) => void;
   onLoadLog?: (log: AdminNotificationOperationLog) => void;
-  onDeleteLog?: (logId: string) => Promise<void>;
+  onDeleteLog?: (logId: string) => void | Promise<void>;
   readOnly?: boolean;
   title?: string;
   description?: string;
@@ -98,7 +98,7 @@ export function PushLogsSection({
   description = "최근 발송 이력을 검색하고 같은 구성을 다시 불러옵니다.",
 }: Props) {
   return (
-    <section className="grid min-w-0 gap-4 overflow-hidden rounded-3xl border border-border bg-surface p-4 shadow-flat sm:p-5">
+    <section className="grid min-w-0 gap-4 rounded-3xl border border-border bg-surface p-4 shadow-flat sm:p-5">
       <SectionHeading title={title} description={description} />
 
       <AutomaticSummaryStrip summaries={automaticSummaries} />

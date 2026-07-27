@@ -134,10 +134,10 @@ export default function MattermostSenderManager({
     >
       <div className="grid gap-2">
         <p className="ui-kicker">
-          {generationLabel ? `${generationLabel} 운영` : "Super Admin only"}
+          {generationLabel ? `${generationLabel} 운영` : "관리자 전용"}
         </p>
         <h2 className="text-lg font-semibold text-foreground">
-          Mattermost Sender
+          Mattermost 발송 계정
         </h2>
         <p className="text-sm leading-6 text-muted-foreground">
           {generationLabel

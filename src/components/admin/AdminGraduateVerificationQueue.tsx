@@ -492,7 +492,7 @@ function GraduateVerificationHeader({
 
   return (
     <AdminReviewQueueHeader
-      eyebrow="검토"
+      eyebrow="작업함"
       title="수료생 인증 검토"
       description="신규 수료생과 기존 회원 복구 요청의 증빙을 확인하고, 다음 상태로 안전하게 전환합니다."
       actions={
@@ -562,7 +562,7 @@ function GraduateVerificationRequestSection({
       aria-labelledby="graduate-request-queue-heading"
     >
       <div>
-        <p className="ui-kicker">New verification</p>
+        <p className="ui-kicker">신규 인증</p>
         <h2
           id="graduate-request-queue-heading"
           className="text-xl font-semibold"
@@ -624,7 +624,7 @@ function GraduateSetupEmailRetrySection({
       aria-labelledby="graduate-setup-email-retry-heading"
     >
       <div>
-        <p className="ui-kicker">Account setup</p>
+        <p className="ui-kicker">계정 설정</p>
         <h2
           id="graduate-setup-email-retry-heading"
           className="text-xl font-semibold"
@@ -825,7 +825,7 @@ export function AdminGraduateVerificationRetryLoading() {
       aria-busy="true"
     >
       <div>
-        <p className="ui-kicker">Account setup</p>
+        <p className="ui-kicker">계정 설정</p>
         <h2
           id="graduate-setup-email-retry-heading"
           className="text-xl font-semibold"

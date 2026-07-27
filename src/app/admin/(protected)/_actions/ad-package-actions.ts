@@ -46,7 +46,7 @@ function parseCampaignStatus(value: string): AdCampaignStatus {
   ) {
     return value;
   }
-  throw new Error("캠페인 상태를 확인해 주세요.");
+  throw new Error("ad_campaign_invalid_status");
 }
 
 async function assertManagedAdPartner(
@@ -115,13 +115,27 @@ function getCouponDetailPath(partnerId: string) {
 }
 
 export async function createAdCampaignAction(formData: FormData) {
-  await requireAdminPermission("home_ads", "create", { path: "/admin/advertisement" });
-  const adminSession = await getAdminSession();
-  const input = {
-    ...parseCreateAdCampaignForm(formData),
-    createdByAdminId: adminSession?.adminId ?? null,
-  };
-  const campaign = await adPackageRepository.createCampaign(input);
+  const fallbackPath = "/admin/advertisement";
+  await requireAdminPermission("home_ads", "create", { path: fallbackPath });
+  let campaign: Awaited<ReturnType<typeof adPackageRepository.createCampaign>>;
+  try {
+    const adminSession = await getAdminSession();
+    const input = {
+      ...parseCreateAdCampaignForm(formData),
+      createdByAdminId: adminSession?.adminId ?? null,
+    };
+    campaign = await adPackageRepository.createCampaign(input);
+  } catch (error) {
+    redirectAdminActionError(
+      fallbackPath,
+      getSafeAdminActionErrorCode(error, "ad_campaign_create_failed"),
+      {
+        action: "ad_campaign_create",
+        targetType: "ad_campaign",
+        properties: { issue: 236 },
+      },
+    );
+  }
 
   await logAdminAction("ad_campaign_create", {
     targetType: "ad_campaign",
@@ -138,13 +152,28 @@ export async function createAdCampaignAction(formData: FormData) {
 }
 
 export async function updateAdCampaignStatusAction(formData: FormData) {
-  await requireAdminPermission("home_ads", "update", { path: "/admin/advertisement" });
+  const fallbackPath = "/admin/advertisement";
+  await requireAdminPermission("home_ads", "update", { path: fallbackPath });
   const campaignId = getString(formData, "campaignId");
   if (!campaignId) {
-    throw new Error("캠페인을 찾을 수 없습니다.");
+    redirectAdminActionError(fallbackPath, "ad_campaign_invalid_request");
   }
-  const status = parseCampaignStatus(getString(formData, "status"));
-  await adPackageRepository.updateCampaignStatus({ campaignId, status });
+  let status: AdCampaignStatus;
+  try {
+    status = parseCampaignStatus(getString(formData, "status"));
+    await adPackageRepository.updateCampaignStatus({ campaignId, status });
+  } catch (error) {
+    redirectAdminActionError(
+      fallbackPath,
+      getSafeAdminActionErrorCode(error, "ad_campaign_update_failed"),
+      {
+        action: "ad_campaign_status_update",
+        targetType: "ad_campaign",
+        targetId: campaignId,
+        properties: { issue: 236 },
+      },
+    );
+  }
 
   await logAdminAction("ad_campaign_status_update", {
     targetType: "ad_campaign",

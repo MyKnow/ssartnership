@@ -134,6 +134,7 @@ export default function AdminCycleView({
         />
         <Link
           href="/admin/cycle/mock"
+          prefetch={false}
           className="rounded-xl border border-border bg-surface-control px-4 py-2 text-sm font-semibold text-foreground hover:bg-surface-muted"
         >
           전체 목업보기

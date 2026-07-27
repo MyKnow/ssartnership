@@ -80,6 +80,12 @@ const ERROR_MESSAGES: Record<string, AdminReviewQueueFeedback> = {
     title: "검토 대상을 찾을 수 없습니다",
     description: "목록을 새로고침해 최신 상태를 확인해 주세요.",
   },
+  partner_form_conversion_failed: {
+    tone: "danger",
+    title: "제휴처 생성을 완료하지 못했습니다",
+    description:
+      "신청 상태는 저장되었지만 제휴처 후속 처리가 끝나지 않았습니다. 운영 기록과 제휴처 목록을 확인해 중복 등록 여부를 점검해 주세요.",
+  },
   regional_admin_scope_denied: {
     tone: "danger",
     title: "접근 범위를 확인해 주세요",

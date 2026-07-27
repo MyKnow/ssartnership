@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import AdminConfirmDialog from "@/components/admin/AdminConfirmDialog";
 import IconActionButton, {
   IconActionGroup,
 } from "@/components/ui/IconActionButton";
@@ -62,6 +63,7 @@ export default function AdminNotificationInbox({
   const [pendingAction, setPendingAction] = useState<
     "read-all" | "delete-all" | null
   >(null);
+  const [deleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false);
 
   const unreadLabel = useMemo(
     () => (state.unreadCount > 99 ? "99+" : String(state.unreadCount)),
@@ -245,11 +247,8 @@ export default function AdminNotificationInbox({
       return;
     }
 
-    if (!window.confirm("관리자 수신함의 모든 알림을 삭제할까요?")) {
-      return;
-    }
-
     const snapshot = state;
+    setDeleteAllConfirmOpen(false);
     setPendingAction("delete-all");
     setState((current) => ({
       ...current,
@@ -339,7 +338,7 @@ export default function AdminNotificationInbox({
               size="sm"
               className="!h-8 !min-h-8 !min-w-0 rounded-full px-3 text-xs font-semibold shadow-raised"
               onClick={() => {
-                void deleteAllNotifications();
+                setDeleteAllConfirmOpen(true);
               }}
               disabled={
                 state.items.length === 0 ||
@@ -507,6 +506,18 @@ export default function AdminNotificationInbox({
           </div>
         </div>
       ) : null}
+      <AdminConfirmDialog
+        open={deleteAllConfirmOpen}
+        title="관리자 알림 전체 삭제"
+        description="현재 관리자 수신함의 알림을 모두 삭제합니다. 삭제 후에는 수신함에서 다시 확인할 수 없습니다."
+        confirmLabel="전체 삭제"
+        danger
+        pending={pendingAction === "delete-all"}
+        onClose={() => setDeleteAllConfirmOpen(false)}
+        onConfirm={() => {
+          void deleteAllNotifications();
+        }}
+      />
     </Card>
   );
 }

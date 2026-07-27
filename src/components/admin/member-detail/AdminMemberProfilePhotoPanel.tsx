@@ -196,7 +196,7 @@ export default function AdminMemberProfilePhotoPanel({
     <Card tone="elevated" className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="ui-kicker">Profile photo</p>
+          <p className="ui-kicker">프로필 사진</p>
           <h2 className="text-lg font-semibold">프로필 사진 관리</h2>
         </div>
         <Badge variant={getStatusVariant(reviewStatus)}>{REVIEW_STATUS_LABEL[reviewStatus]}</Badge>

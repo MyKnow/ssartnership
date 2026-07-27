@@ -29,7 +29,7 @@ export default function AdminNotificationsView({
   return (
     <div className="grid gap-6">
       <AdminPageHeader
-        eyebrow="업무"
+        eyebrow="작업함"
         title="내 알림"
         description="관리자 계정으로 수신한 변경 요청, 종료 임박, 보안 알림을 확인합니다."
       />

@@ -23,7 +23,10 @@ test("혜택별 설정값은 항목별로 보존된다", async () => {
     { title: "커피 할인", maxApplyCount: "" },
   ]);
 
-  assert.deepEqual(items.map((item) => item.title), ["헬스 1개월권", "커피 할인"]);
+  assert.deepEqual(
+    items.map((item: { title: string }) => item.title),
+    ["헬스 1개월권", "커피 할인"],
+  );
   assert.equal(getEffectivePartnerBenefitMaxApplyCount(items[0]?.maxApplyCount), 3);
   assert.equal(getEffectivePartnerBenefitMaxApplyCount(items[1]?.maxApplyCount), 1);
 });

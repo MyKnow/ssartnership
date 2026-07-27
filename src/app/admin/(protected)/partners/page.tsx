@@ -121,7 +121,7 @@ async function AdminPartnersContent({
     <section className="grid gap-6">
         <AdminPartnerCreateToast />
         <AdminPageHeader
-          eyebrow="제휴 운영"
+          eyebrow="데이터"
           title={showPlans ? "플랜과 과금 관리" : "제휴처 목록"}
           description={
             showPlans

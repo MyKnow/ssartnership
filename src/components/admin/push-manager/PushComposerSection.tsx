@@ -692,7 +692,7 @@ export function PushComposerSection({
         : `${getMemberLabel(selectedMembers[0])} 외 ${selectedMembers.length - 1}명`;
 
   return (
-    <section className="grid min-w-0 gap-4 overflow-hidden rounded-3xl border border-border bg-surface p-4 shadow-flat sm:p-5">
+    <section className="grid min-w-0 gap-4 rounded-3xl border border-border bg-surface p-4 shadow-flat sm:p-5">
       <SectionHeading
         title="통합 발송 관리"
         description="대상 설정, 메시지 작성, 최종 확인 순서로만 진행합니다."

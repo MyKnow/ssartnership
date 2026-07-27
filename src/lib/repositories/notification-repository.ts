@@ -15,6 +15,7 @@ export type NotificationListContext = {
 export type CreateNotificationResult = {
   notification: NotificationRecord;
   recipientMemberIds: string[];
+  alreadyExists?: boolean;
 };
 
 export interface NotificationRepository {

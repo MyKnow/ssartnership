@@ -3,6 +3,8 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowTopRightOnSquareIcon,
   Bars3Icon,
@@ -51,6 +53,8 @@ export default function AdminShellView({
   navGroups: AdminNavGroup[];
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const prefetchedHrefsRef = useRef(new Set<string>());
   const { hidden, headerHeight, headerRef } = useAutoHideHeader();
   const activeNavItem =
     navGroups
@@ -60,12 +64,14 @@ export default function AdminShellView({
   const taskNavItem = navGroups
     .flatMap((group) => group.items)
     .find((item) => item.href === "/admin/tasks");
-  const memberReviewGroup = navGroups.find(
-    (group) => group.label === "회원·검토",
+  const dataGroup = navGroups.find(
+    (group) => group.label === "데이터",
   );
-  const memberReviewNavItem = memberReviewGroup?.items[0];
-  const isMemberReviewActive = Boolean(
-    memberReviewGroup?.items.some((item) => isAdminNavActive(pathname, item.href)),
+  const memberNavItem = dataGroup?.items.find(
+    (item) => item.href === "/admin/members",
+  );
+  const isMemberDataActive = Boolean(
+    memberNavItem && isAdminNavActive(pathname, memberNavItem.href),
   );
   const mobileNavItemClassName = (active: boolean) =>
     cn(
@@ -74,6 +80,16 @@ export default function AdminShellView({
     );
   const skipLinkClassName =
     "sr-only fixed left-4 top-4 z-[90] rounded-control border border-border bg-surface-overlay px-4 py-3 text-sm font-semibold text-foreground shadow-overlay focus:not-sr-only focus:!fixed focus:inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  const prefetchOnIntent = useCallback(
+    (href: string) => {
+      if (prefetchedHrefsRef.current.has(href)) {
+        return;
+      }
+      prefetchedHrefsRef.current.add(href);
+      router.prefetch(href);
+    },
+    [router],
+  );
 
   const renderDesktopNav = (expanded: boolean) => (
     <nav className="grid gap-6">
@@ -93,6 +109,9 @@ export default function AdminShellView({
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={false}
+                  onPointerEnter={() => prefetchOnIntent(item.href)}
+                  onFocus={() => prefetchOnIntent(item.href)}
                   title={expanded ? undefined : item.label}
                   className={cn(
                     "group flex items-center gap-3 rounded-2xl border px-3 py-3 text-sm transition-colors",
@@ -175,6 +194,9 @@ export default function AdminShellView({
           <Container size="dashboard" className="flex items-stretch">
             <Link
               href="/admin"
+              prefetch={false}
+              onPointerEnter={() => prefetchOnIntent("/admin")}
+              onFocus={() => prefetchOnIntent("/admin")}
               aria-current={pathname === "/admin" ? "page" : undefined}
               className={mobileNavItemClassName(pathname === "/admin")}
             >
@@ -184,6 +206,9 @@ export default function AdminShellView({
             {taskNavItem ? (
               <Link
                 href={taskNavItem.href}
+                prefetch={false}
+                onPointerEnter={() => prefetchOnIntent(taskNavItem.href)}
+                onFocus={() => prefetchOnIntent(taskNavItem.href)}
                 aria-current={isAdminNavActive(pathname, taskNavItem.href) ? "page" : undefined}
                 className={mobileNavItemClassName(
                   isAdminNavActive(pathname, taskNavItem.href),
@@ -193,15 +218,18 @@ export default function AdminShellView({
                 <span>작업함</span>
               </Link>
             ) : null}
-            {memberReviewNavItem ? (
+            {memberNavItem ? (
               <Link
-                href={memberReviewNavItem.href}
-                title={memberReviewNavItem.label}
-                aria-current={isMemberReviewActive ? "page" : undefined}
-                className={mobileNavItemClassName(isMemberReviewActive)}
+                href={memberNavItem.href}
+                prefetch={false}
+                onPointerEnter={() => prefetchOnIntent(memberNavItem.href)}
+                onFocus={() => prefetchOnIntent(memberNavItem.href)}
+                title={memberNavItem.label}
+                aria-current={isMemberDataActive ? "page" : undefined}
+                className={mobileNavItemClassName(isMemberDataActive)}
               >
                 <Squares2X2Icon className="h-5 w-5" aria-hidden="true" />
-                <span>회원·검토</span>
+                <span>회원</span>
               </Link>
             ) : null}
             <AdminMobileNav
@@ -229,6 +257,9 @@ export default function AdminShellView({
           <div className="flex h-full flex-col gap-6 px-3 py-4 xl:px-4 xl:py-5">
             <Link
               href="/admin"
+              prefetch={false}
+              onPointerEnter={() => prefetchOnIntent("/admin")}
+              onFocus={() => prefetchOnIntent("/admin")}
               aria-label="관리 홈"
               className={cn(
                 "flex items-center rounded-2xl border border-border/70 bg-surface-elevated px-3 py-3 text-foreground shadow-flat",
@@ -257,7 +288,13 @@ export default function AdminShellView({
               <div className="min-w-0">
                 {activeNavItem?.href !== "/admin" ? (
                   <div className="flex flex-wrap items-center gap-1 text-xs font-medium text-muted-foreground">
-                    <Link href="/admin" className="hover:text-foreground">
+                    <Link
+                      href="/admin"
+                      prefetch={false}
+                      onPointerEnter={() => prefetchOnIntent("/admin")}
+                      onFocus={() => prefetchOnIntent("/admin")}
+                      className="hover:text-foreground"
+                    >
                       관리 홈
                     </Link>
                     <ChevronRightIcon className="h-3.5 w-3.5" />

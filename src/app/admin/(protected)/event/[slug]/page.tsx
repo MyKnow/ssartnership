@@ -139,6 +139,28 @@ function RewardStatusPill({
   );
 }
 
+function eventRewardDrawStatusLabel(status: EventRewardStoredDraw["status"]) {
+  return {
+    draft: "작성 중",
+    finalized: "추첨 확정",
+    sent: "발송 완료",
+    partial_failed: "일부 발송 실패",
+    failed: "발송 실패",
+  }[status];
+}
+
+function eventRewardNotificationStatusLabel(
+  status: EventRewardStoredDraw["winners"][number]["notificationStatus"],
+) {
+  return {
+    pending: "발송 대기",
+    sent: "발송 완료",
+    partial_failed: "일부 실패",
+    failed: "발송 실패",
+    skipped: "발송 제외",
+  }[status];
+}
+
 function getEventRewardDrawPreview(params: {
   overview: EventRewardAdminOverview;
   winnerCount?: string;
@@ -214,7 +236,7 @@ function SignupRewardOverviewSection({
     <section className="grid min-w-0 gap-5" aria-label="추첨권 현황">
       <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="ui-kicker">Rewards</p>
+          <p className="ui-kicker">추첨권</p>
           <h3 className="mt-2 text-xl font-semibold text-foreground">
             추첨권 현황
           </h3>
@@ -273,7 +295,7 @@ function SignupRewardOverviewSection({
       <Card tone="elevated" className="grid min-w-0 gap-4 overflow-hidden">
         <div className="flex min-w-0 w-full max-w-full flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="ui-kicker">Draw</p>
+          <p className="ui-kicker">추첨</p>
             <h3 className="mt-2 text-xl font-semibold text-foreground">
               가중 추첨
             </h3>
@@ -283,7 +305,7 @@ function SignupRewardOverviewSection({
           </div>
           {draw ? (
             <span className="rounded-full border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
-              {draw.status}
+              {eventRewardDrawStatusLabel(draw.status)}
             </span>
           ) : null}
         </div>
@@ -373,7 +395,7 @@ function SignupRewardOverviewSection({
               ]}
               minItemWidth="11rem"
             />
-            <div className="overflow-x-auto rounded-[1rem] border border-border/70">
+            <div className="hidden overflow-x-auto rounded-[1rem] border border-border/70 md:block">
               <table className="w-full min-w-[720px] text-left text-sm">
                 <thead className="border-b border-border bg-surface-inset text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                   <tr>
@@ -405,12 +427,51 @@ function SignupRewardOverviewSection({
                         {winner.ticketCount.toLocaleString()}장
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {winner.notificationStatus}
+                        {eventRewardNotificationStatusLabel(winner.notificationStatus)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div className="grid min-w-0 gap-3 md:hidden" aria-label="확정 당첨자 목록">
+              {draw.winners.map((winner) => (
+                <article
+                  key={winner.id}
+                  className="grid min-w-0 gap-3 rounded-card border border-border/70 bg-surface-inset p-4"
+                >
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-muted-foreground">
+                        {winner.rank}위
+                      </p>
+                      <p className="mt-1 truncate font-semibold text-foreground">
+                        {winner.displayName || winner.mmUsername}
+                      </p>
+                      <p className="mt-1 truncate text-xs text-muted-foreground">
+                        {winner.mmUsername}
+                      </p>
+                    </div>
+                    <RewardStatusPill
+                      value={eventRewardNotificationStatusLabel(winner.notificationStatus)}
+                    />
+                  </div>
+                  <dl className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <dt className="text-xs text-muted-foreground">기수·캠퍼스</dt>
+                      <dd className="mt-1 font-medium text-foreground">
+                        {winner.year}기 · {winner.campus || "-"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">추첨권</dt>
+                      <dd className="mt-1 font-semibold text-foreground">
+                        {winner.ticketCount.toLocaleString()}장
+                      </dd>
+                    </div>
+                  </dl>
+                </article>
+              ))}
             </div>
             {!draw.sentAt && canUpdate ? (
               <form
@@ -567,7 +628,7 @@ function SignupRewardOverviewSection({
                   ]}
                   minItemWidth="11rem"
                 />
-                <div className="overflow-x-auto rounded-[1rem] border border-border/70 bg-surface">
+                <div className="hidden overflow-x-auto rounded-[1rem] border border-border/70 bg-surface md:block">
                   <table className="w-full min-w-[640px] text-left text-sm">
                     <thead className="border-b border-border bg-surface-inset text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                       <tr>
@@ -602,6 +663,40 @@ function SignupRewardOverviewSection({
                     </tbody>
                   </table>
                 </div>
+                <div className="grid min-w-0 gap-3 md:hidden" aria-label="테스트 추첨 당첨자 목록">
+                  {drawPreview.winners.map((winner) => (
+                    <article
+                      key={winner.memberId}
+                      className="grid min-w-0 gap-3 rounded-card border border-border/70 bg-surface p-4"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-muted-foreground">
+                          {winner.rank}위
+                        </p>
+                        <p className="mt-1 truncate font-semibold text-foreground">
+                          {winner.displayName || winner.mmUsername}
+                        </p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                          {winner.mmUsername}
+                        </p>
+                      </div>
+                      <dl className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <dt className="text-xs text-muted-foreground">기수·캠퍼스</dt>
+                          <dd className="mt-1 font-medium text-foreground">
+                            {winner.year}기 · {winner.campus || "-"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs text-muted-foreground">추첨권</dt>
+                          <dd className="mt-1 font-semibold text-foreground">
+                            {winner.ticketCount.toLocaleString()}장
+                          </dd>
+                        </div>
+                      </dl>
+                    </article>
+                  ))}
+                </div>
               </div>
             ) : null}
           </div>
@@ -622,7 +717,7 @@ function SignupRewardOverviewSection({
       </Card>
 
       <Card tone="elevated" padding="none" className="min-w-0 overflow-hidden">
-        <div className="min-w-0 max-w-full overflow-x-auto">
+        <div className="hidden min-w-0 max-w-full overflow-x-auto md:block">
           <table className="min-w-[960px] w-full text-left text-sm">
             <thead className="border-b border-border bg-surface-inset text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               <tr>
@@ -683,6 +778,54 @@ function SignupRewardOverviewSection({
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="grid min-w-0 gap-3 p-3 md:hidden" aria-label="회원별 추첨권 목록">
+          {overview.members.map((member) => (
+            <article
+              key={member.id}
+              className="grid min-w-0 gap-3 rounded-card border border-border/70 bg-surface-inset p-4"
+            >
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-foreground">
+                  {member.displayName || member.mmUsername}
+                </p>
+                <p className="mt-1 truncate text-xs text-muted-foreground">
+                  {member.mmUsername}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {member.year}기 · {member.campus || "-"}
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-3 border-t border-border/70 pt-3">
+                <span className="text-sm text-muted-foreground">총 추첨권</span>
+                <span className="font-semibold text-foreground">
+                  {member.totalTickets.toLocaleString()}장
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
+                <div className="grid min-w-0 gap-1">
+                  <span className="text-muted-foreground">회원가입</span>
+                  <RewardStatusPill value={rewardConditionLabel(member, "signup")} />
+                </div>
+                <div className="grid min-w-0 gap-1">
+                  <span className="text-muted-foreground">MM</span>
+                  <RewardStatusPill value={rewardConditionLabel(member, "mm")} />
+                </div>
+                <div className="grid min-w-0 gap-1">
+                  <span className="text-muted-foreground">푸시</span>
+                  <RewardStatusPill value={rewardConditionLabel(member, "push")} />
+                </div>
+                <div className="grid min-w-0 gap-1">
+                  <span className="text-muted-foreground">마케팅</span>
+                  <RewardStatusPill value={rewardConditionLabel(member, "marketing")} />
+                </div>
+                <div className="grid min-w-0 gap-1">
+                  <span className="text-muted-foreground">리뷰</span>
+                  <RewardStatusPill value={rewardConditionLabel(member, "review")} muted />
+                </div>
+              </div>
+            </article>
+          ))}
         </div>
       </Card>
     </section>

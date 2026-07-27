@@ -394,7 +394,7 @@ export async function updatePromotionEventAction(formData: FormData) {
       slug: payload.slug,
       pagePath: payload.page_path,
       targetAudiences: payload.target_audiences,
-      recoveredFromMissingId: !existing?.id,
+      recoveredFromMissingId: !id,
     },
   });
   revalidatePromotionPaths(payload.slug);

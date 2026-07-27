@@ -16,12 +16,16 @@ import {
 import type { GroupFilter, NormalizedLog, SortFilter, StatusFilter } from '@/components/admin/logs/types';
 import type {
   AdminLogsPageData,
+  GetAdminLogsPageDataOptions,
   LogChartBucket,
   LogGroup,
   LogRangePreset,
 } from '@/lib/log-insights';
+import {
+  DEFAULT_LOG_PAGE_SIZE,
+  LOG_PAGE_SIZE_OPTIONS,
+} from '@/lib/log-insights/shared';
 
-const LOG_PAGE_SIZE_OPTIONS = [50, 100, 250] as const;
 const LOG_SEARCH_DEBOUNCE_MS = 350;
 const LOG_LOAD_ERROR_MESSAGE = '로그 조회에 실패했습니다. 잠시 후 다시 시도해 주세요.';
 const LOG_EXPORT_ERROR_MESSAGE = 'CSV 다운로드에 실패했습니다. 잠시 후 다시 시도해 주세요.';
@@ -34,8 +38,30 @@ function createExportGroupSelection(groups: LogGroup[]): Record<LogGroup, boolea
   };
 }
 
-export function useAdminLogsManager(initialData: AdminLogsPageData) {
+function resolveGroupFilter(value: string | null | undefined): GroupFilter {
+  return value === 'product' || value === 'audit' || value === 'security' || value === 'partner'
+    ? value
+    : 'all';
+}
+
+function resolveStatusFilter(value: string | null | undefined): StatusFilter {
+  return value === 'success' || value === 'failure' || value === 'blocked' ? value : 'all';
+}
+
+function resolveSortFilter(value: string | null | undefined): SortFilter {
+  return value === 'oldest' || value === 'actor' || value === 'ip' ? value : 'newest';
+}
+
+export function useAdminLogsManager(
+  initialData: AdminLogsPageData,
+  initialQuery: GetAdminLogsPageDataOptions = {},
+) {
   const { notify } = useToast();
+  const initialPageSize = LOG_PAGE_SIZE_OPTIONS.includes(
+    initialData.list.pageSize as (typeof LOG_PAGE_SIZE_OPTIONS)[number],
+  )
+    ? (initialData.list.pageSize as (typeof LOG_PAGE_SIZE_OPTIONS)[number])
+    : DEFAULT_LOG_PAGE_SIZE;
   const [data, setData] = useState(initialData);
   const [activePreset, setActivePreset] = useState<LogRangePreset>(
     initialData.range.preset,
@@ -46,12 +72,18 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
   const [customEndInput, setCustomEndInput] = useState(
     toDateTimeLocalValue(initialData.range.end),
   );
-  const [searchValue, setSearchValue] = useState('');
-  const [groupFilter, setGroupFilter] = useState<GroupFilter>('all');
-  const [nameFilter, setNameFilter] = useState('all');
-  const [actorFilter, setActorFilter] = useState<'all' | string>('all');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [sortFilter, setSortFilter] = useState<SortFilter>('newest');
+  const [searchValue, setSearchValue] = useState(initialQuery.search?.trim() ?? '');
+  const [groupFilter, setGroupFilter] = useState<GroupFilter>(() =>
+    resolveGroupFilter(initialQuery.group),
+  );
+  const [nameFilter, setNameFilter] = useState(initialQuery.name ?? 'all');
+  const [actorFilter, setActorFilter] = useState<'all' | string>(initialQuery.actor ?? 'all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() =>
+    resolveStatusFilter(initialQuery.status),
+  );
+  const [sortFilter, setSortFilter] = useState<SortFilter>(() =>
+    resolveSortFilter(initialQuery.sort),
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportScope, setExportScope] = useState<'current' | 'custom'>('current');
@@ -67,11 +99,16 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
   const [isExporting, setIsExporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pageSize, setPageSizeState] =
-    useState<(typeof LOG_PAGE_SIZE_OPTIONS)[number]>(initialData.list.pageSize as (typeof LOG_PAGE_SIZE_OPTIONS)[number]);
+    useState<(typeof LOG_PAGE_SIZE_OPTIONS)[number]>(initialPageSize);
   const [pageInputValue, setPageInputValue] = useState(String(initialData.list.page));
   const searchDebounceRef = useRef<number | null>(null);
   const fetchSequenceRef = useRef(0);
   const logRequestAbortControllerRef = useRef<AbortController | null>(null);
+  const cursorByPageRef = useRef(
+    new Map<number, string | null>([
+      [initialData.list.page, initialQuery.cursor?.trim() || null],
+    ]),
+  );
 
   const visibleLogs = useMemo<NormalizedLog[]>(
     () =>
@@ -138,7 +175,17 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
     clearPendingSearch();
     const safePage = Math.min(Math.max(1, nextPage), totalPages);
     setPageInputValue(String(safePage));
-    void fetchLogs({ preset: activePreset, start: data.range.start, end: data.range.end, page: safePage });
+    const cursor =
+      safePage === currentPage + 1
+        ? data.list.nextCursor ?? null
+        : cursorByPageRef.current.get(safePage) ?? null;
+    void fetchLogs({
+      preset: activePreset,
+      start: data.range.start,
+      end: data.range.end,
+      page: safePage,
+      cursor,
+    });
   }
 
   function abortActiveLogRequest() {
@@ -152,6 +199,7 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
     end?: string;
     page?: number;
     pageSize?: number;
+    cursor?: string | null;
     searchValue?: string;
     groupFilter?: GroupFilter;
     nameFilter?: string;
@@ -178,6 +226,9 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
       }
       searchParams.set('page', String(params.page ?? 1));
       searchParams.set('pageSize', String(params.pageSize ?? pageSize));
+      if (params.cursor) {
+        searchParams.set('cursor', params.cursor);
+      }
       const nextSearchValue = params.searchValue ?? searchValue;
       const nextGroupFilter = params.groupFilter ?? groupFilter;
       const nextNameFilter = params.nameFilter ?? nameFilter;
@@ -225,6 +276,19 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
         return;
       }
       setData(nextData);
+      window.history.replaceState(
+        window.history.state,
+        '',
+        `${window.location.pathname}?${searchParams.toString()}`,
+      );
+      const nextPage = nextData.list.page;
+      if (nextPage === 1 || params.cursor !== undefined) {
+        cursorByPageRef.current.clear();
+        cursorByPageRef.current.set(nextPage, params.cursor ?? null);
+      }
+      if (nextData.list.nextCursor) {
+        cursorByPageRef.current.set(nextPage + 1, nextData.list.nextCursor);
+      }
       setActivePreset(nextData.range.preset);
       setCustomStartInput(toDateTimeLocalValue(nextData.range.start));
       setCustomEndInput(toDateTimeLocalValue(nextData.range.end));
@@ -233,7 +297,7 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
           nextData.list.pageSize as (typeof LOG_PAGE_SIZE_OPTIONS)[number],
         )
           ? (nextData.list.pageSize as (typeof LOG_PAGE_SIZE_OPTIONS)[number])
-          : LOG_PAGE_SIZE_OPTIONS[1],
+          : DEFAULT_LOG_PAGE_SIZE,
       );
       setPageInputValue(String(nextData.list.page));
     } catch (error) {
@@ -468,10 +532,17 @@ export function useAdminLogsManager(initialData: AdminLogsPageData) {
         value as (typeof LOG_PAGE_SIZE_OPTIONS)[number],
       )
         ? (value as (typeof LOG_PAGE_SIZE_OPTIONS)[number])
-        : LOG_PAGE_SIZE_OPTIONS[1];
+        : DEFAULT_LOG_PAGE_SIZE;
       setPageSizeState(nextPageSize);
       setPageInputValue('1');
-      void fetchLogs({ preset: activePreset, start: data.range.start, end: data.range.end, pageSize: nextPageSize });
+      void fetchLogs({
+        preset: activePreset,
+        start: data.range.start,
+        end: data.range.end,
+        page: 1,
+        pageSize: nextPageSize,
+        cursor: null,
+      });
     },
     setExportOpen,
     setExportScope,

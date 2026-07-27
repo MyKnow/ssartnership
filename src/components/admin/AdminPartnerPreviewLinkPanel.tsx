@@ -43,7 +43,7 @@ export default function AdminPartnerPreviewLinkPanel({
       <Card tone="elevated" padding="md">
         <div className="grid gap-3">
           <div className="grid gap-2">
-            <p className="ui-kicker">Partner Preview</p>
+            <p className="ui-kicker">제휴처 미리보기</p>
             <h3 className="ui-section-title text-ko-title">미리보기 링크</h3>
             <p className="ui-body text-ko-pretty">
               현재 계정은 미리보기 링크 상태를 확인할 수 있지만 링크를
@@ -113,7 +113,7 @@ export default function AdminPartnerPreviewLinkPanel({
     <Card tone="elevated" padding="md">
       <div className="grid gap-4">
         <div className="grid gap-2">
-          <p className="ui-kicker">Partner Preview</p>
+          <p className="ui-kicker">제휴처 미리보기</p>
           <h3 className="ui-section-title text-ko-title">미리보기 링크</h3>
           <p className="ui-body text-ko-pretty">
             제휴사에 실제 사용자 화면을 안내할 때 사용하는 비공개 링크입니다. 새
