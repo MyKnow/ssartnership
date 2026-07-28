@@ -34,6 +34,22 @@ export function createAdminPreviewBasicAuthHeader({
   return `Basic ${Buffer.from(`${normalizedUsername}:${normalizedPassword}`).toString("base64")}`;
 }
 
+export function mergePreviewCookies(currentCookie = "", setCookieHeaders = []) {
+  const cookies = new Map();
+  const addCookie = (rawCookie) => {
+    const pair = rawCookie.split(";", 1)[0]?.trim() ?? "";
+    const separatorIndex = pair.indexOf("=");
+    if (separatorIndex <= 0) {
+      return;
+    }
+    cookies.set(pair.slice(0, separatorIndex), pair.slice(separatorIndex + 1));
+  };
+
+  currentCookie.split(";").forEach(addCookie);
+  setCookieHeaders.forEach(addCookie);
+  return [...cookies.entries()].map(([name, value]) => `${name}=${value}`).join("; ");
+}
+
 export function percentile(values, ratio) {
   const sorted = values
     .map(toFiniteNonNegativeNumber)
