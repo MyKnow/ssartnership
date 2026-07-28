@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { ArrowRightIcon, QueueListIcon } from "@heroicons/react/24/outline";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import AdminIntentLink from "@/components/admin/AdminIntentLink";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import Badge from "@/components/ui/Badge";
@@ -99,9 +100,8 @@ function AdminTaskInboxTaskList({
         />
       ) : null}
       {nextTask ? (
-        <Link
+        <AdminIntentLink
           href={nextTask.href}
-          prefetch={false}
           data-admin-task-key={getAdminRouteDescriptor(nextTask.href)?.key}
           data-admin-task-source="task_inbox_next"
           className="grid min-w-0 gap-3 rounded-2xl border border-primary/35 bg-primary-soft/70 p-4 transition-colors hover:border-primary/60 hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
@@ -121,7 +121,7 @@ function AdminTaskInboxTaskList({
             )}
             건 검토 시작
           </span>
-        </Link>
+        </AdminIntentLink>
       ) : null}
       <div className="grid min-w-0 gap-3 lg:grid-cols-2">
         {tasks.filter((task) => task.href !== nextTask?.href).map((task) => {

@@ -168,6 +168,7 @@ test("작업함은 count 조회를 기다리지 않고 업무 링크를 먼저 �
   assert.match(viewSource, /<Suspense fallback={<AdminTaskInboxLoading/);
   assert.match(viewSource, /prioritizeAdminTaskItems\(tasks, resolvedCounts\)/);
   assert.match(viewSource, /getNextAdminTaskItem\(tasks, resolvedCounts\)/);
+  assert.match(viewSource, /<AdminIntentLink\s+href=\{nextTask\.href\}/);
   assert.match(viewSource, /data-admin-task-source="task_inbox_next"/);
   assert.match(viewSource, /<Link\s+href="\/admin"\s+prefetch=\{false\}/);
   assert.match(
