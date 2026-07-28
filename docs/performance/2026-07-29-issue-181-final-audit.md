@@ -1,0 +1,47 @@
+# Issue #181 최종 감사
+
+점검일: 2026-07-29 (KST)
+
+이 문서는 `docs/product/todo.md`의 스키마·API·운영 성능 정비 항목을 닫기 전 확인한 근거를 기록한다. Production 원본 데이터와 식별자는 저장하지 않고, 집계 결과와 코드 경계만 기록한다.
+
+## Migration·지표 검증
+
+- Preview migration 적용 및 사후 migration 목록 확인: [workflow 30350210648](https://github.com/MyKnow/ssartnership/actions/runs/30350210648) 성공
+- Production 수동 migration gate 및 사후 migration 목록 확인: [workflow 30160579913](https://github.com/MyKnow/ssartnership/actions/runs/30160579913) 성공
+- Production `get_admin_platform_activity_metrics()` service-role 호출 성공
+  - 기준일: `2026-07-29`
+  - member DAU/WAU/MAU: `0 / 165 / 198`
+  - guest session MAU: `2356`
+  - projection 시작일: `2026-03-30`
+- `platform_active_identities` projection row count: `8490`
+- 최근 30일 `event_logs` row count: `33875`
+- 익명 클라이언트의 지표 RPC 호출은 PostgreSQL 권한 오류 `42501`로 거부됨
+
+Projection은 일자·identity kind·단방향 hash로 중복 제거되므로 raw event row count와 일치하지 않는 것이 정상이다. 원본 식별자나 hash 값을 문서에 남기지 않는다.
+
+## 동기화·event_logs 경계
+
+- `/admin/members` 대량 Mattermost 동기화는 `src/lib/mm-member-sync/batch.ts`의 cursor 기반 배치로 제한되고, Server Action이 `1~100`건 범위를 검증한다.
+- `tests/member-sync-batch.test.mts`와 관리자 회원 목록의 이어하기 query 계약이 이 경계를 보호한다.
+- 애플리케이션 코드에서 `event_logs`를 직접 INSERT하는 producer는 확인되지 않았다.
+  - 제품 이벤트 기록은 service-role 전용 `ingest_product_event` RPC가 담당한다.
+  - 활성 사용자·파트너 rollup은 `event_logs` database trigger가 담당한다.
+  - `src/lib/log-insights/data.ts`, `src/lib/partner-metric-rollups.ts`, 광고 repository는 읽기 전용 consumer다.
+- 따라서 producer owner가 불명확한 외부 계약을 추측해 batch ingest로 바꾸거나 차단하지 않았다.
+
+## 로그·legacy 도메인 결정
+
+- 관리자 로그는 summary RPC와 cursor page RPC를 분리하고, 최근 Preview 측정에서 query 단계와 HTTP total을 별도로 수집한다. 무제한 raw row를 애플리케이션 메모리에 적재하지 않는다.
+- `mm_user_directory.legacy_ssafy_mattermost_user_id`의 Production non-null row는 `8`건이다. 현재 데이터가 남아 있으므로 drop migration 대상이 아니며, 참조·소유자 관찰 기간이 끝나기 전 삭제하지 않는다.
+- 정규화 migration 적용일 기준 30일 재평가일은 `2026-08-12`이다. 그때 query/owner/rollback 근거가 모두 0인지 다시 확인한 뒤 별도 forward migration을 판단한다.
+
+## 검증 명령
+
+```bash
+npm run validate:migrations
+npm run typecheck:ci
+npm run check:lockfile
+node --import ./tests/alias-register.mjs --test tests/member-sync-batch.test.mts tests/admin-forward-activity-performance.test.mts
+```
+
+이번 감사의 결론은 확인된 구현과 운영 증거를 완료 상태로 고정하되, 실제 데이터가 남은 legacy 컬럼 삭제와 소유자 불명 외부 producer 변경은 안전 경계에 따라 수행하지 않는 것이다.
