@@ -23,9 +23,11 @@ export const dynamic = "force-dynamic";
 async function AdminCategoriesContent({
   adminSession,
   params,
+  showHeader = true,
 }: {
   adminSession: Awaited<ReturnType<typeof requireAdminPermission>>;
   params: { error?: string };
+  showHeader?: boolean;
 }) {
   const errorMessage = params.error
     ? adminActionErrorMessages[params.error] ?? null
@@ -41,16 +43,18 @@ async function AdminCategoriesContent({
 
   return (
     <div className="grid min-w-0 gap-6">
-        <AdminPageHeader
-          eyebrow="데이터"
-          title="카테고리 관리"
-          description="사용자에게 보이는 제휴처 분류의 이름, 설명, 색상을 관리합니다."
-          actions={
-            <Button href="/admin/partners" variant="secondary">
-              제휴처 목록
-            </Button>
-          }
-        />
+        {showHeader ? (
+          <AdminPageHeader
+            eyebrow="데이터"
+            title="카테고리 관리"
+            description="사용자에게 보이는 제휴처 분류의 이름, 설명, 색상을 관리합니다."
+            actions={
+              <Button href="/admin/partners" variant="secondary">
+                제휴처 목록
+              </Button>
+            }
+          />
+        ) : null}
         {errorMessage ? <FormMessage variant="error">{errorMessage}</FormMessage> : null}
         {categoryReadModel.loadError ? (
           <AdminStatePanel
@@ -102,9 +106,25 @@ export default async function AdminCategoriesPage({
 
   return (
     <AdminShell title="카테고리" backHref="/admin/partners" backLabel="제휴처">
-      <Suspense fallback={<AdminCategoriesSkeletonContent />}>
-        <AdminCategoriesContent adminSession={adminSession} params={params} />
-      </Suspense>
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="데이터"
+          title="카테고리 관리"
+          description="사용자에게 보이는 제휴처 분류의 이름, 설명, 색상을 관리합니다."
+          actions={
+            <Button href="/admin/partners" variant="secondary">
+              제휴처 목록
+            </Button>
+          }
+        />
+        <Suspense fallback={<AdminCategoriesSkeletonContent showHeader={false} />}>
+          <AdminCategoriesContent
+            adminSession={adminSession}
+            params={params}
+            showHeader={false}
+          />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

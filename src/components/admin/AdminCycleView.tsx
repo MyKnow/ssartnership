@@ -65,6 +65,7 @@ export default function AdminCycleView({
   canManageSenderCreate = false,
   canManageSenderUpdate = false,
   canManageSenderDelete = false,
+  showHeader = true,
 }: {
   settings: SsafyCycleSettings;
   overview: SsafyCycleOverview;
@@ -89,6 +90,7 @@ export default function AdminCycleView({
   canManageSenderCreate?: boolean;
   canManageSenderUpdate?: boolean;
   canManageSenderDelete?: boolean;
+  showHeader?: boolean;
 }) {
   const overrideActive = settings.manualCurrentYear !== null;
   const currentYearLabel = `${overview.currentYear}기`;
@@ -126,20 +128,22 @@ export default function AdminCycleView({
 
   return (
     <div className="grid gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <AdminPageHeader
-          eyebrow="설정"
-          title="기수 계산 기준 관리"
-          description="기수 전환 기준, 기수별 인증 카드 색상, 카드 목업을 한 화면에서 관리합니다."
-        />
-        <Link
-          href="/admin/cycle/mock"
-          prefetch={false}
-          className="rounded-xl border border-border bg-surface-control px-4 py-2 text-sm font-semibold text-foreground hover:bg-surface-muted"
-        >
-          전체 목업보기
-        </Link>
-      </div>
+      {showHeader ? (
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <AdminPageHeader
+            eyebrow="설정"
+            title="기수 계산 기준 관리"
+            description="기수 전환 기준, 기수별 인증 카드 색상, 카드 목업을 한 화면에서 관리합니다."
+          />
+          <Link
+            href="/admin/cycle/mock"
+            prefetch={false}
+            className="rounded-xl border border-border bg-surface-control px-4 py-2 text-sm font-semibold text-foreground hover:bg-surface-muted"
+          >
+            전체 목업보기
+          </Link>
+        </div>
+      ) : null}
       <StatsRow
         items={[
           {

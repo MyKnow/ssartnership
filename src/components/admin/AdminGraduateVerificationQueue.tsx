@@ -501,12 +501,14 @@ function GraduateVerificationHeader({
   setupEmailRetryCount,
   feedback,
   canUpdate,
+  showPageHeader = true,
 }: {
   requests: AdminGraduateVerificationRequest[];
   requestPagination: QueuePaginationState;
   setupEmailRetryCount: number | null;
   feedback?: AdminReviewQueueFeedback | null;
   canUpdate: boolean;
+  showPageHeader?: boolean;
 }) {
   const submittedCount = requests.filter(
     (request) => request.status === "submitted",
@@ -568,6 +570,7 @@ function GraduateVerificationHeader({
         },
       ]}
       feedback={feedback}
+      showPageHeader={showPageHeader}
       nextAction={{
         title: nextActionTitle,
         description: nextActionDescription,
@@ -775,6 +778,7 @@ export default function AdminGraduateVerificationQueue({
   setupEmailRetryPagination,
   loadError = false,
   canUpdate = true,
+  showPageHeader = true,
 }: {
   requests: AdminGraduateVerificationRequest[];
   setupEmailRetries?: AdminGraduateSetupEmailRetry[];
@@ -786,6 +790,7 @@ export default function AdminGraduateVerificationQueue({
   setupEmailRetryPagination?: QueuePaginationState;
   loadError?: boolean;
   canUpdate?: boolean;
+  showPageHeader?: boolean;
 }) {
   if (setupEmailRetryQueue) {
     return (
@@ -798,6 +803,7 @@ export default function AdminGraduateVerificationQueue({
         requestPagination={requestPagination}
         loadError={loadError}
         canUpdate={canUpdate}
+        showPageHeader={showPageHeader}
       />
     );
   }
@@ -822,6 +828,7 @@ export default function AdminGraduateVerificationQueue({
         setupEmailRetryCount={effectiveSetupEmailRetryPagination.totalCount}
         feedback={feedback}
         canUpdate={canUpdate}
+        showPageHeader={showPageHeader}
       />
 
       {loadError ? (
@@ -911,6 +918,7 @@ function AdminGraduateVerificationStreamingView({
   requestPagination,
   loadError,
   canUpdate,
+  showPageHeader,
 }: {
   requests: AdminGraduateVerificationRequest[];
   setupEmailRetryQueue: Promise<SetupEmailRetryQueue>;
@@ -920,6 +928,7 @@ function AdminGraduateVerificationStreamingView({
   requestPagination?: QueuePaginationState;
   loadError: boolean;
   canUpdate: boolean;
+  showPageHeader: boolean;
 }) {
   const effectiveRequestPagination = requestPagination ?? {
     totalCount: requests.length,
@@ -935,6 +944,7 @@ function AdminGraduateVerificationStreamingView({
         setupEmailRetryCount={null}
         feedback={feedback}
         canUpdate={canUpdate}
+        showPageHeader={showPageHeader}
       />
 
       {loadError ? (

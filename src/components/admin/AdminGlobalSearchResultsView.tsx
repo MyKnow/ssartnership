@@ -85,6 +85,7 @@ export default function AdminGlobalSearchResultsView({
   canSearchPartners,
   memberSearchFailed,
   partnerSearchFailed,
+  showHeader = true,
 }: {
   query: string;
   members: AdminGlobalSearchMember[];
@@ -93,6 +94,7 @@ export default function AdminGlobalSearchResultsView({
   canSearchPartners: boolean;
   memberSearchFailed: boolean;
   partnerSearchFailed: boolean;
+  showHeader?: boolean;
 }) {
   const searchHref = buildAdminGlobalSearchHref(query);
   const isQueryReady = isAdminGlobalSearchQueryReady(query);
@@ -102,11 +104,13 @@ export default function AdminGlobalSearchResultsView({
 
   return (
     <div className="grid min-w-0 gap-6">
-      <AdminPageHeader
-        eyebrow="검색"
-        title="통합 검색"
-        description="회원과 제휴처를 이름·로그인 ID·관리 ID로 찾아 바로 상세 화면을 엽니다. 표시되는 대상은 현재 권한과 담당 캠퍼스 범위로 제한됩니다."
-      />
+      {showHeader ? (
+        <AdminPageHeader
+          eyebrow="검색"
+          title="통합 검색"
+          description="회원과 제휴처를 이름·로그인 ID·관리 ID로 찾아 바로 상세 화면을 엽니다. 표시되는 대상은 현재 권한과 담당 캠퍼스 범위로 제한됩니다."
+        />
+      ) : null}
 
       <Surface level="default" padding="lg">
         <form action="/admin/search" method="get" className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">

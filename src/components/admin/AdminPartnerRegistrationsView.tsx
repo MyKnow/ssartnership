@@ -145,6 +145,7 @@ export default function AdminPartnerRegistrationsView({
   loadError = false,
   canReview = true,
   canCreate = true,
+  showHeader = true,
 }: {
   rows: AdminPartnerRegistrationRow[];
   updateStatusAction: AdminFormAction;
@@ -159,6 +160,7 @@ export default function AdminPartnerRegistrationsView({
   loadError?: boolean;
   canReview?: boolean;
   canCreate?: boolean;
+  showHeader?: boolean;
 }) {
   const counts = rows.reduce(
     (result, row) => ({
@@ -230,6 +232,7 @@ export default function AdminPartnerRegistrationsView({
           },
         ]}
         feedback={feedback}
+        showPageHeader={showHeader}
         nextAction={{
           title: "접수 상태와 관리자 메모를 확인한 뒤 한 건씩 저장하세요.",
           description:

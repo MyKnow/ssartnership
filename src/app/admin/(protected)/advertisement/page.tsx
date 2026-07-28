@@ -83,11 +83,6 @@ async function AdminAdvertisementContent({
   } catch {
     return (
       <div className="grid min-w-0 gap-6">
-        <AdminPageHeader
-          eyebrow="자동화"
-          title="홈 광고 관리"
-          description="홈 광고 카드와 캠페인 노출 상태를 관리합니다."
-        />
         <AdminStatePanel
           kind="error"
           title="홈 광고 운영 정보를 불러오지 못했습니다."
@@ -130,6 +125,7 @@ async function AdminAdvertisementContent({
         message={message}
         errorMessage={actionErrorMessage}
         clearPromotionDraft={params.status === "updated"}
+        showHeader={false}
     />
   );
 }
@@ -146,9 +142,16 @@ export default async function AdminAdvertisementPage({
 
   return (
     <AdminShell title="홈 광고 관리" backHref="/admin" backLabel="관리 홈">
-      <Suspense fallback={<AdminAdvertisementSkeletonContent />}>
-        <AdminAdvertisementContent session={session} params={params} />
-      </Suspense>
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="자동화"
+          title="홈 광고 관리"
+          description="홈 캐러셀 카드의 순서, 이미지, 문구, 연결 페이지, 노출 권한을 한 번에 편집합니다."
+        />
+        <Suspense fallback={<AdminAdvertisementSkeletonContent showHeader={false} />}>
+          <AdminAdvertisementContent session={session} params={params} />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

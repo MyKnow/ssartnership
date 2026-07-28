@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import AdminShell from "@/components/admin/AdminShell";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminEventListView, {
   type AdminEventListItem,
 } from "@/components/admin/AdminEventListView";
@@ -132,6 +133,7 @@ async function AdminEventContent({
         statusMessage={statusMessage(params.status)}
         canCreate={canCreate}
         canUpdate={canUpdate}
+        showHeader={false}
     />
   );
 }
@@ -148,9 +150,16 @@ export default async function AdminEventPage({
 
   return (
     <AdminShell title="이벤트 관리" backHref="/admin" backLabel="관리 홈">
-      <Suspense fallback={<AdminEventSkeletonContent />}>
-        <AdminEventContent session={session} params={params} />
-      </Suspense>
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="자동화"
+          title="이벤트 관리"
+          description="코드로 만든 이벤트 페이지를 등록하고, 공개 전·중·후 상태와 노출 대상을 확인합니다."
+        />
+        <Suspense fallback={<AdminEventSkeletonContent showHeader={false} />}>
+          <AdminEventContent session={session} params={params} />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

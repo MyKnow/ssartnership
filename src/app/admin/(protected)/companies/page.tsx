@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import AdminShell from "@/components/admin/AdminShell";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminCompaniesView from "@/components/admin/AdminCompaniesView";
 import { AdminCompaniesSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import {
@@ -93,6 +94,7 @@ async function AdminCompaniesContent({
           createSetupUrlAction: createPartnerAccountInitialSetupUrl,
           sendSetupUrlAction: sendPartnerAccountInitialSetupUrl,
         }}
+        showHeader={false}
       />
   );
 }
@@ -122,13 +124,20 @@ export default async function AdminCompaniesPage({
       backHref="/admin"
       backLabel="관리 홈"
     >
-      <Suspense fallback={<AdminCompaniesSkeletonContent />}>
-        <AdminCompaniesContent
-          adminSession={adminSession}
-          params={params}
-          initialTab={initialTab}
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="데이터"
+          title="파트너사와 계정 연결 관리"
+          description="여러 제휴처를 보유한 회사 단위, 담당 계정, 다대다 연결을 한 화면에서 정리합니다."
         />
-      </Suspense>
+        <Suspense fallback={<AdminCompaniesSkeletonContent showHeader={false} />}>
+          <AdminCompaniesContent
+            adminSession={adminSession}
+            params={params}
+            initialTab={initialTab}
+          />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

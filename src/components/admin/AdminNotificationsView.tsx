@@ -17,6 +17,7 @@ export default function AdminNotificationsView({
   publicKey,
   canSend = true,
   loadError = false,
+  showHeader = true,
 }: {
   notificationResult: AdminNotificationListResult;
   preferences: AdminNotificationPreferenceState;
@@ -25,14 +26,17 @@ export default function AdminNotificationsView({
   publicKey: string;
   canSend?: boolean;
   loadError?: boolean;
+  showHeader?: boolean;
 }) {
   return (
     <div className="grid gap-6">
-      <AdminPageHeader
-        eyebrow="작업함"
-        title="내 알림"
-        description="관리자 계정으로 수신한 변경 요청, 종료 임박, 보안 알림을 확인합니다."
-      />
+      {showHeader ? (
+        <AdminPageHeader
+          eyebrow="작업함"
+          title="내 알림"
+          description="관리자 계정으로 수신한 변경 요청, 종료 임박, 보안 알림을 확인합니다."
+        />
+      ) : null}
       {loadError ? (
         <AdminStatePanel
           kind="error"

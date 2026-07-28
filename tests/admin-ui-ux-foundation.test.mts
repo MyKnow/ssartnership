@@ -146,6 +146,65 @@ test("핵심 관리자 화면은 데이터 본문보다 페이지 헤더를 먼�
   assert.match(pageSources[0], /<AdminDashboardHeader\s*\/>/);
 });
 
+test("제휴처 상세의 오류·로딩 상태도 데이터와 무관한 페이지 h1을 유지한다", async () => {
+  const source = await readFile(
+    new URL(
+      "../src/app/admin/(protected)/partners/[partnerId]/page.tsx",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const headerIndex = source.indexOf("<AdminPageHeader");
+  const suspenseIndex = source.indexOf(
+    "<Suspense fallback={<AdminPartnerDetailSkeletonContent",
+  );
+
+  assert.ok(headerIndex >= 0);
+  assert.ok(suspenseIndex > headerIndex);
+  assert.match(source, /AdminStatePanel/);
+  assert.match(source, /<AdminSectionHeading/);
+  assert.match(source, /showHeader=\{false\}/);
+});
+
+test("나머지 관리자 목록도 데이터 Suspense보다 공통 페이지 헤더를 먼저 스트리밍한다", async () => {
+  const routes = [
+    ["advertisement/page.tsx", "AdminAdvertisementSkeletonContent"],
+    ["categories/page.tsx", "AdminCategoriesSkeletonContent"],
+    ["companies/page.tsx", "AdminCompaniesSkeletonContent"],
+    ["cycle/page.tsx", "AdminCycleSkeletonContent"],
+    ["event/page.tsx", "AdminEventSkeletonContent"],
+    ["graduate-verifications/page.tsx", "AdminGraduateVerificationsSkeletonContent"],
+    ["logs/page.tsx", "AdminLogsSkeletonContent"],
+    ["member-signup-requests/page.tsx", "AdminMemberSignupRequestsSkeletonContent"],
+    ["notification-templates/page.tsx", "AdminNotificationTemplatesSkeletonContent"],
+    ["notifications/page.tsx", "AdminNotificationsSkeletonContent"],
+    ["partner-registrations/page.tsx", "AdminPartnerRegistrationsSkeletonContent"],
+    ["partner-requests/page.tsx", "AdminPartnerRequestsSkeletonContent"],
+    ["partners/page.tsx", "AdminPartnersSkeletonContent"],
+    ["profile-photos/page.tsx", "AdminProfilePhotosSkeletonContent"],
+    ["reviews/page.tsx", "AdminReviewsSkeletonContent"],
+    ["search/page.tsx", "AdminGlobalSearchSkeletonContent"],
+  ] as const;
+
+  for (const [route, fallback] of routes) {
+    const source = await readFile(
+      new URL(`../src/app/admin/(protected)/${route}`, import.meta.url),
+      "utf8",
+    );
+    const headerIndex = source.lastIndexOf("<AdminPageHeader");
+    const suspenseIndex = source.indexOf(
+      `<Suspense fallback={<${fallback} showHeader={false}`,
+    );
+
+    assert.ok(headerIndex >= 0, `${route}: 정적 페이지 헤더가 필요합니다`);
+    assert.ok(
+      suspenseIndex > headerIndex,
+      `${route}: 데이터 Suspense보다 페이지 헤더가 먼저 선언되어야 합니다`,
+    );
+    assert.match(source, /showHeader=\{false\}/, route);
+  }
+});
+
 test("관리 셸은 반복 탐색을 건너뛰고 빠른 찾기 전환 중 즉시 상태를 알린다", async () => {
   const [shellSource, navigatorSource] = await Promise.all([
     readFile(

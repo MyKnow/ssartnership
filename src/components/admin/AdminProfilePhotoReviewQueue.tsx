@@ -322,6 +322,7 @@ export default function AdminProfilePhotoReviewQueue({
   loadError = false,
   focusReasonTarget,
   canUpdate = true,
+  showPageHeader = true,
 }: {
   replacements: AdminProfilePhotoReplacement[];
   currentPhotos?: AdminExistingProfilePhoto[];
@@ -334,6 +335,7 @@ export default function AdminProfilePhotoReviewQueue({
   loadError?: boolean;
   focusReasonTarget?: string | null;
   canUpdate?: boolean;
+  showPageHeader?: boolean;
 }) {
   const resolvedCurrentPhotosPromise =
     currentPhotosPromise ??
@@ -389,6 +391,7 @@ export default function AdminProfilePhotoReviewQueue({
             ? "새 사진을 승인하기 전에는 기존 사진이 유지됩니다. 반려 사유는 회원이 이해할 수 있도록 구체적으로 남겨 주세요."
             : "현재 계정은 사진 상태를 확인할 수 있지만 승인·반려는 할 수 없습니다.",
         }}
+        showPageHeader={showPageHeader}
       />
       {loadError ? (
         <AdminStatePanel

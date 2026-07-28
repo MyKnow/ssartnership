@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import AdminGraduateVerificationQueue from "@/components/admin/AdminGraduateVerificationQueue";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminShell from "@/components/admin/AdminShell";
 import { AdminGraduateVerificationsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import { requireAdminPermission } from "@/lib/admin-access";
@@ -121,6 +122,7 @@ async function AdminGraduateVerificationsContent({
           "graduate_verifications",
           "update",
         )}
+        showPageHeader={false}
     />
   );
 }
@@ -141,9 +143,16 @@ export default async function AdminGraduateVerificationsPage({
 
   return (
     <AdminShell title="수료생 인증">
-      <Suspense fallback={<AdminGraduateVerificationsSkeletonContent />}>
-        <AdminGraduateVerificationsContent session={session} params={params} />
-      </Suspense>
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="작업함"
+          title="수료생 인증 검토"
+          description="신규 수료생과 기존 회원 복구 요청의 증빙을 확인하고 다음 상태로 안전하게 전환합니다."
+        />
+        <Suspense fallback={<AdminGraduateVerificationsSkeletonContent showHeader={false} />}>
+          <AdminGraduateVerificationsContent session={session} params={params} />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

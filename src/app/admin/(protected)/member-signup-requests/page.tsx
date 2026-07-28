@@ -3,6 +3,7 @@ import AdminMemberSignupApprovalQueue, {
   getSignupApprovalStatusMessage,
 } from "@/components/admin/AdminMemberSignupApprovalQueue";
 import AdminShell from "@/components/admin/AdminShell";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { AdminMemberSignupRequestsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import { requireMemberSignupRequestAdmin } from "@/lib/admin-access";
 import { parseAdminReviewQueuePagination } from "@/lib/admin-ia";
@@ -111,9 +112,16 @@ export default async function AdminMemberSignupRequestsPage({
 
   return (
     <AdminShell title="가입 승인">
-      <Suspense fallback={<AdminMemberSignupRequestsSkeletonContent />}>
-        <AdminMemberSignupRequestsContent params={params} />
-      </Suspense>
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="작업함"
+          title="가입 승인 요청"
+          description="Mattermost 닉네임을 자동으로 해석하지 못한 가입 요청을 확인하고, 부족한 회원 정보를 직접 입력해 승인합니다."
+        />
+        <Suspense fallback={<AdminMemberSignupRequestsSkeletonContent showHeader={false} />}>
+          <AdminMemberSignupRequestsContent params={params} />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

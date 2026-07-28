@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import AdminProfilePhotoReviewQueue from "@/components/admin/AdminProfilePhotoReviewQueue";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminShell from "@/components/admin/AdminShell";
 import { AdminProfilePhotosSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import { requireAdminPermission } from "@/lib/admin-access";
@@ -56,6 +57,7 @@ async function AdminProfilePhotosContent({
           "profile_images",
           "update",
         )}
+        showPageHeader={false}
     />
   );
 }
@@ -77,9 +79,16 @@ export default async function AdminProfilePhotosPage({
 
   return (
     <AdminShell title="프로필 사진">
-      <Suspense fallback={<AdminProfilePhotosSkeletonContent />}>
-        <AdminProfilePhotosContent session={session} params={params} />
-      </Suspense>
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="작업함"
+          title="프로필 사진 검토"
+          description="새 사진 교체 요청과 현재 승인 사진 점검을 분리해, 회원 인증에 영향을 주는 작업을 안전하게 처리합니다."
+        />
+        <Suspense fallback={<AdminProfilePhotosSkeletonContent showHeader={false} />}>
+          <AdminProfilePhotosContent session={session} params={params} />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

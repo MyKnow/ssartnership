@@ -48,11 +48,6 @@ async function AdminReviewsContent({
   } catch {
     return (
       <div className="grid min-w-0 gap-6">
-        <AdminPageHeader
-          eyebrow="작업함"
-          title="리뷰 관리"
-          description="회원 리뷰를 검토하고 공개 상태와 삭제를 관리합니다."
-        />
         <AdminStatePanel
           kind="error"
           title="리뷰 목록을 불러오지 못했습니다."
@@ -75,11 +70,6 @@ async function AdminReviewsContent({
 
   return (
     <div className="grid gap-6">
-        <AdminPageHeader
-          eyebrow="작업함"
-          title="리뷰 관리"
-          description="회원 리뷰를 검토하고 공개 상태와 삭제를 관리합니다."
-        />
         <AdminReviewManager
           data={data}
           returnTo={returnTo}
@@ -103,9 +93,16 @@ export default async function AdminReviewsPage({
 
   return (
     <AdminShell title="리뷰 관리" backHref="/admin" backLabel="관리 홈">
-      <Suspense fallback={<AdminReviewsSkeletonContent />}>
-        <AdminReviewsContent adminSession={adminSession} params={params} />
-      </Suspense>
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="작업함"
+          title="리뷰 관리"
+          description="회원 리뷰를 검토하고 공개 상태와 삭제를 관리합니다."
+        />
+        <Suspense fallback={<AdminReviewsSkeletonContent showHeader={false} />}>
+          <AdminReviewsContent adminSession={adminSession} params={params} />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

@@ -101,6 +101,7 @@ export default function AdminMemberSignupApprovalQueue({
           title: requests.length > 0 ? "표시 이름과 신청 기수를 확인한 뒤 한 건씩 검토하세요." : "새 가입 승인 요청이 들어오면 신청 정보부터 확인하세요.",
           description: "승인 화면에서 이름·기수·캠퍼스를 보완하며, 반려할 때는 요청자가 이해할 수 있는 사유를 남깁니다.",
         }}
+        showPageHeader={false}
       />
       {statusMessage && !feedback ? (
         <p className="rounded-card border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
