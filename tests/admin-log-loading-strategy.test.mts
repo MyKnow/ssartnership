@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { shouldUseDbPagedAdminLogList } from "@/lib/log-insights";
+import {
+  getAdminLogsSummaryCacheKey,
+  shouldUseDbPagedAdminLogList,
+} from "@/lib/log-insights";
+import type { AdminLogsAccessCapabilities } from "@/lib/log-insights";
 
 test("로그 explorer는 보조 집계보다 먼저 렌더링할 수 있다", async () => {
   const [pageSource, ancillarySource, dataSource] = await Promise.all([
@@ -80,6 +84,10 @@ test("로그 explorer는 보조 집계보다 먼저 렌더링할 수 있다", as
   assert.match(hookSource, /history\.replaceState/);
   assert.match(dataSource, /get_admin_logs_cursor_scoped/);
   assert.match(dataSource, /cursor rpc unavailable, falling back to page rpc/);
+  assert.match(
+    (await readFile(new URL("../src/lib/log-insights.ts", import.meta.url), "utf8")),
+    /getCachedAdminLogSummaryAggregates/,
+  );
 });
 
 test("shouldUseDbPagedAdminLogList allows newest queries including all-group and search filters", () => {
@@ -164,5 +172,43 @@ test("shouldUseDbPagedAdminLogList rejects non-newest sort combinations and virt
       100,
     ),
     false,
+  );
+});
+
+test("로그 집계 캐시는 페이지·검색 조건과 권한 범위를 분리한다", () => {
+  const baseAccess: AdminLogsAccessCapabilities = {
+    readGroups: ["product", "audit", "security"],
+    exportGroups: ["product", "audit", "security"],
+    includePii: true,
+  };
+  const baseOptions = {
+    preset: "custom",
+    start: "2026-07-27T00:00:00.000Z",
+    end: "2026-07-28T00:00:00.000Z",
+    page: "1",
+    pageSize: "50",
+    search: "",
+  };
+
+  assert.equal(
+    getAdminLogsSummaryCacheKey(baseOptions, baseAccess),
+    getAdminLogsSummaryCacheKey(
+      { ...baseOptions, page: "4", pageSize: "100", search: "회원" },
+      baseAccess,
+    ),
+  );
+  assert.notEqual(
+    getAdminLogsSummaryCacheKey(baseOptions, baseAccess),
+    getAdminLogsSummaryCacheKey(
+      { ...baseOptions, end: "2026-07-29T00:00:00.000Z" },
+      baseAccess,
+    ),
+  );
+  assert.notEqual(
+    getAdminLogsSummaryCacheKey(baseOptions, baseAccess),
+    getAdminLogsSummaryCacheKey(
+      baseOptions,
+      { ...baseAccess, includePii: false },
+    ),
   );
 });
