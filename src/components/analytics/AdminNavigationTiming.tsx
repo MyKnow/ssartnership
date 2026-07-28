@@ -151,7 +151,6 @@ export default function AdminNavigationTiming() {
   useEffect(() => {
     const markFromClick = (event: MouseEvent) => {
       if (
-        event.defaultPrevented ||
         event.button !== 0 ||
         event.metaKey ||
         event.ctrlKey ||
@@ -172,9 +171,16 @@ export default function AdminNavigationTiming() {
         targetLocationKey &&
         targetLocationKey !== getCurrentAdminLocationKey()
       ) {
+        // Next Link prevents the browser default before this document-level
+        // listener runs. Consume the intent before honoring defaultPrevented;
+        // otherwise every real prefetched navigation is counted as unused.
+        const prefetchUsage = consumeAdminPrefetchUsage(anchor.href);
+        if (event.defaultPrevented && !prefetchUsage) {
+          return;
+        }
         markAdminNavigationStart(
           "link",
-          consumeAdminPrefetchUsage(anchor.href) ? "used" : "not-used",
+          prefetchUsage ? "used" : "not-used",
         );
       }
     };
