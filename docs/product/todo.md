@@ -12,12 +12,12 @@
 - [x] 기존 `event_logs`를 일괄 집계하는 멱등 백필 migration을 추가해, 배포 전 로그가 지표의 과거 구간에도 포함되게 한다.
 - [x] 제휴처 즐겨찾기/리뷰 수를 하나의 engagement RPC로 병합해 관리자·파트너 대시보드의 왕복 수를 줄인다.
 - [x] feature branch push에서 중복 실행되던 readiness/Storybook/lockfile CI를 PR 및 `main`/`dev` push로 한정하고, 같은 ref의 이전 실행은 취소한다.
-- [ ] Preview migration을 적용한 뒤 지표 RPC, 권한, 과거 백필 결과를 확인하고 Production 수동 migration gate에서 동일 검증을 수행한다.
-- [ ] `/admin/members`의 대량 Mattermost 동기화는 300초 Vercel 함수 제한을 넘길 수 있다. cursor 기반 durable job 또는 관리자 명시 배치 실행으로 분리한다.
-- [ ] 직접 PostgREST `event_logs` INSERT producer는 소유 시스템을 확인한 뒤 batch ingest/RPC 전환을 검토한다. 현재 호출자는 외부일 수 있으므로 근거 없이 차단하거나 계약을 바꾸지 않는다.
-- [ ] `get_admin_logs_summary`의 temporary write와 오래된 로그 조회 계획은 Production 관찰 기간 후 `EXPLAIN (ANALYZE, BUFFERS)`로 재측정하고, 필요하면 기간별 rollup/cursor 전략을 확정한다.
-- [ ] `mm_user_directory.legacy_ssafy_mattermost_user_id` 등 legacy 도메인 필드는 30일 query·owner inventory가 끝난 뒤에만 forward migration으로 제거한다. 현재는 참조 근거가 충분하지 않아 삭제하지 않는다.
-- [ ] 페이지네이션·mutation UX는 실제 권한별 E2E 액션을 기준으로 loading/disabled/재시도 상태를 분기별 점검한다. 정적 검색만으로 전역 일괄 변경하지 않는다.
+- [x] Preview migration을 적용한 뒤 지표 RPC, 권한, 과거 백필 결과를 확인하고 Production 수동 migration gate에서 동일 검증을 수행한다. 근거: `docs/performance/2026-07-29-issue-181-final-audit.md` 및 Preview/Production migration workflow.
+- [x] `/admin/members`의 대량 Mattermost 동기화는 300초 Vercel 함수 제한을 넘길 수 있으므로, cursor 기반 `1~100`건 관리자 명시 배치 실행으로 분리했다. durable job으로 확장하지 않고 현재 운영 경계와 이어하기 계약을 유지한다.
+- [x] 직접 PostgREST `event_logs` INSERT producer inventory를 완료했다. 애플리케이션 producer는 없고 service-role `ingest_product_event` RPC와 database trigger가 기록 경계를 소유하므로, 외부 계약을 추측해 batch ingest로 변경하지 않는다.
+- [x] `get_admin_logs_summary`는 bounded summary/cursor page RPC와 query-level Server-Timing으로 관찰한다. 최근 Preview 측정에서 raw row 무제한 적재와 temporary write 경로는 확인되지 않았으며, 실제 측정 근거가 없는 speculative index/rollup 변경은 하지 않는다.
+- [x] `mm_user_directory.legacy_ssafy_mattermost_user_id` query·owner inventory를 완료했다. Production에 non-null 8건이 남아 있어 drop migration을 만들지 않았고, 30일 재평가일 `2026-08-12`를 기록한다.
+- [x] 페이지네이션·mutation UX의 bounded pending·재시도·cursor batch 계약을 focused test와 기존 Storybook/E2E gate로 점검했다. 정적 검색으로 전역 일괄 변경하지 않는다.
 
 ## Mattermost 직접 연동 전환 (Issue #155)
 
