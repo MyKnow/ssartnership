@@ -35,7 +35,9 @@ export const SearchAndRestoreFocus: Story = {
     await userEvent.click(trigger);
 
     const body = within(document.body);
-    const query = body.getByRole("searchbox", { name: "관리 화면 찾기" });
+    await expect(body.getByText("자주 시작하는 업무")).toBeInTheDocument();
+    await expect(body.getByRole("option", { name: /작업함/ })).toBeInTheDocument();
+    const query = body.getByRole("combobox", { name: "관리 화면 찾기" });
     await expect(query).toHaveFocus();
     await userEvent.type(query, "변경 승인");
     const result = body.getByRole("link", { name: /변경 요청/ });
@@ -68,7 +70,7 @@ export const SearchActualTarget: Story = {
 
     const body = within(document.body);
     await userEvent.type(
-      body.getByRole("searchbox", { name: "관리 화면 찾기" }),
+      body.getByRole("combobox", { name: "관리 화면 찾기" }),
       "르블라썸 강남점",
     );
     await expect(
@@ -85,7 +87,7 @@ export const KeyboardSelectsResult: Story = {
     );
 
     const body = within(document.body);
-    const query = body.getByRole("searchbox", { name: "관리 화면 찾기" });
+    const query = body.getByRole("combobox", { name: "관리 화면 찾기" });
     await userEvent.type(query, "변경 승인");
     await userEvent.keyboard("{ArrowDown}");
 

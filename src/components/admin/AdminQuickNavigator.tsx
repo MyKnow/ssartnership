@@ -11,7 +11,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowRightIcon,
   MagnifyingGlassIcon,
@@ -21,6 +21,7 @@ import { cn } from "@/lib/cn";
 import {
   ADMIN_NAV_ICON_BY_KEY,
   findAdminNavItems,
+  isAdminNavActive,
   type AdminNavGroup,
 } from "@/components/admin/admin-navigation";
 import { buildAdminGlobalSearchHref } from "@/lib/admin-global-search";
@@ -31,6 +32,42 @@ type AdminQuickNavigatorContextValue = {
 
 const AdminQuickNavigatorContext =
   createContext<AdminQuickNavigatorContextValue | null>(null);
+
+const ADMIN_RECENT_NAV_STORAGE_KEY = "ssartnership.admin.recent-nav.v1";
+const ADMIN_RECENT_NAV_LIMIT = 5;
+const ADMIN_QUICK_START_HREFS = [
+  "/admin/tasks",
+  "/admin/members",
+  "/admin/partners",
+] as const;
+
+function readRecentNavigationHrefs(validHrefs: ReadonlySet<string>) {
+  try {
+    const stored = JSON.parse(
+      sessionStorage.getItem(ADMIN_RECENT_NAV_STORAGE_KEY) ?? "[]",
+    );
+    if (!Array.isArray(stored)) {
+      return [];
+    }
+    return stored.filter(
+      (href): href is string =>
+        typeof href === "string" && validHrefs.has(href),
+    ).slice(0, ADMIN_RECENT_NAV_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+function persistRecentNavigationHrefs(hrefs: readonly string[]) {
+  try {
+    sessionStorage.setItem(
+      ADMIN_RECENT_NAV_STORAGE_KEY,
+      JSON.stringify(hrefs.slice(0, ADMIN_RECENT_NAV_LIMIT)),
+    );
+  } catch {
+    // Private browsing and storage-disabled environments still get navigation.
+  }
+}
 
 function useAdminQuickNavigator() {
   const context = useContext(AdminQuickNavigatorContext);
@@ -88,13 +125,50 @@ export default function AdminQuickNavigatorProvider({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeItemIndex, setActiveItemIndex] = useState(-1);
+  const [recentHrefs, setRecentHrefs] = useState<string[]>([]);
   const [pendingDestination, setPendingDestination] = useState<string | null>(null);
   const [isRoutePending, startRouteTransition] = useTransition();
+  const pathname = usePathname();
   const router = useRouter();
   const dialogRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const items = useMemo(() => findAdminNavItems(query, navGroups), [navGroups, query]);
+  const navItems = useMemo(() => navGroups.flatMap((group) => group.items), [navGroups]);
+  const navItemsByHref = useMemo(
+    () => new Map(navItems.map((item) => [item.href, item])),
+    [navItems],
+  );
+  const validHrefs = useMemo(() => new Set(navItems.map((item) => item.href)), [navItems]);
+  const currentNavItem = navItems.find((item) => isAdminNavActive(pathname, item.href));
+  const recentItems = recentHrefs
+    .map((href) => navItemsByHref.get(href))
+    .filter((item): item is (typeof navItems)[number] => Boolean(item));
+  const quickStartItems = navItems.filter((item) =>
+    ADMIN_QUICK_START_HREFS.includes(item.href as (typeof ADMIN_QUICK_START_HREFS)[number]),
+  );
+  const quickItems = recentItems.length > 0 ? recentItems : quickStartItems;
+  const displayedItems = query.trim() ? items : quickItems;
+
+  useEffect(() => {
+    setRecentHrefs(readRecentNavigationHrefs(validHrefs));
+  }, [validHrefs]);
+
+  useEffect(() => {
+    const currentHref = currentNavItem?.href;
+    if (!currentHref) {
+      return;
+    }
+
+    setRecentHrefs((current) => {
+      const next = [currentHref, ...current.filter((href) => href !== currentHref)].slice(
+        0,
+        ADMIN_RECENT_NAV_LIMIT,
+      );
+      persistRecentNavigationHrefs(next);
+      return next;
+    });
+  }, [currentNavItem?.href]);
 
   const closeNavigator = () => {
     setPendingDestination(null);
@@ -129,13 +203,13 @@ export default function AdminQuickNavigatorProvider({
   };
 
   const handleQueryKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (isRoutePending || items.length === 0) {
+    if (isRoutePending || displayedItems.length === 0) {
       return;
     }
 
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setActiveItemIndex((current) => Math.min(current + 1, items.length - 1));
+      setActiveItemIndex((current) => Math.min(current + 1, displayedItems.length - 1));
       return;
     }
 
@@ -147,7 +221,7 @@ export default function AdminQuickNavigatorProvider({
 
     if (event.key === "Enter" && activeItemIndex >= 0) {
       event.preventDefault();
-      const item = items[activeItemIndex];
+      const item = displayedItems[activeItemIndex];
       if (item) {
         navigateTo(item.href);
       }
@@ -285,9 +359,12 @@ export default function AdminQuickNavigatorProvider({
                         setActiveItemIndex(-1);
                       }}
                       onKeyDown={handleQueryKeyDown}
+                      role="combobox"
                       placeholder="예: 변경 승인, 회원, 발송"
                       disabled={isRoutePending}
                       aria-controls="admin-quick-navigator-results"
+                      aria-expanded="true"
+                      aria-haspopup="listbox"
                       aria-activedescendant={
                         activeItemIndex >= 0
                           ? `admin-quick-navigator-option-${activeItemIndex}`
@@ -345,14 +422,19 @@ export default function AdminQuickNavigatorProvider({
                       <ArrowRightIcon className="h-5 w-5 shrink-0 text-primary transition-transform group-hover:translate-x-0.5" />
                     </Link>
                   ) : null}
+                  {!query.trim() && quickItems.length > 0 ? (
+                    <p className="mb-2 px-1 text-xs font-semibold text-muted-foreground">
+                      {recentItems.length > 0 ? "최근 연 화면" : "자주 시작하는 업무"}
+                    </p>
+                  ) : null}
                   <div
                     id="admin-quick-navigator-results"
                     className="grid gap-2"
-                    role={items.length > 0 ? "listbox" : undefined}
-                    aria-label={items.length > 0 ? "찾은 관리 화면" : undefined}
+                    role={displayedItems.length > 0 ? "listbox" : undefined}
+                    aria-label={displayedItems.length > 0 ? "찾은 관리 화면" : undefined}
                   >
-                    {items.length > 0 ? (
-                      items.map((item, itemIndex) => {
+                    {displayedItems.length > 0 ? (
+                      displayedItems.map((item, itemIndex) => {
                         const Icon = ADMIN_NAV_ICON_BY_KEY[item.iconKey];
                         return (
                           <div
