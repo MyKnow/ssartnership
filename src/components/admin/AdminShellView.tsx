@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeftIcon,
@@ -26,7 +26,10 @@ import AdminQuickNavigatorProvider, {
 } from "@/components/admin/AdminQuickNavigator";
 import { SITE_NAME } from "@/lib/site";
 import { cn } from "@/lib/cn";
-import { markAdminPrefetchIntent } from "@/lib/admin-prefetch";
+import {
+  ADMIN_PREFETCH_HOVER_DELAY_MS,
+  markAdminPrefetchIntent,
+} from "@/lib/admin-prefetch";
 import { useAutoHideHeader } from "@/hooks/useAutoHideHeader";
 import {
   ADMIN_NAV_ICON_BY_KEY,
@@ -59,6 +62,7 @@ export default function AdminShellView({
   const pathname = usePathname();
   const router = useRouter();
   const prefetchedHrefsRef = useRef(new Set<string>());
+  const hoverPrefetchTimersRef = useRef(new Map<string, number>());
   const [isTabletNavExpanded, setIsTabletNavExpanded] = useState(false);
   const { hidden, headerHeight, headerRef } = useAutoHideHeader();
   const activeNavItem =
@@ -85,19 +89,53 @@ export default function AdminShellView({
     );
   const skipLinkClassName =
     "sr-only fixed left-4 top-4 z-[90] rounded-control border border-border bg-surface-overlay px-4 py-3 text-sm font-semibold text-foreground shadow-overlay focus:not-sr-only focus:!fixed focus:inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
-  const prefetchOnIntent = useCallback(
-    (href: string, trigger: "hover" | "focus") => {
-      if (
-        prefetchedHrefsRef.current.has(href) ||
-        !markAdminPrefetchIntent(href, trigger)
-      ) {
+  const requestPrefetch = useCallback((href: string, trigger: "hover" | "focus") => {
+    if (
+      prefetchedHrefsRef.current.has(href) ||
+      !markAdminPrefetchIntent(href, trigger)
+    ) {
+      return;
+    }
+    prefetchedHrefsRef.current.add(href);
+    router.prefetch(href);
+  }, [router]);
+  const prefetchOnIntent = useCallback((href: string, trigger: "hover" | "focus") => {
+    if (trigger === "hover") {
+      if (hoverPrefetchTimersRef.current.has(href)) {
         return;
       }
-      prefetchedHrefsRef.current.add(href);
-      router.prefetch(href);
-    },
-    [router],
-  );
+      const timer = window.setTimeout(() => {
+        hoverPrefetchTimersRef.current.delete(href);
+        requestPrefetch(href, "hover");
+      }, ADMIN_PREFETCH_HOVER_DELAY_MS);
+      hoverPrefetchTimersRef.current.set(href, timer);
+      return;
+    }
+
+    const timer = hoverPrefetchTimersRef.current.get(href);
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      hoverPrefetchTimersRef.current.delete(href);
+    }
+    requestPrefetch(href, "focus");
+  }, [requestPrefetch]);
+  const cancelHoverPrefetch = useCallback((href: string) => {
+    const timer = hoverPrefetchTimersRef.current.get(href);
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      hoverPrefetchTimersRef.current.delete(href);
+    }
+  }, []);
+
+  useEffect(() => {
+    const hoverPrefetchTimers = hoverPrefetchTimersRef.current;
+    return () => {
+      for (const timer of hoverPrefetchTimers.values()) {
+        window.clearTimeout(timer);
+      }
+      hoverPrefetchTimers.clear();
+    };
+  }, []);
 
   const renderDesktopNav = (expanded: boolean) => (
     <nav aria-label="관리자 영역 탐색" className="grid gap-6">
@@ -124,6 +162,7 @@ export default function AdminShellView({
                   href={item.href}
                   prefetch={false}
                   onPointerEnter={() => prefetchOnIntent(item.href, "hover")}
+                  onPointerLeave={() => cancelHoverPrefetch(item.href)}
                   onFocus={() => prefetchOnIntent(item.href, "focus")}
                   title={expanded ? undefined : item.label}
                   aria-current={active ? "page" : undefined}
@@ -210,6 +249,7 @@ export default function AdminShellView({
               href="/admin"
               prefetch={false}
               onPointerEnter={() => prefetchOnIntent("/admin", "hover")}
+              onPointerLeave={() => cancelHoverPrefetch("/admin")}
               onFocus={() => prefetchOnIntent("/admin", "focus")}
               aria-current={pathname === "/admin" ? "page" : undefined}
               className={mobileNavItemClassName(pathname === "/admin")}
@@ -222,6 +262,7 @@ export default function AdminShellView({
                 href={taskNavItem.href}
                 prefetch={false}
                 onPointerEnter={() => prefetchOnIntent(taskNavItem.href, "hover")}
+                onPointerLeave={() => cancelHoverPrefetch(taskNavItem.href)}
                 onFocus={() => prefetchOnIntent(taskNavItem.href, "focus")}
                 aria-current={isAdminNavActive(pathname, taskNavItem.href) ? "page" : undefined}
                 className={mobileNavItemClassName(
@@ -245,6 +286,7 @@ export default function AdminShellView({
                 href={memberNavItem.href}
                 prefetch={false}
                 onPointerEnter={() => prefetchOnIntent(memberNavItem.href, "hover")}
+                onPointerLeave={() => cancelHoverPrefetch(memberNavItem.href)}
                 onFocus={() => prefetchOnIntent(memberNavItem.href, "focus")}
                 title={memberNavItem.label}
                 aria-current={isMemberDataActive ? "page" : undefined}
@@ -293,6 +335,7 @@ export default function AdminShellView({
               href="/admin"
               prefetch={false}
               onPointerEnter={() => prefetchOnIntent("/admin", "hover")}
+              onPointerLeave={() => cancelHoverPrefetch("/admin")}
               onFocus={() => prefetchOnIntent("/admin", "focus")}
               aria-label="관리 홈"
               className={cn(
@@ -353,6 +396,7 @@ export default function AdminShellView({
                       href="/admin"
                       prefetch={false}
                       onPointerEnter={() => prefetchOnIntent("/admin", "hover")}
+                      onPointerLeave={() => cancelHoverPrefetch("/admin")}
                       onFocus={() => prefetchOnIntent("/admin", "focus")}
                       className="hover:text-foreground"
                     >

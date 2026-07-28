@@ -8,7 +8,10 @@ import {
   type AnchorHTMLAttributes,
   type ReactNode,
 } from "react";
-import { markAdminPrefetchIntent } from "@/lib/admin-prefetch";
+import {
+  ADMIN_PREFETCH_HOVER_DELAY_MS,
+  markAdminPrefetchIntent,
+} from "@/lib/admin-prefetch";
 
 type AdminIntentLinkProps = Omit<
   AnchorHTMLAttributes<HTMLAnchorElement>,
@@ -30,21 +33,47 @@ export default function AdminIntentLink({
 }: AdminIntentLinkProps) {
   const router = useRouter();
   const hasPrefetchedRef = useRef(false);
-  const prefetchOnIntent = useCallback((trigger: "hover" | "focus") => {
+  const hoverTimerRef = useRef<number | null>(null);
+  const requestPrefetch = useCallback((trigger: "hover" | "focus") => {
     if (hasPrefetchedRef.current || !markAdminPrefetchIntent(href, trigger)) {
       return;
     }
     hasPrefetchedRef.current = true;
     router.prefetch(href);
   }, [href, router]);
+  const prefetchOnIntent = useCallback((trigger: "hover" | "focus") => {
+    if (trigger === "hover") {
+      if (hoverTimerRef.current !== null) {
+        return;
+      }
+      hoverTimerRef.current = window.setTimeout(() => {
+        hoverTimerRef.current = null;
+        requestPrefetch("hover");
+      }, ADMIN_PREFETCH_HOVER_DELAY_MS);
+      return;
+    }
+
+    if (hoverTimerRef.current !== null) {
+      window.clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    requestPrefetch("focus");
+  }, [requestPrefetch]);
+  const cancelHoverPrefetch = useCallback(() => {
+    if (hoverTimerRef.current !== null) {
+      window.clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  }, []);
 
   return (
     <Link
       href={href}
       prefetch={false}
-      onPointerEnter={() => prefetchOnIntent("hover")}
-      onFocus={() => prefetchOnIntent("focus")}
       {...anchorProps}
+      onPointerEnter={() => prefetchOnIntent("hover")}
+      onPointerLeave={cancelHoverPrefetch}
+      onFocus={() => prefetchOnIntent("focus")}
     >
       {children}
     </Link>
