@@ -26,6 +26,7 @@ import AdminQuickNavigatorProvider, {
 } from "@/components/admin/AdminQuickNavigator";
 import { SITE_NAME } from "@/lib/site";
 import { cn } from "@/lib/cn";
+import { markAdminPrefetchIntent } from "@/lib/admin-prefetch";
 import { useAutoHideHeader } from "@/hooks/useAutoHideHeader";
 import {
   ADMIN_NAV_ICON_BY_KEY,
@@ -85,8 +86,11 @@ export default function AdminShellView({
   const skipLinkClassName =
     "sr-only fixed left-4 top-4 z-[90] rounded-control border border-border bg-surface-overlay px-4 py-3 text-sm font-semibold text-foreground shadow-overlay focus:not-sr-only focus:!fixed focus:inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
   const prefetchOnIntent = useCallback(
-    (href: string) => {
-      if (prefetchedHrefsRef.current.has(href)) {
+    (href: string, trigger: "hover" | "focus") => {
+      if (
+        prefetchedHrefsRef.current.has(href) ||
+        !markAdminPrefetchIntent(href, trigger)
+      ) {
         return;
       }
       prefetchedHrefsRef.current.add(href);
@@ -119,8 +123,8 @@ export default function AdminShellView({
                   key={item.href}
                   href={item.href}
                   prefetch={false}
-                  onPointerEnter={() => prefetchOnIntent(item.href)}
-                  onFocus={() => prefetchOnIntent(item.href)}
+                  onPointerEnter={() => prefetchOnIntent(item.href, "hover")}
+                  onFocus={() => prefetchOnIntent(item.href, "focus")}
                   title={expanded ? undefined : item.label}
                   aria-current={active ? "page" : undefined}
                   className={cn(
@@ -205,8 +209,8 @@ export default function AdminShellView({
             <Link
               href="/admin"
               prefetch={false}
-              onPointerEnter={() => prefetchOnIntent("/admin")}
-              onFocus={() => prefetchOnIntent("/admin")}
+              onPointerEnter={() => prefetchOnIntent("/admin", "hover")}
+              onFocus={() => prefetchOnIntent("/admin", "focus")}
               aria-current={pathname === "/admin" ? "page" : undefined}
               className={mobileNavItemClassName(pathname === "/admin")}
             >
@@ -217,8 +221,8 @@ export default function AdminShellView({
               <Link
                 href={taskNavItem.href}
                 prefetch={false}
-                onPointerEnter={() => prefetchOnIntent(taskNavItem.href)}
-                onFocus={() => prefetchOnIntent(taskNavItem.href)}
+                onPointerEnter={() => prefetchOnIntent(taskNavItem.href, "hover")}
+                onFocus={() => prefetchOnIntent(taskNavItem.href, "focus")}
                 aria-current={isAdminNavActive(pathname, taskNavItem.href) ? "page" : undefined}
                 className={mobileNavItemClassName(
                   isAdminNavActive(pathname, taskNavItem.href),
@@ -240,8 +244,8 @@ export default function AdminShellView({
               <Link
                 href={memberNavItem.href}
                 prefetch={false}
-                onPointerEnter={() => prefetchOnIntent(memberNavItem.href)}
-                onFocus={() => prefetchOnIntent(memberNavItem.href)}
+                onPointerEnter={() => prefetchOnIntent(memberNavItem.href, "hover")}
+                onFocus={() => prefetchOnIntent(memberNavItem.href, "focus")}
                 title={memberNavItem.label}
                 aria-current={isMemberDataActive ? "page" : undefined}
                 className={mobileNavItemClassName(isMemberDataActive)}
@@ -288,8 +292,8 @@ export default function AdminShellView({
             <Link
               href="/admin"
               prefetch={false}
-              onPointerEnter={() => prefetchOnIntent("/admin")}
-              onFocus={() => prefetchOnIntent("/admin")}
+              onPointerEnter={() => prefetchOnIntent("/admin", "hover")}
+              onFocus={() => prefetchOnIntent("/admin", "focus")}
               aria-label="관리 홈"
               className={cn(
                 "flex items-center rounded-2xl border border-border/70 bg-surface-elevated px-3 py-3 text-foreground shadow-flat",
@@ -348,8 +352,8 @@ export default function AdminShellView({
                     <Link
                       href="/admin"
                       prefetch={false}
-                      onPointerEnter={() => prefetchOnIntent("/admin")}
-                      onFocus={() => prefetchOnIntent("/admin")}
+                      onPointerEnter={() => prefetchOnIntent("/admin", "hover")}
+                      onFocus={() => prefetchOnIntent("/admin", "focus")}
                       className="hover:text-foreground"
                     >
                       관리 홈

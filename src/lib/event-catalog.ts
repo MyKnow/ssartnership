@@ -42,6 +42,7 @@ export const PRODUCT_EVENT_NAMES = [
   'ad_push_send',
   'admin_web_vital',
   'admin_route_timing',
+  'admin_prefetch',
   'admin_task_start',
   'admin_task_complete',
   'admin_task_recovery',

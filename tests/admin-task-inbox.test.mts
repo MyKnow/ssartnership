@@ -299,8 +299,15 @@ test("관리 홈은 다음 작업을 우선 표시하고, 활동 지표 조회�
   assert.match(dashboardSource, /AdminIntentLink/);
   assert.match(dashboardSource, /prefetch=\{false\}/);
   assert.match(intentLinkSource, /"use client"/);
-  assert.match(intentLinkSource, /onPointerEnter=\{prefetchOnIntent\}/);
-  assert.match(intentLinkSource, /onFocus=\{prefetchOnIntent\}/);
+  assert.match(
+    intentLinkSource,
+    /onPointerEnter=\{\(\) => prefetchOnIntent\("hover"\)\}/,
+  );
+  assert.match(
+    intentLinkSource,
+    /onFocus=\{\(\) => prefetchOnIntent\("focus"\)\}/,
+  );
+  assert.match(intentLinkSource, /markAdminPrefetchIntent/);
   assert.match(intentLinkSource, /router\.prefetch\(href\)/);
   assert.match(intentLinkSource, /prefetch=\{false\}/);
   assert.match(dashboardSource, /remainingQueueItems\.map\(\(item, index\)/);

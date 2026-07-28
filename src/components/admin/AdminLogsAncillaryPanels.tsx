@@ -1,6 +1,7 @@
 import AdminWebVitalSummaryPanel from "@/components/admin/AdminWebVitalSummaryPanel";
 import AdminRouteTimingSummaryPanel from "@/components/admin/AdminRouteTimingSummaryPanel";
 import AdminTaskOutcomeSummaryPanel from "@/components/admin/AdminTaskOutcomeSummaryPanel";
+import AdminPrefetchSummaryPanel from "@/components/admin/AdminPrefetchSummaryPanel";
 import AdminForwardActivityPanel from "@/components/admin/logs/AdminForwardActivityPanel";
 import InlineMessage from "@/components/ui/InlineMessage";
 import Skeleton from "@/components/ui/Skeleton";
@@ -12,6 +13,7 @@ import {
 import type { AdminWebVitalSummaryMetric } from "@/lib/admin-performance";
 import type { AdminRouteTimingSummaryMetric } from "@/lib/admin-performance";
 import type { AdminTaskOutcomeSummaryMetric } from "@/lib/admin-task-outcome";
+import type { AdminPrefetchSummaryMetric } from "@/lib/admin-performance";
 
 type ActivityLoadResult = {
   metrics: ForwardActivityMetrics;
@@ -32,6 +34,12 @@ type RouteTimingLoadResult = {
 
 type TaskOutcomeLoadResult = {
   metrics: AdminTaskOutcomeSummaryMetric[];
+  windowDays: number;
+  loadError: boolean;
+};
+
+type PrefetchLoadResult = {
+  metrics: AdminPrefetchSummaryMetric[];
   windowDays: number;
   loadError: boolean;
 };
@@ -114,27 +122,45 @@ async function resolveTaskOutcome(
   }
 }
 
+async function resolvePrefetch(
+  promise: Promise<PrefetchLoadResult>,
+): Promise<PrefetchLoadResult> {
+  try {
+    return await promise;
+  } catch {
+    return {
+      metrics: [],
+      windowDays: 7,
+      loadError: true,
+    };
+  }
+}
+
 export default async function AdminLogsAncillaryPanels({
   activity,
   webVitals,
   routeTiming,
   taskOutcome,
+  prefetch,
 }: {
   activity: Promise<ActivityLoadResult>;
   webVitals: Promise<WebVitalLoadResult>;
   routeTiming: Promise<RouteTimingLoadResult>;
   taskOutcome: Promise<TaskOutcomeLoadResult>;
+  prefetch: Promise<PrefetchLoadResult>;
 }) {
   const [
     activityResult,
     webVitalResult,
     routeTimingResult,
     taskOutcomeResult,
+    prefetchResult,
   ] = await Promise.all([
     resolveActivity(activity),
     resolveWebVitals(webVitals),
     resolveRouteTiming(routeTiming),
     resolveTaskOutcome(taskOutcome),
+    resolvePrefetch(prefetch),
   ]);
 
   return (
@@ -150,6 +176,7 @@ export default async function AdminLogsAncillaryPanels({
       <AdminWebVitalSummaryPanel {...webVitalResult} />
       <AdminRouteTimingSummaryPanel {...routeTimingResult} />
       <AdminTaskOutcomeSummaryPanel {...taskOutcomeResult} />
+      <AdminPrefetchSummaryPanel {...prefetchResult} />
     </>
   );
 }

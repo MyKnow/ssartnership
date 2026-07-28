@@ -4,7 +4,9 @@ import {
   summarizeHttpSamples,
   summarizeRouteTiming,
   summarizeTaskOutcome,
+  summarizePrefetch,
   summarizeViewportRouteTiming,
+  summarizeViewportPrefetch,
   summarizeViewportTaskOutcome,
   summarizeViewportWebVitals,
   summarizeWebVitals,
@@ -296,6 +298,13 @@ function printTextReport(report) {
     );
   }
 
+  console.log("\nPrefetch utilization");
+  for (const metric of report.prefetch) {
+    console.log(
+      `- ${metric.routeKey}: used=${metric.usedCount}/${metric.sampleCount}, utilization=${metric.utilizationRate ?? "n/a"}%, target=${metric.threshold}%, status=${metric.status}`,
+    );
+  }
+
   if (report.http.skipped) {
     console.log(`\nHTTP API Server-Timing: skipped (${report.http.skipped})`);
   } else {
@@ -338,6 +347,11 @@ function printTextReport(report) {
       `- ${route.viewport}/${route.routeKey}: p75=${route.p75DurationMs ?? "n/a"}ms, samples=${route.sampleCount}, status=${route.status}`,
     );
   }
+  for (const metric of report.dimensions.prefetch) {
+    console.log(
+      `- ${metric.viewport}/${metric.routeKey}: used=${metric.usedCount}/${metric.sampleCount}, utilization=${metric.utilizationRate ?? "n/a"}%, status=${metric.status}`,
+    );
+  }
 }
 
 async function main() {
@@ -355,6 +369,8 @@ async function main() {
     viewportWebVitals,
     viewportRouteTiming,
     viewportTaskOutcome,
+    prefetch,
+    viewportPrefetch,
     http,
     pages,
   ] = await Promise.all([
@@ -364,6 +380,8 @@ async function main() {
     callSummaryRpc(supabase, "get_admin_web_vitals_dimension_summary", window),
     callSummaryRpc(supabase, "get_admin_route_timing_dimension_summary", window),
     callSummaryRpc(supabase, "get_admin_task_outcome_dimension_summary", window),
+    callSummaryRpc(supabase, "get_admin_prefetch_summary", window),
+    callSummaryRpc(supabase, "get_admin_prefetch_dimension_summary", window),
     measureApiTargets(),
     measurePageTargets(),
   ]);
@@ -373,10 +391,12 @@ async function main() {
     webVitals: summarizeWebVitals(webVitals),
     routeTiming: summarizeRouteTiming(routeTiming),
     taskOutcome: summarizeTaskOutcome(taskOutcome),
+    prefetch: summarizePrefetch(prefetch),
     dimensions: {
       webVitals: summarizeViewportWebVitals(viewportWebVitals),
       routeTiming: summarizeViewportRouteTiming(viewportRouteTiming),
       taskOutcome: summarizeViewportTaskOutcome(viewportTaskOutcome),
+      prefetch: summarizeViewportPrefetch(viewportPrefetch),
     },
     http,
     pages,

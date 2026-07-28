@@ -1,4 +1,5 @@
 export const ADMIN_PERFORMANCE_MIN_SAMPLE_COUNT = 30;
+export const ADMIN_PREFETCH_TARGET_PERCENT = 60;
 
 export const ADMIN_WEB_VITAL_TARGETS = {
   INP: 200,
@@ -162,6 +163,41 @@ export function summarizeViewportTaskOutcome(rows = []) {
   return rows.map((row) => ({
     viewport: normalizeViewport(row?.viewport),
     ...summarizeTaskOutcome([row])[0],
+  }));
+}
+
+export function summarizePrefetch(rows = []) {
+  return rows.map((row) => {
+    const sampleCount = Math.max(0, Math.round(Number(row?.requested_count ?? 0)));
+    const usedCount = Math.min(
+      sampleCount,
+      Math.max(0, Math.round(Number(row?.used_count ?? 0))),
+    );
+    const parsedRate = toFiniteNonNegativeNumber(row?.utilization_rate);
+    const utilizationRate = parsedRate === null ? null : Math.min(100, parsedRate);
+
+    return {
+      routeKey: typeof row?.route_key === "string" ? row.route_key : "admin.unknown",
+      sampleCount,
+      usedCount,
+      utilizationRate,
+      threshold: ADMIN_PREFETCH_TARGET_PERCENT,
+      status:
+        sampleCount === 0 || utilizationRate === null
+          ? "unknown"
+          : sampleCount < ADMIN_PERFORMANCE_MIN_SAMPLE_COUNT
+            ? "insufficient_sample"
+            : utilizationRate >= ADMIN_PREFETCH_TARGET_PERCENT
+              ? "met"
+              : "exceeded",
+    };
+  });
+}
+
+export function summarizeViewportPrefetch(rows = []) {
+  return rows.map((row) => ({
+    viewport: normalizeViewport(row?.viewport),
+    ...summarizePrefetch([row])[0],
   }));
 }
 

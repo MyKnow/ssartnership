@@ -12,6 +12,7 @@ import { fetchForwardActivityMetrics } from "@/lib/platform-activity-forward-met
 import { getAdminWebVitalSummary } from "@/lib/admin-web-vitals-summary.server";
 import { getAdminRouteTimingSummary } from "@/lib/admin-route-timing-summary.server";
 import { getAdminTaskOutcomeSummary } from "@/lib/admin-task-outcome-summary.server";
+import { getAdminPrefetchSummary } from "@/lib/admin-prefetch-summary.server";
 import { AdminLogsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import type { GetAdminLogsPageDataOptions } from "@/lib/log-insights";
 
@@ -29,6 +30,7 @@ async function AdminLogsContent({
   const webVitalsPromise = getAdminWebVitalSummary();
   const routeTimingPromise = getAdminRouteTimingSummary();
   const taskOutcomePromise = getAdminTaskOutcomeSummary();
+  const prefetchPromise = getAdminPrefetchSummary();
   const data = await getCachedAdminLogsPageData(initialQuery, access);
 
   return (
@@ -40,6 +42,7 @@ async function AdminLogsContent({
             webVitals={webVitalsPromise}
             routeTiming={routeTimingPromise}
             taskOutcome={taskOutcomePromise}
+            prefetch={prefetchPromise}
           />
         </Suspense>
     </div>

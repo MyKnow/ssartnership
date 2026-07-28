@@ -51,6 +51,8 @@ export const ADMIN_WEB_VITAL_MIN_SAMPLE_COUNT = 30;
 export const ADMIN_ROUTE_TIMING_MIN_SAMPLE_COUNT =
   ADMIN_WEB_VITAL_MIN_SAMPLE_COUNT;
 export const ADMIN_ROUTE_TIMING_TARGET_MS = 200;
+export const ADMIN_PREFETCH_MIN_SAMPLE_COUNT = 30;
+export const ADMIN_PREFETCH_TARGET_PERCENT = 60;
 
 export const ADMIN_WEB_VITAL_TARGETS = {
   INP: { threshold: 200, unit: "ms", label: "상호작용 응답" },
@@ -108,6 +110,23 @@ export type AdminRouteTimingSummaryMetric = {
   status: "unknown" | "insufficient_sample" | "met" | "exceeded";
 };
 
+export type AdminPrefetchSummaryInput = {
+  routeKey?: string | null;
+  requestedCount?: number | string | null;
+  usedCount?: number | string | null;
+  utilizationRate?: number | string | null;
+};
+
+export type AdminPrefetchSummaryMetric = {
+  routeKey: string;
+  label: string;
+  threshold: number;
+  sampleCount: number;
+  usedCount: number;
+  utilizationRate: number | null;
+  status: "unknown" | "insufficient_sample" | "met" | "exceeded";
+};
+
 type AdminWebVitalInput = {
   name: string;
   rating: string;
@@ -118,6 +137,7 @@ type AdminRouteTimingInput = {
   durationMs: number;
   outcome: string;
   trigger: string;
+  prefetch?: string;
 };
 
 function extractPathname(value: string) {
@@ -153,8 +173,9 @@ export function toAdminRouteTimingProperties({
   durationMs,
   outcome,
   trigger,
+  prefetch,
 }: AdminRouteTimingInput) {
-  return {
+  const properties = {
     durationMs:
       Number.isFinite(durationMs)
         ? Math.min(120_000, Math.max(0, Math.round(durationMs)))
@@ -165,7 +186,16 @@ export function toAdminRouteTimingProperties({
     trigger: (ADMIN_ROUTE_TIMING_TRIGGERS as readonly string[]).includes(trigger)
       ? (trigger as AdminRouteTimingTrigger)
       : "programmatic",
-  } as const;
+  } as {
+    durationMs: number;
+    outcome: AdminRouteTimingOutcome;
+    trigger: AdminRouteTimingTrigger;
+    prefetch?: "used" | "not-used";
+  };
+  if (prefetch === "used" || prefetch === "not-used") {
+    properties.prefetch = prefetch;
+  }
+  return properties;
 }
 
 export function isAdminWebVitalName(value: string): value is AdminWebVitalName {
@@ -312,6 +342,53 @@ export function toAdminRouteTimingSummary(
         return -1;
       }
       return right.p75DurationMs - left.p75DurationMs;
+    });
+}
+
+export function toAdminPrefetchSummary(
+  rows: AdminPrefetchSummaryInput[] | null | undefined,
+): AdminPrefetchSummaryMetric[] {
+  return (rows ?? [])
+    .map((row) => {
+      const routeKey =
+        typeof row.routeKey === "string" &&
+        Object.prototype.hasOwnProperty.call(ADMIN_ROUTE_TIMING_LABELS, row.routeKey)
+          ? row.routeKey
+          : "admin.unknown";
+      const sampleCount = Math.round(toNonNegativeNumber(row.requestedCount));
+      const usedCount = Math.min(
+        sampleCount,
+        Math.round(toNonNegativeNumber(row.usedCount)),
+      );
+      const parsedRate = toOptionalNonNegativeNumber(row.utilizationRate);
+      const utilizationRate =
+        parsedRate === null ? null : Math.min(100, parsedRate);
+
+      return {
+        routeKey,
+        label: getAdminRouteTimingLabel(routeKey),
+        threshold: ADMIN_PREFETCH_TARGET_PERCENT,
+        sampleCount,
+        usedCount,
+        utilizationRate,
+        status:
+          sampleCount === 0 || utilizationRate === null
+            ? "unknown"
+            : sampleCount < ADMIN_PREFETCH_MIN_SAMPLE_COUNT
+              ? "insufficient_sample"
+              : utilizationRate >= ADMIN_PREFETCH_TARGET_PERCENT
+                ? "met"
+                : "exceeded",
+      } satisfies AdminPrefetchSummaryMetric;
+    })
+    .sort((left, right) => {
+      if (left.utilizationRate === null) {
+        return 1;
+      }
+      if (right.utilizationRate === null) {
+        return -1;
+      }
+      return left.utilizationRate - right.utilizationRate;
     });
 }
 

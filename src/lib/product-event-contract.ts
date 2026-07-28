@@ -30,6 +30,7 @@ export const CLIENT_PRODUCT_EVENT_NAMES = [
   "coupon_copy",
   "admin_web_vital",
   "admin_route_timing",
+  "admin_prefetch",
   "admin_task_start",
   "admin_task_complete",
   "admin_task_recovery",
@@ -216,6 +217,17 @@ function parseProperties(
           durationMs: z.number().int().min(0).max(120_000),
           outcome: z.enum(["complete", "unknown", "error"]),
           trigger: z.enum(["initial-load", "link", "history", "programmatic"]),
+          prefetch: z.enum(["used", "not-used"]).optional(),
+          viewport: z.enum(["mobile", "tablet", "desktop"]).nullable().optional(),
+        })
+        .strip()
+        .parse(rawProperties);
+    case "admin_prefetch":
+      return z
+        .object({
+          stage: z.enum(["requested", "used"]),
+          trigger: z.enum(["hover", "focus"]),
+          requestAgeMs: nonNegativeInteger.optional(),
           viewport: z.enum(["mobile", "tablet", "desktop"]).nullable().optional(),
         })
         .strip()
@@ -401,6 +413,14 @@ function parseProductEventTarget(
         { targetId: "safe" },
       );
     case "admin_route_timing":
+      return parseFixedTarget(
+        eventName,
+        targetType,
+        targetId,
+        "admin_performance",
+        { targetId: "safe" },
+      );
+    case "admin_prefetch":
       return parseFixedTarget(
         eventName,
         targetType,
