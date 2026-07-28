@@ -16,6 +16,16 @@ on:
         required: false
         default: "30"
         type: string
+      page_targets:
+        description: Optional JSON array of authenticated admin page targets to measure.
+        required: false
+        default: ""
+        type: string
+      api_targets:
+        description: Optional JSON array of authenticated admin API targets to measure.
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -45,6 +55,8 @@ jobs:
       ADMIN_PREVIEW_LOGIN_USERNAME: ${{ secrets.PREVIEW_TEST_MEMBER_USERNAME }}
       ADMIN_PREVIEW_LOGIN_PASSWORD: ${{ secrets.PREVIEW_TEST_MEMBER_PASSWORD }}
       ADMIN_PREVIEW_ITERATIONS: ${{ inputs.iterations }}
+      ADMIN_PREVIEW_PAGE_TARGETS: ${{ inputs.page_targets }}
+      ADMIN_PREVIEW_API_TARGETS: ${{ inputs.api_targets }}
     steps:
       - name: Checkout selected dev revision
         uses: actions/checkout@v4
