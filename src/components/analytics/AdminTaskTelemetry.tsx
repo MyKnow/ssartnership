@@ -174,7 +174,6 @@ export default function AdminTaskTelemetry() {
   useEffect(() => {
     const handleTaskLinkClick = (event: MouseEvent) => {
       if (
-        event.defaultPrevented ||
         event.button !== 0 ||
         event.metaKey ||
         event.ctrlKey ||
@@ -194,6 +193,9 @@ export default function AdminTaskTelemetry() {
         return;
       }
 
+      // Next Link may call preventDefault before this document listener runs.
+      // The task link itself is still the user's navigation intent, so do not
+      // discard the start event solely because the framework handled it.
       const sourceValue = anchor.getAttribute("data-admin-task-source");
       const source: AdminTaskSource =
         sourceValue === "task_inbox" ||

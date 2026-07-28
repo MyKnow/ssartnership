@@ -186,6 +186,11 @@ test("작업함은 count 조회를 기다리지 않고 업무 링크를 먼저 �
   assert.match(telemetrySource, /admin_task_complete/);
   assert.match(telemetrySource, /admin_task_recovery/);
   assert.match(telemetrySource, /retryAvailable: true/);
+  assert.doesNotMatch(
+    telemetrySource,
+    /event\.defaultPrevented\s*\|\|\s*event\.button/,
+  );
+  assert.match(telemetrySource, /Next Link may call preventDefault/);
   assert.match(layoutSource, /AdminTaskTelemetry/);
 });
 
