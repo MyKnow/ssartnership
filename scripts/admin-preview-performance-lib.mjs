@@ -19,6 +19,21 @@ export function toFiniteNonNegativeNumber(value) {
   return Number.isFinite(parsed) ? Math.max(0, parsed) : null;
 }
 
+export function createAdminPreviewBasicAuthHeader({
+  username = process.env.ADMIN_PREVIEW_BASIC_AUTH_USERNAME,
+  password = process.env.ADMIN_PREVIEW_BASIC_AUTH_PASSWORD,
+} = {}) {
+  const normalizedUsername = username?.trim() ?? "";
+  const normalizedPassword = password?.trim() ?? "";
+  if (!normalizedUsername && !normalizedPassword) {
+    return null;
+  }
+  if (!normalizedUsername || !normalizedPassword) {
+    throw new Error("ADMIN_PREVIEW_BASIC_AUTH_INCOMPLETE");
+  }
+  return `Basic ${Buffer.from(`${normalizedUsername}:${normalizedPassword}`).toString("base64")}`;
+}
+
 export function percentile(values, ratio) {
   const sorted = values
     .map(toFiniteNonNegativeNumber)

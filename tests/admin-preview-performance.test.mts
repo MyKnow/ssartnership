@@ -68,6 +68,20 @@ test("관리자 Preview HTTP runner는 Server-Timing의 허용 phase만 요약�
   });
 });
 
+test("관리자 Preview HTTP runner는 Basic Auth를 로그 없이 요청 헤더에만 추가한다", async () => {
+  const { createAdminPreviewBasicAuthHeader } = await performanceModulePromise;
+
+  assert.equal(createAdminPreviewBasicAuthHeader(), null);
+  assert.equal(
+    createAdminPreviewBasicAuthHeader({ username: "preview-admin", password: "secret" }),
+    "Basic " + Buffer.from("preview-admin:secret").toString("base64"),
+  );
+  assert.throws(
+    () => createAdminPreviewBasicAuthHeader({ username: "preview-admin", password: "" }),
+    /ADMIN_PREVIEW_BASIC_AUTH_INCOMPLETE/,
+  );
+});
+
 test("관리자 Preview 페이지 target은 관리자 경로와 고유 key만 허용한다", async () => {
   const { parseAdminPreviewTargetList } = await performanceModulePromise;
   const defaults = [{ key: "admin.page", path: "/admin" }];
@@ -128,6 +142,8 @@ test("Preview 성능 workflow는 dev와 명시적 확인 문자열에서만 실�
   assert.match(source, /authenticated page and API probes/);
   assert.match(source, /ADMIN_PREVIEW_SESSION_COOKIE/);
   assert.match(source, /ADMIN_PREVIEW_PROTECTION_BYPASS/);
+  assert.match(source, /ADMIN_PREVIEW_BASIC_AUTH_USERNAME/);
+  assert.match(source, /ADMIN_PREVIEW_BASIC_AUTH_PASSWORD/);
   assert.match(source, /npm run measure:admin:preview/);
 });
 
