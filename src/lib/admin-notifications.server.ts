@@ -27,6 +27,7 @@ function createUnavailableAdminNotificationsReadModel() {
 }
 
 const ADMIN_NOTIFICATION_READ_CACHE_REVALIDATE_SECONDS = 3;
+const ADMIN_NOTIFICATION_SETTINGS_CACHE_REVALIDATE_SECONDS = 3;
 
 type AdminNotificationInboxReadModel = {
   notificationResult: AdminNotificationListResult;
@@ -35,6 +36,36 @@ type AdminNotificationInboxReadModel = {
 
 function getAdminNotificationReadCacheTag(adminId: string) {
   return `admin-notifications:${adminId}`;
+}
+
+function getAdminNotificationSettingsCacheTag(adminId: string) {
+  return `admin-notification-settings:${adminId}`;
+}
+
+function getCachedAdminNotificationPreferences(adminId: string) {
+  return unstable_cache(
+    () => getAdminOperationalNotificationPreferences(adminId),
+    ["admin-notification-preferences", adminId],
+    {
+      revalidate: ADMIN_NOTIFICATION_SETTINGS_CACHE_REVALIDATE_SECONDS,
+      tags: [getAdminNotificationSettingsCacheTag(adminId)],
+    },
+  )();
+}
+
+function getCachedAdminNotificationDeviceCount(adminId: string) {
+  return unstable_cache(
+    () =>
+      countOperationalPushSubscriptionDevices({
+        ownerType: "admin",
+        ownerId: adminId,
+      }),
+    ["admin-notification-device-count", adminId],
+    {
+      revalidate: ADMIN_NOTIFICATION_SETTINGS_CACHE_REVALIDATE_SECONDS,
+      tags: [getAdminNotificationSettingsCacheTag(adminId)],
+    },
+  )();
 }
 
 async function getAdminNotificationInboxReadModelUncached({
@@ -143,6 +174,10 @@ export function invalidateAdminNotificationReadCache(adminId: string) {
   revalidateTag(getAdminNotificationReadCacheTag(adminId), "max");
 }
 
+export function invalidateAdminNotificationSettingsCache(adminId: string) {
+  revalidateTag(getAdminNotificationSettingsCacheTag(adminId), "max");
+}
+
 /**
  * Server read model for one administrator's inbox and notification controls.
  * It deliberately turns expected read failures into a safe UI state rather
@@ -157,11 +192,8 @@ export async function getAdminNotificationsReadModel(adminId: string) {
         limit: 10,
         includeUnreadCount: true,
       }),
-      getAdminOperationalNotificationPreferences(adminId),
-      countOperationalPushSubscriptionDevices({
-        ownerType: "admin",
-        ownerId: adminId,
-      }),
+      getCachedAdminNotificationPreferences(adminId),
+      getCachedAdminNotificationDeviceCount(adminId),
     ]);
     if (notificationReadModel.loadError) {
       return createUnavailableAdminNotificationsReadModel();

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
+import { invalidateAdminNotificationSettingsCache } from "@/lib/admin-notifications.server";
 import { deactivateOperationalPushSubscription } from "@/lib/operational-notifications";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { withServerTiming } from "@/lib/server-timing";
@@ -35,6 +36,7 @@ export async function POST(request: NextRequest) {
         subscriptionId: body.subscriptionId ?? null,
         all: body.scope === "all",
       }));
+      invalidateAdminNotificationSettingsCache(session.adminId);
       return NextResponse.json({ ok: true });
     } catch (error) {
       console.error("[admin-push-unsubscribe] unsubscribe failed", error);
