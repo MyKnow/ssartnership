@@ -8,7 +8,7 @@ import {
   loadAdminLogSummaryRows,
   resolveActorMeta,
 } from './log-insights/data';
-import { buildChartBuckets, formatRangeDateTime } from './log-insights/range';
+import { buildChartBuckets, formatRangeDateTime, resolveLogRange } from './log-insights/range';
 import {
   buildUnifiedLogs,
   createTopActors,
@@ -399,7 +399,7 @@ export async function getAdminLogsPageData(
 
   if (useDbPagedList) {
     const [summaryAggregateData, listSourceData] = await Promise.all([
-      loadAdminLogSummaryAggregates(options, access),
+      getCachedAdminLogSummaryAggregates(options, access),
       loadAdminLogNormalizedPage(options, {
         page,
         pageSize,
@@ -537,6 +537,34 @@ export async function getAdminLogsPageData(
     useDbPagedList,
     useSplitLoading,
   }));
+}
+
+export function getAdminLogsSummaryCacheKey(
+  options: GetAdminLogsPageDataOptions,
+  access: AdminLogsAccessCapabilities,
+) {
+  const range = resolveLogRange(options);
+  const accessKey = [
+    [...access.readGroups].sort().join(','),
+    access.includePii ? 'pii' : 'redacted',
+  ].join(':');
+  return `${range.start}|${range.end}|${accessKey}`;
+}
+
+/**
+ * The aggregate cards and chart do not depend on page, cursor, or list
+ * filters. Keep that stable report input separate from the page cache so
+ * pagination and filter transitions do not repeat the summary RPC.
+ */
+export function getCachedAdminLogSummaryAggregates(
+  options: GetAdminLogsPageDataOptions = {},
+  access: AdminLogsAccessCapabilities,
+) {
+  return unstable_cache(
+    () => loadAdminLogSummaryAggregates(options, access),
+    ['admin-logs-summary', getAdminLogsSummaryCacheKey(options, access)],
+    { revalidate: ADMIN_LOGS_READ_CACHE_REVALIDATE_SECONDS },
+  )();
 }
 
 function getAdminLogsReadCacheKey(
