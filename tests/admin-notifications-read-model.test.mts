@@ -22,6 +22,8 @@ test("관리자 개인 알림은 서버 read-model과 안전한 복구 상태를
   assert.doesNotMatch(pageSource, /getSupabaseAdminClient/);
   assert.doesNotMatch(pageSource, /throw new Error/);
   assert.match(readModelSource, /admin_notification_recipients/);
+  assert.match(readModelSource, /countOperationalPushSubscriptionDevices/);
+  assert.doesNotMatch(readModelSource, /listOperationalPushSubscriptionDevices/);
   assert.match(readModelSource, /range\(offset, offset \+ limit\)/);
   assert.match(readModelSource, /unstable_cache/);
   assert.match(readModelSource, /ADMIN_NOTIFICATION_READ_CACHE_REVALIDATE_SECONDS/);

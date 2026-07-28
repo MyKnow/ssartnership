@@ -375,6 +375,31 @@ export async function listOperationalPushSubscriptionDevices(input: {
   }));
 }
 
+export async function countOperationalPushSubscriptionDevices(input: {
+  ownerType: "admin" | "partner";
+  ownerId: string;
+}) {
+  if (input.ownerType === "partner" && isPartnerPortalMock) {
+    return 0;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const table =
+    input.ownerType === "admin" ? "admin_push_subscriptions" : "partner_push_subscriptions";
+  const ownerKey = input.ownerType === "admin" ? "admin_id" : "account_id";
+  const { count, error } = await supabase
+    .from(table)
+    .select("id", { count: "exact", head: true })
+    .eq(ownerKey, input.ownerId)
+    .eq("is_active", true);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return count ?? 0;
+}
+
 async function recordAdminDelivery(input: {
   notificationId: string;
   adminId: string;
