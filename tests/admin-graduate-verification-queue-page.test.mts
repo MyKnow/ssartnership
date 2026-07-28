@@ -44,3 +44,30 @@ test("수료생 인증의 두 운영 큐는 독립적인 서버 페이지네이�
   assert.match(viewSource, /AdminGraduateVerificationRetryLoading/);
   assert.match(viewSource, /aria-busy="true"/);
 });
+
+test("수료생 운영 큐는 각 정렬 조건에 맞는 부분 인덱스를 사용한다", async () => {
+  const migrationSource = await readFile(
+    new URL(
+      "../supabase/migrations/20260728144821_optimize_graduate_verification_queue.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  assert.match(
+    migrationSource,
+    /graduate_verification_requests_open_queue_created_at_idx/,
+  );
+  assert.match(
+    migrationSource,
+    /where status in \('submitted', 'in_review'\)/,
+  );
+  assert.match(
+    migrationSource,
+    /graduate_verification_requests_setup_email_retry_idx/,
+  );
+  assert.match(
+    migrationSource,
+    /where status = 'approved'\s+and setup_email_last_error_at is not null/,
+  );
+});

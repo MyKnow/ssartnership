@@ -4998,6 +4998,15 @@ create unique index if not exists graduate_verification_requests_active_certific
 create index if not exists graduate_verification_requests_status_created_at_idx
   on public.graduate_verification_requests(status, created_at desc);
 
+create index if not exists graduate_verification_requests_open_queue_created_at_idx
+  on public.graduate_verification_requests(created_at desc, id desc)
+  where status in ('submitted', 'in_review');
+
+create index if not exists graduate_verification_requests_setup_email_retry_idx
+  on public.graduate_verification_requests(setup_email_last_error_at desc, id desc)
+  where status = 'approved'
+    and setup_email_last_error_at is not null;
+
 create table if not exists public.member_profile_images (
   id uuid primary key default uuid_generate_v4(),
   graduate_verification_request_id uuid references public.graduate_verification_requests(id) on delete cascade,
