@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
+import { invalidateAdminNotificationSettingsCache } from "@/lib/admin-notifications.server";
 import {
   getAdminOperationalNotificationPreferences,
   upsertAdminOperationalNotificationPreferences,
@@ -70,6 +71,7 @@ export async function POST(request: NextRequest) {
           expiringPartnerEnabled: toOptionalBoolean(body.expiringPartnerEnabled),
         }),
       );
+      invalidateAdminNotificationSettingsCache(session.adminId);
       return NextResponse.json({ ok: true, preferences });
     } catch (error) {
       console.error("[admin-notification-preferences] write failed", error);

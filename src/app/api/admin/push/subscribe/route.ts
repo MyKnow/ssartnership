@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
+import { invalidateAdminNotificationSettingsCache } from "@/lib/admin-notifications.server";
 import { isPushConfigured } from "@/lib/push";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { upsertOperationalPushSubscription } from "@/lib/operational-notifications";
@@ -31,18 +32,21 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-    const body = (await request.json()) as { subscription?: PushSubscriptionJSON };
+      const body = (await request.json()) as { subscription?: PushSubscriptionJSON };
       if (!body.subscription) {
         return NextResponse.json({ message: "Push 구독 정보가 필요합니다." }, { status: 400 });
       }
       const subscription = body.subscription;
-      const preferences = await timing.measure("query", () => upsertOperationalPushSubscription({
-      ownerType: "admin",
-      ownerId: session.adminId,
-        subscription,
-      userAgent: getPushDeviceUserAgent(request),
-    }));
-    return NextResponse.json({ ok: true, preferences });
+      const preferences = await timing.measure("query", () =>
+        upsertOperationalPushSubscription({
+          ownerType: "admin",
+          ownerId: session.adminId,
+          subscription,
+          userAgent: getPushDeviceUserAgent(request),
+        }),
+      );
+      invalidateAdminNotificationSettingsCache(session.adminId);
+      return NextResponse.json({ ok: true, preferences });
     } catch (error) {
       console.error("[admin-push-subscribe] subscription failed", error);
       return NextResponse.json(
