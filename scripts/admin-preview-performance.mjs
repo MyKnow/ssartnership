@@ -8,6 +8,7 @@ import {
   summarizeViewportTaskOutcome,
   summarizeViewportWebVitals,
   summarizeWebVitals,
+  createAdminPreviewBasicAuthHeader,
 } from "./admin-preview-performance-lib.mjs";
 
 const WINDOW_DAYS = 7;
@@ -94,7 +95,16 @@ async function callSummaryRpc(supabase, functionName, window) {
   return data ?? [];
 }
 
-async function measureHttpTarget(baseUrl, cookie, protectionBypass, target, iterations, accept, options) {
+async function measureHttpTarget(
+  baseUrl,
+  cookie,
+  protectionBypass,
+  target,
+  iterations,
+  accept,
+  options,
+  authorization,
+) {
   const samples = [];
   const url = new URL(target.path, baseUrl);
   const headers = {
@@ -105,6 +115,9 @@ async function measureHttpTarget(baseUrl, cookie, protectionBypass, target, iter
   };
   if (protectionBypass) {
     headers["x-vercel-protection-bypass"] = protectionBypass;
+  }
+  if (authorization) {
+    headers.Authorization = authorization;
   }
 
   for (let index = 0; index < iterations; index += 1) {
@@ -148,9 +161,19 @@ async function measureHttpTargets(targets, accept, options) {
   }
 
   const iterations = parsePositiveInteger(process.env.ADMIN_PREVIEW_ITERATIONS, DEFAULT_ITERATIONS);
+  const authorization = createAdminPreviewBasicAuthHeader();
   const results = [];
   for (const target of targets) {
-    results.push(await measureHttpTarget(parsedBaseUrl, cookie, protectionBypass, target, iterations, accept, options));
+    results.push(await measureHttpTarget(
+      parsedBaseUrl,
+      cookie,
+      protectionBypass,
+      target,
+      iterations,
+      accept,
+      options,
+      authorization,
+    ));
   }
   return { iterations, targets: results };
 }
