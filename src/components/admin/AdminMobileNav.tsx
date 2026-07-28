@@ -257,7 +257,7 @@ export default function AdminMobileNav({
                         <DrawerSection
                           key={group.label}
                           title={group.label}
-                          description="작업할 영역으로 바로 이동합니다."
+                          description={group.description}
                         >
                           <div className="grid gap-2">
                             {group.items.map((item) => (

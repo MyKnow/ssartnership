@@ -42,6 +42,9 @@ export const OpenAndClose: Story = {
     const body = within(document.body);
     await expect(body.getByRole("dialog")).toBeInTheDocument();
     await expect(body.getByText("관리 대시보드")).toBeInTheDocument();
+    await expect(
+      body.getByText("승인·검토·예외 처리가 필요한 항목"),
+    ).toBeInTheDocument();
     await expect(body.getByRole("link", { name: /^관리 홈/ })).toHaveAttribute("href", "/admin");
     await expect(body.getByRole("link", { name: /^제휴처/ })).toHaveAttribute("href", "/admin/partners");
     await expect(body.getByRole("link", { name: /^파트너사\/계정/ })).toHaveAttribute("href", "/admin/companies");

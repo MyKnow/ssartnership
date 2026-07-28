@@ -5,8 +5,8 @@ import {
   type AdminNotificationListResult,
 } from "@/lib/admin-notification-inbox";
 import {
+  countOperationalPushSubscriptionDevices,
   getAdminOperationalNotificationPreferences,
-  listOperationalPushSubscriptionDevices,
 } from "@/lib/operational-notifications";
 import { getDefaultAdminNotificationPreferences } from "@/lib/partner-notification-routing";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -158,7 +158,7 @@ export async function getAdminNotificationsReadModel(adminId: string) {
         includeUnreadCount: true,
       }),
       getAdminOperationalNotificationPreferences(adminId),
-      listOperationalPushSubscriptionDevices({
+      countOperationalPushSubscriptionDevices({
         ownerType: "admin",
         ownerId: adminId,
       }),
@@ -170,7 +170,7 @@ export async function getAdminNotificationsReadModel(adminId: string) {
     return {
       notificationResult: notificationReadModel.notificationResult,
       preferences,
-      deviceCount: devices.length,
+      deviceCount: devices,
       loadError: false,
     };
   } catch {
