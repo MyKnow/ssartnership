@@ -1,5 +1,7 @@
 import { Suspense } from "react";
-import AdminDashboardView from "@/components/admin/AdminDashboardView";
+import AdminDashboardView, {
+  AdminDashboardHeader,
+} from "@/components/admin/AdminDashboardView";
 import AdminDashboardPlatformActivitySection from "@/components/admin/AdminDashboardPlatformActivitySection";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminShell from "@/components/admin/AdminShell";
@@ -55,13 +57,11 @@ function AdminDashboardContent({
         hasError: false,
       });
   return (
-    <Suspense fallback={<AdminDashboardSkeletonContent />}>
-      <AdminDashboardData
-        adminSession={adminSession}
-        cycleSettingsPromise={cycleSettingsPromise}
-        dashboardSnapshotPromise={dashboardSnapshotPromise}
-      />
-    </Suspense>
+    <AdminDashboardData
+      adminSession={adminSession}
+      cycleSettingsPromise={cycleSettingsPromise}
+      dashboardSnapshotPromise={dashboardSnapshotPromise}
+    />
   );
 }
 
@@ -115,6 +115,7 @@ async function AdminDashboardData({
           </Suspense>
         ) : null
       }
+      showHeader={false}
     />
   );
 }
@@ -174,9 +175,12 @@ export default async function AdminPage() {
 
   return (
     <AdminShell title="관리 홈">
-      <Suspense fallback={<AdminDashboardSkeletonContent />}>
-        <AdminDashboardContent adminSession={adminSession} />
-      </Suspense>
+      <div className="grid min-w-0 gap-6">
+        <AdminDashboardHeader />
+        <Suspense fallback={<AdminDashboardSkeletonContent showHeader={false} />}>
+          <AdminDashboardContent adminSession={adminSession} />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

@@ -8,6 +8,7 @@ import {
   type AnchorHTMLAttributes,
   type ReactNode,
 } from "react";
+import { markAdminPrefetchIntent } from "@/lib/admin-prefetch";
 
 type AdminIntentLinkProps = Omit<
   AnchorHTMLAttributes<HTMLAnchorElement>,
@@ -29,8 +30,8 @@ export default function AdminIntentLink({
 }: AdminIntentLinkProps) {
   const router = useRouter();
   const hasPrefetchedRef = useRef(false);
-  const prefetchOnIntent = useCallback(() => {
-    if (hasPrefetchedRef.current) {
+  const prefetchOnIntent = useCallback((trigger: "hover" | "focus") => {
+    if (hasPrefetchedRef.current || !markAdminPrefetchIntent(href, trigger)) {
       return;
     }
     hasPrefetchedRef.current = true;
@@ -41,8 +42,8 @@ export default function AdminIntentLink({
     <Link
       href={href}
       prefetch={false}
-      onPointerEnter={prefetchOnIntent}
-      onFocus={prefetchOnIntent}
+      onPointerEnter={() => prefetchOnIntent("hover")}
+      onFocus={() => prefetchOnIntent("focus")}
       {...anchorProps}
     >
       {children}

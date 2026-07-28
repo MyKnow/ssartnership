@@ -21,6 +21,7 @@ export default function AdminCompaniesView({
   canDelete = false,
   actions,
   loadError = false,
+  showHeader = true,
 }: AdminCompanyWorkspaceProps & {
   partnerCount: number;
   errorMessage?: string | null;
@@ -28,6 +29,7 @@ export default function AdminCompaniesView({
   canCreate?: boolean;
   canUpdate?: boolean;
   canDelete?: boolean;
+  showHeader?: boolean;
 }) {
   const activeCompanyCount = companies.filter(
     (company) => company.is_active !== false,
@@ -35,11 +37,13 @@ export default function AdminCompaniesView({
 
   return (
     <section className="grid gap-6">
-      <AdminPageHeader
-        eyebrow="데이터"
-        title="파트너사와 계정 연결 관리"
-        description="여러 제휴처를 보유한 회사 단위, 담당 계정, 다대다 연결을 한 화면에서 정리합니다."
-      />
+      {showHeader ? (
+        <AdminPageHeader
+          eyebrow="데이터"
+          title="파트너사와 계정 연결 관리"
+          description="여러 제휴처를 보유한 회사 단위, 담당 계정, 다대다 연결을 한 화면에서 정리합니다."
+        />
+      ) : null}
       {errorMessage ? (
         <FormMessage variant="error">{errorMessage}</FormMessage>
       ) : null}

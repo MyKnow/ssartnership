@@ -12,6 +12,7 @@ import { fetchForwardActivityMetrics } from "@/lib/platform-activity-forward-met
 import { getAdminWebVitalSummary } from "@/lib/admin-web-vitals-summary.server";
 import { getAdminRouteTimingSummary } from "@/lib/admin-route-timing-summary.server";
 import { getAdminTaskOutcomeSummary } from "@/lib/admin-task-outcome-summary.server";
+import { getAdminPrefetchSummary } from "@/lib/admin-prefetch-summary.server";
 import { AdminLogsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import type { GetAdminLogsPageDataOptions } from "@/lib/log-insights";
 
@@ -29,15 +30,11 @@ async function AdminLogsContent({
   const webVitalsPromise = getAdminWebVitalSummary();
   const routeTimingPromise = getAdminRouteTimingSummary();
   const taskOutcomePromise = getAdminTaskOutcomeSummary();
+  const prefetchPromise = getAdminPrefetchSummary();
   const data = await getCachedAdminLogsPageData(initialQuery, access);
 
   return (
     <div className="grid gap-6">
-        <AdminPageHeader
-          eyebrow="리포트"
-          title="운영 로그 조회"
-          description="제품 이벤트, 관리자 감사, 인증 보안 로그를 공통 탐색 규칙으로 확인합니다."
-        />
         <AdminLogsManager initialData={data} initialQuery={initialQuery} />
         <Suspense fallback={<AdminLogsAncillaryFallback />}>
           <AdminLogsAncillaryPanels
@@ -45,6 +42,7 @@ async function AdminLogsContent({
             webVitals={webVitalsPromise}
             routeTiming={routeTimingPromise}
             taskOutcome={taskOutcomePromise}
+            prefetch={prefetchPromise}
           />
         </Suspense>
     </div>
@@ -94,9 +92,16 @@ export default async function AdminLogsPage({
 
   return (
     <AdminShell title="로그 조회" backHref="/admin" backLabel="관리 홈">
-      <Suspense fallback={<AdminLogsSkeletonContent />}>
-        <AdminLogsContent session={session} initialQuery={initialQuery} />
-      </Suspense>
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="리포트"
+          title="운영 로그 조회"
+          description="제품 이벤트, 관리자 감사, 인증 보안 로그를 공통 탐색 규칙으로 확인합니다."
+        />
+        <Suspense fallback={<AdminLogsSkeletonContent showHeader={false} />}>
+          <AdminLogsContent session={session} initialQuery={initialQuery} />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

@@ -1,8 +1,10 @@
 import { Suspense } from "react";
 import AdminPartnerRegistrationsView from "@/components/admin/AdminPartnerRegistrationsView";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { AdminPartnerRegistrationsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import { updatePartnerRegistrationRequestStatus } from "@/app/admin/(protected)/partner-registrations/actions";
 import AdminShell from "@/components/admin/AdminShell";
+import Button from "@/components/ui/Button";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { canAdmin } from "@/lib/admin-permissions";
 import { getManagedCampusFilterValues } from "@/lib/admin-scope";
@@ -122,6 +124,7 @@ async function AdminPartnerRegistrationsContent({
         loadError={requestPage.loadError}
         canReview={canReview}
         canCreate={canCreate}
+        showHeader={false}
     />
   );
 }
@@ -142,12 +145,35 @@ export default async function AdminPartnerRegistrationsPage({
       backHref="/admin/partners"
       backLabel="제휴처"
     >
-      <Suspense fallback={<AdminPartnerRegistrationsSkeletonContent />}>
-        <AdminPartnerRegistrationsContent
-          adminSession={adminSession}
-          params={params}
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="작업함"
+          title="제휴 등록 신청 검토"
+          description="공개 등록 페이지로 접수된 파트너사와 제휴처 정보를 확인하고 검토 상태를 관리합니다."
+          actions={
+            <>
+              <Button
+                variant="secondary"
+                href="/partner-registration"
+                target="_blank"
+              >
+                공개 신청 페이지
+              </Button>
+              {canAdmin(adminSession.account.permissions, "brands", "create") ? (
+                <Button variant="soft" href="/admin/partners/new">
+                  제휴처 추가
+                </Button>
+              ) : null}
+            </>
+          }
         />
-      </Suspense>
+        <Suspense fallback={<AdminPartnerRegistrationsSkeletonContent showHeader={false} />}>
+          <AdminPartnerRegistrationsContent
+            adminSession={adminSession}
+            params={params}
+          />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

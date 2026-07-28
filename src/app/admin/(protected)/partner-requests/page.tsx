@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import AdminShell from "@/components/admin/AdminShell";
 import AdminReviewQueueHeader from "@/components/admin/AdminReviewQueueHeader";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import PartnerChangeRequestQueue from "@/components/admin/PartnerChangeRequestQueue";
 import Button from "@/components/ui/Button";
 import {
@@ -99,6 +100,7 @@ async function AdminPartnerRequestsContent({
             title: "변경된 항목만 비교한 뒤 승인 또는 거절하세요.",
             description: "오래된 요청부터 처리하면 파트너사 화면에 반영되지 않은 변경 사항이 쌓이는 일을 줄일 수 있습니다.",
           }}
+          showPageHeader={false}
         />
         <PartnerChangeRequestQueue
           requests={scopedRequests}
@@ -129,9 +131,21 @@ export default async function AdminPartnerRequestsPage({
 
   return (
     <AdminShell title="변경 요청" backHref="/admin/partners" backLabel="제휴처">
-      <Suspense fallback={<AdminPartnerRequestsSkeletonContent />}>
-        <AdminPartnerRequestsContent adminSession={adminSession} params={params} />
-      </Suspense>
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="작업함"
+          title="제휴처 변경 요청"
+          description="파트너사 담당자가 요청한 변경 항목을 현재 값과 비교해 승인하거나 거절합니다."
+          actions={
+            <Button href="/admin/partners" variant="secondary">
+              제휴처 목록
+            </Button>
+          }
+        />
+        <Suspense fallback={<AdminPartnerRequestsSkeletonContent showHeader={false} />}>
+          <AdminPartnerRequestsContent adminSession={adminSession} params={params} />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

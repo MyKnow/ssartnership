@@ -77,15 +77,14 @@ async function AdminPartnersContent({
   adminSession,
   params,
   showPlans,
-  canCreatePartner,
+  showHeader = true,
 }: {
   adminSession: Awaited<ReturnType<typeof requireAdminPermission>>;
   params: AdminPartnersSearchParams;
   showPlans: boolean;
-  canCreatePartner: boolean;
+  showHeader?: boolean;
 }) {
   const managedCampusFilter = getManagedCampusFilterValues(adminSession.account);
-  const canManageGlobalSections = !isRegionalAdminAccount(adminSession.account);
   const partnerFormError = getOneSearchParam(params.error)
     ? adminPartnersErrorMessages[getOneSearchParam(params.error) ?? ""]
     : null;
@@ -120,38 +119,17 @@ async function AdminPartnersContent({
   return (
     <section className="grid gap-6">
         <AdminPartnerCreateToast />
-        <AdminPageHeader
-          eyebrow="데이터"
-          title={showPlans ? "플랜과 과금 관리" : "제휴처 목록"}
-          description={
-            showPlans
-              ? "제휴처별 플랜, 결제 요청, 변경 이력을 관리합니다."
-              : "사용자에게 노출되는 제휴처의 혜택과 공개 상태를 검색하고 상세 화면에서 수정합니다."
-          }
-          actions={
-            showPlans ? (
-              <Button variant="secondary" href="/admin/partners">
-                제휴처 목록
-              </Button>
-            ) : (
-              <>
-                <Button variant="secondary" href="/admin/partner-requests">
-                  변경 요청
-                </Button>
-                {canManageGlobalSections ? (
-                  <Button variant="secondary" href="/admin/categories">
-                    카테고리
-                  </Button>
-                ) : null}
-                {canCreatePartner ? (
-                  <Button variant="soft" href="/admin/partners/new">
-                    제휴처 추가
-                  </Button>
-                ) : null}
-              </>
-            )
-          }
-        />
+        {showHeader ? (
+          <AdminPageHeader
+            eyebrow="데이터"
+            title={showPlans ? "플랜과 과금 관리" : "제휴처 목록"}
+            description={
+              showPlans
+                ? "제휴처별 플랜, 결제 요청, 변경 이력을 관리합니다."
+                : "사용자에게 노출되는 제휴처의 혜택과 공개 상태를 검색하고 상세 화면에서 수정합니다."
+            }
+          />
+        ) : null}
 
         {showPlans ? (
           <StatsRow
@@ -258,14 +236,48 @@ export default async function AdminPartnersPage({
       backHref="/admin"
       backLabel="관리 홈"
     >
-      <Suspense fallback={<AdminPartnersSkeletonContent />}>
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="데이터"
+          title={showPlans ? "플랜과 과금 관리" : "제휴처 목록"}
+          description={
+            showPlans
+              ? "제휴처별 플랜, 결제 요청, 변경 이력을 관리합니다."
+              : "사용자에게 노출되는 제휴처의 혜택과 공개 상태를 검색하고 상세 화면에서 수정합니다."
+          }
+          actions={
+            showPlans ? (
+              <Button variant="secondary" href="/admin/partners">
+                제휴처 목록
+              </Button>
+            ) : (
+              <>
+                <Button variant="secondary" href="/admin/partner-requests">
+                  변경 요청
+                </Button>
+                {canManageGlobalSections ? (
+                  <Button variant="secondary" href="/admin/categories">
+                    카테고리
+                  </Button>
+                ) : null}
+                {canCreatePartner ? (
+                  <Button variant="soft" href="/admin/partners/new">
+                    제휴처 추가
+                  </Button>
+                ) : null}
+              </>
+            )
+          }
+        />
+        <Suspense fallback={<AdminPartnersSkeletonContent showHeader={false} />}>
         <AdminPartnersContent
           adminSession={adminSession}
           params={params}
           showPlans={showPlans}
-          canCreatePartner={canCreatePartner}
+          showHeader={false}
         />
-      </Suspense>
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

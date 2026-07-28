@@ -180,11 +180,6 @@ async function AdminMembersContent({
 
   return (
     <div className="grid gap-6">
-        <AdminPageHeader
-          eyebrow="회원"
-          title="회원 계정 관리"
-          description="회원 상태와 인증 이력을 먼저 확인하고, 필요한 운영 작업은 목록 아래에서 실행합니다."
-        />
         {hasMemberLoadError ? (
           <InlineMessage
             tone="danger"
@@ -334,9 +329,16 @@ export default async function AdminMembersPage({
 
   return (
     <AdminShell title="회원 관리" backHref="/admin" backLabel="관리 홈">
-      <Suspense fallback={<AdminMembersSkeletonContent />}>
-        <AdminMembersContent adminSession={adminSession} params={params} />
-      </Suspense>
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="회원"
+          title="회원 계정 관리"
+          description="회원 상태와 인증 이력을 먼저 확인하고, 필요한 운영 작업은 목록 아래에서 실행합니다."
+        />
+        <Suspense fallback={<AdminMembersSkeletonContent showHeader={false} />}>
+          <AdminMembersContent adminSession={adminSession} params={params} />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

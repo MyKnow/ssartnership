@@ -23,14 +23,20 @@ function SearchResultRowsSkeleton() {
   );
 }
 
-export function AdminGlobalSearchSkeletonContent() {
+export function AdminGlobalSearchSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
   return (
     <div className="grid min-w-0 gap-6" aria-busy="true">
-      <div className="grid min-w-0 gap-3 border-b border-border/70 pb-6">
-        <Skeleton className="h-4 w-24 rounded-lg" />
-        <Skeleton className="h-9 w-48 max-w-full" />
-        <Skeleton className="h-4 w-full max-w-2xl" />
-      </div>
+      {showHeader ? (
+        <div className="grid min-w-0 gap-3 border-b border-border/70 pb-6">
+          <Skeleton className="h-4 w-24 rounded-lg" />
+          <Skeleton className="h-9 w-48 max-w-full" />
+          <Skeleton className="h-4 w-full max-w-2xl" />
+        </div>
+      ) : null}
       <Surface level="default" padding="lg" className="grid min-w-0 gap-3">
         <Skeleton className="h-4 w-20" />
         <Skeleton className="h-4 w-full max-w-md" />

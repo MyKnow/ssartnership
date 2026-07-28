@@ -12,6 +12,7 @@ import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import { AdminPartnerDetailSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import {
   generatePartnerPreviewLink,
@@ -253,24 +254,24 @@ async function AdminPartnerDetailContent({
 
   return (
     <section className="grid min-w-0 gap-6">
-        <AdminPageHeader
-          eyebrow="제휴처"
-          title={partner.name}
-          description="운영 지표·혜택 이력·쿠폰을 확인하고, 기본 정보는 별도 화면에서 안전하게 수정합니다."
-          actions={
-            canUpdatePartner ? (
-              <Button
-                href={`${detailPath}/edit${
-                  searchBackHref === "/admin/partners"
-                    ? ""
-                    : `?returnTo=${encodeURIComponent(searchBackHref)}`
-                }`}
-              >
-                기본 정보 수정
-              </Button>
-            ) : null
-          }
-        />
+        <div className="flex min-w-0 flex-wrap items-start justify-between gap-4">
+          <AdminSectionHeading
+            eyebrow="제휴처"
+            title={partner.name}
+            description="운영 지표·혜택 이력·쿠폰을 확인하고, 기본 정보는 별도 화면에서 안전하게 수정합니다."
+          />
+          {canUpdatePartner ? (
+            <Button
+              href={`${detailPath}/edit${
+                searchBackHref === "/admin/partners"
+                  ? ""
+                  : `?returnTo=${encodeURIComponent(searchBackHref)}`
+              }`}
+            >
+              기본 정보 수정
+            </Button>
+          ) : null}
+        </div>
 
         {partnerError ? (
           <FormMessage variant="error">{partnerError}</FormMessage>
@@ -369,13 +370,20 @@ export default async function AdminPartnerDetailPage({
       backHref={searchBackHref}
       backLabel={searchBackLabel}
     >
-      <Suspense fallback={<AdminPartnerDetailSkeletonContent />}>
-        <AdminPartnerDetailContent
-          adminSession={adminSession}
-          partnerId={partnerId}
-          query={query}
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="데이터"
+          title="제휴처 상세"
+          description="제휴처의 운영 상태와 혜택을 확인하고 필요한 후속 작업을 진행합니다."
         />
-      </Suspense>
+        <Suspense fallback={<AdminPartnerDetailSkeletonContent showHeader={false} />}>
+          <AdminPartnerDetailContent
+            adminSession={adminSession}
+            partnerId={partnerId}
+            query={query}
+          />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

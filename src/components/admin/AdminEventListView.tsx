@@ -28,6 +28,7 @@ export type AdminEventListViewProps = {
   statusMessage?: string | null;
   canCreate?: boolean;
   canUpdate?: boolean;
+  showHeader?: boolean;
 };
 
 function EventPill({
@@ -128,17 +129,20 @@ export default function AdminEventListView({
   statusMessage,
   canCreate = true,
   canUpdate = true,
+  showHeader = true,
 }: AdminEventListViewProps) {
   const count = (bucket: string) =>
     sections.find((section) => section.bucket === bucket)?.items.length ?? 0;
 
   return (
     <div className="grid min-w-0 gap-6">
-      <AdminPageHeader
-        eyebrow="자동화"
-        title="이벤트 관리"
-        description="코드로 만든 이벤트 페이지를 등록하고, 공개 전·중·후 상태와 노출 대상을 확인합니다."
-      />
+      {showHeader ? (
+        <AdminPageHeader
+          eyebrow="자동화"
+          title="이벤트 관리"
+          description="코드로 만든 이벤트 페이지를 등록하고, 공개 전·중·후 상태와 노출 대상을 확인합니다."
+        />
+      ) : null}
       <StatsRow
         items={[
           {

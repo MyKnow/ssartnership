@@ -71,11 +71,6 @@ async function AdminCycleContent({
   } catch {
     return (
       <div className="grid min-w-0 gap-6">
-        <AdminPageHeader
-          eyebrow="설정"
-          title="기수 계산 기준 관리"
-          description="현재 기수와 전환 기준을 확인하고 운영 기준을 관리합니다."
-        />
         <AdminStatePanel
           kind="error"
           title="기수 설정을 불러오지 못했습니다."
@@ -130,6 +125,7 @@ async function AdminCycleContent({
         disableMattermostSenderAction={
           canManageSenders ? disableMattermostSender : undefined
         }
+        showHeader={false}
     />
   );
 }
@@ -150,9 +146,17 @@ export default async function AdminCyclePage({
 
   return (
     <AdminShell title="기수 관리" backHref="/admin" backLabel="관리 홈">
-      <Suspense fallback={<AdminCycleSkeletonContent />}>
-        <AdminCycleContent session={session} params={params} />
-      </Suspense>
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="설정"
+          title="기수 계산 기준 관리"
+          description="기수 전환 기준, 기수별 인증 카드 색상, 카드 목업을 한 화면에서 관리합니다."
+          actions={<Button href="/admin/cycle/mock" variant="secondary">전체 목업보기</Button>}
+        />
+        <Suspense fallback={<AdminCycleSkeletonContent showHeader={false} />}>
+          <AdminCycleContent session={session} params={params} />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

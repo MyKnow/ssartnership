@@ -44,11 +44,6 @@ async function AdminPushContent({
 
   return (
     <div className="grid gap-6">
-        <AdminPageHeader
-          eyebrow="자동화"
-          title="발송 관리"
-          description="메시지 작성, 발송 결과, 자동 발송 상태를 한 작업 영역에서 관리합니다."
-        />
         {readModel.loadError ? (
           <AdminStatePanel
             kind="error"
@@ -165,9 +160,16 @@ export default async function AdminPushPage({
 
   return (
     <AdminShell title="발송 관리" backHref="/admin" backLabel="관리 홈">
-      <Suspense fallback={<AdminPushSkeletonContent />}>
-        <AdminPushContent session={session} initialTab={initialTab} />
-      </Suspense>
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="자동화"
+          title="발송 관리"
+          description="메시지 작성, 발송 결과, 자동 발송 상태를 한 작업 영역에서 관리합니다."
+        />
+        <Suspense fallback={<AdminPushSkeletonContent showHeader={false} />}>
+          <AdminPushContent session={session} initialTab={initialTab} />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

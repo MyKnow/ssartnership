@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import AdminShell from "@/components/admin/AdminShell";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminGlobalSearchResultsView from "@/components/admin/AdminGlobalSearchResultsView";
 import { AdminGlobalSearchSkeletonContent } from "@/components/loading/AdminGlobalSearchSkeletonContent";
 import { requireAdminPageAccess } from "@/lib/admin-access";
@@ -48,6 +49,7 @@ async function AdminGlobalSearchContent({
         canSearchPartners={canSearchPartners}
         memberSearchFailed={memberSearchFailed}
         partnerSearchFailed={partnerSearchFailed}
+        showHeader={false}
     />
   );
 }
@@ -73,9 +75,16 @@ export default async function AdminGlobalSearchPage({
 
   return (
     <AdminShell title="통합 검색">
-      <Suspense fallback={<AdminGlobalSearchSkeletonContent />}>
-        <AdminGlobalSearchContent adminSession={adminSession} query={query} />
-      </Suspense>
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="검색"
+          title="통합 검색"
+          description="회원과 제휴처를 이름·로그인 ID·관리 ID로 찾아 바로 상세 화면을 엽니다. 표시되는 대상은 현재 권한과 담당 캠퍼스 범위로 제한됩니다."
+        />
+        <Suspense fallback={<AdminGlobalSearchSkeletonContent showHeader={false} />}>
+          <AdminGlobalSearchContent adminSession={adminSession} query={query} />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

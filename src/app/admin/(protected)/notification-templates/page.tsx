@@ -32,11 +32,6 @@ async function AdminNotificationTemplatesContent({
   } catch {
     return (
       <div className="grid min-w-0 gap-6">
-        <AdminPageHeader
-          eyebrow="자동화"
-          title="알림 템플릿 관리"
-          description="채널별 기본 문구와 허용 변수만 관리합니다."
-        />
         <AdminStatePanel
           kind="error"
           title="알림 템플릿을 불러오지 못했습니다."
@@ -53,16 +48,6 @@ async function AdminNotificationTemplatesContent({
 
   return (
     <div className="grid min-w-0 gap-6">
-        <AdminPageHeader
-          eyebrow="자동화"
-          title="알림 템플릿 관리"
-          description="이메일, Mattermost, 푸시, 인앱 알림의 기본 문구를 확인하고 채널별로 수정합니다. 민감한 실제 값은 저장하지 않고 {변수이름} 자리표시자만 관리합니다."
-          actions={
-            <Button href="/admin/push" variant="secondary">
-              발송 관리
-            </Button>
-          }
-        />
         <AdminOperationFlow
           steps={[
             {
@@ -120,9 +105,17 @@ export default async function AdminNotificationTemplatesPage({
 
   return (
     <AdminShell title="알림 템플릿" backHref="/admin" backLabel="관리 홈">
-      <Suspense fallback={<AdminNotificationTemplatesSkeletonContent />}>
-        <AdminNotificationTemplatesContent session={session} params={params} />
-      </Suspense>
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="자동화"
+          title="알림 템플릿 관리"
+          description="이메일, Mattermost, 푸시, 인앱 알림의 기본 문구를 확인하고 채널별로 수정합니다. 민감한 실제 값은 저장하지 않고 {변수이름} 자리표시자만 관리합니다."
+          actions={<Button href="/admin/push" variant="secondary">발송 관리</Button>}
+        />
+        <Suspense fallback={<AdminNotificationTemplatesSkeletonContent showHeader={false} />}>
+          <AdminNotificationTemplatesContent session={session} params={params} />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

@@ -9,10 +9,12 @@ import {
   type AdminRouteTimingTrigger,
 } from "@/lib/admin-performance";
 import { getCurrentAdminViewport } from "@/lib/admin-viewport";
+import { consumeAdminPrefetchUsage } from "@/lib/admin-prefetch";
 
 type PendingNavigation = {
   startedAt: number;
   trigger: AdminRouteTimingTrigger;
+  prefetch: "used" | "not-used";
 };
 
 let pendingNavigation: PendingNavigation | null = null;
@@ -56,12 +58,15 @@ function clearPendingNavigation() {
   setNavigationIndicatorVisible(false);
 }
 
-export function markAdminNavigationStart(trigger: AdminRouteTimingTrigger) {
+export function markAdminNavigationStart(
+  trigger: AdminRouteTimingTrigger,
+  prefetch: "used" | "not-used" = "not-used",
+) {
   if (typeof window === "undefined" || !Number.isFinite(performance.now())) {
     return;
   }
   const startedAt = performance.now();
-  pendingNavigation = { startedAt, trigger };
+  pendingNavigation = { startedAt, trigger, prefetch };
   clearNavigationIndicatorTimer();
   clearNavigationExpiryTimer();
 
@@ -167,7 +172,10 @@ export default function AdminNavigationTiming() {
         targetLocationKey &&
         targetLocationKey !== getCurrentAdminLocationKey()
       ) {
-        markAdminNavigationStart("link");
+        markAdminNavigationStart(
+          "link",
+          consumeAdminPrefetchUsage(anchor.href) ? "used" : "not-used",
+        );
       }
     };
 
@@ -224,6 +232,7 @@ export default function AdminNavigationTiming() {
       durationMs,
       outcome: pending || durationMs > 0 ? "complete" : "unknown",
       trigger,
+      prefetch: pending?.prefetch ?? "not-used",
     });
 
     lastReportedLocationRef.current = locationKey;

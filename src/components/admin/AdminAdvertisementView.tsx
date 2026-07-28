@@ -37,8 +37,9 @@ export type AdminAdvertisementViewProps = Pick<
     canCreate?: boolean;
     canUpdate?: boolean;
     message?: string | null;
-    errorMessage?: string | null;
-    clearPromotionDraft?: boolean;
+  errorMessage?: string | null;
+  clearPromotionDraft?: boolean;
+  showHeader?: boolean;
   };
 
 async function DeferredCampaignManager({
@@ -97,6 +98,7 @@ export default function AdminAdvertisementView({
   message,
   errorMessage,
   clearPromotionDraft = false,
+  showHeader = true,
 }: AdminAdvertisementViewProps) {
   const resolvedCampaignsPromise =
     campaignsPromise ??
@@ -116,11 +118,13 @@ export default function AdminAdvertisementView({
   return (
     <div className="grid gap-6">
       <PromotionCarouselDraftClearOnSuccess shouldClear={clearPromotionDraft} />
-      <AdminPageHeader
-        eyebrow="자동화"
-        title="홈 광고 관리"
-        description="홈 캐러셀 카드의 순서, 이미지, 문구, 연결 페이지, 노출 권한을 한 번에 편집합니다."
-      />
+      {showHeader ? (
+        <AdminPageHeader
+          eyebrow="자동화"
+          title="홈 광고 관리"
+          description="홈 캐러셀 카드의 순서, 이미지, 문구, 연결 페이지, 노출 권한을 한 번에 편집합니다."
+        />
+      ) : null}
       <StatsRow
         items={[
           {
