@@ -6,6 +6,7 @@ import {
   ADMIN_PREFETCH_TARGET_PERCENT,
   toAdminPrefetchSummary,
 } from "../src/lib/admin-performance.ts";
+import { shouldPrefetchAdminRoute } from "../src/lib/admin-prefetch.ts";
 
 test("관리자 prefetch 활용률은 요청 후 실제 이동 비율을 안전하게 요약한다", () => {
   const metrics = toAdminPrefetchSummary([
@@ -42,6 +43,9 @@ test("관리자 prefetch 활용률은 요청 후 실제 이동 비율을 안전�
   assert.equal(metrics[2]?.routeKey, "admin.unknown");
   assert.equal(metrics[2]?.utilizationRate, null);
   assert.equal(ADMIN_PREFETCH_MIN_SAMPLE_COUNT, 30);
+  assert.equal(shouldPrefetchAdminRoute("admin.members"), true);
+  assert.equal(shouldPrefetchAdminRoute("admin.member-signup-requests"), false);
+  assert.equal(shouldPrefetchAdminRoute("admin.member-signup-requests.detail"), false);
 });
 
 test("prefetch 계측은 요청·활용 단계를 분리하고 raw URL을 보내지 않는다", async () => {

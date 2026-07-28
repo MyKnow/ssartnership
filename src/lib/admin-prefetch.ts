@@ -5,6 +5,14 @@ import { trackProductEvent } from "@/lib/product-events";
 export const ADMIN_PREFETCH_TTL_MS = 30_000;
 export const ADMIN_PREFETCH_HOVER_DELAY_MS = 120;
 
+// Preview telemetry showed no completed navigation after 267 intent requests
+// for signup approvals. Keep that low-use route out of the private prefetch
+// budget until its navigation path has a real usage cohort.
+const ADMIN_PREFETCH_DISABLED_ROUTE_KEYS = new Set([
+  "admin.member-signup-requests",
+  "admin.member-signup-requests.detail",
+]);
+
 export type AdminPrefetchTrigger = "hover" | "focus";
 
 type PrefetchRecord = {
@@ -13,6 +21,10 @@ type PrefetchRecord = {
   requestedAt: number;
   trigger: AdminPrefetchTrigger;
 };
+
+export function shouldPrefetchAdminRoute(routeKey: string) {
+  return !ADMIN_PREFETCH_DISABLED_ROUTE_KEYS.has(routeKey);
+}
 
 const prefetchedRoutes = new Map<string, PrefetchRecord>();
 
@@ -71,7 +83,7 @@ export function markAdminPrefetchIntent(
 ) {
   const normalizedHref = normalizeAdminHref(href);
   const descriptor = getAdminRouteDescriptor(normalizedHref);
-  if (!normalizedHref || !descriptor) {
+  if (!normalizedHref || !descriptor || !shouldPrefetchAdminRoute(descriptor.key)) {
     return false;
   }
 
