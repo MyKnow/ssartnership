@@ -153,6 +153,10 @@ test("Preview 성능 workflow는 dev와 명시적 확인 문자열에서만 실�
   assert.match(source, /ADMIN_PREVIEW_BASIC_AUTH_PASSWORD/);
   assert.match(source, /ADMIN_PREVIEW_LOGIN_USERNAME/);
   assert.match(source, /ADMIN_PREVIEW_LOGIN_PASSWORD/);
+  assert.match(source, /ADMIN_PREVIEW_PAGE_TARGETS/);
+  assert.match(source, /ADMIN_PREVIEW_API_TARGETS/);
+  assert.match(source, /page_targets:/);
+  assert.match(source, /api_targets:/);
   assert.match(source, /npm run measure:admin:preview/);
 });
 

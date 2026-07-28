@@ -27,6 +27,8 @@ const DEFAULT_PAGE_TARGETS = [
   { key: "admin.push.page", path: "/admin/push" },
   { key: "admin.partners.page", path: "/admin/partners" },
   { key: "admin.logs.page", path: "/admin/logs" },
+  { key: "admin.notifications.page", path: "/admin/notifications" },
+  { key: "admin.graduate-verifications.page", path: "/admin/graduate-verifications" },
 ];
 
 function getRequiredEnv(name) {
