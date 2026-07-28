@@ -9,6 +9,7 @@ import {
   summarizeViewportWebVitals,
   summarizeWebVitals,
   createAdminPreviewBasicAuthHeader,
+  mergePreviewCookies,
 } from "./admin-preview-performance-lib.mjs";
 
 const WINDOW_DAYS = 7;
@@ -67,6 +68,77 @@ function parseServerTiming(value) {
     }
   }
   return result;
+}
+
+function getSetCookieHeaders(response) {
+  return typeof response.headers.getSetCookie === "function"
+    ? response.headers.getSetCookie()
+    : [];
+}
+
+async function createFreshAdminSessionCookie(baseUrl, protectionBypass, authorization) {
+  const username = process.env.ADMIN_PREVIEW_LOGIN_USERNAME?.trim();
+  const password = process.env.ADMIN_PREVIEW_LOGIN_PASSWORD?.trim();
+  if (!username || !password) {
+    return null;
+  }
+
+  const commonHeaders = {
+    Origin: baseUrl.origin,
+    Referer: `${baseUrl.origin}/auth/login?returnTo=%2Fadmin`,
+  };
+  if (protectionBypass) {
+    commonHeaders["x-vercel-protection-bypass"] = protectionBypass;
+  }
+  if (authorization) {
+    commonHeaders.Authorization = authorization;
+  }
+
+  try {
+    const loginResponse = await fetch(new URL("/api/auth/login", baseUrl), {
+      method: "POST",
+      redirect: "manual",
+      headers: {
+        ...commonHeaders,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        identifier: username,
+        password,
+        autoLogin: false,
+      }),
+    });
+    const loginCookie = mergePreviewCookies("", getSetCookieHeaders(loginResponse));
+    await loginResponse.arrayBuffer();
+    if (loginResponse.status !== 200 || !loginCookie) {
+      return null;
+    }
+
+    const sessionResponse = await fetch(
+      new URL("/admin/session?returnTo=%2Fadmin", baseUrl),
+      {
+        redirect: "manual",
+        headers: {
+          ...commonHeaders,
+          Accept: "text/html",
+          Cookie: loginCookie,
+        },
+      },
+    );
+    const sessionCookie = mergePreviewCookies(
+      loginCookie,
+      getSetCookieHeaders(sessionResponse),
+    );
+    await sessionResponse.arrayBuffer();
+    return sessionResponse.status >= 300
+      && sessionResponse.status < 400
+      && sessionCookie.split(";").some((cookie) => cookie.trim().startsWith("admin_session="))
+      ? sessionCookie
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function parseTargets() {
@@ -146,11 +218,11 @@ async function measureHttpTarget(
 
 async function measureHttpTargets(targets, accept, options) {
   const baseUrl = process.env.ADMIN_PREVIEW_URL?.trim();
-  const cookie = process.env.ADMIN_PREVIEW_SESSION_COOKIE?.trim();
+  const fallbackCookie = process.env.ADMIN_PREVIEW_SESSION_COOKIE?.trim();
   const protectionBypass = process.env.ADMIN_PREVIEW_PROTECTION_BYPASS?.trim();
-  if (!baseUrl || !cookie) {
+  if (!baseUrl) {
     return {
-      skipped: "ADMIN_PREVIEW_URL_OR_SESSION_COOKIE_MISSING",
+      skipped: "ADMIN_PREVIEW_URL_MISSING",
       targets: [],
     };
   }
@@ -162,6 +234,17 @@ async function measureHttpTargets(targets, accept, options) {
 
   const iterations = parsePositiveInteger(process.env.ADMIN_PREVIEW_ITERATIONS, DEFAULT_ITERATIONS);
   const authorization = createAdminPreviewBasicAuthHeader();
+  const cookie = await createFreshAdminSessionCookie(
+    parsedBaseUrl,
+    protectionBypass,
+    authorization,
+  ) ?? fallbackCookie;
+  if (!cookie) {
+    return {
+      skipped: "ADMIN_PREVIEW_SESSION_COOKIE_OR_LOGIN_MISSING",
+      targets: [],
+    };
+  }
   const results = [];
   for (const target of targets) {
     results.push(await measureHttpTarget(
