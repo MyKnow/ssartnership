@@ -53,6 +53,14 @@ test("prefetch 계측은 요청·활용 단계를 분리하고 raw URL을 보내
     new URL("../src/components/analytics/AdminNavigationTiming.tsx", import.meta.url),
     "utf8",
   );
+  const intentLinkSource = await readFile(
+    new URL("../src/components/admin/AdminIntentLink.tsx", import.meta.url),
+    "utf8",
+  );
+  const shellSource = await readFile(
+    new URL("../src/components/admin/AdminShellView.tsx", import.meta.url),
+    "utf8",
+  );
   const contractSource = await readFile(
     new URL("../src/lib/product-event-contract.ts", import.meta.url),
     "utf8",
@@ -72,6 +80,11 @@ test("prefetch 계측은 요청·활용 단계를 분리하고 raw URL을 보내
   assert.match(contractSource, /"admin_prefetch"/);
   assert.match(contractSource, /requested|used/);
   assert.doesNotMatch(intentSource, /window\.location\.search/);
+  assert.match(intentSource, /ADMIN_PREFETCH_HOVER_DELAY_MS = 120/);
+  assert.match(intentLinkSource, /setTimeout/);
+  assert.match(intentLinkSource, /onPointerLeave=\{cancelHoverPrefetch\}/);
+  assert.match(shellSource, /hoverPrefetchTimersRef/);
+  assert.match(shellSource, /onPointerLeave=\{\(\) => cancelHoverPrefetch/);
 });
 
 test("Preview 측정과 운영 로그는 prefetch 활용률 요약 RPC를 사용한다", async () => {

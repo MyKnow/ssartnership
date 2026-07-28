@@ -3,6 +3,7 @@ import { getCurrentAdminViewport } from "@/lib/admin-viewport";
 import { trackProductEvent } from "@/lib/product-events";
 
 export const ADMIN_PREFETCH_TTL_MS = 30_000;
+export const ADMIN_PREFETCH_HOVER_DELAY_MS = 120;
 
 export type AdminPrefetchTrigger = "hover" | "focus";
 
