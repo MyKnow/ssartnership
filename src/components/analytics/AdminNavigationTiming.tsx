@@ -206,11 +206,13 @@ export default function AdminNavigationTiming() {
       return originalReplaceState.call(window.history, state, unused, url);
     };
 
-    document.addEventListener("click", markFromClick);
+    // Observe before Next Link's bubble handler calls preventDefault so the
+    // prefetch registry can record a real click as used.
+    document.addEventListener("click", markFromClick, true);
     window.addEventListener("popstate", markFromHistory);
 
     return () => {
-      document.removeEventListener("click", markFromClick);
+      document.removeEventListener("click", markFromClick, true);
       window.removeEventListener("popstate", markFromHistory);
       window.history.pushState = originalPushState;
       window.history.replaceState = originalReplaceState;

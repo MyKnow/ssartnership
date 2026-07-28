@@ -65,6 +65,8 @@ test("prefetch 계측은 요청·활용 단계를 분리하고 raw URL을 보내
   assert.match(intentSource, /requestAgeMs/);
   assert.match(navigationSource, /consumeAdminPrefetchUsage/);
   assert.match(navigationSource, /prefetch/);
+  assert.match(navigationSource, /addEventListener\("click", markFromClick, true\)/);
+  assert.match(navigationSource, /removeEventListener\("click", markFromClick, true\)/);
   assert.match(contractSource, /"admin_prefetch"/);
   assert.match(contractSource, /requested|used/);
   assert.doesNotMatch(intentSource, /window\.location\.search/);
