@@ -110,6 +110,42 @@ test("관리 셸은 문서 제목을 만들지 않고 페이지 헤더가 단일
   assert.match(pageHeaderSource, /<h1 className=/);
 });
 
+test("핵심 관리자 화면은 데이터 본문보다 페이지 헤더를 먼저 스트리밍한다", async () => {
+  const pageSources = await Promise.all(
+    [
+      "../src/app/admin/(protected)/page.tsx",
+      "../src/app/admin/(protected)/members/page.tsx",
+      "../src/app/admin/(protected)/push/page.tsx",
+      "../src/app/admin/(protected)/admins/page.tsx",
+    ].map((file) => readFile(new URL(file, import.meta.url), "utf8")),
+  );
+
+  for (const [index, source] of pageSources.entries()) {
+    const headerIndex = source.indexOf(
+      index === 0 ? "<AdminDashboardHeader" : "<AdminPageHeader",
+    );
+    const suspenseIndex = source.indexOf(
+      `<Suspense fallback={<${
+        [
+          "AdminDashboardSkeletonContent",
+          "AdminMembersSkeletonContent",
+          "AdminPushSkeletonContent",
+          "AdminAccountsSkeletonContent",
+        ][index]
+      }`,
+    );
+
+    assert.ok(headerIndex >= 0, "화면별 단일 페이지 헤더가 필요합니다");
+    assert.ok(
+      suspenseIndex > headerIndex,
+      "데이터 Suspense보다 페이지 헤더가 먼저 선언되어야 합니다",
+    );
+    assert.match(source, /showHeader=\{false\}/);
+  }
+
+  assert.match(pageSources[0], /<AdminDashboardHeader\s*\/>/);
+});
+
 test("관리 셸은 반복 탐색을 건너뛰고 빠른 찾기 전환 중 즉시 상태를 알린다", async () => {
   const [shellSource, navigatorSource] = await Promise.all([
     readFile(

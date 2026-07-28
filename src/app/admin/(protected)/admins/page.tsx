@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import AdminAccountsView from "@/components/admin/AdminAccountsView";
 import AdminShell from "@/components/admin/AdminShell";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { AdminAccountsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import {
   applyAdminPermissionTemplate,
@@ -20,9 +21,11 @@ export const dynamic = "force-dynamic";
 async function AdminAccountsContent({
   adminSession,
   status,
+  showHeader = true,
 }: {
   adminSession: Awaited<ReturnType<typeof requireAdminPermission>>;
   status?: string;
+  showHeader?: boolean;
 }) {
   let accounts: Awaited<ReturnType<typeof listAdminAccounts>> = [];
   let loadError = false;
@@ -41,6 +44,7 @@ async function AdminAccountsContent({
         feedback={feedback?.message}
         feedbackIsError={feedback?.tone === "error"}
         loadError={loadError}
+        showHeader={showHeader}
         canGrant={canAdmin(
           adminSession.account.permissions,
           "admin_management",
@@ -80,9 +84,20 @@ export default async function AdminAccountsPage({
 
   return (
     <AdminShell title="관리자 관리" backHref="/admin" backLabel="관리 홈">
-      <Suspense fallback={<AdminAccountsSkeletonContent />}>
-        <AdminAccountsContent adminSession={adminSession} status={status} />
-      </Suspense>
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="설정"
+          title="회원 관리자 권한"
+          description="기존 회원 계정에 권한 템플릿을 부여해 관리자 화면 접근과 기능 수행 범위를 관리합니다."
+        />
+        <Suspense fallback={<AdminAccountsSkeletonContent showHeader={false} />}>
+          <AdminAccountsContent
+            adminSession={adminSession}
+            status={status}
+            showHeader={false}
+          />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

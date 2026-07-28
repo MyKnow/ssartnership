@@ -37,8 +37,9 @@ test("관리 홈은 read model이 준비되는 동안 관리자 셸을 먼저 �
   assert.match(pageSource, /<AdminShell title="관리 홈">/);
   assert.match(
     pageSource,
-    /<Suspense fallback=\{<AdminDashboardSkeletonContent \/>\}>/,
+    /<Suspense fallback=\{<AdminDashboardSkeletonContent showHeader=\{false\} \/>\}>/,
   );
+  assert.match(pageSource, /<AdminDashboardHeader\s*\/>/);
   assert.match(pageSource, /function AdminDashboardContent/);
   assert.match(pageSource, /async function AdminDashboardData/);
   assert.match(pageSource, /const cycleSettingsPromise = getSsafyCycleSettings\(\);/);

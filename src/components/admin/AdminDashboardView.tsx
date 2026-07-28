@@ -71,6 +71,24 @@ type OperationItem = {
   globalOnly?: boolean;
 };
 
+export function AdminDashboardHeader() {
+  return (
+    <AdminPageHeader
+      eyebrow="홈"
+      title="관리 홈"
+      description="처리가 필요한 항목부터 확인하고 자주 쓰는 운영 화면으로 이동합니다."
+      actions={
+        <>
+          <Button href="/admin/tasks">작업함 열기</Button>
+          <Button href="/" variant="secondary">
+            사용자 홈 보기
+          </Button>
+        </>
+      }
+    />
+  );
+}
+
 export default function AdminDashboardView({
   counts,
   queueCounts,
@@ -83,6 +101,7 @@ export default function AdminDashboardView({
   isDataUnavailable = false,
   state = "ready",
   errorMessage,
+  showHeader = true,
 }: {
   counts: AdminDashboardCounts;
   queueCounts: AdminDashboardQueueCounts;
@@ -95,6 +114,7 @@ export default function AdminDashboardView({
   isDataUnavailable?: boolean;
   state?: AdminDashboardViewState;
   errorMessage?: string;
+  showHeader?: boolean;
 }) {
   const errorDescription = errorMessage
     ? "운영 데이터를 다시 불러올 수 없습니다. 잠시 후 다시 확인해 주세요."
@@ -103,11 +123,7 @@ export default function AdminDashboardView({
   if (state !== "ready") {
     return (
       <div className="grid min-w-0 gap-6" aria-busy={state === "loading" || undefined}>
-        <AdminPageHeader
-          eyebrow="홈"
-          title="관리 홈"
-          description="처리가 필요한 항목부터 확인하고 자주 쓰는 운영 화면으로 이동합니다."
-        />
+        {showHeader ? <AdminDashboardHeader /> : null}
         {state === "loading" ? (
           <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,0.8fr)]">
             {[0, 1].map((section) => (
@@ -316,19 +332,7 @@ export default function AdminDashboardView({
 
   return (
     <div className="grid min-w-0 gap-6">
-      <AdminPageHeader
-        eyebrow="홈"
-        title="관리 홈"
-        description="처리가 필요한 항목부터 확인하고 자주 쓰는 운영 화면으로 이동합니다."
-        actions={
-          <>
-            <Button href="/admin/tasks">작업함 열기</Button>
-            <Button href="/" variant="secondary">
-              사용자 홈 보기
-            </Button>
-          </>
-        }
-      />
+      {showHeader ? <AdminDashboardHeader /> : null}
 
       {isDataUnavailable ? (
         <InlineMessage

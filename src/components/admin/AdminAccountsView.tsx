@@ -27,6 +27,7 @@ export default function AdminAccountsView({
   canGrant = false,
   canUpdate = false,
   canDelete = false,
+  showHeader = true,
   grantAction,
   applyTemplateAction,
   updateStatusAction,
@@ -39,6 +40,7 @@ export default function AdminAccountsView({
   canGrant?: boolean;
   canUpdate?: boolean;
   canDelete?: boolean;
+  showHeader?: boolean;
   grantAction: AdminFormAction;
   applyTemplateAction: AdminFormAction;
   updateStatusAction: AdminFormAction;
@@ -54,11 +56,13 @@ export default function AdminAccountsView({
 
   return (
     <div className="grid gap-6">
-      <AdminPageHeader
-        eyebrow="설정"
-        title="회원 관리자 권한"
-        description="기존 회원 계정에 권한 템플릿을 부여해 관리자 화면 접근과 기능 수행 범위를 관리합니다."
-      />
+      {showHeader ? (
+        <AdminPageHeader
+          eyebrow="설정"
+          title="회원 관리자 권한"
+          description="기존 회원 계정에 권한 템플릿을 부여해 관리자 화면 접근과 기능 수행 범위를 관리합니다."
+        />
+      ) : null}
 
       {feedback ? (
         <FormMessage variant={feedbackIsError ? "error" : "info"}>

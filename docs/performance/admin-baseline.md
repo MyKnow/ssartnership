@@ -232,6 +232,12 @@ Web Vitals·route timing·과업 성과 요약도 같은 보조 경계로 취급
 `unexpected_failure` 중 하나의 reason code만 남기므로, 보조 지표 장애가 로그 탐색·첫
 조작·내부 오류 노출로 이어지지 않는다.
 
+### 2026-07-28 핵심 화면 첫 의미 있는 렌더링
+
+- `/admin`, `/admin/members`, `/admin/push`, `/admin/admins`는 공통 셸과 페이지 `h1` 헤더를 데이터 read-model Suspense 바깥에 두었다. 데이터가 늦어도 화면의 현재 위치와 제목이 먼저 보이며, fallback skeleton이 실제 헤더를 중복 렌더링하지 않는다. 기존 URL·권한·도메인 로직은 변경하지 않았다.
+- production build의 로컬 관리자 세션에서 `/admin`, `/admin/tasks`, `/admin/members`, `/admin/push`, `/admin/admins`, `/admin/partners`, `/admin/partner-requests`를 320·360·390·820·1366px로 확인했다. 35개 조합 모두 `h1` 1개, 문서 가로 overflow 없음, page error 없음이었다. 이 검증은 첫 렌더링·containment 증거이며, 전체 관리자 상태와 실제 Preview RUM을 대신하지 않는다.
+- 최신 Preview baseline workflow `30340937393`은 `dev`의 `b462c165`에서 성공했다. Web Vitals는 INP p75 48ms, LCP p75 1,496ms, TTFB p75 360ms로 목표 이내였지만, 직접 HTML 응답 p95는 `/admin` 1,182ms·`/admin/members` 827ms였으므로 사용자 상호작용 p75와 동일하게 해석하지 않는다. 현재 브랜치의 첫 헤더 스트리밍 변경은 이 baseline 이후이므로 Preview 반영 뒤 같은 workflow를 다시 실행해야 한다.
+
 ## 다음 기준선 작업
 
 ### 2026-07-27 회원 목록 재측정

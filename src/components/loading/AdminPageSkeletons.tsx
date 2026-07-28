@@ -98,14 +98,16 @@ function AdminListSkeletonContent({
   actionCount = 2,
   filterFields = 4,
   rows = 4,
+  showHeader = true,
 }: {
   actionCount?: number;
   filterFields?: number;
   rows?: number;
+  showHeader?: boolean;
 }) {
   return (
     <div className="grid min-w-0 gap-6">
-      <PageHeaderSkeleton actionCount={actionCount} />
+      {showHeader ? <PageHeaderSkeleton actionCount={actionCount} /> : null}
       <MetricRowSkeleton />
       <FilterSkeleton fields={filterFields} />
       <ListRowsSkeleton rows={rows} />
@@ -148,10 +150,14 @@ export function AdminLoginSkeleton() {
   );
 }
 
-export function AdminDashboardSkeletonContent() {
+export function AdminDashboardSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
   return (
     <div className="grid min-w-0 gap-6">
-      <PageHeaderSkeleton />
+      {showHeader ? <PageHeaderSkeleton /> : null}
       <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,0.8fr)]">
         <Surface level="elevated" padding="lg" className="grid gap-3">
           <Skeleton className="h-6 w-28" />
@@ -193,8 +199,12 @@ export function AdminMembersSkeleton() {
   return <AdminListSkeleton title="회원 관리" filterFields={4} rows={5} />;
 }
 
-export function AdminMembersSkeletonContent() {
-  return <AdminListSkeletonContent filterFields={4} rows={5} />;
+export function AdminMembersSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent filterFields={4} rows={5} showHeader={showHeader} />;
 }
 
 export function AdminPartnersSkeleton() {
@@ -292,8 +302,12 @@ export function AdminPushSkeleton() {
   return <AdminListSkeleton title="발송 관리" filterFields={3} rows={3} />;
 }
 
-export function AdminPushSkeletonContent() {
-  return <AdminListSkeletonContent filterFields={3} rows={3} />;
+export function AdminPushSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent filterFields={3} rows={3} showHeader={showHeader} />;
 }
 
 export function AdminLogsSkeleton() {
@@ -336,8 +350,12 @@ export function AdminMemberSignupRequestsSkeletonContent() {
   return <AdminListSkeletonContent filterFields={0} rows={4} />;
 }
 
-export function AdminAccountsSkeletonContent() {
-  return <AdminListSkeletonContent filterFields={0} rows={4} />;
+export function AdminAccountsSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent filterFields={0} rows={4} showHeader={showHeader} />;
 }
 
 export function AdminNotificationTemplatesSkeletonContent() {
