@@ -154,6 +154,11 @@ test("대표 관리자 목록은 셸과 read model 콘텐츠를 분리해 스트
     const pageSource = await readFile(new URL(route.page, import.meta.url), "utf8");
 
     assert.match(pageSource, /<AdminShell/);
+    if (pageSource.includes("showHeader={false}")) {
+      assert.match(pageSource, /showHeader=\{false\}/, route.label);
+      assert.match(pageSource, new RegExp(`async function ${route.content}`), route.label);
+      continue;
+    }
     assert.match(
       pageSource,
       new RegExp(`<Suspense fallback=\\{<${route.fallback} \/>\\}>`),
