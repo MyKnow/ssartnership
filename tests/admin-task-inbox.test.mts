@@ -264,10 +264,17 @@ test("관리 홈은 모든 권한 내 검토 큐를 다음 작업 후보에 포�
 });
 
 test("관리 홈은 다음 작업을 우선 표시하고, 활동 지표 조회가 첫 화면을 막지 않는다", async () => {
-  const [dashboardSource, pageSource] = await Promise.all([
+  const [dashboardSource, intentLinkSource, pageSource] = await Promise.all([
     readFile(
       new URL(
         "../src/components/admin/AdminDashboardView.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/components/admin/AdminIntentLink.tsx",
         import.meta.url,
       ),
       "utf8",
@@ -282,9 +289,19 @@ test("관리 홈은 다음 작업을 우선 표시하고, 활동 지표 조회�
   assert.match(dashboardSource, /다음으로 처리/);
   assert.match(
     dashboardSource,
-    /href=\{nextQueueItem\.href\}\s+prefetch=\{false\}/,
+    /<AdminIntentLink\s+href=\{nextQueueItem\.href\}/,
   );
-  assert.match(dashboardSource, /href=\{item\.href\}\s+prefetch=\{false\}/);
+  assert.match(
+    dashboardSource,
+    /<AdminIntentLink\s+key=\{item\.href\}\s+href=\{item\.href\}/,
+  );
+  assert.match(dashboardSource, /AdminIntentLink/);
+  assert.match(dashboardSource, /prefetch=\{false\}/);
+  assert.match(intentLinkSource, /"use client"/);
+  assert.match(intentLinkSource, /onPointerEnter=\{prefetchOnIntent\}/);
+  assert.match(intentLinkSource, /onFocus=\{prefetchOnIntent\}/);
+  assert.match(intentLinkSource, /router\.prefetch\(href\)/);
+  assert.match(intentLinkSource, /prefetch=\{false\}/);
   assert.match(dashboardSource, /remainingQueueItems\.map\(\(item, index\)/);
   assert.match(dashboardSource, /index >= 2 \? "hidden sm:grid" : "grid"/);
   assert.match(dashboardSource, /전체 업무는 작업함에서 보기/);

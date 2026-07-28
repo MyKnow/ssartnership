@@ -9,6 +9,7 @@ import {
   UsersIcon,
 } from "@heroicons/react/24/outline";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import AdminIntentLink from "@/components/admin/AdminIntentLink";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
@@ -370,9 +371,8 @@ export default function AdminDashboardView({
           ) : (
             <div className="grid min-w-0 gap-2">
               {nextQueueItem ? (
-                <Link
+                <AdminIntentLink
                   href={nextQueueItem.href}
-                  prefetch={false}
                   data-admin-task-key={
                     getAdminRouteDescriptor(nextQueueItem.href)?.key
                   }
@@ -391,7 +391,7 @@ export default function AdminDashboardView({
                   <span className="shrink-0 text-sm font-semibold text-primary">
                     {nextQueueItem.count.toLocaleString("ko-KR")}건 검토 시작
                   </span>
-                </Link>
+                </AdminIntentLink>
               ) : null}
               {remainingQueueItems.map((item, index) => (
                 <Link
@@ -443,10 +443,9 @@ export default function AdminDashboardView({
             {quickActions.map((item) => {
               const Icon = item.icon;
               return (
-                <Link
+                <AdminIntentLink
                   key={item.href}
                   href={item.href}
-                  prefetch={false}
                   className="flex min-w-0 items-center gap-3 rounded-2xl border border-border/70 bg-surface-inset p-3 transition-colors hover:border-strong hover:bg-surface-control"
                 >
                   <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-muted text-foreground">
@@ -463,7 +462,7 @@ export default function AdminDashboardView({
                   <span className="shrink-0 text-xs font-semibold text-muted-foreground">
                     {isDataUnavailable ? "확인 필요" : item.meta}
                   </span>
-                </Link>
+                </AdminIntentLink>
               );
             })}
           </div>
