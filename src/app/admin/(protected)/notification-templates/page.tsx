@@ -75,7 +75,7 @@ async function AdminNotificationTemplatesContent({
           resetAction={resetNotificationTemplateAction}
           testAction={sendNotificationTemplateTestAction}
           testRecipients={[]}
-          defaultTestRecipientId={null}
+          defaultTestRecipientId={session.adminId}
           statusMessage={feedback?.tone === "info" ? feedback.message : null}
           errorMessage={feedback?.tone === "error" ? feedback.message : null}
           canUpdate={canAdmin(

@@ -2,7 +2,16 @@ import { AlertTriangle } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 
-export default function AdminAccessDeniedNotice() {
+export default function AdminAccessDeniedNotice({
+  returnTo,
+}: {
+  returnTo?: string | null;
+}) {
+  const safeReturnTo =
+    returnTo === "/admin" || returnTo?.startsWith("/admin/")
+      ? returnTo
+      : null;
+
   return (
     <Card
       className="mx-auto w-full max-w-md text-center"
@@ -27,7 +36,12 @@ export default function AdminAccessDeniedNotice() {
         로그인된 계정에 관리자 권한이 부여되어 있지 않습니다.
         관리자 접근이 필요하면 운영자에게 권한 부여를 요청해 주세요.
       </p>
-      <div className="mt-6 flex justify-center">
+      <div className="mt-6 flex flex-wrap justify-center gap-3">
+        {safeReturnTo ? (
+          <Button href={safeReturnTo} variant="soft">
+            요청한 화면으로 돌아가기
+          </Button>
+        ) : null}
         <Button href="/" variant="secondary">
           홈으로 이동
         </Button>

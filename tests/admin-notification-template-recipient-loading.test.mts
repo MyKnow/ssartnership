@@ -16,7 +16,7 @@ test("알림 템플릿 첫 화면은 상세 본문과 테스트 수신자 조회
   assert.match(page, /listNotificationTemplateSummaries/);
   assert.doesNotMatch(page, /listNotificationTemplates\(\)/);
   assert.match(page, /testRecipients=\{\[\]\}/);
-  assert.match(page, /defaultTestRecipientId=\{null\}/);
+  assert.match(page, /defaultTestRecipientId=\{session\.adminId\}/);
   assert.match(manager, /useEffect/);
   assert.match(manager, /fetch\("\/api\/admin\/notification-templates\/test-recipients"/);
   assert.match(manager, /테스트 수신 회원을 불러오는 중/);

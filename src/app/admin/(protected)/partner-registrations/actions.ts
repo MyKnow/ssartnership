@@ -15,13 +15,19 @@ import {
   type PartnerRegistrationRequestStatus,
 } from "@/lib/partner-registration";
 import {
+  hasPartnerRegistrationFieldErrors,
+  validatePartnerRegistrationInput,
+} from "@/lib/partner-registration";
+import { loadPartnerRegistrationCategories } from "@/lib/partner-registration-submit.server";
+import {
   DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
   normalizeBenefitGroupKey,
 } from "@/lib/partner-branch-registration";
+import { resolvePartnerRegistrationCategory } from "@/lib/partner-registration";
+import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
 import { ensurePartnerCompanyRow } from "@/app/admin/(protected)/_actions/partner-support/company-provision";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getPartnerVisibilityState } from "@/lib/partner-visibility";
-import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
 import {
   logAdminAction,
   redirectAdminActionError,
@@ -570,4 +576,240 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
 
   revalidatePath("/admin/partner-registrations");
   redirect(appendAdminReviewQueueQuery(returnTo, { success: "updated" }));
+}
+
+function areStringArraysEqual(left?: string[] | null, right?: string[] | null) {
+  return JSON.stringify(left ?? []) === JSON.stringify(right ?? []);
+}
+
+function preservePartnerBenefitLimits(
+  existingItems: unknown,
+  benefitTitles: readonly string[],
+) {
+  let existingBenefits: ReturnType<typeof normalizePartnerBenefitItems> = [];
+  try {
+    existingBenefits = normalizePartnerBenefitItems(existingItems ?? []);
+  } catch {
+    existingBenefits = [];
+  }
+
+  if (existingBenefits.length === 0) {
+    return normalizePartnerBenefitItems(
+      benefitTitles.map((title, index) => ({
+        id: `registration-benefit-${index + 1}`,
+        title,
+      })),
+    );
+  }
+
+  return normalizePartnerBenefitItems(
+    benefitTitles.map((title, index) => ({
+      id: existingBenefits[index]?.id,
+      title,
+      maxApplyCount: existingBenefits[index]?.maxApplyCount,
+    })),
+  );
+}
+
+export async function updatePartnerRegistrationRequestDetails(formData: FormData) {
+  const returnTo = sanitizeReturnTo(
+    String(formData.get("returnTo") ?? ""),
+    "/admin/partner-registrations",
+  );
+  const adminSession = await requireAdminPermission("brands", "update", {
+    path: returnTo,
+  });
+  const id = String(formData.get("id") || "").trim();
+  if (!id) {
+    redirectAdminActionError(returnTo, "partner_form_details_invalid");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data: request, error: requestError } = await supabase
+    .from("partner_registration_requests")
+    .select(
+      "id,status,source,company_id,registration_mode,service_mode,benefit_action_type,benefit_items,branch_scope_type,branch_scope_note,brand_name,category_id,category_label,period_start,period_end,inquiry_link,brand_phone,detail_description,company_name,contact_name,contact_email,contact_phone,company_description,benefits,conditions,tags,location,map_url,site_link,benefit_action_link,thumbnail_url,image_urls,company:partner_companies(managed_campus_slugs)",
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (requestError || !request) {
+    redirectAdminActionError(returnTo, "partner_form_not_found");
+  }
+
+  const registrationRequest = request as PartnerRegistrationRequestRow;
+  if (registrationRequest.status === "converted") {
+    redirectAdminActionError(returnTo, "partner_form_details_locked");
+  }
+
+  try {
+    assertAdminCanAccessManagedCampuses(
+      adminSession.account,
+      resolveRegistrationManagedCampusSlugs(registrationRequest),
+    );
+  } catch {
+    redirectAdminActionError(returnTo, "regional_admin_scope_denied");
+  }
+
+  let categories;
+  try {
+    categories = await loadPartnerRegistrationCategories();
+  } catch {
+    redirectAdminActionError(returnTo, "partner_form_details_invalid");
+  }
+
+  const validation = validatePartnerRegistrationInput({
+    registrationMode: registrationRequest.registration_mode ?? "full_new",
+    serviceMode: registrationRequest.service_mode,
+    benefitActionType: registrationRequest.benefit_action_type,
+    // Branch membership is not edited in this form. Preserve the existing scope
+    // while validating the editable request fields.
+    branchScopeType: "single_location",
+    branchScopeNote: String(
+      formData.get("branchScopeNote") ?? registrationRequest.branch_scope_note ?? "",
+    ),
+    brandName: String(formData.get("brandName") ?? ""),
+    categoryLabel: String(formData.get("categoryLabel") ?? ""),
+    periodStart: String(formData.get("periodStart") ?? ""),
+    periodEnd: String(formData.get("periodEnd") ?? ""),
+    inquiryLink: String(formData.get("inquiryLink") ?? ""),
+    brandPhone: String(formData.get("brandPhone") ?? ""),
+    detailDescription: String(formData.get("detailDescription") ?? ""),
+    companyName: registrationRequest.company_name,
+    contactName: String(formData.get("contactName") ?? ""),
+    contactEmail: String(formData.get("contactEmail") ?? ""),
+    contactPhone: String(formData.get("contactPhone") ?? ""),
+    companyDescription: String(formData.get("companyDescription") ?? ""),
+    benefits: String(formData.get("benefits") ?? ""),
+    conditions: String(formData.get("conditions") ?? ""),
+    tags: String(formData.get("tags") ?? ""),
+    location: String(formData.get("location") ?? ""),
+    mapUrl: String(formData.get("mapUrl") ?? ""),
+    siteLink: String(formData.get("siteLink") ?? ""),
+    benefitActionLink: String(formData.get("benefitActionLink") ?? ""),
+    branchListText: "",
+    memo: String(formData.get("memo") ?? ""),
+    benefitItems: "",
+  });
+  if (hasPartnerRegistrationFieldErrors(validation.fieldErrors)) {
+    redirectAdminActionError(returnTo, "partner_form_details_invalid");
+  }
+
+  const values = validation.values;
+  const matchedCategory = resolvePartnerRegistrationCategory(
+    values.categoryLabel,
+    categories,
+  );
+  const { data: benefitGroups, error: benefitGroupsError } = await supabase
+    .from("partner_registration_benefit_groups")
+    .select("id,group_key")
+    .eq("registration_request_id", id)
+    .order("created_at", { ascending: true });
+  if (benefitGroupsError) {
+    redirectAdminActionError(returnTo, "partner_form_details_invalid");
+  }
+
+  const multipleBenefitGroups = (benefitGroups ?? []).length > 1;
+  const benefitsChanged = !areStringArraysEqual(
+    values.parsedBenefits,
+    registrationRequest.benefits,
+  );
+  const conditionsChanged = !areStringArraysEqual(
+    values.parsedConditions,
+    registrationRequest.conditions,
+  );
+  const tagsChanged = !areStringArraysEqual(values.parsedTags, registrationRequest.tags);
+  if (multipleBenefitGroups && (benefitsChanged || conditionsChanged || tagsChanged)) {
+    redirectAdminActionError(returnTo, "partner_form_multiple_groups");
+  }
+
+  let benefitItems;
+  try {
+    benefitItems = preservePartnerBenefitLimits(
+      registrationRequest.benefit_items,
+      values.parsedBenefits,
+    );
+  } catch {
+    redirectAdminActionError(returnTo, "partner_form_details_invalid");
+  }
+
+  const group = (benefitGroups ?? [])[0] as
+    | { id?: string | null; group_key?: string | null }
+    | undefined;
+  if (group?.id) {
+    const { error } = await supabase
+      .from("partner_registration_benefit_groups")
+      .update({
+        benefit_action_type: values.benefitActionType,
+        benefit_action_link: values.safeBenefitActionLink,
+        benefits: values.parsedBenefits,
+        conditions: values.parsedConditions,
+        period_start: values.periodStart || null,
+        period_end: values.periodEnd || null,
+        tags: values.parsedTags,
+      })
+      .eq("id", group.id);
+    if (error) {
+      console.error("[partner-registration] details group update failed", error.message);
+      redirectAdminActionError(returnTo, "partner_form_details_invalid");
+    }
+  }
+
+  const { error: updateError } = await supabase
+      .from("partner_registration_requests")
+    .update({
+      benefit_items: benefitItems.map((benefit, displayOrder) => ({
+        id: benefit.id,
+        title: benefit.title,
+        maxApplyCount: benefit.maxApplyCount,
+        displayOrder,
+      })),
+      branch_scope_note: values.branchScopeNote || null,
+      brand_name: values.brandName,
+      category_id: matchedCategory?.id ?? null,
+      category_label: matchedCategory?.label ?? values.categoryLabel,
+      period_start: values.periodStart || null,
+      period_end: values.periodEnd || null,
+      inquiry_link: values.safeInquiryLink,
+      brand_phone: values.safeBrandPhone,
+      detail_description: values.detailDescription || null,
+      contact_name: values.contactName,
+      contact_email: values.contactEmail,
+      contact_phone: values.contactPhone || null,
+      company_description: values.companyDescription || null,
+      benefits: values.parsedBenefits,
+      conditions: values.parsedConditions,
+      tags: values.parsedTags,
+      location: values.location,
+      map_url: values.safeMapUrl,
+      site_link: values.safeSiteLink,
+      benefit_action_link: values.safeBenefitActionLink,
+      memo: values.memo || null,
+    })
+    .eq("id", id);
+  if (updateError) {
+    console.error("[partner-registration] details update failed", updateError.message);
+    redirectAdminActionError(returnTo, "partner_form_details_invalid");
+  }
+
+  await logAdminAction("partner_update", {
+    targetType: "partner_registration_request",
+    targetId: id,
+    properties: {
+      source: "admin_partner_registration_queue",
+      changedFields: [
+        "brand_name",
+        "category",
+        "location",
+        "period",
+        "contact",
+        "description",
+        "benefits",
+        "conditions",
+        "tags",
+      ],
+    },
+  });
+  revalidatePath("/admin/partner-registrations");
+  redirect(appendAdminReviewQueueQuery(returnTo, { success: "details-updated" }));
 }

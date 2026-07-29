@@ -162,6 +162,7 @@ async function AdminMembersContent({
     mustChangePasswordCount,
     generationMattermostLoginTargetCount,
     hasMemberLoadError,
+    hasMemberMetadataError,
   } = await getAdminMemberListReadModel({
     filters,
     page,
@@ -185,6 +186,15 @@ async function AdminMembersContent({
             tone="danger"
             title="회원 목록을 불러오지 못했습니다."
             description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 담당자에게 알려 주세요."
+            actionHref="/admin/members"
+            actionLabel="다시 확인"
+          />
+        ) : null}
+        {!hasMemberLoadError && hasMemberMetadataError ? (
+          <InlineMessage
+            tone="warning"
+            title="회원 목록은 표시했지만 일부 운영 정보가 늦게 반영될 수 있습니다."
+            description="약관·필터 선택지 또는 요약 정보를 불러오지 못했습니다. 목록은 확인할 수 있으며 잠시 후 다시 확인해 주세요."
             actionHref="/admin/members"
             actionLabel="다시 확인"
           />

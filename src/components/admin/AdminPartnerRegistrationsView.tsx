@@ -5,6 +5,7 @@ import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import Input from "@/components/ui/Input";
 import SubmitButton from "@/components/ui/SubmitButton";
 import Surface from "@/components/ui/Surface";
 import Textarea from "@/components/ui/Textarea";
@@ -137,6 +138,7 @@ function buildRegistrationQueueHref(
 
 export default function AdminPartnerRegistrationsView({
   rows,
+  updateDetailsAction,
   updateStatusAction,
   status,
   feedback,
@@ -148,6 +150,7 @@ export default function AdminPartnerRegistrationsView({
   showHeader = true,
 }: {
   rows: AdminPartnerRegistrationRow[];
+  updateDetailsAction: AdminFormAction;
   updateStatusAction: AdminFormAction;
   status?: PartnerRegistrationRequestStatus | null;
   feedback?: AdminReviewQueueFeedback | null;
@@ -502,6 +505,174 @@ export default function AdminPartnerRegistrationsView({
                     </div>
                   </div>
                 </details>
+
+                {canReview && rowStatus !== "converted" ? (
+                  <details className="group min-w-0 rounded-2xl border border-border/70 bg-surface-inset/55">
+                    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
+                      <span>신청 정보 수정</span>
+                      <span className="text-right text-xs font-normal leading-5 text-muted-foreground">
+                        지점 목록과 혜택 그룹 구조는 유지
+                      </span>
+                    </summary>
+                    <form
+                      action={updateDetailsAction}
+                      className="grid min-w-0 gap-4 border-t border-border/70 px-4 py-4"
+                    >
+                      <input type="hidden" name="id" value={row.id} />
+                      <input type="hidden" name="returnTo" value={returnTo} />
+                      <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          제휴처명
+                          <Input name="brandName" defaultValue={row.brand_name} />
+                        </label>
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          카테고리
+                          <Input
+                            name="categoryLabel"
+                            defaultValue={row.category_label}
+                          />
+                        </label>
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          위치
+                          <Input name="location" defaultValue={row.location} />
+                        </label>
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          시작일
+                          <Input
+                            name="periodStart"
+                            type="date"
+                            defaultValue={row.period_start ?? ""}
+                          />
+                        </label>
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          종료일
+                          <Input
+                            name="periodEnd"
+                            type="date"
+                            defaultValue={row.period_end ?? ""}
+                          />
+                        </label>
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          사이트 링크
+                          <Input name="siteLink" defaultValue={row.site_link ?? ""} />
+                        </label>
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          지도 링크
+                          <Input name="mapUrl" defaultValue={row.map_url ?? ""} />
+                        </label>
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          혜택 이용 링크
+                          <Input
+                            name="benefitActionLink"
+                            defaultValue={row.benefit_action_link ?? ""}
+                          />
+                        </label>
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          제휴처 전화
+                          <Input name="brandPhone" defaultValue={row.brand_phone ?? ""} />
+                        </label>
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          문의 링크 또는 연락처
+                          <Input
+                            name="inquiryLink"
+                            defaultValue={row.inquiry_link ?? ""}
+                          />
+                        </label>
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          담당자명
+                          <Input name="contactName" defaultValue={row.contact_name} />
+                        </label>
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          담당자 이메일
+                          <Input
+                            name="contactEmail"
+                            type="email"
+                            defaultValue={row.contact_email}
+                          />
+                        </label>
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          담당자 전화
+                          <Input
+                            name="contactPhone"
+                            defaultValue={row.contact_phone ?? ""}
+                          />
+                        </label>
+                      </div>
+                      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          제휴처 설명
+                          <Textarea
+                            name="detailDescription"
+                            defaultValue={row.detail_description ?? ""}
+                            rows={3}
+                          />
+                        </label>
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          파트너사 설명
+                          <Textarea
+                            name="companyDescription"
+                            defaultValue={row.company_description ?? ""}
+                            rows={3}
+                          />
+                        </label>
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          혜택
+                          <Textarea
+                            name="benefits"
+                            defaultValue={(row.benefits ?? []).join("\n")}
+                            rows={4}
+                            placeholder="혜택을 한 줄에 하나씩 입력"
+                          />
+                        </label>
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          이용 조건
+                          <Textarea
+                            name="conditions"
+                            defaultValue={(row.conditions ?? []).join("\n")}
+                            rows={4}
+                            placeholder="이용 조건을 한 줄에 하나씩 입력"
+                          />
+                        </label>
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          태그
+                          <Textarea
+                            name="tags"
+                            defaultValue={(row.tags ?? []).join("\n")}
+                            rows={3}
+                            placeholder="태그를 한 줄에 하나씩 입력"
+                          />
+                        </label>
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          지점 범위 메모
+                          <Textarea
+                            name="branchScopeNote"
+                            defaultValue={row.branch_scope_note ?? ""}
+                            rows={3}
+                          />
+                        </label>
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground lg:col-span-2">
+                          운영 메모
+                          <Textarea
+                            name="memo"
+                            defaultValue={row.memo ?? ""}
+                            rows={3}
+                          />
+                        </label>
+                      </div>
+                      <div className="flex justify-end">
+                        <SubmitButton pendingText="저장 중" variant="secondary">
+                          신청 정보 저장
+                        </SubmitButton>
+                      </div>
+                    </form>
+                  </details>
+                ) : rowStatus === "converted" && canReview ? (
+                  <Surface level="inset" className="border-t border-border/70 p-4">
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      등록 완료된 제휴처는 제휴처 상세 화면에서 수정해 주세요.
+                    </p>
+                  </Surface>
+                ) : null}
 
                 {canReview ? (
                   <form

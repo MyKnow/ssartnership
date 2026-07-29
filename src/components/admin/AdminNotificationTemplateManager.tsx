@@ -611,7 +611,9 @@ export default function AdminNotificationTemplateManager({
         setAvailableTestRecipients(recipients);
         setTestRecipientId(
           (current) =>
-            current ||
+            (current && recipients.some((recipient) => recipient.id === current)
+              ? current
+              : null) ||
             (typeof payload.defaultId === "string" ? payload.defaultId : ""),
         );
         setTestRecipientsError(false);

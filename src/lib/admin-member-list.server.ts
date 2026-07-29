@@ -93,6 +93,8 @@ type AdminMemberPolicyContext = {
 
 const ADMIN_MEMBER_LIST_SELECT: string =
   "id,mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at,mattermost_login_disabled_at,mattermost_login_disabled_reason,active_profile_image_id,directory:mm_user_directory!members_mattermost_account_id_fkey(id,mm_user_id,mm_username)";
+const ADMIN_MEMBER_LIST_FALLBACK_SELECT: string =
+  "id,mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at,mattermost_login_disabled_at,mattermost_login_disabled_reason,active_profile_image_id";
 const ADMIN_MEMBER_TREND_SELECT: string = "created_at";
 
 const getCachedAdminMemberPolicyContext = unstable_cache(
@@ -708,6 +710,7 @@ function createEmptyReadModel(filters: AdminMemberListFilters) {
     mustChangePasswordCount: 0,
     generationMattermostLoginTargetCount: null,
     hasMemberLoadError: true,
+    hasMemberMetadataError: false,
   };
 }
 
@@ -735,7 +738,7 @@ function mapAdminMemberRows({
   activePolicies: {
     service: { id: string };
     privacy: { id: string };
-  };
+  } | null;
   activeMarketingPolicy: { id: string } | null;
   enrichment: AdminMemberEnrichment | null;
 }) {
@@ -780,8 +783,12 @@ function mapAdminMemberRows({
       mustChangePassword: member.must_change_password,
       mattermostLoginDisabledAt: member.mattermost_login_disabled_at,
       mattermostLoginDisabledReason: member.mattermost_login_disabled_reason,
-      serviceConsent: Boolean(enrichment) && consentedPolicyDocumentIds.has(activePolicies.service.id),
-      privacyConsent: Boolean(enrichment) && consentedPolicyDocumentIds.has(activePolicies.privacy.id),
+      serviceConsent:
+        Boolean(enrichment && activePolicies) &&
+        Boolean(activePolicies && consentedPolicyDocumentIds.has(activePolicies.service.id)),
+      privacyConsent:
+        Boolean(enrichment && activePolicies) &&
+        Boolean(activePolicies && consentedPolicyDocumentIds.has(activePolicies.privacy.id)),
       marketingConsent: activeMarketingPolicy
         ? Boolean(enrichment) && effectiveMarketingConsentMemberIds.has(member.id)
         : null,
@@ -853,33 +860,36 @@ async function getAdminMemberListReadModelUnbounded({
             .not("mattermost_account_id", "is", null)
             .is("mattermost_login_disabled_at", null),
     ]);
-    if (
-      policyContext.hasError
-      || !policyContext.requiredPolicies
-      || preferenceFilter === undefined
-      || searchMemberIds === undefined
-    ) {
+    if (preferenceFilter === undefined || searchMemberIds === undefined) {
       return createEmptyReadModel(filters);
     }
     const activePolicies = policyContext.requiredPolicies;
     const activeMarketingPolicy = policyContext.marketingPolicy;
-    const policyConsentFilter = await getPolicyConsentFilteredMemberIds(supabase, [
-      {
-        kind: "service",
-        policyDocumentId: activePolicies.service.id,
-        value: filters.serviceConsentFilter,
-      },
-      {
-        kind: "privacy",
-        policyDocumentId: activePolicies.privacy.id,
-        value: filters.privacyConsentFilter,
-      },
-      {
-        kind: "marketing",
-        policyDocumentId: activeMarketingPolicy?.id,
-        value: filters.marketingConsentFilter,
-      },
-    ]);
+    const hasPolicyConsentFilter =
+      filters.serviceConsentFilter !== "all" ||
+      filters.privacyConsentFilter !== "all" ||
+      filters.marketingConsentFilter !== "all";
+    const policyConsentFilter = activePolicies
+      ? await getPolicyConsentFilteredMemberIds(supabase, [
+          {
+            kind: "service",
+            policyDocumentId: activePolicies.service.id,
+            value: filters.serviceConsentFilter,
+          },
+          {
+            kind: "privacy",
+            policyDocumentId: activePolicies.privacy.id,
+            value: filters.privacyConsentFilter,
+          },
+          {
+            kind: "marketing",
+            policyDocumentId: activeMarketingPolicy?.id,
+            value: filters.marketingConsentFilter,
+          },
+        ])
+      : hasPolicyConsentFilter
+        ? undefined
+        : null;
     if (policyConsentFilter === undefined) {
       return createEmptyReadModel(filters);
     }
@@ -935,21 +945,58 @@ async function getAdminMemberListReadModelUnbounded({
       })),
     )
       .catch(() => ({ createdAts: [], hasError: true }));
-    const memberResult = (await memberQuery) as unknown as {
+    let memberResult = (await memberQuery) as unknown as {
       data: AdminMemberDatabaseRow[] | null;
       count: number | null;
       error: unknown | null;
     };
 
-    if (memberResult.error || optionsResult.hasError) {
+    let hasMemberMetadataError =
+      policyContext.hasError ||
+      !policyContext.requiredPolicies ||
+      optionsResult.hasError;
+    if (memberResult.error) {
+      let fallbackMemberQuery = supabase
+        .from("members")
+        .select(ADMIN_MEMBER_LIST_FALLBACK_SELECT, { count: "exact" })
+        .is("deleted_at", null);
+      applyMemberFilters(
+        fallbackMemberQuery as unknown as MemberFilterQuery,
+        filters,
+        memberIdFilter,
+      );
+      if (filters.sortValue === "name") {
+        fallbackMemberQuery = fallbackMemberQuery.order("display_name", {
+          ascending: true,
+        });
+      } else if (filters.sortValue === "updated") {
+        fallbackMemberQuery = fallbackMemberQuery.order("updated_at", {
+          ascending: false,
+        });
+      } else {
+        fallbackMemberQuery = fallbackMemberQuery.order("created_at", {
+          ascending: false,
+        });
+      }
+      memberResult = (await fallbackMemberQuery.range(
+        from,
+        from + pageSize - 1,
+      )) as unknown as {
+        data: AdminMemberDatabaseRow[] | null;
+        count: number | null;
+        error: unknown | null;
+      };
+      hasMemberMetadataError = true;
+    }
+    if (memberResult.error) {
       return createEmptyReadModel(filters);
     }
 
     const safeMembers = memberResult.data ?? [];
     const memberIds = safeMembers.map((member) => member.id);
     const policyDocumentIds = [
-      activePolicies.service.id,
-      activePolicies.privacy.id,
+      activePolicies?.service.id,
+      activePolicies?.privacy.id,
       activeMarketingPolicy?.id,
     ].filter((id): id is string => Boolean(id));
     const memberEnrichmentPromise = Promise.all([
@@ -966,10 +1013,6 @@ async function getAdminMemberListReadModelUnbounded({
         return { currentPolicyConsents, marketingPreferences };
       })
       .catch(() => undefined);
-    const hasPolicyConsentFilter =
-      filters.serviceConsentFilter !== "all"
-      || filters.privacyConsentFilter !== "all"
-      || filters.marketingConsentFilter !== "all";
     const memberEnrichment = hasPolicyConsentFilter
       ? await memberEnrichmentPromise
       : null;
@@ -1011,7 +1054,7 @@ async function getAdminMemberListReadModelUnbounded({
       (member) => member.mustChangePassword,
     ).length;
     const memberSummary = memberEnrichmentPromise.then((enrichment) => {
-      if (!enrichment) {
+      if (!enrichment || !activePolicies) {
         return {
           pendingPolicyCount: 0,
           latestUpdatedAt,
@@ -1051,6 +1094,8 @@ async function getAdminMemberListReadModelUnbounded({
           ? null
           : generationMattermostLoginTargetResult?.count ?? null,
       hasMemberLoadError: false,
+      hasMemberMetadataError:
+        hasMemberMetadataError || (hasPolicyConsentFilter && !memberEnrichment),
     };
   } catch {
     return createEmptyReadModel(filters);

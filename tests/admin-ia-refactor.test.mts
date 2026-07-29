@@ -134,6 +134,24 @@ test("admin navigation separates list, request, category, inbox, and send tasks"
   assert.equal(byHref.get("/admin/push")?.permission.resource, "notifications");
 });
 
+test("관리자 탐색 항목은 의미가 다른 화면에 같은 아이콘을 재사용하지 않는다", async () => {
+  const { ADMIN_NAV_ITEMS } = await adminNavigationModulePromise;
+  const iconUsers = new Map<string, string[]>();
+  for (const item of ADMIN_NAV_ITEMS) {
+    const hrefs = iconUsers.get(item.iconKey) ?? [];
+    hrefs.push(item.href);
+    iconUsers.set(item.iconKey, hrefs);
+  }
+
+  for (const hrefs of iconUsers.values()) {
+    assert.equal(
+      hrefs.length,
+      1,
+      `탐색 아이콘이 여러 화면에서 재사용되었습니다: ${hrefs.join(", ")}`,
+    );
+  }
+});
+
 test("관리자 화면은 업무 목적에 맞는 그룹에 배치되고 로그는 리포트로 모인다", async () => {
   const { ADMIN_NAV_GROUPS } = await adminNavigationModulePromise;
   const groupByHref = new Map(

@@ -1,15 +1,24 @@
 import type { ComponentType, SVGProps } from "react";
 import {
+  AcademicCapIcon,
+  AdjustmentsHorizontalIcon,
+  ArrowsRightLeftIcon,
   BellAlertIcon,
   BuildingOffice2Icon,
+  CalendarDaysIcon,
   ChartBarSquareIcon,
   ClockIcon,
+  DocumentPlusIcon,
+  DocumentTextIcon,
   HomeIcon,
   MegaphoneIcon,
+  PhotoIcon,
   QueueListIcon,
+  RectangleStackIcon,
   ShieldCheckIcon,
   StarIcon,
   TagIcon,
+  UserPlusIcon,
   UserGroupIcon,
   UsersIcon,
 } from "@heroicons/react/24/outline";
@@ -21,16 +30,25 @@ import {
 
 export type AdminNavIcon = ComponentType<SVGProps<SVGSVGElement>>;
 export type AdminNavIconKey =
+  | "academicCap"
+  | "adjustments"
+  | "arrowsRightLeft"
   | "bell"
   | "building"
+  | "calendar"
   | "chart"
   | "clock"
+  | "documentPlus"
+  | "documentText"
   | "home"
   | "megaphone"
+  | "photo"
   | "queue"
+  | "rectangleStack"
   | "shield"
   | "star"
   | "tag"
+  | "userPlus"
   | "userGroup"
   | "users";
 
@@ -54,16 +72,25 @@ export type AdminNavGroup = {
 };
 
 export const ADMIN_NAV_ICON_BY_KEY: Record<AdminNavIconKey, AdminNavIcon> = {
+  academicCap: AcademicCapIcon,
+  adjustments: AdjustmentsHorizontalIcon,
+  arrowsRightLeft: ArrowsRightLeftIcon,
   bell: BellAlertIcon,
   building: BuildingOffice2Icon,
+  calendar: CalendarDaysIcon,
   chart: ChartBarSquareIcon,
   clock: ClockIcon,
+  documentPlus: DocumentPlusIcon,
+  documentText: DocumentTextIcon,
   home: HomeIcon,
   megaphone: MegaphoneIcon,
+  photo: PhotoIcon,
   queue: QueueListIcon,
+  rectangleStack: RectangleStackIcon,
   shield: ShieldCheckIcon,
   star: StarIcon,
   tag: TagIcon,
+  userPlus: UserPlusIcon,
   userGroup: UserGroupIcon,
   users: UsersIcon,
 };
@@ -102,7 +129,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: "가입 승인",
         description: "Mattermost 프로필 파싱 실패 회원 검토",
         keywords: ["가입", "회원가입", "승인", "파싱"],
-        iconKey: "queue",
+        iconKey: "userPlus",
         permission: { resource: "member_signup_requests" },
       },
       {
@@ -110,7 +137,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: "수료생 인증",
         description: "수료증과 교육 이수 정보 검토",
         keywords: ["졸업", "수료", "인증", "증명서"],
-        iconKey: "shield",
+        iconKey: "academicCap",
         permission: { resource: "graduate_verifications" },
       },
       {
@@ -118,7 +145,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: "프로필 사진",
         description: "사진 변경과 기존 사진 점검",
         keywords: ["사진", "이미지", "검수", "프로필"],
-        iconKey: "users",
+        iconKey: "photo",
         permission: { resource: "profile_images" },
       },
       {
@@ -126,7 +153,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: "등록 신청",
         description: "공개 신청 검토 큐",
         keywords: ["제휴처 신청", "신청", "등록", "검토"],
-        iconKey: "queue",
+        iconKey: "documentPlus",
         permission: { resource: "brands" },
       },
       {
@@ -134,7 +161,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: "변경 요청",
         description: "제휴처 변경 승인 큐",
         keywords: ["제휴처 변경", "승인", "검토", "수정 요청"],
-        iconKey: "queue",
+        iconKey: "arrowsRightLeft",
         permission: { resource: "brands" },
       },
       {
@@ -194,7 +221,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: "카테고리",
         description: "제휴처 분류 체계",
         keywords: ["분류", "태그", "종류"],
-        iconKey: "tag",
+        iconKey: "adjustments",
         permission: { resource: "brands" },
         globalOnly: true,
       },
@@ -231,7 +258,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: "알림 템플릿",
         description: "채널별 자동 알림 문구 관리",
         keywords: ["자동화", "문구", "양식", "채널"],
-        iconKey: "megaphone",
+        iconKey: "documentText",
         permission: { resource: "notification_templates" },
       },
       {
@@ -239,7 +266,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: "홈 광고 관리",
         description: "캐러셀 카드 편집",
         keywords: ["배너", "광고", "캐러셀", "홈 화면"],
-        iconKey: "chart",
+        iconKey: "rectangleStack",
         permission: { resource: "home_ads" },
       },
       {
@@ -247,7 +274,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: "이벤트 관리",
         description: "이벤트 게시와 운영",
         keywords: ["행사", "프로모션", "게시"],
-        iconKey: "clock",
+        iconKey: "calendar",
         permission: { resource: "events" },
       },
     ],

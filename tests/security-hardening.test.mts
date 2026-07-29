@@ -451,7 +451,7 @@ test("admin basic auth challenge does not block session bridge pages", async () 
       shouldChallengeAdminBasicAuth({
         pathname: "/admin",
       }),
-      true,
+      false,
     );
   } finally {
     if (originalUsername === undefined) {

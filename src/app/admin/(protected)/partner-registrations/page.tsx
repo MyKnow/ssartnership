@@ -2,7 +2,10 @@ import { Suspense } from "react";
 import AdminPartnerRegistrationsView from "@/components/admin/AdminPartnerRegistrationsView";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { AdminPartnerRegistrationsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
-import { updatePartnerRegistrationRequestStatus } from "@/app/admin/(protected)/partner-registrations/actions";
+import {
+  updatePartnerRegistrationRequestDetails,
+  updatePartnerRegistrationRequestStatus,
+} from "@/app/admin/(protected)/partner-registrations/actions";
 import AdminShell from "@/components/admin/AdminShell";
 import Button from "@/components/ui/Button";
 import { requireAdminPermission } from "@/lib/admin-access";
@@ -112,6 +115,7 @@ async function AdminPartnerRegistrationsContent({
   return (
     <AdminPartnerRegistrationsView
         rows={requestPage.rows}
+        updateDetailsAction={updatePartnerRegistrationRequestDetails}
         updateStatusAction={updatePartnerRegistrationRequestStatus}
         status={status}
         feedback={feedback}
