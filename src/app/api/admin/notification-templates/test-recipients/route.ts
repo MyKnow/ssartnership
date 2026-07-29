@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureAdminApiPermission } from "@/lib/admin-access";
+import { getAdminSession } from "@/lib/auth";
 import { listNotificationTemplateTestRecipients } from "@/lib/notification-templates/test-delivery.server";
 import { withServerTiming } from "@/lib/server-timing";
 
@@ -19,8 +20,11 @@ export async function GET(request: NextRequest) {
     }
 
     try {
+      const adminSession = await getAdminSession();
       const recipients = await timing.measure("query", () =>
-        listNotificationTemplateTestRecipients(),
+        listNotificationTemplateTestRecipients({
+          preferredMemberId: adminSession?.adminId ?? null,
+        }),
       );
       return NextResponse.json(recipients);
     } catch (error) {

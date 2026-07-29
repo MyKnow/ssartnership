@@ -20,7 +20,7 @@ export default function LoginForm({
 }) {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
-  const [autoLogin, setAutoLogin] = useState(false);
+  const [autoLogin, setAutoLogin] = useState(true);
   const [fieldErrors, setFieldErrors] = useState<{
     identifier?: string;
     password?: string;
@@ -148,7 +148,7 @@ export default function LoginForm({
         <Input
           ref={identifierRef}
           autoComplete="username"
-          placeholder="예시: myknow 또는 name@example.com"
+          placeholder="예시: myknow@example.com"
           value={identifier}
           onChange={(event) => {
             setIdentifier(event.target.value);

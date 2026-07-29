@@ -55,6 +55,7 @@ const meta = {
         ],
       },
     ],
+    updateDetailsAction: async () => {},
     updateStatusAction: async () => {},
   },
   parameters: {

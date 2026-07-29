@@ -27,6 +27,12 @@ test.describe("auth and partner portal operation flows", () => {
     await page.goto("/auth/login");
     await page.waitForLoadState("networkidle");
 
+    await expect(page.getByRole("textbox", { name: "아이디 또는 이메일" })).toHaveAttribute(
+      "placeholder",
+      "예시: myknow@example.com",
+    );
+    await expect(page.getByRole("checkbox", { name: "자동 로그인" })).toBeChecked();
+
     await page.getByRole("button", { name: "로그인" }).click();
 
     await expect(page.getByText("아이디 또는 이메일을 입력해 주세요.")).toBeVisible();

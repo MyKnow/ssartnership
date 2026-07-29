@@ -167,11 +167,16 @@ function getRecipientLabel(recipient: TestRecipientRecord) {
   return `${recipient.displayName} (${recipient.loginId}) · ${generationLabel}`;
 }
 
-export async function listNotificationTemplateTestRecipients() {
+export async function listNotificationTemplateTestRecipients(input?: {
+  preferredMemberId?: string | null;
+}) {
   const recipients = await getRecipientRecords();
-  const defaultRecipient = recipients.find(
-    (recipient) => recipient.loginId.toLowerCase() === "myknow",
-  );
+  const preferredRecipient = input?.preferredMemberId
+    ? recipients.find((recipient) => recipient.id === input.preferredMemberId)
+    : null;
+  const defaultRecipient =
+    preferredRecipient ??
+    recipients.find((recipient) => recipient.loginId.toLowerCase() === "myknow");
   const defaultId = defaultRecipient?.id ?? recipients[0]?.id ?? null;
 
   return {

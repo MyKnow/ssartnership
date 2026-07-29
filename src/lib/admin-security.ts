@@ -172,7 +172,10 @@ export function shouldChallengeAdminBasicAuth(input: {
   if (input.hasAdminSession) {
     return false;
   }
-  if (isAdminPagePath(input.pathname) && input.hasUserSession) {
+  // Admin UI authentication is owned by the shared user/admin session bridge.
+  // Keep the gateway challenge for API endpoints, but never make the browser
+  // ask for a second administrator username and password.
+  if (isAdminPagePath(input.pathname)) {
     return false;
   }
   return true;

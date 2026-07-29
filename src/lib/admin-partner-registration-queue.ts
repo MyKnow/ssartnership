@@ -8,8 +8,10 @@ export type AdminPartnerRegistrationRequestDataRow = {
   id: string;
   status: string;
   source?: PartnerRegistrationSource | null;
+  registration_mode?: string | null;
   service_mode: "offline" | "online";
   benefit_action_type: "certification" | "external_link" | "onsite" | "none";
+  benefit_items?: unknown;
   branch_scope_type?: string | null;
   branch_scope_note?: string | null;
   brand_name: string;
@@ -31,6 +33,7 @@ export type AdminPartnerRegistrationRequestDataRow = {
   location: string;
   map_url?: string | null;
   site_link?: string | null;
+  benefit_action_link?: string | null;
   thumbnail_url?: string | null;
   image_urls?: string[] | null;
   memo?: string | null;
@@ -62,8 +65,10 @@ const PARTNER_REGISTRATION_QUEUE_SELECT = [
   "id",
   "status",
   "source",
+  "registration_mode",
   "service_mode",
   "benefit_action_type",
+  "benefit_items",
   "branch_scope_type",
   "branch_scope_note",
   "brand_name",
@@ -85,6 +90,7 @@ const PARTNER_REGISTRATION_QUEUE_SELECT = [
   "location",
   "map_url",
   "site_link",
+  "benefit_action_link",
   "thumbnail_url",
   "image_urls",
   "memo",
