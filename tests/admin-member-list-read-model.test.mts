@@ -99,7 +99,10 @@ test("회원 목록 read-model은 오류를 안전한 상태로 돌려준다", a
   assert.match(source, /hasMemberLoadError/);
   assert.match(source, /withAdminReadModelTimeout/);
   assert.match(source, /ADMIN_MEMBER_READ_MODEL_TIMEOUT_MS/);
-  assert.match(source, /active_profile_image_id/);
+  assert.match(
+    source,
+    /profile_images:member_profile_images!member_profile_images_member_id_fkey\(status\)/,
+  );
   assert.match(source, /directory:mm_user_directory!members_mattermost_account_id_fkey/);
   assert.doesNotMatch(source, /getCurrentMemberProfileImageMemberIds/);
   assert.doesNotMatch(source, /getMmUserDirectoryEntriesByAccountIds/);

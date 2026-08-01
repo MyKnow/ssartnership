@@ -45,7 +45,7 @@ export const ValidationErrors: Story = {
     await expect(canvas.getByText("비밀번호를 입력해 주세요.")).toBeInTheDocument();
 
     await userEvent.type(
-      canvas.getByPlaceholderText("예시: myknow 또는 name@example.com"),
+      canvas.getByPlaceholderText("예시: myknow@example.com"),
       "bad id!",
     );
     await userEvent.type(canvas.getByPlaceholderText("사이트 비밀번호"), "password123");
@@ -66,7 +66,7 @@ export const KeyboardSubmit: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.type(
-      canvas.getByPlaceholderText("예시: myknow 또는 name@example.com"),
+      canvas.getByPlaceholderText("예시: myknow@example.com"),
       "ssafy15",
     );
     await userEvent.type(
@@ -85,7 +85,7 @@ export const BlockedLogin: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.type(
-      canvas.getByPlaceholderText("예시: myknow 또는 name@example.com"),
+      canvas.getByPlaceholderText("예시: myknow@example.com"),
       "ssafy15",
     );
     await userEvent.type(canvas.getByPlaceholderText("사이트 비밀번호"), "password123");
@@ -106,7 +106,7 @@ export const InvalidCredentials: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.type(
-      canvas.getByPlaceholderText("예시: myknow 또는 name@example.com"),
+      canvas.getByPlaceholderText("예시: myknow@example.com"),
       "ssafy15",
     );
     await userEvent.type(canvas.getByPlaceholderText("사이트 비밀번호"), "wrong-password");
@@ -126,7 +126,7 @@ export const SuccessfulLogin: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.type(
-      canvas.getByPlaceholderText("예시: myknow 또는 name@example.com"),
+      canvas.getByPlaceholderText("예시: myknow@example.com"),
       "ssafy15",
     );
     await userEvent.type(canvas.getByPlaceholderText("사이트 비밀번호"), "Valid!123");
@@ -144,7 +144,7 @@ export const SuccessfulLoginRequiringConsent: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.type(
-      canvas.getByPlaceholderText("예시: myknow 또는 name@example.com"),
+      canvas.getByPlaceholderText("예시: myknow@example.com"),
       "ssafy15",
     );
     await userEvent.type(canvas.getByPlaceholderText("사이트 비밀번호"), "Valid!123");

@@ -25,6 +25,7 @@ import {
 } from "@/lib/partner-branch-registration";
 import { resolvePartnerRegistrationCategory } from "@/lib/partner-registration";
 import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
+import { hashCouponVerificationPassword } from "@/lib/coupon-verification-password";
 import { ensurePartnerCompanyRow } from "@/app/admin/(protected)/_actions/partner-support/company-provision";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getPartnerVisibilityState } from "@/lib/partner-visibility";
@@ -51,6 +52,8 @@ type PartnerRegistrationRequestRow = {
   service_mode: string;
   benefit_action_type: string;
   benefit_items?: unknown;
+  benefit_verification_pin_hash?: string | null;
+  benefit_verification_pin_salt?: string | null;
   branch_scope_type?: string | null;
   branch_scope_note?: string | null;
   brand_name: string;
@@ -339,6 +342,10 @@ async function createPartnerFromPortalRegistrationRequest({
             ? "online"
             : request.branch_scope_type ?? "single_location",
         branch_scope_note: request.branch_scope_note ?? null,
+        benefit_verification_pin_hash:
+          request.benefit_verification_pin_hash ?? null,
+        benefit_verification_pin_salt:
+          request.benefit_verification_pin_salt ?? null,
       })
       .select("id,name,location,campus_slugs,visibility,benefits,conditions,period_start,period_end,map_url")
       .single();
@@ -451,7 +458,7 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
   const { data: request, error: requestError } = await supabase
     .from("partner_registration_requests")
     .select(
-      "id,status,source,company_id,registration_mode,service_mode,benefit_action_type,branch_scope_type,branch_scope_note,brand_name,category_id,category_label,period_start,period_end,inquiry_link,brand_phone,detail_description,company_name,contact_name,contact_email,contact_phone,company_description,benefits,conditions,tags,location,map_url,site_link,benefit_action_link,thumbnail_url,image_urls,company:partner_companies(managed_campus_slugs)",
+      "id,status,source,company_id,registration_mode,service_mode,benefit_action_type,benefit_items,benefit_verification_pin_hash,benefit_verification_pin_salt,branch_scope_type,branch_scope_note,brand_name,category_id,category_label,period_start,period_end,inquiry_link,brand_phone,detail_description,company_name,contact_name,contact_email,contact_phone,company_description,benefits,conditions,tags,location,map_url,site_link,benefit_action_link,thumbnail_url,image_urls,company:partner_companies(managed_campus_slugs)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -628,7 +635,7 @@ export async function updatePartnerRegistrationRequestDetails(formData: FormData
   const { data: request, error: requestError } = await supabase
     .from("partner_registration_requests")
     .select(
-      "id,status,source,company_id,registration_mode,service_mode,benefit_action_type,benefit_items,branch_scope_type,branch_scope_note,brand_name,category_id,category_label,period_start,period_end,inquiry_link,brand_phone,detail_description,company_name,contact_name,contact_email,contact_phone,company_description,benefits,conditions,tags,location,map_url,site_link,benefit_action_link,thumbnail_url,image_urls,company:partner_companies(managed_campus_slugs)",
+      "id,status,source,company_id,registration_mode,service_mode,benefit_action_type,benefit_items,benefit_verification_pin_hash,benefit_verification_pin_salt,branch_scope_type,branch_scope_note,brand_name,category_id,category_label,period_start,period_end,inquiry_link,brand_phone,detail_description,company_name,contact_name,contact_email,contact_phone,company_description,benefits,conditions,tags,location,map_url,site_link,benefit_action_link,thumbnail_url,image_urls,company:partner_companies(managed_campus_slugs)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -661,7 +668,9 @@ export async function updatePartnerRegistrationRequestDetails(formData: FormData
   const validation = validatePartnerRegistrationInput({
     registrationMode: registrationRequest.registration_mode ?? "full_new",
     serviceMode: registrationRequest.service_mode,
-    benefitActionType: registrationRequest.benefit_action_type,
+    benefitActionType: String(
+      formData.get("benefitActionType") ?? registrationRequest.benefit_action_type,
+    ),
     // Branch membership is not edited in this form. Preserve the existing scope
     // while validating the editable request fields.
     branchScopeType: "single_location",
@@ -689,7 +698,7 @@ export async function updatePartnerRegistrationRequestDetails(formData: FormData
     benefitActionLink: String(formData.get("benefitActionLink") ?? ""),
     branchListText: "",
     memo: String(formData.get("memo") ?? ""),
-    benefitItems: "",
+    benefitItems: String(formData.get("benefitItems") ?? ""),
   });
   if (hasPartnerRegistrationFieldErrors(validation.fieldErrors)) {
     redirectAdminActionError(returnTo, "partner_form_details_invalid");
@@ -723,14 +732,41 @@ export async function updatePartnerRegistrationRequestDetails(formData: FormData
     redirectAdminActionError(returnTo, "partner_form_multiple_groups");
   }
 
+  const structuredBenefitItems = String(formData.get("benefitItems") ?? "").trim();
   let benefitItems;
   try {
-    benefitItems = preservePartnerBenefitLimits(
-      registrationRequest.benefit_items,
-      values.parsedBenefits,
-    );
+    benefitItems = structuredBenefitItems
+      ? values.parsedBenefitItems
+      : preservePartnerBenefitLimits(
+          registrationRequest.benefit_items,
+          values.parsedBenefits,
+        );
   } catch {
     redirectAdminActionError(returnTo, "partner_form_details_invalid");
+  }
+
+  const rawBenefitVerificationPin = String(
+    formData.get("benefitVerificationPin") ?? "",
+  ).trim();
+  if (rawBenefitVerificationPin && !/^\d{4}$/.test(rawBenefitVerificationPin)) {
+    redirectAdminActionError(returnTo, "partner_form_details_invalid");
+  }
+  let benefitVerificationPinUpdate: {
+    benefit_verification_pin_hash?: string | null;
+    benefit_verification_pin_salt?: string | null;
+  } = {};
+  if (rawBenefitVerificationPin) {
+    try {
+      const hashedPin = await hashCouponVerificationPassword(
+        rawBenefitVerificationPin,
+      );
+      benefitVerificationPinUpdate = {
+        benefit_verification_pin_hash: hashedPin.hash,
+        benefit_verification_pin_salt: hashedPin.salt,
+      };
+    } catch {
+      redirectAdminActionError(returnTo, "partner_form_details_invalid");
+    }
   }
 
   const group = (benefitGroups ?? [])[0] as
@@ -758,6 +794,7 @@ export async function updatePartnerRegistrationRequestDetails(formData: FormData
   const { error: updateError } = await supabase
       .from("partner_registration_requests")
     .update({
+      ...benefitVerificationPinUpdate,
       benefit_items: benefitItems.map((benefit, displayOrder) => ({
         id: benefit.id,
         title: benefit.title,

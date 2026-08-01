@@ -12,6 +12,7 @@ export type AdminPartnerRegistrationRequestDataRow = {
   service_mode: "offline" | "online";
   benefit_action_type: "certification" | "external_link" | "onsite" | "none";
   benefit_items?: unknown;
+  benefit_verification_pin_configured?: boolean;
   branch_scope_type?: string | null;
   branch_scope_note?: string | null;
   brand_name: string;
@@ -69,6 +70,8 @@ const PARTNER_REGISTRATION_QUEUE_SELECT = [
   "service_mode",
   "benefit_action_type",
   "benefit_items",
+  "benefit_verification_pin_hash",
+  "benefit_verification_pin_salt",
   "branch_scope_type",
   "branch_scope_note",
   "brand_name",
@@ -163,9 +166,27 @@ export async function listAdminPartnerRegistrationRequestPage({
   }
 
   const rowsById = new Map(
-    ((rowsResult.data ?? []) as unknown as AdminPartnerRegistrationRequestDataRow[]).map(
-      (row) => [row.id, row],
-    ),
+    (rowsResult.data ?? []).map((rawRow) => {
+      const row = rawRow as unknown as AdminPartnerRegistrationRequestDataRow & {
+        benefit_verification_pin_hash?: string | null;
+        benefit_verification_pin_salt?: string | null;
+      };
+      const {
+        benefit_verification_pin_hash: _hash,
+        benefit_verification_pin_salt: _salt,
+        ...safeRow
+      } = row;
+      void _hash;
+      void _salt;
+      const sanitizedRow: AdminPartnerRegistrationRequestDataRow = {
+        ...safeRow,
+        benefit_verification_pin_configured: Boolean(
+          row.benefit_verification_pin_hash &&
+            row.benefit_verification_pin_salt,
+        ),
+      };
+      return [row.id, sanitizedRow] as const;
+    }),
   );
   return {
     rows: ids.flatMap((id) => {

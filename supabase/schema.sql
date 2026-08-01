@@ -645,6 +645,8 @@ create table if not exists partner_registration_requests (
   registration_mode text not null default 'full_new',
   service_mode text not null,
   benefit_action_type text not null,
+  benefit_verification_pin_hash text,
+  benefit_verification_pin_salt text,
   benefit_use_max_count integer,
   branch_scope_type text not null default 'single_location',
   branch_scope_note text,
@@ -698,6 +700,14 @@ create table if not exists partner_registration_requests (
     ),
   constraint partner_registration_requests_benefit_action_type_check
     check (benefit_action_type in ('certification', 'external_link', 'onsite', 'none')),
+  constraint partner_registration_requests_benefit_verification_pin_check
+    check (
+      (benefit_verification_pin_hash is null and benefit_verification_pin_salt is null)
+      or (
+        char_length(benefit_verification_pin_hash) > 0
+        and char_length(benefit_verification_pin_salt) > 0
+      )
+    ),
   constraint partner_registration_requests_benefit_use_max_count_check
     check (
       benefit_use_max_count is null
@@ -1927,6 +1937,17 @@ create index if not exists partner_benefits_partner_order_idx on public.partner_
 alter table public.partner_benefit_usages add column if not exists benefit_id uuid references public.partner_benefits(id) on delete set null;
 create index if not exists partner_benefit_usages_benefit_verified_at_idx on public.partner_benefit_usages(benefit_id, verified_at desc);
 alter table public.partner_registration_requests add column if not exists benefit_items jsonb not null default '[]'::jsonb;
+alter table public.partner_registration_requests add column if not exists benefit_verification_pin_hash text;
+alter table public.partner_registration_requests add column if not exists benefit_verification_pin_salt text;
+alter table public.partner_registration_requests drop constraint if exists partner_registration_requests_benefit_verification_pin_check;
+alter table public.partner_registration_requests add constraint partner_registration_requests_benefit_verification_pin_check
+  check (
+    (benefit_verification_pin_hash is null and benefit_verification_pin_salt is null)
+    or (
+      char_length(benefit_verification_pin_hash) > 0
+      and char_length(benefit_verification_pin_salt) > 0
+    )
+  );
 
 insert into public.partner_benefits (partner_id, title, display_order, max_apply_count)
 select p.id, item.title, item.display_order, p.benefit_use_max_count

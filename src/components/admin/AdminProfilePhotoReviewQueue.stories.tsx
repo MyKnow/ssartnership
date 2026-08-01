@@ -22,22 +22,12 @@ const meta = {
         },
       },
     ],
-    currentPhotos: [
-      {
-        id: "00000000-0000-4000-8000-000000000203",
-        display_name: "기존 프로필 사진 점검 대상",
-        year: 14,
-        updated_at: "2026-07-11T00:00:00.000Z",
-      },
-    ],
     actions: {
       approveReplacement: noop,
       rejectReplacement: noop,
-      rejectCurrentPhoto: noop,
     },
     canUpdate: true,
     replacementImageUrl: () => syntheticPhoto,
-    currentPhotoUrl: () => syntheticPhoto,
   },
   parameters: {
     nextjs: { appDirectory: true },
@@ -58,7 +48,7 @@ export const InvalidReason: Story = {
 };
 
 export const Empty: Story = {
-  args: { replacements: [], currentPhotos: [] },
+  args: { replacements: [] },
 };
 
 export const LoadError: Story = {
@@ -79,9 +69,6 @@ export const ReadOnly: Story = {
     ).not.toBeInTheDocument();
     await expect(
       canvas.queryByRole("button", { name: "사진 변경 요청 반려" }),
-    ).not.toBeInTheDocument();
-    await expect(
-      canvas.queryByRole("button", { name: "사진 반려 및 인증 중지" }),
     ).not.toBeInTheDocument();
     await expect(canvas.getAllByText("조회 전용 권한").length).toBeGreaterThan(
       0,

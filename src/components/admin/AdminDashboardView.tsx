@@ -208,7 +208,7 @@ export default function AdminDashboardView({
     {
       href: "/admin/profile-photos",
       label: "프로필 사진",
-      description: "사진 변경 요청과 기존 사진 점검",
+      description: "사진 변경 요청",
       count: queueCounts.profilePhotoPendingCount,
       priority: 4,
       permission: "profile_images",

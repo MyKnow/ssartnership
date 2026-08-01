@@ -23,7 +23,12 @@ test("제휴 등록 신청은 관리자 알림과 같은 화면 편집 경로를
   assert.match(page, /updatePartnerRegistrationRequestDetails/);
   assert.match(view, /신청 정보 수정/);
   assert.match(view, /name="brandName"/);
+  assert.match(view, /PartnerChipSections/);
+  assert.match(view, /혜택 이용 확인 PIN/);
+  assert.match(view, /benefitItems/);
+  assert.match(view, /최대 적용 횟수/);
   assert.match(adminAction, /updatePartnerRegistrationRequestDetails/);
+  assert.match(adminAction, /hashCouponVerificationPassword/);
   assert.match(adminAction, /partner_form_multiple_groups/);
   assert.match(adminAction, /preservePartnerBenefitLimits/);
   assert.match(adminAction, /maxApplyCount: existingBenefits\[index\]/);

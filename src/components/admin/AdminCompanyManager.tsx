@@ -167,7 +167,7 @@ export default function AdminCompanyManager({
                   className="overflow-hidden"
                 >
                   <details className="group">
-                    <summary className="grid cursor-pointer list-none gap-4 px-5 py-4 transition hover:bg-surface-muted/50 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:px-6">
+                    <summary className="grid min-w-0 cursor-pointer list-none gap-4 px-5 py-4 transition hover:bg-surface-muted/50 md:grid-cols-1 md:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
                       <div className="min-w-0 space-y-3">
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge variant={isActive ? "success" : "danger"}>
@@ -184,8 +184,9 @@ export default function AdminCompanyManager({
                           <h3 className="truncate text-lg font-semibold text-foreground">
                             {company.name}
                           </h3>
-                          <p className="mt-1 break-all text-sm text-muted-foreground">
-                            slug · {company.slug}
+                          <p className="mt-1 min-w-0 break-words text-sm text-muted-foreground">
+                            <span>slug · </span>
+                            <span className="text-token">{company.slug}</span>
                           </p>
                           {company.description ? (
                             <p className="mt-2 line-clamp-2 max-w-4xl text-sm leading-6 text-muted-foreground">
@@ -195,7 +196,7 @@ export default function AdminCompanyManager({
                         </div>
                       </div>
 
-                      <div className="grid gap-2 text-sm text-muted-foreground md:min-w-[18rem] md:justify-items-end">
+                      <div className="grid min-w-0 gap-2 text-sm text-muted-foreground sm:grid-cols-3 sm:items-center lg:min-w-[18rem] lg:grid-cols-1 lg:justify-items-end">
                         <p>생성 {formatDateTime(company.created_at)}</p>
                         <p>수정 {formatDateTime(company.updated_at)}</p>
                         <span className="text-xs font-semibold text-primary">

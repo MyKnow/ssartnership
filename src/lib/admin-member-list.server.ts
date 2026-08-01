@@ -13,7 +13,8 @@ import { unstable_cache } from "next/cache";
 
 export const ADMIN_MEMBER_OPTION_SAMPLE_LIMIT = 5_000;
 export const ADMIN_MEMBER_TREND_SAMPLE_LIMIT = 5_000;
-export const ADMIN_MEMBER_READ_MODEL_TIMEOUT_MS = 3_000;
+export const ADMIN_MEMBER_READ_MODEL_TIMEOUT_MS = 5_000;
+export const ADMIN_MEMBER_OPTIONAL_READ_MODEL_TIMEOUT_MS = 750;
 export const ADMIN_MEMBER_OPTIONS_CACHE_REVALIDATE_SECONDS = 60;
 export const ADMIN_MEMBER_POLICY_CACHE_REVALIDATE_SECONDS = 3;
 
@@ -47,7 +48,11 @@ type AdminMemberDatabaseRow = {
   updated_at: string | null;
   mattermost_login_disabled_at: string | null;
   mattermost_login_disabled_reason: string | null;
-  active_profile_image_id: string | null;
+  profile_images:
+    | {
+        status: string | null;
+      }[]
+    | null;
   directory:
     | {
         id: string;
@@ -92,9 +97,9 @@ type AdminMemberPolicyContext = {
 };
 
 const ADMIN_MEMBER_LIST_SELECT: string =
-  "id,mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at,mattermost_login_disabled_at,mattermost_login_disabled_reason,active_profile_image_id,directory:mm_user_directory!members_mattermost_account_id_fkey(id,mm_user_id,mm_username)";
+  "id,mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at,mattermost_login_disabled_at,mattermost_login_disabled_reason,profile_images:member_profile_images!member_profile_images_member_id_fkey(status),directory:mm_user_directory!members_mattermost_account_id_fkey(id,mm_user_id,mm_username)";
 const ADMIN_MEMBER_LIST_FALLBACK_SELECT: string =
-  "id,mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at,mattermost_login_disabled_at,mattermost_login_disabled_reason,active_profile_image_id";
+  "id,mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at,mattermost_login_disabled_at,mattermost_login_disabled_reason,profile_images:member_profile_images!member_profile_images_member_id_fkey(status)";
 const ADMIN_MEMBER_TREND_SELECT: string = "created_at";
 
 const getCachedAdminMemberPolicyContext = unstable_cache(
@@ -792,7 +797,9 @@ function mapAdminMemberRows({
       marketingConsent: activeMarketingPolicy
         ? Boolean(enrichment) && effectiveMarketingConsentMemberIds.has(member.id)
         : null,
-      hasProfileImage: Boolean(member.active_profile_image_id),
+      hasProfileImage: member.profile_images?.some(
+        (image) => image.status === "approved",
+      ) ?? false,
       createdAt: member.created_at,
       updatedAt: member.updated_at,
     };
@@ -822,8 +829,23 @@ async function getAdminMemberListReadModelUnbounded({
       searchMemberIds,
       generationMattermostLoginTargetResult,
     ] = await Promise.all([
-      getCachedAdminMemberPolicyContext(),
-      getCachedAdminMemberOptions(),
+      withAdminReadModelTimeout(
+        getCachedAdminMemberPolicyContext(),
+        {
+          requiredPolicies: null,
+          marketingPolicy: null,
+          hasError: true,
+        },
+        ADMIN_MEMBER_OPTIONAL_READ_MODEL_TIMEOUT_MS,
+      ),
+      withAdminReadModelTimeout(
+        getCachedAdminMemberOptions(),
+        {
+          data: [] as AdminMemberOptionDatabaseRow[],
+          hasError: true,
+        },
+        ADMIN_MEMBER_OPTIONAL_READ_MODEL_TIMEOUT_MS,
+      ),
       getPreferenceFilteredMemberIds(supabase, [
         { column: "enabled", value: filters.pushEnabledFilter, defaultEnabled: false },
         {
@@ -852,13 +874,23 @@ async function getAdminMemberListReadModelUnbounded({
       getMemberSearchIds(supabase, filters.searchValue),
       filters.yearFilter === "all"
         ? Promise.resolve(null)
-        : supabase
-            .from("members")
-            .select("id", { count: "exact", head: true })
-            .is("deleted_at", null)
-            .eq("generation", Number(filters.yearFilter))
-            .not("mattermost_account_id", "is", null)
-            .is("mattermost_login_disabled_at", null),
+        : withAdminReadModelTimeout(
+            Promise.resolve(
+              supabase
+                .from("members")
+                .select("id", { count: "exact", head: true })
+                .is("deleted_at", null)
+                .eq("generation", Number(filters.yearFilter))
+                .not("mattermost_account_id", "is", null)
+                .is("mattermost_login_disabled_at", null)
+                .then(({ count, error }) => ({
+                  count: count ?? null,
+                  error: Boolean(error),
+                })),
+            ),
+            { count: null, error: true },
+            ADMIN_MEMBER_OPTIONAL_READ_MODEL_TIMEOUT_MS,
+          ),
     ]);
     if (preferenceFilter === undefined || searchMemberIds === undefined) {
       return createEmptyReadModel(filters);
