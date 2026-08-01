@@ -6,7 +6,15 @@ const root = new URL("..", import.meta.url);
 const read = (path: string) => readFile(new URL(path, root), "utf8");
 
 test("제휴 등록 신청은 관리자 알림과 같은 화면 편집 경로를 제공한다", async () => {
-  const [publicAction, adminAction, page, view, notifications, context] =
+  const [
+    publicAction,
+    adminAction,
+    page,
+    view,
+    notifications,
+    context,
+    benefitField,
+  ] =
     await Promise.all([
       read("src/app/(site)/partner-registration/actions.ts"),
       read("src/app/admin/(protected)/partner-registrations/actions.ts"),
@@ -14,6 +22,7 @@ test("제휴 등록 신청은 관리자 알림과 같은 화면 편집 경로를
       read("src/components/admin/AdminPartnerRegistrationsView.tsx"),
       read("src/lib/operational-notifications.ts"),
       read("src/lib/notification-templates/context.ts"),
+      read("src/components/partner-card-form/PartnerBenefitItemsField.tsx"),
     ]);
 
   assert.match(publicAction, /notifyAdminsOfPartnerRegistrationRequest/);
@@ -26,7 +35,7 @@ test("제휴 등록 신청은 관리자 알림과 같은 화면 편집 경로를
   assert.match(view, /PartnerChipSections/);
   assert.match(view, /혜택 이용 확인 PIN/);
   assert.match(view, /benefitItems/);
-  assert.match(view, /최대 적용 횟수/);
+  assert.match(benefitField, /최대 적용 횟수/);
   assert.match(adminAction, /updatePartnerRegistrationRequestDetails/);
   assert.match(adminAction, /hashCouponVerificationPassword/);
   assert.match(adminAction, /partner_form_multiple_groups/);
