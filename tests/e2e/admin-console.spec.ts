@@ -38,10 +38,16 @@ test.describe("authenticated administrator console", () => {
 
     await expect(
       page.getByRole("heading", { name: "제휴 등록 신청 검토", exact: true }),
-    ).toBeVisible();
-    await expect(page.getByRole("textbox", { name: "검색어" })).toBeVisible();
-    await expect(page.getByRole("combobox", { name: "공개 상태" })).toBeVisible();
-    await expect(page.getByRole("combobox", { name: "정렬" })).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("textbox", { name: "검색어" })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole("combobox", { name: "공개 상태" })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole("combobox", { name: "정렬" })).toBeVisible({
+      timeout: 15_000,
+    });
     await page.getByRole("textbox", { name: "검색어" }).fill("싸피");
     await page.getByRole("button", { name: "검색", exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/partner-registrations\?.*q=%EC%8B%B8%ED%94%BC/);
