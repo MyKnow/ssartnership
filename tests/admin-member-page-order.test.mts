@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("회원 관리 화면은 회원 목록 뒤에 보조 운영 도구와 수동 추가를 노출한다", async () => {
+test("회원 관리 화면은 보조 운영 도구와 수동 추가 뒤에 회원 목록을 노출한다", async () => {
   const [source, operationsSource] = await Promise.all([
     readFile(
       new URL("../src/app/admin/(protected)/members/page.tsx", import.meta.url),
@@ -21,10 +21,10 @@ test("회원 관리 화면은 회원 목록 뒤에 보조 운영 도구와 수�
   const operationsNoteIndex = source.indexOf('title="운영 메모"');
 
   assert.ok(manualAddIndex >= 0);
-  assert.ok(operationsToolIndex > memberListIndex);
   assert.match(operationsSource, /title="운영 도구"/);
-  assert.ok(manualAddIndex > operationsToolIndex);
+  assert.ok(operationsToolIndex < manualAddIndex);
   assert.ok(operationsNoteIndex > manualAddIndex);
+  assert.ok(memberListIndex > operationsNoteIndex);
   assert.doesNotMatch(source, /2xl:sticky/);
 });
 
@@ -46,7 +46,7 @@ test("회원 관리 화면은 직접 계정 생성 패널을 노출하지 않는
   assert.doesNotMatch(source, /AdminMemberDirectCreatePanel/);
   assert.doesNotMatch(source, /createDirectMember/);
   assert.equal(source.includes('title="직접 계정 생성"'), false);
-  assert.ok(operationsToolIndex > memberListIndex);
+  assert.ok(operationsToolIndex < memberListIndex);
   assert.doesNotMatch(operationsSource, /AdminMemberDirectCreatePanel/);
 });
 

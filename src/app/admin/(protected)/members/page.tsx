@@ -236,49 +236,10 @@ async function AdminMembersContent({
           />
         ) : null}
 
-        <section className="grid min-w-0 gap-4">
-          <AdminSectionHeading
-            title="회원 목록"
-            description="검색, 필터, 페이지네이션을 유지한 채 현재 결과를 조정합니다."
-          />
-          <div>
-            <AdminMemberManager
-              key={[
-                page,
-                pageSize,
-                filters.searchValue,
-                filters.sortValue,
-                filters.filterValue,
-                filters.mattermostLifecycleFilter,
-                filters.yearFilter,
-                filters.campusFilter,
-                filters.serviceConsentFilter,
-                filters.privacyConsentFilter,
-                filters.marketingConsentFilter,
-                filters.pushEnabledFilter,
-                filters.announcementEnabledFilter,
-                filters.newPartnerEnabledFilter,
-                filters.expiringPartnerEnabledFilter,
-                filters.reviewEnabledFilter,
-                filters.mmEnabledFilter,
-                filters.marketingEnabledFilter,
-              ].join(":")}
-              members={members}
-              pagination={{
-                totalCount,
-                page,
-                pageSize,
-              }}
-              filters={filters}
-              options={options}
-            />
-          </div>
-        </section>
-
         <section className="grid min-w-0 gap-4" aria-label="회원 운영 요약">
           <AdminSectionHeading
             title="운영 요약"
-            description="목록을 확인한 뒤 현재 필터와 회원 상태를 요약해서 확인합니다."
+            description="현재 권한 범위와 회원 상태를 먼저 요약해서 확인합니다."
           />
           <Suspense fallback={<AdminMemberSummaryFallback />}>
             <AdminMemberSummarySection
@@ -323,6 +284,45 @@ async function AdminMembersContent({
             <p>인증 카드 색상과 목업은 기수 관리 화면에서 확인합니다.</p>
           </div>
         </Card>
+
+        <section className="grid min-w-0 gap-4">
+          <AdminSectionHeading
+            title="회원 목록"
+            description="검색, 필터, 페이지네이션을 유지한 채 현재 결과를 조정합니다."
+          />
+          <div>
+            <AdminMemberManager
+              key={[
+                page,
+                pageSize,
+                filters.searchValue,
+                filters.sortValue,
+                filters.filterValue,
+                filters.mattermostLifecycleFilter,
+                filters.yearFilter,
+                filters.campusFilter,
+                filters.serviceConsentFilter,
+                filters.privacyConsentFilter,
+                filters.marketingConsentFilter,
+                filters.pushEnabledFilter,
+                filters.announcementEnabledFilter,
+                filters.newPartnerEnabledFilter,
+                filters.expiringPartnerEnabledFilter,
+                filters.reviewEnabledFilter,
+                filters.mmEnabledFilter,
+                filters.marketingEnabledFilter,
+              ].join(":")}
+              members={members}
+              pagination={{
+                totalCount,
+                page,
+                pageSize,
+              }}
+              filters={filters}
+              options={options}
+            />
+          </div>
+        </section>
     </div>
   );
 }
@@ -343,7 +343,7 @@ export default async function AdminMembersPage({
         <AdminPageHeader
           eyebrow="회원"
           title="회원 계정 관리"
-          description="회원 상태와 인증 이력을 먼저 확인하고, 필요한 운영 작업은 목록 아래에서 실행합니다."
+          description="운영 요약과 도구를 먼저 확인한 뒤, 필요한 회원을 목록에서 검색하고 조정합니다."
         />
         <Suspense fallback={<AdminMembersSkeletonContent showHeader={false} />}>
           <AdminMembersContent adminSession={adminSession} params={params} />
