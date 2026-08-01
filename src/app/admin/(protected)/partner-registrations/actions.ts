@@ -28,7 +28,10 @@ import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
 import { hashCouponVerificationPassword } from "@/lib/coupon-verification-password";
 import { ensurePartnerCompanyRow } from "@/app/admin/(protected)/_actions/partner-support/company-provision";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import { getPartnerVisibilityState } from "@/lib/partner-visibility";
+import {
+  getPartnerVisibilityState,
+  isPartnerVisibility,
+} from "@/lib/partner-visibility";
 import {
   logAdminAction,
   redirectAdminActionError,
@@ -46,6 +49,7 @@ type RegistrationCompanyRelation =
 type PartnerRegistrationRequestRow = {
   id: string;
   status: string;
+  visibility?: string | null;
   source?: string | null;
   company_id?: string | null;
   registration_mode?: string | null;
@@ -335,7 +339,7 @@ async function createPartnerFromPortalRegistrationRequest({
         thumbnail: request.thumbnail_url ?? null,
         images: request.image_urls ?? [],
         tags: group.tags ?? request.tags ?? [],
-        visibility: "public",
+        visibility: request.visibility ?? "public",
         benefit_visibility: "public",
         branch_scope_type:
           request.service_mode === "online"
@@ -448,9 +452,14 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
 
   const id = String(formData.get("id") || "").trim();
   const status = String(formData.get("status") || "").trim();
+  const visibility = String(formData.get("visibility") || "public").trim();
   const adminNote = String(formData.get("adminNote") || "").trim();
 
-  if (!id || !isPartnerRegistrationRequestStatus(status)) {
+  if (
+    !id ||
+    !isPartnerRegistrationRequestStatus(status) ||
+    !isPartnerVisibility(visibility)
+  ) {
     redirectAdminActionError(returnTo, "partner_form_invalid_request");
   }
 
@@ -458,7 +467,7 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
   const { data: request, error: requestError } = await supabase
     .from("partner_registration_requests")
     .select(
-      "id,status,source,company_id,registration_mode,service_mode,benefit_action_type,benefit_items,benefit_verification_pin_hash,benefit_verification_pin_salt,branch_scope_type,branch_scope_note,brand_name,category_id,category_label,period_start,period_end,inquiry_link,brand_phone,detail_description,company_name,contact_name,contact_email,contact_phone,company_description,benefits,conditions,tags,location,map_url,site_link,benefit_action_link,thumbnail_url,image_urls,company:partner_companies(managed_campus_slugs)",
+      "id,status,visibility,source,company_id,registration_mode,service_mode,benefit_action_type,benefit_items,benefit_verification_pin_hash,benefit_verification_pin_salt,branch_scope_type,branch_scope_note,brand_name,category_id,category_label,period_start,period_end,inquiry_link,brand_phone,detail_description,company_name,contact_name,contact_email,contact_phone,company_description,benefits,conditions,tags,location,map_url,site_link,benefit_action_link,thumbnail_url,image_urls,company:partner_companies(managed_campus_slugs)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -480,11 +489,13 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
 
   const payload: {
     status: PartnerRegistrationRequestStatus;
+    visibility: "public" | "confidential" | "private";
     admin_note: string | null;
     reviewed_by_admin_id?: string | null;
     reviewed_at?: string | null;
   } = {
     status,
+    visibility,
     admin_note: adminNote || null,
   };
 
@@ -512,13 +523,18 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
     redirect(appendAdminReviewQueueQuery(returnTo, { success: "already-updated" }));
   }
 
+  let convertedPartnerId: string | null = null;
   if (status === "converted" && previousStatus !== "converted") {
     try {
       const conversion = await createPartnerFromPortalRegistrationRequest({
         supabase,
-        request: registrationRequest,
+        request: { ...registrationRequest, visibility },
         campusSlugs: managedCampusSlugs,
       });
+      convertedPartnerId =
+        conversion.partners.length === 1
+          ? conversion.partners[0]?.id ?? null
+          : null;
 
       for (const partner of conversion.partners) {
         await logAdminAction("partner_create", {
@@ -582,6 +598,9 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
   }
 
   revalidatePath("/admin/partner-registrations");
+  if (convertedPartnerId) {
+    redirect(`/admin/partners/${convertedPartnerId}`);
+  }
   redirect(appendAdminReviewQueueQuery(returnTo, { success: "updated" }));
 }
 

@@ -1,11 +1,9 @@
-import AdminReviewQueueFilters from "@/components/admin/AdminReviewQueueFilters";
 import AdminReviewQueueHeader from "@/components/admin/AdminReviewQueueHeader";
 import AdminPaginationLink from "@/components/admin/AdminPaginationLink";
 import PartnerChipSections from "@/components/partner-card-form/PartnerChipSections";
 import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
-import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import SubmitButton from "@/components/ui/SubmitButton";
 import Surface from "@/components/ui/Surface";
@@ -18,13 +16,21 @@ import {
 import { PARTNER_BRANCH_SCOPE_OPTIONS } from "@/lib/partner-branch-registration";
 import {
   isPartnerRegistrationRequestStatus,
+  PARTNER_REGISTRATION_QUEUE_SORT_OPTIONS,
   PARTNER_REGISTRATION_SOURCE_LABELS,
+  PARTNER_REGISTRATION_SOURCE_OPTIONS,
   PARTNER_REGISTRATION_STATUS_LABELS,
   PARTNER_REGISTRATION_STATUS_OPTIONS,
   PARTNER_REGISTRATION_BENEFIT_ACTION_OPTIONS,
+  type PartnerRegistrationQueueSort,
   type PartnerRegistrationRequestStatus,
   type PartnerRegistrationSource,
 } from "@/lib/partner-registration";
+import {
+  getPartnerVisibilityLabel,
+  PARTNER_VISIBILITY_VALUES,
+} from "@/lib/partner-visibility";
+import type { PartnerVisibility } from "@/lib/types";
 import type { AdminReviewQueueFeedback } from "@/lib/admin-review-queue";
 import type { AdminPartnerRegistrationRequestDataRow } from "@/lib/admin-partner-registration-queue";
 import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
@@ -127,10 +133,18 @@ function buildRegistrationQueueHref(
   returnTo: string,
   {
     status,
+    search,
+    source,
+    visibility,
+    sort,
     page,
     pageSize,
   }: {
     status?: string | null;
+    search?: string;
+    source?: string | null;
+    visibility?: string | null;
+    sort?: string;
     page: number;
     pageSize: number;
   },
@@ -140,6 +154,26 @@ function buildRegistrationQueueHref(
     url.searchParams.set("status", status);
   } else {
     url.searchParams.delete("status");
+  }
+  if (search) {
+    url.searchParams.set("q", search);
+  } else {
+    url.searchParams.delete("q");
+  }
+  if (source) {
+    url.searchParams.set("source", source);
+  } else {
+    url.searchParams.delete("source");
+  }
+  if (visibility) {
+    url.searchParams.set("visibility", visibility);
+  } else {
+    url.searchParams.delete("visibility");
+  }
+  if (sort && sort !== "recent") {
+    url.searchParams.set("sort", sort);
+  } else {
+    url.searchParams.delete("sort");
   }
   if (page > 1) {
     url.searchParams.set("page", String(page));
@@ -158,6 +192,10 @@ export default function AdminPartnerRegistrationsView({
   rows,
   updateDetailsAction,
   updateStatusAction,
+  search = "",
+  source = null,
+  visibility = null,
+  sort = "recent",
   status,
   feedback,
   returnTo = "/admin/partner-registrations",
@@ -170,6 +208,10 @@ export default function AdminPartnerRegistrationsView({
   rows: AdminPartnerRegistrationRow[];
   updateDetailsAction: AdminFormAction;
   updateStatusAction: AdminFormAction;
+  search?: string;
+  source?: PartnerRegistrationSource | null;
+  visibility?: PartnerVisibility | null;
+  sort?: PartnerRegistrationQueueSort;
   status?: PartnerRegistrationRequestStatus | null;
   feedback?: AdminReviewQueueFeedback | null;
   returnTo?: string;
@@ -260,21 +302,99 @@ export default function AdminPartnerRegistrationsView({
             "신규 카테고리나 지점 범위가 표시된 신청부터 검토하면 후속 제휴처 등록을 빠르게 이어갈 수 있습니다.",
         }}
       />
-      <AdminReviewQueueFilters
-        options={PARTNER_REGISTRATION_STATUS_OPTIONS.map((option) => ({
-          value: option,
-          label: PARTNER_REGISTRATION_STATUS_LABELS[option],
-        }))}
-        value={status}
-        getHref={(nextStatus) =>
-          buildRegistrationQueueHref(returnTo, {
-            status: nextStatus,
-            page: 1,
-            pageSize: effectivePagination.pageSize,
-          })
-        }
-        ariaLabel="등록 신청 상태 필터"
-      />
+      <Surface level="default" padding="md" className="grid min-w-0 gap-4">
+        <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              신청 찾기
+            </p>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              제휴처명·파트너사·카테고리·위치로 찾고, 처리 순서를 조정합니다.
+            </p>
+          </div>
+          <Button variant="ghost" href="/admin/partner-registrations">
+            조건 초기화
+          </Button>
+        </div>
+        <form
+          method="get"
+          action="/admin/partner-registrations"
+          className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end"
+        >
+          <input type="hidden" name="pageSize" value={effectivePagination.pageSize} />
+          <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+            검색어
+            <Input
+              name="q"
+              defaultValue={search}
+              placeholder="제휴처명, 파트너사, 카테고리, 위치"
+              maxLength={100}
+            />
+          </label>
+          <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+            처리 상태
+            <select
+              name="status"
+              defaultValue={status ?? ""}
+              className="h-11 min-w-0 rounded-[1rem] border border-border bg-surface-control px-3 text-sm text-foreground"
+            >
+              <option value="">전체 상태</option>
+              {PARTNER_REGISTRATION_STATUS_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {PARTNER_REGISTRATION_STATUS_LABELS[option]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+            접수 경로
+            <select
+              name="source"
+              defaultValue={source ?? ""}
+              className="h-11 min-w-0 rounded-[1rem] border border-border bg-surface-control px-3 text-sm text-foreground"
+            >
+              <option value="">전체 경로</option>
+              {PARTNER_REGISTRATION_SOURCE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {PARTNER_REGISTRATION_SOURCE_LABELS[option]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+            공개 상태
+            <select
+              name="visibility"
+              defaultValue={visibility ?? ""}
+              className="h-11 min-w-0 rounded-[1rem] border border-border bg-surface-control px-3 text-sm text-foreground"
+            >
+              <option value="">전체 공개 상태</option>
+              {PARTNER_VISIBILITY_VALUES.map((option) => (
+                <option key={option} value={option}>
+                  {getPartnerVisibilityLabel(option)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+            정렬
+            <select
+              name="sort"
+              defaultValue={sort}
+              className="h-11 min-w-0 rounded-[1rem] border border-border bg-surface-control px-3 text-sm text-foreground"
+            >
+              {PARTNER_REGISTRATION_QUEUE_SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button type="submit" variant="primary">
+            검색
+          </Button>
+        </form>
+      </Surface>
 
       {loadError ? (
         <AdminStatePanel
@@ -327,6 +447,10 @@ export default function AdminPartnerRegistrationsView({
                     key={pageSize}
                     href={buildRegistrationQueueHref(returnTo, {
                       status,
+                      search,
+                      source,
+                      visibility,
+                      sort,
                       page: 1,
                       pageSize,
                     })}
@@ -344,6 +468,10 @@ export default function AdminPartnerRegistrationsView({
                 <AdminPaginationLink
                   href={buildRegistrationQueueHref(returnTo, {
                     status,
+                    search,
+                    source,
+                    visibility,
+                    sort,
                     page: currentPage - 1,
                     pageSize: effectivePagination.pageSize,
                   })}
@@ -358,6 +486,10 @@ export default function AdminPartnerRegistrationsView({
                 <AdminPaginationLink
                   href={buildRegistrationQueueHref(returnTo, {
                     status,
+                    search,
+                    source,
+                    visibility,
+                    sort,
                     page: currentPage + 1,
                     pageSize: effectivePagination.pageSize,
                   })}
@@ -382,20 +514,24 @@ export default function AdminPartnerRegistrationsView({
               row.memo,
             ].filter(Boolean).length;
             const benefitItems = getRegistrationBenefitItems(row);
+            const rowVisibility = PARTNER_VISIBILITY_VALUES.includes(
+              row.visibility as PartnerVisibility,
+            )
+              ? (row.visibility as PartnerVisibility)
+              : "public";
             return (
-              <Card
-                key={row.id}
-                tone="elevated"
-                padding="md"
-                className="grid min-w-0 gap-5"
-              >
-                <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <details className="group min-w-0 rounded-card border border-border bg-surface-elevated shadow-flat" key={row.id}>
+                <summary className="flex min-w-0 cursor-pointer list-none items-start justify-between gap-4 p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
+                  <div className="flex min-w-0 flex-col gap-3">
                   <div className="min-w-0">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <Badge variant={statusVariant(rowStatus)}>
                         {PARTNER_REGISTRATION_STATUS_LABELS[rowStatus]}
                       </Badge>
                       <Badge variant="neutral">{sourceLabel(row.source)}</Badge>
+                      <Badge variant="neutral">
+                        {getPartnerVisibilityLabel(rowVisibility)}
+                      </Badge>
                       <Badge variant="primary">
                         {branchScopeLabel(
                           row.branch_scope_type,
@@ -430,17 +566,22 @@ export default function AdminPartnerRegistrationsView({
                       {(row.benefit_groups ?? []).length || 1}개
                     </p>
                   </div>
-                </div>
+                  </div>
+                  <span className="mt-1 shrink-0 text-sm font-semibold text-muted-foreground group-open:rotate-180" aria-hidden="true">
+                   ⌄
+                  </span>
+                </summary>
 
-                <details className="group min-w-0 rounded-2xl border border-border/70 bg-surface-inset/55">
-                  <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
-                    <span>신청 상세 확인</span>
+                <div className="grid min-w-0 gap-5 border-t border-border px-5 pb-5 pt-5">
+                <section className="min-w-0 rounded-2xl border border-border/70 bg-surface-inset/55">
+                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 px-4 py-3">
+                    <h3 className="text-sm font-semibold text-foreground">신청 상세 확인</h3>
                     <span className="text-right text-xs font-normal leading-5 text-muted-foreground">
                       혜택 {(row.benefits ?? []).length}개 · 조건{" "}
                       {(row.conditions ?? []).length}개 · 메모 {noteCount}개 ·
                       첨부 {attachmentCount}개
                     </span>
-                  </summary>
+                  </div>
                   <div className="grid min-w-0 gap-4 border-t border-border/70 px-4 py-4">
                     <div className="grid min-w-0 gap-3 lg:grid-cols-3">
                       <ValueList
@@ -523,16 +664,16 @@ export default function AdminPartnerRegistrationsView({
                       <ValueList title="태그" values={row.tags ?? []} />
                     </div>
                   </div>
-                </details>
+                </section>
 
                 {canReview && rowStatus !== "converted" ? (
-                  <details className="group min-w-0 rounded-2xl border border-border/70 bg-surface-inset/55">
-                    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
-                      <span>신청 정보 수정</span>
+                  <section className="min-w-0 rounded-2xl border border-border/70 bg-surface-inset/55">
+                    <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 px-4 py-3">
+                      <h3 className="text-sm font-semibold text-foreground">신청 정보 수정</h3>
                       <span className="text-right text-xs font-normal leading-5 text-muted-foreground">
                         지점 목록과 혜택 그룹 구조는 유지
                       </span>
-                    </summary>
+                    </div>
                     <form
                       action={updateDetailsAction}
                       className="grid min-w-0 gap-4 border-t border-border/70 px-4 py-4"
@@ -706,7 +847,7 @@ export default function AdminPartnerRegistrationsView({
                         </SubmitButton>
                       </div>
                     </form>
-                  </details>
+                  </section>
                 ) : rowStatus === "converted" && canReview ? (
                   <Surface level="inset" className="border-t border-border/70 p-4">
                     <p className="text-sm leading-6 text-muted-foreground">
@@ -722,7 +863,7 @@ export default function AdminPartnerRegistrationsView({
                   >
                     <input type="hidden" name="id" value={row.id} />
                     <input type="hidden" name="returnTo" value={returnTo} />
-                    <div className="grid min-w-0 gap-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
+                    <div className="grid min-w-0 gap-3 sm:grid-cols-[12rem_12rem_minmax(0,1fr)]">
                       <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
                         처리 상태
                         <select
@@ -733,6 +874,20 @@ export default function AdminPartnerRegistrationsView({
                           {PARTNER_REGISTRATION_STATUS_OPTIONS.map((option) => (
                             <option key={option} value={option}>
                               {PARTNER_REGISTRATION_STATUS_LABELS[option]}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                        공개 상태
+                        <select
+                          name="visibility"
+                          defaultValue={rowVisibility}
+                          className="h-11 rounded-[1rem] border border-border bg-surface-control px-3 text-sm text-foreground"
+                        >
+                          {PARTNER_VISIBILITY_VALUES.map((option) => (
+                            <option key={option} value={option}>
+                              {getPartnerVisibilityLabel(option)}
                             </option>
                           ))}
                         </select>
@@ -765,7 +920,8 @@ export default function AdminPartnerRegistrationsView({
                     </p>
                   </Surface>
                 )}
-              </Card>
+                </div>
+              </details>
             );
           })}
         </div>
