@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { MockAdPackageRepository } from "../src/lib/repositories/mock/ad-package-repository.mock.ts";
 
+const ACTIVE_COUPON_START = "2026-01-01T00:00:00.000Z";
+const ACTIVE_COUPON_END = "2099-12-31T23:59:59.000Z";
+
 async function createCodeCoupon(
   repository: MockAdPackageRepository,
   overrides: { perMemberLimit?: number; usageLimit?: number } = {},
@@ -12,8 +15,8 @@ async function createCodeCoupon(
     title: "직접 사용 테스트 쿠폰",
     redemptionType: "code",
     status: "active",
-    startsAt: "2026-07-01T00:00:00.000Z",
-    endsAt: "2026-07-31T23:59:59.000Z",
+    startsAt: ACTIVE_COUPON_START,
+    endsAt: ACTIVE_COUPON_END,
     perMemberLimit: overrides.perMemberLimit ?? 1,
     usageLimit: overrides.usageLimit,
   });
@@ -110,8 +113,8 @@ describe("mock ad package repository", () => {
       title: "전체 일 발급 제한 쿠폰",
       status: "active",
       redemptionType: "code",
-      startsAt: "2026-07-01T00:00:00.000Z",
-      endsAt: "2026-07-31T23:59:59.000Z",
+      startsAt: ACTIVE_COUPON_START,
+      endsAt: ACTIVE_COUPON_END,
       dailyIssueLimit: 1,
     });
 
@@ -435,8 +438,8 @@ describe("mock ad package repository", () => {
       partnerId: "health-001",
       title: "회원별 발급 제한 쿠폰",
       status: "active",
-      startsAt: "2026-07-01T00:00:00.000Z",
-      endsAt: "2026-07-31T23:59:59.000Z",
+      startsAt: ACTIVE_COUPON_START,
+      endsAt: ACTIVE_COUPON_END,
       perMemberDailyIssueLimit: 1,
       onsitePassword: "2468",
     });
@@ -469,8 +472,8 @@ describe("mock ad package repository", () => {
       partnerId: "health-001",
       title: "현장 확인 쿠폰",
       status: "active",
-      startsAt: "2026-07-01T00:00:00.000Z",
-      endsAt: "2026-07-31T23:59:59.000Z",
+      startsAt: ACTIVE_COUPON_START,
+      endsAt: ACTIVE_COUPON_END,
       onsitePassword: "9876",
     });
     const issued = await repository.issueCoupon({
@@ -511,8 +514,8 @@ describe("mock ad package repository", () => {
       partnerId: "health-001",
       title: "회원별 일 발급 한도 쿠폰",
       status: "active",
-      startsAt: "2026-07-01T00:00:00.000Z",
-      endsAt: "2026-07-31T23:59:59.000Z",
+      startsAt: ACTIVE_COUPON_START,
+      endsAt: ACTIVE_COUPON_END,
       perMemberDailyIssueLimit: 1,
       onsitePassword: "1357",
     });

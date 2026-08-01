@@ -1,6 +1,7 @@
 import AdminReviewQueueFilters from "@/components/admin/AdminReviewQueueFilters";
 import AdminReviewQueueHeader from "@/components/admin/AdminReviewQueueHeader";
 import AdminPaginationLink from "@/components/admin/AdminPaginationLink";
+import PartnerChipSections from "@/components/partner-card-form/PartnerChipSections";
 import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -20,11 +21,13 @@ import {
   PARTNER_REGISTRATION_SOURCE_LABELS,
   PARTNER_REGISTRATION_STATUS_LABELS,
   PARTNER_REGISTRATION_STATUS_OPTIONS,
+  PARTNER_REGISTRATION_BENEFIT_ACTION_OPTIONS,
   type PartnerRegistrationRequestStatus,
   type PartnerRegistrationSource,
 } from "@/lib/partner-registration";
 import type { AdminReviewQueueFeedback } from "@/lib/admin-review-queue";
 import type { AdminPartnerRegistrationRequestDataRow } from "@/lib/admin-partner-registration-queue";
+import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
 
 export type AdminPartnerRegistrationRow =
   AdminPartnerRegistrationRequestDataRow;
@@ -82,6 +85,21 @@ function branchSummary(branches?: AdminPartnerRegistrationRow["branches"]) {
   ]
     .filter(Boolean)
     .join(" · ");
+}
+
+function getRegistrationBenefitItems(row: AdminPartnerRegistrationRow) {
+  try {
+    const items = normalizePartnerBenefitItems(row.benefit_items ?? []);
+    if (items.length > 0) return items;
+  } catch {
+    // Fall back to the legacy title list so an older request remains editable.
+  }
+  return normalizePartnerBenefitItems(
+    (row.benefits ?? []).map((title, index) => ({
+      id: `registration-benefit-${index + 1}`,
+      title,
+    })),
+  );
 }
 
 function ValueList({ title, values }: { title: string; values: string[] }) {
@@ -363,6 +381,7 @@ export default function AdminPartnerRegistrationsView({
               row.company_description,
               row.memo,
             ].filter(Boolean).length;
+            const benefitItems = getRegistrationBenefitItems(row);
             return (
               <Card
                 key={row.id}
@@ -568,6 +587,22 @@ export default function AdminPartnerRegistrationsView({
                           />
                         </label>
                         <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          혜택 이용 방식
+                          <select
+                            name="benefitActionType"
+                            defaultValue={row.benefit_action_type}
+                            className="h-11 min-w-0 rounded-[1rem] border border-border bg-surface-control px-3 text-sm text-foreground"
+                          >
+                            {PARTNER_REGISTRATION_BENEFIT_ACTION_OPTIONS.map(
+                              (option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ),
+                            )}
+                          </select>
+                        </label>
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
                           제휴처 전화
                           <Input name="brandPhone" defaultValue={row.brand_phone ?? ""} />
                         </label>
@@ -615,33 +650,29 @@ export default function AdminPartnerRegistrationsView({
                             rows={3}
                           />
                         </label>
-                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
-                          혜택
-                          <Textarea
-                            name="benefits"
-                            defaultValue={(row.benefits ?? []).join("\n")}
-                            rows={4}
-                            placeholder="혜택을 한 줄에 하나씩 입력"
-                          />
-                        </label>
-                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
-                          이용 조건
-                          <Textarea
-                            name="conditions"
-                            defaultValue={(row.conditions ?? []).join("\n")}
-                            rows={4}
-                            placeholder="이용 조건을 한 줄에 하나씩 입력"
-                          />
-                        </label>
-                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
-                          태그
-                          <Textarea
-                            name="tags"
-                            defaultValue={(row.tags ?? []).join("\n")}
-                            rows={3}
-                            placeholder="태그를 한 줄에 하나씩 입력"
-                          />
-                        </label>
+                        {row.service_mode !== "online" ? (
+                          <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                            혜택 이용 확인 PIN
+                            <Input
+                              name="benefitVerificationPin"
+                              type="password"
+                              inputMode="numeric"
+                              pattern="[0-9]{4}"
+                              maxLength={4}
+                              autoComplete="new-password"
+                              placeholder={
+                                row.benefit_verification_pin_configured
+                                  ? "변경할 때만 숫자 4자리 입력"
+                                  : "숫자 4자리"
+                              }
+                            />
+                            <span className="text-xs font-normal leading-5 text-muted-foreground">
+                              {row.benefit_verification_pin_configured
+                                ? "비워 두면 기존 PIN을 유지합니다."
+                                : "현장에서 혜택 이용을 확인할 때 사용하는 PIN입니다."}
+                            </span>
+                          </label>
+                        ) : null}
                         <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
                           지점 범위 메모
                           <Textarea
@@ -659,6 +690,16 @@ export default function AdminPartnerRegistrationsView({
                           />
                         </label>
                       </div>
+                      <PartnerChipSections
+                        partner={{
+                          id: row.id,
+                          benefitActionType: row.benefit_action_type,
+                          benefitItems,
+                          benefits: row.benefits ?? [],
+                          conditions: row.conditions ?? [],
+                          tags: row.tags ?? [],
+                        }}
+                      />
                       <div className="flex justify-end">
                         <SubmitButton pendingText="저장 중" variant="secondary">
                           신청 정보 저장

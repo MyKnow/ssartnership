@@ -143,7 +143,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       {
         href: "/admin/profile-photos",
         label: "프로필 사진",
-        description: "사진 변경과 기존 사진 점검",
+        description: "사진 변경 요청 검토",
         keywords: ["사진", "이미지", "검수", "프로필"],
         iconKey: "photo",
         permission: { resource: "profile_images" },

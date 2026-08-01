@@ -5,15 +5,11 @@ import AdminShell from "@/components/admin/AdminShell";
 import { AdminProfilePhotosSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { canAdmin } from "@/lib/admin-permissions";
-import {
-  getAdminCurrentProfilePhotoQueueReadModel,
-  getAdminProfilePhotoReplacementQueueReadModel,
-} from "@/lib/admin-profile-photo-queue.server";
+import { getAdminProfilePhotoReplacementQueueReadModel } from "@/lib/admin-profile-photo-queue.server";
 import { getAdminReviewQueueFeedback } from "@/lib/admin-review-queue";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import {
   approveMemberProfilePhotoAction,
-  rejectMemberCurrentProfilePhotoAction,
   rejectMemberProfilePhotoAction,
 } from "./actions";
 
@@ -31,7 +27,6 @@ async function AdminProfilePhotosContent({
     focus?: string;
   };
 }) {
-  const currentPhotosPromise = getAdminCurrentProfilePhotoQueueReadModel();
   const { replacements, queueLoadError } =
     await getAdminProfilePhotoReplacementQueueReadModel();
   const returnTo = sanitizeReturnTo(params.returnTo, "/admin/profile-photos");
@@ -39,11 +34,9 @@ async function AdminProfilePhotosContent({
   return (
     <AdminProfilePhotoReviewQueue
         replacements={replacements}
-        currentPhotosPromise={currentPhotosPromise}
         actions={{
           approveReplacement: approveMemberProfilePhotoAction,
           rejectReplacement: rejectMemberProfilePhotoAction,
-          rejectCurrentPhoto: rejectMemberCurrentProfilePhotoAction,
         }}
         feedback={getAdminReviewQueueFeedback({
           error: params.error,
@@ -83,7 +76,7 @@ export default async function AdminProfilePhotosPage({
         <AdminPageHeader
           eyebrow="작업함"
           title="프로필 사진 검토"
-          description="새 사진 교체 요청과 현재 승인 사진 점검을 분리해, 회원 인증에 영향을 주는 작업을 안전하게 처리합니다."
+          description="새 사진 교체 요청을 확인하고, 회원 인증에 영향을 주는 작업을 안전하게 처리합니다."
         />
         <Suspense fallback={<AdminProfilePhotosSkeletonContent showHeader={false} />}>
           <AdminProfilePhotosContent session={session} params={params} />

@@ -58,7 +58,7 @@ export default function AdminPartnerListItem({
 
   return (
     <article className="grid min-w-0 gap-4 overflow-hidden rounded-2xl border border-border bg-surface px-4 py-4">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="grid min-w-0 gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge className={getPartnerVisibilityBadgeClass(visibilityState)}>
@@ -120,21 +120,17 @@ export default function AdminPartnerListItem({
         </div>
       </div>
 
-      {partner.metrics === undefined ? (
-        <Surface level="inset" padding="sm" className="text-sm text-muted-foreground">
-          운영 지표는 상세 화면에서 확인할 수 있습니다. 목록은 제휴처 찾기와 상태 확인에 집중합니다.
-        </Surface>
-      ) : partner.metrics === null ? (
+      {partner.metrics === null ? (
         <Surface level="inset" padding="sm" className="text-sm text-muted-foreground">
           운영 지표를 불러오지 못했습니다. 상세 화면에서 다시 확인해 주세요.
         </Surface>
-      ) : (
+      ) : partner.metrics ? (
         <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {summaryMetrics.map((metric) => (
             <MetricPill key={metric.label} {...metric} />
           ))}
         </div>
-      )}
+      ) : null}
     </article>
   );
 }

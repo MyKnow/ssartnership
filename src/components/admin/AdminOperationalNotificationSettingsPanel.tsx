@@ -108,7 +108,7 @@ export default function AdminOperationalNotificationSettingsPanel({
   }> = [
     { key: "portalEnabled", label: "관리자 인앱" },
     { key: "pushEnabled", label: "웹푸시" },
-    { key: "partnerRequestEnabled", label: "파트너 변경 요청" },
+    { key: "partnerRequestEnabled", label: "파트너 변경·추가 요청" },
     { key: "expiringPartnerEnabled", label: "제휴 종료 임박" },
     { key: "securityEnabled", label: "중요 보안" },
   ];

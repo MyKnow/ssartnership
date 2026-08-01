@@ -50,6 +50,13 @@
   --grid-max: 76rem;
   --grid-wide: 88rem;
   --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --category-preview-light-background: #f4f7fb;
+  --category-preview-light-foreground: #152033;
+  --category-preview-light-muted: #53657e;
+  --category-preview-dark-background: #07101d;
+  --category-preview-dark-border: #3a4c69;
+  --category-preview-dark-foreground: #eef5ff;
+  --category-preview-dark-muted: #9fb0c9;
 }
 
 html.dark {
@@ -293,6 +300,36 @@ body {
     border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
     background: var(--surface-overlay);
     box-shadow: var(--shadow-overlay);
+  }
+
+  .category-chip-preview-light,
+  .category-chip-preview-dark {
+    border-radius: var(--radius-control);
+  }
+
+  .category-chip-preview-light {
+    border-color: var(--border);
+    background: var(--category-preview-light-background);
+    color: var(--category-preview-light-foreground);
+  }
+
+  .category-chip-preview-dark {
+    border-color: color-mix(in srgb, var(--category-preview-dark-border) 80%, transparent);
+    background: var(--category-preview-dark-background);
+    color: var(--category-preview-dark-foreground);
+  }
+
+  .category-chip-preview-light .category-chip-preview-caption {
+    color: var(--category-preview-light-muted);
+  }
+
+  .category-chip-preview-dark .category-chip-preview-caption {
+    color: var(--category-preview-dark-muted);
+  }
+
+  .category-chip-preview-badge {
+    background: color-mix(in srgb, var(--category-chip-color) 16%, transparent);
+    border-color: color-mix(in srgb, var(--category-chip-color) 42%, transparent);
   }
 
   .ui-control {

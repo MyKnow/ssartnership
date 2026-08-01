@@ -36,7 +36,7 @@ test("관리 메뉴는 의도 기반 여섯 업무 그룹과 기존 권한 필�
   );
 });
 
-test("회원 화면은 내부 오류를 노출하지 않고 목록 이후에 보조 운영 도구를 둔다", async () => {
+test("회원 화면은 내부 오류를 노출하지 않고 보조 운영 도구 이후에 목록을 둔다", async () => {
   const [source, operationsSource] = await Promise.all([
     readFile(
       new URL("../src/app/admin/(protected)/members/page.tsx", import.meta.url),
@@ -52,8 +52,8 @@ test("회원 화면은 내부 오류를 노출하지 않고 목록 이후에 보
   const operationsToolIndex = source.indexOf("<AdminMemberOperationsPanel");
 
   assert.ok(memberListIndex >= 0);
-  assert.ok(summaryIndex > memberListIndex);
-  assert.ok(operationsToolIndex > memberListIndex);
+  assert.ok(summaryIndex < memberListIndex);
+  assert.ok(operationsToolIndex < memberListIndex);
   assert.doesNotMatch(source, /membersError\.message/);
   assert.match(operationsSource, /title="운영 도구"/);
 });
