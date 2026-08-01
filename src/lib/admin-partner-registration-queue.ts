@@ -138,13 +138,14 @@ export async function listAdminPartnerRegistrationRequestPage({
   pageSize: number;
   managedCampusSlugs: readonly string[] | null;
 }) {
-  const supabase = getSupabaseAdminClient();
+  let supabase: ReturnType<typeof getSupabaseAdminClient>;
   let indexResult: {
     data: RegistrationQueueIndexRow[] | null;
     error: unknown;
   };
 
   try {
+    supabase = getSupabaseAdminClient();
     indexResult = await supabase.rpc("get_admin_partner_registration_request_page", {
       input_status: status,
       input_page: page,
@@ -172,16 +173,24 @@ export async function listAdminPartnerRegistrationRequestPage({
     return { rows: [] as AdminPartnerRegistrationRequestDataRow[], totalCount, loadError: false };
   }
 
-  const rowsResult = await supabase
-    .from("partner_registration_requests")
-    .select(PARTNER_REGISTRATION_QUEUE_SELECT)
-    .in("id", ids);
-  if (rowsResult.error) {
+  let rowsData: unknown[] | null = null;
+  let rowsError: unknown = null;
+  try {
+    const rowsResult = await supabase
+      .from("partner_registration_requests")
+      .select(PARTNER_REGISTRATION_QUEUE_SELECT)
+      .in("id", ids);
+    rowsData = rowsResult.data as unknown[] | null;
+    rowsError = rowsResult.error;
+  } catch {
+    return { rows: [] as AdminPartnerRegistrationRequestDataRow[], totalCount: 0, loadError: true };
+  }
+  if (rowsError) {
     return { rows: [] as AdminPartnerRegistrationRequestDataRow[], totalCount: 0, loadError: true };
   }
 
   const rowsById = new Map(
-    (rowsResult.data ?? []).map((rawRow) => {
+    (rowsData ?? []).map((rawRow) => {
       const row = rawRow as unknown as AdminPartnerRegistrationRequestDataRow & {
         benefit_verification_pin_hash?: string | null;
         benefit_verification_pin_salt?: string | null;
