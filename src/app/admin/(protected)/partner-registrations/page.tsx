@@ -13,7 +13,15 @@ import { canAdmin } from "@/lib/admin-permissions";
 import { getManagedCampusFilterValues } from "@/lib/admin-scope";
 import { parseAdminReviewQueuePagination } from "@/lib/admin-ia";
 import { listAdminPartnerRegistrationRequestPage } from "@/lib/admin-partner-registration-queue";
-import { isPartnerRegistrationRequestStatus } from "@/lib/partner-registration";
+import {
+  isPartnerRegistrationRequestStatus,
+  PARTNER_REGISTRATION_QUEUE_SORT_OPTIONS,
+  PARTNER_REGISTRATION_SOURCE_OPTIONS,
+  type PartnerRegistrationQueueSort,
+  type PartnerRegistrationSource,
+} from "@/lib/partner-registration";
+import { isPartnerVisibility } from "@/lib/partner-visibility";
+import type { PartnerVisibility } from "@/lib/types";
 import { getAdminReviewQueueFeedback } from "@/lib/admin-review-queue";
 import { redirect } from "next/navigation";
 
@@ -25,6 +33,10 @@ type PartnerRegistrationSearchParams = {
   success?: string | string[];
   page?: string | string[];
   pageSize?: string | string[];
+  q?: string | string[];
+  source?: string | string[];
+  visibility?: string | string[];
+  sort?: string | string[];
 };
 
 function getOneSearchParam(value: string | string[] | undefined) {
@@ -33,15 +45,27 @@ function getOneSearchParam(value: string | string[] | undefined) {
 
 function buildPartnerRegistrationHref({
   status,
+  search,
+  source,
+  visibility,
+  sort,
   page,
   pageSize,
 }: {
   status: string | null;
+  search: string;
+  source: PartnerRegistrationSource | null;
+  visibility: "public" | "confidential" | "private" | null;
+  sort: PartnerRegistrationQueueSort;
   page: number;
   pageSize: number;
 }) {
   const params = new URLSearchParams();
   if (status) params.set("status", status);
+  if (search) params.set("q", search);
+  if (source) params.set("source", source);
+  if (visibility) params.set("visibility", visibility);
+  if (sort !== "recent") params.set("sort", sort);
   if (page > 1) params.set("page", String(page));
   if (pageSize !== 12) params.set("pageSize", String(pageSize));
   const query = params.toString();
@@ -79,8 +103,31 @@ async function AdminPartnerRegistrationsContent({
     statusValue && isPartnerRegistrationRequestStatus(statusValue)
       ? statusValue
       : null;
+  const search = (getOneSearchParam(params.q) ?? "").trim().slice(0, 100);
+  const sourceValue = getOneSearchParam(params.source);
+  const source = PARTNER_REGISTRATION_SOURCE_OPTIONS.includes(
+    sourceValue as PartnerRegistrationSource,
+  )
+    ? (sourceValue as PartnerRegistrationSource)
+    : null;
+  const visibilityValue = getOneSearchParam(params.visibility);
+  const visibility: PartnerVisibility | null = isPartnerVisibility(
+    visibilityValue ?? "",
+  )
+    ? (visibilityValue as PartnerVisibility)
+    : null;
+  const sortValue = getOneSearchParam(params.sort);
+  const sort = PARTNER_REGISTRATION_QUEUE_SORT_OPTIONS.some(
+    (option) => option.value === sortValue,
+  )
+    ? (sortValue as PartnerRegistrationQueueSort)
+    : "recent";
   const requestPage = await listAdminPartnerRegistrationRequestPage({
     status,
+    search,
+    source,
+    visibility,
+    sort,
     page: pagination.page,
     pageSize: pagination.pageSize,
     managedCampusSlugs: managedCampusFilter,
@@ -97,6 +144,10 @@ async function AdminPartnerRegistrationsContent({
     redirect(
       buildPartnerRegistrationHref({
         status,
+        search,
+        source,
+        visibility,
+        sort,
         page: totalPages,
         pageSize: pagination.pageSize,
       }),
@@ -108,6 +159,10 @@ async function AdminPartnerRegistrationsContent({
   });
   const returnTo = buildPartnerRegistrationHref({
     status,
+    search,
+    source,
+    visibility,
+    sort,
     page: pagination.page,
     pageSize: pagination.pageSize,
   });
@@ -118,6 +173,10 @@ async function AdminPartnerRegistrationsContent({
         updateDetailsAction={updatePartnerRegistrationRequestDetails}
         updateStatusAction={updatePartnerRegistrationRequestStatus}
         status={status}
+        search={search}
+        source={source}
+        visibility={visibility}
+        sort={sort}
         feedback={feedback}
         returnTo={returnTo}
         pagination={{

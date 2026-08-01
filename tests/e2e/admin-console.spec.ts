@@ -24,6 +24,38 @@ test.describe("authenticated administrator console", () => {
     ).toBeVisible();
   });
 
+  test("renders registration search controls and preserves the query state", async ({ page }) => {
+    await page.goto("/admin/partner-registrations");
+    await page.waitForLoadState("networkidle");
+
+    await expect(
+      page.getByRole("heading", { name: "제휴 등록 신청 검토", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "검색어" })).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "공개 상태" })).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "정렬" })).toBeVisible();
+    await page.getByRole("textbox", { name: "검색어" }).fill("싸피");
+    await page.getByRole("button", { name: "검색", exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/partner-registrations\?.*q=%EC%8B%B8%ED%94%BC/);
+  });
+
+  test("keeps the registration queue inside narrow and wide viewports", async ({ page }) => {
+    for (const width of [320, 360, 390, 820, 1366]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/admin/partner-registrations");
+      await page.waitForLoadState("networkidle");
+
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth > window.innerWidth + 1,
+      );
+      expect(overflow, `horizontal overflow at ${width}px`).toBe(false);
+      await page.screenshot({
+        path: `.tmp/ui-qa/admin-partner-registrations-${width}.png`,
+        fullPage: true,
+      });
+    }
+  });
+
   test("traps mobile drawer focus and restores focus to its opener", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/admin/members");

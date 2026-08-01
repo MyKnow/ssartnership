@@ -639,6 +639,7 @@ create table if not exists partner_registration_attempts (
 create table if not exists partner_registration_requests (
   id uuid primary key default uuid_generate_v4(),
   status text not null default 'pending',
+  visibility text not null default 'public',
   source text not null default 'public_web',
   company_id uuid references partner_companies(id) on delete set null,
   requested_by_partner_account_id uuid references partner_accounts(id) on delete set null,
@@ -680,6 +681,8 @@ create table if not exists partner_registration_requests (
   updated_at timestamp with time zone default now(),
   constraint partner_registration_requests_status_check
     check (status in ('pending', 'in_review', 'converted', 'rejected', 'archived')),
+  constraint partner_registration_requests_visibility_check
+    check (visibility in ('public', 'confidential', 'private')),
   constraint partner_registration_requests_source_check
     check (source in ('public_web', 'public_excel', 'partner_portal')),
   constraint partner_registration_requests_registration_mode_check
@@ -1206,7 +1209,11 @@ create or replace function public.get_admin_partner_registration_request_page(
   input_status text default null,
   input_page integer default 1,
   input_page_size integer default 12,
-  input_managed_campus_slugs text[] default null
+  input_managed_campus_slugs text[] default null,
+  input_search text default null,
+  input_source text default null,
+  input_visibility text default null,
+  input_sort text default 'recent'
 )
 returns table (
   id uuid,
@@ -1224,17 +1231,41 @@ as $$
           then input_status
         else null
       end as status_filter,
+      nullif(left(lower(trim(coalesce(input_search, ''))), 100), '') as search_filter,
+      case
+        when input_source in ('public_web', 'public_excel', 'partner_portal')
+          then input_source
+        else null
+      end as source_filter,
+      case
+        when input_visibility in ('public', 'confidential', 'private')
+          then input_visibility
+        else null
+      end as visibility_filter,
+      case
+        when input_sort in ('oldest', 'name') then input_sort
+        else 'recent'
+      end as sort_mode,
       greatest(coalesce(input_page, 1), 1) as page,
       least(greatest(coalesce(input_page_size, 12), 1), 24) as page_size,
       input_managed_campus_slugs is null as is_global,
       coalesce(input_managed_campus_slugs, '{}'::text[]) as managed_campus_slugs
   ),
   scoped_rows as (
-    select request.id, request.created_at
+    select request.id, request.created_at, request.brand_name
     from public.partner_registration_requests as request
     left join public.partner_companies as company on company.id = request.company_id
     cross join parameters
     where (parameters.status_filter is null or request.status = parameters.status_filter)
+      and (parameters.source_filter is null or request.source = parameters.source_filter)
+      and (parameters.visibility_filter is null or request.visibility = parameters.visibility_filter)
+      and (
+        parameters.search_filter is null
+        or position(parameters.search_filter in lower(coalesce(request.brand_name, ''))) > 0
+        or position(parameters.search_filter in lower(coalesce(request.company_name, ''))) > 0
+        or position(parameters.search_filter in lower(coalesce(request.category_label, ''))) > 0
+        or position(parameters.search_filter in lower(coalesce(request.location, ''))) > 0
+      )
       and (
         parameters.is_global
         or (
@@ -1252,8 +1283,15 @@ as $$
     select
       id,
       created_at,
+      brand_name,
       count(*) over()::bigint as total_count,
-      row_number() over (order by created_at desc, id desc) as row_num
+      row_number() over (
+        order by
+          case when (select sort_mode from parameters) = 'name' then lower(brand_name) end asc nulls last,
+          case when (select sort_mode from parameters) = 'oldest' then created_at end asc nulls last,
+          case when (select sort_mode from parameters) = 'recent' then created_at end desc nulls last,
+          id desc
+      ) as row_num
     from scoped_rows
   )
   select numbered_rows.id, numbered_rows.total_count
@@ -1264,10 +1302,10 @@ as $$
   order by numbered_rows.row_num;
 $$;
 
-revoke all on function public.get_admin_partner_registration_request_page(text, integer, integer, text[]) from public;
-revoke all on function public.get_admin_partner_registration_request_page(text, integer, integer, text[]) from anon;
-revoke all on function public.get_admin_partner_registration_request_page(text, integer, integer, text[]) from authenticated;
-grant execute on function public.get_admin_partner_registration_request_page(text, integer, integer, text[]) to service_role;
+revoke all on function public.get_admin_partner_registration_request_page(text, integer, integer, text[], text, text, text, text) from public;
+revoke all on function public.get_admin_partner_registration_request_page(text, integer, integer, text[], text, text, text, text) from anon;
+revoke all on function public.get_admin_partner_registration_request_page(text, integer, integer, text[], text, text, text, text) from authenticated;
+grant execute on function public.get_admin_partner_registration_request_page(text, integer, integer, text[], text, text, text, text) to service_role;
 
 create or replace function public.get_admin_logs_page(
   input_start timestamp with time zone,
@@ -3911,6 +3949,8 @@ create index if not exists partner_registration_requests_status_created_idx
   on partner_registration_requests(status, created_at desc);
 create index if not exists partner_registration_requests_status_created_id_idx
   on partner_registration_requests(status, created_at desc, id desc);
+create index if not exists partner_registration_requests_visibility_created_idx
+  on partner_registration_requests(visibility, created_at desc, id desc);
 create index if not exists partner_registration_requests_category_created_idx
   on partner_registration_requests(category_id, created_at desc);
 create index if not exists partner_registration_requests_source_created_idx
