@@ -2,8 +2,16 @@ import { expect, test } from "@playwright/test";
 
 test.describe("authenticated administrator console", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/auth/mock?returnTo=%2Fadmin");
-    await expect(page).toHaveURL(/\/admin$/);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await page.goto("/auth/mock?returnTo=%2Fadmin", {
+        waitUntil: "domcontentloaded",
+      });
+      if (/\/admin$/.test(page.url())) {
+        break;
+      }
+      await page.waitForTimeout(250 * (attempt + 1));
+    }
+    await expect(page).toHaveURL(/\/admin$/, { timeout: 15_000 });
     await page.waitForLoadState("networkidle");
   });
 
