@@ -20,7 +20,6 @@ test("public readiness CI workflow gates launch-critical checks", () => {
     "npm run lint",
     "npm run typecheck:ci",
     "npm test",
-    "npm audit --omit=dev",
     "npm run audit:security",
     "npm run build",
     "PLAYWRIGHT_CHROMIUM_CHANNEL: chrome",
@@ -35,6 +34,37 @@ test("public readiness CI workflow gates launch-critical checks", () => {
   assert.match(workflow, /push:\s*\n\s+branches:\s*\[main, dev\]/);
   assert.match(workflow, /concurrency:\s*\n\s+group:/);
   assert.match(workflow, /cancel-in-progress:\s+true/);
+  assert.doesNotMatch(workflow, /npm audit --omit=dev/);
+  assert.match(workflow, /name: Dependency policy audit/);
+});
+
+test("local prepush and release use the same Public Readiness gates", () => {
+  const packageJson = JSON.parse(readRepoFile("package.json")) as {
+    scripts: Record<string, string>;
+  };
+  const prepush = packageJson.scripts.prepush;
+
+  for (const requiredCommand of [
+    "npm run check:lockfile",
+    "npm run validate:migrations",
+    "npm run lint",
+    "npm run typecheck:ci",
+    "npm test",
+    "npm run audit:security",
+    "npm run build",
+    "npm run test:e2e:ci",
+  ]) {
+    assert.match(
+      prepush,
+      new RegExp(requiredCommand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    );
+  }
+
+  const release = readRepoFile("scripts/release.sh");
+  assert.match(
+    release,
+    /run_repository_prepush[\s\S]+?npm run build-storybook[\s\S]+?npm run test-storybook[\s\S]+?npm run test:visual/,
+  );
 });
 
 test("Storybook and visual baselines run for pull requests and shared branches without Chromatic", () => {

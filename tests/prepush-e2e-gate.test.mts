@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("pre-push gate verifies the canonical lockfile before the full Playwright suite", async () => {
+test("pre-push gate mirrors Public Readiness before the full Playwright suite", async () => {
   const packageJson = JSON.parse(
     await readFile(new URL("../package.json", import.meta.url), "utf8"),
   ) as { scripts?: Record<string, string> };
 
   assert.equal(
     packageJson.scripts?.prepush,
-    "npm run check:lockfile && npm run test:e2e:ci",
+    "npm run check:lockfile && npm run validate:migrations && npm run lint && npm run typecheck:ci && npm test && npm run audit:security && npm run build && npm run test:e2e:ci",
   );
   assert.match(packageJson.scripts?.["test:e2e:ci"] ?? "", /CI=1/);
   assert.match(
