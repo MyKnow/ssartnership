@@ -344,8 +344,7 @@ else
   echo "Lighthouse 검사를 건너뜁니다."
 fi
 
-echo "Node/Vitest 단위 테스트와 80% 커버리지 게이트를 실행합니다."
-npm test
+run_repository_prepush
 
 echo "Storybook 정적 빌드를 실행합니다."
 npm run build-storybook
@@ -355,8 +354,6 @@ npm run test-storybook
 
 echo "핵심 화면 시각 기준선 비교를 실행합니다."
 npm run test:visual
-
-run_repository_prepush
 
 NEXT_VERSION="$CURRENT_VERSION"
 if [[ "$RELEASE_TYPE" != "none" ]]; then

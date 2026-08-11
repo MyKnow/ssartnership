@@ -1,31 +1,46 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 
-const ALLOWED_ADVISORY_URLS = new Set([
-  "https://github.com/advisories/GHSA-qx2v-qp2m-jg93",
-  // This advisory remains only in dev-only minimatch@3 used by lint tooling;
-  // production dependencies use the patched brace-expansion path and are
-  // checked separately by `npm audit --omit=dev` in CI.
-  "https://github.com/advisories/GHSA-mh99-v99m-4gvg",
-]);
+export function advisoryKey({ packageName, url }) {
+  return `${packageName}:${url}`;
+}
 
-function runNpmAuditJson() {
+export const ALLOWED_DEVELOPMENT_ADVISORIES = new Map(
+  [
+    {
+      packageName: "image-size",
+      url: "https://github.com/advisories/GHSA-w3rx-r6r6-pgpr",
+      reason:
+        "Storybook-only image-size dependency; upstream 2.0.2 has no patched release.",
+    },
+    {
+      packageName: "image-size",
+      url: "https://github.com/advisories/GHSA-5p2g-fcmc-qvqq",
+      reason:
+        "Storybook-only image-size dependency; upstream 2.0.2 has no patched release.",
+    },
+  ].map((advisory) => [advisoryKey(advisory), advisory]),
+);
+
+function runNpmAuditJson({ omitDev = false } = {}) {
+  const args = ["audit", "--json", "--audit-level=moderate"];
+  if (omitDev) {
+    args.push("--omit=dev");
+  }
+
   try {
-    const stdout = execFileSync(
-      "npm",
-      ["audit", "--json", "--audit-level=moderate"],
-      {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
-    return stdout;
+    return execFileSync("npm", args, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
   } catch (error) {
     if (
       error &&
       typeof error === "object" &&
       "stdout" in error &&
-      typeof error.stdout === "string"
+      typeof error.stdout === "string" &&
+      error.stdout.trim()
     ) {
       return error.stdout;
     }
@@ -33,22 +48,29 @@ function runNpmAuditJson() {
   }
 }
 
-function collectAdvisories(report) {
+export function collectAdvisories(report) {
   const vulnerabilities =
     report && typeof report === "object" && "vulnerabilities" in report
       ? report.vulnerabilities
       : {};
+  const seen = new Set();
+  const advisories = [];
 
-  return Object.entries(vulnerabilities ?? {}).flatMap(([name, vulnerability]) => {
+  for (const [packageName, vulnerability] of Object.entries(
+    vulnerabilities ?? {},
+  )) {
     if (!vulnerability || typeof vulnerability !== "object") {
-      return [];
+      continue;
     }
 
     const via = Array.isArray(vulnerability.via) ? vulnerability.via : [];
-    return via
-      .filter((item) => item && typeof item === "object")
-      .map((item) => ({
-        packageName: name,
+    for (const item of via) {
+      if (!item || typeof item !== "object") {
+        continue;
+      }
+
+      const advisory = {
+        packageName,
         severity:
           "severity" in item && typeof item.severity === "string"
             ? item.severity
@@ -58,33 +80,106 @@ function collectAdvisories(report) {
             ? item.title
             : "unknown advisory",
         url: "url" in item && typeof item.url === "string" ? item.url : "",
-      }));
-  });
-}
+        fixAvailable:
+          "fixAvailable" in vulnerability
+            ? vulnerability.fixAvailable
+            : null,
+      };
+      const key = advisoryKey(advisory);
+      if (seen.has(key)) {
+        continue;
+      }
 
-const report = JSON.parse(runNpmAuditJson());
-const advisories = collectAdvisories(report);
-const unknownAdvisories = advisories.filter(
-  (advisory) => !ALLOWED_ADVISORY_URLS.has(advisory.url),
-);
-
-if (unknownAdvisories.length > 0) {
-  console.error("Unexpected npm audit advisories found:");
-  for (const advisory of unknownAdvisories) {
-    console.error(
-      `- [${advisory.severity}] ${advisory.packageName}: ${advisory.title} ${advisory.url}`,
-    );
+      seen.add(key);
+      advisories.push(advisory);
+    }
   }
-  process.exit(1);
+
+  return advisories;
 }
 
-if (advisories.length > 0) {
-  console.warn("Only tracked npm audit advisories remain:");
+export function evaluateAuditPolicy({
+  fullReport,
+  productionReport,
+  allowedDevelopmentAdvisories = ALLOWED_DEVELOPMENT_ADVISORIES,
+}) {
+  const productionFailures = collectAdvisories(productionReport);
+  const productionKeys = new Set(productionFailures.map(advisoryKey));
+  const developmentAdvisories = collectAdvisories(fullReport).filter(
+    (advisory) => !productionKeys.has(advisoryKey(advisory)),
+  );
+  const allowedDevelopment = [];
+  const developmentFailures = [];
+
+  for (const advisory of developmentAdvisories) {
+    const policy = allowedDevelopmentAdvisories.get(advisoryKey(advisory));
+    if (policy && advisory.fixAvailable === false) {
+      allowedDevelopment.push({ ...advisory, reason: policy.reason });
+      continue;
+    }
+
+    developmentFailures.push(advisory);
+  }
+
+  return {
+    productionFailures,
+    developmentFailures,
+    allowedDevelopment,
+  };
+}
+
+function printAdvisories(label, advisories, output = console.error) {
+  output(label);
   for (const advisory of advisories) {
-    console.warn(
+    output(
       `- [${advisory.severity}] ${advisory.packageName}: ${advisory.title} ${advisory.url}`,
     );
   }
 }
 
-console.log("npm audit check passed with tracked advisories only.");
+export function main() {
+  const productionReport = JSON.parse(runNpmAuditJson({ omitDev: true }));
+  const fullReport = JSON.parse(runNpmAuditJson());
+  const result = evaluateAuditPolicy({ fullReport, productionReport });
+
+  if (result.productionFailures.length > 0) {
+    printAdvisories(
+      "Production dependency advisories must be fixed:",
+      result.productionFailures,
+    );
+  }
+
+  if (result.developmentFailures.length > 0) {
+    printAdvisories(
+      "Unexpected or patchable development dependency advisories found:",
+      result.developmentFailures,
+    );
+  }
+
+  if (result.allowedDevelopment.length > 0) {
+    console.warn("Tracked development-only advisories without a patch:");
+    for (const advisory of result.allowedDevelopment) {
+      console.warn(
+        `- [${advisory.severity}] ${advisory.packageName}: ${advisory.title} ${advisory.url}`,
+      );
+      console.warn(`  Reason: ${advisory.reason}`);
+    }
+  }
+
+  if (
+    result.productionFailures.length > 0 ||
+    result.developmentFailures.length > 0
+  ) {
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log("Production dependency audit passed with no advisories.");
+  console.log(
+    "Full dependency policy audit passed with tracked development-only advisories.",
+  );
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}

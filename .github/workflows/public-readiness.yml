@@ -44,10 +44,7 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      - name: Dependency audit
-        run: npm audit --omit=dev
-
-      - name: Security audit
+      - name: Dependency policy audit
         run: npm run audit:security
 
       - name: Production build
