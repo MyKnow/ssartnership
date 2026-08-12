@@ -16,6 +16,12 @@
 
 `main`의 관리자 쿠폰 삭제 안전화 계약은 이미 `dev`의 상위 구현에 포함되어 있었다. 따라서 기능 코드를 과거 버전으로 되돌리지 않고 두 브랜치의 이력만 연결했다.
 
+### 필수 병합 방식
+
+#310은 GitHub의 **Create a merge commit** 방식으로만 `dev`에 병합한다. Squash merge나 rebase merge를 사용하면 `origin/main`이 두 번째 부모라는 이력이 사라져 브랜치 공통 조상이 복구되지 않고, 다음 `dev` → `main` 승격에서 같은 충돌을 다시 만날 수 있다.
+
+병합 직후 생성된 `dev` 커밋에 부모가 두 개이고 그중 하나가 위 `origin/main` 기준 커밋인지 확인한 뒤 Preview 검증을 진행한다.
+
 ## 충돌 해결 결정
 
 | 파일 | 결정 | 보존한 계약 |
@@ -45,10 +51,11 @@ Lint에는 이 작업과 무관한 `tests/admin-log-export-security-contract.tes
 ## 병합 후 Preview 확인
 
 1. #310 PR의 필수 검사가 모두 성공했는지 확인한다.
-2. `dev` 병합 뒤 Vercel Preview와 Preview Supabase sync가 같은 병합 SHA로 완료됐는지 확인한다.
-3. 관리자 제휴처 상세에서 쿠폰 생성·수정·복제와 이력 있는 쿠폰 삭제 차단을 확인한다.
-4. 관리자 상세의 운영 정보·감사 이력·리뷰 지연 로딩 실패 상태를 확인한다.
-5. `git merge-tree origin/main origin/dev`가 미해결 충돌 없이 계산되는지 확인한다.
+2. **Create a merge commit**으로 병합하고 새 `dev` 커밋에 `origin/main` 이력이 부모로 보존됐는지 확인한다.
+3. `dev` 병합 뒤 Vercel Preview와 Preview Supabase sync가 같은 병합 SHA로 완료됐는지 확인한다.
+4. 관리자 제휴처 상세에서 쿠폰 생성·수정·복제와 이력 있는 쿠폰 삭제 차단을 확인한다.
+5. 관리자 상세의 운영 정보·감사 이력·리뷰 지연 로딩 실패 상태를 확인한다.
+6. `git merge-tree origin/main origin/dev`가 미해결 충돌 없이 계산되는지 확인한다.
 
 ## Production 승격 승인 체크리스트
 
