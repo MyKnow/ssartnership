@@ -53,6 +53,10 @@ export default function Footer() {
           <p className="text-xs leading-6">
             Copyright © 2026 {SITE_NAME}. All rights reserved.
           </p>
+          <p className="max-w-3xl text-xs leading-6">
+            Apple, Apple Watch, iPhone, and iPod touch are trademarks of Apple
+            Inc., registered in the U.S. and other countries.
+          </p>
         </div>
 
         <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-4">

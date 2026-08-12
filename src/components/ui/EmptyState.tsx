@@ -5,12 +5,21 @@ export default function EmptyState({
   description,
   className,
   action,
+  messageRole,
 }: {
   title: string;
   description?: string;
   className?: string;
   action?: React.ReactNode;
+  messageRole?: "alert" | "status";
 }) {
+  const message = (
+    <>
+      <p className="text-base font-semibold text-foreground">{title}</p>
+      {description ? <p className="mt-2 ui-body">{description}</p> : null}
+    </>
+  );
+
   return (
     <div
       className={cn(
@@ -18,10 +27,7 @@ export default function EmptyState({
         className,
       )}
     >
-      <p className="text-base font-semibold text-foreground">{title}</p>
-      {description ? (
-        <p className="mt-2 ui-body">{description}</p>
-      ) : null}
+      {messageRole ? <div role={messageRole}>{message}</div> : message}
       {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
     </div>
   );

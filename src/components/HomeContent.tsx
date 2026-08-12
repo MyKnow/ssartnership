@@ -1,5 +1,6 @@
 import HomeView from "@/components/HomeView";
-import { loadHomePartnerDirectory } from "@/lib/home-partner-directory";
+import HomeDirectoryError from "@/components/home-view/HomeDirectoryError";
+import { loadHomePartnerDirectoryState } from "@/lib/home-partner-directory";
 import type { PartnerAudienceKey } from "@/lib/partner-audience";
 
 export default async function HomeContent({
@@ -11,11 +12,21 @@ export default async function HomeContent({
   currentUserId: string | null;
   viewerAudience?: PartnerAudienceKey | null;
 }) {
-  const directory = await loadHomePartnerDirectory({
+  const directoryState = await loadHomePartnerDirectoryState({
     viewerAuthenticated,
     currentUserId,
     viewerAudience,
   });
+
+  if (directoryState.status === "unavailable") {
+    return (
+      <div className="min-w-0">
+        <HomeDirectoryError />
+      </div>
+    );
+  }
+
+  const { directory } = directoryState;
 
   return (
     <div className="min-w-0">

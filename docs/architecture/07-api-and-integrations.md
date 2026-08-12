@@ -37,6 +37,7 @@
 | POST | `/api/member/recovery/email/send` | 복구 세션의 이메일 코드 발송 |
 | POST | `/api/member/recovery/email/verify` | 복구 이메일 코드 검증 및 이메일 로그인 전환 |
 | GET | `/api/certification/avatar/[token]` | QR token 기반 avatar 조회 |
+| GET/POST/DELETE | `/api/wallet/apple/pass` | Apple Wallet `.pkpass` 발급/재다운로드/회원 요청 폐기 |
 
 ### Public/member feature APIs
 
@@ -56,6 +57,8 @@
 | GET | `/api/partners/home-state` | 홈 partner state |
 | POST | `/api/coupons/[couponId]/redeem` | 쿠폰 사용 |
 | POST | `/api/suggest` | 제휴 제안 제출 |
+| GET | `/wallet/verify/[token]` | Apple Wallet 공개 실시간 검증 페이지 |
+| GET | `/api/wallet/apple/avatar/[token]` | Apple Wallet 공개 검증용 승인 프로필 사진 스트리밍 |
 
 ### Push APIs
 
@@ -68,6 +71,16 @@
 | POST | `/api/push/admin/preview` | 관리자 push preview |
 | POST | `/api/push/admin/broadcast` | 관리자 push broadcast |
 | DELETE | `/api/push/admin/logs/[id]` | push log 삭제 |
+
+### Apple Wallet web service APIs
+
+| Method | Route | 목적 |
+| --- | --- | --- |
+| GET | `/api/wallet/apple/v1/devices/[deviceId]/registrations/[passTypeId]` | Apple device library identifier 기준 변경된 serial 조회 |
+| POST/DELETE | `/api/wallet/apple/v1/devices/[deviceId]/registrations/[passTypeId]/[serialNumber]` | Apple Wallet 기기 등록/해제 |
+| GET | `/api/wallet/apple/v1/passes/[passTypeId]/[serialNumber]` | 최신 `.pkpass` 다운로드 |
+| POST | `/api/wallet/apple/v1/log` | Apple Wallet provider log 수신 |
+| GET | `/api/cron/reconcile-apple-wallet-passes` | 설치된 active pass의 자격·동의·snapshot 일일 재검사와 APNs 갱신 |
 
 ### Partner APIs
 
@@ -103,6 +116,7 @@
 - server side에서는 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`를 사용한다.
 - `NEXT_PUBLIC_SUPABASE_URL`은 image remote pattern 등 public 용도만 선택적으로 사용한다.
 - Preview sync는 production data를 preview로 복사하되 member password material과 legacy `members.avatar_base64`만 제거한다. `member_profile_images`와 private `member-profile-images` 객체는 유지해 Preview에서도 실제 프로필 사진을 표시한다.
+- Apple Wallet pass와 device registration은 `member_wallet_passes`, `member_wallet_pass_revisions`, `apple_wallet_device_registrations`, `member_wallet_pass_operations` 및 service-role 전용 RPC(`issue_member_wallet_pass`, `revoke_member_wallet_pass`, `register_apple_wallet_device`, `unregister_apple_wallet_device`, `list_updated_apple_wallet_passes`)로 관리한다.
 
 ### Mattermost
 
@@ -124,6 +138,19 @@
 - VAPID 기반 browser push를 사용한다.
 - 주요 env: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
 - 회원, 관리자, 협력사 subscription table/API가 분리되어 있다.
+
+### Apple Wallet / APNs
+
+- 상세 제품 계약은 [Apple Wallet 회원 인증 패스 MVP](../product/apple-wallet-member-pass-mvp.md)를 따른다.
+- `/certification`에서 발급 전 기존 필수 게이트 우선순위(`비밀번호 변경 -> 필수 약관 동의 -> 본인 사진 -> 원래 목적지`)를 그대로 적용한다.
+- Pass Type ID certificate, private key, Apple WWDR certificate, Wallet master key는 모두 서버 전용 env에서만 읽는다.
+- `APPLE_WALLET_DEVICE_TOKEN_ENCRYPTION_KEY_BASE64`는 정확히 32바이트인 장기 Wallet master key다. APNs token 암호화, device identifier hash, QR 서명, ApplePass 인증은 고정된 서로 다른 HMAC-SHA256 context로 subkey를 파생한다. 설치 수명 중 이 키는 불변이며 회전은 저장 token 재암호화·기기 재등록·패스 재발급을 포함한 별도 migration이다.
+- Apple Wallet이 활성화되면 `NEXT_PUBLIC_SITE_URL`의 명시적인 공개 HTTPS origin이 필수며 fallback을 사용하지 않는다.
+- 공개 검증 경로(`/wallet/verify/[token]`, `/api/wallet/apple/avatar/[token]`)는 `no-store`, `noindex`와 opaque signed token을 사용하고 token 원문을 analytics 식별자나 로그 key로 남기지 않는다.
+- Apple device library identifier는 Wallet master key에서 용도 분리한 HMAC-SHA256 subkey로 hash한다. APNs push token도 별도의 암호화 subkey로 보호한 뒤 `apple_wallet_device_registrations`에 저장한다. master key 회전은 저장 token 재암호화와 기기 hash 재생성·재등록, 기존 패스 재발급 계획이 필요한 별도 작업이다.
+- Vercel cron은 설치된 active pass를 일일 재검사한다. 표시 정보만 달라졌고 자격·동의가 유효하면 새 snapshot revision을 저장하고, 자격 또는 동의가 무효하면 credential을 폐기한 뒤 APNs update를 보낸다. QR 검증은 cron 주기와 무관하게 현재 상태를 즉시 확인한다.
+- APNs가 일시 실패한 설치 pass는 active·revoked 상태 모두 다음 cron에서 재시도하며, 성공 상태의 revoked pass만 조정 큐에서 빠진다.
+- Apple의 `passesUpdatedSince` 목록 커서는 canonical pass의 `updated_at`만 사용한다. 기기 등록·해제 RPC가 registration과 pass 시각을 같은 트랜잭션에서 함께 갱신하므로 필터·정렬·응답 커서가 한 시계를 공유한다.
 
 ### NTS business status
 
@@ -151,6 +178,7 @@
 | Mattermost | `MM_BASE_URL`, `MM_SENDER_CREDENTIALS_KEY_V1`, `MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION` |
 | SMTP | `SMTP_*`, `NAVER_SMTP_*`, `SUGGEST_NOTIFY_EMAIL` |
 | Web Push/Cron | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET` |
+| Apple Wallet | `APPLE_WALLET_ENABLED`, `APPLE_WALLET_TEAM_ID`, `APPLE_WALLET_PASS_TYPE_ID`, `APPLE_WALLET_ORGANIZATION_NAME`, `APPLE_WALLET_CERTIFICATE_BASE64`, `APPLE_WALLET_PRIVATE_KEY_BASE64`, `APPLE_WALLET_PRIVATE_KEY_PASSPHRASE`, `APPLE_WALLET_WWDR_CERTIFICATE_BASE64`, `APPLE_WALLET_DEVICE_TOKEN_ENCRYPTION_KEY_BASE64`, `NEXT_PUBLIC_SITE_URL` |
 | SEO | `NEXT_PUBLIC_SITE_URL` |
 
 ## API design constraints
