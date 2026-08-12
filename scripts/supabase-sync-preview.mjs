@@ -26,6 +26,12 @@ const DEFAULT_CACHE_CONTROL = "31536000";
 const EXCLUDED_PUBLIC_TABLES = [
   "admin_login_attempts",
   "admin_audit_logs",
+  // Keep Preview-local Wallet credentials, revisions, operations, and APNs registrations
+  // out of Production -> Preview restores and preserve them across Preview truncation.
+  "member_wallet_passes",
+  "member_wallet_pass_revisions",
+  "member_wallet_pass_operations",
+  "apple_wallet_device_registrations",
   "auth_security_logs",
   "event_logs",
   "member_auth_attempts",
