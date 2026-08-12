@@ -23,6 +23,13 @@ const walletPassRandomBytesMigration = readFileSync(
   ),
   "utf8",
 );
+const walletDeviceRegistrationMigration = readFileSync(
+  new URL(
+    "../supabase/migrations/20260812182936_fix_apple_wallet_device_registration_conflict.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const schemaSnapshot = readFileSync(
   new URL("../supabase/schema.sql", import.meta.url),
   "utf8",
@@ -198,13 +205,10 @@ test("wallet RPC rows include the domain identity expected by the repository", (
 });
 
 test("Apple device registration distinguishes first registration atomically", () => {
-  const registrationRpc = migration.slice(
-    migration.indexOf("create or replace function public.register_apple_wallet_device"),
-    migration.indexOf("create or replace function public.unregister_apple_wallet_device"),
-  );
+  const registrationRpc = walletDeviceRegistrationMigration;
   assert.match(
     registrationRpc,
-    /inserted_registration_count integer := 0;[\s\S]*on conflict \(pass_id, device_library_identifier_hash\) do nothing[\s\S]*returning \* into registration_row;[\s\S]*get diagnostics inserted_registration_count = row_count;/,
+    /inserted_registration_count integer := 0;[\s\S]*on conflict on constraint apple_wallet_device_registrations_pass_device_key do nothing[\s\S]*returning \* into registration_row;[\s\S]*get diagnostics inserted_registration_count = row_count;/,
   );
   assert.match(
     registrationRpc,
@@ -212,6 +216,27 @@ test("Apple device registration distinguishes first registration atomically", ()
   );
   assert.match(registrationRpc, /inserted_registration_count > 0;/);
   assert.doesNotMatch(registrationRpc, /registration_existed|select exists/);
+  assert.doesNotMatch(
+    registrationRpc,
+    /on conflict \(pass_id, device_library_identifier_hash\)/,
+  );
+  assert.match(
+    migration,
+    /constraint apple_wallet_device_registrations_pass_device_key\s+unique \(pass_id, device_library_identifier_hash\)/,
+  );
+
+  const schemaRegistrationRpc = schemaSnapshot.slice(
+    schemaSnapshot.indexOf(
+      "create or replace function public.register_apple_wallet_device",
+    ),
+    schemaSnapshot.indexOf(
+      "create or replace function public.unregister_apple_wallet_device",
+    ),
+  );
+  assert.equal(
+    schemaRegistrationRpc.trim(),
+    walletDeviceRegistrationMigration.trim(),
+  );
 });
 
 test("credential revocation does not pretend that Apple removed the pass", () => {
