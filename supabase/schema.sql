@@ -2785,7 +2785,7 @@ begin
     p_push_token_key_version,
     now(),
     null
-  ) on conflict (pass_id, device_library_identifier_hash) do nothing
+  ) on conflict on constraint apple_wallet_device_registrations_pass_device_key do nothing
   returning * into registration_row;
   get diagnostics inserted_registration_count = row_count;
 
