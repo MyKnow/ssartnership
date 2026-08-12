@@ -16,6 +16,17 @@ const walletPassResultIndexMigration = readFileSync(
   ),
   "utf8",
 );
+const walletPassRandomBytesMigration = readFileSync(
+  new URL(
+    "../supabase/migrations/20260812173306_qualify_wallet_pass_random_bytes.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const schemaSnapshot = readFileSync(
+  new URL("../supabase/schema.sql", import.meta.url),
+  "utf8",
+);
 const supabaseRepository = readFileSync(
   new URL(
     "../src/lib/repositories/supabase/wallet-pass-repository.supabase.ts",
@@ -94,6 +105,39 @@ test("wallet pass operation result foreign key has a partial covering index", ()
     walletPassResultIndexMigration,
     /create index if not exists member_wallet_pass_operations_result_pass_idx\s+on public\.member_wallet_pass_operations\(result_pass_id\)\s+where result_pass_id is not null;/,
   );
+});
+
+test("wallet pass issuance qualifies extension random bytes under its restricted search path", () => {
+  assert.match(
+    walletPassRandomBytesMigration,
+    /create or replace function public\.issue_member_wallet_pass/,
+  );
+  assert.match(
+    walletPassRandomBytesMigration,
+    /security definer\s+set search_path = public/,
+  );
+  assert.match(
+    walletPassRandomBytesMigration,
+    /encode\(extensions\.gen_random_bytes\(32\), 'base64'\)/,
+  );
+  assert.doesNotMatch(
+    walletPassRandomBytesMigration,
+    /encode\(gen_random_bytes\(32\), 'base64'\)/,
+  );
+  assert.doesNotMatch(
+    walletPassRandomBytesMigration,
+    /set search_path = [^\n]*extensions/,
+  );
+
+  const schemaIssueRpc = schemaSnapshot.slice(
+    schemaSnapshot.indexOf(
+      "create or replace function public.issue_member_wallet_pass",
+    ),
+    schemaSnapshot.indexOf(
+      "create or replace function public.revoke_member_wallet_pass",
+    ),
+  );
+  assert.equal(schemaIssueRpc.trim(), walletPassRandomBytesMigration.trim());
 });
 
 test("wallet snapshot constraints reject extra personal-data fields", () => {

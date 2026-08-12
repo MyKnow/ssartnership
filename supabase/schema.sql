@@ -2172,7 +2172,7 @@ begin
   if not found then
     generated_public_id := rtrim(
       replace(
-        replace(encode(gen_random_bytes(32), 'base64'), '+', '-'),
+        replace(encode(extensions.gen_random_bytes(32), 'base64'), '+', '-'),
         '/',
         '_'
       ),
