@@ -1,18 +1,62 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
-type AttemptState = {
-  id: string;
-  count: number;
-  firstAttemptAt: string;
-  blockedUntil?: string | null;
-};
+export type RateLimitAttemptTable =
+  | "admin_login_attempts"
+  | "member_auth_attempts"
+  | "mattermost_sender_test_attempts"
+  | "partner_auth_attempts"
+  | "partner_registration_attempts"
+  | "suggestion_attempts";
 
 export type RateLimitConfig = {
-  table: string;
+  table: RateLimitAttemptTable;
   windowMs: number;
   maxAttempts: number;
   blockMs: number;
 };
+
+type RecordRateLimitAttemptParameters = {
+  p_table_name: RateLimitAttemptTable;
+  p_identifier: string;
+  p_success: boolean;
+  p_window_ms: number;
+  p_max_attempts: number;
+  p_block_ms: number;
+};
+
+type RecordRateLimitAttemptRpc = (
+  parameters: RecordRateLimitAttemptParameters,
+) => PromiseLike<{ error: unknown }>;
+
+type RateLimitAttemptRecorder = (
+  identifier: string,
+  success: boolean,
+  config: RateLimitConfig,
+) => PromiseLike<RateLimitStorageResult>;
+
+export type RateLimitStorageResult =
+  | { readonly ok: true }
+  | {
+      readonly ok: false;
+      readonly code: "rate_limit_storage_failed";
+    };
+
+export type RateLimitBatchStorageResult =
+  | {
+      readonly ok: true;
+      readonly attemptedCount: number;
+      readonly failedCount: 0;
+    }
+  | {
+      readonly ok: false;
+      readonly code: "rate_limit_storage_failed";
+      readonly attemptedCount: number;
+      readonly failedCount: number;
+    };
+
+function rateLimitStorageFailure(): RateLimitStorageResult {
+  return { ok: false, code: "rate_limit_storage_failed" };
+}
 
 export type RateLimitAttemptScope = "ip" | "account";
 
@@ -87,10 +131,6 @@ export const ADMIN_ACCOUNT_RATE_LIMIT: RateLimitConfig = {
   blockMs: 30 * 60 * 1000,
 };
 
-function toISOString(date: Date) {
-  return date.toISOString();
-}
-
 export async function isBlocked(
   identifier: string,
   config: RateLimitConfig = ADMIN_RATE_LIMIT,
@@ -109,76 +149,46 @@ export async function isBlocked(
   return new Date(data.blocked_until).getTime() > Date.now();
 }
 
+export async function persistRateLimitAttempt(
+  input: {
+    identifier: string;
+    success: boolean;
+    config: RateLimitConfig;
+  },
+  executeRpc: RecordRateLimitAttemptRpc,
+): Promise<RateLimitStorageResult> {
+  let error: unknown;
+
+  try {
+    ({ error } = await executeRpc({
+      p_table_name: input.config.table,
+      p_identifier: input.identifier,
+      p_success: input.success,
+      p_window_ms: input.config.windowMs,
+      p_max_attempts: input.config.maxAttempts,
+      p_block_ms: input.config.blockMs,
+    }));
+  } catch {
+    return rateLimitStorageFailure();
+  }
+
+  if (error) {
+    return rateLimitStorageFailure();
+  }
+
+  return { ok: true };
+}
+
 export async function recordAttempt(
   identifier: string,
   success: boolean,
   config: RateLimitConfig = ADMIN_RATE_LIMIT,
-) {
-  const supabase = getSupabaseAdminClient();
-
-  if (success) {
-    await supabase
-      .from(config.table)
-      .delete()
-      .eq("identifier", identifier);
-    return;
-  }
-
-  const { data } = await supabase
-    .from(config.table)
-    .select("id,count,first_attempt_at,blocked_until")
-    .eq("identifier", identifier)
-    .maybeSingle();
-
-  const now = new Date();
-
-  if (!data) {
-    await supabase.from(config.table).insert({
-      identifier,
-      count: 1,
-      first_attempt_at: toISOString(now),
-    });
-    return;
-  }
-
-  const state: AttemptState = {
-    id: data.id,
-    count: data.count ?? 0,
-    firstAttemptAt: data.first_attempt_at,
-    blockedUntil: data.blocked_until,
-  };
-
-  const windowStart = new Date(state.firstAttemptAt).getTime();
-  if (now.getTime() - windowStart > config.windowMs) {
-    await supabase
-      .from(config.table)
-      .update({
-        count: 1,
-        first_attempt_at: toISOString(now),
-        blocked_until: null,
-      })
-      .eq("id", state.id);
-    return;
-  }
-
-  const nextCount = state.count + 1;
-  const updatePayload: {
-    count: number;
-    blocked_until?: string | null;
-  } = {
-    count: nextCount,
-  };
-
-  if (nextCount >= config.maxAttempts) {
-    updatePayload.blocked_until = toISOString(
-      new Date(now.getTime() + config.blockMs),
-    );
-  }
-
-  await supabase
-    .from(config.table)
-    .update(updatePayload)
-    .eq("id", state.id);
+): Promise<RateLimitStorageResult> {
+  return persistRateLimitAttempt(
+    { identifier, success, config },
+    (parameters) =>
+      getSupabaseAdminClient().rpc("record_rate_limit_attempt", parameters),
+  );
 }
 
 export async function getBlockingState(
@@ -221,11 +231,33 @@ export async function recordAttemptBatch(
   identifiers: string[],
   success: boolean,
   config: RateLimitConfig = ADMIN_RATE_LIMIT,
-) {
+  dependencies: { recordAttempt?: RateLimitAttemptRecorder } = {},
+): Promise<RateLimitBatchStorageResult> {
   const uniqueIdentifiers = [...new Set(identifiers.filter(Boolean))];
-  await Promise.all(
-    uniqueIdentifiers.map((identifier) => recordAttempt(identifier, success, config)),
+  const persistAttempt = dependencies.recordAttempt ?? recordAttempt;
+  const results = await Promise.allSettled(
+    uniqueIdentifiers.map(async (identifier) =>
+      persistAttempt(identifier, success, config),
+    ),
   );
+  const failedCount = results.filter(
+    (result) => result.status === "rejected" || !result.value.ok,
+  ).length;
+
+  if (failedCount > 0) {
+    return {
+      ok: false,
+      code: "rate_limit_storage_failed",
+      attemptedCount: uniqueIdentifiers.length,
+      failedCount,
+    };
+  }
+
+  return {
+    ok: true,
+    attemptedCount: uniqueIdentifiers.length,
+    failedCount: 0,
+  };
 }
 
 export const SUGGEST_RATE_LIMIT: RateLimitConfig = {
