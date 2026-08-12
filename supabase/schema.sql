@@ -6566,6 +6566,14 @@ begin
     and new.id = old.id
     and old.recovery_member_id is not null
     and new.recovery_member_id is null
+    and exists (
+      select 1
+      from public.members anonymizing_member
+      where anonymizing_member.id = old.recovery_member_id
+        and anonymizing_member.deleted_at is not null
+        and anonymizing_member.deleted_at <= now() - interval '30 days'
+        and anonymizing_member.anonymized_at is null
+    )
     and new.email = concat('deleted+', new.id::text, '@deleted.invalid')
     and new.email_normalized = new.email
     and new.legal_name = '탈퇴한 수료생'

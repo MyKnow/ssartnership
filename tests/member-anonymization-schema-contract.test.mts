@@ -7,7 +7,7 @@ const repoRoot = new URL("..", import.meta.url).pathname;
 const migrationName =
   "20260813014223_fix_current_schema_member_anonymization.sql";
 const transitionMigrationName =
-  "20260813021303_allow_member_anonymization_recovery_withdrawal.sql";
+  "20260813022030_require_member_anonymization_gate_for_recovery_withdrawal.sql";
 
 function readRepoFile(path: string) {
   return readFileSync(join(repoRoot, path), "utf8");
@@ -292,6 +292,10 @@ test("approved recovery withdrawal is limited to the anonymization tombstone", (
   assert.match(
     migrationContract,
     /old\.recovery_member_id is not null\s+and new\.recovery_member_id is null/i,
+  );
+  assert.match(
+    migrationContract,
+    /exists \(\s+select 1\s+from public\.members anonymizing_member\s+where anonymizing_member\.id = old\.recovery_member_id\s+and anonymizing_member\.deleted_at is not null\s+and anonymizing_member\.deleted_at <= now\(\) - interval '30 days'\s+and anonymizing_member\.anonymized_at is null\s+\)/i,
   );
   assert.match(
     migrationContract,
