@@ -18,14 +18,26 @@ import {
   resolvePreviewMemberCredentialSeedTarget,
   resolvePreviewMemberCredentialSeedConfig,
 } from "./preview-credential-seed-lib.mjs";
-import { sanitizeDumpSqlForPreview } from "./supabase-sync-preview-lib.mjs";
+import {
+  buildTransactionalPreviewRestoreSql,
+  sanitizeDumpSqlForPreview,
+} from "./supabase-sync-preview-lib.mjs";
 
 const PUBLIC_SCHEMA = "public";
 const CHECK_ONLY_FLAG = "--check-only";
 const DEFAULT_CACHE_CONTROL = "31536000";
+const PREVIEW_LOCAL_WALLET_TABLES = [
+  // Dependency order is also the restore order after the Production data import.
+  "member_wallet_passes",
+  "member_wallet_pass_revisions",
+  "apple_wallet_device_registrations",
+  "member_wallet_pass_operations",
+];
 const EXCLUDED_PUBLIC_TABLES = [
   "admin_login_attempts",
   "admin_audit_logs",
+  // Production Wallet credentials and APNs registrations must never enter Preview.
+  ...PREVIEW_LOCAL_WALLET_TABLES,
   "auth_security_logs",
   "event_logs",
   "member_auth_attempts",
@@ -105,14 +117,6 @@ async function writeGithubOutput(name, value) {
   }
 
   await appendFile(outputPath, `${name}=${value}\n`, "utf8");
-}
-
-function quoteIdentifier(identifier) {
-  return `"${identifier.replace(/"/g, '""')}"`;
-}
-
-function buildQualifiedName(schema, table) {
-  return `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`;
 }
 
 function runCommand(command, args, options = {}) {
@@ -357,35 +361,36 @@ async function sanitizeDumpForPreview(dumpPath, previewDbUrl) {
   await writeFile(dumpPath, sanitized.sql, "utf8");
 }
 
-async function truncatePreviewDatabase(previewDbUrl) {
+async function replacePreviewDatabaseData(dumpPath, restorePath, previewDbUrl) {
   const tables = await listPublicTables(previewDbUrl);
   const targetTables = tables.filter((table) => !EXCLUDED_PUBLIC_TABLES.includes(table));
+  const missingWalletTables = PREVIEW_LOCAL_WALLET_TABLES.filter(
+    (table) => !tables.includes(table),
+  );
+
+  if (missingWalletTables.length > 0) {
+    throw new Error(
+      `Preview Wallet schema is missing ${missingWalletTables.length} required table(s); apply migrations before data sync.`,
+    );
+  }
 
   if (!targetTables.length) {
-    console.log("No preview public tables to truncate.");
+    console.log("No preview public tables to replace.");
     return;
   }
 
-  const truncateSql = `truncate table ${targetTables
-    .map((table) => buildQualifiedName(PUBLIC_SCHEMA, table))
-    .join(", ")} restart identity cascade;`;
+  const productionDumpSql = await readFile(dumpPath, "utf8");
+  const restoreSql = buildTransactionalPreviewRestoreSql({
+    productionDumpSql,
+    schema: PUBLIC_SCHEMA,
+    targetTables,
+    preservedTables: PREVIEW_LOCAL_WALLET_TABLES,
+  });
+  await writeFile(restorePath, restoreSql, "utf8");
 
-  console.log(`Truncating ${targetTables.length} preview public tables...`);
-  await runCommand(
-    "psql",
-    [
-      "--dbname",
-      previewDbUrl,
-      "--set",
-      "ON_ERROR_STOP=1",
-      "--command",
-      truncateSql,
-    ],
+  console.log(
+    `Replacing ${targetTables.length} Preview public tables while preserving local Wallet records...`,
   );
-}
-
-async function restorePreviewDatabase(dumpPath, previewDbUrl) {
-  console.log("Restoring production data into preview...");
   await runCommand(
     "psql",
     [
@@ -393,8 +398,9 @@ async function restorePreviewDatabase(dumpPath, previewDbUrl) {
       previewDbUrl,
       "--set",
       "ON_ERROR_STOP=1",
+      "--single-transaction",
       "--file",
-      dumpPath,
+      restorePath,
     ],
   );
 }
@@ -797,12 +803,12 @@ async function main() {
 
   const tempDir = await mkdtemp(join(tmpdir(), "ssartnership-preview-sync-"));
   const dumpPath = join(tempDir, "production-data.sql");
+  const restorePath = join(tempDir, "preview-restore.sql");
 
   try {
     await dumpProductionDatabase(dumpPath, productionDbUrl);
     await sanitizeDumpForPreview(dumpPath, previewDbUrl);
-    await truncatePreviewDatabase(previewDbUrl);
-    await restorePreviewDatabase(dumpPath, previewDbUrl);
+    await replacePreviewDatabaseData(dumpPath, restorePath, previewDbUrl);
     await seedPreviewAdminPermissions(previewDbUrl);
     await seedPreviewMemberCredentials(previewUrl, previewServiceRoleKey);
     await syncStorageBuckets(

@@ -236,6 +236,8 @@ npm run ci:local
 - `SUPABASE_PREVIEW_ANON_KEY`
 - `*_DB_URL` 값은 Supabase 대시보드에서 복사한 percent-encoded PostgreSQL 연결 문자열을 사용합니다.
 - 로컬 또는 CI에서 동일한 동기화 로직을 재사용하려면 `npm run sync:preview`를 실행합니다.
+- Preview에서 직접 발급한 Apple Wallet 데이터(`member_wallet_passes`, `member_wallet_pass_revisions`, `member_wallet_pass_operations`, `apple_wallet_device_registrations`)는 Production dump 대상에서 제외합니다. Production의 패스와 APNs 기기 등록 정보는 Preview로 복사하지 않습니다.
+- 동기화는 Preview Wallet 원장을 임시 테이블에 보관하고, Production 데이터 교체와 Wallet 원장 복원을 하나의 트랜잭션으로 실행합니다. 참조 회원이 Production 원장에 없거나 복원에 실패하면 전체 데이터 교체를 롤백해 Preview 패스를 조용히 유실하지 않습니다.
 
 `schema.sql`에는 현재 기준 테이블, 정책 문서 v1, MM 유저 디렉토리, Push 관련 스키마, 제휴 업체 `이용 조건` 스키마가 포함되어 있습니다.
 
