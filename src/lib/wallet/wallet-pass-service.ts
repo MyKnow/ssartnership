@@ -10,6 +10,8 @@ import {
   getAppleWalletConfigStatus,
   sendAppleWalletPassUpdate,
 } from "@/lib/wallet/apple";
+import type { AppleWalletConfigStatus } from "@/lib/wallet/apple";
+import type { AppleWalletConfigWarningCode } from "@/lib/wallet/apple/types";
 import {
   decryptApplePushToken,
   type EncryptedApplePushToken,
@@ -58,8 +60,42 @@ export class WalletPassServiceError extends Error {
   }
 }
 
+export type AppleWalletReconcileSkipReason =
+  | "wallet_disabled"
+  | "wallet_config_invalid";
+
+export type ReconcileInstalledAppleWalletPassesResult = {
+  skipped: boolean;
+  scanned: number;
+  invalidated: number;
+  failed: number;
+  truncated: boolean;
+  skipReason: AppleWalletReconcileSkipReason | null;
+  configWarningCodes: AppleWalletConfigWarningCode[];
+  certificateExpiresInDays: number | null;
+};
+
 function requestFingerprint(parts: readonly (string | number)[]) {
   return createHash("sha256").update(JSON.stringify(parts)).digest("hex");
+}
+
+function summarizeAppleWalletConfigObservability(
+  configStatus: AppleWalletConfigStatus,
+): Pick<
+  ReconcileInstalledAppleWalletPassesResult,
+  "skipReason" | "configWarningCodes" | "certificateExpiresInDays"
+> {
+  return {
+    skipReason: configStatus.ok
+      ? null
+      : configStatus.code === "disabled"
+        ? "wallet_disabled"
+        : "wallet_config_invalid",
+    configWarningCodes: configStatus.warnings?.map((warning) => warning.code) ?? [],
+    certificateExpiresInDays: configStatus.ok
+      ? configStatus.config.signerCertificateValidity.expiresInDays
+      : null,
+  };
 }
 
 function mapRepositoryError(error: unknown): never {
@@ -444,9 +480,13 @@ export async function reconcileInstalledAppleWalletPasses(
     batchSize?: number;
     maxPasses?: number;
     notifyPassChange?: typeof notifyAppleWalletPassChange;
+    configStatus?: AppleWalletConfigStatus;
   } = {},
-) {
-  const configStatus = getAppleWalletConfigStatus();
+): Promise<ReconcileInstalledAppleWalletPassesResult> {
+  const configStatus = options.configStatus ?? getAppleWalletConfigStatus();
+  const configObservability = summarizeAppleWalletConfigObservability(
+    configStatus,
+  );
   if (!configStatus.ok) {
     return {
       skipped: true,
@@ -454,6 +494,7 @@ export async function reconcileInstalledAppleWalletPasses(
       invalidated: 0,
       failed: 0,
       truncated: false,
+      ...configObservability,
     };
   }
 
@@ -526,6 +567,7 @@ export async function reconcileInstalledAppleWalletPasses(
     invalidated,
     failed,
     truncated: scanned >= maxPasses && lastBatchWasFull,
+    ...configObservability,
   };
 }
 

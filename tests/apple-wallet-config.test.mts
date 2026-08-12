@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { X509Certificate } from "node:crypto";
 import test from "node:test";
 
 import {
@@ -7,7 +8,26 @@ import {
 } from "@/lib/wallet/apple";
 
 const envNames = getAppleWalletEnvironmentNames();
-const base64Pem = Buffer.from("-----BEGIN CERTIFICATE-----\nZmFrZQ==\n-----END CERTIFICATE-----").toString("base64");
+const signerCertificatePem = `-----BEGIN CERTIFICATE-----
+MIIDJzCCAg+gAwIBAgIUL9LhxGZsKfYjc6iSEuI75iMyInAwDQYJKoZIhvcNAQEL
+BQAwIzEhMB8GA1UEAwwYc3NhcnRuZXJzaGlwLXdhbGxldC10ZXN0MB4XDTI2MDgx
+MjE2MDkwNFoXDTI3MDgxMjE2MDkwNFowIzEhMB8GA1UEAwwYc3NhcnRuZXJzaGlw
+LXdhbGxldC10ZXN0MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7SYY
+ToCUfRHM7q5x9M65yJwe7Y4s9M3WvvT4KQZ1DccqHvO4l6iMZtN50h2nvsz8fTv8
+t/GcRhhgMGhNeVWX90ZNde1A6tZigG9b5c6/309qFueBZU+U+LQvUE36H7OqvToC
+6xVI7Ei5jUJyORFBCIKlQuvYZxqzOOTi8CakDDEBSApTXhZNn/PVrnufQGWPw2Oe
+8C/ZviG5XwoDSoMs4OtwQPKCgH+U7RzeXl/g9AsvftwTErTSYfOB9vvorY6Xvqag
+Bfuhq5bQEXLTvQBd0JX/BFTvnUatNqB605OsyrOEmgGxy3SWyvZGjm+lSSjHzOy6
+6/dR+vfe5ssX8a9xuwIDAQABo1MwUTAdBgNVHQ4EFgQU/2zVCHI4jUB+qZIX6LD8
+jOi1KO8wHwYDVR0jBBgwFoAU/2zVCHI4jUB+qZIX6LD8jOi1KO8wDwYDVR0TAQH/
+BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAUElMhzusC4dy6VmhnfA+do0SvPxk
+NSK+7f1ExxQj8lgKuRGs7XVFCNZrrI6WC6+wkrTIWaWuBOv0H1wNmVaRSFJyDT2i
+n4mMpZA9vHxZ09mVWeriSLgeLgPx82LgcyULjv9kxXjOGFv6Z+YHHS/jeRPCQUJz
+uetYNdvhh2gm+IYMXt9L69qjzku5/7Awea5w4h+tx0084tjqCt7NMONPgCeSOV6i
+ocPkgHOpZtaA1+chF1S9W55iD9u4A8GPsi8Hb7f98Gf2u6OQJuMEko8t1OCvIZqF
+nKSZC+IjBruCE6hve0uGD+wDuZvS1X5zzpErjj6CpQJccrlBj2F4r0j9nQ==
+-----END CERTIFICATE-----`;
+const base64Pem = Buffer.from(signerCertificatePem).toString("base64");
 const base64Key = Buffer.from("-----BEGIN PRIVATE KEY-----\nZmFrZQ==\n-----END PRIVATE KEY-----").toString("base64");
 
 function buildValidEnv() {
@@ -110,6 +130,7 @@ test("apple wallet config returns decoded buffers for valid env", () => {
   assert.ok(status.config.signerKey.length > 0);
   assert.ok(status.config.wwdr.length > 0);
   assert.equal(status.config.deviceTokenEncryptionKey.length, 32);
+  assert.equal(status.config.signerCertificateValidity.expiringSoon, false);
 });
 
 test("apple wallet config requires an explicit public HTTPS site URL", () => {
@@ -155,4 +176,46 @@ test("apple wallet config rejects a master key that is not exactly 32 bytes", ()
     );
     assert.equal(status.message.includes(invalidKey.toString("base64")), false);
   }
+});
+
+test("apple wallet config rejects Pass Type certificates that are not yet valid", () => {
+  const certificate = new X509Certificate(signerCertificatePem);
+  const status = getAppleWalletConfigStatus(buildValidEnv(), {
+    now: new Date(new Date(certificate.validFrom).getTime() - 1_000),
+  });
+
+  assert.equal(status.ok, false);
+  assert.equal(status.code, "invalid_env");
+  assert.equal(status.invalidEnv, "APPLE_WALLET_CERTIFICATE_BASE64");
+  assert.match(status.message, /아직 유효하지 않습니다/);
+});
+
+test("apple wallet config rejects expired Pass Type certificates", () => {
+  const certificate = new X509Certificate(signerCertificatePem);
+  const status = getAppleWalletConfigStatus(buildValidEnv(), {
+    now: new Date(new Date(certificate.validTo).getTime() + 1_000),
+  });
+
+  assert.equal(status.ok, false);
+  assert.equal(status.code, "invalid_env");
+  assert.equal(status.invalidEnv, "APPLE_WALLET_CERTIFICATE_BASE64");
+  assert.match(status.message, /만료되었습니다/);
+});
+
+test("apple wallet config surfaces expiring-soon Pass Type certificates without leaking cert contents", () => {
+  const certificate = new X509Certificate(signerCertificatePem);
+  const status = getAppleWalletConfigStatus(buildValidEnv(), {
+    now: new Date(new Date(certificate.validTo).getTime() - 5 * 24 * 60 * 60 * 1_000),
+  });
+
+  assert.equal(status.ok, true);
+  assert.equal(status.config.signerCertificateValidity.expiringSoon, true);
+  assert.ok(status.config.signerCertificateValidity.expiresInDays <= 5);
+  assert.deepEqual(status.warnings?.map((warning) => warning.code), [
+    "certificate_expiring_soon",
+  ]);
+  assert.equal(
+    status.warnings?.[0]?.message.includes(signerCertificatePem),
+    false,
+  );
 });

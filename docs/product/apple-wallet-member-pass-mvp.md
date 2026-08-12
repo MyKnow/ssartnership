@@ -101,7 +101,11 @@ QR에는 충분히 긴 임의 public ID와 서버 서명만 넣는다. 검증 �
 
 ## 운영과 복구
 
-- pass 인증서 만료일을 운영 체크리스트로 관리하고 만료 전에 교체한다.
+- pass 인증서는 `notBefore` 이전이면 발급·웹서비스를 즉시 막고, `notAfter` 이후면 설정 오류로 간주한다.
+- pass 인증서 만료가 30일 이내로 들어오면 health/config 경계에서 경고를 노출해 교체 일정을 앞당긴다.
+- Apple의 device unregister는 유효한 PassKit 인증을 통과했지만 서버에 패스가 이미 없는 경우에도 `200` no-op으로 처리한다. malformed serial, 잘못된 PassKit authorization, 잘못된 pass type은 계속 거절한다.
+- Preview sync는 Production Wallet 테이블을 가져오지 않고, Preview-local Wallet 테이블만 트랜잭션 안에서 백업·복원한다. Preview schema에 Wallet 테이블이 빠져 있으면 sync를 중단하고 migration 적용을 먼저 요구한다.
+- register, unregister, sync 관측성은 집계용 outcome과 reasonCode만 남기고 serial, device identifier, push token, authorization token, member ID는 로그·분석 속성에 남기지 않는다.
 - 발급 실패는 안전한 코드만 저장하고 provider 원문 오류나 키 정보를 저장하지 않는다.
 - Apple update push가 지연되더라도 QR 검증은 항상 현재 상태를 반환해야 한다.
 - 설치된 active pass는 일일 조정 작업에서 현재 자격·동의·표시 snapshot을 재검사한다. 자격과 동의가 유효한 정보 변경은 새 revision으로 원자적으로 반영하고, 자격 또는 동의가 무효해진 credential은 폐기한다. 두 경우 모두 APNs update를 보내며 다음 조정에서는 같은 변경을 반복하지 않는다.

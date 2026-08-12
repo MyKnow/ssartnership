@@ -1,7 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { headers } from 'next/headers';
-import { after } from 'next/server';
-import { getAdminSession } from '@/lib/auth';
+import { after } from 'next/server.js';
 import {
   type AdminAuditAction,
   type AuthSecurityEventName,
@@ -13,8 +11,6 @@ import { normalizeProductEventLocation } from '@/lib/product-event-path';
 import { redactAuthSecurityExceptionProperties } from '@/lib/auth-security-log-sanitize';
 import { sanitizeLogProperties, type LogJsonValue } from '@/lib/log-sanitization';
 import { getSupabaseAdminClient } from '@/lib/supabase/server';
-import { getSignedUserSession } from '@/lib/user-auth';
-import { getPartnerSession } from '@/lib/partner-session';
 import { sanitizeProductEventTargetId } from '@/lib/activity-log-targets';
 import { getClientIp } from '@/lib/client-ip';
 import type { AuditActorType } from '@/lib/audit-rpc-context';
@@ -137,6 +133,7 @@ function getOccurredAt(value?: string | null) {
 export async function getServerActionLogContext(
   fallbackPath?: string,
 ): Promise<BaseLogContext> {
+  const { headers } = await import('next/headers.js');
   const headerStore = await headers();
   const referrer = headerStore.get('referer');
   const referrerPath = getPathFromValue(referrer);
@@ -167,6 +164,12 @@ export async function resolveCurrentActor(): Promise<{
   actorType: EventActorType;
   actorId: string | null;
 }> {
+  const [{ getSignedUserSession }, { getAdminSession }, { getPartnerSession }] =
+    await Promise.all([
+      import('@/lib/user-auth'),
+      import('@/lib/auth'),
+      import('@/lib/partner-session'),
+    ]);
   const memberSession = await getSignedUserSession();
   if (memberSession?.userId) {
     return {
@@ -247,6 +250,7 @@ export function scheduleProductEventLog(input: ProductLogInput) {
 }
 
 export async function logAdminAudit(input: AdminAuditInput) {
+  const { getAdminSession } = await import('@/lib/auth');
   const adminSession = await getAdminSession();
   const actorId = input.actorId ?? adminSession?.adminId ?? 'system';
   return insertLog('admin_audit_logs', {
@@ -267,6 +271,7 @@ export async function logAdminAuditBatch(inputs: readonly AdminAuditInput[]) {
   if (inputs.length === 0) {
     return true;
   }
+  const { getAdminSession } = await import('@/lib/auth');
   const adminSession = await getAdminSession();
   const payloads = inputs.map((input) => {
     const actorId = input.actorId ?? adminSession?.adminId ?? "system";

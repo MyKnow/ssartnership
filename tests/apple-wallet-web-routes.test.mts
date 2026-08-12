@@ -1,8 +1,29 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { MOCK_MEMBER_ID } from "../src/lib/mock/member.ts";
 import { decryptApplePushToken } from "../src/lib/wallet/apple/apple-wallet-device-token.ts";
 import { deriveAppleWalletAuthenticationToken } from "../src/lib/wallet/wallet-pass-token.ts";
+
+const signerCertificatePem = `-----BEGIN CERTIFICATE-----
+MIIDJzCCAg+gAwIBAgIUL9LhxGZsKfYjc6iSEuI75iMyInAwDQYJKoZIhvcNAQEL
+BQAwIzEhMB8GA1UEAwwYc3NhcnRuZXJzaGlwLXdhbGxldC10ZXN0MB4XDTI2MDgx
+MjE2MDkwNFoXDTI3MDgxMjE2MDkwNFowIzEhMB8GA1UEAwwYc3NhcnRuZXJzaGlw
+LXdhbGxldC10ZXN0MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7SYY
+ToCUfRHM7q5x9M65yJwe7Y4s9M3WvvT4KQZ1DccqHvO4l6iMZtN50h2nvsz8fTv8
+t/GcRhhgMGhNeVWX90ZNde1A6tZigG9b5c6/309qFueBZU+U+LQvUE36H7OqvToC
+6xVI7Ei5jUJyORFBCIKlQuvYZxqzOOTi8CakDDEBSApTXhZNn/PVrnufQGWPw2Oe
+8C/ZviG5XwoDSoMs4OtwQPKCgH+U7RzeXl/g9AsvftwTErTSYfOB9vvorY6Xvqag
+Bfuhq5bQEXLTvQBd0JX/BFTvnUatNqB605OsyrOEmgGxy3SWyvZGjm+lSSjHzOy6
+6/dR+vfe5ssX8a9xuwIDAQABo1MwUTAdBgNVHQ4EFgQU/2zVCHI4jUB+qZIX6LD8
+jOi1KO8wHwYDVR0jBBgwFoAU/2zVCHI4jUB+qZIX6LD8jOi1KO8wDwYDVR0TAQH/
+BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAUElMhzusC4dy6VmhnfA+do0SvPxk
+NSK+7f1ExxQj8lgKuRGs7XVFCNZrrI6WC6+wkrTIWaWuBOv0H1wNmVaRSFJyDT2i
+n4mMpZA9vHxZ09mVWeriSLgeLgPx82LgcyULjv9kxXjOGFv6Z+YHHS/jeRPCQUJz
+uetYNdvhh2gm+IYMXt9L69qjzku5/7Awea5w4h+tx0084tjqCt7NMONPgCeSOV6i
+ocPkgHOpZtaA1+chF1S9W55iD9u4A8GPsi8Hb7f98Gf2u6OQJuMEko8t1OCvIZqF
+nKSZC+IjBruCE6hve0uGD+wDuZvS1X5zzpErjj6CpQJccrlBj2F4r0j9nQ==
+-----END CERTIFICATE-----`;
 
 function applyAppleWalletEnv() {
   process.env.NEXT_PUBLIC_DATA_SOURCE = "mock";
@@ -11,13 +32,13 @@ function applyAppleWalletEnv() {
   process.env.APPLE_WALLET_PASS_TYPE_ID = "pass.com.ssartnership.member";
   process.env.APPLE_WALLET_ORGANIZATION_NAME = "SSARTNERSHIP";
   process.env.APPLE_WALLET_CERTIFICATE_BASE64 = Buffer.from(
-    "-----BEGIN CERTIFICATE-----\nZmFrZQ==\n-----END CERTIFICATE-----",
+    signerCertificatePem,
   ).toString("base64");
   process.env.APPLE_WALLET_PRIVATE_KEY_BASE64 = Buffer.from(
     "-----BEGIN PRIVATE KEY-----\nZmFrZQ==\n-----END PRIVATE KEY-----",
   ).toString("base64");
   process.env.APPLE_WALLET_WWDR_CERTIFICATE_BASE64 = Buffer.from(
-    "-----BEGIN CERTIFICATE-----\nZmFrZQ==\n-----END CERTIFICATE-----",
+    signerCertificatePem,
   ).toString("base64");
   process.env.APPLE_WALLET_DEVICE_TOKEN_ENCRYPTION_KEY_BASE64 = Buffer.alloc(
     32,
@@ -237,6 +258,104 @@ test("unrelated auth secret rotation preserves an existing device registration",
     },
   );
   assert.equal(unregisterResponse.status, 200);
+});
+
+test("authorized unregister is a safe 200 no-op when the pass no longer exists", async () => {
+  applyAppleWalletEnv();
+  const registerRoute = await import(
+    "../src/app/api/wallet/apple/v1/devices/[deviceId]/registrations/[passTypeId]/[serialNumber]/route.ts"
+  );
+  const orphanPublicId = "A".repeat(43);
+
+  const response = await registerRoute.DELETE(
+    new Request("https://example.com/api/wallet/apple/v1/devices", {
+      method: "DELETE",
+      headers: createApplePassHeaders(orphanPublicId),
+    }),
+    {
+      params: Promise.resolve({
+        deviceId: "device-orphan-2000",
+        passTypeId: process.env.APPLE_WALLET_PASS_TYPE_ID ?? "",
+        serialNumber: `sp-${orphanPublicId}`,
+      }),
+    },
+  );
+
+  assert.equal(response.status, 200);
+});
+
+test("orphan unregister still rejects invalid ApplePass authorization", async () => {
+  applyAppleWalletEnv();
+  const registerRoute = await import(
+    "../src/app/api/wallet/apple/v1/devices/[deviceId]/registrations/[passTypeId]/[serialNumber]/route.ts"
+  );
+
+  const response = await registerRoute.DELETE(
+    new Request("https://example.com/api/wallet/apple/v1/devices", {
+      method: "DELETE",
+      headers: {
+        authorization: "ApplePass wrong",
+      },
+    }),
+    {
+      params: Promise.resolve({
+        deviceId: "device-orphan-4010",
+        passTypeId: process.env.APPLE_WALLET_PASS_TYPE_ID ?? "",
+        serialNumber: `sp-${"A".repeat(43)}`,
+      }),
+    },
+  );
+
+  assert.equal(response.status, 401);
+});
+
+test("apple wallet web-service routes emit privacy-safe device observability only", () => {
+  const registrationRoute = readFileSync(
+    new URL(
+      "../src/app/api/wallet/apple/v1/devices/[deviceId]/registrations/[passTypeId]/[serialNumber]/route.ts",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const syncRoute = readFileSync(
+    new URL(
+      "../src/app/api/wallet/apple/v1/devices/[deviceId]/registrations/[passTypeId]/route.ts",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  assert.match(registrationRoute, /wallet_pass_device_register/);
+  assert.match(registrationRoute, /wallet_pass_device_unregister/);
+  assert.match(syncRoute, /wallet_pass_sync/);
+  assert.match(registrationRoute, /scheduleProductEventLog/);
+  assert.match(syncRoute, /scheduleProductEventLog/);
+  assert.doesNotMatch(registrationRoute, /queueMicrotask/);
+  assert.doesNotMatch(syncRoute, /queueMicrotask/);
+  assert.doesNotMatch(registrationRoute, /import\("@\/lib\/activity-logs"\)/);
+  assert.doesNotMatch(syncRoute, /import\("@\/lib\/activity-logs"\)/);
+
+  const propertyBlocks = [
+    ...registrationRoute.matchAll(
+      /logWalletDeviceEvent\([^,]+,\s*\{([\s\S]{0,300}?)\}\);/g,
+    ),
+    ...syncRoute.matchAll(
+      /logWalletSyncEvent\(\{([\s\S]{0,300}?)\}\);/g,
+    ),
+  ].map((match) => match[1] ?? "");
+
+  assert.ok(propertyBlocks.length >= 5);
+
+  for (const block of propertyBlocks) {
+    assert.doesNotMatch(block, /targetId:/);
+    assert.doesNotMatch(block, /deviceId:/);
+    assert.doesNotMatch(block, /pushToken:/);
+    assert.doesNotMatch(block, /authorization:/);
+    assert.doesNotMatch(block, /memberId:/);
+    assert.doesNotMatch(block, /publicId:/);
+  }
+
+  assert.match(syncRoute, /syncScope:\s*"device_updates"/);
 });
 
 test("apple wallet latest pass route honors authorization and If-Modified-Since before rebuilding", async () => {

@@ -2,13 +2,33 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
+const signerCertificatePem = `-----BEGIN CERTIFICATE-----
+MIIDJzCCAg+gAwIBAgIUL9LhxGZsKfYjc6iSEuI75iMyInAwDQYJKoZIhvcNAQEL
+BQAwIzEhMB8GA1UEAwwYc3NhcnRuZXJzaGlwLXdhbGxldC10ZXN0MB4XDTI2MDgx
+MjE2MDkwNFoXDTI3MDgxMjE2MDkwNFowIzEhMB8GA1UEAwwYc3NhcnRuZXJzaGlw
+LXdhbGxldC10ZXN0MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7SYY
+ToCUfRHM7q5x9M65yJwe7Y4s9M3WvvT4KQZ1DccqHvO4l6iMZtN50h2nvsz8fTv8
+t/GcRhhgMGhNeVWX90ZNde1A6tZigG9b5c6/309qFueBZU+U+LQvUE36H7OqvToC
+6xVI7Ei5jUJyORFBCIKlQuvYZxqzOOTi8CakDDEBSApTXhZNn/PVrnufQGWPw2Oe
+8C/ZviG5XwoDSoMs4OtwQPKCgH+U7RzeXl/g9AsvftwTErTSYfOB9vvorY6Xvqag
+Bfuhq5bQEXLTvQBd0JX/BFTvnUatNqB605OsyrOEmgGxy3SWyvZGjm+lSSjHzOy6
+6/dR+vfe5ssX8a9xuwIDAQABo1MwUTAdBgNVHQ4EFgQU/2zVCHI4jUB+qZIX6LD8
+jOi1KO8wHwYDVR0jBBgwFoAU/2zVCHI4jUB+qZIX6LD8jOi1KO8wDwYDVR0TAQH/
+BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAUElMhzusC4dy6VmhnfA+do0SvPxk
+NSK+7f1ExxQj8lgKuRGs7XVFCNZrrI6WC6+wkrTIWaWuBOv0H1wNmVaRSFJyDT2i
+n4mMpZA9vHxZ09mVWeriSLgeLgPx82LgcyULjv9kxXjOGFv6Z+YHHS/jeRPCQUJz
+uetYNdvhh2gm+IYMXt9L69qjzku5/7Awea5w4h+tx0084tjqCt7NMONPgCeSOV6i
+ocPkgHOpZtaA1+chF1S9W55iD9u4A8GPsi8Hb7f98Gf2u6OQJuMEko8t1OCvIZqF
+nKSZC+IjBruCE6hve0uGD+wDuZvS1X5zzpErjj6CpQJccrlBj2F4r0j9nQ==
+-----END CERTIFICATE-----`;
+
 process.env.NEXT_PUBLIC_DATA_SOURCE = "mock";
 process.env.APPLE_WALLET_ENABLED = "true";
 process.env.APPLE_WALLET_TEAM_ID = "ABCDE12345";
 process.env.APPLE_WALLET_PASS_TYPE_ID = "pass.com.ssartnership.member";
 process.env.APPLE_WALLET_ORGANIZATION_NAME = "싸트너십";
 process.env.APPLE_WALLET_CERTIFICATE_BASE64 = Buffer.from(
-  "-----BEGIN CERTIFICATE-----\nZmFrZQ==\n-----END CERTIFICATE-----",
+  signerCertificatePem,
 ).toString("base64");
 process.env.APPLE_WALLET_PRIVATE_KEY_BASE64 = Buffer.from(
   "-----BEGIN PRIVATE KEY-----\nZmFrZQ==\n-----END PRIVATE KEY-----",
@@ -27,9 +47,22 @@ const { MOCK_MEMBER_ID, recordMockRequiredPolicyConsent } = await import(
 const { walletPassRepository } = await import(
   "../src/lib/repositories/wallet-pass.ts"
 );
-const { reconcileInstalledAppleWalletPasses } = await import(
+const {
+  reconcileInstalledAppleWalletPasses,
+} = await import(
   "../src/lib/wallet/wallet-pass-service.ts"
 );
+const { getAppleWalletConfigStatus } = await import(
+  "../src/lib/wallet/apple/index.ts"
+);
+
+function getBaselineConfigStatus() {
+  const status = getAppleWalletConfigStatus(process.env, {
+    now: new Date("2026-08-12T16:09:04.000Z"),
+  });
+  assert.equal(status.ok, true);
+  return status;
+}
 
 test("daily reconciliation persists a changed snapshot before the Apple update", async () => {
   recordMockRequiredPolicyConsent(MOCK_MEMBER_ID, {
@@ -68,6 +101,7 @@ test("daily reconciliation persists a changed snapshot before the Apple update",
   const result = await reconcileInstalledAppleWalletPasses({
     batchSize: 10,
     maxPasses: 10,
+    configStatus: getBaselineConfigStatus(),
     notifyPassChange: async (pass) => {
       notifiedPassIds.push(pass.id);
       assert.equal(pass.syncStatus, "pending");
@@ -86,11 +120,15 @@ test("daily reconciliation persists a changed snapshot before the Apple update",
     invalidated: 1,
     failed: 0,
     truncated: false,
+    skipReason: null,
+    configWarningCodes: [],
+    certificateExpiresInDays: 365,
   });
 
   const converged = await reconcileInstalledAppleWalletPasses({
     batchSize: 10,
     maxPasses: 10,
+    configStatus: getBaselineConfigStatus(),
     notifyPassChange: async () => {
       assert.fail("a converged pass must not be pushed again");
     },
@@ -101,6 +139,9 @@ test("daily reconciliation persists a changed snapshot before the Apple update",
     invalidated: 0,
     failed: 0,
     truncated: false,
+    skipReason: null,
+    configWarningCodes: [],
+    certificateExpiresInDays: 365,
   });
 
   await walletPassRepository.markWalletPassSyncFailure({
@@ -111,6 +152,7 @@ test("daily reconciliation persists a changed snapshot before the Apple update",
   const retriedActive = await reconcileInstalledAppleWalletPasses({
     batchSize: 10,
     maxPasses: 10,
+    configStatus: getBaselineConfigStatus(),
     notifyPassChange: async (pass) => {
       activeRetryCount += 1;
       assert.equal(pass.credentialStatus, "active");
@@ -134,6 +176,7 @@ test("daily reconciliation persists a changed snapshot before the Apple update",
   const retriedRevoked = await reconcileInstalledAppleWalletPasses({
     batchSize: 10,
     maxPasses: 10,
+    configStatus: getBaselineConfigStatus(),
     notifyPassChange: async (pass) => {
       revokedRetryCount += 1;
       assert.equal(pass.credentialStatus, "revoked");
@@ -148,11 +191,97 @@ test("daily reconciliation persists a changed snapshot before the Apple update",
   const revokedConverged = await reconcileInstalledAppleWalletPasses({
     batchSize: 10,
     maxPasses: 10,
+    configStatus: getBaselineConfigStatus(),
     notifyPassChange: async () => {
       assert.fail("a synced revoked pass must leave the reconciliation queue");
     },
   });
   assert.equal(revokedConverged.scanned, 0);
+  assert.equal(revokedConverged.skipReason, null);
+  assert.deepEqual(revokedConverged.configWarningCodes, []);
+  assert.equal(revokedConverged.certificateExpiresInDays, 365);
+});
+
+test("reconciliation surfaces safe skip reasons and certificate warnings", async () => {
+  const disabled = await reconcileInstalledAppleWalletPasses({
+    configStatus: {
+      ok: false,
+      code: "disabled",
+      enabled: false,
+      message: "disabled",
+    },
+  });
+  assert.deepEqual(disabled, {
+    skipped: true,
+    scanned: 0,
+    invalidated: 0,
+    failed: 0,
+    truncated: false,
+    skipReason: "wallet_disabled",
+    configWarningCodes: [],
+    certificateExpiresInDays: null,
+  });
+
+  const invalid = await reconcileInstalledAppleWalletPasses({
+    configStatus: {
+      ok: false,
+      code: "invalid_env",
+      enabled: true,
+      invalidEnv: "APPLE_WALLET_CERTIFICATE_BASE64",
+      message: "invalid",
+    },
+  });
+  assert.deepEqual(invalid, {
+    skipped: true,
+    scanned: 0,
+    invalidated: 0,
+    failed: 0,
+    truncated: false,
+    skipReason: "wallet_config_invalid",
+    configWarningCodes: [],
+    certificateExpiresInDays: null,
+  });
+
+  const expiringSoonStatus = getAppleWalletConfigStatus(
+    {
+      APPLE_WALLET_ENABLED: "true",
+      APPLE_WALLET_TEAM_ID: "ABCDE12345",
+      APPLE_WALLET_PASS_TYPE_ID: "pass.com.ssartnership.member",
+      APPLE_WALLET_ORGANIZATION_NAME: "싸트너십",
+      APPLE_WALLET_CERTIFICATE_BASE64: Buffer.from(
+        signerCertificatePem,
+      ).toString("base64"),
+      APPLE_WALLET_PRIVATE_KEY_BASE64: Buffer.from(
+        "-----BEGIN PRIVATE KEY-----\nZmFrZQ==\n-----END PRIVATE KEY-----",
+      ).toString("base64"),
+      APPLE_WALLET_WWDR_CERTIFICATE_BASE64: Buffer.from(
+        signerCertificatePem,
+      ).toString("base64"),
+      APPLE_WALLET_DEVICE_TOKEN_ENCRYPTION_KEY_BASE64: Buffer.alloc(
+        32,
+        7,
+      ).toString("base64"),
+      NEXT_PUBLIC_SITE_URL: "https://ssartnership.example.com",
+    },
+    {
+      now: new Date("2027-08-07T16:09:04.000Z"),
+    },
+  );
+  assert.equal(expiringSoonStatus.ok, true);
+
+  const withWarning = await reconcileInstalledAppleWalletPasses({
+    batchSize: 1,
+    maxPasses: 1,
+    configStatus: expiringSoonStatus,
+    notifyPassChange: async () => {
+      assert.fail("warning-only config should not change the reconciliation flow");
+    },
+  });
+  assert.equal(withWarning.skipped, false);
+  assert.deepEqual(withWarning.configWarningCodes, [
+    "certificate_expiring_soon",
+  ]);
+  assert.equal(withWarning.certificateExpiresInDays, 5);
 });
 
 test("reconciliation route is secret-gated and scheduled without exposing pass ids", () => {
@@ -169,6 +298,13 @@ test("reconciliation route is secret-gated and scheduled without exposing pass i
   assert.match(route, /request\.headers\.get\("authorization"\)/);
   assert.doesNotMatch(route, /isAdminSession|adminAuthorized/);
   assert.match(route, /reconcileInstalledAppleWalletPasses\(\)/);
+  assert.match(route, /scheduleProductEventLog/);
+  assert.match(route, /syncScope:\s*"daily_reconcile"/);
+  assert.match(route, /configWarningCodes/);
+  assert.match(route, /certificateExpiresInDays/);
+  assert.match(route, /reasonCode:\s*result\.skipReason/);
+  assert.doesNotMatch(route, /queueMicrotask/);
+  assert.doesNotMatch(route, /import\("@\/lib\/activity-logs"\)/);
   assert.doesNotMatch(route, /publicId|memberId|passId/);
   assert.match(vercel, /\/api\/cron\/reconcile-apple-wallet-passes/);
 });

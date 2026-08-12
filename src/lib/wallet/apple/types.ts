@@ -7,6 +7,13 @@ export const APPLE_WALLET_CONFIG_CODES = [
 
 export type AppleWalletConfigCode = (typeof APPLE_WALLET_CONFIG_CODES)[number];
 
+export const APPLE_WALLET_CONFIG_WARNING_CODES = [
+  "certificate_expiring_soon",
+] as const;
+
+export type AppleWalletConfigWarningCode =
+  (typeof APPLE_WALLET_CONFIG_WARNING_CODES)[number];
+
 export type AppleWalletPassInput = {
   serialNumber: string;
   authenticationToken: string;
@@ -33,6 +40,12 @@ export type AppleWalletConfig = {
    * domain-separated subkey before use.
    */
   deviceTokenEncryptionKey: Buffer;
+  signerCertificateValidity: {
+    notBefore: string;
+    notAfter: string;
+    expiresInDays: number;
+    expiringSoon: boolean;
+  };
   signerKeyPassphrase?: string;
 };
 
@@ -40,6 +53,10 @@ type AppleWalletBaseStatus = {
   code: AppleWalletConfigCode;
   enabled: boolean;
   message: string;
+  warnings?: readonly {
+    code: AppleWalletConfigWarningCode;
+    message: string;
+  }[];
 };
 
 export type AppleWalletConfigOkStatus = AppleWalletBaseStatus & {
