@@ -1,6 +1,26 @@
 const SENSITIVE_PATH_PATTERNS: Array<readonly [RegExp, string]> = [
   [/^\/verify\/[^/?#]+(?=\/|$|[?#])/, "/verify/[token]"],
   [
+    /^\/wallet\/verify\/[^/?#]+(?=\/|$|[?#])/,
+    "/wallet/verify/[token]",
+  ],
+  [
+    /^\/api\/wallet\/apple\/avatar\/[^/?#]+(?=\/|$|[?#])/,
+    "/api/wallet/apple/avatar/[token]",
+  ],
+  [
+    /^\/api\/wallet\/apple\/v1\/devices\/[^/?#]+\/registrations\/[^/?#]+\/[^/?#]+(?=\/|$|[?#])/,
+    "/api/wallet/apple/v1/devices/[deviceId]/registrations/[passTypeId]/[serialNumber]",
+  ],
+  [
+    /^\/api\/wallet\/apple\/v1\/devices\/[^/?#]+\/registrations\/[^/?#]+(?=\/|$|[?#])/,
+    "/api/wallet/apple/v1/devices/[deviceId]/registrations/[passTypeId]",
+  ],
+  [
+    /^\/api\/wallet\/apple\/v1\/passes\/[^/?#]+\/[^/?#]+(?=\/|$|[?#])/,
+    "/api/wallet/apple/v1/passes/[passTypeId]/[serialNumber]",
+  ],
+  [
     /^\/api\/partner\/setup\/[^/?#]+(?=\/|$|[?#])/,
     "/api/partner/setup/[token]",
   ],

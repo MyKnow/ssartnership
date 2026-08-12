@@ -67,6 +67,12 @@
 | `member_policy_consents` | 회원별 정책 동의 기록 |
 | `ssafy_cycle_settings` | 기준 기수/연도/월 설정 |
 | `ssafy_cohort_card_themes` | 기수 인증 카드 테마 |
+| `member_wallet_passes` | 회원별 canonical Apple Wallet credential, 공개 `public_id`, serial, 현재 snapshot, 발급/폐기/sync 상태 |
+| `member_wallet_pass_revisions` | Wallet 표시 snapshot과 동의 버전 이력 |
+| `apple_wallet_device_registrations` | Apple device library identifier hash, APNs push token 암호문, 마지막 등록/제거 시각 |
+| `member_wallet_pass_operations` | 발급/폐기 idempotency key, request fingerprint, 결과 pass/revision 연결 |
+
+Wallet QR 서명과 Apple `authenticationToken` 원문은 DB에 저장하지 않는다. `public_id`, Pass Type ID, 설치 수명 동안 불변인 32바이트 Wallet master key로 값을 결정적으로 만들되 QR 서명, ApplePass 인증, device library identifier hash, APNs token 암호화마다 HMAC-SHA256 context가 다른 subkey를 파생한다. `APPLE_WALLET_AUTH_SECRET*`는 Wallet 발급·검증 계약에 사용하지 않는다. Master key 회전은 단순 환경 변수 교체가 아니라 저장 APNs token 재암호화, device hash 재생성 또는 재등록, 기존 pass 폐기·재발급과 QR 교체를 포함하는 별도 migration이다.
 
 ### Reviews, favorites, coupons, ads
 
@@ -155,6 +161,12 @@
 | `set_ad_coupons_updated_at` | ad coupon timestamp |
 | `set_event_reward_draws_updated_at` | event reward draw timestamp |
 | `set_event_reward_winners_updated_at` | event reward winner timestamp |
+| `issue_member_wallet_pass` | Apple Wallet credential 생성/재발급, snapshot revision 기록, idempotency 보장 |
+| `revoke_member_wallet_pass` | Apple Wallet credential 폐기, 동일 member/platform 재시도 보호 |
+| `reconcile_member_wallet_pass_content` | 설치된 active pass의 표시 snapshot revision 갱신 또는 자격·동의 상실 credential 폐기 |
+| `register_apple_wallet_device` | Apple device registration upsert, 설치 상태 갱신, APNs push token 암호문 저장 |
+| `unregister_apple_wallet_device` | Apple device registration 제거, 설치 상태 갱신 |
+| `list_updated_apple_wallet_passes` | device library identifier 기준 변경된 serial 목록 조회 |
 
 ## RLS and indexes
 
@@ -173,3 +185,4 @@
 - admin permission resource/action: `admin-permissions.ts`의 상수와 DB row가 일치해야 한다.
 - notification audience별 table 분리: member/admin/partner notification을 섞지 않는다.
 - password/session/token 원문은 DB와 로그에 저장하지 않는다.
+- Wallet 발급 선행 조건은 별도 저장 상태가 아니라 현재 회원 상태에서 계산한다. 게이트 우선순위는 기존과 동일하게 `비밀번호 변경 -> 필수 약관 동의 -> 본인 사진 -> 원래 목적지`다.

@@ -39,6 +39,10 @@
     {
       "path": "/api/cron/purge-expired-operational-logs",
       "schedule": "50 0 * * *"
+    },
+    {
+      "path": "/api/cron/reconcile-apple-wallet-passes",
+      "schedule": "15 1 * * *"
     }
   ]
 }

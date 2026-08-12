@@ -51,7 +51,7 @@ const mockRouteInventoryBase = [
     routePath: "/certification",
     surface: "public",
     authScope: "member",
-    viewComponent: "CertificationView",
+    viewComponent: "CertificationView + AppleWalletPassSection",
     dataSources: ["api-route", "storybook"],
     requiredScenarioIds: ["public.certification.qr-valid"],
   },
@@ -145,6 +145,15 @@ const mockRouteInventoryBase = [
     viewComponent: "VerifyTokenPage",
     dataSources: ["api-route"],
     requiredScenarioIds: ["public.verify.token"],
+  },
+  {
+    routePath: "/wallet/verify/[token]",
+    surface: "public",
+    authScope: "public",
+    viewComponent: "AppleWalletVerifyPage",
+    dataSources: ["repository", "service"],
+    requiredScenarioIds: ["public.verify.token"],
+    notes: "Apple Wallet QR의 불투명 토큰을 실시간 회원 상태와 대조합니다.",
   },
   {
     routePath: "/auth/change-password",
@@ -739,6 +748,11 @@ const routeContracts: Record<string, RouteContractDefinition> = {
     routeKind: "conditional",
     screenContractId: "public.verify-token",
     primaryTask: "인증 QR 토큰의 유효성과 구성원 상태를 확인한다.",
+  },
+  "/wallet/verify/[token]": {
+    routeKind: "conditional",
+    screenContractId: "public.wallet-pass-verify",
+    primaryTask: "Apple Wallet 패스 QR의 현재 유효성과 구성원 상태를 확인한다.",
   },
   "/auth/change-password": {
     routeKind: "conditional",
