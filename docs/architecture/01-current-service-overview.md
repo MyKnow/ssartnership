@@ -2,7 +2,9 @@
 
 작성 기준일: 2026-07-09
 
-최종 교정일: 2026-07-17
+최종 교정일: 2026-08-13
+
+코드 기준선: `origin/dev`의 `44b63485`. `dev`에 통합됐지만 Production 승격 전인 기능은 별도로 표시한다.
 
 ## 서비스 목적
 
@@ -26,7 +28,7 @@ SSARTNERSHIP, 제품명 "싸트너십"은 SSAFY 구성원을 위한 제휴 혜�
 | 지역 제휴 관리자 | 배정 캠퍼스의 제휴처와 회사 운영 | 관리자 권한 + campus scope |
 | 파트너 계정 | 파트너사/제휴처/변경 요청/리뷰/플랜/알림/지원 관리 | `partner_session` HMAC httpOnly 쿠키 |
 | 시스템/cron | 회원 동기화, RSS, 알림, 프로모션 만료, 결제 배치 | `CRON_SECRET`, 서버 전용 환경 변수 |
-| 외부 서비스 | Mattermost, Supabase, SMTP, Web Push, 공공데이터포털, Vercel | 서비스별 credential |
+| 외부 서비스 | Mattermost, Supabase, SMTP, Web Push, Apple Wallet/APNs, 공공데이터포털, Vercel | 서비스별 credential |
 
 ## 핵심 도메인
 
@@ -38,12 +40,13 @@ SSARTNERSHIP, 제품명 "싸트너십"은 SSAFY 구성원을 위한 제휴 혜�
 - 광고/쿠폰/프로모션: 광고 캠페인, 쿠폰 발급/사용, 홈 프로모션 슬라이드, 이벤트 리워드.
 - 알림/Push: 회원, 관리자, 파트너 대상 notification, push subscription, delivery log, operational notification.
 - 로그/메트릭: product analytics, admin audit, auth security, partner metric rollups, unique visitor.
+- 회원 월렛: `dev`에는 Apple Wallet generic 회원 패스 발급·폐기·기기 등록·실시간 QR 검증이 통합돼 있다. Production 승격과 운영 가드는 [Issue #301](https://github.com/MyKnow/ssartnership/issues/301) 및 [#308](https://github.com/MyKnow/ssartnership/issues/308)의 승인 경계를 따른다.
 
 ## 현재 기술 스택
 
 | 영역 | 구현 |
 | --- | --- |
-| Framework | Next.js `16.2.6`, App Router |
+| Framework | Next.js `16.2.11`, App Router |
 | Runtime/UI | React `19.2.3`, TypeScript `^5` |
 | Styling | Tailwind CSS v4, custom CSS token, Pretendard webfont |
 | Data | Supabase JS `^2.99.0`, Supabase PostgreSQL |
@@ -51,7 +54,6 @@ SSARTNERSHIP, 제품명 "싸트너십"은 SSAFY 구성원을 위한 제휴 혜�
 | Auth primitives | HMAC signed httpOnly cookies, Mattermost DM code HMAC, AES-256-GCM sender credential, password hashes |
 | Forms/validation | Zod `^4.4.3`, shared validation helpers |
 | Charts | Recharts `^3.8.1` |
-| Motion | Framer Motion `^12.38.0` |
 | Icons | Heroicons, lucide-react, react-icons |
 | Media | Next Image, Supabase Storage, image proxy/cache helpers, image crop components |
 | Push | `web-push`, VAPID |
@@ -77,3 +79,4 @@ SSARTNERSHIP, 제품명 "싸트너십"은 SSAFY 구성원을 위한 제휴 혜�
 - 일부 파트너 포털 초기 설정 repository는 현재 façade가 남아 있으며, 실제 범위/권한/대시보드 데이터는 별도 helper와 Supabase query로 처리된다.
 - 모든 주요 Supabase 테이블은 RLS가 켜져 있으나, 앱 서버는 service role admin client를 통해 서버 경계에서 필요한 데이터 접근을 수행한다.
 - SEO surface는 metadata, canonical, sitemap, robots, RSS, JSON-LD를 포함한다.
+- SSAFY Verify runtime reader·writer·route는 제거됐지만 Production에는 레거시 proof 13행, Mattermost alias 8행과 미사용 Vercel env가 남아 있다. 현재 판정은 삭제 보류이며 [2026-08-13 운영 감사](../operations/ssafy-verify-legacy-removal-readiness-2026-08-13.md)의 승인·함수 교체 순서를 따른다.

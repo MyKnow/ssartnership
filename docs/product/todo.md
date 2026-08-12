@@ -2,9 +2,9 @@
 
 정렬 기준: 영향 범위 × 위험도 × 구현 효과. 위에 있는 항목일수록 먼저 처리한다.
 
-최종 점검: 2026-07-21
+최종 점검: 2026-08-13
 
-최신화 기준: Mattermost 직접 연동과 운영자 Sender registry가 현행 인증 기준이다. 이전 SSAFY Verify 기록은 아래 역사 섹션으로 보존한다.
+최신화 기준: Mattermost 직접 연동과 운영자 Sender registry가 현행 인증 기준이다. `dev` 통합과 Production 승격을 구분하고, 이전 SSAFY Verify 기록은 아래 역사 섹션으로 보존한다.
 
 ## 스키마·API·운영 성능 정비 (Issue #181)
 
@@ -16,7 +16,7 @@
 - [x] `/admin/members`의 대량 Mattermost 동기화는 300초 Vercel 함수 제한을 넘길 수 있으므로, cursor 기반 `1~100`건 관리자 명시 배치 실행으로 분리했다. durable job으로 확장하지 않고 현재 운영 경계와 이어하기 계약을 유지한다.
 - [x] 직접 PostgREST `event_logs` INSERT producer inventory를 완료했다. 애플리케이션 producer는 없고 service-role `ingest_product_event` RPC와 database trigger가 기록 경계를 소유하므로, 외부 계약을 추측해 batch ingest로 변경하지 않는다.
 - [x] `get_admin_logs_summary`는 bounded summary/cursor page RPC와 query-level Server-Timing으로 관찰한다. 최근 Preview 측정에서 raw row 무제한 적재와 temporary write 경로는 확인되지 않았으며, 실제 측정 근거가 없는 speculative index/rollup 변경은 하지 않는다.
-- [x] `mm_user_directory.legacy_ssafy_mattermost_user_id` query·owner inventory를 완료했다. Production에 non-null 8건이 남아 있어 drop migration을 만들지 않았고, 30일 재평가일 `2026-08-12`를 기록한다.
+- [x] 2026-08-13에 `mm_user_directory.legacy_ssafy_mattermost_user_id`를 재감사했다. Production non-null 8건, Verify proof 13건, Verify delivery 0건을 확인했고 보관·rollback 승인이 없어 drop migration을 만들지 않았다. 근거: [SSAFY Verify 레거시 삭제 준비도 감사](../operations/ssafy-verify-legacy-removal-readiness-2026-08-13.md).
 - [x] 페이지네이션·mutation UX의 bounded pending·재시도·cursor batch 계약을 focused test와 기존 Storybook/E2E gate로 점검했다. 정적 검색으로 전역 일괄 변경하지 않는다.
 
 ## Mattermost 직접 연동 전환 (Issue #155)
@@ -25,10 +25,21 @@
 - [x] 직접 Mattermost client, 수동 조회·알림·프로필/사진/lifecycle 전환
 - [x] direct DM 가입·재설정 코드와 MM 장애 이메일 복구
 - [x] 기존 회원 복구 request kind와 관리자 명시 대상 연결, 새 회원 행 생성 차단
-- [x] SSAFY Verify runtime/UI/routes/env 제거 및 direct 경로 컷오버
-- [ ] Preview/Production Sender 활성화와 7일 안정화 확인 후 Verify 전용 데이터·스키마·cron·테스트 forward migration 정리
+- [x] SSAFY Verify runtime/UI/routes와 코드 env reader 제거 및 direct 경로 컷오버
+- [ ] Verify rollback·보관 결정을 승인한 뒤 익명화 함수와 휴면 `ssafy_sub` 계약을 먼저 고치고, proof table·legacy alias·Vercel env를 별도 forward cleanup으로 정리
 
-남은 항목은 Sender 운영 smoke와 안정화 기간 종료 뒤의 명시적 데이터 정리이다.
+현재 Production 삭제 판정은 `HOLD`다. Vercel에 미사용 Verify env 12개 엔트리가 남아 있고, 탈퇴 익명화 함수가 레거시 table과 이미 제거된 컬럼을 참조한다. 삭제 migration과 env 변경은 위 운영 감사의 명시적 승인 전에는 진행하지 않는다.
+
+## `dev` 통합 완료·Production 승격 대기
+
+| Issue | `dev` 근거 | 현재 남은 gate |
+| --- | --- | --- |
+| [#291](https://github.com/MyKnow/ssartnership/issues/291) | [PR #292](https://github.com/MyKnow/ssartnership/pull/292), [Public Readiness 성공](https://github.com/MyKnow/ssartnership/actions/runs/30452254334) | Preview 통합 확인과 Production 승격 |
+| [#293](https://github.com/MyKnow/ssartnership/issues/293) | [PR #294](https://github.com/MyKnow/ssartnership/pull/294), [Public Readiness 성공](https://github.com/MyKnow/ssartnership/actions/runs/30697804651) | Preview 운영 흐름 확인과 Production 승격 |
+| [#295](https://github.com/MyKnow/ssartnership/issues/295) | [PR #296](https://github.com/MyKnow/ssartnership/pull/296), [Public Readiness 성공](https://github.com/MyKnow/ssartnership/actions/runs/30707380720) | 실제 신청 행·상세 이동 Preview 증빙과 Production 승격 |
+| [#297](https://github.com/MyKnow/ssartnership/issues/297) | [PR #299](https://github.com/MyKnow/ssartnership/pull/299), Preview READY·관련 회귀 53건 통과 | Production SMTP 호환 설정·배포·실제 발송 smoke |
+| [#300](https://github.com/MyKnow/ssartnership/issues/300) | [PR #303](https://github.com/MyKnow/ssartnership/pull/303), [Public Readiness 성공](https://github.com/MyKnow/ssartnership/actions/runs/31453546265) | Production 승격; patch 없는 dev-only `image-size` advisory 추적 |
+| [#301](https://github.com/MyKnow/ssartnership/issues/301) | [PR #304](https://github.com/MyKnow/ssartnership/pull/304)~[#307](https://github.com/MyKnow/ssartnership/pull/307) | [#308](https://github.com/MyKnow/ssartnership/issues/308) 운영 가드, Preview 실제 기기, Production 승인 |
 
 ## 공개 readiness 보완 (Issue #55)
 
