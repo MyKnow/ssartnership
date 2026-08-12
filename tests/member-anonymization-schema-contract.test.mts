@@ -6,6 +6,8 @@ import test from "node:test";
 const repoRoot = new URL("..", import.meta.url).pathname;
 const migrationName =
   "20260813014223_fix_current_schema_member_anonymization.sql";
+const transitionMigrationName =
+  "20260813021303_allow_member_anonymization_recovery_withdrawal.sql";
 
 function readRepoFile(path: string) {
   return readFileSync(join(repoRoot, path), "utf8");
@@ -32,6 +34,19 @@ function extractFunctionBody(contract: string) {
   const match = contract.match(/\bas \$\$\n([\s\S]*?)\n\$\$;/i);
   assert.ok(match, "PL/pgSQL function body must exist");
   return match[1];
+}
+
+function extractLatestStatusTransitionContract(sql: string) {
+  const signature =
+    "create or replace function public.enforce_graduate_verification_status_transition()";
+  const start = sql.lastIndexOf(signature);
+  assert.notEqual(start, -1, "graduate verification transition function must exist");
+
+  const functionTail = sql.slice(start);
+  const end = functionTail.indexOf("\n$$;");
+  assert.notEqual(end, -1, "transition function must have a complete body");
+
+  return functionTail.slice(0, end + "\n$$;".length).trim();
 }
 
 function getCurrentMemberColumns(schemaSql: string) {
@@ -254,6 +269,49 @@ test("member anonymization privileges and schema snapshot exactly match the migr
   assert.match(
     migrationContract,
     /grant execute on function public\.anonymize_deleted_member\(uuid\) to service_role;/i,
+  );
+});
+
+test("approved recovery withdrawal is limited to the anonymization tombstone", () => {
+  const migrationSql = readRepoFile(
+    `supabase/migrations/${transitionMigrationName}`,
+  );
+  const schemaSql = readRepoFile("supabase/schema.sql");
+  const migrationContract = extractLatestStatusTransitionContract(migrationSql);
+  const schemaContract = extractLatestStatusTransitionContract(schemaSql);
+
+  assert.equal(schemaContract, migrationContract);
+  assert.match(
+    migrationContract,
+    /old\.status = 'approved'\s+and new\.status = 'withdrawn'/i,
+  );
+  assert.match(
+    migrationContract,
+    /old\.request_kind = 'existing_member_recovery'\s+and new\.request_kind = old\.request_kind/i,
+  );
+  assert.match(
+    migrationContract,
+    /old\.recovery_member_id is not null\s+and new\.recovery_member_id is null/i,
+  );
+  assert.match(
+    migrationContract,
+    /new\.email = concat\('deleted\+', new\.id::text, '@deleted\.invalid'\)\s+and new\.email_normalized = new\.email\s+and new\.legal_name = '탈퇴한 수료생'/i,
+  );
+  for (const sensitiveColumn of [
+    "document_number_hmac",
+    "certificate_storage_path",
+    "certificate_sha256",
+    "review_note",
+    "rejection_reason",
+  ]) {
+    assert.match(
+      migrationContract,
+      new RegExp(`new\\.${sensitiveColumn} is null`, "i"),
+    );
+  }
+  assert.match(
+    migrationContract,
+    /raise exception 'invalid_graduate_verification_status_transition'/i,
   );
 });
 
