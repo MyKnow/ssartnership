@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
@@ -24,8 +24,13 @@ export default function MemberEmailRecoveryForm() {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [pending, setPending] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   function resetMessage() {
     setMessage(null);
@@ -166,7 +171,12 @@ export default function MemberEmailRecoveryForm() {
             />
             {fieldErrors.password ? <FormMessage variant="error">{fieldErrors.password}</FormMessage> : null}
           </label>
-          <Button type="submit" loading={pending} loadingText="확인 중">
+          <Button
+            type="submit"
+            disabled={!hydrated}
+            loading={pending}
+            loadingText="확인 중"
+          >
             기존 비밀번호 확인
           </Button>
         </form>
@@ -211,11 +221,24 @@ export default function MemberEmailRecoveryForm() {
             </label>
           ) : null}
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant={step === "code" ? "secondary" : "primary"} loading={pending} loadingText="전송 중" onClick={sendCode}>
+            <Button
+              type="button"
+              variant={step === "code" ? "secondary" : "primary"}
+              disabled={!hydrated}
+              loading={pending}
+              loadingText="전송 중"
+              onClick={sendCode}
+            >
               {step === "code" ? "인증 코드 다시 보내기" : "인증 코드 보내기"}
             </Button>
             {step === "code" ? (
-              <Button type="button" loading={pending} loadingText="확인 중" onClick={verifyCode}>
+              <Button
+                type="button"
+                disabled={!hydrated}
+                loading={pending}
+                loadingText="확인 중"
+                onClick={verifyCode}
+              >
                 이메일 인증 및 전환
               </Button>
             ) : null}
