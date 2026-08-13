@@ -6676,15 +6676,45 @@ begin
   if old.status = new.status then
     return new;
   end if;
-  if not (
+
+  if (
     (old.status = 'draft' and new.status in ('submitted', 'withdrawn'))
     or (old.status = 'submitted' and new.status in ('in_review', 'withdrawn'))
     or (old.status = 'in_review' and new.status in ('needs_resubmission', 'approved', 'rejected'))
     or (old.status = 'needs_resubmission' and new.status in ('submitted', 'withdrawn'))
   ) then
-    raise exception 'invalid_graduate_verification_status_transition';
+    return new;
   end if;
-  return new;
+
+  if old.status = 'approved'
+    and new.status = 'withdrawn'
+    and old.request_kind = 'existing_member_recovery'
+    and new.request_kind = old.request_kind
+    and new.id = old.id
+    and old.recovery_member_id is not null
+    and new.recovery_member_id is null
+    and exists (
+      select 1
+      from public.members anonymizing_member
+      where anonymizing_member.id = old.recovery_member_id
+        and anonymizing_member.deleted_at is not null
+        and anonymizing_member.deleted_at <= now() - interval '30 days'
+        and anonymizing_member.anonymized_at is null
+    )
+    and new.email = concat('deleted+', new.id::text, '@deleted.invalid')
+    and new.email_normalized = new.email
+    and new.legal_name = '탈퇴한 수료생'
+    and new.document_number_hmac is null
+    and new.certificate_storage_path is null
+    and new.certificate_sha256 is null
+    and new.certificate_deleted_at is not null
+    and new.review_note is null
+    and new.rejection_reason is null
+  then
+    return new;
+  end if;
+
+  raise exception 'invalid_graduate_verification_status_transition';
 end;
 $$;
 drop trigger if exists graduate_verification_requests_status_transition on public.graduate_verification_requests;
@@ -10185,24 +10215,43 @@ begin
   delete from public.member_profile_images where member_id = p_member_id;
   delete from public.member_ssafy_verifications where member_id = p_member_id;
   delete from public.member_email_challenges where member_id = p_member_id;
+  delete from public.member_email_login_transitions where member_id = p_member_id;
   delete from public.member_password_action_tokens where member_id = p_member_id;
-  delete from public.member_auth_identities where member_id = p_member_id;
+
+  -- The normalized member contract dropped this legacy table. Keep cleanup
+  -- compatible with a lagging environment without making it a dependency of
+  -- the current Production function.
+  if pg_catalog.to_regclass('public.member_auth_identities') is not null then
+    execute 'delete from public.member_auth_identities where member_id = $1'
+      using p_member_id;
+  end if;
+
   delete from public.graduate_profiles where member_id = p_member_id;
 
-  if verification_request_uuid is not null then
-    update public.graduate_verification_requests
-    set email = concat('deleted+', verification_request_uuid::text, '@deleted.invalid'),
-        email_normalized = concat('deleted+', verification_request_uuid::text, '@deleted.invalid'),
-        legal_name = '탈퇴한 수료생',
-        document_number_hmac = null,
-        certificate_storage_path = null,
-        certificate_sha256 = null,
-        certificate_deleted_at = coalesce(certificate_deleted_at, now()),
-        review_note = null,
-        rejection_reason = null,
-        updated_at = now()
-    where id = verification_request_uuid;
-  end if;
+  update public.graduate_verification_requests as request
+  set email = concat('deleted+', request.id::text, '@deleted.invalid'),
+      email_normalized = concat('deleted+', request.id::text, '@deleted.invalid'),
+      legal_name = '탈퇴한 수료생',
+      document_number_hmac = null,
+      certificate_storage_path = null,
+      certificate_sha256 = null,
+      certificate_deleted_at = coalesce(request.certificate_deleted_at, now()),
+      review_note = null,
+      rejection_reason = null,
+      status = case
+        when request.request_kind = 'existing_member_recovery'
+          and request.recovery_member_id = p_member_id
+          and request.status = 'approved'
+        then 'withdrawn'
+        else request.status
+      end,
+      recovery_member_id = case
+        when request.recovery_member_id = p_member_id then null
+        else request.recovery_member_id
+      end,
+      updated_at = now()
+  where request.id = verification_request_uuid
+     or request.recovery_member_id = p_member_id;
 
   update public.members
   set email = null,
@@ -10216,32 +10265,9 @@ begin
       campus = null,
       staff_source_generation = null,
       mattermost_account_id = null,
-      mm_user_id = null,
-      mm_username = null,
-      ssafy_sub = null,
-      ssafy_verified_at = null,
-      ssafy_auth_time = null,
-      ssafy_verification_id = null,
-      ssafy_mattermost_user_id = null,
-      ssafy_track = null,
-      ssafy_track_name = null,
-      ssafy_last_scope = null,
-      avatar_content_type = null,
-      avatar_base64 = null,
-      avatar_url = null,
-      graduate_verified_at = null,
-      graduate_completion_stage = null,
-      verification_source = null,
-      admin_permission_id = null,
-      admin_managed_campus_slugs = '{}',
-      service_policy_version = null,
-      service_policy_consented_at = null,
-      privacy_policy_version = null,
-      privacy_policy_consented_at = null,
-      marketing_policy_version = null,
-      marketing_policy_consented_at = null,
-      active_profile_image_id = null,
-      profile_photo_review_status = 'approved',
+      mattermost_login_disabled_at = null,
+      mattermost_login_disabled_reason = null,
+      auth_session_version = auth_session_version + 1,
       anonymized_at = now(),
       updated_at = now()
   where id = p_member_id;
