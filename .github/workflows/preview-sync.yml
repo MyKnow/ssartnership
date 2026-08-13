@@ -3,7 +3,8 @@ name: Sync Preview Supabase
 on:
   workflow_run:
     workflows:
-      - Verify Node Lockfile
+      - Public Readiness
+    branches: [dev]
     types:
       - completed
   workflow_dispatch:
@@ -12,14 +13,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: preview-sync-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
-  cancel-in-progress: true
+  group: preview-sync
+  cancel-in-progress: false
 
 jobs:
   sync-preview:
     if: >-
       ${{
-        (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main') ||
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev') ||
         (
           github.event_name == 'workflow_run' &&
           github.event.workflow_run.conclusion == 'success' &&
@@ -54,42 +55,69 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         uses: actions/checkout@v7
 
+      - name: Guard stale dev workflow SHA
+        if: github.event_name == 'workflow_run'
+        id: stale-sha
+        shell: bash
+        env:
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          current_dev_sha="$(git ls-remote origin refs/heads/dev | awk '{print $1}')"
+          if [[ -z "$current_dev_sha" ]]; then
+            echo "::error::Could not resolve origin/dev while validating the triggering workflow SHA."
+            exit 1
+          fi
+
+          if [[ "$current_dev_sha" != "$RUN_SHA" ]]; then
+            echo "is_current=false" >> "$GITHUB_OUTPUT"
+            echo "Preview sync skipped because dev advanced from $RUN_SHA to $current_dev_sha."
+            exit 0
+          fi
+
+          echo "is_current=true" >> "$GITHUB_OUTPUT"
+
       - name: Setup Node
+        if: github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true'
         uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
 
       - name: Install PostgreSQL client
+        if: github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
       - name: Install dependencies
+        if: github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true'
         run: npm ci
 
       - name: Validate Supabase migrations
+        if: github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true'
         run: npm run validate:migrations
 
       - name: Set up Supabase CLI
+        if: github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true'
         uses: supabase/setup-cli@v2
         with:
           version: latest
           github-token: ${{ github.token }}
 
       - name: Check preview database connection
+        if: github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true'
         id: preview-db
         run: node scripts/supabase-sync-preview.mjs --check-only
 
       - name: Apply preview migrations before sync
-        if: steps.preview-db.outputs.preview_database_available != 'false'
+        if: (github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true') && steps.preview-db.outputs.preview_database_available != 'false'
         run: supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes --include-all
 
       - name: Sync production data and storage to preview
         id: sync-preview-data
-        if: steps.preview-db.outputs.preview_database_available != 'false'
+        if: (github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true') && steps.preview-db.outputs.preview_database_available != 'false'
         run: npm run sync:preview
 
       - name: Verify preview migrations after sync
-        if: steps.preview-db.outputs.preview_database_available != 'false'
+        if: (github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true') && steps.preview-db.outputs.preview_database_available != 'false'
         run: supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes --include-all
