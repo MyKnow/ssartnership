@@ -117,11 +117,13 @@ test("Storybook and visual baselines run for pull requests and shared branches w
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /concurrency:\s*\n\s+group:/);
   assert.match(workflow, /cancel-in-progress:\s+true/);
-  assert.match(workflow, /runs-on:\s+macos-14/);
-  assert.match(workflow, /npm run build-storybook/);
   assert.match(
     workflow,
-    /npm run build-storybook[\s\S]+?playwright install chromium[\s\S]+?npm run test-storybook[\s\S]+?npm run test:visual/,
+    /interaction:[\s\S]+?runs-on:\s+ubuntu-latest[\s\S]+?npm run build-storybook[\s\S]+?playwright install --with-deps chromium[\s\S]+?npm run test-storybook/,
+  );
+  assert.match(
+    workflow,
+    /visual:[\s\S]+?runs-on:\s+macos-14[\s\S]+?playwright install chromium[\s\S]+?npm run test:visual/,
   );
   assert.match(
     preview,
