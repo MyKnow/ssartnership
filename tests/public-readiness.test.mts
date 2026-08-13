@@ -40,10 +40,6 @@ test("public readiness CI workflow gates launch-critical checks", () => {
     workflow,
     /if:\s*\$\{\{\s*github\.event_name != 'pull_request' \|\| !github\.event\.pull_request\.draft\s*\}\}/,
   );
-  assert.match(
-    workflow,
-    /jobs:\s*\n\s+verify:\s*\n\s+name: Lint, Test, Build, Security, E2E[\s\S]+?name: Verify lockfile\s*\n\s+run: npm run check:lockfile/,
-  );
 });
 
 test("active workflows use the current Node 24 GitHub action majors", () => {
@@ -105,22 +101,21 @@ test("Storybook interaction runs automatically, isolates shared state, and keeps
   );
 });
 
-test("lockfile verification avoids duplicate feature-branch runs while retaining pull request coverage", () => {
-  const workflow = readRepoFile(".github/workflows/lockfile-check.yml");
-
-  assert.match(workflow, /push:\s*\n\s+branches:\s*\[main, dev\]/);
-  assert.match(workflow, /^\s+pull_request:\s*$/m);
-  assert.match(workflow, /concurrency:\s*\n\s+group:/);
-  assert.match(workflow, /cancel-in-progress:\s+true/);
-  assert.doesNotMatch(
-    workflow,
-    /if:\s*\$\{\{\s*github\.event_name != 'pull_request' \|\| !github\.event\.pull_request\.draft\s*\}\}/,
+test("Public Readiness owns canonical lockfile verification without a standalone workflow", () => {
+  const workflowsDirectory = new URL("../.github/workflows/", import.meta.url);
+  const workflowNames = readdirSync(workflowsDirectory);
+  const publicReadiness = readRepoFile(
+    ".github/workflows/public-readiness.yml",
   );
-  assert.match(workflow, /run: npm run check:lockfile/);
-  assert.match(workflow, /run: npm ci/);
-  assert.doesNotMatch(
-    workflow,
-    /npm install --package-lock-only --ignore-scripts/,
+
+  assert.equal(workflowNames.includes("lockfile-check.yml"), false);
+  assert.match(
+    publicReadiness,
+    /jobs:\s*\n\s+verify:\s*\n\s+name: Lint, Test, Build, Security, E2E[\s\S]+?name: Verify lockfile\s*\n\s+run: npm run check:lockfile/,
+  );
+  assert.equal(
+    [...publicReadiness.matchAll(/run:\s*npm run check:lockfile/g)].length,
+    1,
   );
 });
 
