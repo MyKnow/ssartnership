@@ -1,3 +1,5 @@
+create schema if not exists extensions;
+create extension if not exists pg_trgm with schema extensions;
 create extension if not exists "uuid-ossp";
 
 insert into storage.buckets (id, name, public)
@@ -9124,88 +9126,6 @@ begin
 end;
 $$;
 
-create or replace function public.anonymize_deleted_member(p_member_id uuid)
-returns boolean
-language plpgsql
-security invoker
-set search_path = public
-as $$
-declare
-  member_row public.members%rowtype;
-  mattermost_account_uuid uuid;
-  verification_request_uuid uuid;
-begin
-  select * into member_row
-  from public.members
-  where id = p_member_id
-    and deleted_at is not null
-    and deleted_at <= now() - interval '30 days'
-    and anonymized_at is null
-  for update;
-
-  if not found then
-    return false;
-  end if;
-
-  mattermost_account_uuid := member_row.mattermost_account_id;
-  select verification_request_id into verification_request_uuid
-  from public.graduate_profiles
-  where member_id = p_member_id;
-
-  delete from public.member_profile_images where member_id = p_member_id;
-  delete from public.member_ssafy_verifications where member_id = p_member_id;
-  delete from public.member_email_challenges where member_id = p_member_id;
-  delete from public.member_password_action_tokens where member_id = p_member_id;
-  delete from public.graduate_profiles where member_id = p_member_id;
-
-  if verification_request_uuid is not null then
-    update public.graduate_verification_requests
-    set email = concat('deleted+', verification_request_uuid::text, '@deleted.invalid'),
-        email_normalized = concat('deleted+', verification_request_uuid::text, '@deleted.invalid'),
-        legal_name = '탈퇴한 수료생',
-        document_number_hmac = null,
-        certificate_storage_path = null,
-        certificate_sha256 = null,
-        certificate_deleted_at = coalesce(certificate_deleted_at, now()),
-        review_note = null,
-        rejection_reason = null,
-        updated_at = now()
-    where id = verification_request_uuid;
-  end if;
-
-  update public.members
-  set email = null,
-      email_normalized = null,
-      email_verified_at = null,
-      password_hash = null,
-      password_salt = null,
-      must_change_password = false,
-      display_name = '탈퇴한 회원',
-      campus = null,
-      staff_source_generation = null,
-      mattermost_account_id = null,
-      anonymized_at = now(),
-      updated_at = now()
-  where id = p_member_id;
-
-  if mattermost_account_uuid is not null then
-    delete from public.mm_user_directory directory
-    where directory.id = mattermost_account_uuid
-      and not exists (
-        select 1
-        from public.members linked_member
-        where linked_member.mattermost_account_id = directory.id
-      );
-  end if;
-
-  return true;
-end;
-$$;
-
-revoke all on function public.anonymize_deleted_member(uuid) from public;
-revoke all on function public.anonymize_deleted_member(uuid) from anon;
-revoke all on function public.anonymize_deleted_member(uuid) from authenticated;
-grant execute on function public.anonymize_deleted_member(uuid) to service_role;
 
 create or replace function public.approve_graduate_verification(
   p_request_id uuid,
@@ -10183,113 +10103,6 @@ revoke all on function public.soft_delete_member(uuid, jsonb) from public;
 revoke all on function public.soft_delete_member(uuid, jsonb) from anon;
 revoke all on function public.soft_delete_member(uuid, jsonb) from authenticated;
 grant execute on function public.soft_delete_member(uuid, jsonb) to service_role;
-
-create or replace function public.anonymize_deleted_member(p_member_id uuid)
-returns boolean
-language plpgsql
-security invoker
-set search_path = public
-as $$
-declare
-  member_row public.members%rowtype;
-  mattermost_account_uuid uuid;
-  verification_request_uuid uuid;
-begin
-  select * into member_row
-  from public.members
-  where id = p_member_id
-    and deleted_at is not null
-    and deleted_at <= now() - interval '30 days'
-    and anonymized_at is null
-  for update;
-
-  if not found then
-    return false;
-  end if;
-
-  mattermost_account_uuid := member_row.mattermost_account_id;
-  select verification_request_id into verification_request_uuid
-  from public.graduate_profiles
-  where member_id = p_member_id;
-
-  delete from public.member_profile_images where member_id = p_member_id;
-  delete from public.member_ssafy_verifications where member_id = p_member_id;
-  delete from public.member_email_challenges where member_id = p_member_id;
-  delete from public.member_email_login_transitions where member_id = p_member_id;
-  delete from public.member_password_action_tokens where member_id = p_member_id;
-
-  -- The normalized member contract dropped this legacy table. Keep cleanup
-  -- compatible with a lagging environment without making it a dependency of
-  -- the current Production function.
-  if pg_catalog.to_regclass('public.member_auth_identities') is not null then
-    execute 'delete from public.member_auth_identities where member_id = $1'
-      using p_member_id;
-  end if;
-
-  delete from public.graduate_profiles where member_id = p_member_id;
-
-  update public.graduate_verification_requests as request
-  set email = concat('deleted+', request.id::text, '@deleted.invalid'),
-      email_normalized = concat('deleted+', request.id::text, '@deleted.invalid'),
-      legal_name = '탈퇴한 수료생',
-      document_number_hmac = null,
-      certificate_storage_path = null,
-      certificate_sha256 = null,
-      certificate_deleted_at = coalesce(request.certificate_deleted_at, now()),
-      review_note = null,
-      rejection_reason = null,
-      status = case
-        when request.request_kind = 'existing_member_recovery'
-          and request.recovery_member_id = p_member_id
-          and request.status = 'approved'
-        then 'withdrawn'
-        else request.status
-      end,
-      recovery_member_id = case
-        when request.recovery_member_id = p_member_id then null
-        else request.recovery_member_id
-      end,
-      updated_at = now()
-  where request.id = verification_request_uuid
-     or request.recovery_member_id = p_member_id;
-
-  update public.members
-  set email = null,
-      email_normalized = null,
-      email_verified_at = null,
-      manual_login_id = null,
-      password_hash = null,
-      password_salt = null,
-      must_change_password = false,
-      display_name = '탈퇴한 회원',
-      campus = null,
-      staff_source_generation = null,
-      mattermost_account_id = null,
-      mattermost_login_disabled_at = null,
-      mattermost_login_disabled_reason = null,
-      auth_session_version = auth_session_version + 1,
-      anonymized_at = now(),
-      updated_at = now()
-  where id = p_member_id;
-
-  if mattermost_account_uuid is not null then
-    delete from public.mm_user_directory directory
-    where directory.id = mattermost_account_uuid
-      and not exists (
-        select 1
-        from public.members linked_member
-        where linked_member.mattermost_account_id = directory.id
-      );
-  end if;
-
-  return true;
-end;
-$$;
-
-revoke all on function public.anonymize_deleted_member(uuid) from public;
-revoke all on function public.anonymize_deleted_member(uuid) from anon;
-revoke all on function public.anonymize_deleted_member(uuid) from authenticated;
-grant execute on function public.anonymize_deleted_member(uuid) to service_role;
 
 -- Phase 1 / backfill. Every statement is idempotent so Preview retries are
 -- safe; ambiguous external identities are deliberately left unlinked.
@@ -13890,3 +13703,834 @@ revoke all on function public.anonymize_deleted_member(uuid) from public;
 revoke all on function public.anonymize_deleted_member(uuid) from anon;
 revoke all on function public.anonymize_deleted_member(uuid) from authenticated;
 grant execute on function public.anonymize_deleted_member(uuid) to service_role;
+
+-- Preview catalog parity: administrator read models and their supporting indexes.
+
+-- Source: 20260727025738_optimize_admin_forward_activity_metrics.sql
+-- Prevent the forward activity series from multiplying daily identities against
+-- every future identity before applying distinct counts. The result contract is
+-- unchanged; each rolling window now scans the projection once per day.
+-- Rollback: restore the previous body of
+-- public.get_admin_forward_activity_metrics(date).
+
+create or replace function public.get_admin_forward_activity_metrics(
+  p_anchor_date date default null
+)
+returns table (
+  as_of_date date,
+  today_date date,
+  member_dau bigint,
+  member_wau bigint,
+  member_mau bigint,
+  wau_observed_through date,
+  mau_observed_through date,
+  history_start_date date,
+  daily_series jsonb
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  with parameters as (
+    select
+      least(
+        coalesce(p_anchor_date, (now() at time zone 'Asia/Seoul')::date),
+        (now() at time zone 'Asia/Seoul')::date
+      ) as as_of_date,
+      (now() at time zone 'Asia/Seoul')::date as today_date
+  ),
+  windows as (
+    select
+      parameters.*,
+      least(parameters.as_of_date + 6, parameters.today_date) as wau_observed_through,
+      least(parameters.as_of_date + 29, parameters.today_date) as mau_observed_through
+    from parameters
+  ),
+  daily_activity as (
+    select
+      identities.activity_date,
+      count(*) filter (where identities.identity_kind = 'member')::bigint as member_active_count,
+      count(*) filter (where identities.identity_kind = 'guest_session')::bigint as guest_session_count
+    from public.platform_active_identities as identities
+    cross join windows
+    where identities.activity_date between windows.today_date - 83 and windows.today_date
+    group by identities.activity_date
+  ),
+  rolling_activity as (
+    select
+      series.activity_date::date as activity_date,
+      count(distinct identities.identity_hash) filter (
+        where identities.identity_kind = 'member'
+          and identities.activity_date between series.activity_date::date
+            and least(series.activity_date::date + 6, windows.today_date)
+      )::bigint as member_wau,
+      count(distinct identities.identity_hash) filter (
+        where identities.identity_kind = 'member'
+          and identities.activity_date between series.activity_date::date
+            and least(series.activity_date::date + 29, windows.today_date)
+      )::bigint as member_mau
+    from windows
+    cross join lateral generate_series(
+      windows.today_date - 83,
+      windows.today_date,
+      interval '1 day'
+    ) as series(activity_date)
+    left join public.platform_active_identities as identities
+      on identities.activity_date between series.activity_date::date
+        and least(series.activity_date::date + 29, windows.today_date)
+    group by series.activity_date, windows.today_date
+  ),
+  metric_counts as (
+    select
+      count(distinct identities.identity_hash) filter (
+        where identities.identity_kind = 'member'
+          and identities.activity_date = windows.as_of_date
+      )::bigint as member_dau,
+      count(distinct identities.identity_hash) filter (
+        where identities.identity_kind = 'member'
+          and identities.activity_date between windows.as_of_date and windows.wau_observed_through
+      )::bigint as member_wau,
+      count(distinct identities.identity_hash) filter (
+        where identities.identity_kind = 'member'
+          and identities.activity_date between windows.as_of_date and windows.mau_observed_through
+      )::bigint as member_mau
+    from windows
+    left join public.platform_active_identities as identities
+      on identities.activity_date between windows.as_of_date and windows.mau_observed_through
+    group by windows.as_of_date, windows.wau_observed_through, windows.mau_observed_through
+  )
+  select
+    windows.as_of_date,
+    windows.today_date,
+    metric_counts.member_dau,
+    metric_counts.member_wau,
+    metric_counts.member_mau,
+    windows.wau_observed_through,
+    windows.mau_observed_through,
+    (select min(activity_date) from public.platform_active_identities),
+    coalesce(
+      (
+        select jsonb_agg(
+          jsonb_build_object(
+            'activity_date', series.activity_date::date,
+            'member_active_count', coalesce(daily_activity.member_active_count, 0),
+            'guest_session_count', coalesce(daily_activity.guest_session_count, 0),
+            'member_wau', rolling_activity.member_wau,
+            'member_mau', rolling_activity.member_mau,
+            'wau_observed_through', least(series.activity_date::date + 6, windows.today_date),
+            'mau_observed_through', least(series.activity_date::date + 29, windows.today_date)
+          ) order by series.activity_date
+        )
+        from windows
+        cross join lateral generate_series(
+          windows.today_date - 83,
+          windows.today_date,
+          interval '1 day'
+        ) as series(activity_date)
+        left join daily_activity on daily_activity.activity_date = series.activity_date::date
+        left join rolling_activity on rolling_activity.activity_date = series.activity_date::date
+      ),
+      '[]'::jsonb
+    ) as daily_series
+  from windows
+  cross join metric_counts;
+$$;
+
+revoke all on function public.get_admin_forward_activity_metrics(date) from public;
+revoke all on function public.get_admin_forward_activity_metrics(date) from anon;
+revoke all on function public.get_admin_forward_activity_metrics(date) from authenticated;
+grant execute on function public.get_admin_forward_activity_metrics(date) to service_role;
+
+-- Source: 20260727051209_add_admin_task_outcome_summary.sql
+-- Aggregate safe administrator task outcomes without exposing raw event
+-- properties, paths, or operational identifiers to the logs UI.
+-- Rollback: drop function public.get_admin_task_outcome_summary(timestamptz, timestamptz)
+-- and drop index public.event_logs_admin_task_outcome_created_at_idx.
+
+create index if not exists event_logs_admin_task_outcome_created_at_idx
+  on public.event_logs(target_id, created_at desc)
+  where event_name in (
+    'admin_task_start',
+    'admin_task_complete',
+    'admin_task_recovery'
+  );
+
+create or replace function public.get_admin_task_outcome_summary(
+  input_start timestamp with time zone,
+  input_end timestamp with time zone
+)
+returns table (
+  task_key text,
+  start_count bigint,
+  complete_count bigint,
+  recovery_count bigint,
+  completion_rate numeric,
+  recovery_rate numeric,
+  p75_duration_ms double precision
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  with task_events as (
+    select
+      event_log.target_id as task_key,
+      event_log.event_name,
+      case
+        when event_log.properties ->> 'durationMs' ~ '^[0-9]{1,6}$'
+          and (event_log.properties ->> 'durationMs')::double precision between 0 and 120000
+        then (event_log.properties ->> 'durationMs')::double precision
+        else null
+      end as duration_ms
+    from public.event_logs as event_log
+    where event_log.event_name in (
+      'admin_task_start',
+      'admin_task_complete',
+      'admin_task_recovery'
+    )
+      and event_log.target_type = 'admin_task'
+      and event_log.target_id ~ '^admin\.[a-z0-9._:-]+$'
+      and event_log.created_at >= input_start
+      and event_log.created_at <= input_end
+  )
+  select
+    task_events.task_key,
+    count(*) filter (where task_events.event_name = 'admin_task_start')::bigint as start_count,
+    count(*) filter (where task_events.event_name = 'admin_task_complete')::bigint as complete_count,
+    count(*) filter (where task_events.event_name = 'admin_task_recovery')::bigint as recovery_count,
+    (
+      count(*) filter (where task_events.event_name = 'admin_task_complete')::numeric
+      / nullif(count(*) filter (where task_events.event_name = 'admin_task_start'), 0)::numeric
+      * 100
+    ) as completion_rate,
+    (
+      count(*) filter (where task_events.event_name = 'admin_task_recovery')::numeric
+      / nullif(count(*) filter (where task_events.event_name = 'admin_task_start'), 0)::numeric
+      * 100
+    ) as recovery_rate,
+    percentile_cont(0.75) within group (order by task_events.duration_ms)
+      filter (where task_events.duration_ms is not null) as p75_duration_ms
+  from task_events
+  group by task_events.task_key
+  order by start_count desc, task_events.task_key;
+$$;
+
+revoke all on function public.get_admin_task_outcome_summary(timestamp with time zone, timestamp with time zone) from public;
+revoke all on function public.get_admin_task_outcome_summary(timestamp with time zone, timestamp with time zone) from anon;
+revoke all on function public.get_admin_task_outcome_summary(timestamp with time zone, timestamp with time zone) from authenticated;
+grant execute on function public.get_admin_task_outcome_summary(timestamp with time zone, timestamp with time zone) to service_role;
+
+-- Source: 20260727142557_add_admin_performance_dimension_summaries.sql
+-- Keep administrator performance aggregates separable by coarse viewport class.
+-- The client only emits mobile/tablet/desktop; invalid or legacy values are
+-- grouped as unknown. No raw URL, record identifier, or event property is
+-- returned by these service-role-only summaries.
+-- Rollback: drop the three *_dimension_summary functions and the partial index.
+
+create index if not exists event_logs_admin_performance_viewport_idx
+  on public.event_logs(
+    (coalesce(properties ->> 'viewport', 'unknown')),
+    created_at desc
+  )
+  where event_name in (
+    'admin_web_vital',
+    'admin_route_timing',
+    'admin_task_start',
+    'admin_task_complete',
+    'admin_task_recovery'
+  );
+
+create or replace function public.get_admin_web_vitals_dimension_summary(
+  input_start timestamp with time zone,
+  input_end timestamp with time zone
+)
+returns table (
+  viewport text,
+  metric text,
+  sample_count bigint,
+  p75_value double precision,
+  good_count bigint,
+  needs_improvement_count bigint,
+  poor_count bigint
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  with dimensioned_events as (
+    select
+      case
+        when event_log.properties ->> 'viewport' in ('mobile', 'tablet', 'desktop')
+          then event_log.properties ->> 'viewport'
+        else 'unknown'
+      end as viewport,
+      event_log.properties ->> 'metric' as metric,
+      event_log.properties ->> 'rating' as rating,
+      (event_log.properties ->> 'value')::double precision as value
+    from public.event_logs as event_log
+    where event_log.event_name = 'admin_web_vital'
+      and event_log.created_at >= input_start
+      and event_log.created_at <= input_end
+      and event_log.properties ->> 'metric' in ('INP', 'LCP', 'TTFB')
+      and event_log.properties ->> 'value' ~ '^[0-9]+(?:\.[0-9]+)?$'
+  )
+  select
+    dimensioned_events.viewport,
+    dimensioned_events.metric,
+    count(*)::bigint as sample_count,
+    percentile_cont(0.75) within group (order by dimensioned_events.value)::double precision,
+    count(*) filter (where dimensioned_events.rating = 'good')::bigint,
+    count(*) filter (where dimensioned_events.rating = 'needs-improvement')::bigint,
+    count(*) filter (where dimensioned_events.rating = 'poor')::bigint
+  from dimensioned_events
+  group by dimensioned_events.viewport, dimensioned_events.metric
+  order by dimensioned_events.viewport, dimensioned_events.metric;
+$$;
+
+create or replace function public.get_admin_route_timing_dimension_summary(
+  input_start timestamp with time zone,
+  input_end timestamp with time zone
+)
+returns table (
+  viewport text,
+  route_key text,
+  sample_count bigint,
+  p75_duration_ms double precision,
+  complete_count bigint,
+  unknown_count bigint,
+  error_count bigint
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  with dimensioned_events as (
+    select
+      case
+        when event_log.properties ->> 'viewport' in ('mobile', 'tablet', 'desktop')
+          then event_log.properties ->> 'viewport'
+        else 'unknown'
+      end as viewport,
+      event_log.target_id as route_key,
+      event_log.properties ->> 'outcome' as outcome,
+      (event_log.properties ->> 'durationMs')::double precision as duration_ms
+    from public.event_logs as event_log
+    where event_log.event_name = 'admin_route_timing'
+      and event_log.target_type = 'admin_performance'
+      and event_log.target_id ~ '^admin\.[a-z0-9._:-]+$'
+      and event_log.created_at >= input_start
+      and event_log.created_at <= input_end
+      and event_log.properties ->> 'durationMs' ~ '^[0-9]+$'
+  )
+  select
+    dimensioned_events.viewport,
+    dimensioned_events.route_key,
+    count(*)::bigint as sample_count,
+    percentile_cont(0.75) within group (order by dimensioned_events.duration_ms)::double precision as p75_duration_ms,
+    count(*) filter (where dimensioned_events.outcome = 'complete')::bigint as complete_count,
+    count(*) filter (where dimensioned_events.outcome = 'unknown')::bigint as unknown_count,
+    count(*) filter (where dimensioned_events.outcome = 'error')::bigint as error_count
+  from dimensioned_events
+  group by dimensioned_events.viewport, dimensioned_events.route_key
+  order by dimensioned_events.viewport, p75_duration_ms desc nulls last;
+$$;
+
+create or replace function public.get_admin_task_outcome_dimension_summary(
+  input_start timestamp with time zone,
+  input_end timestamp with time zone
+)
+returns table (
+  viewport text,
+  task_key text,
+  start_count bigint,
+  complete_count bigint,
+  recovery_count bigint,
+  completion_rate numeric,
+  recovery_rate numeric,
+  p75_duration_ms double precision
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  with task_events as (
+    select
+      case
+        when event_log.properties ->> 'viewport' in ('mobile', 'tablet', 'desktop')
+          then event_log.properties ->> 'viewport'
+        else 'unknown'
+      end as viewport,
+      event_log.target_id as task_key,
+      event_log.event_name,
+      case
+        when event_log.properties ->> 'durationMs' ~ '^[0-9]{1,6}$'
+          and (event_log.properties ->> 'durationMs')::double precision between 0 and 120000
+        then (event_log.properties ->> 'durationMs')::double precision
+        else null
+      end as duration_ms
+    from public.event_logs as event_log
+    where event_log.event_name in (
+      'admin_task_start',
+      'admin_task_complete',
+      'admin_task_recovery'
+    )
+      and event_log.target_type = 'admin_task'
+      and event_log.target_id ~ '^admin\.[a-z0-9._:-]+$'
+      and event_log.created_at >= input_start
+      and event_log.created_at <= input_end
+  )
+  select
+    task_events.viewport,
+    task_events.task_key,
+    count(*) filter (where task_events.event_name = 'admin_task_start')::bigint as start_count,
+    count(*) filter (where task_events.event_name = 'admin_task_complete')::bigint as complete_count,
+    count(*) filter (where task_events.event_name = 'admin_task_recovery')::bigint as recovery_count,
+    (
+      count(*) filter (where task_events.event_name = 'admin_task_complete')::numeric
+      / nullif(count(*) filter (where task_events.event_name = 'admin_task_start'), 0)::numeric
+      * 100
+    ),
+    (
+      count(*) filter (where task_events.event_name = 'admin_task_recovery')::numeric
+      / nullif(count(*) filter (where task_events.event_name = 'admin_task_start'), 0)::numeric
+      * 100
+    ) as recovery_rate,
+    percentile_cont(0.75) within group (order by task_events.duration_ms)
+      filter (where task_events.duration_ms is not null)
+      as p75_duration_ms
+  from task_events
+  group by task_events.viewport, task_events.task_key
+  order by task_events.viewport, start_count desc, task_events.task_key;
+$$;
+
+revoke all on function public.get_admin_web_vitals_dimension_summary(timestamp with time zone, timestamp with time zone) from public;
+revoke all on function public.get_admin_web_vitals_dimension_summary(timestamp with time zone, timestamp with time zone) from anon;
+revoke all on function public.get_admin_web_vitals_dimension_summary(timestamp with time zone, timestamp with time zone) from authenticated;
+grant execute on function public.get_admin_web_vitals_dimension_summary(timestamp with time zone, timestamp with time zone) to service_role;
+
+revoke all on function public.get_admin_route_timing_dimension_summary(timestamp with time zone, timestamp with time zone) from public;
+revoke all on function public.get_admin_route_timing_dimension_summary(timestamp with time zone, timestamp with time zone) from anon;
+revoke all on function public.get_admin_route_timing_dimension_summary(timestamp with time zone, timestamp with time zone) from authenticated;
+grant execute on function public.get_admin_route_timing_dimension_summary(timestamp with time zone, timestamp with time zone) to service_role;
+
+revoke all on function public.get_admin_task_outcome_dimension_summary(timestamp with time zone, timestamp with time zone) from public;
+revoke all on function public.get_admin_task_outcome_dimension_summary(timestamp with time zone, timestamp with time zone) from anon;
+revoke all on function public.get_admin_task_outcome_dimension_summary(timestamp with time zone, timestamp with time zone) from authenticated;
+grant execute on function public.get_admin_task_outcome_dimension_summary(timestamp with time zone, timestamp with time zone) to service_role;
+
+-- Source: 20260727150124_add_scoped_admin_log_cursor_rpc.sql
+-- Use a stable created_at/id keyset for interactive log continuation.
+-- The existing page RPC remains available for direct page-number links and rolling deploys.
+create or replace function public.get_admin_logs_cursor_scoped(
+  input_start timestamp with time zone,
+  input_end timestamp with time zone,
+  input_page_size integer,
+  input_cursor_created_at timestamp with time zone default null,
+  input_cursor_id uuid default null,
+  input_group text default 'all',
+  input_search text default '',
+  input_name text default 'all',
+  input_actor text default 'all',
+  input_status text default 'all',
+  input_allowed_groups text[] default '{}',
+  input_include_pii boolean default false
+)
+returns table (
+  group_name text,
+  id uuid,
+  name text,
+  status text,
+  actor_type text,
+  actor_id text,
+  actor_name text,
+  actor_mm_username text,
+  identifier text,
+  ip_address text,
+  path text,
+  referrer text,
+  target_type text,
+  target_id text,
+  properties jsonb,
+  created_at timestamp with time zone,
+  total_count bigint
+)
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  with params as (
+    select
+      greatest(coalesce(input_page_size, 100), 1) as page_size,
+      lower(coalesce(nullif(input_search, ''), '')) as search_query,
+      coalesce(nullif(input_group, ''), 'all') as group_filter,
+      coalesce(nullif(input_name, ''), 'all') as name_filter,
+      coalesce(nullif(input_actor, ''), 'all') as actor_filter,
+      coalesce(nullif(input_status, ''), 'all') as status_filter,
+      array(
+        select candidate
+        from unnest(coalesce(input_allowed_groups, '{}'::text[])) as candidate
+        where candidate in ('product', 'audit', 'security')
+      ) as allowed_groups,
+      coalesce(input_include_pii, false) as include_pii
+  ),
+  base_logs as (
+    select
+      'product'::text as group_name,
+      event_logs.id,
+      event_logs.event_name::text as name,
+      null::text as status,
+      event_logs.actor_type::text as actor_type,
+      case when params.include_pii then event_logs.actor_id else null end as actor_id,
+      case when params.include_pii then members.display_name else null end as actor_name,
+      case when params.include_pii then directory.mm_username else null end as actor_mm_username,
+      null::text as identifier,
+      case when params.include_pii then event_logs.ip_address else null end as ip_address,
+      case when params.include_pii then event_logs.path else null end as path,
+      case when params.include_pii then event_logs.referrer else null end as referrer,
+      event_logs.target_type,
+      case when params.include_pii then event_logs.target_id else null end as target_id,
+      case when params.include_pii then event_logs.properties else null end as properties,
+      event_logs.created_at,
+      lower(concat_ws(' ',
+        event_logs.event_name,
+        event_logs.actor_type,
+        case when params.include_pii then event_logs.path end,
+        event_logs.target_type,
+        case when params.include_pii then members.display_name end,
+        case when params.include_pii then directory.mm_username end,
+        case when params.include_pii then event_logs.actor_id end,
+        case when params.include_pii then event_logs.ip_address end,
+        case when params.include_pii then event_logs.referrer end,
+        case when params.include_pii then event_logs.target_id end,
+        case when params.include_pii then event_logs.properties::text end
+      )) as search_text
+    from public.event_logs
+    cross join params
+    left join public.members
+      on event_logs.actor_type = 'member'
+     and members.id::text = event_logs.actor_id
+    left join public.mm_user_directory directory
+      on directory.id = members.mattermost_account_id
+    where 'product' = any(params.allowed_groups)
+      and event_logs.created_at >= input_start
+      and event_logs.created_at <= input_end
+
+    union all
+
+    select
+      'audit'::text as group_name,
+      admin_audit_logs.id,
+      admin_audit_logs.action::text as name,
+      null::text as status,
+      coalesce(admin_audit_logs.actor_type, 'admin')::text as actor_type,
+      case when params.include_pii then admin_audit_logs.actor_id else null end as actor_id,
+      null::text as actor_name,
+      null::text as actor_mm_username,
+      null::text as identifier,
+      case when params.include_pii then admin_audit_logs.ip_address else null end as ip_address,
+      case when params.include_pii then admin_audit_logs.path else null end as path,
+      null::text as referrer,
+      admin_audit_logs.target_type,
+      case when params.include_pii then admin_audit_logs.target_id else null end as target_id,
+      case when params.include_pii then admin_audit_logs.properties else null end as properties,
+      admin_audit_logs.created_at,
+      lower(concat_ws(' ',
+        admin_audit_logs.action,
+        coalesce(admin_audit_logs.actor_type, 'admin'),
+        case when params.include_pii then admin_audit_logs.path end,
+        admin_audit_logs.target_type,
+        case when params.include_pii then admin_audit_logs.actor_id end,
+        case when params.include_pii then admin_audit_logs.ip_address end,
+        case when params.include_pii then admin_audit_logs.target_id end,
+        case when params.include_pii then admin_audit_logs.properties::text end
+      )) as search_text
+    from public.admin_audit_logs
+    cross join params
+    where 'audit' = any(params.allowed_groups)
+      and admin_audit_logs.created_at >= input_start
+      and admin_audit_logs.created_at <= input_end
+
+    union all
+
+    select
+      'security'::text as group_name,
+      auth_security_logs.id,
+      auth_security_logs.event_name::text as name,
+      auth_security_logs.status::text as status,
+      auth_security_logs.actor_type::text as actor_type,
+      case when params.include_pii then auth_security_logs.actor_id else null end as actor_id,
+      case when params.include_pii then members.display_name else null end as actor_name,
+      case when params.include_pii then directory.mm_username else null end as actor_mm_username,
+      case when params.include_pii then auth_security_logs.identifier else null end as identifier,
+      case when params.include_pii then auth_security_logs.ip_address else null end as ip_address,
+      case when params.include_pii then auth_security_logs.path else null end as path,
+      null::text as referrer,
+      null::text as target_type,
+      null::text as target_id,
+      case when params.include_pii then auth_security_logs.properties else null end as properties,
+      auth_security_logs.created_at,
+      lower(concat_ws(' ',
+        auth_security_logs.event_name,
+        auth_security_logs.status,
+        auth_security_logs.actor_type,
+        case when params.include_pii then auth_security_logs.path end,
+        case when params.include_pii then members.display_name end,
+        case when params.include_pii then directory.mm_username end,
+        case when params.include_pii then auth_security_logs.actor_id end,
+        case when params.include_pii then auth_security_logs.identifier end,
+        case when params.include_pii then auth_security_logs.ip_address end,
+        case when params.include_pii then auth_security_logs.properties::text end
+      )) as search_text
+    from public.auth_security_logs
+    cross join params
+    left join public.members
+      on auth_security_logs.actor_type = 'member'
+     and members.id::text = auth_security_logs.actor_id
+    left join public.mm_user_directory directory
+      on directory.id = members.mattermost_account_id
+    where 'security' = any(params.allowed_groups)
+      and auth_security_logs.created_at >= input_start
+      and auth_security_logs.created_at <= input_end
+  ),
+  filtered_logs as (
+    select base_logs.*
+    from base_logs
+    cross join params
+    where (params.group_filter = 'all' or base_logs.group_name = params.group_filter)
+      and (params.name_filter = 'all' or base_logs.name = params.name_filter)
+      and (params.actor_filter = 'all' or coalesce(base_logs.actor_type, '') = params.actor_filter)
+      and (params.status_filter = 'all' or coalesce(base_logs.status, '') = params.status_filter)
+      and (params.search_query = '' or base_logs.search_text like '%' || params.search_query || '%')
+  ),
+  counted_logs as (
+    select filtered_logs.*, count(*) over () as total_count
+    from filtered_logs
+  ),
+  cursor_logs as (
+    select counted_logs.*
+    from counted_logs
+    where input_cursor_created_at is null
+       or counted_logs.created_at < input_cursor_created_at
+       or (
+         counted_logs.created_at = input_cursor_created_at
+         and input_cursor_id is not null
+         and counted_logs.id < input_cursor_id
+       )
+  )
+  select
+    cursor_logs.group_name,
+    cursor_logs.id,
+    cursor_logs.name,
+    cursor_logs.status,
+    cursor_logs.actor_type,
+    cursor_logs.actor_id,
+    cursor_logs.actor_name,
+    cursor_logs.actor_mm_username,
+    cursor_logs.identifier,
+    cursor_logs.ip_address,
+    cursor_logs.path,
+    cursor_logs.referrer,
+    cursor_logs.target_type,
+    cursor_logs.target_id,
+    cursor_logs.properties,
+    cursor_logs.created_at,
+    cursor_logs.total_count
+  from cursor_logs
+  cross join params
+  order by cursor_logs.created_at desc, cursor_logs.id desc
+  limit (select page_size from params);
+$$;
+
+revoke all on function public.get_admin_logs_cursor_scoped(
+  timestamp with time zone,
+  timestamp with time zone,
+  integer,
+  timestamp with time zone,
+  uuid,
+  text,
+  text,
+  text,
+  text,
+  text,
+  text[],
+  boolean
+) from public;
+revoke all on function public.get_admin_logs_cursor_scoped(
+  timestamp with time zone,
+  timestamp with time zone,
+  integer,
+  timestamp with time zone,
+  uuid,
+  text,
+  text,
+  text,
+  text,
+  text,
+  text[],
+  boolean
+) from anon;
+revoke all on function public.get_admin_logs_cursor_scoped(
+  timestamp with time zone,
+  timestamp with time zone,
+  integer,
+  timestamp with time zone,
+  uuid,
+  text,
+  text,
+  text,
+  text,
+  text,
+  text[],
+  boolean
+) from authenticated;
+grant execute on function public.get_admin_logs_cursor_scoped(
+  timestamp with time zone,
+  timestamp with time zone,
+  integer,
+  timestamp with time zone,
+  uuid,
+  text,
+  text,
+  text,
+  text,
+  text,
+  text[],
+  boolean
+) to service_role;
+
+-- Source: 20260728001426_optimize_admin_console_read_paths.sql
+-- Keep the high-frequency admin inbox and push recipient reads on narrow,
+-- active-only index paths.
+-- Rollback:
+--   drop index if exists public.admin_notification_recipients_active_admin_created_idx;
+--   drop index if exists public.members_admin_recipient_display_name_idx;
+
+create index if not exists admin_notification_recipients_active_admin_created_idx
+  on public.admin_notification_recipients(admin_id, created_at desc)
+  where deleted_at is null;
+
+create index if not exists members_admin_recipient_display_name_idx
+  on public.members(display_name)
+  include (id, mattermost_account_id, generation, campus)
+  where deleted_at is null;
+
+-- Source: 20260728030545_optimize_admin_push_audience_read_model.sql
+-- Return only the audience facets needed by the admin push composer.
+-- This avoids transferring every active member row just to derive years and
+-- campuses while keeping partner options in the same read-model request.
+-- Rollback:
+--   drop function if exists public.get_admin_push_audience_facets();
+
+create or replace function public.get_admin_push_audience_facets()
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'memberCount', (
+      select count(*)::integer
+      from public.members
+      where deleted_at is null
+    ),
+    'availableYears', coalesce((
+      select jsonb_agg(generation order by generation desc)
+      from (
+        select distinct generation
+        from public.members
+        where deleted_at is null
+          and generation is not null
+      ) years
+    ), '[]'::jsonb),
+    'availableCampuses', coalesce((
+      select jsonb_agg(campus order by campus)
+      from (
+        select distinct trim(campus) as campus
+        from public.members
+        where deleted_at is null
+          and nullif(trim(campus), '') is not null
+      ) campuses
+    ), '[]'::jsonb),
+    'partners', coalesce((
+      select jsonb_agg(
+        jsonb_build_object('id', id, 'name', name)
+        order by name, id
+      )
+      from public.partners
+    ), '[]'::jsonb),
+    'partnerCount', (select count(*)::integer from public.partners)
+  );
+$$;
+
+revoke all on function public.get_admin_push_audience_facets() from public;
+revoke all on function public.get_admin_push_audience_facets() from anon;
+revoke all on function public.get_admin_push_audience_facets() from authenticated;
+grant execute on function public.get_admin_push_audience_facets() to service_role;
+
+-- Source: 20260728032722_optimize_admin_session_read_model.sql
+-- Return only the administrator session snapshot needed on every protected
+-- request. This avoids a nested PostgREST relationship read on the hot auth
+-- path while preserving the existing permission-version and active checks.
+-- Rollback:
+--   drop function if exists public.get_admin_session_snapshot(uuid);
+
+create or replace function public.get_admin_session_snapshot(p_member_id uuid)
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'id', member.id,
+    'login_id', directory.mm_username,
+    'display_name', coalesce(
+      nullif(btrim(member.display_name), ''),
+      nullif(btrim(directory.display_name), ''),
+      directory.mm_username
+    ),
+    'email', member.email,
+    'must_change_password', member.must_change_password,
+    'is_active', profile.is_active and directory.is_active and member.deleted_at is null,
+    'permission_version', profile.permission_version,
+    'permission_template_key', profile.permission_template_key,
+    'managed_campus_slugs', profile.managed_campus_slugs,
+    'created_at', profile.created_at,
+    'updated_at', profile.updated_at
+  )
+  from public.admin_profiles profile
+  join public.members member on member.id = profile.member_id
+  join public.mm_user_directory directory on directory.id = member.mattermost_account_id
+  where profile.member_id = p_member_id
+  limit 1;
+$$;
+
+revoke all on function public.get_admin_session_snapshot(uuid) from public;
+revoke all on function public.get_admin_session_snapshot(uuid) from anon;
+revoke all on function public.get_admin_session_snapshot(uuid) from authenticated;
+grant execute on function public.get_admin_session_snapshot(uuid) to service_role;
+
+-- Source: 20260727113746_optimize_admin_member_search.sql
+-- pg_trgm lives in the non-exposed extensions schema in the current contract.
+create index if not exists members_admin_display_name_trgm_idx
+  on public.members using gin (display_name extensions.gin_trgm_ops)
+  where deleted_at is null;
+
+create index if not exists members_admin_manual_login_id_trgm_idx
+  on public.members using gin (manual_login_id extensions.gin_trgm_ops)
+  where deleted_at is null and manual_login_id is not null;
+
+create index if not exists mm_user_directory_admin_username_trgm_idx
+  on public.mm_user_directory using gin (mm_username extensions.gin_trgm_ops)
+  where mm_username is not null;
+
+create index if not exists mm_user_directory_admin_user_id_trgm_idx
+  on public.mm_user_directory using gin (mm_user_id extensions.gin_trgm_ops)
+  where mm_user_id is not null;
