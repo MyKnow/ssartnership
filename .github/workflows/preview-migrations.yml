@@ -62,7 +62,7 @@ jobs:
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v2
         with:
-          version: latest
+          version: 2.114.0
           github-token: ${{ github.token }}
 
       - name: List Preview migrations before apply

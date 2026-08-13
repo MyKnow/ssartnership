@@ -15,6 +15,8 @@ const WORKFLOW_FILES = [
   "storybook.yml",
 ] as const;
 
+const VERIFIED_SUPABASE_CLI_VERSION = "2.114.0";
+
 test("GitHub Actions use the Node 24 action runtime and project runtime with read-only repository access", () => {
   for (const filename of WORKFLOW_FILES) {
     const workflow = readRepoFile(`.github/workflows/${filename}`);
@@ -148,6 +150,67 @@ test("active workflows use the current Node 24 GitHub action majors", () => {
   }
 
   assert.ok(actionCount > 0, "expected active workflows to use GitHub Node actions");
+});
+
+test("active Supabase workflows pin the Production-validated CLI version", () => {
+  const workflowsDirectory = new URL("../.github/workflows/", import.meta.url);
+  const workflowNames = readdirSync(workflowsDirectory)
+    .filter((name) => /\.ya?ml$/.test(name))
+    .sort();
+  let setupCliStepCount = 0;
+
+  for (const workflowName of workflowNames) {
+    const workflow = readFileSync(new URL(workflowName, workflowsDirectory), "utf8");
+    const lines = workflow.split("\n");
+
+    assert.doesNotMatch(
+      workflow,
+      /^\s*version:\s*["']?latest["']?(?:\s+#.*)?$/m,
+      `${workflowName}: active workflows must not float a CLI version`,
+    );
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const setupCliUse = lines[index].match(
+        /^(\s*)uses:\s*supabase\/setup-cli@v2\s*$/,
+      );
+      if (!setupCliUse) {
+        continue;
+      }
+
+      setupCliStepCount += 1;
+      const usesIndent = setupCliUse[1].length;
+      let configuredVersion: string | null = null;
+
+      for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+        const line = lines[cursor];
+        const trimmedLine = line.trimStart();
+        const lineIndent = line.length - trimmedLine.length;
+
+        if (trimmedLine.startsWith("- ") && lineIndent < usesIndent) {
+          break;
+        }
+
+        const version = line.match(
+          /^\s+version:\s*["']?([^\s"'#]+)["']?(?:\s+#.*)?$/,
+        );
+        if (version) {
+          configuredVersion = version[1];
+          break;
+        }
+      }
+
+      assert.equal(
+        configuredVersion,
+        VERIFIED_SUPABASE_CLI_VERSION,
+        `${workflowName}: supabase/setup-cli must use the Production-validated version`,
+      );
+    }
+  }
+
+  assert.ok(
+    setupCliStepCount > 0,
+    "expected at least one active Supabase setup-cli step",
+  );
 });
 
 test("Storybook interaction runs automatically, isolates shared state, and keeps pixel baselines manual", () => {
