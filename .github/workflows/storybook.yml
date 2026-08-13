@@ -48,9 +48,7 @@ jobs:
   visual:
     if: ${{ github.event_name == 'workflow_dispatch' }}
     name: Visual Baselines
-    # Screenshot baselines are generated with CoreText. Keep the pixel job
-    # aligned with that renderer so font metrics do not vary with FreeType.
-    runs-on: macos-14
+    runs-on: ubuntu-latest
     timeout-minutes: 25
 
     steps:
@@ -69,7 +67,7 @@ jobs:
         run: npm ci
 
       - name: Install fixed Chromium
-        run: npx playwright install chromium
+        run: npx playwright install --with-deps chromium
 
       - name: Compare core visual baselines
         run: npm run test:visual

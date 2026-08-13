@@ -80,8 +80,8 @@ export const CreateValidationErrors: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: "등록" }));
-    await expect(canvas.getByText("제목을 입력해 주세요.")).toBeInTheDocument();
-    await expect(canvas.getByText("리뷰 내용을 입력해 주세요.")).toBeInTheDocument();
+    await expect(await canvas.findByText("제목을 입력해 주세요.")).toBeInTheDocument();
+    await expect(await canvas.findByText("리뷰 내용을 입력해 주세요.")).toBeInTheDocument();
   },
 };
 

@@ -12,7 +12,6 @@ test("public readiness CI workflow gates launch-critical checks", () => {
   for (const requiredText of [
     "name: Public Readiness",
     "pull_request:",
-    "ready_for_review",
     "workflow_dispatch:",
     "node-version: 24",
     "npm ci",
@@ -33,13 +32,13 @@ test("public readiness CI workflow gates launch-critical checks", () => {
   }
 
   assert.match(workflow, /push:\s*\n\s+branches:\s*\[main, dev\]/);
-  assert.match(
-    workflow,
-    /pull_request:\s*\n\s+types:\s*\[opened, synchronize, reopened, ready_for_review\]/,
-  );
-  assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name != 'pull_request' \|\| !github\.event\.pull_request\.draft\s*\}\}/);
+  assert.match(workflow, /^\s+pull_request:\s*$/m);
   assert.match(workflow, /concurrency:\s*\n\s+group:/);
   assert.match(workflow, /cancel-in-progress:\s+true/);
+  assert.doesNotMatch(
+    workflow,
+    /if:\s*\$\{\{\s*github\.event_name != 'pull_request' \|\| !github\.event\.pull_request\.draft\s*\}\}/,
+  );
   assert.doesNotMatch(workflow, /npm run check:lockfile/);
 });
 
@@ -63,6 +62,7 @@ test("Storybook interaction runs automatically while pixel baselines stay manual
   assert.match(workflow, /name: Visual Baselines/);
   assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name == 'workflow_dispatch'\s*\}\}/);
   assert.match(workflow, /npm run test:visual/);
+  assert.match(workflow, /runs-on:\s+ubuntu-latest/);
   assert.doesNotMatch(workflow, /name: Detect visual changes/);
   assert.doesNotMatch(workflow, /git diff --name-only --diff-filter/);
   assert.doesNotMatch(workflow, /chromaui\/action|CHROMATIC_PROJECT_TOKEN/);
@@ -72,13 +72,13 @@ test("lockfile verification avoids duplicate feature-branch runs while retaining
   const workflow = readRepoFile(".github/workflows/lockfile-check.yml");
 
   assert.match(workflow, /push:\s*\n\s+branches:\s*\[main, dev\]/);
-  assert.match(
-    workflow,
-    /pull_request:\s*\n\s+types:\s*\[opened, synchronize, reopened, ready_for_review\]/,
-  );
-  assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name != 'pull_request' \|\| !github\.event\.pull_request\.draft\s*\}\}/);
+  assert.match(workflow, /^\s+pull_request:\s*$/m);
   assert.match(workflow, /concurrency:\s*\n\s+group:/);
   assert.match(workflow, /cancel-in-progress:\s+true/);
+  assert.doesNotMatch(
+    workflow,
+    /if:\s*\$\{\{\s*github\.event_name != 'pull_request' \|\| !github\.event\.pull_request\.draft\s*\}\}/,
+  );
 });
 
 test("production Supabase migrations require an explicit guarded dispatch", () => {
@@ -152,7 +152,9 @@ test("Preview sync follows the latest successful dev public-readiness run withou
   assert.match(workflow, /workflows:\s*\n\s+- Public Readiness/);
   assert.match(workflow, /branches:\s*\[dev\]/);
   assert.match(workflow, /types:\s*\n\s+- completed/);
+  assert.match(workflow, /group:\s+preview-sync/);
   assert.match(workflow, /cancel-in-progress:\s+false/);
+  assert.match(workflow, /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/dev'/);
   assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/);
   assert.match(workflow, /github\.event\.workflow_run\.event == 'push'/);
   assert.match(workflow, /github\.event\.workflow_run\.head_branch == 'dev'/);

@@ -13,14 +13,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: preview-sync-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
+  group: preview-sync
   cancel-in-progress: false
 
 jobs:
   sync-preview:
     if: >-
       ${{
-        (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main') ||
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev') ||
         (
           github.event_name == 'workflow_run' &&
           github.event.workflow_run.conclusion == 'success' &&
