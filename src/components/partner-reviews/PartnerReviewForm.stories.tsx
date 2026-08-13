@@ -54,6 +54,9 @@ function mockReviewFetch(response: {
 }
 
 export const Create: Story = {
+  args: {
+    partnerId: "partner-story-create",
+  },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     const fetchMock = mockReviewFetch({ ok: true, body: { success: true } });
@@ -71,6 +74,9 @@ export const Create: Story = {
 };
 
 export const CreateValidationErrors: Story = {
+  args: {
+    partnerId: "partner-story-validation",
+  },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: "등록" }));
@@ -81,6 +87,7 @@ export const CreateValidationErrors: Story = {
 
 export const Edit: Story = {
   args: {
+    partnerId: "partner-story-edit",
     review: existingReview,
   },
   play: async ({ args, canvasElement }) => {
@@ -107,6 +114,9 @@ export const Edit: Story = {
 };
 
 export const CreateNetworkError: Story = {
+  args: {
+    partnerId: "partner-story-network",
+  },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     globalThis.fetch = fn(async () => {
@@ -125,6 +135,9 @@ export const CreateNetworkError: Story = {
 };
 
 export const Cancel: Story = {
+  args: {
+    partnerId: "partner-story-cancel",
+  },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
 
