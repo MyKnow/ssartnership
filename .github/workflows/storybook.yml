@@ -57,16 +57,12 @@ jobs:
           changed=false
           while IFS= read -r pathname; do
             case "$pathname" in
-              *.stories.tsx)
-                # Story interaction assertions do not change the rendered app.
-                # Run pixel comparison manually when a fixture itself changes.
-                ;;
               src/*|public/*|.storybook/*|tests/visual/*|next.config.ts|postcss.config.*|tailwind.config.*|playwright.visual.config.ts)
                 changed=true
                 break
                 ;;
             esac
-          done < <(git diff --name-only --diff-filter=ACMRT "$base_sha" "$head_sha")
+          done < <(git diff --name-only --diff-filter=ACMRTD "$base_sha" "$head_sha")
 
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
