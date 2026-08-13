@@ -7,22 +7,18 @@ on:
         description: Type MEASURE_ADMIN_PERFORMANCE to collect Preview administrator performance.
         required: true
         type: string
-      admin_url:
-        description: Optional Preview application URL for authenticated page and API probes.
-        required: false
-        type: string
       iterations:
-        description: Number of sequential requests per page/API target (1-100).
+        description: Number of sequential requests per authenticated page and API probes target (1-100).
         required: false
         default: "30"
         type: string
       page_targets:
-        description: Optional JSON array of authenticated admin page targets to measure.
+        description: Optional JSON array of authenticated page probes to measure.
         required: false
         default: ""
         type: string
       api_targets:
-        description: Optional JSON array of authenticated admin API targets to measure.
+        description: Optional JSON array of authenticated API probes to measure.
         required: false
         default: ""
         type: string
@@ -44,36 +40,47 @@ jobs:
     name: Collect Preview administrator performance
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      SUPABASE_PREVIEW_URL: ${{ secrets.SUPABASE_PREVIEW_URL }}
-      SUPABASE_PREVIEW_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_PREVIEW_SERVICE_ROLE_KEY }}
-      ADMIN_PREVIEW_URL: ${{ inputs.admin_url }}
-      ADMIN_PREVIEW_SESSION_COOKIE: ${{ secrets.ADMIN_PREVIEW_SESSION_COOKIE }}
-      ADMIN_PREVIEW_PROTECTION_BYPASS: ${{ secrets.ADMIN_PREVIEW_PROTECTION_BYPASS }}
-      ADMIN_PREVIEW_BASIC_AUTH_USERNAME: ${{ secrets.ADMIN_PREVIEW_BASIC_AUTH_USERNAME }}
-      ADMIN_PREVIEW_BASIC_AUTH_PASSWORD: ${{ secrets.ADMIN_PREVIEW_BASIC_AUTH_PASSWORD }}
-      ADMIN_PREVIEW_LOGIN_USERNAME: ${{ secrets.PREVIEW_TEST_MEMBER_USERNAME }}
-      ADMIN_PREVIEW_LOGIN_PASSWORD: ${{ secrets.PREVIEW_TEST_MEMBER_PASSWORD }}
-      ADMIN_PREVIEW_ITERATIONS: ${{ inputs.iterations }}
-      ADMIN_PREVIEW_PAGE_TARGETS: ${{ inputs.page_targets }}
-      ADMIN_PREVIEW_API_TARGETS: ${{ inputs.api_targets }}
     steps:
-      - name: Checkout selected dev revision
+      - name: Checkout dispatched dev revision
         uses: actions/checkout@v7
         with:
-          ref: dev
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify dispatched dev revision
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
 
       - name: Setup Node
         uses: actions/setup-node@v7
+        env:
+          NPM_CONFIG_CACHE: ${{ github.workspace }}/.tmp/npm-cache
         with:
-          node-version: 24
+          node-version: 24.18.1
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install trusted dependencies
+        run: npm run install:trusted
 
       - name: Validate migration files
         run: npm run validate:migrations
 
       - name: Measure Preview administrator performance
+        env:
+          SUPABASE_PREVIEW_URL: ${{ secrets.SUPABASE_PREVIEW_URL }}
+          SUPABASE_PREVIEW_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_PREVIEW_SERVICE_ROLE_KEY }}
+          ADMIN_PREVIEW_URL: https://ssartnership-dev.myknow.xyz
+          ADMIN_PREVIEW_SESSION_COOKIE: ${{ secrets.ADMIN_PREVIEW_SESSION_COOKIE }}
+          ADMIN_PREVIEW_PROTECTION_BYPASS: ${{ secrets.ADMIN_PREVIEW_PROTECTION_BYPASS }}
+          ADMIN_PREVIEW_BASIC_AUTH_USERNAME: ${{ secrets.ADMIN_PREVIEW_BASIC_AUTH_USERNAME }}
+          ADMIN_PREVIEW_BASIC_AUTH_PASSWORD: ${{ secrets.ADMIN_PREVIEW_BASIC_AUTH_PASSWORD }}
+          ADMIN_PREVIEW_LOGIN_USERNAME: ${{ secrets.PREVIEW_TEST_MEMBER_USERNAME }}
+          ADMIN_PREVIEW_LOGIN_PASSWORD: ${{ secrets.PREVIEW_TEST_MEMBER_PASSWORD }}
+          ADMIN_PREVIEW_ITERATIONS: ${{ inputs.iterations }}
+          ADMIN_PREVIEW_PAGE_TARGETS: ${{ inputs.page_targets }}
+          ADMIN_PREVIEW_API_TARGETS: ${{ inputs.api_targets }}
         run: npm run measure:admin:preview
