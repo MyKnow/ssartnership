@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("auth and partner portal operation flows", () => {
+  test.beforeEach(async ({ page }) => {
+    const resetResponse = await page.request.post("/api/e2e/mock/reset");
+    expect(resetResponse.ok()).toBe(true);
+  });
+
   test("manual member setup rejects a missing one-time token without exposing it", async ({ page }) => {
     await page.goto("/auth/member/setup");
 
