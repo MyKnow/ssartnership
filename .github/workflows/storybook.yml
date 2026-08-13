@@ -61,7 +61,7 @@ jobs:
                 # Story interaction assertions do not change the rendered app.
                 # Run pixel comparison manually when a fixture itself changes.
                 ;;
-              src/app/*.tsx|src/components/*.tsx|src/*.css|public/*|.storybook/*|tests/visual/*|playwright.visual.config.ts)
+              src/*|public/*|.storybook/*|tests/visual/*|next.config.ts|postcss.config.*|tailwind.config.*|playwright.visual.config.ts)
                 changed=true
                 break
                 ;;
