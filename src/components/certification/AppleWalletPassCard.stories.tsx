@@ -31,6 +31,7 @@ type Story = StoryObj<typeof meta>;
 export const NotIssued: Story = {
   args: {
     status: "not_issued",
+    lastIssuedAt: null,
   },
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
@@ -38,7 +39,7 @@ export const NotIssued: Story = {
       name: "Apple Wallet 패스 발급하기",
     });
     const checkbox = canvas.getByRole("checkbox", {
-      name: "개인정보 저장 내용을 확인했고 Apple Wallet 패스 발급에 동의합니다.",
+      name: "위 정보 저장에 동의합니다.",
     });
 
     await expect(issueButton).toBeDisabled();
@@ -59,7 +60,7 @@ export const Active: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     const downloadButton = canvas.getByRole("button", { name: "패스 다시 받기" });
-    const revokeButton = canvas.getByRole("button", { name: "패스 폐기" });
+    const revokeButton = canvas.getByRole("button", { name: "이 패스 폐기" });
 
     await expect(downloadButton).toBeEnabled();
     await expect(revokeButton).toBeEnabled();
@@ -76,16 +77,16 @@ export const ActiveIssuanceUnavailable: Story = {
   },
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
-    const downloadButton = canvas.getByRole("button", {
-      name: "패스 다시 받기 중단",
-    });
-    const revokeButton = canvas.getByRole("button", { name: "패스 폐기" });
+    const revokeButton = canvas.getByRole("button", { name: "이 패스 폐기" });
 
-    await expect(downloadButton).toBeDisabled();
+    await expect(
+      canvas.queryByRole("button", { name: "패스 다시 받기 중단" }),
+    ).toBeNull();
+    await expect(
+      canvas.getByText("지금은 기존 패스를 계속 사용하거나 폐기할 수 있어요."),
+    ).toBeInTheDocument();
     await expect(revokeButton).toBeEnabled();
-    await userEvent.click(downloadButton);
     await userEvent.click(revokeButton);
-    await expect(args.onDownload).not.toHaveBeenCalled();
     await expect(args.onRevoke).toHaveBeenCalled();
   },
 };
@@ -114,6 +115,15 @@ export const ErrorState: Story = {
   args: {
     status: "error",
     blockerMessage: "패스 발급 서버와 연결할 수 없어요. 잠시 후 다시 시도해 주세요.",
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const retryButton = canvas.getByRole("button", { name: "최신 패스 받기" });
+
+    await expect(retryButton).toBeEnabled();
+    await expect(canvas.getByText("패스 발급 서버와 연결할 수 없어요. 잠시 후 다시 시도해 주세요.")).toBeInTheDocument();
+    await userEvent.click(retryButton);
+    await expect(args.onIssue).toHaveBeenCalled();
   },
 };
 
