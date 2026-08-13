@@ -70,6 +70,10 @@ export default defineConfig({
         test: {
           name: "storybook",
           setupFiles: [path.join(dirname, ".storybook", "vitest.setup.tsx")],
+          // Storybook collects the stories in one CSF file as concurrent tests.
+          // Several interaction stories intentionally replace browser globals
+          // such as fetch, so keep their shared page mutations strictly serial.
+          maxConcurrency: 1,
           browser: {
             enabled: true,
             headless: true,

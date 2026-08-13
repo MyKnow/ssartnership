@@ -110,6 +110,11 @@ test("local prepush and release use the same Public Readiness gates", () => {
 test("Storybook and visual baselines run for pull requests and shared branches without Chromatic", () => {
   const workflow = readRepoFile(".github/workflows/storybook.yml");
   const preview = readRepoFile(".storybook/preview.tsx");
+  const vitestConfig = readRepoFile("vitest.config.ts");
+  const manualMemberImportStories = readRepoFile(
+    "src/components/admin/AdminMemberManualAddPanel.stories.tsx",
+  );
+  const imageUploadDraftClient = readRepoFile("src/lib/image-upload/draft.client.ts");
 
   assert.match(workflow, /name: Storybook and Visual Baselines/);
   assert.match(workflow, /push:\s*\n\s+branches:\s*\[main, dev\]/);
@@ -128,6 +133,18 @@ test("Storybook and visual baselines run for pull requests and shared branches w
   assert.match(
     preview,
     /pretendard\/dist\/web\/variable\/pretendardvariable\.css/,
+  );
+  assert.match(
+    vitestConfig,
+    /name:\s*"storybook"[\s\S]+?maxConcurrency:\s*1[\s\S]+?fileParallelism:\s*false/,
+  );
+  assert.match(
+    manualMemberImportStories,
+    /beforeEach:\s*async[\s\S]+?window\.fetch = STORYBOOK_FETCH[\s\S]+?await clearImageUploadDraft\(MANUAL_MEMBER_IMPORT_DRAFT_KEY\)[\s\S]+?window\.fetch = STORYBOOK_FETCH[\s\S]+?await clearImageUploadDraft\(MANUAL_MEMBER_IMPORT_DRAFT_KEY\)/,
+  );
+  assert.match(
+    imageUploadDraftClient,
+    /async function runImageUploadDraftTransaction[\s\S]+?request\.addEventListener\("success", \(\) => \{[\s\S]+?result = request\.result;[\s\S]+?transaction\.oncomplete = \(\) => resolve\(result\)/,
   );
   assert.doesNotMatch(workflow, /chromaui\/action|CHROMATIC_PROJECT_TOKEN/);
 });

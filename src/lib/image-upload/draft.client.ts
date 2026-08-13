@@ -62,7 +62,7 @@ function openDatabase() {
   });
 }
 
-async function runTransaction<T>(
+async function runImageUploadDraftTransaction<T>(
   mode: IDBTransactionMode,
   callback: (store: IDBObjectStore) => IDBRequest<T> | void,
 ) {
@@ -72,11 +72,21 @@ async function runTransaction<T>(
       const transaction = database.transaction(STORE_NAME, mode);
       const store = transaction.objectStore(STORE_NAME);
       const request = callback(store);
+      let result: T | undefined;
       if (request) {
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error ?? new Error("임시 이미지 저장소 작업에 실패했습니다."));
+        // Use listeners so callbacks such as draft cleanup can keep their own
+        // success handler that enqueues additional work in this transaction.
+        request.addEventListener("success", () => {
+          result = request.result;
+        });
+        request.addEventListener("error", () => {
+          reject(request.error ?? new Error("임시 이미지 저장소 작업에 실패했습니다."));
+        });
       }
-      transaction.oncomplete = () => resolve(undefined);
+      // A request may enqueue additional writes from its success handler.
+      // Resolve only after the whole transaction commits so callers that await
+      // draft cleanup cannot race a subsequent restore.
+      transaction.oncomplete = () => resolve(result);
       transaction.onerror = () => reject(transaction.error ?? new Error("임시 이미지 저장소 작업에 실패했습니다."));
       transaction.onabort = () => reject(transaction.error ?? new Error("임시 이미지 저장소 작업이 취소되었습니다."));
     });
@@ -147,7 +157,7 @@ export function clearImageUploadDraft(formKey: string) {
     window.sessionStorage.removeItem(getSubmissionSessionKey(formKey));
   }
   if (typeof indexedDB === "undefined") return Promise.resolve();
-  return runTransaction("readwrite", (store) => {
+  return runImageUploadDraftTransaction("readwrite", (store) => {
     const request = store.getAllKeys();
     request.onsuccess = () => {
       for (const key of request.result) {
@@ -166,7 +176,7 @@ export async function saveImageUploadDraftFiles(
 ) {
   if (typeof indexedDB === "undefined") return;
   const nextKeys = new Set(files.map((file) => getFileKey(formKey, file.clientId)));
-  await runTransaction("readwrite", (store) => {
+  await runImageUploadDraftTransaction("readwrite", (store) => {
     for (const file of files) {
       const row: StoredDraftFile = {
         key: getFileKey(formKey, file.clientId),
@@ -200,7 +210,7 @@ export async function saveImageUploadDraftFiles(
 
 export async function loadImageUploadDraftFiles(formKey: string) {
   if (typeof indexedDB === "undefined") return [] as ImageUploadDraftFile[];
-  const rows = await runTransaction<StoredDraftFile[]>("readonly", (store) => store.getAll())
+  const rows = await runImageUploadDraftTransaction<StoredDraftFile[]>("readonly", (store) => store.getAll())
     .catch(() => [] as StoredDraftFile[]);
   return (rows ?? [])
     .filter((row) => row.formKey === formKey)
