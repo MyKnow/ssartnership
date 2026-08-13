@@ -281,12 +281,17 @@ export const InteractiveComposer: Story = {
     await expect(canvas.getAllByText(/푸시 미구독 1명/).length).toBeGreaterThan(0);
 
     await userEvent.click(canvas.getByText("대상자 보기"));
-    await expect(await body.findByText("발송 대상자 2명")).toBeInTheDocument();
-    await userEvent.type(body.getByPlaceholderText("이름, Mattermost 아이디, 캠퍼스"), "ops");
-    await expect(await body.findByText("현재 표시 1명")).toBeInTheDocument();
     const recipientDialog = within(
-      body.getByRole("dialog", { name: "발송 대상자 2명" }),
+      await body.findByRole("dialog", { name: "발송 대상자 2명" }, { timeout: 4000 }),
     );
+    const recipientSearch = recipientDialog.getByPlaceholderText(
+      "이름, Mattermost 아이디, 캠퍼스",
+    );
+    await userEvent.type(recipientSearch, "ops");
+    await expect(recipientSearch).toHaveValue("ops");
+    await expect(
+      await recipientDialog.findByText("현재 표시 1명", {}, { timeout: 4000 }),
+    ).toBeInTheDocument();
     await userEvent.click(recipientDialog.getByRole("button", { name: "모달 닫기" }));
 
     await waitFor(
