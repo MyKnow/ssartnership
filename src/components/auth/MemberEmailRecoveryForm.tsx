@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
+import { useHydrated } from "@/hooks/useHydrated";
 import { normalizeMemberEmail } from "@/lib/member-domain";
 
 type Step = "password" | "email" | "code";
@@ -24,13 +25,9 @@ export default function MemberEmailRecoveryForm() {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [pending, setPending] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
+  const hydrated = useHydrated();
   const [message, setMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
 
   function resetMessage() {
     setMessage(null);
