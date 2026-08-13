@@ -57,7 +57,7 @@ jobs:
           changed=false
           while IFS= read -r pathname; do
             case "$pathname" in
-              src/*|public/*|.storybook/*|tests/visual/*|next.config.ts|postcss.config.*|tailwind.config.*|playwright.visual.config.ts)
+              src/*|public/*|.storybook/*|tests/visual/*|package.json|package-lock.json|next.config.ts|postcss.config.*|tailwind.config.*|playwright.visual.config.ts)
                 changed=true
                 break
                 ;;

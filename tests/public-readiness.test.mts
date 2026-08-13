@@ -49,6 +49,7 @@ test("Storybook and visual baselines run for pull requests and shared branches w
   assert.match(workflow, /name: Detect visual changes/);
   assert.match(workflow, /git diff --name-only --diff-filter=ACMRTD/);
   assert.match(workflow, /src\/\*\|public\/\*/);
+  assert.match(workflow, /package\.json\|package-lock\.json/);
   assert.doesNotMatch(workflow, /^\s+\*\.stories\.tsx\)/m);
   assert.match(workflow, /npm run build-storybook/);
   assert.match(workflow, /npm run test-storybook/);
