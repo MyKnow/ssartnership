@@ -5,7 +5,7 @@ import test from "node:test";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
 const migrationName =
-  "20260813014223_fix_current_schema_member_anonymization.sql";
+  "20260813114408_connect_wallet_member_lifecycle.sql";
 const transitionMigrationName =
   "20260813022030_require_member_anonymization_gate_for_recovery_withdrawal.sql";
 
@@ -200,6 +200,11 @@ test("member anonymization preserves the retention gate and current cleanup cont
 
   assert.match(
     body,
+    /if not public\.purge_deleted_member_wallet_data_for_anonymization\(p_member_id\) then\s+raise exception 'member_wallet_lifecycle_anonymization_gate_failed';\s+end if;/i,
+  );
+
+  assert.match(
+    body,
     /to_regclass\('public\.member_auth_identities'\) is not null/i,
   );
   assert.match(
@@ -321,25 +326,47 @@ test("approved recovery withdrawal is limited to the anonymization tombstone", (
 
 test("member lifecycle deletes private files before calling the anonymization RPC", () => {
   const lifecycleSource = readRepoFile("src/lib/member-lifecycle.ts");
+  const planStart = lifecycleSource.indexOf(
+    "async function readMemberAnonymizationStoragePlan(",
+  );
   const functionStart = lifecycleSource.indexOf(
     "export async function anonymizeDeletedMember(memberId: string)",
   );
+  assert.ok(planStart >= 0 && functionStart > planStart);
+  const planSource = lifecycleSource.slice(planStart, functionStart);
   const functionEnd = lifecycleSource.indexOf("\n}\n\nexport {", functionStart);
   assert.ok(functionStart >= 0 && functionEnd > functionStart);
   const anonymizeSource = lifecycleSource.slice(functionStart, functionEnd + 2);
+
+  const retentionGate = anonymizeSource.indexOf(
+    'readMemberAnonymizationStoragePlan(memberId)',
+  );
 
   const profileDelete = anonymizeSource.indexOf(
     ".from(MEMBER_PROFILE_IMAGES_BUCKET)\n      .remove(paths)",
   );
   const certificateDelete = anonymizeSource.indexOf(
-    ".from(GRADUATE_CERTIFICATES_BUCKET)\n        .remove([certificatePath])",
+    ".from(GRADUATE_CERTIFICATES_BUCKET)\n      .remove([certificatePath])",
   );
   const rpc = anonymizeSource.indexOf(
     'supabase.rpc("anonymize_deleted_member"',
   );
 
+  assert.ok(retentionGate >= 0 && retentionGate < profileDelete);
   assert.ok(profileDelete >= 0 && profileDelete < rpc);
   assert.ok(certificateDelete >= 0 && certificateDelete < rpc);
+  assert.match(
+    planSource,
+    /supabase\.rpc\(\s*"get_deleted_member_anonymization_storage_plan",\s*\{ p_member_id: memberId \},\s*\)/,
+  );
+  assert.doesNotMatch(
+    planSource,
+    /\.from\("(?:members|member_profile_images|graduate_profiles|graduate_verification_requests)"\)/,
+  );
+  assert.match(
+    anonymizeSource,
+    /if \(data !== true\) \{[\s\S]*?\.select\("deleted_at,anonymized_at"\)[\s\S]*?\.eq\("id", memberId\)[\s\S]*?if \(\(currentMember as MemberAnonymizationStateRow \| null\)\?\.anonymized_at\) \{\s+return false;\s+\}[\s\S]*?throw new Error\("회원 익명화 상태가 변경되었습니다\."\);\s+\}/,
+  );
   assert.match(
     lifecycleSource,
     /Date\.now\(\) - 30 \* 24 \* 60 \* 60 \* 1000/,
