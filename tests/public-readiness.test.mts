@@ -46,9 +46,14 @@ test("Storybook and visual baselines run for pull requests and shared branches w
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /concurrency:\s*\n\s+group:/);
   assert.match(workflow, /cancel-in-progress:\s+true/);
+  assert.match(workflow, /name: Detect visual changes/);
+  assert.match(workflow, /git diff --name-only --diff-filter=ACMRT/);
+  assert.match(workflow, /\*\.stories\.tsx\)/);
   assert.match(workflow, /npm run build-storybook/);
   assert.match(workflow, /npm run test-storybook/);
   assert.match(workflow, /playwright install --with-deps chromium/);
+  assert.match(workflow, /needs: changes/);
+  assert.match(workflow, /if: needs\.changes\.outputs\.visual == 'true'/);
   assert.match(workflow, /npm run test:visual/);
   assert.doesNotMatch(workflow, /chromaui\/action|CHROMATIC_PROJECT_TOKEN/);
 });

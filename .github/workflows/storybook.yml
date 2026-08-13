@@ -6,24 +6,83 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  verify:
-    name: Build, A11y, Visual Diff
+  changes:
+    name: Detect visual changes
+    runs-on: ubuntu-latest
+    outputs:
+      visual: ${{ steps.visual.outputs.changed }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect screenshot-affecting changes
+        id: visual
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PULL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PULL_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base_sha="$PULL_BASE_SHA"
+            head_sha="$PULL_HEAD_SHA"
+          else
+            base_sha="$PUSH_BASE_SHA"
+            head_sha="$CURRENT_SHA"
+          fi
+
+          if [[ -z "$base_sha" || "$base_sha" =~ ^0+$ ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed=false
+          while IFS= read -r pathname; do
+            case "$pathname" in
+              *.stories.tsx)
+                # Story interaction assertions do not change the rendered app.
+                # Run pixel comparison manually when a fixture itself changes.
+                ;;
+              src/app/*.tsx|src/components/*.tsx|src/*.css|public/*|.storybook/*|tests/visual/*|playwright.visual.config.ts)
+                changed=true
+                break
+                ;;
+            esac
+          done < <(git diff --name-only --diff-filter=ACMRT "$base_sha" "$head_sha")
+
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
+  interaction:
+    name: Build, Interaction, A11y
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -34,11 +93,38 @@ jobs:
       - name: Build Storybook
         run: npm run build-storybook
 
+      - name: Install fixed Chromium
+        run: npx playwright install --with-deps chromium
+
       - name: Storybook interaction and a11y tests
         run: npm run test-storybook
 
+  visual:
+    name: Visual Baselines
+    needs: changes
+    if: needs.changes.outputs.visual == 'true'
+    # Screenshot baselines are generated with CoreText. Keep the pixel job
+    # aligned with that renderer so font metrics do not vary with FreeType.
+    runs-on: macos-14
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Install fixed Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
 
       - name: Compare core visual baselines
         run: npm run test:visual
