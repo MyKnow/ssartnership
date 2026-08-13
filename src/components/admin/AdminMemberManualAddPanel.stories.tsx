@@ -1,10 +1,22 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, waitFor, within } from "storybook/test";
+import { clearImageUploadDraft } from "@/lib/image-upload/draft.client";
 import AdminMemberManualAddPanel from "./AdminMemberManualAddPanel";
+
+const MANUAL_MEMBER_IMPORT_DRAFT_KEY = "admin-manual-member-import";
+const STORYBOOK_FETCH = globalThis.fetch;
 
 const meta = {
   title: "Screens/Admin/ManualMemberImport",
   component: AdminMemberManualAddPanel,
+  beforeEach: async () => {
+    window.fetch = STORYBOOK_FETCH;
+    await clearImageUploadDraft(MANUAL_MEMBER_IMPORT_DRAFT_KEY);
+    return async () => {
+      window.fetch = STORYBOOK_FETCH;
+      await clearImageUploadDraft(MANUAL_MEMBER_IMPORT_DRAFT_KEY);
+    };
+  },
   parameters: {
     nextjs: { appDirectory: true },
     chromatic: { viewports: [360, 820, 1366] },
