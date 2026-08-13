@@ -59,4 +59,20 @@ test("pre-push gate mirrors Public Readiness before the full Playwright suite", 
   );
   assert.doesNotMatch(adminConsoleSpec, /test\.afterEach/);
   assert.doesNotMatch(adminConsoleSpec, /activeRequestsByPage/);
+
+  const responsiveTest = adminConsoleSpec.match(
+    /test\("keeps the registration queue inside narrow and wide viewports",[\s\S]*?\n  \}\);/,
+  )?.[0];
+  assert.ok(responsiveTest);
+  assert.equal(responsiveTest.match(/page\.goto\(/g)?.length, 1);
+  assert.match(responsiveTest, /page\.goto\("\/admin\/partner-registrations"\)/);
+  assert.doesNotMatch(responsiveTest, /page\.reload\(|\.click\(/);
+  assert.ok(
+    responsiveTest.indexOf('page.goto("/admin/partner-registrations")') <
+      responsiveTest.indexOf("for (const width"),
+  );
+  assert.ok(
+    responsiveTest.lastIndexOf("await settleLateAdminRequests(page)") >
+      responsiveTest.lastIndexOf("await page.screenshot"),
+  );
 });

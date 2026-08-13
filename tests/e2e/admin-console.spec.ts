@@ -60,10 +60,12 @@ test.describe("authenticated administrator console", () => {
   });
 
   test("keeps the registration queue inside narrow and wide viewports", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 900 });
+    await page.goto("/admin/partner-registrations");
+    await page.waitForLoadState("networkidle");
+
     for (const width of [320, 360, 390, 820, 1366]) {
       await page.setViewportSize({ width, height: 900 });
-      await page.goto("/admin/partner-registrations");
-      await page.waitForLoadState("networkidle");
 
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth > window.innerWidth + 1,

@@ -187,8 +187,17 @@ test("every abnormal run updates the skill before another trigger", () => {
     /exact recurrence of an explicitly reviewed, non-actionable tooling-warning baseline/,
   );
   assert.match(skill, /Fix repository-controlled causes in a new commit/);
+  assert.match(skill, /independent fresh-server repetitions for isolation/);
+  assert.match(skill, /complete CI-shaped Playwright invocation/);
+  assert.match(skill, /Preserve a `--repeat-each` server exit or connection refusal/);
+  assert.match(skill, /do not dismiss it or retry it into green/);
   assert.match(skill, /A successful job with a retry is an abnormal run/);
   assert.match(skill, /Keep remote Playwright fail-closed/);
+  assert.match(
+    skill,
+    /responsive screenshot loop for one route must navigate once and resize the loaded page/,
+  );
+  assert.match(skill, /Do not add a suite-wide request-drain `afterEach`/);
   assert.match(skill, /For a proven external-only outage/);
   assert.match(skill, /Audit Completeness Gate/);
 });
