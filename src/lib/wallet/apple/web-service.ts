@@ -118,9 +118,14 @@ export function normalizeAppleWalletSerialNumber(value: string) {
     : null;
 }
 
-export function verifyAppleWalletPassAuthorization(
+export function getAppleWalletPublicIdFromSerialNumber(value: string) {
+  const serialNumber = normalizeAppleWalletSerialNumber(value);
+  return serialNumber ? serialNumber.slice(3) : null;
+}
+
+export function verifyAppleWalletPassAuthorizationByPublicId(
   request: Request,
-  pass: Pick<MemberWalletPass, "publicId">,
+  publicId: string,
   config: Pick<
     AppleWalletConfig,
     "passTypeIdentifier" | "deviceTokenEncryptionKey"
@@ -131,11 +136,26 @@ export function verifyAppleWalletPassAuthorization(
     return false;
   }
   const expectedToken = deriveAppleWalletAuthenticationToken(
-    pass.publicId,
+    publicId,
     config.passTypeIdentifier,
     config.deviceTokenEncryptionKey,
   );
   return safeEqualText(providedToken, expectedToken);
+}
+
+export function verifyAppleWalletPassAuthorization(
+  request: Request,
+  pass: Pick<MemberWalletPass, "publicId">,
+  config: Pick<
+    AppleWalletConfig,
+    "passTypeIdentifier" | "deviceTokenEncryptionKey"
+  >,
+) {
+  return verifyAppleWalletPassAuthorizationByPublicId(
+    request,
+    pass.publicId,
+    config,
+  );
 }
 
 export function hashAppleWalletDeviceIdentifier(

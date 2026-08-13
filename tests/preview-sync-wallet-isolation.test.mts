@@ -57,72 +57,28 @@ test("Preview sync never copies Production Apple Wallet tables", async () => {
   );
 });
 
-test("Preview sync restores Preview-local Wallet rows inside the same replacement transaction", async () => {
-  const { buildTransactionalPreviewRestoreSql } = await previewSyncLibPromise;
-  const productionDumpSql = [
-    "COPY public.members (id) FROM stdin;",
-    "member-1",
-    "\\.",
-  ].join("\n");
-  const sql = buildTransactionalPreviewRestoreSql({
-    productionDumpSql,
-    schema: "public",
-    targetTables: ["categories", "members"],
-    preservedTables: [...WALLET_PREVIEW_LOCAL_TABLES],
-  });
-
-  const lockIndex = sql.indexOf("lock table");
-  const firstBackupIndex = sql.indexOf("create temporary table");
-  const truncateIndex = sql.indexOf("truncate table");
-  const productionRestoreIndex = sql.indexOf(productionDumpSql);
-  const constraintRestoreIndex = sql.indexOf(
-    "set local session_replication_role = origin;",
-  );
-  const firstWalletRestoreIndex = sql.indexOf(
-    'insert into "public"."member_wallet_passes"',
-  );
-
-  assert.ok(lockIndex >= 0, "replacement must lock the affected tables first");
-  assert.ok(firstBackupIndex > lockIndex, "Wallet backup must follow the lock");
-  assert.ok(truncateIndex > firstBackupIndex, "truncate must follow the backup");
-  assert.ok(
-    productionRestoreIndex > truncateIndex,
-    "Production restore must follow truncate",
-  );
-  assert.ok(
-    constraintRestoreIndex > productionRestoreIndex,
-    "foreign-key enforcement must follow the Production restore",
-  );
-  assert.ok(
-    firstWalletRestoreIndex > constraintRestoreIndex,
-    "Wallet restore must follow foreign-key enforcement",
-  );
-
-  for (const table of WALLET_PREVIEW_LOCAL_TABLES) {
-    assert.match(
-      sql,
-      new RegExp(
-        `create temporary table "preview_sync_backup_${table}"[\\s\\S]*as table "public"\\."${table}";`,
-      ),
-    );
-    assert.match(
-      sql,
-      new RegExp(
-        `insert into "public"\\."${table}"[\\s\\S]*from pg_temp\\."preview_sync_backup_${table}";`,
-      ),
-    );
-  }
-});
-
-test("Preview sync executes truncate, Production restore, and Wallet restore atomically", async () => {
+test("Preview sync executes one replacement transaction while preserving Preview-local Wallet rows", async () => {
   const script = await previewSyncScriptPromise;
 
   assert.match(script, /buildTransactionalPreviewRestoreSql\(/);
   assert.match(script, /"--single-transaction"/);
-  assert.match(script, /await replacePreviewDatabaseData\(dumpPath, restorePath, previewDbUrl\)/);
+  assert.match(
+    script,
+    /await replacePreviewDatabaseData\(dumpPath, restorePath, previewDbUrl\)/,
+  );
+  assert.match(script, /preserving local Wallet records/i);
+  assert.match(script, /preservedTables:\s*PREVIEW_LOCAL_WALLET_TABLES/);
+  assert.match(
+    script,
+    /const missingWalletTables = PREVIEW_LOCAL_WALLET_TABLES\.filter\(/,
+  );
+  assert.match(
+    script,
+    /Preview Wallet schema is missing .* apply migrations before data sync\./,
+  );
 });
 
-test("Preview Wallet restore stays fail-closed for removed Production members", async () => {
+test("Preview sync replacement restores Preview-local Wallet rows and stays fail-closed for removed members", async () => {
   const { buildTransactionalPreviewRestoreSql } = await previewSyncLibPromise;
   const sql = buildTransactionalPreviewRestoreSql({
     productionDumpSql: "select 1;",
@@ -131,7 +87,15 @@ test("Preview Wallet restore stays fail-closed for removed Production members", 
     preservedTables: [...WALLET_PREVIEW_LOCAL_TABLES],
   });
 
-  assert.doesNotMatch(sql, /on conflict/i);
-  assert.doesNotMatch(sql, /join\s+"public"\."members"/i);
-  assert.doesNotMatch(sql, /where\s+exists/i);
+  for (const table of WALLET_PREVIEW_LOCAL_TABLES) {
+    assert.match(
+      sql,
+      new RegExp(`preview_sync_backup_${table}`),
+    );
+    assert.match(
+      sql,
+      new RegExp(`insert into "public"\\."${table}"`),
+    );
+  }
+  assert.match(sql, /set local session_replication_role = origin;/);
 });

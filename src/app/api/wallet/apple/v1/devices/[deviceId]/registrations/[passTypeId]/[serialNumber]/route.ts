@@ -1,18 +1,40 @@
+import { scheduleProductEventLog } from "@/lib/activity-logs";
 import { encryptApplePushToken } from "@/lib/wallet/apple/apple-wallet-device-token";
 import { walletPassRepository } from "@/lib/repositories/wallet-pass";
 import {
   appleWalletEmptyResponse,
   appleWalletJsonResponse,
+  getAppleWalletPublicIdFromSerialNumber,
   getAppleWalletWebServiceConfig,
   hashAppleWalletDeviceIdentifier,
   isExpectedAppleWalletPassTypeIdentifier,
   parseAppleWalletRegistrationBody,
   normalizeAppleWalletSerialNumber,
   verifyAppleWalletPassAuthorization,
+  verifyAppleWalletPassAuthorizationByPublicId,
 } from "@/lib/wallet/apple/web-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function logWalletDeviceEvent(
+  eventName: "wallet_pass_device_register" | "wallet_pass_device_unregister",
+  properties: Record<string, unknown>,
+) {
+  try {
+    scheduleProductEventLog({
+      eventName,
+      actorType: "system",
+      targetType: "wallet_pass",
+      properties: {
+        platform: "apple",
+        ...properties,
+      },
+    });
+  } catch {
+    // Observability must not block the Apple Wallet device API.
+  }
+}
 
 function mapRegistrationRepositoryError(error: unknown) {
   const message = error instanceof Error ? error.message : "";
@@ -31,6 +53,7 @@ function mapRegistrationRepositoryError(error: unknown) {
 async function loadAuthorizedPass(
   request: Request,
   params: { passTypeId: string; serialNumber: string },
+  options?: { allowMissingPass?: boolean },
 ) {
   const configStatus = getAppleWalletWebServiceConfig();
   if (!configStatus.ok) {
@@ -62,6 +85,16 @@ async function loadAuthorizedPass(
       ),
     };
   }
+  const publicId = getAppleWalletPublicIdFromSerialNumber(serialNumber);
+  if (!publicId) {
+    return {
+      ok: false as const,
+      response: appleWalletJsonResponse(
+        { message: "패스를 찾을 수 없습니다." },
+        404,
+      ),
+    };
+  }
 
   let pass;
   try {
@@ -78,6 +111,26 @@ async function loadAuthorizedPass(
     };
   }
   if (!pass) {
+    if (options?.allowMissingPass) {
+      if (
+        !verifyAppleWalletPassAuthorizationByPublicId(
+          request,
+          publicId,
+          configStatus.config,
+        )
+      ) {
+        return {
+          ok: false as const,
+          response: appleWalletEmptyResponse(401),
+        };
+      }
+      return {
+        ok: true as const,
+        config: configStatus.config,
+        pass: null,
+        publicId,
+      };
+    }
     return {
       ok: false as const,
       response: appleWalletJsonResponse(
@@ -94,7 +147,7 @@ async function loadAuthorizedPass(
     };
   }
 
-  return { ok: true as const, config: configStatus.config, pass };
+  return { ok: true as const, config: configStatus.config, pass, publicId };
 }
 
 export async function POST(
@@ -111,6 +164,12 @@ export async function POST(
   const authorized = await loadAuthorizedPass(request, params);
   if (!authorized.ok) {
     return authorized.response;
+  }
+  if (!authorized.pass) {
+    return appleWalletJsonResponse(
+      { message: "패스를 찾을 수 없습니다." },
+      404,
+    );
   }
 
   const hashedDeviceIdentifier = hashAppleWalletDeviceIdentifier(
@@ -145,8 +204,23 @@ export async function POST(
       pushTokenAuthTag: encryptedPushToken.tag,
       pushTokenKeyVersion: encryptedPushToken.keyVersion,
     });
+    logWalletDeviceEvent("wallet_pass_device_register", {
+      registrationScope: "device_registration",
+      outcome: result.isNewRegistration ? "registered" : "updated",
+      isNewRegistration: result.isNewRegistration,
+    });
     return appleWalletEmptyResponse(result.isNewRegistration ? 201 : 200);
   } catch (error) {
+    logWalletDeviceEvent("wallet_pass_device_register", {
+      registrationScope: "device_registration",
+      outcome: "failed",
+      reasonCode:
+        error instanceof Error && error.message.includes("revoked")
+          ? "revoked"
+          : error instanceof Error && error.message.includes("not_found")
+            ? "not_found"
+            : "repository_error",
+    });
     return mapRegistrationRepositoryError(error);
   }
 }
@@ -162,7 +236,9 @@ export async function DELETE(
   },
 ) {
   const params = await context.params;
-  const authorized = await loadAuthorizedPass(request, params);
+  const authorized = await loadAuthorizedPass(request, params, {
+    allowMissingPass: true,
+  });
   if (!authorized.ok) {
     return authorized.response;
   }
@@ -178,13 +254,36 @@ export async function DELETE(
     );
   }
 
+  if (!authorized.pass) {
+    logWalletDeviceEvent("wallet_pass_device_unregister", {
+      registrationScope: "device_registration",
+      outcome: "noop_missing_pass",
+    });
+    return appleWalletEmptyResponse(200);
+  }
+
   try {
-    await walletPassRepository.unregisterAppleWalletDevice({
+    const result = await walletPassRepository.unregisterAppleWalletDevice({
       publicId: authorized.pass.publicId,
       deviceLibraryIdentifierHash: hashedDeviceIdentifier,
     });
+    logWalletDeviceEvent("wallet_pass_device_unregister", {
+      registrationScope: "device_registration",
+      outcome: result.removed ? "removed" : "already_removed",
+      removed: result.removed,
+    });
     return appleWalletEmptyResponse(200);
   } catch (error) {
+    logWalletDeviceEvent("wallet_pass_device_unregister", {
+      registrationScope: "device_registration",
+      outcome: "failed",
+      reasonCode:
+        error instanceof Error && error.message.includes("revoked")
+          ? "revoked"
+          : error instanceof Error && error.message.includes("not_found")
+            ? "not_found"
+            : "repository_error",
+    });
     return mapRegistrationRepositoryError(error);
   }
 }

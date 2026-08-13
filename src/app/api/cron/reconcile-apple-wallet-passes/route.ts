@@ -1,5 +1,6 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
+import { scheduleProductEventLog } from "@/lib/activity-logs";
 import { reconcileInstalledAppleWalletPasses } from "@/lib/wallet/wallet-pass-service";
 
 export const runtime = "nodejs";
@@ -10,6 +11,23 @@ function isAuthorizedByCronSecret(request: NextRequest) {
   return Boolean(
     secret && request.headers.get("authorization") === `Bearer ${secret}`,
   );
+}
+
+function logWalletReconcileEvent(properties: Record<string, unknown>) {
+  try {
+    scheduleProductEventLog({
+      eventName: "wallet_pass_sync",
+      actorType: "system",
+      targetType: "wallet_pass",
+      properties: {
+        platform: "apple",
+        syncScope: "daily_reconcile",
+        ...properties,
+      },
+    });
+  } catch {
+    // Cron completion must not fail just because event scheduling is unavailable.
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -23,11 +41,25 @@ export async function GET(request: NextRequest) {
 
   try {
     const result = await reconcileInstalledAppleWalletPasses();
+    logWalletReconcileEvent({
+      outcome: result.skipped ? "reconcile_skipped" : "reconcile_completed",
+      reasonCode: result.skipReason ?? (result.failed > 0 ? "partial_failure" : "ok"),
+      scanned: result.scanned,
+      invalidated: result.invalidated,
+      failed: result.failed,
+      truncated: result.truncated,
+      configWarningCodes: result.configWarningCodes,
+      certificateExpiresInDays: result.certificateExpiresInDays,
+    });
     return NextResponse.json(
       { ok: true, ...result },
       { headers: { "cache-control": "no-store" } },
     );
   } catch {
+    logWalletReconcileEvent({
+      outcome: "reconcile_failed",
+      reasonCode: "unexpected_error",
+    });
     return NextResponse.json(
       {
         ok: false,

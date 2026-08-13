@@ -1,3 +1,5 @@
+import { X509Certificate } from "node:crypto";
+
 import type {
   AppleWalletConfig,
   AppleWalletConfigStatus,
@@ -14,6 +16,7 @@ const WWDR_ENV_NAME = "APPLE_WALLET_WWDR_CERTIFICATE_BASE64";
 const DEVICE_TOKEN_ENCRYPTION_KEY_ENV_NAME =
   "APPLE_WALLET_DEVICE_TOKEN_ENCRYPTION_KEY_BASE64";
 const SITE_URL_ENV_NAME = "NEXT_PUBLIC_SITE_URL";
+const CERTIFICATE_EXPIRING_SOON_THRESHOLD_DAYS = 30;
 
 const REQUIRED_ENV_NAMES = [
   TEAM_ID_ENV_NAME,
@@ -129,6 +132,48 @@ function parseSiteUrl(siteUrl: string) {
   }
 }
 
+function resolveNow(value?: Date) {
+  if (!value) {
+    return new Date();
+  }
+  return Number.isNaN(value.getTime()) ? new Date() : value;
+}
+
+function parseSignerCertificateValidity(buffer: Buffer, now: Date) {
+  try {
+    const certificate = new X509Certificate(buffer);
+    const notBefore = new Date(certificate.validFrom);
+    const notAfter = new Date(certificate.validTo);
+    if (
+      Number.isNaN(notBefore.getTime()) ||
+      Number.isNaN(notAfter.getTime())
+    ) {
+      throw new Error("invalid validity");
+    }
+    const expiresInDays = Math.max(
+      0,
+      Math.ceil((notAfter.getTime() - now.getTime()) / (24 * 60 * 60 * 1_000)),
+    );
+    return {
+      ok: true as const,
+      validity: {
+        notBefore: notBefore.toISOString(),
+        notAfter: notAfter.toISOString(),
+        expiresInDays,
+        expiringSoon:
+          now.getTime() <= notAfter.getTime() &&
+          expiresInDays <= CERTIFICATE_EXPIRING_SOON_THRESHOLD_DAYS,
+      },
+    };
+  } catch {
+    return {
+      ok: false as const,
+      invalidEnv: CERTIFICATE_ENV_NAME,
+      message: `${CERTIFICATE_ENV_NAME} 값에서 인증서 유효기간을 읽지 못했습니다.`,
+    };
+  }
+}
+
 export function getAppleWalletEnvironmentNames() {
   return {
     enabled: ENABLED_ENV_NAME,
@@ -146,7 +191,9 @@ export function getAppleWalletEnvironmentNames() {
 
 export function getAppleWalletConfigStatus(
   env: Partial<NodeJS.ProcessEnv> = process.env,
+  options?: { now?: Date },
 ): AppleWalletConfigStatus {
+  const now = resolveNow(options?.now);
   if (!parseEnabled(env[ENABLED_ENV_NAME])) {
     return {
       ok: false,
@@ -238,6 +285,37 @@ export function getAppleWalletConfigStatus(
       message: `${CERTIFICATE_ENV_NAME} 값은 PEM 인증서여야 합니다.`,
     };
   }
+  const signerCertificateValidity = parseSignerCertificateValidity(
+    signerCert.buffer,
+    now,
+  );
+  if (!signerCertificateValidity.ok) {
+    return {
+      ok: false,
+      code: "invalid_env",
+      enabled: true,
+      invalidEnv: signerCertificateValidity.invalidEnv,
+      message: signerCertificateValidity.message,
+    };
+  }
+  if (now.getTime() < Date.parse(signerCertificateValidity.validity.notBefore)) {
+    return {
+      ok: false,
+      code: "invalid_env",
+      enabled: true,
+      invalidEnv: CERTIFICATE_ENV_NAME,
+      message: `${CERTIFICATE_ENV_NAME} 인증서가 아직 유효하지 않습니다.`,
+    };
+  }
+  if (now.getTime() > Date.parse(signerCertificateValidity.validity.notAfter)) {
+    return {
+      ok: false,
+      code: "invalid_env",
+      enabled: true,
+      invalidEnv: CERTIFICATE_ENV_NAME,
+      message: `${CERTIFICATE_ENV_NAME} 인증서가 만료되었습니다.`,
+    };
+  }
 
   const signerKey = parseBase64Buffer(PRIVATE_KEY_ENV_NAME, signerPrivateKeyValue);
   if (!signerKey.ok) {
@@ -307,8 +385,18 @@ export function getAppleWalletConfigStatus(
     signerCert: signerCert.buffer,
     signerKey: signerKey.buffer,
     deviceTokenEncryptionKey: masterKeyStatus.key,
+    signerCertificateValidity: signerCertificateValidity.validity,
     ...(signerKeyPassphrase ? { signerKeyPassphrase } : {}),
   };
+
+  const warnings = signerCertificateValidity.validity.expiringSoon
+    ? [
+        {
+          code: "certificate_expiring_soon" as const,
+          message: `${CERTIFICATE_ENV_NAME} 인증서 만료가 ${signerCertificateValidity.validity.expiresInDays}일 이내로 임박했습니다.`,
+        },
+      ]
+    : undefined;
 
   return {
     ok: true,
@@ -316,5 +404,6 @@ export function getAppleWalletConfigStatus(
     enabled: true,
     message: "Apple Wallet 설정을 사용할 수 있습니다.",
     config,
+    warnings,
   };
 }
