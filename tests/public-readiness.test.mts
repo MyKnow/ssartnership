@@ -117,9 +117,10 @@ test("Storybook and visual baselines run for pull requests and shared branches w
   assert.match(workflow, /concurrency:\s*\n\s+group:/);
   assert.match(workflow, /cancel-in-progress:\s+true/);
   assert.match(workflow, /npm run build-storybook/);
-  assert.match(workflow, /npm run test-storybook/);
-  assert.match(workflow, /playwright install --with-deps chromium/);
-  assert.match(workflow, /npm run test:visual/);
+  assert.match(
+    workflow,
+    /npm run build-storybook[\s\S]+?playwright install --with-deps chromium[\s\S]+?npm run test-storybook[\s\S]+?npm run test:visual/,
+  );
   assert.doesNotMatch(workflow, /chromaui\/action|CHROMATIC_PROJECT_TOKEN/);
 });
 

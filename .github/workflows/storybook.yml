@@ -37,11 +37,11 @@ jobs:
       - name: Build Storybook
         run: npm run build-storybook
 
-      - name: Storybook interaction and a11y tests
-        run: npm run test-storybook
-
       - name: Install fixed Chromium
         run: npx playwright install --with-deps chromium
+
+      - name: Storybook interaction and a11y tests
+        run: npm run test-storybook
 
       - name: Compare core visual baselines
         run: npm run test:visual
