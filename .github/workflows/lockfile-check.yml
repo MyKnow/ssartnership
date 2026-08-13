@@ -16,21 +16,16 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
 
       - name: Verify Linux canonical lockfile
-        run: |
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-          git diff --exit-code -- package-lock.json || {
-            echo "::error::package-lock.json is not canonical for Linux/amd64. Run 'npm run check:lockfile' and commit the updated package-lock.json."
-            exit 1
-          }
+        run: npm run check:lockfile
 
       - name: Verify npm ci
         run: npm ci
