@@ -42,8 +42,11 @@ test("public readiness CI workflow gates launch-critical checks", () => {
   assert.doesNotMatch(workflow, /npm run check:lockfile/);
 });
 
-test("Storybook interaction runs automatically while pixel baselines stay manual", () => {
+test("Storybook interaction runs automatically, isolates shared state, and keeps pixel baselines manual", () => {
   const workflow = readRepoFile(".github/workflows/storybook.yml");
+  const manualMemberImportStories = readRepoFile(
+    "src/components/admin/AdminMemberManualAddPanel.stories.tsx",
+  );
 
   assert.match(workflow, /name: Storybook and Visual Baselines/);
   assert.match(workflow, /push:\s*\n\s+branches:\s*\[main, dev\]/);
@@ -66,6 +69,10 @@ test("Storybook interaction runs automatically while pixel baselines stay manual
   assert.doesNotMatch(workflow, /name: Detect visual changes/);
   assert.doesNotMatch(workflow, /git diff --name-only --diff-filter/);
   assert.doesNotMatch(workflow, /chromaui\/action|CHROMATIC_PROJECT_TOKEN/);
+  assert.match(
+    manualMemberImportStories,
+    /beforeEach:\s*async[\s\S]+?window\.fetch = STORYBOOK_FETCH[\s\S]+?await clearImageUploadDraft\(MANUAL_MEMBER_IMPORT_DRAFT_KEY\)[\s\S]+?window\.fetch = STORYBOOK_FETCH[\s\S]+?await clearImageUploadDraft\(MANUAL_MEMBER_IMPORT_DRAFT_KEY\)/,
+  );
 });
 
 test("lockfile verification avoids duplicate feature-branch runs while retaining pull request coverage", () => {
