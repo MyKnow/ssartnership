@@ -80,7 +80,7 @@ jobs:
         if: github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true'
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install PostgreSQL client

@@ -15,7 +15,7 @@ const WORKFLOW_FILES = [
   "storybook.yml",
 ] as const;
 
-test("GitHub Actions use the Node 24 action runtime with read-only repository access", () => {
+test("GitHub Actions use the Node 24 action runtime and project runtime with read-only repository access", () => {
   for (const filename of WORKFLOW_FILES) {
     const workflow = readRepoFile(`.github/workflows/${filename}`);
     const checkoutVersions = [
@@ -23,6 +23,9 @@ test("GitHub Actions use the Node 24 action runtime with read-only repository ac
     ].map((match) => match[1]);
     const setupNodeVersions = [
       ...workflow.matchAll(/actions\/setup-node@(v\d+(?:\.\d+)*)/g),
+    ].map((match) => match[1]);
+    const projectNodeVersions = [
+      ...workflow.matchAll(/node-version:\s*["']?(\d+)["']?/g),
     ].map((match) => match[1]);
 
     assert.ok(checkoutVersions.length > 0, `${filename}: checkout action missing`);
@@ -36,6 +39,16 @@ test("GitHub Actions use the Node 24 action runtime with read-only repository ac
       new Set(setupNodeVersions),
       new Set(["v7"]),
       `${filename}: setup-node must use the Node 24 runtime release`,
+    );
+    assert.equal(
+      projectNodeVersions.length,
+      setupNodeVersions.length,
+      `${filename}: every setup-node step must declare the project Node version`,
+    );
+    assert.deepEqual(
+      new Set(projectNodeVersions),
+      new Set(["24"]),
+      `${filename}: project commands must run on Node 24`,
     );
     assert.match(
       workflow,
