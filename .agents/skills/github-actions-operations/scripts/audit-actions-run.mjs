@@ -167,6 +167,10 @@ const signatures = [
   ["mock_server_error", /log_insert_failed|ingest_exception|econnreset|uncaughtexception|\baborted\b/i],
   ["cache_collision", /unable to reserve cache|another job may be creating this cache/i],
   ["npm_policy_warning", /allow-scripts|npm warn deprecated/i],
+  ["storybook_console_error", /\[console\.error\]/i],
+  ["storybook_react_act_warning", /component suspended inside an .*act.*not awaited/i],
+  ["storybook_browser_externalization", /externalized for browser compatibility/i],
+  ["storybook_bundle_warning", /plugin_timings|some chunks are larger than \d+\s*kB/i],
 ];
 
 const ansiEscapePattern = /[\u001B\u009B][[\]()#;?]*(?:(?:[a-zA-Z\d]*(?:;[-a-zA-Z\d\/#&.:=?%@~_]+)*)?\u0007|(?:(?:\d{1,4}(?:[;:]\d{0,4})*)?[\dA-PR-TZcf-nq-uy=><~]))/g;

@@ -96,6 +96,7 @@ Events: push 1,602; workflow_run 1,005; pull_request 670; workflow_dispatch 85.
 - Preview database missing-tenant fallback under green: 26330465086, 27111529103, 27813814301, 27817340422, 27819595233, 27819775977, 31451615513, 31454056487.
 - Overall success with failed job: 25095791143, 25096099514. Full logs expired.
 - Node action deprecation: 1,628 runs; unused-import lint warning: 360; historical npm package deprecation: 115; npm allow-scripts warning: 641; informational positive full-tree audit summary: 746; E2E mock log insertion error: 404; E2E reset/aborted exception noise: 415; cache-save collision: 101.
+- Storybook browser-module externalization and bundle-size/plugin-timing warnings appeared in 44 available successes. A React suspended-without-awaited-`act` console error appeared in 30 available successes (`31662535934` through `31708806810`). These are nominally green tool/test diagnostics, not failed jobs; the living ledger tracks the deterministic fix and rollout state.
 - Internal typecheck-wrapper retry marker: 0 of all 1,755 available successful logs. It appeared in 7 available abnormal runs: 29826051322, 29829199266, 29829836787, 29830160392, 29833137979, 29833536346, and 29833894244. Known typecheck failure 29825302827 has no available log, so its marker status is unavailable.
 
 ### Exact hidden Playwright retry/flaky IDs (441)

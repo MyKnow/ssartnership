@@ -51,6 +51,7 @@ test.describe("authenticated administrator console", () => {
     await page.getByRole("textbox", { name: "검색어" }).fill("싸피");
     await page.getByRole("button", { name: "검색", exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/partner-registrations\?.*q=%EC%8B%B8%ED%94%BC/);
+    await page.waitForLoadState("networkidle");
   });
 
   test("keeps the registration queue inside narrow and wide viewports", async ({ page }) => {

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { act } from "react";
 import { expect, userEvent, within } from "storybook/test";
 import { ADMIN_NAV_GROUPS } from "./admin-navigation";
 import AdminQuickNavigatorProvider, {
@@ -98,7 +99,9 @@ export const KeyboardSelectsResult: Story = {
       result.getAttribute("id") ?? "",
     );
 
-    await userEvent.keyboard("{Enter}");
+    await act(async () => {
+      await userEvent.keyboard("{Enter}");
+    });
     await expect(body.queryByRole("dialog")).not.toBeInTheDocument();
   },
 };

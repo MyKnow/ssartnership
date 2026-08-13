@@ -971,6 +971,20 @@ test("the run auditor emits structural evidence for hostile text and confines ou
       ),
     [],
   );
+  assert.deepEqual(
+    (auditor as unknown as { signatureNamesForText: (text: string) => string[] })
+      .signatureNamesForText(
+        "[vite] (client) [console.error] A component suspended inside an act scope, but the act call was not awaited.",
+      ),
+    ["storybook_console_error", "storybook_react_act_warning"],
+  );
+  assert.deepEqual(
+    (auditor as unknown as { signatureNamesForText: (text: string) => string[] })
+      .signatureNamesForText(
+        'Module "crypto" has been externalized for browser compatibility.',
+      ),
+    ["storybook_browser_externalization"],
+  );
 
   assert.throws(
     () => auditor.resolveSafeOutputPath("../outside.json", "/tmp/repo"),
