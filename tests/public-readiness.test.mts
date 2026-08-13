@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { test } from "node:test";
 
 function readRepoFile(pathname: string) {
@@ -15,6 +15,7 @@ test("public readiness CI workflow gates launch-critical checks", () => {
     "workflow_dispatch:",
     "node-version: 24",
     "npm ci",
+    "npm run check:lockfile",
     "npm run validate:migrations",
     "npm run lint",
     "npm run typecheck:ci",
@@ -39,7 +40,36 @@ test("public readiness CI workflow gates launch-critical checks", () => {
     workflow,
     /if:\s*\$\{\{\s*github\.event_name != 'pull_request' \|\| !github\.event\.pull_request\.draft\s*\}\}/,
   );
-  assert.doesNotMatch(workflow, /npm run check:lockfile/);
+  assert.match(
+    workflow,
+    /jobs:\s*\n\s+verify:\s*\n\s+name: Lint, Test, Build, Security, E2E[\s\S]+?name: Verify lockfile\s*\n\s+run: npm run check:lockfile/,
+  );
+});
+
+test("active workflows use the current Node 24 GitHub action majors", () => {
+  const workflowsDirectory = new URL("../.github/workflows/", import.meta.url);
+  const workflowNames = readdirSync(workflowsDirectory)
+    .filter((name) => /\.ya?ml$/.test(name))
+    .sort();
+  let actionCount = 0;
+
+  for (const workflowName of workflowNames) {
+    const workflow = readFileSync(new URL(workflowName, workflowsDirectory), "utf8");
+    const actions = workflow.matchAll(
+      /uses:\s*actions\/(checkout|setup-node)@([^\s#]+)/g,
+    );
+
+    for (const action of actions) {
+      actionCount += 1;
+      assert.equal(
+        action[2],
+        "v7",
+        `${workflowName} must use actions/${action[1]}@v7`,
+      );
+    }
+  }
+
+  assert.ok(actionCount > 0, "expected active workflows to use GitHub Node actions");
 });
 
 test("Storybook interaction runs automatically while pixel baselines stay manual", () => {
@@ -78,6 +108,12 @@ test("lockfile verification avoids duplicate feature-branch runs while retaining
   assert.doesNotMatch(
     workflow,
     /if:\s*\$\{\{\s*github\.event_name != 'pull_request' \|\| !github\.event\.pull_request\.draft\s*\}\}/,
+  );
+  assert.match(workflow, /run: npm run check:lockfile/);
+  assert.match(workflow, /run: npm ci/);
+  assert.doesNotMatch(
+    workflow,
+    /npm install --package-lock-only --ignore-scripts/,
   );
 });
 
