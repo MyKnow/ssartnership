@@ -16,7 +16,9 @@ concurrency:
 jobs:
   verify:
     name: Build, A11y, Visual Diff
-    runs-on: ubuntu-latest
+    # Screenshot baselines are generated with CoreText. Keep the runner aligned
+    # with that renderer so font metrics do not vary between macOS and FreeType.
+    runs-on: macos-14
     timeout-minutes: 25
 
     steps:
@@ -38,7 +40,7 @@ jobs:
         run: npm run build-storybook
 
       - name: Install fixed Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
 
       - name: Storybook interaction and a11y tests
         run: npm run test-storybook
