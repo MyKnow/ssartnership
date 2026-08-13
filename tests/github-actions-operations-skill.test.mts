@@ -235,10 +235,9 @@ test("trusted dependency installation disables every lifecycle and verifies one 
       npmVersionText: string;
       githubActions?: boolean;
       config: {
-        strictAllowScripts: string;
+        allowGit: string;
         ignoreScripts: string;
         omitLockfileRegistryResolved: string;
-        dangerouslyAllowAllScripts: string;
       };
     }) => void;
     buildControlledInstallEnvironment: (
@@ -261,14 +260,13 @@ test("trusted dependency installation disables every lifecycle and verifies one 
     packageLock.packages?.["node_modules/unrs-resolver"]?.hasInstallScript,
     true,
   );
-  assert.match(npmConfig, /^strict-allow-scripts=true$/m);
+  assert.match(npmConfig, /^allow-git=none$/m);
   assert.match(npmConfig, /^ignore-scripts=true$/m);
   assert.match(npmConfig, /^omit-lockfile-registry-resolved=false$/m);
-  assert.match(npmConfig, /^dangerously-allow-all-scripts=false$/m);
+  assert.doesNotMatch(npmConfig, /strict-allow-scripts|dangerously-allow-all-scripts/);
   assert.match(installScriptGate, /minimumNpmVersion/);
-  assert.match(installScriptGate, /strict-allow-scripts/);
+  assert.match(installScriptGate, /allow-git/);
   assert.match(installScriptGate, /ignore-scripts/);
-  assert.match(installScriptGate, /dangerously-allow-all-scripts/);
   assert.match(installScriptGate, /resolved/);
   assert.match(
     installScriptGate,
@@ -279,6 +277,7 @@ test("trusted dependency installation disables every lifecycle and verifies one 
   assert.match(installScriptGate, /workspace lifecycle scripts require/);
   assert.match(installScriptGate, /dependency lifecycle inventory changed/);
   assert.match(trustedInstaller, /"ci",[\s\S]+?"--ignore-scripts",[\s\S]+?"--include=dev",[\s\S]+?"--include=optional"/);
+  assert.match(trustedInstaller, /"--allow-git=none"/);
   assert.doesNotMatch(trustedInstaller, /node_modules\/esbuild\/install\.js/);
   assert.match(trustedInstaller, /trusted esbuild binary version mismatch/);
   assert.match(trustedInstaller, /trusted esbuild binary integrity mismatch/);
@@ -359,41 +358,46 @@ test("trusted dependency installation disables every lifecycle and verifies one 
     () => policyModule.validateEffectiveNpmConfig({
       npmVersionText: "10.9.2",
       config: {
-        strictAllowScripts: "true",
+        allowGit: "none",
         ignoreScripts: "true",
         omitLockfileRegistryResolved: "false",
-        dangerouslyAllowAllScripts: "false",
       },
     }),
-    /11\.16\.0 through 11\.x/,
+    /11\.12\.1 through 11\.x/,
   );
   assert.throws(
     () => policyModule.validateStaticInstallPolicy({
       ...staticPolicy,
-      npmConfig: `${npmConfig}dangerously-allow-all-scripts=true\n`,
+      npmConfig: `${npmConfig}allow-git=all\n`,
     }),
     /controls changed or contain an override/,
   );
   assert.doesNotThrow(() => policyModule.validateEffectiveNpmConfig({
-    npmVersionText: "11.16.0",
+    npmVersionText: "11.12.1",
     config: {
-      strictAllowScripts: "true",
+      allowGit: "none",
       ignoreScripts: "true",
       omitLockfileRegistryResolved: "false",
-      dangerouslyAllowAllScripts: "false",
+    },
+  }));
+  assert.doesNotThrow(() => policyModule.validateEffectiveNpmConfig({
+    npmVersionText: "11.12.1",
+    config: {
+      allowGit: "none",
+      ignoreScripts: "true",
+      omitLockfileRegistryResolved: "false",
     },
   }));
   assert.throws(
     () => policyModule.validateEffectiveNpmConfig({
-      npmVersionText: "11.15.0",
+      npmVersionText: "11.12.0",
       config: {
-        strictAllowScripts: "true",
+        allowGit: "none",
         ignoreScripts: "true",
         omitLockfileRegistryResolved: "false",
-        dangerouslyAllowAllScripts: "false",
       },
     }),
-    /11\.16\.0 through 11\.x/,
+    /11\.12\.1 through 11\.x/,
   );
   assert.throws(
     () => policyModule.validateStaticInstallPolicy({
@@ -409,6 +413,7 @@ test("trusted dependency installation disables every lifecycle and verifies one 
     "git@github.com:owner/repo.git",
     "~/hostile",
     "vendor/deep/hostile",
+    "$foo/bar",
   ]) {
     assert.throws(
       () => policyModule.validateStaticInstallPolicy({
@@ -425,6 +430,32 @@ test("trusted dependency installation disables every lifecycle and verifies one 
       hostileSpec,
     );
   }
+  assert.throws(
+    () => policyModule.validateStaticInstallPolicy({
+      ...staticPolicy,
+      packageJson: {
+        ...packageJson,
+        dependencies: {
+          ...((packageJson as { dependencies?: object }).dependencies ?? {}),
+          hostile: { nested: "1.0.0" },
+        },
+      },
+    }),
+    /dependencies must remain a string-valued dependency map/,
+  );
+  assert.throws(
+    () => policyModule.validateStaticInstallPolicy({
+      ...staticPolicy,
+      packageJson: {
+        ...packageJson,
+        overrides: {
+          ...((packageJson as { overrides?: object }).overrides ?? {}),
+          hostile: 123,
+        },
+      },
+    }),
+    /overrides must remain a plain object with string leaves/,
+  );
   assert.throws(
     () => policyModule.validateStaticInstallPolicy({
       ...staticPolicy,
@@ -533,22 +564,20 @@ test("trusted dependency installation disables every lifecycle and verifies one 
     () => policyModule.validateEffectiveNpmConfig({
       npmVersionText: "11.16.0",
       config: {
-        strictAllowScripts: "true",
+        allowGit: "all",
         ignoreScripts: "true",
         omitLockfileRegistryResolved: "false",
-        dangerouslyAllowAllScripts: "true",
       },
     }),
-    /dangerously-allow-all-scripts must be false/,
+    /effective allow-git must be none/,
   );
   assert.throws(
     () => policyModule.validateEffectiveNpmConfig({
       npmVersionText: "12.0.0",
       config: {
-        strictAllowScripts: "true",
+        allowGit: "none",
         ignoreScripts: "true",
         omitLockfileRegistryResolved: "false",
-        dangerouslyAllowAllScripts: "false",
       },
     }),
     /through 11\.x/,
@@ -558,10 +587,9 @@ test("trusted dependency installation disables every lifecycle and verifies one 
       npmVersionText: "11.17.0",
       githubActions: true,
       config: {
-        strictAllowScripts: "true",
+        allowGit: "none",
         ignoreScripts: "true",
         omitLockfileRegistryResolved: "false",
-        dangerouslyAllowAllScripts: "false",
       },
     }),
     /GitHub Actions requires exact npm 11\.16\.0/,
@@ -571,10 +599,9 @@ test("trusted dependency installation disables every lifecycle and verifies one 
       npmVersionText: "11.16.0",
       githubActions: true,
       config: {
-        strictAllowScripts: "true",
+        allowGit: "none",
         ignoreScripts: "true",
         omitLockfileRegistryResolved: "false",
-        dangerouslyAllowAllScripts: "false",
       },
     }),
   );
@@ -592,6 +619,8 @@ test("trusted dependency installation disables every lifecycle and verifies one 
     GITHUB_TOKEN: "synthetic-github-secret",
     NODE_AUTH_TOKEN: "synthetic-registry-secret",
     NODE_OPTIONS: "--require synthetic-secret-module",
+    NPM_CONFIG_ALLOW_GIT: "all",
+    NPM_CONFIG_DANGEROUSLY_ALLOW_ALL_SCRIPTS: "true",
     VERCEL_SYNTHETIC_SECRET: "synthetic-vercel-secret",
   });
   assert.notEqual(controlledEnvironment.PATH, "/safe/bin");
@@ -602,10 +631,11 @@ test("trusted dependency installation disables every lifecycle and verifies one 
   assert.equal(controlledEnvironment.RUNNER_ARCH, "X64");
   assert.match(controlledEnvironment.HOME, /\.tmp\/install-home$/);
   assert.match(controlledEnvironment.NPM_CONFIG_CACHE, /\.tmp\/npm-cache$/);
+  assert.equal(controlledEnvironment.NPM_CONFIG_ALLOW_GIT, "none");
   assert.equal(controlledEnvironment.NPM_CONFIG_IGNORE_SCRIPTS, "true");
   assert.equal(controlledEnvironment.NPM_CONFIG_OMIT_LOCKFILE_REGISTRY_RESOLVED, "false");
-  assert.equal(controlledEnvironment.NPM_CONFIG_STRICT_ALLOW_SCRIPTS, "true");
-  assert.equal(controlledEnvironment.NPM_CONFIG_DANGEROUSLY_ALLOW_ALL_SCRIPTS, "false");
+  assert.equal(controlledEnvironment.NPM_CONFIG_STRICT_ALLOW_SCRIPTS, undefined);
+  assert.equal(controlledEnvironment.NPM_CONFIG_DANGEROUSLY_ALLOW_ALL_SCRIPTS, undefined);
   assert.equal(controlledEnvironment.NPM_CONFIG_REGISTRY, "https://registry.npmjs.org/");
   for (const secretKey of [
     "SUPABASE_SERVICE_ROLE_KEY",
@@ -933,6 +963,13 @@ test("the run auditor emits structural evidence for hostile text and confines ou
         "[typecheck-ci] TypeScript 검사에 실패했습니다. 재시도합니다.",
       ),
     ["typecheck_retry"],
+  );
+  assert.deepEqual(
+    (auditor as unknown as { signatureNamesForText: (text: string) => string[] })
+      .signatureNamesForText(
+        "✔ synthetic test describes a timed out deprecated fallback",
+      ),
+    [],
   );
 
   assert.throws(

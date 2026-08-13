@@ -29,6 +29,7 @@ execFileSync(process.execPath, [
   npmCliPath,
   "ci",
   "--ignore-scripts",
+  "--allow-git=none",
   "--include=dev",
   "--include=optional",
   "--no-audit",

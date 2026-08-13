@@ -218,8 +218,12 @@ function safeSha(value) {
 export function signatureNamesForText(text) {
   if (typeof text !== "string") return [];
   const normalizedText = text.replace(ansiEscapePattern, "");
+  const passedTestDescription = /(?:^|\s)[✔✓]\s|(?:^|\t)\s*ok\s+\d+\s+-/u
+    .test(normalizedText);
   return signatures
-    .filter(([, pattern]) => pattern.test(normalizedText))
+    .filter(([name, pattern]) =>
+      !(passedTestDescription && (name === "timeout" || name === "deprecation"))
+        && pattern.test(normalizedText))
     .map(([name]) => name);
 }
 
@@ -231,9 +235,7 @@ function summarizeLogSignatures(log) {
   const lines = log.split(/\r?\n/);
 
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
-    const line = lines[lineIndex].replace(ansiEscapePattern, "");
-    for (const [name, pattern] of signatures) {
-      if (!pattern.test(line)) continue;
+    for (const name of signatureNamesForText(lines[lineIndex])) {
       summary[name].count += 1;
       if (summary[name].firstLineNumbers.length < 20) {
         summary[name].firstLineNumbers.push(lineIndex + 1);

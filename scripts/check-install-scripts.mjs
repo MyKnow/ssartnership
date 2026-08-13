@@ -11,7 +11,7 @@ import { delimiter, dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const minimumNpmVersion = [11, 16, 0];
+const minimumNpmVersion = [11, 12, 1];
 const maximumNpmMajor = 11;
 const expectedEsbuildIntegrity =
   "sha512-HrJrvZv5ayxBzPfwphOoNzkzOIIlifzk0KJrGK2c8R4+LKpMtpYLQeUdjnwjWv/LZlkH2laZk+4w78pi99D4Vw==";
@@ -82,10 +82,16 @@ function collectDependencySources(value, path = [], result = []) {
   return result;
 }
 
-function isReviewedRegistryDependencySpec(value) {
+function isStringLeafObject(value) {
+  if (typeof value === "string") return true;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return Object.values(value).every(isStringLeafObject);
+}
+
+function isReviewedRegistryDependencySpec(value, { allowOverrideReference = false } = {}) {
   const version = "[0-9]+(?:\\.[0-9]+){0,2}(?:-[0-9A-Za-z.-]+)?";
   if (new RegExp(`^[~^]?${version}$`).test(value)) return true;
-  if (/^\$[A-Za-z0-9@/_.-]+$/.test(value)) return true;
+  if (allowOverrideReference && /^\$[A-Za-z0-9@/_.-]+$/.test(value)) return true;
   return new RegExp(
     `^npm:(?:@[^/\\s]+/)?[^@/\\s]+@[~^]?${version}$`,
   ).test(value);
@@ -117,10 +123,9 @@ export function validateStaticInstallPolicy({
     .filter((line) => line && !line.startsWith("#"))
     .sort();
   const expectedConfigLines = [
-    "dangerously-allow-all-scripts=false",
+    "allow-git=none",
     "ignore-scripts=true",
     "omit-lockfile-registry-resolved=false",
-    "strict-allow-scripts=true",
   ];
   if (JSON.stringify(configLines) !== JSON.stringify(expectedConfigLines)) {
     throw new Error(".npmrc install-script controls changed or contain an override.");
@@ -154,10 +159,34 @@ export function validateStaticInstallPolicy({
     peerDependencies: packageJson.peerDependencies,
     overrides: packageJson.overrides,
   };
+  for (const sectionName of [
+    "dependencies",
+    "devDependencies",
+    "optionalDependencies",
+    "peerDependencies",
+  ]) {
+    const section = packageJson[sectionName];
+    if (
+      section !== undefined
+      && (
+        !section
+        || typeof section !== "object"
+        || Array.isArray(section)
+        || Object.values(section).some((value) => typeof value !== "string")
+      )
+    ) {
+      throw new Error(`${sectionName} must remain a string-valued dependency map.`);
+    }
+  }
+  if (!isStringLeafObject(packageJson.overrides)) {
+    throw new Error("overrides must remain a plain object with string leaves.");
+  }
   const dependencySources = collectDependencySources(dependencySections);
   const nonRegistrySources = dependencySources.filter(({ path, value }) =>
     !(path === "overrides.archiver" && value === "file:vendor/archiver-cjs-compat")
-      && !isReviewedRegistryDependencySpec(value));
+      && !isReviewedRegistryDependencySpec(value, {
+        allowOverrideReference: path.startsWith("overrides."),
+      }));
   if (
     nonRegistrySources.length !== 0
     || !dependencySources.some(
@@ -308,17 +337,14 @@ export function validateEffectiveNpmConfig({
       `npm ${minimumNpmVersion.join(".")} through ${maximumNpmMajor}.x is required; found ${npmVersionText}.`,
     );
   }
-  if (config.strictAllowScripts !== "true") {
-    throw new Error("effective strict-allow-scripts must be true.");
+  if (config.allowGit !== "none") {
+    throw new Error("effective allow-git must be none.");
   }
   if (config.ignoreScripts !== "true") {
     throw new Error("effective ignore-scripts must be true.");
   }
   if (config.omitLockfileRegistryResolved !== "false") {
     throw new Error("effective omit-lockfile-registry-resolved must be false.");
-  }
-  if (config.dangerouslyAllowAllScripts !== "false") {
-    throw new Error("dangerously-allow-all-scripts must be false.");
   }
   if (githubActions && npmVersionText !== "11.16.0") {
     throw new Error(`GitHub Actions requires exact npm 11.16.0; found ${npmVersionText}.`);
@@ -359,12 +385,11 @@ export function buildControlledInstallEnvironment(source = process.env) {
     if (typeof source[key] === "string") environment[key] = source[key];
   }
   environment.NPM_CONFIG_AUDIT = "false";
-  environment.NPM_CONFIG_DANGEROUSLY_ALLOW_ALL_SCRIPTS = "false";
+  environment.NPM_CONFIG_ALLOW_GIT = "none";
   environment.NPM_CONFIG_FUND = "false";
   environment.NPM_CONFIG_IGNORE_SCRIPTS = "true";
   environment.NPM_CONFIG_OMIT_LOCKFILE_REGISTRY_RESOLVED = "false";
   environment.NPM_CONFIG_REGISTRY = "https://registry.npmjs.org/";
-  environment.NPM_CONFIG_STRICT_ALLOW_SCRIPTS = "true";
   environment.NPM_CONFIG_USERCONFIG = resolve(repositoryRoot, ".npmrc");
   return environment;
 }
@@ -441,8 +466,8 @@ export function checkInstallScriptPolicy({
     npmVersionText,
     githubActions: environment.GITHUB_ACTIONS === "true",
     config: {
-      strictAllowScripts: readNpm(
-        ["config", "get", "strict-allow-scripts"],
+      allowGit: readNpm(
+        ["config", "get", "allow-git"],
         environment,
         npmCliPath,
       ),
@@ -453,11 +478,6 @@ export function checkInstallScriptPolicy({
       ),
       omitLockfileRegistryResolved: readNpm(
         ["config", "get", "omit-lockfile-registry-resolved"],
-        environment,
-        npmCliPath,
-      ),
-      dangerouslyAllowAllScripts: readNpm(
-        ["config", "get", "dangerously-allow-all-scripts"],
         environment,
         npmCliPath,
       ),
