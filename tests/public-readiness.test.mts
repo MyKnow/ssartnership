@@ -109,6 +109,7 @@ test("local prepush and release use the same Public Readiness gates", () => {
 
 test("Storybook and visual baselines run for pull requests and shared branches without Chromatic", () => {
   const workflow = readRepoFile(".github/workflows/storybook.yml");
+  const preview = readRepoFile(".storybook/preview.tsx");
 
   assert.match(workflow, /name: Storybook and Visual Baselines/);
   assert.match(workflow, /push:\s*\n\s+branches:\s*\[main, dev\]/);
@@ -120,6 +121,10 @@ test("Storybook and visual baselines run for pull requests and shared branches w
   assert.match(
     workflow,
     /npm run build-storybook[\s\S]+?playwright install --with-deps chromium[\s\S]+?npm run test-storybook[\s\S]+?npm run test:visual/,
+  );
+  assert.match(
+    preview,
+    /pretendard\/dist\/web\/variable\/pretendardvariable\.css/,
   );
   assert.doesNotMatch(workflow, /chromaui\/action|CHROMATIC_PROJECT_TOKEN/);
 });
