@@ -4,6 +4,7 @@ on:
   push:
     branches: [main, dev]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -14,59 +15,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  changes:
-    name: Detect visual changes
-    runs-on: ubuntu-latest
-    outputs:
-      visual: ${{ steps.visual.outputs.changed }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Detect screenshot-affecting changes
-        id: visual
-        shell: bash
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          PULL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PULL_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PUSH_BASE_SHA: ${{ github.event.before }}
-          CURRENT_SHA: ${{ github.sha }}
-        run: |
-          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            base_sha="$PULL_BASE_SHA"
-            head_sha="$PULL_HEAD_SHA"
-          else
-            base_sha="$PUSH_BASE_SHA"
-            head_sha="$CURRENT_SHA"
-          fi
-
-          if [[ -z "$base_sha" || "$base_sha" =~ ^0+$ ]]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          changed=false
-          while IFS= read -r pathname; do
-            case "$pathname" in
-              src/*|public/*|.storybook/*|tests/visual/*|package.json|package-lock.json|next.config.ts|postcss.config.*|tailwind.config.*|playwright.visual.config.ts)
-                changed=true
-                break
-                ;;
-            esac
-          done < <(git diff --name-only --diff-filter=ACMRTD "$base_sha" "$head_sha")
-
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
-
   interaction:
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     name: Build, Interaction, A11y
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -96,9 +46,8 @@ jobs:
         run: npm run test-storybook
 
   visual:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     name: Visual Baselines
-    needs: changes
-    if: needs.changes.outputs.visual == 'true'
     # Screenshot baselines are generated with CoreText. Keep the pixel job
     # aligned with that renderer so font metrics do not vary with FreeType.
     runs-on: macos-14

@@ -12,10 +12,10 @@ test("public readiness CI workflow gates launch-critical checks", () => {
   for (const requiredText of [
     "name: Public Readiness",
     "pull_request:",
+    "ready_for_review",
     "workflow_dispatch:",
     "node-version: 24",
     "npm ci",
-    "npm run check:lockfile",
     "npm run validate:migrations",
     "npm run lint",
     "npm run typecheck:ci",
@@ -33,30 +33,38 @@ test("public readiness CI workflow gates launch-critical checks", () => {
   }
 
   assert.match(workflow, /push:\s*\n\s+branches:\s*\[main, dev\]/);
+  assert.match(
+    workflow,
+    /pull_request:\s*\n\s+types:\s*\[opened, synchronize, reopened, ready_for_review\]/,
+  );
+  assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name != 'pull_request' \|\| !github\.event\.pull_request\.draft\s*\}\}/);
   assert.match(workflow, /concurrency:\s*\n\s+group:/);
   assert.match(workflow, /cancel-in-progress:\s+true/);
+  assert.doesNotMatch(workflow, /npm run check:lockfile/);
 });
 
-test("Storybook and visual baselines run for pull requests and shared branches without Chromatic", () => {
+test("Storybook interaction runs automatically while pixel baselines stay manual", () => {
   const workflow = readRepoFile(".github/workflows/storybook.yml");
 
   assert.match(workflow, /name: Storybook and Visual Baselines/);
   assert.match(workflow, /push:\s*\n\s+branches:\s*\[main, dev\]/);
-  assert.match(workflow, /^\s+pull_request:\s*$/m);
+  assert.match(
+    workflow,
+    /pull_request:\s*\n\s+types:\s*\[opened, synchronize, reopened, ready_for_review\]/,
+  );
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /concurrency:\s*\n\s+group:/);
   assert.match(workflow, /cancel-in-progress:\s+true/);
-  assert.match(workflow, /name: Detect visual changes/);
-  assert.match(workflow, /git diff --name-only --diff-filter=ACMRTD/);
-  assert.match(workflow, /src\/\*\|public\/\*/);
-  assert.match(workflow, /package\.json\|package-lock\.json/);
-  assert.doesNotMatch(workflow, /^\s+\*\.stories\.tsx\)/m);
+  assert.match(workflow, /name: Build, Interaction, A11y/);
+  assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name != 'pull_request' \|\| !github\.event\.pull_request\.draft\s*\}\}/);
   assert.match(workflow, /npm run build-storybook/);
   assert.match(workflow, /npm run test-storybook/);
   assert.match(workflow, /playwright install --with-deps chromium/);
-  assert.match(workflow, /needs: changes/);
-  assert.match(workflow, /if: needs\.changes\.outputs\.visual == 'true'/);
+  assert.match(workflow, /name: Visual Baselines/);
+  assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name == 'workflow_dispatch'\s*\}\}/);
   assert.match(workflow, /npm run test:visual/);
+  assert.doesNotMatch(workflow, /name: Detect visual changes/);
+  assert.doesNotMatch(workflow, /git diff --name-only --diff-filter/);
   assert.doesNotMatch(workflow, /chromaui\/action|CHROMATIC_PROJECT_TOKEN/);
 });
 
@@ -64,7 +72,11 @@ test("lockfile verification avoids duplicate feature-branch runs while retaining
   const workflow = readRepoFile(".github/workflows/lockfile-check.yml");
 
   assert.match(workflow, /push:\s*\n\s+branches:\s*\[main, dev\]/);
-  assert.match(workflow, /^\s+pull_request:\s*$/m);
+  assert.match(
+    workflow,
+    /pull_request:\s*\n\s+types:\s*\[opened, synchronize, reopened, ready_for_review\]/,
+  );
+  assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name != 'pull_request' \|\| !github\.event\.pull_request\.draft\s*\}\}/);
   assert.match(workflow, /concurrency:\s*\n\s+group:/);
   assert.match(workflow, /cancel-in-progress:\s+true/);
 });
@@ -130,6 +142,23 @@ test("Preview Supabase migrations apply dev schema changes without syncing data"
     workflow,
     /sync:preview|SUPABASE_PRODUCTION_DB_URL|--include-all/,
   );
+});
+
+test("Preview sync follows the latest successful dev public-readiness run without stale reruns", () => {
+  const workflow = readRepoFile(".github/workflows/preview-sync.yml");
+
+  assert.match(workflow, /name: Sync Preview Supabase/);
+  assert.match(workflow, /workflow_run:/);
+  assert.match(workflow, /workflows:\s*\n\s+- Public Readiness/);
+  assert.match(workflow, /branches:\s*\[dev\]/);
+  assert.match(workflow, /types:\s*\n\s+- completed/);
+  assert.match(workflow, /cancel-in-progress:\s+false/);
+  assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/);
+  assert.match(workflow, /github\.event\.workflow_run\.event == 'push'/);
+  assert.match(workflow, /github\.event\.workflow_run\.head_branch == 'dev'/);
+  assert.match(workflow, /name: Guard stale dev workflow SHA/);
+  assert.match(workflow, /git ls-remote origin refs\/heads\/dev/);
+  assert.match(workflow, /steps\.stale-sha\.outputs\.is_current == 'true'/);
 });
 
 test("playwright config can use the CI-hosted Chrome channel", () => {
