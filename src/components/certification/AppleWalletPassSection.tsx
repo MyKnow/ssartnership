@@ -4,7 +4,9 @@ import { useState } from "react";
 import AppleWalletPassCard, {
   type AppleWalletPassStatus,
 } from "@/components/certification/AppleWalletPassCard";
+import Button from "@/components/ui/Button";
 import InlineMessage from "@/components/ui/InlineMessage";
+import Modal from "@/components/ui/Modal";
 import { resolveAppleWalletCardStatusAfterRevoke } from "@/lib/wallet/wallet-pass-card-state";
 import { APPLE_WALLET_CONSENT_VERSION } from "@/lib/wallet/wallet-pass-request";
 
@@ -44,10 +46,13 @@ export default function AppleWalletPassSection({
   const [status, setStatus] = useState(initialStatus);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [revokeConfirmOpen, setRevokeConfirmOpen] = useState(false);
 
   const handleIssue = async () => {
     setPendingAction("issue");
     setErrorMessage(null);
+    setSuccessMessage(null);
     try {
       const response = await fetch("/api/wallet/apple/pass", {
         method: "POST",
@@ -83,15 +88,14 @@ export default function AppleWalletPassSection({
   const handleDownload = () => {
     setPendingAction("download");
     setErrorMessage(null);
+    setSuccessMessage(null);
     window.location.assign("/api/wallet/apple/pass");
   };
 
   const handleRevoke = async () => {
-    if (!window.confirm("현재 Apple Wallet 패스를 폐기할까요? 기기에 남은 패스의 QR도 더 이상 인증되지 않습니다.")) {
-      return;
-    }
     setPendingAction("revoke");
     setErrorMessage(null);
+    setSuccessMessage(null);
     try {
       const response = await fetch("/api/wallet/apple/pass", {
         method: "DELETE",
@@ -107,6 +111,10 @@ export default function AppleWalletPassSection({
         throw new Error(result.message || "Apple Wallet 패스를 폐기하지 못했어요.");
       }
       setStatus(resolveAppleWalletCardStatusAfterRevoke(status));
+      setRevokeConfirmOpen(false);
+      setSuccessMessage(
+        "패스를 폐기했어요. 기기에 남아 있는 QR도 더 이상 인증되지 않아요.",
+      );
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -120,6 +128,15 @@ export default function AppleWalletPassSection({
 
   return (
     <section aria-label="Apple Wallet 회원 인증" className="space-y-3">
+      {successMessage ? (
+        <InlineMessage
+          tone="success"
+          title="처리 완료"
+          description={successMessage}
+          role="status"
+          ariaLive="polite"
+        />
+      ) : null}
       {errorMessage ? (
         <InlineMessage
           tone="danger"
@@ -146,10 +163,39 @@ export default function AppleWalletPassSection({
         onDownload={status === "active" ? handleDownload : undefined}
         onRevoke={
           status === "active" || status === "active_unavailable"
-            ? handleRevoke
+            ? () => setRevokeConfirmOpen(true)
             : undefined
         }
       />
+      <Modal
+        open={revokeConfirmOpen}
+        title="Apple Wallet 패스를 폐기할까요?"
+        description="기기에 남아 있는 패스의 QR도 즉시 인증되지 않습니다. 필요하면 나중에 새 패스를 발급할 수 있어요."
+        onClose={
+          pendingAction === "revoke"
+            ? () => undefined
+            : () => setRevokeConfirmOpen(false)
+        }
+        bodyClassName="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"
+      >
+        <Button
+          variant="secondary"
+          onClick={() => setRevokeConfirmOpen(false)}
+          disabled={pendingAction === "revoke"}
+        >
+          취소
+        </Button>
+        <Button
+          variant="danger"
+          onClick={() => {
+            void handleRevoke();
+          }}
+          loading={pendingAction === "revoke"}
+          loadingText="폐기 중"
+        >
+          패스 폐기
+        </Button>
+      </Modal>
     </section>
   );
 }
