@@ -79,7 +79,7 @@ for (const viewport of viewports) {
       viewport.width < 500 ? 0.32 : 0.32,
     );
     expect(metrics.cardClassName).toContain(
-      "rounded-[clamp(1rem,3cqw,3rem)]",
+      "rounded-[clamp(0px,3cqw,3rem)]",
     );
     expect(metrics.cardTransform).toBe("none");
     expect(metrics.footerTop).toBeGreaterThanOrEqual(metrics.avatarBottom - 1);

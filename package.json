@@ -86,7 +86,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "eslint-plugin-storybook": "10.3.5",
-    "lighthouse": "^12.6.1",
+    "lighthouse": "^13.4.1",
     "playwright": "^1.59.1",
     "postcss": "^8.5.23",
     "storybook": "^10.3.5",
@@ -98,16 +98,18 @@
     "@babel/core": "^7.29.7",
     "archiver": "file:vendor/archiver-cjs-compat",
     "esbuild": "^0.28.1",
-    "js-yaml": "^4.2.0",
+    "ip-address": "10.3.1",
+    "js-yaml": "4.3.1",
+    "nanoid": "3.3.17",
     "sharp": "$sharp",
     "minimatch@3.1.5": {
-      "brace-expansion": "^1.1.7"
+      "brace-expansion": "1.1.18"
     },
     "minimatch@10.2.4": {
-      "brace-expansion": "^5.0.8"
+      "brace-expansion": "5.0.9"
     },
     "minimatch@10.2.5": {
-      "brace-expansion": "^5.0.8"
+      "brace-expansion": "5.0.9"
     },
     "exceljs": {
       "unzipper": "^0.12.5"
