@@ -101,7 +101,7 @@ jobs:
         if: github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true'
         uses: supabase/setup-cli@v2
         with:
-          version: latest
+          version: 2.114.0
           github-token: ${{ github.token }}
 
       - name: Check preview database connection
