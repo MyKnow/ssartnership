@@ -2,18 +2,35 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { MockAdPackageRepository } from "../src/lib/repositories/mock/ad-package-repository.mock.ts";
 
+const DAY_IN_MS = 24 * 60 * 60 * 1_000;
+
+function activeCouponWindow(reference = new Date()) {
+  return {
+    startsAt: new Date(reference.getTime() - DAY_IN_MS).toISOString(),
+    endsAt: new Date(reference.getTime() + DAY_IN_MS).toISOString(),
+  };
+}
+
 async function createCodeCoupon(
   repository: MockAdPackageRepository,
   overrides: { perMemberLimit?: number; usageLimit?: number } = {},
 ) {
+  const activeWindow = activeCouponWindow();
+  const campaign = await repository.createCampaign({
+    partnerId: "restaurant-001",
+    packageTier: "boost",
+    title: "직접 사용 테스트 캠페인",
+    status: "active",
+    ...activeWindow,
+  });
+
   return repository.createCoupon({
-    campaignId: "campaign-restaurant-boost",
+    campaignId: campaign.id,
     partnerId: "restaurant-001",
     title: "직접 사용 테스트 쿠폰",
     redemptionType: "code",
     status: "active",
-    startsAt: "2026-07-01T00:00:00.000Z",
-    endsAt: "2026-07-31T23:59:59.000Z",
+    ...activeWindow,
     perMemberLimit: overrides.perMemberLimit ?? 1,
     usageLimit: overrides.usageLimit,
   });
@@ -110,8 +127,7 @@ describe("mock ad package repository", () => {
       title: "전체 일 발급 제한 쿠폰",
       status: "active",
       redemptionType: "code",
-      startsAt: "2026-07-01T00:00:00.000Z",
-      endsAt: "2026-07-31T23:59:59.000Z",
+      ...activeCouponWindow(),
       dailyIssueLimit: 1,
     });
 
@@ -323,7 +339,7 @@ describe("mock ad package repository", () => {
     const campaigns = await repository.listAdminCampaigns({
       now: new Date("2026-07-15T12:00:00.000Z"),
     });
-    const campaign = campaigns.find((item) => item.id === "campaign-restaurant-boost");
+    const campaign = campaigns.find((item) => item.id === coupon.campaignId);
 
     assert.equal(campaign?.metrics.couponRedemptions, 1);
     assert.equal(campaign?.coupons[0]?.usedCount, 1);
@@ -367,6 +383,17 @@ describe("mock ad package repository", () => {
   it("excludes wallet coupons after the member reaches the per-member limit", async () => {
     const repository = new MockAdPackageRepository();
     const coupon = await createCodeCoupon(repository);
+    const now = new Date();
+    const availableBeforeUse = await repository.listAvailableCouponsForMember({
+      memberId: "member-1",
+      partnerIds: ["restaurant-001"],
+      now,
+    });
+    assert.equal(
+      availableBeforeUse.some((item) => item.coupon.id === coupon.id),
+      true,
+    );
+
     await repository.redeemCoupon({
       couponId: coupon.id,
       memberId: "member-1",
@@ -376,7 +403,7 @@ describe("mock ad package repository", () => {
     const coupons = await repository.listAvailableCouponsForMember({
       memberId: "member-1",
       partnerIds: ["restaurant-001"],
-      now: new Date("2026-07-15T12:00:00.000Z"),
+      now,
     });
 
     assert.equal(coupons.some((item) => item.coupon.id === coupon.id), false);
@@ -435,8 +462,7 @@ describe("mock ad package repository", () => {
       partnerId: "health-001",
       title: "회원별 발급 제한 쿠폰",
       status: "active",
-      startsAt: "2026-07-01T00:00:00.000Z",
-      endsAt: "2026-07-31T23:59:59.000Z",
+      ...activeCouponWindow(),
       perMemberDailyIssueLimit: 1,
       onsitePassword: "2468",
     });
@@ -469,8 +495,7 @@ describe("mock ad package repository", () => {
       partnerId: "health-001",
       title: "현장 확인 쿠폰",
       status: "active",
-      startsAt: "2026-07-01T00:00:00.000Z",
-      endsAt: "2026-07-31T23:59:59.000Z",
+      ...activeCouponWindow(),
       onsitePassword: "9876",
     });
     const issued = await repository.issueCoupon({
@@ -511,8 +536,7 @@ describe("mock ad package repository", () => {
       partnerId: "health-001",
       title: "회원별 일 발급 한도 쿠폰",
       status: "active",
-      startsAt: "2026-07-01T00:00:00.000Z",
-      endsAt: "2026-07-31T23:59:59.000Z",
+      ...activeCouponWindow(),
       perMemberDailyIssueLimit: 1,
       onsitePassword: "1357",
     });

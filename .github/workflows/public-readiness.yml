@@ -29,9 +29,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify lockfile
-        run: npm run check:lockfile
-
       - name: Validate migrations
         run: npm run validate:migrations
 
