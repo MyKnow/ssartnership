@@ -25,6 +25,15 @@ import {
   MOCK_PARTNER_BENEFIT_USAGE_CONTEXTS,
 } from "../src/lib/repositories/mock/partner-benefit-usage-repository.mock.ts";
 
+const DAY_IN_MS = 24 * 60 * 60 * 1_000;
+
+function activePartnerPeriod(reference = new Date()) {
+  return {
+    periodStart: new Date(reference.getTime() - DAY_IN_MS).toISOString().slice(0, 10),
+    periodEnd: new Date(reference.getTime() + DAY_IN_MS).toISOString().slice(0, 10),
+  };
+}
+
 test("benefit selection accepts only an exact registered benefit", () => {
   const benefits = ["헬스 1개월 33,000원", "필라테스 10회 199,000원"];
 
@@ -154,8 +163,7 @@ test("idempotent benefit-use retries do not create a second aggregate record", a
     {
       partnerId: "partner-1",
       location: "서울 강남구 테헤란로 212",
-      periodStart: "2026-07-01",
-      periodEnd: "2026-07-31",
+      ...activePartnerPeriod(),
       benefitItems: [{ id: "benefit-1", title: "헬스 1개월 33,000원", maxApplyCount: null }],
       pinHash: pin.hash,
       pinSalt: pin.salt,
@@ -186,8 +194,7 @@ test("benefit-use cannot record usage when the partner PIN is not configured", a
     {
       partnerId: "partner-without-pin",
       location: "서울 강남구 테헤란로 212",
-      periodStart: "2026-07-01",
-      periodEnd: "2026-07-31",
+      ...activePartnerPeriod(),
       benefitItems: [{ id: "benefit-1", title: "헬스 1개월 33,000원", maxApplyCount: null }],
       pinHash: null,
       pinSalt: null,
@@ -240,8 +247,7 @@ test("configured benefit use maximum is enforced by the verification service", a
     {
       partnerId: "partner-with-limit",
       location: "서울 강남구 테헤란로 212",
-      periodStart: "2026-07-01",
-      periodEnd: "2026-07-31",
+      ...activePartnerPeriod(),
       benefitItems: [{ id: "benefit-1", title: "헬스 1개월 33,000원", maxApplyCount: 2 }],
       pinHash: pin.hash,
       pinSalt: pin.salt,
@@ -272,8 +278,7 @@ test("legacy benefit IDs are converted before recording usage", async () => {
     {
       partnerId: "partner-legacy-id",
       location: "서울 강남구 테헤란로 212",
-      periodStart: "2026-07-01",
-      periodEnd: "2026-07-31",
+      ...activePartnerPeriod(),
       benefitItems: [
         { id: "canonical-1", title: "첫 번째 혜택", maxApplyCount: null },
         { id: "canonical-2", title: "두 번째 혜택", maxApplyCount: null },
@@ -303,8 +308,7 @@ test("repository benefit and infrastructure errors keep distinct service codes",
   const baseContext = {
     partnerId: "partner-error-map",
     location: "서울 강남구 테헤란로 212",
-    periodStart: "2026-07-01",
-    periodEnd: "2026-07-31",
+    ...activePartnerPeriod(),
     benefitItems: [{ id: "benefit-1", title: "혜택", maxApplyCount: null }],
     pinHash: pin.hash,
     pinSalt: pin.salt,
@@ -393,8 +397,7 @@ test("missing benefit use maximum defaults to one per confirmation", async () =>
     {
       partnerId: "partner-without-limit",
       location: "서울 강남구 테헤란로 212",
-      periodStart: "2026-07-01",
-      periodEnd: "2026-07-31",
+      ...activePartnerPeriod(),
       benefitItems: [{ id: "benefit-1", title: "헬스 1개월 33,000원", maxApplyCount: null }],
       pinHash: pin.hash,
       pinSalt: pin.salt,
