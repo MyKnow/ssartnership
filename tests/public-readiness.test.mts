@@ -6,6 +6,46 @@ function readRepoFile(pathname: string) {
   return readFileSync(new URL(`../${pathname}`, import.meta.url), "utf8");
 }
 
+const WORKFLOW_FILES = [
+  "admin-performance.yml",
+  "lockfile-check.yml",
+  "preview-migrations.yml",
+  "preview-sync.yml",
+  "production-migrations.yml",
+  "public-readiness.yml",
+  "storybook.yml",
+] as const;
+
+test("GitHub Actions use the Node 24 action runtime with read-only repository access", () => {
+  for (const filename of WORKFLOW_FILES) {
+    const workflow = readRepoFile(`.github/workflows/${filename}`);
+    const checkoutVersions = [
+      ...workflow.matchAll(/actions\/checkout@(v\d+(?:\.\d+)*)/g),
+    ].map((match) => match[1]);
+    const setupNodeVersions = [
+      ...workflow.matchAll(/actions\/setup-node@(v\d+(?:\.\d+)*)/g),
+    ].map((match) => match[1]);
+
+    assert.ok(checkoutVersions.length > 0, `${filename}: checkout action missing`);
+    assert.deepEqual(
+      new Set(checkoutVersions),
+      new Set(["v7"]),
+      `${filename}: checkout must use the Node 24 runtime release`,
+    );
+    assert.ok(setupNodeVersions.length > 0, `${filename}: setup-node action missing`);
+    assert.deepEqual(
+      new Set(setupNodeVersions),
+      new Set(["v7"]),
+      `${filename}: setup-node must use the Node 24 runtime release`,
+    );
+    assert.match(
+      workflow,
+      /permissions:\s*\n\s+contents: read/,
+      `${filename}: repository token must remain read-only`,
+    );
+  }
+});
+
 test("public readiness CI workflow gates launch-critical checks", () => {
   const workflow = readRepoFile(".github/workflows/public-readiness.yml");
 

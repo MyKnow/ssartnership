@@ -45,7 +45,8 @@ Storybook 자체 검증은 로컬 릴리즈 게이트로 유지합니다.
 - `npm run release`는 커밋/푸시 전에 `npm run build-storybook`을 반드시 실행합니다.
 - `npm run release`는 커밋/푸시 전에 `npm run test-storybook`을 반드시 실행합니다.
 - 두 명령 중 하나라도 실패하면 버전 업데이트, 커밋, 푸시를 진행하지 않습니다.
-- GitHub Actions의 Chromatic publish workflow는 무료 한도 소진으로 인한 외부 `UI Tests` pending을 피하기 위해 수동 실행 전용입니다.
+- GitHub Actions의 `Storybook and Visual Baselines`는 Chromatic 없이 정적 빌드, browser-mode test, Playwright 이미지 비교를 실행합니다.
+- GitHub에서 수동 비활성화한 워크플로의 재활성화·검증·롤백 절차는 [Storybook·Visual Baselines 워크플로 운영](../operations/storybook-visual-workflow.md)을 따릅니다.
 - 긴급 상황에서 `git push --no-verify`로 로컬 hook을 우회하더라도 release 스크립트와 Public Readiness CI 게이트는 우회하지 않는 것을 원칙으로 합니다.
 
 ## 현재 포함된 스토리
