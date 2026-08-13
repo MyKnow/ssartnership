@@ -47,4 +47,16 @@ test("pre-push gate mirrors Public Readiness before the full Playwright suite", 
     "utf8",
   );
   assert.match(eslintConfig, /"\.next-e2e\/\*\*"/);
+
+  const adminConsoleSpec = await readFile(
+    new URL("./e2e/admin-console.spec.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(adminConsoleSpec, /async function settleLateAdminRequests\(page: Page\)/);
+  assert.equal(
+    adminConsoleSpec.match(/await settleLateAdminRequests\(page\);/g)?.length,
+    2,
+  );
+  assert.doesNotMatch(adminConsoleSpec, /test\.afterEach/);
+  assert.doesNotMatch(adminConsoleSpec, /activeRequestsByPage/);
 });

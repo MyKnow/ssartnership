@@ -178,7 +178,14 @@ test("every abnormal run updates the skill before another trigger", () => {
   assert.match(skill, /Never delete, cancel, or rerun it to manufacture a green history/);
   assert.match(skill, /always update \[failure-ledger\.md\]\(references\/failure-ledger\.md\)/);
   assert.match(skill, /update this `SKILL\.md` too when the reusable procedure itself was incomplete/);
-  assert.match(skill, /Repeated occurrences still extend the ledger/);
+  assert.match(
+    skill,
+    /Repeated failures, errors, retries, provider recoveries, or changed warning counts\/context still extend the ledger/,
+  );
+  assert.match(
+    skill,
+    /exact recurrence of an explicitly reviewed, non-actionable tooling-warning baseline/,
+  );
   assert.match(skill, /Fix repository-controlled causes in a new commit/);
   assert.match(skill, /A successful job with a retry is an abnormal run/);
   assert.match(skill, /Keep remote Playwright fail-closed/);
@@ -984,6 +991,11 @@ test("the run auditor emits structural evidence for hostile text and confines ou
         'Module "crypto" has been externalized for browser compatibility.',
       ),
     ["storybook_browser_externalization"],
+  );
+  assert.deepEqual(
+    (auditor as unknown as { signatureNamesForText: (text: string) => string[] })
+      .signatureNamesForText("Fast Refresh had to perform a full reload."),
+    ["next_dev_full_reload"],
   );
 
   assert.throws(

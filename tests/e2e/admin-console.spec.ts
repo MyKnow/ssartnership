@@ -1,4 +1,8 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function settleLateAdminRequests(page: Page) {
+  await page.waitForLoadState("networkidle");
+}
 
 test.describe("authenticated administrator console", () => {
   test.beforeEach(async ({ page }) => {
@@ -20,6 +24,7 @@ test.describe("authenticated administrator console", () => {
       page.getByRole("heading", { name: "관리 홈", exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("link", { name: /회원/ }).first()).toBeVisible();
+    await settleLateAdminRequests(page);
   });
 
   test("keeps the member search context in the rendered route", async ({ page }) => {
@@ -69,6 +74,7 @@ test.describe("authenticated administrator console", () => {
         fullPage: true,
       });
     }
+    await settleLateAdminRequests(page);
   });
 
   test("traps mobile drawer focus and restores focus to its opener", async ({ page }) => {
