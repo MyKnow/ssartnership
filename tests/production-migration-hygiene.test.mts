@@ -333,10 +333,71 @@ test("schema snapshot declares every added index and RPC after its dependencies"
   }
 });
 
-test("Production migration workflow pins and logs the audited Supabase CLI", () => {
+test("Production migration workflow pins the reviewed commit and fails closed", () => {
   const workflow = readRepoFile(
     ".github/workflows/production-migrations.yml",
   );
+
+  assert.match(workflow, /expected_sha:\s+description:[^\n]+\s+required: true/i);
+  assert.match(
+    workflow,
+    /maintenance_window_approved:\s+description:[^\n]+\s+required: true\s+default: false\s+type: boolean/i,
+  );
+  assert.match(workflow, /timeout-minutes: 60/);
+  assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(workflow, /ref: main/);
+  assert.doesNotMatch(workflow, /^\s+if:.*inputs\.confirmation/gm);
+  assert.match(
+    workflow,
+    /test "\$CONFIRMATION" = "APPLY_PRODUCTION_MIGRATIONS"/,
+  );
+  assert.match(workflow, /test "\$GITHUB_REF" = "refs\/heads\/main"/);
+  assert.match(
+    workflow,
+    /test "\$MAINTENANCE_WINDOW_APPROVED" = "true"/,
+  );
+  assert.match(workflow, /\^\[0-9a-f\]\{40\}\$/);
+  assert.match(workflow, /test "\$DISPATCH_SHA" = "\$EXPECTED_SHA"/);
+  assert.match(
+    workflow,
+    /test "\$\(git rev-parse HEAD\)" = "\$EXPECTED_SHA"/,
+  );
+  assert.equal(
+    countLiteral(
+      workflow,
+      "git ls-remote --exit-code origin refs/heads/main",
+    ),
+    2,
+    "main must be checked at dispatch validation and again immediately before apply",
+  );
+
+  assert.match(workflow, /version: 2\.114\.0/);
+  assert.doesNotMatch(workflow, /version: latest/);
+  assert.match(workflow, /name: Log Supabase CLI version\s+run: supabase --version/);
+  assert.match(
+    workflow,
+    /supabase db push --db-url "\$SUPABASE_PRODUCTION_DB_URL" --dry-run --skip-vault/,
+  );
+  assert.match(
+    workflow,
+    /supabase db push --db-url "\$SUPABASE_PRODUCTION_DB_URL" --yes --skip-vault/,
+  );
+  assert.equal(
+    countLiteral(workflow, "--skip-vault"),
+    2,
+    "schema-only Production applies must not update vault secrets",
+  );
+  assert.match(
+    workflow,
+    /recovery-guidance:\s+if: \$\{\{ always\(\) && needs\.apply\.result != 'success' \}\}\s+needs: apply/,
+  );
+  assert.match(
+    workflow,
+    /name: Record Production migration recovery guidance\s+runs-on: ubuntu-latest\s+timeout-minutes: 5/,
+  );
+  assert.match(workflow, /Treat Production as potentially partially migrated/);
+  assert.match(workflow, /do not rewrite migration history/i);
+  assert.match(workflow, /forward-fix migration/i);
 
   assert.match(workflow, /version: 2\.114\.0/);
   assert.doesNotMatch(workflow, /version: latest/);

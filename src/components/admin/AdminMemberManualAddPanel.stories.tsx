@@ -58,13 +58,13 @@ export const AddsAndRemovesRow: Story = {
     const canvas = within(canvasElement);
     const body = within(canvasElement.ownerDocument.body);
     await userEvent.click(canvas.getByRole("button", { name: "행 추가" }));
-    await expect(canvas.getByText("1번째 회원")).toBeVisible();
-    await expect(canvas.getByText("MM ID 또는 이메일 중 하나는 필수입니다.")).toBeVisible();
-    await expect(canvas.getByText("사진 (선택 사항)")).toBeVisible();
+    await expect(await canvas.findByText("1번째 회원")).toBeVisible();
+    await expect(await canvas.findByText("MM ID 또는 이메일 중 하나는 필수입니다.")).toBeVisible();
+    await expect(await canvas.findByText("사진 (선택 사항)")).toBeVisible();
     await expect(canvas.getByRole("button", { name: "생성 시작" })).toBeDisabled();
-    await expect(canvas.getByRole("combobox", { name: "2행 기수" })).toBeVisible();
-    await expect(canvas.getByRole("combobox", { name: "2행 캠퍼스" })).toBeVisible();
-    const photoInput = canvas.getByLabelText("2행 사진 선택");
+    await expect(await canvas.findByRole("combobox", { name: "2행 기수" })).toBeVisible();
+    await expect(await canvas.findByRole("combobox", { name: "2행 캠퍼스" })).toBeVisible();
+    const photoInput = await canvas.findByLabelText("2행 사진 선택");
     await expect(photoInput).toBeVisible();
     const response = await fetch("/icon-512.png");
     const photo = new File([await response.blob()], "profile.png", { type: "image/png" });
@@ -85,9 +85,11 @@ export const AddsAndRemovesRow: Story = {
     await userEvent.click(body.getByRole("button", { name: /^적용$/ }));
     await expect(await canvas.findByText("선택됨 · profile.png")).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: "사진 해제" }));
-    await expect(canvas.getByText(/JPEG·PNG·WebP·AVIF·HEIC\/HEIF·GIF·BMP·TIFF·SVG/)).toBeVisible();
+    await expect(
+      await canvas.findByText(/JPEG·PNG·WebP·AVIF·HEIC\/HEIF·GIF·BMP·TIFF·SVG/),
+    ).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: "행 삭제" }));
-    await expect(canvas.getByText(/행 추가를 누르거나 회원 XLSX를 업로드/)).toBeVisible();
+    await expect(await canvas.findByText(/행 추가를 누르거나 회원 XLSX를 업로드/)).toBeVisible();
   },
 };
 
@@ -187,7 +189,9 @@ export const RetriesFailedRows: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.click(canvas.getByRole("button", { name: "검증 및 업로드" }));
-    await expect(await canvas.findByRole("button", { name: "생성 시작" })).toBeEnabled();
+    await waitFor(() => {
+      expect(canvas.getByRole("button", { name: "생성 시작" })).toBeEnabled();
+    });
     await userEvent.click(canvas.getByRole("button", { name: "생성 시작" }));
     await expect(await canvas.findByRole("button", { name: "실패 행 재시도" })).toBeEnabled();
     await expect(canvas.getByText(/같은 준비 배치에서 실패 행만 다시 시도/)).toBeVisible();
@@ -270,6 +274,9 @@ export const StopsRetryWhenDeliveryOutcomeIsUnknown: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.click(canvas.getByRole("button", { name: "검증 및 업로드" }));
+    await waitFor(() => {
+      expect(canvas.getByRole("button", { name: "생성 시작" })).toBeEnabled();
+    });
     await userEvent.click(await canvas.findByRole("button", { name: "생성 시작" }));
     await expect(await canvas.findByText(/전송 결과 확인이 필요한 행이 있어 자동 재시도는 중지되었습니다/)).toBeVisible();
     await expect(canvas.getByRole("button", { name: "자동 재시도 불가" })).toBeDisabled();
@@ -335,6 +342,9 @@ export const ShowsExistingMemberWithoutReissue: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.click(canvas.getByRole("button", { name: "검증 및 업로드" }));
+    await waitFor(() => {
+      expect(canvas.getByRole("button", { name: "생성 시작" })).toBeEnabled();
+    });
     await userEvent.click(await canvas.findByRole("button", { name: "생성 시작" }));
     await expect(await canvas.findByText("이미 등록됨 1")).toBeVisible();
     await expect(canvas.getByRole("link", { name: "기존 회원 상세" })).toHaveAttribute(
@@ -363,7 +373,9 @@ export const ClearsZipConnectedPhoto: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByText("사진 ZIP 연결됨")).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: "사진 연결 해제" }));
-    await expect(canvas.getByText(/JPEG·PNG·WebP·AVIF·HEIC\/HEIF·GIF·BMP·TIFF·SVG/)).toBeVisible();
+    await expect(
+      await canvas.findByText(/JPEG·PNG·WebP·AVIF·HEIC\/HEIF·GIF·BMP·TIFF·SVG/),
+    ).toBeVisible();
   },
 };
 
@@ -385,7 +397,7 @@ export const FocusesCampusValidationError: Story = {
     const canvas = within(canvasElement);
     const campus = canvas.getByRole("combobox", { name: "2행 캠퍼스" });
     await userEvent.click(canvas.getByRole("button", { name: "검증 및 업로드" }));
-    await expect(canvas.getByText(/캠퍼스를 입력해 주세요/)).toBeVisible();
+    await expect(await canvas.findByText(/캠퍼스를 입력해 주세요/)).toBeVisible();
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     await expect(campus).toHaveFocus();
   },

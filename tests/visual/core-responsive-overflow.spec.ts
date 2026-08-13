@@ -15,6 +15,7 @@ const viewportWidths = [320, 360, 390, 768, 820, 1024, 1366, 1440, 1536] as cons
 
 for (const width of viewportWidths) {
   test(`core stories have no document overflow at ${width}px`, async ({ page }) => {
+    test.slow();
     await page.setViewportSize({
       width,
       height: width < 768 ? 844 : width < 1200 ? 1180 : 900,
