@@ -7,6 +7,15 @@ on:
         description: Type APPLY_PRODUCTION_MIGRATIONS to apply pending migrations to Production.
         required: true
         type: string
+      expected_sha:
+        description: Exact reviewed 40-character main commit SHA to apply.
+        required: true
+        type: string
+      maintenance_window_approved:
+        description: Confirm a measured low-traffic window and forward-recovery runbook are approved.
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -17,20 +26,34 @@ concurrency:
 
 jobs:
   apply:
-    if: >-
-      ${{
-        inputs.confirmation == 'APPLY_PRODUCTION_MIGRATIONS' &&
-        github.ref == 'refs/heads/main'
-      }}
     name: Validate and apply Production migrations
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
 
     steps:
-      - name: Checkout main
+      - name: Checkout reviewed commit
         uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.sha }}
+
+      - name: Verify reviewed Production target
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          DISPATCH_SHA: ${{ github.sha }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          MAINTENANCE_WINDOW_APPROVED: ${{ inputs.maintenance_window_approved }}
+        run: |
+          set -euo pipefail
+
+          test "$CONFIRMATION" = "APPLY_PRODUCTION_MIGRATIONS"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$MAINTENANCE_WINDOW_APPROVED" = "true"
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$DISPATCH_SHA" = "$EXPECTED_SHA"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+          current_main_sha="$(git ls-remote --exit-code origin refs/heads/main | cut -f1)"
+          test "$current_main_sha" = "$EXPECTED_SHA"
 
       - name: Setup Node
         uses: actions/setup-node@v7
@@ -47,8 +70,11 @@ jobs:
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v2
         with:
-          version: latest
+          version: 2.114.0
           github-token: ${{ github.token }}
+
+      - name: Log Supabase CLI version
+        run: supabase --version
 
       - name: List Production migrations before apply
         env:
@@ -58,12 +84,29 @@ jobs:
           test -n "$SUPABASE_PRODUCTION_DB_URL"
           supabase migration list --db-url "$SUPABASE_PRODUCTION_DB_URL"
 
+      - name: Dry-run pending Production migrations
+        env:
+          SUPABASE_PRODUCTION_DB_URL: ${{ secrets.SUPABASE_PRODUCTION_DB_URL }}
+        run: |
+          set -euo pipefail
+          supabase db push --db-url "$SUPABASE_PRODUCTION_DB_URL" --dry-run --skip-vault
+
+      - name: Recheck reviewed main immediately before apply
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          current_main_sha="$(git ls-remote --exit-code origin refs/heads/main | cut -f1)"
+          test "$current_main_sha" = "$EXPECTED_SHA"
+
       - name: Apply pending Production migrations
         env:
           SUPABASE_PRODUCTION_DB_URL: ${{ secrets.SUPABASE_PRODUCTION_DB_URL }}
         run: |
           set -euo pipefail
-          supabase db push --db-url "$SUPABASE_PRODUCTION_DB_URL" --yes
+          supabase db push --db-url "$SUPABASE_PRODUCTION_DB_URL" --yes --skip-vault
 
       - name: Verify Production migrations after apply
         env:
@@ -71,3 +114,24 @@ jobs:
         run: |
           set -euo pipefail
           supabase migration list --db-url "$SUPABASE_PRODUCTION_DB_URL"
+
+  recovery-guidance:
+    if: ${{ always() && needs.apply.result != 'success' }}
+    needs: apply
+    name: Record Production migration recovery guidance
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Record forward-recovery guidance
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## Production migration run stopped
+
+          Treat Production as potentially partially migrated.
+
+          1. Do not promote application code and do not rewrite migration history.
+          2. Inspect the remote migration list and active lock waits.
+          3. Resume only from this same reviewed commit when the failed migration is safely retryable.
+          4. Otherwise, prepare and review a forward-fix migration before another apply.
+          EOF

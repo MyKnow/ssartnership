@@ -127,7 +127,11 @@ test("production Supabase migrations require an explicit guarded dispatch", () =
   assert.doesNotMatch(workflow, /^\s+push:\s*$/m);
   assert.match(workflow, /confirmation:/);
   assert.match(workflow, /APPLY_PRODUCTION_MIGRATIONS/);
-  assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow, /expected_sha:/);
+  assert.match(workflow, /maintenance_window_approved:/);
+  assert.match(workflow, /test "\$GITHUB_REF" = "refs\/heads\/main"/);
+  assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(workflow, /ref: main/);
   assert.match(workflow, /permissions:\s*\n\s+contents: read/);
   assert.match(
     workflow,
@@ -140,7 +144,11 @@ test("production Supabase migrations require an explicit guarded dispatch", () =
   );
   assert.match(
     workflow,
-    /supabase db push --db-url "\$SUPABASE_PRODUCTION_DB_URL" --yes/,
+    /supabase db push --db-url "\$SUPABASE_PRODUCTION_DB_URL" --yes --skip-vault/,
+  );
+  assert.match(
+    workflow,
+    /supabase db push --db-url "\$SUPABASE_PRODUCTION_DB_URL" --dry-run --skip-vault/,
   );
   assert.doesNotMatch(workflow, /--include-all/);
 });

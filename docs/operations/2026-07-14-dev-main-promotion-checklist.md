@@ -87,7 +87,7 @@ npm audit --omit=dev --audit-level=high
 - [ ] 배포 담당자, 배포 시간, 롤백 담당자와 연락 경로를 정한다.
 - [ ] 새 컬럼·테이블이 없는 상태에서도 새 코드가 안전하게 동작하는지 확인하거나, 승인된 마이그레이션 우선/점검 창 전략을 선택한다.
 - [ ] 백업·복구 가능 여부와 실패 시 되돌릴 코드 SHA를 기록한다.
-- [ ] `main` 병합 후 GitHub Actions에서 **Apply Production Supabase Migrations**를 실행하고 `APPLY_PRODUCTION_MIGRATIONS` 확인 입력을 명시한다.
+- [ ] `main` 병합 후 GitHub Actions에서 **Apply Production Supabase Migrations**를 실행하고 `APPLY_PRODUCTION_MIGRATIONS`, 검토 완료된 `expected_sha`, 저트래픽 유지보수 창 승인 여부를 함께 명시한다.
 - [ ] 마이그레이션 적용 전후 `supabase migration list` 결과가 기대값과 같은지 확인한다.
 - [ ] Vercel Production 배포가 병합 SHA로 `READY`인지 확인한다.
 - [ ] Production에서 로그인, 사진 인증 진입, 관리자 회원 생성, 홈 필터, 관리자 사진·초대 주요 경로를 스모크 테스트한다.

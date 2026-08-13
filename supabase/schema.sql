@@ -1,3 +1,5 @@
+create schema if not exists extensions;
+create extension if not exists pg_trgm with schema extensions;
 create extension if not exists "uuid-ossp";
 
 insert into storage.buckets (id, name, public)
@@ -639,12 +641,15 @@ create table if not exists partner_registration_attempts (
 create table if not exists partner_registration_requests (
   id uuid primary key default uuid_generate_v4(),
   status text not null default 'pending',
+  visibility text not null default 'public',
   source text not null default 'public_web',
   company_id uuid references partner_companies(id) on delete set null,
   requested_by_partner_account_id uuid references partner_accounts(id) on delete set null,
   registration_mode text not null default 'full_new',
   service_mode text not null,
   benefit_action_type text not null,
+  benefit_verification_pin_hash text,
+  benefit_verification_pin_salt text,
   benefit_use_max_count integer,
   branch_scope_type text not null default 'single_location',
   branch_scope_note text,
@@ -678,6 +683,8 @@ create table if not exists partner_registration_requests (
   updated_at timestamp with time zone default now(),
   constraint partner_registration_requests_status_check
     check (status in ('pending', 'in_review', 'converted', 'rejected', 'archived')),
+  constraint partner_registration_requests_visibility_check
+    check (visibility in ('public', 'confidential', 'private')),
   constraint partner_registration_requests_source_check
     check (source in ('public_web', 'public_excel', 'partner_portal')),
   constraint partner_registration_requests_registration_mode_check
@@ -698,6 +705,14 @@ create table if not exists partner_registration_requests (
     ),
   constraint partner_registration_requests_benefit_action_type_check
     check (benefit_action_type in ('certification', 'external_link', 'onsite', 'none')),
+  constraint partner_registration_requests_benefit_verification_pin_check
+    check (
+      (benefit_verification_pin_hash is null and benefit_verification_pin_salt is null)
+      or (
+        char_length(benefit_verification_pin_hash) > 0
+        and char_length(benefit_verification_pin_salt) > 0
+      )
+    ),
   constraint partner_registration_requests_benefit_use_max_count_check
     check (
       benefit_use_max_count is null
@@ -1051,6 +1066,248 @@ as $$
       0
     ) as security_log_count;
 $$;
+
+create index if not exists partner_registration_requests_pending_company_idx
+  on public.partner_registration_requests(company_id)
+  where status in ('pending', 'in_review');
+
+create index if not exists admin_notification_recipients_unread_admin_idx
+  on public.admin_notification_recipients(admin_id)
+  where deleted_at is null and read_at is null;
+
+create or replace function public.get_admin_dashboard_home_snapshot(
+  input_admin_id uuid,
+  input_managed_campus_slugs text[] default null,
+  input_include_brand_queues boolean default false,
+  input_include_graduate_verifications boolean default false,
+  input_include_signup_requests boolean default false,
+  input_include_profile_photos boolean default false,
+  input_include_notifications boolean default false
+)
+returns table (
+  member_count bigint,
+  company_count bigint,
+  partner_count bigint,
+  category_count bigint,
+  account_count bigint,
+  review_count bigint,
+  active_push_subscription_count bigint,
+  product_log_count bigint,
+  audit_log_count bigint,
+  security_log_count bigint,
+  registration_pending_count bigint,
+  change_request_pending_count bigint,
+  plan_request_pending_count bigint,
+  graduate_verification_pending_count bigint,
+  signup_request_pending_count bigint,
+  profile_photo_pending_count bigint,
+  unread_notification_count bigint
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  with scope as (
+    select
+      input_managed_campus_slugs is null as is_global,
+      coalesce(input_managed_campus_slugs, '{}'::text[]) as managed_campus_slugs
+  )
+  select
+    case when scope.is_global then (select count(*)::bigint from public.members) else 0::bigint end,
+    case when scope.is_global then (select count(*)::bigint from public.partner_companies) else 0::bigint end,
+    (
+      select count(*)::bigint
+      from public.partners as partner
+      where scope.is_global or partner.managed_campus_slugs && scope.managed_campus_slugs
+    ),
+    case when scope.is_global then (select count(*)::bigint from public.categories) else 0::bigint end,
+    case when scope.is_global then (select count(*)::bigint from public.partner_accounts) else 0::bigint end,
+    case when scope.is_global then (
+      select count(*)::bigint
+      from public.partner_reviews
+      where deleted_at is null
+    ) else 0::bigint end,
+    case when scope.is_global then (
+      select count(*)::bigint
+      from public.push_subscriptions
+      where is_active = true
+    ) else 0::bigint end,
+    case when scope.is_global then greatest(
+      coalesce((select reltuples::bigint from pg_class where oid = 'public.event_logs'::regclass), 0),
+      0
+    ) else 0::bigint end,
+    case when scope.is_global then greatest(
+      coalesce((select reltuples::bigint from pg_class where oid = 'public.admin_audit_logs'::regclass), 0),
+      0
+    ) else 0::bigint end,
+    case when scope.is_global then greatest(
+      coalesce((select reltuples::bigint from pg_class where oid = 'public.auth_security_logs'::regclass), 0),
+      0
+    ) else 0::bigint end,
+    case when input_include_brand_queues then (
+      select count(*)::bigint
+      from public.partner_registration_requests as request
+      left join public.partner_companies as company on company.id = request.company_id
+      where request.status in ('pending', 'in_review')
+        and (
+          scope.is_global
+          or (
+            company.id is not null
+            and company.managed_campus_slugs && scope.managed_campus_slugs
+          )
+          or (
+            company.id is null
+            and request.location ~ '(전국|전\s*지점|전체\s*지점|모든\s*지점|전\s*매장|전체\s*매장|모든\s*매장|서울|강남|역삼|역삼역|선릉|테헤란|봉은사|논현|구미|경북|경상북도|대전|유성|둔산|부산|울산|경남|창원|김해|양산|해운대|서면|광주|전남)'
+            and public.infer_partner_campus_slugs(request.location) && scope.managed_campus_slugs
+          )
+        )
+    ) else 0::bigint end,
+    case when input_include_brand_queues then (
+      select count(*)::bigint
+      from public.partner_change_requests as request
+      join public.partners as partner on partner.id = request.partner_id
+      where request.status = 'pending'
+        and (scope.is_global or partner.managed_campus_slugs && scope.managed_campus_slugs)
+    ) else 0::bigint end,
+    case when input_include_brand_queues and scope.is_global then (
+      select count(*)::bigint
+      from public.partner_plan_upgrade_requests
+      where status = 'pending'
+    ) else 0::bigint end,
+    case when input_include_graduate_verifications then (
+      select count(*)::bigint
+      from public.graduate_verification_requests
+      where status in ('submitted', 'in_review')
+    ) else 0::bigint end,
+    case when input_include_signup_requests then (
+      select count(*)::bigint
+      from public.member_signup_approval_requests
+      where status = 'pending'
+    ) else 0::bigint end,
+    case when input_include_profile_photos then (
+      select count(*)::bigint
+      from public.member_profile_images
+      where graduate_verification_request_id is null
+        and member_id is not null
+        and status = 'pending'
+    ) else 0::bigint end,
+    case when input_include_notifications then (
+      select count(*)::bigint
+      from public.admin_notification_recipients
+      where admin_id = input_admin_id
+        and deleted_at is null
+        and read_at is null
+    ) else 0::bigint end
+  from scope;
+$$;
+
+revoke all on function public.get_admin_dashboard_home_snapshot(uuid, text[], boolean, boolean, boolean, boolean, boolean) from public;
+revoke all on function public.get_admin_dashboard_home_snapshot(uuid, text[], boolean, boolean, boolean, boolean, boolean) from anon;
+revoke all on function public.get_admin_dashboard_home_snapshot(uuid, text[], boolean, boolean, boolean, boolean, boolean) from authenticated;
+grant execute on function public.get_admin_dashboard_home_snapshot(uuid, text[], boolean, boolean, boolean, boolean, boolean) to service_role;
+
+create or replace function public.get_admin_partner_registration_request_page(
+  input_status text default null,
+  input_page integer default 1,
+  input_page_size integer default 12,
+  input_managed_campus_slugs text[] default null,
+  input_search text default null,
+  input_source text default null,
+  input_visibility text default null,
+  input_sort text default 'recent'
+)
+returns table (
+  id uuid,
+  total_count bigint
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  with parameters as (
+    select
+      case
+        when input_status in ('pending', 'in_review', 'converted', 'rejected', 'archived')
+          then input_status
+        else null
+      end as status_filter,
+      nullif(left(lower(trim(coalesce(input_search, ''))), 100), '') as search_filter,
+      case
+        when input_source in ('public_web', 'public_excel', 'partner_portal')
+          then input_source
+        else null
+      end as source_filter,
+      case
+        when input_visibility in ('public', 'confidential', 'private')
+          then input_visibility
+        else null
+      end as visibility_filter,
+      case
+        when input_sort in ('oldest', 'name') then input_sort
+        else 'recent'
+      end as sort_mode,
+      greatest(coalesce(input_page, 1), 1) as page,
+      least(greatest(coalesce(input_page_size, 12), 1), 24) as page_size,
+      input_managed_campus_slugs is null as is_global,
+      coalesce(input_managed_campus_slugs, '{}'::text[]) as managed_campus_slugs
+  ),
+  scoped_rows as (
+    select request.id, request.created_at, request.brand_name
+    from public.partner_registration_requests as request
+    left join public.partner_companies as company on company.id = request.company_id
+    cross join parameters
+    where (parameters.status_filter is null or request.status = parameters.status_filter)
+      and (parameters.source_filter is null or request.source = parameters.source_filter)
+      and (parameters.visibility_filter is null or request.visibility = parameters.visibility_filter)
+      and (
+        parameters.search_filter is null
+        or position(parameters.search_filter in lower(coalesce(request.brand_name, ''))) > 0
+        or position(parameters.search_filter in lower(coalesce(request.company_name, ''))) > 0
+        or position(parameters.search_filter in lower(coalesce(request.category_label, ''))) > 0
+        or position(parameters.search_filter in lower(coalesce(request.location, ''))) > 0
+      )
+      and (
+        parameters.is_global
+        or (
+          company.id is not null
+          and company.managed_campus_slugs && parameters.managed_campus_slugs
+        )
+        or (
+          company.id is null
+          and request.location ~ '(전국|전\s*지점|전체\s*지점|모든\s*지점|전\s*매장|전체\s*매장|모든\s*매장|서울|강남|역삼|역삼역|선릉|테헤란|봉은사|논현|구미|경북|경상북도|대전|유성|둔산|부산|울산|경남|창원|김해|양산|해운대|서면|광주|전남)'
+          and public.infer_partner_campus_slugs(request.location) && parameters.managed_campus_slugs
+        )
+      )
+  ),
+  numbered_rows as (
+    select
+      id,
+      created_at,
+      brand_name,
+      count(*) over()::bigint as total_count,
+      row_number() over (
+        order by
+          case when (select sort_mode from parameters) = 'name' then lower(brand_name) end asc nulls last,
+          case when (select sort_mode from parameters) = 'oldest' then created_at end asc nulls last,
+          case when (select sort_mode from parameters) = 'recent' then created_at end desc nulls last,
+          id desc
+      ) as row_num
+    from scoped_rows
+  )
+  select numbered_rows.id, numbered_rows.total_count
+  from numbered_rows
+  cross join parameters
+  where numbered_rows.row_num > ((parameters.page - 1) * parameters.page_size)
+    and numbered_rows.row_num <= (parameters.page * parameters.page_size)
+  order by numbered_rows.row_num;
+$$;
+
+revoke all on function public.get_admin_partner_registration_request_page(text, integer, integer, text[], text, text, text, text) from public;
+revoke all on function public.get_admin_partner_registration_request_page(text, integer, integer, text[], text, text, text, text) from anon;
+revoke all on function public.get_admin_partner_registration_request_page(text, integer, integer, text[], text, text, text, text) from authenticated;
+grant execute on function public.get_admin_partner_registration_request_page(text, integer, integer, text[], text, text, text, text) to service_role;
 
 create or replace function public.get_admin_logs_page(
   input_start timestamp with time zone,
@@ -1596,6 +1853,1439 @@ on conflict (kind, version) do update set
   effective_at = excluded.effective_at,
   updated_at = now();
 
+create or replace function public.record_rate_limit_attempt(
+  p_table_name text,
+  p_identifier text,
+  p_success boolean,
+  p_window_ms bigint,
+  p_max_attempts integer,
+  p_block_ms bigint
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  recorded_at timestamp with time zone := clock_timestamp();
+begin
+  if p_table_name is null or p_table_name not in (
+    'admin_login_attempts',
+    'member_auth_attempts',
+    'mattermost_sender_test_attempts',
+    'partner_auth_attempts',
+    'partner_registration_attempts',
+    'suggestion_attempts'
+  ) then
+    raise exception using
+      errcode = '22023',
+      message = 'rate_limit_table_invalid';
+  end if;
+
+  if p_identifier is null
+     or btrim(p_identifier) = ''
+     or char_length(p_identifier) > 512 then
+    raise exception using
+      errcode = '22023',
+      message = 'rate_limit_identifier_invalid';
+  end if;
+
+  if p_success is null
+     or p_window_ms is null
+     or p_window_ms < 1
+     or p_window_ms > 2592000000
+     or p_max_attempts is null
+     or p_max_attempts < 1
+     or p_max_attempts > 10000
+     or p_block_ms is null
+     or p_block_ms < 1
+     or p_block_ms > 2592000000 then
+    raise exception using
+      errcode = '22023',
+      message = 'rate_limit_policy_invalid';
+  end if;
+
+  if p_success then
+    execute format(
+      'delete from public.%I where identifier = $1',
+      p_table_name
+    ) using p_identifier;
+    return;
+  end if;
+
+  execute format(
+    $statement$
+      insert into public.%1$I as attempt (
+        identifier,
+        count,
+        first_attempt_at,
+        blocked_until
+      )
+      values (
+        $1,
+        1,
+        $2,
+        case
+          when $4 <= 1
+            then $2 + ($5::double precision * interval '1 millisecond')
+          else null
+        end
+      )
+      on conflict (identifier) do update
+      set
+        count = case
+          when $2 - attempt.first_attempt_at
+               > ($3::double precision * interval '1 millisecond')
+            then 1
+          else attempt.count + 1
+        end,
+        first_attempt_at = case
+          when $2 - attempt.first_attempt_at
+               > ($3::double precision * interval '1 millisecond')
+            then $2
+          else attempt.first_attempt_at
+        end,
+        blocked_until = case
+          when $2 - attempt.first_attempt_at
+               > ($3::double precision * interval '1 millisecond')
+            then case
+              when $4 <= 1
+                then $2 + ($5::double precision * interval '1 millisecond')
+              else null
+            end
+          when attempt.count + 1 >= $4
+            then greatest(
+              coalesce(
+                attempt.blocked_until,
+                '-infinity'::timestamp with time zone
+              ),
+              pg_catalog.clock_timestamp()
+                + ($5::double precision * interval '1 millisecond')
+            )
+          else attempt.blocked_until
+        end
+    $statement$,
+    p_table_name
+  ) using
+    p_identifier,
+    recorded_at,
+    p_window_ms,
+    p_max_attempts,
+    p_block_ms;
+end;
+$$;
+
+revoke all on function public.record_rate_limit_attempt(text, text, boolean, bigint, integer, bigint) from public;
+revoke all on function public.record_rate_limit_attempt(text, text, boolean, bigint, integer, bigint) from anon;
+revoke all on function public.record_rate_limit_attempt(text, text, boolean, bigint, integer, bigint) from authenticated;
+grant execute on function public.record_rate_limit_attempt(text, text, boolean, bigint, integer, bigint) to service_role;
+
+create table if not exists public.member_wallet_passes (
+  id uuid primary key default gen_random_uuid(),
+  member_id uuid not null references public.members(id) on delete cascade,
+  platform text not null,
+  public_id text not null,
+  serial_number text not null,
+  credential_status text not null default 'active',
+  installation_status text not null default 'pending',
+  sync_status text not null default 'pending',
+  consent_version integer not null,
+  consented_at timestamp with time zone not null,
+  current_revision integer not null default 1,
+  current_snapshot_hash text not null,
+  current_snapshot jsonb not null default '{}'::jsonb,
+  issued_at timestamp with time zone not null default now(),
+  revoked_at timestamp with time zone,
+  last_sync_attempted_at timestamp with time zone,
+  last_synced_at timestamp with time zone,
+  last_sync_error_code text,
+  last_sync_error_at timestamp with time zone,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  constraint member_wallet_passes_platform_check
+    check (platform in ('apple')),
+  constraint member_wallet_passes_public_id_check
+    check (public_id ~ '^[A-Za-z0-9_-]{43}$'),
+  constraint member_wallet_passes_serial_number_check
+    check (serial_number = 'sp-' || public_id),
+  constraint member_wallet_passes_credential_status_check
+    check (credential_status in ('active', 'revoked')),
+  constraint member_wallet_passes_installation_status_check
+    check (installation_status in ('pending', 'installed', 'removed')),
+  constraint member_wallet_passes_sync_status_check
+    check (sync_status in ('pending', 'synced', 'failed')),
+  constraint member_wallet_passes_consent_version_check
+    check (consent_version > 0),
+  constraint member_wallet_passes_current_revision_check
+    check (current_revision >= 1),
+  constraint member_wallet_passes_current_snapshot_object_check
+    check (jsonb_typeof(current_snapshot) = 'object'),
+  constraint member_wallet_passes_current_snapshot_minimal_check
+    check (
+      current_snapshot ?& array['displayName', 'generationLabel', 'campusLabel', 'roleLabel']
+      and current_snapshot - 'displayName' - 'generationLabel' - 'campusLabel' - 'roleLabel' = '{}'::jsonb
+      and jsonb_typeof(current_snapshot -> 'displayName') = 'string'
+      and jsonb_typeof(current_snapshot -> 'generationLabel') = 'string'
+      and jsonb_typeof(current_snapshot -> 'campusLabel') = 'string'
+      and jsonb_typeof(current_snapshot -> 'roleLabel') = 'string'
+    )
+);
+
+create unique index if not exists member_wallet_passes_public_id_key
+  on public.member_wallet_passes(public_id);
+create unique index if not exists member_wallet_passes_platform_serial_number_key
+  on public.member_wallet_passes(platform, serial_number);
+create unique index if not exists member_wallet_passes_active_member_platform_key
+  on public.member_wallet_passes(member_id, platform)
+  where credential_status = 'active';
+create index if not exists member_wallet_passes_member_platform_created_idx
+  on public.member_wallet_passes(member_id, platform, created_at desc);
+create index if not exists member_wallet_passes_updated_at_idx
+  on public.member_wallet_passes(updated_at desc, id desc);
+
+create table if not exists public.member_wallet_pass_revisions (
+  id uuid primary key default gen_random_uuid(),
+  pass_id uuid not null references public.member_wallet_passes(id) on delete cascade,
+  revision integer not null,
+  snapshot_hash text not null,
+  snapshot jsonb not null default '{}'::jsonb,
+  consent_version integer not null,
+  consented_at timestamp with time zone not null,
+  issued_at timestamp with time zone not null default now(),
+  created_at timestamp with time zone not null default now(),
+  constraint member_wallet_pass_revisions_revision_check
+    check (revision >= 1),
+  constraint member_wallet_pass_revisions_snapshot_object_check
+    check (jsonb_typeof(snapshot) = 'object'),
+  constraint member_wallet_pass_revisions_snapshot_minimal_check
+    check (
+      snapshot ?& array['displayName', 'generationLabel', 'campusLabel', 'roleLabel']
+      and snapshot - 'displayName' - 'generationLabel' - 'campusLabel' - 'roleLabel' = '{}'::jsonb
+      and jsonb_typeof(snapshot -> 'displayName') = 'string'
+      and jsonb_typeof(snapshot -> 'generationLabel') = 'string'
+      and jsonb_typeof(snapshot -> 'campusLabel') = 'string'
+      and jsonb_typeof(snapshot -> 'roleLabel') = 'string'
+    ),
+  constraint member_wallet_pass_revisions_consent_version_check
+    check (consent_version > 0),
+  constraint member_wallet_pass_revisions_pass_revision_key
+    unique (pass_id, revision)
+);
+
+create index if not exists member_wallet_pass_revisions_pass_created_idx
+  on public.member_wallet_pass_revisions(pass_id, created_at desc);
+
+create table if not exists public.apple_wallet_device_registrations (
+  id uuid primary key default gen_random_uuid(),
+  pass_id uuid not null references public.member_wallet_passes(id) on delete cascade,
+  device_library_identifier_hash text not null,
+  push_token_ciphertext text not null,
+  push_token_iv text not null,
+  push_token_auth_tag text not null,
+  push_token_key_version integer not null,
+  last_registered_at timestamp with time zone not null default now(),
+  removed_at timestamp with time zone,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  constraint apple_wallet_device_registrations_identifier_hash_check
+    check (char_length(trim(device_library_identifier_hash)) between 16 and 256),
+  constraint apple_wallet_device_registrations_push_token_ciphertext_check
+    check (char_length(trim(push_token_ciphertext)) > 0),
+  constraint apple_wallet_device_registrations_push_token_iv_check
+    check (char_length(trim(push_token_iv)) > 0),
+  constraint apple_wallet_device_registrations_push_token_auth_tag_check
+    check (char_length(trim(push_token_auth_tag)) > 0),
+  constraint apple_wallet_device_registrations_key_version_check
+    check (push_token_key_version > 0),
+  constraint apple_wallet_device_registrations_pass_device_key
+    unique (pass_id, device_library_identifier_hash)
+);
+
+create index if not exists apple_wallet_device_registrations_pass_updated_idx
+  on public.apple_wallet_device_registrations(pass_id, updated_at desc);
+create index if not exists apple_wallet_device_registrations_active_pass_idx
+  on public.apple_wallet_device_registrations(pass_id, updated_at desc)
+  where removed_at is null;
+
+create table if not exists public.member_wallet_pass_operations (
+  id uuid primary key default gen_random_uuid(),
+  operation text not null,
+  idempotency_key text not null,
+  request_fingerprint text not null,
+  member_id uuid not null references public.members(id) on delete cascade,
+  platform text not null,
+  result_pass_id uuid references public.member_wallet_passes(id) on delete set null,
+  result_revision integer,
+  result_status text not null,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  constraint member_wallet_pass_operations_operation_check
+    check (operation in ('issue', 'revoke')),
+  constraint member_wallet_pass_operations_platform_check
+    check (platform in ('apple')),
+  constraint member_wallet_pass_operations_result_status_check
+    check (result_status in ('active', 'revoked')),
+  constraint member_wallet_pass_operations_idempotency_key_check
+    check (char_length(trim(idempotency_key)) between 16 and 128),
+  constraint member_wallet_pass_operations_request_fingerprint_check
+    check (char_length(trim(request_fingerprint)) between 16 and 256),
+  constraint member_wallet_pass_operations_idempotency_key_key
+    unique (idempotency_key)
+);
+
+create index if not exists member_wallet_pass_operations_member_platform_created_idx
+  on public.member_wallet_pass_operations(member_id, platform, created_at desc);
+
+create index if not exists member_wallet_pass_operations_result_pass_idx
+  on public.member_wallet_pass_operations(result_pass_id)
+  where result_pass_id is not null;
+
+create or replace function public.issue_member_wallet_pass(
+  p_member_id uuid,
+  p_platform text,
+  p_consent_version integer,
+  p_consented_at timestamp with time zone,
+  p_snapshot_hash text,
+  p_snapshot jsonb,
+  p_idempotency_key text,
+  p_request_fingerprint text
+)
+returns table (
+  pass_id uuid,
+  member_id uuid,
+  platform text,
+  public_id text,
+  serial_number text,
+  credential_status text,
+  installation_status text,
+  sync_status text,
+  consent_version integer,
+  consented_at timestamp with time zone,
+  current_revision integer,
+  current_snapshot_hash text,
+  current_snapshot jsonb,
+  issued_at timestamp with time zone,
+  revoked_at timestamp with time zone,
+  last_sync_attempted_at timestamp with time zone,
+  last_synced_at timestamp with time zone,
+  last_sync_error_code text,
+  last_sync_error_at timestamp with time zone,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  is_new_pass boolean,
+  is_new_revision boolean,
+  operation_created boolean
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  member_row public.members%rowtype;
+  active_pass_row public.member_wallet_passes%rowtype;
+  operation_row public.member_wallet_pass_operations%rowtype;
+  revision_row public.member_wallet_pass_revisions%rowtype;
+  normalized_platform text := trim(coalesce(p_platform, ''));
+  normalized_snapshot_hash text := trim(coalesce(p_snapshot_hash, ''));
+  normalized_idempotency_key text := trim(coalesce(p_idempotency_key, ''));
+  normalized_request_fingerprint text := trim(coalesce(p_request_fingerprint, ''));
+  next_revision integer;
+  inserted_count integer := 0;
+  created_pass boolean := false;
+  created_revision boolean := false;
+  generated_public_id text;
+  generated_serial_number text;
+begin
+  if normalized_platform <> 'apple' then
+    raise exception 'member_wallet_pass_platform_invalid';
+  end if;
+  if p_member_id is null then
+    raise exception 'member_wallet_pass_member_required';
+  end if;
+  if p_consent_version is null or p_consent_version < 1 then
+    raise exception 'member_wallet_pass_consent_version_invalid';
+  end if;
+  if p_consented_at is null then
+    raise exception 'member_wallet_pass_consented_at_required';
+  end if;
+  if normalized_snapshot_hash = '' then
+    raise exception 'member_wallet_pass_snapshot_hash_invalid';
+  end if;
+  if p_snapshot is null or jsonb_typeof(p_snapshot) <> 'object' then
+    raise exception 'member_wallet_pass_snapshot_invalid';
+  end if;
+  if char_length(normalized_idempotency_key) < 16 or char_length(normalized_idempotency_key) > 128 then
+    raise exception 'member_wallet_pass_idempotency_key_invalid';
+  end if;
+  if char_length(normalized_request_fingerprint) < 16 or char_length(normalized_request_fingerprint) > 256 then
+    raise exception 'member_wallet_pass_request_fingerprint_invalid';
+  end if;
+
+  select * into member_row
+  from public.members as member
+  where member.id = p_member_id
+    and member.deleted_at is null
+  for update;
+  if not found then
+    raise exception 'member_wallet_pass_member_not_found';
+  end if;
+  if member_row.must_change_password then
+    raise exception 'member_wallet_pass_member_password_change_required';
+  end if;
+
+  select * into operation_row
+  from public.member_wallet_pass_operations as operations
+  where operations.idempotency_key = normalized_idempotency_key
+  for update;
+  if found then
+    if operation_row.operation <> 'issue'
+       or operation_row.member_id <> p_member_id
+       or operation_row.platform <> normalized_platform
+       or operation_row.request_fingerprint <> normalized_request_fingerprint then
+      raise exception 'member_wallet_pass_idempotency_conflict';
+    end if;
+
+    select * into active_pass_row
+    from public.member_wallet_passes as passes
+    where passes.id = operation_row.result_pass_id;
+    if not found then
+      raise exception 'member_wallet_pass_operation_result_missing';
+    end if;
+
+    select * into revision_row
+    from public.member_wallet_pass_revisions as revisions
+    where revisions.pass_id = active_pass_row.id
+      and revisions.revision = operation_row.result_revision;
+    if not found then
+      raise exception 'member_wallet_pass_revision_missing';
+    end if;
+
+    return query
+    select
+      active_pass_row.id,
+      active_pass_row.member_id,
+      active_pass_row.platform,
+      active_pass_row.public_id,
+      active_pass_row.serial_number,
+      active_pass_row.credential_status,
+      active_pass_row.installation_status,
+      active_pass_row.sync_status,
+      active_pass_row.consent_version,
+      active_pass_row.consented_at,
+      active_pass_row.current_revision,
+      active_pass_row.current_snapshot_hash,
+      active_pass_row.current_snapshot,
+      active_pass_row.issued_at,
+      active_pass_row.revoked_at,
+      active_pass_row.last_sync_attempted_at,
+      active_pass_row.last_synced_at,
+      active_pass_row.last_sync_error_code,
+      active_pass_row.last_sync_error_at,
+      active_pass_row.created_at,
+      active_pass_row.updated_at,
+      false,
+      false,
+      false;
+    return;
+  end if;
+
+  select * into active_pass_row
+  from public.member_wallet_passes as passes
+  where passes.member_id = p_member_id
+    and passes.platform = normalized_platform
+    and passes.credential_status = 'active'
+  order by passes.created_at desc
+  limit 1
+  for update;
+
+  if not found then
+    generated_public_id := rtrim(
+      replace(
+        replace(encode(extensions.gen_random_bytes(32), 'base64'), '+', '-'),
+        '/',
+        '_'
+      ),
+      '='
+    );
+    generated_serial_number := 'sp-' || generated_public_id;
+
+    insert into public.member_wallet_passes (
+      member_id,
+      platform,
+      public_id,
+      serial_number,
+      credential_status,
+      installation_status,
+      sync_status,
+      consent_version,
+      consented_at,
+      current_revision,
+      current_snapshot_hash,
+      current_snapshot,
+      issued_at
+    ) values (
+      p_member_id,
+      normalized_platform,
+      generated_public_id,
+      generated_serial_number,
+      'active',
+      'pending',
+      'pending',
+      p_consent_version,
+      p_consented_at,
+      1,
+      normalized_snapshot_hash,
+      p_snapshot,
+      now()
+    )
+    returning * into active_pass_row;
+
+    created_pass := true;
+    next_revision := 1;
+  elsif active_pass_row.current_snapshot_hash = normalized_snapshot_hash
+    and active_pass_row.current_snapshot = p_snapshot
+    and active_pass_row.consent_version = p_consent_version
+    and active_pass_row.consented_at = p_consented_at then
+    next_revision := active_pass_row.current_revision;
+  else
+    next_revision := active_pass_row.current_revision + 1;
+
+    update public.member_wallet_passes as passes
+    set consent_version = p_consent_version,
+        consented_at = p_consented_at,
+        current_revision = next_revision,
+        current_snapshot_hash = normalized_snapshot_hash,
+        current_snapshot = p_snapshot,
+        issued_at = now(),
+        revoked_at = null,
+        sync_status = 'pending',
+        last_sync_error_code = null,
+        last_sync_error_at = null,
+        updated_at = now()
+    where passes.id = active_pass_row.id
+    returning * into active_pass_row;
+  end if;
+
+  select * into revision_row
+  from public.member_wallet_pass_revisions as revisions
+  where revisions.pass_id = active_pass_row.id
+    and revisions.revision = next_revision;
+
+  if not found then
+    insert into public.member_wallet_pass_revisions (
+      pass_id,
+      revision,
+      snapshot_hash,
+      snapshot,
+      consent_version,
+      consented_at,
+      issued_at
+    ) values (
+      active_pass_row.id,
+      next_revision,
+      normalized_snapshot_hash,
+      p_snapshot,
+      p_consent_version,
+      p_consented_at,
+      active_pass_row.issued_at
+    )
+    returning * into revision_row;
+    created_revision := true;
+  end if;
+
+  insert into public.member_wallet_pass_operations (
+    operation,
+    idempotency_key,
+    request_fingerprint,
+    member_id,
+    platform,
+    result_pass_id,
+    result_revision,
+    result_status
+  ) values (
+    'issue',
+    normalized_idempotency_key,
+    normalized_request_fingerprint,
+    p_member_id,
+    normalized_platform,
+    active_pass_row.id,
+    next_revision,
+    active_pass_row.credential_status
+  ) on conflict (idempotency_key) do nothing;
+  get diagnostics inserted_count = row_count;
+
+  select * into operation_row
+  from public.member_wallet_pass_operations as operations
+  where operations.idempotency_key = normalized_idempotency_key
+  for update;
+  if not found then
+    raise exception 'member_wallet_pass_operation_record_failed';
+  end if;
+  if operation_row.operation <> 'issue'
+     or operation_row.member_id <> p_member_id
+     or operation_row.platform <> normalized_platform
+     or operation_row.request_fingerprint <> normalized_request_fingerprint
+     or operation_row.result_pass_id <> active_pass_row.id
+     or operation_row.result_revision <> next_revision then
+    raise exception 'member_wallet_pass_idempotency_conflict';
+  end if;
+
+  return query
+  select
+    active_pass_row.id,
+    active_pass_row.member_id,
+    active_pass_row.platform,
+    active_pass_row.public_id,
+    active_pass_row.serial_number,
+    active_pass_row.credential_status,
+    active_pass_row.installation_status,
+    active_pass_row.sync_status,
+    active_pass_row.consent_version,
+    active_pass_row.consented_at,
+    active_pass_row.current_revision,
+    active_pass_row.current_snapshot_hash,
+    active_pass_row.current_snapshot,
+    active_pass_row.issued_at,
+    active_pass_row.revoked_at,
+    active_pass_row.last_sync_attempted_at,
+    active_pass_row.last_synced_at,
+    active_pass_row.last_sync_error_code,
+    active_pass_row.last_sync_error_at,
+    active_pass_row.created_at,
+    active_pass_row.updated_at,
+    created_pass,
+    created_revision,
+    inserted_count > 0;
+end;
+$$;
+
+create or replace function public.revoke_member_wallet_pass(
+  p_member_id uuid,
+  p_platform text,
+  p_idempotency_key text,
+  p_request_fingerprint text,
+  p_reason text
+)
+returns table (
+  pass_id uuid,
+  member_id uuid,
+  platform text,
+  public_id text,
+  serial_number text,
+  credential_status text,
+  installation_status text,
+  sync_status text,
+  consent_version integer,
+  consented_at timestamp with time zone,
+  current_revision integer,
+  current_snapshot_hash text,
+  current_snapshot jsonb,
+  issued_at timestamp with time zone,
+  revoked_at timestamp with time zone,
+  last_sync_attempted_at timestamp with time zone,
+  last_synced_at timestamp with time zone,
+  last_sync_error_code text,
+  last_sync_error_at timestamp with time zone,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  already_revoked boolean,
+  operation_created boolean
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  member_row public.members%rowtype;
+  pass_row public.member_wallet_passes%rowtype;
+  operation_row public.member_wallet_pass_operations%rowtype;
+  normalized_platform text := trim(coalesce(p_platform, ''));
+  normalized_idempotency_key text := trim(coalesce(p_idempotency_key, ''));
+  normalized_request_fingerprint text := trim(coalesce(p_request_fingerprint, ''));
+  normalized_reason text := trim(coalesce(p_reason, ''));
+  inserted_count integer := 0;
+  was_already_revoked boolean := false;
+begin
+  if normalized_platform <> 'apple' then
+    raise exception 'member_wallet_pass_platform_invalid';
+  end if;
+  if p_member_id is null then
+    raise exception 'member_wallet_pass_member_required';
+  end if;
+  if char_length(normalized_idempotency_key) < 16 or char_length(normalized_idempotency_key) > 128 then
+    raise exception 'member_wallet_pass_idempotency_key_invalid';
+  end if;
+  if char_length(normalized_request_fingerprint) < 16 or char_length(normalized_request_fingerprint) > 256 then
+    raise exception 'member_wallet_pass_request_fingerprint_invalid';
+  end if;
+  if normalized_reason = '' then
+    raise exception 'member_wallet_pass_revoke_reason_invalid';
+  end if;
+
+  select * into operation_row
+  from public.member_wallet_pass_operations as operations
+  where operations.idempotency_key = normalized_idempotency_key
+  for update;
+  if found then
+    if operation_row.operation <> 'revoke'
+       or operation_row.member_id <> p_member_id
+       or operation_row.platform <> normalized_platform
+       or operation_row.request_fingerprint <> normalized_request_fingerprint then
+      raise exception 'member_wallet_pass_idempotency_conflict';
+    end if;
+
+    select * into pass_row
+    from public.member_wallet_passes as passes
+    where passes.id = operation_row.result_pass_id;
+    if not found then
+      raise exception 'member_wallet_pass_operation_result_missing';
+    end if;
+
+    return query
+    select
+      pass_row.id,
+      pass_row.member_id,
+      pass_row.platform,
+      pass_row.public_id,
+      pass_row.serial_number,
+      pass_row.credential_status,
+      pass_row.installation_status,
+      pass_row.sync_status,
+      pass_row.consent_version,
+      pass_row.consented_at,
+      pass_row.current_revision,
+      pass_row.current_snapshot_hash,
+      pass_row.current_snapshot,
+      pass_row.issued_at,
+      pass_row.revoked_at,
+      pass_row.last_sync_attempted_at,
+      pass_row.last_synced_at,
+      pass_row.last_sync_error_code,
+      pass_row.last_sync_error_at,
+      pass_row.created_at,
+      pass_row.updated_at,
+      pass_row.credential_status = 'revoked',
+      false;
+    return;
+  end if;
+
+  select * into member_row
+  from public.members as member
+  where member.id = p_member_id
+    and member.deleted_at is null
+  for update;
+  if not found then
+    raise exception 'member_wallet_pass_member_not_found';
+  end if;
+
+  select * into pass_row
+  from public.member_wallet_passes as passes
+  where passes.member_id = p_member_id
+    and passes.platform = normalized_platform
+  order by
+    case when passes.credential_status = 'active' then 0 else 1 end,
+    passes.created_at desc
+  limit 1
+  for update;
+  if not found then
+    raise exception 'member_wallet_pass_not_found';
+  end if;
+
+  if pass_row.credential_status = 'revoked' then
+    was_already_revoked := true;
+  else
+    update public.member_wallet_passes as passes
+    set credential_status = 'revoked',
+        sync_status = 'pending',
+        revoked_at = now(),
+        last_sync_error_code = null,
+        last_sync_error_at = null,
+        updated_at = now()
+    where passes.id = pass_row.id
+    returning * into pass_row;
+  end if;
+
+  insert into public.member_wallet_pass_operations (
+    operation,
+    idempotency_key,
+    request_fingerprint,
+    member_id,
+    platform,
+    result_pass_id,
+    result_revision,
+    result_status
+  ) values (
+    'revoke',
+    normalized_idempotency_key,
+    normalized_request_fingerprint,
+    p_member_id,
+    normalized_platform,
+    pass_row.id,
+    pass_row.current_revision,
+    pass_row.credential_status
+  ) on conflict (idempotency_key) do nothing;
+  get diagnostics inserted_count = row_count;
+
+  select * into operation_row
+  from public.member_wallet_pass_operations as operations
+  where operations.idempotency_key = normalized_idempotency_key
+  for update;
+  if not found then
+    raise exception 'member_wallet_pass_operation_record_failed';
+  end if;
+  if operation_row.operation <> 'revoke'
+     or operation_row.member_id <> p_member_id
+     or operation_row.platform <> normalized_platform
+     or operation_row.request_fingerprint <> normalized_request_fingerprint
+     or operation_row.result_pass_id <> pass_row.id then
+    raise exception 'member_wallet_pass_idempotency_conflict';
+  end if;
+
+  return query
+  select
+    pass_row.id,
+    pass_row.member_id,
+    pass_row.platform,
+    pass_row.public_id,
+    pass_row.serial_number,
+    pass_row.credential_status,
+    pass_row.installation_status,
+    pass_row.sync_status,
+    pass_row.consent_version,
+    pass_row.consented_at,
+    pass_row.current_revision,
+    pass_row.current_snapshot_hash,
+    pass_row.current_snapshot,
+    pass_row.issued_at,
+    pass_row.revoked_at,
+    pass_row.last_sync_attempted_at,
+    pass_row.last_synced_at,
+    pass_row.last_sync_error_code,
+    pass_row.last_sync_error_at,
+    pass_row.created_at,
+    pass_row.updated_at,
+    was_already_revoked,
+    inserted_count > 0;
+end;
+$$;
+
+create or replace function public.reconcile_member_wallet_pass_content(
+  p_pass_id uuid,
+  p_action text,
+  p_snapshot_hash text default null,
+  p_snapshot jsonb default null,
+  p_changed_at timestamp with time zone default null
+)
+returns table (
+  pass_id uuid,
+  member_id uuid,
+  platform text,
+  public_id text,
+  serial_number text,
+  credential_status text,
+  installation_status text,
+  sync_status text,
+  consent_version integer,
+  consented_at timestamp with time zone,
+  current_revision integer,
+  current_snapshot_hash text,
+  current_snapshot jsonb,
+  issued_at timestamp with time zone,
+  revoked_at timestamp with time zone,
+  last_sync_attempted_at timestamp with time zone,
+  last_synced_at timestamp with time zone,
+  last_sync_error_code text,
+  last_sync_error_at timestamp with time zone,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  pass_row public.member_wallet_passes%rowtype;
+  normalized_action text := trim(coalesce(p_action, ''));
+  normalized_snapshot_hash text := trim(coalesce(p_snapshot_hash, ''));
+  changed_at timestamp with time zone := coalesce(p_changed_at, now());
+  next_revision integer;
+begin
+  if p_pass_id is null then
+    raise exception 'member_wallet_pass_id_required';
+  end if;
+  if normalized_action not in ('refresh', 'invalidate') then
+    raise exception 'member_wallet_pass_reconcile_action_invalid';
+  end if;
+  if normalized_action = 'refresh' then
+    if normalized_snapshot_hash = '' then
+      raise exception 'member_wallet_pass_snapshot_hash_invalid';
+    end if;
+    if p_snapshot is null
+       or jsonb_typeof(p_snapshot) <> 'object'
+       or not (p_snapshot ?& array['displayName', 'generationLabel', 'campusLabel', 'roleLabel'])
+       or p_snapshot - 'displayName' - 'generationLabel' - 'campusLabel' - 'roleLabel' <> '{}'::jsonb
+       or jsonb_typeof(p_snapshot -> 'displayName') <> 'string'
+       or jsonb_typeof(p_snapshot -> 'generationLabel') <> 'string'
+       or jsonb_typeof(p_snapshot -> 'campusLabel') <> 'string'
+       or jsonb_typeof(p_snapshot -> 'roleLabel') <> 'string' then
+      raise exception 'member_wallet_pass_snapshot_invalid';
+    end if;
+  end if;
+
+  select * into pass_row
+  from public.member_wallet_passes as passes
+  where passes.id = p_pass_id
+    and passes.platform = 'apple'
+    and passes.credential_status = 'active'
+  for update;
+  if not found then
+    raise exception 'member_wallet_pass_not_found';
+  end if;
+
+  if normalized_action = 'invalidate' then
+    update public.member_wallet_passes as passes
+    set credential_status = 'revoked',
+        sync_status = 'pending',
+        revoked_at = changed_at,
+        last_sync_error_code = null,
+        last_sync_error_at = null,
+        updated_at = changed_at
+    where passes.id = pass_row.id
+    returning * into pass_row;
+  elsif pass_row.current_snapshot_hash <> normalized_snapshot_hash
+     or pass_row.current_snapshot <> p_snapshot then
+    next_revision := pass_row.current_revision + 1;
+    update public.member_wallet_passes as passes
+    set current_revision = next_revision,
+        current_snapshot_hash = normalized_snapshot_hash,
+        current_snapshot = p_snapshot,
+        issued_at = changed_at,
+        sync_status = 'pending',
+        last_sync_error_code = null,
+        last_sync_error_at = null,
+        updated_at = changed_at
+    where passes.id = pass_row.id
+    returning * into pass_row;
+
+    insert into public.member_wallet_pass_revisions (
+      pass_id,
+      revision,
+      snapshot_hash,
+      snapshot,
+      consent_version,
+      consented_at,
+      issued_at,
+      created_at
+    ) values (
+      pass_row.id,
+      next_revision,
+      normalized_snapshot_hash,
+      p_snapshot,
+      pass_row.consent_version,
+      pass_row.consented_at,
+      changed_at,
+      changed_at
+    );
+  end if;
+
+  return query
+  select
+    pass_row.id,
+    pass_row.member_id,
+    pass_row.platform,
+    pass_row.public_id,
+    pass_row.serial_number,
+    pass_row.credential_status,
+    pass_row.installation_status,
+    pass_row.sync_status,
+    pass_row.consent_version,
+    pass_row.consented_at,
+    pass_row.current_revision,
+    pass_row.current_snapshot_hash,
+    pass_row.current_snapshot,
+    pass_row.issued_at,
+    pass_row.revoked_at,
+    pass_row.last_sync_attempted_at,
+    pass_row.last_synced_at,
+    pass_row.last_sync_error_code,
+    pass_row.last_sync_error_at,
+    pass_row.created_at,
+    pass_row.updated_at;
+end;
+$$;
+
+
+create or replace function public.register_apple_wallet_device(
+  p_public_id text,
+  p_device_library_identifier_hash text,
+  p_push_token_ciphertext text,
+  p_push_token_iv text,
+  p_push_token_auth_tag text,
+  p_push_token_key_version integer
+)
+returns table (
+  pass_id uuid,
+  member_id uuid,
+  platform text,
+  public_id text,
+  serial_number text,
+  credential_status text,
+  installation_status text,
+  sync_status text,
+  consent_version integer,
+  consented_at timestamp with time zone,
+  current_revision integer,
+  current_snapshot_hash text,
+  current_snapshot jsonb,
+  issued_at timestamp with time zone,
+  revoked_at timestamp with time zone,
+  last_sync_attempted_at timestamp with time zone,
+  last_synced_at timestamp with time zone,
+  last_sync_error_code text,
+  last_sync_error_at timestamp with time zone,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  registration_id uuid,
+  device_library_identifier_hash text,
+  push_token_ciphertext text,
+  push_token_iv text,
+  push_token_auth_tag text,
+  push_token_key_version integer,
+  last_registered_at timestamp with time zone,
+  removed_at timestamp with time zone,
+  registration_created_at timestamp with time zone,
+  registration_updated_at timestamp with time zone,
+  is_new_registration boolean
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  pass_row public.member_wallet_passes%rowtype;
+  registration_row public.apple_wallet_device_registrations%rowtype;
+  normalized_public_id text := trim(coalesce(p_public_id, ''));
+  normalized_device_hash text := trim(coalesce(p_device_library_identifier_hash, ''));
+  normalized_push_token_ciphertext text := trim(coalesce(p_push_token_ciphertext, ''));
+  normalized_push_token_iv text := trim(coalesce(p_push_token_iv, ''));
+  normalized_push_token_auth_tag text := trim(coalesce(p_push_token_auth_tag, ''));
+  inserted_registration_count integer := 0;
+begin
+  if normalized_public_id = '' then
+    raise exception 'apple_wallet_device_public_id_invalid';
+  end if;
+  if char_length(normalized_device_hash) < 16 then
+    raise exception 'apple_wallet_device_identifier_invalid';
+  end if;
+  if normalized_push_token_ciphertext = '' or normalized_push_token_iv = '' or normalized_push_token_auth_tag = '' then
+    raise exception 'apple_wallet_device_push_token_invalid';
+  end if;
+  if p_push_token_key_version is null or p_push_token_key_version < 1 then
+    raise exception 'apple_wallet_device_push_token_key_version_invalid';
+  end if;
+
+  select * into pass_row
+  from public.member_wallet_passes as passes
+  where passes.public_id = normalized_public_id
+    and passes.platform = 'apple'
+  for update;
+  if not found then
+    raise exception 'member_wallet_pass_not_found';
+  end if;
+  if pass_row.credential_status <> 'active' then
+    raise exception 'member_wallet_pass_revoked';
+  end if;
+
+  insert into public.apple_wallet_device_registrations (
+    pass_id,
+    device_library_identifier_hash,
+    push_token_ciphertext,
+    push_token_iv,
+    push_token_auth_tag,
+    push_token_key_version,
+    last_registered_at,
+    removed_at
+  ) values (
+    pass_row.id,
+    normalized_device_hash,
+    normalized_push_token_ciphertext,
+    normalized_push_token_iv,
+    normalized_push_token_auth_tag,
+    p_push_token_key_version,
+    now(),
+    null
+  ) on conflict on constraint apple_wallet_device_registrations_pass_device_key do nothing
+  returning * into registration_row;
+  get diagnostics inserted_registration_count = row_count;
+
+  if inserted_registration_count = 0 then
+    update public.apple_wallet_device_registrations as registrations
+    set push_token_ciphertext = normalized_push_token_ciphertext,
+        push_token_iv = normalized_push_token_iv,
+        push_token_auth_tag = normalized_push_token_auth_tag,
+        push_token_key_version = p_push_token_key_version,
+        last_registered_at = now(),
+        removed_at = null,
+        updated_at = now()
+    where registrations.pass_id = pass_row.id
+      and registrations.device_library_identifier_hash = normalized_device_hash
+    returning * into registration_row;
+    if not found then
+      raise exception 'apple_wallet_device_registration_failed';
+    end if;
+  end if;
+
+  update public.member_wallet_passes as passes
+  set installation_status = 'installed',
+      updated_at = now()
+  where passes.id = pass_row.id
+  returning * into pass_row;
+
+  return query
+  select
+    pass_row.id,
+    pass_row.member_id,
+    pass_row.platform,
+    pass_row.public_id,
+    pass_row.serial_number,
+    pass_row.credential_status,
+    pass_row.installation_status,
+    pass_row.sync_status,
+    pass_row.consent_version,
+    pass_row.consented_at,
+    pass_row.current_revision,
+    pass_row.current_snapshot_hash,
+    pass_row.current_snapshot,
+    pass_row.issued_at,
+    pass_row.revoked_at,
+    pass_row.last_sync_attempted_at,
+    pass_row.last_synced_at,
+    pass_row.last_sync_error_code,
+    pass_row.last_sync_error_at,
+    pass_row.created_at,
+    pass_row.updated_at,
+    registration_row.id,
+    registration_row.device_library_identifier_hash,
+    registration_row.push_token_ciphertext,
+    registration_row.push_token_iv,
+    registration_row.push_token_auth_tag,
+    registration_row.push_token_key_version,
+    registration_row.last_registered_at,
+    registration_row.removed_at,
+    registration_row.created_at,
+    registration_row.updated_at,
+    inserted_registration_count > 0;
+end;
+$$;
+
+create or replace function public.unregister_apple_wallet_device(
+  p_public_id text,
+  p_device_library_identifier_hash text
+)
+returns table (
+  pass_id uuid,
+  member_id uuid,
+  platform text,
+  public_id text,
+  serial_number text,
+  credential_status text,
+  installation_status text,
+  sync_status text,
+  consent_version integer,
+  consented_at timestamp with time zone,
+  current_revision integer,
+  current_snapshot_hash text,
+  current_snapshot jsonb,
+  issued_at timestamp with time zone,
+  revoked_at timestamp with time zone,
+  last_sync_attempted_at timestamp with time zone,
+  last_synced_at timestamp with time zone,
+  last_sync_error_code text,
+  last_sync_error_at timestamp with time zone,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  removed boolean
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  pass_row public.member_wallet_passes%rowtype;
+  active_registration_count bigint := 0;
+  removed_registration_count bigint := 0;
+  normalized_public_id text := trim(coalesce(p_public_id, ''));
+  normalized_device_hash text := trim(coalesce(p_device_library_identifier_hash, ''));
+begin
+  if normalized_public_id = '' then
+    raise exception 'apple_wallet_device_public_id_invalid';
+  end if;
+  if char_length(normalized_device_hash) < 16 then
+    raise exception 'apple_wallet_device_identifier_invalid';
+  end if;
+
+  select * into pass_row
+  from public.member_wallet_passes as passes
+  where passes.public_id = normalized_public_id
+    and passes.platform = 'apple'
+  for update;
+  if not found then
+    raise exception 'member_wallet_pass_not_found';
+  end if;
+
+  update public.apple_wallet_device_registrations as registrations
+  set removed_at = now(),
+      updated_at = now()
+  where registrations.pass_id = pass_row.id
+    and registrations.device_library_identifier_hash = normalized_device_hash
+    and registrations.removed_at is null;
+  get diagnostics removed_registration_count = row_count;
+
+  select count(*)::bigint into active_registration_count
+  from public.apple_wallet_device_registrations as registrations
+  where registrations.pass_id = pass_row.id
+    and registrations.removed_at is null;
+
+  update public.member_wallet_passes as passes
+  set installation_status = case
+        when active_registration_count > 0 then 'installed'
+        else 'removed'
+      end,
+      updated_at = now()
+  where passes.id = pass_row.id
+  returning * into pass_row;
+
+  return query
+  select
+    pass_row.id,
+    pass_row.member_id,
+    pass_row.platform,
+    pass_row.public_id,
+    pass_row.serial_number,
+    pass_row.credential_status,
+    pass_row.installation_status,
+    pass_row.sync_status,
+    pass_row.consent_version,
+    pass_row.consented_at,
+    pass_row.current_revision,
+    pass_row.current_snapshot_hash,
+    pass_row.current_snapshot,
+    pass_row.issued_at,
+    pass_row.revoked_at,
+    pass_row.last_sync_attempted_at,
+    pass_row.last_synced_at,
+    pass_row.last_sync_error_code,
+    pass_row.last_sync_error_at,
+    pass_row.created_at,
+    pass_row.updated_at,
+    removed_registration_count > 0;
+end;
+$$;
+
+create or replace function public.list_updated_apple_wallet_passes(
+  p_device_library_identifier_hash text,
+  p_updated_since timestamp with time zone default null,
+  p_limit integer default 100
+)
+returns table (
+  pass_id uuid,
+  member_id uuid,
+  platform text,
+  public_id text,
+  serial_number text,
+  credential_status text,
+  installation_status text,
+  sync_status text,
+  consent_version integer,
+  consented_at timestamp with time zone,
+  current_revision integer,
+  current_snapshot_hash text,
+  current_snapshot jsonb,
+  issued_at timestamp with time zone,
+  revoked_at timestamp with time zone,
+  last_sync_attempted_at timestamp with time zone,
+  last_synced_at timestamp with time zone,
+  last_sync_error_code text,
+  last_sync_error_at timestamp with time zone,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    pass.id,
+    pass.member_id,
+    pass.platform,
+    pass.public_id,
+    pass.serial_number,
+    pass.credential_status,
+    pass.installation_status,
+    pass.sync_status,
+    pass.consent_version,
+    pass.consented_at,
+    pass.current_revision,
+    pass.current_snapshot_hash,
+    pass.current_snapshot,
+    pass.issued_at,
+    pass.revoked_at,
+    pass.last_sync_attempted_at,
+    pass.last_synced_at,
+    pass.last_sync_error_code,
+    pass.last_sync_error_at,
+    pass.created_at,
+    pass.updated_at
+  from public.member_wallet_passes as pass
+  join public.apple_wallet_device_registrations as registration
+    on registration.pass_id = pass.id
+   and registration.removed_at is null
+   and registration.device_library_identifier_hash = trim(coalesce(p_device_library_identifier_hash, ''))
+  where pass.platform = 'apple'
+    and trim(coalesce(p_device_library_identifier_hash, '')) <> ''
+    and pass.updated_at > coalesce(p_updated_since, to_timestamp(0))
+  order by pass.updated_at asc, pass.id asc
+  limit greatest(coalesce(p_limit, 100), 1);
+$$;
+
+alter table public.member_wallet_passes enable row level security;
+alter table public.member_wallet_pass_revisions enable row level security;
+alter table public.apple_wallet_device_registrations enable row level security;
+alter table public.member_wallet_pass_operations enable row level security;
+
+revoke all on table public.member_wallet_passes from anon;
+revoke all on table public.member_wallet_passes from authenticated;
+revoke all on table public.member_wallet_passes from service_role;
+revoke all on table public.member_wallet_pass_revisions from anon;
+revoke all on table public.member_wallet_pass_revisions from authenticated;
+revoke all on table public.member_wallet_pass_revisions from service_role;
+revoke all on table public.apple_wallet_device_registrations from anon;
+revoke all on table public.apple_wallet_device_registrations from authenticated;
+revoke all on table public.apple_wallet_device_registrations from service_role;
+revoke all on table public.member_wallet_pass_operations from anon;
+revoke all on table public.member_wallet_pass_operations from authenticated;
+revoke all on table public.member_wallet_pass_operations from service_role;
+
+grant select, update on table public.member_wallet_passes to service_role;
+grant select on table public.member_wallet_pass_revisions to service_role;
+grant select on table public.apple_wallet_device_registrations to service_role;
+
+revoke all on function public.issue_member_wallet_pass(uuid, text, integer, timestamp with time zone, text, jsonb, text, text) from public;
+revoke all on function public.issue_member_wallet_pass(uuid, text, integer, timestamp with time zone, text, jsonb, text, text) from anon;
+revoke all on function public.issue_member_wallet_pass(uuid, text, integer, timestamp with time zone, text, jsonb, text, text) from authenticated;
+grant execute on function public.issue_member_wallet_pass(uuid, text, integer, timestamp with time zone, text, jsonb, text, text) to service_role;
+
+revoke all on function public.revoke_member_wallet_pass(uuid, text, text, text, text) from public;
+revoke all on function public.revoke_member_wallet_pass(uuid, text, text, text, text) from anon;
+revoke all on function public.revoke_member_wallet_pass(uuid, text, text, text, text) from authenticated;
+grant execute on function public.revoke_member_wallet_pass(uuid, text, text, text, text) to service_role;
+
+revoke all on function public.reconcile_member_wallet_pass_content(uuid, text, text, jsonb, timestamp with time zone) from public;
+revoke all on function public.reconcile_member_wallet_pass_content(uuid, text, text, jsonb, timestamp with time zone) from anon;
+revoke all on function public.reconcile_member_wallet_pass_content(uuid, text, text, jsonb, timestamp with time zone) from authenticated;
+grant execute on function public.reconcile_member_wallet_pass_content(uuid, text, text, jsonb, timestamp with time zone) to service_role;
+
+
+revoke all on function public.register_apple_wallet_device(text, text, text, text, text, integer) from public;
+revoke all on function public.register_apple_wallet_device(text, text, text, text, text, integer) from anon;
+revoke all on function public.register_apple_wallet_device(text, text, text, text, text, integer) from authenticated;
+grant execute on function public.register_apple_wallet_device(text, text, text, text, text, integer) to service_role;
+
+revoke all on function public.unregister_apple_wallet_device(text, text) from public;
+revoke all on function public.unregister_apple_wallet_device(text, text) from anon;
+revoke all on function public.unregister_apple_wallet_device(text, text) from authenticated;
+grant execute on function public.unregister_apple_wallet_device(text, text) to service_role;
+
+revoke all on function public.list_updated_apple_wallet_passes(text, timestamp with time zone, integer) from public;
+revoke all on function public.list_updated_apple_wallet_passes(text, timestamp with time zone, integer) from anon;
+revoke all on function public.list_updated_apple_wallet_passes(text, timestamp with time zone, integer) from authenticated;
+grant execute on function public.list_updated_apple_wallet_passes(text, timestamp with time zone, integer) to service_role;
+
+create or replace function public.get_admin_task_inbox_counts(
+  input_admin_id uuid,
+  input_managed_campus_slugs text[] default null,
+  input_include_brand_queues boolean default false,
+  input_include_graduate_verifications boolean default false,
+  input_include_signup_requests boolean default false,
+  input_include_profile_photos boolean default false,
+  input_include_notifications boolean default false
+)
+returns table (
+  registration_pending_count bigint,
+  change_request_pending_count bigint,
+  graduate_verification_pending_count bigint,
+  signup_request_pending_count bigint,
+  profile_photo_pending_count bigint,
+  unread_notification_count bigint
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  with scope as (
+    select
+      input_managed_campus_slugs is null as is_global,
+      coalesce(input_managed_campus_slugs, '{}'::text[]) as managed_campus_slugs
+  )
+  select
+    case when input_include_brand_queues then (
+      select count(*)::bigint
+      from public.partner_registration_requests as request
+      left join public.partner_companies as company on company.id = request.company_id
+      where request.status in ('pending', 'in_review')
+        and (
+          scope.is_global
+          or (
+            company.id is not null
+            and company.managed_campus_slugs && scope.managed_campus_slugs
+          )
+          or (
+            company.id is null
+            and request.location ~ '(전국|전\s*지점|전체\s*지점|모든\s*지점|전\s*매장|전체\s*매장|모든\s*매장|서울|강남|역삼|역삼역|선릉|테헤란|봉은사|논현|구미|경북|경상북도|대전|유성|둔산|부산|울산|경남|창원|김해|양산|해운대|서면|광주|전남)'
+            and public.infer_partner_campus_slugs(request.location) && scope.managed_campus_slugs
+          )
+        )
+    ) else null end,
+    case when input_include_brand_queues then (
+      select count(*)::bigint
+      from public.partner_change_requests as request
+      join public.partners as partner on partner.id = request.partner_id
+      where request.status = 'pending'
+        and (scope.is_global or partner.managed_campus_slugs && scope.managed_campus_slugs)
+    ) else null end,
+    case when input_include_graduate_verifications then (
+      select count(*)::bigint
+      from public.graduate_verification_requests
+      where status in ('submitted', 'in_review')
+    ) else null end,
+    case when input_include_signup_requests then (
+      select count(*)::bigint
+      from public.member_signup_approval_requests
+      where status = 'pending'
+    ) else null end,
+    case when input_include_profile_photos then (
+      select count(*)::bigint
+      from public.member_profile_images
+      where graduate_verification_request_id is null
+        and member_id is not null
+        and status = 'pending'
+    ) else null end,
+    case when input_include_notifications then (
+      select count(*)::bigint
+      from public.admin_notification_recipients
+      where admin_id = input_admin_id
+        and deleted_at is null
+        and read_at is null
+    ) else null end
+  from scope;
+$$;
+
+revoke all on function public.get_admin_task_inbox_counts(uuid, text[], boolean, boolean, boolean, boolean, boolean) from public;
+revoke all on function public.get_admin_task_inbox_counts(uuid, text[], boolean, boolean, boolean, boolean, boolean) from anon;
+revoke all on function public.get_admin_task_inbox_counts(uuid, text[], boolean, boolean, boolean, boolean, boolean) from authenticated;
+grant execute on function public.get_admin_task_inbox_counts(uuid, text[], boolean, boolean, boolean, boolean, boolean) to service_role;
+
 -- 20260723080416_sync_partner_benefit_cache.sql snapshot
 create or replace function public.bump_partner_benefits_public_cache_version()
 returns trigger
@@ -1635,6 +3325,17 @@ create index if not exists partner_benefits_partner_order_idx on public.partner_
 alter table public.partner_benefit_usages add column if not exists benefit_id uuid references public.partner_benefits(id) on delete set null;
 create index if not exists partner_benefit_usages_benefit_verified_at_idx on public.partner_benefit_usages(benefit_id, verified_at desc);
 alter table public.partner_registration_requests add column if not exists benefit_items jsonb not null default '[]'::jsonb;
+alter table public.partner_registration_requests add column if not exists benefit_verification_pin_hash text;
+alter table public.partner_registration_requests add column if not exists benefit_verification_pin_salt text;
+alter table public.partner_registration_requests drop constraint if exists partner_registration_requests_benefit_verification_pin_check;
+alter table public.partner_registration_requests add constraint partner_registration_requests_benefit_verification_pin_check
+  check (
+    (benefit_verification_pin_hash is null and benefit_verification_pin_salt is null)
+    or (
+      char_length(benefit_verification_pin_hash) > 0
+      and char_length(benefit_verification_pin_salt) > 0
+    )
+  );
 
 insert into public.partner_benefits (partner_id, title, display_order, max_apply_count)
 select p.id, item.title, item.display_order, p.benefit_use_max_count
@@ -1911,6 +3612,7 @@ create table if not exists notifications (
   body text not null,
   target_url text not null,
   metadata jsonb not null default '{}'::jsonb,
+  idempotency_key text unique,
   created_by_member_id uuid references members(id) on delete set null,
   created_at timestamp with time zone default now()
 );
@@ -2949,6 +4651,183 @@ revoke all on function public.get_admin_platform_activity_metrics() from anon;
 revoke all on function public.get_admin_platform_activity_metrics() from authenticated;
 grant execute on function public.get_admin_platform_activity_metrics() to service_role;
 
+create or replace function public.get_admin_web_vitals_summary(
+  input_start timestamp with time zone,
+  input_end timestamp with time zone
+)
+returns table (
+  metric text,
+  sample_count bigint,
+  p75_value double precision,
+  good_count bigint,
+  needs_improvement_count bigint,
+  poor_count bigint
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  select
+    event_log.properties ->> 'metric' as metric,
+    count(*)::bigint as sample_count,
+    percentile_cont(0.75) within group (
+      order by (event_log.properties ->> 'value')::double precision
+    )::double precision as p75_value,
+    count(*) filter (where event_log.properties ->> 'rating' = 'good')::bigint as good_count,
+    count(*) filter (
+      where event_log.properties ->> 'rating' = 'needs-improvement'
+    )::bigint as needs_improvement_count,
+    count(*) filter (where event_log.properties ->> 'rating' = 'poor')::bigint as poor_count
+  from public.event_logs as event_log
+  where event_log.event_name = 'admin_web_vital'
+    and event_log.created_at >= input_start
+    and event_log.created_at <= input_end
+    and event_log.properties ->> 'metric' in ('INP', 'LCP', 'TTFB')
+    and event_log.properties ->> 'value' ~ '^[0-9]+(?:\.[0-9]+)?$'
+  group by event_log.properties ->> 'metric';
+$$;
+
+revoke all on function public.get_admin_web_vitals_summary(timestamp with time zone, timestamp with time zone) from public;
+revoke all on function public.get_admin_web_vitals_summary(timestamp with time zone, timestamp with time zone) from anon;
+revoke all on function public.get_admin_web_vitals_summary(timestamp with time zone, timestamp with time zone) from authenticated;
+grant execute on function public.get_admin_web_vitals_summary(timestamp with time zone, timestamp with time zone) to service_role;
+
+create or replace function public.get_admin_route_timing_summary(
+  input_start timestamp with time zone,
+  input_end timestamp with time zone
+)
+returns table (
+  route_key text,
+  sample_count bigint,
+  p75_duration_ms double precision,
+  complete_count bigint,
+  unknown_count bigint,
+  error_count bigint
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  select
+    event_log.target_id as route_key,
+    count(*)::bigint as sample_count,
+    percentile_cont(0.75) within group (
+      order by (event_log.properties ->> 'durationMs')::double precision
+    )::double precision as p75_duration_ms,
+    count(*) filter (where event_log.properties ->> 'outcome' = 'complete')::bigint as complete_count,
+    count(*) filter (where event_log.properties ->> 'outcome' = 'unknown')::bigint as unknown_count,
+    count(*) filter (where event_log.properties ->> 'outcome' = 'error')::bigint as error_count
+  from public.event_logs as event_log
+  where event_log.event_name = 'admin_route_timing'
+    and event_log.target_type = 'admin_performance'
+    and event_log.target_id is not null
+    and event_log.created_at >= input_start
+    and event_log.created_at <= input_end
+    and event_log.properties ->> 'durationMs' ~ '^[0-9]+$'
+  group by event_log.target_id
+  order by p75_duration_ms desc nulls last;
+$$;
+
+revoke all on function public.get_admin_route_timing_summary(timestamp with time zone, timestamp with time zone) from public;
+revoke all on function public.get_admin_route_timing_summary(timestamp with time zone, timestamp with time zone) from anon;
+revoke all on function public.get_admin_route_timing_summary(timestamp with time zone, timestamp with time zone) from authenticated;
+grant execute on function public.get_admin_route_timing_summary(timestamp with time zone, timestamp with time zone) to service_role;
+
+create or replace function public.get_admin_prefetch_summary(
+  input_start timestamp with time zone,
+  input_end timestamp with time zone
+)
+returns table (
+  route_key text,
+  requested_count bigint,
+  used_count bigint,
+  utilization_rate numeric
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  select
+    event_log.target_id as route_key,
+    count(*) filter (where event_log.properties ->> 'stage' = 'requested')::bigint,
+    count(*) filter (where event_log.properties ->> 'stage' = 'used')::bigint,
+    (
+      count(*) filter (where event_log.properties ->> 'stage' = 'used')::numeric
+      / nullif(count(*) filter (where event_log.properties ->> 'stage' = 'requested'), 0)::numeric
+      * 100
+    ) as utilization_rate
+  from public.event_logs as event_log
+  where event_log.event_name = 'admin_prefetch'
+    and event_log.target_type = 'admin_performance'
+    and event_log.target_id ~ '^admin\.[a-z0-9._:-]+$'
+    and event_log.created_at >= input_start
+    and event_log.created_at <= input_end
+    and event_log.properties ->> 'stage' in ('requested', 'used')
+  group by event_log.target_id
+  order by utilization_rate asc nulls last;
+$$;
+
+create or replace function public.get_admin_prefetch_dimension_summary(
+  input_start timestamp with time zone,
+  input_end timestamp with time zone
+)
+returns table (
+  viewport text,
+  route_key text,
+  requested_count bigint,
+  used_count bigint,
+  utilization_rate numeric
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  with dimensioned_events as (
+    select
+      case
+        when event_log.properties ->> 'viewport' in ('mobile', 'tablet', 'desktop')
+          then event_log.properties ->> 'viewport'
+        else 'unknown'
+      end as viewport,
+      event_log.target_id as route_key,
+      event_log.properties ->> 'stage' as stage
+    from public.event_logs as event_log
+    where event_log.event_name = 'admin_prefetch'
+      and event_log.target_type = 'admin_performance'
+      and event_log.target_id ~ '^admin\.[a-z0-9._:-]+$'
+      and event_log.created_at >= input_start
+      and event_log.created_at <= input_end
+      and event_log.properties ->> 'stage' in ('requested', 'used')
+  )
+  select
+    dimensioned_events.viewport,
+    dimensioned_events.route_key,
+    count(*) filter (where dimensioned_events.stage = 'requested')::bigint,
+    count(*) filter (where dimensioned_events.stage = 'used')::bigint,
+    (
+      count(*) filter (where dimensioned_events.stage = 'used')::numeric
+      / nullif(count(*) filter (where dimensioned_events.stage = 'requested'), 0)::numeric
+      * 100
+    ) as utilization_rate
+  from dimensioned_events
+  group by dimensioned_events.viewport, dimensioned_events.route_key
+  order by dimensioned_events.viewport, utilization_rate asc nulls last;
+$$;
+
+revoke all on function public.get_admin_prefetch_summary(timestamp with time zone, timestamp with time zone) from public;
+revoke all on function public.get_admin_prefetch_summary(timestamp with time zone, timestamp with time zone) from anon;
+revoke all on function public.get_admin_prefetch_summary(timestamp with time zone, timestamp with time zone) from authenticated;
+grant execute on function public.get_admin_prefetch_summary(timestamp with time zone, timestamp with time zone) to service_role;
+
+revoke all on function public.get_admin_prefetch_dimension_summary(timestamp with time zone, timestamp with time zone) from public;
+revoke all on function public.get_admin_prefetch_dimension_summary(timestamp with time zone, timestamp with time zone) from anon;
+revoke all on function public.get_admin_prefetch_dimension_summary(timestamp with time zone, timestamp with time zone) from authenticated;
+grant execute on function public.get_admin_prefetch_dimension_summary(timestamp with time zone, timestamp with time zone) to service_role;
+
 revoke all on function public.get_partner_engagement_counts(uuid[]) from public;
 revoke all on function public.get_partner_engagement_counts(uuid[]) from anon;
 revoke all on function public.get_partner_engagement_counts(uuid[]) from authenticated;
@@ -3418,6 +5297,10 @@ create index if not exists suggestion_attempts_identifier_idx on suggestion_atte
 create index if not exists partner_registration_attempts_identifier_idx on partner_registration_attempts(identifier);
 create index if not exists partner_registration_requests_status_created_idx
   on partner_registration_requests(status, created_at desc);
+create index if not exists partner_registration_requests_status_created_id_idx
+  on partner_registration_requests(status, created_at desc, id desc);
+create index if not exists partner_registration_requests_visibility_created_idx
+  on partner_registration_requests(visibility, created_at desc, id desc);
 create index if not exists partner_registration_requests_category_created_idx
   on partner_registration_requests(category_id, created_at desc);
 create index if not exists partner_registration_requests_source_created_idx
@@ -3576,6 +5459,18 @@ create index if not exists event_logs_created_at_id_idx
 create index if not exists event_logs_event_name_idx on event_logs(event_name);
 create index if not exists event_logs_name_created_at_idx
   on event_logs(event_name, created_at desc);
+create index if not exists event_logs_admin_web_vital_created_at_idx
+  on event_logs(created_at desc)
+  where event_name = 'admin_web_vital';
+create index if not exists event_logs_admin_route_timing_created_at_idx
+  on event_logs(target_id, created_at desc)
+  where event_name = 'admin_route_timing';
+create index if not exists event_logs_admin_prefetch_created_at_idx
+  on event_logs(target_id, created_at desc)
+  where event_name = 'admin_prefetch';
+create index if not exists event_logs_admin_prefetch_viewport_idx
+  on event_logs((coalesce(properties ->> 'viewport', 'unknown')), target_id, created_at desc)
+  where event_name = 'admin_prefetch';
 create index if not exists event_logs_actor_id_idx on event_logs(actor_id);
 create index if not exists event_logs_actor_type_created_at_idx
   on event_logs(actor_type, created_at desc);
@@ -4613,6 +6508,15 @@ create unique index if not exists graduate_verification_requests_active_certific
 create index if not exists graduate_verification_requests_status_created_at_idx
   on public.graduate_verification_requests(status, created_at desc);
 
+create index if not exists graduate_verification_requests_open_queue_created_at_idx
+  on public.graduate_verification_requests(created_at desc, id desc)
+  where status in ('submitted', 'in_review');
+
+create index if not exists graduate_verification_requests_setup_email_retry_idx
+  on public.graduate_verification_requests(setup_email_last_error_at desc, id desc)
+  where status = 'approved'
+    and setup_email_last_error_at is not null;
+
 create table if not exists public.member_profile_images (
   id uuid primary key default uuid_generate_v4(),
   graduate_verification_request_id uuid references public.graduate_verification_requests(id) on delete cascade,
@@ -4774,15 +6678,45 @@ begin
   if old.status = new.status then
     return new;
   end if;
-  if not (
+
+  if (
     (old.status = 'draft' and new.status in ('submitted', 'withdrawn'))
     or (old.status = 'submitted' and new.status in ('in_review', 'withdrawn'))
     or (old.status = 'in_review' and new.status in ('needs_resubmission', 'approved', 'rejected'))
     or (old.status = 'needs_resubmission' and new.status in ('submitted', 'withdrawn'))
   ) then
-    raise exception 'invalid_graduate_verification_status_transition';
+    return new;
   end if;
-  return new;
+
+  if old.status = 'approved'
+    and new.status = 'withdrawn'
+    and old.request_kind = 'existing_member_recovery'
+    and new.request_kind = old.request_kind
+    and new.id = old.id
+    and old.recovery_member_id is not null
+    and new.recovery_member_id is null
+    and exists (
+      select 1
+      from public.members anonymizing_member
+      where anonymizing_member.id = old.recovery_member_id
+        and anonymizing_member.deleted_at is not null
+        and anonymizing_member.deleted_at <= now() - interval '30 days'
+        and anonymizing_member.anonymized_at is null
+    )
+    and new.email = concat('deleted+', new.id::text, '@deleted.invalid')
+    and new.email_normalized = new.email
+    and new.legal_name = '탈퇴한 수료생'
+    and new.document_number_hmac is null
+    and new.certificate_storage_path is null
+    and new.certificate_sha256 is null
+    and new.certificate_deleted_at is not null
+    and new.review_note is null
+    and new.rejection_reason is null
+  then
+    return new;
+  end if;
+
+  raise exception 'invalid_graduate_verification_status_transition';
 end;
 $$;
 drop trigger if exists graduate_verification_requests_status_transition on public.graduate_verification_requests;
@@ -7192,88 +9126,6 @@ begin
 end;
 $$;
 
-create or replace function public.anonymize_deleted_member(p_member_id uuid)
-returns boolean
-language plpgsql
-security invoker
-set search_path = public
-as $$
-declare
-  member_row public.members%rowtype;
-  mattermost_account_uuid uuid;
-  verification_request_uuid uuid;
-begin
-  select * into member_row
-  from public.members
-  where id = p_member_id
-    and deleted_at is not null
-    and deleted_at <= now() - interval '30 days'
-    and anonymized_at is null
-  for update;
-
-  if not found then
-    return false;
-  end if;
-
-  mattermost_account_uuid := member_row.mattermost_account_id;
-  select verification_request_id into verification_request_uuid
-  from public.graduate_profiles
-  where member_id = p_member_id;
-
-  delete from public.member_profile_images where member_id = p_member_id;
-  delete from public.member_ssafy_verifications where member_id = p_member_id;
-  delete from public.member_email_challenges where member_id = p_member_id;
-  delete from public.member_password_action_tokens where member_id = p_member_id;
-  delete from public.graduate_profiles where member_id = p_member_id;
-
-  if verification_request_uuid is not null then
-    update public.graduate_verification_requests
-    set email = concat('deleted+', verification_request_uuid::text, '@deleted.invalid'),
-        email_normalized = concat('deleted+', verification_request_uuid::text, '@deleted.invalid'),
-        legal_name = '탈퇴한 수료생',
-        document_number_hmac = null,
-        certificate_storage_path = null,
-        certificate_sha256 = null,
-        certificate_deleted_at = coalesce(certificate_deleted_at, now()),
-        review_note = null,
-        rejection_reason = null,
-        updated_at = now()
-    where id = verification_request_uuid;
-  end if;
-
-  update public.members
-  set email = null,
-      email_normalized = null,
-      email_verified_at = null,
-      password_hash = null,
-      password_salt = null,
-      must_change_password = false,
-      display_name = '탈퇴한 회원',
-      campus = null,
-      staff_source_generation = null,
-      mattermost_account_id = null,
-      anonymized_at = now(),
-      updated_at = now()
-  where id = p_member_id;
-
-  if mattermost_account_uuid is not null then
-    delete from public.mm_user_directory directory
-    where directory.id = mattermost_account_uuid
-      and not exists (
-        select 1
-        from public.members linked_member
-        where linked_member.mattermost_account_id = directory.id
-      );
-  end if;
-
-  return true;
-end;
-$$;
-
-revoke all on function public.anonymize_deleted_member(uuid) from public;
-revoke all on function public.anonymize_deleted_member(uuid) from anon;
-revoke all on function public.anonymize_deleted_member(uuid) from authenticated;
-grant execute on function public.anonymize_deleted_member(uuid) to service_role;
 
 create or replace function public.approve_graduate_verification(
   p_request_id uuid,
@@ -8251,117 +10103,6 @@ revoke all on function public.soft_delete_member(uuid, jsonb) from public;
 revoke all on function public.soft_delete_member(uuid, jsonb) from anon;
 revoke all on function public.soft_delete_member(uuid, jsonb) from authenticated;
 grant execute on function public.soft_delete_member(uuid, jsonb) to service_role;
-
-create or replace function public.anonymize_deleted_member(p_member_id uuid)
-returns boolean
-language plpgsql
-security invoker
-set search_path = public
-as $$
-declare
-  member_row public.members%rowtype;
-  mattermost_account_uuid uuid;
-  verification_request_uuid uuid;
-begin
-  select * into member_row
-  from public.members
-  where id = p_member_id
-    and deleted_at is not null
-    and deleted_at <= now() - interval '30 days'
-    and anonymized_at is null
-  for update;
-
-  if not found then
-    return false;
-  end if;
-
-  mattermost_account_uuid := member_row.mattermost_account_id;
-  select verification_request_id into verification_request_uuid
-  from public.graduate_profiles
-  where member_id = p_member_id;
-
-  delete from public.member_profile_images where member_id = p_member_id;
-  delete from public.member_ssafy_verifications where member_id = p_member_id;
-  delete from public.member_email_challenges where member_id = p_member_id;
-  delete from public.member_password_action_tokens where member_id = p_member_id;
-  delete from public.member_auth_identities where member_id = p_member_id;
-  delete from public.graduate_profiles where member_id = p_member_id;
-
-  if verification_request_uuid is not null then
-    update public.graduate_verification_requests
-    set email = concat('deleted+', verification_request_uuid::text, '@deleted.invalid'),
-        email_normalized = concat('deleted+', verification_request_uuid::text, '@deleted.invalid'),
-        legal_name = '탈퇴한 수료생',
-        document_number_hmac = null,
-        certificate_storage_path = null,
-        certificate_sha256 = null,
-        certificate_deleted_at = coalesce(certificate_deleted_at, now()),
-        review_note = null,
-        rejection_reason = null,
-        updated_at = now()
-    where id = verification_request_uuid;
-  end if;
-
-  update public.members
-  set email = null,
-      email_normalized = null,
-      email_verified_at = null,
-      manual_login_id = null,
-      password_hash = null,
-      password_salt = null,
-      must_change_password = false,
-      display_name = '탈퇴한 회원',
-      campus = null,
-      staff_source_generation = null,
-      mattermost_account_id = null,
-      mm_user_id = null,
-      mm_username = null,
-      ssafy_sub = null,
-      ssafy_verified_at = null,
-      ssafy_auth_time = null,
-      ssafy_verification_id = null,
-      ssafy_mattermost_user_id = null,
-      ssafy_track = null,
-      ssafy_track_name = null,
-      ssafy_last_scope = null,
-      avatar_content_type = null,
-      avatar_base64 = null,
-      avatar_url = null,
-      graduate_verified_at = null,
-      graduate_completion_stage = null,
-      verification_source = null,
-      admin_permission_id = null,
-      admin_managed_campus_slugs = '{}',
-      service_policy_version = null,
-      service_policy_consented_at = null,
-      privacy_policy_version = null,
-      privacy_policy_consented_at = null,
-      marketing_policy_version = null,
-      marketing_policy_consented_at = null,
-      active_profile_image_id = null,
-      profile_photo_review_status = 'approved',
-      anonymized_at = now(),
-      updated_at = now()
-  where id = p_member_id;
-
-  if mattermost_account_uuid is not null then
-    delete from public.mm_user_directory directory
-    where directory.id = mattermost_account_uuid
-      and not exists (
-        select 1
-        from public.members linked_member
-        where linked_member.mattermost_account_id = directory.id
-      );
-  end if;
-
-  return true;
-end;
-$$;
-
-revoke all on function public.anonymize_deleted_member(uuid) from public;
-revoke all on function public.anonymize_deleted_member(uuid) from anon;
-revoke all on function public.anonymize_deleted_member(uuid) from authenticated;
-grant execute on function public.anonymize_deleted_member(uuid) to service_role;
 
 -- Phase 1 / backfill. Every statement is idempotent so Preview retries are
 -- safe; ambiguous external identities are deliberately left unlinked.
@@ -11616,3 +13357,1352 @@ on conflict (kind, version) do update set
   is_active = excluded.is_active,
   effective_at = excluded.effective_at,
   updated_at = now();
+
+-- 20260813114408_connect_wallet_member_lifecycle.sql
+-- Connect member deletion to Apple Wallet without broadening direct table
+-- privileges. The helper is intentionally narrow so only the service-role
+-- lifecycle path can transition credentials while soft_delete_member keeps
+-- the member row, identifier reservations, and Wallet revocation atomic.
+create or replace function public.revoke_deleted_member_wallet_passes(
+  p_member_id uuid,
+  p_changed_at timestamp with time zone default null
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  member_row public.members%rowtype;
+  lifecycle_changed_at timestamp with time zone := coalesce(p_changed_at, now());
+  revoked_pass_count integer := 0;
+begin
+  if p_member_id is null then
+    raise exception 'member_wallet_lifecycle_member_required';
+  end if;
+
+  select * into member_row
+  from public.members as member
+  where member.id = p_member_id
+    and member.deleted_at is not null
+    and member.anonymized_at is null
+  for update;
+
+  if not found then
+    raise exception 'member_wallet_lifecycle_soft_delete_required';
+  end if;
+
+  update public.member_wallet_passes as passes
+  set credential_status = 'revoked',
+      sync_status = 'pending',
+      revoked_at = coalesce(passes.revoked_at, lifecycle_changed_at),
+      last_sync_error_code = null,
+      last_sync_error_at = null,
+      updated_at = greatest(
+        passes.updated_at + interval '1 microsecond',
+        lifecycle_changed_at,
+        clock_timestamp()
+      )
+  where passes.member_id = p_member_id
+    and passes.platform = 'apple'
+    and passes.credential_status = 'active';
+  get diagnostics revoked_pass_count = row_count;
+
+  return revoked_pass_count;
+end;
+$$;
+
+revoke all on function public.revoke_deleted_member_wallet_passes(uuid, timestamp with time zone) from public;
+revoke all on function public.revoke_deleted_member_wallet_passes(uuid, timestamp with time zone) from anon;
+revoke all on function public.revoke_deleted_member_wallet_passes(uuid, timestamp with time zone) from authenticated;
+grant execute on function public.revoke_deleted_member_wallet_passes(uuid, timestamp with time zone) to service_role;
+
+-- The Wallet operation rows are an idempotency ledger, not the durable audit
+-- source. Once the 30-day member recovery window closes, remove them before
+-- deleting passes; pass deletion then cascades through revisions and encrypted
+-- Apple device registrations. event_logs remain untouched for aggregate audit.
+create or replace function public.purge_deleted_member_wallet_data_for_anonymization(
+  p_member_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  member_row public.members%rowtype;
+begin
+  if p_member_id is null then
+    return false;
+  end if;
+
+  select * into member_row
+  from public.members as member
+  where member.id = p_member_id
+    and member.deleted_at is not null
+    and member.deleted_at <= now() - interval '30 days'
+    and member.anonymized_at is null
+  for update;
+
+  if not found then
+    return false;
+  end if;
+
+  delete from public.member_wallet_pass_operations as operations
+  where operations.member_id = p_member_id;
+
+  delete from public.member_wallet_passes as passes
+  where passes.member_id = p_member_id;
+
+  return true;
+end;
+$$;
+
+revoke all on function public.purge_deleted_member_wallet_data_for_anonymization(uuid) from public;
+revoke all on function public.purge_deleted_member_wallet_data_for_anonymization(uuid) from anon;
+revoke all on function public.purge_deleted_member_wallet_data_for_anonymization(uuid) from authenticated;
+grant execute on function public.purge_deleted_member_wallet_data_for_anonymization(uuid) to service_role;
+
+-- Resolve every private object with database time under the same retention
+-- gate used by anonymize_deleted_member. The lock cannot span the external
+-- Storage calls, so the final anonymization RPC still revalidates the gate.
+create or replace function public.get_deleted_member_anonymization_storage_plan(
+  p_member_id uuid
+)
+returns table (
+  profile_image_paths text[],
+  certificate_paths text[]
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  member_row public.members%rowtype;
+  verification_request_uuid uuid;
+begin
+  if p_member_id is null then
+    return;
+  end if;
+
+  select * into member_row
+  from public.members as member
+  where member.id = p_member_id
+    and member.deleted_at is not null
+    and member.deleted_at <= now() - interval '30 days'
+    and member.anonymized_at is null
+  for update;
+
+  if not found then
+    return;
+  end if;
+
+  select profile.verification_request_id into verification_request_uuid
+  from public.graduate_profiles as profile
+  where profile.member_id = p_member_id;
+
+  return query
+  select
+    coalesce(
+      array(
+        select distinct image.storage_path
+        from public.member_profile_images as image
+        where image.member_id = p_member_id
+        order by image.storage_path
+      ),
+      '{}'::text[]
+    ),
+    coalesce(
+      array(
+        select distinct request.certificate_storage_path
+        from public.graduate_verification_requests as request
+        where request.certificate_storage_path is not null
+          and (
+            request.id = verification_request_uuid
+            or request.recovery_member_id = p_member_id
+          )
+        order by request.certificate_storage_path
+      ),
+      '{}'::text[]
+    );
+end;
+$$;
+
+revoke all on function public.get_deleted_member_anonymization_storage_plan(uuid) from public;
+revoke all on function public.get_deleted_member_anonymization_storage_plan(uuid) from anon;
+revoke all on function public.get_deleted_member_anonymization_storage_plan(uuid) from authenticated;
+grant execute on function public.get_deleted_member_anonymization_storage_plan(uuid) to service_role;
+
+create or replace function public.soft_delete_member(
+  p_member_id uuid,
+  p_identifier_reservations jsonb
+)
+returns boolean
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  member_row public.members%rowtype;
+  reservation record;
+  lifecycle_changed_at timestamp with time zone := now();
+begin
+  select * into member_row
+  from public.members
+  where id = p_member_id
+  for update;
+
+  if not found or member_row.deleted_at is not null then
+    return false;
+  end if;
+
+  for reservation in
+    select identifier_kind, identifier_hash
+    from jsonb_to_recordset(coalesce(p_identifier_reservations, '[]'::jsonb))
+      as value(identifier_kind text, identifier_hash text)
+  loop
+    insert into public.member_identifier_reservations (
+      identifier_kind,
+      identifier_hash
+    )
+    values (reservation.identifier_kind, reservation.identifier_hash)
+    on conflict (identifier_kind, identifier_hash) do nothing;
+  end loop;
+
+  update public.members
+  set deleted_at = lifecycle_changed_at, updated_at = lifecycle_changed_at
+  where id = p_member_id;
+
+  perform public.revoke_deleted_member_wallet_passes(p_member_id, lifecycle_changed_at);
+
+  update public.admin_profiles
+  set is_active = false,
+      permission_version = permission_version + 1,
+      updated_at = lifecycle_changed_at
+  where member_id = p_member_id;
+
+  delete from public.push_subscriptions
+  where member_id = p_member_id;
+
+  return true;
+end;
+$$;
+
+revoke all on function public.soft_delete_member(uuid, jsonb) from public;
+revoke all on function public.soft_delete_member(uuid, jsonb) from anon;
+revoke all on function public.soft_delete_member(uuid, jsonb) from authenticated;
+grant execute on function public.soft_delete_member(uuid, jsonb) to service_role;
+
+create or replace function public.anonymize_deleted_member(p_member_id uuid)
+returns boolean
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  member_row public.members%rowtype;
+  mattermost_account_uuid uuid;
+  verification_request_uuid uuid;
+begin
+  select * into member_row
+  from public.members
+  where id = p_member_id
+    and deleted_at is not null
+    and deleted_at <= now() - interval '30 days'
+    and anonymized_at is null
+  for update;
+
+  if not found then
+    return false;
+  end if;
+
+  if not public.purge_deleted_member_wallet_data_for_anonymization(p_member_id) then
+    raise exception 'member_wallet_lifecycle_anonymization_gate_failed';
+  end if;
+
+  mattermost_account_uuid := member_row.mattermost_account_id;
+  select verification_request_id into verification_request_uuid
+  from public.graduate_profiles
+  where member_id = p_member_id;
+
+  delete from public.member_profile_images where member_id = p_member_id;
+  delete from public.member_ssafy_verifications where member_id = p_member_id;
+  delete from public.member_email_challenges where member_id = p_member_id;
+  delete from public.member_email_login_transitions where member_id = p_member_id;
+  delete from public.member_password_action_tokens where member_id = p_member_id;
+
+  -- The normalized member contract dropped this legacy table. Keep cleanup
+  -- compatible with a lagging environment without making it a dependency of
+  -- the current Production function.
+  if pg_catalog.to_regclass('public.member_auth_identities') is not null then
+    execute 'delete from public.member_auth_identities where member_id = $1'
+      using p_member_id;
+  end if;
+
+  delete from public.graduate_profiles where member_id = p_member_id;
+
+  update public.graduate_verification_requests as request
+  set email = concat('deleted+', request.id::text, '@deleted.invalid'),
+      email_normalized = concat('deleted+', request.id::text, '@deleted.invalid'),
+      legal_name = '탈퇴한 수료생',
+      document_number_hmac = null,
+      certificate_storage_path = null,
+      certificate_sha256 = null,
+      certificate_deleted_at = coalesce(request.certificate_deleted_at, now()),
+      review_note = null,
+      rejection_reason = null,
+      status = case
+        when request.request_kind = 'existing_member_recovery'
+          and request.recovery_member_id = p_member_id
+          and request.status = 'approved'
+        then 'withdrawn'
+        else request.status
+      end,
+      recovery_member_id = case
+        when request.recovery_member_id = p_member_id then null
+        else request.recovery_member_id
+      end,
+      updated_at = now()
+  where request.id = verification_request_uuid
+     or request.recovery_member_id = p_member_id;
+
+  update public.members
+  set email = null,
+      email_normalized = null,
+      email_verified_at = null,
+      manual_login_id = null,
+      password_hash = null,
+      password_salt = null,
+      must_change_password = false,
+      display_name = '탈퇴한 회원',
+      campus = null,
+      staff_source_generation = null,
+      mattermost_account_id = null,
+      mattermost_login_disabled_at = null,
+      mattermost_login_disabled_reason = null,
+      auth_session_version = auth_session_version + 1,
+      anonymized_at = now(),
+      updated_at = now()
+  where id = p_member_id;
+
+  if mattermost_account_uuid is not null then
+    delete from public.mm_user_directory directory
+    where directory.id = mattermost_account_uuid
+      and not exists (
+        select 1
+        from public.members linked_member
+        where linked_member.mattermost_account_id = directory.id
+      );
+  end if;
+
+  return true;
+end;
+$$;
+
+revoke all on function public.anonymize_deleted_member(uuid) from public;
+revoke all on function public.anonymize_deleted_member(uuid) from anon;
+revoke all on function public.anonymize_deleted_member(uuid) from authenticated;
+grant execute on function public.anonymize_deleted_member(uuid) to service_role;
+
+-- Preview catalog parity: administrator read models and their supporting indexes.
+
+-- Source: 20260727025738_optimize_admin_forward_activity_metrics.sql
+-- Prevent the forward activity series from multiplying daily identities against
+-- every future identity before applying distinct counts. The result contract is
+-- unchanged; each rolling window now scans the projection once per day.
+-- Rollback: restore the previous body of
+-- public.get_admin_forward_activity_metrics(date).
+
+create or replace function public.get_admin_forward_activity_metrics(
+  p_anchor_date date default null
+)
+returns table (
+  as_of_date date,
+  today_date date,
+  member_dau bigint,
+  member_wau bigint,
+  member_mau bigint,
+  wau_observed_through date,
+  mau_observed_through date,
+  history_start_date date,
+  daily_series jsonb
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  with parameters as (
+    select
+      least(
+        coalesce(p_anchor_date, (now() at time zone 'Asia/Seoul')::date),
+        (now() at time zone 'Asia/Seoul')::date
+      ) as as_of_date,
+      (now() at time zone 'Asia/Seoul')::date as today_date
+  ),
+  windows as (
+    select
+      parameters.*,
+      least(parameters.as_of_date + 6, parameters.today_date) as wau_observed_through,
+      least(parameters.as_of_date + 29, parameters.today_date) as mau_observed_through
+    from parameters
+  ),
+  daily_activity as (
+    select
+      identities.activity_date,
+      count(*) filter (where identities.identity_kind = 'member')::bigint as member_active_count,
+      count(*) filter (where identities.identity_kind = 'guest_session')::bigint as guest_session_count
+    from public.platform_active_identities as identities
+    cross join windows
+    where identities.activity_date between windows.today_date - 83 and windows.today_date
+    group by identities.activity_date
+  ),
+  rolling_activity as (
+    select
+      series.activity_date::date as activity_date,
+      count(distinct identities.identity_hash) filter (
+        where identities.identity_kind = 'member'
+          and identities.activity_date between series.activity_date::date
+            and least(series.activity_date::date + 6, windows.today_date)
+      )::bigint as member_wau,
+      count(distinct identities.identity_hash) filter (
+        where identities.identity_kind = 'member'
+          and identities.activity_date between series.activity_date::date
+            and least(series.activity_date::date + 29, windows.today_date)
+      )::bigint as member_mau
+    from windows
+    cross join lateral generate_series(
+      windows.today_date - 83,
+      windows.today_date,
+      interval '1 day'
+    ) as series(activity_date)
+    left join public.platform_active_identities as identities
+      on identities.activity_date between series.activity_date::date
+        and least(series.activity_date::date + 29, windows.today_date)
+    group by series.activity_date, windows.today_date
+  ),
+  metric_counts as (
+    select
+      count(distinct identities.identity_hash) filter (
+        where identities.identity_kind = 'member'
+          and identities.activity_date = windows.as_of_date
+      )::bigint as member_dau,
+      count(distinct identities.identity_hash) filter (
+        where identities.identity_kind = 'member'
+          and identities.activity_date between windows.as_of_date and windows.wau_observed_through
+      )::bigint as member_wau,
+      count(distinct identities.identity_hash) filter (
+        where identities.identity_kind = 'member'
+          and identities.activity_date between windows.as_of_date and windows.mau_observed_through
+      )::bigint as member_mau
+    from windows
+    left join public.platform_active_identities as identities
+      on identities.activity_date between windows.as_of_date and windows.mau_observed_through
+    group by windows.as_of_date, windows.wau_observed_through, windows.mau_observed_through
+  )
+  select
+    windows.as_of_date,
+    windows.today_date,
+    metric_counts.member_dau,
+    metric_counts.member_wau,
+    metric_counts.member_mau,
+    windows.wau_observed_through,
+    windows.mau_observed_through,
+    (select min(activity_date) from public.platform_active_identities),
+    coalesce(
+      (
+        select jsonb_agg(
+          jsonb_build_object(
+            'activity_date', series.activity_date::date,
+            'member_active_count', coalesce(daily_activity.member_active_count, 0),
+            'guest_session_count', coalesce(daily_activity.guest_session_count, 0),
+            'member_wau', rolling_activity.member_wau,
+            'member_mau', rolling_activity.member_mau,
+            'wau_observed_through', least(series.activity_date::date + 6, windows.today_date),
+            'mau_observed_through', least(series.activity_date::date + 29, windows.today_date)
+          ) order by series.activity_date
+        )
+        from windows
+        cross join lateral generate_series(
+          windows.today_date - 83,
+          windows.today_date,
+          interval '1 day'
+        ) as series(activity_date)
+        left join daily_activity on daily_activity.activity_date = series.activity_date::date
+        left join rolling_activity on rolling_activity.activity_date = series.activity_date::date
+      ),
+      '[]'::jsonb
+    ) as daily_series
+  from windows
+  cross join metric_counts;
+$$;
+
+revoke all on function public.get_admin_forward_activity_metrics(date) from public;
+revoke all on function public.get_admin_forward_activity_metrics(date) from anon;
+revoke all on function public.get_admin_forward_activity_metrics(date) from authenticated;
+grant execute on function public.get_admin_forward_activity_metrics(date) to service_role;
+
+-- Source: 20260727051209_add_admin_task_outcome_summary.sql
+-- Aggregate safe administrator task outcomes without exposing raw event
+-- properties, paths, or operational identifiers to the logs UI.
+-- Rollback: drop function public.get_admin_task_outcome_summary(timestamptz, timestamptz)
+-- and drop index public.event_logs_admin_task_outcome_created_at_idx.
+
+create index if not exists event_logs_admin_task_outcome_created_at_idx
+  on public.event_logs(target_id, created_at desc)
+  where event_name in (
+    'admin_task_start',
+    'admin_task_complete',
+    'admin_task_recovery'
+  );
+
+create or replace function public.get_admin_task_outcome_summary(
+  input_start timestamp with time zone,
+  input_end timestamp with time zone
+)
+returns table (
+  task_key text,
+  start_count bigint,
+  complete_count bigint,
+  recovery_count bigint,
+  completion_rate numeric,
+  recovery_rate numeric,
+  p75_duration_ms double precision
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  with task_events as (
+    select
+      event_log.target_id as task_key,
+      event_log.event_name,
+      case
+        when event_log.properties ->> 'durationMs' ~ '^[0-9]{1,6}$'
+          and (event_log.properties ->> 'durationMs')::double precision between 0 and 120000
+        then (event_log.properties ->> 'durationMs')::double precision
+        else null
+      end as duration_ms
+    from public.event_logs as event_log
+    where event_log.event_name in (
+      'admin_task_start',
+      'admin_task_complete',
+      'admin_task_recovery'
+    )
+      and event_log.target_type = 'admin_task'
+      and event_log.target_id ~ '^admin\.[a-z0-9._:-]+$'
+      and event_log.created_at >= input_start
+      and event_log.created_at <= input_end
+  )
+  select
+    task_events.task_key,
+    count(*) filter (where task_events.event_name = 'admin_task_start')::bigint as start_count,
+    count(*) filter (where task_events.event_name = 'admin_task_complete')::bigint as complete_count,
+    count(*) filter (where task_events.event_name = 'admin_task_recovery')::bigint as recovery_count,
+    (
+      count(*) filter (where task_events.event_name = 'admin_task_complete')::numeric
+      / nullif(count(*) filter (where task_events.event_name = 'admin_task_start'), 0)::numeric
+      * 100
+    ) as completion_rate,
+    (
+      count(*) filter (where task_events.event_name = 'admin_task_recovery')::numeric
+      / nullif(count(*) filter (where task_events.event_name = 'admin_task_start'), 0)::numeric
+      * 100
+    ) as recovery_rate,
+    percentile_cont(0.75) within group (order by task_events.duration_ms)
+      filter (where task_events.duration_ms is not null) as p75_duration_ms
+  from task_events
+  group by task_events.task_key
+  order by start_count desc, task_events.task_key;
+$$;
+
+revoke all on function public.get_admin_task_outcome_summary(timestamp with time zone, timestamp with time zone) from public;
+revoke all on function public.get_admin_task_outcome_summary(timestamp with time zone, timestamp with time zone) from anon;
+revoke all on function public.get_admin_task_outcome_summary(timestamp with time zone, timestamp with time zone) from authenticated;
+grant execute on function public.get_admin_task_outcome_summary(timestamp with time zone, timestamp with time zone) to service_role;
+
+-- Source: 20260727142557_add_admin_performance_dimension_summaries.sql
+-- Keep administrator performance aggregates separable by coarse viewport class.
+-- The client only emits mobile/tablet/desktop; invalid or legacy values are
+-- grouped as unknown. No raw URL, record identifier, or event property is
+-- returned by these service-role-only summaries.
+-- Rollback: drop the three *_dimension_summary functions and the partial index.
+
+create index if not exists event_logs_admin_performance_viewport_idx
+  on public.event_logs(
+    (coalesce(properties ->> 'viewport', 'unknown')),
+    created_at desc
+  )
+  where event_name in (
+    'admin_web_vital',
+    'admin_route_timing',
+    'admin_task_start',
+    'admin_task_complete',
+    'admin_task_recovery'
+  );
+
+create or replace function public.get_admin_web_vitals_dimension_summary(
+  input_start timestamp with time zone,
+  input_end timestamp with time zone
+)
+returns table (
+  viewport text,
+  metric text,
+  sample_count bigint,
+  p75_value double precision,
+  good_count bigint,
+  needs_improvement_count bigint,
+  poor_count bigint
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  with dimensioned_events as (
+    select
+      case
+        when event_log.properties ->> 'viewport' in ('mobile', 'tablet', 'desktop')
+          then event_log.properties ->> 'viewport'
+        else 'unknown'
+      end as viewport,
+      event_log.properties ->> 'metric' as metric,
+      event_log.properties ->> 'rating' as rating,
+      (event_log.properties ->> 'value')::double precision as value
+    from public.event_logs as event_log
+    where event_log.event_name = 'admin_web_vital'
+      and event_log.created_at >= input_start
+      and event_log.created_at <= input_end
+      and event_log.properties ->> 'metric' in ('INP', 'LCP', 'TTFB')
+      and event_log.properties ->> 'value' ~ '^[0-9]+(?:\.[0-9]+)?$'
+  )
+  select
+    dimensioned_events.viewport,
+    dimensioned_events.metric,
+    count(*)::bigint as sample_count,
+    percentile_cont(0.75) within group (order by dimensioned_events.value)::double precision,
+    count(*) filter (where dimensioned_events.rating = 'good')::bigint,
+    count(*) filter (where dimensioned_events.rating = 'needs-improvement')::bigint,
+    count(*) filter (where dimensioned_events.rating = 'poor')::bigint
+  from dimensioned_events
+  group by dimensioned_events.viewport, dimensioned_events.metric
+  order by dimensioned_events.viewport, dimensioned_events.metric;
+$$;
+
+create or replace function public.get_admin_route_timing_dimension_summary(
+  input_start timestamp with time zone,
+  input_end timestamp with time zone
+)
+returns table (
+  viewport text,
+  route_key text,
+  sample_count bigint,
+  p75_duration_ms double precision,
+  complete_count bigint,
+  unknown_count bigint,
+  error_count bigint
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  with dimensioned_events as (
+    select
+      case
+        when event_log.properties ->> 'viewport' in ('mobile', 'tablet', 'desktop')
+          then event_log.properties ->> 'viewport'
+        else 'unknown'
+      end as viewport,
+      event_log.target_id as route_key,
+      event_log.properties ->> 'outcome' as outcome,
+      (event_log.properties ->> 'durationMs')::double precision as duration_ms
+    from public.event_logs as event_log
+    where event_log.event_name = 'admin_route_timing'
+      and event_log.target_type = 'admin_performance'
+      and event_log.target_id ~ '^admin\.[a-z0-9._:-]+$'
+      and event_log.created_at >= input_start
+      and event_log.created_at <= input_end
+      and event_log.properties ->> 'durationMs' ~ '^[0-9]+$'
+  )
+  select
+    dimensioned_events.viewport,
+    dimensioned_events.route_key,
+    count(*)::bigint as sample_count,
+    percentile_cont(0.75) within group (order by dimensioned_events.duration_ms)::double precision as p75_duration_ms,
+    count(*) filter (where dimensioned_events.outcome = 'complete')::bigint as complete_count,
+    count(*) filter (where dimensioned_events.outcome = 'unknown')::bigint as unknown_count,
+    count(*) filter (where dimensioned_events.outcome = 'error')::bigint as error_count
+  from dimensioned_events
+  group by dimensioned_events.viewport, dimensioned_events.route_key
+  order by dimensioned_events.viewport, p75_duration_ms desc nulls last;
+$$;
+
+create or replace function public.get_admin_task_outcome_dimension_summary(
+  input_start timestamp with time zone,
+  input_end timestamp with time zone
+)
+returns table (
+  viewport text,
+  task_key text,
+  start_count bigint,
+  complete_count bigint,
+  recovery_count bigint,
+  completion_rate numeric,
+  recovery_rate numeric,
+  p75_duration_ms double precision
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  with task_events as (
+    select
+      case
+        when event_log.properties ->> 'viewport' in ('mobile', 'tablet', 'desktop')
+          then event_log.properties ->> 'viewport'
+        else 'unknown'
+      end as viewport,
+      event_log.target_id as task_key,
+      event_log.event_name,
+      case
+        when event_log.properties ->> 'durationMs' ~ '^[0-9]{1,6}$'
+          and (event_log.properties ->> 'durationMs')::double precision between 0 and 120000
+        then (event_log.properties ->> 'durationMs')::double precision
+        else null
+      end as duration_ms
+    from public.event_logs as event_log
+    where event_log.event_name in (
+      'admin_task_start',
+      'admin_task_complete',
+      'admin_task_recovery'
+    )
+      and event_log.target_type = 'admin_task'
+      and event_log.target_id ~ '^admin\.[a-z0-9._:-]+$'
+      and event_log.created_at >= input_start
+      and event_log.created_at <= input_end
+  )
+  select
+    task_events.viewport,
+    task_events.task_key,
+    count(*) filter (where task_events.event_name = 'admin_task_start')::bigint as start_count,
+    count(*) filter (where task_events.event_name = 'admin_task_complete')::bigint as complete_count,
+    count(*) filter (where task_events.event_name = 'admin_task_recovery')::bigint as recovery_count,
+    (
+      count(*) filter (where task_events.event_name = 'admin_task_complete')::numeric
+      / nullif(count(*) filter (where task_events.event_name = 'admin_task_start'), 0)::numeric
+      * 100
+    ),
+    (
+      count(*) filter (where task_events.event_name = 'admin_task_recovery')::numeric
+      / nullif(count(*) filter (where task_events.event_name = 'admin_task_start'), 0)::numeric
+      * 100
+    ) as recovery_rate,
+    percentile_cont(0.75) within group (order by task_events.duration_ms)
+      filter (where task_events.duration_ms is not null)
+      as p75_duration_ms
+  from task_events
+  group by task_events.viewport, task_events.task_key
+  order by task_events.viewport, start_count desc, task_events.task_key;
+$$;
+
+revoke all on function public.get_admin_web_vitals_dimension_summary(timestamp with time zone, timestamp with time zone) from public;
+revoke all on function public.get_admin_web_vitals_dimension_summary(timestamp with time zone, timestamp with time zone) from anon;
+revoke all on function public.get_admin_web_vitals_dimension_summary(timestamp with time zone, timestamp with time zone) from authenticated;
+grant execute on function public.get_admin_web_vitals_dimension_summary(timestamp with time zone, timestamp with time zone) to service_role;
+
+revoke all on function public.get_admin_route_timing_dimension_summary(timestamp with time zone, timestamp with time zone) from public;
+revoke all on function public.get_admin_route_timing_dimension_summary(timestamp with time zone, timestamp with time zone) from anon;
+revoke all on function public.get_admin_route_timing_dimension_summary(timestamp with time zone, timestamp with time zone) from authenticated;
+grant execute on function public.get_admin_route_timing_dimension_summary(timestamp with time zone, timestamp with time zone) to service_role;
+
+revoke all on function public.get_admin_task_outcome_dimension_summary(timestamp with time zone, timestamp with time zone) from public;
+revoke all on function public.get_admin_task_outcome_dimension_summary(timestamp with time zone, timestamp with time zone) from anon;
+revoke all on function public.get_admin_task_outcome_dimension_summary(timestamp with time zone, timestamp with time zone) from authenticated;
+grant execute on function public.get_admin_task_outcome_dimension_summary(timestamp with time zone, timestamp with time zone) to service_role;
+
+-- Source: 20260727150124_add_scoped_admin_log_cursor_rpc.sql
+-- Use a stable created_at/id keyset for interactive log continuation.
+-- The existing page RPC remains available for direct page-number links and rolling deploys.
+create or replace function public.get_admin_logs_cursor_scoped(
+  input_start timestamp with time zone,
+  input_end timestamp with time zone,
+  input_page_size integer,
+  input_cursor_created_at timestamp with time zone default null,
+  input_cursor_id uuid default null,
+  input_group text default 'all',
+  input_search text default '',
+  input_name text default 'all',
+  input_actor text default 'all',
+  input_status text default 'all',
+  input_allowed_groups text[] default '{}',
+  input_include_pii boolean default false
+)
+returns table (
+  group_name text,
+  id uuid,
+  name text,
+  status text,
+  actor_type text,
+  actor_id text,
+  actor_name text,
+  actor_mm_username text,
+  identifier text,
+  ip_address text,
+  path text,
+  referrer text,
+  target_type text,
+  target_id text,
+  properties jsonb,
+  created_at timestamp with time zone,
+  total_count bigint
+)
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  with params as (
+    select
+      greatest(coalesce(input_page_size, 100), 1) as page_size,
+      lower(coalesce(nullif(input_search, ''), '')) as search_query,
+      coalesce(nullif(input_group, ''), 'all') as group_filter,
+      coalesce(nullif(input_name, ''), 'all') as name_filter,
+      coalesce(nullif(input_actor, ''), 'all') as actor_filter,
+      coalesce(nullif(input_status, ''), 'all') as status_filter,
+      array(
+        select candidate
+        from unnest(coalesce(input_allowed_groups, '{}'::text[])) as candidate
+        where candidate in ('product', 'audit', 'security')
+      ) as allowed_groups,
+      coalesce(input_include_pii, false) as include_pii
+  ),
+  base_logs as (
+    select
+      'product'::text as group_name,
+      event_logs.id,
+      event_logs.event_name::text as name,
+      null::text as status,
+      event_logs.actor_type::text as actor_type,
+      case when params.include_pii then event_logs.actor_id else null end as actor_id,
+      case when params.include_pii then members.display_name else null end as actor_name,
+      case when params.include_pii then directory.mm_username else null end as actor_mm_username,
+      null::text as identifier,
+      case when params.include_pii then event_logs.ip_address else null end as ip_address,
+      case when params.include_pii then event_logs.path else null end as path,
+      case when params.include_pii then event_logs.referrer else null end as referrer,
+      event_logs.target_type,
+      case when params.include_pii then event_logs.target_id else null end as target_id,
+      case when params.include_pii then event_logs.properties else null end as properties,
+      event_logs.created_at,
+      lower(concat_ws(' ',
+        event_logs.event_name,
+        event_logs.actor_type,
+        case when params.include_pii then event_logs.path end,
+        event_logs.target_type,
+        case when params.include_pii then members.display_name end,
+        case when params.include_pii then directory.mm_username end,
+        case when params.include_pii then event_logs.actor_id end,
+        case when params.include_pii then event_logs.ip_address end,
+        case when params.include_pii then event_logs.referrer end,
+        case when params.include_pii then event_logs.target_id end,
+        case when params.include_pii then event_logs.properties::text end
+      )) as search_text
+    from public.event_logs
+    cross join params
+    left join public.members
+      on event_logs.actor_type = 'member'
+     and members.id::text = event_logs.actor_id
+    left join public.mm_user_directory directory
+      on directory.id = members.mattermost_account_id
+    where 'product' = any(params.allowed_groups)
+      and event_logs.created_at >= input_start
+      and event_logs.created_at <= input_end
+
+    union all
+
+    select
+      'audit'::text as group_name,
+      admin_audit_logs.id,
+      admin_audit_logs.action::text as name,
+      null::text as status,
+      coalesce(admin_audit_logs.actor_type, 'admin')::text as actor_type,
+      case when params.include_pii then admin_audit_logs.actor_id else null end as actor_id,
+      null::text as actor_name,
+      null::text as actor_mm_username,
+      null::text as identifier,
+      case when params.include_pii then admin_audit_logs.ip_address else null end as ip_address,
+      case when params.include_pii then admin_audit_logs.path else null end as path,
+      null::text as referrer,
+      admin_audit_logs.target_type,
+      case when params.include_pii then admin_audit_logs.target_id else null end as target_id,
+      case when params.include_pii then admin_audit_logs.properties else null end as properties,
+      admin_audit_logs.created_at,
+      lower(concat_ws(' ',
+        admin_audit_logs.action,
+        coalesce(admin_audit_logs.actor_type, 'admin'),
+        case when params.include_pii then admin_audit_logs.path end,
+        admin_audit_logs.target_type,
+        case when params.include_pii then admin_audit_logs.actor_id end,
+        case when params.include_pii then admin_audit_logs.ip_address end,
+        case when params.include_pii then admin_audit_logs.target_id end,
+        case when params.include_pii then admin_audit_logs.properties::text end
+      )) as search_text
+    from public.admin_audit_logs
+    cross join params
+    where 'audit' = any(params.allowed_groups)
+      and admin_audit_logs.created_at >= input_start
+      and admin_audit_logs.created_at <= input_end
+
+    union all
+
+    select
+      'security'::text as group_name,
+      auth_security_logs.id,
+      auth_security_logs.event_name::text as name,
+      auth_security_logs.status::text as status,
+      auth_security_logs.actor_type::text as actor_type,
+      case when params.include_pii then auth_security_logs.actor_id else null end as actor_id,
+      case when params.include_pii then members.display_name else null end as actor_name,
+      case when params.include_pii then directory.mm_username else null end as actor_mm_username,
+      case when params.include_pii then auth_security_logs.identifier else null end as identifier,
+      case when params.include_pii then auth_security_logs.ip_address else null end as ip_address,
+      case when params.include_pii then auth_security_logs.path else null end as path,
+      null::text as referrer,
+      null::text as target_type,
+      null::text as target_id,
+      case when params.include_pii then auth_security_logs.properties else null end as properties,
+      auth_security_logs.created_at,
+      lower(concat_ws(' ',
+        auth_security_logs.event_name,
+        auth_security_logs.status,
+        auth_security_logs.actor_type,
+        case when params.include_pii then auth_security_logs.path end,
+        case when params.include_pii then members.display_name end,
+        case when params.include_pii then directory.mm_username end,
+        case when params.include_pii then auth_security_logs.actor_id end,
+        case when params.include_pii then auth_security_logs.identifier end,
+        case when params.include_pii then auth_security_logs.ip_address end,
+        case when params.include_pii then auth_security_logs.properties::text end
+      )) as search_text
+    from public.auth_security_logs
+    cross join params
+    left join public.members
+      on auth_security_logs.actor_type = 'member'
+     and members.id::text = auth_security_logs.actor_id
+    left join public.mm_user_directory directory
+      on directory.id = members.mattermost_account_id
+    where 'security' = any(params.allowed_groups)
+      and auth_security_logs.created_at >= input_start
+      and auth_security_logs.created_at <= input_end
+  ),
+  filtered_logs as (
+    select base_logs.*
+    from base_logs
+    cross join params
+    where (params.group_filter = 'all' or base_logs.group_name = params.group_filter)
+      and (params.name_filter = 'all' or base_logs.name = params.name_filter)
+      and (params.actor_filter = 'all' or coalesce(base_logs.actor_type, '') = params.actor_filter)
+      and (params.status_filter = 'all' or coalesce(base_logs.status, '') = params.status_filter)
+      and (params.search_query = '' or base_logs.search_text like '%' || params.search_query || '%')
+  ),
+  counted_logs as (
+    select filtered_logs.*, count(*) over () as total_count
+    from filtered_logs
+  ),
+  cursor_logs as (
+    select counted_logs.*
+    from counted_logs
+    where input_cursor_created_at is null
+       or counted_logs.created_at < input_cursor_created_at
+       or (
+         counted_logs.created_at = input_cursor_created_at
+         and input_cursor_id is not null
+         and counted_logs.id < input_cursor_id
+       )
+  )
+  select
+    cursor_logs.group_name,
+    cursor_logs.id,
+    cursor_logs.name,
+    cursor_logs.status,
+    cursor_logs.actor_type,
+    cursor_logs.actor_id,
+    cursor_logs.actor_name,
+    cursor_logs.actor_mm_username,
+    cursor_logs.identifier,
+    cursor_logs.ip_address,
+    cursor_logs.path,
+    cursor_logs.referrer,
+    cursor_logs.target_type,
+    cursor_logs.target_id,
+    cursor_logs.properties,
+    cursor_logs.created_at,
+    cursor_logs.total_count
+  from cursor_logs
+  cross join params
+  order by cursor_logs.created_at desc, cursor_logs.id desc
+  limit (select page_size from params);
+$$;
+
+revoke all on function public.get_admin_logs_cursor_scoped(
+  timestamp with time zone,
+  timestamp with time zone,
+  integer,
+  timestamp with time zone,
+  uuid,
+  text,
+  text,
+  text,
+  text,
+  text,
+  text[],
+  boolean
+) from public;
+revoke all on function public.get_admin_logs_cursor_scoped(
+  timestamp with time zone,
+  timestamp with time zone,
+  integer,
+  timestamp with time zone,
+  uuid,
+  text,
+  text,
+  text,
+  text,
+  text,
+  text[],
+  boolean
+) from anon;
+revoke all on function public.get_admin_logs_cursor_scoped(
+  timestamp with time zone,
+  timestamp with time zone,
+  integer,
+  timestamp with time zone,
+  uuid,
+  text,
+  text,
+  text,
+  text,
+  text,
+  text[],
+  boolean
+) from authenticated;
+grant execute on function public.get_admin_logs_cursor_scoped(
+  timestamp with time zone,
+  timestamp with time zone,
+  integer,
+  timestamp with time zone,
+  uuid,
+  text,
+  text,
+  text,
+  text,
+  text,
+  text[],
+  boolean
+) to service_role;
+
+-- Source: 20260728001426_optimize_admin_console_read_paths.sql
+-- Keep the high-frequency admin inbox and push recipient reads on narrow,
+-- active-only index paths.
+-- Rollback:
+--   drop index if exists public.admin_notification_recipients_active_admin_created_idx;
+--   drop index if exists public.members_admin_recipient_display_name_idx;
+
+create index if not exists admin_notification_recipients_active_admin_created_idx
+  on public.admin_notification_recipients(admin_id, created_at desc)
+  where deleted_at is null;
+
+create index if not exists members_admin_recipient_display_name_idx
+  on public.members(display_name)
+  include (id, mattermost_account_id, generation, campus)
+  where deleted_at is null;
+
+-- Source: 20260728030545_optimize_admin_push_audience_read_model.sql
+-- Return only the audience facets needed by the admin push composer.
+-- This avoids transferring every active member row just to derive years and
+-- campuses while keeping partner options in the same read-model request.
+-- Rollback:
+--   drop function if exists public.get_admin_push_audience_facets();
+
+create or replace function public.get_admin_push_audience_facets()
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'memberCount', (
+      select count(*)::integer
+      from public.members
+      where deleted_at is null
+    ),
+    'availableYears', coalesce((
+      select jsonb_agg(generation order by generation desc)
+      from (
+        select distinct generation
+        from public.members
+        where deleted_at is null
+          and generation is not null
+      ) years
+    ), '[]'::jsonb),
+    'availableCampuses', coalesce((
+      select jsonb_agg(campus order by campus)
+      from (
+        select distinct trim(campus) as campus
+        from public.members
+        where deleted_at is null
+          and nullif(trim(campus), '') is not null
+      ) campuses
+    ), '[]'::jsonb),
+    'partners', coalesce((
+      select jsonb_agg(
+        jsonb_build_object('id', id, 'name', name)
+        order by name, id
+      )
+      from public.partners
+    ), '[]'::jsonb),
+    'partnerCount', (select count(*)::integer from public.partners)
+  );
+$$;
+
+revoke all on function public.get_admin_push_audience_facets() from public;
+revoke all on function public.get_admin_push_audience_facets() from anon;
+revoke all on function public.get_admin_push_audience_facets() from authenticated;
+grant execute on function public.get_admin_push_audience_facets() to service_role;
+
+-- Source: 20260728032722_optimize_admin_session_read_model.sql
+-- Return only the administrator session snapshot needed on every protected
+-- request. This avoids a nested PostgREST relationship read on the hot auth
+-- path while preserving the existing permission-version and active checks.
+-- Rollback:
+--   drop function if exists public.get_admin_session_snapshot(uuid);
+
+create or replace function public.get_admin_session_snapshot(p_member_id uuid)
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'id', member.id,
+    'login_id', directory.mm_username,
+    'display_name', coalesce(
+      nullif(btrim(member.display_name), ''),
+      nullif(btrim(directory.display_name), ''),
+      directory.mm_username
+    ),
+    'email', member.email,
+    'must_change_password', member.must_change_password,
+    'is_active', profile.is_active and directory.is_active and member.deleted_at is null,
+    'permission_version', profile.permission_version,
+    'permission_template_key', profile.permission_template_key,
+    'managed_campus_slugs', profile.managed_campus_slugs,
+    'created_at', profile.created_at,
+    'updated_at', profile.updated_at
+  )
+  from public.admin_profiles profile
+  join public.members member on member.id = profile.member_id
+  join public.mm_user_directory directory on directory.id = member.mattermost_account_id
+  where profile.member_id = p_member_id
+  limit 1;
+$$;
+
+revoke all on function public.get_admin_session_snapshot(uuid) from public;
+revoke all on function public.get_admin_session_snapshot(uuid) from anon;
+revoke all on function public.get_admin_session_snapshot(uuid) from authenticated;
+grant execute on function public.get_admin_session_snapshot(uuid) to service_role;
+
+-- Source: 20260727113746_optimize_admin_member_search.sql
+-- pg_trgm lives in the non-exposed extensions schema in the current contract.
+create index if not exists members_admin_display_name_trgm_idx
+  on public.members using gin (display_name extensions.gin_trgm_ops)
+  where deleted_at is null;
+
+create index if not exists members_admin_manual_login_id_trgm_idx
+  on public.members using gin (manual_login_id extensions.gin_trgm_ops)
+  where deleted_at is null and manual_login_id is not null;
+
+create index if not exists mm_user_directory_admin_username_trgm_idx
+  on public.mm_user_directory using gin (mm_username extensions.gin_trgm_ops)
+  where mm_username is not null;
+
+create index if not exists mm_user_directory_admin_user_id_trgm_idx
+  on public.mm_user_directory using gin (mm_user_id extensions.gin_trgm_ops)
+  where mm_user_id is not null;
+
+-- Source: 20260813135812_complete_member_email_verification_atomically.sql
+create or replace function public.complete_member_email_verification(
+  p_member_id uuid,
+  p_email_normalized text,
+  p_email_reservation_hash text,
+  p_code_hash text
+)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = pg_catalog, public
+as $$
+declare
+  member_row public.members%rowtype;
+  challenge_row public.member_email_challenges%rowtype;
+  completion_time timestamp with time zone;
+begin
+  if p_member_id is null
+    or p_email_normalized is null
+    or p_email_normalized = ''
+    or pg_catalog.lower(pg_catalog.btrim(p_email_normalized)) <> p_email_normalized
+    or p_email_reservation_hash is null
+    or p_email_reservation_hash !~ '^[0-9a-f]{64}$'
+    or p_code_hash is null
+    or p_code_hash !~ '^[0-9a-f]{64}$' then
+    return pg_catalog.jsonb_build_object(
+      'verified', false,
+      'reason', 'invalid_request'
+    );
+  end if;
+
+  select * into member_row
+  from public.members
+  where id = p_member_id
+    and deleted_at is null
+  for update;
+  if not found then
+    return pg_catalog.jsonb_build_object(
+      'verified', false,
+      'reason', 'member_missing'
+    );
+  end if;
+
+  select * into challenge_row
+  from public.member_email_challenges
+  where member_id = p_member_id
+    and email_normalized = p_email_normalized
+    and purpose = 'email_verify'
+  order by created_at desc, id desc
+  limit 1
+  for update;
+  if not found then
+    return pg_catalog.jsonb_build_object(
+      'verified', false,
+      'reason', 'challenge_missing'
+    );
+  end if;
+
+  -- Capture time only after both row locks are held. A request waiting behind
+  -- another verifier must not accept a challenge that expired while waiting or
+  -- move members.updated_at backwards.
+  completion_time := pg_catalog.clock_timestamp();
+
+  if challenge_row.consumed_at is not null
+    or challenge_row.verified_at is not null then
+    return pg_catalog.jsonb_build_object(
+      'verified', false,
+      'reason', 'challenge_consumed'
+    );
+  end if;
+
+  if challenge_row.expires_at <= completion_time then
+    update public.member_email_challenges
+    set consumed_at = completion_time
+    where id = challenge_row.id
+      and consumed_at is null;
+    return pg_catalog.jsonb_build_object(
+      'verified', false,
+      'reason', 'challenge_expired'
+    );
+  end if;
+
+  if challenge_row.attempt_count >= 10 then
+    update public.member_email_challenges
+    set consumed_at = completion_time
+    where id = challenge_row.id
+      and consumed_at is null;
+    return pg_catalog.jsonb_build_object(
+      'verified', false,
+      'reason', 'attempts_exhausted'
+    );
+  end if;
+
+  if challenge_row.code_hash <> p_code_hash then
+    update public.member_email_challenges
+    set attempt_count = least(10, challenge_row.attempt_count + 1),
+        consumed_at = case
+          when challenge_row.attempt_count + 1 >= 10 then completion_time
+          else consumed_at
+        end
+    where id = challenge_row.id
+      and consumed_at is null;
+    return pg_catalog.jsonb_build_object(
+      'verified', false,
+      'reason', 'invalid_code'
+    );
+  end if;
+
+  if exists (
+    select 1
+    from public.members member
+    where member.email_normalized = p_email_normalized
+      and member.id <> p_member_id
+      and member.deleted_at is null
+  ) then
+    return pg_catalog.jsonb_build_object(
+      'verified', false,
+      'reason', 'email_conflict'
+    );
+  end if;
+
+  if exists (
+    select 1
+    from public.member_identifier_reservations reservation
+    where reservation.identifier_kind = 'email'
+      and reservation.identifier_hash = p_email_reservation_hash
+  ) then
+    return pg_catalog.jsonb_build_object(
+      'verified', false,
+      'reason', 'email_reserved'
+    );
+  end if;
+
+  begin
+    update public.members
+    set email = p_email_normalized,
+        email_normalized = p_email_normalized,
+        email_verified_at = completion_time,
+        updated_at = completion_time
+    where id = p_member_id
+      and deleted_at is null;
+
+    update public.member_email_challenges
+    set verified_at = completion_time,
+        consumed_at = completion_time,
+        attempt_count = least(10, challenge_row.attempt_count + 1)
+    where id = challenge_row.id
+      and consumed_at is null
+      and verified_at is null;
+
+    if not found then
+      raise exception using
+        errcode = 'P0001',
+        message = 'member_email_challenge_state_conflict';
+    end if;
+  exception
+    when unique_violation then
+      return pg_catalog.jsonb_build_object(
+        'verified', false,
+        'reason', 'email_conflict'
+      );
+  end;
+
+  return pg_catalog.jsonb_build_object('verified', true);
+end;
+$$;
+
+revoke all on function public.complete_member_email_verification(uuid, text, text, text) from public;
+revoke all on function public.complete_member_email_verification(uuid, text, text, text) from anon;
+revoke all on function public.complete_member_email_verification(uuid, text, text, text) from authenticated;
+grant execute on function public.complete_member_email_verification(uuid, text, text, text) to service_role;
