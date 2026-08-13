@@ -1,8 +1,16 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+async function waitForDirectoryControls(page: Page) {
+  await expect(page.getByTestId("partner-filter-interaction-root")).toHaveAttribute(
+    "data-hydrated",
+    "true",
+  );
+}
+
 async function typeSearch(page: Page, value: string) {
   await page.waitForLoadState("networkidle");
+  await waitForDirectoryControls(page);
   const searchInput = page.getByTestId("partner-search-input");
   await searchInput.fill(value);
 }
@@ -160,6 +168,7 @@ test.describe("public partner discovery", () => {
     await page.setViewportSize({ width: 360, height: 844 });
     await page.goto("/#benefits");
     await page.waitForLoadState("networkidle");
+    await waitForDirectoryControls(page);
 
     await page.getByText("고급 필터", { exact: true }).click();
     await page.getByTestId("partner-campus-filter").selectOption("seoul");
@@ -177,6 +186,7 @@ test.describe("public partner discovery", () => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto("/?campaign=summer#benefits");
     await page.waitForLoadState("networkidle");
+    await waitForDirectoryControls(page);
     await expect(page.getByTestId("partner-grid")).toBeVisible();
 
     const filterRscRequests: string[] = [];
