@@ -64,6 +64,22 @@ export const Default: Story = {
     await expect(
       canvas.queryByRole("heading", { name: "14기 운영" }),
     ).not.toBeInTheDocument();
+
+    const cardPreviewElement = canvasElement.querySelector("#card-preview");
+    await expect(cardPreviewElement).not.toBeNull();
+    const cardPreview = within(cardPreviewElement as HTMLElement);
+    await expect(
+      cardPreview.getByRole("heading", {
+        name: "16기 인증 카드 목업",
+        level: 4,
+      }),
+    ).toBeInTheDocument();
+    await expect(
+      cardPreview.queryByRole("heading", { name: "16기 카드 예시" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      cardPreview.getByTestId("certification-card-frame"),
+    ).toBeInTheDocument();
   },
 };
 

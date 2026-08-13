@@ -310,6 +310,10 @@ export function AdminCertificationCardPreviewGrid({
       : previews;
   const generationLabel =
     typeof generation === "number" ? formatSsafyYearLabel(generation) : null;
+  const singlePreview =
+    generationLabel !== null && visiblePreviews.length === 1
+      ? visiblePreviews[0]
+      : null;
 
   return (
     <Card
@@ -318,7 +322,7 @@ export function AdminCertificationCardPreviewGrid({
         (generationLabel ? `card-preview-${generation}` : "card-preview")
       }
       tone="elevated"
-      className="grid gap-5"
+      className={singlePreview ? "grid" : "grid gap-5"}
     >
       <SectionHeading
         title={
@@ -331,8 +335,16 @@ export function AdminCertificationCardPreviewGrid({
             ? `${generationLabel} 카드 색상과 인증 정보를 실제 카드 컴포넌트로 확인합니다.`
             : "기수별 색상과 수료생 대비를 실제 카드 컴포넌트로 확인합니다."
         }
+        headingLevel={generationLabel ? "h4" : "h3"}
       />
-      {visiblePreviews.length > 0 ? (
+      {singlePreview ? (
+        <CertificationView
+          member={singlePreview.member}
+          initialTimestamp={initialTimestamp}
+          disableTracking
+          cohortCardThemes={themes}
+        />
+      ) : visiblePreviews.length > 0 ? (
         <div className="grid gap-6 xl:grid-cols-2">
           {visiblePreviews.map((preview) => (
             <div

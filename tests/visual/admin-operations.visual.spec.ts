@@ -53,6 +53,9 @@ for (const screen of screens) {
         height: viewport.height,
       });
       await page.emulateMedia({ reducedMotion: "reduce" });
+      if (screen.key === "cycle") {
+        await page.clock.setFixedTime("2026-07-10T01:00:00.000Z");
+      }
       await page.goto(`/iframe.html?id=${screen.storyId}&viewMode=story`, {
         waitUntil: "domcontentloaded",
       });
@@ -86,6 +89,20 @@ for (const screen of screens) {
           scale: "css",
         },
       );
+
+      if (screen.key === "cycle") {
+        const cardPreview = page.locator("#card-preview");
+        await expect(cardPreview).toBeVisible();
+        await expect(cardPreview).toHaveScreenshot(
+          `admin-operations-cycle-card-preview-${viewport.key}.png`,
+          {
+            animations: "disabled",
+            caret: "hide",
+            maxDiffPixelRatio: 0.015,
+            scale: "css",
+          },
+        );
+      }
     });
   }
 }
