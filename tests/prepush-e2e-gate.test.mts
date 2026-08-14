@@ -75,4 +75,41 @@ test("pre-push gate mirrors Public Readiness before the full Playwright suite", 
     responsiveTest.lastIndexOf("await settleLateAdminRequests(page)") >
       responsiveTest.lastIndexOf("await page.screenshot"),
   );
+
+  const pageSmokeSpec = await readFile(
+    new URL("./e2e/page-smoke.spec.ts", import.meta.url),
+    "utf8",
+  );
+  const smokeHelper = pageSmokeSpec.match(
+    /async function visitSmokeRoute[\s\S]*?\n}/,
+  )?.[0];
+  const redirectHelper = pageSmokeSpec.match(
+    /async function visitRedirectRoute[\s\S]*?\n}/,
+  )?.[0];
+
+  assert.ok(smokeHelper);
+  assert.ok(redirectHelper);
+  assert.ok(
+    smokeHelper.indexOf("await expectNoNextError(page)") <
+      smokeHelper.indexOf('await page.waitForLoadState("networkidle")'),
+  );
+  assert.ok(
+    redirectHelper.indexOf("await expectNoNextError(page)") <
+      redirectHelper.indexOf('await page.waitForLoadState("networkidle")'),
+  );
+  assert.doesNotMatch(pageSmokeSpec, /test\.afterEach/);
+
+  const pwaProvider = await readFile(
+    new URL("../src/components/PwaProvider.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(pwaProvider, /process\.env\.NODE_ENV !== "production"/);
+  assert.match(
+    pwaProvider,
+    /process\.env\.NEXT_PUBLIC_DATA_SOURCE === "mock"/,
+  );
+  assert.ok(
+    pwaProvider.indexOf('process.env.NODE_ENV !== "production"') <
+      pwaProvider.indexOf('navigator.serviceWorker.register("/sw.js")'),
+  );
 });
