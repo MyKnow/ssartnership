@@ -37,6 +37,7 @@ import {
   findAdminNavItem,
   isAdminNavActive,
 } from "@/components/admin/admin-navigation";
+import { useHydrated } from "@/hooks/useHydrated";
 
 const AdminMobileNav = dynamic(() => import("@/components/admin/AdminMobileNav"));
 const AdminLogoutButton = dynamic(() => import("@/components/admin/AdminLogoutButton"));
@@ -61,6 +62,7 @@ export default function AdminShellView({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const hydrated = useHydrated();
   const prefetchedHrefsRef = useRef(new Set<string>());
   const hoverPrefetchTimersRef = useRef(new Map<string, number>());
   const [isTabletNavExpanded, setIsTabletNavExpanded] = useState(false);
@@ -194,7 +196,10 @@ export default function AdminShellView({
 
   return (
     <AdminQuickNavigatorProvider navGroups={navGroups}>
-      <div className="min-h-screen bg-background">
+      <div
+        className="min-h-screen bg-background"
+        data-admin-hydrated={hydrated}
+      >
       <a
         href="#admin-main-content"
         className={cn(skipLinkClassName, "md:hidden")}

@@ -1,6 +1,7 @@
 'use client';
 
 import type { ProductEventName } from '@/lib/event-catalog';
+import { shouldBypassProductEventTransport } from '@/lib/activity-log-runtime';
 import { normalizeProductEventLocation } from '@/lib/product-event-path';
 import { PRODUCT_EVENT_SCHEMA_VERSION } from '@/lib/product-event-schema';
 
@@ -57,7 +58,13 @@ export function getProductSessionId() {
 }
 
 export function trackProductEvent(payload: ProductEventClientPayload) {
-  if (typeof window === 'undefined') {
+  if (
+    typeof window === 'undefined'
+    || shouldBypassProductEventTransport({
+      NODE_ENV: process.env.NODE_ENV,
+      NEXT_PUBLIC_DATA_SOURCE: process.env.NEXT_PUBLIC_DATA_SOURCE,
+    })
+  ) {
     return;
   }
 

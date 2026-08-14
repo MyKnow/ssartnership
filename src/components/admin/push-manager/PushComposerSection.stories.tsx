@@ -287,12 +287,18 @@ export const InteractiveComposer: Story = {
     const recipientSearch = recipientDialog.getByPlaceholderText(
       "이름, Mattermost 아이디, 캠퍼스",
     );
+    const recipientCloseButton = recipientDialog.getByRole("button", { name: "모달 닫기" });
+    await waitFor(() => {
+      expect(recipientCloseButton).toHaveFocus();
+    });
+    await userEvent.click(recipientSearch);
+    await expect(recipientSearch).toHaveFocus();
     await userEvent.type(recipientSearch, "ops");
     await expect(recipientSearch).toHaveValue("ops");
     await expect(
       await recipientDialog.findByText("현재 표시 1명", {}, { timeout: 4000 }),
     ).toBeInTheDocument();
-    await userEvent.click(recipientDialog.getByRole("button", { name: "모달 닫기" }));
+    await userEvent.click(recipientCloseButton);
 
     await waitFor(
       () => {

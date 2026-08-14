@@ -52,6 +52,7 @@ async function visitSmokeRoute(page: Page, route: SmokeRoute) {
   expect(response?.status(), route.path).toBeLessThan(500);
   await expect(page.locator("body")).toContainText(route.expected);
   await expectNoNextError(page);
+  await page.waitForLoadState("networkidle");
 }
 
 async function visitRedirectRoute(page: Page, route: RedirectRoute) {
@@ -62,6 +63,7 @@ async function visitRedirectRoute(page: Page, route: RedirectRoute) {
     new RegExp(`${route.expectedPath.replaceAll("/", "\\/")}`),
   );
   await expectNoNextError(page);
+  await page.waitForLoadState("networkidle");
 }
 
 async function visitAdminGuardRoute(

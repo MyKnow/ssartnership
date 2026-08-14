@@ -167,7 +167,20 @@ test("the skill fails closed before a remote trigger", () => {
   assert.match(skill, /Do not push, merge, dispatch, or change PR state while Preview sync/);
   assert.match(skill, /Perform one deliberate remote mutation/);
   assert.match(skill, /Re-read it immediately before each Actions-triggering mutation/);
+  assert.match(skill, /designate exactly one remote-mutation owner/);
+  assert.match(
+    skill,
+    /Monitoring, audit, diagnostic, review, and cleanup workers remain read-only/,
+  );
+  assert.match(skill, /every registered worktree for that branch/);
+  assert.match(
+    skill,
+    /Never merge a PR while its exact-head first-attempt log audit is still running/,
+  );
   assert.match(skill, /then `npm run prepush`/);
+  assert.match(skill, /Inspect the complete local output, not only its exit code/);
+  assert.match(skill, /interrupt it before `receive-pack`/);
+  assert.match(skill, /prove that no remote branch\/run\/deployment was created/);
   assert.match(skill, /`gh workflow list`/);
 });
 
@@ -197,9 +210,61 @@ test("every abnormal run updates the skill before another trigger", () => {
     skill,
     /responsive screenshot loop for one route must navigate once and resize the loaded page/,
   );
+  assert.match(
+    skill,
+    /browser must not open fire-and-forget\/keepalive product-event requests/,
+  );
   assert.match(skill, /Do not add a suite-wide request-drain `afterEach`/);
+  assert.match(
+    skill,
+    /wait for the dialog's declared initial-focus target before typing/,
+  );
   assert.match(skill, /For a proven external-only outage/);
   assert.match(skill, /Audit Completeness Gate/);
+});
+
+test("modal Story interactions wait for initial focus before controlled input", () => {
+  const story = read(
+    "src/components/admin/push-manager/PushComposerSection.stories.tsx",
+  );
+  const recipientDialog = story.indexOf("const recipientDialog = within(");
+  const initialFocusWait = story.indexOf(
+    "await waitFor(",
+    recipientDialog,
+  );
+  const initialFocus = story.indexOf(
+    "expect(recipientCloseButton).toHaveFocus()",
+    initialFocusWait,
+  );
+  const searchClick = story.indexOf(
+    "await userEvent.click(recipientSearch)",
+    recipientDialog,
+  );
+  const searchFocus = story.indexOf(
+    "await expect(recipientSearch).toHaveFocus()",
+    recipientDialog,
+  );
+  const searchType = story.indexOf(
+    'await userEvent.type(recipientSearch, "ops")',
+    recipientDialog,
+  );
+  const controlledValue = story.indexOf(
+    'await expect(recipientSearch).toHaveValue("ops")',
+    recipientDialog,
+  );
+  const filteredResult = story.indexOf(
+    'await recipientDialog.findByText("현재 표시 1명"',
+    recipientDialog,
+  );
+
+  assert.ok(recipientDialog >= 0);
+  assert.ok(initialFocusWait > recipientDialog);
+  assert.ok(initialFocus > initialFocusWait);
+  assert.ok(searchClick > initialFocus);
+  assert.ok(searchFocus > searchClick);
+  assert.ok(searchType > searchFocus);
+  assert.ok(controlledValue > searchType);
+  assert.ok(filteredResult > controlledValue);
 });
 
 test("required Playwright checks cannot hide a failed first attempt", () => {
@@ -990,6 +1055,18 @@ test("the run auditor emits structural evidence for hostile text and confines ou
   assert.deepEqual(
     (auditor as unknown as { signatureNamesForText: (text: string) => string[] })
       .signatureNamesForText(
+        'await dialog.findByText("ready", {}, { timeout: 4000 })',
+      ),
+    [],
+  );
+  assert.deepEqual(
+    (auditor as unknown as { signatureNamesForText: (text: string) => string[] })
+      .signatureNamesForText("Test timeout of 30000ms exceeded."),
+    ["timeout"],
+  );
+  assert.deepEqual(
+    (auditor as unknown as { signatureNamesForText: (text: string) => string[] })
+      .signatureNamesForText(
         "[vite] (client) [console.error] A component suspended inside an act scope, but the act call was not awaited.",
       ),
     ["storybook_console_error", "storybook_react_act_warning"],
@@ -1005,6 +1082,11 @@ test("the run auditor emits structural evidence for hostile text and confines ou
     (auditor as unknown as { signatureNamesForText: (text: string) => string[] })
       .signatureNamesForText("Fast Refresh had to perform a full reload."),
     ["next_dev_full_reload"],
+  );
+  assert.deepEqual(
+    (auditor as unknown as { signatureNamesForText: (text: string) => string[] })
+      .signatureNamesForText("npm warn EBADENGINE Unsupported engine"),
+    ["npm_engine_warning"],
   );
 
   assert.throws(
