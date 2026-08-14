@@ -86,7 +86,9 @@ If logs have expired or a run was deleted, record the unavailable boundary and d
 - Only an eligible successful `dev` push may join the shared Preview mutation queue. Non-eligible completions need unique no-op concurrency groups.
 - Do not start another dev mutation while a sync is active. Verify exact checkout, stale-SHA guard, migration count, credential sanitization, all table/storage stages, and the post-sync migration check.
 - Treat `failed on attempt`, provider 5xx recovery, database fallback, `Skipping object`, or `Skipping bucket` as abnormal even if the run succeeds. A required bucket/object skip is blocking; an intentional database fallback must emit and verify a distinct degraded result rather than masquerade as clean parity.
+- A recovered Storage retry remains a learning event even when every bucket and the post-sync migration check succeed: extend `storage_provider_retry_recovered` before the next trigger. Final parity proves recovery, not a clean first attempt.
 - Never expose passwords, tokens, member identifiers, object paths, or other PII while inspecting sync evidence. Storage retry/failure diagnostics may emit only fixed operation labels, validated numeric status, and a provider-code-presence boolean; never embed provider messages, code values, or object paths.
+- Preview credential-seed success diagnostics must use a fixed outcome without usernames or member IDs. Keep `preview_member_identifier_log` in the structural auditor so a legacy or reintroduced interpolated identifier invalidates nominal success.
 
 ### Main promotion and external providers
 

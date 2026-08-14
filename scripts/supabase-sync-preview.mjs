@@ -483,7 +483,7 @@ async function seedPreviewMemberCredentials(previewUrl, previewServiceRoleKey) {
   }
 
   console.log(
-    `Seeded preview member credentials for ${seedConfig.username}. Production password hashes remain stripped.`,
+    "Seeded one Preview-only member credential. Production password hashes remain stripped.",
   );
 }
 
