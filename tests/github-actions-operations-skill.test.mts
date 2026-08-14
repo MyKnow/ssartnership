@@ -178,6 +178,9 @@ test("the skill fails closed before a remote trigger", () => {
     /Never merge a PR while its exact-head first-attempt log audit is still running/,
   );
   assert.match(skill, /then `npm run prepush`/);
+  assert.match(skill, /Inspect the complete local output, not only its exit code/);
+  assert.match(skill, /interrupt it before `receive-pack`/);
+  assert.match(skill, /prove that no remote branch\/run\/deployment was created/);
   assert.match(skill, /`gh workflow list`/);
 });
 
@@ -206,6 +209,10 @@ test("every abnormal run updates the skill before another trigger", () => {
   assert.match(
     skill,
     /responsive screenshot loop for one route must navigate once and resize the loaded page/,
+  );
+  assert.match(
+    skill,
+    /browser must not open fire-and-forget\/keepalive product-event requests/,
   );
   assert.match(skill, /Do not add a suite-wide request-drain `afterEach`/);
   assert.match(skill, /For a proven external-only outage/);
