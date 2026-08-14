@@ -215,8 +215,56 @@ test("every abnormal run updates the skill before another trigger", () => {
     /browser must not open fire-and-forget\/keepalive product-event requests/,
   );
   assert.match(skill, /Do not add a suite-wide request-drain `afterEach`/);
+  assert.match(
+    skill,
+    /wait for the dialog's declared initial-focus target before typing/,
+  );
   assert.match(skill, /For a proven external-only outage/);
   assert.match(skill, /Audit Completeness Gate/);
+});
+
+test("modal Story interactions wait for initial focus before controlled input", () => {
+  const story = read(
+    "src/components/admin/push-manager/PushComposerSection.stories.tsx",
+  );
+  const recipientDialog = story.indexOf("const recipientDialog = within(");
+  const initialFocusWait = story.indexOf(
+    "await waitFor(",
+    recipientDialog,
+  );
+  const initialFocus = story.indexOf(
+    "expect(recipientCloseButton).toHaveFocus()",
+    initialFocusWait,
+  );
+  const searchClick = story.indexOf(
+    "await userEvent.click(recipientSearch)",
+    recipientDialog,
+  );
+  const searchFocus = story.indexOf(
+    "await expect(recipientSearch).toHaveFocus()",
+    recipientDialog,
+  );
+  const searchType = story.indexOf(
+    'await userEvent.type(recipientSearch, "ops")',
+    recipientDialog,
+  );
+  const controlledValue = story.indexOf(
+    'await expect(recipientSearch).toHaveValue("ops")',
+    recipientDialog,
+  );
+  const filteredResult = story.indexOf(
+    'await recipientDialog.findByText("현재 표시 1명"',
+    recipientDialog,
+  );
+
+  assert.ok(recipientDialog >= 0);
+  assert.ok(initialFocusWait > recipientDialog);
+  assert.ok(initialFocus > initialFocusWait);
+  assert.ok(searchClick > initialFocus);
+  assert.ok(searchFocus > searchClick);
+  assert.ok(searchType > searchFocus);
+  assert.ok(controlledValue > searchType);
+  assert.ok(filteredResult > controlledValue);
 });
 
 test("required Playwright checks cannot hide a failed first attempt", () => {
@@ -1003,6 +1051,18 @@ test("the run auditor emits structural evidence for hostile text and confines ou
         "✔ synthetic test describes a timed out deprecated fallback",
       ),
     [],
+  );
+  assert.deepEqual(
+    (auditor as unknown as { signatureNamesForText: (text: string) => string[] })
+      .signatureNamesForText(
+        'await dialog.findByText("ready", {}, { timeout: 4000 })',
+      ),
+    [],
+  );
+  assert.deepEqual(
+    (auditor as unknown as { signatureNamesForText: (text: string) => string[] })
+      .signatureNamesForText("Test timeout of 30000ms exceeded."),
+    ["timeout"],
   );
   assert.deepEqual(
     (auditor as unknown as { signatureNamesForText: (text: string) => string[] })

@@ -158,7 +158,10 @@ const signatures = [
   ["visual_drift", /screenshot comparison failed|pixelmatch|visual baseline/i],
   ["sync_missing_object", /missing\s+\d+\s+synchronized object/i],
   ["migration_failure", /migrations?_failed|migration.*(?:failed|error)/i],
-  ["timeout", /timed?\s*out|timeout exceeded/i],
+  [
+    "timeout",
+    /\btimed\s+out\b|\btimeout(?:\s+of)?(?:\s+\d+(?:\.\d+)?(?:ms|s))?\s+exceeded\b|\bexceeded\s+(?:the\s+)?timeout\b|\btimeouterror\b/i,
+  ],
   ["deprecation", /deprecated|deprecation/i],
   ["github_warning", /##\[warning\]/i],
   ["storage_retry", /failed on attempt\s+\d+\/\d+/i],
