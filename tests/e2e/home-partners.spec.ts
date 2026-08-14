@@ -270,6 +270,7 @@ test.describe("public partner discovery", () => {
 
   test("lists partners and opens a public partner detail page", async ({ page }) => {
     await page.goto("/");
+    await waitForDirectoryControls(page);
 
     const cards = page.getByTestId("partner-card");
     await expect(cards.first()).toBeVisible();
@@ -282,10 +283,13 @@ test.describe("public partner discovery", () => {
       .getByRole("link", { name: "제휴 상세 보기" });
     await expect(publicPartnerLink).toBeVisible();
     await publicPartnerLink.scrollIntoViewIfNeeded();
-    await publicPartnerLink.click();
+    await Promise.all([
+      page.waitForURL(/\/partners\/[^/?]+(?:\?|$)/, { timeout: 15_000 }),
+      publicPartnerLink.click(),
+    ]);
 
-    await expect(page).toHaveURL(/\/partners\/[^/?]+(?:\?|$)/);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.waitForLoadState("networkidle");
   });
 
   test("opens a public partner detail page from the card surface", async ({ page }) => {

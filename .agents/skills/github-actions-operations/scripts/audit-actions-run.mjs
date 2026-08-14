@@ -167,6 +167,7 @@ const signatures = [
   ["mock_server_error", /log_insert_failed|ingest_exception|econnreset|uncaughtexception|\baborted\b/i],
   ["next_dev_full_reload", /fast refresh had to perform a full reload/i],
   ["cache_collision", /unable to reserve cache|another job may be creating this cache/i],
+  ["npm_engine_warning", /npm warn ebadengine/i],
   ["npm_policy_warning", /allow-scripts|npm warn deprecated/i],
   ["storybook_console_error", /\[console\.error\]/i],
   ["storybook_react_act_warning", /component suspended inside an .*act.*not awaited/i],

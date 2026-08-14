@@ -112,4 +112,34 @@ test("pre-push gate mirrors Public Readiness before the full Playwright suite", 
     pwaProvider.indexOf('process.env.NODE_ENV !== "production"') <
       pwaProvider.indexOf('navigator.serviceWorker.register("/sw.js")'),
   );
+
+  const homePartnersSpec = await readFile(
+    new URL("./e2e/home-partners.spec.ts", import.meta.url),
+    "utf8",
+  );
+  const publicPartnerNavigationTest = homePartnersSpec.match(
+    /test\("lists partners and opens a public partner detail page",[\s\S]*?\n  \}\);/,
+  )?.[0];
+  assert.ok(publicPartnerNavigationTest);
+  assert.match(
+    publicPartnerNavigationTest,
+    /await waitForDirectoryControls\(page\)/,
+  );
+  assert.match(publicPartnerNavigationTest, /await Promise\.all\(\[/);
+  assert.match(
+    publicPartnerNavigationTest,
+    /page\.waitForURL\([\s\S]*timeout: 15_000/,
+  );
+  assert.ok(
+    publicPartnerNavigationTest.indexOf("page.waitForURL") <
+      publicPartnerNavigationTest.indexOf("publicPartnerLink.click"),
+  );
+  assert.ok(
+    publicPartnerNavigationTest.lastIndexOf('page.waitForLoadState("networkidle")') >
+      publicPartnerNavigationTest.lastIndexOf('getByRole("heading"'),
+  );
+  assert.doesNotMatch(
+    publicPartnerNavigationTest,
+    /force:\s*true|waitForTimeout|retry/,
+  );
 });

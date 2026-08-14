@@ -21,6 +21,8 @@ Before **every** operation that can start, replace, queue, skip, or cancel a Git
 6. Review the final diff, status, issue/PR linkage, and expected run count. Use `Refs #...` until the work has reached the repository's required promotion boundary.
 7. State the expected remote effects before triggering them. Perform one deliberate remote mutation, then monitor its exact first attempt before causing another.
 
+For multi-agent or multi-worktree tasks, designate exactly one remote-mutation owner. Monitoring, audit, diagnostic, review, and cleanup workers remain read-only unless the coordinator assigns one exact mutation after reporting that every gate above is satisfied; they must not infer push or merge authority from the user's overall delivery goal. Immediately before the mutation, the owner must re-read the live PR/ref and every registered worktree for that branch. A newer local commit, dirty worktree, active audit, pending ledger correction, differing PR head, or active shared-state run cancels the mutation authorization and returns control to the coordinator.
+
 Reading the skill earlier in the task does not satisfy this gate. Re-read it immediately before each Actions-triggering mutation because the ledger may have changed.
 
 ## First-Attempt Verification
@@ -50,6 +52,8 @@ When one occurs:
 5. Update this skill package before the next Actions-triggering mutation: always update [failure-ledger.md](references/failure-ledger.md) with the run, signature, cause, prevention, regression coverage, and rollout state; update this `SKILL.md` too when the reusable procedure itself was incomplete. Repeated failures, errors, retries, provider recoveries, or changed warning counts/context still extend the ledger even when the procedure text needs no change. An exact recurrence of an explicitly reviewed, non-actionable tooling-warning baseline may be verified against its existing ledger entry without creating an infinite evidence-only push loop; any count, context, severity, or affected-test change reopens it.
 6. Add an executable regression or fail-closed contract whenever practical. Fix repository-controlled causes in a new commit and run retry-disabled focused repetition plus the full relevant gate locally. When investigating a Next development-server lifecycle or teardown signal, use independent fresh-server repetitions for isolation and the complete CI-shaped Playwright invocation for accumulated-lifecycle coverage. Preserve a `--repeat-each` server exit or connection refusal as a distinct stress signal with unresolved causality unless evidence ties it to the original failure; do not dismiss it or retry it into green. For a proven external-only outage, add a repository guard or remove the avoidable dependency when possible; otherwise record the provider incident and wait for a new, independently triggered first attempt without rerunning or rewriting the original evidence.
 7. Re-read this skill and the updated ledger immediately before pushing the new commit. Verify its remote first attempt from raw logs.
+
+Never merge a PR while its exact-head first-attempt log audit is still running, while a replacement commit exists only locally, or while another agent is investigating an abnormal result. A green badge or a previously issued broad instruction is not a substitute for the mutation owner's fresh gate decision.
 
 If logs have expired or a run was deleted, record the unavailable boundary and do not claim that log as audited.
 

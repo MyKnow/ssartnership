@@ -167,6 +167,16 @@ test("the skill fails closed before a remote trigger", () => {
   assert.match(skill, /Do not push, merge, dispatch, or change PR state while Preview sync/);
   assert.match(skill, /Perform one deliberate remote mutation/);
   assert.match(skill, /Re-read it immediately before each Actions-triggering mutation/);
+  assert.match(skill, /designate exactly one remote-mutation owner/);
+  assert.match(
+    skill,
+    /Monitoring, audit, diagnostic, review, and cleanup workers remain read-only/,
+  );
+  assert.match(skill, /every registered worktree for that branch/);
+  assert.match(
+    skill,
+    /Never merge a PR while its exact-head first-attempt log audit is still running/,
+  );
   assert.match(skill, /then `npm run prepush`/);
   assert.match(skill, /`gh workflow list`/);
 });
@@ -1005,6 +1015,11 @@ test("the run auditor emits structural evidence for hostile text and confines ou
     (auditor as unknown as { signatureNamesForText: (text: string) => string[] })
       .signatureNamesForText("Fast Refresh had to perform a full reload."),
     ["next_dev_full_reload"],
+  );
+  assert.deepEqual(
+    (auditor as unknown as { signatureNamesForText: (text: string) => string[] })
+      .signatureNamesForText("npm warn EBADENGINE Unsupported engine"),
+    ["npm_engine_warning"],
   );
 
   assert.throws(
