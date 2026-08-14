@@ -4,6 +4,19 @@ const e2ePort = process.env.E2E_PORT ?? "3100";
 const baseURL = process.env.BASE_URL ?? `http://127.0.0.1:${e2ePort}`;
 const adminBaseURL = process.env.BASE_URL ?? `http://localhost:${e2ePort}`;
 const chromiumChannel = process.env.PLAYWRIGHT_CHROMIUM_CHANNEL === "chrome" ? "chrome" : undefined;
+const isLoopbackBaseURL = (() => {
+  try {
+    const hostname = new URL(baseURL).hostname;
+    return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1";
+  } catch {
+    return false;
+  }
+})();
+if (!isLoopbackBaseURL && !process.env.E2E_ADMIN_GATEWAY_PASSWORD) {
+  throw new Error(
+    "A non-loopback BASE_URL requires an explicit E2E_ADMIN_GATEWAY_PASSWORD.",
+  );
+}
 const e2eAdminGatewayPassword =
   process.env.E2E_ADMIN_GATEWAY_PASSWORD ?? ["e2e", "admin", "gateway", "password"].join("-");
 const e2eAdminGatewayCredentials = {
@@ -18,7 +31,9 @@ export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 2 : 0,
+  // Required CI must fail on the first test failure. A retry can turn a real
+  // regression into a misleading green GitHub check.
+  retries: 0,
   workers: 1,
   reporter: [
     ["html", { outputFolder: "playwright-report", open: "never" }],
@@ -27,7 +42,7 @@ export default defineConfig({
   ],
   use: {
     baseURL,
-    trace: "on-first-retry",
+    trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: chromiumChannel ? "off" : "retain-on-failure",
   },

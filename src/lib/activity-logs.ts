@@ -12,6 +12,7 @@ import { redactAuthSecurityExceptionProperties } from '@/lib/auth-security-log-s
 import { sanitizeLogProperties, type LogJsonValue } from '@/lib/log-sanitization';
 import { getSupabaseAdminClient } from '@/lib/supabase/server';
 import { sanitizeProductEventTargetId } from '@/lib/activity-log-targets';
+import { shouldBypassActivityLogPersistence } from '@/lib/activity-log-runtime';
 import { getClientIp } from '@/lib/client-ip';
 import type { AuditActorType } from '@/lib/audit-rpc-context';
 
@@ -73,6 +74,9 @@ function sanitizeAuthSecurityProperties(
 }
 
 async function insertLog(table: string, payload: Record<string, unknown>) {
+  if (shouldBypassActivityLogPersistence()) {
+    return true;
+  }
   try {
     const supabase = getSupabaseAdminClient();
     const { error } = await supabase.from(table).insert(payload);
@@ -97,6 +101,9 @@ async function insertLog(table: string, payload: Record<string, unknown>) {
 
 async function insertLogs(table: string, payloads: readonly Record<string, unknown>[]) {
   if (payloads.length === 0) {
+    return true;
+  }
+  if (shouldBypassActivityLogPersistence()) {
     return true;
   }
   try {
@@ -201,6 +208,9 @@ export async function resolveCurrentActor(): Promise<{
 }
 
 export async function logProductEvent(input: ProductLogInput) {
+  if (shouldBypassActivityLogPersistence()) {
+    return true;
+  }
   const targetId = sanitizeProductEventTargetId(input.targetType, input.targetId);
   const eventId = input.eventId ?? randomUUID();
 

@@ -22,7 +22,7 @@ Chromatic이나 외부 시각 검증 서비스, 별도 토큰은 사용하지 �
 
 재활성화 전에 아래 증거를 모두 확보한다.
 
-1. `npm ci`
+1. `npm run install:trusted`
 2. `npm run build-storybook`
 3. `npm run test-storybook`
 4. `npx playwright install chromium`

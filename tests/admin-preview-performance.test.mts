@@ -69,7 +69,12 @@ test("관리자 Preview HTTP runner는 Server-Timing의 허용 phase만 요약�
 });
 
 test("관리자 Preview HTTP runner는 Basic Auth를 로그 없이 요청 헤더에만 추가한다", async () => {
-  const { createAdminPreviewBasicAuthHeader, mergePreviewCookies } = await performanceModulePromise;
+  const {
+    ADMIN_PREVIEW_ORIGIN,
+    createAdminPreviewBasicAuthHeader,
+    mergePreviewCookies,
+    parseAdminPreviewBaseUrl,
+  } = await performanceModulePromise;
 
   assert.equal(createAdminPreviewBasicAuthHeader(), null);
   assert.equal(
@@ -87,6 +92,19 @@ test("관리자 Preview HTTP runner는 Basic Auth를 로그 없이 요청 헤더
     ]),
     "user_session=new; theme=dark; admin_session=token",
   );
+  assert.equal(parseAdminPreviewBaseUrl(ADMIN_PREVIEW_ORIGIN).origin, ADMIN_PREVIEW_ORIGIN);
+  assert.equal(
+    parseAdminPreviewBaseUrl("http://127.0.0.1:3100", { allowLocalhost: true }).origin,
+    "http://127.0.0.1:3100",
+  );
+  for (const hostileUrl of [
+    "https://attacker.invalid",
+    "https://ssartnership-dev.myknow.xyz.attacker.invalid",
+    "https://user:password@ssartnership-dev.myknow.xyz",
+    "http://localhost:3100",
+  ]) {
+    assert.throws(() => parseAdminPreviewBaseUrl(hostileUrl), /ADMIN_PREVIEW_URL_INVALID/);
+  }
 });
 
 test("관리자 Preview 페이지 target은 관리자 경로와 고유 key만 허용한다", async () => {
@@ -144,9 +162,14 @@ test("Preview 성능 workflow는 dev와 명시적 확인 문자열에서만 실�
   );
 
   assert.match(source, /github\.ref == 'refs\/heads\/dev'/);
+  assert.match(source, /ref: \$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(source, /ref: dev/);
+  assert.doesNotMatch(source, /admin_url:/);
+  assert.match(source, /ADMIN_PREVIEW_URL: https:\/\/ssartnership-dev\.myknow\.xyz/);
   assert.match(source, /MEASURE_ADMIN_PERFORMANCE/);
   assert.match(source, /SUPABASE_PREVIEW_SERVICE_ROLE_KEY/);
-  assert.match(source, /authenticated page and API probes/);
+  assert.match(source, /authenticated page probes/);
+  assert.match(source, /authenticated API probes/);
   assert.match(source, /ADMIN_PREVIEW_SESSION_COOKIE/);
   assert.match(source, /ADMIN_PREVIEW_PROTECTION_BYPASS/);
   assert.match(source, /ADMIN_PREVIEW_BASIC_AUTH_USERNAME/);

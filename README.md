@@ -123,7 +123,7 @@ docs/
 ## 로컬 실행
 
 ```bash
-npm install
+npm run install:trusted
 npm run dev
 ```
 
@@ -135,17 +135,17 @@ http://localhost:3000
 
 ## CI 사전 점검
 
-GitHub Actions와 동일한 Linux/amd64 lockfile 해석 차이로 `npm ci`가 깨질 수 있습니다. 특히 macOS에서 의존성을 갱신했으면 아래 순서로 먼저 확인합니다.
+GitHub Actions와 동일한 Linux/amd64 lockfile 해석 차이로 신뢰 설치가 깨질 수 있습니다. 특히 macOS에서 의존성을 갱신했으면 아래 순서로 먼저 확인합니다.
 
 ```bash
 npm run check:lockfile
 npm run ci:local
 ```
 
-- `check:lockfile`: Docker가 있으면 Linux/amd64 기준 lockfile canonical 여부 확인, 없으면 `npm@10`으로 lockfile 재생성 후 비교
-- `ci:local`: `npm ci`, lint, build, Storybook test까지 한 번에 검증
+- `check:lockfile`: Docker가 있으면 Node 24.18.1/Linux/amd64 기준 lockfile canonical 여부 확인, 없으면 `npm@11.16.0`으로 재생성 후 비교
+- `ci:local`: 생명주기 스크립트를 실행하지 않는 신뢰 설치, 전체 사전 푸시 게이트, Storybook·Visual test를 한 번에 검증
 
-`check:lockfile`은 Docker Desktop이 있으면 Linux/amd64 기준으로 검증하고, 없으면 `npm@10`으로 package-lock을 다시 생성해 비교합니다.
+`check:lockfile`은 Docker Desktop이 있으면 Node 24.18.1/Linux/amd64 기준으로 검증하고, 없으면 `npm@11.16.0`으로 package-lock을 다시 생성해 비교합니다.
 
 ## 환경 변수
 

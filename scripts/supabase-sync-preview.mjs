@@ -513,7 +513,7 @@ async function collectBucketFilePaths(storageClient, bucketName, prefix = "", pa
 
   while (true) {
     const data = await runStorageOperation(
-      `Listing preview objects in ${bucketName}/${prefix || "."}`,
+      `Listing preview objects in ${bucketName}`,
       () =>
         storageClient.storage.from(bucketName).list(prefix, {
           limit,
@@ -594,7 +594,7 @@ async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = 
 
   while (true) {
     const data = await runStorageOperation(
-      `Listing production objects in ${bucketName}/${prefix || "."}`,
+      `Listing production objects in ${bucketName}`,
       () =>
         prodClient.storage.from(bucketName).list(prefix, {
           limit,
@@ -620,12 +620,12 @@ async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = 
 
       try {
         const file = await runStorageOperation(
-          `Downloading ${bucketName}/${objectPath}`,
+          `Downloading object from ${bucketName}`,
           () => prodClient.storage.from(bucketName).download(objectPath),
         );
 
         if (!file) {
-          throw new Error(`다운로드할 파일을 찾을 수 없습니다: ${bucketName}/${objectPath}`);
+          throw new Error("STORAGE_OBJECT_DOWNLOAD_EMPTY");
         }
 
         const contentType =
@@ -636,7 +636,7 @@ async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = 
 
         const buffer = Buffer.from(await file.arrayBuffer());
         await runStorageOperation(
-          `Uploading ${bucketName}/${objectPath}`,
+          `Uploading object to ${bucketName}`,
           () =>
             previewClient.storage.from(bucketName).upload(objectPath, buffer, {
               contentType,
@@ -647,11 +647,11 @@ async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = 
       } catch (error) {
         if (shouldAbortPreviewStorageObjectSync(bucketName)) {
           throw new Error(
-            `Preview required object ${bucketName}/${objectPath} could not be synchronized: ${formatStorageError(error)}`,
+            `Preview required object in ${bucketName} could not be synchronized: ${formatStorageError(error)}`,
           );
         }
         console.warn(
-          `Skipping object ${bucketName}/${objectPath} after storage sync failure: ${formatStorageError(error)}`,
+          `Skipping one object in ${bucketName} after storage sync failure: ${formatStorageError(error)}`,
         );
       }
     }
@@ -765,12 +765,7 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
 
 async function main() {
   const checkOnly = process.argv.includes(CHECK_ONLY_FLAG);
-  const productionDbUrl = requiredEnv("SUPABASE_PRODUCTION_DB_URL");
-  const productionUrl = requiredEnv("SUPABASE_PRODUCTION_URL");
-  const productionServiceRoleKey = requiredEnv("SUPABASE_PRODUCTION_SERVICE_ROLE_KEY");
   const previewDbUrl = requiredEnv("SUPABASE_PREVIEW_DB_URL");
-  const previewUrl = requiredEnv("SUPABASE_PREVIEW_URL");
-  const previewServiceRoleKey = requiredEnv("SUPABASE_PREVIEW_SERVICE_ROLE_KEY");
   const skipUnavailablePreview = isTruthyEnv("SUPABASE_PREVIEW_SYNC_SKIP_UNAVAILABLE");
 
   try {
@@ -800,6 +795,12 @@ async function main() {
     console.log("Preview database connection preflight passed.");
     return;
   }
+
+  const productionDbUrl = requiredEnv("SUPABASE_PRODUCTION_DB_URL");
+  const productionUrl = requiredEnv("SUPABASE_PRODUCTION_URL");
+  const productionServiceRoleKey = requiredEnv("SUPABASE_PRODUCTION_SERVICE_ROLE_KEY");
+  const previewUrl = requiredEnv("SUPABASE_PREVIEW_URL");
+  const previewServiceRoleKey = requiredEnv("SUPABASE_PREVIEW_SERVICE_ROLE_KEY");
 
   const tempDir = await mkdtemp(join(tmpdir(), "ssartnership-preview-sync-"));
   const dumpPath = join(tempDir, "production-data.sql");

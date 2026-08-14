@@ -53,6 +53,7 @@ Use the minimal relevant skill for the task.
 Project-local skills, tracked with this repository:
 
 - `ssartnership-patterns`: repository-specific Next.js, Supabase, Repository, validation, CI, and release conventions
+- `github-actions-operations`: mandatory before any operation that can trigger or affect GitHub Actions, and after every failed, cancelled, unexpectedly skipped, retrying, flaky, or error-bearing run; update its failure ledger before the next trigger
 - `ssartnership-ui-ux`: project visual system, Korean UI states, routing/error recovery, prototype promotion, and UI QA
 - `member-required-gate-redirects`: member password, consent, profile-photo, and `returnTo` gate priority/loop prevention
 - `docs-governance`: repository documentation placement and taxonomy

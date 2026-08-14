@@ -57,9 +57,9 @@ if (process.env.NODE_ENV === "production") {
 
 const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
-  // Public Readiness runs the project-pinned TypeScript check before build.
-  // Next 16's embedded type worker crashes on this repository's valid generic
-  // types, so let the verified standalone check remain the single type gate.
+  // Public Readiness runs the project-pinned semantic TypeScript check before
+  // build. Next 16's embedded worker has crashed independently, so keep the
+  // verified standalone check as the single required type gate.
   typescript: {
     ignoreBuildErrors: true,
   },

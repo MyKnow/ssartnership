@@ -149,7 +149,7 @@ export class MockMemberEmailVerificationRepository
 
   private async withMemberLock<T>(memberId: string, operation: () => Promise<T>) {
     const previous = this.memberLocks.get(memberId) ?? Promise.resolve();
-    let release = () => undefined;
+    let release: () => void = () => {};
     const current = new Promise<void>((resolve) => {
       release = resolve;
     });
