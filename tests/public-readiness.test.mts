@@ -361,8 +361,8 @@ test("Preview Supabase migrations apply dev schema changes without syncing data"
 test("Preview sync isolates non-eligible completions from the mutation queue", () => {
   const workflow = readRepoFile(".github/workflows/preview-sync.yml");
   const concurrencyBlock = workflow.match(
-    /concurrency:\s*\n(?<block>[\s\S]+?)\n\njobs:/,
-  )?.groups?.block;
+    /concurrency:\s*\n([\s\S]+?)\n\njobs:/,
+  )?.[1];
 
   assert.ok(concurrencyBlock, "Preview sync concurrency block missing");
   assert.match(concurrencyBlock, /group:\s*>-/);
@@ -384,11 +384,11 @@ test("Preview sync isolates non-eligible completions from the mutation queue", (
 test("Preview sync concurrency and job guards use the same eligibility predicate", () => {
   const workflow = readRepoFile(".github/workflows/preview-sync.yml");
   const concurrencyEligibility = workflow.match(
-    /concurrency:\s*\n\s+group:\s*>-\s*\n(?<expression>[\s\S]+?)\n\s+cancel-in-progress:/,
-  )?.groups?.expression;
+    /concurrency:\s*\n\s+group:\s*>-\s*\n([\s\S]+?)\n\s+cancel-in-progress:/,
+  )?.[1];
   const jobEligibility = workflow.match(
-    /jobs:\s*\n\s+sync-preview:\s*\n\s+if:\s*>-\s*\n(?<expression>[\s\S]+?)\n\s+runs-on:/,
-  )?.groups?.expression;
+    /jobs:\s*\n\s+sync-preview:\s*\n\s+if:\s*>-\s*\n([\s\S]+?)\n\s+runs-on:/,
+  )?.[1];
 
   assert.ok(concurrencyEligibility, "Preview sync concurrency eligibility missing");
   assert.ok(jobEligibility, "Preview sync job eligibility guard missing");
@@ -408,8 +408,8 @@ test("Preview sync concurrency and job guards use the same eligibility predicate
 test("Preview sync follows the latest successful dev public-readiness run without stale reruns", () => {
   const workflow = readRepoFile(".github/workflows/preview-sync.yml");
   const jobEligibility = workflow.match(
-    /jobs:\s*\n\s+sync-preview:\s*\n\s+if:\s*>-\s*\n(?<expression>[\s\S]+?)\n\s+runs-on:/,
-  )?.groups?.expression;
+    /jobs:\s*\n\s+sync-preview:\s*\n\s+if:\s*>-\s*\n([\s\S]+?)\n\s+runs-on:/,
+  )?.[1];
 
   assert.match(workflow, /name: Sync Preview Supabase/);
   assert.match(workflow, /workflow_run:/);
