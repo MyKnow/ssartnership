@@ -165,6 +165,7 @@ const signatures = [
   ["deprecation", /deprecated|deprecation/i],
   ["github_warning", /##\[warning\]/i],
   ["storage_retry", /failed on attempt\s+\d+\/\d+/i],
+  ["preview_member_identifier_log", /seeded preview member credentials for\s+\S+/i],
   ["storage_skip", /skipping (?:object|bucket|stale-object cleanup)/i],
   ["database_fallback", /tenant\/user.*not found|fallback.*(?:database|pooler)/i],
   ["mock_server_error", /log_insert_failed|ingest_exception|econnreset|uncaughtexception|\baborted\b/i],

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   hashPreviewSeedPassword,
@@ -6,6 +7,11 @@ import {
   resolvePreviewMemberCredentialSeedTarget,
   resolvePreviewMemberCredentialSeedConfig,
 } from "../scripts/preview-credential-seed-lib.mjs";
+
+const syncSource = readFileSync(
+  new URL("../scripts/supabase-sync-preview.mjs", import.meta.url),
+  "utf8",
+);
 
 test("preview credential seed config is optional", () => {
   assert.equal(resolvePreviewMemberCredentialSeedConfig({}), null);
@@ -96,5 +102,13 @@ test("preview credential seed rejects a directory entry that is not linked to an
         "ssafy15",
       ),
     /is not linked to an active member after sync/,
+  );
+});
+
+test("preview credential seed success logs do not expose member identifiers", () => {
+  assert.doesNotMatch(syncSource, /\$\{seedConfig\.username\}/);
+  assert.match(
+    syncSource,
+    /Seeded one Preview-only member credential\. Production password hashes remain stripped\./,
   );
 });

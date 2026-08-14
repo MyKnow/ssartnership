@@ -220,6 +220,10 @@ test("every abnormal run updates the skill before another trigger", () => {
     /wait for the dialog's declared initial-focus target before typing/,
   );
   assert.match(skill, /For a proven external-only outage/);
+  assert.match(
+    skill,
+    /A recovered Storage retry remains a learning event even when every bucket and the post-sync migration check succeed/,
+  );
   assert.match(skill, /Audit Completeness Gate/);
 });
 
@@ -909,6 +913,16 @@ test("the failure ledger records a paginated retained-run census", () => {
   assert.match(retainedAudit, /public_e2e_regression_or_flake_exhausted` \(54\)/);
 });
 
+test("the ledger retains post-merge Preview Sync recovery and privacy evidence", () => {
+  const ledger = read(ledgerPath);
+
+  assert.match(ledger, /31770526425/);
+  assert.match(ledger, /`storage_retry` once at fixed line 963/);
+  assert.match(ledger, /`preview_member_identifier_log`[\s\S]+fixed line 957/);
+  assert.match(ledger, /712\/712 credential-material removals/);
+  assert.match(ledger, /168 migrations, 84 replaced tables, seven Storage buckets/);
+});
+
 test("project guidance makes the Actions skill mandatory", () => {
   const agents = read("AGENTS.md");
   const patterns = read(".agents/skills/ssartnership-patterns/SKILL.md");
@@ -930,6 +944,7 @@ test("the run auditor is read-only, persists no GitHub text, and exposes help", 
   assert.match(script, /test_failure/);
   assert.match(script, /testing_library/);
   assert.match(script, /storage_retry/);
+  assert.match(script, /preview_member_identifier_log/);
   assert.match(script, /storage_skip/);
   assert.match(script, /database_fallback/);
   assert.match(script, /successWithFailedJobs/);
@@ -1087,6 +1102,13 @@ test("the run auditor emits structural evidence for hostile text and confines ou
     (auditor as unknown as { signatureNamesForText: (text: string) => string[] })
       .signatureNamesForText("npm warn EBADENGINE Unsupported engine"),
     ["npm_engine_warning"],
+  );
+  assert.deepEqual(
+    (auditor as unknown as { signatureNamesForText: (text: string) => string[] })
+      .signatureNamesForText(
+        "Seeded preview member credentials for SYNTHETIC_MEMBER.",
+      ),
+    ["preview_member_identifier_log"],
   );
 
   assert.throws(
