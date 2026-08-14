@@ -1,4 +1,8 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function settleLateAdminRequests(page: Page) {
+  await page.waitForLoadState("networkidle");
+}
 
 test.describe("authenticated administrator console", () => {
   test.beforeEach(async ({ page }) => {
@@ -20,6 +24,7 @@ test.describe("authenticated administrator console", () => {
       page.getByRole("heading", { name: "관리 홈", exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("link", { name: /회원/ }).first()).toBeVisible();
+    await settleLateAdminRequests(page);
   });
 
   test("keeps the member search context in the rendered route", async ({ page }) => {
@@ -51,13 +56,16 @@ test.describe("authenticated administrator console", () => {
     await page.getByRole("textbox", { name: "검색어" }).fill("싸피");
     await page.getByRole("button", { name: "검색", exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/partner-registrations\?.*q=%EC%8B%B8%ED%94%BC/);
+    await page.waitForLoadState("networkidle");
   });
 
   test("keeps the registration queue inside narrow and wide viewports", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 900 });
+    await page.goto("/admin/partner-registrations");
+    await page.waitForLoadState("networkidle");
+
     for (const width of [320, 360, 390, 820, 1366]) {
       await page.setViewportSize({ width, height: 900 });
-      await page.goto("/admin/partner-registrations");
-      await page.waitForLoadState("networkidle");
 
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth > window.innerWidth + 1,
@@ -68,6 +76,7 @@ test.describe("authenticated administrator console", () => {
         fullPage: true,
       });
     }
+    await settleLateAdminRequests(page);
   });
 
   test("traps mobile drawer focus and restores focus to its opener", async ({ page }) => {

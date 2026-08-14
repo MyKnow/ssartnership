@@ -36,11 +36,29 @@ test("required profile image object failure aborts the Preview sync", async () =
   assert.match(script, /shouldAbortPreviewStorageObjectSync\(bucketName\)/);
   assert.match(
     script,
-    /Preview required object \$\{bucketName\}\/\$\{objectPath\} could not be synchronized/,
+    /Preview required object in \$\{bucketName\} could not be synchronized/,
   );
+  assert.doesNotMatch(script, /(?:Downloading|Uploading|Skipping object).*\$\{objectPath\}/);
+  assert.doesNotMatch(script, /could not be synchronized[^\n]*\$\{objectPath\}/);
   assert.match(
     script,
     /Preview required bucket \$\{bucketName\} is missing \$\{missingPaths\.length\} synchronized object\(s\)/,
+  );
+});
+
+test("storage diagnostics retain status and code without private object paths", async () => {
+  const { formatStorageError } = await previewSyncStoragePromise;
+  const formatted = formatStorageError({
+    message: "failed member-profile-images/private/member-id/photo.webp",
+    status: 504,
+    code: "gateway_timeout",
+  });
+
+  assert.equal(formatted, "status=504,code_present=true");
+  assert.doesNotMatch(formatted, /member|private|photo\.webp/);
+  assert.equal(
+    formatStorageError({ message: "private/path.webp", code: "unsafe/path" }),
+    "code_present=true",
   );
 });
 

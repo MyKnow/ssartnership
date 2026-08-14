@@ -87,8 +87,10 @@ test("회원 이메일 완료 mock은 회원 갱신과 challenge 소비를 한 �
     { verified: true },
   );
   const snapshot = repository.getSnapshot();
-  const member = snapshot.members.find((item) => item.id === MEMBER_ID);
-  const challenge = snapshot.challenges.find((item) => item.id === "challenge-1");
+  const member = snapshot.members.find((item: { id: string }) => item.id === MEMBER_ID);
+  const challenge = snapshot.challenges.find(
+    (item: { id: string }) => item.id === "challenge-1",
+  );
 
   assert.equal(member?.emailNormalized, EMAIL);
   assert.equal(member?.emailVerifiedAt, NOW);
@@ -108,8 +110,10 @@ test("회원 갱신 뒤 challenge 저장이 실패해도 mock 원자 경계는 �
       !error.message.includes(EMAIL),
   );
   const snapshot = repository.getSnapshot();
-  const member = snapshot.members.find((item) => item.id === MEMBER_ID);
-  const challenge = snapshot.challenges.find((item) => item.id === "challenge-1");
+  const member = snapshot.members.find((item: { id: string }) => item.id === MEMBER_ID);
+  const challenge = snapshot.challenges.find(
+    (item: { id: string }) => item.id === "challenge-1",
+  );
 
   assert.equal(member?.emailNormalized, null);
   assert.equal(member?.emailVerifiedAt, null);
@@ -173,7 +177,7 @@ test("invalid, expired, consumed, exhausted challenge는 회원 이메일을 갱
     );
     const snapshot = repository.getSnapshot();
     assert.equal(
-      snapshot.members.find((item) => item.id === MEMBER_ID)?.emailNormalized,
+      snapshot.members.find((item: { id: string }) => item.id === MEMBER_ID)?.emailNormalized,
       null,
       scenario.name,
     );
@@ -242,6 +246,7 @@ test("Supabase repository는 RPC 결과만 domain 결과로 허용하고 provide
   await assert.rejects(
     failureRepository.completeMemberEmailVerification(completionInput),
     (error: unknown) => {
+      assert.ok(error instanceof Error);
       assert.ok(error instanceof MemberEmailVerificationStorageError);
       assert.equal(error.message, "member_email_verification_storage_failed");
       assert.doesNotMatch(JSON.stringify(error), /member@example\.com|secret-db-host/);

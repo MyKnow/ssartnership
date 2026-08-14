@@ -12,6 +12,7 @@ import {
   summarizeWebVitals,
   createAdminPreviewBasicAuthHeader,
   mergePreviewCookies,
+  parseAdminPreviewBaseUrl,
 } from "./admin-preview-performance-lib.mjs";
 
 const WINDOW_DAYS = 7;
@@ -231,10 +232,9 @@ async function measureHttpTargets(targets, accept, options) {
     };
   }
 
-  const parsedBaseUrl = new URL(baseUrl);
-  if (parsedBaseUrl.protocol !== "https:" && parsedBaseUrl.hostname !== "localhost") {
-    throw new Error("ADMIN_PREVIEW_URL_INVALID");
-  }
+  const parsedBaseUrl = parseAdminPreviewBaseUrl(baseUrl, {
+    allowLocalhost: process.env.CI !== "true" && process.env.GITHUB_ACTIONS !== "true",
+  });
 
   const iterations = parsePositiveInteger(process.env.ADMIN_PREVIEW_ITERATIONS, DEFAULT_ITERATIONS);
   const authorization = createAdminPreviewBasicAuthHeader();

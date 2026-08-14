@@ -8,6 +8,33 @@ export const ADMIN_WEB_VITAL_TARGETS = {
 };
 
 const ADMIN_VIEWPORTS = new Set(["mobile", "tablet", "desktop"]);
+export const ADMIN_PREVIEW_ORIGIN = "https://ssartnership-dev.myknow.xyz";
+
+export function parseAdminPreviewBaseUrl(value, { allowLocalhost = false } = {}) {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error("ADMIN_PREVIEW_URL_INVALID");
+  }
+  const isPinnedPreview = parsed.origin === ADMIN_PREVIEW_ORIGIN;
+  const isLocal = allowLocalhost
+    && parsed.protocol === "http:"
+    && (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1");
+  if (!isPinnedPreview && !isLocal) {
+    throw new Error("ADMIN_PREVIEW_URL_INVALID");
+  }
+  if (
+    parsed.username
+    || parsed.password
+    || parsed.pathname !== "/"
+    || parsed.search
+    || parsed.hash
+  ) {
+    throw new Error("ADMIN_PREVIEW_URL_INVALID");
+  }
+  return parsed;
+}
 
 function normalizeViewport(value) {
   return typeof value === "string" && ADMIN_VIEWPORTS.has(value)

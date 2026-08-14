@@ -9,7 +9,7 @@ test("pre-push gate mirrors Public Readiness before the full Playwright suite", 
 
   assert.equal(
     packageJson.scripts?.prepush,
-    "npm run check:lockfile && npm run validate:migrations && npm run lint && npm run typecheck:ci && npm test && npm run audit:security && npm run build && npm run test:e2e:ci",
+    "npm run check:install-scripts && npm run check:lockfile && npm run validate:migrations && npm run lint && npm run typecheck:ci && npm test && npm run audit:security && npm run build && npm run test:e2e:ci",
   );
   assert.match(packageJson.scripts?.["test:e2e:ci"] ?? "", /CI=1/);
   assert.match(
@@ -34,6 +34,11 @@ test("pre-push gate mirrors Public Readiness before the full Playwright suite", 
     new URL("../playwright.config.ts", import.meta.url),
     "utf8",
   );
+  assert.match(playwrightConfig, /retries:\s*0/);
+  assert.doesNotMatch(playwrightConfig, /retries:\s*process\.env\.CI/);
+  assert.match(playwrightConfig, /trace:\s*"retain-on-failure"/);
+  assert.match(playwrightConfig, /non-loopback BASE_URL requires an explicit/);
+  assert.match(playwrightConfig, /hostname === "127\.0\.0\.1"/);
   assert.match(playwrightConfig, /NEXT_DIST_DIR: "\.next-e2e"/);
   assert.match(playwrightConfig, /PARTNER_SESSION_SECRET:/);
 
@@ -42,4 +47,32 @@ test("pre-push gate mirrors Public Readiness before the full Playwright suite", 
     "utf8",
   );
   assert.match(eslintConfig, /"\.next-e2e\/\*\*"/);
+
+  const adminConsoleSpec = await readFile(
+    new URL("./e2e/admin-console.spec.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(adminConsoleSpec, /async function settleLateAdminRequests\(page: Page\)/);
+  assert.equal(
+    adminConsoleSpec.match(/await settleLateAdminRequests\(page\);/g)?.length,
+    2,
+  );
+  assert.doesNotMatch(adminConsoleSpec, /test\.afterEach/);
+  assert.doesNotMatch(adminConsoleSpec, /activeRequestsByPage/);
+
+  const responsiveTest = adminConsoleSpec.match(
+    /test\("keeps the registration queue inside narrow and wide viewports",[\s\S]*?\n  \}\);/,
+  )?.[0];
+  assert.ok(responsiveTest);
+  assert.equal(responsiveTest.match(/page\.goto\(/g)?.length, 1);
+  assert.match(responsiveTest, /page\.goto\("\/admin\/partner-registrations"\)/);
+  assert.doesNotMatch(responsiveTest, /page\.reload\(|\.click\(/);
+  assert.ok(
+    responsiveTest.indexOf('page.goto("/admin/partner-registrations")') <
+      responsiveTest.indexOf("for (const width"),
+  );
+  assert.ok(
+    responsiveTest.lastIndexOf("await settleLateAdminRequests(page)") >
+      responsiveTest.lastIndexOf("await page.screenshot"),
+  );
 });

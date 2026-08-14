@@ -11,6 +11,9 @@ const productEventContractModulePromise = import(
 const requestBodyLimitModulePromise = import(
   new URL("../src/lib/request-body-limit.ts", import.meta.url).href,
 );
+const activityLogRuntimeModulePromise = import(
+  new URL("../src/lib/activity-log-runtime.ts", import.meta.url).href,
+);
 
 const schemaSql = readFileSync(
   new URL("../supabase/schema.sql", import.meta.url),
@@ -54,6 +57,37 @@ test("all log sinks recursively redact credentials while keeping stable reason c
       },
       sessions: "[redacted]",
     },
+  );
+});
+
+test("activity persistence is bypassed only in the explicit non-production E2E mock runtime", async () => {
+  const { shouldBypassActivityLogPersistence } = await activityLogRuntimeModulePromise;
+
+  assert.equal(shouldBypassActivityLogPersistence({
+    NODE_ENV: "test",
+    E2E_MOCK_MUTATIONS: "1",
+    NEXT_PUBLIC_DATA_SOURCE: "mock",
+  }), true);
+  assert.equal(shouldBypassActivityLogPersistence({
+    NODE_ENV: "production",
+    E2E_MOCK_MUTATIONS: "1",
+    NEXT_PUBLIC_DATA_SOURCE: "mock",
+  }), false);
+  assert.equal(shouldBypassActivityLogPersistence({
+    NODE_ENV: "test",
+    E2E_MOCK_MUTATIONS: "0",
+    NEXT_PUBLIC_DATA_SOURCE: "mock",
+  }), false);
+  assert.equal(shouldBypassActivityLogPersistence({
+    NODE_ENV: "test",
+    E2E_MOCK_MUTATIONS: "1",
+    NEXT_PUBLIC_DATA_SOURCE: "supabase",
+  }), false);
+
+  assert.equal(
+    activityLogsSource.match(/if \(shouldBypassActivityLogPersistence\(\)\)/g)?.length,
+    3,
+    "all three persistence sinks must share the exact mock-runtime guard",
   );
 });
 

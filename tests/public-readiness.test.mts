@@ -27,7 +27,7 @@ test("GitHub Actions use the Node 24 action runtime and project runtime with rea
       ...workflow.matchAll(/actions\/setup-node@(v\d+(?:\.\d+)*)/g),
     ].map((match) => match[1]);
     const projectNodeVersions = [
-      ...workflow.matchAll(/node-version:\s*["']?(\d+)["']?/g),
+      ...workflow.matchAll(/node-version:\s*["']?([^\s"'#]+)["']?/g),
     ].map((match) => match[1]);
 
     assert.ok(checkoutVersions.length > 0, `${filename}: checkout action missing`);
@@ -49,8 +49,8 @@ test("GitHub Actions use the Node 24 action runtime and project runtime with rea
     );
     assert.deepEqual(
       new Set(projectNodeVersions),
-      new Set(["24"]),
-      `${filename}: project commands must run on Node 24`,
+      new Set(["24.18.1"]),
+      `${filename}: project commands must run on the pinned Node release`,
     );
     assert.match(
       workflow,
@@ -68,7 +68,7 @@ test("public readiness CI workflow gates launch-critical checks", () => {
     "pull_request:",
     "workflow_dispatch:",
     "node-version: 24.18.1",
-    "npm ci",
+    "npm run install:trusted",
     "npm run check:lockfile",
     "npm run validate:migrations",
     "npm run lint",
@@ -104,6 +104,7 @@ test("local prepush and release use the same Public Readiness gates", () => {
   const prepush = packageJson.scripts.prepush;
 
   for (const requiredCommand of [
+    "npm run check:install-scripts",
     "npm run check:lockfile",
     "npm run validate:migrations",
     "npm run lint",
@@ -322,9 +323,10 @@ test("Preview Supabase migrations apply dev schema changes without syncing data"
     "branches: [main]",
     "workflow_dispatch:",
     "APPLY_PREVIEW_MIGRATIONS",
+    "expected_dev_sha:",
     "[apply-preview-migrations]",
     "github.ref == 'refs/heads/main'",
-    "ref: dev",
+    "ref: ${{ steps.select-dev.outputs.sha }}",
     "npm run validate:migrations",
     "SUPABASE_PREVIEW_DB_URL",
     'supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes',
@@ -347,6 +349,12 @@ test("Preview Supabase migrations apply dev schema changes without syncing data"
   assert.doesNotMatch(
     workflow,
     /sync:preview|SUPABASE_PRODUCTION_DB_URL|--include-all/,
+  );
+  assert.doesNotMatch(workflow, /ref: dev/);
+  assert.match(workflow, /git ls-remote "\$REPOSITORY_URL" refs\/heads\/dev/);
+  assert.match(
+    workflow,
+    /name: Apply pending Preview migrations[\s\S]+?test "\$\(git rev-parse HEAD\)" = "\$EXPECTED_DEV_SHA"[\s\S]+?git ls-remote origin refs\/heads\/dev[\s\S]+?supabase db push/,
   );
 });
 
