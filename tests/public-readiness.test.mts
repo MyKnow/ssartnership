@@ -358,20 +358,78 @@ test("Preview Supabase migrations apply dev schema changes without syncing data"
   );
 });
 
+test("Preview sync isolates non-eligible completions from the mutation queue", () => {
+  const workflow = readRepoFile(".github/workflows/preview-sync.yml");
+  const concurrencyBlock = workflow.match(
+    /concurrency:\s*\n([\s\S]+?)\n\njobs:/,
+  )?.[1];
+
+  assert.ok(concurrencyBlock, "Preview sync concurrency block missing");
+  assert.match(concurrencyBlock, /group:\s*>-/);
+  assert.match(
+    concurrencyBlock,
+    /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/dev'[\s\S]+?github\.event_name == 'workflow_run'[\s\S]+?github\.event\.workflow_run\.conclusion == 'success'[\s\S]+?github\.event\.workflow_run\.event == 'push'[\s\S]+?github\.event\.workflow_run\.head_branch == 'dev'[\s\S]+?&& 'preview-sync' \|\|[\s\S]+?format\('preview-sync-noop-\{0\}', github\.run_id\)/,
+  );
+  assert.equal(
+    [
+      ...concurrencyBlock.matchAll(
+        /format\('preview-sync-noop-\{0\}', github\.run_id\)/g,
+      ),
+    ].length,
+    1,
+  );
+  assert.match(concurrencyBlock, /cancel-in-progress:\s+false/);
+});
+
+test("Preview sync concurrency and job guards use the same eligibility predicate", () => {
+  const workflow = readRepoFile(".github/workflows/preview-sync.yml");
+  const concurrencyEligibility = workflow.match(
+    /concurrency:\s*\n\s+group:\s*>-\s*\n([\s\S]+?)\n\s+cancel-in-progress:/,
+  )?.[1];
+  const jobEligibility = workflow.match(
+    /jobs:\s*\n\s+sync-preview:\s*\n\s+if:\s*>-\s*\n([\s\S]+?)\n\s+runs-on:/,
+  )?.[1];
+
+  assert.ok(concurrencyEligibility, "Preview sync concurrency eligibility missing");
+  assert.ok(jobEligibility, "Preview sync job eligibility guard missing");
+
+  const compactExpression = (expression: string) =>
+    expression.replace(/\s+/g, "").replace(/^\$\{\{/, "").replace(/\}\}$/, "");
+  const compactJobEligibility = compactExpression(jobEligibility);
+  const queueSelection =
+    "&&'preview-sync'||format('preview-sync-noop-{0}',github.run_id)";
+
+  assert.equal(
+    compactExpression(concurrencyEligibility),
+    `(${compactJobEligibility})${queueSelection}`,
+  );
+});
+
 test("Preview sync follows the latest successful dev public-readiness run without stale reruns", () => {
   const workflow = readRepoFile(".github/workflows/preview-sync.yml");
+  const jobEligibility = workflow.match(
+    /jobs:\s*\n\s+sync-preview:\s*\n\s+if:\s*>-\s*\n([\s\S]+?)\n\s+runs-on:/,
+  )?.[1];
 
   assert.match(workflow, /name: Sync Preview Supabase/);
   assert.match(workflow, /workflow_run:/);
   assert.match(workflow, /workflows:\s*\n\s+- Public Readiness/);
   assert.match(workflow, /branches:\s*\[dev\]/);
   assert.match(workflow, /types:\s*\n\s+- completed/);
-  assert.match(workflow, /group:\s+preview-sync/);
-  assert.match(workflow, /cancel-in-progress:\s+false/);
-  assert.match(workflow, /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/dev'/);
-  assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/);
-  assert.match(workflow, /github\.event\.workflow_run\.event == 'push'/);
-  assert.match(workflow, /github\.event\.workflow_run\.head_branch == 'dev'/);
+  assert.ok(jobEligibility, "Preview sync job eligibility guard missing");
+  assert.match(
+    jobEligibility,
+    /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/dev'/,
+  );
+  assert.match(
+    jobEligibility,
+    /github\.event\.workflow_run\.conclusion == 'success'/,
+  );
+  assert.match(jobEligibility, /github\.event\.workflow_run\.event == 'push'/);
+  assert.match(
+    jobEligibility,
+    /github\.event\.workflow_run\.head_branch == 'dev'/,
+  );
   assert.match(workflow, /name: Guard stale dev workflow SHA/);
   assert.match(workflow, /git ls-remote origin refs\/heads\/dev/);
   assert.match(workflow, /steps\.stale-sha\.outputs\.is_current == 'true'/);
