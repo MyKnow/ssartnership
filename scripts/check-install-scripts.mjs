@@ -1,13 +1,17 @@
+#!/usr/bin/env node
+
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  existsSync,
   lstatSync,
   mkdirSync,
   readFileSync,
   readdirSync,
   realpathSync,
+  writeFileSync,
 } from "node:fs";
-import { delimiter, dirname, isAbsolute, resolve } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -45,6 +49,8 @@ const pinnedPlatformPackages = {
     "sha512-yHs+0uc8+nvEAfAfxrWQKK5peSNzBc4PegcMO0EJ2hT71uA7vB8Ihg2e77R2P7SG5uYjPbHlLLmve4LLLRCf0g==",
   "@esbuild/linux-x64":
     "sha512-u/anNYF2mmVOEDwLtnQ1wOr3EZ9sTNGLWrsYGYwHWzGA3Si84IOkHXlbWTD1NB+9/1lcnweYKO54uhxZydNzfA==",
+  "@esbuild/win32-x64":
+    "sha512-bm4Mowrv+GXMlpWX++EcXw/iLyd1o3+bJkC2DkWXYVvgZCqD/bSj9ctZeAMC3cIxgjRVR2Dufaiu4YPxr5gW1A==",
 };
 const rootInstallEvents = [
   "preinstall",
@@ -128,7 +134,7 @@ export function validateStaticInstallPolicy({
     "omit-lockfile-registry-resolved=false",
   ];
   if (JSON.stringify(configLines) !== JSON.stringify(expectedConfigLines)) {
-    throw new Error(".npmrc install-script controls changed or contain an override.");
+    throw new Error(".npmrc install controls changed or contain an override.");
   }
   if (JSON.stringify(packageJson.allowScripts) !== JSON.stringify(expectedPolicy)) {
     throw new Error("allowScripts policy changed; every dependency lifecycle must stay denied.");
@@ -280,7 +286,6 @@ export function validateStaticInstallPolicy({
       "esbuild must retain its exact version, registry URL, integrity, and denied lifecycle.",
     );
   }
-
   const platformEntries = packageEntries.filter(([path]) =>
     path.startsWith("node_modules/@esbuild/"));
   for (const [path, entry] of platformEntries) {
@@ -351,14 +356,18 @@ export function validateEffectiveNpmConfig({
   }
 }
 
+/**
+ * @param {NodeJS.ProcessEnv} [source]
+ * @returns {NodeJS.ProcessEnv}
+ */
 export function buildControlledInstallEnvironment(source = process.env) {
-  const installHome = resolve(repositoryRoot, ".tmp/install-home");
-  const npmCache = resolve(repositoryRoot, ".tmp/npm-cache");
+  const installRoot = resolve(repositoryRoot, ".tmp/install-state");
+  /** @type {NodeJS.ProcessEnv} */
   const environment = {
-    HOME: installHome,
-    NPM_CONFIG_CACHE: npmCache,
-    PATH: [dirname(process.execPath), "/usr/local/bin", "/usr/bin", "/bin"]
-      .join(delimiter),
+    NPM_CONFIG_CACHE: resolve(installRoot, "cache"),
+    NPM_CONFIG_GLOBALCONFIG: resolve(installRoot, "global.npmrc"),
+    NPM_CONFIG_USERCONFIG: resolve(repositoryRoot, ".npmrc"),
+    PATH: dirname(process.execPath),
   };
   for (const key of [
     "CI",
@@ -374,10 +383,12 @@ export function buildControlledInstallEnvironment(source = process.env) {
     "RUNNER_OS",
     "SSL_CERT_DIR",
     "SSL_CERT_FILE",
+    "SystemRoot",
     "TERM",
     "TEMP",
     "TMP",
     "TMPDIR",
+    "WINDIR",
     "http_proxy",
     "https_proxy",
     "no_proxy",
@@ -390,7 +401,6 @@ export function buildControlledInstallEnvironment(source = process.env) {
   environment.NPM_CONFIG_IGNORE_SCRIPTS = "true";
   environment.NPM_CONFIG_OMIT_LOCKFILE_REGISTRY_RESOLVED = "false";
   environment.NPM_CONFIG_REGISTRY = "https://registry.npmjs.org/";
-  environment.NPM_CONFIG_USERCONFIG = resolve(repositoryRoot, ".npmrc");
   return environment;
 }
 
@@ -432,8 +442,14 @@ export function checkInstallScriptPolicy({
   environment = buildControlledInstallEnvironment(),
   npmCliPath = resolveTrustedNpmCliPath(),
 } = {}) {
-  mkdirSync(environment.HOME, { recursive: true, mode: 0o700 });
   mkdirSync(environment.NPM_CONFIG_CACHE, { recursive: true, mode: 0o700 });
+  if (!existsSync(environment.NPM_CONFIG_GLOBALCONFIG)) {
+    writeFileSync(environment.NPM_CONFIG_GLOBALCONFIG, "", {
+      encoding: "utf8",
+      flag: "wx",
+      mode: 0o600,
+    });
+  }
   const packageJson = JSON.parse(
     readFileSync(resolve(repositoryRoot, "package.json"), "utf8"),
   );
@@ -441,17 +457,19 @@ export function checkInstallScriptPolicy({
     readFileSync(resolve(repositoryRoot, "package-lock.json"), "utf8"),
   );
   const npmConfig = readFileSync(resolve(repositoryRoot, ".npmrc"), "utf8");
+  const vendorRoot = resolve(repositoryRoot, "vendor/archiver-cjs-compat");
   const vendorPackageJson = JSON.parse(
-    readFileSync(resolve(repositoryRoot, "vendor/archiver-cjs-compat/package.json"), "utf8"),
+    readFileSync(resolve(vendorRoot, "package.json"), "utf8"),
   );
   const vendorDigests = {
-    "index.cjs": sha256(resolve(repositoryRoot, "vendor/archiver-cjs-compat/index.cjs")),
-    "package.json": sha256(resolve(repositoryRoot, "vendor/archiver-cjs-compat/package.json")),
+    "index.cjs": sha256(resolve(vendorRoot, "index.cjs")),
+    "package.json": sha256(resolve(vendorRoot, "package.json")),
   };
-  const vendorFiles = readdirSync(resolve(repositoryRoot, "vendor/archiver-cjs-compat"))
-    .sort();
-  if (JSON.stringify(vendorFiles) !== JSON.stringify(["index.cjs", "package.json"])) {
-    throw new Error("the reviewed local archiver package file inventory changed.");
+  if (JSON.stringify(readdirSync(vendorRoot).sort()) !== JSON.stringify([
+    "index.cjs",
+    "package.json",
+  ])) {
+    throw new Error("the reviewed local archiver file inventory changed.");
   }
 
   validateStaticInstallPolicy({
@@ -466,11 +484,7 @@ export function checkInstallScriptPolicy({
     npmVersionText,
     githubActions: environment.GITHUB_ACTIONS === "true",
     config: {
-      allowGit: readNpm(
-        ["config", "get", "allow-git"],
-        environment,
-        npmCliPath,
-      ),
+      allowGit: readNpm(["config", "get", "allow-git"], environment, npmCliPath),
       ignoreScripts: readNpm(
         ["config", "get", "ignore-scripts"],
         environment,

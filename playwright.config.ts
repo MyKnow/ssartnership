@@ -3,6 +3,10 @@ import { defineConfig, devices } from "@playwright/test";
 const e2ePort = process.env.E2E_PORT ?? "3100";
 const baseURL = process.env.BASE_URL ?? `http://127.0.0.1:${e2ePort}`;
 const adminBaseURL = process.env.BASE_URL ?? `http://localhost:${e2ePort}`;
+const nodeExecutable =
+  process.platform === "win32"
+    ? `"${process.execPath.replaceAll('"', '""')}"`
+    : JSON.stringify(process.execPath);
 const chromiumChannel = process.env.PLAYWRIGHT_CHROMIUM_CHANNEL === "chrome" ? "chrome" : undefined;
 const isLoopbackBaseURL = (() => {
   try {
@@ -18,7 +22,7 @@ if (!isLoopbackBaseURL && !process.env.E2E_ADMIN_GATEWAY_PASSWORD) {
   );
 }
 const e2eAdminGatewayPassword =
-  process.env.E2E_ADMIN_GATEWAY_PASSWORD ?? ["e2e", "admin", "gateway", "password"].join("-");
+  process.env.E2E_ADMIN_GATEWAY_PASSWORD ?? ["e2e", "admin", "gateway", "password", "minimum", "32", "chars"].join("-");
 const e2eAdminGatewayCredentials = {
   username: process.env.E2E_ADMIN_GATEWAY_USERNAME ?? "e2e-admin-gateway",
   password: e2eAdminGatewayPassword,
@@ -72,7 +76,9 @@ export default defineConfig({
   webServer: process.env.BASE_URL
     ? undefined
     : {
-        command: `npm run dev -- --hostname 127.0.0.1 --port ${e2ePort} --webpack`,
+        // Keep the web server on the same pinned Node runtime as Playwright.
+        // Invoking a PATH-resolved npm can otherwise select another Node install.
+        command: `${nodeExecutable} scripts/dev.mjs --hostname 127.0.0.1 --port ${e2ePort} --webpack`,
         url: baseURL,
         reuseExistingServer: false,
         timeout: 120_000,

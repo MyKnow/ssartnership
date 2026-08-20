@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
-const repoRoot = new URL("..", import.meta.url).pathname;
+const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
 function readRepoFile(path: string) {
   return readFileSync(join(repoRoot, path), "utf8");
@@ -349,7 +350,7 @@ test("관리자 회원 화면과 수정 액션은 정규화된 회원 관계만 
   assert.match(memberListReadModel, /marketing_enabled/);
   assert.match(
     memberListReadModel,
-    /mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation/,
+    /mattermost_account_id,manual_login_id,display_name,email,email_normalized,generation,staff_source_generation/,
   );
   assert.match(
     memberListReadModel,

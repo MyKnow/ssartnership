@@ -10,8 +10,9 @@ import {
   symlinkSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 const read = (path: string) =>
   readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
@@ -29,7 +30,10 @@ const reviewedWorkflowNpmCommands = new Set([
   "npm run audit:security",
   "npm run build",
   "npm run build-storybook",
+  "npm run bootstrap -- --ci --skip-install",
+  "npm run check:cross-platform",
   "npm run check:lockfile",
+  "npm run doctor -- --ci",
   "npm run install:trusted",
   "npm run lint",
   "npm run measure:admin:preview",
@@ -370,12 +374,12 @@ test("trusted dependency installation disables every lifecycle and verifies one 
   assert.match(installScriptGate, /unreviewed non-registry dependency source/);
   assert.match(installScriptGate, /expectedVendorDigests/);
   assert.match(installScriptGate, /buildControlledInstallEnvironment/);
-  assert.match(read("package.json"), /"prepush": "npm run check:install-scripts/);
-  assert.equal(packageJson.scripts?.["install:trusted"], "node scripts/install-dependencies.mjs");
   assert.match(
-    vercel.installCommand ?? "",
-    /^env -i [^\n]+ npm run install:trusted$/,
+    read("package.json"),
+    /"prepush": "node scripts\/run-package-scripts\.mjs check:install-scripts check:cross-platform check:lockfile/,
   );
+  assert.equal(packageJson.scripts?.["install:trusted"], "node scripts/install-dependencies.mjs");
+  assert.equal(vercel.installCommand, "npm run install:trusted");
 
   const vendorPackageJson = JSON.parse(read("vendor/archiver-cjs-compat/package.json"));
   const vendorDigests = {
@@ -709,13 +713,18 @@ test("trusted dependency installation disables every lifecycle and verifies one 
     VERCEL_SYNTHETIC_SECRET: "synthetic-vercel-secret",
   });
   assert.notEqual(controlledEnvironment.PATH, "/safe/bin");
-  assert.match(controlledEnvironment.PATH, new RegExp(`^${process.execPath.replace(/\/[^/]+$/, "")}`));
+  assert.equal(controlledEnvironment.PATH, dirname(process.execPath));
   assert.equal(controlledEnvironment.CI, "true");
   assert.equal(controlledEnvironment.GITHUB_ACTIONS, "true");
   assert.equal(controlledEnvironment.RUNNER_OS, "Linux");
   assert.equal(controlledEnvironment.RUNNER_ARCH, "X64");
-  assert.match(controlledEnvironment.HOME, /\.tmp\/install-home$/);
-  assert.match(controlledEnvironment.NPM_CONFIG_CACHE, /\.tmp\/npm-cache$/);
+  assert.equal(controlledEnvironment.HOME, undefined);
+  assert.match(controlledEnvironment.NPM_CONFIG_CACHE, /\.tmp[/\\]install-state[/\\]cache$/);
+  assert.match(
+    controlledEnvironment.NPM_CONFIG_GLOBALCONFIG,
+    /\.tmp[/\\]install-state[/\\]global\.npmrc$/,
+  );
+  assert.match(controlledEnvironment.NPM_CONFIG_USERCONFIG, /\.npmrc$/);
   assert.equal(controlledEnvironment.NPM_CONFIG_ALLOW_GIT, "none");
   assert.equal(controlledEnvironment.NPM_CONFIG_IGNORE_SCRIPTS, "true");
   assert.equal(controlledEnvironment.NPM_CONFIG_OMIT_LOCKFILE_REGISTRY_RESOLVED, "false");
@@ -954,7 +963,7 @@ test("the run auditor is read-only, persists no GitHub text, and exposes help", 
   assert.match(script, /firstLineNumbers/);
   assert.match(script, /never persists GitHub-provided log, annotation, workflow, job, step, or path text/);
 
-  const help = execFileSync(process.execPath, [new URL(`../${scriptPath}`, import.meta.url).pathname, "--help"], {
+  const help = execFileSync(process.execPath, [fileURLToPath(new URL(`../${scriptPath}`, import.meta.url)), "--help"], {
     encoding: "utf8",
   });
   assert.match(help, /--repo OWNER\/REPO --run-id ID --attempt N/);
@@ -1115,9 +1124,13 @@ test("the run auditor emits structural evidence for hostile text and confines ou
     () => auditor.resolveSafeOutputPath("../outside.json", "/tmp/repo"),
     /must be inside \.tmp\/actions-audit/,
   );
-  assert.match(
-    auditor.resolveSafeOutputPath(".tmp/actions-audit/run-1.json", "/tmp/repo").target,
-    /\/tmp\/repo\/\.tmp\/actions-audit\/run-1\.json$/,
+  const safeOutput = auditor.resolveSafeOutputPath(
+    ".tmp/actions-audit/run-1.json",
+    "/tmp/repo",
+  );
+  assert.equal(
+    relative("/tmp/repo", safeOutput.target),
+    join(".tmp", "actions-audit", "run-1.json"),
   );
 
   const tempRoot = mkdtempSync(join(realpathSync(tmpdir()), "actions-auditor-"));
@@ -1130,7 +1143,11 @@ test("the run auditor emits structural evidence for hostile text and confines ou
     repositoryRoot,
   );
   const outputPath = join(repositoryRoot, ".tmp/actions-audit/run-1.json");
-  assert.equal(statSync(outputPath).mode & 0o777, 0o600);
+  const outputStat = statSync(outputPath);
+  assert.equal(outputStat.isFile(), true);
+  if (process.platform !== "win32") {
+    assert.equal(outputStat.mode & 0o777, 0o600);
+  }
   assert.throws(
     () => auditor.writeAuditFile(
       ".tmp/actions-audit/run-1.json",

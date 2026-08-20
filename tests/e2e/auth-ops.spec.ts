@@ -1,7 +1,17 @@
 import { expect, test } from "@playwright/test";
 
+let hasWarmedAuthRoute = false;
+
 test.describe("auth and partner portal operation flows", () => {
   test.beforeEach(async ({ page }) => {
+    if (!hasWarmedAuthRoute) {
+      await page.goto("/auth/login");
+      await expect(
+        page.getByRole("textbox", { name: "아이디 또는 이메일" }),
+      ).toBeVisible();
+      hasWarmedAuthRoute = true;
+    }
+
     const resetResponse = await page.request.post("/api/e2e/mock/reset");
     expect(resetResponse.ok()).toBe(true);
   });

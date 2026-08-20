@@ -1,0 +1,83 @@
+name: Cross-Platform Development Environment
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - ".github/workflows/cross-platform-development.yml"
+      - ".gitattributes"
+      - ".node-version"
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/**"
+      - "tests/cross-platform-development-contract.test.mts"
+      - "tests/development-environment.test.mts"
+  pull_request:
+    paths:
+      - ".github/workflows/cross-platform-development.yml"
+      - ".gitattributes"
+      - ".node-version"
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/**"
+      - "tests/cross-platform-development-contract.test.mts"
+      - "tests/development-environment.test.mts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: Windows x64
+            os: windows-2025
+          - platform: macOS arm64
+            os: macos-26
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        env:
+          NPM_CONFIG_CACHE: ${{ github.workspace }}/.tmp/npm-cache
+        with:
+          node-version: 24.18.1
+          cache: npm
+
+      - name: Install trusted dependencies
+        run: npm run install:trusted
+
+      - name: Bootstrap
+        run: npm run bootstrap -- --ci --skip-install
+
+      - name: Doctor
+        run: npm run doctor -- --ci
+
+      - name: Cross-platform policy
+        run: npm run check:cross-platform
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck:ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build

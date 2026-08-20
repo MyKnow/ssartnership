@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
-const repoRoot = new URL("..", import.meta.url).pathname;
+const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const partnerScopeMigration =
   "20260813115043_restore_partner_registration_scope_whitespace.sql";
 const pgTrgmMigration =
@@ -24,6 +25,7 @@ const expectedAdminIndexNames = [
   "event_logs_admin_task_outcome_created_at_idx",
   "members_admin_display_name_trgm_idx",
   "members_admin_manual_login_id_trgm_idx",
+  "members_admin_email_normalized_trgm_idx",
   "mm_user_directory_admin_username_trgm_idx",
   "mm_user_directory_admin_user_id_trgm_idx",
   "event_logs_admin_performance_viewport_idx",
@@ -31,11 +33,16 @@ const expectedAdminIndexNames = [
   "members_admin_recipient_display_name_idx",
 ] as const;
 
-const expectedTrigramIndexNames = [
+const relocatedTrigramIndexNames = [
   "members_admin_display_name_trgm_idx",
   "members_admin_manual_login_id_trgm_idx",
   "mm_user_directory_admin_username_trgm_idx",
   "mm_user_directory_admin_user_id_trgm_idx",
+] as const;
+
+const expectedTrigramIndexNames = [
+  ...relocatedTrigramIndexNames,
+  "members_admin_email_normalized_trgm_idx",
 ] as const;
 
 const schemaIndexDependencies = [
@@ -68,6 +75,13 @@ const schemaIndexDependencies = [
   ],
   [
     "members_admin_manual_login_id_trgm_idx",
+    [
+      "create extension if not exists pg_trgm with schema extensions;",
+      "create table if not exists members (",
+    ],
+  ],
+  [
+    "members_admin_email_normalized_trgm_idx",
     [
       "create extension if not exists pg_trgm with schema extensions;",
       "create table if not exists members (",
@@ -213,7 +227,7 @@ test("final partner registration RPC restores whitespace-tolerant nationwide loc
   );
 });
 
-test("pg_trgm relocation preserves the four live trigram index contracts", () => {
+test("pg_trgm relocation preserves the original four trigram index contracts", () => {
   const migration = readRepoFile(`supabase/migrations/${pgTrgmMigration}`);
 
   assert.match(migration, /create schema if not exists extensions;/i);
@@ -229,7 +243,7 @@ test("pg_trgm relocation preserves the four live trigram index contracts", () =>
   assert.match(migration, /opclass_schema\.nspname = 'extensions'/i);
   assert.match(migration, /pg_trgm_index_contract_invalid/i);
 
-  for (const indexName of expectedTrigramIndexNames) {
+  for (const indexName of relocatedTrigramIndexNames) {
     assert.equal(
       countLiteral(migration, `'${indexName}'`),
       1,

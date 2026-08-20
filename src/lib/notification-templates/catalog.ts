@@ -507,8 +507,8 @@ const emailTemplates: NotificationTemplateDefinition[] = [
   }),
   defineTemplate({
     eventKey: "email.manual_member_password_reset",
-    label: "수동 추가 회원 비밀번호 재설정",
-    description: "수동 추가 회원의 비밀번호 재설정 링크를 전송합니다.",
+    label: "회원 비밀번호 재설정",
+    description: "회원에게 비밀번호 재설정 링크를 전송합니다.",
     group: "회원·수료생 이메일",
     channel: "email",
     titleTemplate: "[{siteName}] 비밀번호 재설정",
