@@ -175,6 +175,8 @@ test("테스트 파일 URL과 비교 경로를 운영체제 중립적으로 처�
     "tests/mattermost-direct-reversion.test.mts",
     "tests/mattermost-signup-campus.test.mts",
     "tests/member-normalized-auth-contract.test.mts",
+    "tests/member-anonymization-schema-contract.test.mts",
+    "tests/member-wallet-lifecycle-sql-contract.test.mts",
     "tests/production-migration-hygiene.test.mts",
     "tests/github-actions-operations-skill.test.mts",
   ];

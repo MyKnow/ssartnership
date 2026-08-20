@@ -130,6 +130,19 @@ test("local prepush and release use the same Public Readiness gates", () => {
   );
 });
 
+test("auth E2E mock reset waits for a semantic application readiness boundary", () => {
+  const authOperations = readRepoFile("tests/e2e/auth-ops.spec.ts");
+  const readinessIndex = authOperations.indexOf('await page.goto("/auth/login");');
+  const resetIndex = authOperations.indexOf('page.request.post("/api/e2e/mock/reset")');
+
+  assert.ok(readinessIndex >= 0, "auth operations must warm the login route first");
+  assert.ok(resetIndex > readinessIndex, "mock reset must follow route readiness");
+  assert.match(
+    authOperations,
+    /getByRole\("textbox", \{ name: "아이디 또는 이메일" \}\)[\s\S]*?\.toBeVisible\(\);[\s\S]*?page\.request\.post\("\/api\/e2e\/mock\/reset"\)/,
+  );
+});
+
 test("active workflows use the current Node 24 GitHub action majors", () => {
   const workflowsDirectory = new URL("../.github/workflows/", import.meta.url);
   const workflowNames = readdirSync(workflowsDirectory)
