@@ -178,6 +178,18 @@ test("테스트 파일 URL과 비교 경로를 운영체제 중립적으로 처�
   assert.match(terminologyContract, /\.split\(path\.sep\)\.join\("\/"\)/u);
 });
 
+test("테스트 glob과 E2E mock 환경은 깨끗한 Windows와 CI에서도 같은 계약을 사용한다", async () => {
+  const vitestConfig = await readRepoFile("vitest.config.ts");
+  const playwrightConfig = await readRepoFile("playwright.config.ts");
+
+  assert.match(vitestConfig, /include: \["tests\/unit\/\*\*\/\*\.test\.ts"\]/u);
+  assert.doesNotMatch(
+    vitestConfig,
+    /path\.join\(dirname, "tests", "unit", "\*\*", "\*\.test\.ts"\)/u,
+  );
+  assert.match(playwrightConfig, /MOCK_MEMBER_AUTH: "1"/u);
+});
+
 test("Storybook browser 전역 상태와 종료 진단을 명시적으로 정리한다", async () => {
   const packageJson = JSON.parse(await readRepoFile("package.json")) as {
     scripts?: Record<string, string>;
