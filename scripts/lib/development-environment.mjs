@@ -385,7 +385,14 @@ export function validateEnvironment(environment) {
   return diagnostics;
 }
 
-export function resolveNpmCliPath(environment = process.env) {
+export function resolveNpmCliPath(
+  environment = process.env,
+  {
+    executablePath = process.execPath,
+    pathModule = { dirname, join },
+    exists = existsSync,
+  } = {},
+) {
   const npmExecPath = environment.npm_execpath?.trim();
   if (npmExecPath) {
     return npmExecPath;
@@ -394,11 +401,41 @@ export function resolveNpmCliPath(environment = process.env) {
   // Playwright starts the local web server through Node directly. Discover the
   // npm CLI bundled with that exact runtime so doctor remains valid even when
   // another npm installation appears first on PATH.
-  const executableDirectory = dirname(process.execPath);
+  const executableDirectory = pathModule.dirname(executablePath);
   const bundledNpmCandidates = [
-    join(executableDirectory, "node_modules", "npm", "bin", "npm-cli.js"),
-    join(
+    pathModule.join(
       executableDirectory,
+      "node_modules",
+      "npm",
+      "bin",
+      "npm-cli.js",
+    ),
+    // Windows hosted runtimes can keep node.exe in an architecture directory
+    // while placing npm next to the version directory.
+    pathModule.join(
+      executableDirectory,
+      "..",
+      "node_modules",
+      "npm",
+      "bin",
+      "npm-cli.js",
+    ),
+    pathModule.join(
+      executableDirectory,
+      "..",
+      "lib",
+      "node_modules",
+      "npm",
+      "bin",
+      "npm-cli.js",
+    ),
+    // Homebrew resolves node to a Cellar path while npm remains linked from
+    // the stable prefix's global lib directory.
+    pathModule.join(
+      executableDirectory,
+      "..",
+      "..",
+      "..",
       "..",
       "lib",
       "node_modules",
@@ -408,7 +445,7 @@ export function resolveNpmCliPath(environment = process.env) {
     ),
   ];
 
-  return bundledNpmCandidates.find((candidate) => existsSync(candidate)) ?? null;
+  return bundledNpmCandidates.find((candidate) => exists(candidate)) ?? null;
 }
 
 export function runNodeCli(cliPath, args, options = {}) {
