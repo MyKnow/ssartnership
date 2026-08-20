@@ -56,9 +56,25 @@ test("표준 개발 명령과 교차 플랫폼 정책이 repository contract에 
     scripts?: Record<string, string>;
   };
   const scripts = packageJson.scripts ?? {};
+  const lockfile = JSON.parse(await readRepoFile("package-lock.json")) as {
+    packages?: Record<string, { engines?: Record<string, string> }>;
+  };
+  const developmentEnvironment = await readRepoFile(
+    "scripts/lib/development-environment.mjs",
+  );
 
   assert.equal(packageJson.packageManager, "npm@11.16.0");
-  assert.equal(packageJson.engines?.node, "24.18.1");
+  assert.equal(packageJson.engines?.node, ">=24.18.1 <25");
+  assert.equal(lockfile.packages?.[""]?.engines?.node, ">=24.18.1 <25");
+  assert.equal((await readRepoFile(".node-version")).trim(), "24.18.1");
+  assert.match(
+    developmentEnvironment,
+    /REQUIRED_NODE_VERSION = "24\.18\.1"/u,
+  );
+  assert.match(
+    developmentEnvironment,
+    /DEPLOYMENT_NODE_VERSION_RANGE = ">=24\.18\.1 <25"/u,
+  );
   assert.equal(scripts.bootstrap, "node scripts/bootstrap.mjs");
   assert.equal(scripts.doctor, "node scripts/doctor.mjs");
   assert.equal(scripts.dev, "node scripts/dev.mjs");

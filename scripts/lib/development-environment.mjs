@@ -12,6 +12,7 @@ import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const REQUIRED_NODE_VERSION = "24.18.1";
+export const DEPLOYMENT_NODE_VERSION_RANGE = ">=24.18.1 <25";
 export const REQUIRED_NPM_VERSION = "11.16.0";
 export const DEVELOPMENT_PORT = 3000;
 

@@ -11,7 +11,11 @@ import {
   findNonPortablePackageScripts,
   validateNativeDependencyMatrix,
 } from "./lib/cross-platform-policy.mjs";
-import { repositoryRoot } from "./lib/development-environment.mjs";
+import {
+  DEPLOYMENT_NODE_VERSION_RANGE,
+  REQUIRED_NODE_VERSION,
+  repositoryRoot,
+} from "./lib/development-environment.mjs";
 
 const failures = [];
 
@@ -189,11 +193,11 @@ if (packageJson.packageManager !== "npm@11.16.0") {
     "Pin npm@11.16.0 as the development environment source of truth.",
   );
 }
-if (packageJson.engines?.node !== "24.18.1") {
+if (packageJson.engines?.node !== DEPLOYMENT_NODE_VERSION_RANGE) {
   addFailure(
-    "node_runtime_not_pinned",
+    "deployment_node_range_invalid",
     "package.json#engines.node",
-    "Pin Node.js 24.18.1 as the development environment source of truth.",
+    `Allow deployment providers to use Node.js ${REQUIRED_NODE_VERSION} through the next major version while keeping local and CI tooling pinned exactly.`,
   );
 }
 
