@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { classifyMattermostSignupProfile } from "../src/lib/mm-signup-approval.ts";
 
-const repoRoot = new URL("..", import.meta.url).pathname;
+const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
 function readRepoFile(path: string) {
   return readFileSync(join(repoRoot, path), "utf8");

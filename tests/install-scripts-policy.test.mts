@@ -40,6 +40,22 @@ test("trusted install 정책이 registry identity와 lifecycle inventory를 고�
   assert.doesNotThrow(() => validateStaticInstallPolicy(input));
 });
 
+test("Production nanoid 보안 수정 버전을 package와 lock 계약에 함께 고정한다", async () => {
+  const { packageJson, packageLock } = await loadStaticPolicyInput();
+  const nanoid = packageLock.packages["node_modules/nanoid"];
+
+  assert.equal(packageJson.overrides.nanoid, "3.3.18");
+  assert.equal(nanoid.version, "3.3.18");
+  assert.equal(
+    nanoid.resolved,
+    "https://registry.npmjs.org/nanoid/-/nanoid-3.3.18.tgz",
+  );
+  assert.equal(
+    nanoid.integrity,
+    "sha512-DTg4MJbGMWkfi6VZFdNt2/caMbQy4Ou+Op/hJQvGEWcnVfoA1QA+xzRKAzw9jD6+GVOOeYr/mIcuDSdug6F6+w==",
+  );
+});
+
 test("root lifecycle 또는 검토되지 않은 dependency source를 차단한다", async () => {
   const input = await loadStaticPolicyInput();
   const lifecycleInput = structuredClone(input);

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+import { repositoryRootFromModuleUrl } from "./alias-loader.mjs";
 import {
   findCaseInsensitiveCollisions,
   findForbiddenAbsolutePaths,
@@ -136,4 +137,54 @@ test("Node 테스트 로더는 폐기된 비동기 register API를 사용하지 
   assert.doesNotMatch(registerSource, /\bregister\(/u);
   assert.match(loaderSource, /export function resolve\(/u);
   assert.doesNotMatch(loaderSource, /export async function resolve\(/u);
+  assert.match(loaderSource, /fileURLToPath\(new URL\("\.\."/u);
+  assert.equal(
+    repositoryRootFromModuleUrl(
+      "file:///D:/a/ssartnership/ssartnership/tests/alias-loader.mjs",
+      { windows: true },
+    ),
+    "D:\\a\\ssartnership\\ssartnership\\",
+  );
+});
+
+test("테스트 파일 URL과 비교 경로를 운영체제 중립적으로 처리한다", async () => {
+  const fileUrlBoundaryFiles = [
+    "tests/alias-loader.mjs",
+    "tests/auth-session-isolation.test.mts",
+    "tests/certification-card-responsive-contract.test.mts",
+    "tests/mattermost-direct-reversion.test.mts",
+    "tests/mattermost-signup-campus.test.mts",
+    "tests/member-normalized-auth-contract.test.mts",
+    "tests/production-migration-hygiene.test.mts",
+  ];
+  const sources = await Promise.all(
+    fileUrlBoundaryFiles.map(async (file) => ({
+      file,
+      source: await readRepoFile(file),
+    })),
+  );
+
+  for (const { file, source } of sources) {
+    assert.doesNotMatch(
+      source,
+      /new URL\([^\n]*import\.meta\.url[^\n]*\)\.pathname/u,
+      `${file} must convert file URLs with fileURLToPath`,
+    );
+  }
+
+  const terminologyContract = await readRepoFile(
+    "tests/terminology-contract.test.mts",
+  );
+  assert.match(terminologyContract, /\.split\(path\.sep\)\.join\("\/"\)/u);
+});
+
+test("Storybook browser 전역 상태와 종료 진단을 명시적으로 정리한다", async () => {
+  const packageJson = JSON.parse(await readRepoFile("package.json")) as {
+    scripts?: Record<string, string>;
+  };
+  const setup = await readRepoFile(".storybook/vitest.setup.tsx");
+
+  assert.match(setup, /afterAll\(\(\) => \{/u);
+  assert.match(setup, /vi\.unstubAllGlobals\(\)/u);
+  assert.match(packageJson.scripts?.["test-storybook"] ?? "", /hanging-process/u);
 });
