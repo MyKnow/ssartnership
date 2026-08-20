@@ -1142,7 +1142,11 @@ test("the run auditor emits structural evidence for hostile text and confines ou
     repositoryRoot,
   );
   const outputPath = join(repositoryRoot, ".tmp/actions-audit/run-1.json");
-  assert.equal(statSync(outputPath).mode & 0o777, 0o600);
+  const outputStat = statSync(outputPath);
+  assert.equal(outputStat.isFile(), true);
+  if (process.platform !== "win32") {
+    assert.equal(outputStat.mode & 0o777, 0o600);
+  }
   assert.throws(
     () => auditor.writeAuditFile(
       ".tmp/actions-audit/run-1.json",
