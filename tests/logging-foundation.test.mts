@@ -11,6 +11,9 @@ const productEventContractModulePromise = import(
 const requestBodyLimitModulePromise = import(
   new URL("../src/lib/request-body-limit.ts", import.meta.url).href,
 );
+const activityLogRuntimeModulePromise = import(
+  new URL("../src/lib/activity-log-runtime.ts", import.meta.url).href,
+);
 
 const schemaSql = readFileSync(
   new URL("../supabase/schema.sql", import.meta.url),
@@ -54,6 +57,70 @@ test("all log sinks recursively redact credentials while keeping stable reason c
       },
       sessions: "[redacted]",
     },
+  );
+});
+
+test("activity persistence is bypassed only in the explicit non-production E2E mock runtime", async () => {
+  const {
+    shouldBypassActivityLogPersistence,
+    shouldBypassProductEventTransport,
+  } = await activityLogRuntimeModulePromise;
+
+  assert.equal(shouldBypassActivityLogPersistence({
+    NODE_ENV: "test",
+    E2E_MOCK_MUTATIONS: "1",
+    NEXT_PUBLIC_DATA_SOURCE: "mock",
+  }), true);
+  assert.equal(shouldBypassActivityLogPersistence({
+    NODE_ENV: "production",
+    E2E_MOCK_MUTATIONS: "1",
+    NEXT_PUBLIC_DATA_SOURCE: "mock",
+  }), false);
+  assert.equal(shouldBypassActivityLogPersistence({
+    NODE_ENV: "test",
+    E2E_MOCK_MUTATIONS: "0",
+    NEXT_PUBLIC_DATA_SOURCE: "mock",
+  }), false);
+  assert.equal(shouldBypassActivityLogPersistence({
+    NODE_ENV: "test",
+    E2E_MOCK_MUTATIONS: "1",
+    NEXT_PUBLIC_DATA_SOURCE: "supabase",
+  }), false);
+
+  assert.equal(shouldBypassProductEventTransport({
+    NODE_ENV: "test",
+    NEXT_PUBLIC_DATA_SOURCE: "mock",
+  }), true);
+  assert.equal(shouldBypassProductEventTransport({
+    NODE_ENV: "production",
+    NEXT_PUBLIC_DATA_SOURCE: "mock",
+  }), false);
+  assert.equal(shouldBypassProductEventTransport({
+    NODE_ENV: "test",
+    NEXT_PUBLIC_DATA_SOURCE: "supabase",
+  }), false);
+
+  assert.equal(
+    activityLogsSource.match(/if \(shouldBypassActivityLogPersistence\(\)\)/g)?.length,
+    3,
+  );
+});
+
+test("the non-production mock client never opens a keepalive telemetry request", () => {
+  const productEventsSource = readFileSync(
+    new URL("../src/lib/product-events.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(productEventsSource, /shouldBypassProductEventTransport/);
+  assert.match(productEventsSource, /NODE_ENV: process\.env\.NODE_ENV/);
+  assert.match(
+    productEventsSource,
+    /NEXT_PUBLIC_DATA_SOURCE: process\.env\.NEXT_PUBLIC_DATA_SOURCE/,
+  );
+  assert.ok(
+    productEventsSource.indexOf("shouldBypassProductEventTransport") <
+      productEventsSource.indexOf("void fetch('/api/events/product'"),
   );
 });
 

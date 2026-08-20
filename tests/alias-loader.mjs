@@ -46,7 +46,7 @@ function resolveRelativePath(specifier, parentURL) {
   return findResolvableFile(basePath);
 }
 
-export async function resolve(specifier, context, nextResolve) {
+export function resolve(specifier, context, nextResolve) {
   if (specifier === "next/cache") {
     return nextResolve("next/cache.js", context);
   }

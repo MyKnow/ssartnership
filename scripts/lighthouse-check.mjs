@@ -4,6 +4,8 @@ import { access } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
 import process from 'node:process';
 
+import { findExecutableOnPath } from './lib/development-environment.mjs';
+
 const HOST = process.env.LIGHTHOUSE_HOST || '127.0.0.1';
 const PORT = process.env.LIGHTHOUSE_PORT || '3333';
 const BASE_URL = process.env.LIGHTHOUSE_URL || `http://${HOST}:${PORT}/`;
@@ -44,17 +46,24 @@ async function detectChromePath() {
     return process.env.CHROME_PATH;
   }
 
+  try {
+    const { chromium } = await import('playwright');
+    const playwrightPath = chromium.executablePath();
+    if (playwrightPath && await fileExists(playwrightPath)) {
+      return playwrightPath;
+    }
+  } catch {
+    // Continue with PATH-based discovery.
+  }
+
   const candidates = [
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    '/Applications/Chromium.app/Contents/MacOS/Chromium',
-    '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
-    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-    '/usr/bin/google-chrome',
-    '/usr/bin/google-chrome-stable',
-    '/opt/google/chrome/chrome',
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-  ];
+    'google-chrome',
+    'google-chrome-stable',
+    'chromium',
+    'chromium-browser',
+    'chrome',
+    'msedge',
+  ].map((command) => findExecutableOnPath(command)).filter(Boolean);
 
   for (const candidate of candidates) {
     if (await fileExists(candidate)) {
