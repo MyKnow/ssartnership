@@ -10,7 +10,7 @@ import {
   symlinkSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import test from "node:test";
 
 const read = (path: string) =>
@@ -1123,9 +1123,13 @@ test("the run auditor emits structural evidence for hostile text and confines ou
     () => auditor.resolveSafeOutputPath("../outside.json", "/tmp/repo"),
     /must be inside \.tmp\/actions-audit/,
   );
-  assert.match(
-    auditor.resolveSafeOutputPath(".tmp/actions-audit/run-1.json", "/tmp/repo").target,
-    /\/tmp\/repo\/\.tmp\/actions-audit\/run-1\.json$/,
+  const safeOutput = auditor.resolveSafeOutputPath(
+    ".tmp/actions-audit/run-1.json",
+    "/tmp/repo",
+  );
+  assert.equal(
+    relative("/tmp/repo", safeOutput.target),
+    join(".tmp", "actions-audit", "run-1.json"),
   );
 
   const tempRoot = mkdtempSync(join(realpathSync(tmpdir()), "actions-auditor-"));
