@@ -94,7 +94,17 @@ export default function AdminMemberDetailView({
   deferredAccountManager,
   deferredOperationalPanels,
 }: AdminMemberDetailViewProps) {
-  const loginIdentifier = member.manualLoginId ?? member.mmUsername;
+  const loginIdentifier = member.mmUsername || member.email || member.manualLoginId || "";
+  const primaryIdentifier = member.mmUsername
+    ? `@${member.mmUsername}`
+    : member.email ?? member.manualLoginId ?? "-";
+  const primaryIdentifierHint = member.mmUsername
+    ? member.mmUserId ?? "외부 식별자 없음"
+    : member.email
+      ? "MM ID 미연결 회원"
+      : member.manualLoginId
+        ? "이메일 미등록 회원"
+        : "식별자 없음";
   const avatarLabel = (member.displayName || loginIdentifier || "?")
     .trim()
     .charAt(0)
@@ -131,8 +141,8 @@ export default function AdminMemberDetailView({
         items={[
           {
             label: "로그인 ID",
-            value: member.manualLoginId ?? (member.mmUsername ? `@${member.mmUsername}` : "-"),
-            hint: member.manualLoginId ? "관리자 직접 생성 계정" : member.mmUserId ?? "외부 식별자 없음",
+            value: primaryIdentifier,
+            hint: primaryIdentifierHint,
           },
           {
             label: "기수/캠퍼스",
@@ -189,9 +199,13 @@ export default function AdminMemberDetailView({
                 {member.displayName}
               </h2>
               <p className="break-all text-sm text-muted-foreground">
-                {member.manualLoginId
-                  ? `직접 ID · ${member.manualLoginId}`
-                  : `@${member.mmUsername || "mm_username 없음"}`}
+                {member.mmUsername
+                  ? `@${member.mmUsername}`
+                  : member.email
+                    ? `이메일 · ${member.email}`
+                    : member.manualLoginId
+                      ? `직접 ID · ${member.manualLoginId}`
+                      : "식별자 미등록"}
               </p>
             </div>
 
@@ -201,9 +215,15 @@ export default function AdminMemberDetailView({
                 <span className="font-medium text-foreground">{member.campus}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span>{member.manualLoginId ? "직접 로그인 ID" : "MM User ID"}</span>
+                <span>이메일</span>
                 <span className="max-w-[13rem] break-all text-right font-medium text-foreground">
-                  {member.manualLoginId ?? member.mmUserId ?? "-"}
+                  {member.email ?? "이메일 미등록"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>{member.mmUserId ? "MM User ID" : "직접 로그인 ID"}</span>
+                <span className="max-w-[13rem] break-all text-right font-medium text-foreground">
+                  {member.mmUserId ?? member.manualLoginId ?? "-"}
                 </span>
               </div>
             </div>

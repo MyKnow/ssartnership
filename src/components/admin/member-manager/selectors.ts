@@ -5,6 +5,7 @@ export type AdminMember = {
   mmUserId: string;
   mmUsername: string;
   manualLoginId?: string | null;
+  email?: string | null;
   displayName?: string | null;
   generation?: number | null;
   staffSourceGeneration?: number | null;
@@ -94,6 +95,7 @@ export function normalizeAdminMembers(members: AdminMember[]): NormalizedMember[
         member.mmUsername,
         member.mmUserId,
         member.manualLoginId ?? "",
+        member.email ?? "",
         member.displayName ?? "",
         displayName,
       ]

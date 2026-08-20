@@ -203,12 +203,8 @@ async function AdminMemberDetailContent({
           hasMattermostAccount: Boolean(member.mattermostAccountId),
           mattermostLoginDisabledAt: member.mattermostLoginDisabledAt,
           mattermostLoginDisabledReason: member.mattermostLoginDisabledReason,
-          ...(canUpdateMembers
-            ? {
-                email: member.email,
-                emailVerifiedAt: member.emailVerifiedAt,
-              }
-            : {}),
+          email: member.email,
+          emailVerifiedAt: member.emailVerifiedAt,
           createdAt: member.createdAt,
           updatedAt: member.updatedAt,
           hasAvatar,

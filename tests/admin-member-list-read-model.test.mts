@@ -33,13 +33,22 @@ test("관리자 회원 목록은 페이지에서 DB 조회를 분리하고 서�
 });
 
 test("회원 부분 검색은 한국어·Mattermost 필드용 trigram 인덱스를 사용한다", async () => {
-  const migrationSource = await readFile(
-    new URL(
-      "../supabase/migrations/20260727113746_optimize_admin_member_search.sql",
-      import.meta.url,
+  const [migrationSource, emailSearchMigration] = await Promise.all([
+    readFile(
+      new URL(
+        "../supabase/migrations/20260727113746_optimize_admin_member_search.sql",
+        import.meta.url,
+      ),
+      "utf8",
     ),
-    "utf8",
-  );
+    readFile(
+      new URL(
+        "../supabase/migrations/20260821001338_add_admin_member_password_reset.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
 
   assert.match(migrationSource, /create extension if not exists pg_trgm/i);
   assert.match(migrationSource, /members_admin_display_name_trgm_idx/);
@@ -48,6 +57,8 @@ test("회원 부분 검색은 한국어·Mattermost 필드용 trigram 인덱스�
   assert.match(migrationSource, /mm_user_directory_admin_user_id_trgm_idx/);
   assert.match(migrationSource, /using gin \(display_name gin_trgm_ops\)/);
   assert.match(migrationSource, /where deleted_at is null/);
+  assert.match(emailSearchMigration, /members_admin_email_normalized_trgm_idx/);
+  assert.match(emailSearchMigration, /email_normalized extensions\.gin_trgm_ops/);
 });
 
 test("회원 목록은 추이 query를 핵심 목록과 분리해 먼저 렌더링할 수 있다", async () => {
@@ -117,6 +128,8 @@ test("회원 목록 read-model은 오류를 안전한 상태로 돌려준다", a
   assert.match(source, /mm_user_directory!inner\(id\)/);
   assert.match(source, /ilike\("mm_user_directory\.mm_username"/);
   assert.match(source, /ilike\("mm_user_directory\.mm_user_id"/);
+  assert.match(source, /email_normalized\.ilike\.\$\{pattern\}/);
+  assert.match(source, /ilike\("email_normalized", pattern\)/);
   assert.match(source, /canUseMemberSearchOrFilter/);
   assert.match(source, /referencedTable: "mm_user_directory"/);
   assert.match(source, /searchResults\.some\(\(result\) => Boolean\(result\.error\)\)/);

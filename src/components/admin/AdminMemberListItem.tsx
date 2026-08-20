@@ -32,7 +32,14 @@ export default function AdminMemberListItem({
   const profile = parseSsafyProfile(member.displayName ?? member.mmUsername);
   const displayName =
     profile.displayName ?? member.displayName ?? member.manualLoginId ?? member.mmUsername;
-  const loginIdentifier = member.manualLoginId ?? member.mmUsername;
+  const loginIdentifier = member.mmUsername || member.email || member.manualLoginId || "";
+  const identityLabel = member.mmUsername
+    ? `@${member.mmUsername}`
+    : member.email
+      ? `이메일 · ${member.email}`
+      : member.manualLoginId
+        ? `직접 ID · ${member.manualLoginId}`
+        : "식별자 미등록";
   const yearLabel = formatSsafyMemberLifecycleLabel(
     member.generation ?? getCurrentSsafyYear(),
   );
@@ -118,7 +125,7 @@ export default function AdminMemberListItem({
           )}
         </div>
         <p className="text-token mt-1 truncate text-sm text-muted-foreground">
-          {member.manualLoginId ? `직접 ID · ${member.manualLoginId}` : `@${member.mmUsername}`}
+          {identityLabel}
         </p>
         <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
           <span>{yearLabel}</span>
