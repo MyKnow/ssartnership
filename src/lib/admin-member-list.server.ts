@@ -40,6 +40,8 @@ type AdminMemberDatabaseRow = {
   mattermost_account_id: string | null;
   manual_login_id: string | null;
   display_name: string | null;
+  email: string | null;
+  email_normalized: string | null;
   generation: number | null;
   staff_source_generation: number | null;
   campus: string | null;
@@ -97,9 +99,9 @@ type AdminMemberPolicyContext = {
 };
 
 const ADMIN_MEMBER_LIST_SELECT: string =
-  "id,mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at,mattermost_login_disabled_at,mattermost_login_disabled_reason,profile_images:member_profile_images!member_profile_images_member_id_fkey(status),directory:mm_user_directory!members_mattermost_account_id_fkey(id,mm_user_id,mm_username)";
+  "id,mattermost_account_id,manual_login_id,display_name,email,email_normalized,generation,staff_source_generation,campus,must_change_password,created_at,updated_at,mattermost_login_disabled_at,mattermost_login_disabled_reason,profile_images:member_profile_images!member_profile_images_member_id_fkey(status),directory:mm_user_directory!members_mattermost_account_id_fkey(id,mm_user_id,mm_username)";
 const ADMIN_MEMBER_LIST_FALLBACK_SELECT: string =
-  "id,mattermost_account_id,manual_login_id,display_name,generation,staff_source_generation,campus,must_change_password,created_at,updated_at,mattermost_login_disabled_at,mattermost_login_disabled_reason,profile_images:member_profile_images!member_profile_images_member_id_fkey(status)";
+  "id,mattermost_account_id,manual_login_id,display_name,email,email_normalized,generation,staff_source_generation,campus,must_change_password,created_at,updated_at,mattermost_login_disabled_at,mattermost_login_disabled_reason,profile_images:member_profile_images!member_profile_images_member_id_fkey(status)";
 const ADMIN_MEMBER_TREND_SELECT: string = "created_at";
 
 const getCachedAdminMemberPolicyContext = unstable_cache(
@@ -384,7 +386,7 @@ function escapeLikePattern(value: string) {
 }
 
 function canUseMemberSearchOrFilter(value: string) {
-  return /^[\p{L}\p{N}\s@_-]+$/u.test(value);
+  return /^[\p{L}\p{N}\s@._+-]+$/u.test(value);
 }
 
 async function getPreferenceFilteredMemberIds(
@@ -565,7 +567,7 @@ async function getMemberSearchIds(
           .from("members")
           .select("id")
           .is("deleted_at", null)
-          .or(`display_name.ilike.${pattern},manual_login_id.ilike.${pattern}`)
+          .or(`display_name.ilike.${pattern},manual_login_id.ilike.${pattern},email_normalized.ilike.${pattern}`)
           .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
       ]
     : [
@@ -580,6 +582,12 @@ async function getMemberSearchIds(
           .select("id")
           .is("deleted_at", null)
           .ilike("manual_login_id", pattern)
+          .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
+        supabase
+          .from("members")
+          .select("id")
+          .is("deleted_at", null)
+          .ilike("email_normalized", pattern)
           .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
       ];
   const directorySearchQueries = useOrFilter
@@ -782,6 +790,7 @@ function mapAdminMemberRows({
       mmUsername: directory?.mm_username ?? "",
       manualLoginId: member.manual_login_id,
       displayName: member.display_name,
+      email: member.email ?? member.email_normalized,
       generation: member.generation,
       staffSourceGeneration: member.staff_source_generation,
       campus: member.campus,

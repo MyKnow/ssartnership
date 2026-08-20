@@ -79,6 +79,8 @@ export const ADMIN_AUDIT_ACTIONS = [
   'member_email_login_transition',
   'member_manual_add',
   'member_manual_setup_link_reissue',
+  'member_password_reset_link_generate',
+  'member_password_reset_link_send',
   'member_direct_create',
   'member_delete',
   'cycle_settings_update',

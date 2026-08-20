@@ -7,6 +7,7 @@ import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
 import AdminConfirmDialog from "@/components/admin/AdminConfirmDialog";
+import AdminMemberPasswordResetPanel from "@/components/admin/member-detail/AdminMemberPasswordResetPanel";
 import type { MemberEmailLoginTransition } from "@/lib/member-email-login-transition";
 
 type FormAction = (formData: FormData) => void | Promise<void>;
@@ -122,6 +123,15 @@ export default function AdminMemberAccountManager({
             회원 정보 저장
           </SubmitButton>
         </form>
+      ) : null}
+
+      {canUpdate ? (
+        <AdminMemberPasswordResetPanel
+          memberId={member.id}
+          displayName={member.displayName}
+          email={member.email}
+          emailVerifiedAt={member.emailVerifiedAt}
+        />
       ) : null}
 
       {canUpdate && member.hasMattermostAccount ? (
