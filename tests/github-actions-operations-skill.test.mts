@@ -10,7 +10,7 @@ import {
   symlinkSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
 
 const read = (path: string) =>
@@ -712,7 +712,7 @@ test("trusted dependency installation disables every lifecycle and verifies one 
     VERCEL_SYNTHETIC_SECRET: "synthetic-vercel-secret",
   });
   assert.notEqual(controlledEnvironment.PATH, "/safe/bin");
-  assert.match(controlledEnvironment.PATH, new RegExp(`^${process.execPath.replace(/\/[^/]+$/, "")}`));
+  assert.equal(controlledEnvironment.PATH, dirname(process.execPath));
   assert.equal(controlledEnvironment.CI, "true");
   assert.equal(controlledEnvironment.GITHUB_ACTIONS, "true");
   assert.equal(controlledEnvironment.RUNNER_OS, "Linux");
