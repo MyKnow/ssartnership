@@ -8,7 +8,7 @@ export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 2 : 0,
+  retries: 0,
   workers: 1,
   reporter: [
     ["html", { outputFolder: "playwright-report", open: "never" }],
@@ -17,7 +17,7 @@ export default defineConfig({
   ],
   use: {
     baseURL,
-    trace: "on-first-retry",
+    trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: chromiumChannel ? "off" : "retain-on-failure",
   },
@@ -42,6 +42,7 @@ export default defineConfig({
           NEXT_DIST_DIR: ".next-e2e",
           NEXT_PUBLIC_DATA_SOURCE: "mock",
           NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE: "mock",
+          MOCK_MEMBER_AUTH: "1",
           PARTNER_SESSION_SECRET: "e2e-partner-session-secret-for-playwright-only",
         },
       },

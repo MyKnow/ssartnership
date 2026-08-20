@@ -1,5 +1,5 @@
 import React from "react";
-import { vi } from "vitest";
+import { afterAll, vi } from "vitest";
 
 const nativeMatchMedia = window.matchMedia.bind(window);
 
@@ -18,6 +18,10 @@ vi.stubGlobal("matchMedia", (query: string) => {
     removeEventListener: result.removeEventListener.bind(result),
     dispatchEvent: result.dispatchEvent.bind(result),
   };
+});
+
+afterAll(() => {
+  vi.unstubAllGlobals();
 });
 
 vi.mock("next/image", () => {

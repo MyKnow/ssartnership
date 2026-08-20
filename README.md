@@ -122,10 +122,27 @@ docs/
 
 ## 로컬 실행
 
-```bash
-npm install
+새 PC에서는 Windows와 macOS 모두 같은 명령을 사용합니다.
+
+```text
+npm run bootstrap
+npm run doctor
 npm run dev
 ```
+
+이미 구성된 PC에서는 다음 흐름만 사용합니다.
+
+```text
+git pull --rebase
+npm run doctor
+npm run dev
+```
+
+- 공식 개발 환경: Windows x64, macOS arm64
+- 고정 runtime: Node.js 24.18.1, npm 11.16.0
+- `bootstrap`: 검증된 `install:trusted` 경계의 lockfile 설치, 로컬 mock 환경 생성, 환경 진단
+- `doctor`: 환경을 변경하지 않고 OS/Architecture/runtime/env/cloud 연결/port/filesystem/native dependency 상태를 `PASS`/`WARN`/`FAIL`로 진단
+- 상세 계약: [교차 플랫폼 개발환경 운영 문서](./docs/operations/cross-platform-development.md)
 
 개발 서버:
 
@@ -135,17 +152,15 @@ http://localhost:3000
 
 ## CI 사전 점검
 
-GitHub Actions와 동일한 Linux/amd64 lockfile 해석 차이로 `npm ci`가 깨질 수 있습니다. 특히 macOS에서 의존성을 갱신했으면 아래 순서로 먼저 확인합니다.
+Windows와 macOS에서 같은 저장소 계약을 확인하려면 아래 순서를 사용합니다.
 
 ```bash
 npm run check:lockfile
 npm run ci:local
 ```
 
-- `check:lockfile`: Docker가 있으면 Linux/amd64 기준 lockfile canonical 여부 확인, 없으면 `npm@10`으로 lockfile 재생성 후 비교
-- `ci:local`: `npm ci`, lint, build, Storybook test까지 한 번에 검증
-
-`check:lockfile`은 Docker Desktop이 있으면 Linux/amd64 기준으로 검증하고, 없으면 `npm@10`으로 package-lock을 다시 생성해 비교합니다.
+- `check:lockfile`: Node.js 24.18.1과 npm 11.16.0으로 lockfile을 재계산해 canonical 여부 확인
+- `ci:local`: bootstrap, 교차 플랫폼 정책, lint, typecheck, test, build, Storybook, visual test를 순서대로 검증
 
 ## 환경 변수
 
@@ -193,7 +208,7 @@ npm run ci:local
 - 사이트 URL / SEO
   - `NEXT_PUBLIC_SITE_URL`
 
-환경 변수 예시는 [.env.example](/Users/myknow/coding/ssartnership/.env.example)에 있습니다.
+환경 변수 예시는 [.env.example](./.env.example)에 있습니다.
 
 ## 파트너 결제 운영 설정
 
@@ -410,8 +425,8 @@ erDiagram
 
 공개 문서:
 
-- [/legal/service](/Users/myknow/coding/ssartnership/src/app/legal/[kind]/page.tsx)
-- [/legal/privacy](/Users/myknow/coding/ssartnership/src/app/legal/[kind]/page.tsx)
+- `/legal/service`: [정책 문서 route](./src/app/legal/[kind]/page.tsx)
+- `/legal/privacy`: [정책 문서 route](./src/app/legal/[kind]/page.tsx)
 
 ## 관리자 운영 포인트
 
@@ -461,7 +476,7 @@ DM 발송 실패 시에는 비밀번호 / 생성 상태를 롤백합니다.
 - 탈퇴 후 30일이 지난 회원은 Vercel cron으로 익명화합니다.
 - 제휴 종료 예정 알림도 하루 1회 실행합니다.
 
-[vercel.json](/Users/myknow/coding/ssartnership/vercel.json)
+[vercel.json](./vercel.json)
 
 ```json
 {
@@ -495,7 +510,9 @@ DM 발송 실패 시에는 비밀번호 / 생성 상태를 롤백합니다.
 
 ## 스크립트
 
-```bash
+```text
+npm run bootstrap
+npm run doctor
 npm run dev
 npm run lint
 npm run build
@@ -504,7 +521,7 @@ npm run build-storybook
 npm run test-storybook
 npm run start
 npm run test:mm-profile
-npm run release -- patch
+npm run release
 ```
 
 ### Storybook
@@ -541,24 +558,19 @@ npm run test-storybook
 - `main` 외 브랜치: Lighthouse 선택 실행 후 Storybook build/test를 강제하고, 통과 시 `npm version` 실행 후 commit + push
 - `main` 브랜치: 현재 `package.json` 버전 기준 annotated tag 생성 후 push
 
-한 줄 메시지:
+대화형 실행:
 
-```bash
-npm run release -- patch "feat: 운영진 지원과 MM 닉네임 파싱 확장"
+```text
+npm run release
 ```
 
-여러 줄 메시지:
+자동화된 실행에서 선택값이 이미 정해졌다면 같은 Node.js 진입점에 명시적으로 전달합니다.
 
-```bash
-npm run release -- patch <<'EOF'
-feat: 운영진 지원과 MM 닉네임 파싱 확장
-
-- 운영진 year=0 지원
-- MM 닉네임 파싱 보강
-EOF
+```text
+npm run release -- --version=none --lighthouse=skip --message="chore: 교차 플랫폼 개발환경 정비" --yes
 ```
 
-구현은 [scripts/release.sh](/Users/myknow/coding/ssartnership/scripts/release.sh)에 있습니다.
+여러 줄 메시지는 UTF-8 파일을 만든 뒤 `--message-file=경로`로 전달할 수 있습니다. 구현은 [scripts/release.mjs](./scripts/release.mjs)에 있습니다.
 
 주의:
 

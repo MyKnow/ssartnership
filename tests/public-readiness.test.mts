@@ -13,8 +13,8 @@ test("public readiness CI workflow gates launch-critical checks", () => {
     "name: Public Readiness",
     "pull_request:",
     "workflow_dispatch:",
-    "node-version: 24",
-    "npm ci",
+    "node-version: 24.18.1",
+    "npm run install:trusted",
     "npm run check:lockfile",
     "npm run validate:migrations",
     "npm run lint",
@@ -36,6 +36,8 @@ test("public readiness CI workflow gates launch-critical checks", () => {
   assert.match(workflow, /^\s+pull_request:\s*$/m);
   assert.match(workflow, /concurrency:\s*\n\s+group:/);
   assert.match(workflow, /cancel-in-progress:\s+true/);
+  assert.match(workflow, /persist-credentials:\s+false/);
+  assert.doesNotMatch(workflow, /\bnpm (?:ci|install)\b/);
   assert.doesNotMatch(
     workflow,
     /if:\s*\$\{\{\s*github\.event_name != 'pull_request' \|\| !github\.event\.pull_request\.draft\s*\}\}/,
@@ -87,6 +89,9 @@ test("Storybook interaction runs automatically, isolates shared state, and keeps
   assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name != 'pull_request' \|\| !github\.event\.pull_request\.draft\s*\}\}/);
   assert.match(workflow, /npm run build-storybook/);
   assert.match(workflow, /npm run test-storybook/);
+  assert.match(workflow, /npm run install:trusted/);
+  assert.match(workflow, /persist-credentials:\s+false/);
+  assert.doesNotMatch(workflow, /\bnpm (?:ci|install)\b/);
   assert.match(workflow, /playwright install --with-deps chromium/);
   assert.match(workflow, /name: Visual Baselines/);
   assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name == 'workflow_dispatch'\s*\}\}/);
@@ -198,7 +203,8 @@ test("Preview sync follows the latest successful dev public-readiness run withou
   assert.match(workflow, /workflows:\s*\n\s+- Public Readiness/);
   assert.match(workflow, /branches:\s*\[dev\]/);
   assert.match(workflow, /types:\s*\n\s+- completed/);
-  assert.match(workflow, /group:\s+preview-sync/);
+  assert.match(workflow, /&& 'preview-sync' \|\|/);
+  assert.match(workflow, /format\('preview-sync-noop-\{0\}', github\.run_id\)/);
   assert.match(workflow, /cancel-in-progress:\s+false/);
   assert.match(workflow, /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/dev'/);
   assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/);
@@ -207,6 +213,11 @@ test("Preview sync follows the latest successful dev public-readiness run withou
   assert.match(workflow, /name: Guard stale dev workflow SHA/);
   assert.match(workflow, /git ls-remote origin refs\/heads\/dev/);
   assert.match(workflow, /steps\.stale-sha\.outputs\.is_current == 'true'/);
+  assert.match(workflow, /node-version:\s+24\.18\.1/);
+  assert.match(workflow, /npm run install:trusted/);
+  assert.match(workflow, /version:\s+2\.114\.0/);
+  assert.match(workflow, /persist-credentials:\s+false/);
+  assert.doesNotMatch(workflow, /\bnpm (?:ci|install)\b/);
 });
 
 test("playwright config can use the CI-hosted Chrome channel", () => {

@@ -9,14 +9,21 @@ test("pre-push gate verifies the canonical lockfile before the full Playwright s
 
   assert.equal(
     packageJson.scripts?.prepush,
-    "npm run check:lockfile && npm run test:e2e:ci",
+    "node scripts/run-package-scripts.mjs check:install-scripts check:cross-platform check:lockfile test:e2e:ci",
   );
-  assert.match(packageJson.scripts?.["test:e2e:ci"] ?? "", /CI=1/);
-  assert.match(
-    packageJson.scripts?.["test:e2e:ci"] ?? "",
-    /PLAYWRIGHT_CHROMIUM_CHANNEL=chrome/,
+  assert.equal(
+    packageJson.scripts?.["test:e2e:ci"],
+    "node scripts/run-e2e-ci.mjs",
   );
-  assert.match(packageJson.scripts?.["test:e2e:ci"] ?? "", /playwright test/);
+
+  const e2eRunner = await readFile(
+    new URL("../scripts/run-e2e-ci.mjs", import.meta.url),
+    "utf8",
+  );
+  assert.match(e2eRunner, /CI: "1"/);
+  assert.match(e2eRunner, /PLAYWRIGHT_CHROMIUM_CHANNEL: "chrome"/);
+  assert.match(e2eRunner, /delete childEnvironment\.NO_COLOR/);
+  assert.match(e2eRunner, /playwrightCli, "test"/);
 
   const publicReadinessWorkflow = await readFile(
     new URL("../.github/workflows/public-readiness.yml", import.meta.url),
@@ -25,10 +32,10 @@ test("pre-push gate verifies the canonical lockfile before the full Playwright s
   assert.match(publicReadinessWorkflow, /run: npm run test:e2e:ci/);
 
   const releaseScript = await readFile(
-    new URL("../scripts/release.sh", import.meta.url),
+    new URL("../scripts/release.mjs", import.meta.url),
     "utf8",
   );
-  assert.match(releaseScript, /npm run prepush/);
+  assert.match(releaseScript, /runRequiredScript\("prepush"\)/);
 
   const playwrightConfig = await readFile(
     new URL("../playwright.config.ts", import.meta.url),
@@ -36,6 +43,8 @@ test("pre-push gate verifies the canonical lockfile before the full Playwright s
   );
   assert.match(playwrightConfig, /NEXT_DIST_DIR: "\.next-e2e"/);
   assert.match(playwrightConfig, /PARTNER_SESSION_SECRET:/);
+  assert.match(playwrightConfig, /retries: 0/);
+  assert.match(playwrightConfig, /trace: "retain-on-failure"/);
 
   const eslintConfig = await readFile(
     new URL("../eslint.config.mjs", import.meta.url),

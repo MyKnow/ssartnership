@@ -3,10 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { delimiter } from "node:path";
 import test from "node:test";
 
-const DEFAULT_CSV_PATHS = [
-  "/Users/myknow/Library/Mobile Documents/com~apple~CloudDocs/SSAFY/지역대표/MM/member_list/14기/14기_공지_전용/2._소통/all/20260407_094807.csv",
-  "/Users/myknow/Library/Mobile Documents/com~apple~CloudDocs/SSAFY/지역대표/MM/member_list/15기/15기_공지_전용/2._소통/filtered/20260407_094736.csv",
-] as const;
+const DEFAULT_CSV_PATHS: readonly string[] = [];
 
 const csvPaths = (
   process.env.MM_PROFILE_TEST_CSVS
@@ -17,7 +14,7 @@ const csvPaths = (
 const availableCsvPaths = csvPaths.filter((filePath) => existsSync(filePath));
 const skipReason =
   availableCsvPaths.length === 0
-    ? `CSV fixture not found. Set MM_PROFILE_TEST_CSVS or place the files at: ${csvPaths.join(", ")}`
+    ? "CSV fixture not found. Set MM_PROFILE_TEST_CSVS with OS-native PATH separators."
     : false;
 
 const CAMPUS_NAMES = ["서울", "광주", "구미", "부울경", "대전", "창업"] as const;

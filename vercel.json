@@ -1,4 +1,6 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm run install:trusted",
   "crons": [
     {
       "path": "/api/cron/push-expiring-partners",
