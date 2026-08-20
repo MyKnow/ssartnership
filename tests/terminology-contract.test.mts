@@ -34,7 +34,7 @@ test("user-facing source uses the partner company and partnership-place terminol
   const violations = sourceRoots
     .flatMap((sourceRoot) => collectSourceFiles(path.join(repoRoot, sourceRoot)))
     .flatMap((absolutePath) => {
-      const relativePath = path.relative(repoRoot, absolutePath);
+      const relativePath = path.relative(repoRoot, absolutePath).split(path.sep).join("/");
       return readFileSync(absolutePath, "utf8")
         .split("\n")
         .map((line, index) => ({ relativePath, line, lineNumber: index + 1 }))

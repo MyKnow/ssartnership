@@ -57,7 +57,7 @@ export default defineConfig({
         test: {
           name: "unit",
           environment: "node",
-          include: [path.join(dirname, "tests", "unit", "**", "*.test.ts")],
+          include: ["tests/unit/**/*.test.ts"],
         },
       },
       {

@@ -9,14 +9,21 @@ test("pre-push gate mirrors Public Readiness before the full Playwright suite", 
 
   assert.equal(
     packageJson.scripts?.prepush,
-    "npm run check:install-scripts && npm run check:lockfile && npm run validate:migrations && npm run lint && npm run typecheck:ci && npm test && npm run audit:security && npm run build && npm run test:e2e:ci",
+    "node scripts/run-package-scripts.mjs check:install-scripts check:cross-platform check:lockfile validate:migrations lint typecheck:ci test audit:security build test:e2e:ci",
   );
-  assert.match(packageJson.scripts?.["test:e2e:ci"] ?? "", /CI=1/);
-  assert.match(
-    packageJson.scripts?.["test:e2e:ci"] ?? "",
-    /PLAYWRIGHT_CHROMIUM_CHANNEL=chrome/,
+  assert.equal(
+    packageJson.scripts?.["test:e2e:ci"],
+    "node scripts/run-e2e-ci.mjs",
   );
-  assert.match(packageJson.scripts?.["test:e2e:ci"] ?? "", /playwright test/);
+
+  const e2eRunner = await readFile(
+    new URL("../scripts/run-e2e-ci.mjs", import.meta.url),
+    "utf8",
+  );
+  assert.match(e2eRunner, /CI: "1"/);
+  assert.match(e2eRunner, /PLAYWRIGHT_CHROMIUM_CHANNEL: "chrome"/);
+  assert.match(e2eRunner, /delete childEnvironment\.NO_COLOR/);
+  assert.match(e2eRunner, /playwrightCli, "test"/);
 
   const publicReadinessWorkflow = await readFile(
     new URL("../.github/workflows/public-readiness.yml", import.meta.url),
@@ -25,10 +32,10 @@ test("pre-push gate mirrors Public Readiness before the full Playwright suite", 
   assert.match(publicReadinessWorkflow, /run: npm run test:e2e:ci/);
 
   const releaseScript = await readFile(
-    new URL("../scripts/release.sh", import.meta.url),
+    new URL("../scripts/release.mjs", import.meta.url),
     "utf8",
   );
-  assert.match(releaseScript, /npm run prepush/);
+  assert.match(releaseScript, /runRequiredScript\("prepush"\)/);
 
   const playwrightConfig = await readFile(
     new URL("../playwright.config.ts", import.meta.url),
@@ -39,8 +46,13 @@ test("pre-push gate mirrors Public Readiness before the full Playwright suite", 
   assert.match(playwrightConfig, /trace:\s*"retain-on-failure"/);
   assert.match(playwrightConfig, /non-loopback BASE_URL requires an explicit/);
   assert.match(playwrightConfig, /hostname === "127\.0\.0\.1"/);
+  assert.match(playwrightConfig, /const nodeExecutable =/);
+  assert.match(playwrightConfig, /process\.execPath/);
+  assert.doesNotMatch(playwrightConfig, /command: `npm run dev/);
   assert.match(playwrightConfig, /NEXT_DIST_DIR: "\.next-e2e"/);
   assert.match(playwrightConfig, /PARTNER_SESSION_SECRET:/);
+  assert.match(playwrightConfig, /retries: 0/);
+  assert.match(playwrightConfig, /trace: "retain-on-failure"/);
 
   const eslintConfig = await readFile(
     new URL("../eslint.config.mjs", import.meta.url),

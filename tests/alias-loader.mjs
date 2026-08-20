@@ -2,7 +2,11 @@ import { statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-const rootDir = path.resolve(new URL("..", import.meta.url).pathname);
+export function repositoryRootFromModuleUrl(moduleUrl, options) {
+  return fileURLToPath(new URL("..", moduleUrl), options);
+}
+
+const rootDir = repositoryRootFromModuleUrl(import.meta.url);
 const srcDir = path.join(rootDir, "src");
 const extensions = ["", ".ts", ".tsx", ".mts", ".mjs", ".js"];
 const indexExtensions = [".ts", ".tsx", ".mts", ".mjs", ".js"];
@@ -46,7 +50,7 @@ function resolveRelativePath(specifier, parentURL) {
   return findResolvableFile(basePath);
 }
 
-export async function resolve(specifier, context, nextResolve) {
+export function resolve(specifier, context, nextResolve) {
   if (specifier === "next/cache") {
     return nextResolve("next/cache.js", context);
   }

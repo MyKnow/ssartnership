@@ -1,3 +1,5 @@
-import { register } from "node:module";
+import { registerHooks } from "node:module";
 
-register(new URL("./alias-loader.mjs", import.meta.url));
+import { resolve } from "./alias-loader.mjs";
+
+registerHooks({ resolve });

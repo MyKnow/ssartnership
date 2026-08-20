@@ -59,8 +59,8 @@ export function getProductSessionId() {
 
 export function trackProductEvent(payload: ProductEventClientPayload) {
   if (
-    typeof window === 'undefined'
-    || shouldBypassProductEventTransport({
+    typeof window === 'undefined' ||
+    shouldBypassProductEventTransport({
       NODE_ENV: process.env.NODE_ENV,
       NEXT_PUBLIC_DATA_SOURCE: process.env.NEXT_PUBLIC_DATA_SOURCE,
     })

@@ -91,6 +91,8 @@ test("public readiness CI workflow gates launch-critical checks", () => {
   assert.match(workflow, /concurrency:\s*\n\s+group:/);
   assert.match(workflow, /cancel-in-progress:\s+true/);
   assert.match(workflow, /name: Dependency audit/);
+  assert.match(workflow, /persist-credentials:\s+false/);
+  assert.doesNotMatch(workflow, /\bnpm (?:ci|install)\b/);
   assert.doesNotMatch(
     workflow,
     /if:\s*\$\{\{\s*github\.event_name != 'pull_request' \|\| !github\.event\.pull_request\.draft\s*\}\}/,
@@ -103,27 +105,28 @@ test("local prepush and release use the same Public Readiness gates", () => {
   };
   const prepush = packageJson.scripts.prepush;
 
-  for (const requiredCommand of [
-    "npm run check:install-scripts",
-    "npm run check:lockfile",
-    "npm run validate:migrations",
-    "npm run lint",
-    "npm run typecheck:ci",
-    "npm test",
-    "npm run audit:security",
-    "npm run build",
-    "npm run test:e2e:ci",
+  for (const requiredScript of [
+    "check:install-scripts",
+    "check:cross-platform",
+    "check:lockfile",
+    "validate:migrations",
+    "lint",
+    "typecheck:ci",
+    "test",
+    "audit:security",
+    "build",
+    "test:e2e:ci",
   ]) {
     assert.match(
       prepush,
-      new RegExp(requiredCommand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      new RegExp(requiredScript.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
     );
   }
 
-  const release = readRepoFile("scripts/release.sh");
+  const release = readRepoFile("scripts/release.mjs");
   assert.match(
     release,
-    /run_repository_prepush[\s\S]+?npm run build-storybook[\s\S]+?npm run test-storybook[\s\S]+?npm run test:visual/,
+    /runRequiredScript\("prepush"\)[\s\S]+?runRequiredScript\("build-storybook"\)[\s\S]+?runRequiredScript\("test-storybook"\)[\s\S]+?runRequiredScript\("test:visual"\)/,
   );
 });
 
@@ -236,6 +239,9 @@ test("Storybook interaction runs automatically, isolates shared state, and keeps
   assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name != 'pull_request' \|\| !github\.event\.pull_request\.draft\s*\}\}/);
   assert.match(workflow, /npm run build-storybook/);
   assert.match(workflow, /npm run test-storybook/);
+  assert.match(workflow, /npm run install:trusted/);
+  assert.match(workflow, /persist-credentials:\s+false/);
+  assert.doesNotMatch(workflow, /\bnpm (?:ci|install)\b/);
   assert.match(workflow, /playwright install --with-deps chromium/);
   assert.match(workflow, /name: Visual Baselines/);
   assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name == 'workflow_dispatch'\s*\}\}/);
@@ -430,9 +436,21 @@ test("Preview sync follows the latest successful dev public-readiness run withou
     jobEligibility,
     /github\.event\.workflow_run\.head_branch == 'dev'/,
   );
+  assert.match(workflow, /&& 'preview-sync' \|\|/);
+  assert.match(workflow, /format\('preview-sync-noop-\{0\}', github\.run_id\)/);
+  assert.match(workflow, /cancel-in-progress:\s+false/);
+  assert.match(workflow, /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/dev'/);
+  assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/);
+  assert.match(workflow, /github\.event\.workflow_run\.event == 'push'/);
+  assert.match(workflow, /github\.event\.workflow_run\.head_branch == 'dev'/);
   assert.match(workflow, /name: Guard stale dev workflow SHA/);
   assert.match(workflow, /git ls-remote origin refs\/heads\/dev/);
   assert.match(workflow, /steps\.stale-sha\.outputs\.is_current == 'true'/);
+  assert.match(workflow, /node-version:\s+24\.18\.1/);
+  assert.match(workflow, /npm run install:trusted/);
+  assert.match(workflow, /version:\s+2\.114\.0/);
+  assert.match(workflow, /persist-credentials:\s+false/);
+  assert.doesNotMatch(workflow, /\bnpm (?:ci|install)\b/);
 });
 
 test("playwright config can use the CI-hosted Chrome channel", () => {
