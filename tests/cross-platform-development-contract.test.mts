@@ -176,6 +176,7 @@ test("테스트 파일 URL과 비교 경로를 운영체제 중립적으로 처�
     "tests/mattermost-signup-campus.test.mts",
     "tests/member-normalized-auth-contract.test.mts",
     "tests/production-migration-hygiene.test.mts",
+    "tests/github-actions-operations-skill.test.mts",
   ];
   const sources = await Promise.all(
     fileUrlBoundaryFiles.map(async (file) => ({

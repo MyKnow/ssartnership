@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 const read = (path: string) =>
   readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
@@ -962,7 +963,7 @@ test("the run auditor is read-only, persists no GitHub text, and exposes help", 
   assert.match(script, /firstLineNumbers/);
   assert.match(script, /never persists GitHub-provided log, annotation, workflow, job, step, or path text/);
 
-  const help = execFileSync(process.execPath, [new URL(`../${scriptPath}`, import.meta.url).pathname, "--help"], {
+  const help = execFileSync(process.execPath, [fileURLToPath(new URL(`../${scriptPath}`, import.meta.url)), "--help"], {
     encoding: "utf8",
   });
   assert.match(help, /--repo OWNER\/REPO --run-id ID --attempt N/);
