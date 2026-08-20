@@ -118,12 +118,13 @@ test("pre-push gate mirrors Public Readiness before the full Playwright suite", 
   assert.ok(redirectHelper);
   assert.ok(
     smokeHelper.indexOf("await expectNoNextError(page)") <
-      smokeHelper.indexOf('await page.waitForLoadState("networkidle")'),
+      smokeHelper.indexOf('await page.waitForLoadState("load")'),
   );
   assert.ok(
     redirectHelper.indexOf("await expectNoNextError(page)") <
-      redirectHelper.indexOf('await page.waitForLoadState("networkidle")'),
+      redirectHelper.indexOf('await page.waitForLoadState("load")'),
   );
+  assert.doesNotMatch(pageSmokeSpec, /waitForLoadState\("networkidle"/);
   assert.doesNotMatch(pageSmokeSpec, /test\.afterEach/);
 
   const pwaProvider = await readFile(
