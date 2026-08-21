@@ -80,6 +80,8 @@ test("Preview sync executes one replacement transaction while preserving Preview
   const script = await previewSyncScriptPromise;
 
   assert.match(script, /buildTransactionalPreviewRestoreSql\(/);
+  assert.match(script, /stripUnsupportedPreviewRestoreTriggerControls\(/);
+  assert.match(script, /triggerControlSanitized\.sql/);
   assert.match(script, /"--single-transaction"/);
   assert.match(
     script,
