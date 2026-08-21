@@ -78,8 +78,6 @@ export default async function CertificationPage({
   ]);
   const photoAccess = getMemberProfilePhotoAccessState(photoState.reviewStatus);
 
-  const member = await getMemberCanonicalProfile(session.userId);
-
   if (!member) {
     redirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
