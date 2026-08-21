@@ -70,10 +70,11 @@ export default async function CertificationPage({
     redirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
 
-  const [headerSession, cohortCardThemes, photoState] = await Promise.all([
+  const [headerSession, cohortCardThemes, photoState, member] = await Promise.all([
     getHeaderSession(session.userId),
     listCohortCardThemes(),
     getMemberProfilePhotoState(session.userId),
+    getMemberCanonicalProfile(session.userId),
   ]);
   const photoAccess = getMemberProfilePhotoAccessState(photoState.reviewStatus);
 

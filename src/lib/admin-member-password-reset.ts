@@ -11,7 +11,6 @@ type AdminMemberPasswordResetMember = {
   id: string;
   display_name: string | null;
   email_normalized: string | null;
-  email_verified_at: string | null;
 };
 
 export type AdminMemberPasswordResetDelivery = "copy" | "email";
@@ -32,7 +31,7 @@ export class AdminMemberPasswordResetError extends Error {
 async function getActiveMember(memberId: string) {
   const { data, error } = await getSupabaseAdminClient()
     .from("members")
-    .select("id,display_name,email_normalized,email_verified_at")
+    .select("id,display_name,email_normalized")
     .eq("id", memberId)
     .is("deleted_at", null)
     .maybeSingle();
@@ -83,10 +82,10 @@ export async function issueAdminMemberPasswordReset(input: {
   delivery: AdminMemberPasswordResetDelivery;
 }) {
   const member = await getActiveMember(input.memberId);
-  if (
-    input.delivery === "email"
-    && (!member.email_normalized || !member.email_verified_at)
-  ) {
+  // Delivery to the stored address proves email ownership only when the
+  // recipient completes that email-channel token. A copied admin link remains
+  // a manual channel and intentionally does not verify an email address.
+  if (input.delivery === "email" && !member.email_normalized) {
     throw new AdminMemberPasswordResetError("email_not_available");
   }
 
