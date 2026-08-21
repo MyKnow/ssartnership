@@ -122,8 +122,11 @@ export function buildProductionDataDumpContainerPlan({
       "--network",
       "host",
       ...environmentNames.flatMap((name) => ["--env", name]),
-      SUPABASE_POSTGRES_DUMP_IMAGE,
+      // The pinned Supabase Postgres image has a database-server entrypoint.
+      // Override it so the dump script runs as the client shell that the CLI uses.
+      "--entrypoint",
       "bash",
+      SUPABASE_POSTGRES_DUMP_IMAGE,
       "-c",
       dumpScript,
     ],
