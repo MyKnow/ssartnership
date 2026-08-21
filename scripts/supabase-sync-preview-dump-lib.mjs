@@ -15,6 +15,66 @@ const POSTGRES_ENVIRONMENT_NAMES = [
 export const SUPABASE_POSTGRES_DUMP_IMAGE =
   "ghcr.io/supabase/postgres@sha256:99b1729aeb0bac314445024fc149fbd39306170b61dd50800ccf180327ab3459";
 
+const CIRCULAR_FOREIGN_KEY_WARNING_HEADER =
+  /^pg_dump: warning: .*circular foreign-key constraints/u;
+const CIRCULAR_FOREIGN_KEY_WARNING_DETAIL = /^pg_dump: detail: /u;
+const CIRCULAR_FOREIGN_KEY_WARNING_HINT =
+  /^pg_dump: hint: .*--disable-triggers/u;
+
+function removeLineEnding(line) {
+  return line.replace(/\r?\n$/u, "");
+}
+
+/**
+ * Removes only the complete pg_dump circular-FK advisory that is already
+ * handled by the dump's --disable-triggers/session-replica restore contract.
+ * Any partial or unfamiliar diagnostic is kept verbatim so Preview Sync stays
+ * fail-closed for new dump errors and warnings.
+ */
+export function filterPgDumpCircularForeignKeyWarnings(stderr) {
+  const output = [];
+  let pendingWarning = null;
+
+  for (const line of stderr.split(/(?<=\n)/u)) {
+    const normalizedLine = removeLineEnding(line);
+
+    if (CIRCULAR_FOREIGN_KEY_WARNING_HEADER.test(normalizedLine)) {
+      if (pendingWarning) {
+        output.push(...pendingWarning.lines);
+      }
+      pendingWarning = { detailCount: 0, lines: [line] };
+      continue;
+    }
+
+    if (pendingWarning) {
+      pendingWarning.lines.push(line);
+      if (CIRCULAR_FOREIGN_KEY_WARNING_DETAIL.test(normalizedLine)) {
+        pendingWarning.detailCount += 1;
+        continue;
+      }
+      if (
+        pendingWarning.detailCount > 0 &&
+        CIRCULAR_FOREIGN_KEY_WARNING_HINT.test(normalizedLine)
+      ) {
+        pendingWarning = null;
+        continue;
+      }
+
+      output.push(...pendingWarning.lines);
+      pendingWarning = null;
+      continue;
+    }
+
+    output.push(line);
+  }
+
+  if (pendingWarning) {
+    output.push(...pendingWarning.lines);
+  }
+
+  return output.join("");
+}
+
 function decodeConnectionComponent(value, name) {
   try {
     return decodeURIComponent(value);
