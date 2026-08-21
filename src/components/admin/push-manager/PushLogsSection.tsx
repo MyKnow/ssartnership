@@ -7,7 +7,10 @@ import Input from "@/components/ui/Input";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Select from "@/components/ui/Select";
 import type { PushAudienceScope } from "@/lib/push";
-import type { AdminNotificationOperationLog, AdminNotificationType } from "@/lib/admin-notification-ops";
+import type {
+  AdminNotificationOperationLog,
+  AdminNotificationType,
+} from "@/lib/admin-notification-ops";
 import {
   audienceLabels,
   formatNotificationChannels,
@@ -31,11 +34,17 @@ type Props = {
   };
   deletingLogId?: string | null;
   onUpdateFilter: (
-    key: "search" | "typeFilter" | "sourceFilter" | "statusFilter" | "audienceFilter" | "sort",
+    key:
+      | "search"
+      | "typeFilter"
+      | "sourceFilter"
+      | "statusFilter"
+      | "audienceFilter"
+      | "sort",
     value: string,
   ) => void;
   onLoadLog?: (log: AdminNotificationOperationLog) => void;
-  onDeleteLog?: (logId: string) => Promise<void>;
+  onDeleteLog?: (logId: string) => void | Promise<void>;
   readOnly?: boolean;
   title?: string;
   description?: string;
@@ -57,9 +66,14 @@ function AutomaticSummaryStrip({
           key={summary.notificationType}
           className="grid min-w-[14rem] gap-1 rounded-2xl border border-border bg-surface-inset px-4 py-3"
         >
-          <p className="text-sm font-semibold text-foreground">{summary.label}</p>
+          <p className="text-sm font-semibold text-foreground">
+            {summary.label}
+          </p>
           <p className="text-sm text-muted-foreground">
-            최근 실행 {summary.lastRunAt ? formatPushLogDateTime(summary.lastRunAt) : "기록 없음"}
+            최근 실행{" "}
+            {summary.lastRunAt
+              ? formatPushLogDateTime(summary.lastRunAt)
+              : "기록 없음"}
           </p>
           <p className="text-sm text-muted-foreground">
             실패 {summary.failedCount}건
@@ -84,15 +98,15 @@ export function PushLogsSection({
   description = "최근 발송 이력을 검색하고 같은 구성을 다시 불러옵니다.",
 }: Props) {
   return (
-    <section className="grid min-w-0 gap-4 overflow-hidden rounded-3xl border border-border bg-surface p-4 shadow-flat sm:p-5">
-      <SectionHeading
-        title={title}
-        description={description}
-      />
+    <section className="grid min-w-0 gap-4 rounded-3xl border border-border bg-surface p-4 shadow-flat sm:p-5">
+      <SectionHeading title={title} description={description} />
 
       <AutomaticSummaryStrip summaries={automaticSummaries} />
 
-      <FilterBar title="로그 검색" description="필요한 조건만 남겨서 최근 이력을 찾습니다.">
+      <FilterBar
+        title="로그 검색"
+        description="필요한 조건만 남겨서 최근 이력을 찾습니다."
+      >
         <div className="grid min-w-[14rem] flex-1 gap-1">
           <span className="ui-caption">검색</span>
           <Input
@@ -107,7 +121,9 @@ export function PushLogsSection({
           <Select
             aria-label="발송 로그 유형"
             value={filters.typeFilter}
-            onChange={(event) => onUpdateFilter("typeFilter", event.target.value)}
+            onChange={(event) =>
+              onUpdateFilter("typeFilter", event.target.value)
+            }
           >
             <option value="all">전체 유형</option>
             <option value="announcement">운영 공지</option>
@@ -121,7 +137,9 @@ export function PushLogsSection({
           <Select
             aria-label="발송 로그 상태"
             value={filters.statusFilter}
-            onChange={(event) => onUpdateFilter("statusFilter", event.target.value)}
+            onChange={(event) =>
+              onUpdateFilter("statusFilter", event.target.value)
+            }
           >
             <option value="all">전체 상태</option>
             <option value="sent">발송 완료</option>
@@ -178,40 +196,55 @@ export function PushLogsSection({
                   </p>
                   <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
                     <p>
-                      {formatPushLogDateTime(log.createdAt)} · {log.source === "manual" ? "수동" : "자동"} · {formatNotificationChannels(log.selectedChannels)}
+                      {formatPushLogDateTime(log.createdAt)} ·{" "}
+                      {log.source === "manual" ? "수동" : "자동"} ·{" "}
+                      {formatNotificationChannels(log.selectedChannels)}
                     </p>
                     <p className="break-all">대상 {log.targetLabel}</p>
                     <p>
-                      발송 인앱 {log.channelResults.in_app.sent} · 푸시 {log.channelResults.push.sent} · MM {log.channelResults.mm.sent}
+                      발송 인앱 {log.channelResults.in_app.sent} · 푸시{" "}
+                      {log.channelResults.push.sent} · MM{" "}
+                      {log.channelResults.mm.sent}
                     </p>
-                    {log.url ? <p className="break-all">이동 URL {log.url}</p> : null}
+                    {log.url ? (
+                      <p className="break-all">이동 URL {log.url}</p>
+                    ) : null}
                     {log.exclusionReasons.length > 0 ? (
                       <p>
-                        제외 {log.exclusionReasons.map((reason) => `${reason.label} ${reason.count}명`).join(", ")}
+                        제외{" "}
+                        {log.exclusionReasons
+                          .map((reason) => `${reason.label} ${reason.count}명`)
+                          .join(", ")}
                       </p>
                     ) : null}
                   </div>
                 </div>
 
-                {!readOnly && onLoadLog && onDeleteLog ? (
+                {!readOnly && (onLoadLog || onDeleteLog) ? (
                   <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-                    <Button
-                      className="w-full justify-center sm:w-auto"
-                      variant="ghost"
-                      onClick={() => onLoadLog(log)}
-                    >
-                      불러오기
-                    </Button>
-                    <Button
-                      variant="danger"
-                      className="w-full justify-center sm:w-auto"
-                      onClick={() => void onDeleteLog(log.id)}
-                      loading={deletingLogId === log.id}
-                      loadingText="삭제 중"
-                      disabled={Boolean(deletingLogId && deletingLogId !== log.id)}
-                    >
-                      삭제
-                    </Button>
+                    {onLoadLog ? (
+                      <Button
+                        className="w-full justify-center sm:w-auto"
+                        variant="ghost"
+                        onClick={() => onLoadLog(log)}
+                      >
+                        불러오기
+                      </Button>
+                    ) : null}
+                    {onDeleteLog ? (
+                      <Button
+                        variant="danger"
+                        className="w-full justify-center sm:w-auto"
+                        onClick={() => void onDeleteLog(log.id)}
+                        loading={deletingLogId === log.id}
+                        loadingText="삭제 중"
+                        disabled={Boolean(
+                          deletingLogId && deletingLogId !== log.id,
+                        )}
+                      >
+                        삭제
+                      </Button>
+                    ) : null}
                   </div>
                 ) : null}
               </div>

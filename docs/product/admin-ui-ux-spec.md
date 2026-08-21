@@ -1,8 +1,8 @@
 # 관리자 기능·UI/UX 구현 명세
 
-작성 기준일: 2026-07-23
-상태: 구현 전 기준선
-관련 Issue: #205
+작성 기준일: 2026-07-26
+상태: #229 구현 진행 중
+관련 Issue: #205, #229
 
 이 문서는 싸트너십 관리자 콘솔을 새로 만들거나 리팩터링하는 Agent의 제품·UX·기술 계약이다. 실제 권한은 `src/lib/admin-permissions.ts`, 실제 route는 `src/lib/mock/scenarios/route-inventory.ts`, 디자인 토큰과 공용 컴포넌트는 `docs/design-system/` 및 `src/components/ui/`가 최종 기준이다. 문서가 코드와 다르면 임의로 화면을 바꾸지 말고 차이를 Issue에 기록한 뒤 함께 수정한다.
 
@@ -47,16 +47,18 @@
 
 | 그룹 | canonical 화면 | 목적 |
 | --- | --- | --- |
-| 개요 | `/admin` | 대기 업무와 운영 요약에서 다음 작업으로 이동 |
-| 사용자/권한 | 회원, 수료생 인증, 가입 승인, 프로필 사진, 리뷰, 로그 | 사람·신원·운영 기록을 안전하게 검토 |
-| 제휴 운영 | 제휴처, 변경 요청, 카테고리, 등록 신청, 파트너사/계정 | 제휴 서비스의 생성·변경·승인·계정 운영 |
-| 메시지/노출 | 내 알림, 발송 관리, 알림 템플릿, 홈 광고, 이벤트 | 내부·외부 메시지와 공개 노출 운영 |
-| 설정 | 기수 관리, 관리자 관리 | 전역 운영 기준과 관리자 권한 관리 |
+| 홈 | `/admin` | 오늘의 운영 상태와 가장 중요한 다음 작업으로 이동 |
+| 작업함 | `/admin/tasks`, 가입 승인, 수료생 인증, 프로필 사진, 등록·변경 요청, 리뷰, 내 알림 | 처리할 대기 항목을 우선순위와 복구 맥락으로 처리 |
+| 데이터 | 회원, 제휴처, 카테고리, 파트너사/계정 | 운영 대상과 기준 데이터를 찾고 관리 |
+| 리포트 | 운영 로그 | 제품·감사·보안 기록과 성능 지표를 탐색 |
+| 자동화 | 발송 관리, 알림 템플릿, 홈 광고, 이벤트 | 반복 발송과 공개 노출을 설정·운영 |
+| 설정 | 기수 관리, 관리자 관리 | 전역 운영 기준과 관리자 권한을 관리 |
 
 ### Shell 계약
 
 - 데스크톱은 `AdminShell`의 고정 좌측 navigation과 상단 utility bar를 사용한다. 중간 폭에서는 아이콘 rail, 넓은 화면에서는 그룹명·라벨·설명이 있는 확장 rail을 사용한다.
-- 모바일은 고정 헤더, 홈 이동, 테마 전환, 권한 기반 drawer navigation을 사용한다. 현재 화면의 title과 back context는 drawer에서 확인할 수 있어야 한다.
+- 모바일은 고정 헤더의 빠른 찾기·테마 전환, 하단의 `홈·작업함·회원·더보기` 탐색, 권한 기반 drawer navigation을 함께 사용한다. 현재 화면의 title과 back context는 drawer에서 확인할 수 있어야 한다. 하단 탐색은 최소 44px touch target과 safe area를 보장하며, scroll-to-top 같은 floating action은 그 위에 배치한다.
+- desktop과 mobile 헤더는 `빠른 찾기`를 제공한다. `⌘K` 또는 `Ctrl+K`로 권한 내 navigation label·설명을 검색하고, 선택하면 그 목적지로 이동한다. dialog는 focus trap, Escape, overlay close, opener focus return, 기존 body overflow 복원을 보장한다.
 - shell은 위치·권한 내비게이션·전역 utility만 담당한다. 각 page는 의미상 `h1` 하나, 사용자 과업을 수행하는 primary CTA 하나를 가진 `PageHeader`를 렌더한다. shell title을 페이지 `h1`으로 반복하지 않는다.
 - breadcrumb는 `관리 홈 → 현재 영역`까지만 표시한다. 상세 편집 화면은 목록 query를 보존하는 `목록으로` 보조 이동을 제공한다.
 - nav item은 read 권한이 있을 때만 보인다. active state는 primary surface와 명도·border·텍스트 대비로 구분하며 색만으로 상태를 전달하지 않는다.
@@ -108,7 +110,7 @@ generic UI 자기점검과 제거할 장식:
 | 현재 route를 유지한 채 독립 행·drawer action 결과만 다시 읽기 | 한 번의 `refresh` |
 
 - 검색·정렬·필터·page size·페이지는 canonical 목록 route의 URL query가 단일 기준이다. filter가 바뀌면 page를 1로 되돌리고 `replace`하며 scroll 위치를 불필요하게 초기화하지 않는다.
-- `/admin/members`는 이 계약을 따른다. `/admin/partners`처럼 로컬 state에만 머무는 기존 목록은 리팩터링 우선 대상이며, 완료 기준은 URL 복원·뒤로가기·공유 가능 검색이다.
+- `/admin/members`와 `/admin/partners`는 이 계약을 따른다. `/admin/partners`의 `q`(제휴처명)·`category`·`visibility`·`sort`·`page`·`pageSize`는 URL을 단일 기준으로 하며, 서버가 해당 filter와 page만 조회한다. 완료 기준은 URL 복원·뒤로가기·공유 가능 검색·필터 결과의 정확한 total count다.
 - 상세 진입은 목록 query를 검증된 `returnTo` 또는 명시적 back context로 보존한다. 외부 URL, 다른 권한 영역, 민감 query는 허용하지 않는다.
 - mutation 성공 뒤에는 `redirect`, `replace`, `refresh` 중 하나만 실행한다. 성공 toast를 다른 화면으로 전달하려면 안전한 status code만 전달하고 raw error를 query에 넣지 않는다.
 
@@ -141,7 +143,8 @@ generic UI 자기점검과 제거할 장식:
 | route | 권한·범위 | 사용자 과업과 primary action | 필수 상태·수용 기준 |
 | --- | --- | --- | --- |
 | `/admin` | 최소 members read, 각 카드별 resource read, regional scope | 가장 긴급한 큐를 열고 운영 화면으로 이동 | pending queue → quick action → 운영 지표 순. 허용된 수치·링크만 첫 viewport에 노출. 기본/없음/부분 실패/loading/forbidden Story 필요. |
-| `/admin/admins` | `admin_management`, 권한 수정은 privileged guard | 관리자 초대·상태·권한 template·campus scope 저장 | 자기 escalation·마지막 최고 권한 제거 금지. setup token은 한 번만 안전히 표시하며 목록·log에 남기지 않음. |
+| `/admin/tasks` | 로그인한 관리자, 각 업무 링크는 개별 read 권한 | 처리할 검토·승인·운영 큐를 찾아 해당 화면으로 이동 | 메뉴는 권한 기반으로만 표시. 업무가 없으면 권한 요청 또는 관리 홈으로 복귀. 대기 건수는 `get_admin_task_inbox_counts` 단일 scope-aware read로 제공하며, 지역 제휴 관리자는 담당 캠퍼스의 등록·변경 요청만 본다. |
+| `/admin/admins` | `admin_management`, 권한 수정은 privileged guard | 관리자 초대·상태·권한 template·campus scope 저장 | 자기 escalation·마지막 최고 권한 제거 금지. setup token은 한 번만 안전히 표시하며 목록·log에 남기지 않음. 오류는 안전한 status code로만 복구. |
 | `/admin/cycle` | cycles read/update | 현재 기수·전환 규칙·카드 theme 저장 | 저장 전 영향 범위와 preview를 표시. `/admin/cycle/mock`은 운영용 mock-only로 navigation에 노출하지 않음. |
 | `/admin/denied` | 조건부 public | 권한 부족 후 안전한 출발점으로 이동 | 요청 route·민감 resource를 드러내지 않으며 로그인/관리 홈/사용자 홈 중 안전한 한 행동을 제공. |
 
@@ -153,30 +156,30 @@ generic UI 자기점검과 제거할 장식:
 | `/admin/members/[memberId]` | members read/update, campus scope와 개별 민감 action의 서버 guard | 한 회원의 상태·동의·사진·운영 기록을 검토하고 허용된 변경 저장 | back context 보존. not-found/forbidden/conflict/security-log 없음. 비밀번호 material은 절대 렌더하지 않음. |
 | `/admin/graduate-verifications` | graduate_verifications read/update | 수료생 신규·복구·보완·사진 교체를 검토·결정 | private viewer는 서버 권한/no-store. 승인·반려·보완·메일 실패·빈 큐. 새 가입과 기존 회원 복구를 시각적으로 분리. |
 | `/admin/profile-photos` | profile_images read/update | 일반 회원의 사진 변경 요청과 기존 사진을 검토 | 인증 검토와 별도 queue. pending/rejected 회원의 인증 카드 노출 규칙을 설명하고 PII 없는 audit을 남김. |
-| `/admin/member-signup-requests` | Super Admin + member_signup_requests read | Mattermost 파싱 실패 가입 신청을 상세 검토로 이동 | password material, hash, token을 목록에 노출하지 않음. 빈 큐/부분 실패/권한 없음. |
+| `/admin/member-signup-requests` | Super Admin + member_signup_requests read | Mattermost 파싱 실패 가입 신청을 상세 검토로 이동 | password material, hash, token을 목록에 노출하지 않음. 잘못된 request ID는 목록의 안전한 오류 상태로 복구. 빈 큐/부분 실패/권한 없음. |
 | `/admin/member-signup-requests/[requestId]` | Super Admin + update | 누락 이름·기수·캠퍼스를 보완해 승인 또는 반려 | pending lock, 이미 처리됨 conflict, 승인/반려 완료. 결정 뒤 password material은 제거되고 재사용 불가. |
 | `/admin/reviews` | reviews read/update/delete, campus scope | 신고·검토 우선 리뷰의 공개 상태를 조정 | 검색·상태·rating·company/partner filter, 이미지 실패, hidden/deleted 이력. 이미지 URL과 회원 정보 최소 노출. |
 | `/admin/logs` | logs read, export 별도 capability | preset과 query로 제품·감사·보안 로그를 탐색·내보내기 | 제한된 기본 기간, cursor pagination, 결과 유지, source partial failure, export pending. 조회·export를 audit하고 민감 payload redaction 유지. |
 
-### 제휴 운영
+### 데이터
 
 | route | 권한·범위 | 사용자 과업과 primary action | 필수 상태·수용 기준 |
 | --- | --- | --- | --- |
-| `/admin/partners` | brands read/create, campus scope | 제휴처를 찾고 생성·상세 작업으로 이동 | 검색·카테고리·공개 상태·정렬을 URL query로 통일. 20개 단위 또는 명시된 pagination, empty/no result, public/confidential/private 상태가 구분됨. |
+| `/admin/partners` | brands read/create, campus scope | 제휴처를 찾고 생성·상세 작업으로 이동 | 검색·카테고리·공개 상태·정렬·page size를 URL query로 통일. 12·24·48개 server pagination, empty/no result, public/confidential/private 상태가 구분됨. 범위를 벗어난 page는 현재 filter를 보존해 canonical URL로 정규화. |
 | `/admin/partners/new` | brands create, campus scope | 회사 연결부터 혜택·지점·미디어를 검증해 제휴처 생성 | 입력 보존, 첫 오류 focus, duplicate candidate, file/image error, submit pending. 성공하면 canonical detail로 단 한 번 이동. |
-| `/admin/partners/[partnerId]` | brands update, campus scope | 공개 상태·핵심 정보·혜택·지점·미디어·리뷰·이력을 수정 | section stack과 sticky save 하나. 최신 원본 conflict, media error, field-level audit. 사용자 문구에서 파트너사/제휴처/지점/혜택을 구분. |
-| `/admin/partner-requests` | brands update, campus scope | 변경 요청의 최신 원본과 diff를 보고 승인 또는 반려 | split queue/detail workspace. diff 없음, 증빙 오류, already handled, conflict. `/admin/partners?tab=requests`는 이 route로 canonical redirect. |
+| `/admin/partners/[partnerId]` | brands update, campus scope | 기본 정보를 먼저 수정하고 공개 상태·운영 지표·혜택·리뷰·이력을 필요할 때 확인 | 헤더의 동일 화면 edit anchor와 section stack, sticky save 하나. 최신 원본 conflict, media error, field-level audit. 사용자 문구에서 파트너사/제휴처/지점/혜택을 구분. |
+| `/admin/partner-requests` | brands update, campus scope | 변경 요청의 최신 원본과 diff를 보고 승인 또는 반려 | 오래 대기한 요청부터 6·12·24개 server pagination. 지역 범위가 비어 있으면 전역 queue로 확장하지 않는다. diff 없음, 증빙 오류, already handled, conflict. `/admin/partners?tab=requests`는 이 route로 canonical redirect. |
 | `/admin/partner-registrations` | brands read/update, campus scope | 공개 등록 신청의 회사·제휴처·지점·서류를 승인/반려 | queue/detail 분리, 반려 사유 validation, file error, duplicate 처리 차단. |
 | `/admin/categories` | global brands 관리 | 카테고리 생성·이름·순서를 관리하고 삭제 영향을 판단 | 지역 관리자에게 숨김. 현재는 삭제를 잠그고 연결 수·차단 이유를 보여줌. `/admin/partners?tab=categories`는 canonical redirect. |
 | `/admin/companies` | companies read/update, campus scope | 파트너사·담당 계정·플랜·증빙을 관리 | 회사와 제휴처 용어 구분. 결제 대기/미납, setup token one-time display, 부분 실패, audit. |
 
-### 메시지·노출·이벤트
+### 자동화·이벤트
 
 | route | 권한·범위 | 사용자 과업과 primary action | 필수 상태·수용 기준 |
 | --- | --- | --- | --- |
 | `/admin/notifications` | notifications read/update, current admin only | 내 운영 알림을 열고 읽음·수신 설정을 관리 | 발송 composer를 섞지 않음. unread/empty/pagination/read pending/partial failure. 내부 허용 목적지만 열기. |
 | `/admin/push` | notifications send, audience validation | 대상·채널·내용을 검토한 뒤 알림을 발송 | 알림센터/로그/발송은 명확한 view mode로만 분리. 대상 수·채널 설정·preview·확인 dialog·부분 실패·중복 submit 차단. |
-| `/admin/notification-templates` | Super Admin + notification_templates | 자동 알림의 채널별 template과 허용 변수를 수정·복원 | 실제 password/token 값은 삽입하지 않음. unknown/missing variable, plain-text 안전성, save/restore audit. |
+| `/admin/notification-templates` | Super Admin + notification_templates | 자동 알림의 채널별 template과 허용 변수를 수정·복원 | 실제 password/token 값은 삽입하지 않음. unknown/missing variable, plain-text 안전성, save/restore audit. validation·저장·복원·테스트 오류는 raw message 대신 안전한 code로 복구. |
 | `/admin/advertisement` | home_ads | 홈 광고·캠페인·carousel·쿠폰 연결을 생성·수정·종료 | 노출 기간/대상/이미지 validation, public preview, expired state. `/admin/promotions`는 이 route로 redirect. |
 | `/admin/event` | events | 이벤트 상태·기간·참여/보상 요약을 보고 상세로 이동 | 진행/예정/종료 filter, empty/error, public 상태와 일치. |
 | `/admin/event/[slug]` | events + 민감 참여 데이터 최소 권한 | 현재 필요한 보상·종료 처리를 하고 export | 참여 없음/다건/filter/pagination/reward pending/completed. 모바일은 카드 또는 명시적 내부 table scroll. 서버가 중복 보상을 차단. |
@@ -209,7 +212,7 @@ generic UI 자기점검과 제거할 장식:
 ## 8. 접근성·반응형·한국어
 
 - 기본 검증 viewport는 360px, 820px, 1366px다. filter, dense table, modal, sticky action, 긴 한국어 제목은 320px과 390px도 추가 확인한다.
-- 자연어 한국어는 `word-break: keep-all`을 우선하고, 이메일·URL·UUID·계좌·긴 식별자만 bounded container의 `overflow-wrap: anywhere`를 사용한다. shrink 가능한 flex/grid child에는 `min-w-0`을 둔다.
+- 자연어 한국어에는 전역 `word-break: keep-all`을 강제하지 않는다. 문단은 자연 줄바꿈을 기본으로 하고, 제목·짧은 라벨처럼 의미 단위 보존이 필요한 곳에만 제한적으로 `keep-all`을 적용한다. 이메일·URL·UUID·계좌·긴 식별자는 bounded container의 `overflow-wrap: anywhere`를 사용하며, shrink 가능한 flex/grid child에는 `min-w-0`을 둔다.
 - 모든 control은 label/accessible name, visible keyboard focus, 44px 이상 touch target, keyboard completion을 제공한다. dialog는 focus trap·Escape·복귀 focus를 지원한다.
 - `loading`, `error`, `success`, filter result count, async pending은 screen reader가 이해할 수 있는 문구를 갖는다. 색만으로 승인·경고·삭제·선택을 구분하지 않는다.
 - 모션은 섹션 reveal, tab layout transition, overlay 진입처럼 정보 구조를 보일 때만 사용한다. `prefers-reduced-motion`에서는 이동과 duration을 줄이거나 제거한다.
@@ -232,6 +235,8 @@ generic UI 자기점검과 제거할 장식:
 
 - 데이터 열람, export, 승인/반려, 공개 상태, 권한·계정·플랜·기수 변경, 발송, template 복원은 actor·대상·safe outcome·before/after 정책에 따라 audit한다.
 - 사용자에게 보이는 분석 event는 화면 목적과 성공 행동만 기록한다. 이메일, 사진 URL, token, raw error를 event property에 넣지 않는다.
+- `/admin`의 RUM은 `CLS`, `FCP`, `INP`, `LCP`, `TTFB`만 안전한 수치·rating으로 기록한다. metric id, query, row id, 회원·제휴처 식별자, raw path는 기록하지 않는다.
+- 성능 수용 기준은 p75 `INP ≤ 200ms`, `LCP ≤ 2.5s`, `TTFB ≤ 0.8s`다. 읽기 API p95 `≤ 150ms`, 쓰기 API p95 `≤ 120ms`를 목표로 하되, 이를 넘는 mutation은 대상 항목 범위의 즉시·사실적인 pending feedback을 제공한다. cache 가능 데이터와 권한·PII 데이터의 cache 경계는 별도 성능 기록에서 검증한다.
 
 ## 10. 외부 Agent 작업 계약
 

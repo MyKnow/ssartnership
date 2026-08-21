@@ -5,6 +5,7 @@ import { getRequestLogContext, logAdminAudit } from '@/lib/activity-logs';
 import { getAdminSession } from '@/lib/auth';
 import { exportAdminLogsCsv, type LogGroup, type LogRangePreset } from '@/lib/log-insights';
 import { isTrustedSameOriginRequest } from '@/lib/request-guards';
+import { withServerTiming } from '@/lib/server-timing';
 
 export const runtime = 'nodejs';
 
@@ -51,71 +52,85 @@ function parseExportRequestBody(value: unknown) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!isTrustedSameOriginRequest(request, {
-    expectedOrigin: request.nextUrl.origin,
-    allowedContentTypes: ['application/json'],
-  })) {
-    return NextResponse.json({ message: '잘못된 요청입니다.' }, { status: 403 });
-  }
+  return withServerTiming(async (timing) => {
+    if (!isTrustedSameOriginRequest(request, {
+      expectedOrigin: request.nextUrl.origin,
+      allowedContentTypes: ['application/json'],
+    })) {
+      return NextResponse.json({ message: '잘못된 요청입니다.' }, { status: 403 });
+    }
 
-  const accessDenied = await ensureAdminApiPermission(request, 'logs', 'read');
-  if (accessDenied) {
-    return accessDenied;
-  }
-
-  const session = await getAdminSession();
-  if (!session) {
-    return NextResponse.json({ message: '관리자 인증이 필요합니다.' }, { status: 401 });
-  }
-
-  const body = parseExportRequestBody(await request.json().catch(() => null));
-  if (!body) {
-    return NextResponse.json({ message: '내보내기 요청 형식이 올바르지 않습니다.' }, { status: 400 });
-  }
-
-  const access = getAdminLogAccessPolicy(session.account);
-  const allowedGroups = selectAllowedLogGroups(body.groups, access.exportGroups);
-  if (allowedGroups.length !== body.groups.length) {
-    return NextResponse.json({ message: '요청한 로그 내보내기 권한이 없습니다.' }, { status: 403 });
-  }
-
-  const { filename, stream, data } = await exportAdminLogsCsv({
-    ...body,
-    groups: allowedGroups,
-    includePii: access.includePii,
-  });
-  const auditRecorded = await logAdminAudit({
-    ...getRequestLogContext(request),
-    action: 'admin_log_export_requested',
-    actorType: 'admin',
-    actorId: session.adminId,
-    targetType: 'admin_logs',
-    properties: {
-      outcome: 'initiated',
-      groups: allowedGroups,
-      rangePreset: body.preset,
-      includePii: access.includePii,
-      exportedRows: {
-        product: data.productRows.length,
-        audit: data.auditRows.length,
-        security: data.securityRows.length,
-      },
-      truncated: data.truncated,
-    },
-  });
-  if (!auditRecorded) {
-    return NextResponse.json(
-      { message: '내보내기 감사 기록 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.' },
-      { status: 503 },
+    const accessDenied = await timing.measure('auth', () =>
+      ensureAdminApiPermission(request, 'logs', 'read'),
     );
-  }
+    if (accessDenied) {
+      return accessDenied;
+    }
 
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Cache-Control': 'no-store',
-      'X-Content-Type-Options': 'nosniff',
-    },
+    const session = await timing.measure('session', () => getAdminSession());
+    if (!session) {
+      return NextResponse.json({ message: '관리자 인증이 필요합니다.' }, { status: 401 });
+    }
+
+    const body = parseExportRequestBody(await request.json().catch(() => null));
+    if (!body) {
+      return NextResponse.json({ message: '내보내기 요청 형식이 올바르지 않습니다.' }, { status: 400 });
+    }
+
+    const access = getAdminLogAccessPolicy(session.account);
+    const allowedGroups = selectAllowedLogGroups(body.groups, access.exportGroups);
+    if (allowedGroups.length !== body.groups.length) {
+      return NextResponse.json({ message: '요청한 로그 내보내기 권한이 없습니다.' }, { status: 403 });
+    }
+
+    try {
+      const { filename, stream, data } = await timing.measure('query', () =>
+        exportAdminLogsCsv({
+          ...body,
+          groups: allowedGroups,
+          includePii: access.includePii,
+        }),
+      );
+    const auditRecorded = await timing.measure('audit', () => logAdminAudit({
+      ...getRequestLogContext(request),
+      action: 'admin_log_export_requested',
+      actorType: 'admin',
+      actorId: session.adminId,
+      targetType: 'admin_logs',
+      properties: {
+        outcome: 'initiated',
+        groups: allowedGroups,
+        rangePreset: body.preset,
+        includePii: access.includePii,
+        exportedRows: {
+          product: data.productRows.length,
+          audit: data.auditRows.length,
+          security: data.securityRows.length,
+        },
+        truncated: data.truncated,
+      },
+    }));
+    if (!auditRecorded) {
+      return NextResponse.json(
+        { message: '내보내기 감사 기록 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.' },
+        { status: 503 },
+      );
+    }
+
+      return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
+    } catch (error) {
+      console.error('[admin-logs] export failed', error);
+      return NextResponse.json(
+        { message: 'CSV 파일을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.' },
+        { status: 500 },
+      );
+    }
   });
 }

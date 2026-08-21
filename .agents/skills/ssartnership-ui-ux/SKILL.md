@@ -5,7 +5,11 @@ description: Design, implement, or review ssartnership UI changes that need the 
 
 # Ssartnership UI/UX
 
-Use this skill for any UI creation, revision, or review in this repository. Apply the local `frontend-design`, `frontend-patterns`, `design-system`, `browser-qa`, and Korean responsive skills through this project-specific overlay.
+Use this skill for any UI creation, revision, or review in this repository. Apply the local `frontend-design`, `frontend-patterns`, `design-system`, `browser-qa`, `korean-responsive-ui-quality`, `mobile-ui-guardrails`, and `tablet-desktop-ui-guardrails` skills through this project-specific overlay. For dashboards or analytics workbooks, also apply `source-backed-dashboard` or `analytics-dashboard-template` as appropriate.
+
+## Rule Precedence
+
+Resolve a conflict in this order: server-side authorization, privacy, and accessibility; this repository's source of truth and existing interaction contracts; the user's task and recovery risk; then visual distinction. Record a brief exception when a local surface cannot follow a shared primitive or generic guardrail.
 
 ## Source Of Truth
 
@@ -39,6 +43,12 @@ For a new surface, redesign, or information-architecture change, extend it with 
 - Pair every changed interaction with loading, empty, error, and disabled/pending behavior as applicable.
 - Use concise, action-based Korean copy. An error states what happened and what the user can do next; it never exposes internal details.
 
+## Dashboards And Analytics Workbooks
+
+- For product or operational dashboards, define the source owner, metric contract, grain, time zone, freshness, filter scope, and permitted audience before choosing cards or charts. Enforce access on the server and do not auto-publish or widen sharing.
+- For the Analytics Dashboard spreadsheet template, preserve the original as a reference, work in a versioned copy, validate formulas/chart ranges/named references, and run accessibility review before handoff.
+- Use charts only when they answer a stated decision. Provide a concise text finding and usable data alternative for decision-critical visualizations.
+
 ## State Changes, Errors, And Routing
 
 - Keep domain state transitions and recoverable errors outside page components when they grow beyond rendering.
@@ -57,6 +67,6 @@ For a new surface, redesign, or information-architecture change, extend it with 
 ## Korean Responsive QA
 
 - For this repository, use `src/lib/mock/scenarios/` and repository mocks instead of production data in stories or screenshots. `registry.ts`, `route-inventory.ts`, `storybook-coverage.ts`, and `required-states.ts` are the stable scenario, ownership, coverage, and viewport records.
-- Cover relevant `default`, `empty`, `many`, `longKorean`, `loading`, `error`, and `unauthorized` states.
-- Capture the affected surface at 360px, 820px, and 1366px at minimum; add 320px, 390px, or breakpoint-sensitive widths when the surface is dense, form-heavy, table-like, or modal-like.
-- Treat document overflow, severe Korean line breaks, missing core story states, and PII in fixtures/screenshots as blockers.
+- Start with the default state and 360px, 820px, and 1366px for a responsive surface. Add `empty`, `many`, `longKorean`, `loading`, `error`, `unauthorized`, 320px, 390px, zoom/reflow, or breakpoint-sensitive coverage only when the changed behavior makes that risk credible.
+- Use page-state stories for deterministic, regression-prone views or existing Storybook contracts. A documented route-level browser check is acceptable when a story cannot represent server or permission behavior faithfully.
+- Treat document overflow, severe Korean line breaks, hidden required content, failed keyboard access, missing meaningful recovery, and PII in fixtures/screenshots as blockers.

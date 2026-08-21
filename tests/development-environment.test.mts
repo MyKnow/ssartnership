@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
+import { win32 as winPath } from "node:path";
 import test from "node:test";
 
 import {
   buildLocalDevelopmentEnv,
   classifyPlatform,
   parseEnvFile,
+  resolveNpmCliPath,
   validateEnvironment,
 } from "../scripts/lib/development-environment.mjs";
 
@@ -38,6 +40,29 @@ test("CRLF와 따옴표를 포함한 env 파일을 OS와 무관하게 읽는다"
       EMPTY: "",
     },
   );
+});
+
+test("npm 실행 경로가 없는 직접 Node 실행에서도 같은 runtime의 npm CLI를 찾는다", () => {
+  const npmCliPath = resolveNpmCliPath({} as NodeJS.ProcessEnv);
+
+  assert.ok(npmCliPath);
+  assert.match(npmCliPath, /node_modules[\\/]npm[\\/]bin[\\/]npm-cli\.js$/u);
+});
+
+test("Windows hosted Node layout에서도 상위 version 디렉터리의 npm CLI를 찾는다", () => {
+  const nodeExecutablePath = String.raw`C:\hostedtoolcache\windows\node\24.18.1\x64\node.exe`;
+  const expectedNpmCliPath = String.raw`C:\hostedtoolcache\windows\node\24.18.1\node_modules\npm\bin\npm-cli.js`;
+
+  const npmCliPath = resolveNpmCliPath(
+    {} as NodeJS.ProcessEnv,
+    {
+      executablePath: nodeExecutablePath,
+      pathModule: winPath,
+      exists: (candidate) => candidate === expectedNpmCliPath,
+    },
+  );
+
+  assert.equal(npmCliPath, expectedNpmCliPath);
 });
 
 test("bootstrap용 로컬 환경은 secret을 출력하지 않고 mock profile을 만든다", () => {

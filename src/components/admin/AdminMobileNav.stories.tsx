@@ -42,13 +42,16 @@ export const OpenAndClose: Story = {
     const body = within(document.body);
     await expect(body.getByRole("dialog")).toBeInTheDocument();
     await expect(body.getByText("관리 대시보드")).toBeInTheDocument();
+    await expect(
+      body.getByText("승인·검토·예외 처리가 필요한 항목"),
+    ).toBeInTheDocument();
     await expect(body.getByRole("link", { name: /^관리 홈/ })).toHaveAttribute("href", "/admin");
     await expect(body.getByRole("link", { name: /^제휴처/ })).toHaveAttribute("href", "/admin/partners");
     await expect(body.getByRole("link", { name: /^파트너사\/계정/ })).toHaveAttribute("href", "/admin/companies");
     await expect(body.getByRole("link", { name: "사용자 화면" })).toHaveAttribute("href", "/");
     await expect(body.getByRole("button", { name: "로그아웃" })).toBeInTheDocument();
 
-    await userEvent.click(body.getAllByRole("button", { name: "관리 메뉴 닫기" })[0]!);
+    await userEvent.click(body.getByRole("button", { name: "관리 메뉴 배경 닫기" }));
     await expect(body.queryByRole("dialog")).not.toBeInTheDocument();
   },
 };
@@ -73,7 +76,7 @@ export const KeyboardFocus: Story = {
     await userEvent.click(trigger);
 
     const body = within(document.body);
-    const closeButton = body.getAllByRole("button", { name: "관리 메뉴 닫기" })[1]!;
+    const closeButton = body.getByRole("button", { name: "관리 메뉴 닫기" });
     await expect(closeButton).toHaveFocus();
 
     await userEvent.keyboard("{Shift>}{Tab}{/Shift}");

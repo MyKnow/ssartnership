@@ -17,8 +17,11 @@ test("관리자 고정 액션은 보이지 않는 공통 그룹에서 세로로 
   assert.match(scrollFab, /order-first pointer-events-none/);
   assert.match(scrollFab, /<FloatingAction/);
   assert.match(formActions, /order-last pointer-events-auto/);
-  assert.match(shell, /<FloatingActionGroup>\s*<ScrollToTopFab \/>\s*<main>[\s\S]*<\/FloatingActionGroup>/);
-  assert.equal((shell.match(/<FloatingActionGroup>/g) ?? []).length, 2);
+  assert.match(
+    shell,
+    /<FloatingActionGroup[\s\S]*>\s*<ScrollToTopFab \/>\s*<main\b[^>]*>[\s\S]*<\/FloatingActionGroup>/,
+  );
+  assert.equal((shell.match(/<FloatingActionGroup(?:\s|>)/g) ?? []).length, 1);
   assert.match(
     styles,
     /\.bottom-safe-partner-action-bar\s*\{\s*bottom: calc\(env\(safe-area-inset-bottom\) \+ 6rem\);/,

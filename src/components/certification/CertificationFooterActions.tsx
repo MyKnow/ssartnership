@@ -5,11 +5,14 @@ import { useState } from "react";
 import Button from "@/components/ui/Button";
 import Surface from "@/components/ui/Surface";
 import { useToast } from "@/components/ui/Toast";
+import { buildMemberGateHref } from "@/lib/member-required-gates";
 
 export default function CertificationFooterActions({
   canChangeProfilePhoto = false,
+  returnTo = "/certification",
 }: {
   canChangeProfilePhoto?: boolean;
+  returnTo?: string;
 }) {
   const { notify } = useToast();
   const router = useRouter();
@@ -28,7 +31,7 @@ export default function CertificationFooterActions({
         {canChangeProfilePhoto ? (
           <Button
             variant="ghost"
-            href="/certification/photo"
+            href={buildMemberGateHref("profile-photo", returnTo)}
             prefetch={false}
           >
             본인 사진 변경
@@ -36,7 +39,7 @@ export default function CertificationFooterActions({
         ) : null}
         <Button
           variant="ghost"
-          href="/auth/change-password?returnTo=%2Fcertification"
+          href={buildMemberGateHref("change-password", returnTo)}
           prefetch={false}
         >
           비밀번호 변경하기

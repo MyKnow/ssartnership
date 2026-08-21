@@ -2,6 +2,7 @@
 
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import AdminPaginationLink from "@/components/admin/AdminPaginationLink";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import SubmitButton from "@/components/ui/SubmitButton";
@@ -102,19 +103,49 @@ function PartnerChangeRequestCard({
   );
 }
 
+function buildQueuePageHref(returnTo: string, page: number) {
+  const url = new URL(returnTo, "https://admin.local");
+  if (page > 1) {
+    url.searchParams.set("page", String(page));
+  } else {
+    url.searchParams.delete("page");
+  }
+  return `${url.pathname}${url.search}`;
+}
+
 export default function PartnerChangeRequestQueue({
   requests,
   approveAction,
   rejectAction,
   canReview,
   returnTo = "/admin/partner-requests",
+  pagination,
+  loadError = false,
 }: {
   requests: PartnerChangeRequestSummary[];
   approveAction: (formData: FormData) => void | Promise<void>;
   rejectAction: (formData: FormData) => void | Promise<void>;
   canReview: boolean;
   returnTo?: string;
+  pagination?: {
+    totalCount: number;
+    page: number;
+    pageSize: number;
+  };
+  loadError?: boolean;
 }) {
+  const effectivePagination = pagination ?? {
+    totalCount: requests.length,
+    page: 1,
+    pageSize: Math.max(1, requests.length),
+  };
+  const totalPages = Math.max(
+    1,
+    Math.ceil(effectivePagination.totalCount / effectivePagination.pageSize),
+  );
+  const currentPage = Math.min(effectivePagination.page, totalPages);
+  const pageStart = (currentPage - 1) * effectivePagination.pageSize;
+
   return (
     <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
       <AdminSectionHeading
@@ -122,7 +153,14 @@ export default function PartnerChangeRequestQueue({
         description="변경된 항목만 현재값과 요청값으로 비교한 뒤 승인하거나 거절합니다."
       />
 
-      {requests.length === 0 ? (
+      {loadError ? (
+        <AdminStatePanel
+          kind="error"
+          title="변경 요청을 불러오지 못했습니다."
+          description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 담당자에게 알려 주세요."
+          action={<Button href={returnTo} variant="secondary">다시 확인</Button>}
+        />
+      ) : requests.length === 0 ? (
         <AdminStatePanel
           kind="empty"
           title="승인 대기 요청이 없습니다."
@@ -135,6 +173,32 @@ export default function PartnerChangeRequestQueue({
         />
       ) : (
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
+          {totalPages > 1 ? (
+            <Surface level="inset" padding="sm" className="flex min-w-0 flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+              <p>
+                {pageStart + 1}-{Math.min(pageStart + requests.length, effectivePagination.totalCount)} / {effectivePagination.totalCount.toLocaleString("ko-KR")}
+              </p>
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                <AdminPaginationLink
+                  href={buildQueuePageHref(returnTo, currentPage - 1)}
+                  prefetch
+                  disabled={currentPage === 1}
+                >
+                  이전
+                </AdminPaginationLink>
+                <span className="min-w-[5.5rem] text-center text-xs sm:text-sm">
+                  {currentPage} / {totalPages}
+                </span>
+                <AdminPaginationLink
+                  href={buildQueuePageHref(returnTo, currentPage + 1)}
+                  prefetch
+                  disabled={currentPage === totalPages}
+                >
+                  다음
+                </AdminPaginationLink>
+              </div>
+            </Surface>
+          ) : null}
           {requests.map((request) => (
             <PartnerChangeRequestCard
               key={request.id}

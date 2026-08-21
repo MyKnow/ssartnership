@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import AdminAccessDeniedNotice from "@/components/admin/AdminAccessDeniedNotice";
+import { sanitizeAdminReturnTo } from "@/lib/admin-session-bridge";
 import { SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -10,10 +11,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default function AdminDeniedPage() {
+export default async function AdminDeniedPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ returnTo?: string }>;
+}) {
+  const params = (await searchParams) ?? {};
+  const returnTo = sanitizeAdminReturnTo(params.returnTo);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6 py-16">
-      <AdminAccessDeniedNotice />
+      <AdminAccessDeniedNotice returnTo={returnTo} />
     </div>
   );
 }

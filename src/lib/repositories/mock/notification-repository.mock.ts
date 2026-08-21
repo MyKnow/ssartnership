@@ -112,6 +112,23 @@ export class MockNotificationRepository implements NotificationRepository {
       createdAt: now,
     };
     const store = getStore();
+    const idempotencyKey = input.idempotencyKey?.trim() || null;
+    if (idempotencyKey) {
+      const existing = store.notifications.find(
+        (item) => item.metadata?.adminOperationIdempotencyKey === idempotencyKey,
+      );
+      if (existing) {
+        return {
+          notification: existing,
+          recipientMemberIds: [],
+          alreadyExists: true,
+        };
+      }
+      notification.metadata = {
+        ...notification.metadata,
+        adminOperationIdempotencyKey: idempotencyKey,
+      };
+    }
     store.notifications.unshift(notification);
 
     const recipientMemberIds = Array.from(

@@ -115,6 +115,7 @@ export function revalidateMemberPaths() {
 }
 
 export function revalidateCyclePaths() {
+  revalidateTag("ssafy-cycle-settings", "max");
   revalidatePath("/admin");
   revalidatePath("/admin/cycle");
   revalidatePath("/admin/members");

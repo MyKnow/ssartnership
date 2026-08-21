@@ -1,11 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 import AdminEventListView, {
   type AdminEventListSection,
 } from "./AdminEventListView";
 
-const emptySections = ["진행 전", "진행 중", "진행 후", "비활성", "등록 필요"].map(
-  (bucket) => ({ bucket, items: [] }),
-) satisfies AdminEventListSection[];
+const emptySections = [
+  "진행 전",
+  "진행 중",
+  "진행 후",
+  "비활성",
+  "등록 필요",
+].map((bucket) => ({ bucket, items: [] })) satisfies AdminEventListSection[];
 
 const sections: AdminEventListSection[] = emptySections.map((section) =>
   section.bucket === "진행 중"
@@ -45,3 +50,19 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const ReadOnly: Story = {
+  args: {
+    canCreate: false,
+    canUpdate: false,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole("link", { name: "운영 설정 보기" }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("link", { name: "등록하기" }),
+    ).not.toBeInTheDocument();
+  },
+};

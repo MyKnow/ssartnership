@@ -8,6 +8,7 @@ import InlineMessage from "@/components/ui/InlineMessage";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
+import Textarea from "@/components/ui/Textarea";
 import type { MattermostSignupApprovalRequestSummary } from "@/lib/mm-signup-approval";
 import { MANUAL_MEMBER_IMPORT_CAMPUS_OPTIONS } from "@/lib/member-manual-import/options";
 import { formatSsafyYearLabel, getCurrentSsafyYear } from "@/lib/ssafy-year";
@@ -37,23 +38,31 @@ export default function AdminMemberSignupApprovalDetail({
   rejectAction,
   returnTo = "/admin/member-signup-requests",
   feedback,
+  focusRejectReason = false,
 }: {
   request: MattermostSignupApprovalRequestSummary;
   approveAction: (formData: FormData) => Promise<void>;
   rejectAction: (formData: FormData) => Promise<void>;
   returnTo?: string;
   feedback?: AdminReviewQueueFeedback | null;
+  focusRejectReason?: boolean;
 }) {
   const generationOptions = Array.from(
     { length: Math.min(99, Math.max(1, getCurrentSsafyYear())) + 1 },
     (_, generation) => generation,
   );
   const isPending = request.status === "pending";
+  const rejectionReasonId = `member-signup-rejection-reason-${request.id}`;
+  const rejectionReasonHelpId = `${rejectionReasonId}-help`;
+  const rejectionReasonErrorId = `${rejectionReasonId}-error`;
+  const rejectionReasonDescribedBy = focusRejectReason
+    ? `${rejectionReasonHelpId} ${rejectionReasonErrorId}`
+    : rejectionReasonHelpId;
 
   return (
     <div className="grid gap-6">
       <AdminPageHeader
-        eyebrow="Member onboarding"
+        eyebrow="가입 승인"
         title="가입 승인 요청 검토"
         description="Mattermost 계정은 이미 인증되었지만, 닉네임에서 이름·기수·캠퍼스를 자동 확정하지 못한 요청입니다."
         actions={
@@ -169,13 +178,57 @@ export default function AdminMemberSignupApprovalDetail({
           <Card className="grid gap-4">
             <div>
               <h2 className="text-lg font-semibold text-foreground">승인하지 않기</h2>
-              <p className="mt-1 text-sm text-muted-foreground">반려 사유를 남기면 요청의 비밀번호 material은 즉시 삭제됩니다.</p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                반려 사유를 남기면 요청의 비밀번호 정보는 즉시 삭제됩니다.
+              </p>
             </div>
             <form action={rejectAction} className="grid gap-3">
               <input type="hidden" name="requestId" value={request.id} />
               <input type="hidden" name="returnTo" value={returnTo} />
-              <textarea name="reason" required maxLength={500} className="min-h-24 rounded-card border border-border bg-surface px-3 py-2 text-sm text-foreground" placeholder="반려 사유를 입력해 주세요." />
-              <SubmitButton variant="danger" pendingText="반려 중">반려</SubmitButton>
+              <fieldset className="grid min-w-0 gap-2">
+                <legend className="text-sm font-semibold text-foreground">
+                  반려 사유
+                </legend>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  요청이 이미 처리되면 다시 반려할 수 없습니다. 확인한 근거를 구체적으로 남겨 주세요.
+                </p>
+                <label
+                  htmlFor={rejectionReasonId}
+                  className="text-sm font-medium text-foreground"
+                >
+                  반려 사유 입력
+                </label>
+                <Textarea
+                  id={rejectionReasonId}
+                  name="reason"
+                  required
+                  maxLength={500}
+                  autoFocus={focusRejectReason}
+                  aria-invalid={focusRejectReason || undefined}
+                  aria-describedby={rejectionReasonDescribedBy}
+                  placeholder="예: 신청한 기수와 Mattermost 인증 정보가 일치하지 않습니다."
+                />
+                <p
+                  id={rejectionReasonHelpId}
+                  className="text-xs leading-5 text-muted-foreground"
+                >
+                  반려 사유를 1~500자로 입력해 주세요. 개인정보나 내부 운영 메모는 적지 마세요.
+                </p>
+                {focusRejectReason ? (
+                  <p
+                    id={rejectionReasonErrorId}
+                    className="text-sm font-medium text-danger"
+                    role="alert"
+                  >
+                    반려 사유를 1~500자로 입력해 주세요.
+                  </p>
+                ) : null}
+                <div>
+                  <SubmitButton variant="danger" pendingText="반려하는 중">
+                    가입 요청 반려
+                  </SubmitButton>
+                </div>
+              </fieldset>
             </form>
           </Card>
         </>

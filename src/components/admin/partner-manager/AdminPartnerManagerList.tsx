@@ -10,33 +10,23 @@ import type {
 
 export default function AdminPartnerManagerList({
   partners,
-  filteredPartners,
   categories,
 }: {
   partners: AdminPartner[];
-  filteredPartners: AdminPartner[];
   categories: AdminCategory[];
 }) {
-  if (filteredPartners.length === 0) {
+  if (partners.length === 0) {
     return (
       <EmptyState
-        title={
-          partners.length === 0
-            ? ADMIN_COPY.emptyPartnerTitle
-            : ADMIN_COPY.noResultsTitle
-        }
-        description={
-          partners.length === 0
-            ? ADMIN_COPY.emptyPartnerDescription
-            : ADMIN_COPY.noResultsDescription
-        }
+        title={ADMIN_COPY.emptyPartnerTitle}
+        description={ADMIN_COPY.emptyPartnerDescription}
       />
     );
   }
 
   return (
     <div className="grid gap-6">
-      {filteredPartners.map((partner) => (
+      {partners.map((partner) => (
         <AdminPartnerListItem
           key={partner.id}
           partner={partner}

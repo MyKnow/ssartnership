@@ -2,8 +2,8 @@
 
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import HomeView from "@/components/HomeView";
+import HomeDirectoryError from "@/components/home-view/HomeDirectoryError";
 import { ToastProvider } from "@/components/ui/Toast";
-import AppErrorScreen from "@/components/errors/AppErrorScreen";
 import { HomePartnerExploreSkeleton } from "@/components/loading/SitePageSkeletons";
 import type { Category, Partner } from "@/lib/types";
 
@@ -95,12 +95,5 @@ export const Loading: Story = {
 };
 
 export const Error: Story = {
-  render: () => (
-    <AppErrorScreen
-      code="HOME_DIRECTORY_ERROR"
-      title="혜택을 불러오지 못했습니다"
-      description="잠시 후 다시 시도해 주세요. 문제가 계속되면 오류를 제보할 수 있습니다."
-      onRetry={() => undefined}
-    />
-  ),
+  render: () => <HomeDirectoryError />,
 };

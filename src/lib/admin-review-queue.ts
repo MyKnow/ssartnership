@@ -27,6 +27,16 @@ const SUCCESS_MESSAGES: Record<string, AdminReviewQueueFeedback> = {
     title: "저장 완료",
     description: "검토 상태를 저장했습니다.",
   },
+  "details-updated": {
+    tone: "success",
+    title: "저장 완료",
+    description: "제휴 등록 신청 정보를 저장했습니다.",
+  },
+  "already-updated": {
+    tone: "info",
+    title: "최신 상태를 확인했습니다",
+    description: "다른 관리자가 먼저 상태를 변경했습니다. 현재 목록에서 최신 내용을 확인하세요.",
+  },
 };
 
 const ERROR_MESSAGES: Record<string, AdminReviewQueueFeedback> = {
@@ -79,6 +89,27 @@ const ERROR_MESSAGES: Record<string, AdminReviewQueueFeedback> = {
     tone: "danger",
     title: "검토 대상을 찾을 수 없습니다",
     description: "목록을 새로고침해 최신 상태를 확인해 주세요.",
+  },
+  partner_form_conversion_failed: {
+    tone: "danger",
+    title: "제휴처 생성을 완료하지 못했습니다",
+    description:
+      "신청 상태는 저장되었지만 제휴처 후속 처리가 끝나지 않았습니다. 운영 기록과 제휴처 목록을 확인해 중복 등록 여부를 점검해 주세요.",
+  },
+  partner_form_details_invalid: {
+    tone: "danger",
+    title: "신청 정보 저장을 확인해 주세요",
+    description: "필수 항목과 링크·기간 형식을 확인한 뒤 다시 시도해 주세요.",
+  },
+  partner_form_details_locked: {
+    tone: "info",
+    title: "등록 완료 신청은 여기서 수정하지 않습니다",
+    description: "등록 완료 후 정보는 제휴처 상세 화면에서 수정해 주세요.",
+  },
+  partner_form_multiple_groups: {
+    tone: "info",
+    title: "혜택 그룹별 수정이 필요합니다",
+    description: "혜택 그룹이 여러 개인 신청은 그룹별 편집 화면에서 확인한 뒤 저장해 주세요.",
   },
   regional_admin_scope_denied: {
     tone: "danger",

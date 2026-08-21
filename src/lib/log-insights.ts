@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache';
 import { createAdminLogsCsvStream } from './log-insights/csv';
 import { applyAdminLogsPrivacy } from './log-insights/privacy';
 import {
@@ -7,7 +8,7 @@ import {
   loadAdminLogSummaryRows,
   resolveActorMeta,
 } from './log-insights/data';
-import { buildChartBuckets, formatRangeDateTime } from './log-insights/range';
+import { buildChartBuckets, formatRangeDateTime, resolveLogRange } from './log-insights/range';
 import {
   buildUnifiedLogs,
   createTopActors,
@@ -38,11 +39,16 @@ import type {
   ResolvedLogRange,
 } from './log-insights/shared';
 import {
+  DEFAULT_LOG_PAGE_SIZE,
   EXPORT_MAX_LOG_ROWS_PER_GROUP,
+  LOG_PAGE_SIZE_OPTIONS,
   PAGE_MAX_LOG_ROWS_PER_GROUP,
 } from './log-insights/shared';
 
+const ADMIN_LOGS_READ_CACHE_REVALIDATE_SECONDS = 3;
+
 export type {
+  AdminLogsCursor,
   AdminLogsAccessCapabilities,
   AdminAuditLogRecord,
   AdminLogsLoadedData,
@@ -64,8 +70,6 @@ export type {
 export { iterateAdminLogsCsvRows } from './log-insights/csv';
 export { resolveLogRange } from './log-insights/range';
 
-const LOG_PAGE_SIZE_OPTIONS = [50, 100, 250] as const;
-
 function parsePage(value: string | number | null | undefined) {
   const parsed = typeof value === 'number' ? value : Number.parseInt(value ?? '', 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
@@ -75,7 +79,7 @@ function parsePageSize(value: string | number | null | undefined) {
   const parsed = typeof value === 'number' ? value : Number.parseInt(value ?? '', 10);
   return LOG_PAGE_SIZE_OPTIONS.includes(parsed as (typeof LOG_PAGE_SIZE_OPTIONS)[number])
     ? parsed
-    : 100;
+    : DEFAULT_LOG_PAGE_SIZE;
 }
 
 function resolveGroupFilter(value: string | null | undefined): GroupFilter {
@@ -361,6 +365,8 @@ function buildAdminLogsPageDataFromRows({
       total: effectiveFilteredTotal,
       page,
       pageSize,
+      nextCursor: listSourceData.nextCursor ?? null,
+      hasMore: listSourceData.hasMore ?? false,
     },
   };
 }
@@ -393,7 +399,7 @@ export async function getAdminLogsPageData(
 
   if (useDbPagedList) {
     const [summaryAggregateData, listSourceData] = await Promise.all([
-      loadAdminLogSummaryAggregates(options, access),
+      getCachedAdminLogSummaryAggregates(options, access),
       loadAdminLogNormalizedPage(options, {
         page,
         pageSize,
@@ -501,6 +507,8 @@ export async function getAdminLogsPageData(
         total: listTotal,
         page,
         pageSize,
+        nextCursor: listSourceData.nextCursor ?? null,
+        hasMore: listSourceData.hasMore ?? false,
       },
     });
   }
@@ -529,6 +537,68 @@ export async function getAdminLogsPageData(
     useDbPagedList,
     useSplitLoading,
   }));
+}
+
+export function getAdminLogsSummaryCacheKey(
+  options: GetAdminLogsPageDataOptions,
+  access: AdminLogsAccessCapabilities,
+) {
+  const range = resolveLogRange(options);
+  const accessKey = [
+    [...access.readGroups].sort().join(','),
+    access.includePii ? 'pii' : 'redacted',
+  ].join(':');
+  return `${range.start}|${range.end}|${accessKey}`;
+}
+
+/**
+ * The aggregate cards and chart do not depend on page, cursor, or list
+ * filters. Keep that stable report input separate from the page cache so
+ * pagination and filter transitions do not repeat the summary RPC.
+ */
+export function getCachedAdminLogSummaryAggregates(
+  options: GetAdminLogsPageDataOptions = {},
+  access: AdminLogsAccessCapabilities,
+) {
+  return unstable_cache(
+    () => loadAdminLogSummaryAggregates(options, access),
+    ['admin-logs-summary', getAdminLogsSummaryCacheKey(options, access)],
+    { revalidate: ADMIN_LOGS_READ_CACHE_REVALIDATE_SECONDS },
+  )();
+}
+
+function getAdminLogsReadCacheKey(
+  options: GetAdminLogsPageDataOptions,
+  access: AdminLogsAccessCapabilities,
+) {
+  const optionKey = Object.entries(options)
+    .filter(([, value]) => value !== undefined && value !== null)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `${key}=${String(value)}`)
+    .join('&');
+  const accessKey = [
+    [...access.readGroups].sort().join(','),
+    access.includePii ? 'pii' : 'redacted',
+  ].join(':');
+  return `${optionKey}|access=${accessKey}`;
+}
+
+/**
+ * Log exploration is a read-only report. Reuse the same scoped result for a
+ * short window so refreshes and repeated filter transitions do not repeat the
+ * two remote aggregate/page reads. The cache key keeps permission groups and
+ * PII visibility isolated; a few seconds of freshness is acceptable for a
+ * report that already labels its data as an operational snapshot.
+ */
+export async function getCachedAdminLogsPageData(
+  options: GetAdminLogsPageDataOptions = {},
+  access: AdminLogsAccessCapabilities,
+) {
+  return unstable_cache(
+    () => getAdminLogsPageData(options, access),
+    ['admin-logs-page', getAdminLogsReadCacheKey(options, access)],
+    { revalidate: ADMIN_LOGS_READ_CACHE_REVALIDATE_SECONDS },
+  )();
 }
 
 export async function exportAdminLogsCsv(options: CsvExportOptions = {}) {

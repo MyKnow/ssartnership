@@ -8,17 +8,12 @@ const args = [
   "--pretty",
   "false",
   "--skipLibCheck",
-  "--noCheck",
+  "--incremental",
+  "false",
 ];
 
 function runTypecheck() {
   return spawnSync(command, args, { stdio: "inherit" }).status ?? 1;
 }
 
-const firstStatus = runTypecheck();
-if (firstStatus === 0) {
-  process.exit(0);
-}
-
-console.warn("[typecheck-ci] TypeScript 검사에 실패했습니다. 일시적인 컴파일러 내부 오류를 배제하기 위해 한 번만 재시도합니다.");
 process.exit(runTypecheck());

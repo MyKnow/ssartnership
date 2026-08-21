@@ -19,6 +19,21 @@ export default function AdminStatePanel({
     return (
       <InlineMessage
         tone="danger"
+        role="alert"
+        aria-live="assertive"
+        title={title}
+        description={description}
+        action={action}
+      />
+    );
+  }
+
+  if (kind === "forbidden") {
+    return (
+      <InlineMessage
+        tone="warning"
+        role="status"
+        aria-live="polite"
         title={title}
         description={description}
         action={action}

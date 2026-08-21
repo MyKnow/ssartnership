@@ -58,6 +58,8 @@ const auditLabels: Record<string, string> = {
   admin_log_export_requested: '관리 로그 내보내기 요청',
   member_manual_add: '회원 수동 추가',
   member_manual_setup_link_reissue: '수동 회원 초기 설정 링크 재발급',
+  member_password_reset_link_generate: '회원 비밀번호 재발급 링크 생성',
+  member_password_reset_link_send: '회원 비밀번호 재발급 이메일 발송',
   member_delete: '회원 삭제',
   cycle_settings_update: '기수 기준 수정',
   cycle_settings_early_start: '기수 조기 시작',

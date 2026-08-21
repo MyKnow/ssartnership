@@ -22,16 +22,23 @@ const currentImageRoutePath = new URL(
   "../src/app/api/admin/profile-photos/current/[memberId]/route.ts",
   import.meta.url,
 );
+const profilePhotoQueueReadModelPath = new URL(
+  "../src/lib/admin-profile-photo-queue.server.ts",
+  import.meta.url,
+);
 
 test("공통 프로필 사진 검토는 수료생 인증과 별도 권한 및 경로를 사용한다", async () => {
-  const [pageSource, actionSource, navigationSource] = await Promise.all([
+  const [pageSource, actionSource, navigationSource, readModelSource] = await Promise.all([
     readFile(pagePath, "utf8"),
     readFile(actionPath, "utf8"),
     readFile(navigationPath, "utf8"),
+    readFile(profilePhotoQueueReadModelPath, "utf8"),
   ]);
 
   assert.match(pageSource, /requireAdminPermission\("profile_images", "read"/);
-  assert.match(pageSource, /graduate_verification_request_id", null/);
+  assert.match(pageSource, /getAdminProfilePhotoReplacementQueueReadModel/);
+  assert.doesNotMatch(pageSource, /currentPhotosPromise/);
+  assert.match(readModelSource, /graduate_verification_request_id", null/);
   assert.match(actionSource, /requireAdminPermission\("profile_images", "update"/);
   assert.match(actionSource, /rejectMemberActiveProfilePhoto/);
   assert.match(navigationSource, /href: "\/admin\/profile-photos"/);

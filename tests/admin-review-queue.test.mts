@@ -42,6 +42,11 @@ test("대표 검토 큐는 공통 헤더와 상태 피드백 계약을 사용한
   for (const source of sources) {
     assert.match(source, /AdminReviewQueueHeader/);
   }
+
+  const partnerRequestsPage = sources[1];
+  assert.match(partnerRequestsPage, /getAdminPartnerChangeRequestQueueReadModel/);
+  assert.match(partnerRequestsPage, /parseAdminReviewQueuePagination/);
+  assert.doesNotMatch(partnerRequestsPage, /throw new Error/);
 });
 
 test("결정 액션은 대상 항목의 제출 상태를 표시하고 목록 맥락을 보존한다", async () => {
@@ -86,6 +91,7 @@ test("결정 액션은 대상 항목의 제출 상태를 표시하고 목록 맥
 
   assert.match(partnerQueue, /<input[^>]+name="returnTo"/);
   assert.match(partnerQueue, /<SubmitButton/);
+  assert.match(partnerQueue, /buildQueuePageHref/);
   assert.match(partnerActions, /sanitizeReturnTo/);
   assert.match(signupQueue, /returnTo/);
   assert.match(signupDetail, /name="returnTo"/);
@@ -95,6 +101,64 @@ test("결정 액션은 대상 항목의 제출 상태를 표시하고 목록 맥
   assert.match(photoActions, /redirectAdminActionError/);
   assert.match(photoActions, /appendAdminReviewQueueQuery/);
   assert.doesNotMatch(photoActions, /throw new Error/);
+});
+
+test("가입 승인 상세의 반려 입력은 같은 화면 복구와 접근 가능한 한국어 안내를 제공한다", async () => {
+  const [detailSource, pageSource] = await Promise.all([
+    readFile(
+      new URL(
+        "../src/components/admin/AdminMemberSignupApprovalDetail.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/app/admin/(protected)/member-signup-requests/[requestId]/page.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(detailSource, /from "@\/components\/ui\/Textarea"/);
+  assert.match(detailSource, /<fieldset/);
+  assert.match(detailSource, /<legend/);
+  assert.match(detailSource, /htmlFor=\{rejectionReasonId\}/);
+  assert.match(detailSource, /반려 사유를 1~500자로 입력해 주세요/);
+  assert.match(detailSource, /aria-invalid=\{focusRejectReason \|\| undefined\}/);
+  assert.match(detailSource, /autoFocus=\{focusRejectReason\}/);
+  assert.doesNotMatch(detailSource, /<textarea name="reason"/);
+  assert.match(pageSource, /focusRejectReason=\{query\.error === "invalid_reason"\}/);
+});
+
+test("프로필 사진 반려 입력은 실패한 카드로 복구하고 접근 가능한 한국어 안내를 제공한다", async () => {
+  const [queueSource, pageSource, actionSource] = await Promise.all([
+    readFile(queueSourcePaths[3], "utf8"),
+    readFile(
+      new URL(
+        "../src/app/admin/(protected)/profile-photos/page.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/app/admin/(protected)/profile-photos/actions.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(queueSource, /from "@\/components\/ui\/Textarea"/);
+  assert.match(queueSource, /focusReasonTarget/);
+  assert.match(queueSource, /반려 사유를 1~500자로 입력해 주세요/);
+  assert.match(queueSource, /aria-invalid=\{isReasonInvalid \|\| undefined\}/);
+  assert.match(queueSource, /autoFocus=\{isReasonInvalid\}/);
+  assert.doesNotMatch(queueSource, /<input\s+id=\{`(?:replacement|current-photo)-reason-/);
+  assert.match(pageSource, /focusReasonTarget=\{params\.focus/);
+  assert.match(actionSource, /appendAdminReviewQueueQuery\(returnTo, \{ focus: reasonFieldId \}\)/);
 });
 
 test("관리자 라우트 오류 화면은 내부 오류 메시지를 렌더링하지 않는다", async () => {

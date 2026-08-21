@@ -27,7 +27,10 @@ export async function GET(request: NextRequest) {
     persistent: false,
     authenticationMethod: "manual",
     freshAuthentication: true,
-    policyConsentSnapshot: null,
+    policyConsentSnapshot:
+      process.env.E2E_ADMIN_AUTH === "1" && process.env.E2E_MOCK_MUTATIONS === "1"
+        ? { serviceVersion: 1, privacyVersion: 1 }
+        : null,
   });
 
   const session = await getUserSession();

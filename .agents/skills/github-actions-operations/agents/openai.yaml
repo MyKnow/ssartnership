@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitHub Actions Operations"
+  short_description: "Actions 전후 검증과 실패 학습을 강제하는 운영 절차"
+  default_prompt: "Use $github-actions-operations before triggering GitHub Actions and after any failed, cancelled, or flaky run."

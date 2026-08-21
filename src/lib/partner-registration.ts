@@ -263,6 +263,21 @@ export const PARTNER_REGISTRATION_SOURCE_LABELS: Record<
   partner_portal: "파트너 포털",
 };
 
+export const PARTNER_REGISTRATION_SOURCE_OPTIONS = [
+  "public_web",
+  "public_excel",
+  "partner_portal",
+] as const satisfies PartnerRegistrationSource[];
+
+export const PARTNER_REGISTRATION_QUEUE_SORT_OPTIONS = [
+  { value: "recent", label: "최근 접수순" },
+  { value: "oldest", label: "오래된 접수순" },
+  { value: "name", label: "제휴처명순" },
+] as const;
+
+export type PartnerRegistrationQueueSort =
+  (typeof PARTNER_REGISTRATION_QUEUE_SORT_OPTIONS)[number]["value"];
+
 export const PARTNER_REGISTRATION_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const PARTNER_REGISTRATION_GALLERY_MAX_FILES = 5;
 export const PARTNER_REGISTRATION_IMAGE_ACCEPT = IMAGE_SOURCE_ACCEPT;

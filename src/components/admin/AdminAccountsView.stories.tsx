@@ -31,6 +31,9 @@ const meta = {
     ],
     templates: ADMIN_PERMISSION_TEMPLATES,
     feedback: null,
+    canGrant: true,
+    canUpdate: true,
+    canDelete: true,
     grantAction: async () => {},
     applyTemplateAction: async () => {},
     updateStatusAction: async () => {},
@@ -46,3 +49,24 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const Empty: Story = {
+  args: {
+    accounts: [],
+  },
+};
+
+export const LoadError: Story = {
+  args: {
+    accounts: [],
+    loadError: true,
+  },
+};
+
+export const ReadOnly: Story = {
+  args: {
+    canGrant: false,
+    canUpdate: false,
+    canDelete: false,
+  },
+};

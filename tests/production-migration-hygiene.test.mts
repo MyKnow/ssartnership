@@ -25,6 +25,7 @@ const expectedAdminIndexNames = [
   "event_logs_admin_task_outcome_created_at_idx",
   "members_admin_display_name_trgm_idx",
   "members_admin_manual_login_id_trgm_idx",
+  "members_admin_email_normalized_trgm_idx",
   "mm_user_directory_admin_username_trgm_idx",
   "mm_user_directory_admin_user_id_trgm_idx",
   "event_logs_admin_performance_viewport_idx",
@@ -32,11 +33,16 @@ const expectedAdminIndexNames = [
   "members_admin_recipient_display_name_idx",
 ] as const;
 
-const expectedTrigramIndexNames = [
+const relocatedTrigramIndexNames = [
   "members_admin_display_name_trgm_idx",
   "members_admin_manual_login_id_trgm_idx",
   "mm_user_directory_admin_username_trgm_idx",
   "mm_user_directory_admin_user_id_trgm_idx",
+] as const;
+
+const expectedTrigramIndexNames = [
+  ...relocatedTrigramIndexNames,
+  "members_admin_email_normalized_trgm_idx",
 ] as const;
 
 const schemaIndexDependencies = [
@@ -69,6 +75,13 @@ const schemaIndexDependencies = [
   ],
   [
     "members_admin_manual_login_id_trgm_idx",
+    [
+      "create extension if not exists pg_trgm with schema extensions;",
+      "create table if not exists members (",
+    ],
+  ],
+  [
+    "members_admin_email_normalized_trgm_idx",
     [
       "create extension if not exists pg_trgm with schema extensions;",
       "create table if not exists members (",
@@ -214,7 +227,7 @@ test("final partner registration RPC restores whitespace-tolerant nationwide loc
   );
 });
 
-test("pg_trgm relocation preserves the four live trigram index contracts", () => {
+test("pg_trgm relocation preserves the original four trigram index contracts", () => {
   const migration = readRepoFile(`supabase/migrations/${pgTrgmMigration}`);
 
   assert.match(migration, /create schema if not exists extensions;/i);
@@ -230,7 +243,7 @@ test("pg_trgm relocation preserves the four live trigram index contracts", () =>
   assert.match(migration, /opclass_schema\.nspname = 'extensions'/i);
   assert.match(migration, /pg_trgm_index_contract_invalid/i);
 
-  for (const indexName of expectedTrigramIndexNames) {
+  for (const indexName of relocatedTrigramIndexNames) {
     assert.equal(
       countLiteral(migration, `'${indexName}'`),
       1,
@@ -399,6 +412,10 @@ test("Production migration workflow pins the reviewed commit and fails closed", 
   assert.match(workflow, /Treat Production as potentially partially migrated/);
   assert.match(workflow, /do not rewrite migration history/i);
   assert.match(workflow, /forward-fix migration/i);
+
+  assert.match(workflow, /version: 2\.114\.0/);
+  assert.doesNotMatch(workflow, /version: latest/);
+  assert.match(workflow, /name: Log Supabase CLI version\s+run: supabase --version/);
 
   const versionLog = workflow.indexOf("run: supabase --version");
   const firstRemoteRead = workflow.indexOf(

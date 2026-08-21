@@ -1,6 +1,21 @@
 import { expect, test } from "@playwright/test";
 
+let hasWarmedAuthRoute = false;
+
 test.describe("auth and partner portal operation flows", () => {
+  test.beforeEach(async ({ page }) => {
+    if (!hasWarmedAuthRoute) {
+      await page.goto("/auth/login");
+      await expect(
+        page.getByRole("textbox", { name: "아이디 또는 이메일" }),
+      ).toBeVisible();
+      hasWarmedAuthRoute = true;
+    }
+
+    const resetResponse = await page.request.post("/api/e2e/mock/reset");
+    expect(resetResponse.ok()).toBe(true);
+  });
+
   test("manual member setup rejects a missing one-time token without exposing it", async ({ page }) => {
     await page.goto("/auth/member/setup");
 
@@ -11,12 +26,22 @@ test.describe("auth and partner portal operation flows", () => {
   });
 
   test("preserves the partner detail return path through member certification login", async ({ page }) => {
+    const loginWarmup = await page.request.get("/auth/login");
+    expect(loginWarmup.ok()).toBe(true);
+
     await page.goto("/partners/health-001?returnTo=%2F%3Fcategory%3Dhealth%23benefits");
     await page.waitForLoadState("networkidle");
 
-    await page.getByRole("button", { name: "혜택 이용하기" }).first().click();
+    const benefitAction = page.getByRole("link", { name: "혜택 이용하기" }).first();
+    await expect(benefitAction).toHaveAttribute(
+      "href",
+      "/auth/login?returnTo=%2Fpartners%2Fhealth-001%3FreturnTo%3D%252F%253Fcategory%253Dhealth%2523benefits",
+    );
 
-    await expect(page).toHaveURL(/\/auth\/login\?returnTo=/, { timeout: 15_000 });
+    await Promise.all([
+      page.waitForURL(/\/auth\/login\?returnTo=/, { timeout: 15_000 }),
+      benefitAction.click(),
+    ]);
     const loginUrl = new URL(page.url());
     const benefitUseReturnTo = loginUrl.searchParams.get("returnTo") ?? "";
     const decodedReturnTo = decodeURIComponent(benefitUseReturnTo);
@@ -26,6 +51,12 @@ test.describe("auth and partner portal operation flows", () => {
   test("member login shows field-level validation before submitting", async ({ page }) => {
     await page.goto("/auth/login");
     await page.waitForLoadState("networkidle");
+
+    await expect(page.getByRole("textbox", { name: "아이디 또는 이메일" })).toHaveAttribute(
+      "placeholder",
+      "예시: myknow@example.com",
+    );
+    await expect(page.getByRole("checkbox", { name: "자동 로그인" })).toBeChecked();
 
     await page.getByRole("button", { name: "로그인" }).click();
 
@@ -133,6 +164,9 @@ test.describe("auth and partner portal operation flows", () => {
   });
 
   test("offers email recovery and an existing-member recovery application when Mattermost is unavailable", async ({ page }) => {
+    const recoveryWarmup = await page.request.get("/auth/recover-email");
+    expect(recoveryWarmup.ok()).toBe(true);
+
     await page.goto("/auth/reset");
 
     const emailRecovery = page.getByRole("link", { name: /이메일 로그인 복구/ });
@@ -143,12 +177,16 @@ test.describe("auth and partner portal operation flows", () => {
       "/auth/signup/graduate?kind=recovery",
     );
 
-    await emailRecovery.click();
-    await expect(page).toHaveURL(/\/auth\/recover-email$/);
+    await Promise.all([
+      page.waitForURL(/\/auth\/recover-email$/),
+      emailRecovery.click(),
+    ]);
     await page.waitForLoadState("networkidle");
     await expect(page.getByRole("heading", { name: "이메일 로그인 복구" })).toBeVisible();
     await expect(page.getByRole("textbox", { name: "기존 아이디 또는 이메일" })).toBeVisible();
-    await page.getByRole("button", { name: "기존 비밀번호 확인" }).click();
+    const passwordSubmit = page.getByRole("button", { name: "기존 비밀번호 확인" });
+    await expect(passwordSubmit).toBeEnabled();
+    await passwordSubmit.click();
     await expect(page.getByText("아이디 또는 이메일을 입력해 주세요.")).toBeVisible();
     await expect(page.getByText("기존 사이트 비밀번호를 입력해 주세요.")).toBeVisible();
 

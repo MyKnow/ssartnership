@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
 import { logAuthSecurity, getRequestLogContext, getServerActionLogContext } from "@/lib/activity-logs";
-import { getAdminSession } from "@/lib/auth";
+import { getAdminSession, type AdminSession } from "@/lib/auth";
 import { sanitizeAdminReturnTo } from "@/lib/admin-session-bridge";
 import {
   type AdminPermissionAction,
@@ -232,11 +232,15 @@ export async function ensureAdminApiAccess(request: NextRequest) {
   );
 }
 
-export async function ensureAdminApiPermission(
+type AdminApiPermissionResult =
+  | { session: AdminSession }
+  | { response: NextResponse };
+
+export async function getAdminApiPermissionSession(
   request: NextRequest,
   resource: AdminPermissionResource,
   action: AdminPermissionAction,
-) {
+): Promise<AdminApiPermissionResult> {
   const session = await getAdminSession();
   if (!session) {
     await logAuthSecurity({
@@ -251,10 +255,12 @@ export async function ensureAdminApiPermission(
       },
     });
 
-    return NextResponse.json(
-      { message: "관리자 인증이 필요합니다." },
-      { status: 401 },
-    );
+    return {
+      response: NextResponse.json(
+        { message: "관리자 인증이 필요합니다." },
+        { status: 401 },
+      ),
+    } satisfies AdminApiPermissionResult;
   }
 
   if (!canAdmin(session.account.permissions, resource, action)) {
@@ -272,11 +278,22 @@ export async function ensureAdminApiPermission(
       },
     });
 
-    return NextResponse.json(
-      { message: "관리자 권한이 필요합니다." },
-      { status: 403 },
-    );
+    return {
+      response: NextResponse.json(
+        { message: "관리자 권한이 필요합니다." },
+        { status: 403 },
+      ),
+    } satisfies AdminApiPermissionResult;
   }
 
-  return null;
+  return { session } satisfies AdminApiPermissionResult;
+}
+
+export async function ensureAdminApiPermission(
+  request: NextRequest,
+  resource: AdminPermissionResource,
+  action: AdminPermissionAction,
+) {
+  const result = await getAdminApiPermissionSession(request, resource, action);
+  return "response" in result ? result.response : null;
 }

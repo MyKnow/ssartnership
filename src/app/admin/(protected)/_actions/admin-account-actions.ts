@@ -10,6 +10,7 @@ import {
 import { requireAdminPermission } from "@/lib/admin-access";
 import { createAdminOperationalNotification } from "@/lib/operational-notifications";
 import { getCampusBySlug } from "@/lib/campuses";
+import { getAdminAccountActionErrorCode } from "@/lib/admin-account-feedback";
 import type { NotificationTemplateContext } from "@/lib/notification-templates/context";
 import { logAdminAction } from "./shared-helpers";
 
@@ -91,9 +92,7 @@ export async function grantMemberAdminPermissionAction(formData: FormData) {
     });
     revalidatePath("/admin/admins");
   } catch (error) {
-    redirectPath = adminManagementPathWithStatus("error", {
-      message: error instanceof Error ? error.message : "관리자 권한 부여에 실패했습니다.",
-    });
+    redirectPath = adminManagementPathWithStatus(getAdminAccountActionErrorCode(error));
   }
   redirect(redirectPath);
 }
@@ -104,9 +103,7 @@ export async function createAdminAccountAction(formData: FormData) {
 
 export async function issueAdminInitialSetupLinkAction(formData?: FormData) {
   void formData;
-  redirect(adminManagementPathWithStatus("error", {
-    message: "member 기반 관리자 권한에서는 초기설정 링크를 사용하지 않습니다.",
-  }));
+  redirect(adminManagementPathWithStatus("admin_account_unsupported_setup"));
 }
 
 export async function updateAdminAccountStatusAction(formData: FormData) {
@@ -149,9 +146,7 @@ export async function updateAdminAccountStatusAction(formData: FormData) {
     });
     revalidatePath("/admin/admins");
   } catch (error) {
-    redirectPath = adminManagementPathWithStatus("error", {
-      message: error instanceof Error ? error.message : "관리자 권한 상태 변경에 실패했습니다.",
-    });
+    redirectPath = adminManagementPathWithStatus(getAdminAccountActionErrorCode(error));
   }
   redirect(redirectPath);
 }
@@ -199,9 +194,7 @@ export async function applyAdminPermissionTemplateAction(formData: FormData) {
     });
     revalidatePath("/admin/admins");
   } catch (error) {
-    redirectPath = adminManagementPathWithStatus("error", {
-      message: error instanceof Error ? error.message : "권한 템플릿 적용에 실패했습니다.",
-    });
+    redirectPath = adminManagementPathWithStatus(getAdminAccountActionErrorCode(error));
   }
   redirect(redirectPath);
 }

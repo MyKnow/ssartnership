@@ -24,6 +24,9 @@ type NotificationRow = {
   created_at: string;
 };
 
+const NOTIFICATION_SELECT =
+  "id,type,title,body,target_url,metadata,created_by_member_id,created_at";
+
 type MemberNotificationRow = {
   id: string;
   notification_id: string;
@@ -103,21 +106,57 @@ export class SupabaseNotificationRepository implements NotificationRepository {
     }
 
     const supabase = getSupabaseAdminClient();
-    const { data: notificationData, error: notificationError } = await supabase
-      .from("notifications")
-      .insert({
-        type: input.type,
-        title: input.title,
-        body: input.body,
-        target_url: targetUrl,
-        metadata: input.metadata ?? {},
-        created_by_member_id: input.createdByMemberId ?? null,
-      })
-      .select("id,type,title,body,target_url,metadata,created_by_member_id,created_at")
-      .single();
+    const idempotencyKey = input.idempotencyKey?.trim() || null;
+    const notificationInput = {
+      type: input.type,
+      title: input.title,
+      body: input.body,
+      target_url: targetUrl,
+      metadata: input.metadata ?? {},
+      created_by_member_id: input.createdByMemberId ?? null,
+      idempotency_key: idempotencyKey,
+    };
 
-    if (notificationError) {
-      throw new Error(notificationError.message);
+    const notificationResult = idempotencyKey
+      ? await supabase
+          .from("notifications")
+          .upsert(notificationInput, {
+            onConflict: "idempotency_key",
+            ignoreDuplicates: true,
+          })
+          .select(NOTIFICATION_SELECT)
+          .maybeSingle()
+      : await supabase
+          .from("notifications")
+          .insert(notificationInput)
+          .select(NOTIFICATION_SELECT)
+          .single();
+
+    let notificationData = notificationResult.data;
+    if (!notificationData && idempotencyKey && !notificationResult.error) {
+      const existingResult = await supabase
+        .from("notifications")
+        .select(NOTIFICATION_SELECT)
+        .eq("idempotency_key", idempotencyKey)
+        .maybeSingle();
+      notificationData = existingResult.data;
+      if (existingResult.error) {
+        throw new Error(existingResult.error.message);
+      }
+      if (notificationData) {
+        return {
+          notification: mapNotificationRow(notificationData as NotificationRow),
+          recipientMemberIds: [],
+          alreadyExists: true,
+        };
+      }
+    }
+
+    if (notificationResult.error) {
+      throw new Error(notificationResult.error.message);
+    }
+    if (!notificationData) {
+      throw new Error("알림을 저장하지 못했습니다.");
     }
 
     const notification = mapNotificationRow(notificationData as NotificationRow);

@@ -220,6 +220,22 @@ const storybookViewportKeys = [
 const routeOwnedStateOverrides: Partial<
   Record<string, MockRequiredStateKey[]>
 > = {
+  "/admin/tasks": [
+    "default",
+    "empty",
+    "forbidden",
+    "long-korean",
+    "mobile-overflow",
+  ],
+  "/admin/search": [
+    "default",
+    "loading",
+    "empty",
+    "error",
+    "forbidden",
+    "long-korean",
+    "mobile-overflow",
+  ],
   "/auth/signup/pending": [
     "default",
     "pending",
@@ -352,6 +368,7 @@ const routeOwnedStateOverrides: Partial<
 const collectionRoutes = new Set([
   "/admin/logs",
   "/admin/members",
+  "/admin/search",
   "/admin/partners",
   "/admin/partner-requests",
   "/admin/categories",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Button from "@/components/ui/Button";
 import FilterBar from "@/components/ui/FilterBar";
 import FormMessage from "@/components/ui/FormMessage";
@@ -11,6 +11,7 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
 import { getNotificationChannelLabel } from "@/lib/notifications/shared";
+import { getSafeAdminResponseMessage } from "@/lib/admin-safe-messages";
 import {
   formatSsafyMemberLifecycleLabel,
   formatSsafyYearLabel,
@@ -60,6 +61,7 @@ type Props = {
   onCloseMemberPicker: () => void;
   onToggleMember: (memberId: string) => void;
   onSelectAllFilteredMembers: (memberIds: string[]) => void;
+  onRecipientOptionsLoaded?: (members: AdminPushManagerProps["members"]) => void;
   onOpenRecipientModal: () => void;
   onCloseRecipientModal: () => void;
   onCloseSendConfirm: () => void;
@@ -144,7 +146,7 @@ function AudienceResultCard({
     <button
       type="button"
       onClick={onOpen}
-      className="grid w-full gap-4 rounded-2xl border border-primary/15 bg-primary-soft/55 px-4 py-4 text-left shadow-flat transition-colors hover:bg-primary-soft/70"
+      className="grid w-full gap-4 rounded-2xl border border-primary/15 bg-primary-soft/55 px-4 py-4 text-left shadow-flat transition-colors hover:bg-primary-soft/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="grid gap-1">
@@ -308,6 +310,7 @@ function MemberPickerModal({
   getMemberLabel,
   onToggleMember,
   onSelectAllFiltered,
+  onRecipientOptionsLoaded,
   onClose,
 }: {
   open: boolean;
@@ -316,16 +319,75 @@ function MemberPickerModal({
   getMemberLabel: (member: AdminPushManagerProps["members"][number]) => string;
   onToggleMember: (memberId: string) => void;
   onSelectAllFiltered: (memberIds: string[]) => void;
+  onRecipientOptionsLoaded?: (members: AdminPushManagerProps["members"]) => void;
   onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<MemberSortOption>("name");
+  const [searchResults, setSearchResults] = useState(members);
+  const [searchPending, setSearchPending] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || !onRecipientOptionsLoaded) {
+      return;
+    }
+
+    const abortController = new AbortController();
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        setSearchPending(true);
+        setSearchError(null);
+        try {
+          const params = new URLSearchParams({ limit: "30" });
+          if (query.trim()) {
+            params.set("query", query.trim());
+          }
+          const response = await fetch(`/api/admin/push/recipients?${params.toString()}`, {
+            signal: abortController.signal,
+          });
+          const data = (await response.json().catch(() => null)) as {
+            message?: string;
+            recipients?: AdminPushManagerProps["members"];
+          } | null;
+          if (abortController.signal.aborted) {
+            return;
+          }
+          if (!response.ok || !Array.isArray(data?.recipients)) {
+            setSearchError(
+              getSafeAdminResponseMessage(
+                data?.message,
+                "개인 발송 대상을 불러오지 못했습니다.",
+              ),
+            );
+            return;
+          }
+          setSearchResults(data.recipients);
+          onRecipientOptionsLoaded?.(data.recipients);
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") {
+            return;
+          }
+          setSearchError("개인 발송 대상을 불러오지 못했습니다.");
+        } finally {
+          if (!abortController.signal.aborted) {
+            setSearchPending(false);
+          }
+        }
+      })();
+    }, query.trim() ? 150 : 0);
+
+    return () => {
+      window.clearTimeout(timer);
+      abortController.abort();
+    };
+  }, [onRecipientOptionsLoaded, open, query]);
 
   const filteredMembers = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    const next = normalized
-      ? members.filter((member) => {
-          const memberLabel = [
+    const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
+    const matchedMembers = normalizedQuery
+      ? searchResults.filter((member) =>
+          [
             member.display_name ?? "",
             member.mm_username,
             member.year ?? "",
@@ -333,12 +395,12 @@ function MemberPickerModal({
             getMemberLabel(member),
           ]
             .join(" ")
-            .toLowerCase();
-          return memberLabel.includes(normalized);
-        })
-      : members;
+            .toLocaleLowerCase("ko-KR")
+            .includes(normalizedQuery),
+        )
+      : searchResults;
 
-    return [...next].sort((left, right) => {
+    return [...matchedMembers].sort((left, right) => {
       switch (sortBy) {
         case "year":
           return (right.year ?? -1) - (left.year ?? -1) || (left.campus ?? "").localeCompare(right.campus ?? "", "ko-KR") || getMemberLabel(left).localeCompare(getMemberLabel(right), "ko-KR");
@@ -349,7 +411,7 @@ function MemberPickerModal({
           return getMemberLabel(left).localeCompare(getMemberLabel(right), "ko-KR");
       }
     });
-  }, [getMemberLabel, members, query, sortBy]);
+  }, [getMemberLabel, query, searchResults, sortBy]);
 
   const selectedMembers = members.filter((member) => selectedMemberIds.includes(member.id));
   const selectedSummary =
@@ -379,10 +441,14 @@ function MemberPickerModal({
           />
         </label>
 
+        {searchError ? <InlineMessage tone="danger" description={searchError} /> : null}
+
         <div className="grid gap-2 rounded-2xl border border-border bg-surface-inset px-3 py-2">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 grid gap-0.5 text-sm text-muted-foreground">
-              <p className="truncate">검색 결과 {filteredMembers.length}명</p>
+              <p className="truncate" role="status" aria-live="polite">
+                {searchPending ? "대상자 검색 중" : `검색 결과 ${filteredMembers.length}명`}
+              </p>
               <p className="truncate">현재 선택 {selectedMembers.length}명</p>
             </div>
             <Button
@@ -392,7 +458,7 @@ function MemberPickerModal({
               className="shrink-0"
               onClick={() => onSelectAllFiltered(filteredMembers.map((member) => member.id))}
             >
-              전체 선택
+              현재 결과 전체 선택
             </Button>
           </div>
 
@@ -432,6 +498,7 @@ function MemberPickerModal({
           <p className="whitespace-normal break-words text-sm text-muted-foreground" title={selectedSummary}>
             선택된 인원 {selectedSummary}
           </p>
+          <p className="text-xs text-muted-foreground">검색 결과는 한 번에 최대 30명까지 표시합니다.</p>
         </div>
       </div>
 
@@ -442,25 +509,15 @@ function MemberPickerModal({
               {filteredMembers.map((member) => {
                 const isSelected = selectedMemberIds.includes(member.id);
                 return (
-                  <div
+                  <label
                     key={member.id}
-                    role="button"
-                    tabIndex={0}
-                    className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-start gap-3 px-3 py-2 text-left hover:bg-surface-muted"
-                    onClick={() => onToggleMember(member.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        onToggleMember(member.id);
-                      }
-                    }}
+                    className="grid min-h-11 w-full cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-start gap-3 px-3 py-2 text-left hover:bg-surface-muted focus-within:bg-surface-muted"
                   >
                     <input
                       type="checkbox"
                       checked={isSelected}
-                      onClick={(event) => event.stopPropagation()}
                       onChange={() => onToggleMember(member.id)}
-                      className="h-4 w-4 accent-primary"
+                      className="mt-0.5 h-4 w-4 accent-primary"
                     />
                     <div className="min-w-0 grid gap-0.5">
                       <p className="min-w-0 break-words text-sm font-semibold text-foreground" title={getMemberLabel(member)}>
@@ -473,7 +530,7 @@ function MemberPickerModal({
                         {member.year === null ? (member.campus ?? "캠퍼스 미지정") : formatRecipientMeta(member.year, member.campus)}
                       </p>
                     </div>
-                  </div>
+                  </label>
                 );
               })}
             </div>
@@ -610,6 +667,7 @@ export function PushComposerSection({
   onUpdateNotificationType,
   onToggleMember,
   onSelectAllFilteredMembers,
+  onRecipientOptionsLoaded,
   onUrlChange,
   partners,
   pending,
@@ -636,7 +694,7 @@ export function PushComposerSection({
         : `${getMemberLabel(selectedMembers[0])} 외 ${selectedMembers.length - 1}명`;
 
   return (
-    <section className="grid min-w-0 gap-4 overflow-hidden rounded-3xl border border-border bg-surface p-4 shadow-flat sm:p-5">
+    <section className="grid min-w-0 gap-4 rounded-3xl border border-border bg-surface p-4 shadow-flat sm:p-5">
       <SectionHeading
         title="통합 발송 관리"
         description="대상 설정, 메시지 작성, 최종 확인 순서로만 진행합니다."
@@ -909,6 +967,7 @@ export function PushComposerSection({
         getMemberLabel={getMemberLabel}
         onToggleMember={onToggleMember}
         onSelectAllFiltered={onSelectAllFilteredMembers}
+        onRecipientOptionsLoaded={onRecipientOptionsLoaded}
         onClose={onCloseMemberPicker}
       />
     </section>

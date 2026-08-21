@@ -9,6 +9,7 @@ import Textarea from "@/components/ui/Textarea";
 import { getPartnerPeriodEndAt, toDateTimeLocalInput } from "@/lib/ad-coupon-period";
 import {
   AD_PACKAGE_FORM_LIMITS,
+  getSafeAdCouponFormMessage,
   parseCreateAdCouponForm,
 } from "@/lib/ad-package-validation";
 import type { AdCampaignWithStats, AdCoupon } from "@/lib/repositories/ad-package-repository";
@@ -163,7 +164,7 @@ export default function AdminPartnerCouponForm({
       setFormError(null);
     } catch (error) {
       event.preventDefault();
-      setFormError(error instanceof Error ? error.message : "입력값을 확인해 주세요.");
+      setFormError(getSafeAdCouponFormMessage(error));
     }
   };
 
@@ -182,8 +183,8 @@ export default function AdminPartnerCouponForm({
           className="flex flex-wrap items-center gap-2"
           id={formErrorId}
         >
-          <span className="inline-flex shrink-0 items-center rounded-full border border-danger/25 bg-danger/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.08em]">
-            Error
+          <span className="inline-flex shrink-0 items-center rounded-full border border-danger/25 bg-danger/10 px-2 py-0.5 text-[11px] font-bold tracking-[0.04em]">
+            입력 오류
           </span>
           <span>{formError}</span>
         </FormMessage>
@@ -357,7 +358,7 @@ export default function AdminPartnerCouponForm({
 
         <FormSection
           title="발급 한도 및 상태"
-          description="전체 한도와 회원별 한도를 설정합니다. 회원별 일·주·월 한도를 비워두면 무제한으로 처리됩니다."
+          description="전체 사용 한도는 모든 회원 합산 사용 횟수입니다. 회원별 총 보유·사용 제한은 한 회원의 누적 횟수를, 일·주·월 발급 한도는 기간별 발급 횟수만 제한합니다."
         >
           <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <FieldLabel>
@@ -370,25 +371,25 @@ export default function AdminPartnerCouponForm({
               </Select>
             </FieldLabel>
             <FieldLabel>
-              전체 사용 한도
+              총 사용 한도(전체 회원 합산)
               <Input name="usageLimit" type="number" min={0} step={1} defaultValue={defaults.usageLimit} placeholder="무제한" />
             </FieldLabel>
             <FieldLabel>
-              일 발급 한도
+              전체 일 발급 한도
               <Input name="dailyIssueLimit" type="number" min={0} step={1} defaultValue={defaults.dailyIssueLimit} placeholder="무제한" />
             </FieldLabel>
             <FieldLabel>
-              주 발급 한도
+              전체 주 발급 한도
               <Input name="weeklyIssueLimit" type="number" min={0} step={1} defaultValue={defaults.weeklyIssueLimit} placeholder="무제한" />
             </FieldLabel>
             <FieldLabel>
-              월 발급 한도
+              전체 월 발급 한도
               <Input name="monthlyIssueLimit" type="number" min={0} step={1} defaultValue={defaults.monthlyIssueLimit} placeholder="무제한" />
             </FieldLabel>
           </div>
           <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <FieldLabel>
-              회원별 총 보유/사용 제한
+              회원별 누적 보유·사용 한도
               <Input name="perMemberLimit" type="number" min={1} step={1} defaultValue={defaults.perMemberLimit} />
             </FieldLabel>
             <FieldLabel>

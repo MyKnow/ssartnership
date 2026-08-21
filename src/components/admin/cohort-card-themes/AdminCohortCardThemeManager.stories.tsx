@@ -73,5 +73,8 @@ export const FullSurface: Story = {
     await expect(canvas.getByText("기수별 카드 색상")).toBeInTheDocument();
     await expect(canvas.getByText("16기 카드 예시")).toBeInTheDocument();
     await expect(canvas.getByText("14기 수료생 카드 예시")).toBeInTheDocument();
+    await expect(
+      canvas.getAllByTestId("certification-card-frame"),
+    ).toHaveLength(4);
   },
 };

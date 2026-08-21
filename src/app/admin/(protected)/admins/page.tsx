@@ -1,5 +1,8 @@
+import { Suspense } from "react";
 import AdminAccountsView from "@/components/admin/AdminAccountsView";
 import AdminShell from "@/components/admin/AdminShell";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import { AdminAccountsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import {
   applyAdminPermissionTemplate,
   grantMemberAdminPermission,
@@ -10,21 +13,58 @@ import {
   listAdminAccounts,
   listAdminPermissionTemplates,
 } from "@/lib/admin-accounts";
+import { getAdminAccountFeedback } from "@/lib/admin-account-feedback";
+import { canAdmin } from "@/lib/admin-permissions";
 
 export const dynamic = "force-dynamic";
 
-function statusMessage(status?: string, message?: string) {
-  if (status === "granted" || status === "created") {
-    return "회원에게 관리자 권한을 부여했습니다.";
+async function AdminAccountsContent({
+  adminSession,
+  status,
+  showHeader = true,
+}: {
+  adminSession: Awaited<ReturnType<typeof requireAdminPermission>>;
+  status?: string;
+  showHeader?: boolean;
+}) {
+  let accounts: Awaited<ReturnType<typeof listAdminAccounts>> = [];
+  let loadError = false;
+  try {
+    accounts = await listAdminAccounts();
+  } catch {
+    loadError = true;
   }
-  if (status === "activated") return "관리자 권한을 활성화했습니다.";
-  if (status === "revoked" || status === "deactivated") {
-    return "관리자 권한을 회수했습니다.";
-  }
-  if (status === "permissions-updated") return "관리자 권한을 저장했습니다.";
-  if (status === "template-applied") return "권한 템플릿을 적용했습니다.";
-  if (status === "error") return message || "관리자 작업에 실패했습니다.";
-  return null;
+  const templates = listAdminPermissionTemplates();
+  const feedback = getAdminAccountFeedback(status);
+
+  return (
+    <AdminAccountsView
+        accounts={accounts}
+        templates={templates}
+        feedback={feedback?.message}
+        feedbackIsError={feedback?.tone === "error"}
+        loadError={loadError}
+        showHeader={showHeader}
+        canGrant={canAdmin(
+          adminSession.account.permissions,
+          "admin_management",
+          "create",
+        )}
+        canUpdate={canAdmin(
+          adminSession.account.permissions,
+          "admin_management",
+          "update",
+        )}
+        canDelete={canAdmin(
+          adminSession.account.permissions,
+          "admin_management",
+          "delete",
+        )}
+        grantAction={grantMemberAdminPermission}
+        applyTemplateAction={applyAdminPermissionTemplate}
+        updateStatusAction={updateAdminAccountStatus}
+    />
+  );
 }
 
 export default async function AdminAccountsPage({
@@ -32,28 +72,32 @@ export default async function AdminAccountsPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireAdminPermission("admin_management", "read", {
-    path: "/admin/admins",
-  });
+  const adminSession = await requireAdminPermission(
+    "admin_management",
+    "read",
+    {
+      path: "/admin/admins",
+    },
+  );
   const params = (await searchParams) ?? {};
   const status = typeof params.status === "string" ? params.status : undefined;
-  const message = typeof params.message === "string" ? params.message : undefined;
-  const [accounts, templates] = await Promise.all([
-    listAdminAccounts(),
-    Promise.resolve(listAdminPermissionTemplates()),
-  ]);
 
   return (
     <AdminShell title="관리자 관리" backHref="/admin" backLabel="관리 홈">
-      <AdminAccountsView
-        accounts={accounts}
-        templates={templates}
-        feedback={statusMessage(status, message)}
-        feedbackIsError={status === "error"}
-        grantAction={grantMemberAdminPermission}
-        applyTemplateAction={applyAdminPermissionTemplate}
-        updateStatusAction={updateAdminAccountStatus}
-      />
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="설정"
+          title="회원 관리자 권한"
+          description="기존 회원 계정에 권한 템플릿을 부여해 관리자 화면 접근과 기능 수행 범위를 관리합니다."
+        />
+        <Suspense fallback={<AdminAccountsSkeletonContent showHeader={false} />}>
+          <AdminAccountsContent
+            adminSession={adminSession}
+            status={status}
+            showHeader={false}
+          />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

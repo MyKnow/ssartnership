@@ -375,6 +375,31 @@ export async function listOperationalPushSubscriptionDevices(input: {
   }));
 }
 
+export async function countOperationalPushSubscriptionDevices(input: {
+  ownerType: "admin" | "partner";
+  ownerId: string;
+}) {
+  if (input.ownerType === "partner" && isPartnerPortalMock) {
+    return 0;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const table =
+    input.ownerType === "admin" ? "admin_push_subscriptions" : "partner_push_subscriptions";
+  const ownerKey = input.ownerType === "admin" ? "admin_id" : "account_id";
+  const { count, error } = await supabase
+    .from(table)
+    .select("id", { count: "exact", head: true })
+    .eq(ownerKey, input.ownerId)
+    .eq("is_active", true);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return count ?? 0;
+}
+
 async function recordAdminDelivery(input: {
   notificationId: string;
   adminId: string;
@@ -581,6 +606,46 @@ export async function createAdminOperationalNotification(input: {
   }
 
   return { notificationId: String(notification.id), recipientCount: recipientRows.length };
+}
+
+export async function notifyAdminsOfPartnerRegistrationRequest(input: {
+  requestId: string;
+  source: string;
+  companyName: string;
+  partnerName: string;
+  requesterName: string;
+  categoryLabel: string;
+  location: string;
+}) {
+  const claimed = await claimOperationalNotificationDedupe({
+    dedupeKey: `partner-registration-request:${input.requestId}`,
+    audience: "admin",
+    notificationType: "partner_registration_request",
+    targetId: input.requestId,
+  });
+  if (!claimed) {
+    return null;
+  }
+
+  return createAdminOperationalNotification({
+    type: "partner_registration_request",
+    title: input.partnerName,
+    body: `회사: ${input.companyName}\n카테고리: ${input.categoryLabel}\n위치: ${input.location}\n신청자: ${input.requesterName}`,
+    targetUrl: "/admin/partner-registrations?status=pending",
+    metadata: {
+      partnerRegistrationRequestId: input.requestId,
+      source: input.source,
+    },
+    templateContext: {
+      kind: "admin_partner_registration_request",
+      companyName: input.companyName,
+      partnerName: input.partnerName,
+      requesterName: input.requesterName,
+      partnerCategory: input.categoryLabel,
+      partnerLocation: input.location,
+      requestUrl: "/admin/partner-registrations?status=pending",
+    },
+  });
 }
 
 async function sendAdminPushDeliveries(input: {

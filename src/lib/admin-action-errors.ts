@@ -8,6 +8,7 @@ export const adminActionErrorMessages: Record<string, string> = {
   company_missing_name: "파트너사명을 입력해 주세요.",
   company_invalid_email: "담당자 이메일 형식이 올바르지 않습니다.",
   company_invalid_request: "파트너사 입력값을 확인해 주세요.",
+  partner_update_failed: "제휴처를 저장하지 못했습니다. 입력값과 권한을 확인한 뒤 다시 시도해 주세요.",
   cycle_missing_fields: "기준 기수, 기준 연도, 기준 월을 모두 입력해 주세요.",
   cycle_invalid_number: "기준값은 허용된 범위의 숫자로 입력해 주세요.",
   cycle_invalid_request: "기수 기준 입력값을 확인해 주세요.",
@@ -77,3 +78,15 @@ export const adminActionErrorMessages: Record<string, string> = {
   admin_usage_count_exceeded: "선택한 혜택의 최대 적용 횟수를 초과했습니다.",
   admin_usage_database_failed: "혜택 적용 이력을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
 };
+
+const ADMIN_ACTION_ERROR_CODE_PATTERN = /^[a-z][a-z0-9_]{0,79}$/;
+
+/**
+ * Server actions may receive either a stable domain error code or an internal
+ * provider/database message. Only code-shaped values are allowed to cross the
+ * redirect boundary; pages still map unknown codes to their generic message.
+ */
+export function getSafeAdminActionErrorCode(error: unknown, fallback: string) {
+  const candidate = error instanceof Error ? error.message.trim() : "";
+  return ADMIN_ACTION_ERROR_CODE_PATTERN.test(candidate) ? candidate : fallback;
+}

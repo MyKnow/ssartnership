@@ -31,6 +31,7 @@ import { isE2eMockMutationEnabled } from "@/lib/e2e-mutation-mode";
 import { PARTNER_REGISTRATION_RATE_LIMIT, isBlocked, recordAttempt } from "@/lib/rate-limit";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { readFormIdempotencyKey } from "@/lib/form-idempotency";
+import { notifyAdminsOfPartnerRegistrationRequest } from "@/lib/operational-notifications";
 
 function getClientIdentifier(headerStore: Awaited<ReturnType<typeof headers>>) {
   const forwarded = headerStore.get("x-forwarded-for");
@@ -146,6 +147,22 @@ export async function createPartnerRegistrationRequestAction(
         categoryMatched: insertedRequest.categoryMatched,
       },
     });
+    try {
+      await notifyAdminsOfPartnerRegistrationRequest({
+        requestId: insertedRequest.requestId,
+        source: "public_web",
+        companyName: values.companyName,
+        partnerName: values.brandName,
+        requesterName: values.contactName,
+        categoryLabel: insertedRequest.categoryLabel,
+        location: values.location,
+      });
+    } catch (error) {
+      console.error(
+        "[partner-registration] admin notification failed",
+        error instanceof Error ? error.message : "notification_failed",
+      );
+    }
   }
 
   revalidatePath("/admin/partner-registrations");
@@ -293,6 +310,24 @@ export async function createPartnerRegistrationExcelRequestAction(
       categoryMatched: insertedRequest.categoryMatched,
     },
   });
+  if (insertedRequest.created) {
+    try {
+      await notifyAdminsOfPartnerRegistrationRequest({
+        requestId: insertedRequest.requestId,
+        source: "public_excel",
+        companyName: validation.values.companyName,
+        partnerName: validation.values.brandName,
+        requesterName: validation.values.contactName,
+        categoryLabel: insertedRequest.categoryLabel,
+        location: validation.values.location,
+      });
+    } catch (error) {
+      console.error(
+        "[partner-registration:xlsx] admin notification failed",
+        error instanceof Error ? error.message : "notification_failed",
+      );
+    }
+  }
 
   revalidatePath("/admin/partner-registrations");
 

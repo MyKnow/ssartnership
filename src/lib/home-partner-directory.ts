@@ -3,6 +3,7 @@ import {
   normalizeHomePartners,
   type HomePartnerSortOption,
 } from "@/components/home-view/selectors";
+import { unstable_rethrow } from "next/navigation";
 import type { PartnerAudienceFilter, PartnerAudienceKey } from "@/lib/partner-audience";
 import { getHomePartnerState, type HomePartnerState } from "@/lib/home-partner-state";
 import { isWithinPeriod } from "@/lib/partner-utils";
@@ -39,6 +40,85 @@ export type LoadedHomePartnerDirectory = HomePartnerDirectoryResult & {
   partnerState: HomePartnerState;
   query: HomePartnerDirectoryQuery;
 };
+
+export type LoadHomePartnerDirectoryInput = {
+  viewerAuthenticated: boolean;
+  currentUserId: string | null;
+  viewerAudience?: PartnerAudienceKey | null;
+  query?: Partial<HomePartnerDirectoryQuery>;
+};
+
+export type HomePartnerDirectoryLoadState =
+  | {
+      status: "ready";
+      directory: LoadedHomePartnerDirectory;
+    }
+  | {
+      status: "unavailable";
+    };
+
+type HomePartnerDirectoryLoader = (
+  input: LoadHomePartnerDirectoryInput,
+) => Promise<LoadedHomePartnerDirectory>;
+
+type ErrorLike = {
+  cause?: unknown;
+  code?: unknown;
+  message?: unknown;
+  name?: unknown;
+};
+
+const HOME_DIRECTORY_ERROR_MESSAGE_LIMIT = 512;
+const HOME_DIRECTORY_SECRET_VALUE_PATTERN =
+  /((?:api[-_]?key|authorization|client[-_]?secret|cookie|credential|password|private[-_]?key|secret|session|token)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^,;]+)/gi;
+const HOME_DIRECTORY_BEARER_VALUE_PATTERN = /(bearer\s+)[^\s,;]+/gi;
+const HOME_DIRECTORY_URL_CREDENTIAL_PATTERN =
+  /([a-z][a-z0-9+.-]*:\/\/)[^\s/:@]+:[^\s/@]+@/gi;
+
+function toErrorLike(error: unknown): ErrorLike {
+  return error && typeof error === "object" ? (error as ErrorLike) : {};
+}
+
+function normalizeDiagnosticText(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) {
+    return undefined;
+  }
+
+  const redacted = value
+    .replace(HOME_DIRECTORY_SECRET_VALUE_PATTERN, "$1[redacted]")
+    .replace(HOME_DIRECTORY_BEARER_VALUE_PATTERN, "$1[redacted]")
+    .replace(HOME_DIRECTORY_URL_CREDENTIAL_PATTERN, "$1[redacted]@");
+  return redacted.length <= HOME_DIRECTORY_ERROR_MESSAGE_LIMIT
+    ? redacted
+    : `${redacted.slice(0, HOME_DIRECTORY_ERROR_MESSAGE_LIMIT - 1)}…`;
+}
+
+function normalizeDiagnosticCode(value: unknown) {
+  return typeof value === "string" && /^[a-z0-9._-]{1,80}$/i.test(value)
+    ? value
+    : undefined;
+}
+
+function getHomeDirectoryErrorDiagnostics(error: unknown) {
+  const candidate = toErrorLike(error);
+  const cause = toErrorLike(candidate.cause);
+  const errorName = normalizeDiagnosticText(candidate.name);
+  const errorMessage = normalizeDiagnosticText(candidate.message);
+  const errorCode = normalizeDiagnosticCode(candidate.code);
+  const causeName = normalizeDiagnosticText(cause.name);
+  const causeMessage = normalizeDiagnosticText(cause.message);
+  const causeCode = normalizeDiagnosticCode(cause.code);
+
+  return {
+    reasonCode: "directory_load_failed",
+    ...(errorName ? { errorName } : {}),
+    ...(errorMessage ? { errorMessage } : {}),
+    ...(errorCode ? { errorCode } : {}),
+    ...(causeName ? { causeName } : {}),
+    ...(causeMessage ? { causeMessage } : {}),
+    ...(causeCode ? { causeCode } : {}),
+  };
+}
 
 function maskExpiredPartnerActions(partners: Partner[]) {
   return partners.map((partner) => {
@@ -120,12 +200,7 @@ export async function loadHomePartnerDirectory({
   currentUserId,
   viewerAudience,
   query,
-}: {
-  viewerAuthenticated: boolean;
-  currentUserId: string | null;
-  viewerAudience?: PartnerAudienceKey | null;
-  query?: Partial<HomePartnerDirectoryQuery>;
-}): Promise<LoadedHomePartnerDirectory> {
+}: LoadHomePartnerDirectoryInput): Promise<LoadedHomePartnerDirectory> {
   const [categories, partners] = await Promise.all([
     partnerRepository.getCategories(),
     partnerRepository.getPartners({
@@ -154,4 +229,23 @@ export async function loadHomePartnerDirectory({
     partnerState,
     query: resolvedQuery,
   };
+}
+
+export async function loadHomePartnerDirectoryState(
+  input: LoadHomePartnerDirectoryInput,
+  loadDirectory: HomePartnerDirectoryLoader = loadHomePartnerDirectory,
+): Promise<HomePartnerDirectoryLoadState> {
+  try {
+    return {
+      status: "ready",
+      directory: await loadDirectory(input),
+    };
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error(
+      "[home-partner-directory] directory unavailable",
+      getHomeDirectoryErrorDiagnostics(error),
+    );
+    return { status: "unavailable" };
+  }
 }

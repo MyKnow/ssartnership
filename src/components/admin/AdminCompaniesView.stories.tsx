@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, userEvent, within } from "storybook/test";
 import AdminCompaniesView from "./AdminCompaniesView";
 
 const companies = [
@@ -54,8 +55,16 @@ const meta = {
         ],
       },
     ],
+    accountSummary: {
+      totalCount: 1,
+      activeCount: 1,
+      totalLinks: 1,
+    },
     partnerCount: 4,
     initialTab: "companies",
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
     actions: {
       createCompanyAction: async () => {},
       updateCompanyAction: async () => {},
@@ -78,3 +87,45 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const LoadError: Story = {
+  args: {
+    companies: [],
+    accounts: [],
+    partnerCount: 0,
+    loadError: true,
+  },
+};
+
+export const ReadOnly: Story = {
+  args: {
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(
+      canvas.queryByRole("button", { name: "파트너사 추가" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "파트너사 저장" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "파트너사 삭제" }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(canvas.getByRole("tab", { name: /파트너 계정/ }));
+
+    await expect(
+      canvas.queryByRole("button", { name: "계정 추가" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "계정 저장" }),
+    ).not.toBeInTheDocument();
+    await expect(canvas.getAllByText("조회 전용 권한").length).toBeGreaterThan(
+      0,
+    );
+  },
+};
