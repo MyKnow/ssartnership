@@ -4,10 +4,15 @@ import test from "node:test";
 
 type PreviewSyncLibModule =
   typeof import("../scripts/supabase-sync-preview-lib.mjs");
+type PreviewSyncDumpModule =
+  typeof import("../scripts/supabase-sync-preview-dump-lib.mjs");
 
 const previewSyncLibPromise = import(
   new URL("../scripts/supabase-sync-preview-lib.mjs", import.meta.url).href
 ) as Promise<PreviewSyncLibModule>;
+const previewSyncDumpModulePromise = import(
+  new URL("../scripts/supabase-sync-preview-dump-lib.mjs", import.meta.url).href,
+) as Promise<PreviewSyncDumpModule>;
 
 const previewSyncScriptPromise = readFile(
   new URL("../scripts/supabase-sync-preview.mjs", import.meta.url),
@@ -51,10 +56,24 @@ test("Preview sync never copies Production Apple Wallet tables", async () => {
     excludedTablesMatch[1],
     /\.\.\.PREVIEW_LOCAL_WALLET_TABLES/,
   );
-  assert.match(
-    script,
-    /for \(const table of EXCLUDED_PUBLIC_TABLES\)\s*\{\s*args\.push\("-x", `\$\{PUBLIC_SCHEMA\}\.\$\{table\}`\);\s*\}/,
-  );
+  assert.match(script, /excludedTables:\s*EXCLUDED_PUBLIC_TABLES/);
+
+  const { buildProductionDataDumpContainerPlan } = await previewSyncDumpModulePromise;
+  const plan = buildProductionDataDumpContainerPlan({
+    productionDbUrl: "postgresql://postgres:secret@db.example.test:5432/partnership",
+    schema: "public",
+    excludedTables: [...WALLET_PREVIEW_LOCAL_TABLES],
+  });
+  const dumpScript = plan.args.at(-1);
+
+  assert.ok(dumpScript, "Docker dump command should include a shell script");
+
+  for (const table of WALLET_PREVIEW_LOCAL_TABLES) {
+    assert.match(
+      dumpScript,
+      new RegExp(`--exclude-table '\\"public\\"\\.\\"${table}\\"'`),
+    );
+  }
 });
 
 test("Preview sync executes one replacement transaction while preserving Preview-local Wallet rows", async () => {

@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
+import { createWriteStream } from "node:fs";
 import { appendFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
+import { finished } from "node:stream/promises";
 import { createClient } from "@supabase/supabase-js";
 import {
   formatStorageError,
@@ -22,6 +24,7 @@ import {
   buildTransactionalPreviewRestoreSql,
   sanitizeDumpSqlForPreview,
 } from "./supabase-sync-preview-lib.mjs";
+import { buildProductionDataDumpContainerPlan } from "./supabase-sync-preview-dump-lib.mjs";
 
 const PUBLIC_SCHEMA = "public";
 const CHECK_ONLY_FLAG = "--check-only";
@@ -124,13 +127,23 @@ function runCommand(command, args, options = {}) {
     captureStdout = false,
     captureStderr = true,
     env = {},
+    stdoutPath,
   } = options;
 
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const settleFailure = (error) => {
+      if (!settled) {
+        settled = true;
+        reject(error);
+      }
+    };
+    const stdoutFile = stdoutPath ? createWriteStream(stdoutPath, { flags: "w" }) : null;
+    const stdoutFinished = stdoutFile ? finished(stdoutFile) : null;
     const child = spawn(command, args, {
       stdio: [
         "ignore",
-        captureStdout ? "pipe" : "inherit",
+        captureStdout || stdoutFile ? "pipe" : "inherit",
         captureStderr ? "pipe" : "inherit",
       ],
       env: {
@@ -148,6 +161,10 @@ function runCommand(command, args, options = {}) {
       });
     }
 
+    if (stdoutFile && child.stdout) {
+      child.stdout.pipe(stdoutFile);
+    }
+
     if (captureStderr && child.stderr) {
       child.stderr.on("data", (chunk) => {
         const text = chunk.toString("utf8");
@@ -156,13 +173,29 @@ function runCommand(command, args, options = {}) {
       });
     }
 
-    child.once("error", reject);
-    child.once("close", (code) => {
-      if (code !== 0) {
-        reject(new Error(stderr.trim() || `${command} failed with exit code ${code}`));
+    child.once("error", (error) => {
+      stdoutFile?.destroy(error);
+      void stdoutFinished?.catch(() => undefined);
+      settleFailure(error);
+    });
+    child.once("close", async (code) => {
+      if (settled) {
         return;
       }
 
+      try {
+        await stdoutFinished;
+      } catch (error) {
+        settleFailure(error);
+        return;
+      }
+
+      if (code !== 0) {
+        settleFailure(new Error(stderr.trim() || `${command} failed with exit code ${code}`));
+        return;
+      }
+
+      settled = true;
       resolve({ stdout, stderr });
     });
   });
@@ -243,25 +276,17 @@ async function listPublicTableColumns(dbUrl) {
 }
 
 async function dumpProductionDatabase(dumpPath, productionDbUrl) {
-  const args = [
-    "db",
-    "dump",
-    "--data-only",
-    "--use-copy",
-    "--schema",
-    PUBLIC_SCHEMA,
-    "--file",
-    dumpPath,
-    "--db-url",
+  const plan = buildProductionDataDumpContainerPlan({
     productionDbUrl,
-  ];
+    schema: PUBLIC_SCHEMA,
+    excludedTables: EXCLUDED_PUBLIC_TABLES,
+  });
 
-  for (const table of EXCLUDED_PUBLIC_TABLES) {
-    args.push("-x", `${PUBLIC_SCHEMA}.${table}`);
-  }
-
-  console.log("Syncing production public data dump...");
-  await runCommand("supabase", args);
+  console.log("Syncing production public data dump with the pinned PostgreSQL 17 client...");
+  await runCommand(plan.command, plan.args, {
+    env: plan.environment,
+    stdoutPath: dumpPath,
+  });
 }
 
 async function assertPreviewDatabaseAvailable(previewDbUrl) {
