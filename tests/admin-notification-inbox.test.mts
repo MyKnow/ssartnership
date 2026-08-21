@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { getSafeAdminMessage } from "../src/lib/admin-safe-messages";
 
 type AdminNotificationInboxModule = typeof import("../src/lib/admin-notification-inbox.ts");
 
@@ -132,4 +134,123 @@ test("admin navigation separates personal inbox from notification operations", a
   assert.equal(inboxItem?.href, "/admin/notifications");
   assert.equal(operationsItem?.label, "발송 관리");
   assert.equal(operationsItem?.href, "/admin/push");
+});
+
+test("admin notification API never returns storage errors to the browser", async () => {
+  const [listSource, itemSource] = await Promise.all([
+    readFile(
+      new URL("../src/app/api/admin/notifications/route.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/app/api/admin/notifications/[id]/route.ts", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.equal(
+    getSafeAdminMessage(new Error("relation admin_notification_recipients does not exist"), "알림을 불러오지 못했습니다."),
+    "알림을 불러오지 못했습니다.",
+  );
+  assert.match(listSource, /알림을 불러오지 못했습니다\./);
+  assert.match(listSource, /getSafeAdminMessage/);
+  assert.match(listSource, /includeSummary/);
+  assert.match(listSource, /includeUnreadCount: includeSummary/);
+  assert.match(listSource, /includeSummary \? \{ summary:/);
+  assert.match(listSource, /getCachedAdminNotificationInboxReadModel/);
+  assert.match(listSource, /invalidateAdminNotificationReadCache/);
+  assert.match(itemSource, /getSafeAdminMessage/);
+  assert.doesNotMatch(listSource, /message:\s*unreadResult\.error\.message/);
+  assert.doesNotMatch(listSource, /message:\s*inboxResult\.error\.message/);
+  assert.doesNotMatch(listSource, /error instanceof Error \? error\.message/);
+  assert.doesNotMatch(itemSource, /error instanceof Error \? error\.message/);
+  assert.doesNotMatch(itemSource, /throw new Error\(error\.message\)/);
+  assert.match(itemSource, /withServerTiming/);
+  assert.match(itemSource, /timing\.measure\("auth"/);
+  assert.match(itemSource, /timing\.measure\("query"/);
+});
+
+test("관리자 알림 설정 API는 실패 원문을 숨기고 응답 시간을 계측한다", async () => {
+  const source = await readFile(
+    new URL("../src/app/api/admin/notifications/preferences/route.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /withServerTiming/);
+  assert.match(source, /timing\.measure\("auth"/);
+  assert.match(source, /timing\.measure\("query"/);
+  assert.match(source, /알림 설정을 불러오지 못했습니다\./);
+  assert.match(source, /알림 설정을 저장하지 못했습니다\./);
+  assert.doesNotMatch(source, /message:\s*error\.message/);
+  assert.doesNotMatch(source, /return NextResponse\.json\(\{\s*preferences:\s*await/);
+});
+
+test("발송 로그는 완료 메타데이터가 있으면 delivery 재조회 없이 표시한다", async () => {
+  const source = await readFile(
+    new URL("../src/lib/admin-notification-ops.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /hasCompleteChannelResults/);
+  assert.match(source, /rowsNeedingDeliveryLookup/);
+  assert.match(source, /if \(rowsNeedingDeliveryLookup\.length > 0\)/);
+});
+
+test("관리자 발송 API는 요청 재시도 키와 안전한 오류 매핑을 사용한다", async () => {
+  const [broadcastSource, previewSource, repositorySource, migrationSource] =
+    await Promise.all([
+      readFile(
+        new URL("../src/app/api/push/admin/broadcast/route.ts", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../src/app/api/push/admin/preview/route.ts", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../src/lib/repositories/supabase/notification-repository.supabase.ts",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../supabase/migrations/20260727144656_add_notification_idempotency_key.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    ]);
+
+  assert.match(broadcastSource, /idempotencyKey/);
+  assert.match(broadcastSource, /withServerTiming/);
+  assert.match(broadcastSource, /알림 발송에 실패했습니다\. 잠시 후 다시 시도해 주세요\./);
+  assert.doesNotMatch(broadcastSource, /error instanceof Error \? error\.message/);
+  assert.match(previewSource, /withServerTiming/);
+  assert.match(previewSource, /알림 검토 정보를 불러오지 못했습니다\. 잠시 후 다시 시도해 주세요\./);
+  assert.doesNotMatch(previewSource, /error instanceof Error \? error\.message/);
+  assert.match(repositorySource, /onConflict: "idempotency_key"/);
+  assert.match(repositorySource, /alreadyExists: true/);
+  assert.match(migrationSource, /notifications_idempotency_key_unique/);
+  assert.match(migrationSource, /unique \(idempotency_key\)/);
+});
+
+test("알림 발송 후처리 경고는 provider 오류 원문을 UI 계약에 저장하지 않는다", async () => {
+  const [deliverySource, operationSource] = await Promise.all([
+    readFile(
+      new URL("../src/lib/admin-notification-ops-delivery.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/lib/admin-notification-ops.ts", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(deliverySource, /푸시 알림 전송에 실패했습니다\./);
+  assert.match(deliverySource, /console\.error\("\[admin-notification-ops\] push delivery failed"/);
+  assert.doesNotMatch(deliverySource, /errorMessage\s*=\s*error instanceof Error \? error\.message/);
+  assert.match(operationSource, /발송 결과 기록을 저장하지 못했습니다\./);
+  assert.doesNotMatch(operationSource, /final metadata update failed for notification \$\{created\.notification\.id\}[^\n]*error\.message/);
 });

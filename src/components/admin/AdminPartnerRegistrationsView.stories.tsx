@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 import AdminPartnerRegistrationsView from "./AdminPartnerRegistrationsView";
 
 const meta = {
@@ -46,10 +47,15 @@ const meta = {
           },
         ],
         benefit_groups: [
-          { id: "benefit-group-default", group_key: "default", label: "기본 혜택" },
+          {
+            id: "benefit-group-default",
+            group_key: "default",
+            label: "기본 혜택",
+          },
         ],
       },
     ],
+    updateDetailsAction: async () => {},
     updateStatusAction: async () => {},
   },
   parameters: {
@@ -63,3 +69,44 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const Paginated: Story = {
+  args: {
+    pagination: {
+      totalCount: 25,
+      page: 2,
+      pageSize: 12,
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("link", { name: "이전" })).toHaveAttribute(
+      "href",
+      "/admin/partner-registrations",
+    );
+    await expect(canvas.getByRole("link", { name: "다음" })).toHaveAttribute(
+      "href",
+      "/admin/partner-registrations?page=3",
+    );
+    await expect(canvas.getByText("2 / 3")).toBeVisible();
+  },
+};
+
+export const ReadOnly: Story = {
+  args: {
+    canReview: false,
+    canCreate: false,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText("조회 전용 권한", { exact: true }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "상태 저장" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("link", { name: "제휴처 추가" }),
+    ).not.toBeInTheDocument();
+  },
+};

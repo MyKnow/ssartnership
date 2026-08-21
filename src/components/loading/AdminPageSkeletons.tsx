@@ -1,4 +1,5 @@
 import AdminShell from "@/components/admin/AdminShell";
+import { AdminGlobalSearchSkeletonContent } from "@/components/loading/AdminGlobalSearchSkeletonContent";
 import Skeleton from "@/components/ui/Skeleton";
 import Surface from "@/components/ui/Surface";
 
@@ -93,6 +94,27 @@ function FormSkeleton({ sections = 2 }: { sections?: number }) {
   );
 }
 
+function AdminListSkeletonContent({
+  actionCount = 2,
+  filterFields = 4,
+  rows = 4,
+  showHeader = true,
+}: {
+  actionCount?: number;
+  filterFields?: number;
+  rows?: number;
+  showHeader?: boolean;
+}) {
+  return (
+    <div className="grid min-w-0 gap-6">
+      {showHeader ? <PageHeaderSkeleton actionCount={actionCount} /> : null}
+      <MetricRowSkeleton />
+      <FilterSkeleton fields={filterFields} />
+      <ListRowsSkeleton rows={rows} />
+    </div>
+  );
+}
+
 function AdminListSkeleton({
   title,
   actionCount = 2,
@@ -106,12 +128,11 @@ function AdminListSkeleton({
 }) {
   return (
     <AdminShell title={title} backHref="/admin" backLabel="관리 홈">
-      <div className="grid min-w-0 gap-6">
-        <PageHeaderSkeleton actionCount={actionCount} />
-        <MetricRowSkeleton />
-        <FilterSkeleton fields={filterFields} />
-        <ListRowsSkeleton rows={rows} />
-      </div>
+      <AdminListSkeletonContent
+        actionCount={actionCount}
+        filterFields={filterFields}
+        rows={rows}
+      />
     </AdminShell>
   );
 }
@@ -129,25 +150,35 @@ export function AdminLoginSkeleton() {
   );
 }
 
+export function AdminDashboardSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return (
+    <div className="grid min-w-0 gap-6">
+      {showHeader ? <PageHeaderSkeleton /> : null}
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,0.8fr)]">
+        <Surface level="elevated" padding="lg" className="grid gap-3">
+          <Skeleton className="h-6 w-28" />
+          <ListRowsSkeleton rows={3} />
+        </Surface>
+        <Surface level="default" padding="lg" className="grid gap-3">
+          <Skeleton className="h-6 w-24" />
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton key={index} className="h-14 w-full rounded-2xl" />
+          ))}
+        </Surface>
+      </div>
+      <MetricRowSkeleton />
+    </div>
+  );
+}
+
 export function AdminOverviewSkeleton() {
   return (
     <AdminShell title="관리 홈">
-      <div className="grid min-w-0 gap-6">
-        <PageHeaderSkeleton />
-        <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,0.8fr)]">
-          <Surface level="elevated" padding="lg" className="grid gap-3">
-            <Skeleton className="h-6 w-28" />
-            <ListRowsSkeleton rows={3} />
-          </Surface>
-          <Surface level="default" padding="lg" className="grid gap-3">
-            <Skeleton className="h-6 w-24" />
-            {Array.from({ length: 4 }).map((_, index) => (
-              <Skeleton key={index} className="h-14 w-full rounded-2xl" />
-            ))}
-          </Surface>
-        </div>
-        <MetricRowSkeleton />
-      </div>
+      <AdminDashboardSkeletonContent />
     </AdminShell>
   );
 }
@@ -156,31 +187,81 @@ export function AdminProtectedSkeleton() {
   return <AdminListSkeleton title="관리 화면" />;
 }
 
+export function AdminGlobalSearchSkeleton() {
+  return (
+    <AdminShell title="통합 검색">
+      <AdminGlobalSearchSkeletonContent />
+    </AdminShell>
+  );
+}
+
 export function AdminMembersSkeleton() {
   return <AdminListSkeleton title="회원 관리" filterFields={4} rows={5} />;
+}
+
+export function AdminMembersSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent filterFields={4} rows={5} showHeader={showHeader} />;
 }
 
 export function AdminPartnersSkeleton() {
   return <AdminListSkeleton title="제휴처" actionCount={3} />;
 }
 
+export function AdminPartnersSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent actionCount={3} showHeader={showHeader} />;
+}
+
 export function AdminPartnerRequestsSkeleton() {
   return <AdminListSkeleton title="변경 요청" actionCount={1} filterFields={0} />;
+}
+
+export function AdminPartnerRequestsSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent actionCount={1} filterFields={0} showHeader={showHeader} />;
 }
 
 export function AdminCategoriesSkeleton() {
   return <AdminListSkeleton title="카테고리" actionCount={1} filterFields={4} rows={3} />;
 }
 
+export function AdminCategoriesSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent actionCount={1} filterFields={4} rows={3} showHeader={showHeader} />;
+}
+
 export function AdminPartnerDetailSkeleton() {
   return (
     <AdminShell title="제휴처 상세" backHref="/admin/partners" backLabel="제휴처">
-      <div className="grid min-w-0 gap-6">
-        <PageHeaderSkeleton />
-        <MetricRowSkeleton />
-        <FormSkeleton sections={3} />
-      </div>
+      <AdminPartnerDetailSkeletonContent />
     </AdminShell>
+  );
+}
+
+export function AdminPartnerDetailSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return (
+    <div className="grid min-w-0 gap-6">
+      {showHeader ? <PageHeaderSkeleton /> : null}
+      <MetricRowSkeleton />
+      <FormSkeleton sections={3} />
+    </div>
   );
 }
 
@@ -199,20 +280,46 @@ export function AdminCompaniesSkeleton() {
   return <AdminListSkeleton title="파트너사/계정" actionCount={2} />;
 }
 
+export function AdminCompaniesSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent actionCount={2} showHeader={showHeader} />;
+}
+
 export function AdminCycleSkeleton() {
   return (
     <AdminShell title="기수 관리" backHref="/admin" backLabel="관리 홈">
-      <div className="grid min-w-0 gap-6">
-        <PageHeaderSkeleton />
-        <MetricRowSkeleton count={3} />
-        <FormSkeleton sections={1} />
-      </div>
+      <AdminCycleSkeletonContent />
     </AdminShell>
+  );
+}
+
+export function AdminCycleSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return (
+    <div className="grid min-w-0 gap-6">
+      {showHeader ? <PageHeaderSkeleton /> : null}
+      <MetricRowSkeleton count={3} />
+      <FormSkeleton sections={1} />
+    </div>
   );
 }
 
 export function AdminReviewsSkeleton() {
   return <AdminListSkeleton title="리뷰 관리" filterFields={4} />;
+}
+
+export function AdminReviewsSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent filterFields={4} showHeader={showHeader} />;
 }
 
 export function AdminStyleGuideSkeleton() {
@@ -223,6 +330,155 @@ export function AdminPushSkeleton() {
   return <AdminListSkeleton title="발송 관리" filterFields={3} rows={3} />;
 }
 
+export function AdminPushSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent filterFields={3} rows={3} showHeader={showHeader} />;
+}
+
 export function AdminLogsSkeleton() {
   return <AdminListSkeleton title="로그 조회" filterFields={4} rows={5} />;
+}
+
+export function AdminLogsSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent filterFields={4} rows={5} showHeader={showHeader} />;
+}
+
+export function AdminNotificationsSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent filterFields={0} rows={3} showHeader={showHeader} />;
+}
+
+export function AdminAdvertisementSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent filterFields={0} rows={4} showHeader={showHeader} />;
+}
+
+export function AdminEventSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent filterFields={0} rows={4} showHeader={showHeader} />;
+}
+
+export function AdminPartnerRegistrationsSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent filterFields={0} rows={4} showHeader={showHeader} />;
+}
+
+export function AdminGraduateVerificationsSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent filterFields={0} rows={4} showHeader={showHeader} />;
+}
+
+export function AdminProfilePhotosSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent filterFields={0} rows={4} showHeader={showHeader} />;
+}
+
+export function AdminMemberDetailSkeletonContent() {
+  return <AdminListSkeletonContent filterFields={0} rows={4} />;
+}
+
+export function AdminMemberSignupRequestsSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent filterFields={0} rows={4} showHeader={showHeader} />;
+}
+
+export function AdminAccountsSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent filterFields={0} rows={4} showHeader={showHeader} />;
+}
+
+export function AdminNotificationTemplatesSkeletonContent({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+} = {}) {
+  return <AdminListSkeletonContent filterFields={0} rows={3} showHeader={showHeader} />;
+}
+
+export function AdminTaskInboxSkeletonContent() {
+  return (
+    <div className="grid min-w-0 gap-6">
+      <PageHeaderSkeleton actionCount={0} />
+      <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <Surface
+            key={index}
+            level="elevated"
+            padding="md"
+            className="grid min-w-0 grid-cols-[2.75rem_minmax(0,1fr)_4rem] items-center gap-3"
+          >
+            <Skeleton className="h-11 w-11 rounded-control" />
+            <div className="grid min-w-0 gap-2">
+              <Skeleton className="h-5 w-28 max-w-full" />
+              <Skeleton className="h-4 w-full max-w-sm" />
+            </div>
+            <Skeleton className="h-6 w-14 rounded-full" />
+          </Surface>
+        ))}
+      </div>
+      <Surface level="inset" padding="md" className="grid gap-2">
+        <Skeleton className="h-5 w-5 rounded-full" />
+        <Skeleton className="h-4 w-full max-w-3xl" />
+      </Surface>
+    </div>
+  );
+}
+
+export function AdminPartnerNewSkeletonContent() {
+  return (
+    <div className="grid min-w-0 gap-6">
+      <PageHeaderSkeleton />
+      <FormSkeleton sections={2} />
+    </div>
+  );
+}
+
+export function AdminEventDetailSkeletonContent() {
+  return (
+    <div className="grid min-w-0 gap-6">
+      <PageHeaderSkeleton />
+      <MetricRowSkeleton count={3} />
+      <FormSkeleton sections={2} />
+    </div>
+  );
+}
+
+export function AdminMemberSignupRequestDetailSkeletonContent() {
+  return (
+    <div className="grid min-w-0 gap-6">
+      <PageHeaderSkeleton />
+      <FormSkeleton sections={1} />
+    </div>
+  );
 }

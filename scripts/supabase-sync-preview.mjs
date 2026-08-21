@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
+import { createWriteStream } from "node:fs";
 import { appendFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
+import { finished } from "node:stream/promises";
 import { createClient } from "@supabase/supabase-js";
 import {
   formatStorageError,
@@ -18,7 +20,14 @@ import {
   resolvePreviewMemberCredentialSeedTarget,
   resolvePreviewMemberCredentialSeedConfig,
 } from "./preview-credential-seed-lib.mjs";
-import { sanitizeDumpSqlForPreview } from "./supabase-sync-preview-lib.mjs";
+import {
+  sanitizeDumpSqlForPreview,
+  stripUnsupportedPreviewRestoreTriggerControls,
+} from "./supabase-sync-preview-lib.mjs";
+import {
+  buildProductionDataDumpContainerPlan,
+  filterPgDumpCircularForeignKeyWarnings,
+} from "./supabase-sync-preview-dump-lib.mjs";
 
 const PUBLIC_SCHEMA = "public";
 const CHECK_ONLY_FLAG = "--check-only";
@@ -120,13 +129,24 @@ function runCommand(command, args, options = {}) {
     captureStdout = false,
     captureStderr = true,
     env = {},
+    stdoutPath,
+    transformStderr,
   } = options;
 
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const settleFailure = (error) => {
+      if (!settled) {
+        settled = true;
+        reject(error);
+      }
+    };
+    const stdoutFile = stdoutPath ? createWriteStream(stdoutPath, { flags: "w" }) : null;
+    const stdoutFinished = stdoutFile ? finished(stdoutFile) : null;
     const child = spawn(command, args, {
       stdio: [
         "ignore",
-        captureStdout ? "pipe" : "inherit",
+        captureStdout || stdoutFile ? "pipe" : "inherit",
         captureStderr ? "pipe" : "inherit",
       ],
       env: {
@@ -144,22 +164,58 @@ function runCommand(command, args, options = {}) {
       });
     }
 
+    if (stdoutFile && child.stdout) {
+      child.stdout.pipe(stdoutFile);
+    }
+
     if (captureStderr && child.stderr) {
       child.stderr.on("data", (chunk) => {
         const text = chunk.toString("utf8");
         stderr += text;
-        process.stderr.write(text);
+        if (!transformStderr) {
+          process.stderr.write(text);
+        }
       });
     }
 
-    child.once("error", reject);
-    child.once("close", (code) => {
-      if (code !== 0) {
-        reject(new Error(stderr.trim() || `${command} failed with exit code ${code}`));
+    child.once("error", (error) => {
+      stdoutFile?.destroy(error);
+      void stdoutFinished?.catch(() => undefined);
+      settleFailure(error);
+    });
+    child.once("close", async (code) => {
+      if (settled) {
         return;
       }
 
-      resolve({ stdout, stderr });
+      try {
+        await stdoutFinished;
+      } catch (error) {
+        settleFailure(error);
+        return;
+      }
+
+      let reportedStderr;
+      try {
+        reportedStderr = transformStderr ? transformStderr(stderr) : stderr;
+      } catch (error) {
+        settleFailure(error);
+        return;
+      }
+
+      if (transformStderr && reportedStderr) {
+        process.stderr.write(reportedStderr);
+      }
+
+      if (code !== 0) {
+        settleFailure(
+          new Error(reportedStderr.trim() || `${command} failed with exit code ${code}`),
+        );
+        return;
+      }
+
+      settled = true;
+      resolve({ stdout, stderr: reportedStderr });
     });
   });
 }
@@ -239,25 +295,18 @@ async function listPublicTableColumns(dbUrl) {
 }
 
 async function dumpProductionDatabase(dumpPath, productionDbUrl) {
-  const args = [
-    "db",
-    "dump",
-    "--data-only",
-    "--use-copy",
-    "--schema",
-    PUBLIC_SCHEMA,
-    "--file",
-    dumpPath,
-    "--db-url",
+  const plan = buildProductionDataDumpContainerPlan({
     productionDbUrl,
-  ];
+    schema: PUBLIC_SCHEMA,
+    excludedTables: EXCLUDED_PUBLIC_TABLES,
+  });
 
-  for (const table of EXCLUDED_PUBLIC_TABLES) {
-    args.push("-x", `${PUBLIC_SCHEMA}.${table}`);
-  }
-
-  console.log("Syncing production public data dump...");
-  await runCommand("supabase", args);
+  console.log("Syncing production public data dump with the pinned PostgreSQL 17 client...");
+  await runCommand(plan.command, plan.args, {
+    env: plan.environment,
+    stdoutPath: dumpPath,
+    transformStderr: filterPgDumpCircularForeignKeyWarnings,
+  });
 }
 
 async function assertPreviewDatabaseAvailable(previewDbUrl) {
@@ -284,6 +333,9 @@ async function sanitizeDumpForPreview(dumpPath, previewDbUrl) {
   const previewColumnsByTable = await listPublicTableColumns(previewDbUrl);
   const sourceSql = await readFile(dumpPath, "utf8");
   const sanitized = sanitizeDumpSqlForPreview(sourceSql, previewColumnsByTable);
+  const triggerControlSanitized = stripUnsupportedPreviewRestoreTriggerControls(
+    sanitized.sql,
+  );
   const { stats } = sanitized;
 
   if (stats.memberCopyBlocksSeen > 0) {
@@ -349,12 +401,22 @@ async function sanitizeDumpForPreview(dumpPath, previewDbUrl) {
     );
   }
 
-  if (!sanitized.changed) {
+  if (triggerControlSanitized.removedCount > 0) {
+    console.log(
+      [
+        "Preview sync trigger restore sanitization:",
+        `unsupportedPublicTriggerControlsRemoved=${triggerControlSanitized.removedCount}`,
+        "session-level constraint handling remains enabled.",
+      ].join(" "),
+    );
+  }
+
+  if (!sanitized.changed && triggerControlSanitized.removedCount === 0) {
     return;
   }
 
   console.log("Sanitizing production dump for preview schema differences...");
-  await writeFile(dumpPath, sanitized.sql, "utf8");
+  await writeFile(dumpPath, triggerControlSanitized.sql, "utf8");
 }
 
 async function truncatePreviewDatabase(previewDbUrl) {
@@ -477,7 +539,7 @@ async function seedPreviewMemberCredentials(previewUrl, previewServiceRoleKey) {
   }
 
   console.log(
-    `Seeded preview member credentials for ${seedConfig.username}. Production password hashes remain stripped.`,
+    "Seeded one Preview-only member credential. Production password hashes remain stripped.",
   );
 }
 
@@ -507,7 +569,7 @@ async function collectBucketFilePaths(storageClient, bucketName, prefix = "", pa
 
   while (true) {
     const data = await runStorageOperation(
-      `Listing preview objects in ${bucketName}/${prefix || "."}`,
+      `Listing preview objects in ${bucketName}`,
       () =>
         storageClient.storage.from(bucketName).list(prefix, {
           limit,
@@ -588,7 +650,7 @@ async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = 
 
   while (true) {
     const data = await runStorageOperation(
-      `Listing production objects in ${bucketName}/${prefix || "."}`,
+      `Listing production objects in ${bucketName}`,
       () =>
         prodClient.storage.from(bucketName).list(prefix, {
           limit,
@@ -614,12 +676,12 @@ async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = 
 
       try {
         const file = await runStorageOperation(
-          `Downloading ${bucketName}/${objectPath}`,
+          `Downloading object from ${bucketName}`,
           () => prodClient.storage.from(bucketName).download(objectPath),
         );
 
         if (!file) {
-          throw new Error(`다운로드할 파일을 찾을 수 없습니다: ${bucketName}/${objectPath}`);
+          throw new Error("STORAGE_OBJECT_DOWNLOAD_EMPTY");
         }
 
         const contentType =
@@ -630,7 +692,7 @@ async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = 
 
         const buffer = Buffer.from(await file.arrayBuffer());
         await runStorageOperation(
-          `Uploading ${bucketName}/${objectPath}`,
+          `Uploading object to ${bucketName}`,
           () =>
             previewClient.storage.from(bucketName).upload(objectPath, buffer, {
               contentType,
@@ -641,11 +703,11 @@ async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = 
       } catch (error) {
         if (shouldAbortPreviewStorageObjectSync(bucketName)) {
           throw new Error(
-            `Preview required object ${bucketName}/${objectPath} could not be synchronized: ${formatStorageError(error)}`,
+            `Preview required object in ${bucketName} could not be synchronized: ${formatStorageError(error)}`,
           );
         }
         console.warn(
-          `Skipping object ${bucketName}/${objectPath} after storage sync failure: ${formatStorageError(error)}`,
+          `Skipping one object in ${bucketName} after storage sync failure: ${formatStorageError(error)}`,
         );
       }
     }
@@ -759,12 +821,7 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
 
 async function main() {
   const checkOnly = process.argv.includes(CHECK_ONLY_FLAG);
-  const productionDbUrl = requiredEnv("SUPABASE_PRODUCTION_DB_URL");
-  const productionUrl = requiredEnv("SUPABASE_PRODUCTION_URL");
-  const productionServiceRoleKey = requiredEnv("SUPABASE_PRODUCTION_SERVICE_ROLE_KEY");
   const previewDbUrl = requiredEnv("SUPABASE_PREVIEW_DB_URL");
-  const previewUrl = requiredEnv("SUPABASE_PREVIEW_URL");
-  const previewServiceRoleKey = requiredEnv("SUPABASE_PREVIEW_SERVICE_ROLE_KEY");
   const skipUnavailablePreview = isTruthyEnv("SUPABASE_PREVIEW_SYNC_SKIP_UNAVAILABLE");
 
   try {
@@ -794,6 +851,12 @@ async function main() {
     console.log("Preview database connection preflight passed.");
     return;
   }
+
+  const productionDbUrl = requiredEnv("SUPABASE_PRODUCTION_DB_URL");
+  const productionUrl = requiredEnv("SUPABASE_PRODUCTION_URL");
+  const productionServiceRoleKey = requiredEnv("SUPABASE_PRODUCTION_SERVICE_ROLE_KEY");
+  const previewUrl = requiredEnv("SUPABASE_PREVIEW_URL");
+  const previewServiceRoleKey = requiredEnv("SUPABASE_PREVIEW_SERVICE_ROLE_KEY");
 
   const tempDir = await mkdtemp(join(tmpdir(), "ssartnership-preview-sync-"));
   const dumpPath = join(tempDir, "production-data.sql");

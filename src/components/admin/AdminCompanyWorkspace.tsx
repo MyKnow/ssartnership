@@ -10,6 +10,7 @@ import type { AdminPartnerAccount } from "@/components/admin/partner-account-man
 import type { AdminCompanyFormActions } from "@/components/admin/admin-form-actions";
 import {
   buildAdminCompanyTabHref,
+  type AdminCompanyAccountSummary,
   type AdminCompanyTab,
 } from "@/lib/admin-company-workspace";
 
@@ -26,9 +27,13 @@ export type AdminCompanyWorkspaceProps = {
     accountCount: number;
   }>;
   accounts: AdminPartnerAccount[];
+  accountSummary: AdminCompanyAccountSummary;
   generatedSetupUrl?: string | null;
   generatedSetupAccountId?: string | null;
   initialTab?: AdminCompanyTab;
+  canCreate?: boolean;
+  canUpdate?: boolean;
+  canDelete?: boolean;
   actions: AdminCompanyFormActions;
 };
 
@@ -51,6 +56,9 @@ export default function AdminCompanyWorkspace({
   generatedSetupUrl,
   generatedSetupAccountId,
   initialTab = "companies",
+  canCreate = false,
+  canUpdate = false,
+  canDelete = false,
   actions,
 }: AdminCompanyWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<AdminCompanyTab>(initialTab);
@@ -81,20 +89,22 @@ export default function AdminCompanyWorkspace({
       {activeTab === "companies" ? (
         <section className="grid gap-4">
           <AdminSectionHeading
-            eyebrow="Companies"
+            eyebrow="데이터"
             title="파트너사 운영"
             description="회사 기본 정보, 연결 제휴처 수, 삭제/수정 작업을 한 영역에서 관리합니다."
           />
           <AdminCompanyManager
             companies={companies}
-            accounts={accounts}
+            canCreate={canCreate}
+            canUpdate={canUpdate}
+            canDelete={canDelete}
             actions={actions}
           />
         </section>
       ) : activeTab === "accounts" ? (
         <section className="grid gap-4">
           <AdminSectionHeading
-            eyebrow="Accounts"
+            eyebrow="데이터"
             title="파트너 계정"
             description="담당 계정 생성, 초기 설정 링크 발급, 연결 조정을 같은 영역에서 처리합니다."
           />
@@ -103,6 +113,8 @@ export default function AdminCompanyWorkspace({
             companies={companies}
             generatedSetupUrl={generatedSetupUrl}
             generatedSetupAccountId={generatedSetupAccountId}
+            canCreate={canCreate}
+            canUpdate={canUpdate}
             actions={actions}
           />
         </section>

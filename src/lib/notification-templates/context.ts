@@ -28,6 +28,15 @@ export type NotificationTemplateContext =
       partnerUrl: string;
     }
   | {
+      kind: "admin_partner_registration_request";
+      companyName: string;
+      partnerName: string;
+      requesterName: string;
+      partnerCategory: string;
+      partnerLocation: string;
+      requestUrl: string;
+    }
+  | {
       kind: "admin_partner_change_request";
       companyName: string;
       partnerName: string;
@@ -172,6 +181,15 @@ export function getNotificationTemplateContextVariables(
         partnerName: context.partnerName,
         requesterName: context.requesterName,
         changeSummary: context.changeSummary,
+        requestUrl: context.requestUrl,
+      };
+    case "admin_partner_registration_request":
+      return {
+        companyName: context.companyName,
+        partnerName: context.partnerName,
+        requesterName: context.requesterName,
+        partnerCategory: context.partnerCategory,
+        partnerLocation: context.partnerLocation,
         requestUrl: context.requestUrl,
       };
     case "admin_partner_plan_upgrade_request":

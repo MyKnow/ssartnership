@@ -53,11 +53,12 @@ Use the minimal relevant skill for the task.
 Project-local skills, tracked with this repository:
 
 - `ssartnership-patterns`: repository-specific Next.js, Supabase, Repository, validation, CI, and release conventions
+- `github-actions-operations`: mandatory before any operation that can trigger or affect GitHub Actions, and after every failed, cancelled, unexpectedly skipped, retrying, flaky, or error-bearing run; update its failure ledger before the next trigger
 - `ssartnership-ui-ux`: project visual system, Korean UI states, routing/error recovery, prototype promotion, and UI QA
 - `member-required-gate-redirects`: member password, consent, profile-photo, and `returnTo` gate priority/loop prevention
 - `docs-governance`: repository documentation placement and taxonomy
 
-Codex-local skills are cross-project tools and are intentionally not copied into this repository. Use them when installed: frontend, backend, data, security, testing, research, documentation, deployment, Git, and `ui-prototyping` skills. Keep a project-specific rule in a project-local skill instead of adding it to a Codex-local skill.
+Codex-local skills are cross-project tools and are intentionally not copied into this repository. Use them when installed: frontend, backend, data, security, testing, research, documentation, deployment, Git, `ui-prototyping`, `source-backed-dashboard`, and `analytics-dashboard-template` skills. Keep a project-specific rule in a project-local skill instead of adding it to a Codex-local skill.
 
 ## Verification
 

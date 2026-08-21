@@ -118,6 +118,8 @@ export const Default: Story = {
     await expect(createAccordionButton).toBeInTheDocument();
     await expect(createAccordionButton.closest("details")).not.toHaveAttribute("open");
     await expect(canvas.getByText("신규 회원 디저트 세트")).toBeInTheDocument();
+    await expect(canvas.getAllByText(/회원별 누적 보유·사용 1회/)).toHaveLength(2);
+    await expect(canvas.getByText(/전체 사용 21회 \/ 300회/)).toBeInTheDocument();
     await expect(canvas.getAllByText("수정").length).toBeGreaterThan(0);
     await expect(canvas.getAllByRole("button", { name: "복제" }).length).toBeGreaterThan(0);
     await expect(canvas.getByText(/발급 또는 사용 이력이 있어 삭제할 수 없습니다/)).toBeInTheDocument();
@@ -130,7 +132,7 @@ export const Default: Story = {
       name: /^쿠폰 생성$/,
     });
     await userEvent.click(createSubmitButtons[createSubmitButtons.length - 1]);
-    await expect(canvas.getByText("Error", { exact: true })).toBeInTheDocument();
+    await expect(canvas.getByText("입력 오류", { exact: true })).toBeInTheDocument();
   },
 };
 
@@ -141,7 +143,7 @@ export const DeleteBlockedByHistory: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText("쿠폰을 삭제하지 못했습니다.")).toBeInTheDocument();
+    await expect(canvas.getByText("쿠폰 작업을 처리하지 못했습니다.")).toBeInTheDocument();
     await expect(
       canvas.getByText(/발급 또는 사용 이력이 있는 쿠폰은 삭제할 수 없습니다/),
     ).toBeInTheDocument();

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 import {
   GRADUATE_PROFILE_IMAGE_SIZE,
   MAX_GRADUATE_CERTIFICATE_BYTES,
@@ -115,7 +115,7 @@ export async function normalizeGraduateProfileImage(input: {
     throw new Error("본인 사진은 5MB 이하만 업로드할 수 있습니다.");
   }
 
-  let metadata: sharp.Metadata;
+  let metadata: Metadata;
   try {
     metadata = await sharp(input.source, {
       animated: true,
@@ -180,7 +180,7 @@ export async function normalizeMattermostProfileImage(input: {
     throw new Error("Mattermost 프로필 사진 크기를 확인해 주세요.");
   }
 
-  let metadata: sharp.Metadata | null = null;
+  let metadata: Metadata | null = null;
   try {
     metadata = await sharp(input.source, {
       animated: false,

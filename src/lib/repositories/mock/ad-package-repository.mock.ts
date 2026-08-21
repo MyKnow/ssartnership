@@ -17,6 +17,7 @@ import {
 } from "@/lib/coupon-verification-password";
 import type {
   AdCampaign,
+  AdCampaignOption,
   AdCampaignWithStats,
   AdCoupon,
   AdCouponRedemption,
@@ -122,8 +123,8 @@ function createMockCampaigns(): AdCampaign[] {
       description: "점심 시간대 SSAFY 구성원 방문을 늘리는 홈 배너+쿠폰 패키지입니다.",
       sponsorLabel: "역삼 국밥집 제공",
       status: "active",
-      startsAt: "2026-07-01T00:00:00.000Z",
-      endsAt: "2026-07-31T23:59:59.000Z",
+      startsAt: "2026-01-01T00:00:00.000Z",
+      endsAt: "2099-12-31T23:59:59.000Z",
       channels: ["coupon", "home_banner", "push"],
       monthlyPriceKrw: getAdPackageDefinition("boost").monthlyPriceKrw,
       notes: "",
@@ -234,6 +235,14 @@ export class MockAdPackageRepository implements AdPackageRepository {
     this.couponCodes = new Map();
     this.couponPasswords = new Map();
     this.events = [];
+  }
+
+  async listAdminCampaignOptions(): Promise<AdCampaignOption[]> {
+    return this.campaigns.map((campaign) => ({
+      id: campaign.id,
+      partnerId: campaign.partnerId,
+      label: `${campaign.sponsorLabel || campaign.partnerName} · ${campaign.title}`,
+    }));
   }
 
   async listAdminCampaigns(options?: { now?: Date }): Promise<AdCampaignWithStats[]> {

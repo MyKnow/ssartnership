@@ -39,6 +39,8 @@ function createSupabaseMock({
   partners = [],
   reviews = [],
   reactions = [],
+  members = [],
+  directories = [],
   counts = {
     total: 0,
     visible: 0,
@@ -49,12 +51,28 @@ function createSupabaseMock({
   partners?: unknown[];
   reviews?: unknown[];
   reactions?: unknown[];
+  members?: unknown[];
+  directories?: unknown[];
   counts?: {
     total: number;
     visible: number;
     hidden: number;
   };
 }) {
+  const derivedMembers = reviews.flatMap((review) => {
+    const member = (review as { member?: Record<string, unknown> }).member;
+    return member?.id ? [member] : [];
+  });
+  const derivedDirectories = reviews.flatMap((review) => {
+    const member = (review as { member?: Record<string, unknown> }).member;
+    const directory = member?.directory as Record<string, unknown> | undefined;
+    return member?.mattermost_account_id && directory
+      ? [{ id: member.mattermost_account_id, ...directory }]
+      : [];
+  });
+  const memberRows = members.length > 0 ? members : derivedMembers;
+  const directoryRows = directories.length > 0 ? directories : derivedDirectories;
+
   return {
     rpc(fn: string) {
       if (fn === "get_admin_review_counts") {
@@ -83,6 +101,10 @@ function createSupabaseMock({
                 ? reviews
                 : table === "partner_review_reactions"
                   ? reactions
+                  : table === "members"
+                    ? memberRows
+                    : table === "mm_user_directory"
+                      ? directoryRows
                   : [],
       };
 
@@ -95,6 +117,9 @@ function createSupabaseMock({
                 if (field === "hidden_at" && value === null) {
                   mode = "visible";
                 }
+                return countBuilder;
+              },
+              in() {
                 return countBuilder;
               },
               not(field: string, _operator: string, value: unknown) {
@@ -145,6 +170,11 @@ function createSupabaseMock({
               (row) => row.rating === value,
             );
           }
+          if (table === "partner_reviews" && field === "deleted_at") {
+            state.rows = (state.rows as Array<{ deleted_at: string | null }>).filter(
+              (row) => row.deleted_at === value,
+            );
+          }
           return builder;
         },
         in(field: string, values: unknown[]) {
@@ -159,17 +189,34 @@ function createSupabaseMock({
             );
             return builder;
           }
+          if (table === "members" && field === "mattermost_account_id") {
+            state.rows = (state.rows as Array<{ mattermost_account_id: string | null }>).filter(
+              (row) => values.includes(row.mattermost_account_id),
+            );
+            return builder;
+          }
           return Promise.resolve({ data: state.rows, error: null });
         },
         is(field: string, value: unknown) {
+          if (table === "partner_reviews" && field === "deleted_at") {
+            state.rows = (state.rows as Array<{ deleted_at: string | null }>).filter(
+              (row) => row.deleted_at === value,
+            );
+          }
           if (table === "partner_reviews" && field === "hidden_at") {
             builder.__hidden = value === null ? "visible" : builder.__hidden;
+            state.rows = (state.rows as Array<{ hidden_at: string | null }>).filter(
+              (row) => row.hidden_at === value,
+            );
           }
           return builder;
         },
         not(field: string, _operator: string, value: unknown) {
           if (table === "partner_reviews" && field === "hidden_at" && value === null) {
             builder.__hidden = "hidden";
+            state.rows = (state.rows as Array<{ hidden_at: string | null }>).filter(
+              (row) => row.hidden_at !== null,
+            );
           }
           if (table === "partner_reviews" && field === "images") {
             state.rows = (state.rows as Array<{ images: string[] | null }>).filter(
@@ -177,6 +224,30 @@ function createSupabaseMock({
             );
           }
           return builder;
+        },
+        ilike(field: string, pattern: string) {
+          const needle = pattern.replace(/^%|%$/g, "").toLowerCase();
+          state.rows = (state.rows as Array<Record<string, unknown>>).filter((row) =>
+            String(row[field] ?? "").toLowerCase().includes(needle),
+          );
+          return builder;
+        },
+        or(expression: string) {
+          if (table === "partner_reviews") {
+            const memberIds = expression.match(/member_id\.in\.\(([^)]*)\)/)?.[1]?.split(",") ?? [];
+            const partnerIds = expression.match(/partner_id\.in\.\(([^)]*)\)/)?.[1]?.split(",") ?? [];
+            state.rows = (state.rows as Array<{ member_id: string; partner_id: string }>).filter(
+              (row) => memberIds.includes(row.member_id) || partnerIds.includes(row.partner_id),
+            );
+          }
+          return builder;
+        },
+        range(from: number, to: number) {
+          return Promise.resolve({
+            data: state.rows.slice(from, to + 1),
+            count: state.rows.length,
+            error: null,
+          });
         },
         limit() {
           return Promise.resolve({ data: state.rows, error: null });
@@ -255,6 +326,23 @@ describe("admin review helpers", () => {
     expect(filters.companyId).toBe("");
     expect(filters.partnerId).toBe("");
     expect(adminReviews.serializeAdminReviewFilters(filters)).toBe("");
+  });
+
+  test("normalizes review pagination and keeps filters in page links", async () => {
+    const adminReviews = await import("../../src/lib/admin-reviews");
+    const filters = adminReviews.parseAdminReviewFilters({ status: "hidden" });
+
+    expect(adminReviews.parseAdminReviewPagination({ page: "3", pageSize: "24" })).toEqual({
+      page: 3,
+      pageSize: 24,
+    });
+    expect(adminReviews.parseAdminReviewPagination({ page: "0", pageSize: "999" })).toEqual({
+      page: 1,
+      pageSize: 12,
+    });
+    expect(adminReviews.serializeAdminReviewPageQuery(filters, { page: 3, pageSize: 24 })).toBe(
+      "status=hidden&page=3&pageSize=24",
+    );
   });
 
   test("getAdminReviewPageData maps relations, reactions, and applies client filtering", async () => {
@@ -389,6 +477,9 @@ describe("admin review helpers", () => {
         disrecommendCount: 1,
       }),
     ]);
+    expect("body" in result.reviews[0]).toBe(false);
+    expect("images" in result.reviews[0]).toBe(false);
+    expect(result.pagination).toEqual({ page: 1, pageSize: 12, totalCount: 1 });
   });
 
   test("getAdminReviewPageData returns no reviews for invalid partner ids", async () => {

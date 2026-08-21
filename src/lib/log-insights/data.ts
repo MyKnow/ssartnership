@@ -24,6 +24,7 @@ import {
 } from './shared';
 import { getBucketSizeMs, resolveLogRange } from './range';
 import { collectPagedRows } from './paging';
+import { encodeAdminLogsCursor, parseAdminLogsCursor } from './cursor';
 
 async function queryAllRows<T>(
   supabase: AdminSupabaseClient,
@@ -551,19 +552,54 @@ export async function loadAdminLogNormalizedPage(
 ) {
   const supabase = getSupabaseAdminClient();
   const range = resolveLogRange(options);
-  const { data, error } = await supabase.rpc('get_admin_logs_page_scoped', {
-    input_start: range.start,
-    input_end: range.end,
-    input_page: config.page,
-    input_page_size: config.pageSize,
-    input_group: options.group ?? 'all',
-    input_search: options.search ?? '',
-    input_name: options.name ?? 'all',
-    input_actor: options.actor ?? 'all',
-    input_status: options.status ?? 'all',
-    input_allowed_groups: config.access.readGroups,
-    input_include_pii: config.access.includePii,
-  });
+  const cursor = parseAdminLogsCursor(options.cursor);
+  const useCursor = config.page === 1 || Boolean(cursor);
+  let rpcResult = useCursor
+    ? await supabase.rpc('get_admin_logs_cursor_scoped', {
+        input_start: range.start,
+        input_end: range.end,
+        input_page_size: config.pageSize + 1,
+        input_cursor_created_at: cursor?.createdAt ?? null,
+        input_cursor_id: cursor?.id ?? null,
+        input_group: options.group ?? 'all',
+        input_search: options.search ?? '',
+        input_name: options.name ?? 'all',
+        input_actor: options.actor ?? 'all',
+        input_status: options.status ?? 'all',
+        input_allowed_groups: config.access.readGroups,
+        input_include_pii: config.access.includePii,
+      })
+    : await supabase.rpc('get_admin_logs_page_scoped', {
+        input_start: range.start,
+        input_end: range.end,
+        input_page: config.page,
+        input_page_size: config.pageSize,
+        input_group: options.group ?? 'all',
+        input_search: options.search ?? '',
+        input_name: options.name ?? 'all',
+        input_actor: options.actor ?? 'all',
+        input_status: options.status ?? 'all',
+        input_allowed_groups: config.access.readGroups,
+        input_include_pii: config.access.includePii,
+      });
+  if (rpcResult.error && useCursor) {
+    console.error('[log-insights] cursor rpc unavailable, falling back to page rpc', rpcResult.error.message);
+    rpcResult = await supabase.rpc('get_admin_logs_page_scoped', {
+      input_start: range.start,
+      input_end: range.end,
+      input_page: config.page,
+      input_page_size: config.pageSize,
+      input_group: options.group ?? 'all',
+      input_search: options.search ?? '',
+      input_name: options.name ?? 'all',
+      input_actor: options.actor ?? 'all',
+      input_status: options.status ?? 'all',
+      input_allowed_groups: config.access.readGroups,
+      input_include_pii: config.access.includePii,
+    });
+  }
+
+  const { data: rawData, error } = rpcResult;
 
   if (error) {
     console.error('[log-insights] scoped admin logs page rpc failed', error.message);
@@ -576,10 +612,18 @@ export async function loadAdminLogNormalizedPage(
       partnerLookup: new Map<string, string>(),
       total: 0,
       partialFailure: createPartialFailureState('all'),
+      nextCursor: null,
+      hasMore: false,
     };
   }
 
-  const rows = (data ?? []) as AdminLogPageRpcRow[];
+  const rawRows = (rawData ?? []) as AdminLogPageRpcRow[];
+  const hasMore = useCursor && rawRows.length > config.pageSize;
+  const rows = hasMore ? rawRows.slice(0, config.pageSize) : rawRows;
+  const lastRow = rows.at(-1);
+  const nextCursor = hasMore && lastRow
+    ? encodeAdminLogsCursor({ createdAt: lastRow.created_at, id: lastRow.id })
+    : null;
   const memberLookup = new Map<string, MemberLookupRecord>();
   for (const row of rows) {
     if (row.actor_type !== 'member' || !row.actor_id) {
@@ -653,6 +697,8 @@ export async function loadAdminLogNormalizedPage(
     partnerLookup,
     total: parseRpcCount(rows[0]?.total_count),
     partialFailure: createNoPartialFailureState(),
+    nextCursor,
+    hasMore,
   };
 }
 

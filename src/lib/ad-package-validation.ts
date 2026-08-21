@@ -28,6 +28,13 @@ export const AD_PACKAGE_FORM_LIMITS = {
   notesMax: 500,
 } as const;
 
+const SAFE_COUPON_FORM_MESSAGE = /^[가-힣0-9()·,./~\s-]{1,140}[.!?]$/u;
+
+export function getSafeAdCouponFormMessage(error: unknown, fallback = "입력값을 확인해 주세요.") {
+  const message = error instanceof Error ? error.message.trim() : "";
+  return SAFE_COUPON_FORM_MESSAGE.test(message) ? message : fallback;
+}
+
 const campaignStatuses = new Set<AdCampaignStatus>([
   "draft",
   "active",

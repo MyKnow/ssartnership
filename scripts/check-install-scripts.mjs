@@ -43,6 +43,10 @@ const expectedVendorDigests = {
 const pinnedPlatformPackages = {
   "@esbuild/darwin-arm64":
     "sha512-TZbWkQY7kvTAXbXUT7uVACR5cMHsDiSz9z7ZKAX/RTq/WJEk3QyRr0wZpNhBDX+/0CtdqUIJlOiodQcta6tY3Q==",
+  "@esbuild/darwin-x64":
+    "sha512-zfdzgK9ACBNZLI/CyHTOx81SyNbM6YXn7rxSgX97VjyiPl9W1i4Ka4fgKECEoFCKGpvBj5qArWIGgQjOwkgskQ==",
+  "@esbuild/linux-arm64":
+    "sha512-yHs+0uc8+nvEAfAfxrWQKK5peSNzBc4PegcMO0EJ2hT71uA7vB8Ihg2e77R2P7SG5uYjPbHlLLmve4LLLRCf0g==",
   "@esbuild/linux-x64":
     "sha512-u/anNYF2mmVOEDwLtnQ1wOr3EZ9sTNGLWrsYGYwHWzGA3Si84IOkHXlbWTD1NB+9/1lcnweYKO54uhxZydNzfA==",
   "@esbuild/win32-x64":
@@ -149,12 +153,11 @@ export function validateStaticInstallPolicy({
     throw new Error("the only reviewed local dependency source changed.");
   }
   if (JSON.stringify(vendorPackageJson) !== JSON.stringify(expectedVendorPackage)) {
-    throw new Error("the reviewed local archiver manifest changed.");
+    throw new Error("the reviewed local archiver package manifest changed.");
   }
   if (JSON.stringify(vendorDigests) !== JSON.stringify(expectedVendorDigests)) {
-    throw new Error("the reviewed local archiver contents changed.");
+    throw new Error("the reviewed local archiver package contents changed.");
   }
-
   const dependencySections = {
     dependencies: packageJson.dependencies,
     devDependencies: packageJson.devDependencies,
@@ -283,28 +286,43 @@ export function validateStaticInstallPolicy({
       "esbuild must retain its exact version, registry URL, integrity, and denied lifecycle.",
     );
   }
-  for (const [packageName, integrity] of Object.entries(pinnedPlatformPackages)) {
-    const entry = packageLock.packages?.[`node_modules/${packageName}`];
+  const platformEntries = packageEntries.filter(([path]) =>
+    path.startsWith("node_modules/@esbuild/"));
+  for (const [path, entry] of platformEntries) {
+    const packageName = path.slice("node_modules/".length);
     const leaf = packageName.slice("@esbuild/".length);
     if (
       entry?.version !== "0.28.1"
-      || entry.resolved
-        !== `https://registry.npmjs.org/${packageName}/-/${leaf}-0.28.1.tgz`
-      || entry.integrity !== integrity
+      || entry.resolved !== `https://registry.npmjs.org/${packageName}/-/${leaf}-0.28.1.tgz`
+      || typeof entry.integrity !== "string"
+      || !entry.integrity.startsWith("sha512-")
     ) {
-      throw new Error(`deployment esbuild identity changed: ${packageName}`);
+      throw new Error(`esbuild platform package identity changed: ${packageName}`);
+    }
+  }
+  for (const [packageName, integrity] of Object.entries(pinnedPlatformPackages)) {
+    const entry = packageLock.packages?.[`node_modules/${packageName}`];
+    if (entry?.integrity !== integrity) {
+      throw new Error(`deployment esbuild binary integrity changed: ${packageName}`);
     }
   }
 
+  const unrsResolver = packageLock.packages?.["node_modules/unrs-resolver"];
+  if (unrsResolver?.version !== "1.11.1" || unrsResolver.hasInstallScript !== true) {
+    throw new Error("the explicitly denied unrs-resolver script changed unexpectedly.");
+  }
   const lifecycleInventory = packageEntries
     .filter(([, entry]) => entry?.hasInstallScript === true)
     .map(([path, entry]) => `${path}@${entry.version ?? "unknown"}`)
     .sort();
-  if (JSON.stringify(lifecycleInventory) !== JSON.stringify([
+  const expectedLifecycleInventory = [
     "node_modules/esbuild@0.28.1",
     "node_modules/unrs-resolver@1.11.1",
-  ])) {
-    throw new Error(`dependency lifecycle inventory changed: ${lifecycleInventory.join(", ")}`);
+  ];
+  if (JSON.stringify(lifecycleInventory) !== JSON.stringify(expectedLifecycleInventory)) {
+    throw new Error(
+      `dependency lifecycle inventory changed: ${lifecycleInventory.join(", ")}`,
+    );
   }
 }
 
@@ -338,8 +356,13 @@ export function validateEffectiveNpmConfig({
   }
 }
 
+/**
+ * @param {NodeJS.ProcessEnv} [source]
+ * @returns {NodeJS.ProcessEnv}
+ */
 export function buildControlledInstallEnvironment(source = process.env) {
   const installRoot = resolve(repositoryRoot, ".tmp/install-state");
+  /** @type {NodeJS.ProcessEnv} */
   const environment = {
     NPM_CONFIG_CACHE: resolve(installRoot, "cache"),
     NPM_CONFIG_GLOBALCONFIG: resolve(installRoot, "global.npmrc"),

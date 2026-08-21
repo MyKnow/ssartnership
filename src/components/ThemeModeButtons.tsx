@@ -1,7 +1,6 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { motion } from "framer-motion";
 import { MoonIcon, SunIcon } from "@heroicons/react/24/solid";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/cn";
@@ -35,10 +34,9 @@ export default function ThemeModeButtons() {
           )}
         >
           {activeTheme === "light" ? (
-            <motion.span
-              layoutId="theme-mode-active-pill"
+            <span
+              aria-hidden="true"
               className="absolute inset-0 rounded-[1.05rem] bg-primary shadow-raised"
-              transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
             />
           ) : null}
           <SunIcon className="relative h-5 w-5 shrink-0 text-warning" />
@@ -57,10 +55,9 @@ export default function ThemeModeButtons() {
           )}
         >
           {activeTheme === "dark" ? (
-            <motion.span
-              layoutId="theme-mode-active-pill"
+            <span
+              aria-hidden="true"
               className="absolute inset-0 rounded-[1.05rem] bg-primary shadow-raised"
-              transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
             />
           ) : null}
           <MoonIcon

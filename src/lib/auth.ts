@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import {
   createHmacDigest,
   splitSignedToken,
@@ -112,14 +113,16 @@ export async function isAdminSession() {
   return (await getAdminSession()) !== null;
 }
 
-export async function getAdminSession(): Promise<{
+export type AdminSession = {
   adminId: string;
   loginId: string;
   issuedAt: number;
   expiresAt: number;
   permissionVersion: number;
   account: AdminAccount;
-} | null> {
+};
+
+export const getAdminSession = cache(async (): Promise<AdminSession | null> => {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
   if (!token) {
@@ -146,7 +149,7 @@ export async function getAdminSession(): Promise<{
   } catch {
     return null;
   }
-}
+});
 
 export async function requireAdmin() {
   const ok = await isAdminSession();

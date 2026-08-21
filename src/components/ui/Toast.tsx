@@ -9,7 +9,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 type Toast = {
   id: string;
@@ -27,7 +26,6 @@ const noopToastContext: ToastContextValue = {
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const shouldReduceMotion = useReducedMotion();
   const mountedRef = useRef(true);
   const removalTimersRef = useRef<number[]>([]);
 
@@ -64,24 +62,15 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={value}>
       {children}
       <div className="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex flex-col items-end gap-2 sm:inset-x-auto sm:right-6 sm:max-w-sm">
-        <AnimatePresence initial={false}>
-          {toasts.map((toast) => (
-            <motion.div
-              key={toast.id}
-              className="pointer-events-auto w-full rounded-[1.25rem] border border-border/80 bg-surface-overlay px-4 py-3 text-sm text-foreground shadow-overlay backdrop-blur-xl sm:w-auto sm:min-w-[18rem]"
-              initial={
-                shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 16, scale: 0.98 }
-              }
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={
-                shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.98 }
-              }
-              transition={{ duration: shouldReduceMotion ? 0 : 0.2, ease: [0.2, 0.8, 0.2, 1] }}
-            >
-              {toast.message}
-            </motion.div>
-          ))}
-        </AnimatePresence>
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            role="status"
+            className="pointer-events-auto w-full translate-y-0 rounded-[1.25rem] border border-border/80 bg-surface-overlay px-4 py-3 text-sm text-foreground opacity-100 shadow-overlay backdrop-blur-xl transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none sm:w-auto sm:min-w-[18rem]"
+          >
+            {toast.message}
+          </div>
+        ))}
       </div>
     </ToastContext.Provider>
   );

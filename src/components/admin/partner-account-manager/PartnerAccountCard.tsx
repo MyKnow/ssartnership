@@ -15,6 +15,7 @@ export default function PartnerAccountCard({
   companies,
   generatedSetupUrl,
   actions,
+  canUpdate = false,
 }: {
   account: AdminPartnerAccount;
   companies: {
@@ -24,6 +25,7 @@ export default function PartnerAccountCard({
   }[];
   generatedSetupUrl?: string | null;
   actions: AdminCompanyFormActions;
+  canUpdate?: boolean;
 }) {
   const accountFormId = `partner-account-form-${account.id}`;
   const setupBadge = getPartnerInitialSetupBadge(account);
@@ -37,12 +39,12 @@ export default function PartnerAccountCard({
               <Badge variant={account.is_active ? "success" : "danger"}>
                 {account.is_active ? "활성" : "비활성"}
               </Badge>
-              <Badge variant={account.must_change_password ? "warning" : "neutral"}>
+              <Badge
+                variant={account.must_change_password ? "warning" : "neutral"}
+              >
                 {account.must_change_password ? "비밀번호 변경 필요" : "일반"}
               </Badge>
-              <Badge variant="neutral">
-                파트너사 {account.links.length}개
-              </Badge>
+              <Badge variant="neutral">파트너사 {account.links.length}개</Badge>
               <Badge variant={setupBadge.variant}>{setupBadge.label}</Badge>
             </div>
             <div className="min-w-0">
@@ -57,7 +59,9 @@ export default function PartnerAccountCard({
 
           <div className="grid gap-2 text-sm text-muted-foreground md:min-w-[18rem] md:justify-items-end">
             <p>생성 {formatPartnerAccountDateTime(account.created_at)}</p>
-            <p>최근 로그인 {formatPartnerAccountDateTime(account.last_login_at)}</p>
+            <p>
+              최근 로그인 {formatPartnerAccountDateTime(account.last_login_at)}
+            </p>
             <span className="text-xs font-semibold text-primary">
               펼쳐서 관리
             </span>
@@ -67,9 +71,10 @@ export default function PartnerAccountCard({
         <div className="grid gap-5 border-t border-border/70 bg-surface-inset/40 p-5 md:p-6">
           <PartnerAccountHeader
             account={account}
-            generatedSetupUrl={generatedSetupUrl}
+            generatedSetupUrl={canUpdate ? generatedSetupUrl : null}
             createSetupUrlAction={actions.createSetupUrlAction}
             sendSetupUrlAction={actions.sendSetupUrlAction}
+            canUpdate={canUpdate}
           />
 
           <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
@@ -77,11 +82,13 @@ export default function PartnerAccountCard({
               account={account}
               formId={accountFormId}
               updateAccountAction={actions.updateAccountAction}
+              canUpdate={canUpdate}
             />
             <PartnerAccountLinks
               account={account}
               companies={companies}
               updateConnectionAction={actions.updateConnectionAction}
+              canUpdate={canUpdate}
             />
           </div>
         </div>

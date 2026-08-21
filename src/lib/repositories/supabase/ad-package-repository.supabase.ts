@@ -19,6 +19,7 @@ import {
 } from "@/lib/coupon-verification-password";
 import type {
   AdCampaign,
+  AdCampaignOption,
   AdCampaignWithStats,
   AdCoupon,
   AdCouponRedemption,
@@ -70,6 +71,14 @@ type AdCampaignRow = {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  partners?: PartnerJoin;
+};
+
+type AdCampaignOptionRow = {
+  id: string;
+  partner_id: string;
+  title: string;
+  sponsor_label: string | null;
   partners?: PartnerJoin;
 };
 
@@ -335,6 +344,30 @@ function isMissingAdPackageSchemaMessage(message: string, tableName: string) {
 }
 
 export class SupabaseAdPackageRepository implements AdPackageRepository {
+  async listAdminCampaignOptions(): Promise<AdCampaignOption[]> {
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("ad_campaigns")
+      .select("id,partner_id,title,sponsor_label,partners(name)")
+      .order("updated_at", { ascending: false });
+    if (error) {
+      if (isMissingAdPackageSchemaMessage(error.message, "ad_campaigns")) {
+        return [];
+      }
+      throw new Error(error.message);
+    }
+
+    return ((data ?? []) as AdCampaignOptionRow[]).map((row) => {
+      const partner = Array.isArray(row.partners) ? row.partners[0] : row.partners;
+      const sponsor = row.sponsor_label?.trim() || partner?.name?.trim() || "제휴처";
+      return {
+        id: row.id,
+        partnerId: row.partner_id,
+        label: `${sponsor} · ${row.title}`,
+      };
+    });
+  }
+
   async listAdminCampaigns(): Promise<AdCampaignWithStats[]> {
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase

@@ -21,6 +21,7 @@ export default function AdminReviewQueueFilters({
     <nav className="flex min-w-0 flex-wrap gap-2" aria-label={ariaLabel}>
       <Link
         href={getHref()}
+        prefetch={false}
         aria-current={!value ? "page" : undefined}
         className={cn(
           "inline-flex min-h-11 items-center rounded-pill border px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
@@ -37,6 +38,7 @@ export default function AdminReviewQueueFilters({
           <Link
             key={option.value}
             href={getHref(option.value)}
+            prefetch={false}
             aria-current={active ? "page" : undefined}
             className={cn(
               "inline-flex min-h-11 items-center rounded-pill border px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",

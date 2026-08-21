@@ -142,6 +142,8 @@ export function buildAdminNotificationListResult({
 
 export function getAdminNotificationTypeLabel(type: string) {
   switch (type) {
+    case "partner_registration_request":
+      return "제휴 등록 신청";
     case "partner_change_request":
       return "변경 요청";
     case "partner_immediate_update":

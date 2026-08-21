@@ -1,6 +1,7 @@
 import Badge from "@/components/ui/Badge";
 import Input from "@/components/ui/Input";
 import SubmitButton from "@/components/ui/SubmitButton";
+import Surface from "@/components/ui/Surface";
 import type { AdminFormAction } from "@/components/admin/admin-form-actions";
 import FieldGroup from "@/components/admin/partner-account-manager/FieldGroup";
 import { formatPartnerAccountDateTime } from "@/components/admin/partner-account-manager/helpers";
@@ -10,11 +11,25 @@ export default function PartnerAccountForm({
   account,
   formId,
   updateAccountAction,
+  canUpdate = false,
 }: {
   account: AdminPartnerAccount;
   formId: string;
   updateAccountAction: AdminFormAction;
+  canUpdate?: boolean;
 }) {
+  if (!canUpdate) {
+    return (
+      <Surface level="inset" className="grid gap-2 p-4">
+        <p className="text-sm font-semibold text-foreground">조회 전용 권한</p>
+        <p className="text-sm leading-6 text-muted-foreground">
+          계정 상태와 기본 정보는 확인할 수 있지만, 수정은 파트너사 운영 권한이
+          있는 관리자만 할 수 있습니다.
+        </p>
+      </Surface>
+    );
+  }
+
   return (
     <div className="rounded-2xl border border-border/70 bg-surface-inset/80 p-4">
       <div className="flex items-center justify-between gap-3">
@@ -84,7 +99,11 @@ export default function PartnerAccountForm({
         </div>
 
         <div className="md:col-span-2 flex justify-end">
-          <SubmitButton pendingText="저장 중" form={formId} className="w-full sm:w-auto">
+          <SubmitButton
+            pendingText="저장 중"
+            form={formId}
+            className="w-full sm:w-auto"
+          >
             계정 저장
           </SubmitButton>
         </div>

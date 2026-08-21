@@ -1,15 +1,19 @@
+import { Suspense } from "react";
 import AdminReviewManager from "@/components/admin/AdminReviewManager";
 import AdminShell from "@/components/admin/AdminShell";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
-import {
-  adminActionErrorMessages,
-} from "@/lib/admin-action-errors";
+import AdminStatePanel from "@/components/admin/AdminStatePanel";
+import { AdminReviewsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
+import Button from "@/components/ui/Button";
+import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import {
   getAdminReviewPageData,
   parseAdminReviewFilters,
-  serializeAdminReviewFilters,
+  parseAdminReviewPagination,
+  serializeAdminReviewPageQuery,
 } from "@/lib/admin-reviews";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { canAdmin } from "@/lib/admin-permissions";
 import { getManagedCampusFilterValues } from "@/lib/admin-scope";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +21,65 @@ export const dynamic = "force-dynamic";
 const adminReviewsErrorMessages: Record<string, string> = {
   ...adminActionErrorMessages,
 };
+
+async function AdminReviewsContent({
+  adminSession,
+  params,
+}: {
+  adminSession: Awaited<ReturnType<typeof requireAdminPermission>>;
+  params: Record<string, string | string[] | undefined>;
+}) {
+  const filters = parseAdminReviewFilters(params);
+  const pagination = parseAdminReviewPagination(params);
+  const errorMessage =
+    typeof params.error === "string"
+      ? (adminReviewsErrorMessages[params.error] ?? null)
+      : null;
+  const queryString = serializeAdminReviewPageQuery(filters, pagination);
+  const returnTo = queryString
+    ? `/admin/reviews?${queryString}`
+    : "/admin/reviews";
+  let data;
+  try {
+    data = await getAdminReviewPageData(filters, {
+      managedCampusSlugs: getManagedCampusFilterValues(adminSession.account),
+      ...pagination,
+    });
+  } catch {
+    return (
+      <div className="grid min-w-0 gap-6">
+        <AdminStatePanel
+          kind="error"
+          title="리뷰 목록을 불러오지 못했습니다."
+          description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 담당자에게 알려 주세요."
+          action={<Button href={returnTo} variant="secondary">다시 확인</Button>}
+        />
+      </div>
+    );
+  }
+  const canUpdate = canAdmin(
+    adminSession.account.permissions,
+    "reviews",
+    "update",
+  );
+  const canDelete = canAdmin(
+    adminSession.account.permissions,
+    "reviews",
+    "delete",
+  );
+
+  return (
+    <div className="grid gap-6">
+        <AdminReviewManager
+          data={data}
+          returnTo={returnTo}
+          errorMessage={errorMessage}
+          canUpdate={canUpdate}
+          canDelete={canDelete}
+        />
+    </div>
+  );
+}
 
 export default async function AdminReviewsPage({
   searchParams,
@@ -27,23 +90,18 @@ export default async function AdminReviewsPage({
     path: "/admin/reviews",
   });
   const params = (await searchParams) ?? {};
-  const filters = parseAdminReviewFilters(params);
-  const errorMessage = typeof params.error === "string" ? adminReviewsErrorMessages[params.error] ?? null : null;
-  const data = await getAdminReviewPageData(filters, {
-    managedCampusSlugs: getManagedCampusFilterValues(adminSession.account),
-  });
-  const queryString = serializeAdminReviewFilters(filters);
-  const returnTo = queryString ? `/admin/reviews?${queryString}` : "/admin/reviews";
 
   return (
     <AdminShell title="리뷰 관리" backHref="/admin" backLabel="관리 홈">
-      <div className="grid gap-6">
+      <div className="grid min-w-0 gap-6">
         <AdminPageHeader
-          eyebrow="Reviews"
+          eyebrow="작업함"
           title="리뷰 관리"
           description="회원 리뷰를 검토하고 공개 상태와 삭제를 관리합니다."
         />
-        <AdminReviewManager data={data} returnTo={returnTo} errorMessage={errorMessage} />
+        <Suspense fallback={<AdminReviewsSkeletonContent showHeader={false} />}>
+          <AdminReviewsContent adminSession={adminSession} params={params} />
+        </Suspense>
       </div>
     </AdminShell>
   );

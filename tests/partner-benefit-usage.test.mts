@@ -325,6 +325,13 @@ test("repository benefit and infrastructure errors keep distinct service codes",
         throw new Error(repositoryMessage);
       },
       listUsageHistory: async () => ({ items: [], total: 0, page: 1, pageSize: 25 }),
+      createAdminUsage: async () => {
+        throw new Error("unused");
+      },
+      updateAdminUsage: async () => {
+        throw new Error("unused");
+      },
+      deleteAdminUsage: async () => undefined,
     };
 
     await assert.rejects(
@@ -349,8 +356,7 @@ test("mock admin usage repository supports create, update, list, and delete", as
     {
       partnerId: "partner-admin-crud",
       location: "서울 강남구 테헤란로 212",
-      periodStart: "2026-07-01",
-      periodEnd: "2026-07-31",
+      ...activePartnerPeriod(),
       benefitItems: [
         { id: "benefit-1", title: "첫 번째 혜택", maxApplyCount: null },
         { id: "benefit-2", title: "두 번째 혜택", maxApplyCount: null },

@@ -4,23 +4,32 @@ import {
   restorePartnerReview,
   updatePartnerReview,
 } from "@/app/admin/(protected)/actions";
-import type { AdminReviewRecord } from "@/lib/admin-reviews";
+import type {
+  AdminReviewRecord,
+  AdminReviewSummary,
+} from "@/lib/admin-reviews";
 import AdminReviewCardView from "./AdminReviewCardView";
 
 export default function AdminReviewCard({
   review,
   returnTo,
   editable = false,
+  canUpdate = true,
+  canDelete = true,
 }: {
-  review: AdminReviewRecord;
+  review: AdminReviewSummary | AdminReviewRecord;
   returnTo: string;
   editable?: boolean;
+  canUpdate?: boolean;
+  canDelete?: boolean;
 }) {
   return (
     <AdminReviewCardView
       review={review}
       returnTo={returnTo}
       editable={editable}
+      canUpdate={canUpdate}
+      canDelete={canDelete}
       hideAction={hidePartnerReview}
       restoreAction={restorePartnerReview}
       updateAction={updatePartnerReview}

@@ -1,9 +1,13 @@
+import { Suspense } from "react";
 import AdminShell from "@/components/admin/AdminShell";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminEventListView, {
   type AdminEventListItem,
 } from "@/components/admin/AdminEventListView";
+import { AdminEventSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import { listEventPageDefinitions } from "@/lib/event-pages";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { canAdmin } from "@/lib/admin-permissions";
 import { PROMOTION_AUDIENCE_OPTIONS } from "@/lib/promotions/catalog";
 import {
   getPromotionCampaignState,
@@ -52,14 +56,21 @@ function buildEventListItem({
   definition: ReturnType<typeof listEventPageDefinitions>[number];
   registration: ManagedEventCampaign | null;
 }): AdminEventListItem {
-  const isRegistered = registration?.source === "database" && Boolean(registration.id);
+  const isRegistered =
+    registration?.source === "database" && Boolean(registration.id);
   const state = getEventState(isRegistered ? registration : null);
-  const periodStarts = formatEventDate(registration?.startsAt ?? definition.startsAt);
+  const periodStarts = formatEventDate(
+    registration?.startsAt ?? definition.startsAt,
+  );
   const periodEnds = formatEventDate(registration?.endsAt ?? definition.endsAt);
   const targetLabel =
-    registration?.targetAudiences?.map(
-      (audience) => PROMOTION_AUDIENCE_OPTIONS.find((option) => option.key === audience)?.label ?? audience,
-    ).join(" · ") ?? "전체";
+    registration?.targetAudiences
+      ?.map(
+        (audience) =>
+          PROMOTION_AUDIENCE_OPTIONS.find((option) => option.key === audience)
+            ?.label ?? audience,
+      )
+      .join(" · ") ?? "전체";
 
   return {
     slug: definition.slug,
@@ -77,44 +88,78 @@ function buildEventListItem({
   };
 }
 
+async function AdminEventContent({
+  session,
+  params,
+}: {
+  session: Awaited<ReturnType<typeof requireAdminPermission>>;
+  params: { status?: string };
+}) {
+  const canCreate = canAdmin(session.account.permissions, "events", "create");
+  const canUpdate = canAdmin(session.account.permissions, "events", "update");
+  const definitions = listEventPageDefinitions();
+  const registrations = await listManagedEventCampaigns({
+    includeInactive: true,
+  });
+  const registrationMap = new Map(
+    registrations.map((campaign) => [campaign.slug, campaign]),
+  );
+
+  const sections = (
+    ["진행 전", "진행 중", "진행 후", "비활성", "등록 필요"] as const
+  ).map((bucket) => ({
+    bucket,
+    items: definitions
+      .filter((definition) => {
+        const registration = registrationMap.get(definition.slug) ?? null;
+        const isRegistered =
+          registration?.source === "database" && Boolean(registration.id);
+        if (!isRegistered) {
+          return bucket === "등록 필요";
+        }
+        return getEventState(registration).label === bucket;
+      })
+      .map((definition) =>
+        buildEventListItem({
+          definition,
+          registration: registrationMap.get(definition.slug) ?? null,
+        }),
+      ),
+  }));
+
+  return (
+    <AdminEventListView
+        sections={sections}
+        statusMessage={statusMessage(params.status)}
+        canCreate={canCreate}
+        canUpdate={canUpdate}
+        showHeader={false}
+    />
+  );
+}
+
 export default async function AdminEventPage({
   searchParams,
 }: {
   searchParams?: Promise<{ status?: string }>;
 }) {
-  await requireAdminPermission("events", "read", { path: "/admin/event" });
+  const session = await requireAdminPermission("events", "read", {
+    path: "/admin/event",
+  });
   const params = (await searchParams) ?? {};
-  const definitions = listEventPageDefinitions();
-  const registrations = await listManagedEventCampaigns({ includeInactive: true });
-  const registrationMap = new Map(registrations.map((campaign) => [campaign.slug, campaign]));
-
-  const sections = (["진행 전", "진행 중", "진행 후", "비활성", "등록 필요"] as const).map(
-    (bucket) => ({
-      bucket,
-      items: definitions
-        .filter((definition) => {
-          const registration = registrationMap.get(definition.slug) ?? null;
-          const isRegistered = registration?.source === "database" && Boolean(registration.id);
-          if (!isRegistered) {
-            return bucket === "등록 필요";
-          }
-          return getEventState(registration).label === bucket;
-        })
-        .map((definition) =>
-          buildEventListItem({
-            definition,
-            registration: registrationMap.get(definition.slug) ?? null,
-          }),
-        ),
-    }),
-  );
 
   return (
     <AdminShell title="이벤트 관리" backHref="/admin" backLabel="관리 홈">
-      <AdminEventListView
-        sections={sections}
-        statusMessage={statusMessage(params.status)}
-      />
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="자동화"
+          title="이벤트 관리"
+          description="코드로 만든 이벤트 페이지를 등록하고, 공개 전·중·후 상태와 노출 대상을 확인합니다."
+        />
+        <Suspense fallback={<AdminEventSkeletonContent showHeader={false} />}>
+          <AdminEventContent session={session} params={params} />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

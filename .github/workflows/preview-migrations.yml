@@ -13,6 +13,10 @@ on:
         description: Type APPLY_PREVIEW_MIGRATIONS to apply pending dev migrations to Preview.
         required: true
         type: string
+      expected_dev_sha:
+        description: Exact current dev commit SHA approved for Preview migration.
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -42,19 +46,55 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - name: Checkout current dev revision
+      - name: Select exact dev revision
+        id: select-dev
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_EXPECTED_DEV_SHA: ${{ inputs.expected_dev_sha }}
+          REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}.git
+        run: |
+          set -euo pipefail
+          live_dev_sha="$(git ls-remote "$REPOSITORY_URL" refs/heads/dev | awk '{print $1}')"
+          if [[ ! "$live_dev_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Could not resolve a valid origin/dev commit."
+            exit 1
+          fi
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            expected_dev_sha="$INPUT_EXPECTED_DEV_SHA"
+          else
+            expected_dev_sha="$live_dev_sha"
+          fi
+          if [[ ! "$expected_dev_sha" =~ ^[0-9a-f]{40}$ ]] || [[ "$expected_dev_sha" != "$live_dev_sha" ]]; then
+            echo "::error::The approved dev commit does not match current origin/dev."
+            exit 1
+          fi
+          echo "sha=$expected_dev_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout selected dev revision
         uses: actions/checkout@v7
         with:
-          ref: dev
+          ref: ${{ steps.select-dev.outputs.sha }}
+          persist-credentials: false
+
+      - name: Verify selected dev revision
+        shell: bash
+        env:
+          EXPECTED_DEV_SHA: ${{ steps.select-dev.outputs.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_DEV_SHA"
 
       - name: Setup Node
         uses: actions/setup-node@v7
+        env:
+          NPM_CONFIG_CACHE: ${{ github.workspace }}/.tmp/npm-cache
         with:
-          node-version: 24
+          node-version: 24.18.1
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install trusted dependencies
+        run: npm run install:trusted
 
       - name: Validate migration files
         run: npm run validate:migrations
@@ -62,7 +102,7 @@ jobs:
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v2
         with:
-          version: latest
+          version: 2.114.0
           github-token: ${{ github.token }}
 
       - name: List Preview migrations before apply
@@ -80,9 +120,12 @@ jobs:
             contains(github.event.head_commit.message, '[repair-preview-migration-history]')
           }}
         env:
+          EXPECTED_DEV_SHA: ${{ steps.select-dev.outputs.sha }}
           SUPABASE_PREVIEW_DB_URL: ${{ secrets.SUPABASE_PREVIEW_DB_URL }}
         run: |
           set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_DEV_SHA"
+          test "$(git ls-remote origin refs/heads/dev | awk '{print $1}')" = "$EXPECTED_DEV_SHA"
             supabase migration repair \
             --status reverted \
             --db-url "$SUPABASE_PREVIEW_DB_URL" \
@@ -91,9 +134,12 @@ jobs:
 
       - name: Apply pending Preview migrations
         env:
+          EXPECTED_DEV_SHA: ${{ steps.select-dev.outputs.sha }}
           SUPABASE_PREVIEW_DB_URL: ${{ secrets.SUPABASE_PREVIEW_DB_URL }}
         run: |
           set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_DEV_SHA"
+          test "$(git ls-remote origin refs/heads/dev | awk '{print $1}')" = "$EXPECTED_DEV_SHA"
           supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes
 
       - name: Verify Preview migrations after apply

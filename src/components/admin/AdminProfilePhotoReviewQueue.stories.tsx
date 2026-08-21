@@ -1,3 +1,4 @@
+import { expect, within } from "storybook/test";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import AdminProfilePhotoReviewQueue from "./AdminProfilePhotoReviewQueue";
 
@@ -21,21 +22,12 @@ const meta = {
         },
       },
     ],
-    currentPhotos: [
-      {
-        id: "00000000-0000-4000-8000-000000000203",
-        display_name: "기존 프로필 사진 점검 대상",
-        year: 14,
-        updated_at: "2026-07-11T00:00:00.000Z",
-      },
-    ],
     actions: {
       approveReplacement: noop,
       rejectReplacement: noop,
-      rejectCurrentPhoto: noop,
     },
+    canUpdate: true,
     replacementImageUrl: () => syntheticPhoto,
-    currentPhotoUrl: () => syntheticPhoto,
   },
   parameters: {
     nextjs: { appDirectory: true },
@@ -48,6 +40,38 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+export const InvalidReason: Story = {
+  args: {
+    focusReasonTarget:
+      "replacement-reason-00000000-0000-4000-8000-000000000201",
+  },
+};
+
 export const Empty: Story = {
-  args: { replacements: [], currentPhotos: [] },
+  args: { replacements: [] },
+};
+
+export const LoadError: Story = {
+  args: {
+    loadError: true,
+  },
+};
+
+export const ReadOnly: Story = {
+  args: {
+    canUpdate: false,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(
+      canvas.queryByRole("button", { name: "사진 승인" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "사진 변경 요청 반려" }),
+    ).not.toBeInTheDocument();
+    await expect(canvas.getAllByText("조회 전용 권한").length).toBeGreaterThan(
+      0,
+    );
+  },
 };

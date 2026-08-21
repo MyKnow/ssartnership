@@ -4,7 +4,11 @@ import { useEffect } from "react";
 
 export default function PwaProvider() {
   useEffect(() => {
-    if (!("serviceWorker" in navigator)) {
+    if (
+      process.env.NODE_ENV !== "production" ||
+      process.env.NEXT_PUBLIC_DATA_SOURCE === "mock" ||
+      !("serviceWorker" in navigator)
+    ) {
       return;
     }
 

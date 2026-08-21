@@ -68,6 +68,7 @@ export type AdminNotificationComposerInput = {
   audience: PushAudience;
   channels: AdminNotificationChannelSelection;
   confirmationText?: string | null;
+  idempotencyKey?: string | null;
   templateContext?: NotificationTemplateContext;
 };
 
@@ -132,6 +133,7 @@ export type AdminNotificationSendResult = {
     }
   >;
   warnings: string[];
+  alreadyExists?: boolean;
 };
 
 export type AdminNotificationOperationLog = {
@@ -212,6 +214,7 @@ type NotificationCampaignMetadata = {
     confirmationPhrase: string;
     channels: AdminNotificationChannelPreview[];
   };
+  adminOperationIdempotencyKey?: string;
   channelResults?: AdminNotificationSendResult["channelResults"];
   warnings?: string[];
   campaignStatus?: AdminNotificationOperationLog["status"];
@@ -234,6 +237,21 @@ type NotificationDeliveryRow = {
   channel: NotificationChannel;
   status: "pending" | "sent" | "failed" | "skipped";
 };
+
+function hasCompleteChannelResults(
+  metadata: ReturnType<typeof parseLogMetadata>,
+) {
+  return Boolean(metadata.selectedChannels.every((channel) => {
+    const result = metadata.channelResults?.[channel];
+    return (
+      result &&
+      Number.isFinite(result.targeted) &&
+      Number.isFinite(result.sent) &&
+      Number.isFinite(result.failed) &&
+      Number.isFinite(result.skipped)
+    );
+  }));
+}
 
 type PushMessageLogRow = {
   id: string;
@@ -631,6 +649,9 @@ export async function sendAdminNotificationCampaign(
       channels: context.preview.channels,
     },
   };
+  if (input.idempotencyKey) {
+    metadata.adminOperationIdempotencyKey = input.idempotencyKey;
+  }
   if (input.templateContext) {
     metadata.templateContextKind = input.templateContext.kind;
   }
@@ -661,10 +682,21 @@ export async function sendAdminNotificationCampaign(
     body: renderedInAppBody,
     targetUrl: context.destinationUrl,
     metadata,
+    idempotencyKey: input.idempotencyKey,
     recipientMemberIds: context.selectedChannels.includes("in_app")
       ? context.eligibleMemberIds.in_app
       : [],
   });
+
+  if (created.alreadyExists) {
+    return {
+      notificationId: created.notification.id,
+      preview: context.preview,
+      channelResults: structuredClone(EMPTY_CHANNEL_RESULTS),
+      warnings: ["같은 발송 요청이 이미 처리 중이거나 완료되었습니다."],
+      alreadyExists: true,
+    };
+  }
 
   const channelResults: AdminNotificationSendResult["channelResults"] = structuredClone(EMPTY_CHANNEL_RESULTS);
   const warnings: string[] = [];
@@ -736,11 +768,12 @@ export async function sendAdminNotificationCampaign(
       completedMetadata,
     );
   } catch (error) {
-    const warning = `[admin-notification-ops] final metadata update failed for notification ${
-      created.notification.id
-    }: ${error instanceof Error ? error.message : "알 수 없는 후처리 오류"}`;
+    const warning = "발송 결과 기록을 저장하지 못했습니다.";
     warnings.push(warning);
-    console.error(warning);
+    console.error(
+      `[admin-notification-ops] final metadata update failed for notification ${created.notification.id}`,
+      error,
+    );
   }
 
   return {
@@ -764,27 +797,36 @@ export async function getRecentAdminNotificationOperationLogs(limit = 50) {
   } else {
     const rows = (notifications ?? []) as NotificationRow[];
     if (rows.length) {
-      const { data: deliveries, error: deliveryError } = await supabase
-        .from("notification_deliveries")
-        .select("notification_id,channel,status")
-        .in("notification_id", rows.map((row) => row.id));
-      if (deliveryError) {
-        console.error(
-          "[admin-notification-ops] notification_deliveries query failed",
-          deliveryError.message,
-        );
-      }
+      const parsedRows = rows.map((row) => ({
+        row,
+        metadata: parseLogMetadata(row.metadata, ADMIN_NOTIFICATION_TYPES),
+      }));
+      const rowsNeedingDeliveryLookup = parsedRows
+        .filter(({ metadata }) => !hasCompleteChannelResults(metadata))
+        .map(({ row }) => row.id);
 
       const deliveriesByNotification = new Map<string, NotificationDeliveryRow[]>();
-      for (const delivery of (deliveries ?? []) as NotificationDeliveryRow[]) {
-        const current = deliveriesByNotification.get(delivery.notification_id) ?? [];
-        current.push(delivery);
-        deliveriesByNotification.set(delivery.notification_id, current);
+      if (rowsNeedingDeliveryLookup.length > 0) {
+        const { data: deliveries, error: deliveryError } = await supabase
+          .from("notification_deliveries")
+          .select("notification_id,channel,status")
+          .in("notification_id", rowsNeedingDeliveryLookup);
+        if (deliveryError) {
+          console.error(
+            "[admin-notification-ops] notification_deliveries query failed",
+            deliveryError.message,
+          );
+        }
+
+        for (const delivery of (deliveries ?? []) as NotificationDeliveryRow[]) {
+          const current = deliveriesByNotification.get(delivery.notification_id) ?? [];
+          current.push(delivery);
+          deliveriesByNotification.set(delivery.notification_id, current);
+        }
       }
 
-      return rows
-        .map((row) => {
-          const metadata = parseLogMetadata(row.metadata, ADMIN_NOTIFICATION_TYPES);
+      return parsedRows
+        .map(({ row, metadata }) => {
           const notificationType =
             metadata.notificationType ??
             (isAdminNotificationType(row.type, ADMIN_NOTIFICATION_TYPES) ? row.type : "announcement");

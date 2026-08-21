@@ -5,6 +5,7 @@ export {
   getMockPartnerChangeRequestPartnerStatuses,
 } from "./partner-change-requests/service-store.ts";
 export {
+  listMockPartnerChangeRequestPage,
   listMockPartnerChangeRequests,
   getMockPartnerChangeRequestContext,
 } from "./partner-change-requests/context.ts";

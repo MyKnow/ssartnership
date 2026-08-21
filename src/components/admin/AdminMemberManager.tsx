@@ -1,6 +1,12 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatSsafyYearLabel } from "@/lib/ssafy-year";
 import EmptyState from "@/components/ui/EmptyState";
@@ -74,18 +80,29 @@ export default function AdminMemberManager({
     sourcePage: pagination.page,
     value: String(pagination.page),
   });
+  const [requestedPage, setRequestedPage] = useState<number | null>(null);
   const [searchInputDraft, setSearchInputDraft] = useState({
     sourceValue: filters.searchValue,
     value: filters.searchValue,
   });
+  const searchParamsValue = searchParams.toString();
+  const returnTo = useMemo(
+    () => (searchParamsValue ? `${pathname}?${searchParamsValue}` : pathname),
+    [pathname, searchParamsValue],
+  );
 
   const normalizedMembers = useMemo(
     () => normalizeAdminMembers(members),
     [members],
   );
-  const totalPages = Math.max(1, Math.ceil(pagination.totalCount / pagination.pageSize));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(pagination.totalCount / pagination.pageSize),
+  );
   const currentPage = Math.min(pagination.page, totalPages);
   const pageStart = (currentPage - 1) * pagination.pageSize;
+  const isPageNavigationPending = isPending && requestedPage !== null;
+  const displayedPage = isPageNavigationPending ? requestedPage : currentPage;
   const pageInputValue =
     pageInputDraft.sourcePage === pagination.page
       ? pageInputDraft.value
@@ -109,7 +126,43 @@ export default function AdminMemberManager({
     filters.mmEnabledFilter !== "all" ||
     filters.marketingEnabledFilter !== "all";
 
-  const updateQuery = (updates: Record<string, string | number | null>) => {
+  const buildPageHref = useCallback(
+    (targetPage: number) => {
+      const next = new URLSearchParams(searchParamsValue);
+      if (targetPage <= 1) {
+        next.delete("page");
+      } else {
+        next.set("page", String(targetPage));
+      }
+      const query = next.toString();
+      return query ? `${pathname}?${query}` : pathname;
+    },
+    [pathname, searchParamsValue],
+  );
+
+  const prefetchPage = useCallback(
+    (targetPage: number) => {
+      const safePage = Math.min(Math.max(1, targetPage), totalPages);
+      if (safePage === currentPage) {
+        return;
+      }
+      router.prefetch(buildPageHref(safePage));
+    },
+    [buildPageHref, currentPage, router, totalPages],
+  );
+
+  useEffect(() => {
+    if (totalPages <= 1) {
+      return;
+    }
+    prefetchPage(currentPage - 1);
+    prefetchPage(currentPage + 1);
+  }, [currentPage, prefetchPage, totalPages]);
+
+  const updateQuery = (
+    updates: Record<string, string | number | null>,
+    pendingPage: number | null = null,
+  ) => {
     const next = new URLSearchParams(searchParams.toString());
     Object.entries(updates).forEach(([key, value]) => {
       if (value === null || value === "" || value === "all") {
@@ -118,6 +171,7 @@ export default function AdminMemberManager({
         next.set(key, String(value));
       }
     });
+    setRequestedPage(pendingPage);
     startTransition(() => {
       router.replace(`${pathname}?${next.toString()}`, { scroll: false });
     });
@@ -151,16 +205,25 @@ export default function AdminMemberManager({
 
   const syncPage = (nextPage: number) => {
     const safePage = Math.min(Math.max(1, nextPage), totalPages);
+    if (safePage === currentPage) return;
+    prefetchPage(safePage);
     setPageInputDraft({ sourcePage: pagination.page, value: String(safePage) });
-    updateQuery({ page: safePage });
+    updateQuery({ page: safePage }, safePage);
   };
 
   if (state !== "ready") {
     return (
-      <div className="grid min-w-0 gap-4" aria-busy={state === "loading" || undefined}>
+      <div
+        className="grid min-w-0 gap-4"
+        aria-busy={state === "loading" || undefined}
+      >
         {state === "loading" ? (
           <>
-            <Surface level="elevated" padding="lg" className="grid min-w-0 gap-4">
+            <Surface
+              level="elevated"
+              padding="lg"
+              className="grid min-w-0 gap-4"
+            >
               <Skeleton className="h-5 w-28" />
               <Skeleton className="h-4 w-full max-w-xl" />
               <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -170,7 +233,12 @@ export default function AdminMemberManager({
               </div>
             </Surface>
             {Array.from({ length: 4 }).map((_, index) => (
-              <Surface key={index} level="inset" padding="md" className="grid min-w-0 gap-3 sm:grid-cols-[3.5rem_minmax(0,1fr)_auto] sm:items-center">
+              <Surface
+                key={index}
+                level="inset"
+                padding="md"
+                className="grid min-w-0 gap-3 sm:grid-cols-[3.5rem_minmax(0,1fr)_auto] sm:items-center"
+              >
                 <Skeleton className="h-14 w-14 rounded-2xl" />
                 <div className="grid min-w-0 gap-2">
                   <Skeleton className="h-5 w-48 max-w-full" />
@@ -224,12 +292,17 @@ export default function AdminMemberManager({
         description="자주 쓰는 검색·상태·캠퍼스·기수 필터를 먼저 확인합니다."
         tone="elevated"
       >
-        <div className="grid w-full min-w-0 gap-4">
+        <fieldset
+          disabled={isPending}
+          className="m-0 grid w-full min-w-0 gap-4 border-0 p-0"
+        >
+          <legend className="sr-only">회원 목록 필터</legend>
           <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(18rem,2fr)_repeat(3,minmax(10rem,1fr))]">
             <div className="grid min-w-0 gap-1">
               <span className="ui-caption">검색</span>
               <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                 <Input
+                  aria-label="회원 검색"
                   value={searchInputValue}
                   onChange={(event) => {
                     setSearchInputDraft({
@@ -243,13 +316,13 @@ export default function AdminMemberManager({
                       applySearchFilter();
                     }
                   }}
-                  placeholder="이름, 직접 로그인 ID, MM 아이디로 검색"
+                  placeholder="이름, 이메일, 직접 로그인 ID, MM 아이디로 검색"
                 />
                 <button
                   type="button"
                   onClick={applySearchFilter}
                   disabled={!isSearchDirty || isPending}
-                  className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                  className="min-h-11 rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   검색
                 </button>
@@ -258,7 +331,7 @@ export default function AdminMemberManager({
                     type="button"
                     onClick={resetSearchFilter}
                     disabled={isPending}
-                    className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-muted-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                    className="min-h-11 rounded-xl border border-border px-3 py-2 text-sm font-medium text-muted-foreground disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     초기화
                   </button>
@@ -325,7 +398,11 @@ export default function AdminMemberManager({
             <div className="grid min-w-0 gap-3 border-t border-border/70 p-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
               <div className="grid min-w-0 gap-1">
                 <span className="ui-caption">정렬</span>
-                <Select aria-label="회원 정렬" value={filters.sortValue} onChange={(event) => updateFilter("sort", event.target.value)}>
+                <Select
+                  aria-label="회원 정렬"
+                  value={filters.sortValue}
+                  onChange={(event) => updateFilter("sort", event.target.value)}
+                >
                   <option value="recent">등록순</option>
                   <option value="updated">최근 수정순</option>
                   <option value="name">이름순</option>
@@ -336,7 +413,9 @@ export default function AdminMemberManager({
                 <Select
                   aria-label="MM 로그인 상태"
                   value={filters.mattermostLifecycleFilter}
-                  onChange={(event) => updateFilter("mmLifecycle", event.target.value)}
+                  onChange={(event) =>
+                    updateFilter("mmLifecycle", event.target.value)
+                  }
                 >
                   <option value="all">전체</option>
                   <option value="disabled">MM 이용 중단</option>
@@ -346,7 +425,13 @@ export default function AdminMemberManager({
               </div>
               <div className="grid min-w-0 gap-1">
                 <span className="ui-caption">서비스 이용약관</span>
-                <Select aria-label="서비스 이용약관 동의 상태" value={filters.serviceConsentFilter} onChange={(event) => updateFilter("serviceConsent", event.target.value)}>
+                <Select
+                  aria-label="서비스 이용약관 동의 상태"
+                  value={filters.serviceConsentFilter}
+                  onChange={(event) =>
+                    updateFilter("serviceConsent", event.target.value)
+                  }
+                >
                   <option value="all">전체</option>
                   <option value="agreed">현재 동의</option>
                   <option value="pending">현재 미동의</option>
@@ -354,7 +439,13 @@ export default function AdminMemberManager({
               </div>
               <div className="grid min-w-0 gap-1">
                 <span className="ui-caption">개인정보 처리방침</span>
-                <Select aria-label="개인정보 처리방침 동의 상태" value={filters.privacyConsentFilter} onChange={(event) => updateFilter("privacyConsent", event.target.value)}>
+                <Select
+                  aria-label="개인정보 처리방침 동의 상태"
+                  value={filters.privacyConsentFilter}
+                  onChange={(event) =>
+                    updateFilter("privacyConsent", event.target.value)
+                  }
+                >
                   <option value="all">전체</option>
                   <option value="agreed">현재 동의</option>
                   <option value="pending">현재 미동의</option>
@@ -362,7 +453,13 @@ export default function AdminMemberManager({
               </div>
               <div className="grid min-w-0 gap-1">
                 <span className="ui-caption">마케팅 정보 수신</span>
-                <Select aria-label="마케팅 정보 수신 동의 상태" value={filters.marketingConsentFilter} onChange={(event) => updateFilter("marketingConsent", event.target.value)}>
+                <Select
+                  aria-label="마케팅 정보 수신 동의 상태"
+                  value={filters.marketingConsentFilter}
+                  onChange={(event) =>
+                    updateFilter("marketingConsent", event.target.value)
+                  }
+                >
                   <option value="all">전체</option>
                   <option value="agreed">현재 동의</option>
                   <option value="pending">현재 미동의</option>
@@ -370,7 +467,13 @@ export default function AdminMemberManager({
               </div>
               <div className="grid min-w-0 gap-1">
                 <span className="ui-caption">푸시 채널</span>
-                <Select aria-label="푸시 채널 상태" value={filters.pushEnabledFilter} onChange={(event) => updateFilter("pushEnabled", event.target.value)}>
+                <Select
+                  aria-label="푸시 채널 상태"
+                  value={filters.pushEnabledFilter}
+                  onChange={(event) =>
+                    updateFilter("pushEnabled", event.target.value)
+                  }
+                >
                   <option value="all">전체</option>
                   <option value="enabled">켜짐</option>
                   <option value="disabled">꺼짐</option>
@@ -378,7 +481,13 @@ export default function AdminMemberManager({
               </div>
               <div className="grid min-w-0 gap-1">
                 <span className="ui-caption">운영 공지</span>
-                <Select aria-label="운영 공지 수신 상태" value={filters.announcementEnabledFilter} onChange={(event) => updateFilter("announcementEnabled", event.target.value)}>
+                <Select
+                  aria-label="운영 공지 수신 상태"
+                  value={filters.announcementEnabledFilter}
+                  onChange={(event) =>
+                    updateFilter("announcementEnabled", event.target.value)
+                  }
+                >
                   <option value="all">전체</option>
                   <option value="enabled">켜짐</option>
                   <option value="disabled">꺼짐</option>
@@ -386,7 +495,13 @@ export default function AdminMemberManager({
               </div>
               <div className="grid min-w-0 gap-1">
                 <span className="ui-caption">신규 제휴</span>
-                <Select aria-label="신규 제휴 알림 상태" value={filters.newPartnerEnabledFilter} onChange={(event) => updateFilter("newPartnerEnabled", event.target.value)}>
+                <Select
+                  aria-label="신규 제휴 알림 상태"
+                  value={filters.newPartnerEnabledFilter}
+                  onChange={(event) =>
+                    updateFilter("newPartnerEnabled", event.target.value)
+                  }
+                >
                   <option value="all">전체</option>
                   <option value="enabled">켜짐</option>
                   <option value="disabled">꺼짐</option>
@@ -394,7 +509,13 @@ export default function AdminMemberManager({
               </div>
               <div className="grid min-w-0 gap-1">
                 <span className="ui-caption">종료 임박</span>
-                <Select aria-label="종료 임박 알림 상태" value={filters.expiringPartnerEnabledFilter} onChange={(event) => updateFilter("expiringPartnerEnabled", event.target.value)}>
+                <Select
+                  aria-label="종료 임박 알림 상태"
+                  value={filters.expiringPartnerEnabledFilter}
+                  onChange={(event) =>
+                    updateFilter("expiringPartnerEnabled", event.target.value)
+                  }
+                >
                   <option value="all">전체</option>
                   <option value="enabled">켜짐</option>
                   <option value="disabled">꺼짐</option>
@@ -402,7 +523,13 @@ export default function AdminMemberManager({
               </div>
               <div className="grid min-w-0 gap-1">
                 <span className="ui-caption">리뷰 알림</span>
-                <Select aria-label="리뷰 알림 상태" value={filters.reviewEnabledFilter} onChange={(event) => updateFilter("reviewEnabled", event.target.value)}>
+                <Select
+                  aria-label="리뷰 알림 상태"
+                  value={filters.reviewEnabledFilter}
+                  onChange={(event) =>
+                    updateFilter("reviewEnabled", event.target.value)
+                  }
+                >
                   <option value="all">전체</option>
                   <option value="enabled">켜짐</option>
                   <option value="disabled">꺼짐</option>
@@ -410,7 +537,13 @@ export default function AdminMemberManager({
               </div>
               <div className="grid min-w-0 gap-1">
                 <span className="ui-caption">Mattermost</span>
-                <Select aria-label="Mattermost 알림 상태" value={filters.mmEnabledFilter} onChange={(event) => updateFilter("mmEnabled", event.target.value)}>
+                <Select
+                  aria-label="Mattermost 알림 상태"
+                  value={filters.mmEnabledFilter}
+                  onChange={(event) =>
+                    updateFilter("mmEnabled", event.target.value)
+                  }
+                >
                   <option value="all">전체</option>
                   <option value="enabled">켜짐</option>
                   <option value="disabled">꺼짐</option>
@@ -418,7 +551,13 @@ export default function AdminMemberManager({
               </div>
               <div className="grid min-w-0 gap-1">
                 <span className="ui-caption">마케팅/이벤트</span>
-                <Select aria-label="마케팅 이벤트 알림 상태" value={filters.marketingEnabledFilter} onChange={(event) => updateFilter("marketingEnabled", event.target.value)}>
+                <Select
+                  aria-label="마케팅 이벤트 알림 상태"
+                  value={filters.marketingEnabledFilter}
+                  onChange={(event) =>
+                    updateFilter("marketingEnabled", event.target.value)
+                  }
+                >
                   <option value="all">전체</option>
                   <option value="enabled">켜짐</option>
                   <option value="disabled">꺼짐</option>
@@ -426,7 +565,7 @@ export default function AdminMemberManager({
               </div>
             </div>
           </details>
-        </div>
+        </fieldset>
       </FilterBar>
 
       <p className="text-sm text-muted-foreground">
@@ -440,11 +579,18 @@ export default function AdminMemberManager({
           description="검색어나 상태 필터를 조정해 다시 확인해 주세요."
         />
       ) : (
-        <div className="grid min-w-0 gap-4">
+        <div
+          className="grid min-w-0 gap-4"
+          aria-busy={isPageNavigationPending || undefined}
+        >
           <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-surface-muted/40 px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             <p>
-              {pageStart + 1}-{Math.min(pageStart + normalizedMembers.length, pagination.totalCount)} /{" "}
-              {pagination.totalCount}
+              {pageStart + 1}-
+              {Math.min(
+                pageStart + normalizedMembers.length,
+                pagination.totalCount,
+              )}{" "}
+              / {pagination.totalCount}
             </p>
             <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end">
               <label className="flex items-center justify-between gap-2 whitespace-nowrap sm:justify-start">
@@ -452,10 +598,16 @@ export default function AdminMemberManager({
                 <Select
                   value={String(pagination.pageSize)}
                   onChange={(event) => {
-                    const nextPageSize = Number(event.target.value) as AdminMemberPageSize;
-                    setPageInputDraft({ sourcePage: pagination.page, value: "1" });
+                    const nextPageSize = Number(
+                      event.target.value,
+                    ) as AdminMemberPageSize;
+                    setPageInputDraft({
+                      sourcePage: pagination.page,
+                      value: "1",
+                    });
                     updateQuery({ pageSize: nextPageSize, page: null });
                   }}
+                  disabled={isPending}
                 >
                   {ADMIN_MEMBER_PAGE_SIZE_OPTIONS.map((option) => (
                     <option key={option} value={option}>
@@ -468,19 +620,24 @@ export default function AdminMemberManager({
                 <button
                   type="button"
                   onClick={() => syncPage(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={currentPage === 1 || isPending}
+                  className="min-h-11 min-w-14 whitespace-nowrap rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   이전
                 </button>
-                <span className="min-w-[5.5rem] text-center text-xs sm:text-sm">
-                  {currentPage} / {totalPages}
+                <span
+                  className="min-w-[5.5rem] text-center text-xs sm:text-sm"
+                  aria-live="polite"
+                >
+                  {isPageNavigationPending
+                    ? `${displayedPage}페이지 불러오는 중`
+                    : `${currentPage} / ${totalPages}`}
                 </span>
                 <button
                   type="button"
                   onClick={() => syncPage(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={currentPage === totalPages || isPending}
+                  className="min-h-11 min-w-14 whitespace-nowrap rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   다음
                 </button>
@@ -492,6 +649,7 @@ export default function AdminMemberManager({
                   min={1}
                   max={totalPages}
                   value={pageInputValue}
+                  disabled={isPending}
                   onChange={(event) => {
                     setPageInputDraft({
                       sourcePage: pagination.page,
@@ -517,21 +675,28 @@ export default function AdminMemberManager({
                       syncPage(parsed);
                     }
                   }}
-                  className="shrink-0 whitespace-nowrap rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground"
+                  disabled={isPending}
+                  className="min-h-11 shrink-0 whitespace-nowrap rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   이동
                 </button>
               </div>
             </div>
+            <p className="sr-only" aria-live="polite">
+              {isPageNavigationPending
+                ? `${displayedPage}페이지 결과를 불러오는 중입니다.`
+                : ""}
+            </p>
           </div>
 
           <div className="grid min-w-0 gap-3">
-          {normalizedMembers.map((member) => (
-            <AdminMemberListItem
-              key={member.id}
-              member={member}
-            />
-          ))}
+            {normalizedMembers.map((member) => (
+              <AdminMemberListItem
+                key={member.id}
+                member={member}
+                returnTo={returnTo}
+              />
+            ))}
           </div>
         </div>
       )}

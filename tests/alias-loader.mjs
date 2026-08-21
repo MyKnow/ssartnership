@@ -55,6 +55,10 @@ export function resolve(specifier, context, nextResolve) {
     return nextResolve("next/cache.js", context);
   }
 
+  if (specifier === "next/navigation") {
+    return nextResolve("next/navigation.js", context);
+  }
+
   const aliasPath = resolveAliasPath(specifier);
   if (aliasPath) {
     return {

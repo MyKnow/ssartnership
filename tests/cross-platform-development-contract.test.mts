@@ -62,6 +62,7 @@ test("표준 개발 명령과 교차 플랫폼 정책이 repository contract에 
   const developmentEnvironment = await readRepoFile(
     "scripts/lib/development-environment.mjs",
   );
+  const lockfileCheck = await readRepoFile("scripts/check-lockfile.mjs");
 
   assert.equal(packageJson.packageManager, "npm@11.16.0");
   assert.equal(packageJson.engines?.node, ">=24.18.1 <25");
@@ -88,6 +89,9 @@ test("표준 개발 명령과 교차 플랫폼 정책이 repository contract에 
     "node scripts/check-cross-platform.mjs",
   );
   assert.deepEqual(findNonPortablePackageScripts(scripts), []);
+  assert.match(lockfileCheck, /REQUIRED_NODE_VERSION/u);
+  assert.match(lockfileCheck, /REQUIRED_NPM_VERSION/u);
+  assert.doesNotMatch(lockfileCheck, /\b(?:docker|npx)\b/u);
 
   const attributes = await readRepoFile(".gitattributes");
   assert.match(attributes, /^\* text=auto eol=lf$/m);
@@ -171,7 +175,9 @@ test("테스트 파일 URL과 비교 경로를 운영체제 중립적으로 처�
     "tests/mattermost-direct-reversion.test.mts",
     "tests/mattermost-signup-campus.test.mts",
     "tests/member-normalized-auth-contract.test.mts",
+    "tests/member-anonymization-schema-contract.test.mts",
     "tests/production-migration-hygiene.test.mts",
+    "tests/github-actions-operations-skill.test.mts",
   ];
   const sources = await Promise.all(
     fileUrlBoundaryFiles.map(async (file) => ({
@@ -211,8 +217,16 @@ test("Storybook browser 전역 상태와 종료 진단을 명시적으로 정리
     scripts?: Record<string, string>;
   };
   const setup = await readRepoFile(".storybook/vitest.setup.tsx");
+  const storybookTestRunner = await readRepoFile("scripts/run-storybook-tests.mjs");
 
   assert.match(setup, /afterAll\(\(\) => \{/u);
   assert.match(setup, /vi\.unstubAllGlobals\(\)/u);
-  assert.match(packageJson.scripts?.["test-storybook"] ?? "", /hanging-process/u);
+  assert.match(
+    packageJson.scripts?.["test-storybook"] ?? "",
+    /node scripts\/run-storybook-tests\.mjs/u,
+  );
+  assert.match(storybookTestRunner, /--reporter=hanging-process/u);
+  assert.match(storybookTestRunner, /process\.execPath/u);
+  assert.match(storybookTestRunner, /pathToFileURL\(resolve\(executedPath\)\)/u);
+  assert.match(storybookTestRunner, /close timed out after/u);
 });

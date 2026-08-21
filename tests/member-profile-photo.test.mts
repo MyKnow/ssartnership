@@ -14,6 +14,18 @@ import {
 
 const schemaPath = new URL("../supabase/schema.sql", import.meta.url);
 const siteLayoutPath = new URL("../src/app/(site)/layout.tsx", import.meta.url);
+const certificationPagePath = new URL(
+  "../src/app/(site)/certification/page.tsx",
+  import.meta.url,
+);
+const certificationFooterPath = new URL(
+  "../src/components/certification/CertificationFooterActions.tsx",
+  import.meta.url,
+);
+const certificationPhotoPagePath = new URL(
+  "../src/app/(site)/certification/photo/page.tsx",
+  import.meta.url,
+);
 const adminProtectedLayoutPath = new URL(
   "../src/app/admin/(protected)/layout.tsx",
   import.meta.url,
@@ -90,6 +102,30 @@ test("사진 제출 경로는 공통 게이트 해석기로 자기 재진입을 
   assert.match(layout, /session\?\.requiresProfilePhotoUpdate/);
   assert.match(layout, /getMemberRequiredGateRedirect/);
   assert.match(layout, /currentPath: returnTo/);
+});
+
+test("인증 화면의 사진 CTA는 원래 목적지를 사진 화면까지 보존한다", async () => {
+  const [certificationPage, certificationFooter, certificationPhotoPage] =
+    await Promise.all([
+      readFile(certificationPagePath, "utf8"),
+      readFile(certificationFooterPath, "utf8"),
+      readFile(certificationPhotoPagePath, "utf8"),
+    ]);
+
+  assert.match(
+    certificationPage,
+    /href=\{buildMemberGateHref\("profile-photo", returnTo\)\}/,
+  );
+  assert.doesNotMatch(certificationPage, /href="\/certification\/photo"/);
+  assert.match(
+    certificationPage,
+    /<CertificationFooterActions[\s\S]*returnTo=\{returnTo\}/,
+  );
+  assert.match(
+    certificationFooter,
+    /buildMemberGateHref\("profile-photo", returnTo\)/,
+  );
+  assert.match(certificationPhotoPage, /backHref: returnTo/);
 });
 
 test("사진 제출 경로는 Next 내부 헤더와 분리된 요청 경로 컨텍스트를 사용한다", async () => {

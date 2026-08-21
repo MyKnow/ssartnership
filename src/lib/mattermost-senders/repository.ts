@@ -18,6 +18,7 @@ import {
   getMattermostSenderHealthFailurePolicy,
   type MattermostSenderHealthStatus,
 } from "./health";
+import type { MattermostSenderTestRecipientKind } from "./routing";
 
 type SenderAuditInput = {
   context: AtomicAuditContext;
@@ -405,7 +406,7 @@ export class MattermostSenderRepository {
     candidateId: string;
     senderMattermostUserId: string;
     senderUsernameHint: string;
-    testTargetKind: "previous_generation_sender" | "super_admin_bootstrap";
+    testTargetKind: MattermostSenderTestRecipientKind;
     audit: SenderAuditInput;
   }) {
     const { data, error } = await getSupabaseAdminClient().rpc(

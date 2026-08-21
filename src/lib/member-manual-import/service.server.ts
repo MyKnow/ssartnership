@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { SITE_NAME, SITE_URL } from "@/lib/site";
+import { SITE_NAME } from "@/lib/site";
 import { createHmacDigest } from "@/lib/hmac.js";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
@@ -22,6 +22,10 @@ import {
 import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
 import { resolveManualMemberResolution } from "@/lib/member-manual-add/lookup";
 import { renderEmailTemplateBody } from "@/lib/email-content";
+import {
+  buildMemberPasswordSetupUrl,
+  sendMemberPasswordResetEmail,
+} from "@/lib/member-password-action-email";
 import { withActiveMattermostSenderForGeneration } from "@/lib/mattermost-senders/service";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
 import { renderNotificationTemplate } from "@/lib/notification-templates/template";
@@ -128,13 +132,6 @@ function toErrors(messages: Array<{ rowNumber: number | null; message: string }>
   );
 }
 
-function buildSetupUrl(token: string) {
-  const url = new URL("/auth/member/setup", SITE_URL);
-  // Fragment values are not sent in request paths or Referer headers.
-  url.hash = new URLSearchParams({ token }).toString();
-  return url.toString();
-}
-
 async function buildManualMemberSetupMattermostMessage(input: {
   displayName: string;
   setupUrl: string;
@@ -160,7 +157,7 @@ async function sendSetupEmail(input: {
 }) {
   const smtpConfig = getSmtpConfig();
   const transport = createSmtpTransport(smtpConfig);
-  const setupUrl = buildSetupUrl(input.token);
+  const setupUrl = buildMemberPasswordSetupUrl(input.token);
   const template = await resolveNotificationTemplate(
     input.reset
       ? "email.manual_member_password_reset"
@@ -1016,7 +1013,7 @@ async function deliverManualMemberImportSetup(input: {
     input.onRowLeaseUpdated(currentRowLeaseVersion);
 
     try {
-      const setupUrl = buildSetupUrl(setupToken);
+      const setupUrl = buildMemberPasswordSetupUrl(setupToken);
       const message = await buildManualMemberSetupMattermostMessage({
         displayName: input.displayName,
         setupUrl,
@@ -1655,7 +1652,7 @@ export async function reissueManualMemberImportSetup(input: {
         throw new Error("회원의 연결된 MM 계정을 확인하지 못했습니다.");
       }
       try {
-        const setupUrl = buildSetupUrl(setupToken);
+        const setupUrl = buildMemberPasswordSetupUrl(setupToken);
         const message = await buildManualMemberSetupMattermostMessage({
           displayName,
           setupUrl,
@@ -1763,19 +1760,24 @@ export async function completeManualMemberPasswordAction(input: {
       p_password_salt: input.passwordSalt,
     },
   );
+  const completion = data as Record<string, unknown> | null;
   if (
     error
-    || !data
-    || typeof data !== "object"
-    || typeof (data as Record<string, unknown>).memberId !== "string"
-    || ((data as Record<string, unknown>).deliveryChannel !== "email"
-      && (data as Record<string, unknown>).deliveryChannel !== "mattermost")
+    || !completion
+    || typeof completion.memberId !== "string"
+    || (completion.deliveryChannel !== "email"
+      && completion.deliveryChannel !== "mattermost"
+      && completion.deliveryChannel !== "admin")
+    || (completion.authenticationMethod !== "email"
+      && completion.authenticationMethod !== "manual"
+      && completion.authenticationMethod !== "mattermost")
   ) {
     return null;
   }
   return {
-    memberId: (data as Record<string, unknown>).memberId as string,
-    deliveryChannel: (data as Record<string, unknown>).deliveryChannel as "email" | "mattermost",
+    memberId: completion.memberId,
+    deliveryChannel: completion.deliveryChannel as "email" | "mattermost" | "admin",
+    authenticationMethod: completion.authenticationMethod as "email" | "manual" | "mattermost",
   };
 }
 
@@ -1796,11 +1798,10 @@ export async function issueManualMemberPasswordReset(email: string) {
     purpose: "manual_password_reset",
     deliveryChannel: "email",
   });
-  await sendSetupEmail({
+  await sendMemberPasswordResetEmail({
     email: data.email_normalized as string,
     displayName: String(data.display_name ?? "회원"),
     token,
-    reset: true,
   });
   return true;
 }

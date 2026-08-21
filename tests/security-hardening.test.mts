@@ -67,6 +67,27 @@ test("log locations mask setup and QR token path segments", async () => {
   );
 });
 
+test("product event locations mask dynamic administrator record identifiers", async () => {
+  const { normalizeProductEventLocation } = await pathModulePromise;
+
+  assert.equal(
+    normalizeProductEventLocation(
+      "/admin/members/3e15f0c2-9f6b-4e45-a211-15e7fa1ea4b9?tab=security",
+    ),
+    "/admin/members/[memberId]",
+  );
+  assert.equal(
+    normalizeProductEventLocation("/admin/partners/partner-private-id"),
+    "/admin/partners/[partnerId]",
+  );
+  assert.equal(
+    normalizeProductEventLocation(
+      "/admin/member-signup-requests/request-token",
+    ),
+    "/admin/member-signup-requests/[requestId]",
+  );
+});
+
 test("hmac digest verification rejects mismatched lengths", async () => {
   const { createHmacDigest, verifyHmacDigest } = await hmacModulePromise;
 
@@ -430,7 +451,7 @@ test("admin basic auth challenge does not block session bridge pages", async () 
       shouldChallengeAdminBasicAuth({
         pathname: "/admin",
       }),
-      true,
+      false,
     );
   } finally {
     if (originalUsername === undefined) {

@@ -9,6 +9,7 @@ const meta = {
   args: {
     partnerId: "00000000-0000-4000-8000-000000000001",
     partnerName: "카페 싸피 역삼점",
+    benefitId: "benefit-americano",
     benefit: "아메리카노 1+1 및 디저트 20% 할인",
     useCount: 2,
     member: {

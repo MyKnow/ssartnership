@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 import type { PartnerChangeRequestSummary } from "@/lib/partner-change-requests";
 import PartnerChangeRequestQueue from "./PartnerChangeRequestQueue";
 
@@ -79,4 +80,32 @@ export const Empty: Story = {
 
 export const Readonly: Story = {
   args: { canReview: false },
+};
+
+export const Paginated: Story = {
+  args: {
+    pagination: {
+      totalCount: 25,
+      page: 2,
+      pageSize: 12,
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("link", { name: "이전" })).toHaveAttribute(
+      "href",
+      "/admin/partner-requests",
+    );
+    await expect(canvas.getByRole("link", { name: "다음" })).toHaveAttribute(
+      "href",
+      "/admin/partner-requests?page=3",
+    );
+    await expect(canvas.getByText("2 / 3")).toBeVisible();
+  },
+};
+
+export const LoadError: Story = {
+  args: {
+    loadError: true,
+  },
 };

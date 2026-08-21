@@ -84,6 +84,20 @@ export type PartnerChangeRequestSummary = {
   updatedAt: string;
 };
 
+export type PartnerChangeRequestListInput = {
+  companyIds?: string[];
+  partnerIds?: string[];
+  page: number;
+  pageSize: number;
+};
+
+export type PartnerChangeRequestPage = {
+  requests: PartnerChangeRequestSummary[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+};
+
 export type PartnerChangeRequestContext = {
   companyId: string;
   companyName: string;
@@ -187,6 +201,9 @@ export interface PartnerChangeRequestRepository {
     accountId?: string,
   ): Promise<PartnerChangeRequestContext | null>;
   listPendingRequests(companyIds?: string[]): Promise<PartnerChangeRequestSummary[]>;
+  listPendingRequestsPage(
+    input: PartnerChangeRequestListInput,
+  ): Promise<PartnerChangeRequestPage>;
   createRequest(
     input: PartnerChangeRequestCreateInput,
   ): Promise<PartnerChangeRequestSummary>;
@@ -305,6 +322,15 @@ export type PartnerChangeRequestRow = {
 
 export const REQUEST_SELECT =
   "id,company_id,partner_id,status,current_partner_name,current_partner_location,current_detail_description,current_map_url,current_campus_slugs,current_conditions,current_benefits,current_applies_to,current_tags,current_thumbnail,current_images,current_reservation_link,current_inquiry_link,current_period_start,current_period_end,requested_partner_name,requested_partner_location,requested_detail_description,requested_map_url,requested_campus_slugs,requested_conditions,requested_benefits,requested_applies_to,requested_tags,requested_thumbnail,requested_images,requested_reservation_link,requested_inquiry_link,requested_period_start,requested_period_end,requested_by_account_id,reviewed_by_admin_id,reviewed_at,cancelled_by_account_id,cancelled_at,created_at,updated_at,company:partner_companies(id,name,slug),partner:partners(id,name,location,detail_description,campus_slugs,map_url,conditions,benefits,partner_benefits(id,title,max_apply_count,display_order),applies_to,thumbnail,images,tags,reservation_link,inquiry_link,period_start,period_end,categories(label),company:partner_companies(id,name,slug)),requested_by:partner_accounts!partner_change_requests_requested_by_account_id_fkey(id,login_id,display_name,email)";
+
+/**
+ * The admin review queue only renders the fields needed to decide whether a
+ * request can be approved. Media, tags, and public links remain available to
+ * the detail/history reads that need them, but should not inflate every queue
+ * page response.
+ */
+export const ADMIN_PENDING_REQUEST_SELECT =
+  "id,company_id,partner_id,status,current_partner_name,current_partner_location,current_detail_description,current_map_url,current_campus_slugs,current_conditions,current_benefits,current_applies_to,current_period_start,current_period_end,requested_partner_name,requested_partner_location,requested_detail_description,requested_map_url,requested_campus_slugs,requested_conditions,requested_benefits,requested_applies_to,requested_by_account_id,created_at,updated_at,company:partner_companies(id,name,slug),partner:partners(id,name,location,detail_description,campus_slugs,map_url,categories(label)),requested_by:partner_accounts!partner_change_requests_requested_by_account_id_fkey(id,login_id,display_name)";
 
 export type PartnerChangeRequestSupabaseClient = ReturnType<
   typeof getSupabaseAdminClient

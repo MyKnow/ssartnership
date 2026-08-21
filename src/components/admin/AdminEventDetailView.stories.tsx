@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 import { getEventPageDefinition } from "@/lib/event-pages";
 import type { ManagedEventCampaign } from "@/lib/promotions/events";
 import AdminEventDetailView from "./AdminEventDetailView";
@@ -46,3 +47,23 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const ReadOnly: Story = {
+  args: {
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText("조회 전용 권한", { exact: true }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "이벤트 수정" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "이벤트 삭제" }),
+    ).not.toBeInTheDocument();
+  },
+};

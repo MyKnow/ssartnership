@@ -18,6 +18,21 @@ type MemberReservationSource = {
   mattermost_account_id: string | null;
 };
 
+type MemberAnonymizationStoragePlan = {
+  profileImagePaths: string[];
+  certificatePaths: string[];
+};
+
+type MemberAnonymizationStoragePlanRpcRow = {
+  profile_image_paths?: string[] | null;
+  certificate_paths?: string[] | null;
+};
+
+type MemberAnonymizationStateRow = {
+  deleted_at: string | null;
+  anonymized_at: string | null;
+};
+
 function toRpcReservations(reservations: MemberIdentifierReservation[]) {
   return reservations.map((reservation) => ({
     identifier_kind: reservation.identifierKind,
@@ -95,31 +110,50 @@ export async function listMembersEligibleForAnonymization(limit = ANONYMIZATION_
   return (data ?? []) as Array<{ id: string }>;
 }
 
-export async function anonymizeDeletedMember(memberId: string) {
+async function readMemberAnonymizationStoragePlan(
+  memberId: string,
+): Promise<MemberAnonymizationStoragePlan | null> {
   const supabase = getSupabaseAdminClient();
-  const [{ data: images, error: imageError }, { data: graduateProfile, error: profileError }] =
-    await Promise.all([
-      supabase
-        .from("member_profile_images")
-        .select("storage_path")
-        .eq("member_id", memberId)
-        .is("deleted_at", null),
-      supabase
-        .from("graduate_profiles")
-        .select("verification_request_id")
-        .eq("member_id", memberId)
-        .maybeSingle(),
-    ]);
-  if (imageError) {
-    throw new Error("익명화할 프로필 사진을 불러오지 못했습니다.");
+  const { data, error } = await supabase.rpc(
+    "get_deleted_member_anonymization_storage_plan",
+    { p_member_id: memberId },
+  );
+  if (error) {
+    throw new Error("익명화할 비공개 파일 정보를 불러오지 못했습니다.");
   }
-  if (profileError) {
-    throw new Error("익명화할 수료생 인증 정보를 불러오지 못했습니다.");
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | MemberAnonymizationStoragePlanRpcRow
+    | null;
+  if (!row) {
+    return null;
   }
 
-  const paths = (images ?? [])
-    .map((image) => (image as { storage_path?: string | null }).storage_path)
-    .filter((path): path is string => Boolean(path));
+  const normalizePaths = (paths: string[] | null | undefined) => [
+    ...new Set(
+      (paths ?? [])
+        .map((path) => path.trim())
+        .filter((path) => path.length > 0),
+    ),
+  ];
+  const profileImagePaths = normalizePaths(row.profile_image_paths);
+  const certificatePaths = normalizePaths(row.certificate_paths);
+
+  return { profileImagePaths, certificatePaths };
+}
+
+export async function anonymizeDeletedMember(memberId: string) {
+  // Storage mutations cannot join the database transaction. Recheck the
+  // 30-day gate before deleting every referenced private object, retain the
+  // database paths until removal succeeds, then let the RPC atomically purge
+  // relational data. A failed removal leaves the plan retryable; a failed RPC
+  // is surfaced instead of reporting a partially completed anonymization.
+  const storagePlan = await readMemberAnonymizationStoragePlan(memberId);
+  if (!storagePlan) {
+    return false;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const paths = storagePlan.profileImagePaths;
   if (paths.length > 0) {
     const { error } = await supabase.storage
       .from(MEMBER_PROFILE_IMAGES_BUCKET)
@@ -129,28 +163,12 @@ export async function anonymizeDeletedMember(memberId: string) {
     }
   }
 
-  const verificationRequestId = (graduateProfile as {
-    verification_request_id?: string | null;
-  } | null)?.verification_request_id;
-  if (verificationRequestId) {
-    const { data: request, error: requestError } = await supabase
-      .from("graduate_verification_requests")
-      .select("certificate_storage_path")
-      .eq("id", verificationRequestId)
-      .maybeSingle();
-    if (requestError) {
-      throw new Error("익명화할 교육이수증 정보를 불러오지 못했습니다.");
-    }
-    const certificatePath = (request as {
-      certificate_storage_path?: string | null;
-    } | null)?.certificate_storage_path;
-    if (certificatePath) {
-      const { error } = await supabase.storage
-        .from(GRADUATE_CERTIFICATES_BUCKET)
-        .remove([certificatePath]);
-      if (error) {
-        throw new Error("익명화할 교육이수증을 삭제하지 못했습니다.");
-      }
+  for (const certificatePath of storagePlan.certificatePaths) {
+    const { error } = await supabase.storage
+      .from(GRADUATE_CERTIFICATES_BUCKET)
+      .remove([certificatePath]);
+    if (error) {
+      throw new Error("익명화할 교육이수증을 삭제하지 못했습니다.");
     }
   }
 
@@ -160,7 +178,21 @@ export async function anonymizeDeletedMember(memberId: string) {
   if (error) {
     throw new Error("회원 익명화를 처리하지 못했습니다.");
   }
-  return data === true;
+  if (data !== true) {
+    const { data: currentMember, error: stateError } = await supabase
+      .from("members")
+      .select("deleted_at,anonymized_at")
+      .eq("id", memberId)
+      .maybeSingle();
+    if (stateError) {
+      throw new Error("회원 익명화 상태를 확인하지 못했습니다.");
+    }
+    if ((currentMember as MemberAnonymizationStateRow | null)?.anonymized_at) {
+      return false;
+    }
+    throw new Error("회원 익명화 상태가 변경되었습니다.");
+  }
+  return true;
 }
 
 export { hashMemberIdentifierForAudit };

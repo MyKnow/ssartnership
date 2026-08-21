@@ -25,6 +25,16 @@ const platformPackages = {
     "bin/esbuild",
     "0c6588b092a2c291a72bab90659f3c9e0e25e0fe59c9ac12b4dae4d945e5548c",
   ],
+  "darwin-x64": [
+    "@esbuild/darwin-x64",
+    "bin/esbuild",
+    "dd53ccf32f9b5b3ab30d41388ef1fc8f81c44ca57ee7a32a7364a1753308d009",
+  ],
+  "linux-arm64": [
+    "@esbuild/linux-arm64",
+    "bin/esbuild",
+    "51e829ba36f36be6d9aea6e329ddc4f9350302339b16aaca96a3cb97f64a8ebb",
+  ],
   "win32-x64": [
     "@esbuild/win32-x64",
     "esbuild.exe",

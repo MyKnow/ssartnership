@@ -27,6 +27,7 @@ export default function PartnerBenefitUseAction({
 }) {
   const router = useRouter();
   const dialogId = useId();
+  const loginHref = `/auth/login?returnTo=${encodeURIComponent(action.returnTo)}`;
   const [isOpen, setIsOpen] = useState(false);
   const [selectedBenefit, setSelectedBenefit] = useState("");
   const [useCount, setUseCount] = useState(1);
@@ -55,10 +56,6 @@ export default function PartnerBenefitUseAction({
   }, [isOpen]);
 
   function openDialog() {
-    if (action.requiresLogin) {
-      router.push(`/auth/login?returnTo=${encodeURIComponent(action.returnTo)}`);
-      return;
-    }
     setSelectedBenefit("");
     setUseCount(1);
     setIsOpen(true);
@@ -123,10 +120,10 @@ export default function PartnerBenefitUseAction({
   return (
     <>
       <Button
-        type="button"
         variant="primary"
         className={className ?? "!h-14 w-full justify-center rounded-[1rem] text-base"}
-        onClick={openDialog}
+        href={action.requiresLogin ? loginHref : undefined}
+        onClick={action.requiresLogin ? undefined : openDialog}
       >
         혜택 이용하기
       </Button>

@@ -1,3 +1,4 @@
+import { revalidateTag, unstable_cache } from "next/cache";
 import {
   ADMIN_PERMISSION_TEMPLATES,
   type AdminPermissionMatrix,
@@ -10,6 +11,7 @@ import {
   getDefaultManagedCampusSlugsForTemplate,
   normalizeAdminManagedCampusSlugs,
 } from "@/lib/admin-scope";
+import { getMockAdminAccountById } from "@/lib/mock/admin";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export type AdminAccount = {
@@ -60,14 +62,53 @@ type AdminProfileRow = {
   updated_at: string | null;
 };
 
+type AdminMemberWithDirectoryRow = AdminMemberRow & {
+  directory:
+    | AdminDirectoryRow
+    | AdminDirectoryRow[]
+    | null;
+};
+
+type AdminProfileSessionRow = AdminProfileRow & {
+  member:
+    | AdminMemberWithDirectoryRow
+    | AdminMemberWithDirectoryRow[]
+    | null;
+};
+
+type AdminSessionSnapshotRow = {
+  id: string;
+  login_id: string;
+  display_name: string | null;
+  email: string | null;
+  must_change_password: boolean;
+  is_active: boolean;
+  permission_version: number;
+  permission_template_key: string;
+  managed_campus_slugs: string[] | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
 const ADMIN_MEMBER_SELECT =
   "id,mattermost_account_id,display_name,email,must_change_password,deleted_at,created_at,updated_at";
 const ADMIN_DIRECTORY_SELECT = "id,mm_username,display_name,is_active";
 const ADMIN_PROFILE_SELECT =
   "id,member_id,permission_template_key,managed_campus_slugs,is_active,permission_version,created_at,updated_at";
+const ADMIN_PROFILE_SESSION_SELECT = [
+  ADMIN_PROFILE_SELECT,
+  `member:members!admin_profiles_member_id_fkey(${ADMIN_MEMBER_SELECT},directory:mm_user_directory!members_mattermost_account_id_fkey(${ADMIN_DIRECTORY_SELECT}))`,
+].join(",");
 
 const SUPER_ADMIN_USERNAME = "myknow";
 const DEFAULT_ADMIN_PERMISSION_ID = "readonly";
+const ADMIN_ACCOUNT_CACHE_REVALIDATE_SECONDS = 5;
+const ADMIN_ACCOUNTS_LIST_CACHE_REVALIDATE_SECONDS = 5;
+const ADMIN_ACCOUNTS_LIST_CACHE_TAG = "admin-accounts-list";
+
+function getAdminAccountCacheTag(memberId: string) {
+  return `admin-account:${memberId}`;
+}
 
 function normalizeMemberUsername(value: string) {
   return value.trim().toLowerCase();
@@ -115,6 +156,50 @@ function mapAdminProfile(
   };
 }
 
+function mapAdminSessionSnapshot(value: unknown): AdminAccount | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const snapshot = value as Partial<AdminSessionSnapshotRow>;
+  if (
+    typeof snapshot.id !== "string" ||
+    typeof snapshot.login_id !== "string" ||
+    snapshot.login_id.length === 0 ||
+    typeof snapshot.permission_template_key !== "string" ||
+    typeof snapshot.permission_version !== "number" ||
+    typeof snapshot.must_change_password !== "boolean" ||
+    typeof snapshot.is_active !== "boolean"
+  ) {
+    return null;
+  }
+
+  const template = getTemplateOrNull(snapshot.permission_template_key);
+  if (!template) {
+    return null;
+  }
+
+  return {
+    id: snapshot.id,
+    loginId: snapshot.login_id,
+    displayName: snapshot.display_name?.trim() || snapshot.login_id,
+    email: snapshot.email ?? null,
+    isActive: snapshot.is_active,
+    mustChangePassword: snapshot.must_change_password,
+    initialSetupExpiresAt: null,
+    initialSetupCompletedAt: snapshot.created_at ?? new Date(0).toISOString(),
+    lastLoginAt: null,
+    permissionVersion: snapshot.permission_version,
+    permissionId: template.key,
+    managedCampusSlugs: normalizeAdminManagedCampusSlugs(
+      snapshot.managed_campus_slugs ?? [],
+    ),
+    createdAt: snapshot.created_at ?? null,
+    updatedAt: snapshot.updated_at ?? null,
+    permissions: normalizeAdminPermissionMatrix(template.permissions),
+  };
+}
+
 async function getMemberById(memberId: string) {
   const { data, error } = await getSupabaseAdminClient()
     .from("members")
@@ -155,7 +240,19 @@ async function getDirectoryById(directoryId: string | null) {
   return data as AdminDirectoryRow;
 }
 
-async function getAdminAccountFromProfile(memberId: string) {
+function resolveRelation<T>(value: T | T[] | null | undefined) {
+  return Array.isArray(value) ? value[0] ?? null : value ?? null;
+}
+
+function mapAdminProfileSessionRow(
+  row: AdminProfileSessionRow,
+): AdminAccount | null {
+  const member = resolveRelation(row.member);
+  const directory = resolveRelation(member?.directory);
+  return member && directory ? mapAdminProfile(row, member, directory) : null;
+}
+
+async function getAdminAccountFromProfileLegacy(memberId: string) {
   const [profile, member] = await Promise.all([
     getAdminProfileByMemberId(memberId),
     getMemberById(memberId),
@@ -167,12 +264,77 @@ async function getAdminAccountFromProfile(memberId: string) {
   return directory ? mapAdminProfile(profile, member, directory) : null;
 }
 
+async function getAdminAccountFromProfile(memberId: string) {
+  const { data, error } = await getSupabaseAdminClient()
+    .from("admin_profiles")
+    .select(ADMIN_PROFILE_SESSION_SELECT)
+    .eq("member_id", memberId)
+    .maybeSingle();
+
+  if (!error) {
+    const row = data as AdminProfileSessionRow | null;
+    if (!row) {
+      return null;
+    }
+    return mapAdminProfileSessionRow(row);
+  }
+
+  // Keep a compatibility fallback for a rolling deploy where the PostgREST
+  // schema cache has not learned the nested relationship yet.
+  return getAdminAccountFromProfileLegacy(memberId);
+}
+
+async function getAdminAccountByIdUncached(memberId: string) {
+  if (!memberId) {
+    return null;
+  }
+
+  const mockAccount = getMockAdminAccountById(memberId);
+  if (mockAccount) {
+    return mockAccount;
+  }
+
+  const { data, error } = await getSupabaseAdminClient().rpc(
+    "get_admin_session_snapshot",
+    { p_member_id: memberId },
+  );
+  if (!error) {
+    return mapAdminSessionSnapshot(data);
+  }
+
+  // Keep the nested PostgREST read during a rolling deploy before the RPC is
+  // available in the target database or schema cache.
+  return getAdminAccountFromProfile(memberId);
+}
+
+/**
+ * The signed cookie still carries the permission version and the cached
+ * snapshot is invalidated whenever this application changes an admin profile.
+ * A short bounded cache avoids paying the remote Supabase round trip on every
+ * API request while keeping permission changes visible within five seconds.
+ */
 export async function getAdminAccountById(memberId: string) {
   if (!memberId) {
     return null;
   }
 
-  return getAdminAccountFromProfile(memberId);
+  return unstable_cache(
+    () => getAdminAccountByIdUncached(memberId),
+    ["admin-account-by-id", memberId],
+    {
+      revalidate: ADMIN_ACCOUNT_CACHE_REVALIDATE_SECONDS,
+      tags: [getAdminAccountCacheTag(memberId)],
+    },
+  )();
+}
+
+export function invalidateAdminAccountCache(memberId: string) {
+  if (!memberId) {
+    return;
+  }
+
+  revalidateTag(getAdminAccountCacheTag(memberId), "max");
+  revalidateTag(ADMIN_ACCOUNTS_LIST_CACHE_TAG, "max");
 }
 
 export async function getAdminAccountByLoginId(loginId: string) {
@@ -214,7 +376,21 @@ export async function authenticateAdminCredentials(
   return null;
 }
 
-export async function listAdminAccounts() {
+async function listAdminAccountsFromRelation() {
+  const { data, error } = await getSupabaseAdminClient()
+    .from("admin_profiles")
+    .select(ADMIN_PROFILE_SESSION_SELECT)
+    .order("updated_at", { ascending: false });
+  if (error) {
+    return null;
+  }
+
+  return ((data ?? []) as unknown as AdminProfileSessionRow[])
+    .map(mapAdminProfileSessionRow)
+    .filter((account): account is AdminAccount => account !== null);
+}
+
+async function listAdminAccountsLegacy() {
   const supabase = getSupabaseAdminClient();
   const { data: profiles, error: profileError } = await supabase
     .from("admin_profiles")
@@ -272,6 +448,22 @@ export async function listAdminAccounts() {
     .filter((account): account is AdminAccount => account !== null);
 }
 
+export async function listAdminAccounts() {
+  return getCachedAdminAccounts();
+}
+
+const getCachedAdminAccounts = unstable_cache(
+  async () => {
+    const relationAccounts = await listAdminAccountsFromRelation();
+    return relationAccounts ?? listAdminAccountsLegacy();
+  },
+  [ADMIN_ACCOUNTS_LIST_CACHE_TAG],
+  {
+    revalidate: ADMIN_ACCOUNTS_LIST_CACHE_REVALIDATE_SECONDS,
+    tags: [ADMIN_ACCOUNTS_LIST_CACHE_TAG],
+  },
+);
+
 export async function countActivePrivilegedAdmins() {
   const accounts = await listAdminAccounts();
   return accounts.filter(
@@ -307,6 +499,7 @@ async function persistAdminProfile(input: {
   if (error) {
     throw new Error("관리자 권한 프로필을 저장하지 못했습니다.");
   }
+  invalidateAdminAccountCache(input.memberId);
 }
 
 export async function grantMemberAdminPermission(input: {

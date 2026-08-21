@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getSafeAdminActionErrorCode } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { generateTempPassword, hashPassword } from "@/lib/password";
 import { issuePartnerAccountInitialSetupLink } from "./partner-support/setup-link";
@@ -29,7 +30,7 @@ export async function updatePartnerAccountAction(formData: FormData) {
   } catch (error) {
     redirectAdminActionError(
       "/admin/companies?tab=accounts",
-      error instanceof Error ? error.message : "partner_account_invalid_request",
+      getSafeAdminActionErrorCode(error, "partner_account_invalid_request"),
     );
   }
 
@@ -94,7 +95,7 @@ export async function createPartnerAccountAction(formData: FormData) {
   } catch (error) {
     redirectAdminActionError(
       "/admin/companies?tab=accounts",
-      error instanceof Error ? error.message : "partner_account_invalid_request",
+      getSafeAdminActionErrorCode(error, "partner_account_invalid_request"),
     );
   }
 

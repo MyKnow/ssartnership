@@ -1,5 +1,7 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
+  ArrowRightIcon,
   BellAlertIcon,
   QueueListIcon,
   TagIcon,
@@ -7,6 +9,7 @@ import {
   UsersIcon,
 } from "@heroicons/react/24/outline";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import AdminIntentLink from "@/components/admin/AdminIntentLink";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
@@ -21,15 +24,19 @@ import {
   type AdminPermissionResource,
   canAdmin,
 } from "@/lib/admin-permissions";
-import type { AdminDashboardCounts } from "@/lib/partner-counts";
+import type {
+  AdminDashboardCounts,
+  AdminDashboardHomeQueueCounts,
+} from "@/lib/partner-counts";
 import type { AdminPlatformActivityMetrics } from "@/lib/platform-activity-metrics";
+import {
+  getNextAdminTaskItem,
+  prioritizeAdminTaskItems,
+} from "@/lib/admin-task-inbox";
+import { getAdminRouteDescriptor } from "@/lib/admin-performance";
+import { cn } from "@/lib/cn";
 
-export type AdminDashboardQueueCounts = {
-  registrationPendingCount: number;
-  changeRequestPendingCount: number;
-  planRequestPendingCount: number;
-  unreadNotificationCount: number;
-};
+export type AdminDashboardQueueCounts = AdminDashboardHomeQueueCounts;
 
 export type AdminDashboardViewState =
   | "ready"
@@ -43,6 +50,7 @@ type QueueItem = {
   label: string;
   description: string;
   count: number;
+  priority: number;
   permission: AdminPermissionResource;
 };
 
@@ -63,6 +71,24 @@ type OperationItem = {
   globalOnly?: boolean;
 };
 
+export function AdminDashboardHeader() {
+  return (
+    <AdminPageHeader
+      eyebrow="홈"
+      title="관리 홈"
+      description="처리가 필요한 항목부터 확인하고 자주 쓰는 운영 화면으로 이동합니다."
+      actions={
+        <>
+          <Button href="/admin/tasks">작업함 열기</Button>
+          <Button href="/" variant="secondary">
+            사용자 홈 보기
+          </Button>
+        </>
+      }
+    />
+  );
+}
+
 export default function AdminDashboardView({
   counts,
   queueCounts,
@@ -71,18 +97,24 @@ export default function AdminDashboardView({
   includeGlobalTasks = true,
   platformActivityMetrics,
   platformActivityErrorMessage,
+  platformActivity,
+  isDataUnavailable = false,
   state = "ready",
   errorMessage,
+  showHeader = true,
 }: {
   counts: AdminDashboardCounts;
   queueCounts: AdminDashboardQueueCounts;
   permissions: AdminPermissionMatrix;
-  cycleMeta: string;
+  cycleMeta: ReactNode;
   includeGlobalTasks?: boolean;
   platformActivityMetrics?: AdminPlatformActivityMetrics | null;
   platformActivityErrorMessage?: string | null;
+  platformActivity?: ReactNode;
+  isDataUnavailable?: boolean;
   state?: AdminDashboardViewState;
   errorMessage?: string;
+  showHeader?: boolean;
 }) {
   const errorDescription = errorMessage
     ? "운영 데이터를 다시 불러올 수 없습니다. 잠시 후 다시 확인해 주세요."
@@ -91,11 +123,7 @@ export default function AdminDashboardView({
   if (state !== "ready") {
     return (
       <div className="grid min-w-0 gap-6" aria-busy={state === "loading" || undefined}>
-        <AdminPageHeader
-          eyebrow="Operations"
-          title="관리 홈"
-          description="처리가 필요한 항목부터 확인하고 자주 쓰는 운영 화면으로 이동합니다."
-        />
+        {showHeader ? <AdminDashboardHeader /> : null}
         {state === "loading" ? (
           <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,0.8fr)]">
             {[0, 1].map((section) => (
@@ -150,6 +178,7 @@ export default function AdminDashboardView({
       label: "신규 제휴 접수",
       description: "공개 등록 페이지에서 접수된 신청",
       count: queueCounts.registrationPendingCount,
+      priority: 0,
       permission: "brands",
     },
     {
@@ -157,13 +186,39 @@ export default function AdminDashboardView({
       label: "제휴처 변경 요청",
       description: "파트너사 담당자가 보낸 변경 승인 요청",
       count: queueCounts.changeRequestPendingCount,
+      priority: 1,
       permission: "brands",
+    },
+    {
+      href: "/admin/graduate-verifications",
+      label: "수료생 인증",
+      description: "수료증과 교육 이수 정보 검토",
+      count: queueCounts.graduateVerificationPendingCount,
+      priority: 2,
+      permission: "graduate_verifications",
+    },
+    {
+      href: "/admin/member-signup-requests",
+      label: "가입 승인",
+      description: "자동 확인하지 못한 회원 가입 요청",
+      count: queueCounts.signupRequestPendingCount,
+      priority: 3,
+      permission: "member_signup_requests",
+    },
+    {
+      href: "/admin/profile-photos",
+      label: "프로필 사진",
+      description: "사진 변경 요청",
+      count: queueCounts.profilePhotoPendingCount,
+      priority: 4,
+      permission: "profile_images",
     },
     {
       href: "/admin/partners?tab=plans",
       label: "플랜 검토",
       description: "결제 확인 또는 플랜 승인 대기",
       count: queueCounts.planRequestPendingCount,
+      priority: 5,
       permission: "brands",
     },
     {
@@ -171,6 +226,7 @@ export default function AdminDashboardView({
       label: "읽지 않은 알림",
       description: "현재 관리자 계정의 운영 수신함",
       count: queueCounts.unreadNotificationCount,
+      priority: 6,
       permission: "notifications",
     },
   ] satisfies QueueItem[]).filter(
@@ -259,19 +315,34 @@ export default function AdminDashboardView({
   );
   const canViewPlatformActivity =
     includeGlobalTasks && canAdmin(permissions, "logs", "read");
+  const queueCountsByHref = Object.fromEntries(
+    queueItems.map((item) => [item.href, item.count]),
+  );
+  const prioritizedQueueItems = prioritizeAdminTaskItems(
+    queueItems,
+    queueCountsByHref,
+  );
+  const nextQueueItem = getNextAdminTaskItem(
+    queueItems,
+    queueCountsByHref,
+  );
+  const remainingQueueItems = prioritizedQueueItems.filter(
+    (item) => item.href !== nextQueueItem?.href,
+  );
 
   return (
     <div className="grid min-w-0 gap-6">
-      <AdminPageHeader
-        eyebrow="Operations"
-        title="관리 홈"
-        description="처리가 필요한 항목부터 확인하고 자주 쓰는 운영 화면으로 이동합니다."
-        actions={
-          <Button href="/" variant="secondary">
-            사용자 홈 보기
-          </Button>
-        }
-      />
+      {showHeader ? <AdminDashboardHeader /> : null}
+
+      {isDataUnavailable ? (
+        <InlineMessage
+          tone="warning"
+          title="일부 운영 집계를 아직 확인하지 못했습니다."
+          description="대기 건수와 운영 현황을 다시 불러오려면 다시 확인하세요."
+          actionHref="/admin"
+          actionLabel="다시 확인"
+        />
+      ) : null}
 
       <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,0.8fr)]">
         <Surface level="elevated" padding="lg" className="grid min-w-0 gap-4">
@@ -280,10 +351,20 @@ export default function AdminDashboardView({
               title="처리 필요"
               description="대기 중인 운영 작업을 오래된 항목부터 확인하세요."
             />
-            <Badge variant={totalPendingCount > 0 ? "warning" : "success"}>
-              {totalPendingCount > 0
-                ? `${totalPendingCount.toLocaleString("ko-KR")}건 대기`
-                : "대기 없음"}
+            <Badge
+              variant={
+                isDataUnavailable
+                  ? "warning"
+                  : totalPendingCount > 0
+                    ? "warning"
+                    : "success"
+              }
+            >
+              {isDataUnavailable
+                ? "확인 필요"
+                : totalPendingCount > 0
+                  ? `${totalPendingCount.toLocaleString("ko-KR")}건 대기`
+                  : "대기 없음"}
             </Badge>
           </div>
           {queueItems.length === 0 ? (
@@ -293,14 +374,43 @@ export default function AdminDashboardView({
             />
           ) : (
             <div className="grid min-w-0 gap-2">
-              {queueItems.map((item) => (
+              {nextQueueItem ? (
+                <AdminIntentLink
+                  href={nextQueueItem.href}
+                  data-admin-task-key={
+                    getAdminRouteDescriptor(nextQueueItem.href)?.key
+                  }
+                  data-admin-task-source="home"
+                  className="grid min-w-0 gap-3 rounded-2xl border border-primary/35 bg-primary-soft/70 p-4 transition-colors hover:border-primary/60 hover:bg-primary-soft sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                >
+                  <div className="min-w-0">
+                    <p className="ui-kicker text-primary">다음으로 처리</p>
+                    <p className="mt-1 font-semibold text-foreground">
+                      {nextQueueItem.label}
+                    </p>
+                    <p className="text-ko-pretty mt-1 text-sm text-muted-foreground">
+                      {nextQueueItem.description}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-sm font-semibold text-primary">
+                    {nextQueueItem.count.toLocaleString("ko-KR")}건 검토 시작
+                  </span>
+                </AdminIntentLink>
+              ) : null}
+              {remainingQueueItems.map((item, index) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="grid min-w-0 gap-3 rounded-2xl border border-border/80 bg-surface-inset p-4 transition-colors hover:border-strong hover:bg-surface-control sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                  prefetch={false}
+                  data-admin-task-key={getAdminRouteDescriptor(item.href)?.key}
+                  data-admin-task-source="home"
+                  className={cn(
+                    "min-w-0 gap-3 rounded-2xl border border-border/80 bg-surface-inset p-4 transition-colors hover:border-strong hover:bg-surface-control sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center",
+                    index >= 2 ? "hidden sm:grid" : "grid",
+                  )}
                 >
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-foreground">
+                    <p className="font-semibold text-foreground">
                       {item.label}
                     </p>
                     <p className="text-ko-pretty mt-1 line-clamp-2 text-sm text-muted-foreground">
@@ -308,10 +418,22 @@ export default function AdminDashboardView({
                     </p>
                   </div>
                   <span className="text-xl font-semibold tracking-[-0.03em] text-foreground">
-                    {item.count.toLocaleString("ko-KR")}건
+                    {isDataUnavailable
+                      ? "확인 필요"
+                      : `${item.count.toLocaleString("ko-KR")}건`}
                   </span>
                 </Link>
               ))}
+              {remainingQueueItems.length > 2 ? (
+                <div className="sm:hidden">
+                  <Button href="/admin/tasks" prefetch={false} variant="secondary" className="w-full">
+                    <span className="flex w-full items-center justify-between gap-3">
+                      <span>전체 업무는 작업함에서 보기</span>
+                      <ArrowRightIcon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                    </span>
+                  </Button>
+                </div>
+              ) : null}
             </div>
           )}
         </Surface>
@@ -325,7 +447,7 @@ export default function AdminDashboardView({
             {quickActions.map((item) => {
               const Icon = item.icon;
               return (
-                <Link
+                <AdminIntentLink
                   key={item.href}
                   href={item.href}
                   className="flex min-w-0 items-center gap-3 rounded-2xl border border-border/70 bg-surface-inset p-3 transition-colors hover:border-strong hover:bg-surface-control"
@@ -334,17 +456,17 @@ export default function AdminDashboardView({
                     <Icon className="h-5 w-5" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-foreground">
+                    <span className="block text-sm font-semibold text-foreground">
                       {item.label}
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                    <span className="text-ko-pretty mt-0.5 block text-xs text-muted-foreground">
                       {item.description}
                     </span>
                   </span>
                   <span className="shrink-0 text-xs font-semibold text-muted-foreground">
-                    {item.meta}
+                    {isDataUnavailable ? "확인 필요" : item.meta}
                   </span>
-                </Link>
+                </AdminIntentLink>
               );
             })}
           </div>
@@ -361,7 +483,7 @@ export default function AdminDashboardView({
             <Surface key={item.label} level="inset" padding="md" className="min-w-0">
               <p className="ui-kicker">{item.label}</p>
               <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-foreground">
-                {item.value}
+                {isDataUnavailable ? "확인 필요" : item.value}
               </p>
               <p className="mt-1 truncate text-sm text-muted-foreground">
                 {item.description}
@@ -375,8 +497,8 @@ export default function AdminDashboardView({
             현재 기수 <span className="font-semibold text-foreground">{cycleMeta}</span>
             {includeGlobalTasks ? (
               <>
-                {" · "}파트너사 {counts.companyCount.toLocaleString("ko-KR")}개
-                {" · "}담당 계정 {counts.accountCount.toLocaleString("ko-KR")}개
+                {" · "}파트너사 {isDataUnavailable ? "확인 필요" : `${counts.companyCount.toLocaleString("ko-KR")}개`}
+                {" · "}담당 계정 {isDataUnavailable ? "확인 필요" : `${counts.accountCount.toLocaleString("ko-KR")}개`}
               </>
             ) : (
               <> · 배정된 캠퍼스 범위의 제휴처만 집계합니다.</>
@@ -385,17 +507,17 @@ export default function AdminDashboardView({
         </Surface>
       </section>
 
-      {canViewPlatformActivity ? (
+      {platformActivity ?? (canViewPlatformActivity ? (
         platformActivityErrorMessage ? (
           <InlineMessage
             tone="warning"
             title="서비스 활성 지표를 불러오지 못했습니다."
-            description="기존 로그 집계가 완료되면 이 영역에서 DAU·WAU·MAU를 확인할 수 있습니다."
+            description="기존 로그 집계가 완료되면 일간·주간·월간 활성 현황을 이 영역에서 확인할 수 있습니다."
           />
         ) : platformActivityMetrics ? (
           <AdminPlatformActivityMetricsPanel metrics={platformActivityMetrics} />
         ) : null
-      ) : null}
+      ) : null)}
     </div>
   );
 }

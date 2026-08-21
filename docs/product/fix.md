@@ -1,7 +1,8 @@
 # FIX.md
 
-이 문서는 현재 코드베이스를 훑으면서 확인한, 불필요한 서버 에러와 UX 저하 지점을 기록한다.  
-기준은 `500을 사용자에게 직접 노출시키는가`, `같은 화면에서 복구할 수 있는가`, `입력값을 잃지 않는가`다.
+이 문서는 2026-04 당시 코드베이스에서 확인하고 이후 완료한 서버 오류·UX 복구 작업의 역사 기록이다. 경로와 줄 번호는 당시 snapshot 근거이며 현재 열린 결함 목록이 아니다.
+
+최종 상태 점검: 2026-08-13. 아래 P0~P2는 모두 완료 상태다. 현재 작업과 결함은 [TODO](todo.md)와 [GitHub Issues](https://github.com/MyKnow/ssartnership/issues)에서 추적한다.
 
 ## 수행
 
@@ -108,8 +109,8 @@
 - `src/components/partner/PartnerPortalActionLinks.tsx`의 로그아웃 프리패치는 꺼서, 미리 요청으로 세션이 풀리는 문제를 줄였다.
 - `src/app/admin/(protected)/partners/page.tsx`와 `src/app/admin/(protected)/partners/new/page.tsx`는 작성 실패를 페이지 안에서 보여주도록 분리했다.
 
-## 다음 우선순위
+## 현재 상태
 
-- 관리자 action 전체를 “raw throw -> redirect/query param -> inline form state” 패턴으로 계속 정리한다.
-- 회원/파트너 인증 API는 500과 사용자 입력 실패를 더 명확히 분리한다.
-- 폼성 페이지는 서버 에러 대신 같은 페이지 복구를 기본값으로 둔다.
+- 이 감사에서 기록한 P0~P2 작업은 완료됐다.
+- 이후 회귀는 당시 줄 번호를 재사용하지 않고 재현 조건·현재 경로·검증 계획을 포함한 새 Issue로 추적한다.
+- 사용자 입력 오류의 같은 화면 복구, 안전한 오류 코드, destructive action의 재시도 상태는 새 기능에서도 유지하는 제품 계약이다.

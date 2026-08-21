@@ -57,10 +57,12 @@ function extractStorageErrorDetails(error) {
 }
 
 export function formatStorageError(error) {
-  const { message, status, code } = extractStorageErrorDetails(error);
-  const statusLabel = typeof status === "number" ? ` (status ${status})` : "";
-  const codeLabel = code ? ` [${code}]` : "";
-  return `${message}${statusLabel}${codeLabel}`;
+  const { status, code } = extractStorageErrorDetails(error);
+  const fields = [
+    typeof status === "number" ? `status=${status}` : null,
+    typeof code === "string" ? "code_present=true" : null,
+  ].filter(Boolean);
+  return fields.length > 0 ? fields.join(",") : "storage_error";
 }
 
 export function isRetryableStorageError(error) {

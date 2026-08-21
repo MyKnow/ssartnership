@@ -1,4 +1,8 @@
-import type { PartnerChangeRequestContext } from "../../partner-change-requests/shared.ts";
+import type {
+  PartnerChangeRequestContext,
+  PartnerChangeRequestListInput,
+  PartnerChangeRequestPage,
+} from "../../partner-change-requests/shared.ts";
 import { findPendingRequest, findService, getStore } from "./service-store.ts";
 import { normalizeServiceRecord, toSummary } from "./normalizers.ts";
 import { normalizePartnerBenefitItems } from "../../partner-benefit-items.ts";
@@ -13,7 +17,29 @@ export async function listMockPartnerChangeRequests(
       (uniqueCompanyIds.length === 0 || uniqueCompanyIds.includes(request.companyId)),
     )
     .map(toSummary)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+export async function listMockPartnerChangeRequestPage(
+  input: PartnerChangeRequestListInput,
+): Promise<PartnerChangeRequestPage> {
+  const partnerIds = new Set(
+    (input.partnerIds ?? []).map((id) => id.trim()).filter(Boolean),
+  );
+  const allRequests = await listMockPartnerChangeRequests(input.companyIds);
+  const scopedRequests = input.partnerIds === undefined
+    ? allRequests
+    : allRequests.filter((request) => partnerIds.has(request.partnerId));
+  const page = Math.max(1, input.page);
+  const pageSize = Math.max(1, input.pageSize);
+  const from = (page - 1) * pageSize;
+
+  return {
+    requests: scopedRequests.slice(from, from + pageSize),
+    totalCount: scopedRequests.length,
+    page,
+    pageSize,
+  };
 }
 
 export async function getMockPartnerChangeRequestContext(

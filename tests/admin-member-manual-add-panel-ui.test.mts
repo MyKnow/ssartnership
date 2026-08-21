@@ -27,5 +27,9 @@ test("수동 회원 행은 기수·캠퍼스 선택과 사진 파일 선택을 �
   assert.match(source, /if \(!batch \|\| !rowReadiness\.isComplete \|\| pending \|\| \(result && result\.retryableFailures === 0\)\) return;/);
   assert.match(source, /실패 행 재시도/);
   assert.match(source, /전송 결과 확인이 필요한 행이 있어 자동 재시도는 중지되었습니다/);
+  assert.match(
+    source,
+    /<Link prefetch=\{false\}[\s\S]*?href=\{`\/admin\/members\/\$\{encodeURIComponent\(item\.existingMemberId\)\}`\}/,
+  );
   assert.doesNotMatch(source, /사진 파일명/);
 });

@@ -305,6 +305,7 @@ function defineTemplate(
 }
 
 const adminOperationalTypes = [
+  ["partner_registration_request", "제휴 등록 신청", "공개 제휴 등록 신청이 접수되었을 때"],
   ["partner_change_request", "파트너 변경 요청", "파트너 변경 요청이 접수되었을 때"],
   ["partner_immediate_update", "파트너 즉시 수정 반영", "파트너 정보가 즉시 수정되었을 때"],
   ["expiring_partner", "제휴 종료 임박", "제휴 종료가 임박했을 때"],
@@ -360,6 +361,10 @@ const adminOperationalTemplateCopies: Record<
   AdminOperationalType,
   NotificationTemplateCopy
 > = {
+  partner_registration_request: {
+    titleTemplate: "제휴 등록 신청 · {title}",
+    bodyTemplate: "{body}\n\n관리자 페이지에서 신청 내용을 검토해 주세요.",
+  },
   partner_change_request: {
     titleTemplate: "파트너 변경 요청 · {title}",
     bodyTemplate: "{body}\n\n관리자 페이지에서 변경 요청을 검토해 주세요.",
@@ -502,8 +507,8 @@ const emailTemplates: NotificationTemplateDefinition[] = [
   }),
   defineTemplate({
     eventKey: "email.manual_member_password_reset",
-    label: "수동 추가 회원 비밀번호 재설정",
-    description: "수동 추가 회원의 비밀번호 재설정 링크를 전송합니다.",
+    label: "회원 비밀번호 재설정",
+    description: "회원에게 비밀번호 재설정 링크를 전송합니다.",
     group: "회원·수료생 이메일",
     channel: "email",
     titleTemplate: "[{siteName}] 비밀번호 재설정",
@@ -730,6 +735,15 @@ const automaticCampaignTemplates = (["new_partner", "expiring_partner"] as const
 });
 
 const adminOperationalSemanticContexts = {
+  partner_registration_request: {
+    label: "제휴 등록 신청",
+    description: "공개 제휴 등록 신청이 접수되었을 때 관리자에게 전송합니다.",
+    contextKey: "admin_partner_registration_request" as const,
+    variables: [semanticVariables.companyName, semanticVariables.partnerName, semanticVariables.requesterName, semanticVariables.partnerCategory, semanticVariables.partnerLocation, semanticVariables.requestUrl],
+    requiredVariables: ["companyName", "partnerName", "requesterName", "partnerCategory", "partnerLocation", "requestUrl"],
+    titleTemplate: "제휴 등록 신청 · {partnerName}",
+    bodyTemplate: "회사: {companyName}\n신청 제휴처: {partnerName}\n카테고리: {partnerCategory}\n위치: {partnerLocation}\n신청자: {requesterName}\n\n{requestUrl}",
+  },
   partner_change_request: {
     label: "파트너 변경 요청",
     description: "파트너 담당자가 변경 요청을 제출했을 때 관리자에게 전송합니다.",
