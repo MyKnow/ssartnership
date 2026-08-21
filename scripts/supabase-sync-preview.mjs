@@ -25,7 +25,10 @@ import {
   sanitizeDumpSqlForPreview,
   stripUnsupportedPreviewRestoreTriggerControls,
 } from "./supabase-sync-preview-lib.mjs";
-import { buildProductionDataDumpContainerPlan } from "./supabase-sync-preview-dump-lib.mjs";
+import {
+  buildProductionDataDumpContainerPlan,
+  filterPgDumpCircularForeignKeyWarnings,
+} from "./supabase-sync-preview-dump-lib.mjs";
 
 const PUBLIC_SCHEMA = "public";
 const CHECK_ONLY_FLAG = "--check-only";
@@ -129,6 +132,7 @@ function runCommand(command, args, options = {}) {
     captureStderr = true,
     env = {},
     stdoutPath,
+    transformStderr,
   } = options;
 
   return new Promise((resolve, reject) => {
@@ -170,7 +174,9 @@ function runCommand(command, args, options = {}) {
       child.stderr.on("data", (chunk) => {
         const text = chunk.toString("utf8");
         stderr += text;
-        process.stderr.write(text);
+        if (!transformStderr) {
+          process.stderr.write(text);
+        }
       });
     }
 
@@ -191,13 +197,27 @@ function runCommand(command, args, options = {}) {
         return;
       }
 
+      let reportedStderr;
+      try {
+        reportedStderr = transformStderr ? transformStderr(stderr) : stderr;
+      } catch (error) {
+        settleFailure(error);
+        return;
+      }
+
+      if (transformStderr && reportedStderr) {
+        process.stderr.write(reportedStderr);
+      }
+
       if (code !== 0) {
-        settleFailure(new Error(stderr.trim() || `${command} failed with exit code ${code}`));
+        settleFailure(
+          new Error(reportedStderr.trim() || `${command} failed with exit code ${code}`),
+        );
         return;
       }
 
       settled = true;
-      resolve({ stdout, stderr });
+      resolve({ stdout, stderr: reportedStderr });
     });
   });
 }
@@ -287,6 +307,7 @@ async function dumpProductionDatabase(dumpPath, productionDbUrl) {
   await runCommand(plan.command, plan.args, {
     env: plan.environment,
     stdoutPath: dumpPath,
+    transformStderr: filterPgDumpCircularForeignKeyWarnings,
   });
 }
 

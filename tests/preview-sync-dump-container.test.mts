@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 type PreviewSyncDumpModule =
@@ -7,6 +8,10 @@ type PreviewSyncDumpModule =
 const previewSyncDumpModulePromise = import(
   new URL("../scripts/supabase-sync-preview-dump-lib.mjs", import.meta.url).href,
 ) as Promise<PreviewSyncDumpModule>;
+const previewSyncScriptPromise = readFile(
+  new URL("../scripts/supabase-sync-preview.mjs", import.meta.url),
+  "utf8",
+);
 
 test("Preview Sync uses a pinned PostgreSQL 17 container and disables restore triggers", async () => {
   const {
@@ -53,6 +58,43 @@ test("Preview Sync uses a pinned PostgreSQL 17 container and disables restore tr
   assert.match(dumpScript, /--exclude-table '"public"\."member_wallet_passes"'/);
   assert.match(dumpScript, /SET session_replication_role = replica/);
   assert.match(dumpScript, /RESET ALL/);
+});
+
+test("Preview Sync suppresses only complete circular-FK pg_dump advisories", async () => {
+  const { filterPgDumpCircularForeignKeyWarnings } = await previewSyncDumpModulePromise;
+  const knownAdvisory = [
+    "pg_dump: warning: fixture circular foreign-key constraints",
+    "pg_dump: detail: fixture_a",
+    "pg_dump: detail: fixture_b",
+    "pg_dump: hint: use --disable-triggers for this fixture",
+  ].join("\n");
+  const unrelatedDiagnostic = "pg_dump: warning: retain this diagnostic\n";
+
+  assert.equal(
+    filterPgDumpCircularForeignKeyWarnings(`${knownAdvisory}\n${unrelatedDiagnostic}`),
+    unrelatedDiagnostic,
+  );
+
+  const incompleteAdvisory = [
+    "pg_dump: warning: fixture circular foreign-key constraints",
+    "pg_dump: detail: fixture_a",
+    "pg_dump: hint: retain this unfamiliar recovery guidance",
+  ].join("\n");
+  assert.equal(
+    filterPgDumpCircularForeignKeyWarnings(`${incompleteAdvisory}\n`),
+    `${incompleteAdvisory}\n`,
+  );
+});
+
+test("Preview Sync filters the direct dump stderr before writing it to workflow logs", async () => {
+  const script = await previewSyncScriptPromise;
+
+  assert.match(script, /transformStderr/);
+  assert.match(script, /filterPgDumpCircularForeignKeyWarnings/);
+  assert.match(
+    script,
+    /transformStderr:\s*filterPgDumpCircularForeignKeyWarnings/,
+  );
 });
 
 test("Preview Sync rejects unsupported dump inputs before starting Docker", async () => {
