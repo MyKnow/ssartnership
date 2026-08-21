@@ -88,7 +88,7 @@ export async function POST(
         }
         if (error.code === "email_not_available") {
           return response(
-            { ok: false, message: "인증된 이메일이 있는 회원에게만 이메일로 발송할 수 있습니다." },
+            { ok: false, message: "등록된 이메일이 있는 회원에게만 이메일로 발송할 수 있습니다." },
             400,
           );
         }

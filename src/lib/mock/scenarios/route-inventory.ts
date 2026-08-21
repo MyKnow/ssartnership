@@ -51,7 +51,7 @@ const mockRouteInventoryBase = [
     routePath: "/certification",
     surface: "public",
     authScope: "member",
-    viewComponent: "CertificationView + AppleWalletPassSection",
+    viewComponent: "CertificationView",
     dataSources: ["api-route", "storybook"],
     requiredScenarioIds: ["public.certification.qr-valid"],
   },

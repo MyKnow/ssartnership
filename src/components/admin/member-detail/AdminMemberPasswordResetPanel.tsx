@@ -36,7 +36,7 @@ export default function AdminMemberPasswordResetPanel({
   const [confirmAction, setConfirmAction] = useState<PasswordResetAction | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [resetUrl, setResetUrl] = useState<string | null>(null);
-  const canSendEmail = Boolean(email && emailVerifiedAt);
+  const canSendEmail = Boolean(email);
 
   const issueLink = async (delivery: PasswordResetAction) => {
     setIsPending(true);
@@ -66,7 +66,11 @@ export default function AdminMemberPasswordResetPanel({
         notify("비밀번호 재발급 링크를 생성했습니다.");
         return;
       }
-      notify("인증된 이메일로 비밀번호 재발급 링크를 발송했습니다.");
+      notify(
+        emailVerifiedAt
+          ? "인증된 이메일로 비밀번호 재발급 링크를 발송했습니다."
+          : "등록된 이메일로 비밀번호 재발급 링크를 발송했습니다. 수신한 링크로 비밀번호를 설정하면 이메일 인증도 완료됩니다.",
+      );
     } catch {
       notify("비밀번호 재발급 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
@@ -89,7 +93,9 @@ export default function AdminMemberPasswordResetPanel({
   };
 
   const confirmDescription = confirmAction === "email"
-    ? `${displayName} 회원의 인증된 이메일로 재발급 링크를 발송합니다. 기존에 사용하지 않은 재발급 링크는 즉시 무효화됩니다.`
+    ? emailVerifiedAt
+      ? `${displayName} 회원의 인증된 이메일로 재발급 링크를 발송합니다. 기존에 사용하지 않은 재발급 링크는 즉시 무효화됩니다.`
+      : `${displayName} 회원의 등록된 이메일로 재발급 링크를 발송합니다. 수신한 링크로 비밀번호를 설정하면 이메일 인증도 완료됩니다. 기존에 사용하지 않은 재발급 링크는 즉시 무효화됩니다.`
     : `${displayName} 회원의 새 비밀번호 재발급 링크를 생성합니다. 기존에 사용하지 않은 재발급 링크는 즉시 무효화됩니다.`;
 
   return (
@@ -117,14 +123,14 @@ export default function AdminMemberPasswordResetPanel({
           className="w-full"
           onClick={() => setConfirmAction("email")}
           disabled={isPending || !canSendEmail}
-          title={canSendEmail ? undefined : "인증된 이메일이 있는 회원에게만 발송할 수 있습니다."}
+          title={canSendEmail ? undefined : "등록된 이메일이 있는 회원에게만 발송할 수 있습니다."}
         >
           이메일로 발송
         </Button>
       </div>
       {!canSendEmail ? (
         <p className="text-xs leading-5 text-muted-foreground">
-          인증된 이메일이 없는 회원은 링크를 생성해 안전한 경로로 직접 전달해 주세요.
+          등록된 이메일이 없는 회원은 링크를 생성해 안전한 경로로 직접 전달해 주세요.
         </p>
       ) : null}
       {resetUrl ? (
@@ -143,6 +149,9 @@ export default function AdminMemberPasswordResetPanel({
           </Button>
           <p className="text-xs leading-5 text-muted-foreground">
             이 화면을 닫거나 새 링크를 만들면 다시 확인할 수 없습니다.
+          </p>
+          <p className="text-xs leading-5 text-muted-foreground">
+            직접 전달한 링크로는 이메일 인증 상태가 바뀌지 않습니다.
           </p>
         </div>
       ) : null}

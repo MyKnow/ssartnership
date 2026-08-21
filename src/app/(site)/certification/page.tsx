@@ -19,12 +19,7 @@ import { listCohortCardThemes } from "@/lib/cohort-card-themes";
 import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { getMemberProfilePhotoAccessState } from "@/lib/member-profile-photo";
 import Button from "@/components/ui/Button";
-import AppleWalletPassSection from "@/components/certification/AppleWalletPassSection";
 import { buildMemberGateHref } from "@/lib/member-required-gates";
-import {
-  getAppleWalletMemberState,
-} from "@/lib/wallet/wallet-pass-service";
-import { resolveAppleWalletCardState } from "@/lib/wallet/wallet-pass-ui-state";
 
 export const metadata: Metadata = {
   title: `내 인증 | ${SITE_NAME}`,
@@ -75,27 +70,17 @@ export default async function CertificationPage({
     redirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
 
-  const [headerSession, cohortCardThemes, photoState, member, walletState] = await Promise.all([
+  const [headerSession, cohortCardThemes, photoState, member] = await Promise.all([
     getHeaderSession(session.userId),
     listCohortCardThemes(),
     getMemberProfilePhotoState(session.userId),
     getMemberCanonicalProfile(session.userId),
-    getAppleWalletMemberState(session.userId),
   ]);
   const photoAccess = getMemberProfilePhotoAccessState(photoState.reviewStatus);
 
   if (!member) {
     redirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
-
-  const appleWalletCardState = resolveAppleWalletCardState({
-    eligibility: walletState.eligibility,
-    configured: walletState.configStatus.ok,
-    consentCurrent: walletState.consentCurrent,
-    snapshotStale: walletState.snapshotStale,
-    returnTo,
-    pass: walletState.pass,
-  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -137,13 +122,6 @@ export default async function CertificationPage({
               initialTimestamp={initialTimestamp}
               cohortCardThemes={cohortCardThemes}
             />}
-            <AppleWalletPassSection
-              initialStatus={appleWalletCardState.status}
-              lastIssuedAt={appleWalletCardState.lastIssuedAt}
-              blockerMessage={appleWalletCardState.blockerMessage}
-              blockerActionHref={appleWalletCardState.blockerActionHref}
-              blockerActionLabel={appleWalletCardState.blockerActionLabel}
-            />
             {member.mattermostAccountId ? (
               <CertificationMattermostSyncAction />
             ) : null}
