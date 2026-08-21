@@ -38,6 +38,12 @@ test("Preview Sync uses a pinned PostgreSQL 17 container and disables restore tr
   assert.equal(plan.args.includes("host"), true);
   assert.equal(plan.args.includes("--env"), true);
   assert.equal(plan.args.includes("PGPASSWORD"), true);
+  const entrypointIndex = plan.args.indexOf("--entrypoint");
+  const imageIndex = plan.args.indexOf(SUPABASE_POSTGRES_DUMP_IMAGE);
+  assert.ok(entrypointIndex >= 0, "Docker dump command should override the server entrypoint");
+  assert.equal(plan.args[entrypointIndex + 1], "bash");
+  assert.ok(entrypointIndex < imageIndex, "Docker entrypoint override must precede the image");
+  assert.equal(plan.args[imageIndex + 1], "-c");
   assert.equal(serializedArgs.includes(productionDbUrl), false);
   assert.equal(serializedArgs.includes("p@ss/word"), false);
   assert.ok(dumpScript, "Docker dump command should include a shell script");
