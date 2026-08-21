@@ -218,8 +218,16 @@ test("Storybook browser 전역 상태와 종료 진단을 명시적으로 정리
     scripts?: Record<string, string>;
   };
   const setup = await readRepoFile(".storybook/vitest.setup.tsx");
+  const storybookTestRunner = await readRepoFile("scripts/run-storybook-tests.mjs");
 
   assert.match(setup, /afterAll\(\(\) => \{/u);
   assert.match(setup, /vi\.unstubAllGlobals\(\)/u);
-  assert.match(packageJson.scripts?.["test-storybook"] ?? "", /hanging-process/u);
+  assert.match(
+    packageJson.scripts?.["test-storybook"] ?? "",
+    /node scripts\/run-storybook-tests\.mjs/u,
+  );
+  assert.match(storybookTestRunner, /--reporter=hanging-process/u);
+  assert.match(storybookTestRunner, /process\.execPath/u);
+  assert.match(storybookTestRunner, /pathToFileURL\(resolve\(executedPath\)\)/u);
+  assert.match(storybookTestRunner, /close timed out after/u);
 });
