@@ -8,6 +8,7 @@ import process from "node:process";
 import { finished } from "node:stream/promises";
 import { createClient } from "@supabase/supabase-js";
 import {
+  createSafeStorageOperationError,
   formatStorageError,
   isPreviewRequiredStorageBucket,
   runStorageOperation,
@@ -706,8 +707,9 @@ async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = 
         );
       } catch (error) {
         if (shouldAbortPreviewStorageObjectSync(bucketName)) {
-          throw new Error(
-            `Preview required object in ${bucketName} could not be synchronized: ${formatStorageError(error)}`,
+          throw createSafeStorageOperationError(
+            `Preview required object in ${bucketName} could not be synchronized`,
+            error,
           );
         }
         console.warn(
@@ -761,8 +763,9 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
       prodClient.storage.listBuckets(),
     );
   } catch (error) {
-    throw new Error(
-      `Production storage buckets could not be listed: ${formatStorageError(error)}`,
+    throw createSafeStorageOperationError(
+      "Production storage buckets could not be listed",
+      error,
     );
   }
 
@@ -778,8 +781,9 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
       previewClient.storage.listBuckets(),
     );
   } catch (error) {
-    throw new Error(
-      `Preview storage buckets could not be listed: ${formatStorageError(error)}`,
+    throw createSafeStorageOperationError(
+      "Preview storage buckets could not be listed",
+      error,
     );
   }
 
@@ -814,8 +818,9 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
       }
     } catch (error) {
       if (isPreviewRequiredStorageBucket(bucketName)) {
-        throw new Error(
-          `Preview member profile image storage could not be synchronized: ${formatStorageError(error)}`,
+        throw createSafeStorageOperationError(
+          "Preview member profile image storage could not be synchronized",
+          error,
         );
       }
       console.warn(`Skipping bucket ${bucketName} after storage sync failure: ${formatStorageError(error)}`);

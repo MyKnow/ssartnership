@@ -56,11 +56,19 @@ function extractStorageErrorDetails(error) {
   return { message, status, code };
 }
 
+function hasStorageErrorCode(error, code) {
+  return (
+    typeof code === "string" ||
+    (typeof error === "object" && error !== null && error.storageCodePresent === true)
+  );
+}
+
 export function formatStorageError(error) {
   const { status, code } = extractStorageErrorDetails(error);
+  const codePresent = hasStorageErrorCode(error, code);
   const fields = [
     typeof status === "number" ? `status=${status}` : null,
-    typeof code === "string" ? "code_present=true" : null,
+    codePresent ? "code_present=true" : null,
   ].filter(Boolean);
   return fields.length > 0 ? fields.join(",") : "storage_error";
 }
@@ -90,8 +98,22 @@ export function toStorageError(error) {
   return storageError;
 }
 
+export function createSafeStorageOperationError(context, error) {
+  const { status, code } = extractStorageErrorDetails(error);
+  const storageError = new Error(`${context}: ${formatStorageError(error)}`);
+
+  if (typeof status === "number") {
+    storageError.status = status;
+  }
+  if (hasStorageErrorCode(error, code)) {
+    storageError.storageCodePresent = true;
+  }
+
+  return storageError;
+}
+
 export async function withStorageRetry(taskName, operation, options = {}) {
-  const attempts = Math.max(1, options.attempts ?? 3);
+  const attempts = Math.max(1, options.attempts ?? 5);
   const baseDelayMs = Math.max(0, options.baseDelayMs ?? 750);
   let lastError = null;
 
@@ -104,7 +126,7 @@ export async function withStorageRetry(taskName, operation, options = {}) {
         throw error;
       }
 
-      const waitMs = baseDelayMs * attempt;
+      const waitMs = baseDelayMs * 2 ** (attempt - 1);
       console.warn(
         `${taskName} failed on attempt ${attempt}/${attempts}: ${formatStorageError(error)}. Retrying in ${waitMs}ms...`,
       );
