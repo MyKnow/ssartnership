@@ -335,6 +335,26 @@ export function buildCopyStatement(schema, table, columns) {
     .join(", ")}) FROM stdin;`;
 }
 
+const PREVIEW_RESTORE_TRIGGER_CONTROL_PATTERN =
+  /^ALTER TABLE(?: ONLY)? "public"\."(?:""|[^"])+" (?:DISABLE|ENABLE) TRIGGER ALL;$/;
+
+export function stripUnsupportedPreviewRestoreTriggerControls(sql) {
+  let removedCount = 0;
+  const filteredLines = sql.split("\n").filter((line) => {
+    if (!PREVIEW_RESTORE_TRIGGER_CONTROL_PATTERN.test(line)) {
+      return true;
+    }
+
+    removedCount += 1;
+    return false;
+  });
+
+  return {
+    sql: filteredLines.join("\n"),
+    removedCount,
+  };
+}
+
 export function sanitizeDumpSqlForPreview(
   sql,
   previewColumnsByTable,

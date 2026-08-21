@@ -23,6 +23,7 @@ import {
 import {
   buildTransactionalPreviewRestoreSql,
   sanitizeDumpSqlForPreview,
+  stripUnsupportedPreviewRestoreTriggerControls,
 } from "./supabase-sync-preview-lib.mjs";
 import { buildProductionDataDumpContainerPlan } from "./supabase-sync-preview-dump-lib.mjs";
 
@@ -313,6 +314,9 @@ async function sanitizeDumpForPreview(dumpPath, previewDbUrl) {
   const previewColumnsByTable = await listPublicTableColumns(previewDbUrl);
   const sourceSql = await readFile(dumpPath, "utf8");
   const sanitized = sanitizeDumpSqlForPreview(sourceSql, previewColumnsByTable);
+  const triggerControlSanitized = stripUnsupportedPreviewRestoreTriggerControls(
+    sanitized.sql,
+  );
   const { stats } = sanitized;
 
   if (stats.memberCopyBlocksSeen > 0) {
@@ -378,12 +382,22 @@ async function sanitizeDumpForPreview(dumpPath, previewDbUrl) {
     );
   }
 
-  if (!sanitized.changed) {
+  if (triggerControlSanitized.removedCount > 0) {
+    console.log(
+      [
+        "Preview sync trigger restore sanitization:",
+        `unsupportedPublicTriggerControlsRemoved=${triggerControlSanitized.removedCount}`,
+        "session-level constraint handling remains enabled.",
+      ].join(" "),
+    );
+  }
+
+  if (!sanitized.changed && triggerControlSanitized.removedCount === 0) {
     return;
   }
 
   console.log("Sanitizing production dump for preview schema differences...");
-  await writeFile(dumpPath, sanitized.sql, "utf8");
+  await writeFile(dumpPath, triggerControlSanitized.sql, "utf8");
 }
 
 async function replacePreviewDatabaseData(dumpPath, restorePath, previewDbUrl) {

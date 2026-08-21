@@ -56,6 +56,35 @@ test("sanitizeDumpSqlForPreview leaves aligned copy blocks unchanged", async () 
   assert.equal(sanitized.sql, sourceSql);
 });
 
+test("stripUnsupportedPreviewRestoreTriggerControls removes only public dump trigger controls", async () => {
+  const { stripUnsupportedPreviewRestoreTriggerControls } = await previewSyncLibPromise;
+  const sourceSql = [
+    "SET session_replication_role = replica;",
+    'ALTER TABLE ONLY "public"."members" DISABLE TRIGGER ALL;',
+    'ALTER TABLE "public"."members" ENABLE TRIGGER ALL;',
+    'ALTER TABLE "storage"."objects" DISABLE TRIGGER ALL;',
+    "COPY public.members (id) FROM stdin;",
+    "member-1",
+    "\\.",
+    "RESET ALL;",
+  ].join("\n");
+
+  const sanitized = stripUnsupportedPreviewRestoreTriggerControls(sourceSql);
+
+  assert.equal(sanitized.removedCount, 2);
+  assert.equal(
+    sanitized.sql,
+    [
+      "SET session_replication_role = replica;",
+      'ALTER TABLE "storage"."objects" DISABLE TRIGGER ALL;',
+      "COPY public.members (id) FROM stdin;",
+      "member-1",
+      "\\.",
+      "RESET ALL;",
+    ].join("\n"),
+  );
+});
+
 test("sanitizeDumpSqlForPreview drops copy blocks for tables missing from preview schema", async () => {
   const { sanitizeDumpSqlForPreview } = await previewSyncLibPromise;
 
