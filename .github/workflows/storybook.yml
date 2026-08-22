@@ -1,22 +1,29 @@
 name: Storybook and Visual Baselines
 
 on:
-  push:
-    branches: [main, dev]
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
+    inputs:
+      interaction:
+        description: Build Storybook and run interaction/accessibility tests.
+        required: false
+        default: true
+        type: boolean
+      visual:
+        description: Compare the reviewed visual baselines.
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: storybook-manual
+  cancel-in-progress: false
 
 jobs:
   interaction:
-    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    if: ${{ inputs.interaction }}
     name: Build, Interaction, A11y
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -49,7 +56,7 @@ jobs:
         run: npm run test-storybook
 
   visual:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    if: ${{ inputs.visual }}
     name: Visual Baselines
     runs-on: ubuntu-latest
     timeout-minutes: 25

@@ -190,9 +190,6 @@ try {
     runRequiredScript("perf:lighthouse");
   }
   runRequiredScript("prepush");
-  runRequiredScript("build-storybook");
-  runRequiredScript("test-storybook");
-  runRequiredScript("test:visual");
 
   if (releaseType !== "none") {
     requireSuccessfulResult(

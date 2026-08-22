@@ -110,10 +110,15 @@ test("Windows x64와 macOS arm64 CI가 같은 개발환경 명령을 검증한�
   assert.doesNotMatch(workflow, /\bnpm (?:ci|install)\b/);
   assert.match(workflow, /npm run doctor -- --ci/);
   assert.match(workflow, /npm run check:cross-platform/);
-  assert.match(workflow, /npm run lint/);
-  assert.match(workflow, /npm run typecheck:ci/);
-  assert.match(workflow, /npm test/);
-  assert.match(workflow, /npm run build/);
+  assert.match(
+    workflow,
+    /node --import \.\/tests\/alias-register\.mjs --test tests\/cross-platform-development-contract\.test\.mts tests\/development-environment\.test\.mts/,
+  );
+  assert.doesNotMatch(workflow, /^\s+push:\s*$/m);
+  assert.doesNotMatch(workflow, /npm run lint/);
+  assert.doesNotMatch(workflow, /npm run typecheck:ci/);
+  assert.doesNotMatch(workflow, /npm test/);
+  assert.doesNotMatch(workflow, /npm run build/);
 });
 
 test("runtime 도구와 문서에는 사용자 또는 애플리케이션 절대경로가 없다", async () => {

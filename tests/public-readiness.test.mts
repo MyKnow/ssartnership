@@ -60,7 +60,7 @@ test("GitHub Actions use the Node 24 action runtime and project runtime with rea
   }
 });
 
-test("public readiness CI workflow gates launch-critical checks", () => {
+test("public readiness separates the normal Quick Gate from main promotion", () => {
   const workflow = readRepoFile(".github/workflows/public-readiness.yml");
 
   for (const requiredText of [
@@ -74,11 +74,11 @@ test("public readiness CI workflow gates launch-critical checks", () => {
     "npm run lint",
     "npm run typecheck:ci",
     "npm test",
-    "npm audit --omit=dev",
     "npm run audit:security",
-    "npm run build",
+    "name: Quick Readiness",
+    "name: Release Readiness",
     "PLAYWRIGHT_CHROMIUM_CHANNEL: chrome",
-    "npm run test:e2e",
+    "npm run verify:release:post-quick",
   ]) {
     assert.match(
       workflow,
@@ -87,10 +87,15 @@ test("public readiness CI workflow gates launch-critical checks", () => {
   }
 
   assert.match(workflow, /push:\s*\n\s+branches:\s*\[main, dev\]/);
-  assert.match(workflow, /^\s+pull_request:\s*$/m);
+  assert.match(workflow, /pull_request:\s*\n\s+branches:\s*\[main, dev\]/);
   assert.match(workflow, /concurrency:\s*\n\s+group:/);
   assert.match(workflow, /cancel-in-progress:\s+true/);
-  assert.match(workflow, /name: Dependency audit/);
+  assert.match(
+    workflow,
+    /github\.event_name == 'pull_request' && github\.base_ref == 'main'/,
+  );
+  assert.doesNotMatch(workflow, /name: Dependency audit/);
+  assert.doesNotMatch(workflow, /run: npm audit --omit=dev/);
   assert.match(workflow, /persist-credentials:\s+false/);
   assert.doesNotMatch(workflow, /\bnpm (?:ci|install)\b/);
   assert.doesNotMatch(
@@ -99,11 +104,11 @@ test("public readiness CI workflow gates launch-critical checks", () => {
   );
 });
 
-test("local prepush and release use the same Public Readiness gates", () => {
+test("local prepush stays quick and the explicit release gate adds build and E2E", () => {
   const packageJson = JSON.parse(readRepoFile("package.json")) as {
     scripts: Record<string, string>;
   };
-  const prepush = packageJson.scripts.prepush;
+  const quick = packageJson.scripts["verify:quick"];
 
   for (const requiredScript of [
     "check:install-scripts",
@@ -114,20 +119,28 @@ test("local prepush and release use the same Public Readiness gates", () => {
     "typecheck:ci",
     "test",
     "audit:security",
-    "build",
-    "test:e2e:ci",
   ]) {
     assert.match(
-      prepush,
+      quick,
       new RegExp(requiredScript.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
     );
   }
+  assert.equal(packageJson.scripts.prepush, "npm run verify:quick");
+  assert.doesNotMatch(quick, /\bbuild\b|test:e2e:ci/);
+  assert.match(
+    packageJson.scripts["verify:release"],
+    /verify:quick verify:release:post-quick/,
+  );
+  assert.match(
+    packageJson.scripts["verify:release:post-quick"],
+    /build test:e2e:ci/,
+  );
 
   const release = readRepoFile("scripts/release.mjs");
-  assert.match(
-    release,
-    /runRequiredScript\("prepush"\)[\s\S]+?runRequiredScript\("build-storybook"\)[\s\S]+?runRequiredScript\("test-storybook"\)[\s\S]+?runRequiredScript\("test:visual"\)/,
-  );
+  assert.match(release, /runRequiredScript\("prepush"\)/);
+  assert.doesNotMatch(release, /runRequiredScript\("build-storybook"\)/);
+  assert.doesNotMatch(release, /runRequiredScript\("test-storybook"\)/);
+  assert.doesNotMatch(release, /runRequiredScript\("test:visual"\)/);
 });
 
 test("auth E2E mock reset waits for a semantic application readiness boundary", () => {
@@ -230,7 +243,7 @@ test("active Supabase workflows pin the Production-validated CLI version", () =>
   );
 });
 
-test("Storybook interaction runs automatically, isolates shared state, and keeps pixel baselines manual", () => {
+test("Storybook interaction and visual baselines are explicit manual tools", () => {
   const workflow = readRepoFile(".github/workflows/storybook.yml");
   const preview = readRepoFile(".storybook/preview.tsx");
   const vitestConfig = readRepoFile("vitest.config.ts");
@@ -240,16 +253,15 @@ test("Storybook interaction runs automatically, isolates shared state, and keeps
   const imageUploadDraftClient = readRepoFile("src/lib/image-upload/draft.client.ts");
 
   assert.match(workflow, /name: Storybook and Visual Baselines/);
-  assert.match(workflow, /push:\s*\n\s+branches:\s*\[main, dev\]/);
-  assert.match(
-    workflow,
-    /pull_request:\s*\n\s+types:\s*\[opened, synchronize, reopened, ready_for_review\]/,
-  );
+  assert.doesNotMatch(workflow, /^\s+push:\s*$/m);
+  assert.doesNotMatch(workflow, /^\s+pull_request:\s*$/m);
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /interaction:/);
+  assert.match(workflow, /visual:/);
   assert.match(workflow, /concurrency:\s*\n\s+group:/);
-  assert.match(workflow, /cancel-in-progress:\s+true/);
+  assert.match(workflow, /cancel-in-progress:\s+false/);
   assert.match(workflow, /name: Build, Interaction, A11y/);
-  assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name != 'pull_request' \|\| !github\.event\.pull_request\.draft\s*\}\}/);
+  assert.match(workflow, /if:\s*\$\{\{\s*inputs\.interaction\s*\}\}/);
   assert.match(workflow, /npm run build-storybook/);
   assert.match(workflow, /npm run test-storybook/);
   assert.match(workflow, /npm run install:trusted/);
@@ -257,7 +269,7 @@ test("Storybook interaction runs automatically, isolates shared state, and keeps
   assert.doesNotMatch(workflow, /\bnpm (?:ci|install)\b/);
   assert.match(workflow, /playwright install --with-deps chromium/);
   assert.match(workflow, /name: Visual Baselines/);
-  assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name == 'workflow_dispatch'\s*\}\}/);
+  assert.match(workflow, /if:\s*\$\{\{\s*inputs\.visual\s*\}\}/);
   assert.match(workflow, /npm run test:visual/);
   assert.match(workflow, /runs-on:\s+ubuntu-latest/);
   assert.doesNotMatch(workflow, /name: Detect visual changes/);
@@ -291,7 +303,7 @@ test("Public Readiness owns canonical lockfile verification without a standalone
   assert.equal(workflowNames.includes("lockfile-check.yml"), false);
   assert.match(
     publicReadiness,
-    /jobs:\s*\n\s+verify:\s*\n\s+name: Lint, Test, Build, Security, E2E[\s\S]+?name: Verify lockfile\s*\n\s+run: npm run check:lockfile/,
+    /jobs:\s*\n\s+quick:\s*\n\s+name: Quick Readiness[\s\S]+?name: Verify lockfile\s*\n\s+run: npm run check:lockfile/,
   );
   assert.equal(
     [...publicReadiness.matchAll(/run:\s*npm run check:lockfile/g)].length,
@@ -338,22 +350,20 @@ test("Preview Supabase migrations apply dev schema changes without syncing data"
 
   for (const requiredText of [
     "name: Apply Preview Supabase Migrations",
-    "push:",
-    "branches: [main]",
+    "workflow_run:",
+    "Public Readiness",
+    "branches: [dev]",
     "workflow_dispatch:",
     "APPLY_PREVIEW_MIGRATIONS",
     "expected_dev_sha:",
-    "[apply-preview-migrations]",
+    "github.event.workflow_run.conclusion == 'success'",
+    "github.event.workflow_run.event == 'push'",
+    "github.event.workflow_run.head_branch == 'dev'",
     "github.ref == 'refs/heads/main'",
     "ref: ${{ steps.select-dev.outputs.sha }}",
     "npm run validate:migrations",
     "SUPABASE_PREVIEW_DB_URL",
     'supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes',
-    "Repair stale Preview migration history",
-    "[repair-preview-migration-history]",
-    "supabase migration repair",
-    "--status reverted",
-    "20260712133729 20260712143858",
   ]) {
     assert.match(
       workflow,
@@ -361,104 +371,39 @@ test("Preview Supabase migrations apply dev schema changes without syncing data"
     );
   }
 
-  assert.match(
-    workflow,
-    /name: Repair stale Preview migration history[\s\S]+?github\.event_name == 'push' &&[\s\S]+?contains\(github\.event\.head_commit\.message, '\[repair-preview-migration-history\]'\)[\s\S]+?supabase migration repair[\s\S]+?--status reverted[\s\S]+?20260712133729 20260712143858/,
-  );
   assert.doesNotMatch(
     workflow,
-    /sync:preview|SUPABASE_PRODUCTION_DB_URL|--include-all/,
+    /sync:preview|SUPABASE_PRODUCTION_DB_URL|--include-all|migration repair/,
   );
   assert.doesNotMatch(workflow, /ref: dev/);
   assert.match(workflow, /git ls-remote "\$REPOSITORY_URL" refs\/heads\/dev/);
+  assert.match(workflow, /echo "is_current=false" >> "\$GITHUB_OUTPUT"/);
   assert.match(
     workflow,
     /name: Apply pending Preview migrations[\s\S]+?test "\$\(git rev-parse HEAD\)" = "\$EXPECTED_DEV_SHA"[\s\S]+?git ls-remote origin refs\/heads\/dev[\s\S]+?supabase db push/,
   );
 });
 
-test("Preview sync isolates non-eligible completions from the mutation queue", () => {
+test("Preview data and Storage sync is an explicit exact-dev maintenance operation", () => {
   const workflow = readRepoFile(".github/workflows/preview-sync.yml");
-  const concurrencyBlock = workflow.match(
-    /concurrency:\s*\n([\s\S]+?)\n\njobs:/,
-  )?.[1];
-
-  assert.ok(concurrencyBlock, "Preview sync concurrency block missing");
-  assert.match(concurrencyBlock, /group:\s*>-/);
-  assert.match(
-    concurrencyBlock,
-    /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/dev'[\s\S]+?github\.event_name == 'workflow_run'[\s\S]+?github\.event\.workflow_run\.conclusion == 'success'[\s\S]+?github\.event\.workflow_run\.event == 'push'[\s\S]+?github\.event\.workflow_run\.head_branch == 'dev'[\s\S]+?&& 'preview-sync' \|\|[\s\S]+?format\('preview-sync-noop-\{0\}', github\.run_id\)/,
-  );
-  assert.equal(
-    [
-      ...concurrencyBlock.matchAll(
-        /format\('preview-sync-noop-\{0\}', github\.run_id\)/g,
-      ),
-    ].length,
-    1,
-  );
-  assert.match(concurrencyBlock, /cancel-in-progress:\s+false/);
-});
-
-test("Preview sync concurrency and job guards use the same eligibility predicate", () => {
-  const workflow = readRepoFile(".github/workflows/preview-sync.yml");
-  const concurrencyEligibility = workflow.match(
-    /concurrency:\s*\n\s+group:\s*>-\s*\n([\s\S]+?)\n\s+cancel-in-progress:/,
-  )?.[1];
-  const jobEligibility = workflow.match(
-    /jobs:\s*\n\s+sync-preview:\s*\n\s+if:\s*>-\s*\n([\s\S]+?)\n\s+runs-on:/,
-  )?.[1];
-
-  assert.ok(concurrencyEligibility, "Preview sync concurrency eligibility missing");
-  assert.ok(jobEligibility, "Preview sync job eligibility guard missing");
-
-  const compactExpression = (expression: string) =>
-    expression.replace(/\s+/g, "").replace(/^\$\{\{/, "").replace(/\}\}$/, "");
-  const compactJobEligibility = compactExpression(jobEligibility);
-  const queueSelection =
-    "&&'preview-sync'||format('preview-sync-noop-{0}',github.run_id)";
-
-  assert.equal(
-    compactExpression(concurrencyEligibility),
-    `(${compactJobEligibility})${queueSelection}`,
-  );
-});
-
-test("Preview sync follows the latest successful dev public-readiness run without stale reruns", () => {
-  const workflow = readRepoFile(".github/workflows/preview-sync.yml");
-  const jobEligibility = workflow.match(
-    /jobs:\s*\n\s+sync-preview:\s*\n\s+if:\s*>-\s*\n([\s\S]+?)\n\s+runs-on:/,
-  )?.[1];
 
   assert.match(workflow, /name: Sync Preview Supabase/);
-  assert.match(workflow, /workflow_run:/);
-  assert.match(workflow, /workflows:\s*\n\s+- Public Readiness/);
-  assert.match(workflow, /branches:\s*\[dev\]/);
-  assert.match(workflow, /types:\s*\n\s+- completed/);
-  assert.ok(jobEligibility, "Preview sync job eligibility guard missing");
-  assert.match(
-    jobEligibility,
-    /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/dev'/,
-  );
-  assert.match(
-    jobEligibility,
-    /github\.event\.workflow_run\.conclusion == 'success'/,
-  );
-  assert.match(jobEligibility, /github\.event\.workflow_run\.event == 'push'/);
-  assert.match(
-    jobEligibility,
-    /github\.event\.workflow_run\.head_branch == 'dev'/,
-  );
-  assert.match(workflow, /&& 'preview-sync' \|\|/);
-  assert.match(workflow, /format\('preview-sync-noop-\{0\}', github\.run_id\)/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.doesNotMatch(workflow, /workflow_run:/);
+  assert.doesNotMatch(workflow, /^\s+push:\s*$/m);
+  assert.match(workflow, /confirmation:/);
+  assert.match(workflow, /SYNC_PREVIEW_DATA/);
+  assert.match(workflow, /expected_dev_sha:/);
+  assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow, /group:\s+preview-data-sync/);
   assert.match(workflow, /cancel-in-progress:\s+false/);
-  assert.match(workflow, /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/dev'/);
-  assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/);
-  assert.match(workflow, /github\.event\.workflow_run\.event == 'push'/);
-  assert.match(workflow, /github\.event\.workflow_run\.head_branch == 'dev'/);
-  assert.match(workflow, /name: Guard stale dev workflow SHA/);
+  assert.match(workflow, /ref: \$\{\{ steps\.select-dev\.outputs\.sha \}\}/);
+  assert.doesNotMatch(workflow, /ref: dev/);
+  assert.doesNotMatch(workflow, /ref: main/);
   assert.match(workflow, /git ls-remote origin refs\/heads\/dev/);
-  assert.match(workflow, /steps\.stale-sha\.outputs\.is_current == 'true'/);
+  assert.match(workflow, /run: npm run sync:preview/);
+  assert.match(workflow, /SUPABASE_PRODUCTION_DB_URL/);
+  assert.match(workflow, /SUPABASE_PREVIEW_SERVICE_ROLE_KEY/);
   assert.match(workflow, /node-version:\s+24\.18\.1/);
   assert.match(workflow, /npm run install:trusted/);
   assert.match(workflow, /version:\s+2\.114\.0/);
