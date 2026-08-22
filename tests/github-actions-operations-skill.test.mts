@@ -1086,6 +1086,18 @@ test("the run auditor emits structural evidence for hostile text and confines ou
   assert.deepEqual(
     (auditor as unknown as { signatureNamesForText: (text: string) => string[] })
       .signatureNamesForText(
+        "✔ Storybook and visual baselines remain explicit manual tools",
+      ),
+    [],
+  );
+  assert.deepEqual(
+    (auditor as unknown as { signatureNamesForText: (text: string) => string[] })
+      .signatureNamesForText("Screenshot comparison failed for visual baseline"),
+    ["visual_drift"],
+  );
+  assert.deepEqual(
+    (auditor as unknown as { signatureNamesForText: (text: string) => string[] })
+      .signatureNamesForText(
         'await dialog.findByText("ready", {}, { timeout: 4000 })',
       ),
     [],
