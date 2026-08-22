@@ -43,6 +43,8 @@ const reviewedWorkflowNpmCommands = new Set([
   "npm run test:visual",
   "npm run typecheck:ci",
   "npm run validate:migrations",
+  "npm run verify:change --\n--base \"$BASE_SHA\"\n--head \"$HEAD_SHA\"\n--event \"$EVENT_NAME\"\n--base-ref \"$BASE_REF\"\n--force-full \"$FORCE_FULL\"\n--expected-level \"$EXPECTED_LEVEL\"",
+  "npm run verify:promotion:smoke",
   "npm run verify:release:post-quick",
   "npm test",
 ]);
@@ -182,7 +184,7 @@ test("the skill fails closed before a remote trigger", () => {
     skill,
     /Never merge a PR while its exact-head first-attempt log audit is still running/,
   );
-  assert.match(skill, /then `npm run verify:quick`/);
+  assert.match(skill, /then `npm run verify:change`/);
   assert.match(skill, /Run `npm run verify:release` before a `dev` to `main` promotion/);
   assert.match(skill, /Inspect the complete local output, not only its exit code/);
   assert.match(skill, /interrupt it before `receive-pack`/);
@@ -379,7 +381,7 @@ test("trusted dependency installation disables every lifecycle and verifies one 
   assert.match(installScriptGate, /buildControlledInstallEnvironment/);
   assert.match(
     read("package.json"),
-    /"prepush": "npm run verify:quick"/,
+    /"prepush": "npm run verify:change"/,
   );
   assert.equal(packageJson.scripts?.["install:trusted"], "node scripts/install-dependencies.mjs");
   assert.equal(vercel.installCommand, "npm run install:trusted");
@@ -917,7 +919,7 @@ test("the failure ledger records a paginated retained-run census", () => {
   assert.match(ledger, /1,755 full logs available and scanned, 582 returned `410 Gone`/);
   assert.match(ledger, /441 successful retained runs/);
   assert.match(ledger, /A blocking abnormal run extends this file before another attempt/);
-  assert.match(ledger, /Tiered CI policy/);
+  assert.match(ledger, /Change-aware tiered CI policy/);
   assert.doesNotMatch(ledger, /audit in progress|pending final census|Do not treat this draft/i);
 
   assert.match(retainedAudit, /Runs: 3,362 = 2,337 success \+ 195 failure \+ 136 cancelled \+ 694 skipped/);

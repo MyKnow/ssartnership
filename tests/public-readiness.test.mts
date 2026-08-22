@@ -60,7 +60,7 @@ test("GitHub Actions use the Node 24 action runtime and project runtime with rea
   }
 });
 
-test("public readiness separates the normal Quick Gate from main promotion", () => {
+test("public readiness classifies the diff and closes conditional jobs with one policy gate", () => {
   const workflow = readRepoFile(".github/workflows/public-readiness.yml");
 
   for (const requiredText of [
@@ -69,15 +69,16 @@ test("public readiness separates the normal Quick Gate from main promotion", () 
     "workflow_dispatch:",
     "node-version: 24.18.1",
     "npm run install:trusted",
-    "npm run check:lockfile",
-    "npm run validate:migrations",
-    "npm run lint",
-    "npm run typecheck:ci",
-    "npm test",
-    "npm run audit:security",
-    "name: Quick Readiness",
-    "name: Release Readiness",
+    "name: Classify Change",
+    "node scripts/change-policy.mjs",
+    "name: Change-Aware Verification",
+    "npm run verify:change",
+    "name: CI Policy Gate",
+    "node scripts/ci-policy-gate.mjs",
+    "verify_step_result: ${{ steps.change-verify.outcome }}",
+    "VERIFY_STEP_RESULT: ${{ needs.verify.outputs.verify_step_result }}",
     "PLAYWRIGHT_CHROMIUM_CHANNEL: chrome",
+    "npm run verify:promotion:smoke",
     "npm run verify:release:post-quick",
   ]) {
     assert.match(
@@ -90,10 +91,10 @@ test("public readiness separates the normal Quick Gate from main promotion", () 
   assert.match(workflow, /pull_request:\s*\n\s+branches:\s*\[main, dev\]/);
   assert.match(workflow, /concurrency:\s*\n\s+group:/);
   assert.match(workflow, /cancel-in-progress:\s+true/);
-  assert.match(
-    workflow,
-    /github\.event_name == 'pull_request' && github\.base_ref == 'main'/,
-  );
+  assert.match(workflow, /contains\(github\.event\.pull_request\.labels\.\*\.name, 'ci:full'\)/);
+  assert.match(workflow, /if:\s*\$\{\{ always\(\) \}\}/);
+  assert.match(workflow, /needs:\s*\[classify, verify\]/);
+  assert.match(workflow, /fetch-depth:\s*0/);
   assert.doesNotMatch(workflow, /name: Dependency audit/);
   assert.doesNotMatch(workflow, /run: npm audit --omit=dev/);
   assert.match(workflow, /persist-credentials:\s+false/);
@@ -104,7 +105,7 @@ test("public readiness separates the normal Quick Gate from main promotion", () 
   );
 });
 
-test("local prepush stays quick and the explicit release gate adds build and E2E", () => {
+test("local prepush shares the change classifier while explicit promotion gates stay available", () => {
   const packageJson = JSON.parse(readRepoFile("package.json")) as {
     scripts: Record<string, string>;
   };
@@ -125,7 +126,15 @@ test("local prepush stays quick and the explicit release gate adds build and E2E
       new RegExp(requiredScript.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
     );
   }
-  assert.equal(packageJson.scripts.prepush, "npm run verify:quick");
+  assert.equal(packageJson.scripts.prepush, "npm run verify:change");
+  assert.equal(
+    packageJson.scripts["classify:change"],
+    "node scripts/change-policy.mjs",
+  );
+  assert.equal(
+    packageJson.scripts["verify:change"],
+    "node scripts/verify-change.mjs",
+  );
   assert.doesNotMatch(quick, /\bbuild\b|test:e2e:ci/);
   assert.match(
     packageJson.scripts["verify:release"],
@@ -135,6 +144,11 @@ test("local prepush stays quick and the explicit release gate adds build and E2E
     packageJson.scripts["verify:release:post-quick"],
     /build test:e2e:ci/,
   );
+  assert.match(
+    packageJson.scripts["verify:promotion:smoke"],
+    /build test:e2e:smoke:ci/,
+  );
+  assert.match(packageJson.scripts["test:e2e:smoke:ci"], /--grep @critical/);
 
   const release = readRepoFile("scripts/release.mjs");
   assert.match(release, /runRequiredScript\("prepush"\)/);
@@ -293,7 +307,7 @@ test("Storybook interaction and visual baselines are explicit manual tools", () 
   assert.doesNotMatch(workflow, /chromaui\/action|CHROMATIC_PROJECT_TOKEN/);
 });
 
-test("Public Readiness owns canonical lockfile verification without a standalone workflow", () => {
+test("Public Readiness delegates canonical lockfile verification to the shared Quick profile", () => {
   const workflowsDirectory = new URL("../.github/workflows/", import.meta.url);
   const workflowNames = readdirSync(workflowsDirectory);
   const publicReadiness = readRepoFile(
@@ -301,14 +315,12 @@ test("Public Readiness owns canonical lockfile verification without a standalone
   );
 
   assert.equal(workflowNames.includes("lockfile-check.yml"), false);
-  assert.match(
-    publicReadiness,
-    /jobs:\s*\n\s+quick:\s*\n\s+name: Quick Readiness[\s\S]+?name: Verify lockfile\s*\n\s+run: npm run check:lockfile/,
-  );
-  assert.equal(
-    [...publicReadiness.matchAll(/run:\s*npm run check:lockfile/g)].length,
-    1,
-  );
+  assert.match(publicReadiness, /npm run verify:change/);
+  assert.match(readRepoFile("scripts/verify-change.mjs"), /runRequired\("verify:quick"\)/);
+  const packageJson = JSON.parse(readRepoFile("package.json")) as {
+    scripts: Record<string, string>;
+  };
+  assert.match(packageJson.scripts["verify:quick"], /check:lockfile/);
 });
 
 test("production Supabase migrations require an explicit guarded dispatch", () => {
@@ -350,15 +362,15 @@ test("Preview Supabase migrations apply dev schema changes without syncing data"
 
   for (const requiredText of [
     "name: Apply Preview Supabase Migrations",
-    "workflow_run:",
-    "Public Readiness",
+    "push:",
     "branches: [dev]",
+    '"supabase/migrations/**"',
+    '"supabase/schema.sql"',
     "workflow_dispatch:",
     "APPLY_PREVIEW_MIGRATIONS",
     "expected_dev_sha:",
-    "github.event.workflow_run.conclusion == 'success'",
-    "github.event.workflow_run.event == 'push'",
-    "github.event.workflow_run.head_branch == 'dev'",
+    "github.event_name == 'push'",
+    "github.ref == 'refs/heads/dev'",
     "github.ref == 'refs/heads/main'",
     "ref: ${{ steps.select-dev.outputs.sha }}",
     "npm run validate:migrations",
@@ -376,6 +388,7 @@ test("Preview Supabase migrations apply dev schema changes without syncing data"
     /sync:preview|SUPABASE_PRODUCTION_DB_URL|--include-all|migration repair/,
   );
   assert.doesNotMatch(workflow, /ref: dev/);
+  assert.doesNotMatch(workflow, /workflow_run:/);
   assert.match(workflow, /git ls-remote "\$REPOSITORY_URL" refs\/heads\/dev/);
   assert.match(workflow, /echo "is_current=false" >> "\$GITHUB_OUTPUT"/);
   assert.match(

@@ -26,7 +26,7 @@ test.describe("authenticated administrator console", () => {
     await waitForAdminShellHydration(page);
   });
 
-  test("renders the admin home and permission-filtered navigation", async ({ page }) => {
+  test("@critical renders the admin home and permission-filtered navigation", async ({ page }) => {
     await expect(
       page.getByRole("heading", { name: "관리 홈", exact: true }),
     ).toBeVisible();

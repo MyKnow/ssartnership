@@ -21,15 +21,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quick:
-    name: Quick Readiness
+  classify:
+    name: Classify Change
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
+    outputs:
+      level: ${{ steps.policy.outputs.level }}
+      change_count: ${{ steps.policy.outputs.change_count }}
+      verify_profile: ${{ steps.policy.outputs.verify_profile }}
+      run_verify: ${{ steps.policy.outputs.run_verify }}
+      run_smoke: ${{ steps.policy.outputs.run_smoke }}
+      run_release: ${{ steps.policy.outputs.run_release }}
+      run_job: ${{ steps.policy.outputs.run_job }}
+      requires_vercel: ${{ steps.policy.outputs.requires_vercel }}
+      target_sha: ${{ steps.policy.outputs.target_sha }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Setup Node
@@ -40,42 +51,39 @@ jobs:
           node-version: 24.18.1
           cache: npm
 
-      - name: Install trusted dependencies
-        run: npm run install:trusted
+      - name: Classify changed files
+        id: policy
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          FORCE_FULL: ${{ (github.event_name == 'workflow_dispatch' && inputs.release_gate) || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci:full')) }}
+        run: >-
+          node scripts/change-policy.mjs
+          --base "$BASE_SHA"
+          --head "$HEAD_SHA"
+          --event "$EVENT_NAME"
+          --base-ref "$BASE_REF"
+          --force-full "$FORCE_FULL"
+          --github-output "$GITHUB_OUTPUT"
 
-      - name: Verify lockfile
-        run: npm run check:lockfile
-
-      - name: Validate migrations
-        run: npm run validate:migrations
-
-      - name: Lint
-        run: npm run lint
-
-      - name: TypeScript syntax check
-        run: npm run typecheck:ci
-
-      - name: Unit tests
-        run: npm test
-
-      - name: Security audit
-        run: npm run audit:security
-
-  release:
-    if: >-
-      ${{
-        (github.event_name == 'pull_request' && github.base_ref == 'main') ||
-        (github.event_name == 'workflow_dispatch' && inputs.release_gate)
-      }}
-    needs: quick
-    name: Release Readiness
+  verify:
+    if: ${{ needs.classify.result == 'success' && needs.classify.outputs.run_job == 'true' }}
+    needs: classify
+    name: Change-Aware Verification
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    outputs:
+      verify_step_result: ${{ steps.change-verify.outcome }}
+      smoke_step_result: ${{ steps.promotion-smoke.outcome }}
+      release_step_result: ${{ steps.full-release.outcome }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Setup Node
@@ -89,7 +97,69 @@ jobs:
       - name: Install trusted dependencies
         run: npm run install:trusted
 
+      - name: Run classified verification
+        id: change-verify
+        if: ${{ needs.classify.outputs.run_verify == 'true' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          EXPECTED_LEVEL: ${{ needs.classify.outputs.level }}
+          FORCE_FULL: ${{ (github.event_name == 'workflow_dispatch' && inputs.release_gate) || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci:full')) }}
+        run: >-
+          npm run verify:change --
+          --base "$BASE_SHA"
+          --head "$HEAD_SHA"
+          --event "$EVENT_NAME"
+          --base-ref "$BASE_REF"
+          --force-full "$FORCE_FULL"
+          --expected-level "$EXPECTED_LEVEL"
+
+      - name: Production build and critical E2E smoke
+        id: promotion-smoke
+        if: ${{ needs.classify.outputs.run_smoke == 'true' }}
+        env:
+          PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
+        run: npm run verify:promotion:smoke
+
       - name: Production build and full E2E
+        id: full-release
+        if: ${{ needs.classify.outputs.run_release == 'true' }}
         env:
           PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
         run: npm run verify:release:post-quick
+
+  policy:
+    if: ${{ always() }}
+    needs: [classify, verify]
+    name: CI Policy Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.18.1
+
+      - name: Verify required conditional jobs
+        env:
+          CLASSIFY_RESULT: ${{ needs.classify.result }}
+          VERIFICATION_RESULT: ${{ needs.verify.result }}
+          CHANGE_LEVEL: ${{ needs.classify.outputs.level }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          RUN_JOB: ${{ needs.classify.outputs.run_job }}
+          RUN_VERIFY: ${{ needs.classify.outputs.run_verify }}
+          RUN_SMOKE: ${{ needs.classify.outputs.run_smoke }}
+          RUN_RELEASE: ${{ needs.classify.outputs.run_release }}
+          VERIFY_STEP_RESULT: ${{ needs.verify.outputs.verify_step_result }}
+          SMOKE_STEP_RESULT: ${{ needs.verify.outputs.smoke_step_result }}
+          RELEASE_STEP_RESULT: ${{ needs.verify.outputs.release_step_result }}
+        run: node scripts/ci-policy-gate.mjs

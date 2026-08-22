@@ -19,12 +19,14 @@ This is the living, sanitized source for Actions failure signatures and rollout 
 
 The audit is complete for the retained GitHub inventory, subject to the stated expired-log boundary. GitHub cannot prove runs that were deleted before the freeze. Exact frozen IDs and category coverage are preserved in [retained-actions-audit.md](retained-actions-audit.md).
 
-## Tiered CI policy
+## Change-aware tiered CI policy
 
-- `verify:quick` is the normal local, feature PR, `dev` push, and post-merge `main` gate. It keeps trusted-install, lockfile, migration, lint, semantic type, unit, and dependency/security checks.
-- `verify:release` adds the Production build and retry-free full E2E suite. GitHub runs the release portion automatically only for PRs targeting `main` or an explicit manual release dispatch.
+- `verify:change` is the normal local and GitHub gate. The shared merge-base diff classifier selects `docs`, `development`, `ui`, `standard`, or `high`; labels and manual input may escalate but never downgrade. Unknown paths, empty/oversized ranges, deletions, copies, renames, type changes, and unresolved states fail closed to `high`.
+- `docs` performs classification only; `development` runs changed-file lint and semantic typecheck; `ui` adds Node/unit tests; `standard` and `high` run trusted-install, lockfile, migration, full lint/type, unit, and dependency/security checks. Main-target `ui`/`standard` PRs add a critical smoke suite, while `high` PRs add the Production build and retry-free full E2E suite.
+- The always-running `CI Policy Gate` independently derives the expected event/level plan and validates the classifier plan, conditional job result, and each verify/smoke/release step outcome. It is the branch-protection aggregation boundary. Vercel remains separately required because ignored deployments surface as cancelled provider states and cannot safely replace deployment evidence.
+- `verify:release` remains the explicit complete local Production gate and is required before `dev` to `main` promotion.
 - Storybook interaction, accessibility, and visual baseline workflows are manual. They remain available for explicit component-contract or visual work without creating ordinary push/PR notifications.
-- Production-to-Preview data and Storage sync is manual and exact-`dev`-SHA bound. A successful `dev` Quick Readiness run applies pending Preview migrations only.
+- Production-to-Preview data and Storage sync is manual and exact-`dev`-SHA bound. Preview migration automation runs only for `dev` pushes that change migration files or the schema snapshot; ordinary changes create no migration workflow run.
 - Windows/macOS validate bootstrap, doctor, cross-platform policy, and focused development-environment contracts only when their path filter matches a PR or a manual dispatch.
 - Repository-controlled test, workflow, dependency, security, and schema failures remain blocking. Recovered provider transients with verified final parity are operational observations, not reasons to rebuild unchanged source under a new SHA.
 
