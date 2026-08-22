@@ -112,7 +112,7 @@ test("Windows x64와 macOS arm64 CI가 같은 개발환경 명령을 검증한�
   assert.match(workflow, /npm run check:cross-platform/);
   assert.match(
     workflow,
-    /node --import \.\/tests\/alias-register\.mjs --test tests\/cross-platform-development-contract\.test\.mts tests\/development-environment\.test\.mts/,
+    /node --import \.\/tests\/alias-register\.mjs --test tests\/change-policy\.test\.mts tests\/cross-platform-development-contract\.test\.mts tests\/development-environment\.test\.mts/,
   );
   assert.doesNotMatch(workflow, /^\s+push:\s*$/m);
   assert.doesNotMatch(workflow, /npm run lint/);

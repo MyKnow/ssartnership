@@ -9,6 +9,18 @@ import {
   type SmokeRoute,
 } from "./fixtures/routes";
 
+const criticalPublicPaths = new Set([
+  "/",
+  "/auth/login",
+  "/partners/health-001",
+]);
+const criticalRedirectPaths = new Set(["/certification", "/partner"]);
+const criticalAdminPaths = new Set(["/admin/login", "/admin"]);
+
+function criticalTitle(path: string, title: string, criticalPaths: Set<string>) {
+  return `${criticalPaths.has(path) ? "@critical " : ""}${title}`;
+}
+
 async function expectNoNextError(page: Page) {
   await expect(
     page.getByText(
@@ -20,9 +32,12 @@ async function expectNoNextError(page: Page) {
 test.describe("page smoke coverage", () => {
   test.describe("public and login pages", () => {
     for (const route of [...publicSmokeRoutes, ...authSmokeRoutes]) {
-      test(`renders ${route.path}`, async ({ page }) => {
-        await visitSmokeRoute(page, route);
-      });
+      test(
+        criticalTitle(route.path, `renders ${route.path}`, criticalPublicPaths),
+        async ({ page }) => {
+          await visitSmokeRoute(page, route);
+        },
+      );
     }
   });
 
@@ -31,17 +46,27 @@ test.describe("page smoke coverage", () => {
       ...memberProtectedRoutes,
       ...partnerProtectedRoutes,
     ]) {
-      test(`redirects ${route.path}`, async ({ page }) => {
-        await visitRedirectRoute(page, route);
-      });
+      test(
+        criticalTitle(
+          route.path,
+          `redirects ${route.path}`,
+          criticalRedirectPaths,
+        ),
+        async ({ page }) => {
+          await visitRedirectRoute(page, route);
+        },
+      );
     }
   });
 
   test.describe("admin edge guard", () => {
     for (const route of adminGuardRoutes) {
-      test(`guards ${route.path}`, async ({ request }) => {
-        await visitAdminGuardRoute(request, route);
-      });
+      test(
+        criticalTitle(route.path, `guards ${route.path}`, criticalAdminPaths),
+        async ({ request }) => {
+          await visitAdminGuardRoute(request, route);
+        },
+      );
     }
   });
 });

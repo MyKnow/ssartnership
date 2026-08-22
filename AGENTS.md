@@ -70,6 +70,8 @@ npx eslint <changed-files>
 node --test tests/<focused-test>.test.mts
 ```
 
+Before pushing, run `npm run verify:change`. It classifies the actual diff and uses the same risk tier as GitHub Actions. Run `npm run verify:release` before promoting `dev` to `main`, or whenever the build, E2E, dependency, migration, authentication/security, or CI policy boundary changes.
+
 Run `next build` only when the change touches build/runtime behavior broadly or the user asks for production verification.
 
 For UI creation or modification, include visual proof in the final handoff. Capture the affected surface after the change at the relevant viewport classes and show the screenshots with Markdown image tags using absolute local paths: mobile (`360px`, plus `320px`/`390px` when risky), tablet (`820px` or `1024px`), and desktop (`1366px` or `1440px`). If a viewport class is out of scope or screenshot capture fails, state that explicitly with the reason and the fallback verification performed. Store these QA screenshots in an ignored temporary folder such as `.tmp/ui-qa/`; do not stage them.

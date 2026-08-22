@@ -9,6 +9,7 @@ on:
       - "package.json"
       - "package-lock.json"
       - "scripts/**"
+      - "tests/change-policy.test.mts"
       - "tests/cross-platform-development-contract.test.mts"
       - "tests/development-environment.test.mts"
   workflow_dispatch:
@@ -60,4 +61,4 @@ jobs:
         run: npm run check:cross-platform
 
       - name: Development environment contracts
-        run: node --import ./tests/alias-register.mjs --test tests/cross-platform-development-contract.test.mts tests/development-environment.test.mts
+        run: node --import ./tests/alias-register.mjs --test tests/change-policy.test.mts tests/cross-platform-development-contract.test.mts tests/development-environment.test.mts
