@@ -5130,7 +5130,15 @@ create table if not exists admin_notifications (
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamp with time zone not null default now(),
   constraint admin_notifications_type_check
-    check (type in ('partner_change_request', 'partner_immediate_update', 'expiring_partner', 'security_alert'))
+    check (
+      type in (
+        'partner_change_request',
+        'partner_immediate_update',
+        'expiring_partner',
+        'security_alert',
+        'partner_registration_request'
+      )
+    )
 );
 
 create table if not exists admin_notification_recipients (
