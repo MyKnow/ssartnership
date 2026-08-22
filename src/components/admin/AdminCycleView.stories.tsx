@@ -28,6 +28,8 @@ const meta = {
     themes: [],
     currentSemester: 2,
     initialTimestamp: "2026-07-10T10:00:00+09:00",
+    canUpdate: true,
+    canDelete: true,
     updateSettingsAction: async () => {},
     earlyStartAction: async () => {},
     restoreAction: async () => {},
@@ -47,11 +49,37 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole("heading", { name: "기수별 운영" })).toBeInTheDocument();
-    await expect(canvas.getByRole("combobox", { name: "표시할 기수" })).toHaveValue("16");
-    await expect(canvas.getByRole("heading", { name: "16기 운영" })).toBeInTheDocument();
-    await expect(canvas.queryByRole("heading", { name: "15기 운영" })).not.toBeInTheDocument();
-    await expect(canvas.queryByRole("heading", { name: "14기 운영" })).not.toBeInTheDocument();
+    await expect(
+      canvas.getByRole("heading", { name: "기수별 운영" }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByRole("combobox", { name: "표시할 기수" }),
+    ).toHaveValue("16");
+    await expect(
+      canvas.getByRole("heading", { name: "16기 운영" }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("heading", { name: "15기 운영" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("heading", { name: "14기 운영" }),
+    ).not.toBeInTheDocument();
+
+    const cardPreviewElement = canvasElement.querySelector("#card-preview");
+    await expect(cardPreviewElement).not.toBeNull();
+    const cardPreview = within(cardPreviewElement as HTMLElement);
+    await expect(
+      cardPreview.getByRole("heading", {
+        name: "16기 인증 카드 목업",
+        level: 4,
+      }),
+    ).toBeInTheDocument();
+    await expect(
+      cardPreview.queryByRole("heading", { name: "16기 카드 예시" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      cardPreview.getByTestId("certification-card-frame"),
+    ).toBeInTheDocument();
   },
 };
 
@@ -61,10 +89,18 @@ export const SelectedGeneration15: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole("combobox", { name: "표시할 기수" })).toHaveValue("15");
-    await expect(canvas.getByRole("heading", { name: "15기 운영" })).toBeInTheDocument();
-    await expect(canvas.queryByRole("heading", { name: "16기 운영" })).not.toBeInTheDocument();
-    await expect(canvas.queryByRole("heading", { name: "14기 운영" })).not.toBeInTheDocument();
+    await expect(
+      canvas.getByRole("combobox", { name: "표시할 기수" }),
+    ).toHaveValue("15");
+    await expect(
+      canvas.getByRole("heading", { name: "15기 운영" }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("heading", { name: "16기 운영" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("heading", { name: "14기 운영" }),
+    ).not.toBeInTheDocument();
   },
 };
 
@@ -130,12 +166,17 @@ export const MattermostSenderManagement: Story = {
       },
     ],
     mattermostSenderLoadError: false,
+    canManageSenderCreate: true,
+    canManageSenderUpdate: true,
+    canManageSenderDelete: true,
     saveMattermostSenderAction: async () => {},
     testMattermostSenderAction: async () => {},
     disableMattermostSenderAction: async () => {},
   },
   play: async ({ canvasElement }) => {
-    const themeManagerElement = canvasElement.querySelector("#card-theme-manager");
+    const themeManagerElement = canvasElement.querySelector(
+      "#card-theme-manager",
+    );
     if (!(themeManagerElement instanceof HTMLElement)) {
       throw new Error("카드 색상 관리 영역을 찾지 못했습니다.");
     }

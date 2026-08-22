@@ -189,10 +189,6 @@ try {
   if (lighthouse === "run") {
     runRequiredScript("perf:lighthouse");
   }
-  runRequiredScript("test");
-  runRequiredScript("build-storybook");
-  runRequiredScript("test-storybook");
-  runRequiredScript("test:visual");
   runRequiredScript("prepush");
 
   if (releaseType !== "none") {

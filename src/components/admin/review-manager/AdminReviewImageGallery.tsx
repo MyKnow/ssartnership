@@ -32,6 +32,7 @@ export default function AdminReviewImageGallery({
               fill
               sizes="(max-width: 640px) 33vw, 160px"
               className="object-cover"
+              loading="lazy"
               unoptimized
             />
           </button>

@@ -32,6 +32,11 @@ export type ResolvedNotificationTemplate = NotificationTemplateDefinition & {
   updatedBy: string | null;
 };
 
+export type NotificationTemplateSummary = Omit<
+  ResolvedNotificationTemplate,
+  "bodyTemplate"
+>;
+
 function validateStoredRow(
   definition: NotificationTemplateDefinition,
   row: NotificationTemplateRow,
@@ -157,6 +162,17 @@ export async function listNotificationTemplates() {
       rowByKey.get(`${definition.eventKey}:${definition.channel}`) ?? null,
     ),
   );
+}
+
+export async function listNotificationTemplateSummaries(): Promise<
+  NotificationTemplateSummary[]
+> {
+  const templates = await listNotificationTemplates();
+  return templates.map((template) => {
+    const { bodyTemplate, ...summary } = template;
+    void bodyTemplate;
+    return summary;
+  });
 }
 
 export async function upsertNotificationTemplate(input: {

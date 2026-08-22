@@ -56,7 +56,6 @@ const meta = {
   component: AdminPartnerManagerList,
   args: {
     partners,
-    filteredPartners: partners,
     categories,
   },
 } satisfies Meta<typeof AdminPartnerManagerList>;
@@ -69,13 +68,12 @@ export const Default: Story = {};
 
 export const Empty: Story = {
   args: {
-    filteredPartners: [],
+    partners: [],
   },
 };
 
 export const NoPartners: Story = {
   args: {
     partners: [],
-    filteredPartners: [],
   },
 };

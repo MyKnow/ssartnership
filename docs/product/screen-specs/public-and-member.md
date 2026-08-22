@@ -86,11 +86,11 @@
 <!-- screen-contract: member.certification -->
 ## `/certification` — 내 인증
 
-- 목표·위계: 인증 유효 상태 → 구성원 이름/기수/캠퍼스 → QR·만료 → 갱신 안내 순이다.
-- 액션·흐름: primary는 QR 제시 또는 갱신이며 보조는 계정 메뉴 복귀다. 사용자 메뉴에서 진입하고 원래 `returnTo`로 복귀할 수 있다.
-- 경계·상태: member session과 서버 발급 QR만 사용한다. 유효, 갱신 중, 만료, 비로그인, 정보 불일치, 발급 오류를 제공한다.
-- 반응형·분석: QR은 모바일 현장 제시를 우선하고 계정 변경·탈퇴 작업과 별도 surface로 분리한다. `certification_view`, `certification_refresh`를 기록한다.
-- 수용 기준: 화면 제목과 메뉴 용어가 모두 `내 인증`이고 QR token 원문을 analytics·오류 메시지에 남기지 않는다.
+- 목표·위계: 인증 유효 상태 → 구성원 이름/기수/캠퍼스 → QR·만료 → Apple Wallet 보조 인증 수단 → 계정 관리 순이다.
+- 액션·흐름: primary는 QR 제시 또는 갱신이다. 기존 필수 게이트를 통과한 15기 교육생·운영진은 보조 액션으로 Wallet 데이터 이용에 동의하고 `싸트너십 회원 인증` 패스를 추가·재발급·폐기할 수 있다. 사용자 메뉴에서 진입하고 원래 `returnTo`로 복귀할 수 있다.
+- 경계·상태: member session, 서버 발급 QR, Wallet pass repository의 현재 상태만 사용한다. 웹 QR의 유효·갱신 중·만료·발급 오류와 Wallet의 미발급·발급됨·회수됨·오류·설정 필요 상태를 제공한다. Wallet QR 검증은 pass 스냅샷이 아니라 현재 회원·필수 동의·사진·폐기 상태를 다시 확인한다.
+- 반응형·분석: QR은 모바일 현장 제시를 우선한다. Apple Wallet 상태 카드는 인증 카드 아래의 낮은 강조 surface로 두고 360px에서는 한 열과 full-width CTA, 820px 이상에서는 설명과 액션을 나눈다. 계정 변경·탈퇴 작업은 별도 surface로 유지한다. `certification_view`, `certification_refresh`, `wallet_pass_issue`, `wallet_pass_download`, `wallet_pass_revoke`를 서버 확인 결과 기준으로 기록한다.
+- 수용 기준: 화면 제목과 메뉴 용어가 모두 `내 인증`이고 QR token, Wallet public ID, Apple authentication token, device push token 원문을 analytics·오류 메시지에 남기지 않는다. 비밀번호 변경 → 필수 약관 동의 → 본인 사진 게이트 우선순위를 Wallet 발급·갱신 route도 우회하지 않는다.
 
 <!-- screen-contract: member.coupons -->
 ## `/coupons` — 내 쿠폰

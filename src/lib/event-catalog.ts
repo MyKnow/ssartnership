@@ -30,6 +30,13 @@ export const PRODUCT_EVENT_NAMES = [
   'certification_view',
   'certification_qr_open',
   'certification_qr_verify',
+  'wallet_pass_issue',
+  'wallet_pass_download',
+  'wallet_pass_verify',
+  'wallet_pass_revoke',
+  'wallet_pass_device_register',
+  'wallet_pass_device_unregister',
+  'wallet_pass_sync',
   'partner_review_create',
   'partner_review_update',
   'partner_review_delete',
@@ -40,6 +47,12 @@ export const PRODUCT_EVENT_NAMES = [
   'coupon_copy',
   'coupon_redeem',
   'ad_push_send',
+  'admin_web_vital',
+  'admin_route_timing',
+  'admin_prefetch',
+  'admin_task_start',
+  'admin_task_complete',
+  'admin_task_recovery',
 ] as const;
 
 export type ProductEventName = (typeof PRODUCT_EVENT_NAMES)[number];
@@ -66,6 +79,8 @@ export const ADMIN_AUDIT_ACTIONS = [
   'member_email_login_transition',
   'member_manual_add',
   'member_manual_setup_link_reissue',
+  'member_password_reset_link_generate',
+  'member_password_reset_link_send',
   'member_direct_create',
   'member_delete',
   'cycle_settings_update',
@@ -141,6 +156,7 @@ export const ADMIN_AUDIT_ACTIONS = [
   'notification_template_reset',
   'notification_template_test_send',
   'admin_log_export_requested',
+  'log_retention_purge',
 ] as const;
 
 export type AdminAuditAction = (typeof ADMIN_AUDIT_ACTIONS)[number];

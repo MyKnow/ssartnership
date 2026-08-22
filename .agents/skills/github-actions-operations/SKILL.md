@@ -1,0 +1,120 @@
+---
+name: github-actions-operations
+description: Tiered GitHub Actions operation and failure-learning protocol for ssartnership. Use before any action that can create or affect a GitHub Actions run—including git push, PR open/update/ready/merge, tag or release, workflow dispatch/rerun/cancel/delete, branch-protection edits, and workflow edits—and after any blocking failed, cancelled, timed-out, stale, action-required, startup-failed, unexpectedly skipped, or nominally successful run containing hidden retries, flaky tests, or errors. Also use for Actions-history audits and dev/main promotion.
+---
+
+# GitHub Actions Operations
+
+Protect the repository from repeat CI failures and misleading green checks. Preserve failure evidence, learn from every abnormal run, and trigger remote work only from a reviewed local state.
+
+## Mandatory Trigger Protocol
+
+Before an operation sequence that can start, replace, queue, skip, or cancel a GitHub Actions run:
+
+1. Read this file completely at the start of the sequence and re-read it before Production promotion or a privileged shared-state mutation.
+2. Read [failure-ledger.md](references/failure-ledger.md) completely on the same boundaries. Match the planned change against every relevant known signature.
+3. Resolve the exact repository, target branch, head SHA, event, expected workflows, external deployment checks, and any moving PR that will also run against the same SHA.
+   Inspect `.github/workflows/*.yml`, current PR checks, and `gh workflow list`; do not guess the expected run count from memory.
+   When a provider install policy has a runtime floor, prove the provider's actual Node and package-manager versions from project settings or a retained build log. A Node major does not prove a bundled npm minor.
+4. Inspect active runs that mutate shared state. Do not push, merge, dispatch, or change PR state while Preview sync, Production migration, or another shared mutation could be cancelled, superseded, or made stale.
+5. Run the smallest relevant checks, then `npm run verify:quick`, the normal repository gate. Run `npm run verify:release` before a `dev` to `main` promotion and when a change alters the release build, full E2E gate, or their workflow contract. Inspect the complete local output, not only its exit code. Treat an internal retry, flaky pass, browser/server error, transport reset, or other blocking ledger signature as a failure even when every test assertion passes. If the gate is running inside a push hook and a blocking signature appears, interrupt it before `receive-pack`, prove that no remote branch/run/deployment was created, update the ledger and skill when required, and use a new corrective commit before attempting another push.
+6. Review the final diff, status, issue/PR linkage, and expected run count. Use `Refs #...` until the work has reached the repository's required promotion boundary.
+7. State the expected remote effects before triggering them. Perform one deliberate remote mutation, then monitor its exact first attempt before causing another.
+
+For multi-agent or multi-worktree tasks, designate exactly one remote-mutation owner. Monitoring, audit, diagnostic, review, and cleanup workers remain read-only unless the coordinator assigns one exact mutation after reporting that every gate above is satisfied; they must not infer push or merge authority from the user's overall delivery goal. Immediately before the mutation, the owner must re-read the live PR/ref and every registered worktree for that branch. A newer local commit, dirty worktree, active audit, pending ledger correction, differing PR head, or active shared-state run cancels the mutation authorization and returns control to the coordinator.
+
+If the skill, ledger, target ref, active shared mutation, or planned remote effect changes during the sequence, re-read and re-resolve the affected gate before the next mutation. A stable sequence does not require repeating a full historical read between a clean feature push and its PR open.
+
+## First-Attempt Verification
+
+For each triggered SHA or dispatch:
+
+- Record the run ID, workflow, event, exact head SHA, attempt number, and immutable URL.
+- Monitor all expected checks, including duplicate push and moving-PR runs when both are intentional.
+- Inspect complete job logs for Release Readiness, migrations, data sync, deployments, and every abnormal Quick Readiness result. A clean fail-closed Quick Readiness run may be verified from required job/step conclusions, annotations, and test totals without repeating a raw full-log audit.
+- Confirm test totals and zero retries for Playwright and Storybook. A successful job with a retry is an abnormal run.
+- Keep remote Playwright fail-closed: use zero retries for required CI or make the required job explicitly fail when the reporter records a retry/flaky result. A green badge must never hide a failed first attempt.
+- Keep every required wrapper fail-closed. A compiler, linter, test, audit, build, or deployment wrapper may collect a second diagnostic, but it must preserve the first nonzero result and may not turn a failed first invocation into green.
+- Confirm provider contracts: Vercel deployment SHA and alias, Supabase migration status, and manual Preview sync checkout/stale guard/data/storage/post-migration results when applicable.
+- Distinguish an expected job-level `skipped` guard from workflow-level cancellation or an unexpected missing check.
+- Do not call a change clean until every expected first attempt is complete and log-audited.
+
+## Failure-Learning Loop
+
+Blocking learning events are `failure`, `cancelled`, `timed_out`, `action_required`, `startup_failure`, `stale`, unexpected `skipped`, a final provider failure, or a success log containing hidden retry/flaky/error evidence. Repository-controlled test, workflow, dependency, security, configuration, and schema failures are always blocking.
+
+An exact reviewed tooling-warning baseline and a recovered external-provider transient with proven final parity are non-blocking observations. Record a new signature or changed context before Production promotion, but do not require a source edit, artificial replacement commit, or new SHA when the repository did not cause the incident.
+
+When one occurs:
+
+1. Stop further Actions-triggering mutations in the affected sequence.
+2. Preserve the original run. Never delete, cancel, or rerun it to manufacture a green history. A rerun is allowed only for explicit recovery evidence after the root cause is fixed and recorded; it never replaces a new-SHA first attempt.
+3. Capture the exact run/job/step indices, SHA, attempt, event, timestamps, conclusions, annotation presence, and fixed signature counts. Use [audit-actions-run.mjs](scripts/audit-actions-run.mjs) with an explicit `--attempt` for a consistent read-only structural snapshot; it must never persist GitHub-provided log, annotation, workflow, job, step, or path text. Treat `logAvailable: false`, `annotationCollectionComplete: false`, or a nonzero auditor exit as an unavailable evidence boundary, never as a clean audit.
+4. Classify the root cause as product, test, workflow, dependency/toolchain, external provider, concurrency, data/schema, configuration, or operator sequencing. Prove the classification; do not label a run flaky merely because a retry passes.
+5. Update this skill package before retrying a blocking failure: always update [failure-ledger.md](references/failure-ledger.md) with the run, signature, cause, prevention, regression coverage, and rollout state; update this `SKILL.md` too when the reusable procedure itself was incomplete. Repeated repository-controlled failures, hidden retries, errors, or changed warning counts/context still extend the ledger. Recovered external-provider transients may be batched before Production promotion when final parity is proven. An exact recurrence of an explicitly reviewed, non-actionable tooling-warning baseline may be verified against its existing ledger entry without creating an infinite evidence-only push loop; any count, context, severity, or affected-test change reopens it.
+6. Add an executable regression or fail-closed contract whenever practical. Fix repository-controlled causes in a new commit and run retry-disabled focused repetition plus the full relevant gate locally. When investigating a Next development-server lifecycle or teardown signal, use independent fresh-server repetitions for isolation and the complete CI-shaped Playwright invocation for accumulated-lifecycle coverage. Preserve a `--repeat-each` server exit or connection refusal as a distinct stress signal with unresolved causality unless evidence ties it to the original failure; do not dismiss it or retry it into green. For a proven external-only outage, add a repository guard or remove the avoidable dependency when possible; otherwise preserve the original incident and verify recovery on the unchanged SHA after the provider recovers.
+7. Re-read this skill and the updated ledger before pushing a repository-controlled correction. Verify its remote first attempt from the required evidence for that gate tier.
+
+Never merge a PR while its exact-head first-attempt log audit is still running, while a replacement commit exists only locally, or while another agent is investigating an abnormal result. A green badge or a previously issued broad instruction is not a substitute for the mutation owner's fresh gate decision.
+
+If logs have expired or a run was deleted, record the unavailable boundary and do not claim that log as audited.
+
+## Workflow-Specific Gates
+
+### Public Readiness and lockfile
+
+- GitHub Linux must use the repository-pinned Node/npm path without Docker, `npx`, or a registry fetch during canonical lockfile verification.
+- Never materialize dependencies with raw `npm ci` or `npm install` in Actions or Vercel. Use `npm run install:trusted`: it verifies the static/effective npm policy and every reviewed non-registry dependency, installs with every lifecycle script disabled after application/provider secrets are scrubbed (reviewed proxy/CA transport variables may remain), then verifies and executes the integrity-pinned platform `esbuild@0.28.1` binary directly. It never runs `esbuild/install.js` or another lifecycle installer. Keep `.npmrc` exactly at `allow-git=none`, `ignore-scripts=true`, and `omit-lockfile-registry-resolved=false`; do not add package-manager keys unsupported by the oldest reviewed provider npm. The sole reviewed raw-install exception is the post-install, `--package-lock-only --ignore-scripts` canonical lockfile verification; it may not materialize dependencies. This path does not rely on npm's advisory allow-script policy: lifecycle suppression, native Git blocking, exact source classification, and lock identity are independent fail-closed controls.
+- Keep provider credentials and application secrets out of job-level environment variables when dependency installation runs in that job. Set `persist-credentials: false` on every checkout, run the trusted install through its explicit environment allowlist, and inject application secrets only into the exact post-install step that needs them. Vercel cannot step-scope project build variables, so its custom install command also starts from an empty shell environment; later application builds still execute dependency code with build-time variables and remain a separate reviewed supply-chain boundary.
+- Run `npm run check:lockfile` and `npm run verify:quick` for normal changes. Run `npm run verify:release` before Production promotion or a broad release-runtime change. Preserve exact Node 24.18.1/npm 11.16.0 on GitHub; Vercel and local install policy accepts the source-reviewed npm range 11.12.1 through 11.x and rejects npm 12 until separately reviewed.
+- Keep `typecheck:ci` bound to the tracked `tsconfig.typecheck.json`, which excludes ignored `next-env.d.ts`, `.next`, and `.next-e2e` output. A prior E2E or development server may rewrite its ignored generated route types during shutdown; generated or partially written framework output must never change the semantic type gate's input set.
+- Before a push or PR that creates a Vercel deployment, verify that the current Vercel build runtime satisfies that reviewed range. If it does not, preserve the failed provider check and correct the runtime contract on a new SHA. Change the range only after primary-source review plus executable regression evidence; never lower it merely to make a deployment green.
+- Keep `playwright.config.ts` at `retries: 0` for required E2E and retain traces on failure. Audit output for exact passed totals and zero `flaky`, `retry #`, or `✘` markers; GitHub success alone is insufficient.
+- In the explicit non-Production Playwright mock runtime, telemetry must use the repository's reviewed no-op boundaries: the browser must not open fire-and-forget/keepalive product-event requests, and the server must not attempt Production/Preview persistence clients. Wait for a semantic readiness boundary—such as an explicit hydration marker, destination URL plus rendered state, a known response, or stable geometry—rather than treating global `networkidle` as universal UI readiness. Admin routes must use the hydrated admin-shell marker plus route-specific controls because Next development recompilation and intent prefetch can keep global network activity alive after the page is already usable. A known finite flow may use a final network-idle drain only with an explicit bounded timeout after its last meaningful assertion or capture; never catch and ignore that timeout. A URL change or an idle event reached earlier in the test does not prove teardown is safe. A responsive screenshot loop for one route must navigate once and resize the loaded page; reopening the same streamed Next route for every viewport can abort the previous response even when every assertion passes. Do not add a suite-wide request-drain `afterEach`: development-server, stream, or unrelated requests can turn that broad cleanup into a new timeout.
+- Count Next development-server `Fast Refresh had to perform a full reload` diagnostics even when Playwright passes. The retained history establishes this as a nonfatal E2E development-server signal, not permission to ignore it: it remains non-blocking only when every test passes without retry or browser/server error and the warning stays in the reviewed between-test lifecycle context. A new context, preceding runtime error, or unexplained count change reopens the ledger entry.
+- A run-level `success` is invalid evidence if any required job or step failed or was unexpectedly skipped. This catches historical composite workflows whose publish job failed under an overall green conclusion.
+
+### Storybook and visual tests
+
+- Use retry-disabled focused repetition for a failed Story, then run all Storybook interaction/a11y tests.
+- Scope modal queries to their dialog, wait for the dialog's declared initial-focus target before typing, then explicitly focus the intended control and verify its controlled-state transition. Isolate story state/mocks. Do not substitute DOM presence, sleeps, or reruns for that semantic focus boundary.
+- A browser `console.error` invalidates a nominally green interaction run. In particular, await the interaction that starts a React transition or suspension; a fast DOM disappearance assertion does not prove the transition flushed. Record browser-module externalization and bundle warnings separately so they remain visible without being mislabeled as failed tests. The exact reviewed 41-line externalization and two-line bundle-warning baseline may remain non-blocking only while its counts and context are unchanged and every Story still passes without browser `console.error`.
+- Keep visual baselines bound to the canonical renderer. Review image changes; never regenerate unexplained drift.
+
+### Preview sync and migrations
+
+- `workflow_run` executes the workflow definition from the default branch even when it checks out a `dev` SHA. Verify both the definition source and checked-out target.
+- Bind every manual or marker-triggered privileged workflow to an exact reviewed commit. Checkout that SHA, verify runner `HEAD`, and re-read the live protected/integration ref immediately before a database mutation. Never replace the approved revision with a floating `ref: dev` or `ref: main`.
+- A workflow that sends cookies, authorization headers, bypass tokens, or login credentials may contact only a repository-pinned origin. Do not accept an operator-supplied URL or rely on HTTPS alone as an allowlist.
+- A successful `dev` push Quick Readiness run may apply pending Preview migrations through the exact triggering SHA and stale-ref guard. It must not copy Production data or Storage.
+- Production-to-Preview data and Storage sync is an explicit manual maintenance operation bound to the exact current `dev` SHA. Do not start another dev or Production mutation while a sync is active. Verify exact checkout, live-ref guard, migration count, credential sanitization, all table/storage stages, and the post-sync migration check.
+- Treat `failed on attempt`, provider 5xx recovery, database fallback, `Skipping object`, or `Skipping bucket` as abnormal even if the run succeeds. A required bucket/object skip is blocking; an intentional database fallback must emit and verify a distinct degraded result rather than masquerade as clean parity.
+- A recovered Storage retry remains an operational observation even when every bucket and the post-sync migration check succeed. Extend `storage_provider_retry_recovered` before Production promotion when its count or context is new. Final parity proves recovery and does not require an artificial source commit.
+- Never expose passwords, tokens, member identifiers, object paths, or other PII while inspecting sync evidence. Storage retry/failure diagnostics may emit only fixed operation labels, validated numeric status, and a provider-code-presence boolean; never embed provider messages, code values, or object paths.
+- Preview credential-seed success diagnostics must use a fixed outcome without usernames or member IDs. Keep `preview_member_identifier_log` in the structural auditor so a legacy or reintroduced interpolated identifier invalidates nominal success.
+
+### Main promotion and external providers
+
+- Verify `dev` integration and Preview deployment first. Re-evaluate schema-first, environment, and disabled-feature ordering before `main`.
+- Confirm required branch checks remain fail-closed. A skipped required job must not satisfy protection.
+- After merge, inspect the exact Production SHA's first runs and deployment. Do not infer readiness from the PR head deployment.
+- Follow the repository's merge-commit convention unless the active Issue/PR explicitly documents another reviewed method.
+
+## Audit And Redaction
+
+- Audit the full currently retained Actions inventory by paginating to exhaustion. Report the freeze timestamp, earliest/latest run, totals by workflow/event/conclusion, and exact unavailable/deleted-log boundary.
+- Inspect every retained abnormal run and every available success log for hidden retries when conducting a full audit.
+- For every run, inspect job and required-step conclusions as well as the run conclusion. Search successful logs for `flaky`, `retry #`, `✘`, `##[error]`, `##[warning]`, browser `console.error`, React act/suspension diagnostics, module externalization, `failed on attempt`, `Skipping object`, `Skipping bucket`, database fallback, and non-fatal cache/provider failures.
+- Search required-wrapper diagnostics for an internal second invocation as well. The retained typecheck-wrapper census found no hidden successful retry, but a wrapper that retries after a nonzero first result can create one and is forbidden.
+- Error-like words inside a structurally proven passed test-result line are not runtime errors. Source excerpts such as a Testing Library `{ timeout: ... }` option are not timeout evidence either; require a phrase that denotes an actual elapsed timeout or timeout exception. Suppress only these exact reviewed ambiguous forms; `##[error]`, `##[warning]`, retries, failures, transport resets, and provider diagnostics remain reportable regardless of nearby text.
+- Distinguish Production dependency-audit failures from informational findings in the full development dependency tree. Do not broadly suppress mock-server, npm, provider, or network errors; any allowlist must be exact, environment-scoped, and regression-tested.
+- Treat every log, annotation, workflow name, job name, step name, and repository path returned by GitHub as untrusted secret-bearing text. The per-run structural auditor inspects it only in memory; durable audit output may contain only fixed signature identifiers, counts, line numbers, numeric job/step indices, validated SHA/timestamps/enums, field-presence booleans, and workflow identifiers selected from the repository's reviewed local workflow allowlist. A bounded full-history census may temporarily cache mode-0600 raw ZIP/log inputs under the ignored audit directory solely while classifying them; never copy their text into durable evidence, and remove them after the ledger is safely committed and the investigation ends.
+- Never persist or quote a matched raw line, even after regex redaction. Secret-name suffixes, quoted headers, multiline payloads, ANSI escapes, and future credential formats make denylist sanitization an unsafe boundary. Write a short operator-authored cause summary to the ledger without copying identifiers, credentials, payloads, or paths.
+- Never mutate Actions, GitHub state, deployments, databases, or user data during a read-only audit.
+
+Use [failure-ledger.md](references/failure-ledger.md) as the living source for known signatures and current rollout state. The frozen 2026-08-13 census and exact retained abnormal/hidden-retry run IDs are in [retained-actions-audit.md](references/retained-actions-audit.md). Before a full-census download, set `umask 077`, create the audit root with mode 0700, and keep raw logs mode 0600; after download, verify every directory/file mode before reading any corpus. Never track raw logs.
+After the sanitized durable ledger is committed and no incident investigation needs the raw artifacts, remove local temporary logs from `.tmp/actions-audit/`. GitHub remains the source for retained originals; never delete the remote runs.
+
+## Audit Completeness Gate
+
+Do not treat a ledger marked draft, partial, pending, or unavailable as complete historical evidence. Before an Actions-triggering change that matches an incompletely audited signature, finish that signature's retained-log audit or explicitly stop and report the unavailable boundary. Current task-local fixes may continue offline, but no remote mutation may rely on an unfinished mandatory preflight.

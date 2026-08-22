@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     }
     await setUserSession(completion.memberId, false, {
       persistent: true,
-      authenticationMethod: completion.deliveryChannel === "mattermost" ? "mattermost" : "email",
+      authenticationMethod: completion.authenticationMethod,
       freshAuthentication: true,
     });
     await recordMemberAuthAttempt("manual-password-action", throttle, true);

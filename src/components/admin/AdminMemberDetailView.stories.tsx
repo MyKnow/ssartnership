@@ -27,7 +27,6 @@ const meta = {
       hasAvatar: false,
       avatarUrl: "/api/admin/members/member-seoul-15-001/avatar",
     },
-    activeDeviceCount: 2,
     preferences: {
       enabled: true,
       announcementEnabled: true,
@@ -173,5 +172,57 @@ export const ActiveMattermostSync: Story = {
     await expect(button).toBeInTheDocument();
     await userEvent.click(button);
     await expect(args.syncMemberProfileAction).toHaveBeenCalled();
+  },
+};
+
+export const EmailOnlyMember: Story = {
+  args: {
+    member: {
+      id: "member-email-only-001",
+      displayName: "이메일 회원",
+      mmUsername: "",
+      mmUserId: null,
+      manualLoginId: "member-email-only",
+      generation: 15,
+      generationLabel: "15기 · 2학기",
+      campus: "서울",
+      mustChangePassword: false,
+      email: "email-only@example.com",
+      emailVerifiedAt: "2026-08-01T09:00:00+09:00",
+      hasMattermostAccount: false,
+      mattermostLoginDisabledAt: null,
+      mattermostLoginDisabledReason: null,
+      emailLoginTransition: null,
+      createdAt: "2026-08-01T09:00:00+09:00",
+      updatedAt: "2026-08-01T09:00:00+09:00",
+      hasAvatar: false,
+      avatarUrl: "/api/admin/members/member-email-only-001/avatar",
+    },
+  },
+};
+
+export const EmailOnlyUnverified: Story = {
+  args: {
+    member: {
+      id: "member-email-only-unverified-001",
+      displayName: "이메일 미인증 회원",
+      mmUsername: "",
+      mmUserId: null,
+      manualLoginId: "member-email-only-unverified",
+      generation: 15,
+      generationLabel: "15기 · 2학기",
+      campus: "서울",
+      mustChangePassword: false,
+      email: "email-only-unverified@example.com",
+      emailVerifiedAt: null,
+      hasMattermostAccount: false,
+      mattermostLoginDisabledAt: null,
+      mattermostLoginDisabledReason: null,
+      emailLoginTransition: null,
+      createdAt: "2026-08-01T09:00:00+09:00",
+      updatedAt: "2026-08-01T09:00:00+09:00",
+      hasAvatar: false,
+      avatarUrl: "/api/admin/members/member-email-only-unverified-001/avatar",
+    },
   },
 };

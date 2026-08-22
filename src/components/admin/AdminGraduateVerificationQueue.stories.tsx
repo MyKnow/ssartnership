@@ -1,31 +1,32 @@
 import { expect, userEvent, within } from "storybook/test";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import AdminGraduateVerificationQueue from "./AdminGraduateVerificationQueue";
+import AdminGraduateVerificationQueue, {
+  AdminGraduateVerificationRetryLoading,
+} from "./AdminGraduateVerificationQueue";
 
 const noop = async () => undefined;
+const submittedRequest = {
+  id: "00000000-0000-4000-8000-000000000101",
+  email: "graduate@example.com",
+  legal_name: "합성 수료생 신청자",
+  education_start_year: 2026,
+  education_start_month: 1,
+  education_end_year: 2026,
+  education_end_month: 6,
+  inferred_generation: 15,
+  campus: "서울",
+  request_kind: "graduate_signup" as const,
+  recovery_member_id: null,
+  status: "submitted",
+  profile_image_id: "00000000-0000-4000-8000-000000000102",
+  created_at: "2026-07-12T00:00:00.000Z",
+};
 
 const meta = {
   title: "Domains/Admin/GraduateVerificationQueue",
   component: AdminGraduateVerificationQueue,
   args: {
-    requests: [
-      {
-        id: "00000000-0000-4000-8000-000000000101",
-        email: "graduate@example.com",
-        legal_name: "합성 수료생 신청자",
-        education_start_year: 2026,
-        education_start_month: 1,
-        education_end_year: 2026,
-        education_end_month: 6,
-        inferred_generation: 15,
-        campus: "서울",
-        request_kind: "graduate_signup",
-        recovery_member_id: null,
-        status: "submitted",
-        profile_image_id: "00000000-0000-4000-8000-000000000102",
-        created_at: "2026-07-12T00:00:00.000Z",
-      },
-    ],
+    requests: [submittedRequest],
     setupEmailRetries: [
       {
         id: "00000000-0000-4000-8000-000000000105",
@@ -41,6 +42,7 @@ const meta = {
       rejectRequest: noop,
       resendSetupEmail: noop,
     },
+    canUpdate: true,
   },
   parameters: {
     nextjs: { appDirectory: true },
@@ -51,10 +53,101 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByText("다음 행동: 검토 시작")).toBeInTheDocument();
+    await expect(
+      canvas.getByRole("button", { name: "검토 시작" }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "승인 및 비밀번호 설정 메일" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "보완 요청 보내기" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "요청 반려" }),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const InReview: Story = {
+  args: {
+    requests: [{ ...submittedRequest, status: "in_review" }],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(
+      canvas.getByText("검토 중인 요청의 결정을 입력하세요."),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "검토 시작" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.getByRole("button", { name: "승인 및 비밀번호 설정 메일" }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByRole("button", { name: "보완 요청 보내기" }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByRole("button", { name: "요청 반려" }),
+    ).toBeInTheDocument();
+  },
+};
 
 export const Empty: Story = {
   args: { requests: [], setupEmailRetries: [] },
+};
+
+export const ReadOnly: Story = {
+  args: { canUpdate: false },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(
+      canvas.queryByRole("button", { name: "검토 시작" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "승인 및 비밀번호 설정 메일" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "보완 요청 보내기" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "요청 반려" }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "설정 메일 다시 보내기" }),
+    ).not.toBeInTheDocument();
+    await expect(canvas.getAllByText("조회 전용 권한").length).toBeGreaterThan(
+      0,
+    );
+  },
+};
+
+export const Paginated: Story = {
+  args: {
+    requestPagination: {
+      totalCount: 25,
+      page: 2,
+      pageSize: 12,
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("link", { name: "이전" })).toHaveAttribute(
+      "href",
+      "/admin/graduate-verifications",
+    );
+    await expect(canvas.getByRole("link", { name: "다음" })).toHaveAttribute(
+      "href",
+      "/admin/graduate-verifications?requestPage=3",
+    );
+    await expect(canvas.getByText("2 / 3")).toBeVisible();
+  },
 };
 
 export const MediaViewer: Story = {
@@ -62,11 +155,23 @@ export const MediaViewer: Story = {
     const canvas = within(canvasElement);
     const body = within(document.body);
 
-    await expect(canvas.getByRole("button", { name: "수료증 보기" })).toBeInTheDocument();
-    await expect(canvas.queryByRole("link", { name: "수료증 보기" })).not.toBeInTheDocument();
+    await expect(
+      canvas.getByRole("button", { name: "수료증 보기" }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("link", { name: "수료증 보기" }),
+    ).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "사진 보기" }));
-    await expect(body.getByRole("dialog", { name: "본인 사진 미리보기" })).toBeInTheDocument();
+    await expect(
+      body.getByRole("dialog", { name: "본인 사진 미리보기" }),
+    ).toBeInTheDocument();
     await userEvent.click(body.getByRole("button", { name: "닫기" }));
-    await expect(body.queryByRole("dialog", { name: "본인 사진 미리보기" })).not.toBeInTheDocument();
+    await expect(
+      body.queryByRole("dialog", { name: "본인 사진 미리보기" }),
+    ).not.toBeInTheDocument();
   },
+};
+
+export const AncillaryQueueLoading: Story = {
+  render: () => <AdminGraduateVerificationRetryLoading />,
 };

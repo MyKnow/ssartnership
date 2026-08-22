@@ -53,11 +53,12 @@ Use the minimal relevant skill for the task.
 Project-local skills, tracked with this repository:
 
 - `ssartnership-patterns`: repository-specific Next.js, Supabase, Repository, validation, CI, and release conventions
+- `github-actions-operations`: mandatory before any operation that can trigger or affect GitHub Actions, and after every failed, cancelled, unexpectedly skipped, retrying, flaky, or error-bearing run; update its failure ledger before the next trigger
 - `ssartnership-ui-ux`: project visual system, Korean UI states, routing/error recovery, prototype promotion, and UI QA
 - `member-required-gate-redirects`: member password, consent, profile-photo, and `returnTo` gate priority/loop prevention
 - `docs-governance`: repository documentation placement and taxonomy
 
-Codex-local skills are cross-project tools and are intentionally not copied into this repository. Use them when installed: frontend, backend, data, security, testing, research, documentation, deployment, Git, and `ui-prototyping` skills. Keep a project-specific rule in a project-local skill instead of adding it to a Codex-local skill.
+Codex-local skills are cross-project tools and are intentionally not copied into this repository. Use them when installed: frontend, backend, data, security, testing, research, documentation, deployment, Git, `ui-prototyping`, `source-backed-dashboard`, and `analytics-dashboard-template` skills. Keep a project-specific rule in a project-local skill instead of adding it to a Codex-local skill.
 
 ## Verification
 
@@ -102,7 +103,7 @@ For UI creation or modification, include visual proof in the final handoff. Capt
   - A 기능 의존성 개선
   - A 기능의 B 변수 수정
   ```
-- When the user asks to commit and push, use `npm run release` by default instead of manual `git add`, `git commit`, and `git push`. This keeps version bumping, Storybook build/test gates, commit formatting, and push behavior consistent.
+- When the user asks to commit and push, use `npm run release` by default instead of manual `git add`, `git commit`, and `git push`. This keeps the local Quick Gate, version bumping, commit formatting, and push behavior consistent. Storybook and visual verification are explicit manual checks rather than release prerequisites.
 - If `npm run release` is blocked by a non-script environment issue after it already performed part of the release flow, inspect the partial state first, then complete only the remaining equivalent steps with the same Korean conventional commit message.
 - Do not revert user changes.
 - Review `git diff` before staging or committing.
@@ -118,6 +119,7 @@ For UI creation or modification, include visual proof in the final handoff. Capt
 - Complete the task and run local verification inside the typed work branch before merging it into `dev`.
 - When every task for an Issue has been merged into `dev`, run Preview/integration testing from `dev`.
 - Merge `dev` into `main` only after the Preview/integration test is clean and the change is ready for Production.
+- Open the `dev` to `main` promotion PR only when Production promotion is actually ready. Do not keep a long-lived moving promotion PR open because it duplicates every `dev` push check.
 - For urgent production fixes, start from `main` and create a `hotfix/*` branch. After local verification, merge the hotfix into `main` first for Production recovery, then back-merge or cherry-pick the same fix into `dev` so Preview does not drift from Production.
 
 ### Issue / PR Workflow

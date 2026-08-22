@@ -5,6 +5,7 @@ export type AdminNotificationChannel = (typeof ADMIN_NOTIFICATION_CHANNELS)[numb
 export type PartnerNotificationChannel = (typeof PARTNER_NOTIFICATION_CHANNELS)[number];
 
 export type AdminOperationalNotificationType =
+  | "partner_registration_request"
   | "partner_change_request"
   | "partner_immediate_update"
   | "expiring_partner"
@@ -79,6 +80,7 @@ function isAdminTypeEnabled(
       return preferences.expiringPartnerEnabled;
     case "partner_change_request":
     case "partner_immediate_update":
+    case "partner_registration_request":
       return preferences.partnerRequestEnabled;
   }
 }

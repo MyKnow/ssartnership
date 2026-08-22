@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 import AdminMemberSignupApprovalQueue from "./AdminMemberSignupApprovalQueue";
 
 const request = {
@@ -35,4 +36,26 @@ export const Default: Story = {};
 
 export const Empty: Story = {
   args: { requests: [] },
+};
+
+export const Paginated: Story = {
+  args: {
+    pagination: {
+      totalCount: 25,
+      page: 2,
+      pageSize: 12,
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("link", { name: "이전" })).toHaveAttribute(
+      "href",
+      "/admin/member-signup-requests",
+    );
+    await expect(canvas.getByRole("link", { name: "다음" })).toHaveAttribute(
+      "href",
+      "/admin/member-signup-requests?page=3",
+    );
+    await expect(canvas.getByText("2 / 3")).toBeVisible();
+  },
 };

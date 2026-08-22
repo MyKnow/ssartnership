@@ -87,7 +87,7 @@ function CouponManagementActions({
     <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
       {canUpdateCoupon && updateCouponAction ? (
         <details className="min-w-0">
-          <summary className="flex min-h-10 cursor-pointer list-none items-center justify-center whitespace-nowrap rounded-[0.95rem] border border-border bg-surface-control px-4 text-sm font-semibold text-foreground transition-interactive hover:border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 [&::-webkit-details-marker]:hidden">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center whitespace-nowrap rounded-[0.95rem] border border-border bg-surface-control px-4 text-sm font-semibold text-foreground transition-interactive hover:border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 [&::-webkit-details-marker]:hidden">
             수정
           </summary>
           <div className="mt-3 w-full min-w-0 sm:min-w-[min(42rem,calc(100vw-3rem))]">
@@ -163,6 +163,7 @@ export default function AdminPartnerCouponManager({
   canDeleteCoupon?: boolean;
 }) {
   const activeCouponCount = coupons.filter((coupon) => coupon.status === "active").length;
+  const issuedCount = coupons.reduce((sum, coupon) => sum + coupon.issuedCount, 0);
   const usedCount = coupons.reduce((sum, coupon) => sum + coupon.usedCount, 0);
   const campaignOptions = campaigns.filter((campaign) => campaign.partnerId === partnerId);
 
@@ -178,15 +179,16 @@ export default function AdminPartnerCouponManager({
         items={[
           { label: "전체 쿠폰", value: `${coupons.length}개`, hint: "이 제휴처 등록 쿠폰" },
           { label: "활성 쿠폰", value: `${activeCouponCount}개`, hint: "회원에게 노출 가능" },
-          { label: "사용", value: `${usedCount}건`, hint: "누적 사용 횟수" },
+          { label: "발급", value: `${issuedCount.toLocaleString("ko-KR")}건`, hint: "누적 발급 횟수" },
+          { label: "사용", value: `${usedCount.toLocaleString("ko-KR")}건`, hint: "누적 사용 횟수" },
         ]}
         minItemWidth="12rem"
       />
 
       {errorMessage ? (
-        <InlineMessage
-          tone="error"
-          title="쿠폰을 삭제하지 못했습니다."
+          <InlineMessage
+            tone="danger"
+          title="쿠폰 작업을 처리하지 못했습니다."
           description={errorMessage}
         />
       ) : null}
@@ -248,9 +250,14 @@ export default function AdminPartnerCouponManager({
                   <p className="mt-2 break-words text-xs leading-5 text-muted-foreground">
                     다운로드 {formatDateTime(coupon.downloadStartsAt)} - {formatDateTime(coupon.downloadEndsAt)}
                   </p>
-                  <p className="break-words text-xs leading-5 text-muted-foreground">
-                    회원별 발급 · 일 {formatIssueLimit(coupon.perMemberDailyIssueLimit)} · 주 {formatIssueLimit(coupon.perMemberWeeklyIssueLimit)} · 월 {formatIssueLimit(coupon.perMemberMonthlyIssueLimit)}
-                  </p>
+                  <div className="mt-2 grid gap-0.5 break-words text-xs leading-5 text-muted-foreground">
+                    <p>
+                      회원별 누적 보유·사용 {formatIssueLimit(coupon.perMemberLimit)}
+                    </p>
+                    <p>
+                      회원별 발급 · 일 {formatIssueLimit(coupon.perMemberDailyIssueLimit)} · 주 {formatIssueLimit(coupon.perMemberWeeklyIssueLimit)} · 월 {formatIssueLimit(coupon.perMemberMonthlyIssueLimit)}
+                    </p>
+                  </div>
                   {coupon.redemptionType === "onsite" ? (
                     <p className="mt-1 text-xs font-medium text-primary">
                       {coupon.hasOnsitePassword ? "현장 확인 PIN 설정됨" : "현장 확인 PIN 미설정"}
@@ -259,8 +266,10 @@ export default function AdminPartnerCouponManager({
                 </div>
                 <div className="flex min-w-0 flex-wrap items-center justify-start gap-3 md:col-start-2 md:min-w-[13rem] md:flex-col md:items-end md:justify-start">
                   <span className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">
-                    {coupon.usedCount}
-                    {coupon.usageLimit !== null ? `/${coupon.usageLimit}` : "회 사용"}
+                    전체 사용 {coupon.usedCount.toLocaleString("ko-KR")}회
+                    {coupon.usageLimit !== null
+                      ? ` / ${coupon.usageLimit.toLocaleString("ko-KR")}회`
+                      : " · 한도 무제한"}
                   </span>
                 </div>
               </div>

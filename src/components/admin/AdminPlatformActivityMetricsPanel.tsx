@@ -9,6 +9,7 @@ import type { AdminPlatformActivityMetrics } from "@/lib/platform-activity-metri
 
 type ActivityMetricCard = {
   label: string;
+  abbreviation: "DAU" | "WAU" | "MAU";
   value: number;
   description: string;
 };
@@ -36,9 +37,24 @@ export default function AdminPlatformActivityMetricsPanel({
   metrics: AdminPlatformActivityMetrics;
 }) {
   const memberMetrics: ActivityMetricCard[] = [
-    { label: "DAU", value: metrics.memberDau, description: "오늘 활성 회원" },
-    { label: "WAU", value: metrics.memberWau, description: "최근 7일 활성 회원" },
-    { label: "MAU", value: metrics.memberMau, description: "최근 30일 활성 회원" },
+    {
+      label: "일간 활성",
+      abbreviation: "DAU",
+      value: metrics.memberDau,
+      description: "오늘 로그인한 회원",
+    },
+    {
+      label: "주간 활성",
+      abbreviation: "WAU",
+      value: metrics.memberWau,
+      description: "최근 7일 로그인한 회원",
+    },
+    {
+      label: "월간 활성",
+      abbreviation: "MAU",
+      value: metrics.memberMau,
+      description: "최근 30일 로그인한 회원",
+    },
   ];
   const activityHeatmap = buildActivityHeatmap(metrics.dailySeries);
   const activeDays = metrics.dailySeries.filter((point) => point.memberActiveCount > 0).length;
@@ -64,7 +80,7 @@ export default function AdminPlatformActivityMetricsPanel({
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
         <AdminSectionHeading
           title="서비스 활성도"
-          description="로그인 회원 기준 DAU·WAU·MAU입니다. 비로그인 방문은 별도 세션으로 집계합니다."
+          description="로그인한 회원의 일간·주간·월간 활성 현황입니다. 비로그인 방문은 별도 세션으로 집계합니다."
         />
         <Badge variant="neutral">기준일 {formatDate(metrics.asOfDate)}</Badge>
       </div>
@@ -72,7 +88,9 @@ export default function AdminPlatformActivityMetricsPanel({
       <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {memberMetrics.map((item) => (
           <Surface key={item.label} level="inset" padding="md" className="min-w-0">
-            <p className="ui-kicker">{item.label}</p>
+            <p className="ui-kicker">
+              {item.label} <span aria-hidden="true">({item.abbreviation})</span>
+            </p>
             <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-foreground">
               {item.value.toLocaleString("ko-KR")}명
             </p>

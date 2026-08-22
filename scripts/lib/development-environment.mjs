@@ -385,16 +385,74 @@ export function validateEnvironment(environment) {
   return diagnostics;
 }
 
-export function resolveNpmCliPath(environment = process.env) {
+export function resolveNpmCliPath(
+  environment = process.env,
+  {
+    executablePath = process.execPath,
+    pathModule = { dirname, join },
+    exists = existsSync,
+  } = {},
+) {
   const npmExecPath = environment.npm_execpath?.trim();
-  return npmExecPath || null;
+  if (npmExecPath) {
+    return npmExecPath;
+  }
+
+  // Playwright starts the local web server through Node directly. Discover the
+  // npm CLI bundled with that exact runtime so doctor remains valid even when
+  // another npm installation appears first on PATH.
+  const executableDirectory = pathModule.dirname(executablePath);
+  const bundledNpmCandidates = [
+    pathModule.join(
+      executableDirectory,
+      "node_modules",
+      "npm",
+      "bin",
+      "npm-cli.js",
+    ),
+    // Windows hosted runtimes can keep node.exe in an architecture directory
+    // while placing npm next to the version directory.
+    pathModule.join(
+      executableDirectory,
+      "..",
+      "node_modules",
+      "npm",
+      "bin",
+      "npm-cli.js",
+    ),
+    pathModule.join(
+      executableDirectory,
+      "..",
+      "lib",
+      "node_modules",
+      "npm",
+      "bin",
+      "npm-cli.js",
+    ),
+    // Homebrew resolves node to a Cellar path while npm remains linked from
+    // the stable prefix's global lib directory.
+    pathModule.join(
+      executableDirectory,
+      "..",
+      "..",
+      "..",
+      "..",
+      "lib",
+      "node_modules",
+      "npm",
+      "bin",
+      "npm-cli.js",
+    ),
+  ];
+
+  return bundledNpmCandidates.find((candidate) => exists(candidate)) ?? null;
 }
 
 export function runNodeCli(cliPath, args, options = {}) {
   if (!cliPath) {
     return {
       status: 1,
-      error: new Error("npm_execpath is unavailable"),
+      error: new Error("npm CLI is unavailable"),
       stdout: "",
       stderr: "",
     };

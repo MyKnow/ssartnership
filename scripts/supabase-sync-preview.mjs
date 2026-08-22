@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
+import { createWriteStream } from "node:fs";
 import { appendFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
+import { finished } from "node:stream/promises";
 import { createClient } from "@supabase/supabase-js";
 import {
+  createSafeStorageOperationError,
   formatStorageError,
   isPreviewRequiredStorageBucket,
   runStorageOperation,
@@ -18,14 +21,31 @@ import {
   resolvePreviewMemberCredentialSeedTarget,
   resolvePreviewMemberCredentialSeedConfig,
 } from "./preview-credential-seed-lib.mjs";
-import { sanitizeDumpSqlForPreview } from "./supabase-sync-preview-lib.mjs";
+import {
+  buildTransactionalPreviewRestoreSql,
+  sanitizeDumpSqlForPreview,
+  stripUnsupportedPreviewRestoreTriggerControls,
+} from "./supabase-sync-preview-lib.mjs";
+import {
+  buildProductionDataDumpContainerPlan,
+  filterPgDumpCircularForeignKeyWarnings,
+} from "./supabase-sync-preview-dump-lib.mjs";
 
 const PUBLIC_SCHEMA = "public";
 const CHECK_ONLY_FLAG = "--check-only";
 const DEFAULT_CACHE_CONTROL = "31536000";
+const PREVIEW_LOCAL_WALLET_TABLES = [
+  // Dependency order is also the restore order after the Production data import.
+  "member_wallet_passes",
+  "member_wallet_pass_revisions",
+  "apple_wallet_device_registrations",
+  "member_wallet_pass_operations",
+];
 const EXCLUDED_PUBLIC_TABLES = [
   "admin_login_attempts",
   "admin_audit_logs",
+  // Production Wallet credentials and APNs registrations must never enter Preview.
+  ...PREVIEW_LOCAL_WALLET_TABLES,
   "auth_security_logs",
   "event_logs",
   "member_auth_attempts",
@@ -107,26 +127,29 @@ async function writeGithubOutput(name, value) {
   await appendFile(outputPath, `${name}=${value}\n`, "utf8");
 }
 
-function quoteIdentifier(identifier) {
-  return `"${identifier.replace(/"/g, '""')}"`;
-}
-
-function buildQualifiedName(schema, table) {
-  return `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`;
-}
-
 function runCommand(command, args, options = {}) {
   const {
     captureStdout = false,
     captureStderr = true,
     env = {},
+    stdoutPath,
+    transformStderr,
   } = options;
 
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const settleFailure = (error) => {
+      if (!settled) {
+        settled = true;
+        reject(error);
+      }
+    };
+    const stdoutFile = stdoutPath ? createWriteStream(stdoutPath, { flags: "w" }) : null;
+    const stdoutFinished = stdoutFile ? finished(stdoutFile) : null;
     const child = spawn(command, args, {
       stdio: [
         "ignore",
-        captureStdout ? "pipe" : "inherit",
+        captureStdout || stdoutFile ? "pipe" : "inherit",
         captureStderr ? "pipe" : "inherit",
       ],
       env: {
@@ -144,22 +167,58 @@ function runCommand(command, args, options = {}) {
       });
     }
 
+    if (stdoutFile && child.stdout) {
+      child.stdout.pipe(stdoutFile);
+    }
+
     if (captureStderr && child.stderr) {
       child.stderr.on("data", (chunk) => {
         const text = chunk.toString("utf8");
         stderr += text;
-        process.stderr.write(text);
+        if (!transformStderr) {
+          process.stderr.write(text);
+        }
       });
     }
 
-    child.once("error", reject);
-    child.once("close", (code) => {
-      if (code !== 0) {
-        reject(new Error(stderr.trim() || `${command} failed with exit code ${code}`));
+    child.once("error", (error) => {
+      stdoutFile?.destroy(error);
+      void stdoutFinished?.catch(() => undefined);
+      settleFailure(error);
+    });
+    child.once("close", async (code) => {
+      if (settled) {
         return;
       }
 
-      resolve({ stdout, stderr });
+      try {
+        await stdoutFinished;
+      } catch (error) {
+        settleFailure(error);
+        return;
+      }
+
+      let reportedStderr;
+      try {
+        reportedStderr = transformStderr ? transformStderr(stderr) : stderr;
+      } catch (error) {
+        settleFailure(error);
+        return;
+      }
+
+      if (transformStderr && reportedStderr) {
+        process.stderr.write(reportedStderr);
+      }
+
+      if (code !== 0) {
+        settleFailure(
+          new Error(reportedStderr.trim() || `${command} failed with exit code ${code}`),
+        );
+        return;
+      }
+
+      settled = true;
+      resolve({ stdout, stderr: reportedStderr });
     });
   });
 }
@@ -239,25 +298,18 @@ async function listPublicTableColumns(dbUrl) {
 }
 
 async function dumpProductionDatabase(dumpPath, productionDbUrl) {
-  const args = [
-    "db",
-    "dump",
-    "--data-only",
-    "--use-copy",
-    "--schema",
-    PUBLIC_SCHEMA,
-    "--file",
-    dumpPath,
-    "--db-url",
+  const plan = buildProductionDataDumpContainerPlan({
     productionDbUrl,
-  ];
+    schema: PUBLIC_SCHEMA,
+    excludedTables: EXCLUDED_PUBLIC_TABLES,
+  });
 
-  for (const table of EXCLUDED_PUBLIC_TABLES) {
-    args.push("-x", `${PUBLIC_SCHEMA}.${table}`);
-  }
-
-  console.log("Syncing production public data dump...");
-  await runCommand("supabase", args);
+  console.log("Syncing production public data dump with the pinned PostgreSQL 17 client...");
+  await runCommand(plan.command, plan.args, {
+    env: plan.environment,
+    stdoutPath: dumpPath,
+    transformStderr: filterPgDumpCircularForeignKeyWarnings,
+  });
 }
 
 async function assertPreviewDatabaseAvailable(previewDbUrl) {
@@ -284,6 +336,9 @@ async function sanitizeDumpForPreview(dumpPath, previewDbUrl) {
   const previewColumnsByTable = await listPublicTableColumns(previewDbUrl);
   const sourceSql = await readFile(dumpPath, "utf8");
   const sanitized = sanitizeDumpSqlForPreview(sourceSql, previewColumnsByTable);
+  const triggerControlSanitized = stripUnsupportedPreviewRestoreTriggerControls(
+    sanitized.sql,
+  );
   const { stats } = sanitized;
 
   if (stats.memberCopyBlocksSeen > 0) {
@@ -349,43 +404,54 @@ async function sanitizeDumpForPreview(dumpPath, previewDbUrl) {
     );
   }
 
-  if (!sanitized.changed) {
+  if (triggerControlSanitized.removedCount > 0) {
+    console.log(
+      [
+        "Preview sync trigger restore sanitization:",
+        `unsupportedPublicTriggerControlsRemoved=${triggerControlSanitized.removedCount}`,
+        "session-level constraint handling remains enabled.",
+      ].join(" "),
+    );
+  }
+
+  if (!sanitized.changed && triggerControlSanitized.removedCount === 0) {
     return;
   }
 
   console.log("Sanitizing production dump for preview schema differences...");
-  await writeFile(dumpPath, sanitized.sql, "utf8");
+  await writeFile(dumpPath, triggerControlSanitized.sql, "utf8");
 }
 
-async function truncatePreviewDatabase(previewDbUrl) {
+async function replacePreviewDatabaseData(dumpPath, restorePath, previewDbUrl) {
   const tables = await listPublicTables(previewDbUrl);
   const targetTables = tables.filter((table) => !EXCLUDED_PUBLIC_TABLES.includes(table));
+  const missingWalletTables = PREVIEW_LOCAL_WALLET_TABLES.filter(
+    (table) => !tables.includes(table),
+  );
+
+  if (missingWalletTables.length > 0) {
+    throw new Error(
+      `Preview Wallet schema is missing ${missingWalletTables.length} required table(s); apply migrations before data sync.`,
+    );
+  }
 
   if (!targetTables.length) {
-    console.log("No preview public tables to truncate.");
+    console.log("No preview public tables to replace.");
     return;
   }
 
-  const truncateSql = `truncate table ${targetTables
-    .map((table) => buildQualifiedName(PUBLIC_SCHEMA, table))
-    .join(", ")} restart identity cascade;`;
+  const productionDumpSql = await readFile(dumpPath, "utf8");
+  const restoreSql = buildTransactionalPreviewRestoreSql({
+    productionDumpSql,
+    schema: PUBLIC_SCHEMA,
+    targetTables,
+    preservedTables: PREVIEW_LOCAL_WALLET_TABLES,
+  });
+  await writeFile(restorePath, restoreSql, "utf8");
 
-  console.log(`Truncating ${targetTables.length} preview public tables...`);
-  await runCommand(
-    "psql",
-    [
-      "--dbname",
-      previewDbUrl,
-      "--set",
-      "ON_ERROR_STOP=1",
-      "--command",
-      truncateSql,
-    ],
+  console.log(
+    `Replacing ${targetTables.length} Preview public tables while preserving local Wallet records...`,
   );
-}
-
-async function restorePreviewDatabase(dumpPath, previewDbUrl) {
-  console.log("Restoring production data into preview...");
   await runCommand(
     "psql",
     [
@@ -393,8 +459,9 @@ async function restorePreviewDatabase(dumpPath, previewDbUrl) {
       previewDbUrl,
       "--set",
       "ON_ERROR_STOP=1",
+      "--single-transaction",
       "--file",
-      dumpPath,
+      restorePath,
     ],
   );
 }
@@ -477,7 +544,7 @@ async function seedPreviewMemberCredentials(previewUrl, previewServiceRoleKey) {
   }
 
   console.log(
-    `Seeded preview member credentials for ${seedConfig.username}. Production password hashes remain stripped.`,
+    "Seeded one Preview-only member credential. Production password hashes remain stripped.",
   );
 }
 
@@ -507,7 +574,7 @@ async function collectBucketFilePaths(storageClient, bucketName, prefix = "", pa
 
   while (true) {
     const data = await runStorageOperation(
-      `Listing preview objects in ${bucketName}/${prefix || "."}`,
+      `Listing preview objects in ${bucketName}`,
       () =>
         storageClient.storage.from(bucketName).list(prefix, {
           limit,
@@ -588,7 +655,7 @@ async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = 
 
   while (true) {
     const data = await runStorageOperation(
-      `Listing production objects in ${bucketName}/${prefix || "."}`,
+      `Listing production objects in ${bucketName}`,
       () =>
         prodClient.storage.from(bucketName).list(prefix, {
           limit,
@@ -614,12 +681,12 @@ async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = 
 
       try {
         const file = await runStorageOperation(
-          `Downloading ${bucketName}/${objectPath}`,
+          `Downloading object from ${bucketName}`,
           () => prodClient.storage.from(bucketName).download(objectPath),
         );
 
         if (!file) {
-          throw new Error(`다운로드할 파일을 찾을 수 없습니다: ${bucketName}/${objectPath}`);
+          throw new Error("STORAGE_OBJECT_DOWNLOAD_EMPTY");
         }
 
         const contentType =
@@ -630,7 +697,7 @@ async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = 
 
         const buffer = Buffer.from(await file.arrayBuffer());
         await runStorageOperation(
-          `Uploading ${bucketName}/${objectPath}`,
+          `Uploading object to ${bucketName}`,
           () =>
             previewClient.storage.from(bucketName).upload(objectPath, buffer, {
               contentType,
@@ -640,12 +707,13 @@ async function syncBucketPrefix(prodClient, previewClient, bucketName, prefix = 
         );
       } catch (error) {
         if (shouldAbortPreviewStorageObjectSync(bucketName)) {
-          throw new Error(
-            `Preview required object ${bucketName}/${objectPath} could not be synchronized: ${formatStorageError(error)}`,
+          throw createSafeStorageOperationError(
+            `Preview required object in ${bucketName} could not be synchronized`,
+            error,
           );
         }
         console.warn(
-          `Skipping object ${bucketName}/${objectPath} after storage sync failure: ${formatStorageError(error)}`,
+          `Skipping one object in ${bucketName} after storage sync failure: ${formatStorageError(error)}`,
         );
       }
     }
@@ -695,8 +763,9 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
       prodClient.storage.listBuckets(),
     );
   } catch (error) {
-    throw new Error(
-      `Production storage buckets could not be listed: ${formatStorageError(error)}`,
+    throw createSafeStorageOperationError(
+      "Production storage buckets could not be listed",
+      error,
     );
   }
 
@@ -712,8 +781,9 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
       previewClient.storage.listBuckets(),
     );
   } catch (error) {
-    throw new Error(
-      `Preview storage buckets could not be listed: ${formatStorageError(error)}`,
+    throw createSafeStorageOperationError(
+      "Preview storage buckets could not be listed",
+      error,
     );
   }
 
@@ -748,8 +818,9 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
       }
     } catch (error) {
       if (isPreviewRequiredStorageBucket(bucketName)) {
-        throw new Error(
-          `Preview member profile image storage could not be synchronized: ${formatStorageError(error)}`,
+        throw createSafeStorageOperationError(
+          "Preview member profile image storage could not be synchronized",
+          error,
         );
       }
       console.warn(`Skipping bucket ${bucketName} after storage sync failure: ${formatStorageError(error)}`);
@@ -759,12 +830,7 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
 
 async function main() {
   const checkOnly = process.argv.includes(CHECK_ONLY_FLAG);
-  const productionDbUrl = requiredEnv("SUPABASE_PRODUCTION_DB_URL");
-  const productionUrl = requiredEnv("SUPABASE_PRODUCTION_URL");
-  const productionServiceRoleKey = requiredEnv("SUPABASE_PRODUCTION_SERVICE_ROLE_KEY");
   const previewDbUrl = requiredEnv("SUPABASE_PREVIEW_DB_URL");
-  const previewUrl = requiredEnv("SUPABASE_PREVIEW_URL");
-  const previewServiceRoleKey = requiredEnv("SUPABASE_PREVIEW_SERVICE_ROLE_KEY");
   const skipUnavailablePreview = isTruthyEnv("SUPABASE_PREVIEW_SYNC_SKIP_UNAVAILABLE");
 
   try {
@@ -795,14 +861,20 @@ async function main() {
     return;
   }
 
+  const productionDbUrl = requiredEnv("SUPABASE_PRODUCTION_DB_URL");
+  const productionUrl = requiredEnv("SUPABASE_PRODUCTION_URL");
+  const productionServiceRoleKey = requiredEnv("SUPABASE_PRODUCTION_SERVICE_ROLE_KEY");
+  const previewUrl = requiredEnv("SUPABASE_PREVIEW_URL");
+  const previewServiceRoleKey = requiredEnv("SUPABASE_PREVIEW_SERVICE_ROLE_KEY");
+
   const tempDir = await mkdtemp(join(tmpdir(), "ssartnership-preview-sync-"));
   const dumpPath = join(tempDir, "production-data.sql");
+  const restorePath = join(tempDir, "preview-restore.sql");
 
   try {
     await dumpProductionDatabase(dumpPath, productionDbUrl);
     await sanitizeDumpForPreview(dumpPath, previewDbUrl);
-    await truncatePreviewDatabase(previewDbUrl);
-    await restorePreviewDatabase(dumpPath, previewDbUrl);
+    await replacePreviewDatabaseData(dumpPath, restorePath, previewDbUrl);
     await seedPreviewAdminPermissions(previewDbUrl);
     await seedPreviewMemberCredentials(previewUrl, previewServiceRoleKey);
     await syncStorageBuckets(

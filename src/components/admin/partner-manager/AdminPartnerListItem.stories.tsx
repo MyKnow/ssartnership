@@ -66,3 +66,17 @@ export const ConfidentialWithoutCompany: Story = {
     },
   },
 };
+
+export const LongKoreanContent: Story = {
+  args: {
+    partner: {
+      ...partner,
+      name: "서울 캠퍼스 구성원을 위한 긴 이름의 체형 교정과 건강 관리 전문 제휴처",
+      location: "서울특별시 강남구 테헤란로 인근에서 운영하는 예약 기반 체형 교정 및 건강 관리 서비스",
+      company: {
+        ...partner.company!,
+        name: "서울 캠퍼스 구성원 건강 관리 협력 운영사",
+      },
+    },
+  },
+};

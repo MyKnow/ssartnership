@@ -52,10 +52,13 @@ function NavButton({
     <Button
       variant="ghost"
       href={href}
+      prefetch={false}
       className={cn(
         "w-full justify-start rounded-2xl px-4",
         active ? "border-strong bg-surface-elevated text-foreground shadow-flat" : null,
       )}
+      ariaLabel={label}
+      ariaCurrent={active ? "page" : undefined}
       onClick={onNavigate}
     >
       <span className="grid min-w-0 justify-items-start gap-0.5 text-left">
@@ -75,6 +78,8 @@ export default function AdminMobileNav({
   backLabel,
   logoutAction,
   navGroups,
+  triggerClassName,
+  triggerContent,
 }: {
   title: string;
   description?: string;
@@ -82,6 +87,8 @@ export default function AdminMobileNav({
   backLabel?: string;
   logoutAction: (formData: FormData) => void | Promise<void>;
   navGroups: AdminNavGroup[];
+  triggerClassName?: string;
+  triggerContent?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -153,34 +160,40 @@ export default function AdminMobileNav({
       <button
         ref={menuButtonRef}
         type="button"
-        className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-control text-foreground"
+        className={cn(
+          "inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-control text-foreground",
+          triggerClassName,
+        )}
         aria-label="관리 메뉴 열기"
+        aria-expanded={open}
         onClick={() => setOpen(true)}
       >
-        <svg
-          width={18}
-          height={18}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M3 6h18" />
-          <path d="M3 12h18" />
-          <path d="M3 18h18" />
-        </svg>
+        {triggerContent ?? (
+          <svg
+            width={18}
+            height={18}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 6h18" />
+            <path d="M3 12h18" />
+            <path d="M3 18h18" />
+          </svg>
+        )}
       </button>
 
       {open && typeof document !== "undefined"
         ? createPortal(
-            <div className="fixed inset-0 isolate z-[70] md:hidden" aria-hidden={!open}>
+            <div className="fixed inset-0 isolate z-[70] md:hidden">
               <button
                 type="button"
                 className="absolute inset-0 z-0 bg-black/55"
-                aria-label="관리 메뉴 닫기"
+                aria-label="관리 메뉴 배경 닫기"
                 onClick={closeMenu}
               />
 
@@ -197,7 +210,7 @@ export default function AdminMobileNav({
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                          Admin Workspace
+                          관리자 메뉴
                         </p>
                         <p className="mt-1.5 text-base font-semibold text-foreground">
                           {SITE_NAME}
@@ -244,7 +257,7 @@ export default function AdminMobileNav({
                         <DrawerSection
                           key={group.label}
                           title={group.label}
-                          description="작업할 영역으로 바로 이동합니다."
+                          description={group.description}
                         >
                           <div className="grid gap-2">
                             {group.items.map((item) => (

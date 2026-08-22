@@ -24,6 +24,7 @@ import { cn } from "@/lib/cn";
 import { HOME_COPY } from "@/lib/content";
 import { trackProductEvent } from "@/lib/product-events";
 import { useToast } from "@/components/ui/Toast";
+import { useHydrated } from "@/hooks/useHydrated";
 import type { PartnerPopularityMetrics } from "@/lib/partner-popularity";
 import {
   createHomeCategoryMap,
@@ -76,6 +77,7 @@ export default function HomeView({
     key: "",
     limit: INITIAL_PARTNER_CARD_COUNT,
   });
+  const directoryHydrated = useHydrated();
   const [localPopularityById, setLocalPopularityById] = useState<
     Record<string, PartnerPopularityMetrics | undefined>
   >(partnerPopularityById ?? {});
@@ -412,7 +414,10 @@ export default function HomeView({
         <div className="grid min-w-0 gap-6 min-[840px]:grid-cols-[minmax(15rem,17rem)_minmax(0,1fr)] min-[840px]:items-start min-[1200px]:grid-cols-[18rem_minmax(0,1fr)]">
           <div
             className="min-w-0 min-[840px]:sticky min-[840px]:top-24 min-[840px]:self-start"
+            data-hydrated={directoryHydrated}
             data-nosnippet
+            data-testid="partner-filter-interaction-root"
+            inert={!directoryHydrated}
           >
             <PartnerFilters
               categories={categories}

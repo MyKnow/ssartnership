@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getSafeAdminActionErrorCode } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { assertAdminCanUseGlobalFeature } from "@/lib/admin-scope";
 import {
@@ -83,7 +84,7 @@ export async function updatePartnerBrandPlanAction(formData: FormData) {
   } catch (error) {
     redirectAdminActionError(
       ADMIN_BRAND_PLANS_PATH,
-      error instanceof Error ? error.message : "partner_company_plan_invalid_request",
+      getSafeAdminActionErrorCode(error, "partner_company_plan_invalid_request"),
       {
         action: "partner_brand_plan_update",
         targetType: "partner_brand",
@@ -101,7 +102,7 @@ export async function updatePartnerBrandPlanAction(formData: FormData) {
   } catch (error) {
     redirectAdminActionError(
       ADMIN_BRAND_PLANS_PATH,
-      error instanceof Error ? error.message : "partner_company_plan_invalid_request",
+      getSafeAdminActionErrorCode(error, "partner_company_plan_invalid_request"),
       {
         action: "partner_brand_plan_update",
         targetType: "partner_brand",
@@ -161,7 +162,7 @@ export async function confirmPartnerPlanBankTransferPaymentAction(formData: Form
   } catch (error) {
     redirectAdminActionError(
       ADMIN_BRAND_PLANS_PATH,
-      error instanceof Error ? error.message : "partner_company_plan_invalid_request",
+      getSafeAdminActionErrorCode(error, "partner_company_plan_invalid_request"),
       {
         action: "partner_plan_bank_transfer_confirmed",
         targetType: "partner_plan_upgrade_request",
@@ -180,7 +181,10 @@ export async function confirmPartnerPlanBankTransferPaymentAction(formData: Form
   } catch (error) {
     redirectAdminActionError(
       ADMIN_BRAND_PLANS_PATH,
-      error instanceof Error ? error.message : "partner_company_plan_invalid_request",
+      getSafeAdminActionErrorCode(
+        error,
+        "partner_company_plan_invalid_request",
+      ),
       {
         action: "partner_plan_bank_transfer_confirmed",
         targetType: "partner_plan_upgrade_request",
@@ -240,9 +244,7 @@ async function reviewPartnerPlanRequestAction(
         ? "partner_company_plan_processed"
         : error instanceof Error && error.message.includes("입금 확인")
           ? "partner_company_plan_payment_unconfirmed"
-        : error instanceof Error
-          ? error.message
-          : "partner_company_plan_invalid_request";
+          : getSafeAdminActionErrorCode(error, "partner_company_plan_invalid_request");
     redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, message, {
       action: `partner_plan_upgrade_${nextStatus}`,
       targetType: "partner_plan_upgrade_request",

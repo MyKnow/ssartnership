@@ -337,7 +337,7 @@ test("알림 템플릿 테이블은 RLS와 service_role 전용 접근을 사용�
 });
 
 test("템플릿 관리자는 서버에서 수신 회원을 재검증하고 모든 템플릿을 테스트 발송할 수 있다", async () => {
-  const [action, page, component, delivery] = await Promise.all([
+  const [action, page, component, delivery, recipientsRoute] = await Promise.all([
     readFile(
       new URL(
         "../src/app/admin/(protected)/notification-templates/actions.ts",
@@ -360,13 +360,21 @@ test("템플릿 관리자는 서버에서 수신 회원을 재검증하고 모�
       new URL("../src/lib/notification-templates/test-delivery.server.ts", import.meta.url),
       "utf8",
     ),
+    readFile(
+      new URL(
+        "../src/app/api/admin/notification-templates/test-recipients/route.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
   ]);
 
   assert.match(action, /sendNotificationTemplateTestAction/);
   assert.match(action, /requireNotificationTemplateAdmin\("update"/);
   assert.match(action, /memberId/);
-  assert.match(page, /listNotificationTemplateTestRecipients/);
+  assert.match(page, /testRecipients=\{\[\]\}/);
   assert.match(component, /<details/);
+  assert.match(component, /\/api\/admin\/notification-templates\/test-recipients/);
   assert.match(component, /useState\(false\)/);
   assert.match(component, /테스트 발송/);
   assert.match(delivery, /getRecipientById/);
@@ -374,6 +382,8 @@ test("템플릿 관리자는 서버에서 수신 회원을 재검증하고 모�
   assert.match(delivery, /withActiveMattermostSenderForSubject/);
   assert.match(delivery, /sendPushTemplateTest/);
   assert.match(delivery, /createNotification/);
+  assert.match(recipientsRoute, /ensureAdminApiPermission/);
+  assert.match(recipientsRoute, /listNotificationTemplateTestRecipients/);
 
   const memberSelect = delivery.match(/const MEMBER_SELECT =\s*"([^"]+)"/)?.[1];
   assert.equal(

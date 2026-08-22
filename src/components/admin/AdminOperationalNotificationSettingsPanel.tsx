@@ -6,6 +6,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import type { AdminNotificationPreferenceState } from "@/lib/partner-notification-routing";
+import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
 
 type AdminOperationalNotificationSettingsPanelProps = {
   pushConfigured: boolean;
@@ -29,9 +30,7 @@ async function postJson(url: string, body: Record<string, unknown>) {
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(
-      typeof data.message === "string" ? data.message : "요청을 처리하지 못했습니다.",
-    );
+    throw new Error("요청을 처리하지 못했습니다.");
   }
   return data;
 }
@@ -68,7 +67,7 @@ export default function AdminOperationalNotificationSettingsPanel({
         setMessage("알림 설정을 저장했습니다.");
       } catch (caught) {
         setState(previousState);
-        setError(caught instanceof Error ? caught.message : "알림 설정 저장에 실패했습니다.");
+        setError(getSafeAdminMessage(caught, "알림 설정 저장에 실패했습니다."));
       }
     });
   }
@@ -98,7 +97,7 @@ export default function AdminOperationalNotificationSettingsPanel({
         }
         setMessage("이 기기에서 푸시 알림을 받습니다.");
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "푸시 구독에 실패했습니다.");
+        setError(getSafeAdminMessage(caught, "푸시 구독에 실패했습니다."));
       }
     });
   }
@@ -109,7 +108,7 @@ export default function AdminOperationalNotificationSettingsPanel({
   }> = [
     { key: "portalEnabled", label: "관리자 인앱" },
     { key: "pushEnabled", label: "웹푸시" },
-    { key: "partnerRequestEnabled", label: "파트너 변경 요청" },
+    { key: "partnerRequestEnabled", label: "파트너 변경·추가 요청" },
     { key: "expiringPartnerEnabled", label: "제휴 종료 임박" },
     { key: "securityEnabled", label: "중요 보안" },
   ];
@@ -118,7 +117,7 @@ export default function AdminOperationalNotificationSettingsPanel({
     <Card tone="default" padding="md" className="grid gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
-          <p className="ui-kicker">Delivery Settings</p>
+          <p className="ui-kicker">발송 설정</p>
           <h2 className="text-lg font-semibold text-foreground">관리자 알림 설정</h2>
         </div>
         <div className="flex flex-wrap gap-2">

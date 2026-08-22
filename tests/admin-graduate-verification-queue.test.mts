@@ -4,17 +4,26 @@ import test from "node:test";
 
 const pagePath = new URL("../src/app/admin/(protected)/graduate-verifications/page.tsx", import.meta.url);
 const queuePath = new URL("../src/components/admin/AdminGraduateVerificationQueue.tsx", import.meta.url);
+const readModelPath = new URL(
+  "../src/lib/admin-graduate-verification-queue.server.ts",
+  import.meta.url,
+);
 const mediaViewerPath = new URL(
   "../src/components/admin/AdminGraduateVerificationMediaViewer.tsx",
   import.meta.url,
 );
 
 test("수료생 검토 페이지는 사진 변경 대기열을 전용 관리자 화면으로 분리한다", async () => {
-  const pageSource = await readFile(pagePath, "utf8");
+  const [pageSource, readModelSource] = await Promise.all([
+    readFile(pagePath, "utf8"),
+    readFile(readModelPath, "utf8"),
+  ]);
 
   assert.doesNotMatch(pageSource, /member_profile_images/);
   assert.doesNotMatch(pageSource, /approveGraduateProfileImageAction/);
-  assert.match(pageSource, /graduate_verification_requests/);
+  assert.match(pageSource, /getAdminGraduateVerificationRequestQueueReadModel/);
+  assert.match(pageSource, /getAdminGraduateSetupEmailRetryQueueReadModel/);
+  assert.match(readModelSource, /graduate_verification_requests/);
 });
 
 test("관리자 미디어 액션은 새 탭 링크 대신 이미지 뷰어를 연다", async () => {
@@ -29,4 +38,57 @@ test("관리자 미디어 액션은 새 탭 링크 대신 이미지 뷰어를 �
   assert.match(viewerSource, /pdfjs-dist/);
   assert.match(viewerSource, /getDocument/);
   assert.match(viewerSource, /credentials:\s*["']same-origin["']/);
+});
+
+test("수료생 검토의 결정 입력은 레이블·도움말·공용 폼 제어를 제공한다", async () => {
+  const queueSource = await readFile(queuePath, "utf8");
+
+  assert.match(queueSource, /from "@\/components\/ui\/Input"/);
+  assert.match(queueSource, /from "@\/components\/ui\/Textarea"/);
+  assert.match(queueSource, /<fieldset/);
+  assert.match(queueSource, /<legend/);
+  assert.match(queueSource, /htmlFor=\{documentNumberInputId\}/);
+  assert.match(queueSource, /수료증에 적힌 문서 번호를 입력하세요/);
+  assert.match(queueSource, /htmlFor=\{existingMemberIdInputId\}/);
+  assert.match(queueSource, /회원 상세에서 복사한 UUID를 입력하세요/);
+  assert.match(queueSource, /보완이 필요한 항목/);
+  assert.match(queueSource, /보완 요청 사유/);
+  assert.match(queueSource, /반려 사유/);
+  assert.match(queueSource, /min-h-11 cursor-pointer/);
+  assert.doesNotMatch(
+    queueSource,
+    /className="h-11 min-w-56 rounded-\[1rem\] border border-border bg-surface px-3 text-sm"/,
+  );
+});
+
+test("수료생 검토 카드는 현재 상태에 맞는 다음 행동만 노출한다", async () => {
+  const queueSource = await readFile(queuePath, "utf8");
+
+  assert.match(queueSource, /const isSubmitted = request\.status === "submitted"/);
+  assert.match(queueSource, /const isInReview = request\.status === "in_review"/);
+  assert.match(queueSource, /canUpdate && isSubmitted/);
+  assert.match(queueSource, /canUpdate && isInReview/);
+  assert.match(queueSource, /다음 행동: 검토 시작/);
+  assert.match(queueSource, /현재 상태에서는 추가 결정을 할 수 없습니다\./);
+});
+
+test("수료생 검토는 주 큐를 메일 재발송 보조 큐보다 먼저 렌더링한다", async () => {
+  const [pageSource, queueSource] = await Promise.all([
+    readFile(pagePath, "utf8"),
+    readFile(queuePath, "utf8"),
+  ]);
+
+  assert.match(pageSource, /const requestQueuePromise/);
+  assert.match(pageSource, /const setupEmailRetryQueuePromise/);
+  assert.match(pageSource, /const requestQueue = await requestQueuePromise/);
+  assert.doesNotMatch(
+    pageSource,
+    /await getAdminGraduateSetupEmailRetryQueueReadModel/,
+  );
+  assert.match(queueSource, /<Suspense fallback={<AdminGraduateVerificationRetryLoading/);
+  assert.match(
+    queueSource,
+    /신규 인증 검토는 지금 바로 시작할 수 있습니다\./,
+  );
+  assert.match(queueSource, /메일 재발송 대상을 불러오지 못했습니다\./);
 });

@@ -6,7 +6,61 @@ function readRepoFile(pathname: string) {
   return readFileSync(new URL(`../${pathname}`, import.meta.url), "utf8");
 }
 
-test("public readiness CI workflow gates launch-critical checks", () => {
+const WORKFLOW_FILES = [
+  "admin-performance.yml",
+  "preview-migrations.yml",
+  "preview-sync.yml",
+  "production-migrations.yml",
+  "public-readiness.yml",
+  "storybook.yml",
+] as const;
+
+const VERIFIED_SUPABASE_CLI_VERSION = "2.114.0";
+
+test("GitHub Actions use the Node 24 action runtime and project runtime with read-only repository access", () => {
+  for (const filename of WORKFLOW_FILES) {
+    const workflow = readRepoFile(`.github/workflows/${filename}`);
+    const checkoutVersions = [
+      ...workflow.matchAll(/actions\/checkout@(v\d+(?:\.\d+)*)/g),
+    ].map((match) => match[1]);
+    const setupNodeVersions = [
+      ...workflow.matchAll(/actions\/setup-node@(v\d+(?:\.\d+)*)/g),
+    ].map((match) => match[1]);
+    const projectNodeVersions = [
+      ...workflow.matchAll(/node-version:\s*["']?([^\s"'#]+)["']?/g),
+    ].map((match) => match[1]);
+
+    assert.ok(checkoutVersions.length > 0, `${filename}: checkout action missing`);
+    assert.deepEqual(
+      new Set(checkoutVersions),
+      new Set(["v7"]),
+      `${filename}: checkout must use the Node 24 runtime release`,
+    );
+    assert.ok(setupNodeVersions.length > 0, `${filename}: setup-node action missing`);
+    assert.deepEqual(
+      new Set(setupNodeVersions),
+      new Set(["v7"]),
+      `${filename}: setup-node must use the Node 24 runtime release`,
+    );
+    assert.equal(
+      projectNodeVersions.length,
+      setupNodeVersions.length,
+      `${filename}: every setup-node step must declare the project Node version`,
+    );
+    assert.deepEqual(
+      new Set(projectNodeVersions),
+      new Set(["24.18.1"]),
+      `${filename}: project commands must run on the pinned Node release`,
+    );
+    assert.match(
+      workflow,
+      /permissions:\s*\n\s+contents: read/,
+      `${filename}: repository token must remain read-only`,
+    );
+  }
+});
+
+test("public readiness separates the normal Quick Gate from main promotion", () => {
   const workflow = readRepoFile(".github/workflows/public-readiness.yml");
 
   for (const requiredText of [
@@ -20,11 +74,11 @@ test("public readiness CI workflow gates launch-critical checks", () => {
     "npm run lint",
     "npm run typecheck:ci",
     "npm test",
-    "npm audit --omit=dev",
     "npm run audit:security",
-    "npm run build",
+    "name: Quick Readiness",
+    "name: Release Readiness",
     "PLAYWRIGHT_CHROMIUM_CHANNEL: chrome",
-    "npm run test:e2e",
+    "npm run verify:release:post-quick",
   ]) {
     assert.match(
       workflow,
@@ -33,14 +87,72 @@ test("public readiness CI workflow gates launch-critical checks", () => {
   }
 
   assert.match(workflow, /push:\s*\n\s+branches:\s*\[main, dev\]/);
-  assert.match(workflow, /^\s+pull_request:\s*$/m);
+  assert.match(workflow, /pull_request:\s*\n\s+branches:\s*\[main, dev\]/);
   assert.match(workflow, /concurrency:\s*\n\s+group:/);
   assert.match(workflow, /cancel-in-progress:\s+true/);
+  assert.match(
+    workflow,
+    /github\.event_name == 'pull_request' && github\.base_ref == 'main'/,
+  );
+  assert.doesNotMatch(workflow, /name: Dependency audit/);
+  assert.doesNotMatch(workflow, /run: npm audit --omit=dev/);
   assert.match(workflow, /persist-credentials:\s+false/);
   assert.doesNotMatch(workflow, /\bnpm (?:ci|install)\b/);
   assert.doesNotMatch(
     workflow,
     /if:\s*\$\{\{\s*github\.event_name != 'pull_request' \|\| !github\.event\.pull_request\.draft\s*\}\}/,
+  );
+});
+
+test("local prepush stays quick and the explicit release gate adds build and E2E", () => {
+  const packageJson = JSON.parse(readRepoFile("package.json")) as {
+    scripts: Record<string, string>;
+  };
+  const quick = packageJson.scripts["verify:quick"];
+
+  for (const requiredScript of [
+    "check:install-scripts",
+    "check:cross-platform",
+    "check:lockfile",
+    "validate:migrations",
+    "lint",
+    "typecheck:ci",
+    "test",
+    "audit:security",
+  ]) {
+    assert.match(
+      quick,
+      new RegExp(requiredScript.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    );
+  }
+  assert.equal(packageJson.scripts.prepush, "npm run verify:quick");
+  assert.doesNotMatch(quick, /\bbuild\b|test:e2e:ci/);
+  assert.match(
+    packageJson.scripts["verify:release"],
+    /verify:quick verify:release:post-quick/,
+  );
+  assert.match(
+    packageJson.scripts["verify:release:post-quick"],
+    /build test:e2e:ci/,
+  );
+
+  const release = readRepoFile("scripts/release.mjs");
+  assert.match(release, /runRequiredScript\("prepush"\)/);
+  assert.doesNotMatch(release, /runRequiredScript\("build-storybook"\)/);
+  assert.doesNotMatch(release, /runRequiredScript\("test-storybook"\)/);
+  assert.doesNotMatch(release, /runRequiredScript\("test:visual"\)/);
+});
+
+test("auth E2E mock reset waits for a semantic application readiness boundary", () => {
+  const authOperations = readRepoFile("tests/e2e/auth-ops.spec.ts");
+  const readinessIndex = authOperations.indexOf('await page.goto("/auth/login");');
+  const resetIndex = authOperations.indexOf('page.request.post("/api/e2e/mock/reset")');
+
+  assert.ok(readinessIndex >= 0, "auth operations must warm the login route first");
+  assert.ok(resetIndex > readinessIndex, "mock reset must follow route readiness");
+  assert.match(
+    authOperations,
+    /getByRole\("textbox", \{ name: "아이디 또는 이메일" \}\)[\s\S]*?\.toBeVisible\(\);[\s\S]*?page\.request\.post\("\/api\/e2e\/mock\/reset"\)/,
   );
 });
 
@@ -70,23 +182,86 @@ test("active workflows use the current Node 24 GitHub action majors", () => {
   assert.ok(actionCount > 0, "expected active workflows to use GitHub Node actions");
 });
 
-test("Storybook interaction runs automatically, isolates shared state, and keeps pixel baselines manual", () => {
+test("active Supabase workflows pin the Production-validated CLI version", () => {
+  const workflowsDirectory = new URL("../.github/workflows/", import.meta.url);
+  const workflowNames = readdirSync(workflowsDirectory)
+    .filter((name) => /\.ya?ml$/.test(name))
+    .sort();
+  let setupCliStepCount = 0;
+
+  for (const workflowName of workflowNames) {
+    const workflow = readFileSync(new URL(workflowName, workflowsDirectory), "utf8");
+    const lines = workflow.split("\n");
+
+    assert.doesNotMatch(
+      workflow,
+      /^\s*version:\s*["']?latest["']?(?:\s+#.*)?$/m,
+      `${workflowName}: active workflows must not float a CLI version`,
+    );
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const setupCliUse = lines[index].match(
+        /^(\s*)uses:\s*supabase\/setup-cli@v2\s*$/,
+      );
+      if (!setupCliUse) {
+        continue;
+      }
+
+      setupCliStepCount += 1;
+      const usesIndent = setupCliUse[1].length;
+      let configuredVersion: string | null = null;
+
+      for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+        const line = lines[cursor];
+        const trimmedLine = line.trimStart();
+        const lineIndent = line.length - trimmedLine.length;
+
+        if (trimmedLine.startsWith("- ") && lineIndent < usesIndent) {
+          break;
+        }
+
+        const version = line.match(
+          /^\s+version:\s*["']?([^\s"'#]+)["']?(?:\s+#.*)?$/,
+        );
+        if (version) {
+          configuredVersion = version[1];
+          break;
+        }
+      }
+
+      assert.equal(
+        configuredVersion,
+        VERIFIED_SUPABASE_CLI_VERSION,
+        `${workflowName}: supabase/setup-cli must use the Production-validated version`,
+      );
+    }
+  }
+
+  assert.ok(
+    setupCliStepCount > 0,
+    "expected at least one active Supabase setup-cli step",
+  );
+});
+
+test("Storybook interaction and visual baselines are explicit manual tools", () => {
   const workflow = readRepoFile(".github/workflows/storybook.yml");
+  const preview = readRepoFile(".storybook/preview.tsx");
+  const vitestConfig = readRepoFile("vitest.config.ts");
   const manualMemberImportStories = readRepoFile(
     "src/components/admin/AdminMemberManualAddPanel.stories.tsx",
   );
+  const imageUploadDraftClient = readRepoFile("src/lib/image-upload/draft.client.ts");
 
   assert.match(workflow, /name: Storybook and Visual Baselines/);
-  assert.match(workflow, /push:\s*\n\s+branches:\s*\[main, dev\]/);
-  assert.match(
-    workflow,
-    /pull_request:\s*\n\s+types:\s*\[opened, synchronize, reopened, ready_for_review\]/,
-  );
+  assert.doesNotMatch(workflow, /^\s+push:\s*$/m);
+  assert.doesNotMatch(workflow, /^\s+pull_request:\s*$/m);
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /interaction:/);
+  assert.match(workflow, /visual:/);
   assert.match(workflow, /concurrency:\s*\n\s+group:/);
-  assert.match(workflow, /cancel-in-progress:\s+true/);
+  assert.match(workflow, /cancel-in-progress:\s+false/);
   assert.match(workflow, /name: Build, Interaction, A11y/);
-  assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name != 'pull_request' \|\| !github\.event\.pull_request\.draft\s*\}\}/);
+  assert.match(workflow, /if:\s*\$\{\{\s*inputs\.interaction\s*\}\}/);
   assert.match(workflow, /npm run build-storybook/);
   assert.match(workflow, /npm run test-storybook/);
   assert.match(workflow, /npm run install:trusted/);
@@ -94,16 +269,28 @@ test("Storybook interaction runs automatically, isolates shared state, and keeps
   assert.doesNotMatch(workflow, /\bnpm (?:ci|install)\b/);
   assert.match(workflow, /playwright install --with-deps chromium/);
   assert.match(workflow, /name: Visual Baselines/);
-  assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name == 'workflow_dispatch'\s*\}\}/);
+  assert.match(workflow, /if:\s*\$\{\{\s*inputs\.visual\s*\}\}/);
   assert.match(workflow, /npm run test:visual/);
   assert.match(workflow, /runs-on:\s+ubuntu-latest/);
   assert.doesNotMatch(workflow, /name: Detect visual changes/);
   assert.doesNotMatch(workflow, /git diff --name-only --diff-filter/);
-  assert.doesNotMatch(workflow, /chromaui\/action|CHROMATIC_PROJECT_TOKEN/);
+  assert.match(
+    preview,
+    /pretendard\/dist\/web\/variable\/pretendardvariable\.css/,
+  );
+  assert.match(
+    vitestConfig,
+    /name:\s*"storybook"[\s\S]+?maxConcurrency:\s*1[\s\S]+?fileParallelism:\s*false/,
+  );
   assert.match(
     manualMemberImportStories,
     /beforeEach:\s*async[\s\S]+?window\.fetch = STORYBOOK_FETCH[\s\S]+?await clearImageUploadDraft\(MANUAL_MEMBER_IMPORT_DRAFT_KEY\)[\s\S]+?window\.fetch = STORYBOOK_FETCH[\s\S]+?await clearImageUploadDraft\(MANUAL_MEMBER_IMPORT_DRAFT_KEY\)/,
   );
+  assert.match(
+    imageUploadDraftClient,
+    /async function runImageUploadDraftTransaction[\s\S]+?request\.addEventListener\("success", \(\) => \{[\s\S]+?result = request\.result;[\s\S]+?transaction\.oncomplete = \(\) => resolve\(result\)/,
+  );
+  assert.doesNotMatch(workflow, /chromaui\/action|CHROMATIC_PROJECT_TOKEN/);
 });
 
 test("Public Readiness owns canonical lockfile verification without a standalone workflow", () => {
@@ -116,7 +303,7 @@ test("Public Readiness owns canonical lockfile verification without a standalone
   assert.equal(workflowNames.includes("lockfile-check.yml"), false);
   assert.match(
     publicReadiness,
-    /jobs:\s*\n\s+verify:\s*\n\s+name: Lint, Test, Build, Security, E2E[\s\S]+?name: Verify lockfile\s*\n\s+run: npm run check:lockfile/,
+    /jobs:\s*\n\s+quick:\s*\n\s+name: Quick Readiness[\s\S]+?name: Verify lockfile\s*\n\s+run: npm run check:lockfile/,
   );
   assert.equal(
     [...publicReadiness.matchAll(/run:\s*npm run check:lockfile/g)].length,
@@ -163,21 +350,20 @@ test("Preview Supabase migrations apply dev schema changes without syncing data"
 
   for (const requiredText of [
     "name: Apply Preview Supabase Migrations",
-    "push:",
-    "branches: [main]",
+    "workflow_run:",
+    "Public Readiness",
+    "branches: [dev]",
     "workflow_dispatch:",
     "APPLY_PREVIEW_MIGRATIONS",
-    "[apply-preview-migrations]",
+    "expected_dev_sha:",
+    "github.event.workflow_run.conclusion == 'success'",
+    "github.event.workflow_run.event == 'push'",
+    "github.event.workflow_run.head_branch == 'dev'",
     "github.ref == 'refs/heads/main'",
-    "ref: dev",
+    "ref: ${{ steps.select-dev.outputs.sha }}",
     "npm run validate:migrations",
     "SUPABASE_PREVIEW_DB_URL",
     'supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes',
-    "Repair stale Preview migration history",
-    "[repair-preview-migration-history]",
-    "supabase migration repair",
-    "--status reverted",
-    "20260712133729 20260712143858",
   ]) {
     assert.match(
       workflow,
@@ -185,34 +371,39 @@ test("Preview Supabase migrations apply dev schema changes without syncing data"
     );
   }
 
-  assert.match(
-    workflow,
-    /name: Repair stale Preview migration history[\s\S]+?github\.event_name == 'push' &&[\s\S]+?contains\(github\.event\.head_commit\.message, '\[repair-preview-migration-history\]'\)[\s\S]+?supabase migration repair[\s\S]+?--status reverted[\s\S]+?20260712133729 20260712143858/,
-  );
   assert.doesNotMatch(
     workflow,
-    /sync:preview|SUPABASE_PRODUCTION_DB_URL|--include-all/,
+    /sync:preview|SUPABASE_PRODUCTION_DB_URL|--include-all|migration repair/,
+  );
+  assert.doesNotMatch(workflow, /ref: dev/);
+  assert.match(workflow, /git ls-remote "\$REPOSITORY_URL" refs\/heads\/dev/);
+  assert.match(workflow, /echo "is_current=false" >> "\$GITHUB_OUTPUT"/);
+  assert.match(
+    workflow,
+    /name: Apply pending Preview migrations[\s\S]+?test "\$\(git rev-parse HEAD\)" = "\$EXPECTED_DEV_SHA"[\s\S]+?git ls-remote origin refs\/heads\/dev[\s\S]+?supabase db push/,
   );
 });
 
-test("Preview sync follows the latest successful dev public-readiness run without stale reruns", () => {
+test("Preview data and Storage sync is an explicit exact-dev maintenance operation", () => {
   const workflow = readRepoFile(".github/workflows/preview-sync.yml");
 
   assert.match(workflow, /name: Sync Preview Supabase/);
-  assert.match(workflow, /workflow_run:/);
-  assert.match(workflow, /workflows:\s*\n\s+- Public Readiness/);
-  assert.match(workflow, /branches:\s*\[dev\]/);
-  assert.match(workflow, /types:\s*\n\s+- completed/);
-  assert.match(workflow, /&& 'preview-sync' \|\|/);
-  assert.match(workflow, /format\('preview-sync-noop-\{0\}', github\.run_id\)/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.doesNotMatch(workflow, /workflow_run:/);
+  assert.doesNotMatch(workflow, /^\s+push:\s*$/m);
+  assert.match(workflow, /confirmation:/);
+  assert.match(workflow, /SYNC_PREVIEW_DATA/);
+  assert.match(workflow, /expected_dev_sha:/);
+  assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow, /group:\s+preview-data-sync/);
   assert.match(workflow, /cancel-in-progress:\s+false/);
-  assert.match(workflow, /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/dev'/);
-  assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/);
-  assert.match(workflow, /github\.event\.workflow_run\.event == 'push'/);
-  assert.match(workflow, /github\.event\.workflow_run\.head_branch == 'dev'/);
-  assert.match(workflow, /name: Guard stale dev workflow SHA/);
+  assert.match(workflow, /ref: \$\{\{ steps\.select-dev\.outputs\.sha \}\}/);
+  assert.doesNotMatch(workflow, /ref: dev/);
+  assert.doesNotMatch(workflow, /ref: main/);
   assert.match(workflow, /git ls-remote origin refs\/heads\/dev/);
-  assert.match(workflow, /steps\.stale-sha\.outputs\.is_current == 'true'/);
+  assert.match(workflow, /run: npm run sync:preview/);
+  assert.match(workflow, /SUPABASE_PRODUCTION_DB_URL/);
+  assert.match(workflow, /SUPABASE_PREVIEW_SERVICE_ROLE_KEY/);
   assert.match(workflow, /node-version:\s+24\.18\.1/);
   assert.match(workflow, /npm run install:trusted/);
   assert.match(workflow, /version:\s+2\.114\.0/);

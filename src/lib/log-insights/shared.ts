@@ -9,6 +9,11 @@ import type {
 export type LogRangePreset = '1h' | '12h' | '24h' | '7d' | '30d' | 'custom';
 export type LogGroup = 'product' | 'audit' | 'security';
 
+export type AdminLogsCursor = {
+  createdAt: string;
+  id: string;
+};
+
 export type MemberLookupRecord = {
   id: string;
   displayName: string | null;
@@ -196,6 +201,8 @@ export type AdminLogsPageData = {
     total: number;
     page: number;
     pageSize: number;
+    nextCursor?: string | null;
+    hasMore?: boolean;
   };
 };
 
@@ -217,6 +224,7 @@ export type GetAdminLogsPageDataOptions = {
   actor?: string | null;
   status?: string | null;
   sort?: string | null;
+  cursor?: string | null;
 };
 
 export type CsvExportOptions = {
@@ -274,6 +282,8 @@ export type AdminLogsLoadedData = {
     security: boolean;
     any: boolean;
   };
+  nextCursor?: string | null;
+  hasMore?: boolean;
 };
 
 export const RANGE_PRESET_MS: Record<Exclude<LogRangePreset, 'custom'>, number> = {
@@ -285,6 +295,8 @@ export const RANGE_PRESET_MS: Record<Exclude<LogRangePreset, 'custom'>, number> 
 };
 
 export const DEFAULT_PRESET: LogRangePreset = '24h';
+export const LOG_PAGE_SIZE_OPTIONS = [50, 100, 250] as const;
+export const DEFAULT_LOG_PAGE_SIZE = LOG_PAGE_SIZE_OPTIONS[0];
 export const QUERY_PAGE_SIZE = 1000;
 export const MAX_CUSTOM_RANGE_MS = 31 * 24 * 60 * 60 * 1000;
 export const PAGE_MAX_LOG_ROWS_PER_GROUP = 5000;

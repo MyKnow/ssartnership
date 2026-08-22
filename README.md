@@ -160,7 +160,7 @@ npm run ci:local
 ```
 
 - `check:lockfile`: Node.js 24.18.1과 npm 11.16.0으로 lockfile을 재계산해 canonical 여부 확인
-- `ci:local`: bootstrap, 교차 플랫폼 정책, lint, typecheck, test, build, Storybook, visual test를 순서대로 검증
+- `ci:local`: 신뢰 설치, 교차 플랫폼 정책, 전체 사전 푸시 게이트, Storybook·Visual test를 순서대로 검증
 
 ## 환경 변수
 
@@ -251,6 +251,8 @@ npm run ci:local
 - `SUPABASE_PREVIEW_ANON_KEY`
 - `*_DB_URL` 값은 Supabase 대시보드에서 복사한 percent-encoded PostgreSQL 연결 문자열을 사용합니다.
 - 로컬 또는 CI에서 동일한 동기화 로직을 재사용하려면 `npm run sync:preview`를 실행합니다.
+- Preview에서 직접 발급한 Apple Wallet 데이터(`member_wallet_passes`, `member_wallet_pass_revisions`, `member_wallet_pass_operations`, `apple_wallet_device_registrations`)는 Production dump 대상에서 제외합니다. Production의 패스와 APNs 기기 등록 정보는 Preview로 복사하지 않습니다.
+- 동기화는 Preview Wallet 원장을 임시 테이블에 보관하고, Production 데이터 교체와 Wallet 원장 복원을 하나의 트랜잭션으로 실행합니다. 참조 회원이 Production 원장에 없거나 복원에 실패하면 전체 데이터 교체를 롤백해 Preview 패스를 조용히 유실하지 않습니다.
 
 `schema.sql`에는 현재 기준 테이블, 정책 문서 v1, MM 유저 디렉토리, Push 관련 스키마, 제휴 업체 `이용 조건` 스키마가 포함되어 있습니다.
 
@@ -369,7 +371,7 @@ erDiagram
 
 - 로그인 식별자는 Mattermost 아이디 또는 **인증된 이메일**이다. 이메일은 `/certification`에서 6자리 코드로 등록·변경한다.
 - `mm_username`은 로그인 입력과 디렉토리 조회에 쓰는 변경 가능한 외부 식별자다. 회원 테이블에서는 nullable FK만 보유하고, MM 세부값은 `mm_user_directory`가 보관한다.
-- `member_ssafy_verifications`는 SSAFY pairwise subject, 검증 시각, 트랙 정보를 보관한다. 기존 `members.ssafy_*` 컬럼은 Preview 검증이 끝날 때까지 호환 목적으로만 함께 쓴다.
+- `member_ssafy_verifications`는 더 이상 런타임에서 읽지 않는 SSAFY Verify 레거시 proof다. Production에는 2026-08-13 기준 13행이 남아 있고 기존 `members.ssafy_*` 컬럼은 이미 제거됐다. 삭제 조건과 승인 경계는 [SSAFY Verify 레거시 삭제 준비도 감사](docs/operations/ssafy-verify-legacy-removal-readiness-2026-08-13.md)를 따른다.
 - 기수 계산은 `ssafy_cycle_settings`와 날짜를 사용한다. 예를 들어 `generation = 15`는 15기이며, 현재 시점에 따라 교육생·수료생 역할 표시는 파생한다.
 - 반·강의실·반장·CA 등 운영에 불필요한 닉네임 파생값은 저장하지 않는다.
 
@@ -384,18 +386,18 @@ erDiagram
 - 관리자 권한의 원천은 `admin_profiles.permission_template_key`와 템플릿이다. 현재 관리자 세션/감사 FK는 안전한 전환을 위해 회원 ID를 유지하며, Preview 검증 후 관리자 프로필 ID로 계약 전환한다.
 - `policy_documents`는 버전 콘텐츠를 수정하지 않고 새 버전을 발행한다. `member_policy_consents`는 약관 동의 이력을 보존한다.
 
-### 전환 순서
+### 정규화 전환 상태
 
-1. 확장: 새 테이블·FK·인덱스를 추가하고 기존 컬럼을 유지한다.
-2. 백필 및 이중 쓰기: 기존 회원을 새 모델로 옮기고 신규 가입·승인·권한 변경도 두 모델에 쓴다.
-3. Preview 검증: 로그인, 인증, 수료생 승인, 관리자 권한, 탈퇴 익명화, 이미지 접근을 검증한다.
-4. 계약: 모든 reader가 새 모델만 사용한 뒤 레거시 MM/SSAFY/권한/약관 미러 컬럼을 별도 migration으로 제거한다.
+1. 새 정규화 테이블·FK·인덱스 추가와 백필은 완료됐다.
+2. active reader는 정규화 회원·Mattermost 관계를 사용하고 `members.ssafy_*` 미러 컬럼은 제거됐다.
+3. SSAFY Verify proof table, legacy Mattermost alias, 휴면 `ssafy_sub` 예약 계약은 운영자 보관·rollback 결정 전까지 유지한다.
+4. 삭제할 때는 탈퇴 익명화 함수를 먼저 현행 스키마에 맞춘 뒤 별도 forward migration으로 정리한다.
 
 ## Mattermost 직접 인증과 Sender 운영
 
 ### 서버 환경과 Sender 등록
 
-- 서버에는 `MM_BASE_URL`, `MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION`, `MM_SENDER_CREDENTIALS_KEY_V1`만 설정합니다.
+- 현행 애플리케이션 런타임은 직접 Mattermost 연동에 `MM_BASE_URL`, `MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION`, `MM_SENDER_CREDENTIALS_KEY_V1`만 읽습니다. Vercel에는 미사용 SSAFY Verify key가 남아 있어 별도 삭제 승인이 필요합니다.
 - 기수별 Sender의 로그인 ID·비밀번호는 Super Admin이 `/admin/cycle`에서 입력하며, AES-256-GCM으로 암호화되어 저장됩니다. 평문, MM 세션 토큰, credential metadata는 브라우저와 로그에 노출하지 않습니다.
 - 새 후보 Sender는 이전 활성 Sender 또는 Super Admin 연결 계정으로 테스트 DM을 보낸 뒤에만 활성화됩니다. 기수별 활성 Sender는 하나이고, 교체 성공 시 이전 ciphertext는 삭제됩니다.
 - 팀과 채널은 코드에서 `s{generation}public`과 `town-square`로만 계산합니다.

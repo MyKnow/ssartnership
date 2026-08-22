@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
+import type { ReactNode } from "react";
 import AdminEventDetailView from "@/components/admin/AdminEventDetailView";
 import AdminShell from "@/components/admin/AdminShell";
+import { AdminEventDetailSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
@@ -15,8 +18,12 @@ import {
   updatePromotionEventAction,
 } from "@/app/admin/(protected)/_actions/promotion-actions";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { canAdmin } from "@/lib/admin-permissions";
 import { getEventPageDefinition } from "@/lib/event-pages";
-import { PROMOTION_AUDIENCE_OPTIONS, type EventCampaign } from "@/lib/promotions/catalog";
+import {
+  PROMOTION_AUDIENCE_OPTIONS,
+  type EventCampaign,
+} from "@/lib/promotions/catalog";
 import {
   buildEventRewardAdminOverview,
   buildEventRewardComparisonOverview,
@@ -59,6 +66,19 @@ function statusMessage(status?: string) {
   }
   if (status === "winner-test-sent") {
     return "당첨 안내 테스트를 발송했습니다.";
+  }
+  return null;
+}
+
+function errorMessage(error?: string) {
+  if (error === "admin_event_create_failed") {
+    return "이벤트를 등록하지 못했습니다. 입력값과 운영 권한을 확인한 뒤 다시 시도해 주세요.";
+  }
+  if (error === "admin_event_update_failed") {
+    return "이벤트를 수정하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  }
+  if (error === "admin_event_delete_failed") {
+    return "이벤트를 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.";
   }
   return null;
 }
@@ -119,6 +139,28 @@ function RewardStatusPill({
   );
 }
 
+function eventRewardDrawStatusLabel(status: EventRewardStoredDraw["status"]) {
+  return {
+    draft: "작성 중",
+    finalized: "추첨 확정",
+    sent: "발송 완료",
+    partial_failed: "일부 발송 실패",
+    failed: "발송 실패",
+  }[status];
+}
+
+function eventRewardNotificationStatusLabel(
+  status: EventRewardStoredDraw["winners"][number]["notificationStatus"],
+) {
+  return {
+    pending: "발송 대기",
+    sent: "발송 완료",
+    partial_failed: "일부 실패",
+    failed: "발송 실패",
+    skipped: "발송 제외",
+  }[status];
+}
+
 function getEventRewardDrawPreview(params: {
   overview: EventRewardAdminOverview;
   winnerCount?: string;
@@ -159,6 +201,8 @@ function SignupRewardOverviewSection({
   drawInputWinnerCount,
   drawInputSeed,
   warningMessage,
+  canCreate,
+  canUpdate,
 }: {
   campaign: EventCampaign;
   overview: EventRewardAdminOverview;
@@ -169,8 +213,13 @@ function SignupRewardOverviewSection({
   drawInputWinnerCount?: string | null;
   drawInputSeed?: string | null;
   warningMessage?: string | null;
+  canCreate: boolean;
+  canUpdate: boolean;
 }) {
-  const comparison = buildEventRewardComparisonOverview(campaign, overview.members);
+  const comparison = buildEventRewardComparisonOverview(
+    campaign,
+    overview.members,
+  );
   const conditionStats = [
     { label: "회원가입", value: `${overview.conditionCounts.signup ?? 0}명` },
     { label: "MM 알림", value: `${overview.conditionCounts.mm ?? 0}명` },
@@ -187,7 +236,7 @@ function SignupRewardOverviewSection({
     <section className="grid min-w-0 gap-5" aria-label="추첨권 현황">
       <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="ui-kicker">Rewards</p>
+          <p className="ui-kicker">추첨권</p>
           <h3 className="mt-2 text-xl font-semibold text-foreground">
             추첨권 현황
           </h3>
@@ -195,7 +244,10 @@ function SignupRewardOverviewSection({
             이벤트 종료 전 가입자는 회원가입 추첨권 1장을 완료 처리합니다.
           </p>
         </div>
-        <Button href="/admin/event/signup-reward/rewards/export" variant="secondary">
+        <Button
+          href="/admin/event/signup-reward/rewards/export"
+          variant="secondary"
+        >
           CSV 내보내기
         </Button>
         <Button
@@ -208,11 +260,31 @@ function SignupRewardOverviewSection({
 
       <StatsRow
         items={[
-          { label: "대상 회원", value: `${overview.memberCount.toLocaleString()}명`, hint: "전체 회원" },
-          { label: "총 추첨권", value: `${overview.totalTickets.toLocaleString()}장`, hint: "현재 조건 기준" },
-          { label: "리뷰 인정", value: `${overview.reviewCount.toLocaleString()}개`, hint: "이벤트 기간 visible 리뷰" },
-          { label: "가입 완료", value: `${(overview.conditionCounts.signup ?? 0).toLocaleString()}명`, hint: "종료 전 가입자" },
-          { label: "확인가능 증가", value: `${comparison.totalKnownTicketDelta.toLocaleString()}장`, hint: "before 복원 가능분 기준" },
+          {
+            label: "대상 회원",
+            value: `${overview.memberCount.toLocaleString()}명`,
+            hint: "전체 회원",
+          },
+          {
+            label: "총 추첨권",
+            value: `${overview.totalTickets.toLocaleString()}장`,
+            hint: "현재 조건 기준",
+          },
+          {
+            label: "리뷰 인정",
+            value: `${overview.reviewCount.toLocaleString()}개`,
+            hint: "이벤트 기간 visible 리뷰",
+          },
+          {
+            label: "가입 완료",
+            value: `${(overview.conditionCounts.signup ?? 0).toLocaleString()}명`,
+            hint: "종료 전 가입자",
+          },
+          {
+            label: "확인가능 증가",
+            value: `${comparison.totalKnownTicketDelta.toLocaleString()}장`,
+            hint: "before 복원 가능분 기준",
+          },
         ]}
         minItemWidth="13rem"
       />
@@ -223,7 +295,7 @@ function SignupRewardOverviewSection({
       <Card tone="elevated" className="grid min-w-0 gap-4 overflow-hidden">
         <div className="flex min-w-0 w-full max-w-full flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="ui-kicker">Draw</p>
+          <p className="ui-kicker">추첨</p>
             <h3 className="mt-2 text-xl font-semibold text-foreground">
               가중 추첨
             </h3>
@@ -233,65 +305,97 @@ function SignupRewardOverviewSection({
           </div>
           {draw ? (
             <span className="rounded-full border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
-              {draw.status}
+              {eventRewardDrawStatusLabel(draw.status)}
             </span>
           ) : null}
         </div>
 
-        <form
-          action={sendEventRewardWinnerTestNotificationAction}
-          className="grid min-w-0 w-full max-w-full gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4"
-        >
-          <input type="hidden" name="slug" value="signup-reward" />
-          {draw ? <input type="hidden" name="drawId" value={draw.id} /> : null}
-          <div>
-            <p className="text-sm font-semibold text-foreground">테스트 발송</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              앱+MM+푸시 채널로 테스트 안내를 보냅니다.
+        {canUpdate ? (
+          <form
+            action={sendEventRewardWinnerTestNotificationAction}
+            className="grid min-w-0 w-full max-w-full gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4"
+          >
+            <input type="hidden" name="slug" value="signup-reward" />
+            {draw ? (
+              <input type="hidden" name="drawId" value={draw.id} />
+            ) : null}
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                테스트 발송
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                앱+MM+푸시 채널로 테스트 안내를 보냅니다.
+              </p>
+            </div>
+            <label className="grid gap-2 text-sm font-medium text-foreground">
+              수신자
+              <select
+                name="memberId"
+                required
+                defaultValue=""
+                disabled={testRecipientOptions.length === 0}
+                className="h-11 rounded-input border border-border bg-surface-control px-3 text-sm text-foreground disabled:opacity-60"
+              >
+                <option value="" disabled>
+                  테스트 수신자 선택
+                </option>
+                {testRecipientOptions.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.label} · {member.meta}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex justify-end">
+              <Button
+                type="submit"
+                variant="secondary"
+                disabled={testRecipientOptions.length === 0}
+              >
+                테스트 발송
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <div className="rounded-[1rem] border border-border/70 bg-surface-inset p-4">
+            <p className="text-sm font-semibold text-foreground">
+              테스트 발송 권한이 없습니다.
+            </p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              추첨권 현황은 확인할 수 있지만, 테스트·당첨 안내 발송은 이벤트
+              수정 권한이 있는 관리자만 할 수 있습니다.
             </p>
           </div>
-          <label className="grid gap-2 text-sm font-medium text-foreground">
-            수신자
-            <select
-              name="memberId"
-              required
-              defaultValue=""
-              disabled={testRecipientOptions.length === 0}
-              className="h-11 rounded-input border border-border bg-surface-control px-3 text-sm text-foreground disabled:opacity-60"
-            >
-              <option value="" disabled>
-                테스트 수신자 선택
-              </option>
-              {testRecipientOptions.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.label} · {member.meta}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="flex justify-end">
-            <Button
-              type="submit"
-              variant="secondary"
-              disabled={testRecipientOptions.length === 0}
-            >
-              테스트 발송
-            </Button>
-          </div>
-        </form>
+        )}
 
         {draw ? (
           <div className="grid min-w-0 w-full max-w-full gap-4">
             <StatsRow
               items={[
-                { label: "당첨자", value: `${draw.winners.length.toLocaleString()}명`, hint: "확정 결과" },
-                { label: "후보", value: `${draw.candidateCount.toLocaleString()}명`, hint: "추첨권 1장 이상" },
-                { label: "총 추첨권", value: `${draw.totalTickets.toLocaleString()}장`, hint: "추첨 시점" },
-                { label: "Seed", value: draw.seed.slice(0, 12), hint: "재현용" },
+                {
+                  label: "당첨자",
+                  value: `${draw.winners.length.toLocaleString()}명`,
+                  hint: "확정 결과",
+                },
+                {
+                  label: "후보",
+                  value: `${draw.candidateCount.toLocaleString()}명`,
+                  hint: "추첨권 1장 이상",
+                },
+                {
+                  label: "총 추첨권",
+                  value: `${draw.totalTickets.toLocaleString()}장`,
+                  hint: "추첨 시점",
+                },
+                {
+                  label: "Seed",
+                  value: draw.seed.slice(0, 12),
+                  hint: "재현용",
+                },
               ]}
               minItemWidth="11rem"
             />
-            <div className="overflow-x-auto rounded-[1rem] border border-border/70">
+            <div className="hidden overflow-x-auto rounded-[1rem] border border-border/70 md:block">
               <table className="w-full min-w-[720px] text-left text-sm">
                 <thead className="border-b border-border bg-surface-inset text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                   <tr>
@@ -323,14 +427,53 @@ function SignupRewardOverviewSection({
                         {winner.ticketCount.toLocaleString()}장
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {winner.notificationStatus}
+                        {eventRewardNotificationStatusLabel(winner.notificationStatus)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            {!draw.sentAt ? (
+            <div className="grid min-w-0 gap-3 md:hidden" aria-label="확정 당첨자 목록">
+              {draw.winners.map((winner) => (
+                <article
+                  key={winner.id}
+                  className="grid min-w-0 gap-3 rounded-card border border-border/70 bg-surface-inset p-4"
+                >
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-muted-foreground">
+                        {winner.rank}위
+                      </p>
+                      <p className="mt-1 truncate font-semibold text-foreground">
+                        {winner.displayName || winner.mmUsername}
+                      </p>
+                      <p className="mt-1 truncate text-xs text-muted-foreground">
+                        {winner.mmUsername}
+                      </p>
+                    </div>
+                    <RewardStatusPill
+                      value={eventRewardNotificationStatusLabel(winner.notificationStatus)}
+                    />
+                  </div>
+                  <dl className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <dt className="text-xs text-muted-foreground">기수·캠퍼스</dt>
+                      <dd className="mt-1 font-medium text-foreground">
+                        {winner.year}기 · {winner.campus || "-"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">추첨권</dt>
+                      <dd className="mt-1 font-semibold text-foreground">
+                        {winner.ticketCount.toLocaleString()}장
+                      </dd>
+                    </div>
+                  </dl>
+                </article>
+              ))}
+            </div>
+            {!draw.sentAt && canUpdate ? (
               <form
                 action={sendEventRewardWinnerNotificationsAction}
                 className="grid min-w-0 w-full max-w-full gap-3 rounded-[1rem] border border-primary/20 bg-primary-soft p-4"
@@ -338,9 +481,12 @@ function SignupRewardOverviewSection({
                 <input type="hidden" name="slug" value="signup-reward" />
                 <input type="hidden" name="drawId" value={draw.id} />
                 <div>
-                  <p className="text-sm font-semibold text-primary">실제 발송</p>
+                  <p className="text-sm font-semibold text-primary">
+                    실제 발송
+                  </p>
                   <p className="mt-1 text-xs text-primary/80">
-                    당첨자 {draw.winners.length.toLocaleString()}명에게 앱+MM+푸시 안내를 보냅니다.
+                    당첨자 {draw.winners.length.toLocaleString()}명에게
+                    앱+MM+푸시 안내를 보냅니다.
                   </p>
                 </div>
                 <label className="grid gap-2 text-sm font-medium text-primary">
@@ -349,7 +495,9 @@ function SignupRewardOverviewSection({
                     name="confirmationText"
                     required
                     pattern={EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT}
-                    placeholder={EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT}
+                    placeholder={
+                      EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT
+                    }
                     title={EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT}
                     className="h-11 rounded-input border border-primary/20 bg-surface-control px-3 text-sm text-foreground"
                   />
@@ -358,11 +506,23 @@ function SignupRewardOverviewSection({
                   <Button type="submit">발송 확인</Button>
                 </div>
               </form>
-            ) : (
+            ) : draw.sentAt ? (
               <div className="rounded-[1rem] border border-border/70 bg-surface-inset p-4">
-                <p className="text-sm font-semibold text-foreground">발송 완료</p>
+                <p className="text-sm font-semibold text-foreground">
+                  발송 완료
+                </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {formatEventDate(draw.sentAt)}
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-[1rem] border border-border/70 bg-surface-inset p-4">
+                <p className="text-sm font-semibold text-foreground">
+                  실제 발송 권한이 없습니다.
+                </p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  당첨 결과는 확인할 수 있지만, 당첨 안내 발송은 이벤트 수정
+                  권한이 있는 관리자만 할 수 있습니다.
                 </p>
               </div>
             )}
@@ -379,7 +539,9 @@ function SignupRewardOverviewSection({
                     min="1"
                     required
                     defaultValue={
-                      drawPreview?.winnerCount ?? drawInputWinnerCount ?? undefined
+                      drawPreview?.winnerCount ??
+                      drawInputWinnerCount ??
+                      undefined
                     }
                     className="h-11 rounded-input border border-border bg-surface-control px-3 text-sm text-foreground"
                   />
@@ -414,10 +576,16 @@ function SignupRewardOverviewSection({
                 >
                   테스트 추첨
                 </Button>
-                <Button type="submit">추첨 확정</Button>
+                {canCreate ? <Button type="submit">추첨 확정</Button> : null}
               </div>
             </form>
 
+            {!canCreate ? (
+              <p className="text-sm text-muted-foreground">
+                조회 전용 권한에서는 테스트 추첨만 실행할 수 있고, 결과 확정은
+                이벤트 생성 권한이 있는 관리자만 할 수 있습니다.
+              </p>
+            ) : null}
             {drawError ? (
               <FormMessage variant="error">{drawError}</FormMessage>
             ) : null}
@@ -432,7 +600,8 @@ function SignupRewardOverviewSection({
                       테스트 추첨 결과
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      DB에 저장되지 않는 미리보기입니다. 같은 Seed로 확정하면 같은 순서가 재현됩니다.
+                      DB에 저장되지 않는 미리보기입니다. 같은 Seed로 확정하면
+                      같은 순서가 재현됩니다.
                     </p>
                   </div>
                   <span className="rounded-full border border-border/70 bg-surface px-3 py-1.5 text-xs font-semibold text-muted-foreground">
@@ -441,13 +610,25 @@ function SignupRewardOverviewSection({
                 </div>
                 <StatsRow
                   items={[
-                    { label: "미리보기 당첨자", value: `${drawPreview.winners.length.toLocaleString()}명`, hint: "저장 안 됨" },
-                    { label: "후보", value: `${drawPreview.candidateCount.toLocaleString()}명`, hint: "추첨권 1장 이상" },
-                    { label: "총 추첨권", value: `${drawPreview.totalTickets.toLocaleString()}장`, hint: "현재 조건 기준" },
+                    {
+                      label: "미리보기 당첨자",
+                      value: `${drawPreview.winners.length.toLocaleString()}명`,
+                      hint: "저장 안 됨",
+                    },
+                    {
+                      label: "후보",
+                      value: `${drawPreview.candidateCount.toLocaleString()}명`,
+                      hint: "추첨권 1장 이상",
+                    },
+                    {
+                      label: "총 추첨권",
+                      value: `${drawPreview.totalTickets.toLocaleString()}장`,
+                      hint: "현재 조건 기준",
+                    },
                   ]}
                   minItemWidth="11rem"
                 />
-                <div className="overflow-x-auto rounded-[1rem] border border-border/70 bg-surface">
+                <div className="hidden overflow-x-auto rounded-[1rem] border border-border/70 bg-surface md:block">
                   <table className="w-full min-w-[640px] text-left text-sm">
                     <thead className="border-b border-border bg-surface-inset text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                       <tr>
@@ -482,6 +663,40 @@ function SignupRewardOverviewSection({
                     </tbody>
                   </table>
                 </div>
+                <div className="grid min-w-0 gap-3 md:hidden" aria-label="테스트 추첨 당첨자 목록">
+                  {drawPreview.winners.map((winner) => (
+                    <article
+                      key={winner.memberId}
+                      className="grid min-w-0 gap-3 rounded-card border border-border/70 bg-surface p-4"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-muted-foreground">
+                          {winner.rank}위
+                        </p>
+                        <p className="mt-1 truncate font-semibold text-foreground">
+                          {winner.displayName || winner.mmUsername}
+                        </p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                          {winner.mmUsername}
+                        </p>
+                      </div>
+                      <dl className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <dt className="text-xs text-muted-foreground">기수·캠퍼스</dt>
+                          <dd className="mt-1 font-medium text-foreground">
+                            {winner.year}기 · {winner.campus || "-"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs text-muted-foreground">추첨권</dt>
+                          <dd className="mt-1 font-semibold text-foreground">
+                            {winner.ticketCount.toLocaleString()}장
+                          </dd>
+                        </div>
+                      </dl>
+                    </article>
+                  ))}
+                </div>
               </div>
             ) : null}
           </div>
@@ -502,7 +717,7 @@ function SignupRewardOverviewSection({
       </Card>
 
       <Card tone="elevated" padding="none" className="min-w-0 overflow-hidden">
-        <div className="min-w-0 max-w-full overflow-x-auto">
+        <div className="hidden min-w-0 max-w-full overflow-x-auto md:block">
           <table className="min-w-[960px] w-full text-left text-sm">
             <thead className="border-b border-border bg-surface-inset text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               <tr>
@@ -534,59 +749,111 @@ function SignupRewardOverviewSection({
                     {member.totalTickets.toLocaleString()}장
                   </td>
                   <td className="px-4 py-3">
-                    <RewardStatusPill value={rewardConditionLabel(member, "signup")} />
+                    <RewardStatusPill
+                      value={rewardConditionLabel(member, "signup")}
+                    />
                   </td>
                   <td className="px-4 py-3">
-                    <RewardStatusPill value={rewardConditionLabel(member, "mm")} />
+                    <RewardStatusPill
+                      value={rewardConditionLabel(member, "mm")}
+                    />
                   </td>
                   <td className="px-4 py-3">
-                    <RewardStatusPill value={rewardConditionLabel(member, "push")} />
+                    <RewardStatusPill
+                      value={rewardConditionLabel(member, "push")}
+                    />
                   </td>
                   <td className="px-4 py-3">
-                    <RewardStatusPill value={rewardConditionLabel(member, "marketing")} />
+                    <RewardStatusPill
+                      value={rewardConditionLabel(member, "marketing")}
+                    />
                   </td>
                   <td className="px-4 py-3">
-                    <RewardStatusPill value={rewardConditionLabel(member, "review")} muted />
+                    <RewardStatusPill
+                      value={rewardConditionLabel(member, "review")}
+                      muted
+                    />
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        <div className="grid min-w-0 gap-3 p-3 md:hidden" aria-label="회원별 추첨권 목록">
+          {overview.members.map((member) => (
+            <article
+              key={member.id}
+              className="grid min-w-0 gap-3 rounded-card border border-border/70 bg-surface-inset p-4"
+            >
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-foreground">
+                  {member.displayName || member.mmUsername}
+                </p>
+                <p className="mt-1 truncate text-xs text-muted-foreground">
+                  {member.mmUsername}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {member.year}기 · {member.campus || "-"}
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-3 border-t border-border/70 pt-3">
+                <span className="text-sm text-muted-foreground">총 추첨권</span>
+                <span className="font-semibold text-foreground">
+                  {member.totalTickets.toLocaleString()}장
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
+                <div className="grid min-w-0 gap-1">
+                  <span className="text-muted-foreground">회원가입</span>
+                  <RewardStatusPill value={rewardConditionLabel(member, "signup")} />
+                </div>
+                <div className="grid min-w-0 gap-1">
+                  <span className="text-muted-foreground">MM</span>
+                  <RewardStatusPill value={rewardConditionLabel(member, "mm")} />
+                </div>
+                <div className="grid min-w-0 gap-1">
+                  <span className="text-muted-foreground">푸시</span>
+                  <RewardStatusPill value={rewardConditionLabel(member, "push")} />
+                </div>
+                <div className="grid min-w-0 gap-1">
+                  <span className="text-muted-foreground">마케팅</span>
+                  <RewardStatusPill value={rewardConditionLabel(member, "marketing")} />
+                </div>
+                <div className="grid min-w-0 gap-1">
+                  <span className="text-muted-foreground">리뷰</span>
+                  <RewardStatusPill value={rewardConditionLabel(member, "review")} muted />
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
       </Card>
     </section>
   );
 }
 
-export default async function AdminEventDetailPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ slug: string }>;
-  searchParams?: Promise<{
-    status?: string;
-    drawError?: string;
-    drawWinnerCount?: string;
-    drawSeed?: string;
-    previewError?: string;
-    previewWinnerCount?: string;
-    previewSeed?: string;
-  }>;
-}) {
-  await requireAdminPermission("events", "read", { path: "/admin/event" });
-  const { slug } = await params;
-  const paramsData = (await searchParams) ?? {};
-  const definition = getEventPageDefinition(slug);
-  if (!definition) {
-    notFound();
-  }
+type AdminEventDetailSearchParams = {
+  status?: string;
+  error?: string;
+  drawError?: string;
+  drawWinnerCount?: string;
+  drawSeed?: string;
+  previewError?: string;
+  previewWinnerCount?: string;
+  previewSeed?: string;
+};
 
-  const campaigns = await listManagedEventCampaigns({ includeInactive: true });
-  const registration = campaigns.find((campaign) => campaign.slug === slug) ?? null;
-  const campaign = registration ?? definition;
-  const isRegistered = registration?.source === "database" && Boolean(registration.id);
-  const state = getEventState(isRegistered ? registration : null);
-  const message = statusMessage(paramsData.status);
+async function getSignupRewardContent({
+  campaign,
+  params,
+  canCreate,
+  canUpdate,
+}: {
+  campaign: EventCampaign;
+  params: AdminEventDetailSearchParams;
+  canCreate: boolean;
+  canUpdate: boolean;
+}): Promise<ReactNode> {
   let rewardOverview: EventRewardAdminOverview | null = null;
   let rewardDraw: EventRewardStoredDraw | null = null;
   let rewardDrawPreview: EventRewardDrawPlan | null = null;
@@ -595,70 +862,144 @@ export default async function AdminEventDetailPage({
   let rewardDrawInputWinnerCount: string | null = null;
   let rewardDrawInputSeed: string | null = null;
   let rewardWarningMessage: string | null = null;
-  if (slug === "signup-reward") {
-    rewardDrawError = paramsData.drawError ?? null;
-    rewardDrawInputWinnerCount = paramsData.drawWinnerCount ?? null;
-    rewardDrawInputSeed = paramsData.drawSeed ?? null;
-    try {
-      [rewardOverview, rewardDraw] = await Promise.all([
-        getEventRewardAdminOverview(campaign),
-        getLatestEventRewardDrawWithWinners(slug),
-      ]);
-    } catch (error) {
-      console.error("[admin-event] reward overview query failed", error);
-      rewardOverview = buildEventRewardAdminOverview(campaign, []);
-      rewardWarningMessage =
-        "추첨권 현황 데이터를 불러오지 못했습니다. Supabase 연결과 이벤트 보상 테이블 상태를 확인해 주세요.";
-    }
-    if (rewardOverview && !rewardDraw) {
-      if (paramsData.previewError) {
-        rewardDrawPreviewError = paramsData.previewError;
-      } else {
-        const preview = getEventRewardDrawPreview({
-          overview: rewardOverview,
-          winnerCount: paramsData.previewWinnerCount,
-          seed: paramsData.previewSeed,
-        });
-        rewardDrawPreview = preview.plan;
-        rewardDrawPreviewError = preview.error;
-      }
+
+  rewardDrawError = params.drawError ?? null;
+  rewardDrawInputWinnerCount = params.drawWinnerCount ?? null;
+  rewardDrawInputSeed = params.drawSeed ?? null;
+  try {
+    [rewardOverview, rewardDraw] = await Promise.all([
+      getEventRewardAdminOverview(campaign),
+      getLatestEventRewardDrawWithWinners("signup-reward"),
+    ]);
+  } catch (error) {
+    console.error("[admin-event] reward overview query failed", error);
+    rewardOverview = buildEventRewardAdminOverview(campaign, []);
+    rewardWarningMessage =
+      "추첨권 현황 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  }
+  if (rewardOverview && !rewardDraw) {
+    if (params.previewError) {
+      rewardDrawPreviewError = params.previewError;
+    } else {
+      const preview = getEventRewardDrawPreview({
+        overview: rewardOverview,
+        winnerCount: params.previewWinnerCount,
+        seed: params.previewSeed,
+      });
+      rewardDrawPreview = preview.plan;
+      rewardDrawPreviewError = preview.error;
     }
   }
+
+  return rewardOverview ? (
+    <SignupRewardOverviewSection
+      campaign={campaign}
+      overview={rewardOverview}
+      draw={rewardDraw}
+      drawPreview={rewardDrawPreview}
+      drawPreviewError={rewardDrawPreviewError}
+      drawError={rewardDrawError}
+      drawInputWinnerCount={rewardDrawInputWinnerCount}
+      drawInputSeed={rewardDrawInputSeed}
+      warningMessage={rewardWarningMessage}
+      canCreate={canCreate}
+      canUpdate={canUpdate}
+    />
+  ) : null;
+}
+
+async function AdminEventDetailContent({
+  session,
+  slug,
+  paramsData,
+  definition,
+}: {
+  session: Awaited<ReturnType<typeof requireAdminPermission>>;
+  slug: string;
+  paramsData: AdminEventDetailSearchParams;
+  definition: NonNullable<ReturnType<typeof getEventPageDefinition>>;
+}) {
+  const campaigns = await listManagedEventCampaigns({ includeInactive: true });
+  const registration =
+    campaigns.find((campaign) => campaign.slug === slug) ?? null;
+  const campaign = registration ?? definition;
+  const isRegistered =
+    registration?.source === "database" && Boolean(registration.id);
+  const canCreate = canAdmin(session.account.permissions, "events", "create");
+  const canUpdate = canAdmin(session.account.permissions, "events", "update");
+  const canDelete = canAdmin(session.account.permissions, "events", "delete");
+  const state = getEventState(isRegistered ? registration : null);
+  const message = statusMessage(paramsData.status);
+  const actionErrorMessage = errorMessage(paramsData.error);
+  const rewardContentPromise =
+    slug === "signup-reward"
+      ? getSignupRewardContent({
+          campaign,
+          params: paramsData,
+          canCreate,
+          canUpdate,
+        })
+      : null;
   const targetLabel =
-    registration?.targetAudiences?.map(
-      (audience) => PROMOTION_AUDIENCE_OPTIONS.find((option) => option.key === audience)?.label ?? audience,
-    ).join(" · ") ?? "전체";
+    registration?.targetAudiences
+      ?.map(
+        (audience) =>
+          PROMOTION_AUDIENCE_OPTIONS.find((option) => option.key === audience)
+            ?.label ?? audience,
+      )
+      .join(" · ") ?? "전체";
 
   return (
-    <AdminShell
-      title={registration ? definition.title : "이벤트 운영 등록"}
-      backHref="/admin/event"
-      backLabel="이벤트 목록"
-    >
-      <AdminEventDetailView
+    <AdminEventDetailView
         definition={definition}
         registration={registration}
         state={state}
         targetLabel={targetLabel}
         message={message}
+        errorMessage={actionErrorMessage}
         registrationAction={
           isRegistered ? updatePromotionEventAction : createPromotionEventAction
         }
         deleteAction={deletePromotionEventAction}
-        rewardContent={rewardOverview ? (
-          <SignupRewardOverviewSection
-            campaign={campaign}
-            overview={rewardOverview}
-            draw={rewardDraw}
-            drawPreview={rewardDrawPreview}
-            drawPreviewError={rewardDrawPreviewError}
-            drawError={rewardDrawError}
-            drawInputWinnerCount={rewardDrawInputWinnerCount}
-            drawInputSeed={rewardDrawInputSeed}
-            warningMessage={rewardWarningMessage}
-          />
-        ) : null}
-      />
+        rewardContentPromise={rewardContentPromise}
+        canCreate={canCreate}
+        canUpdate={canUpdate}
+        canDelete={canDelete}
+    />
+  );
+}
+
+export default async function AdminEventDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams?: Promise<AdminEventDetailSearchParams>;
+}) {
+  const session = await requireAdminPermission("events", "read", {
+    path: "/admin/event",
+  });
+  const { slug } = await params;
+  const paramsData = (await searchParams) ?? {};
+  const definition = getEventPageDefinition(slug);
+  if (!definition) {
+    notFound();
+  }
+
+  return (
+    <AdminShell
+      title="이벤트 상세"
+      backHref="/admin/event"
+      backLabel="이벤트 목록"
+    >
+      <Suspense fallback={<AdminEventDetailSkeletonContent />}>
+        <AdminEventDetailContent
+          session={session}
+          slug={slug}
+          paramsData={paramsData}
+          definition={definition}
+        />
+      </Suspense>
     </AdminShell>
   );
 }

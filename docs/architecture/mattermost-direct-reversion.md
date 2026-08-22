@@ -3,6 +3,8 @@
 작성 기준일: 2026-07-17
 관련 작업: [Issue #155](https://github.com/MyKnow/ssartnership/issues/155)
 
+2026-08-13 재감사: runtime과 코드 env reader는 제거됐지만 Vercel Verify env와 Production legacy data는 남아 있다. 삭제 판정과 승인 순서는 [SSAFY Verify 레거시 삭제 준비도 감사](../operations/ssafy-verify-legacy-removal-readiness-2026-08-13.md)를 따른다.
+
 ## 결정
 
 SSAFY Verify runtime과 사용자 UI는 제거하고, 회원 인증·프로필 동기화·운영 알림을 서비스 내부의 Mattermost 직접 어댑터로 처리한다. 컷오버 이후 외부 Verify fallback은 제공하지 않는다.
@@ -50,8 +52,8 @@ SSAFY Verify runtime과 사용자 UI는 제거하고, 회원 인증·프로필 �
 
 - sender credential, 코드, session/token, 비밀번호 평문은 로그·응답·브라우저 상태에 남기지 않는다.
 - 민감 테이블은 RLS를 활성화하고 `anon`/`authenticated`의 전체 권한을 회수하며 service-role RPC만 실행한다.
-- Verify runtime/UI/routes/env는 이번 전환에서 제거했다. 안정화 7일 동안 레거시 Verify 데이터는 읽지 않는 상태로 보존한다.
-- 안정화가 끝난 뒤 별도 forward migration에서 `member_ssafy_verifications`, Verify 전용 claim/track 컬럼, provider 값, cron, 테스트를 제거한다. 이 삭제는 rollback 없는 데이터 정리이므로 안정화 검증 전에는 시행하지 않는다.
+- Verify runtime/UI/routes와 코드 env reader는 제거했다. Vercel에는 미사용 Verify env가 남아 있고 레거시 Verify 데이터는 읽지 않는 상태로 보존한다.
+- 레거시 삭제는 별도 승인과 forward migration으로 수행한다. generic notification provider 컬럼·현행 회귀 테스트·역사 migration은 삭제하지 않으며, `anonymize_deleted_member`를 먼저 현행 스키마에 맞춰 교체한다.
 
 ## 운영 확인
 
@@ -59,4 +61,4 @@ SSAFY Verify runtime과 사용자 UI는 제거하고, 회원 인증·프로필 �
 2. 기수별 Sender를 운영 화면에서 테스트하고 active로 전환한다.
 3. 신규 가입, 재설정, 수동 조회, 프로필 동기화, 기수별 알림을 Preview에서 확인한다.
 4. MM 장애 시 이메일 복구와 기존 회원 복구가 새 회원을 만들지 않는지 확인한다.
-5. 7일 안정화 이후 Verify 데이터 정리 Issue를 별도로 실행한다.
+5. 안정화 증빙과 보관·rollback 결정을 기록한 뒤 운영 감사의 수동 승인 경계에서 Verify 데이터 정리 Issue를 별도로 실행한다.

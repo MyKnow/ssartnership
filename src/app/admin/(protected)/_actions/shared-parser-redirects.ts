@@ -3,6 +3,7 @@ import {
   parseCohortCardThemeDeletePayload,
   parseCohortCardThemePayload,
 } from "@/lib/cohort-card-themes";
+import { getSafeAdminActionErrorCode } from "@/lib/admin-action-errors";
 import {
   parseCategoryPayload,
   parsePartnerCompanyPayload,
@@ -17,8 +18,7 @@ export function parsePartnerPayloadOrRedirect(
   try {
     return parsePartnerPayload(formData);
   } catch (error) {
-    const code =
-      error instanceof Error ? error.message : "partner_form_invalid_request";
+    const code = getSafeAdminActionErrorCode(error, "partner_form_invalid_request");
     redirect(`${path}?error=${encodeURIComponent(code)}`);
   }
 }
@@ -30,8 +30,7 @@ export function parsePartnerCompanyPayloadOrRedirect(
   try {
     return parsePartnerCompanyPayload(formData);
   } catch (error) {
-    const code =
-      error instanceof Error ? error.message : "partner_company_invalid_request";
+    const code = getSafeAdminActionErrorCode(error, "partner_company_invalid_request");
     redirect(`${path}?error=${encodeURIComponent(code)}`);
   }
 }
@@ -43,7 +42,7 @@ export function parseCategoryPayloadOrRedirect(
   try {
     return parseCategoryPayload(formData);
   } catch (error) {
-    const code = error instanceof Error ? error.message : "category_invalid_request";
+    const code = getSafeAdminActionErrorCode(error, "category_invalid_request");
     redirect(`${path}?error=${encodeURIComponent(code)}`);
   }
 }
@@ -55,7 +54,7 @@ export function parseSsafyCycleSettingsPayloadOrRedirect(
   try {
     return parseSsafyCycleSettingsPayload(formData);
   } catch (error) {
-    const code = error instanceof Error ? error.message : "cycle_invalid_request";
+    const code = getSafeAdminActionErrorCode(error, "cycle_invalid_request");
     redirect(`${path}?error=${encodeURIComponent(code)}`);
   }
 }
@@ -67,7 +66,7 @@ export function parseCohortCardThemePayloadOrRedirect(
   try {
     return parseCohortCardThemePayload(formData);
   } catch (error) {
-    const code = error instanceof Error ? error.message : "cohort_theme_invalid_request";
+    const code = getSafeAdminActionErrorCode(error, "cohort_theme_invalid_request");
     redirect(`${path}?error=${encodeURIComponent(code)}`);
   }
 }
@@ -79,7 +78,7 @@ export function parseCohortCardThemeDeletePayloadOrRedirect(
   try {
     return parseCohortCardThemeDeletePayload(formData);
   } catch (error) {
-    const code = error instanceof Error ? error.message : "cohort_theme_invalid_request";
+    const code = getSafeAdminActionErrorCode(error, "cohort_theme_invalid_request");
     redirect(`${path}?error=${encodeURIComponent(code)}`);
   }
 }

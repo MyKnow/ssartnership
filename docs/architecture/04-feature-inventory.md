@@ -29,6 +29,7 @@
 | 프로필 동기화 | `/api/mm/profile-sync`, cron member sync | 최신 Mattermost ID, 표시명/username/사진만 갱신 |
 | 회원 탈퇴/삭제 | `/api/mm/delete` | session and member cleanup |
 | 인증 카드 | `/certification`, `CertificationView`, `certification-qr.ts` | QR token, avatar route |
+| Apple Wallet 회원 패스 | `/api/wallet/apple/pass`, `/api/wallet/apple/v1/**`, `/wallet/verify/[token]` | [MVP 제품 계약](../product/apple-wallet-member-pass-mvp.md), `.pkpass` 발급/폐기, 공개 실시간 검증, Apple device registration/APNs 갱신 |
 
 ## Admin operations
 

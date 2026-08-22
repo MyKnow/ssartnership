@@ -77,6 +77,7 @@ test("설치 child environment가 application secret과 전역 Home 상태를 �
   const environment = buildControlledInstallEnvironment({
     CI: "1",
     GITHUB_ACTIONS: "true",
+    NODE_ENV: "test",
     HOME: "untrusted-home",
     PATH: "untrusted-path",
     SUPABASE_SERVICE_ROLE_KEY: "untrusted-secret",
@@ -89,6 +90,7 @@ test("설치 child environment가 application secret과 전역 Home 상태를 �
   assert.equal(environment.PATH, dirname(process.execPath));
   assert.equal("HOME" in environment, false);
   assert.equal("SUPABASE_SERVICE_ROLE_KEY" in environment, false);
+  assert.ok(environment.NPM_CONFIG_CACHE);
   assert.match(environment.NPM_CONFIG_CACHE, /\.tmp[/\\]install-state[/\\]cache$/);
 });
 

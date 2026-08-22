@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 import { ToastProvider } from "@/components/ui/Toast";
 import AdminNotificationsView from "./AdminNotificationsView";
 
@@ -63,6 +64,7 @@ const meta = {
     deviceCount: 2,
     pushConfigured: true,
     publicKey: "storybook-public-key",
+    canSend: true,
   },
   parameters: {
     nextjs: { appDirectory: true },
@@ -75,3 +77,28 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const LoadError: Story = {
+  args: {
+    loadError: true,
+  },
+};
+
+export const ReadOnly: Story = {
+  args: {
+    canSend: false,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText("수신함", { exact: true }),
+    ).toBeInTheDocument();
+    await expect(canvas.getByText("결과", { exact: true })).toBeInTheDocument();
+    await expect(
+      canvas.queryByText("작성", { exact: true }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("link", { name: /알림 전송/ }),
+    ).not.toBeInTheDocument();
+  },
+};

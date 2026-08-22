@@ -116,6 +116,13 @@ export const partnerCanonicalServiceContext = {
   mapUrl: "https://map.naver.com/",
   benefitActionType: "external_link",
   benefitActionLink: "https://booking.naver.com/",
+  benefitItems: [
+    {
+      id: "benefit-americano",
+      title: "아메리카노 20% 할인",
+      maxApplyCount: 1,
+    },
+  ],
   reservationLink: "https://booking.naver.com/",
   inquiryLink: "02-555-8123",
   currentConditions: ["SSAFY 구성원 인증", "매장 주문 시 적용"],

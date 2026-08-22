@@ -38,6 +38,58 @@ function quoteIdentifier(value) {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
+function buildQualifiedName(schema, table) {
+  return `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`;
+}
+
+function buildPreviewBackupTableName(table) {
+  return `preview_sync_backup_${table}`;
+}
+
+export function buildTransactionalPreviewRestoreSql({
+  productionDumpSql,
+  schema,
+  targetTables,
+  preservedTables,
+}) {
+  if (!productionDumpSql.trim()) {
+    throw new Error("Production data dump must not be empty.");
+  }
+
+  const uniqueTargetTables = [...new Set(targetTables)];
+  const uniquePreservedTables = [...new Set(preservedTables)];
+  if (uniqueTargetTables.length === 0) {
+    throw new Error("At least one Preview table must be replaced.");
+  }
+
+  const lockTables = [
+    ...new Set([...uniqueTargetTables, ...uniquePreservedTables]),
+  ].sort();
+  const statements = [
+    `lock table ${lockTables
+      .map((table) => buildQualifiedName(schema, table))
+      .join(", ")} in access exclusive mode;`,
+    ...uniquePreservedTables.map((table) => {
+      const backupTable = quoteIdentifier(buildPreviewBackupTableName(table));
+      return `create temporary table ${backupTable} on commit drop as table ${buildQualifiedName(schema, table)};`;
+    }),
+    `truncate table ${uniqueTargetTables
+      .map((table) => buildQualifiedName(schema, table))
+      .join(", ")} restart identity cascade;`,
+    productionDumpSql.trimEnd(),
+    // A data dump may disable triggers while loading. Preview-local rows must be
+    // checked against the restored member ledger so missing members roll back.
+    "set local session_replication_role = origin;",
+    ...uniquePreservedTables.map((table) => {
+      const qualifiedTable = buildQualifiedName(schema, table);
+      const backupTable = quoteIdentifier(buildPreviewBackupTableName(table));
+      return `insert into ${qualifiedTable} select * from pg_temp.${backupTable};`;
+    }),
+  ];
+
+  return `${statements.join("\n\n")}\n`;
+}
+
 const DEFAULT_EXCLUDED_COPY_COLUMNS_BY_TABLE = new Map([
   [
     "members",
@@ -281,6 +333,26 @@ export function buildCopyStatement(schema, table, columns) {
   return `COPY ${quoteIdentifier(schema)}.${quoteIdentifier(table)} (${columns
     .map((column) => quoteIdentifier(column))
     .join(", ")}) FROM stdin;`;
+}
+
+const PREVIEW_RESTORE_TRIGGER_CONTROL_PATTERN =
+  /^ALTER TABLE(?: ONLY)? "public"\."(?:""|[^"])+" (?:DISABLE|ENABLE) TRIGGER ALL;$/;
+
+export function stripUnsupportedPreviewRestoreTriggerControls(sql) {
+  let removedCount = 0;
+  const filteredLines = sql.split("\n").filter((line) => {
+    if (!PREVIEW_RESTORE_TRIGGER_CONTROL_PATTERN.test(line)) {
+      return true;
+    }
+
+    removedCount += 1;
+    return false;
+  });
+
+  return {
+    sql: filteredLines.join("\n"),
+    removedCount,
+  };
 }
 
 export function sanitizeDumpSqlForPreview(

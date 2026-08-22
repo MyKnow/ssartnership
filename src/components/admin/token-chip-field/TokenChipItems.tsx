@@ -75,7 +75,7 @@ export default function TokenChipItems({
               disabled={index === 0}
               ariaLabel="위로 이동"
               title="위로 이동"
-              className="h-10 w-10 min-h-10 min-w-10 disabled:border-border/50 disabled:bg-surface-muted/60 disabled:text-muted-foreground/50 disabled:shadow-none disabled:opacity-35"
+              className="h-11 w-11 min-h-11 min-w-11 disabled:border-border/50 disabled:bg-surface-muted/60 disabled:text-muted-foreground/50 disabled:shadow-none disabled:opacity-35"
             >
               <ArrowUpIcon className="h-4 w-4" />
             </Button>
@@ -87,7 +87,7 @@ export default function TokenChipItems({
               disabled={index === items.length - 1}
               ariaLabel="아래로 이동"
               title="아래로 이동"
-              className="h-10 w-10 min-h-10 min-w-10 disabled:border-border/50 disabled:bg-surface-muted/60 disabled:text-muted-foreground/50 disabled:shadow-none disabled:opacity-35"
+              className="h-11 w-11 min-h-11 min-w-11 disabled:border-border/50 disabled:bg-surface-muted/60 disabled:text-muted-foreground/50 disabled:shadow-none disabled:opacity-35"
             >
               <ArrowDownIcon className="h-4 w-4" />
             </Button>
@@ -99,7 +99,7 @@ export default function TokenChipItems({
                 onClick={() => onCommitEdit(index, editingValue)}
                 ariaLabel="수정 완료"
                 title="수정 완료"
-                className="h-10 w-10 min-h-10 min-w-10"
+                className="h-11 w-11 min-h-11 min-w-11"
               >
                 <CheckIcon className="h-4 w-4" />
               </Button>
@@ -111,7 +111,7 @@ export default function TokenChipItems({
                 onClick={() => onStartEditing(index)}
                 ariaLabel="수정"
                 title="수정"
-                className="h-10 w-10 min-h-10 min-w-10"
+                className="h-11 w-11 min-h-11 min-w-11"
               >
                 <PencilIcon className="h-4 w-4" />
               </Button>
@@ -123,7 +123,7 @@ export default function TokenChipItems({
               onClick={() => onRemoveItem(index)}
               ariaLabel="삭제"
               title="삭제"
-              className="h-10 w-10 min-h-10 min-w-10"
+              className="h-11 w-11 min-h-11 min-w-11"
             >
               <XMarkIcon className="h-4 w-4" />
             </Button>

@@ -19,6 +19,7 @@ import { listCohortCardThemes } from "@/lib/cohort-card-themes";
 import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { getMemberProfilePhotoAccessState } from "@/lib/member-profile-photo";
 import Button from "@/components/ui/Button";
+import { buildMemberGateHref } from "@/lib/member-required-gates";
 
 export const metadata: Metadata = {
   title: `내 인증 | ${SITE_NAME}`,
@@ -69,14 +70,13 @@ export default async function CertificationPage({
     redirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
 
-  const [headerSession, cohortCardThemes, photoState] = await Promise.all([
+  const [headerSession, cohortCardThemes, photoState, member] = await Promise.all([
     getHeaderSession(session.userId),
     listCohortCardThemes(),
     getMemberProfilePhotoState(session.userId),
+    getMemberCanonicalProfile(session.userId),
   ]);
   const photoAccess = getMemberProfilePhotoAccessState(photoState.reviewStatus);
-
-  const member = await getMemberCanonicalProfile(session.userId);
 
   if (!member) {
     redirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
@@ -99,7 +99,12 @@ export default async function CertificationPage({
               <div className="rounded-3xl border border-border bg-surface p-6 shadow-flat">
                 <h2 className="text-lg font-semibold text-foreground">인증 카드 준비 중</h2>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">{photoAccess.message}</p>
-                <Button className="mt-5" href="/certification/photo">본인 사진 {photoAccess.requiresSubmission ? "제출하기" : "확인하기"}</Button>
+                <Button
+                  className="mt-5"
+                  href={buildMemberGateHref("profile-photo", returnTo)}
+                >
+                  본인 사진 {photoAccess.requiresSubmission ? "제출하기" : "확인하기"}
+                </Button>
               </div>
             ) : <CertificationView
               member={{
@@ -125,7 +130,10 @@ export default async function CertificationPage({
               emailVerified={Boolean(member.emailVerifiedAt)}
             />
             <div className="mt-10 w-full border-t border-border/70 pt-8">
-              <CertificationFooterActions canChangeProfilePhoto />
+              <CertificationFooterActions
+                canChangeProfilePhoto
+                returnTo={returnTo}
+              />
             </div>
           </div>
         </Container>

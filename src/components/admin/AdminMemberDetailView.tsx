@@ -9,6 +9,7 @@ import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import StatsRow from "@/components/ui/StatsRow";
+import type { ReactNode } from "react";
 import type {
   AdminMemberNotificationPreferences,
   AdminMemberPolicyEvent,
@@ -42,7 +43,6 @@ export type AdminMemberDetailViewProps = {
     hasAvatar: boolean;
     avatarUrl: string;
   };
-  activeDeviceCount: number;
   securityLogs: AdminMemberSecurityLog[];
   securityLogPagination: {
     totalCount: number;
@@ -67,6 +67,9 @@ export type AdminMemberDetailViewProps = {
     rejectReplacementAction: FormAction;
     rejectCurrentAction: FormAction;
   } | null;
+  deferredProfilePhoto?: ReactNode;
+  deferredAccountManager?: ReactNode;
+  deferredOperationalPanels?: ReactNode;
 };
 
 function formatDate(value: string | null) {
@@ -75,7 +78,6 @@ function formatDate(value: string | null) {
 
 export default function AdminMemberDetailView({
   member,
-  activeDeviceCount,
   securityLogs,
   securityLogPagination,
   preferences,
@@ -88,8 +90,21 @@ export default function AdminMemberDetailView({
   canUpdate,
   canDelete,
   profilePhoto = null,
+  deferredProfilePhoto,
+  deferredAccountManager,
+  deferredOperationalPanels,
 }: AdminMemberDetailViewProps) {
-  const loginIdentifier = member.manualLoginId ?? member.mmUsername;
+  const loginIdentifier = member.mmUsername || member.email || member.manualLoginId || "";
+  const primaryIdentifier = member.mmUsername
+    ? `@${member.mmUsername}`
+    : member.email ?? member.manualLoginId ?? "-";
+  const primaryIdentifierHint = member.mmUsername
+    ? member.mmUserId ?? "외부 식별자 없음"
+    : member.email
+      ? "MM ID 미연결 회원"
+      : member.manualLoginId
+        ? "이메일 미등록 회원"
+        : "식별자 없음";
   const avatarLabel = (member.displayName || loginIdentifier || "?")
     .trim()
     .charAt(0)
@@ -117,7 +132,7 @@ export default function AdminMemberDetailView({
   return (
     <div className="grid gap-6">
       <AdminPageHeader
-        eyebrow="Member"
+        eyebrow="회원"
         title={member.displayName}
         description="회원 프로필, 약관 상태, 활성 기기, 인증/보안 활동을 한 화면에서 확인합니다."
       />
@@ -126,8 +141,8 @@ export default function AdminMemberDetailView({
         items={[
           {
             label: "로그인 ID",
-            value: member.manualLoginId ?? (member.mmUsername ? `@${member.mmUsername}` : "-"),
-            hint: member.manualLoginId ? "관리자 직접 생성 계정" : member.mmUserId ?? "외부 식별자 없음",
+            value: primaryIdentifier,
+            hint: primaryIdentifierHint,
           },
           {
             label: "기수/캠퍼스",
@@ -137,7 +152,9 @@ export default function AdminMemberDetailView({
           {
             label: "비밀번호 상태",
             value: member.mustChangePassword ? "변경 필요" : "정상",
-            hint: `활성 기기 ${activeDeviceCount}개`,
+            hint: canUpdate
+              ? "계정 관리에서 변경 필요 여부를 조정합니다."
+              : "현재 계정 상태",
           },
           {
             label: "최근 갱신",
@@ -182,9 +199,13 @@ export default function AdminMemberDetailView({
                 {member.displayName}
               </h2>
               <p className="break-all text-sm text-muted-foreground">
-                {member.manualLoginId
-                  ? `직접 ID · ${member.manualLoginId}`
-                  : `@${member.mmUsername || "mm_username 없음"}`}
+                {member.mmUsername
+                  ? `@${member.mmUsername}`
+                  : member.email
+                    ? `이메일 · ${member.email}`
+                    : member.manualLoginId
+                      ? `직접 ID · ${member.manualLoginId}`
+                      : "식별자 미등록"}
               </p>
             </div>
 
@@ -194,24 +215,20 @@ export default function AdminMemberDetailView({
                 <span className="font-medium text-foreground">{member.campus}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span>{member.manualLoginId ? "직접 로그인 ID" : "MM User ID"}</span>
+                <span>이메일</span>
                 <span className="max-w-[13rem] break-all text-right font-medium text-foreground">
-                  {member.manualLoginId ?? member.mmUserId ?? "-"}
+                  {member.email ?? "이메일 미등록"}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span>활성 푸시 기기</span>
-                <span className="font-medium text-foreground">{activeDeviceCount}개</span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span>보안 로그</span>
-                <span className="font-medium text-foreground">
-                  {securityLogPagination.totalCount.toLocaleString("ko-KR")}건
+                <span>{member.mmUserId ? "MM User ID" : "직접 로그인 ID"}</span>
+                <span className="max-w-[13rem] break-all text-right font-medium text-foreground">
+                  {member.mmUserId ?? member.manualLoginId ?? "-"}
                 </span>
               </div>
             </div>
           </Card>
-          {profilePhoto ? (
+          {deferredProfilePhoto ?? (profilePhoto ? (
             <AdminMemberProfilePhotoPanel
               memberId={member.id}
               reviewStatus={profilePhoto.reviewStatus}
@@ -221,7 +238,7 @@ export default function AdminMemberDetailView({
               rejectReplacementAction={profilePhoto.rejectReplacementAction}
               rejectCurrentAction={profilePhoto.rejectCurrentAction}
             />
-          ) : null}
+          ) : null)}
 
           <Card tone="default" className="grid gap-4">
             <AdminSectionHeading
@@ -244,27 +261,33 @@ export default function AdminMemberDetailView({
             </div>
           </Card>
 
-          <AdminMemberAccountManager
-            member={accountManagerMember}
-            updateAction={updateAction}
-            deleteAction={deleteAction}
-            emailLoginTransitionAction={emailLoginTransitionAction}
-            syncMemberProfileAction={syncMemberProfileAction}
-            canUpdate={canUpdate}
-            canDelete={canDelete}
-          />
+          {deferredAccountManager ?? (
+            <AdminMemberAccountManager
+              member={accountManagerMember}
+              updateAction={updateAction}
+              deleteAction={deleteAction}
+              emailLoginTransitionAction={emailLoginTransitionAction}
+              syncMemberProfileAction={syncMemberProfileAction}
+              canUpdate={canUpdate}
+              canDelete={canDelete}
+            />
+          )}
         </div>
 
         <div className="grid min-w-0 gap-6">
-          <AdminMemberCommunicationPanel
-            preferences={preferences}
-            policyStates={policyStates}
-            consentTimeline={consentTimeline}
-          />
-          <AdminMemberSecurityLogExplorer
-            logs={securityLogs}
-            pagination={securityLogPagination}
-          />
+          {deferredOperationalPanels ?? (
+            <>
+              <AdminMemberCommunicationPanel
+                preferences={preferences}
+                policyStates={policyStates}
+                consentTimeline={consentTimeline}
+              />
+              <AdminMemberSecurityLogExplorer
+                logs={securityLogs}
+                pagination={securityLogPagination}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>

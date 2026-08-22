@@ -147,6 +147,15 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["public.verify.token"],
   },
   {
+    routePath: "/wallet/verify/[token]",
+    surface: "public",
+    authScope: "public",
+    viewComponent: "AppleWalletVerifyPage",
+    dataSources: ["repository", "service"],
+    requiredScenarioIds: ["public.verify.token"],
+    notes: "Apple Wallet QR의 불투명 토큰을 실시간 회원 상태와 대조합니다.",
+  },
+  {
     routePath: "/auth/change-password",
     surface: "auth",
     authScope: "member",
@@ -257,6 +266,22 @@ const mockRouteInventoryBase = [
     viewComponent: "AdminAccountsPage",
     dataSources: ["service"],
     requiredScenarioIds: ["admin.dashboard.default"],
+  },
+  {
+    routePath: "/admin/tasks",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "AdminTaskInboxView",
+    dataSources: ["service", "storybook"],
+    requiredScenarioIds: ["admin.tasks.default"],
+  },
+  {
+    routePath: "/admin/search",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "AdminGlobalSearchResultsView",
+    dataSources: ["service", "storybook"],
+    requiredScenarioIds: ["admin.search"],
   },
   {
     routePath: "/admin/advertisement",
@@ -443,7 +468,15 @@ const mockRouteInventoryBase = [
     routePath: "/admin/partners/[partnerId]",
     surface: "admin",
     authScope: "admin",
-    viewComponent: "AdminPartnerEditPage",
+    viewComponent: "AdminPartnerDetailPage",
+    dataSources: ["repository", "service"],
+    requiredScenarioIds: ["admin.partners.editor"],
+  },
+  {
+    routePath: "/admin/partners/[partnerId]/edit",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "AdminPartnerDetailEditPage",
     dataSources: ["repository", "service", "storybook"],
     requiredScenarioIds: ["admin.partners.editor"],
   },
@@ -645,7 +678,7 @@ const mockRouteInventoryBase = [
   },
 ] as const satisfies RouteInventoryInput[];
 
-const routeContracts = {
+const routeContracts: Record<string, RouteContractDefinition> = {
   "/": {
     routeKind: "canonical",
     screenContractId: "public.home",
@@ -716,6 +749,11 @@ const routeContracts = {
     screenContractId: "public.verify-token",
     primaryTask: "인증 QR 토큰의 유효성과 구성원 상태를 확인한다.",
   },
+  "/wallet/verify/[token]": {
+    routeKind: "conditional",
+    screenContractId: "public.wallet-pass-verify",
+    primaryTask: "Apple Wallet 패스 QR의 현재 유효성과 구성원 상태를 확인한다.",
+  },
   "/auth/change-password": {
     routeKind: "conditional",
     screenContractId: "auth.change-password",
@@ -780,6 +818,16 @@ const routeContracts = {
     routeKind: "canonical",
     screenContractId: "admin.dashboard",
     primaryTask: "처리가 필요한 운영 업무를 파악하고 바로 이동한다.",
+  },
+  "/admin/tasks": {
+    routeKind: "canonical",
+    screenContractId: "admin.task-inbox",
+    primaryTask: "권한 내에서 처리할 검토·승인·운영 작업을 열고 다음 행동으로 이동한다.",
+  },
+  "/admin/search": {
+    routeKind: "canonical",
+    screenContractId: "admin.search",
+    primaryTask: "회원 또는 제휴처를 검색해 권한 범위 안의 상세 화면을 바로 연다.",
   },
   "/admin/admins": {
     routeKind: "canonical",
@@ -899,7 +947,12 @@ const routeContracts = {
   "/admin/partners/[partnerId]": {
     routeKind: "canonical",
     screenContractId: "admin.partner-editor",
-    primaryTask: "제휴처 정보와 혜택·미디어를 수정한다.",
+    primaryTask: "제휴처 운영 현황과 혜택·미디어를 확인한다.",
+  },
+  "/admin/partners/[partnerId]/edit": {
+    routeKind: "canonical",
+    screenContractId: "admin.partner-editor",
+    primaryTask: "제휴처 기본 정보와 혜택·미디어를 수정한다.",
   },
   "/admin/partners/new": {
     routeKind: "canonical",
@@ -1021,10 +1074,7 @@ const routeContracts = {
     screenContractId: "partner.support",
     primaryTask: "지원 유형과 문의 템플릿을 확인해 운영진에게 요청한다.",
   },
-} as const satisfies Record<
-  (typeof mockRouteInventoryBase)[number]["routePath"],
-  RouteContractDefinition
->;
+};
 
 const partnerBenefitUseRouteInput = {
   routePath: "/partners/[id]/benefit-use",
@@ -1045,6 +1095,9 @@ const partnerBenefitUseRoute: MockRouteInventoryItem = {
 
 const baseRouteInventory: MockRouteInventoryItem[] = mockRouteInventoryBase.map((route) => {
   const contract = routeContracts[route.routePath];
+  if (!contract) {
+    throw new Error(`Missing route contract: ${route.routePath}`);
+  }
   const routeWithContract = {
     ...route,
     ...contract,

@@ -19,6 +19,7 @@ export default function AdminReviewQueueHeader({
   metrics,
   feedback,
   nextAction,
+  showPageHeader = true,
 }: {
   eyebrow: string;
   title: string;
@@ -30,15 +31,18 @@ export default function AdminReviewQueueHeader({
     title: string;
     description: string;
   };
+  showPageHeader?: boolean;
 }) {
   return (
     <div className="grid min-w-0 gap-5">
-      <AdminPageHeader
-        eyebrow={eyebrow}
-        title={title}
-        description={description}
-        actions={actions}
-      />
+      {showPageHeader ? (
+        <AdminPageHeader
+          eyebrow={eyebrow}
+          title={title}
+          description={description}
+          actions={actions}
+        />
+      ) : null}
       {feedback ? (
         <InlineMessage
           tone={feedback.tone}

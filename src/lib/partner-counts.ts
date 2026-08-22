@@ -35,6 +35,16 @@ type AdminDashboardCountRpcRow = {
   security_log_count: number | string | null;
 };
 
+type AdminDashboardHomeSnapshotRpcRow = AdminDashboardCountRpcRow & {
+  registration_pending_count: number | string | null;
+  change_request_pending_count: number | string | null;
+  plan_request_pending_count: number | string | null;
+  graduate_verification_pending_count: number | string | null;
+  signup_request_pending_count: number | string | null;
+  profile_photo_pending_count: number | string | null;
+  unread_notification_count: number | string | null;
+};
+
 export type ReviewVisibilityCounts = {
   totalCount: number;
   visibleCount: number;
@@ -52,6 +62,21 @@ export type AdminDashboardCounts = {
   productLogCount: number;
   auditLogCount: number;
   securityLogCount: number;
+};
+
+export type AdminDashboardHomeQueueCounts = {
+  registrationPendingCount: number;
+  changeRequestPendingCount: number;
+  planRequestPendingCount: number;
+  graduateVerificationPendingCount: number;
+  signupRequestPendingCount: number;
+  profilePhotoPendingCount: number;
+  unreadNotificationCount: number;
+};
+
+export type AdminDashboardHomeSnapshot = {
+  counts: AdminDashboardCounts;
+  queueCounts: AdminDashboardHomeQueueCounts;
 };
 
 export type PartnerEngagementCounts = {
@@ -99,6 +124,25 @@ export function toAdminDashboardCounts(
     productLogCount: parseCount(row?.product_log_count),
     auditLogCount: parseCount(row?.audit_log_count),
     securityLogCount: parseCount(row?.security_log_count),
+  };
+}
+
+export function toAdminDashboardHomeSnapshot(
+  row?: AdminDashboardHomeSnapshotRpcRow | null,
+): AdminDashboardHomeSnapshot {
+  return {
+    counts: toAdminDashboardCounts(row),
+    queueCounts: {
+      registrationPendingCount: parseCount(row?.registration_pending_count),
+      changeRequestPendingCount: parseCount(row?.change_request_pending_count),
+      planRequestPendingCount: parseCount(row?.plan_request_pending_count),
+      graduateVerificationPendingCount: parseCount(
+        row?.graduate_verification_pending_count,
+      ),
+      signupRequestPendingCount: parseCount(row?.signup_request_pending_count),
+      profilePhotoPendingCount: parseCount(row?.profile_photo_pending_count),
+      unreadNotificationCount: parseCount(row?.unread_notification_count),
+    },
   };
 }
 
@@ -331,5 +375,50 @@ export async function fetchAdminDashboardCounts(
   return {
     counts: toAdminDashboardCounts(((data ?? [])[0] as AdminDashboardCountRpcRow | undefined) ?? null),
     errorMessage: null as string | null,
+  };
+}
+
+export async function fetchAdminDashboardHomeSnapshot(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  {
+    adminId,
+    managedCampusSlugs,
+    includeBrandQueues,
+    includeGraduateVerifications,
+    includeSignupRequests,
+    includeProfilePhotos,
+    includeNotifications,
+  }: {
+    adminId: string;
+    managedCampusSlugs: readonly string[] | null;
+    includeBrandQueues: boolean;
+    includeGraduateVerifications: boolean;
+    includeSignupRequests: boolean;
+    includeProfilePhotos: boolean;
+    includeNotifications: boolean;
+  },
+) {
+  const { data, error } = await supabase.rpc("get_admin_dashboard_home_snapshot", {
+    input_admin_id: adminId,
+    input_managed_campus_slugs: managedCampusSlugs,
+    input_include_brand_queues: includeBrandQueues,
+    input_include_graduate_verifications: includeGraduateVerifications,
+    input_include_signup_requests: includeSignupRequests,
+    input_include_profile_photos: includeProfilePhotos,
+    input_include_notifications: includeNotifications,
+  });
+
+  if (error) {
+    return {
+      snapshot: toAdminDashboardHomeSnapshot(),
+      hasError: true,
+    };
+  }
+
+  return {
+    snapshot: toAdminDashboardHomeSnapshot(
+      ((data ?? [])[0] as AdminDashboardHomeSnapshotRpcRow | undefined) ?? null,
+    ),
+    hasError: false,
   };
 }

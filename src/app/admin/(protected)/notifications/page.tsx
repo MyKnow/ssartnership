@@ -1,71 +1,59 @@
+import { Suspense } from "react";
 import AdminNotificationsView from "@/components/admin/AdminNotificationsView";
 import AdminShell from "@/components/admin/AdminShell";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import { AdminNotificationsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import { requireAdminPermission } from "@/lib/admin-access";
-import {
-  buildAdminNotificationListResult,
-  type AdminNotificationRecipientRow,
-} from "@/lib/admin-notification-inbox";
-import {
-  getAdminOperationalNotificationPreferences,
-  listOperationalPushSubscriptionDevices,
-} from "@/lib/operational-notifications";
+import { canAdmin } from "@/lib/admin-permissions";
+import { getAdminNotificationsReadModel } from "@/lib/admin-notifications.server";
 import { getPushPublicKey, isPushConfigured } from "@/lib/push";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+async function AdminNotificationsContent({
+  session,
+}: {
+  session: Awaited<ReturnType<typeof requireAdminPermission>>;
+}) {
+  const canSend = canAdmin(
+    session.account.permissions,
+    "notifications",
+    "create",
+  );
+  const { notificationResult, preferences, deviceCount, loadError } =
+    await getAdminNotificationsReadModel(session.adminId);
+
+  return (
+    <AdminNotificationsView
+        notificationResult={notificationResult}
+        preferences={preferences}
+        deviceCount={deviceCount}
+        pushConfigured={isPushConfigured()}
+        publicKey={getPushPublicKey()}
+        canSend={canSend}
+        loadError={loadError}
+        showHeader={false}
+    />
+  );
+}
 
 export default async function AdminNotificationsPage() {
   const session = await requireAdminPermission("notifications", "read", {
     path: "/admin/notifications",
   });
-  const supabase = getSupabaseAdminClient();
-
-  const [unreadResult, inboxResult, preferences, devices] = await Promise.all([
-    supabase
-      .from("admin_notification_recipients")
-      .select("id", { count: "exact", head: true })
-      .eq("admin_id", session.adminId)
-      .is("deleted_at", null)
-      .is("read_at", null),
-    supabase
-      .from("admin_notification_recipients")
-      .select(
-        "id,read_at,deleted_at,created_at,updated_at,notification:admin_notifications(id,type,title,body,target_url,metadata,created_at)",
-      )
-      .eq("admin_id", session.adminId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .range(0, 10),
-    getAdminOperationalNotificationPreferences(session.adminId),
-    listOperationalPushSubscriptionDevices({
-      ownerType: "admin",
-      ownerId: session.adminId,
-    }),
-  ]);
-
-  if (unreadResult.error) {
-    throw new Error(unreadResult.error.message);
-  }
-  if (inboxResult.error) {
-    throw new Error(inboxResult.error.message);
-  }
-
-  const notificationResult = buildAdminNotificationListResult({
-    unreadCount: unreadResult.count ?? 0,
-    rows: (inboxResult.data ?? []) as AdminNotificationRecipientRow[],
-    offset: 0,
-    limit: 10,
-  });
 
   return (
     <AdminShell title="내 알림" backHref="/admin" backLabel="관리 홈">
-      <AdminNotificationsView
-        notificationResult={notificationResult}
-        preferences={preferences}
-        deviceCount={devices.length}
-        pushConfigured={isPushConfigured()}
-        publicKey={getPushPublicKey()}
-      />
+      <div className="grid min-w-0 gap-6">
+        <AdminPageHeader
+          eyebrow="작업함"
+          title="내 알림"
+          description="관리자 계정으로 수신한 변경 요청, 종료 임박, 보안 알림을 확인합니다."
+        />
+        <Suspense fallback={<AdminNotificationsSkeletonContent showHeader={false} />}>
+          <AdminNotificationsContent session={session} />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

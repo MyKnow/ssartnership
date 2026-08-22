@@ -5,13 +5,20 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import { PushLogsSection } from "@/components/admin/push-manager/PushLogsSection";
 import { filterPushLogs } from "@/components/admin/push-manager/selectors";
-import type { AdminPushManagerProps, SortOption } from "@/components/admin/push-manager/types";
+import type {
+  AdminPushManagerProps,
+  SortOption,
+} from "@/components/admin/push-manager/types";
 import type { PushAudienceScope } from "@/lib/push";
-import type { AdminNotificationOperationLog, AdminNotificationType } from "@/lib/admin-notification-ops";
+import type {
+  AdminNotificationOperationLog,
+  AdminNotificationType,
+} from "@/lib/admin-notification-ops";
 
 type Props = Pick<AdminPushManagerProps, "automaticSummaries" | "recentLogs">;
 type NotificationCenterProps = Props & {
   onMoveToSend?: () => void;
+  canSend?: boolean;
 };
 
 type CenterFilterState = {
@@ -95,7 +102,9 @@ function MetricCard({
   return (
     <Card tone="elevated" padding="md" className="min-w-0">
       <p className="ui-kicker">{label}</p>
-      <p className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-foreground">{value}</p>
+      <p className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-foreground">
+        {value}
+      </p>
       <p className="mt-2 text-sm text-muted-foreground">{description}</p>
     </Card>
   );
@@ -105,6 +114,7 @@ export default function AdminNotificationCenter({
   automaticSummaries,
   recentLogs,
   onMoveToSend,
+  canSend = true,
 }: NotificationCenterProps) {
   const [filters, setFilters] = useState(initialFilters);
   const filteredLogs = useMemo(
@@ -124,13 +134,25 @@ export default function AdminNotificationCenter({
         case "search":
           return { ...current, search: value };
         case "typeFilter":
-          return { ...current, typeFilter: value as CenterFilterState["typeFilter"] };
+          return {
+            ...current,
+            typeFilter: value as CenterFilterState["typeFilter"],
+          };
         case "sourceFilter":
-          return { ...current, sourceFilter: value as CenterFilterState["sourceFilter"] };
+          return {
+            ...current,
+            sourceFilter: value as CenterFilterState["sourceFilter"],
+          };
         case "statusFilter":
-          return { ...current, statusFilter: value as CenterFilterState["statusFilter"] };
+          return {
+            ...current,
+            statusFilter: value as CenterFilterState["statusFilter"],
+          };
         case "audienceFilter":
-          return { ...current, audienceFilter: value as CenterFilterState["audienceFilter"] };
+          return {
+            ...current,
+            audienceFilter: value as CenterFilterState["audienceFilter"],
+          };
         default:
           return current;
       }
@@ -177,17 +199,19 @@ export default function AdminNotificationCenter({
         onUpdateFilter={updateFilter}
       />
 
-      <div className="flex justify-end">
-        {onMoveToSend ? (
-          <Button type="button" variant="secondary" onClick={onMoveToSend}>
-            알림 전송으로 이동
-          </Button>
-        ) : (
-          <Button href="/admin/push?tab=send" variant="secondary">
-            알림 전송으로 이동
-          </Button>
-        )}
-      </div>
+      {canSend ? (
+        <div className="flex justify-end">
+          {onMoveToSend ? (
+            <Button type="button" variant="secondary" onClick={onMoveToSend}>
+              알림 전송으로 이동
+            </Button>
+          ) : (
+            <Button href="/admin/push?tab=send" variant="secondary">
+              알림 전송으로 이동
+            </Button>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -4,8 +4,48 @@ import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
 import Surface from "@/components/ui/Surface";
 import type { AdminCategory } from "@/components/admin/partner-manager/types";
+import type { CSSProperties } from "react";
 
 type FormAction = (formData: FormData) => void | Promise<void>;
+
+function CategoryChipPreview({
+  label,
+  color,
+}: {
+  label: string;
+  color?: string | null;
+}) {
+  const safeLabel = label.trim() || "라벨 미입력";
+  const safeColor = /^#([\da-f]{3}|[\da-f]{6})$/i.test(color ?? "")
+    ? color ?? "var(--primary)"
+    : "var(--primary)";
+  const chipStyle = {
+    "--category-chip-color": safeColor,
+  } as CSSProperties;
+
+  return (
+    <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+      <div className="category-chip-preview-light grid min-w-0 gap-2 border p-3">
+        <span className="category-chip-preview-caption text-xs font-semibold">라이트</span>
+        <span
+          className="category-chip-preview-badge inline-flex min-h-8 min-w-0 w-fit max-w-full items-center rounded-full border px-2.5 py-1 text-xs font-semibold"
+          style={chipStyle}
+        >
+          <span className="truncate">{safeLabel}</span>
+        </span>
+      </div>
+      <div className="category-chip-preview-dark grid min-w-0 gap-2 border p-3">
+        <span className="category-chip-preview-caption text-xs font-semibold">다크</span>
+        <span
+          className="category-chip-preview-badge inline-flex min-h-8 min-w-0 w-fit max-w-full items-center rounded-full border px-2.5 py-1 text-xs font-semibold"
+          style={chipStyle}
+        >
+          <span className="truncate">{safeLabel}</span>
+        </span>
+      </div>
+    </div>
+  );
+}
 
 function CategoryFields({ category }: { category?: AdminCategory }) {
   return (
@@ -147,6 +187,15 @@ export default function AdminCategoryManager({
                   >
                     삭제 잠금
                   </span>
+                </div>
+                <div className="grid min-w-0 gap-2 xl:col-span-2">
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    사용자 칩 미리보기
+                  </p>
+                  <CategoryChipPreview
+                    label={category.label}
+                    color={category.color}
+                  />
                 </div>
               </Surface>
             );

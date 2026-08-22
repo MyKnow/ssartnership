@@ -34,6 +34,17 @@ export function createAudienceYearOptions(
   return Array.from(next).sort((a, b) => b - a);
 }
 
+export function mergeSelectedMemberIds(
+  currentMemberIds: string[],
+  nextMemberIds: string[],
+) {
+  if (nextMemberIds.length === 0) {
+    return [];
+  }
+
+  return Array.from(new Set([...currentMemberIds, ...nextMemberIds]));
+}
+
 export function countTargetableMembers(params: {
   audienceScope: PushAudienceScope;
   members: MemberOption[];

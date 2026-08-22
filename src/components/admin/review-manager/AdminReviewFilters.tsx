@@ -35,6 +35,7 @@ export default function AdminReviewFilters({
         <div className="grid min-w-[14rem] flex-1 gap-1">
           <span className="ui-caption">작성자 검색</span>
           <Input
+            aria-label="리뷰 작성자 검색"
             name="memberQuery"
             defaultValue={filters.memberQuery}
             placeholder="이름 또는 MM 아이디"
@@ -43,7 +44,11 @@ export default function AdminReviewFilters({
 
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">파트너사</span>
-          <Select name="companyId" defaultValue={filters.companyId || "all"}>
+          <Select
+            aria-label="리뷰 파트너사"
+            name="companyId"
+            defaultValue={filters.companyId || "all"}
+          >
             <option value="all">전체 파트너사</option>
             {companies.map((company) => (
               <option key={company.id} value={company.id}>
@@ -55,7 +60,11 @@ export default function AdminReviewFilters({
 
         <div className="grid min-w-[12rem] gap-1">
           <span className="ui-caption">제휴처</span>
-          <Select name="partnerId" defaultValue={filters.partnerId || "all"}>
+          <Select
+            aria-label="리뷰 제휴처"
+            name="partnerId"
+            defaultValue={filters.partnerId || "all"}
+          >
             <option value="all">전체 제휴처</option>
             {partners.map((partner) => (
               <option key={partner.id} value={partner.id}>
@@ -67,7 +76,7 @@ export default function AdminReviewFilters({
 
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">별점</span>
-          <Select name="rating" defaultValue={filters.rating}>
+          <Select aria-label="리뷰 별점" name="rating" defaultValue={filters.rating}>
             {getAdminReviewRatingOptions().map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -78,7 +87,7 @@ export default function AdminReviewFilters({
 
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">상태</span>
-          <Select name="status" defaultValue={filters.status}>
+          <Select aria-label="리뷰 상태" name="status" defaultValue={filters.status}>
             {getAdminReviewStatusOptions().map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -89,7 +98,7 @@ export default function AdminReviewFilters({
 
         <div className="grid min-w-[10rem] gap-1">
           <span className="ui-caption">정렬</span>
-          <Select name="sort" defaultValue={filters.sort}>
+          <Select aria-label="리뷰 정렬" name="sort" defaultValue={filters.sort}>
             {getAdminReviewSortOptions().map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}

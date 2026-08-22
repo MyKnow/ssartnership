@@ -11,7 +11,7 @@ import {
   rejectMattermostSignupApprovalRequest,
 } from "@/lib/mm-signup-approval/repository";
 import { parseMattermostSignupApprovalDecision } from "@/lib/mm-signup-approval";
-import { isUuid } from "@/lib/uuid";
+import { parseMemberSignupRequestId } from "@/lib/mm-signup-approval/action-input";
 import {
   logAdminAction,
   scheduleAdminActionFailureLog,
@@ -21,11 +21,7 @@ import { sanitizeReturnTo } from "@/lib/return-to";
 const QUEUE_PATH = "/admin/member-signup-requests";
 
 function getRequestId(formData: FormData) {
-  const requestId = String(formData.get("requestId") ?? "").trim();
-  if (!isUuid(requestId)) {
-    throw new Error("가입 승인 요청 식별자를 확인해 주세요.");
-  }
-  return requestId;
+  return parseMemberSignupRequestId(formData.get("requestId"));
 }
 
 function getReturnTo(formData: FormData) {
@@ -41,6 +37,9 @@ function detailPath(requestId: string, returnTo: string) {
 
 export async function approveMemberSignupRequestAction(formData: FormData) {
   const requestId = getRequestId(formData);
+  if (!requestId) {
+    redirect(appendAdminReviewQueueQuery(QUEUE_PATH, { error: "invalid_fields" }));
+  }
   const returnTo = getReturnTo(formData);
   const path = detailPath(requestId, returnTo);
   const session = await requireMemberSignupRequestAdmin("update", { path });
@@ -84,6 +83,9 @@ export async function approveMemberSignupRequestAction(formData: FormData) {
 
 export async function rejectMemberSignupRequestAction(formData: FormData) {
   const requestId = getRequestId(formData);
+  if (!requestId) {
+    redirect(appendAdminReviewQueueQuery(QUEUE_PATH, { error: "invalid_fields" }));
+  }
   const returnTo = getReturnTo(formData);
   const path = detailPath(requestId, returnTo);
   const session = await requireMemberSignupRequestAdmin("update", { path });

@@ -83,10 +83,12 @@ function DashboardOverviewState({
   state = "ready",
   longKorean = false,
   regional = false,
+  dataUnavailable = false,
 }: {
   state?: AdminDashboardViewState;
   longKorean?: boolean;
   regional?: boolean;
+  dataUnavailable?: boolean;
 }) {
   const permissions = ADMIN_PERMISSION_TEMPLATES.find(
     (template) =>
@@ -122,6 +124,9 @@ function DashboardOverviewState({
           registrationPendingCount: 3,
           changeRequestPendingCount: 2,
           planRequestPendingCount: 1,
+          graduateVerificationPendingCount: 4,
+          signupRequestPendingCount: 2,
+          profilePhotoPendingCount: 1,
           unreadNotificationCount: 4,
         }}
         permissions={permissions}
@@ -132,6 +137,7 @@ function DashboardOverviewState({
         }
         state={state}
         includeGlobalTasks={!regional}
+        isDataUnavailable={dataUnavailable}
         platformActivityMetrics={
           regional
             ? null
@@ -169,14 +175,14 @@ function CompanyBillingState() {
     <AdminPageStateFrame title="파트너사 관리">
       <div className="grid gap-4">
         <AdminPageHeader
-          eyebrow="Companies"
+          eyebrow="데이터"
           title="파트너사와 계정"
           description="계약 회사와 담당자 계정을 관리합니다."
         />
         <Card className="grid min-w-0 gap-4">
           <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="ui-kicker">Plan & Billing</p>
+              <p className="ui-kicker">플랜·과금</p>
               <h2 className="truncate text-xl font-semibold text-foreground">
                 카페 싸피 플랜/과금 검토
               </h2>
@@ -231,13 +237,13 @@ function PartnerEditorState() {
     <AdminPageStateFrame title="제휴처 편집">
       <div className="grid min-w-0 gap-5">
         <AdminPageHeader
-          eyebrow="Partner"
+          eyebrow="데이터"
           title="제휴처 상세"
           description="혜택과 공개 상태를 검토합니다."
         />
         <Card className="grid min-w-0 gap-5">
         <div className="min-w-0">
-          <p className="ui-kicker">Brand Editor</p>
+          <p className="ui-kicker">제휴처 편집</p>
           <h2 className="truncate text-xl font-semibold text-foreground">
             카페 싸피 강남점 정보 검토
           </h2>
@@ -286,7 +292,7 @@ function NotificationsInboxState() {
       <AdminPageStateFrame title="관리자 알림">
         <div className="grid gap-6">
           <AdminPageHeader
-            eyebrow="Notifications"
+            eyebrow="작업함"
             title="내 알림"
             description="현재 관리자 계정으로 수신한 운영 알림입니다."
           />
@@ -317,6 +323,31 @@ export const DashboardOverview: Story = {
       routePath: "/admin",
       scenarioId: "admin.dashboard.default",
     },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("link", { name: "작업함 열기" })).toHaveAttribute(
+      "href",
+      "/admin/tasks",
+    );
+    expect(canvas.getAllByText("다음으로 처리").length).toBeGreaterThan(0);
+    for (const link of canvas.getAllByRole("link", {
+      name: /신규 제휴 접수.*3건 검토 시작/,
+    })) {
+      await expect(link).toHaveAttribute(
+        "href",
+        "/admin/partner-registrations?status=pending",
+      );
+    }
+    for (const [name, href] of [
+      [/수료생 인증.*4건/, "/admin/graduate-verifications"],
+      [/가입 승인.*2건/, "/admin/member-signup-requests"],
+      [/프로필 사진.*1건/, "/admin/profile-photos"],
+    ] as const) {
+      for (const link of canvas.getAllByRole("link", { name })) {
+        await expect(link).toHaveAttribute("href", href);
+      }
+    }
   },
 };
 
@@ -360,6 +391,19 @@ export const DashboardError: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getAllByText("관리 홈 데이터를 불러오지 못했습니다.").length).toBeGreaterThan(0);
+    for (const link of canvas.getAllByRole("link", { name: "다시 확인" })) {
+      await expect(link).toHaveAttribute("href", "/admin");
+    }
+  },
+};
+
+export const DashboardDataUnavailable: Story = {
+  render: () => <DashboardOverviewState dataUnavailable />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(
+      canvas.getAllByText("일부 운영 집계를 아직 확인하지 못했습니다.").length,
+    ).toBeGreaterThan(0);
     for (const link of canvas.getAllByRole("link", { name: "다시 확인" })) {
       await expect(link).toHaveAttribute("href", "/admin");
     }

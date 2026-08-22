@@ -1,13 +1,17 @@
 "use client";
 
+import { useRef, useState } from "react";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
+import AdminConfirmDialog from "@/components/admin/AdminConfirmDialog";
+import AdminMemberPasswordResetPanel from "@/components/admin/member-detail/AdminMemberPasswordResetPanel";
 import type { MemberEmailLoginTransition } from "@/lib/member-email-login-transition";
 
 type FormAction = (formData: FormData) => void | Promise<void>;
+type ProtectedAction = "email-transition" | "delete-member";
 
 export default function AdminMemberAccountManager({
   member,
@@ -40,6 +44,37 @@ export default function AdminMemberAccountManager({
   canUpdate: boolean;
   canDelete: boolean;
 }) {
+  const [confirmAction, setConfirmAction] = useState<ProtectedAction | null>(null);
+  const confirmedActionRef = useRef<ProtectedAction | null>(null);
+  const emailTransitionFormRef = useRef<HTMLFormElement>(null);
+  const deleteFormRef = useRef<HTMLFormElement>(null);
+
+  const handleProtectedSubmit = (
+    action: ProtectedAction,
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
+    if (confirmedActionRef.current === action) {
+      confirmedActionRef.current = null;
+      return;
+    }
+    event.preventDefault();
+    setConfirmAction(action);
+  };
+
+  const confirmProtectedAction = () => {
+    if (!confirmAction) {
+      return;
+    }
+    const action = confirmAction;
+    setConfirmAction(null);
+    confirmedActionRef.current = action;
+    if (action === "email-transition") {
+      emailTransitionFormRef.current?.requestSubmit();
+    } else {
+      deleteFormRef.current?.requestSubmit();
+    }
+  };
+
   if (!canUpdate && !canDelete) {
     return null;
   }
@@ -88,6 +123,15 @@ export default function AdminMemberAccountManager({
             회원 정보 저장
           </SubmitButton>
         </form>
+      ) : null}
+
+      {canUpdate ? (
+        <AdminMemberPasswordResetPanel
+          memberId={member.id}
+          displayName={member.displayName}
+          email={member.email}
+          emailVerifiedAt={member.emailVerifiedAt}
+        />
       ) : null}
 
       {canUpdate && member.hasMattermostAccount ? (
@@ -141,12 +185,9 @@ export default function AdminMemberAccountManager({
             </p>
           ) : (
             <form
+              ref={emailTransitionFormRef}
               action={emailLoginTransitionAction}
-              onSubmit={(event) => {
-                if (!window.confirm("MM 로그인을 중단하고 이메일 설정 링크를 발송하시겠습니까?")) {
-                  event.preventDefault();
-                }
-              }}
+              onSubmit={(event) => handleProtectedSubmit("email-transition", event)}
               className="grid min-w-0 gap-3"
             >
               <input type="hidden" name="id" value={member.id} />
@@ -188,16 +229,9 @@ export default function AdminMemberAccountManager({
 
       {canDelete ? (
         <form
+          ref={deleteFormRef}
           action={deleteAction}
-          onSubmit={(event) => {
-            if (
-              !window.confirm(
-                `정말 ${member.displayName}(${member.manualLoginId ?? `@${member.mmUsername}`}) 회원을 삭제하시겠습니까?`,
-              )
-            ) {
-              event.preventDefault();
-            }
-          }}
+          onSubmit={(event) => handleProtectedSubmit("delete-member", event)}
           className="border-t border-border/70 pt-4"
         >
           <input type="hidden" name="id" value={member.id} />
@@ -206,6 +240,19 @@ export default function AdminMemberAccountManager({
           </SubmitButton>
         </form>
       ) : null}
+      <AdminConfirmDialog
+        open={confirmAction !== null}
+        title={confirmAction === "delete-member" ? "회원 삭제" : "이메일 로그인 전환"}
+        description={
+          confirmAction === "delete-member"
+            ? `정말 ${member.displayName}(${member.manualLoginId ?? `@${member.mmUsername}`}) 회원을 삭제하시겠습니까? 삭제 후에는 복구할 수 없습니다.`
+            : "MM 로그인을 중단하고 입력한 이메일로 설정 링크를 발송하시겠습니까? 신원과 이메일 소유를 확인한 경우에만 진행하세요."
+        }
+        confirmLabel={confirmAction === "delete-member" ? "회원 삭제" : "전환·링크 발송"}
+        danger={confirmAction === "delete-member"}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={confirmProtectedAction}
+      />
     </Card>
   );
 }

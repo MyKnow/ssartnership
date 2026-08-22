@@ -27,16 +27,20 @@
     "test": "node scripts/run-package-scripts.mjs test:node test:unit",
     "test:node": "node --import ./tests/alias-register.mjs --test tests/*.test.mts tests/push/*.test.mts",
     "test:unit": "vitest run --project=unit --coverage",
-    "test-storybook": "vitest run --project=storybook --reporter=default --reporter=hanging-process",
+    "test-storybook": "node scripts/run-storybook-tests.mjs",
     "test-storybook:watch": "vitest --project=storybook",
     "test:visual": "playwright test --config=playwright.visual.config.ts",
-    "ci:local": "node scripts/run-package-scripts.mjs bootstrap check:cross-platform check:lockfile lint typecheck:ci test build build-storybook test-storybook test:visual",
+    "ci:local": "node scripts/run-package-scripts.mjs bootstrap verify:quick",
     "start": "next start",
     "lint": "eslint",
     "test:e2e": "playwright test",
     "test:e2e:ci": "node scripts/run-e2e-ci.mjs",
-    "prepush": "node scripts/run-package-scripts.mjs check:install-scripts check:cross-platform check:lockfile test:e2e:ci",
+    "verify:quick": "node scripts/run-package-scripts.mjs check:install-scripts check:cross-platform check:lockfile validate:migrations lint typecheck:ci test audit:security",
+    "verify:release:post-quick": "node scripts/run-package-scripts.mjs build test:e2e:ci",
+    "verify:release": "node scripts/run-package-scripts.mjs verify:quick verify:release:post-quick",
+    "prepush": "npm run verify:quick",
     "sync:preview": "node scripts/supabase-sync-preview.mjs",
+    "measure:admin:preview": "node scripts/admin-preview-performance.mjs",
     "migrate:legacy-member-avatars": "node --import ./tests/alias-register.mjs --env-file-if-exists=.env scripts/migrate-legacy-member-avatars.mjs",
     "migrate:image-assets": "node --import ./tests/alias-register.mjs --env-file-if-exists=.env scripts/migrate-image-assets.mts",
     "rss:refresh": "node scripts/refresh-rss.mjs",
@@ -51,16 +55,15 @@
     "release": "node scripts/release.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1095.0",
     "@discourse/heic": "1.0.0",
     "@heroicons/react": "^2.2.0",
     "@supabase/supabase-js": "^2.99.0",
     "@types/qrcode": "^1.5.6",
-    "@aws-sdk/client-s3": "^3.1095.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "archiver-core": "npm:archiver@8.0.0",
     "exceljs": "^4.4.0",
-    "framer-motion": "^12.38.0",
     "jose": "^6.2.3",
     "jszip": "^3.10.1",
     "lucide-react": "^0.577.0",
@@ -68,6 +71,7 @@
     "next": "16.2.11",
     "next-themes": "^0.4.6",
     "nodemailer": "^9.0.1",
+    "passkit-generator": "3.5.7",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.10.38",
     "qrcode": "^1.5.4",
@@ -94,8 +98,9 @@
     "@types/react-dom": "^19",
     "@types/sanitize-html": "^2.16.1",
     "@types/web-push": "^3.6.4",
-    "@vitest/browser-playwright": "^4.1.10",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/browser": "^4.1.11",
+    "@vitest/browser-playwright": "^4.1.11",
+    "@vitest/coverage-v8": "^4.1.11",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
@@ -103,10 +108,11 @@
     "lighthouse": "^13.4.1",
     "playwright": "^1.59.1",
     "postcss": "^8.5.23",
+    "pretendard": "^1.3.9",
     "storybook": "^10.3.5",
     "tailwindcss": "^4",
     "typescript": "5.6.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "@babel/core": "^7.29.7",
@@ -124,6 +130,9 @@
     },
     "minimatch@10.2.5": {
       "brace-expansion": "5.0.9"
+    },
+    "passkit-generator": {
+      "joi": "17.13.4"
     },
     "exceljs": {
       "unzipper": "^0.12.5"

@@ -1,8 +1,16 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+async function waitForDirectoryControls(page: Page) {
+  await expect(page.getByTestId("partner-filter-interaction-root")).toHaveAttribute(
+    "data-hydrated",
+    "true",
+  );
+}
+
 async function typeSearch(page: Page, value: string) {
   await page.waitForLoadState("networkidle");
+  await waitForDirectoryControls(page);
   const searchInput = page.getByTestId("partner-search-input");
   await searchInput.fill(value);
 }
@@ -160,6 +168,7 @@ test.describe("public partner discovery", () => {
     await page.setViewportSize({ width: 360, height: 844 });
     await page.goto("/#benefits");
     await page.waitForLoadState("networkidle");
+    await waitForDirectoryControls(page);
 
     await page.getByText("고급 필터", { exact: true }).click();
     await page.getByTestId("partner-campus-filter").selectOption("seoul");
@@ -177,6 +186,7 @@ test.describe("public partner discovery", () => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto("/?campaign=summer#benefits");
     await page.waitForLoadState("networkidle");
+    await waitForDirectoryControls(page);
     await expect(page.getByTestId("partner-grid")).toBeVisible();
 
     const filterRscRequests: string[] = [];
@@ -260,6 +270,7 @@ test.describe("public partner discovery", () => {
 
   test("lists partners and opens a public partner detail page", async ({ page }) => {
     await page.goto("/");
+    await waitForDirectoryControls(page);
 
     const cards = page.getByTestId("partner-card");
     await expect(cards.first()).toBeVisible();
@@ -272,10 +283,13 @@ test.describe("public partner discovery", () => {
       .getByRole("link", { name: "제휴 상세 보기" });
     await expect(publicPartnerLink).toBeVisible();
     await publicPartnerLink.scrollIntoViewIfNeeded();
-    await publicPartnerLink.click();
+    await Promise.all([
+      page.waitForURL(/\/partners\/[^/?]+(?:\?|$)/, { timeout: 15_000 }),
+      publicPartnerLink.click(),
+    ]);
 
-    await expect(page).toHaveURL(/\/partners\/[^/?]+(?:\?|$)/);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.waitForLoadState("networkidle");
   });
 
   test("opens a public partner detail page from the card surface", async ({ page }) => {

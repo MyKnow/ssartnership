@@ -1,34 +1,33 @@
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import AdminShell from "@/components/admin/AdminShell";
 import AdminMemberDetailView from "@/components/admin/AdminMemberDetailView";
-import AdminMemberDetailStatusMessages from "@/components/admin/member-detail/AdminMemberDetailStatusMessages";
 import {
-  type AdminMemberSecurityLog,
-} from "@/components/admin/member-detail/AdminMemberSecurityLogExplorer";
+  AdminMemberAccountBoundary,
+  AdminMemberDetailDeferredFallback,
+  AdminMemberOperationalBoundary,
+  AdminMemberProfilePhotoBoundary,
+} from "@/components/admin/AdminMemberDetailDeferredPanels";
+import AdminMemberDetailStatusMessages from "@/components/admin/member-detail/AdminMemberDetailStatusMessages";
+import AdminStatePanel from "@/components/admin/AdminStatePanel";
+import { AdminMemberDetailSkeletonContent } from "@/components/loading/AdminPageSkeletons";
+import Button from "@/components/ui/Button";
 import { parseSsafyProfile } from "@/lib/mm-profile";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { formatSsafyMemberLifecycleLabel, getCurrentSsafyYear } from "@/lib/ssafy-year";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { canAdmin } from "@/lib/admin-permissions";
+import { normalizeAdminMemberNotificationPreferences } from "@/lib/admin-member-detail";
 import {
-  buildAdminMemberPolicyOverview,
-  normalizeAdminMemberNotificationPreferences,
-  type AdminMemberConsentActivityRow,
-  type AdminMemberConsentHistoryRow,
-  type AdminMemberPushPreferenceRow,
-} from "@/lib/admin-member-detail";
-import {
-  getActiveRequiredPolicies,
-  getPolicyDocumentByKind,
-} from "@/lib/policy-documents";
-import { getMemberCanonicalProfile } from "@/lib/member-profile-view";
+  getAdminMemberDetailCoreReadModel,
+  getAdminMemberDetailOperationalReadModel,
+} from "@/lib/admin-member-detail.server";
 import {
   deleteMember,
   issueMemberEmailLoginTransition,
   syncMemberProfile,
   updateMember,
 } from "@/app/admin/(protected)/actions";
-import { getMemberEmailLoginTransition } from "@/lib/member-email-login-transition";
+import { sanitizeAdminReturnTo } from "@/lib/admin-session-bridge";
 import {
   approveMemberProfilePhotoAction,
   rejectMemberCurrentProfilePhotoAction,
@@ -46,6 +45,7 @@ type AdminMemberDetailSearchParams = {
   error?: string;
   emailTransition?: string;
   memberSync?: string;
+  returnTo?: string;
 };
 
 function parsePositiveInteger(value: string | undefined, fallback: number) {
@@ -62,113 +62,76 @@ function parseSecurityLogPageSize(value: string | undefined) {
     : DEFAULT_SECURITY_LOG_PAGE_SIZE;
 }
 
-export default async function AdminMemberDetailPage({
-  params,
-  searchParams,
+function buildMemberDetailRetryHref({
+  memberId,
+  securityLogPage,
+  securityLogPageSize,
+  backHref,
 }: {
-  params: Promise<{ memberId: string }>;
-  searchParams?: Promise<AdminMemberDetailSearchParams>;
+  memberId: string;
+  securityLogPage: number;
+  securityLogPageSize: number;
+  backHref: string;
 }) {
-  const adminSession = await requireAdminPermission("members", "read", {
-    path: "/admin/members",
-  });
+  const params = new URLSearchParams();
+  if (securityLogPage > 1) params.set("logPage", String(securityLogPage));
+  if (securityLogPageSize !== DEFAULT_SECURITY_LOG_PAGE_SIZE) {
+    params.set("logPageSize", String(securityLogPageSize));
+  }
+  if (backHref !== "/admin/members") {
+    params.set("returnTo", backHref);
+  }
+  const query = params.toString();
+  return query ? `/admin/members/${memberId}?${query}` : `/admin/members/${memberId}`;
+}
+
+async function AdminMemberDetailContent({
+  adminSession,
+  memberId,
+  query,
+  backHref,
+}: {
+  adminSession: Awaited<ReturnType<typeof requireAdminPermission>>;
+  memberId: string;
+  query: AdminMemberDetailSearchParams;
+  backHref: string;
+}) {
   const canUpdateMembers = canAdmin(
     adminSession.account.permissions,
     "members",
     "update",
   );
-  const { memberId } = await params;
-  const query = (await searchParams) ?? {};
   const securityLogPage = parsePositiveInteger(query.logPage, 1);
   const securityLogPageSize = parseSecurityLogPageSize(query.logPageSize);
-  const securityLogFrom = (securityLogPage - 1) * securityLogPageSize;
-  const securityLogTo = securityLogFrom + securityLogPageSize - 1;
-  const supabase = getSupabaseAdminClient();
+  const retryHref = buildMemberDetailRetryHref({
+    memberId,
+    securityLogPage,
+    securityLogPageSize,
+    backHref,
+  });
+  const operationalPromise = getAdminMemberDetailOperationalReadModel({
+    memberId,
+    canUpdateMembers,
+    securityLogPage,
+    securityLogPageSize,
+  });
+  const detail = await getAdminMemberDetailCoreReadModel({ memberId });
 
-  const [
-    member,
-    preferenceResult,
-    subscriptionsResult,
-    consentHistoryResult,
-    consentActivityResult,
-    securityLogsResult,
-    activePolicies,
-    activeMarketingPolicy,
-    pendingProfilePhotoResult,
-    emailLoginTransition,
-  ] = await Promise.all([
-    getMemberCanonicalProfile(memberId),
-    supabase
-      .from("push_preferences")
-      .select(
-        "enabled,announcement_enabled,new_partner_enabled,expiring_partner_enabled,review_enabled,mm_enabled,marketing_enabled",
-      )
-      .eq("member_id", memberId)
-      .maybeSingle(),
-    supabase
-      .from("push_subscriptions")
-      .select("id", { count: "exact", head: true })
-      .eq("member_id", memberId)
-      .eq("is_active", true),
-    supabase
-      .from("member_policy_consents")
-      .select(
-        "kind,version,agreed_at,policy_documents(title,effective_at)",
-      )
-      .eq("member_id", memberId)
-      .order("agreed_at", { ascending: false }),
-    supabase
-      .from("auth_security_logs")
-      .select("properties,created_at")
-      .eq("event_name", "member_policy_consent")
-      .eq("status", "success")
-      .eq("actor_type", "member")
-      .eq("actor_id", memberId)
-      .order("created_at", { ascending: false })
-      .limit(100),
-    supabase
-      .from("auth_security_logs")
-      .select("id,event_name,status,identifier,path,ip_address,properties,created_at", {
-        count: "exact",
-      })
-      .eq("actor_type", "member")
-      .eq("actor_id", memberId)
-      .order("created_at", { ascending: false })
-      .range(securityLogFrom, securityLogTo),
-    getActiveRequiredPolicies(),
-    getPolicyDocumentByKind("marketing").catch(() => null),
-    supabase
-      .from("member_profile_images")
-      .select("id")
-      .eq("member_id", memberId)
-      .eq("status", "pending")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    canUpdateMembers
-      ? getMemberEmailLoginTransition(memberId)
-      : Promise.resolve(null),
-  ]);
-
-  if (!member) {
+  if (!detail.member) {
+    if (detail.memberLoadError) {
+      return (
+        <AdminStatePanel
+          kind="error"
+          title="회원 정보를 불러오지 못했습니다."
+          description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 기록을 확인해 주세요."
+          action={<Button href={retryHref} variant="secondary">다시 확인</Button>}
+        />
+      );
+    }
     notFound();
   }
 
-  const securityLogs: AdminMemberSecurityLog[] = (securityLogsResult.data ?? []).map((log) => ({
-    id: log.id,
-    eventName: log.event_name,
-    status: log.status,
-    identifier: log.identifier,
-    path: log.path,
-    ipAddress: log.ip_address,
-    properties:
-      log.properties && typeof log.properties === "object" && !Array.isArray(log.properties)
-        ? (log.properties as Record<string, unknown>)
-        : null,
-    createdAt: log.created_at,
-  }));
-  const securityLogTotalCount = securityLogsResult.count ?? securityLogs.length;
+  const member = detail.member;
   const profile = parseSsafyProfile(
     member.displayName ?? member.manualLoginId ?? member.mattermostUsername ?? undefined,
   );
@@ -186,30 +149,6 @@ export default async function AdminMemberDetailPage({
       member.profilePhotoReviewStatus === "approved",
   );
   const avatarUrl = `/api/admin/members/${member.id}/avatar${member.updatedAt ? `?v=${encodeURIComponent(member.updatedAt)}` : ""}`;
-  const notificationPreferences = normalizeAdminMemberNotificationPreferences(
-    (preferenceResult.data ?? null) as AdminMemberPushPreferenceRow | null,
-    subscriptionsResult.count,
-  );
-  const consentActivity: AdminMemberConsentActivityRow[] = (
-    consentActivityResult.data ?? []
-  ).map((row) => ({
-    properties:
-      row.properties &&
-      typeof row.properties === "object" &&
-      !Array.isArray(row.properties)
-        ? (row.properties as Record<string, unknown>)
-        : null,
-    created_at: row.created_at,
-  }));
-  const policyOverview = buildAdminMemberPolicyOverview({
-    activeVersions: {
-      service: activePolicies.service.version,
-      privacy: activePolicies.privacy.version,
-      marketing: activeMarketingPolicy?.version ?? null,
-    },
-    consentHistory: (consentHistoryResult.data ?? []) as AdminMemberConsentHistoryRow[],
-    consentActivity,
-  });
   const canReadProfilePhotos = canAdmin(
     adminSession.account.permissions,
     "profile_images",
@@ -220,9 +159,31 @@ export default async function AdminMemberDetailPage({
     "profile_images",
     "update",
   );
+  const canDeleteMembers = canAdmin(
+    adminSession.account.permissions,
+    "members",
+    "delete",
+  );
+  const accountManagerMember = {
+    id: member.id,
+    displayName,
+    campus,
+    generation,
+    mmUsername: member.mattermostUsername ?? "",
+    manualLoginId: member.manualLoginId,
+    mustChangePassword: member.mustChangePassword,
+    hasMattermostAccount: Boolean(member.mattermostAccountId),
+    mattermostLoginDisabledAt: member.mattermostLoginDisabledAt,
+    mattermostLoginDisabledReason: member.mattermostLoginDisabledReason,
+    ...(canUpdateMembers
+      ? {
+          email: member.email,
+          emailVerifiedAt: member.emailVerifiedAt,
+        }
+      : {}),
+  };
   return (
-    <AdminShell title="회원 상세" backHref="/admin/members" backLabel="회원 관리">
-      <div className="grid gap-4">
+    <div className="grid gap-4">
         <AdminMemberDetailStatusMessages
           errorCode={query.error}
           emailTransition={query.emailTransition}
@@ -242,49 +203,112 @@ export default async function AdminMemberDetailPage({
           hasMattermostAccount: Boolean(member.mattermostAccountId),
           mattermostLoginDisabledAt: member.mattermostLoginDisabledAt,
           mattermostLoginDisabledReason: member.mattermostLoginDisabledReason,
-          ...(canUpdateMembers
-            ? {
-                email: member.email,
-                emailVerifiedAt: member.emailVerifiedAt,
-                emailLoginTransition,
-              }
-            : {}),
+          email: member.email,
+          emailVerifiedAt: member.emailVerifiedAt,
           createdAt: member.createdAt,
           updatedAt: member.updatedAt,
           hasAvatar,
           avatarUrl,
         }}
-        activeDeviceCount={subscriptionsResult.count ?? 0}
-        securityLogs={securityLogs}
+        securityLogs={[]}
         securityLogPagination={{
-          totalCount: securityLogTotalCount,
+          totalCount: 0,
           page: securityLogPage,
           pageSize: securityLogPageSize,
           pageSizeOptions: SECURITY_LOG_PAGE_SIZE_OPTIONS,
         }}
-        preferences={notificationPreferences}
-        policyStates={policyOverview.states}
-        consentTimeline={policyOverview.timeline}
+        preferences={normalizeAdminMemberNotificationPreferences(null, 0)}
+        policyStates={[]}
+        consentTimeline={[]}
         updateAction={updateMember}
         deleteAction={deleteMember}
         emailLoginTransitionAction={issueMemberEmailLoginTransition}
         syncMemberProfileAction={syncMemberProfile}
         canUpdate={canUpdateMembers}
-        canDelete={canAdmin(
-          adminSession.account.permissions,
-          "members",
-          "delete",
-        )}
-        profilePhoto={canReadProfilePhotos ? {
-          reviewStatus: member.profilePhotoReviewStatus,
-          pendingImageId: pendingProfilePhotoResult.data?.id ?? null,
-          canUpdate: canUpdateProfilePhotos,
-          approveAction: approveMemberProfilePhotoAction,
-          rejectReplacementAction: rejectMemberProfilePhotoAction,
-          rejectCurrentAction: rejectMemberCurrentProfilePhotoAction,
-        } : null}
+        canDelete={canDeleteMembers}
+        profilePhoto={null}
+        deferredProfilePhoto={canReadProfilePhotos ? (
+          <Suspense
+            fallback={
+              <AdminMemberDetailDeferredFallback label="프로필 사진 운영 정보를 불러오는 중입니다." />
+            }
+          >
+            <AdminMemberProfilePhotoBoundary
+              operational={operationalPromise}
+              memberId={member.id}
+              reviewStatus={member.profilePhotoReviewStatus}
+              canUpdate={canUpdateProfilePhotos}
+              approveAction={approveMemberProfilePhotoAction}
+              rejectReplacementAction={rejectMemberProfilePhotoAction}
+              rejectCurrentAction={rejectMemberCurrentProfilePhotoAction}
+            />
+          </Suspense>
+        ) : null}
+        deferredAccountManager={canUpdateMembers || canDeleteMembers ? (
+          <Suspense
+            fallback={
+              <AdminMemberDetailDeferredFallback label="계정 운영 도구를 불러오는 중입니다." />
+            }
+          >
+            <AdminMemberAccountBoundary
+              operational={operationalPromise}
+              member={accountManagerMember}
+              updateAction={updateMember}
+              deleteAction={deleteMember}
+              emailLoginTransitionAction={issueMemberEmailLoginTransition}
+              syncMemberProfileAction={syncMemberProfile}
+              canUpdate={canUpdateMembers}
+              canDelete={canDeleteMembers}
+            />
+          </Suspense>
+        ) : null}
+        deferredOperationalPanels={
+          <Suspense
+            fallback={
+              <AdminMemberDetailDeferredFallback label="알림·약관·보안 정보를 불러오는 중입니다." />
+            }
+          >
+            <AdminMemberOperationalBoundary
+              operational={operationalPromise}
+              retryHref={retryHref}
+              securityLogPage={securityLogPage}
+              securityLogPageSize={securityLogPageSize}
+              securityLogPageSizeOptions={SECURITY_LOG_PAGE_SIZE_OPTIONS}
+            />
+          </Suspense>
+        }
       />
-      </div>
+    </div>
+  );
+}
+
+export default async function AdminMemberDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ memberId: string }>;
+  searchParams?: Promise<AdminMemberDetailSearchParams>;
+}) {
+  const adminSession = await requireAdminPermission("members", "read", {
+    path: "/admin/members",
+  });
+  const { memberId } = await params;
+  const query = (await searchParams) ?? {};
+  const backHref = sanitizeAdminReturnTo(query.returnTo, "/admin/members");
+  const backLabel = backHref.startsWith("/admin/search")
+    ? "검색 결과"
+    : "회원 관리";
+
+  return (
+    <AdminShell title="회원 상세" backHref={backHref} backLabel={backLabel}>
+      <Suspense fallback={<AdminMemberDetailSkeletonContent />}>
+        <AdminMemberDetailContent
+          adminSession={adminSession}
+          memberId={memberId}
+          query={query}
+          backHref={backHref}
+        />
+      </Suspense>
     </AdminShell>
   );
 }
