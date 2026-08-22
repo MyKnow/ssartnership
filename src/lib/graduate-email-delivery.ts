@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server.js";
+import {
+  EmailDeliveryConfigError,
+  EmailProviderError,
+} from "@/lib/email-delivery";
 import { SmtpConfigError } from "@/lib/smtp";
 
 export const GRADUATE_EMAIL_DELIVERY_ERROR_CODES = [
@@ -11,6 +15,14 @@ export const GRADUATE_EMAIL_DELIVERY_ERROR_CODES = [
   "smtp_recipient_rejected",
   "smtp_provider_rate_limited",
   "smtp_delivery_failed",
+  "email_provider_invalid",
+  "resend_missing_env",
+  "resend_invalid_env",
+  "resend_auth_failed",
+  "resend_connection_failed",
+  "resend_provider_rate_limited",
+  "resend_recipient_rejected",
+  "resend_delivery_failed",
 ] as const;
 
 export type GraduateEmailDeliveryErrorCode =
@@ -88,6 +100,12 @@ export function classifyGraduateEmailDeliveryError(
   error: unknown,
 ): GraduateEmailDeliveryErrorCode {
   if (error instanceof SmtpConfigError) {
+    return error.code;
+  }
+  if (error instanceof EmailDeliveryConfigError) {
+    return error.code;
+  }
+  if (error instanceof EmailProviderError) {
     return error.code;
   }
 

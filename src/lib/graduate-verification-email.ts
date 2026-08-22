@@ -1,7 +1,7 @@
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 import { renderEmailTemplateBody } from "@/lib/email-content";
+import { sendTransactionalEmail } from "@/lib/email-delivery";
 import { formatGraduateEmailCodeExpirationNotice } from "@/lib/graduate-verification-email-code";
-import { createSmtpTransport, getSmtpConfig } from "@/lib/smtp";
 import type { GraduateVerificationRequestKind } from "@/lib/graduate-verification";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
 import { renderNotificationTemplate } from "@/lib/notification-templates/template";
@@ -26,8 +26,6 @@ export async function sendGraduateVerificationCodeEmail(input: {
   purpose?: GraduateVerificationCodeEmailPurpose;
   expiresInSeconds?: number;
 }) {
-  const smtpConfig = getSmtpConfig();
-  const transporter = createSmtpTransport(smtpConfig);
   const purpose = input.purpose ?? "application";
   const expirationNotice = formatGraduateEmailCodeExpirationNotice(
     input.expiresInSeconds ?? DEFAULT_GRADUATE_EMAIL_CODE_TTL_SECONDS,
@@ -43,8 +41,7 @@ export async function sendGraduateVerificationCodeEmail(input: {
     },
   );
 
-  await transporter.sendMail({
-    from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
+  await sendTransactionalEmail({
     to: input.to,
     subject: template.subject,
     text: template.text,
@@ -58,8 +55,6 @@ export async function sendGraduateAccountSetupEmail(input: {
   token: string;
   requestKind?: GraduateVerificationRequestKind;
 }) {
-  const smtpConfig = getSmtpConfig();
-  const transporter = createSmtpTransport(smtpConfig);
   const setupUrl = new URL("/auth/graduate/setup", SITE_URL);
   // Fragments never reach the server or HTTP Referer headers. The client reads
   // this opaque one-time token once, removes the fragment, then submits it only
@@ -77,8 +72,7 @@ export async function sendGraduateAccountSetupEmail(input: {
     setupUrl: setupUrl.toString(),
   });
 
-  await transporter.sendMail({
-    from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
+  await sendTransactionalEmail({
     to: input.to,
     subject: template.subject,
     text: template.text,
@@ -91,8 +85,6 @@ export async function sendGraduatePasswordResetEmail(input: {
   displayName: string;
   token: string;
 }) {
-  const smtpConfig = getSmtpConfig();
-  const transporter = createSmtpTransport(smtpConfig);
   const setupUrl = new URL("/auth/graduate/setup", SITE_URL);
   // Keep a reset token out of the server-visible path and query string too.
   setupUrl.hash = new URLSearchParams({ token: input.token }).toString();
@@ -102,8 +94,7 @@ export async function sendGraduatePasswordResetEmail(input: {
     setupUrl: setupUrl.toString(),
   });
 
-  await transporter.sendMail({
-    from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
+  await sendTransactionalEmail({
     to: input.to,
     subject: template.subject,
     text: template.text,
@@ -118,8 +109,6 @@ export async function sendGraduateVerificationResubmissionEmail(input: {
   note: string | null;
   requestKind?: GraduateVerificationRequestKind;
 }) {
-  const smtpConfig = getSmtpConfig();
-  const transporter = createSmtpTransport(smtpConfig);
   const applicationUrl = new URL("/auth/signup/graduate", SITE_URL);
   if (input.requestKind === "existing_member_recovery") {
     applicationUrl.searchParams.set("kind", "recovery");
@@ -132,8 +121,7 @@ export async function sendGraduateVerificationResubmissionEmail(input: {
     applicationUrl: applicationUrl.toString(),
   });
 
-  await transporter.sendMail({
-    from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
+  await sendTransactionalEmail({
     to: input.to,
     subject: template.subject,
     text: template.text,
@@ -147,8 +135,6 @@ export async function sendGraduateVerificationRejectionEmail(input: {
   reason: string;
   requestKind?: GraduateVerificationRequestKind;
 }) {
-  const smtpConfig = getSmtpConfig();
-  const transporter = createSmtpTransport(smtpConfig);
   const applicationUrl = new URL("/auth/signup/graduate", SITE_URL);
   if (input.requestKind === "existing_member_recovery") {
     applicationUrl.searchParams.set("kind", "recovery");
@@ -160,8 +146,7 @@ export async function sendGraduateVerificationRejectionEmail(input: {
     applicationUrl: applicationUrl.toString(),
   });
 
-  await transporter.sendMail({
-    from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
+  await sendTransactionalEmail({
     to: input.to,
     subject: template.subject,
     text: template.text,

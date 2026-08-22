@@ -23,13 +23,16 @@ import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identi
 import { resolveManualMemberResolution } from "@/lib/member-manual-add/lookup";
 import { renderEmailTemplateBody } from "@/lib/email-content";
 import {
+  getEmailDeliveryConfig,
+  sendTransactionalEmail,
+} from "@/lib/email-delivery";
+import {
   buildMemberPasswordSetupUrl,
   sendMemberPasswordResetEmail,
 } from "@/lib/member-password-action-email";
 import { withActiveMattermostSenderForGeneration } from "@/lib/mattermost-senders/service";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
 import { renderNotificationTemplate } from "@/lib/notification-templates/template";
-import { createSmtpTransport, getSmtpConfig } from "@/lib/smtp";
 import {
   MANUAL_MEMBER_IMPORT_IMAGE_CONTENT_TYPES,
   MANUAL_MEMBER_IMPORT_LIMITS,
@@ -155,8 +158,6 @@ async function sendSetupEmail(input: {
   reset: boolean;
   idempotencyKey?: string;
 }) {
-  const smtpConfig = getSmtpConfig();
-  const transport = createSmtpTransport(smtpConfig);
   const setupUrl = buildMemberPasswordSetupUrl(input.token);
   const template = await resolveNotificationTemplate(
     input.reset
@@ -170,12 +171,12 @@ async function sendSetupEmail(input: {
   };
   const subject = renderNotificationTemplate(template.titleTemplate, variables);
   const renderedBody = renderEmailTemplateBody(template.bodyTemplate, template.bodyFormat, variables);
-  await transport.sendMail({
-    from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
+  await sendTransactionalEmail({
     to: input.email,
     subject,
-    // Message-ID is correlation metadata only; SMTP delivery safety is handled
-    // by the durable attempt checkpoint below, not by this header.
+    idempotencyKey: input.idempotencyKey,
+    // Message-ID remains SMTP correlation metadata. The Resend provider uses
+    // the same durable key as its 24-hour Idempotency-Key.
     messageId: input.idempotencyKey
       ? getManualMemberImportEmailMessageId(input.idempotencyKey)
       : undefined,
@@ -1034,9 +1035,9 @@ async function deliverManualMemberImportSetup(input: {
   if (!input.row.email_normalized) {
     throw new Error("계정 설정 링크를 전달할 수 없습니다.");
   }
-  // Validate static configuration before recording an attempt. Any later SMTP
-  // error is intentionally treated as an unknown outcome and is not resent.
-  getSmtpConfig();
+  // Validate static configuration before recording an attempt. Any later
+  // provider error is intentionally treated as an unknown outcome and is not resent.
+  getEmailDeliveryConfig();
   const setupToken = await ensureManualMemberImportPasswordAction({
     memberId: input.memberId,
     rowId: input.row.id,
@@ -1575,8 +1576,8 @@ export async function reissueManualMemberImportSetup(input: {
     throw new Error("이메일 계정 설정 링크를 전달할 수 없습니다.");
   }
   if (row.delivery_channel === "email") {
-    // Reject missing SMTP configuration before the row is claimed for delivery.
-    getSmtpConfig();
+    // Reject missing provider configuration before the row is claimed for delivery.
+    getEmailDeliveryConfig();
   }
 
   const deliveryIdempotencyKey = getManualMemberImportReissueIdempotencyKey(row.id);
