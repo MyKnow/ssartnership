@@ -50,6 +50,9 @@ type PartnerRegistrationRequestRow = {
   id: string;
   status: string;
   visibility?: string | null;
+  admin_note?: string | null;
+  reviewed_by_admin_id?: string | null;
+  reviewed_at?: string | null;
   source?: string | null;
   company_id?: string | null;
   registration_mode?: string | null;
@@ -441,6 +444,40 @@ async function createPartnerFromPortalRegistrationRequest({
   return { partners: createdPartners, created: createdPartners.length > 0 };
 }
 
+async function rollbackPartnerRegistrationRequestStatus({
+  supabase,
+  request,
+  requestedStatus,
+}: {
+  supabase: ReturnType<typeof getSupabaseAdminClient>;
+  request: PartnerRegistrationRequestRow;
+  requestedStatus: PartnerRegistrationRequestStatus;
+}) {
+  const previousStatus = isPartnerRegistrationRequestStatus(request.status)
+    ? request.status
+    : "pending";
+  const previousVisibility =
+    typeof request.visibility === "string" &&
+    isPartnerVisibility(request.visibility)
+      ? request.visibility
+      : "public";
+  const { data, error } = await supabase
+    .from("partner_registration_requests")
+    .update({
+      status: previousStatus,
+      visibility: previousVisibility,
+      admin_note: request.admin_note ?? null,
+      reviewed_by_admin_id: request.reviewed_by_admin_id ?? null,
+      reviewed_at: request.reviewed_at ?? null,
+    })
+    .eq("id", request.id)
+    .eq("status", requestedStatus)
+    .select("id")
+    .maybeSingle();
+
+  return !error && Boolean(data);
+}
+
 export async function updatePartnerRegistrationRequestStatus(formData: FormData) {
   const returnTo = sanitizeReturnTo(
     String(formData.get("returnTo") ?? ""),
@@ -467,7 +504,7 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
   const { data: request, error: requestError } = await supabase
     .from("partner_registration_requests")
     .select(
-      "id,status,visibility,source,company_id,registration_mode,service_mode,benefit_action_type,benefit_items,benefit_verification_pin_hash,benefit_verification_pin_salt,branch_scope_type,branch_scope_note,brand_name,category_id,category_label,period_start,period_end,inquiry_link,brand_phone,detail_description,company_name,contact_name,contact_email,contact_phone,company_description,benefits,conditions,tags,location,map_url,site_link,benefit_action_link,thumbnail_url,image_urls,company:partner_companies(managed_campus_slugs)",
+      "id,status,visibility,admin_note,reviewed_by_admin_id,reviewed_at,source,company_id,registration_mode,service_mode,benefit_action_type,benefit_items,benefit_verification_pin_hash,benefit_verification_pin_salt,branch_scope_type,branch_scope_note,brand_name,category_id,category_label,period_start,period_end,inquiry_link,brand_phone,detail_description,company_name,contact_name,contact_email,contact_phone,company_description,benefits,conditions,tags,location,map_url,site_link,benefit_action_link,thumbnail_url,image_urls,company:partner_companies(managed_campus_slugs)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -531,6 +568,9 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
         request: { ...registrationRequest, visibility },
         campusSlugs: managedCampusSlugs,
       });
+      if (conversion.partners.length === 0) {
+        throw new Error("등록 가능한 제휴처가 생성되지 않았습니다.");
+      }
       convertedPartnerId =
         conversion.partners.length === 1
           ? conversion.partners[0]?.id ?? null
@@ -578,11 +618,21 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
         revalidateAdminAndPublicPaths(partner.id);
       }
     } catch (error) {
+      const rollbackSucceeded = await rollbackPartnerRegistrationRequestStatus({
+        supabase,
+        request: registrationRequest,
+        requestedStatus: status,
+      });
       const message =
         error instanceof Error
           ? error.message
           : "제휴처 등록 신청 승인 후처리에 실패했습니다.";
       console.error("[partner-registration] converted follow-up failed", message);
+      if (!rollbackSucceeded) {
+        console.error(
+          "[partner-registration] converted status rollback failed",
+        );
+      }
       revalidatePath("/admin/partner-registrations");
       redirectAdminActionError(returnTo, "partner_form_conversion_failed", {
         action: "partner_create",
