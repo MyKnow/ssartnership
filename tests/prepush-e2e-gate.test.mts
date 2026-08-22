@@ -2,19 +2,44 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("pre-push gate mirrors Public Readiness before the full Playwright suite", async () => {
+test("Quick Gate stays fast while Release Gate owns the full Playwright suite", async () => {
   const packageJson = JSON.parse(
     await readFile(new URL("../package.json", import.meta.url), "utf8"),
   ) as { scripts?: Record<string, string> };
 
+  assert.equal(packageJson.scripts?.prepush, "npm run verify:quick");
   assert.equal(
-    packageJson.scripts?.prepush,
-    "node scripts/run-package-scripts.mjs check:install-scripts check:cross-platform check:lockfile validate:migrations lint typecheck:ci test audit:security build test:e2e:ci",
+    packageJson.scripts?.["verify:quick"],
+    "node scripts/run-package-scripts.mjs check:install-scripts check:cross-platform check:lockfile validate:migrations lint typecheck:ci test audit:security",
+  );
+  assert.equal(
+    packageJson.scripts?.["verify:release"],
+    "node scripts/run-package-scripts.mjs verify:quick verify:release:post-quick",
+  );
+  assert.equal(
+    packageJson.scripts?.["verify:release:post-quick"],
+    "node scripts/run-package-scripts.mjs build test:e2e:ci",
   );
   assert.equal(
     packageJson.scripts?.["test:e2e:ci"],
     "node scripts/run-e2e-ci.mjs",
   );
+
+  const typecheckRunner = await readFile(
+    new URL("../scripts/typecheck-ci.mjs", import.meta.url),
+    "utf8",
+  );
+  const typecheckConfig = JSON.parse(
+    await readFile(new URL("../tsconfig.typecheck.json", import.meta.url), "utf8"),
+  ) as { include?: string[]; exclude?: string[] };
+  assert.match(typecheckRunner, /tsconfig\.typecheck\.json/);
+  assert.deepEqual(typecheckConfig.include, ["**/*.ts", "**/*.tsx", "**/*.mts"]);
+  assert.deepEqual(typecheckConfig.exclude, [
+    "node_modules",
+    ".next",
+    ".next-e2e",
+    "next-env.d.ts",
+  ]);
 
   const e2eRunner = await readFile(
     new URL("../scripts/run-e2e-ci.mjs", import.meta.url),
@@ -29,13 +54,25 @@ test("pre-push gate mirrors Public Readiness before the full Playwright suite", 
     new URL("../.github/workflows/public-readiness.yml", import.meta.url),
     "utf8",
   );
-  assert.match(publicReadinessWorkflow, /run: npm run test:e2e:ci/);
+  assert.match(publicReadinessWorkflow, /name: Quick Readiness/);
+  assert.match(publicReadinessWorkflow, /name: Release Readiness/);
+  assert.match(
+    publicReadinessWorkflow,
+    /github\.event_name == 'pull_request' && github\.base_ref == 'main'/,
+  );
+  assert.match(
+    publicReadinessWorkflow,
+    /run: npm run verify:release:post-quick/,
+  );
 
   const releaseScript = await readFile(
     new URL("../scripts/release.mjs", import.meta.url),
     "utf8",
   );
   assert.match(releaseScript, /runRequiredScript\("prepush"\)/);
+  assert.doesNotMatch(releaseScript, /runRequiredScript\("build-storybook"\)/);
+  assert.doesNotMatch(releaseScript, /runRequiredScript\("test-storybook"\)/);
+  assert.doesNotMatch(releaseScript, /runRequiredScript\("test:visual"\)/);
 
   const playwrightConfig = await readFile(
     new URL("../playwright.config.ts", import.meta.url),

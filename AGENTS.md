@@ -103,7 +103,7 @@ For UI creation or modification, include visual proof in the final handoff. Capt
   - A 기능 의존성 개선
   - A 기능의 B 변수 수정
   ```
-- When the user asks to commit and push, use `npm run release` by default instead of manual `git add`, `git commit`, and `git push`. This keeps version bumping, Storybook build/test gates, commit formatting, and push behavior consistent.
+- When the user asks to commit and push, use `npm run release` by default instead of manual `git add`, `git commit`, and `git push`. This keeps the local Quick Gate, version bumping, commit formatting, and push behavior consistent. Storybook and visual verification are explicit manual checks rather than release prerequisites.
 - If `npm run release` is blocked by a non-script environment issue after it already performed part of the release flow, inspect the partial state first, then complete only the remaining equivalent steps with the same Korean conventional commit message.
 - Do not revert user changes.
 - Review `git diff` before staging or committing.
@@ -119,6 +119,7 @@ For UI creation or modification, include visual proof in the final handoff. Capt
 - Complete the task and run local verification inside the typed work branch before merging it into `dev`.
 - When every task for an Issue has been merged into `dev`, run Preview/integration testing from `dev`.
 - Merge `dev` into `main` only after the Preview/integration test is clean and the change is ready for Production.
+- Open the `dev` to `main` promotion PR only when Production promotion is actually ready. Do not keep a long-lived moving promotion PR open because it duplicates every `dev` push check.
 - For urgent production fixes, start from `main` and create a `hotfix/*` branch. After local verification, merge the hotfix into `main` first for Production recovery, then back-merge or cherry-pick the same fix into `dev` so Preview does not drift from Production.
 
 ### Issue / PR Workflow

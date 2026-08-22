@@ -1,17 +1,6 @@
 name: Cross-Platform Development Environment
 
 on:
-  push:
-    branches: [main, dev]
-    paths:
-      - ".github/workflows/cross-platform-development.yml"
-      - ".gitattributes"
-      - ".node-version"
-      - "package.json"
-      - "package-lock.json"
-      - "scripts/**"
-      - "tests/cross-platform-development-contract.test.mts"
-      - "tests/development-environment.test.mts"
   pull_request:
     paths:
       - ".github/workflows/cross-platform-development.yml"
@@ -43,7 +32,7 @@ jobs:
           - platform: macOS arm64
             os: macos-26
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 35
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -70,14 +59,5 @@ jobs:
       - name: Cross-platform policy
         run: npm run check:cross-platform
 
-      - name: Lint
-        run: npm run lint
-
-      - name: Typecheck
-        run: npm run typecheck:ci
-
-      - name: Test
-        run: npm test
-
-      - name: Build
-        run: npm run build
+      - name: Development environment contracts
+        run: node --import ./tests/alias-register.mjs --test tests/cross-platform-development-contract.test.mts tests/development-environment.test.mts

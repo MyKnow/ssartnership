@@ -1,84 +1,66 @@
 name: Sync Preview Supabase
 
 on:
-  workflow_run:
-    workflows:
-      - Public Readiness
-    branches: [dev]
-    types:
-      - completed
   workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type SYNC_PREVIEW_DATA to replace Preview data and Storage from Production.
+        required: true
+        type: string
+      expected_dev_sha:
+        description: Exact current dev commit SHA approved for the Preview sync.
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: >-
-    ${{
-      (
-        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev') ||
-        (
-          github.event_name == 'workflow_run' &&
-          github.event.workflow_run.conclusion == 'success' &&
-          github.event.workflow_run.event == 'push' &&
-          github.event.workflow_run.head_branch == 'dev'
-        )
-      ) && 'preview-sync' ||
-      format('preview-sync-noop-{0}', github.run_id)
-    }}
+  group: preview-data-sync
   cancel-in-progress: false
 
 jobs:
   sync-preview:
     if: >-
       ${{
-        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev') ||
-        (
-          github.event_name == 'workflow_run' &&
-          github.event.workflow_run.conclusion == 'success' &&
-          github.event.workflow_run.event == 'push' &&
-          github.event.workflow_run.head_branch == 'dev'
-        )
+        github.ref == 'refs/heads/main' &&
+        inputs.confirmation == 'SYNC_PREVIEW_DATA'
       }}
+    name: Replace Preview data and Storage
     runs-on: ubuntu-latest
     timeout-minutes: 120
+
     steps:
-      - name: Checkout workflow run commit
-        if: github.event_name == 'workflow_run'
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          persist-credentials: false
-
-      - name: Checkout selected ref
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - name: Guard stale dev workflow SHA
-        if: github.event_name == 'workflow_run'
-        id: stale-sha
+      - name: Select exact dev revision
+        id: select-dev
         shell: bash
         env:
-          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          EXPECTED_DEV_SHA: ${{ inputs.expected_dev_sha }}
+          REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}.git
         run: |
-          current_dev_sha="$(git ls-remote origin refs/heads/dev | awk '{print $1}')"
-          if [[ -z "$current_dev_sha" ]]; then
-            echo "::error::Could not resolve origin/dev while validating the triggering workflow SHA."
+          set -euo pipefail
+          live_dev_sha="$(git ls-remote "$REPOSITORY_URL" refs/heads/dev | awk '{print $1}')"
+          if [[ ! "$EXPECTED_DEV_SHA" =~ ^[0-9a-f]{40}$ ]] || [[ "$EXPECTED_DEV_SHA" != "$live_dev_sha" ]]; then
+            echo "::error::The approved dev commit does not match current origin/dev."
             exit 1
           fi
+          echo "sha=$EXPECTED_DEV_SHA" >> "$GITHUB_OUTPUT"
 
-          if [[ "$current_dev_sha" != "$RUN_SHA" ]]; then
-            echo "is_current=false" >> "$GITHUB_OUTPUT"
-            echo "Preview sync skipped because dev advanced from $RUN_SHA to $current_dev_sha."
-            exit 0
-          fi
+      - name: Checkout selected dev revision
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.select-dev.outputs.sha }}
+          persist-credentials: false
 
-          echo "is_current=true" >> "$GITHUB_OUTPUT"
+      - name: Verify selected dev revision
+        shell: bash
+        env:
+          EXPECTED_DEV_SHA: ${{ steps.select-dev.outputs.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_DEV_SHA"
 
       - name: Setup Node
-        if: github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true'
         uses: actions/setup-node@v7
         env:
           NPM_CONFIG_CACHE: ${{ github.workspace }}/.tmp/npm-cache
@@ -87,43 +69,40 @@ jobs:
           cache: npm
 
       - name: Install PostgreSQL client
-        if: github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
       - name: Install trusted dependencies
-        if: github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true'
         run: npm run install:trusted
 
       - name: Validate Supabase migrations
-        if: github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true'
         run: npm run validate:migrations
 
       - name: Set up Supabase CLI
-        if: github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true'
         uses: supabase/setup-cli@v2
         with:
           version: 2.114.0
           github-token: ${{ github.token }}
 
       - name: Check preview database connection
-        if: github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true'
         id: preview-db
         env:
           SUPABASE_PREVIEW_DB_URL: ${{ secrets.SUPABASE_PREVIEW_DB_URL }}
-          SUPABASE_PREVIEW_SYNC_SKIP_UNAVAILABLE: ${{ github.event_name == 'workflow_run' && 'true' || 'false' }}
         run: node scripts/supabase-sync-preview.mjs --check-only
 
       - name: Apply preview migrations before sync
-        if: (github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true') && steps.preview-db.outputs.preview_database_available != 'false'
         env:
+          EXPECTED_DEV_SHA: ${{ steps.select-dev.outputs.sha }}
           SUPABASE_PREVIEW_DB_URL: ${{ secrets.SUPABASE_PREVIEW_DB_URL }}
-        run: supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes --include-all
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_DEV_SHA"
+          test "$(git ls-remote origin refs/heads/dev | awk '{print $1}')" = "$EXPECTED_DEV_SHA"
+          supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes --include-all
 
       - name: Sync production data and storage to preview
         id: sync-preview-data
-        if: (github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true') && steps.preview-db.outputs.preview_database_available != 'false'
         env:
           SUPABASE_PRODUCTION_DB_URL: ${{ secrets.SUPABASE_PRODUCTION_DB_URL }}
           SUPABASE_PRODUCTION_URL: ${{ secrets.SUPABASE_PRODUCTION_URL }}
@@ -133,11 +112,14 @@ jobs:
           SUPABASE_PREVIEW_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_PREVIEW_SERVICE_ROLE_KEY }}
           PREVIEW_TEST_MEMBER_USERNAME: ${{ secrets.PREVIEW_TEST_MEMBER_USERNAME }}
           PREVIEW_TEST_MEMBER_PASSWORD: ${{ secrets.PREVIEW_TEST_MEMBER_PASSWORD }}
-          SUPABASE_PREVIEW_SYNC_SKIP_UNAVAILABLE: ${{ github.event_name == 'workflow_run' && 'true' || 'false' }}
         run: npm run sync:preview
 
       - name: Verify preview migrations after sync
-        if: (github.event_name != 'workflow_run' || steps.stale-sha.outputs.is_current == 'true') && steps.preview-db.outputs.preview_database_available != 'false'
         env:
+          EXPECTED_DEV_SHA: ${{ steps.select-dev.outputs.sha }}
           SUPABASE_PREVIEW_DB_URL: ${{ secrets.SUPABASE_PREVIEW_DB_URL }}
-        run: supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes --include-all
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_DEV_SHA"
+          test "$(git ls-remote origin refs/heads/dev | awk '{print $1}')" = "$EXPECTED_DEV_SHA"
+          supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes --include-all

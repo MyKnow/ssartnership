@@ -43,6 +43,7 @@ const reviewedWorkflowNpmCommands = new Set([
   "npm run test:visual",
   "npm run typecheck:ci",
   "npm run validate:migrations",
+  "npm run verify:release:post-quick",
   "npm test",
 ]);
 
@@ -170,7 +171,7 @@ test("the skill fails closed before a remote trigger", () => {
   assert.match(skill, /Read \[failure-ledger\.md\]\(references\/failure-ledger\.md\) completely/);
   assert.match(skill, /Do not push, merge, dispatch, or change PR state while Preview sync/);
   assert.match(skill, /Perform one deliberate remote mutation/);
-  assert.match(skill, /Re-read it immediately before each Actions-triggering mutation/);
+  assert.match(skill, /re-read it before Production promotion or a privileged shared-state mutation/);
   assert.match(skill, /designate exactly one remote-mutation owner/);
   assert.match(
     skill,
@@ -181,24 +182,26 @@ test("the skill fails closed before a remote trigger", () => {
     skill,
     /Never merge a PR while its exact-head first-attempt log audit is still running/,
   );
-  assert.match(skill, /then `npm run prepush`/);
+  assert.match(skill, /then `npm run verify:quick`/);
+  assert.match(skill, /Run `npm run verify:release` before a `dev` to `main` promotion/);
   assert.match(skill, /Inspect the complete local output, not only its exit code/);
   assert.match(skill, /interrupt it before `receive-pack`/);
   assert.match(skill, /prove that no remote branch\/run\/deployment was created/);
   assert.match(skill, /`gh workflow list`/);
 });
 
-test("every abnormal run updates the skill before another trigger", () => {
+test("blocking abnormal runs update the skill before another trigger", () => {
   const skill = read(skillPath);
 
-  assert.match(skill, /success log containing retry\/flaky\/error evidence/);
+  assert.match(skill, /success log containing hidden retry\/flaky\/error evidence/);
   assert.match(skill, /Never delete, cancel, or rerun it to manufacture a green history/);
   assert.match(skill, /always update \[failure-ledger\.md\]\(references\/failure-ledger\.md\)/);
   assert.match(skill, /update this `SKILL\.md` too when the reusable procedure itself was incomplete/);
   assert.match(
     skill,
-    /Repeated failures, errors, retries, provider recoveries, or changed warning counts\/context still extend the ledger/,
+    /Repeated repository-controlled failures, hidden retries, errors, or changed warning counts\/context still extend the ledger/,
   );
+  assert.match(skill, /Recovered external-provider transients may be batched before Production promotion/);
   assert.match(
     skill,
     /exact recurrence of an explicitly reviewed, non-actionable tooling-warning baseline/,
@@ -226,7 +229,7 @@ test("every abnormal run updates the skill before another trigger", () => {
   assert.match(skill, /For a proven external-only outage/);
   assert.match(
     skill,
-    /A recovered Storage retry remains a learning event even when every bucket and the post-sync migration check succeed/,
+    /A recovered Storage retry remains an operational observation even when every bucket and the post-sync migration check succeed/,
   );
   assert.match(skill, /Audit Completeness Gate/);
 });
@@ -376,7 +379,7 @@ test("trusted dependency installation disables every lifecycle and verifies one 
   assert.match(installScriptGate, /buildControlledInstallEnvironment/);
   assert.match(
     read("package.json"),
-    /"prepush": "node scripts\/run-package-scripts\.mjs check:install-scripts check:cross-platform check:lockfile/,
+    /"prepush": "npm run verify:quick"/,
   );
   assert.equal(packageJson.scripts?.["install:trusted"], "node scripts/install-dependencies.mjs");
   assert.equal(vercel.installCommand, "npm run install:trusted");
@@ -913,7 +916,8 @@ test("the failure ledger records a paginated retained-run census", () => {
   assert.match(ledger, /all 331 runs classified/);
   assert.match(ledger, /1,755 full logs available and scanned, 582 returned `410 Gone`/);
   assert.match(ledger, /441 successful retained runs/);
-  assert.match(ledger, /Every abnormal run extends this file/);
+  assert.match(ledger, /A blocking abnormal run extends this file before another attempt/);
+  assert.match(ledger, /Tiered CI policy/);
   assert.doesNotMatch(ledger, /audit in progress|pending final census|Do not treat this draft/i);
 
   assert.match(retainedAudit, /Runs: 3,362 = 2,337 success \+ 195 failure \+ 136 cancelled \+ 694 skipped/);
@@ -938,7 +942,8 @@ test("project guidance makes the Actions skill mandatory", () => {
 
   assert.match(agents, /`github-actions-operations`: mandatory before any operation/);
   assert.match(patterns, /Before any push, PR open\/update\/ready transition, merge, release, tag/);
-  assert.match(patterns, /update that skill before the next remote trigger/);
+  assert.match(patterns, /Repository-controlled failures, hidden retries, security failures, and schema failures block the next trigger/);
+  assert.match(patterns, /recovered external-provider transient with proven final parity does not require a source change or a new SHA/);
 });
 
 test("the run auditor is read-only, persists no GitHub text, and exposes help", () => {
