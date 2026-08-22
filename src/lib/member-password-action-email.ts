@@ -1,8 +1,8 @@
 import { renderEmailTemplateBody } from "@/lib/email-content";
+import { sendTransactionalEmail } from "@/lib/email-delivery";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
 import { renderNotificationTemplate } from "@/lib/notification-templates/template";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
-import { createSmtpTransport, getSmtpConfig } from "@/lib/smtp";
 
 export function buildMemberPasswordSetupUrl(token: string) {
   const url = new URL("/auth/member/setup", SITE_URL);
@@ -16,8 +16,6 @@ export async function sendMemberPasswordResetEmail(input: {
   displayName: string;
   token: string;
 }) {
-  const smtpConfig = getSmtpConfig();
-  const transport = createSmtpTransport(smtpConfig);
   const template = await resolveNotificationTemplate(
     "email.manual_member_password_reset",
   );
@@ -32,8 +30,7 @@ export async function sendMemberPasswordResetEmail(input: {
     template.bodyFormat,
     variables,
   );
-  await transport.sendMail({
-    from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
+  await sendTransactionalEmail({
     to: input.email,
     subject,
     text: renderedBody.text,

@@ -71,6 +71,19 @@ test("delivery diagnostics expose only a request id and allowlisted error code",
     errorCode: "smtp_tls_failed",
   });
   assert.doesNotMatch(JSON.stringify(legacyTlsDiagnostic), /dh key too small/i);
+
+  const { EmailProviderError } = await import(
+    new URL("../src/lib/email-delivery.ts", import.meta.url).href
+  );
+  const resendDiagnostic = getGraduateEmailDeliveryDiagnostic(
+    requestId,
+    new EmailProviderError("resend_provider_rate_limited", 429),
+  );
+  assert.deepEqual(resendDiagnostic, {
+    requestId,
+    errorCode: "resend_provider_rate_limited",
+  });
+  assert.doesNotMatch(JSON.stringify(resendDiagnostic), /429|resend\.com/i);
 });
 
 test("repeated provider failures use a separate short protection bucket", async () => {

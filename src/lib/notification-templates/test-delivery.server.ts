@@ -2,8 +2,7 @@ import { notificationRepository } from "@/lib/repositories";
 import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
 import { withActiveMattermostSenderForSubject } from "@/lib/mattermost-senders/service";
 import { renderEmailTemplateBody } from "@/lib/email-content";
-import { SITE_NAME } from "@/lib/site";
-import { createSmtpTransport, getSmtpConfig } from "@/lib/smtp";
+import { sendTransactionalEmail } from "@/lib/email-delivery";
 import { sendPushTemplateTest } from "@/lib/push/send";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
@@ -301,15 +300,12 @@ export async function sendNotificationTemplateTest(input: {
     if (!recipient.email) {
       throw new Error("선택한 회원에 등록된 이메일 주소가 없습니다.");
     }
-    const smtpConfig = getSmtpConfig();
-    const transporter = createSmtpTransport(smtpConfig);
     const emailBody = renderEmailTemplateBody(
       input.bodyTemplate,
       rendered.bodyFormat,
       rendered.variables,
     );
-    await transporter.sendMail({
-      from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
+    await sendTransactionalEmail({
       to: recipient.email,
       subject: rendered.title.replace(/[\r\n]+/g, " ").trim(),
       text: emailBody.text,

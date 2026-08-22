@@ -1,5 +1,5 @@
 import { SITE_NAME } from "./site";
-import { createSmtpTransport, getSmtpConfig } from "./smtp";
+import { sendTransactionalEmail } from "./email-delivery";
 import type { PartnerOperationalNotificationType } from "./partner-notification-routing";
 import {
   renderEmailTemplateBody,
@@ -34,8 +34,6 @@ export async function sendPartnerPortalTemporaryPasswordEmail(input: {
   loginId: string;
   temporaryPassword: string;
 }) {
-  const smtpConfig = getSmtpConfig();
-  const transporter = createSmtpTransport(smtpConfig);
   const template = await renderPartnerEmailTemplate("email.partner_temporary_password", {
     siteName: SITE_NAME,
     displayName: input.displayName || "담당자",
@@ -43,8 +41,7 @@ export async function sendPartnerPortalTemporaryPasswordEmail(input: {
     temporaryPassword: input.temporaryPassword,
   });
 
-  await transporter.sendMail({
-    from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
+  await sendTransactionalEmail({
     to: input.to,
     subject: template.subject,
     text: template.text,
@@ -58,8 +55,6 @@ export async function sendPartnerPortalInitialSetupEmail(input: {
   loginId: string;
   setupUrl: string;
 }) {
-  const smtpConfig = getSmtpConfig();
-  const transporter = createSmtpTransport(smtpConfig);
   const template = await renderPartnerEmailTemplate("email.partner_initial_setup", {
     siteName: SITE_NAME,
     displayName: input.displayName || "담당자",
@@ -67,8 +62,7 @@ export async function sendPartnerPortalInitialSetupEmail(input: {
     setupUrl: input.setupUrl,
   });
 
-  await transporter.sendMail({
-    from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
+  await sendTransactionalEmail({
     to: input.to,
     subject: template.subject,
     text: template.text,
@@ -86,8 +80,6 @@ export async function sendPartnerOperationalNotificationEmail(input: {
   templateContext?: NotificationTemplateContext;
   templateVariant?: string;
 }) {
-  const smtpConfig = getSmtpConfig();
-  const transporter = createSmtpTransport(smtpConfig);
   const eventKey = input.notificationType
     ? getPartnerOperationalTemplateKey(
         "email",
@@ -108,8 +100,7 @@ export async function sendPartnerOperationalNotificationEmail(input: {
     }),
   });
 
-  await transporter.sendMail({
-    from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
+  await sendTransactionalEmail({
     to: input.to,
     subject: template.subject,
     text: template.text,

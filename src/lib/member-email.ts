@@ -1,5 +1,5 @@
 import { SITE_NAME } from "@/lib/site";
-import { createSmtpTransport, getSmtpConfig } from "@/lib/smtp";
+import { sendTransactionalEmail } from "@/lib/email-delivery";
 import { MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS } from "@/lib/member-email-verification";
 import { renderEmailTemplateBody } from "@/lib/email-content";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
@@ -9,8 +9,6 @@ export async function sendMemberEmailVerificationCode(input: {
   to: string;
   code: string;
 }) {
-  const smtpConfig = getSmtpConfig();
-  const transporter = createSmtpTransport(smtpConfig);
   const expiresInMinutes = Math.floor(
     MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS / 60,
   );
@@ -24,8 +22,7 @@ export async function sendMemberEmailVerificationCode(input: {
     expiresInMinutes,
   });
 
-  await transporter.sendMail({
-    from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
+  await sendTransactionalEmail({
     to: input.to,
     subject,
     text: renderedBody.text,
