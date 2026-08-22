@@ -1,5 +1,6 @@
 import {
   buildMemberPasswordSetupUrl,
+  sendMemberInitialSetupReissueEmail,
   sendMemberPasswordResetEmail,
 } from "@/lib/member-password-action-email";
 import { generateOpaqueToken, hashOpaqueToken } from "@/lib/password";
@@ -11,15 +12,18 @@ type AdminMemberPasswordResetMember = {
   id: string;
   display_name: string | null;
   email_normalized: string | null;
+  must_change_password: boolean;
 };
 
 export type AdminMemberPasswordResetDelivery = "copy" | "email";
+export type AdminMemberPasswordActionKind = "initial_setup" | "password_reset";
 
 export class AdminMemberPasswordResetError extends Error {
   constructor(
     readonly code:
       | "member_not_found"
       | "email_not_available"
+      | "email_transition_pending"
       | "issue_failed"
       | "email_delivery_failed",
   ) {
@@ -31,7 +35,7 @@ export class AdminMemberPasswordResetError extends Error {
 async function getActiveMember(memberId: string) {
   const { data, error } = await getSupabaseAdminClient()
     .from("members")
-    .select("id,display_name,email_normalized")
+    .select("id,display_name,email_normalized,must_change_password")
     .eq("id", memberId)
     .is("deleted_at", null)
     .maybeSingle();
@@ -45,36 +49,44 @@ async function getActiveMember(memberId: string) {
   return data as AdminMemberPasswordResetMember;
 }
 
-async function createAdminPasswordResetAction(memberId: string) {
+async function createAdminPasswordAction(input: {
+  memberId: string;
+  mustChangePassword: boolean;
+  delivery: AdminMemberPasswordResetDelivery;
+  email: string | null;
+}) {
   const token = generateOpaqueToken();
   const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS).toISOString();
-  const supabase = getSupabaseAdminClient();
-  const { error: consumeError } = await supabase
-    .from("member_password_action_tokens")
-    .update({ consumed_at: new Date().toISOString() })
-    .eq("member_id", memberId)
-    .in("purpose", ["admin_password_reset", "manual_password_reset"])
-    .is("consumed_at", null);
-  if (consumeError) {
+  const purpose = input.mustChangePassword
+    ? "manual_initial_setup"
+    : "admin_password_reset";
+  const { data: tokenId, error } = await getSupabaseAdminClient().rpc(
+    "issue_admin_member_password_action",
+    {
+      p_member_id: input.memberId,
+      p_purpose: purpose,
+      p_delivery_channel: input.delivery === "email" ? "email" : "admin",
+      // The database action locks the member and rejects delivery when the
+      // address changed after this read. That prevents a newly issued link
+      // from being sent to an address that was just removed or replaced.
+      p_expected_email: input.delivery === "email" ? input.email : null,
+      p_token_hash: hashOpaqueToken(token),
+      p_expires_at: expiresAt,
+    },
+  );
+  if (error?.message?.includes("admin_member_password_action_transition_pending")) {
+    throw new AdminMemberPasswordResetError("email_transition_pending");
+  }
+  if (error || typeof tokenId !== "string") {
     throw new AdminMemberPasswordResetError("issue_failed");
   }
 
-  const { error: insertError } = await supabase
-    .from("member_password_action_tokens")
-    .insert({
-      member_id: memberId,
-      purpose: "admin_password_reset",
-      // An administrator can hand the link to a member without proving email
-      // ownership, so completion must not treat this as email verification.
-      delivery_channel: "admin",
-      token_hash: hashOpaqueToken(token),
-      expires_at: expiresAt,
-    });
-  if (insertError) {
-    throw new AdminMemberPasswordResetError("issue_failed");
-  }
-
-  return { token, expiresAt };
+  return {
+    token,
+    actionKind: input.mustChangePassword
+      ? "initial_setup" as const
+      : "password_reset" as const,
+  };
 }
 
 export async function issueAdminMemberPasswordReset(input: {
@@ -89,16 +101,27 @@ export async function issueAdminMemberPasswordReset(input: {
     throw new AdminMemberPasswordResetError("email_not_available");
   }
 
-  const { token } = await createAdminPasswordResetAction(member.id);
+  const issued = await createAdminPasswordAction({
+    memberId: member.id,
+    mustChangePassword: member.must_change_password,
+    delivery: input.delivery,
+    email: member.email_normalized,
+  });
+  const { token } = issued;
   const resetUrl = buildMemberPasswordSetupUrl(token);
 
   if (input.delivery === "email") {
     try {
-      await sendMemberPasswordResetEmail({
+      const emailInput = {
         email: member.email_normalized as string,
         displayName: member.display_name ?? "회원",
         token,
-      });
+      };
+      if (issued.actionKind === "initial_setup") {
+        await sendMemberInitialSetupReissueEmail(emailInput);
+      } else {
+        await sendMemberPasswordResetEmail(emailInput);
+      }
     } catch {
       throw new AdminMemberPasswordResetError("email_delivery_failed");
     }
@@ -106,5 +129,6 @@ export async function issueAdminMemberPasswordReset(input: {
 
   return {
     resetUrl: input.delivery === "copy" ? resetUrl : null,
+    actionKind: issued.actionKind satisfies AdminMemberPasswordActionKind,
   };
 }

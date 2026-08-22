@@ -1,6 +1,6 @@
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 import { sendTransactionalEmail } from "@/lib/email-delivery";
-import { renderEmailTemplateBody } from "@/lib/email-content";
+import { renderResolvedNotificationEmailContent } from "@/lib/notification-email-content";
 import { normalizeMemberEmail } from "@/lib/member-domain";
 import { generateOpaqueToken, hashOpaqueToken } from "@/lib/password";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -91,10 +91,17 @@ async function sendEmailLoginTransitionEmail(input: {
   const subject = renderNotificationTemplate(template.titleTemplate, {
     siteName: SITE_NAME,
   });
-  const renderedBody = renderEmailTemplateBody(template.bodyTemplate, template.bodyFormat, {
+  const variables = {
     siteName: SITE_NAME,
     displayName: input.displayName || "회원",
     setupUrl,
+  };
+  const renderedBody = renderResolvedNotificationEmailContent({
+    eventKey: template.eventKey,
+    bodyTemplate: template.bodyTemplate,
+    bodyFormat: template.bodyFormat,
+    isCustomized: template.isCustomized,
+    variables,
   });
 
   await sendTransactionalEmail({

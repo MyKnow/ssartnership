@@ -13,6 +13,7 @@ type PasswordResetResponse = {
   ok?: unknown;
   message?: unknown;
   resetUrl?: unknown;
+  actionKind?: unknown;
 };
 
 function getErrorMessage(body: PasswordResetResponse | null) {
@@ -26,17 +27,23 @@ export default function AdminMemberPasswordResetPanel({
   displayName,
   email,
   emailVerifiedAt,
+  mustChangePassword,
 }: {
   memberId: string;
   displayName: string;
   email: string | null | undefined;
   emailVerifiedAt: string | null | undefined;
+  mustChangePassword: boolean;
 }) {
   const { notify } = useToast();
   const [confirmAction, setConfirmAction] = useState<PasswordResetAction | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [resetUrl, setResetUrl] = useState<string | null>(null);
   const canSendEmail = Boolean(email);
+  const actionLabel = mustChangePassword ? "초기 설정" : "비밀번호 재발급";
+  const panelTitle = mustChangePassword
+    ? "초기 설정 링크 재발급"
+    : "비밀번호 재발급";
 
   const issueLink = async (delivery: PasswordResetAction) => {
     setIsPending(true);
@@ -63,11 +70,13 @@ export default function AdminMemberPasswordResetPanel({
           return;
         }
         setResetUrl(body.resetUrl);
-        notify("비밀번호 재발급 링크를 생성했습니다.");
+        notify(`${actionLabel} 링크를 생성했습니다.`);
         return;
       }
       notify(
-        emailVerifiedAt
+        body.actionKind === "initial_setup"
+          ? "계정 초기 설정을 계속할 수 있도록 새 링크를 이메일로 발송했습니다."
+          : emailVerifiedAt
           ? "인증된 이메일로 비밀번호 재발급 링크를 발송했습니다."
           : "등록된 이메일로 비밀번호 재발급 링크를 발송했습니다. 수신한 링크로 비밀번호를 설정하면 이메일 인증도 완료됩니다.",
       );
@@ -86,23 +95,29 @@ export default function AdminMemberPasswordResetPanel({
         throw new Error("clipboard_unavailable");
       }
       await navigator.clipboard.writeText(resetUrl);
-      notify("비밀번호 재발급 링크를 복사했습니다.");
+      notify(`${actionLabel} 링크를 복사했습니다.`);
     } catch {
       notify("링크를 복사하지 못했습니다. 직접 선택해 복사해 주세요.");
     }
   };
 
   const confirmDescription = confirmAction === "email"
-    ? emailVerifiedAt
+    ? mustChangePassword
+      ? `${displayName} 회원에게 새 초기 설정 링크를 이메일로 발송합니다. 기존 설정·재설정 링크는 즉시 무효화됩니다.`
+      : emailVerifiedAt
       ? `${displayName} 회원의 인증된 이메일로 재발급 링크를 발송합니다. 기존에 사용하지 않은 재발급 링크는 즉시 무효화됩니다.`
       : `${displayName} 회원의 등록된 이메일로 재발급 링크를 발송합니다. 수신한 링크로 비밀번호를 설정하면 이메일 인증도 완료됩니다. 기존에 사용하지 않은 재발급 링크는 즉시 무효화됩니다.`
-    : `${displayName} 회원의 새 비밀번호 재발급 링크를 생성합니다. 기존에 사용하지 않은 재발급 링크는 즉시 무효화됩니다.`;
+    : mustChangePassword
+      ? `${displayName} 회원의 새 초기 설정 링크를 생성합니다. 기존 설정·재설정 링크는 즉시 무효화됩니다.`
+      : `${displayName} 회원의 새 비밀번호 재발급 링크를 생성합니다. 기존에 사용하지 않은 재발급 링크는 즉시 무효화됩니다.`;
 
   return (
     <section className="grid gap-3 border-t border-border/70 pt-4">
       <AdminSectionHeading
-        title="비밀번호 재발급"
-        description="한 번만 사용할 수 있는 링크는 24시간 동안 유효합니다. 링크 생성·발송 기록에는 URL이나 토큰을 남기지 않습니다."
+        title={panelTitle}
+        description={mustChangePassword
+          ? "최초 계정 설정을 완료하지 않은 회원입니다. 새 링크는 24시간 동안 한 번만 사용할 수 있고 기존 설정·재설정 링크는 즉시 무효화됩니다."
+          : "한 번만 사용할 수 있는 링크는 24시간 동안 유효합니다. 링크 생성·발송 기록에는 URL이나 토큰을 남기지 않습니다."}
       />
       <p className="break-all text-sm text-muted-foreground">
         이메일: {email ?? "미등록"} {email ? (emailVerifiedAt ? "· 인증됨" : "· 미인증") : ""}
@@ -115,7 +130,7 @@ export default function AdminMemberPasswordResetPanel({
           onClick={() => setConfirmAction("copy")}
           disabled={isPending}
         >
-          링크 생성
+          {mustChangePassword ? "초기 설정 링크 생성" : "링크 생성"}
         </Button>
         <Button
           type="button"
@@ -125,7 +140,7 @@ export default function AdminMemberPasswordResetPanel({
           disabled={isPending || !canSendEmail}
           title={canSendEmail ? undefined : "등록된 이메일이 있는 회원에게만 발송할 수 있습니다."}
         >
-          이메일로 발송
+          {mustChangePassword ? "초기 설정 메일 재발송" : "이메일로 발송"}
         </Button>
       </div>
       {!canSendEmail ? (
@@ -136,11 +151,11 @@ export default function AdminMemberPasswordResetPanel({
       {resetUrl ? (
         <div className="grid gap-2 rounded-2xl border border-border bg-surface-inset p-3">
           <label className="grid gap-2 text-sm font-medium text-foreground">
-            발급된 비밀번호 재발급 링크
+            발급된 {actionLabel} 링크
             <Input
               value={resetUrl}
               readOnly
-              aria-label="발급된 비밀번호 재발급 링크"
+              aria-label={`발급된 ${actionLabel} 링크`}
               onFocus={(event) => event.currentTarget.select()}
             />
           </label>
@@ -157,9 +172,13 @@ export default function AdminMemberPasswordResetPanel({
       ) : null}
       <AdminConfirmDialog
         open={confirmAction !== null}
-        title={confirmAction === "email" ? "비밀번호 재발급 이메일 발송" : "비밀번호 재발급 링크 생성"}
+        title={confirmAction === "email"
+          ? mustChangePassword ? "초기 설정 메일 재발송" : "비밀번호 재발급 이메일 발송"
+          : mustChangePassword ? "초기 설정 링크 생성" : "비밀번호 재발급 링크 생성"}
         description={confirmDescription}
-        confirmLabel={confirmAction === "email" ? "이메일 발송" : "링크 생성"}
+        confirmLabel={confirmAction === "email"
+          ? mustChangePassword ? "초기 설정 메일 발송" : "이메일 발송"
+          : "링크 생성"}
         pending={isPending}
         onClose={() => setConfirmAction(null)}
         onConfirm={() => {

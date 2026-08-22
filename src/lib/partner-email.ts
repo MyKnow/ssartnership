@@ -1,9 +1,7 @@
 import { SITE_NAME } from "./site";
 import { sendTransactionalEmail } from "./email-delivery";
 import type { PartnerOperationalNotificationType } from "./partner-notification-routing";
-import {
-  renderEmailTemplateBody,
-} from "@/lib/email-content";
+import { renderResolvedNotificationEmailContent } from "@/lib/notification-email-content";
 import { getPartnerOperationalTemplateKey } from "./notification-templates/catalog";
 import { resolveNotificationTemplate } from "./notification-templates/repository.server";
 import { renderNotificationTemplate } from "./notification-templates/template";
@@ -17,11 +15,13 @@ async function renderPartnerEmailTemplate(
   variables: Record<string, string | number | null | undefined>,
 ) {
   const template = await resolveNotificationTemplate(eventKey);
-  const renderedBody = renderEmailTemplateBody(
-    template.bodyTemplate,
-    template.bodyFormat,
+  const renderedBody = renderResolvedNotificationEmailContent({
+    eventKey: template.eventKey,
+    bodyTemplate: template.bodyTemplate,
+    bodyFormat: template.bodyFormat,
+    isCustomized: template.isCustomized,
     variables,
-  );
+  });
   return {
     subject: renderNotificationTemplate(template.titleTemplate, variables),
     ...renderedBody,
