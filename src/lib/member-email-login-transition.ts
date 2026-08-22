@@ -1,8 +1,8 @@
 import { SITE_NAME, SITE_URL } from "@/lib/site";
+import { sendTransactionalEmail } from "@/lib/email-delivery";
 import { renderEmailTemplateBody } from "@/lib/email-content";
 import { normalizeMemberEmail } from "@/lib/member-domain";
 import { generateOpaqueToken, hashOpaqueToken } from "@/lib/password";
-import { createSmtpTransport, getSmtpConfig } from "@/lib/smtp";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
 import { renderNotificationTemplate } from "@/lib/notification-templates/template";
@@ -86,8 +86,6 @@ async function sendEmailLoginTransitionEmail(input: {
   displayName: string;
   token: string;
 }) {
-  const smtpConfig = getSmtpConfig();
-  const transport = createSmtpTransport(smtpConfig);
   const setupUrl = buildEmailLoginSetupUrl(input.token);
   const template = await resolveNotificationTemplate("email.member_email_login_transition");
   const subject = renderNotificationTemplate(template.titleTemplate, {
@@ -99,8 +97,7 @@ async function sendEmailLoginTransitionEmail(input: {
     setupUrl,
   });
 
-  await transport.sendMail({
-    from: `${SITE_NAME} <${smtpConfig.fromEmail}>`,
+  await sendTransactionalEmail({
     to: input.email,
     subject,
     text: renderedBody.text,

@@ -5,10 +5,14 @@ import {
   resolveCurrentActor,
 } from "@/lib/activity-logs";
 import { BUG_REPORT_EMAIL, SITE_NAME } from "@/lib/site";
+import {
+  getEmailDeliveryConfig,
+  sendTransactionalEmail,
+  toEmailDeliveryConfigErrorLog,
+} from "@/lib/email-delivery";
 import { renderEmailTemplateBody } from "@/lib/email-content";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
 import { renderNotificationTemplate } from "@/lib/notification-templates/template";
-import { createSmtpTransport, getSmtpConfig, toSmtpConfigErrorLog } from "@/lib/smtp";
 import { isBlocked, recordAttempt, SUGGEST_RATE_LIMIT } from "@/lib/rate-limit";
 import { validateSuggestPayload } from "@/lib/suggest-validation";
 
@@ -51,19 +55,19 @@ export async function POST(request: Request) {
     await recordAttempt(identifier, false, SUGGEST_RATE_LIMIT);
 
     const recipient = process.env.SUGGEST_NOTIFY_EMAIL ?? BUG_REPORT_EMAIL;
-    let smtpConfig: ReturnType<typeof getSmtpConfig>;
     try {
-      smtpConfig = getSmtpConfig();
+      getEmailDeliveryConfig();
     } catch (error) {
-      console.error("[suggest] smtp config error", toSmtpConfigErrorLog(error));
+      console.error(
+        "[suggest] email config error",
+        toEmailDeliveryConfigErrorLog(error),
+      );
       return errorResponse(
         "메일 설정이 누락되었습니다.",
         503,
         "suggest_mail_not_configured",
       );
     }
-
-    const transporter = createSmtpTransport(smtpConfig);
 
     const template = await resolveNotificationTemplate(
       "email.partner_suggestion_received",
@@ -81,8 +85,7 @@ export async function POST(request: Request) {
     const subject = renderNotificationTemplate(template.titleTemplate, variables);
     const renderedBody = renderEmailTemplateBody(template.bodyTemplate, template.bodyFormat, variables);
 
-    await transporter.sendMail({
-      from: `SSARTNERSHIP <${smtpConfig.fromEmail}>`,
+    await sendTransactionalEmail({
       to: payload.contactEmail,
       bcc: recipient,
       replyTo: payload.contactEmail,
