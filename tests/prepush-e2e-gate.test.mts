@@ -2,12 +2,16 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("Quick Gate stays fast while Release Gate owns the full Playwright suite", async () => {
+test("change-aware prepush stays tiered while promotion gates own browser coverage", async () => {
   const packageJson = JSON.parse(
     await readFile(new URL("../package.json", import.meta.url), "utf8"),
   ) as { scripts?: Record<string, string> };
 
-  assert.equal(packageJson.scripts?.prepush, "npm run verify:quick");
+  assert.equal(packageJson.scripts?.prepush, "npm run verify:change");
+  assert.equal(
+    packageJson.scripts?.["verify:change"],
+    "node scripts/verify-change.mjs",
+  );
   assert.equal(
     packageJson.scripts?.["verify:quick"],
     "node scripts/run-package-scripts.mjs check:install-scripts check:cross-platform check:lockfile validate:migrations lint typecheck:ci test audit:security",
@@ -23,6 +27,14 @@ test("Quick Gate stays fast while Release Gate owns the full Playwright suite", 
   assert.equal(
     packageJson.scripts?.["test:e2e:ci"],
     "node scripts/run-e2e-ci.mjs",
+  );
+  assert.equal(
+    packageJson.scripts?.["test:e2e:smoke:ci"],
+    "node scripts/run-e2e-ci.mjs --grep @critical",
+  );
+  assert.equal(
+    packageJson.scripts?.["verify:promotion:smoke"],
+    "node scripts/run-package-scripts.mjs build test:e2e:smoke:ci",
   );
 
   const typecheckRunner = await readFile(
@@ -54,16 +66,50 @@ test("Quick Gate stays fast while Release Gate owns the full Playwright suite", 
     new URL("../.github/workflows/public-readiness.yml", import.meta.url),
     "utf8",
   );
-  assert.match(publicReadinessWorkflow, /name: Quick Readiness/);
-  assert.match(publicReadinessWorkflow, /name: Release Readiness/);
-  assert.match(
-    publicReadinessWorkflow,
-    /github\.event_name == 'pull_request' && github\.base_ref == 'main'/,
-  );
+  assert.match(publicReadinessWorkflow, /name: Classify Change/);
+  assert.match(publicReadinessWorkflow, /name: Change-Aware Verification/);
+  assert.match(publicReadinessWorkflow, /name: CI Policy Gate/);
+  assert.match(publicReadinessWorkflow, /if: \$\{\{ always\(\) \}\}/);
+  assert.match(publicReadinessWorkflow, /run: node scripts\/ci-policy-gate\.mjs/);
   assert.match(
     publicReadinessWorkflow,
     /run: npm run verify:release:post-quick/,
   );
+  assert.match(
+    publicReadinessWorkflow,
+    /run: npm run verify:promotion:smoke/,
+  );
+
+  const pageSmoke = await readFile(
+    new URL("./e2e/page-smoke.spec.ts", import.meta.url),
+    "utf8",
+  );
+  const authOperations = await readFile(
+    new URL("./e2e/auth-ops.spec.ts", import.meta.url),
+    "utf8",
+  );
+  const adminConsole = await readFile(
+    new URL("./e2e/admin-console.spec.ts", import.meta.url),
+    "utf8",
+  );
+  const partnerRegistration = await readFile(
+    new URL("./e2e/partner-registration.spec.ts", import.meta.url),
+    "utf8",
+  );
+  for (const criticalPath of [
+    "/",
+    "/auth/login",
+    "/partners/health-001",
+    "/certification",
+    "/partner",
+    "/admin/login",
+    "/admin",
+  ]) {
+    assert.match(pageSmoke, new RegExp(`"${criticalPath.replaceAll("/", "\\/")}"`));
+  }
+  assert.match(authOperations, /@critical member login/);
+  assert.match(adminConsole, /@critical renders the admin home/);
+  assert.match(partnerRegistration, /@critical partner registration/);
 
   const releaseScript = await readFile(
     new URL("../scripts/release.mjs", import.meta.url),

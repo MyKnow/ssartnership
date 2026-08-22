@@ -178,6 +178,11 @@ const signatures = [
   ["storybook_browser_externalization", /externalized for browser compatibility/i],
   ["storybook_bundle_warning", /plugin_timings|some chunks are larger than \d+\s*kB/i],
 ];
+const passedDescriptionOnlySignatures = new Set([
+  "timeout",
+  "deprecation",
+  "visual_drift",
+]);
 
 const ansiEscapePattern = /[\u001B\u009B][[\]()#;?]*(?:(?:[a-zA-Z\d]*(?:;[-a-zA-Z\d\/#&.:=?%@~_]+)*)?\u0007|(?:(?:\d{1,4}(?:[;:]\d{0,4})*)?[\dA-PR-TZcf-nq-uy=><~]))/g;
 
@@ -232,7 +237,7 @@ export function signatureNamesForText(text) {
     .test(normalizedText);
   return signatures
     .filter(([name, pattern]) =>
-      !(passedTestDescription && (name === "timeout" || name === "deprecation"))
+      !(passedTestDescription && passedDescriptionOnlySignatures.has(name))
         && pattern.test(normalizedText))
     .map(([name]) => name);
 }

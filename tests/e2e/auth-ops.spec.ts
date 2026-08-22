@@ -48,7 +48,7 @@ test.describe("auth and partner portal operation flows", () => {
     expect(decodedReturnTo).toBe("/partners/health-001?returnTo=/?category=health#benefits");
   });
 
-  test("member login shows field-level validation before submitting", async ({ page }) => {
+  test("@critical member login shows field-level validation before submitting", async ({ page }) => {
     await page.goto("/auth/login");
     await page.waitForLoadState("networkidle");
 

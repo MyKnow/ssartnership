@@ -1,12 +1,11 @@
 name: Apply Preview Supabase Migrations
 
 on:
-  workflow_run:
-    workflows:
-      - Public Readiness
+  push:
     branches: [dev]
-    types:
-      - completed
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/schema.sql"
   workflow_dispatch:
     inputs:
       confirmation:
@@ -30,10 +29,8 @@ jobs:
     if: >-
       ${{
         (
-          github.event_name == 'workflow_run' &&
-          github.event.workflow_run.conclusion == 'success' &&
-          github.event.workflow_run.event == 'push' &&
-          github.event.workflow_run.head_branch == 'dev'
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/dev'
         ) ||
         (
           github.event_name == 'workflow_dispatch' &&
@@ -51,7 +48,7 @@ jobs:
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
-          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_SHA: ${{ github.sha }}
           INPUT_EXPECTED_DEV_SHA: ${{ inputs.expected_dev_sha }}
           REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}.git
         run: |
@@ -62,7 +59,7 @@ jobs:
             exit 1
           fi
 
-          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+          if [[ "$EVENT_NAME" == "push" ]]; then
             expected_dev_sha="$RUN_SHA"
             if [[ "$expected_dev_sha" != "$live_dev_sha" ]]; then
               echo "is_current=false" >> "$GITHUB_OUTPUT"

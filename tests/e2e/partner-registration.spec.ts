@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("partner registration reaches a review-ready submit through all five steps", async ({
+test("@critical partner registration reaches a review-ready submit through all five steps", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 360, height: 844 });
