@@ -131,6 +131,7 @@ export default function AdminMemberAccountManager({
           displayName={member.displayName}
           email={member.email}
           emailVerifiedAt={member.emailVerifiedAt}
+          mustChangePassword={member.mustChangePassword}
         />
       ) : null}
 

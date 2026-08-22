@@ -274,8 +274,8 @@ test("반려와 계정 전달 경로는 알림 템플릿을 사용한다", async
   assert.match(manualAdd, /mattermost\.manual_member_temporary_password/);
   assert.match(cycleActions, /mattermost\.sender_test/);
   assert.match(suggestionRoute, /email\.partner_suggestion_received/);
-  assert.match(memberEmail, /renderEmailTemplateBody/);
-  assert.match(partnerEmail, /renderEmailTemplateBody/);
+  assert.match(memberEmail, /renderResolvedNotificationEmailContent/);
+  assert.match(partnerEmail, /renderResolvedNotificationEmailContent/);
 });
 
 test("활성 자동·운영 producer는 임의 metadata 대신 타입화된 컨텍스트를 전달한다", async () => {
