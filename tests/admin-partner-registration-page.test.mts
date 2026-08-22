@@ -60,6 +60,9 @@ test("제휴 등록 신청은 서버 범위 페이지 조회와 안전한 URL �
   assert.match(actionSource, /\.eq\("status", previousStatus\)/);
   assert.match(actionSource, /request: \{ \.\.\.registrationRequest, visibility \}/);
   assert.match(actionSource, /\/admin\/partners\/\$\{convertedPartnerId\}/);
+  assert.match(actionSource, /conversion\.partners\.length === 0/);
+  assert.match(actionSource, /rollbackPartnerRegistrationRequestStatus/);
+  assert.match(actionSource, /\.eq\("status", requestedStatus\)/);
   assert.match(actionSource, /success: "already-updated"/);
   assert.match(feedbackSource, /partner_form_conversion_failed/);
   assert.match(migrationSource, /get_admin_partner_registration_request_page/);
