@@ -10,7 +10,7 @@ import {
   sendTransactionalEmail,
   toEmailDeliveryConfigErrorLog,
 } from "@/lib/email-delivery";
-import { renderEmailTemplateBody } from "@/lib/email-content";
+import { renderResolvedNotificationEmailContent } from "@/lib/notification-email-content";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
 import { renderNotificationTemplate } from "@/lib/notification-templates/template";
 import { isBlocked, recordAttempt, SUGGEST_RATE_LIMIT } from "@/lib/rate-limit";
@@ -83,7 +83,13 @@ export async function POST(request: Request) {
       companyUrl: safeCompanyUrlValue ?? "-",
     };
     const subject = renderNotificationTemplate(template.titleTemplate, variables);
-    const renderedBody = renderEmailTemplateBody(template.bodyTemplate, template.bodyFormat, variables);
+    const renderedBody = renderResolvedNotificationEmailContent({
+      eventKey: template.eventKey,
+      bodyTemplate: template.bodyTemplate,
+      bodyFormat: template.bodyFormat,
+      isCustomized: template.isCustomized,
+      variables,
+    });
 
     await sendTransactionalEmail({
       to: payload.contactEmail,

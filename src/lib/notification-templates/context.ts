@@ -238,6 +238,7 @@ export function getNotificationTemplateContextVariables(
         partnerName: context.partnerName,
         previousPlanName: context.previousPlanName,
         nextPlanName: context.nextPlanName,
+        requestedPlanName: context.nextPlanName,
         effectiveAt: context.effectiveAt,
         expiresAt: context.expiresAt,
         planUrl: context.planUrl,

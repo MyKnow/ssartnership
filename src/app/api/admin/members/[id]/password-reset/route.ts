@@ -71,10 +71,18 @@ export async function POST(
       );
       await logAdminAudit({
         ...audit,
-        properties: { ...audit.properties, outcome: "success" },
+        action: issued.actionKind === "initial_setup"
+          ? "member_manual_setup_link_reissue"
+          : audit.action,
+        properties: {
+          ...audit.properties,
+          actionKind: issued.actionKind,
+          outcome: "success",
+        },
       });
       return response({
         ok: true,
+        actionKind: issued.actionKind,
         ...(issued.resetUrl ? { resetUrl: issued.resetUrl } : {}),
       });
     } catch (error) {
@@ -96,6 +104,15 @@ export async function POST(
           return response(
             { ok: false, message: "이메일을 발송하지 못했습니다. 잠시 후 다시 시도해 주세요." },
             503,
+          );
+        }
+        if (error.code === "email_transition_pending") {
+          return response(
+            {
+              ok: false,
+              message: "이메일 로그인 전환이 진행 중인 회원입니다. 기존 전환을 완료하거나 새 전환 링크를 발급해 주세요.",
+            },
+            409,
           );
         }
       }

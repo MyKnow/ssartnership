@@ -21,7 +21,7 @@ import {
 } from "@/lib/mm-directory";
 import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
 import { resolveManualMemberResolution } from "@/lib/member-manual-add/lookup";
-import { renderEmailTemplateBody } from "@/lib/email-content";
+import { renderResolvedNotificationEmailContent } from "@/lib/notification-email-content";
 import {
   getEmailDeliveryConfig,
   sendTransactionalEmail,
@@ -170,7 +170,13 @@ async function sendSetupEmail(input: {
     setupUrl,
   };
   const subject = renderNotificationTemplate(template.titleTemplate, variables);
-  const renderedBody = renderEmailTemplateBody(template.bodyTemplate, template.bodyFormat, variables);
+  const renderedBody = renderResolvedNotificationEmailContent({
+    eventKey: template.eventKey,
+    bodyTemplate: template.bodyTemplate,
+    bodyFormat: template.bodyFormat,
+    isCustomized: template.isCustomized,
+    variables,
+  });
   await sendTransactionalEmail({
     to: input.email,
     subject,

@@ -422,7 +422,7 @@ const emailTemplates: NotificationTemplateDefinition[] = [
     channel: "email",
     titleTemplate: "[{siteName}] 이메일 인증 코드",
     bodyTemplate:
-      "이메일 로그인 등록 또는 변경을 위한 인증 코드입니다.\n\n인증 코드: {code}\n\n코드는 {expiresInMinutes}분 동안 사용할 수 있습니다. 본인이 요청하지 않았다면 이 메일을 무시해 주세요.",
+      "이메일 로그인 등록 또는 변경을 위한 인증 코드입니다.\n\n인증 코드: {code}\n\n코드는 {expiresInMinutes}분 동안 사용할 수 있습니다. 본인이 요청하지 않았다면 별도의 조치를 하지 않아도 됩니다.",
     variables: [siteName, code, { name: "expiresInMinutes", label: "코드 유효 시간(분)" }],
   }),
   defineTemplate({
@@ -432,7 +432,7 @@ const emailTemplates: NotificationTemplateDefinition[] = [
     group: "회원·수료생 이메일",
     channel: "email",
     titleTemplate: "[{siteName}] 수료생 인증 코드",
-    bodyTemplate: "수료생 가입을 위한 이메일 인증 코드입니다.\n\n인증 코드: {code}\n\n{expirationNotice}",
+    bodyTemplate: "{siteName} 가입을 계속하려면 아래 인증 코드를 입력해 주세요.\n\n인증 코드: {code}\n\n{expirationNotice}\n본인이 요청하지 않았다면 별도의 조치를 하지 않아도 됩니다. 인증 코드를 다른 사람에게 전달하지 마세요.",
     variables: [siteName, code, { name: "expirationNotice", label: "만료 안내" }],
   }),
   defineTemplate({
@@ -442,7 +442,7 @@ const emailTemplates: NotificationTemplateDefinition[] = [
     group: "회원·수료생 이메일",
     channel: "email",
     titleTemplate: "[{siteName}] 수료생 비밀번호 재설정 코드",
-    bodyTemplate: "수료생 계정의 비밀번호 재설정을 위한 이메일 인증 코드입니다.\n\n인증 코드: {code}\n\n{expirationNotice}",
+    bodyTemplate: "비밀번호 재설정을 계속하려면 아래 인증 코드를 입력해 주세요.\n\n인증 코드: {code}\n\n{expirationNotice}\n본인이 요청하지 않았다면 별도의 조치를 하지 않아도 됩니다. 인증 코드를 다른 사람에게 전달하지 마세요.",
     variables: [siteName, code, { name: "expirationNotice", label: "만료 안내" }],
   }),
   defineTemplate({
@@ -452,7 +452,7 @@ const emailTemplates: NotificationTemplateDefinition[] = [
     group: "회원·수료생 이메일",
     channel: "email",
     titleTemplate: "[{siteName}] {subjectLabel}",
-    bodyTemplate: "{description}\n\n아래 링크에서 비밀번호를 설정해 주세요.\n{setupUrl}\n\n링크는 24시간 동안 한 번만 사용할 수 있습니다.",
+    bodyTemplate: "{description}\n\n계정 설정 완료하기\n{setupUrl}",
     variables: [siteName, { name: "subjectLabel", label: "메일 제목 보조 문구" }, { name: "description", label: "설명" }, { name: "setupUrl", label: "설정 URL" }],
   }),
   defineTemplate({
@@ -461,8 +461,8 @@ const emailTemplates: NotificationTemplateDefinition[] = [
     description: "수료생 비밀번호 재설정 링크를 전송합니다.",
     group: "회원·수료생 이메일",
     channel: "email",
-    titleTemplate: "[{siteName}] 수료생 비밀번호 재설정",
-    bodyTemplate: "{displayName}님, 비밀번호 재설정 요청을 확인했습니다.\n\n아래 링크에서 새 비밀번호를 설정해 주세요.\n{setupUrl}\n\n링크는 24시간 동안 한 번만 사용할 수 있습니다. 본인이 요청하지 않았다면 이 메일을 무시해 주세요.",
+    titleTemplate: "[{siteName}] 비밀번호를 다시 설정해 주세요",
+    bodyTemplate: "{displayName}님, 요청하신 비밀번호 재설정 링크를 보내드렸습니다.\n아래 링크에서 새 비밀번호를 설정해 주세요.\n\n비밀번호 재설정하기\n{setupUrl}",
     variables: [siteName, displayName, { name: "setupUrl", label: "설정 URL" }],
   }),
   defineTemplate({
@@ -471,8 +471,8 @@ const emailTemplates: NotificationTemplateDefinition[] = [
     description: "관리자가 보완을 요청했을 때 전송하는 이메일입니다.",
     group: "회원·수료생 이메일",
     channel: "email",
-    titleTemplate: "[{siteName}] 수료생 인증 보완 요청",
-    bodyTemplate: "{displayName}님, 수료생 인증 신청에 보완이 필요합니다.\n보완 항목: {targets}\n{note}\n\n아래 페이지에서 같은 이메일로 다시 인증한 뒤 보완 요청된 항목만 제출해 주세요.\n{applicationUrl}",
+    titleTemplate: "[{siteName}] 수료생 인증 보완이 필요합니다",
+    bodyTemplate: "{displayName}님, 수료생 인증을 완료하려면 아래 자료를 한 번 더 확인해 주세요.\n\n보완 항목: {targets}\n{note}\n\n보완 자료 제출하기\n{applicationUrl}",
     variables: [siteName, displayName, { name: "targets", label: "보완 항목" }, { name: "note", label: "관리자 안내" }, { name: "applicationUrl", label: "보완 제출 URL" }],
   }),
   defineTemplate({
@@ -492,7 +492,7 @@ const emailTemplates: NotificationTemplateDefinition[] = [
     group: "회원·수료생 이메일",
     channel: "email",
     titleTemplate: "[{siteName}] 이메일 로그인 설정",
-    bodyTemplate: "{displayName}님, Mattermost 로그인을 이메일 로그인으로 전환합니다.\n\n아래 링크에서 이메일 로그인용 비밀번호를 설정해 주세요.\n{setupUrl}\n\n링크는 24시간 동안 한 번만 사용할 수 있습니다.",
+    bodyTemplate: "{displayName}님, Mattermost 로그인을 이메일 로그인으로 전환합니다.\n아래 버튼을 눌러 이메일 로그인용 비밀번호를 설정해 주세요.\n\n이메일 로그인 설정하기\n{setupUrl}",
     variables: [siteName, displayName, { name: "setupUrl", label: "설정 URL" }],
   }),
   defineTemplate({
@@ -502,7 +502,17 @@ const emailTemplates: NotificationTemplateDefinition[] = [
     group: "회원·수료생 이메일",
     channel: "email",
     titleTemplate: "[{siteName}] 계정 비밀번호 설정",
-    bodyTemplate: "{displayName}님, 아래 링크에서 {siteName} 비밀번호를 설정해 주세요.\n\n{setupUrl}\n\n링크는 24시간 동안 한 번만 사용할 수 있습니다.",
+    bodyTemplate: "{displayName}님, {siteName} 계정이 준비되었습니다.\n아래 버튼을 눌러 사용할 비밀번호를 설정해 주세요.\n\n비밀번호 설정하기\n{setupUrl}",
+    variables: [siteName, displayName, { name: "setupUrl", label: "설정 URL" }],
+  }),
+  defineTemplate({
+    eventKey: "email.manual_member_setup_reissue",
+    label: "수동 추가 회원 초기 설정 재발급",
+    description: "최초 계정 설정을 완료하지 않은 회원에게 새 초기 설정 링크를 전송합니다.",
+    group: "회원·수료생 이메일",
+    channel: "email",
+    titleTemplate: "[{siteName}] 계정 설정 링크 재발급",
+    bodyTemplate: "{displayName}님, 계정 설정을 계속할 수 있도록 새 링크를 보내드렸습니다.\n아래 버튼을 눌러 사용할 비밀번호를 설정해 주세요.\n\n비밀번호 설정하기\n{setupUrl}",
     variables: [siteName, displayName, { name: "setupUrl", label: "설정 URL" }],
   }),
   defineTemplate({
@@ -512,7 +522,7 @@ const emailTemplates: NotificationTemplateDefinition[] = [
     group: "회원·수료생 이메일",
     channel: "email",
     titleTemplate: "[{siteName}] 비밀번호 재설정",
-    bodyTemplate: "{displayName}님, 아래 링크에서 {siteName} 비밀번호를 재설정해 주세요.\n\n{setupUrl}\n\n링크는 24시간 동안 한 번만 사용할 수 있습니다.",
+    bodyTemplate: "{displayName}님, 요청하신 {siteName} 비밀번호 재설정 링크를 보내드렸습니다.\n아래 버튼을 눌러 새 비밀번호를 설정해 주세요.\n\n비밀번호 재설정하기\n{setupUrl}",
     variables: [siteName, displayName, { name: "setupUrl", label: "설정 URL" }],
   }),
   defineTemplate({
@@ -522,7 +532,7 @@ const emailTemplates: NotificationTemplateDefinition[] = [
     group: "제휴 이메일",
     channel: "email",
     titleTemplate: "[{siteName}] 제휴 제안 접수 안내",
-    bodyTemplate: "안녕하세요 {contactName} {contactRole}님,\n\n{siteName} 파트너십 제안을 접수했습니다. 보내주신 내용을 아래와 같이 정리해 전달드립니다.\n\n파트너사명: {companyName}\n사업 분야 소개: {businessArea}\n제안 제휴 조건: {partnershipConditions}\n담당자 이메일: {contactEmail}\n회사 사이트: {companyUrl}\n\n담당자가 확인 후 안내드리겠습니다. 추가로 전달하실 내용이 있으면 이 메일에 회신해 주세요.",
+    bodyTemplate: "안녕하세요 {contactName} {contactRole}님,\n\n{siteName} 파트너십 제안을 접수했습니다. 보내주신 내용을 아래와 같이 정리해 전달드립니다.\n\n파트너사명: {companyName}\n사업 분야 소개: {businessArea}\n제안 제휴 조건: {partnershipConditions}\n담당자 이메일: {contactEmail}\n회사 사이트: {companyUrl}\n\n담당자가 확인 후 안내드리겠습니다. 추가로 전달하실 내용이 있으면 답장해 주세요.",
     variables: [
       siteName,
       { name: "contactName", label: "담당자 이름" },
@@ -551,7 +561,7 @@ const emailTemplates: NotificationTemplateDefinition[] = [
     group: "파트너 이메일",
     channel: "email",
     titleTemplate: "[{siteName}] 파트너사 포털 초기 설정 안내",
-    bodyTemplate: "{displayName}님, 파트너사 포털 초기 설정 링크를 전송드립니다.\n로그인 아이디: {loginId}\n초기 설정 URL: {setupUrl}\n\n링크로 이동해 새 비밀번호를 설정해 주세요.",
+    bodyTemplate: "{displayName}님, 파트너사 포털 계정이 준비되었습니다.\n로그인 아이디: {loginId}\n아래 버튼을 눌러 새 비밀번호를 설정해 주세요.\n\n초기 설정하기\n{setupUrl}",
     variables: [siteName, displayName, { name: "loginId", label: "로그인 아이디" }, { name: "setupUrl", label: "초기 설정 URL" }],
   }),
   defineTemplate({
@@ -561,7 +571,7 @@ const emailTemplates: NotificationTemplateDefinition[] = [
     group: "파트너 이메일",
     channel: "email",
     titleTemplate: "[{siteName}] {title}",
-    bodyTemplate: "{displayName}님,\n\n{body}\n\n알림 확인: {targetUrl}",
+    bodyTemplate: "{displayName}님, 확인이 필요한 운영 안내가 있습니다.\n\n{body}\n\n알림 확인하기\n{targetUrl}",
     variables: [siteName, displayName, title, body, targetUrl],
   }),
 ];
@@ -914,7 +924,7 @@ const partnerOperationalTemplates = partnerOperationalTypes.flatMap(([type, labe
         group: "호환·비활성 템플릿",
         channel: "email",
         titleTemplate: "[{siteName}] {title}",
-        bodyTemplate: "{displayName}님,\n\n{body}\n\n알림 확인: {targetUrl}",
+        bodyTemplate: "{displayName}님, 확인이 필요한 운영 안내가 있습니다.\n\n{body}\n\n알림 확인하기\n{targetUrl}",
         variables: [siteName, displayName, title, body, targetUrl],
         requiredVariables: ["siteName", "displayName", "title", "body", "targetUrl"],
         source: "compatibility",

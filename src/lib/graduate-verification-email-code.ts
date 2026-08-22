@@ -14,5 +14,5 @@ export function formatGraduateEmailCodeRemainingTime(remainingSeconds: number) {
 
 export function formatGraduateEmailCodeExpirationNotice(expiresInSeconds: number) {
   const minutes = Math.max(1, Math.ceil(expiresInSeconds / 60));
-  return `코드는 ${minutes}분 동안만 유효합니다. 본인이 요청하지 않았다면 이 메일을 무시해 주세요.`;
+  return `코드는 발급 후 ${minutes}분 동안 한 번만 사용할 수 있습니다.`;
 }

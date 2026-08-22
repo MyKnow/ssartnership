@@ -1,6 +1,7 @@
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 import { renderEmailTemplateBody } from "@/lib/email-content";
 import { sendTransactionalEmail } from "@/lib/email-delivery";
+import { renderGraduateVerificationEmailContent } from "@/lib/graduate-verification-email-content";
 import { formatGraduateEmailCodeExpirationNotice } from "@/lib/graduate-verification-email-code";
 import type { GraduateVerificationRequestKind } from "@/lib/graduate-verification";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
@@ -9,11 +10,20 @@ import { renderNotificationTemplate } from "@/lib/notification-templates/templat
 async function renderEmailTemplate(
   eventKey: string,
   variables: Record<string, string | number>,
+  renderDefaultBody: () => ReturnType<
+    typeof renderGraduateVerificationEmailContent
+  >,
 ) {
   const template = await resolveNotificationTemplate(eventKey);
   return {
     subject: renderNotificationTemplate(template.titleTemplate, variables),
-    ...renderEmailTemplateBody(template.bodyTemplate, template.bodyFormat, variables),
+    ...(template.isCustomized
+      ? renderEmailTemplateBody(
+          template.bodyTemplate,
+          template.bodyFormat,
+          variables,
+        )
+      : renderDefaultBody()),
   };
 }
 
@@ -30,6 +40,9 @@ export async function sendGraduateVerificationCodeEmail(input: {
   const expirationNotice = formatGraduateEmailCodeExpirationNotice(
     input.expiresInSeconds ?? DEFAULT_GRADUATE_EMAIL_CODE_TTL_SECONDS,
   );
+  const kind = purpose === "password_reset"
+    ? "password_reset_code"
+    : "application_code";
   const template = await renderEmailTemplate(
     purpose === "password_reset"
       ? "email.graduate_password_reset_code"
@@ -39,6 +52,11 @@ export async function sendGraduateVerificationCodeEmail(input: {
       code: input.code,
       expirationNotice,
     },
+    () => renderGraduateVerificationEmailContent({
+      kind,
+      code: input.code,
+      expirationNotice,
+    }),
   );
 
   await sendTransactionalEmail({
@@ -61,16 +79,27 @@ export async function sendGraduateAccountSetupEmail(input: {
   // in the same-origin password-setup request body.
   setupUrl.hash = new URLSearchParams({ token: input.token }).toString();
   const isExistingMemberRecovery = input.requestKind === "existing_member_recovery";
-  const subjectLabel = isExistingMemberRecovery ? "기존 회원 계정 복구" : "수료생 계정 비밀번호 설정";
+  const subjectLabel = isExistingMemberRecovery
+    ? "기존 회원 계정 복구가 승인되었습니다"
+    : "수료생 인증이 승인되었습니다";
   const description = isExistingMemberRecovery
-    ? `${input.displayName || "회원"}님, 기존 회원 복구가 승인되었습니다. 아래 링크에서 새 비밀번호를 설정해 주세요.`
-    : `${input.displayName || "회원"}님, 수료생 인증이 승인되었습니다. 아래 링크에서 비밀번호를 설정해 주세요.`;
-  const template = await renderEmailTemplate("email.graduate_account_setup", {
-    siteName: SITE_NAME,
-    subjectLabel,
-    description,
-    setupUrl: setupUrl.toString(),
-  });
+    ? `${input.displayName || "회원"}님, 기존 회원 복구가 승인되었습니다. 새 비밀번호를 설정해 주세요.`
+    : `${input.displayName || "회원"}님, 수료생 인증 자료의 검토가 완료되었습니다. 계정 설정을 마무리해 주세요.`;
+  const template = await renderEmailTemplate(
+    "email.graduate_account_setup",
+    {
+      siteName: SITE_NAME,
+      subjectLabel,
+      description,
+      setupUrl: setupUrl.toString(),
+    },
+    () => renderGraduateVerificationEmailContent({
+      kind: "account_setup",
+      displayName: input.displayName || "회원",
+      setupUrl: setupUrl.toString(),
+      isExistingMemberRecovery,
+    }),
+  );
 
   await sendTransactionalEmail({
     to: input.to,
@@ -88,11 +117,19 @@ export async function sendGraduatePasswordResetEmail(input: {
   const setupUrl = new URL("/auth/graduate/setup", SITE_URL);
   // Keep a reset token out of the server-visible path and query string too.
   setupUrl.hash = new URLSearchParams({ token: input.token }).toString();
-  const template = await renderEmailTemplate("email.graduate_password_reset", {
-    siteName: SITE_NAME,
-    displayName: input.displayName || "회원",
-    setupUrl: setupUrl.toString(),
-  });
+  const template = await renderEmailTemplate(
+    "email.graduate_password_reset",
+    {
+      siteName: SITE_NAME,
+      displayName: input.displayName || "회원",
+      setupUrl: setupUrl.toString(),
+    },
+    () => renderGraduateVerificationEmailContent({
+      kind: "password_reset",
+      displayName: input.displayName || "회원",
+      setupUrl: setupUrl.toString(),
+    }),
+  );
 
   await sendTransactionalEmail({
     to: input.to,
@@ -113,13 +150,23 @@ export async function sendGraduateVerificationResubmissionEmail(input: {
   if (input.requestKind === "existing_member_recovery") {
     applicationUrl.searchParams.set("kind", "recovery");
   }
-  const template = await renderEmailTemplate("email.graduate_resubmission", {
-    siteName: SITE_NAME,
-    displayName: input.displayName || "회원",
-    targets: input.targets.join(", "),
-    note: input.note ? `안내: ${input.note}` : "",
-    applicationUrl: applicationUrl.toString(),
-  });
+  const template = await renderEmailTemplate(
+    "email.graduate_resubmission",
+    {
+      siteName: SITE_NAME,
+      displayName: input.displayName || "회원",
+      targets: input.targets.join(", "),
+      note: input.note ? `안내: ${input.note}` : "",
+      applicationUrl: applicationUrl.toString(),
+    },
+    () => renderGraduateVerificationEmailContent({
+      kind: "resubmission",
+      displayName: input.displayName || "회원",
+      targets: input.targets,
+      note: input.note,
+      applicationUrl: applicationUrl.toString(),
+    }),
+  );
 
   await sendTransactionalEmail({
     to: input.to,
@@ -139,12 +186,21 @@ export async function sendGraduateVerificationRejectionEmail(input: {
   if (input.requestKind === "existing_member_recovery") {
     applicationUrl.searchParams.set("kind", "recovery");
   }
-  const template = await renderEmailTemplate("email.graduate_rejection", {
-    siteName: SITE_NAME,
-    displayName: input.displayName || "회원",
-    reason: input.reason,
-    applicationUrl: applicationUrl.toString(),
-  });
+  const template = await renderEmailTemplate(
+    "email.graduate_rejection",
+    {
+      siteName: SITE_NAME,
+      displayName: input.displayName || "회원",
+      reason: input.reason,
+      applicationUrl: applicationUrl.toString(),
+    },
+    () => renderGraduateVerificationEmailContent({
+      kind: "rejection",
+      displayName: input.displayName || "회원",
+      reason: input.reason,
+      applicationUrl: applicationUrl.toString(),
+    }),
+  );
 
   await sendTransactionalEmail({
     to: input.to,

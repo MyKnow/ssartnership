@@ -226,3 +226,39 @@ export const EmailOnlyUnverified: Story = {
     },
   },
 };
+
+export const EmailOnlyAwaitingInitialSetup: Story = {
+  args: {
+    member: {
+      id: "member-email-only-awaiting-setup-001",
+      displayName: "초기 설정 대기 회원",
+      mmUsername: "",
+      mmUserId: null,
+      manualLoginId: "member-email-awaiting-setup",
+      generation: 15,
+      generationLabel: "15기 · 2학기",
+      campus: "서울",
+      mustChangePassword: true,
+      email: "awaiting-setup@example.com",
+      emailVerifiedAt: null,
+      hasMattermostAccount: false,
+      mattermostLoginDisabledAt: null,
+      mattermostLoginDisabledReason: null,
+      emailLoginTransition: null,
+      createdAt: "2026-08-22T09:00:00+09:00",
+      updatedAt: "2026-08-22T09:00:00+09:00",
+      hasAvatar: false,
+      avatarUrl: "/api/admin/members/member-email-only-awaiting-setup-001/avatar",
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(
+      canvas.getByRole("heading", { name: "초기 설정 링크 재발급" }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByRole("button", { name: "초기 설정 메일 재발송" }),
+    ).toBeInTheDocument();
+  },
+};
