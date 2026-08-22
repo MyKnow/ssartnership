@@ -94,7 +94,7 @@ const ERROR_MESSAGES: Record<string, AdminReviewQueueFeedback> = {
     tone: "danger",
     title: "제휴처 생성을 완료하지 못했습니다",
     description:
-      "신청 상태는 저장되었지만 제휴처 후속 처리가 끝나지 않았습니다. 운영 기록과 제휴처 목록을 확인해 중복 등록 여부를 점검해 주세요.",
+      "제휴처 후속 처리를 완료하지 못해 신청 상태를 변경 전으로 되돌렸습니다. 운영 기록과 제휴처 목록을 확인한 뒤 다시 시도해 주세요.",
   },
   partner_form_details_invalid: {
     tone: "danger",
