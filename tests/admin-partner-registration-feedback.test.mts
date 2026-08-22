@@ -14,6 +14,8 @@ test("제휴 등록 신청은 관리자 알림과 같은 화면 편집 경로를
     notifications,
     context,
     benefitField,
+    migration,
+    schema,
   ] =
     await Promise.all([
       read("src/app/(site)/partner-registration/actions.ts"),
@@ -23,12 +25,22 @@ test("제휴 등록 신청은 관리자 알림과 같은 화면 편집 경로를
       read("src/lib/operational-notifications.ts"),
       read("src/lib/notification-templates/context.ts"),
       read("src/components/partner-card-form/PartnerBenefitItemsField.tsx"),
+      read(
+        "supabase/migrations/20260823000136_allow_partner_registration_admin_notifications.sql",
+      ),
+      read("supabase/schema.sql"),
     ]);
 
   assert.match(publicAction, /notifyAdminsOfPartnerRegistrationRequest/);
   assert.match(notifications, /partner-registration-request:\$\{input\.requestId\}/);
   assert.match(notifications, /partner_registration_request/);
   assert.match(context, /admin_partner_registration_request/);
+  assert.match(migration, /drop constraint if exists admin_notifications_type_check/);
+  assert.match(migration, /partner_registration_request/);
+  assert.match(
+    schema,
+    /admin_notifications_type_check[\s\S]*partner_registration_request/,
+  );
   assert.match(page, /updatePartnerRegistrationRequestDetails/);
   assert.match(view, /신청 정보 수정/);
   assert.match(view, /name="brandName"/);
