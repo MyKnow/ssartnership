@@ -28,6 +28,15 @@ test("검토 큐 피드백은 허용된 코드만 안전한 안내로 변환한�
     getAdminReviewQueueFeedback({ error: "unknown_internal_code" })?.description,
     "잠시 후 다시 시도해 주세요. 문제가 계속되면 운영 기록을 확인해 주세요.",
   );
+  assert.deepEqual(
+    getAdminReviewQueueFeedback({ error: "partner_form_conversion_failed" }),
+    {
+      tone: "danger",
+      title: "제휴처 생성을 완료하지 못했습니다",
+      description:
+        "제휴처 후속 처리를 완료하지 못해 신청 상태를 변경 전으로 되돌렸습니다. 운영 기록과 제휴처 목록을 확인한 뒤 다시 시도해 주세요.",
+    },
+  );
   assert.equal(
     appendAdminReviewQueueQuery("/admin/queue?page=2", { success: "approved" }),
     "/admin/queue?page=2&success=approved",
