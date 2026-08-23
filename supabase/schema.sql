@@ -15118,7 +15118,7 @@ begin
       greatest(
         1,
         ceil(
-          pg_catalog.extract(
+          extract(
             epoch from existing_challenge.resend_available_at - reservation_time
           )
         )::integer

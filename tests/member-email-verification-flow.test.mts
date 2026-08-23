@@ -69,6 +69,9 @@ test("인증 코드 발급 RPC는 회원 단위 잠금·재전송 대기·최신
     /purpose = 'email_verify'[\s\S]+consumed_at is null[\s\S]+expires_at > reservation_time[\s\S]+order by created_at desc, id desc[\s\S]+for update/i,
   );
   assert.match(migration, /resend_available_at > reservation_time/i);
+  assert.match(migration, /extract\s*\(\s*epoch from/i);
+  assert.doesNotMatch(migration, /pg_catalog\.extract/i);
+  assert.doesNotMatch(schema, /pg_catalog\.extract/i);
   assert.match(
     migration,
     /update public\.member_email_challenges[\s\S]+set consumed_at = reservation_time[\s\S]+purpose = 'email_verify'/i,
