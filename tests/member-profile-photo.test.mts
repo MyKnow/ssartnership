@@ -44,11 +44,11 @@ const profileSyncPath = new URL(
   import.meta.url,
 );
 
-test("사진이 없는 회원만 사진 제출 전까지 일반 이용을 막고, 검토 상태는 인증 기능만 제한한다", () => {
+test("사진이 없거나 반려된 회원은 재제출까지 일반 이용을 막고, 검토 중에는 인증 기능만 제한한다", () => {
   assert.equal(requiresMemberProfilePhotoUpdate("missing"), true);
   assert.equal(requiresMemberProfilePhotoUpdate("approved"), false);
   assert.equal(requiresMemberProfilePhotoUpdate("pending"), false);
-  assert.equal(requiresMemberProfilePhotoUpdate("rejected"), false);
+  assert.equal(requiresMemberProfilePhotoUpdate("rejected"), true);
   assert.equal(requiresMemberProfilePhotoUpdate(null), false);
 });
 
@@ -69,7 +69,7 @@ test("사진 상태는 사용자에게 필요한 다음 행동만 노출한다",
     message: "본인 사진 변경 요청을 검토하고 있습니다. 인증 서비스를 이용하려면 검토가 끝날 때까지 기다려 주세요.",
   });
   assert.deepEqual(getMemberProfilePhotoAccessState("rejected"), {
-    requiresSubmission: false,
+    requiresSubmission: true,
     restrictCertification: true,
     message: "본인 사진을 다시 제출해 주세요. 승인 전에는 인증 서비스를 이용할 수 없습니다.",
   });
