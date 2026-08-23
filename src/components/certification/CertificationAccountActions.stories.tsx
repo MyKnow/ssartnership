@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
-import CertificationEmailAction from "@/components/certification/CertificationEmailAction";
+import CertificationEmailSummary from "@/components/certification/CertificationEmailSummary";
 import CertificationFooterActions from "@/components/certification/CertificationFooterActions";
 import CertificationMattermostSyncAction from "@/components/certification/CertificationMattermostSyncAction";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -14,9 +14,10 @@ function CertificationAccountActionsStory({
     <div className="mx-auto w-full max-w-4xl space-y-6 p-4 sm:p-6">
       <ToastProvider>
         <CertificationMattermostSyncAction />
-        <CertificationEmailAction
-          initialEmail={emailVerified ? "member@example.com" : null}
+        <CertificationEmailSummary
+          email={emailVerified ? "member@example.com" : null}
           emailVerified={emailVerified}
+          returnTo="/certification"
         />
         <CertificationFooterActions canChangeProfilePhoto />
       </ToastProvider>

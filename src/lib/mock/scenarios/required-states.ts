@@ -274,6 +274,17 @@ const routeOwnedStateOverrides: Partial<
     "async-pending",
     "setup-token",
   ],
+  "/certification/email": [
+    "default",
+    "validation-error",
+    "pending",
+    "expired",
+    "success",
+    "error",
+    "long-korean",
+    "mobile-overflow",
+    "async-pending",
+  ],
   "/certification/photo": [
     "default",
     "validation-error",

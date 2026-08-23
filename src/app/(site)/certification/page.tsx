@@ -11,7 +11,7 @@ import {
 import { getSignedUserSession } from "@/lib/user-auth";
 import CertificationView from "@/components/certification/CertificationView";
 import CertificationFooterActions from "@/components/certification/CertificationFooterActions";
-import CertificationEmailAction from "@/components/certification/CertificationEmailAction";
+import CertificationEmailSummary from "@/components/certification/CertificationEmailSummary";
 import CertificationMattermostSyncAction from "@/components/certification/CertificationMattermostSyncAction";
 import { SITE_NAME } from "@/lib/site";
 import { sanitizeReturnTo } from "@/lib/return-to";
@@ -125,9 +125,10 @@ export default async function CertificationPage({
             {member.mattermostAccountId ? (
               <CertificationMattermostSyncAction />
             ) : null}
-            <CertificationEmailAction
-              initialEmail={member.email}
+            <CertificationEmailSummary
+              email={member.email}
               emailVerified={Boolean(member.emailVerifiedAt)}
+              returnTo={returnTo}
             />
             <div className="mt-10 w-full border-t border-border/70 pt-8">
               <CertificationFooterActions
