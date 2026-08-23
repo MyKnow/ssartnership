@@ -23,6 +23,7 @@ type MockChallenge = {
   consumedAt: string | null;
   attemptCount: number;
   createdAt: string;
+  deliveryStatus?: "pending" | "sent";
 };
 
 type MockMemberEmailVerificationState = {
@@ -86,7 +87,6 @@ export class MockMemberEmailVerificationRepository
         .filter(
           (candidate) =>
             candidate.memberId === input.memberId &&
-            candidate.emailNormalized === input.emailNormalized &&
             candidate.purpose === "email_verify",
         )
         .sort(
@@ -95,6 +95,12 @@ export class MockMemberEmailVerificationRepository
             right.id.localeCompare(left.id),
         )[0];
       if (!challenge) {
+        return { verified: false, reason: "challenge_missing" };
+      }
+      if (
+        challenge.emailNormalized !== input.emailNormalized ||
+        challenge.deliveryStatus === "pending"
+      ) {
         return { verified: false, reason: "challenge_missing" };
       }
       if (challenge.consumedAt || challenge.verifiedAt) {

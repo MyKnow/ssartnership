@@ -3,9 +3,15 @@ import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { isE2eMockMutationEnabled } from "@/lib/e2e-mutation-mode";
 import { sendMemberEmailVerificationCode } from "@/lib/member-email";
 import {
+  deleteMemberEmailVerificationChallenge,
+  markMemberEmailVerificationChallengeSent,
+  reserveMemberEmailVerificationChallenge,
+} from "@/lib/member-email-verification-challenge";
+import {
   generateMemberEmailVerificationCode,
   hashMemberEmailIdentifier,
   hashMemberEmailVerificationCode,
+  MEMBER_EMAIL_RESEND_COOLDOWN_SECONDS,
   MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS,
 } from "@/lib/member-email-verification";
 import {
@@ -118,21 +124,48 @@ export async function POST(request: Request) {
   }
 
   const code = generateMemberEmailVerificationCode();
+  const issuedAt = Date.now();
   const expiresAt = new Date(
-    Date.now() + MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS * 1_000,
+    issuedAt + MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS * 1_000,
   ).toISOString();
-  const { data: challenge, error: challengeError } = await supabase
-    .from("member_email_challenges")
-    .insert({
-      member_id: session.userId,
-      email_normalized: email,
-      purpose: "email_verify",
-      code_hash: hashMemberEmailVerificationCode(email, code),
-      expires_at: expiresAt,
-    })
-    .select("id")
-    .single();
-  if (challengeError || !challenge?.id) {
+  const resendAvailableAt = new Date(
+    issuedAt + MEMBER_EMAIL_RESEND_COOLDOWN_SECONDS * 1_000,
+  ).toISOString();
+  let challengeId: string;
+  try {
+    const reservation = await reserveMemberEmailVerificationChallenge({
+      memberId: session.userId,
+      emailNormalized: email,
+      codeHash: hashMemberEmailVerificationCode(email, code),
+      expiresAt,
+      resendAvailableAt,
+    });
+    if (!reservation.accepted) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_email_verification",
+        status: "blocked",
+        actorType: "member",
+        actorId: session.userId,
+        properties: { stage: "send", reason: "resend_cooldown" },
+      });
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "resend_cooldown",
+          message: "새 인증 코드는 잠시 후 다시 요청할 수 있습니다.",
+          retryAfterSeconds: reservation.retryAfterSeconds,
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(reservation.retryAfterSeconds),
+          },
+        },
+      );
+    }
+    challengeId = reservation.challengeId;
+  } catch {
     return NextResponse.json(
       {
         ok: false,
@@ -148,6 +181,7 @@ export async function POST(request: Request) {
     if (!isE2eMockMutationEnabled()) {
       await sendMemberEmailVerificationCode({ to: email, code });
     }
+    await markMemberEmailVerificationChallengeSent(challengeId);
     await logAuthSecurity({
       ...context,
       eventName: "member_email_verification",
@@ -158,14 +192,14 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({
       ok: true,
+      expiresAt,
       expiresInSeconds: MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS,
+      resendAvailableAt,
+      resendAvailableInSeconds: MEMBER_EMAIL_RESEND_COOLDOWN_SECONDS,
       ...(isE2eMockMutationEnabled() ? { testCode: code } : {}),
     });
   } catch {
-    await supabase
-      .from("member_email_challenges")
-      .delete()
-      .eq("id", challenge.id);
+    await deleteMemberEmailVerificationChallenge(challengeId).catch(() => {});
     await logAuthSecurity({
       ...context,
       eventName: "member_email_verification",

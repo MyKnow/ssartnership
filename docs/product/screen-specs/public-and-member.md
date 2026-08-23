@@ -86,11 +86,20 @@
 <!-- screen-contract: member.certification -->
 ## `/certification` — 내 인증
 
-- 목표·위계: 인증 유효 상태 → 구성원 이름/기수/캠퍼스 → QR·만료 → Apple Wallet 보조 인증 수단 → 계정 관리 순이다.
-- 액션·흐름: primary는 QR 제시 또는 갱신이다. 기존 필수 게이트를 통과한 15기 교육생·운영진은 보조 액션으로 Wallet 데이터 이용에 동의하고 `싸트너십 회원 인증` 패스를 추가·재발급·폐기할 수 있다. 사용자 메뉴에서 진입하고 원래 `returnTo`로 복귀할 수 있다.
+- 목표·위계: 인증 유효 상태 → 구성원 이름/기수/캠퍼스 → QR·만료 → Apple Wallet 보조 인증 수단 → Mattermost 동기화 → 로그인·복구 이메일 요약 → 계정 관리 순이다.
+- 액션·흐름: primary는 QR 제시 또는 갱신이다. 기존 필수 게이트를 통과한 15기 교육생·운영진은 보조 액션으로 Wallet 데이터 이용에 동의하고 `싸트너십 회원 인증` 패스를 추가·재발급·폐기할 수 있다. 로그인·복구 이메일은 상태와 별도 화면 진입 CTA만 표시하며 이 화면 안에서 이메일이나 인증 코드를 직접 입력하지 않는다. 사용자 메뉴에서 진입하고 원래 `returnTo`로 복귀할 수 있다.
 - 경계·상태: member session, 서버 발급 QR, Wallet pass repository의 현재 상태만 사용한다. 웹 QR의 유효·갱신 중·만료·발급 오류와 Wallet의 미발급·발급됨·회수됨·오류·설정 필요 상태를 제공한다. Wallet QR 검증은 pass 스냅샷이 아니라 현재 회원·필수 동의·사진·폐기 상태를 다시 확인한다.
 - 반응형·분석: QR은 모바일 현장 제시를 우선한다. Apple Wallet 상태 카드는 인증 카드 아래의 낮은 강조 surface로 두고 360px에서는 한 열과 full-width CTA, 820px 이상에서는 설명과 액션을 나눈다. 계정 변경·탈퇴 작업은 별도 surface로 유지한다. `certification_view`, `certification_refresh`, `wallet_pass_issue`, `wallet_pass_download`, `wallet_pass_revoke`를 서버 확인 결과 기준으로 기록한다.
 - 수용 기준: 화면 제목과 메뉴 용어가 모두 `내 인증`이고 QR token, Wallet public ID, Apple authentication token, device push token 원문을 analytics·오류 메시지에 남기지 않는다. 비밀번호 변경 → 필수 약관 동의 → 본인 사진 게이트 우선순위를 Wallet 발급·갱신 route도 우회하지 않는다.
+
+<!-- screen-contract: member.certification-email -->
+## `/certification/email` — 로그인·복구 이메일
+
+- 목표·위계: 이메일 용도 안내 → 이메일 입력 → 코드 전송 결과와 고정된 대상 이메일 → 10분 유효시간 → 인증 완료 순이다. MM과 이메일은 서로를 대체하는 전환 상태가 아니라 각자의 접근 여정을 위한 별도 인증 수단으로 설명한다.
+- 액션·흐름: primary는 인증 코드 전송과 인증 완료다. 코드를 보낸 뒤에는 대상 이메일을 일반 입력으로 수정할 수 없고 `다른 이메일 입력`을 명시적으로 선택해야 한다. 재전송은 전송 성공 후 60초 동안 비활성화하고 남은 시간을 표시한다. 완료하면 정제된 `returnTo`로 복귀한다.
+- 경계·상태: member session과 서버의 이메일 중복·예약 식별자·발급 제한을 사용한다. 기본, 입력 검증 오류, 전송 중, 코드 입력, 코드 만료, 재전송 대기, 서버 오류, 완료 상태를 제공한다. 회원별 최신 `email_verify` challenge만 유효하고 메일 전송 완료로 표시되지 않은 challenge는 인증할 수 없다.
+- 반응형·분석: 360px에서는 한 열과 full-width CTA를 사용하고 이메일 및 오류 문구가 수평 overflow를 만들지 않는다. 인증 코드 유효시간은 `mm:ss`, 재전송 대기시간은 남은 초 단위로 실시간 갱신하며 보조기술에도 timer로 전달한다. 이메일 원문과 인증 코드는 analytics·활동 로그에 남기지 않는다.
+- 수용 기준: 전송 후 이메일이 고정되고, 10분이 지나면 인증 버튼이 비활성화되며, 60초 전에는 UI와 서버 모두 재전송을 거절한다. 새 코드를 발급하면 이전 이메일·이전 코드가 즉시 무효화되고, 성공 후 내 인증 화면에는 인증된 이메일 상태만 요약해서 표시한다.
 
 <!-- screen-contract: member.coupons -->
 ## `/coupons` — 내 쿠폰

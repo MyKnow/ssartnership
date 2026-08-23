@@ -56,6 +56,14 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["public.certification.qr-valid"],
   },
   {
+    routePath: "/certification/email",
+    surface: "public",
+    authScope: "member",
+    viewComponent: "MemberEmailVerificationView",
+    dataSources: ["api-route", "service", "storybook"],
+    requiredScenarioIds: ["public.certification.qr-valid"],
+  },
+  {
     routePath: "/certification/photo",
     surface: "public",
     authScope: "member",
@@ -693,6 +701,11 @@ const routeContracts: Record<string, RouteContractDefinition> = {
     routeKind: "canonical",
     screenContractId: "member.certification",
     primaryTask: "내 SSAFY 구성원 인증 상태와 QR을 제시한다.",
+  },
+  "/certification/email": {
+    routeKind: "canonical",
+    screenContractId: "member.certification-email",
+    primaryTask: "로그인과 비밀번호 재설정에 사용할 이메일을 인증한다.",
   },
   "/certification/photo": {
     routeKind: "canonical",

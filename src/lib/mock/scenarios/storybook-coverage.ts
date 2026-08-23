@@ -177,6 +177,83 @@ const mockStorybookScenarioCoverageBase = [
     viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
   },
   {
+    routePath: "/certification/email",
+    scenarioId: "public.certification.qr-valid",
+    storyId: "screens-member-memberemailverificationview--unverified",
+    storyFile:
+      "src/components/certification/MemberEmailVerificationView.stories.tsx",
+    renderKind: "actual-view",
+    actualViewComponent: "MemberEmailVerificationView",
+    coveredStateKeys: ["default", "mobile-overflow"],
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
+  {
+    routePath: "/certification/email",
+    scenarioId: "public.certification.qr-valid",
+    storyId: "screens-member-memberemailverificationview--long-korean",
+    storyFile:
+      "src/components/certification/MemberEmailVerificationView.stories.tsx",
+    renderKind: "actual-view",
+    actualViewComponent: "MemberEmailVerificationView",
+    coveredStateKeys: ["long-korean"],
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
+  {
+    routePath: "/certification/email",
+    scenarioId: "public.certification.qr-valid",
+    storyId: "screens-member-memberemailverificationview--verified",
+    storyFile:
+      "src/components/certification/MemberEmailVerificationView.stories.tsx",
+    renderKind: "actual-view",
+    actualViewComponent: "MemberEmailVerificationView",
+    coveredStateKeys: ["success"],
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
+  {
+    routePath: "/certification/email",
+    scenarioId: "public.certification.qr-valid",
+    storyId: "screens-member-memberemailverificationview--code-sent",
+    storyFile:
+      "src/components/certification/MemberEmailVerificationView.stories.tsx",
+    renderKind: "actual-view",
+    actualViewComponent: "MemberEmailVerificationView",
+    coveredStateKeys: ["pending", "async-pending"],
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
+  {
+    routePath: "/certification/email",
+    scenarioId: "public.certification.qr-valid",
+    storyId: "screens-member-memberemailverificationview--validation-error",
+    storyFile:
+      "src/components/certification/MemberEmailVerificationView.stories.tsx",
+    renderKind: "actual-view",
+    actualViewComponent: "MemberEmailVerificationView",
+    coveredStateKeys: ["validation-error"],
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
+  {
+    routePath: "/certification/email",
+    scenarioId: "public.certification.qr-valid",
+    storyId: "screens-member-memberemailverificationview--expired",
+    storyFile:
+      "src/components/certification/MemberEmailVerificationView.stories.tsx",
+    renderKind: "actual-view",
+    actualViewComponent: "MemberEmailVerificationView",
+    coveredStateKeys: ["expired"],
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
+  {
+    routePath: "/certification/email",
+    scenarioId: "public.certification.qr-valid",
+    storyId: "screens-member-memberemailverificationview--server-error",
+    storyFile:
+      "src/components/certification/MemberEmailVerificationView.stories.tsx",
+    renderKind: "actual-view",
+    actualViewComponent: "MemberEmailVerificationView",
+    coveredStateKeys: ["error"],
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
+  {
     routePath: "/certification",
     scenarioId: "public.certification.qr-valid",
     storyId: "components-certification-applewalletpasscard--not-issued",
