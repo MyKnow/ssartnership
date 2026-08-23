@@ -254,3 +254,23 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
     /force:\s*true|waitForTimeout|retry/,
   );
 });
+
+test("Mattermost signup E2E waits for its finite form readiness instead of global network idle", async () => {
+  const authOperations = await readFile(
+    new URL("./e2e/auth-ops.spec.ts", import.meta.url),
+    "utf8",
+  );
+  const mattermostSignupTest = authOperations.match(
+    /test\("Mattermost 가입 인증은 5분 타이머를 표시하고 기존 회원은 로그인으로 안내한다",[\s\S]*?\n  \}\);/,
+  )?.[0];
+
+  assert.ok(mattermostSignupTest);
+  assert.match(
+    mattermostSignupTest,
+    /await page\.goto\("\/auth\/signup"\);[\s\S]*?await expect\(generationOption\)\.toBeAttached\(\);/,
+  );
+  assert.doesNotMatch(
+    mattermostSignupTest,
+    /waitForLoadState\("networkidle"\)|waitForTimeout|test\.slow|test\.setTimeout|\bretries?\b/,
+  );
+});
