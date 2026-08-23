@@ -1,5 +1,5 @@
-import { CertificationPageSkeleton } from "@/components/loading/SitePageSkeletons";
+import { MemberEmailVerificationPageSkeleton } from "@/components/loading/SitePageSkeletons";
 
 export default function CertificationEmailLoading() {
-  return <CertificationPageSkeleton />;
+  return <MemberEmailVerificationPageSkeleton />;
 }

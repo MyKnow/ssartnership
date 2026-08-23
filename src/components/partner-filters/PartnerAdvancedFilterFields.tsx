@@ -22,6 +22,7 @@ export default function PartnerAdvancedFilterFields({
   onSortChange,
   layout = "toolbar",
   testIdSuffix = "",
+  includeSort = true,
 }: {
   campusFilter: CampusSlug | "all";
   onCampusFilterChange: (value: CampusSlug | "all") => void;
@@ -31,6 +32,7 @@ export default function PartnerAdvancedFilterFields({
   onSortChange: (value: PartnerSortOption) => void;
   layout?: "toolbar" | "sidebar";
   testIdSuffix?: string;
+  includeSort?: boolean;
 }) {
   return (
     <div
@@ -74,22 +76,24 @@ export default function PartnerAdvancedFilterFields({
           ))}
         </Select>
       </label>
-      <label className="flex min-w-0 flex-col gap-1.5">
-        <span className="ui-caption">정렬</span>
-        <Select
-          value={sortValue}
-          onChange={(event) =>
-            onSortChange(event.target.value as PartnerSortOption)
-          }
-          data-testid={`partner-sort-select${testIdSuffix}`}
-        >
-          {partnerSortOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </Select>
-      </label>
+      {includeSort ? (
+        <label className="flex min-w-0 flex-col gap-1.5">
+          <span className="ui-caption">정렬</span>
+          <Select
+            value={sortValue}
+            onChange={(event) =>
+              onSortChange(event.target.value as PartnerSortOption)
+            }
+            data-testid={`partner-sort-select${testIdSuffix}`}
+          >
+            {partnerSortOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </label>
+      ) : null}
     </div>
   );
 }

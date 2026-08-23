@@ -121,25 +121,54 @@ export default function PartnerActiveFilters({
     return null;
   }
 
+  const mobileActiveFilters = activeFilters.filter(
+    (filter) =>
+      filter.key !== "search" &&
+      filter.key !== "category" &&
+      filter.key !== "sort",
+  );
+
   return (
-    <div
-      className="flex min-w-0 flex-wrap items-center gap-2"
-      data-testid="partner-active-filters"
-      aria-label="적용된 필터"
-    >
-      <span className="ui-caption mr-0.5">적용 중</span>
-      {activeFilters.map((filter) => (
-        <button
-          key={filter.key}
-          type="button"
-          onClick={filter.onClear}
-          className="inline-flex min-h-10 max-w-full items-center gap-1.5 rounded-full border border-primary/20 bg-primary-soft px-3 text-xs font-semibold text-primary transition-interactive hover:border-primary/35 hover:bg-primary-soft/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-          aria-label={filter.ariaLabel}
+    <>
+      {mobileActiveFilters.length > 0 ? (
+        <div
+          className="flex min-w-0 flex-wrap items-center gap-2 min-[840px]:hidden"
+          data-testid="partner-active-filters"
+          aria-label="적용된 상세 필터"
         >
-          <span className="max-w-56 truncate">{filter.label}</span>
-          <XMarkIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-        </button>
-      ))}
-    </div>
+          {mobileActiveFilters.map((filter) => (
+            <button
+              key={filter.key}
+              type="button"
+              onClick={filter.onClear}
+              className="inline-flex min-h-10 max-w-full items-center gap-1.5 rounded-full border border-primary/20 bg-primary-soft px-3 text-xs font-semibold text-primary transition-interactive hover:border-primary/35 hover:bg-primary-soft/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+              aria-label={filter.ariaLabel}
+            >
+              <span className="max-w-56 truncate">{filter.label}</span>
+              <XMarkIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <div
+        className="hidden min-w-0 flex-wrap items-center gap-2 min-[840px]:flex"
+        data-testid="partner-active-filters"
+        aria-label="적용된 필터"
+      >
+        <span className="ui-caption mr-0.5">적용 중</span>
+        {activeFilters.map((filter) => (
+          <button
+            key={filter.key}
+            type="button"
+            onClick={filter.onClear}
+            className="inline-flex min-h-10 max-w-full items-center gap-1.5 rounded-full border border-primary/20 bg-primary-soft px-3 text-xs font-semibold text-primary transition-interactive hover:border-primary/35 hover:bg-primary-soft/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+            aria-label={filter.ariaLabel}
+          >
+            <span className="max-w-56 truncate">{filter.label}</span>
+            <XMarkIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          </button>
+        ))}
+      </div>
+    </>
   );
 }

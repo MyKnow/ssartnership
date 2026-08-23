@@ -51,11 +51,11 @@ export default async function CertificationEmailPage({
         <Container className="pb-16 pt-10">
           <div className="mx-auto w-full max-w-2xl space-y-6">
             <PageHeader
-              eyebrow="Member"
               title="로그인·복구 이메일"
-              description="MM 사용 여부와 별개로, 계정 접근과 비밀번호 재설정에 사용할 이메일을 인증합니다."
+              description="로그인과 비밀번호 재설정에 사용할 이메일을 인증합니다."
               backHref={completionHref}
-              backLabel="내 인증으로 돌아가기"
+              backLabel="이전 화면으로 돌아가기"
+              className="border-b-0"
             />
             <MemberEmailVerificationView
               initialEmail={member.email}

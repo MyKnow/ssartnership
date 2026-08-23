@@ -62,6 +62,8 @@ test("표준 개발 명령과 교차 플랫폼 정책이 repository contract에 
   const developmentEnvironment = await readRepoFile(
     "scripts/lib/development-environment.mjs",
   );
+  const bootstrap = await readRepoFile("scripts/bootstrap.mjs");
+  const vercelWrapper = await readRepoFile("scripts/vercel-ssartnership.mjs");
   const lockfileCheck = await readRepoFile("scripts/check-lockfile.mjs");
 
   assert.equal(packageJson.packageManager, "npm@11.16.0");
@@ -76,6 +78,12 @@ test("표준 개발 명령과 교차 플랫폼 정책이 repository contract에 
     developmentEnvironment,
     /DEPLOYMENT_NODE_VERSION_RANGE = ">=24\.18\.1 <25"/u,
   );
+  assert.match(developmentEnvironment, /const ENV_FILES = \["\.env"\]/u);
+  assert.doesNotMatch(developmentEnvironment, /"\.env\.local"/u);
+  assert.match(bootstrap, /join\(repositoryRoot, "\.env"\)/u);
+  assert.doesNotMatch(bootstrap, /"\.env\.local"/u);
+  assert.match(vercelWrapper, /const ENV_FILES = \["\.env"\]/u);
+  assert.doesNotMatch(vercelWrapper, /"\.env\.local"/u);
   assert.equal(scripts.bootstrap, "node scripts/bootstrap.mjs");
   assert.equal(scripts.doctor, "node scripts/doctor.mjs");
   assert.equal(scripts.dev, "node scripts/dev.mjs");

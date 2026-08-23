@@ -13,7 +13,7 @@
 | 제휴 상세 | `/partners/[id]`, `_page/*` | visibility, benefit visibility, period, contacts, coupons, reviews |
 | 프로모션 | `PromotionCarousel`, `promotions/events.ts` | authenticated/year/campus audience |
 | 공유/연락 | `ShareLinkButton`, `ContactCopyRow`, detail contact section | map/reservation/inquiry/benefit action links |
-| PWA 설치/스크롤 | `PwaProvider`, `PwaInstallButton`, `ScrollToTopFab`, manifest | standalone display, viewport fit |
+| PWA 설치 | `PwaProvider`, `PwaInstallButton`, manifest | standalone display, viewport fit |
 
 ## Authentication/member
 
@@ -29,6 +29,7 @@
 | 프로필 동기화 | `/api/mm/profile-sync`, cron member sync | 최신 Mattermost ID, 표시명/username/사진만 갱신 |
 | 회원 탈퇴/삭제 | `/api/mm/delete` | session and member cleanup |
 | 인증 카드 | `/certification`, `CertificationView`, `certification-qr.ts` | QR token, avatar route |
+| 회원 계정 설정 | `/settings`, `MemberSettingsView`, `CertificationSettingsList` | MM 프로필 동기화, 로그인·복구 이메일, 사진·비밀번호, 탈퇴 |
 | Apple Wallet 회원 패스 | `/api/wallet/apple/pass`, `/api/wallet/apple/v1/**`, `/wallet/verify/[token]` | [MVP 제품 계약](../product/apple-wallet-member-pass-mvp.md), `.pkpass` 발급/폐기, 공개 실시간 검증, Apple device registration/APNs 갱신 |
 
 ## Admin operations

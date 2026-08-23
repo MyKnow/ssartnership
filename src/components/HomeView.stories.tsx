@@ -1,6 +1,7 @@
 "use client";
 
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, userEvent, within } from "storybook/test";
 import HomeView from "@/components/HomeView";
 import HomeDirectoryError from "@/components/home-view/HomeDirectoryError";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -73,6 +74,28 @@ export const Empty: Story = {
 
 export const Many: Story = {
   args: { partners: Array.from({ length: 18 }, (_, index) => createPartner(index + 1)) },
+};
+
+export const MobileAdvancedFilters: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      canvas.getByRole("button", { name: "상세 필터 열기" }),
+    );
+
+    const body = within(document.body);
+    const dialog = body.getByRole("dialog", { name: "필터" });
+    await expect(dialog).toBeVisible();
+    await userEvent.selectOptions(
+      body.getByTestId("partner-campus-filter-mobile"),
+      "seoul",
+    );
+    await userEvent.click(body.getByRole("button", { name: "결과 보기" }));
+
+    await expect(
+      body.queryByRole("dialog", { name: "필터" }),
+    ).not.toBeInTheDocument();
+  },
 };
 
 export const LongKorean: Story = {

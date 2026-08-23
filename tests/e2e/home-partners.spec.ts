@@ -304,9 +304,7 @@ test.describe("public partner discovery", () => {
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
 
-  test("keeps the scroll-to-top action above the mobile detail action bar", async ({
-    page,
-  }) => {
+  test("does not render a scroll-to-top FAB on mobile partner detail", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/#benefits");
 
@@ -314,22 +312,9 @@ test.describe("public partner discovery", () => {
     await expect(card).toBeVisible();
     await card.getByRole("link", { name: /상세 보기/ }).first().click();
 
-    const actionBar = page.locator("[data-partner-detail-mobile-action-bar]");
-    await expect(actionBar).toBeVisible();
+    await expect(page.locator("[data-partner-detail-mobile-action-bar]")).toBeVisible();
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-
-    const scrollToTop = page.getByRole("button", { name: "맨 위로 이동" });
-    await expect(scrollToTop).toBeVisible();
-
-    const actionBarBox = await actionBar.boundingBox();
-    const scrollToTopBox = await scrollToTop.boundingBox();
-    expect(actionBarBox).not.toBeNull();
-    expect(scrollToTopBox).not.toBeNull();
-    if (actionBarBox && scrollToTopBox) {
-      expect(scrollToTopBox.y + scrollToTopBox.height + 8).toBeLessThanOrEqual(
-        actionBarBox.y,
-      );
-    }
+    await expect(page.getByRole("button", { name: "맨 위로 이동" })).toHaveCount(0);
   });
 
   test("filters partners by search keyword and shows an empty state", async ({ page }) => {

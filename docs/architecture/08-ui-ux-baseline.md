@@ -37,13 +37,12 @@
 - `RouteScrollManager`는 route 전환 시 scroll 동작을 관리한다.
 - `ThemeProvider`, `ThemeToggle`, `ThemeModeButtons`는 light/dark mode를 관리한다.
 - `PwaProvider`, `PwaInstallButton`은 install prompt를 관리한다.
-- `ScrollToTopFab`은 긴 목록/상세 페이지 보조 동작이다.
 
 public header는 브랜드와 계정·알림·쿠폰·테마·전체 메뉴처럼 전역 동작만 담당하며 홈 내부 section으로 이동하는 1차 메뉴를 중복 제공하지 않는다. `내 인증`, 쿠폰, 알림, 계정은 인증 사용자 메뉴에 둔다. 파트너 모바일 1차 메뉴는 `홈`, `제휴처`, `알림`, `더보기` 네 개이며 데스크톱 sidebar는 같은 목적지를 펼친다.
 
 ## Public UI composition
 
-- 홈: `PromotionCarousel`, `HomePushOptInBannerGate`, `HomeContent`, `HomeView`.
+- 홈: `PromotionCarousel`, `HomeContent`, `HomeView`.
 - 목록: `CategoryTabs`, `PartnerFilters`, `PartnerCardView`, `PartnerAudienceChips`, `PartnerValueBadge`.
 - 상세: `PartnerImageCarousel`, detail `_page/*` components, `PartnerDetailCoupons`, `PartnerDetailReviews`.
 - 리뷰: `PartnerReviewSection`, `PartnerReviewCard`, `PartnerReviewForm`, `PartnerReviewSummaryCard`, `ReviewStarsInput`, review media uploader/crop modal.

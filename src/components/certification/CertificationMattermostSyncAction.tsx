@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import Button from "@/components/ui/Button";
-import Surface from "@/components/ui/Surface";
+import { ArrowPathRoundedSquareIcon } from "@heroicons/react/24/outline";
+import { CertificationSettingRow } from "@/components/certification/CertificationSettingsList";
 import { useToast } from "@/components/ui/Toast";
 import { buildMemberGateHref } from "@/lib/member-required-gates";
 
@@ -75,26 +75,13 @@ export default function CertificationMattermostSyncAction() {
   };
 
   return (
-    <Surface
-      level="inset"
-      padding="lg"
-      className="flex w-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
-    >
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-foreground">Mattermost 프로필</p>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          MM에서 변경한 이름, MM 아이디, 트랙, 프로필 사진을 지금 바로 반영합니다.
-        </p>
-      </div>
-      <Button
-        variant="secondary"
-        className="w-full shrink-0 sm:w-auto"
-        loading={syncing}
-        loadingText="동기화 중"
-        onClick={syncProfile}
-      >
-        MM 프로필 동기화
-      </Button>
-    </Surface>
+    <CertificationSettingRow
+      icon={<ArrowPathRoundedSquareIcon className="h-5 w-5" />}
+      title="Mattermost 프로필 동기화"
+      description="MM에서 현재 이름, 아이디, 트랙, 프로필 사진을 가져옵니다."
+      loading={syncing}
+      loadingLabel="동기화 중"
+      onClick={syncProfile}
+    />
   );
 }

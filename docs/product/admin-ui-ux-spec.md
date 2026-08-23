@@ -57,7 +57,7 @@
 ### Shell 계약
 
 - 데스크톱은 `AdminShell`의 고정 좌측 navigation과 상단 utility bar를 사용한다. 중간 폭에서는 아이콘 rail, 넓은 화면에서는 그룹명·라벨·설명이 있는 확장 rail을 사용한다.
-- 모바일은 고정 헤더의 빠른 찾기·테마 전환, 하단의 `홈·작업함·회원·더보기` 탐색, 권한 기반 drawer navigation을 함께 사용한다. 현재 화면의 title과 back context는 drawer에서 확인할 수 있어야 한다. 하단 탐색은 최소 44px touch target과 safe area를 보장하며, scroll-to-top 같은 floating action은 그 위에 배치한다.
+- 모바일은 고정 헤더의 빠른 찾기·테마 전환, 하단의 `홈·작업함·회원·더보기` 탐색, 권한 기반 drawer navigation을 함께 사용한다. 현재 화면의 title과 back context는 drawer에서 확인할 수 있어야 한다. 하단 탐색은 최소 44px touch target과 safe area를 보장한다.
 - desktop과 mobile 헤더는 `빠른 찾기`를 제공한다. `⌘K` 또는 `Ctrl+K`로 권한 내 navigation label·설명을 검색하고, 선택하면 그 목적지로 이동한다. dialog는 focus trap, Escape, overlay close, opener focus return, 기존 body overflow 복원을 보장한다.
 - shell은 위치·권한 내비게이션·전역 utility만 담당한다. 각 page는 의미상 `h1` 하나, 사용자 과업을 수행하는 primary CTA 하나를 가진 `PageHeader`를 렌더한다. shell title을 페이지 `h1`으로 반복하지 않는다.
 - breadcrumb는 `관리 홈 → 현재 영역`까지만 표시한다. 상세 편집 화면은 목록 query를 보존하는 `목록으로` 보조 이동을 제공한다.

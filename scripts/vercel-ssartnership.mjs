@@ -11,7 +11,7 @@ const REQUIRED_ENV = [
 
 const BLOCKED_ARGS = new Set(["link", "project"]);
 const BLOCKED_FLAGS = new Set(["--token", "-t", "--scope", "-S"]);
-const ENV_FILES = [".env", ".env.local", ".env.development.local"];
+const ENV_FILES = [".env"];
 const VERCEL_CLI_PACKAGE = "vercel@54.14.2";
 
 function parseEnvLine(line) {
@@ -77,7 +77,7 @@ for (const arg of args) {
 const missing = REQUIRED_ENV.filter((key) => !process.env[key]?.trim());
 if (missing.length > 0) {
   fail(
-    `missing ${missing.join(", ")}. Store the ssartnership account token and project IDs in a gitignored env file.`,
+    `missing ${missing.join(", ")}. Store the ssartnership account token and project IDs in the gitignored .env file.`,
   );
 }
 

@@ -18,8 +18,8 @@ import PartnerActiveFilters from "@/components/partner-filters/PartnerActiveFilt
 import PartnerDirectoryToolbar from "@/components/partner-filters/PartnerDirectoryToolbar";
 import MotionReveal from "@/components/ui/MotionReveal";
 import PartnerCardView from "@/components/PartnerCardView";
-import SectionHeading from "@/components/ui/SectionHeading";
 import EmptyState from "@/components/ui/EmptyState";
+import HomeDirectorySectionHeader from "@/components/home-view/HomeDirectorySectionHeader";
 import { cn } from "@/lib/cn";
 import { HOME_COPY } from "@/lib/content";
 import { trackProductEvent } from "@/lib/product-events";
@@ -213,6 +213,26 @@ export default function HomeView({
   }, [notify]);
 
   useEffect(() => {
+    if (window.location.hash !== "#benefit-search") {
+      return;
+    }
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      const searchInput = document.querySelector<HTMLInputElement>(
+        "[data-testid='partner-search-input']",
+      );
+      if (!searchInput) {
+        return;
+      }
+
+      searchInput.scrollIntoView({ block: "center" });
+      searchInput.focus({ preventScroll: true });
+    });
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, []);
+
+  useEffect(() => {
     const missingPartnerIds = displayPartnerIds.filter(
       (partnerId) => !loadedPartnerStateIdSet.has(partnerId),
     );
@@ -404,13 +424,8 @@ export default function HomeView({
 
   return (
     <MotionReveal delay={0.04}>
-      <section id="benefits" className="flex scroll-mt-24 flex-col gap-6 pt-10">
-        <SectionHeading
-          eyebrow="Directory"
-          title={HOME_COPY.categoryTitle}
-          description={HOME_COPY.categoryDescription}
-          headingLevel="h2"
-        />
+      <section id="benefits" className="flex scroll-mt-24 flex-col gap-4 pt-7">
+        <HomeDirectorySectionHeader />
         <div className="grid min-w-0 gap-6 min-[840px]:grid-cols-[minmax(15rem,17rem)_minmax(0,1fr)] min-[840px]:items-start min-[1200px]:grid-cols-[18rem_minmax(0,1fr)]">
           <div
             className="min-w-0 min-[840px]:sticky min-[840px]:top-24 min-[840px]:self-start"
@@ -455,6 +470,8 @@ export default function HomeView({
               resultCount={directoryResultCount}
               viewMode={viewMode}
               onViewModeChange={handleViewModeChange}
+              sortValue={sortValue}
+              onSortChange={handleSortChange}
             />
           {displayPartners.length === 0 ? (
             <div data-testid="partner-no-results">

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import HomeContent from "@/components/HomeContent";
-import HomePushOptInBannerGate from "@/components/HomePushOptInBannerGate";
 import PromotionCarousel from "@/components/promotions/PromotionCarousel";
 import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
@@ -110,15 +109,17 @@ export default async function Home() {
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
       <main>
-        <Container className="pb-16 pt-10" size="wide">
+        <Container className="pb-16 pt-0" size="wide">
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
           />
-          <PromotionCarousel slides={resolvedPromotionSlides} headingLevel="h1" className="mt-0" />
-          <Suspense fallback={null}>
-            <HomePushOptInBannerGate memberId={session?.userId ?? null} />
-          </Suspense>
+          <PromotionCarousel
+            slides={resolvedPromotionSlides}
+            headingLevel="h1"
+            fullBleed
+            className="mt-0"
+          />
           <Suspense fallback={<HomePartnerExploreSkeleton />}>
             <HomeContent
               viewerAuthenticated={Boolean(session?.userId)}

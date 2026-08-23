@@ -112,6 +112,22 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["public.notifications.default"],
   },
   {
+    routePath: "/settings",
+    surface: "public",
+    authScope: "member",
+    viewComponent: "MemberSettingsView",
+    dataSources: ["service", "storybook"],
+    requiredScenarioIds: ["public.certification.qr-valid"],
+  },
+  {
+    routePath: "/settings/delete-account",
+    surface: "public",
+    authScope: "member",
+    viewComponent: "MemberAccountDeletionView",
+    dataSources: ["api-route", "storybook"],
+    requiredScenarioIds: ["public.certification.qr-valid"],
+  },
+  {
     routePath: "/partner-registration",
     surface: "public",
     authScope: "public",
@@ -736,6 +752,16 @@ const routeContracts: Record<string, RouteContractDefinition> = {
     routeKind: "canonical",
     screenContractId: "member.notifications",
     primaryTask: "내 알림을 확인하고 읽음 상태를 관리한다.",
+  },
+  "/settings": {
+    routeKind: "canonical",
+    screenContractId: "member.settings",
+    primaryTask: "계정 연결 정보와 로그인 보안을 관리한다.",
+  },
+  "/settings/delete-account": {
+    routeKind: "canonical",
+    screenContractId: "member.account-deletion",
+    primaryTask: "탈퇴에 따른 영향을 확인하고 최종 탈퇴 요청을 진행한다.",
   },
   "/partner-registration": {
     routeKind: "canonical",

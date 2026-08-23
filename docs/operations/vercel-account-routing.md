@@ -4,7 +4,7 @@
 
 ## Required Local Env
 
-Store these values in a gitignored env file such as `.env.local` or the existing local `.env`:
+Store these values in the single gitignored local `.env` file. Keep `.env.example` limited to variable names and non-secret examples:
 
 ```bash
 SSARTNERSHIP_VERCEL_TOKEN=vercel_token_for_the_ssartnership_account
@@ -20,11 +20,11 @@ Run Vercel commands through the project wrapper:
 
 ```bash
 node scripts/vercel-ssartnership.mjs env ls production
-node scripts/vercel-ssartnership.mjs env pull .env.production.local --environment=production --yes
+node scripts/vercel-ssartnership.mjs env ls preview
 node scripts/vercel-ssartnership.mjs deploy --prod
 ```
 
-The wrapper loads local env files, injects `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, and a child-process-only `VERCEL_TOKEN` for the Vercel CLI. It blocks `vercel link`, `vercel project`, `--scope`, and manual `--token` arguments so the command cannot silently fall back to another account.
+The wrapper loads only `.env`, injects `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, and a child-process-only `VERCEL_TOKEN` for the Vercel CLI. It blocks `vercel link`, `vercel project`, `--scope`, and manual `--token` arguments so the command cannot silently fall back to another account.
 
 ## Recovery
 

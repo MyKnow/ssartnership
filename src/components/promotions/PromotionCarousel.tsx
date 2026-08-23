@@ -22,10 +22,12 @@ function isRemoteImageSrc(src: string) {
 export default function PromotionCarousel({
   slides,
   headingLevel = "h2",
+  fullBleed = false,
   className,
 }: {
   slides: PromotionSlide[];
   headingLevel?: "h1" | "h2";
+  fullBleed?: boolean;
   className?: string;
 }) {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -99,31 +101,28 @@ export default function PromotionCarousel({
   return (
     <section
       id="events"
-      className={cn("relative mt-5 scroll-mt-24", className)}
+      className={cn(
+        "relative scroll-mt-24",
+        fullBleed
+          ? "left-1/2 mt-0 w-screen -translate-x-1/2"
+          : "mt-5",
+        className,
+      )}
       aria-roledescription="carousel"
       aria-label="광고 캐러셀"
     >
-      <div className="mb-4 grid min-w-0 gap-3 px-1">
-        <div className="min-w-0 space-y-1.5">
-          <Heading className="text-ko-title text-2xl font-semibold tracking-[-0.03em] text-foreground sm:text-3xl">
-            {activeSlide.title}
-          </Heading>
-          <p className="text-ko-pretty max-w-2xl text-sm leading-6 text-muted-foreground">
-            {activeSlide.description}
-          </p>
-        </div>
-      </div>
+      <Heading className="sr-only">{activeSlide.title}</Heading>
 
       <div className="relative">
         <div
           ref={scrollerRef}
-          className="flex min-w-0 snap-x snap-mandatory overflow-x-auto rounded-overlay [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex min-w-0 snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {slides.map((slide, index) => (
             <Link
               key={slide.id}
               href={slide.href}
-              className="block min-w-full snap-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="block min-w-full snap-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
               aria-label={slide.title}
               onClick={() =>
                 trackProductEvent({
@@ -140,7 +139,7 @@ export default function PromotionCarousel({
             >
               <div
                 data-promotion-carousel-media
-                className="relative mx-auto aspect-[21/9] w-full max-h-none max-w-none overflow-hidden rounded-overlay border border-border/70 bg-surface-muted shadow-raised md:max-h-[20rem] md:max-w-[46.6667rem] lg:max-h-[28rem] lg:max-w-[65.3333rem]"
+                className="relative aspect-[21/9] w-full overflow-hidden bg-surface-muted"
               >
                 {slide.sponsorLabel ? (
                   <span className="absolute left-3 top-3 z-10 rounded-full border border-white/25 bg-black/70 px-3 py-1.5 text-xs font-semibold text-white shadow-flat backdrop-blur-md">
@@ -160,7 +159,11 @@ export default function PromotionCarousel({
                     src={slide.imageSrc}
                     alt={slide.imageAlt}
                     fill
-                    sizes="(min-width: 1280px) 1084px, calc(100vw - 32px)"
+                    sizes={
+                      fullBleed
+                        ? "100vw"
+                        : "(min-width: 1024px) 50vw, calc(100vw - 64px)"
+                    }
                     priority={index === 0}
                     unoptimized={isRemoteImageSrc(slide.imageSrc)}
                     className="object-cover"

@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   buildLocalDevelopmentEnv,
   classifyPlatform,
+  getUnexpectedProjectEnvironmentFiles,
   parseEnvFile,
   resolveNpmCliPath,
   validateEnvironment,
@@ -39,6 +40,20 @@ test("CRLF와 따옴표를 포함한 env 파일을 OS와 무관하게 읽는다"
       QUOTED: "hello world",
       EMPTY: "",
     },
+  );
+});
+
+test("프로젝트 루트 환경 파일은 .env와 .env.example만 허용한다", () => {
+  assert.deepEqual(
+    getUnexpectedProjectEnvironmentFiles([
+      ".env",
+      ".env.example",
+      ".env.local",
+      ".env.development",
+      ".env.development.local",
+      "README.md",
+    ]),
+    [".env.development", ".env.development.local", ".env.local"],
   );
 });
 
@@ -95,6 +110,25 @@ test("개발 mock profile은 필수 변수와 형식을 함께 검증한다", ()
         item.code === "environment_required" &&
         item.subject === "NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE",
     ),
+  );
+});
+
+test("외부 제공자가 정하는 SMTP 비밀번호 길이는 애플리케이션 secret 규칙으로 거부하지 않는다", () => {
+  const diagnostics = validateEnvironment({
+    NODE_ENV: "development",
+    NEXT_PUBLIC_DATA_SOURCE: "mock",
+    NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE: "mock",
+    MOCK_MEMBER_AUTH: "1",
+    SMTP_PASS: "provider-password",
+  });
+
+  assert.equal(
+    diagnostics.some(
+      (item) =>
+        item.code === "environment_secret_too_short" &&
+        item.subject === "SMTP_PASS",
+    ),
+    false,
   );
 });
 
