@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 import Button from "./Button";
 import Modal from "./Modal";
 
@@ -37,7 +38,7 @@ function ModalDemo({
           </p>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>
-              닫기
+              취소
             </Button>
             <Button onClick={() => setOpen(false)}>확인</Button>
           </div>
@@ -60,7 +61,18 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  play: async () => {
+    const body = within(document.body);
+    const closeButton = await body.findByRole("button", { name: "모달 닫기" });
+
+    await expect(closeButton).toHaveClass("rounded-full");
+    await expect(closeButton).toHaveTextContent("");
+    await waitFor(() => expect(closeButton).toHaveFocus());
+    await userEvent.click(closeButton);
+    await expect(body.queryByRole("dialog")).not.toBeInTheDocument();
+  },
+};
 
 export const DenseBody: Story = {
   args: {
