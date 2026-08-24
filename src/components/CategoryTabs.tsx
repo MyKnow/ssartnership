@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import type { CategoryKey } from "@/lib/types";
 import { cn } from "@/lib/cn";
 
@@ -21,39 +20,14 @@ export default function CategoryTabs({
   onChange: (key: CategoryKey | "all") => void;
   layout?: "scroll" | "responsive";
 }) {
-  const categoryButtonRefs = useRef(
-    new Map<CategoryKey | "all", HTMLButtonElement>(),
-  );
-
-  useEffect(() => {
-    if (
-      layout !== "responsive" ||
-      !window.matchMedia("(max-width: 839px)").matches
-    ) {
-      return;
-    }
-
-    const activeButton = categoryButtonRefs.current.get(activeKey);
-    if (!activeButton) {
-      return;
-    }
-
-    activeButton.scrollIntoView({
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? "auto"
-        : "smooth",
-      block: "nearest",
-      inline: "center",
-    });
-  }, [activeKey, layout]);
-
   return (
     <div className="relative min-w-0">
       <div
         className={cn(
-          "-mx-1 flex min-w-0 snap-x gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-          layout === "responsive" &&
-            "min-[840px]:mx-0 min-[840px]:flex-wrap min-[840px]:overflow-visible min-[840px]:px-0",
+          "flex min-w-0 gap-2",
+          layout === "scroll"
+            ? "-mx-1 snap-x overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            : "flex-wrap",
         )}
         role="group"
         aria-label="제휴처 카테고리"
@@ -63,13 +37,6 @@ export default function CategoryTabs({
           return (
             <button
               key={option.key}
-              ref={(element) => {
-                if (element) {
-                  categoryButtonRefs.current.set(option.key, element);
-                } else {
-                  categoryButtonRefs.current.delete(option.key);
-                }
-              }}
               type="button"
               aria-pressed={isActive}
               onClick={() => onChange(option.key)}
@@ -85,12 +52,6 @@ export default function CategoryTabs({
           );
         })}
       </div>
-      {layout === "responsive" ? (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-surface-inset via-surface-inset/85 to-transparent min-[840px]:hidden"
-        />
-      ) : null}
     </div>
   );
 }

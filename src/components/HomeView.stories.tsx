@@ -76,24 +76,31 @@ export const Many: Story = {
   args: { partners: Array.from({ length: 18 }, (_, index) => createPartner(index + 1)) },
 };
 
-export const MobileAdvancedFilters: Story = {
+export const MobileFilterDisclosure: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(
-      canvas.getByRole("button", { name: "상세 필터 열기" }),
-    );
+    const disclosure = canvas.getByRole("button", { name: "필터 펼쳐보기" });
 
-    const body = within(document.body);
-    const dialog = body.getByRole("dialog", { name: "필터" });
-    await expect(dialog).toBeVisible();
+    await expect(disclosure).toHaveAttribute("aria-expanded", "false");
+    await expect(
+      canvas.queryByTestId("partner-mobile-filter-fields"),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(disclosure);
+
+    await expect(disclosure).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      canvas.getByTestId("partner-mobile-filter-fields"),
+    ).toBeVisible();
     await userEvent.selectOptions(
-      body.getByTestId("partner-campus-filter-mobile"),
+      canvas.getByTestId("partner-campus-filter-mobile-inline"),
       "seoul",
     );
-    await userEvent.click(body.getByRole("button", { name: "결과 보기" }));
+    await userEvent.click(disclosure);
 
+    await expect(disclosure).toHaveAttribute("aria-expanded", "false");
     await expect(
-      body.queryByRole("dialog", { name: "필터" }),
+      canvas.queryByTestId("partner-mobile-filter-fields"),
     ).not.toBeInTheDocument();
   },
 };

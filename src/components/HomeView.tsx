@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   useCallback,
   startTransition,
@@ -58,6 +58,7 @@ export default function HomeView({
   loadedPartnerStateIds?: string[];
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const categoryKeys = useMemo(
     () => categories.map((category) => category.key),
@@ -77,6 +78,7 @@ export default function HomeView({
     key: "",
     limit: INITIAL_PARTNER_CARD_COUNT,
   });
+  const [searchInputValue, setSearchInputValue] = useState(searchValue);
   const directoryHydrated = useHydrated();
   const [localPopularityById, setLocalPopularityById] = useState<
     Record<string, PartnerPopularityMetrics | undefined>
@@ -93,8 +95,11 @@ export default function HomeView({
   const lastLoggedSearchRef = useRef("");
   const { notify } = useToast();
 
-  const replaceDirectoryState = useCallback(
-    (nextState: Partial<HomeDirectoryState>) => {
+  const updateDirectoryState = useCallback(
+    (
+      nextState: Partial<HomeDirectoryState>,
+      historyMode: "push" | "replace" = "replace",
+    ) => {
       const currentParams = new URLSearchParams(window.location.search);
       const currentDirectoryState = parseHomeDirectoryState(
         currentParams,
@@ -105,14 +110,35 @@ export default function HomeView({
         currentParams,
       );
       const query = params.toString();
-      window.history.replaceState(
-        null,
-        "",
-        query ? `${pathname}?${query}#benefits` : `${pathname}#benefits`,
-      );
+      const nextUrl = query
+        ? `${pathname}?${query}#benefits`
+        : `${pathname}#benefits`;
+
+      if (historyMode === "push") {
+        router.push(nextUrl);
+      } else {
+        window.history.replaceState(null, "", nextUrl);
+      }
     },
-    [categoryKeys, pathname],
+    [categoryKeys, pathname, router],
   );
+
+  const commitSearchValue = useCallback(
+    (nextValue: string) => {
+      if (nextValue === searchValue) {
+        return;
+      }
+
+      startTransition(() => {
+        updateDirectoryState({ q: nextValue }, "push");
+      });
+    },
+    [searchValue, updateDirectoryState],
+  );
+
+  useEffect(() => {
+    setSearchInputValue(searchValue);
+  }, [searchValue]);
 
   const directoryReturnTo = useMemo(() => {
     const query = searchParams.toString();
@@ -340,7 +366,7 @@ export default function HomeView({
 
   const handleCategoryChange = (nextCategory: CategoryKey | "all") => {
     startTransition(() => {
-      replaceDirectoryState({ category: nextCategory });
+      updateDirectoryState({ category: nextCategory });
     });
     trackProductEvent({
       eventName: "category_filter_change",
@@ -354,7 +380,7 @@ export default function HomeView({
 
   const handleSortChange = (nextSort: PartnerSortOption) => {
     startTransition(() => {
-      replaceDirectoryState({ sort: nextSort });
+      updateDirectoryState({ sort: nextSort });
     });
     trackProductEvent({
       eventName: "sort_change",
@@ -370,7 +396,7 @@ export default function HomeView({
     nextCampus: HomeDirectoryState["campus"],
   ) => {
     startTransition(() => {
-      replaceDirectoryState({ campus: nextCampus });
+      updateDirectoryState({ campus: nextCampus });
     });
   };
 
@@ -378,13 +404,13 @@ export default function HomeView({
     nextAudience: HomeDirectoryState["audience"],
   ) => {
     startTransition(() => {
-      replaceDirectoryState({ audience: nextAudience });
+      updateDirectoryState({ audience: nextAudience });
     });
   };
 
   const handleViewModeChange = (nextViewMode: HomeDirectoryState["view"]) => {
     startTransition(() => {
-      replaceDirectoryState({ view: nextViewMode });
+      updateDirectoryState({ view: nextViewMode });
     });
     trackProductEvent({
       eventName: "directory_view_change",
@@ -396,10 +422,12 @@ export default function HomeView({
     });
   };
 
-  const handleSearchChange = (nextValue: string) => {
-    startTransition(() => {
-      replaceDirectoryState({ q: nextValue });
-    });
+  const handleSearchInputChange = (nextValue: string) => {
+    setSearchInputValue(nextValue);
+  };
+
+  const handleSearchSubmit = () => {
+    commitSearchValue(searchInputValue);
   };
 
   const handleFavoriteChange = (partnerId: string, nextFavorited: boolean) => {
@@ -438,8 +466,9 @@ export default function HomeView({
               categories={categories}
               activeCategory={activeCategory}
               onCategoryChange={handleCategoryChange}
-              searchValue={searchValue}
-              onSearchChange={handleSearchChange}
+              searchValue={searchInputValue}
+              onSearchChange={handleSearchInputChange}
+              onSearchSubmit={handleSearchSubmit}
               campusFilter={campusFilter}
               onCampusFilterChange={handleCampusFilterChange}
               appliesToFilter={appliesToFilter}
@@ -460,7 +489,7 @@ export default function HomeView({
               campusFilter={campusFilter}
               appliesToFilter={appliesToFilter}
               sortValue={sortValue}
-              onSearchChange={handleSearchChange}
+              onSearchChange={commitSearchValue}
               onCategoryChange={handleCategoryChange}
               onCampusFilterChange={handleCampusFilterChange}
               onAppliesToFilterChange={handleAppliesToFilterChange}

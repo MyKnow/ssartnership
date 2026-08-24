@@ -2,16 +2,14 @@
 
 import { useState } from "react";
 import {
-  AdjustmentsHorizontalIcon,
+  ChevronDownIcon,
   MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
 import type { Category, CategoryKey } from "@/lib/types";
 import CategoryTabs, { CategoryTabOption } from "@/components/CategoryTabs";
 import PartnerAdvancedFilterFields from "@/components/partner-filters/PartnerAdvancedFilterFields";
 import AdvancedFilterDisclosure from "@/components/ui/AdvancedFilterDisclosure";
-import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
-import Modal from "@/components/ui/Modal";
 import Select from "@/components/ui/Select";
 import Surface from "@/components/ui/Surface";
 import { cn } from "@/lib/cn";
@@ -27,17 +25,13 @@ import {
 export { partnerSortOptions };
 export type { PartnerSortOption };
 
-type MobileAdvancedFilterDraft = {
-  campusFilter: CampusSlug | "all";
-  appliesToFilter: PartnerAudienceFilter;
-};
-
 export default function PartnerFilters({
   categories,
   activeCategory,
   onCategoryChange,
   searchValue,
   onSearchChange,
+  onSearchSubmit,
   campusFilter = "all",
   onCampusFilterChange,
   appliesToFilter,
@@ -52,6 +46,7 @@ export default function PartnerFilters({
   onCategoryChange: (key: CategoryKey | "all") => void;
   searchValue: string;
   onSearchChange: (value: string) => void;
+  onSearchSubmit?: () => void;
   campusFilter?: CampusSlug | "all";
   onCampusFilterChange?: (value: CampusSlug | "all") => void;
   appliesToFilter?: PartnerAudienceFilter;
@@ -63,11 +58,6 @@ export default function PartnerFilters({
 }) {
   const isHomeDirectory = mode === "home-directory";
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const [mobileAdvancedFilterDraft, setMobileAdvancedFilterDraft] =
-    useState<MobileAdvancedFilterDraft>({
-      campusFilter,
-      appliesToFilter: appliesToFilter ?? "all",
-    });
   const tabOptions: CategoryTabOption[] = [
     { key: "all", label: "전체" },
     ...categories.map((category) => ({
@@ -80,20 +70,37 @@ export default function PartnerFilters({
     appliesToFilter !== undefined && appliesToFilter !== "all",
     sortValue !== "popular",
   ].filter(Boolean).length;
-  const mobileAdvancedFilterCount = [
-    campusFilter !== "all",
-    appliesToFilter !== undefined && appliesToFilter !== "all",
-  ].filter(Boolean).length;
+  const categoryTabs = (
+    <CategoryTabs
+      options={tabOptions}
+      activeKey={activeCategory}
+      onChange={onCategoryChange}
+      layout={isHomeDirectory ? "responsive" : "scroll"}
+    />
+  );
   const categoryField = (
     <div className="flex min-w-0 flex-col gap-1.5">
       <span className="ui-caption">카테고리</span>
-      <CategoryTabs
-        options={tabOptions}
-        activeKey={activeCategory}
-        onChange={onCategoryChange}
-        layout={isHomeDirectory ? "responsive" : "scroll"}
-      />
+      {categoryTabs}
     </div>
+  );
+  const searchInput = (
+    <Input
+      id={isHomeDirectory ? "benefit-search" : undefined}
+      type={isHomeDirectory ? "search" : undefined}
+      enterKeyHint={isHomeDirectory ? "search" : undefined}
+      value={searchValue}
+      onChange={(event) => onSearchChange(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && onSearchSubmit) {
+          event.preventDefault();
+          onSearchSubmit();
+        }
+      }}
+      placeholder="제휴처명, 위치, 혜택으로 검색"
+      className={isHomeDirectory && onSearchSubmit ? "pr-12" : undefined}
+      data-testid="partner-search-input"
+    />
   );
   const searchField = (
     <label className="flex min-w-0 flex-col gap-1.5">
@@ -105,22 +112,22 @@ export default function PartnerFilters({
       >
         검색
       </span>
-      <span className="relative block min-w-0">
-        {isHomeDirectory ? (
-          <MagnifyingGlassIcon
-            className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground"
-            aria-hidden="true"
-          />
-        ) : null}
-        <Input
-          id={isHomeDirectory ? "benefit-search" : undefined}
-          value={searchValue}
-          onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="제휴처명, 위치, 혜택으로 검색"
-          className={isHomeDirectory ? "pl-11" : undefined}
-          data-testid="partner-search-input"
-        />
-      </span>
+      {isHomeDirectory && onSearchSubmit ? (
+        <span className="relative block min-w-0">
+          {searchInput}
+          <button
+            type="button"
+            aria-label="검색"
+            title="검색"
+            onClick={onSearchSubmit}
+            className="absolute inset-y-0 right-0 inline-flex min-h-11 min-w-11 items-center justify-center rounded-r-[1rem] bg-primary text-primary-foreground transition-colors hover:bg-primary-emphasis focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+          >
+            <MagnifyingGlassIcon className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </span>
+      ) : (
+        <span className="block min-w-0">{searchInput}</span>
+      )}
     </label>
   );
   const hasAdvancedFilters = Boolean(
@@ -129,112 +136,91 @@ export default function PartnerFilters({
       onCampusFilterChange,
   );
 
-  const openMobileFilters = () => {
-    setMobileAdvancedFilterDraft({
-      campusFilter,
-      appliesToFilter: appliesToFilter ?? "all",
-    });
-    setMobileFiltersOpen(true);
-  };
-
   return (
     <Surface
       level="inset"
-      padding={isHomeDirectory ? "sm" : "md"}
+      padding="md"
       className={cn(
         "flex min-w-0 flex-col gap-4",
-        isHomeDirectory && "gap-3 min-[840px]:gap-5 min-[840px]:p-4",
+        isHomeDirectory && "min-[840px]:gap-5",
         className,
       )}
       data-testid={isHomeDirectory ? "partner-filter-panel" : undefined}
     >
       {isHomeDirectory ? (
-        <div className="flex min-w-0 items-end gap-2 min-[840px]:block">
-          <div className="min-w-0 flex-1">{searchField}</div>
-          {hasAdvancedFilters ? (
-            <Button
-              variant="secondary"
-              className="shrink-0 gap-1.5 px-3 min-[840px]:hidden"
-              onClick={openMobileFilters}
-              ariaLabel={
-                mobileAdvancedFilterCount === 0
-                  ? "상세 필터 열기"
-                  : `상세 필터 ${mobileAdvancedFilterCount}개 적용됨`
-              }
+        <>
+          <div className="min-w-0">{searchField}</div>
+          <div className="min-[840px]:hidden">
+            <button
+              type="button"
+              aria-expanded={mobileFiltersOpen}
+              aria-controls="partner-mobile-filter-fields"
+              onClick={() => setMobileFiltersOpen((current) => !current)}
+              className="ui-label flex min-h-11 w-full items-center justify-center gap-1.5 px-4 text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+              data-testid="partner-mobile-filter-disclosure"
             >
-              <AdjustmentsHorizontalIcon className="h-4 w-4" aria-hidden="true" />
-              필터
-              {mobileAdvancedFilterCount > 0 ? (
-                <span
-                  aria-hidden="true"
-                  className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground"
-                >
-                  {mobileAdvancedFilterCount}
-                </span>
-              ) : null}
-            </Button>
-          ) : null}
-        </div>
+              <span>{mobileFiltersOpen ? "필터 접기" : "필터 펼쳐보기"}</span>
+              <ChevronDownIcon
+                className={cn(
+                  "h-4 w-4 shrink-0 transition-transform",
+                  mobileFiltersOpen && "rotate-180",
+                )}
+                aria-hidden="true"
+              />
+            </button>
+            {mobileFiltersOpen ? (
+              <div
+                id="partner-mobile-filter-fields"
+                className="mt-5 grid min-w-0 gap-5"
+                data-testid="partner-mobile-filter-fields"
+              >
+                <div className="min-w-0">
+                  <span className="ui-caption block">카테고리</span>
+                  <div className="mt-2">{categoryTabs}</div>
+                </div>
+                {hasAdvancedFilters &&
+                appliesToFilter &&
+                onAppliesToFilterChange &&
+                onCampusFilterChange ? (
+                  <PartnerAdvancedFilterFields
+                    campusFilter={campusFilter}
+                    onCampusFilterChange={onCampusFilterChange}
+                    appliesToFilter={appliesToFilter}
+                    onAppliesToFilterChange={onAppliesToFilterChange}
+                    sortValue={sortValue}
+                    onSortChange={onSortChange}
+                    includeSort={false}
+                    layout="sidebar"
+                    testIdSuffix="-mobile-inline"
+                  />
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          <div className="hidden min-[840px]:block">{categoryField}</div>
+        </>
       ) : (
         categoryField
       )}
-      {isHomeDirectory ? categoryField : searchField}
       {hasAdvancedFilters && appliesToFilter && onAppliesToFilterChange && onCampusFilterChange ? (
         <>
           {isHomeDirectory ? (
-            <Modal
-              open={mobileFiltersOpen}
-              title="필터"
-              description="캠퍼스와 적용 대상을 설정합니다."
-              onClose={() => setMobileFiltersOpen(false)}
-              panelClassName="max-h-[calc(100dvh-1rem)] self-end rounded-b-none pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:self-center sm:rounded-overlay sm:pb-6"
-              bodyClassName="overflow-y-auto"
-            >
+            <div className="hidden min-w-0 gap-3 border-t border-border/70 pt-4 min-[840px]:grid">
+              <div className="min-w-0">
+                <p className="ui-label text-foreground">상세 필터</p>
+                <p className="ui-caption mt-1">캠퍼스·대상·정렬을 한 번에 조정합니다.</p>
+              </div>
               <PartnerAdvancedFilterFields
-                campusFilter={mobileAdvancedFilterDraft.campusFilter}
-                onCampusFilterChange={(nextCampus) =>
-                  setMobileAdvancedFilterDraft((current) => ({
-                    ...current,
-                    campusFilter: nextCampus,
-                  }))
-                }
-                appliesToFilter={mobileAdvancedFilterDraft.appliesToFilter}
-                onAppliesToFilterChange={(nextAudience) =>
-                  setMobileAdvancedFilterDraft((current) => ({
-                    ...current,
-                    appliesToFilter: nextAudience,
-                  }))
-                }
+                campusFilter={campusFilter}
+                onCampusFilterChange={onCampusFilterChange}
+                appliesToFilter={appliesToFilter}
+                onAppliesToFilterChange={onAppliesToFilterChange}
                 sortValue={sortValue}
                 onSortChange={onSortChange}
-                includeSort={false}
-                testIdSuffix="-mobile"
+                layout="sidebar"
+                testIdSuffix="-desktop"
               />
-              <div className="mt-5 grid grid-cols-[auto_minmax(0,1fr)] gap-2 border-t border-border/70 pt-4">
-                <Button
-                  variant="ghost"
-                  onClick={() =>
-                    setMobileAdvancedFilterDraft({
-                      campusFilter: "all",
-                      appliesToFilter: "all",
-                    })
-                  }
-                >
-                  초기화
-                </Button>
-                <Button
-                  onClick={() => {
-                    onCampusFilterChange(mobileAdvancedFilterDraft.campusFilter);
-                    onAppliesToFilterChange(
-                      mobileAdvancedFilterDraft.appliesToFilter,
-                    );
-                    setMobileFiltersOpen(false);
-                  }}
-                >
-                  결과 보기
-                </Button>
-              </div>
-            </Modal>
+            </div>
           ) : (
             <AdvancedFilterDisclosure
               summary={
@@ -253,24 +239,6 @@ export default function PartnerFilters({
               />
             </AdvancedFilterDisclosure>
           )}
-          {isHomeDirectory ? (
-            <div className="hidden min-w-0 gap-3 border-t border-border/70 pt-4 min-[840px]:grid">
-              <div className="min-w-0">
-                <p className="ui-label text-foreground">상세 필터</p>
-                <p className="ui-caption mt-1">캠퍼스·대상·정렬을 한 번에 조정합니다.</p>
-              </div>
-              <PartnerAdvancedFilterFields
-                campusFilter={campusFilter}
-                onCampusFilterChange={onCampusFilterChange}
-                appliesToFilter={appliesToFilter}
-                onAppliesToFilterChange={onAppliesToFilterChange}
-                sortValue={sortValue}
-                onSortChange={onSortChange}
-                layout="sidebar"
-                testIdSuffix="-desktop"
-              />
-            </div>
-          ) : null}
         </>
       ) : (
         <div className="flex min-w-0 flex-col gap-1">

@@ -54,17 +54,17 @@ export default function PartnerDirectoryToolbar({
         </label>
       </div>
       <div
-        className="grid w-full min-w-0 grid-cols-2 gap-1 rounded-card border border-border/80 bg-surface-muted p-1 sm:w-auto sm:min-w-64"
+        className="grid w-full min-w-0 grid-cols-2 overflow-hidden rounded-card border border-border/80 bg-surface-muted sm:w-auto sm:min-w-64"
         role="group"
         aria-label="제휴처 보기 방식"
       >
         <button
           type="button"
           className={cn(
-            "ui-label inline-flex min-h-11 items-center justify-center gap-2 rounded-[0.8rem] px-3 transition-interactive",
+            "ui-label inline-flex min-h-11 items-center justify-center gap-2 rounded-card px-3 transition-colors focus-visible:relative focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
             viewMode === "card"
-              ? "bg-primary text-primary-foreground shadow-flat"
-              : "text-muted-foreground hover:bg-surface-elevated hover:text-foreground",
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground",
           )}
           aria-pressed={viewMode === "card"}
           onClick={() => onViewModeChange("card")}
@@ -75,10 +75,10 @@ export default function PartnerDirectoryToolbar({
         <button
           type="button"
           className={cn(
-            "ui-label inline-flex min-h-11 items-center justify-center gap-2 rounded-[0.8rem] px-3 transition-interactive",
+            "ui-label inline-flex min-h-11 items-center justify-center gap-2 rounded-card px-3 transition-colors focus-visible:relative focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
             viewMode === "list"
-              ? "bg-primary text-primary-foreground shadow-flat"
-              : "text-muted-foreground hover:bg-surface-elevated hover:text-foreground",
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground",
           )}
           aria-pressed={viewMode === "list"}
           onClick={() => onViewModeChange("list")}

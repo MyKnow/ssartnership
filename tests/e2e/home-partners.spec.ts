@@ -13,6 +13,7 @@ async function typeSearch(page: Page, value: string) {
   await waitForDirectoryControls(page);
   const searchInput = page.getByTestId("partner-search-input");
   await searchInput.fill(value);
+  await searchInput.press("Enter");
 }
 
 test.describe("public partner discovery", () => {
@@ -162,6 +163,42 @@ test.describe("public partner discovery", () => {
     await expect(firstCard.getByText("혜택", { exact: true })).toBeVisible();
     await expect(firstCard.getByText("적용 대상", { exact: true })).toBeVisible();
     await expect(page.getByTestId("partner-results-toolbar")).toContainText(/제휴처 \d+곳/);
+  });
+
+  test("wraps expanded mobile categories instead of horizontally scrolling", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 844 });
+    await page.goto("/#benefits");
+    await waitForDirectoryControls(page);
+
+    await page
+      .getByTestId("partner-mobile-filter-disclosure")
+      .click();
+
+    const categoryGroup = page.getByRole("group", {
+      name: "제휴처 카테고리",
+    });
+    await expect(categoryGroup).toBeVisible();
+
+    const metrics = await categoryGroup.evaluate((element) => {
+      const buttons = Array.from(
+        element.querySelectorAll<HTMLButtonElement>("button"),
+      );
+
+      return {
+        clientWidth: element.clientWidth,
+        overflowX: window.getComputedStyle(element).overflowX,
+        rowCount: new Set(
+          buttons.map((button) => Math.round(button.getBoundingClientRect().top)),
+        ).size,
+        scrollWidth: element.scrollWidth,
+      };
+    });
+
+    expect(metrics.overflowX).toBe("visible");
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
+    expect(metrics.rowCount).toBeGreaterThan(1);
   });
 
   test("keeps applied filters visible and individually removable", async ({ page }) => {
@@ -348,7 +385,40 @@ test.describe("public partner discovery", () => {
     await expect(cards).toHaveCount(initialCount);
   });
 
-  test("searches benefits and returns with filters intact", async ({ page }) => {
+  test("applies a partner search only after an explicit submit", async ({ page }) => {
+    await page.goto("/#benefits");
+    await waitForDirectoryControls(page);
+
+    const cards = page.getByTestId("partner-card");
+    const initialCount = await cards.count();
+    const firstPartnerName = (
+      await cards.first().locator('a[aria-label$=" 상세 보기"]').first().textContent()
+    )?.trim();
+    expect(firstPartnerName).toBeTruthy();
+    if (!firstPartnerName) {
+      return;
+    }
+
+    const searchInput = page.getByTestId("partner-search-input");
+    await searchInput.fill(firstPartnerName);
+
+    await expect(searchInput).toHaveValue(firstPartnerName);
+    await expect(searchInput).toHaveAttribute("enterkeyhint", "search");
+    expect(page.url()).not.toContain("q=");
+    await expect(cards).toHaveCount(initialCount);
+
+    await searchInput.press("Enter");
+    await expect(page).toHaveURL(/q=/);
+    await expect(cards).toHaveCount(1);
+
+    await searchInput.fill("");
+    await expect(page).toHaveURL(/q=/);
+    await page.getByRole("button", { name: "검색", exact: true }).click();
+    await expect(page).not.toHaveURL(/q=/);
+    await expect(cards).toHaveCount(initialCount);
+  });
+
+  test("keeps a submitted search in the partner detail return target", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     const benefitsSection = page.locator("#benefits");
@@ -369,10 +439,24 @@ test.describe("public partner discovery", () => {
 
     const resultCard = cards.first();
     await expect(resultCard).toBeVisible();
-    await resultCard.getByRole("link", { name: "제휴 상세 보기" }).click();
+    const detailLink = resultCard
+      .locator('a[aria-label$=" 상세 보기"]')
+      .first();
+    await expect(detailLink).toHaveAttribute("href", /returnTo=.*q%3D/);
+    await detailLink.click();
 
     await expect(page).toHaveURL(/returnTo=/);
-    await page.goBack();
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    const returnTo = await page.evaluate(
+      () => new URL(window.location.href).searchParams.get("returnTo"),
+    );
+    expect(returnTo).toContain("q=");
+    if (!returnTo) {
+      return;
+    }
+
+    await page.goto(new URL(returnTo, page.url()).toString());
 
     await expect(page).toHaveURL(/q=/);
     await expect(page.getByTestId("partner-search-input")).toHaveValue(firstPartnerName);
