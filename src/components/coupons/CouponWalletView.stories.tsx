@@ -123,17 +123,20 @@ export const AvailableAccordion: Story = {
     const canvas = within(canvasElement);
     const firstSummary = canvas.getByText("아침 집중 부스터 아메리카노 1+1 쿠폰");
     const secondSummary = canvas.getByText("저녁 스터디룸 1시간 무료 쿠폰");
-    const firstDetails = firstSummary.closest("details");
-    const secondDetails = secondSummary.closest("details");
-    const detailLinks = canvas.getAllByRole("link", { name: /제휴처 상세 보기/ });
-    const firstDetailLink = detailLinks.find(
-      (link) => link.getAttribute("href") === "/partners/cafe-001#coupons",
-    );
-    const secondDetailLink = detailLinks.find(
-      (link) => link.getAttribute("href") === "/partners/space-001#coupons",
-    );
+    const firstCard = firstSummary.closest("article");
+    const secondCard = secondSummary.closest("article");
+    const firstToggle = firstCard?.querySelector("button[aria-controls]");
+    const secondToggle = secondCard?.querySelector("button[aria-controls]");
+    const firstUseLink = firstCard?.querySelector('a[href="/coupons?issueId=mock-issued-coupon-cafe-morning"]');
+    const secondUseLink = secondCard?.querySelector('a[href="/coupons?issueId=mock-issued-coupon-space-evening"]');
+    const firstPartnerLink = canvas.getByRole("link", {
+      name: "카페 싸피 역삼본점 제휴처 상세 보기",
+    });
+    const secondPartnerLink = canvas.getByRole("link", {
+      name: "워크라운지 역삼 스터디룸 제휴처 상세 보기",
+    });
 
-    if (!firstDetails || !secondDetails || !firstDetailLink || !secondDetailLink) {
+    if (!firstCard || !secondCard || !firstToggle || !secondToggle || !firstUseLink || !secondUseLink) {
       throw new Error("Coupon wallet story fixture is incomplete.");
     }
 
@@ -146,16 +149,21 @@ export const AvailableAccordion: Story = {
     await expect(
       canvas.queryByText("제휴처 상세에서 쿠폰 사용 방법을 확인해 주세요."),
     ).not.toBeInTheDocument();
+    await expect(canvas.queryByText("전체 잔여 수량")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("전체 제한 없음")).not.toBeInTheDocument();
     await expect(canvas.getAllByRole("link", { name: "사용하기" }).length).toBeGreaterThan(0);
-    await expect(firstDetails).toHaveAttribute("open");
-    await expect(secondDetails).not.toHaveAttribute("open");
+    await expect(firstToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(secondToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(firstUseLink).toBeVisible();
+    await expect(secondUseLink).toBeVisible();
     await expect(canvas.getByText(/앱 주문 전 SSAFY 인증 카드/)).toBeVisible();
-    await expect(firstDetailLink).toHaveAttribute("href", "/partners/cafe-001#coupons");
-    await userEvent.click(secondSummary);
-    await expect(secondDetails).toHaveAttribute("open");
-    await expect(firstDetails).not.toHaveAttribute("open");
+    await expect(firstPartnerLink).toHaveAttribute("href", "/partners/cafe-001#coupons");
+    await userEvent.click(secondToggle);
+    await expect(secondToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(firstToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(firstUseLink).toBeVisible();
     await expect(canvas.getByText(/평일 18시 이후/)).toBeVisible();
-    await expect(secondDetailLink).toHaveAttribute("href", "/partners/space-001#coupons");
+    await expect(secondPartnerLink).toHaveAttribute("href", "/partners/space-001#coupons");
   },
 };
 

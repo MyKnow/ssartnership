@@ -20,10 +20,19 @@ test("쿠폰함은 중복 요약 정보를 노출하지 않고 사용 CTA를 통
   assert.doesNotMatch(wallet, /CouponWalletStats/);
   assert.doesNotMatch(wallet, /가장 빠른 만료/);
   assert.doesNotMatch(wallet, /내 \{remainingMemberUses/);
+  assert.doesNotMatch(wallet, /전체 잔여 수량/);
+  assert.doesNotMatch(wallet, /formatGlobalRemaining/);
   assert.doesNotMatch(wallet, /제휴처 상세에서 쿠폰 사용 방법을 확인해 주세요\./);
   assert.doesNotMatch(wallet, /별도 사용 조건은 제휴처 상세를 확인해 주세요\./);
   assert.doesNotMatch(wallet, /제휴처 상세에서 쿠폰을 확인하고 사용할 수 있습니다\./);
+  assert.doesNotMatch(wallet, /<Button href=\{detailHref\} variant="primary"/);
+  assert.match(wallet, /<Link[\s\S]*href=\{detailHref\}/);
+  assert.match(wallet, /\$\{coupon\.partnerName\} 제휴처 상세 보기/);
   assert.match(wallet, />\s*사용하기\s*</);
+  assert.match(wallet, /hover:bg-surface-elevated hover-shadow-raised/);
+  assert.doesNotMatch(wallet, /hover:ring-/);
+  assert.match(wallet, /h-24 cursor-pointer/);
+  assert.match(wallet, /min-h-24/);
   assert.match(detail, />\s*사용하기\s*</);
 });
 
