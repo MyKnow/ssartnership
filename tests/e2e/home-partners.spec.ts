@@ -317,7 +317,7 @@ test.describe("public partner discovery", () => {
 
     const publicPartnerLink = cards
       .first()
-      .getByRole("link", { name: "제휴 상세 보기" });
+      .getByRole("link", { name: / 상세 보기$/ });
     await expect(publicPartnerLink).toBeVisible();
     await publicPartnerLink.scrollIntoViewIfNeeded();
     await Promise.all([
@@ -334,6 +334,9 @@ test.describe("public partner discovery", () => {
 
     const card = page.getByTestId("partner-card").first();
     await expect(card).toBeVisible();
+    await expect(
+      card.getByRole("link", { name: "제휴 상세 보기" }),
+    ).toHaveCount(0);
     await card.scrollIntoViewIfNeeded();
     await card.locator("p").first().click();
 
