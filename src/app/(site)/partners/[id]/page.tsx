@@ -268,11 +268,11 @@ export default async function PartnerDetailPage({
             >
               <div
                 data-partner-detail-hero-info
-                className="grid min-w-0 gap-4 rounded-card border border-border bg-surface p-6 shadow-flat md:gap-0 md:grid-cols-[140px_minmax(0,1fr)] md:items-stretch"
+                className="grid min-w-0 gap-4 rounded-card border border-border bg-surface p-5 shadow-flat md:gap-0 md:grid-cols-[7rem_minmax(0,1fr)] md:items-center"
               >
                 <PartnerImageCarousel
                   key={`${carouselKey}:thumbnail`}
-                  className="mx-auto w-full max-w-none md:mx-0 md:max-w-[140px] md:self-center"
+                  className="mx-auto w-full max-w-none md:mx-0 md:max-w-28 md:self-center"
                   images={partner.thumbnail ? [partner.thumbnail] : []}
                   name={partner.name}
                   variant="hero"
@@ -280,7 +280,7 @@ export default async function PartnerDetailPage({
                   showThumbnails={false}
                   priority
                 />
-                <div className="flex min-w-0 flex-col gap-4 md:ml-4">
+                <div className="flex min-w-0 flex-col gap-4 md:ml-4 md:justify-center">
                   <PartnerDetailHeroMeta
                     partnerId={partner.id}
                     categoryLabel={categoryLabel}
@@ -290,12 +290,10 @@ export default async function PartnerDetailPage({
                     favoriteCount={metrics.favoriteCount}
                   />
                   <PageHeader
-                    className="h-full border-0 border-b-0 pb-0"
+                    className="border-0 border-b-0 pb-0"
                     title={partner.name}
-                    description={
-                      partner.detailDescription ||
-                      "혜택과 이용 조건을 확인하고 바로 이용할 수 있습니다."
-                    }
+                    titleClassName="text-[clamp(1.75rem,2vw,2.25rem)]"
+                    description={partner.detailDescription || undefined}
                   />
                 </div>
               </div>

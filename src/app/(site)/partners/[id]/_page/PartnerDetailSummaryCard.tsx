@@ -10,7 +10,6 @@ import Chip from "@/components/ui/Chip";
 import PageSection from "@/components/ui/PageSection";
 import Surface from "@/components/ui/Surface";
 import PartnerAudienceChips from "@/components/PartnerAudienceChips";
-import PartnerValueBadge from "@/components/PartnerValueBadge";
 import {
   getPartnerPlaceLinkLabel,
   getPartnerServiceMode,
@@ -18,6 +17,42 @@ import {
 import { getPartnerBranchScopeLabel } from "@/lib/partner-branch-registration";
 import type { Partner } from "@/lib/types";
 import PartnerDetailInfoRow from "./PartnerDetailInfoRow";
+
+function PartnerDetailNumberedList({
+  ariaLabel,
+  items,
+}: {
+  ariaLabel: string;
+  items: string[];
+}) {
+  return (
+    <ol
+      aria-label={ariaLabel}
+      className={
+        items.length > 1
+          ? "grid gap-px overflow-hidden rounded-[1.4rem] border border-border/80 bg-border/80 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2"
+          : "grid gap-px overflow-hidden rounded-[1.4rem] border border-border/80 bg-border/80"
+      }
+    >
+      {items.map((item, index) => (
+        <li
+          key={`${item}-${index}`}
+          className="flex min-w-0 items-start gap-3 bg-surface-inset p-4 sm:p-5"
+        >
+          <span
+            aria-hidden="true"
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/10 bg-primary-soft text-[11px] font-bold tabular-nums text-primary"
+          >
+            {String(index + 1).padStart(2, "0")}
+          </span>
+          <span className="text-ko-pretty min-w-0 pt-1 text-sm font-semibold leading-6 text-foreground sm:text-base">
+            {item}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 export default function PartnerDetailSummaryCard({
   partner,
@@ -44,7 +79,6 @@ export default function PartnerDetailSummaryCard({
   const hasAdditionalInformation = Boolean(
     partner.period.start ||
       partner.period.end ||
-      partner.conditions.length > 0 ||
       showBranchScope ||
       partner.branchScopeNote ||
       (partner.tags?.length ?? 0) > 0,
@@ -63,33 +97,19 @@ export default function PartnerDetailSummaryCard({
       >
         <PageSection title="받을 수 있는 혜택">
           {partner.benefits.length > 0 ? (
-            <ol
-              aria-label="제휴 혜택"
-              className="grid gap-px overflow-hidden rounded-[1.4rem] border border-border/80 bg-border/80 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2"
-            >
-              {partner.benefits.map((benefit, index) => (
-                <li
-                  key={`${benefit}-${index}`}
-                  className="flex min-w-0 items-start gap-3 bg-surface-inset p-4 sm:p-5"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/10 bg-primary-soft text-[11px] font-bold tabular-nums text-primary"
-                  >
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <span className="text-ko-pretty min-w-0 pt-1 text-sm font-semibold leading-6 text-foreground sm:text-base">
-                    {benefit}
-                  </span>
-                </li>
-              ))}
-            </ol>
+            <PartnerDetailNumberedList ariaLabel="제휴 혜택" items={partner.benefits} />
           ) : (
             <Surface level="inset" padding="md">
               <p className="ui-body">등록된 혜택 정보가 없습니다.</p>
             </Surface>
           )}
         </PageSection>
+
+        {partner.conditions.length > 0 ? (
+          <PageSection title="이용 조건" data-partner-benefit-conditions>
+            <PartnerDetailNumberedList ariaLabel="이용 조건" items={partner.conditions} />
+          </PageSection>
+        ) : null}
 
         <section
           aria-labelledby={`partner-detail-information-${partner.id}`}
@@ -185,7 +205,7 @@ export default function PartnerDetailSummaryCard({
                 id={`partner-detail-additional-information-${partner.id}`}
                 className="ui-section-title text-ko-title text-balance"
               >
-                이용조건 및 태그
+                이용 기간 및 태그
               </h3>
               <div className="grid min-w-0 gap-5">
                 {partner.period.start || partner.period.end ? (
@@ -202,18 +222,6 @@ export default function PartnerDetailSummaryCard({
                       <span className="whitespace-nowrap tabular-nums">
                         {partner.period.start} – {partner.period.end}
                       </span>
-                    </div>
-                  </div>
-                ) : null}
-                {partner.conditions.length > 0 ? (
-                  <div>
-                    <p className="ui-caption">이용 조건</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {partner.conditions.map((condition) => (
-                        <PartnerValueBadge key={condition}>
-                          {condition}
-                        </PartnerValueBadge>
-                      ))}
                     </div>
                   </div>
                 ) : null}

@@ -11,6 +11,7 @@ export default function PageHeader({
   backHref,
   backLabel = "이전 화면으로",
   className,
+  titleClassName,
 }: {
   title: string;
   description?: string;
@@ -19,6 +20,7 @@ export default function PageHeader({
   backHref?: string;
   backLabel?: string;
   className?: string;
+  titleClassName?: string;
 }) {
   return (
     <header
@@ -39,7 +41,7 @@ export default function PageHeader({
         ) : null}
         {eyebrow ? <p className="ui-kicker">{eyebrow}</p> : null}
         <div className="space-y-2">
-          <h1 className="ui-page-title text-ko-title text-balance">{title}</h1>
+          <h1 className={cn("ui-page-title text-ko-title text-balance", titleClassName)}>{title}</h1>
           {description ? (
             <p className="ui-body text-ko-pretty max-w-3xl">{description}</p>
           ) : null}

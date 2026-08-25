@@ -87,17 +87,12 @@ test("glass 탐색은 safe area와 하단 피드백 영역을 보호한다", asy
 
   assert.match(source, /--navigation-glass:/);
   assert.match(source, /backdrop-filter: blur\(24px\) saturate\(180%\)/);
-  assert.match(source, /body:has\(\[data-site-mobile-navigation\]\)/);
   assert.match(source, /\[data-toast-viewport\]/);
   assert.match(actionBarSource, /bottom-0/);
   assert.match(actionBarSource, /pb-safe-bottom-2/);
-  assert.doesNotMatch(
-    source,
-    /body:has\(\[data-site-mobile-navigation\]\) \{\s*padding-bottom:/,
-  );
   assert.match(
     source,
-    /body:has\(\[data-site-mobile-navigation\]\) \[data-site-footer-navigation-reserve\][\s\S]*padding-bottom: calc\(env\(safe-area-inset-bottom\) \+ 7\.75rem\)/,
+    /\[data-site-footer-navigation-reserve\] \{\s*padding-bottom: calc\(env\(safe-area-inset-bottom\) \+ 7\.75rem\)/,
   );
   assert.match(
     footerSource,

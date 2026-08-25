@@ -58,3 +58,62 @@ export const WithImages: Story = {
     await expect(body.queryByRole("button", { name: "닫기" })).not.toBeInTheDocument();
   },
 };
+
+export const MainGalleryWithTabletPreviewCarousel: Story = {
+  args: {
+    variant: "main",
+    images: [
+      demoImageA,
+      demoImageB,
+      demoImageA,
+      demoImageB,
+      demoImageA,
+      demoImageB,
+      demoImageA,
+      demoImageB,
+    ],
+  },
+  play: async ({ canvasElement }) => {
+    const carousel = canvasElement.querySelector<HTMLElement>(
+      '[data-partner-image-carousel="main"]',
+    );
+    const canvas = within(canvasElement);
+    const tabletCarousel = canvasElement.querySelector<HTMLElement>(
+      "[data-partner-image-tablet-carousel]",
+    );
+
+    await expect(carousel).not.toBeNull();
+    await expect(tabletCarousel).not.toBeNull();
+    await expect(tabletCarousel).toHaveClass("hidden", "md:block");
+    await expect(
+      canvas.queryByRole("button", { name: "이전 이미지" }),
+    ).not.toBeInTheDocument();
+    const nextButton = canvas.getByRole("button", { name: "다음 이미지" });
+    await expect(nextButton).toBeInTheDocument();
+    await expect(
+      tabletCarousel?.querySelector("[data-partner-image-carousel-preview=previous]"),
+    ).toBeNull();
+    await expect(
+      tabletCarousel?.querySelector("[data-partner-image-carousel-preview=next]"),
+    ).not.toBeNull();
+
+    await userEvent.click(nextButton);
+    await expect(canvas.getByRole("button", { name: "이전 이미지" })).toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: "이미지 2 크게 보기" })).toBeVisible();
+    await expect(
+      tabletCarousel?.querySelectorAll("[data-partner-image-carousel-preview=previous]"),
+    ).toHaveLength(1);
+
+    await userEvent.click(canvas.getByRole("button", { name: "다음 이미지" }));
+    await expect(
+      tabletCarousel?.querySelectorAll("[data-partner-image-carousel-preview=previous]"),
+    ).toHaveLength(2);
+
+    const immediateNextPreview = canvas.getByRole("button", {
+      name: "역삼 캠퍼스 샐러드 바 이미지 4 선택",
+    });
+    await expect(immediateNextPreview).not.toBeNull();
+    await userEvent.click(immediateNextPreview!);
+    await expect(canvas.getByRole("button", { name: "이미지 4 크게 보기" })).toBeVisible();
+  },
+};

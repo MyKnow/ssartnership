@@ -93,6 +93,7 @@ function CarouselControllerHarness({
     activateImage,
     goNext,
     goPrev,
+    handleHorizontalWheel,
     resetInteractiveState,
   } = useCarouselController({ images, matchHeightSelector });
 
@@ -153,6 +154,9 @@ function CarouselControllerHarness({
       <button type="button" onClick={() => activateImage(99)}>
         activate-99
       </button>
+      <button type="button" onClick={() => activateImage(0)}>
+        activate-first
+      </button>
       <button type="button" onClick={() => handleZoom(2)}>
         zoom-2
       </button>
@@ -171,6 +175,30 @@ function CarouselControllerHarness({
       </button>
       <button type="button" onClick={resetInteractiveState}>
         reset
+      </button>
+      <button type="button" onClick={() => handleHorizontalWheel(100, 0)}>
+        horizontal-wheel-next
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          handleHorizontalWheel(96, 0);
+          window.setTimeout(() => handleHorizontalWheel(8, 0), 100);
+          window.setTimeout(() => handleHorizontalWheel(8, 0), 150);
+        }}
+      >
+        horizontal-wheel-coast
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          handleHorizontalWheel(96, 0);
+          window.setTimeout(() => handleHorizontalWheel(8, 0), 80);
+          window.setTimeout(() => handleHorizontalWheel(48, 0), 130);
+          window.setTimeout(() => handleHorizontalWheel(48, 0), 240);
+        }}
+      >
+        horizontal-wheel-continue
       </button>
     </div>
   );
@@ -215,6 +243,10 @@ export const MultiImage: Story = {
     await expect(canvas.getByText("active-index:1")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "prev" }));
     await expect(canvas.getByText("active-index:0")).toBeInTheDocument();
+    await userEvent.click(
+      canvas.getByRole("button", { name: "horizontal-wheel-next" }),
+    );
+    await expect(canvas.getByText("active-index:1")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "activate-99" }));
     await expect(canvas.getByText("active-index:1")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "zoom-2" }));
@@ -232,6 +264,42 @@ export const MultiImage: Story = {
       expect(document.body.style.overflow).toBe("hidden");
       expect(document.body.style.touchAction).toBe("none");
     });
+  },
+};
+
+export const HorizontalWheelGesture: Story = {
+  args: {
+    images: [demoImageA, demoImageB, demoImageA, demoImageB],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "horizontal-wheel-coast" }),
+    );
+    await waitFor(
+      () => {
+        expect(canvas.getByText("active-index:1")).toBeInTheDocument();
+      },
+      { timeout: 700 },
+    );
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "activate-first" }),
+    );
+    await expect(canvas.getByText("active-index:0")).toBeInTheDocument();
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 420);
+    });
+    await userEvent.click(
+      canvas.getByRole("button", { name: "horizontal-wheel-continue" }),
+    );
+    await waitFor(
+      () => {
+        expect(canvas.getByText("active-index:2")).toBeInTheDocument();
+      },
+      { timeout: 700 },
+    );
   },
 };
 
