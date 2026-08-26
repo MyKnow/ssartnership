@@ -1,7 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
 import {
-  CalendarDaysIcon,
-  ChevronDownIcon,
   MapPinIcon,
   UserGroupIcon,
 } from "@heroicons/react/24/outline";
@@ -79,14 +77,7 @@ export default function PartnerDetailSummaryCard({
     !isOnlineService && partner.branchScopeType && partner.branchScopeType !== "single_location";
   const detailDescription = partner.detailDescription?.trim() ?? "";
   const tags = (partner.tags ?? []).map((tag) => tag.trim()).filter(Boolean);
-  const hasIntroduction = Boolean(detailDescription || tags.length > 0);
-  const hasAdditionalInformation = Boolean(
-    partner.period.start ||
-      partner.period.end ||
-      showBranchScope ||
-      partner.branchScopeNote ||
-      hasIntroduction,
-  );
+  const hasBranchInformation = Boolean(showBranchScope || partner.branchScopeNote);
 
   return (
     <Surface
@@ -99,6 +90,23 @@ export default function PartnerDetailSummaryCard({
         data-partner-detail-summary-content
         className="flex min-w-0 flex-col gap-7"
       >
+        {detailDescription ? (
+          <PageSection title="제휴처 소개" data-partner-introduction-section>
+            <Surface
+              level="inset"
+              padding="md"
+              data-partner-introduction-container
+            >
+              <p
+                data-partner-introduction-content
+                className="text-ko-pretty whitespace-pre-line text-sm leading-7 text-muted-foreground sm:text-base"
+              >
+                {detailDescription}
+              </p>
+            </Surface>
+          </PageSection>
+        ) : null}
+
         <PageSection title="받을 수 있는 혜택">
           {partner.benefits.length > 0 ? (
             <PartnerDetailNumberedList ariaLabel="제휴 혜택" items={partner.benefits} />
@@ -199,7 +207,7 @@ export default function PartnerDetailSummaryCard({
             </PartnerDetailInfoRow>
           </div>
 
-          {hasAdditionalInformation ? (
+          {hasBranchInformation ? (
             <section
               data-additional-information-section
               aria-labelledby={`partner-detail-additional-information-${partner.id}`}
@@ -212,92 +220,39 @@ export default function PartnerDetailSummaryCard({
                 추가 정보
               </h3>
               <div className="grid min-w-0 gap-5">
-                {partner.period.start || partner.period.end ? (
-                  <div data-partner-period>
-                    <p className="ui-caption">이용 기간</p>
-                    <div
-                      aria-label={`이용 기간 ${partner.period.start}부터 ${partner.period.end}까지`}
-                      className="mt-2 inline-flex h-8 max-w-full items-center gap-2 rounded-full border border-border/80 bg-surface-inset px-4 py-1 text-xs font-semibold text-foreground"
-                    >
-                      <CalendarDaysIcon
-                        className="size-4 shrink-0 text-muted-foreground"
-                        aria-hidden="true"
-                      />
-                      <span className="whitespace-nowrap tabular-nums">
-                        {partner.period.start} – {partner.period.end}
-                      </span>
-                    </div>
-                  </div>
-                ) : null}
-                {showBranchScope || partner.branchScopeNote ? (
-                  <div>
-                    <p className="ui-caption">적용 지점</p>
-                    <p className="text-ko-pretty mt-2 whitespace-pre-line text-sm leading-7 text-muted-foreground">
-                      {partner.branchScopeNote?.trim() || `${branchScopeLabel}에 적용됩니다.`}
-                    </p>
-                  </div>
-                ) : null}
-                {hasIntroduction ? (
-                  <details
-                    data-partner-introduction-disclosure
-                    className="group min-w-0 overflow-hidden rounded-[1.4rem] border border-border/80 bg-surface-inset"
-                  >
-                    <summary className="flex min-h-14 min-w-0 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 outline-none transition-colors hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/25 [&::-webkit-details-marker]:hidden sm:px-5">
-                      <span className="min-w-0 flex-1">
-                        <span className="ui-label block text-foreground">
-                          제휴처 소개·태그
-                        </span>
-                        <span
-                          data-partner-introduction-teaser
-                          className="ui-caption mt-1 block truncate text-muted-foreground"
-                        >
-                          {detailDescription || `등록된 소개 없이 태그 ${tags.length}개가 있습니다.`}
-                        </span>
-                      </span>
-                      <span className="flex shrink-0 items-center gap-2">
-                        {tags.length > 0 ? (
-                          <span className="rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
-                            태그 {tags.length}개
-                          </span>
-                        ) : null}
-                        <ChevronDownIcon
-                          className="size-5 text-muted-foreground transition-transform duration-200 group-open:rotate-180"
-                          aria-hidden="true"
-                        />
-                      </span>
-                    </summary>
-                    <div
-                      data-partner-introduction-content
-                      className="grid gap-5 border-t border-border/70 px-4 py-4 sm:px-5 sm:py-5"
-                    >
-                      {detailDescription ? (
-                        <div>
-                          <p className="ui-caption">소개</p>
-                          <p className="text-ko-pretty mt-2 whitespace-pre-line text-sm leading-7 text-muted-foreground sm:text-base">
-                            {detailDescription}
-                          </p>
-                        </div>
-                      ) : null}
-                      {tags.length > 0 ? (
-                        <div>
-                          <p className="ui-caption">태그</p>
-                          <ul
-                            data-partner-tag-list
-                            aria-label="제휴처 태그"
-                            className="mt-2 flex flex-wrap gap-2"
-                          >
-                            {tags.map((tag) => (
-                              <li key={tag} data-partner-tag>
-                                <Chip style={chipStyle}>#{tag}</Chip>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null}
-                    </div>
-                  </details>
-                ) : null}
+                <div>
+                  <p className="ui-caption">적용 지점</p>
+                  <p className="text-ko-pretty mt-2 whitespace-pre-line text-sm leading-7 text-muted-foreground">
+                    {partner.branchScopeNote?.trim() || `${branchScopeLabel}에 적용됩니다.`}
+                  </p>
+                </div>
               </div>
+            </section>
+          ) : null}
+
+          {tags.length > 0 ? (
+            <section
+              data-partner-tags-section
+              aria-labelledby={`partner-detail-tags-${partner.id}`}
+              className="grid min-w-0 gap-5 border-t border-border/70 pt-5"
+            >
+              <h3
+                id={`partner-detail-tags-${partner.id}`}
+                className="ui-section-title text-ko-title text-balance"
+              >
+                태그
+              </h3>
+              <ul
+                data-partner-tag-list
+                aria-label="제휴처 태그"
+                className="flex flex-wrap gap-2"
+              >
+                {tags.map((tag) => (
+                  <li key={tag} data-partner-tag>
+                    <Chip style={chipStyle}>#{tag}</Chip>
+                  </li>
+                ))}
+              </ul>
             </section>
           ) : null}
         </section>

@@ -5,7 +5,6 @@ import AnalyticsEventOnMount from "@/components/analytics/AnalyticsEventOnMount"
 import SiteHeader from "@/components/SiteHeader";
 import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
-import PageHeader from "@/components/ui/PageHeader";
 import PartnerImageCarousel from "@/components/PartnerImageCarousel";
 import { SITE_NAME } from "@/lib/site";
 import { createCanonicalAlternates } from "@/lib/seo";
@@ -13,7 +12,7 @@ import { getPartnerViewerContext } from "@/lib/partner-view-context";
 import PartnerDetailContactSection from "./_page/PartnerDetailContactSection";
 import PartnerDetailAccessGate from "./_page/PartnerDetailAccessGate";
 import PartnerDetailCoupons from "./_page/PartnerDetailCoupons";
-import PartnerDetailHeroMeta from "./_page/PartnerDetailHeroMeta";
+import PartnerDetailHeroContent from "./_page/PartnerDetailHeroContent";
 import { getPartnerDetailPageData, getPartnerMetadataData } from "./_page/page-data";
 import PartnerDetailSummaryCard from "./_page/PartnerDetailSummaryCard";
 import PartnerDetailMobileActionBar from "./_page/PartnerDetailMobileActionBar";
@@ -267,11 +266,11 @@ export default async function PartnerDetailPage({
             >
               <div
                 data-partner-detail-hero-info
-                className="grid min-w-0 grid-cols-[5rem_minmax(0,1fr)] items-center gap-4 rounded-card border border-border bg-surface p-4 shadow-flat sm:p-5 md:grid-cols-[7rem_minmax(0,1fr)]"
+                className="grid min-w-0 grid-cols-1 items-stretch gap-4 rounded-card border border-border bg-surface p-4 shadow-flat min-[480px]:grid-cols-[auto_minmax(0,1fr)] min-[480px]:gap-3 sm:p-5 md:gap-5"
               >
                 <PartnerImageCarousel
                   key={`${carouselKey}:thumbnail`}
-                  className="w-full max-w-20 self-center md:max-w-28"
+                  className="aspect-square w-full self-start justify-self-stretch min-[480px]:h-full min-[480px]:min-h-20 min-[480px]:min-w-20 min-[480px]:w-auto min-[480px]:self-stretch min-[480px]:justify-self-start"
                   images={partner.thumbnail ? [partner.thumbnail] : []}
                   name={partner.name}
                   variant="hero"
@@ -279,21 +278,16 @@ export default async function PartnerDetailPage({
                   showThumbnails={false}
                   priority
                 />
-                <div className="flex min-w-0 flex-col justify-center gap-3">
-                  <PartnerDetailHeroMeta
-                    partnerId={partner.id}
-                    categoryLabel={categoryLabel}
-                    chipStyle={chipStyle}
-                    currentUserId={currentUserId}
-                    isFavorited={isFavorited}
-                    favoriteCount={metrics.favoriteCount}
-                  />
-                  <PageHeader
-                    className="border-0 border-b-0 pb-0"
-                    title={partner.name}
-                    titleClassName="text-[clamp(1.5rem,5.5vw,2.25rem)]"
-                  />
-                </div>
+                <PartnerDetailHeroContent
+                  partnerName={partner.name}
+                  partnerId={partner.id}
+                  categoryLabel={categoryLabel}
+                  categoryColor={chipStyle?.color}
+                  currentUserId={currentUserId}
+                  isFavorited={isFavorited}
+                  favoriteCount={metrics.favoriteCount}
+                  period={partner.period}
+                />
               </div>
             </div>
 
