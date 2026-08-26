@@ -1,14 +1,6 @@
-import { useEffect } from "react";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, userEvent, within } from "storybook/test";
-import { ToastProvider } from "@/components/ui/Toast";
-import type { HeaderSession } from "@/lib/header-session";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 import MobileNav from "./MobileNav";
-
-const signedInSession: HeaderSession = {
-  userId: "member-1",
-  notificationUnreadCount: 4,
-};
 
 const meta = {
   title: "Domains/MobileNav",
@@ -20,11 +12,13 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <ToastProvider>
-        <div className="min-h-[24rem] bg-background p-4">
-          <Story />
+      <div className="min-h-[36rem] bg-background px-4 py-8">
+        <div className="grid gap-4">
+          <div className="h-36 rounded-panel border border-border bg-surface" />
+          <div className="h-56 rounded-panel border border-border bg-surface-muted" />
         </div>
-      </ToastProvider>
+        <Story />
+      </div>
     ),
   ],
 } satisfies Meta<typeof MobileNav>;
@@ -35,82 +29,104 @@ type Story = StoryObj<typeof meta>;
 
 export const Guest: Story = {
   args: {
-    initialSession: null,
+    signedInUserId: null,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: "메뉴 열기" }));
-
-    const body = within(document.body);
-    await expect(body.getByRole("dialog")).toBeInTheDocument();
-    await expect(body.getByRole("link", { name: "로그인" })).toHaveAttribute("href", "/auth/login");
-    await expect(body.getByRole("link", { name: "회원가입" })).toHaveAttribute("href", "/auth/signup");
-    await expect(body.getByRole("button", { name: "앱 설치" })).toBeVisible();
-
-    await userEvent.click(body.getAllByRole("button", { name: "메뉴 닫기" })[0]!);
-    await expect(body.queryByRole("dialog")).not.toBeInTheDocument();
+    await expect(canvas.getByRole("navigation", { name: "모바일 주요 탐색" })).toBeVisible();
+    await expect(canvas.getByRole("link", { name: "혜택 검색" })).toHaveAttribute(
+      "href",
+      "/#benefit-search",
+    );
+    await expect(canvas.getByRole("link", { name: "쿠폰함" })).toHaveAttribute(
+      "href",
+      "/auth/login?returnTo=%2Fcoupons",
+    );
+    await expect(canvas.getByRole("link", { name: "내 정보" })).toHaveAttribute(
+      "href",
+      "/auth/login?returnTo=%2Fcertification",
+    );
   },
 };
 
-export const SignedInEscapeClose: Story = {
+export const SignedIn: Story = {
   args: {
-    initialSession: signedInSession,
+    signedInUserId: "member-1",
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: "메뉴 열기" }));
-
-    const body = within(document.body);
-    await expect(body.getByRole("link", { name: "내 인증" })).toHaveAttribute("href", "/certification");
-    await userEvent.keyboard("{Escape}");
-    await expect(body.queryByRole("dialog")).not.toBeInTheDocument();
+    await expect(canvas.getByRole("link", { name: "홈" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(canvas.getByRole("link", { name: "쿠폰함" })).toHaveAttribute(
+      "href",
+      "/coupons",
+    );
+    await expect(canvas.getByRole("link", { name: "내 정보" })).toHaveAttribute(
+      "href",
+      "/certification",
+    );
   },
 };
 
-function InstallPromptMobileNavStory() {
-  useEffect(() => {
-    const promptEvent = new Event("beforeinstallprompt", { cancelable: true }) as Event & {
-      prompt: () => Promise<void>;
-      userChoice: Promise<{ outcome: "accepted"; platform: string }>;
-    };
-    promptEvent.prompt = async () => {};
-    promptEvent.userChoice = Promise.resolve({ outcome: "accepted", platform: "web" });
-    const timeoutId = window.setTimeout(() => {
-      window.dispatchEvent(promptEvent);
-    }, 250);
-    return () => window.clearTimeout(timeoutId);
-  }, []);
-
-  return <MobileNav initialSession={signedInSession} />;
-}
-
-export const SignedInActions: Story = {
-  render: () => <InstallPromptMobileNavStory />,
+export const RouteLoading: Story = {
+  args: {
+    signedInUserId: "member-1",
+  },
   play: async ({ canvasElement }) => {
-    const originalConfirm = window.confirm;
-    let confirmCalled = false;
-    window.confirm = () => {
-      confirmCalled = true;
-      return false;
-    };
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole("navigation", { name: "모바일 주요 탐색" }),
+    ).toBeVisible();
+    await expect(canvas.getByRole("link", { name: "쿠폰함" })).toHaveAttribute(
+      "href",
+      "/coupons",
+    );
+  },
+};
 
-    try {
-      const canvas = within(canvasElement);
-      await userEvent.click(canvas.getByRole("button", { name: "메뉴 열기" }));
+export const SettingsActive: Story = {
+  args: {
+    signedInUserId: "member-1",
+  },
+  parameters: {
+    nextjs: {
+      navigation: { pathname: "/settings" },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("link", { name: "내 정보" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  },
+};
 
-      const body = within(document.body);
-      const dialog = body.getByRole("dialog");
-      const logoutButton = within(dialog).getByRole("button", { name: "로그아웃" });
-      await userEvent.click(logoutButton);
-      await expect(confirmCalled).toBe(true);
-      await expect(logoutButton).toBeVisible();
-
-      await new Promise((resolve) => window.setTimeout(resolve, 300));
-      const installButton = await within(dialog).findByRole("button", { name: "앱 설치" });
-      await userEvent.click(installButton);
-      await expect(await body.findByText("설치가 시작되었습니다.")).toBeVisible();
-    } finally {
-      window.confirm = originalConfirm;
-    }
+export const HomeSearchFocus: Story = {
+  args: {
+    signedInUserId: "member-1",
+  },
+  decorators: [
+    (Story) => (
+      <div className="min-h-[36rem] bg-background px-4 py-8">
+        <label className="grid gap-2 text-sm font-semibold text-foreground">
+          검색
+          <input
+            data-testid="partner-search-input"
+            className="h-11 rounded-control border border-border bg-surface-control px-3"
+          />
+        </label>
+        <Story />
+      </div>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const searchInput = canvas.getByTestId("partner-search-input");
+    searchInput.scrollIntoView = () => undefined;
+    await userEvent.click(canvas.getByRole("link", { name: "혜택 검색" }));
+    await waitFor(() => expect(searchInput).toHaveFocus());
   },
 };

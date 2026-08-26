@@ -26,12 +26,8 @@ const PLATFORM_MATRIX = new Map([
   ["linux-x64", { key: "linux-x64", label: "Linux x64", support: "ci-only" }],
 ]);
 
-const ENV_FILES = [
-  ".env",
-  ".env.local",
-  ".env.development",
-  ".env.development.local",
-];
+const ENV_FILES = [".env"];
+const ALLOWED_PROJECT_ENV_FILES = new Set([".env", ".env.example"]);
 
 const DEVELOPMENT_REQUIRED_ENV = [
   "NEXT_PUBLIC_DATA_SOURCE",
@@ -71,6 +67,10 @@ const SECRET_ENV_NAMES = new Set([
   "VAPID_PRIVATE_KEY",
   "CRON_SECRET",
 ]);
+
+const MINIMUM_LENGTH_SECRET_ENV_NAMES = new Set(
+  [...SECRET_ENV_NAMES].filter((name) => name !== "SMTP_PASS"),
+);
 
 const URL_ENV_NAMES = [
   "SUPABASE_URL",
@@ -133,6 +133,20 @@ export function parseEnvFile(source) {
   }
 
   return parsed;
+}
+
+export function getUnexpectedProjectEnvironmentFiles(entries) {
+  return entries
+    .filter(
+      (entry) =>
+        (entry === ".env" || entry.startsWith(".env.")) &&
+        !ALLOWED_PROJECT_ENV_FILES.has(entry),
+    )
+    .toSorted();
+}
+
+export function findUnexpectedProjectEnvironmentFiles({ root = repositoryRoot } = {}) {
+  return getUnexpectedProjectEnvironmentFiles(readdirSync(root));
 }
 
 export function loadProjectEnvironment({ root = repositoryRoot, environment = process.env } = {}) {
@@ -308,7 +322,7 @@ export function validateEnvironment(environment) {
     }
   }
 
-  for (const name of SECRET_ENV_NAMES) {
+  for (const name of MINIMUM_LENGTH_SECRET_ENV_NAMES) {
     const value = environment[name]?.trim();
     if (value && value.length < 32) {
       diagnostics.push(
@@ -633,6 +647,30 @@ export async function collectDoctorDiagnostics({
           "Dependencies",
           "Project dependencies are missing or incomplete.",
           "Run npm run bootstrap.",
+        ),
+  );
+
+  let unexpectedEnvironmentFiles = [];
+  try {
+    unexpectedEnvironmentFiles = findUnexpectedProjectEnvironmentFiles({ root });
+  } catch {
+    // The filesystem diagnostic below owns unreadable repository failures.
+  }
+  diagnostics.push(
+    unexpectedEnvironmentFiles.length === 0
+      ? diagnostic(
+          "PASS",
+          "environment_files",
+          "Environment files",
+          "Only .env and .env.example are present at the repository root.",
+          "No action required.",
+        )
+      : diagnostic(
+          "FAIL",
+          "environment_files",
+          "Environment files",
+          `Unsupported environment files are present: ${unexpectedEnvironmentFiles.join(", ")}.`,
+          "Consolidate their reviewed values into .env, then remove the extra files.",
         ),
   );
 

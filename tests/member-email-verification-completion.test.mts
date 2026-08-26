@@ -136,6 +136,67 @@ test("동시에 같은 인증 코드를 재사용해도 한 요청만 완료된�
   );
 });
 
+test("새 이메일 코드가 발급되면 이전 이메일의 코드는 더 이상 완료할 수 없다", async () => {
+  const { MockMemberEmailVerificationRepository } =
+    await mockRepositoryModulePromise;
+  const repository = new MockMemberEmailVerificationRepository({
+    now: NOW,
+    members: [
+      {
+        id: MEMBER_ID,
+        emailNormalized: null,
+        emailVerifiedAt: null,
+        deletedAt: null,
+      },
+    ],
+    challenges: [
+      {
+        id: "challenge-old",
+        memberId: MEMBER_ID,
+        emailNormalized: EMAIL,
+        purpose: "email_verify",
+        codeHash: CODE_HASH,
+        expiresAt: "2026-08-13T05:08:12.000Z",
+        verifiedAt: null,
+        consumedAt: null,
+        attemptCount: 0,
+        createdAt: "2026-08-13T04:56:12.000Z",
+        deliveryStatus: "sent",
+      },
+      {
+        id: "challenge-new",
+        memberId: MEMBER_ID,
+        emailNormalized: "new@example.com",
+        purpose: "email_verify",
+        codeHash: WRONG_CODE_HASH,
+        expiresAt: "2026-08-13T05:08:12.000Z",
+        verifiedAt: null,
+        consumedAt: null,
+        attemptCount: 0,
+        createdAt: "2026-08-13T04:57:12.000Z",
+        deliveryStatus: "sent",
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    await repository.completeMemberEmailVerification(completionInput),
+    { verified: false, reason: "challenge_missing" },
+  );
+  assert.equal(repository.getSnapshot().members[0]?.emailNormalized, null);
+});
+
+test("전송 완료로 표시되지 않은 코드는 인증에 사용할 수 없다", async () => {
+  const repository = await createRepository({
+    challengeOverrides: { deliveryStatus: "pending" },
+  });
+
+  assert.deepEqual(
+    await repository.completeMemberEmailVerification(completionInput),
+    { verified: false, reason: "challenge_missing" },
+  );
+});
+
 test("invalid, expired, consumed, exhausted challenge는 회원 이메일을 갱신하지 않는다", async () => {
   const scenarios = [
     {

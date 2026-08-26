@@ -13,6 +13,7 @@ async function typeSearch(page: Page, value: string) {
   await waitForDirectoryControls(page);
   const searchInput = page.getByTestId("partner-search-input");
   await searchInput.fill(value);
+  await searchInput.press("Enter");
 }
 
 test.describe("public partner discovery", () => {
@@ -119,12 +120,21 @@ test.describe("public partner discovery", () => {
     await page.setViewportSize({ width: 360, height: 844 });
     await page.goto("/?view=list#benefits");
     await page.waitForLoadState("networkidle");
+    await waitForDirectoryControls(page);
 
     const searchBox = await page.getByTestId("partner-search-input").boundingBox();
+    const disclosure = page.getByTestId("partner-mobile-filter-disclosure");
+    const disclosureBox = await disclosure.boundingBox();
+    expect(searchBox).not.toBeNull();
+    expect(disclosureBox).not.toBeNull();
+    if (searchBox && disclosureBox) {
+      expect(searchBox.y).toBeLessThan(disclosureBox.y);
+    }
+
+    await disclosure.click();
     const categoryBox = await page
       .getByRole("group", { name: "제휴처 카테고리" })
       .boundingBox();
-    expect(searchBox).not.toBeNull();
     expect(categoryBox).not.toBeNull();
     if (searchBox && categoryBox) {
       expect(searchBox.y).toBeLessThan(categoryBox.y);
@@ -164,17 +174,55 @@ test.describe("public partner discovery", () => {
     await expect(page.getByTestId("partner-results-toolbar")).toContainText(/제휴처 \d+곳/);
   });
 
+  test("wraps expanded mobile categories instead of horizontally scrolling", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 844 });
+    await page.goto("/#benefits");
+    await waitForDirectoryControls(page);
+
+    await page
+      .getByTestId("partner-mobile-filter-disclosure")
+      .click();
+
+    const categoryGroup = page.getByRole("group", {
+      name: "제휴처 카테고리",
+    });
+    await expect(categoryGroup).toBeVisible();
+
+    const metrics = await categoryGroup.evaluate((element) => {
+      const buttons = Array.from(
+        element.querySelectorAll<HTMLButtonElement>("button"),
+      );
+
+      return {
+        clientWidth: element.clientWidth,
+        overflowX: window.getComputedStyle(element).overflowX,
+        rowCount: new Set(
+          buttons.map((button) => Math.round(button.getBoundingClientRect().top)),
+        ).size,
+        scrollWidth: element.scrollWidth,
+      };
+    });
+
+    expect(metrics.overflowX).toBe("visible");
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
+    expect(metrics.rowCount).toBeGreaterThan(1);
+  });
+
   test("keeps applied filters visible and individually removable", async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 844 });
     await page.goto("/#benefits");
     await page.waitForLoadState("networkidle");
     await waitForDirectoryControls(page);
 
-    await page.getByText("고급 필터", { exact: true }).click();
-    await page.getByTestId("partner-campus-filter").selectOption("seoul");
+    await page.getByTestId("partner-mobile-filter-disclosure").click();
+    await page
+      .getByTestId("partner-campus-filter-mobile-inline")
+      .selectOption("seoul");
     await expect(page).toHaveURL(/campus=seoul/);
 
-    const activeFilters = page.getByTestId("partner-active-filters");
+    const activeFilters = page.getByLabel("적용된 상세 필터");
     await expect(activeFilters).toBeVisible();
     await activeFilters.getByRole("button", { name: "서울 캠퍼스 필터 해제" }).click();
     await expect(page).not.toHaveURL(/campus=seoul/);
@@ -280,7 +328,7 @@ test.describe("public partner discovery", () => {
 
     const publicPartnerLink = cards
       .first()
-      .getByRole("link", { name: "제휴 상세 보기" });
+      .getByRole("link", { name: / 상세 보기$/ });
     await expect(publicPartnerLink).toBeVisible();
     await publicPartnerLink.scrollIntoViewIfNeeded();
     await Promise.all([
@@ -297,6 +345,9 @@ test.describe("public partner discovery", () => {
 
     const card = page.getByTestId("partner-card").first();
     await expect(card).toBeVisible();
+    await expect(
+      card.getByRole("link", { name: "제휴 상세 보기" }),
+    ).toHaveCount(0);
     await card.scrollIntoViewIfNeeded();
     await card.locator("p").first().click();
 
@@ -304,9 +355,7 @@ test.describe("public partner discovery", () => {
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
 
-  test("keeps the scroll-to-top action above the mobile detail action bar", async ({
-    page,
-  }) => {
+  test("does not render a scroll-to-top FAB on mobile partner detail", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/#benefits");
 
@@ -314,22 +363,9 @@ test.describe("public partner discovery", () => {
     await expect(card).toBeVisible();
     await card.getByRole("link", { name: /상세 보기/ }).first().click();
 
-    const actionBar = page.locator("[data-partner-detail-mobile-action-bar]");
-    await expect(actionBar).toBeVisible();
+    await expect(page.locator("[data-partner-detail-mobile-action-bar]")).toBeVisible();
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-
-    const scrollToTop = page.getByRole("button", { name: "맨 위로 이동" });
-    await expect(scrollToTop).toBeVisible();
-
-    const actionBarBox = await actionBar.boundingBox();
-    const scrollToTopBox = await scrollToTop.boundingBox();
-    expect(actionBarBox).not.toBeNull();
-    expect(scrollToTopBox).not.toBeNull();
-    if (actionBarBox && scrollToTopBox) {
-      expect(scrollToTopBox.y + scrollToTopBox.height + 8).toBeLessThanOrEqual(
-        actionBarBox.y,
-      );
-    }
+    await expect(page.getByRole("button", { name: "맨 위로 이동" })).toHaveCount(0);
   });
 
   test("filters partners by search keyword and shows an empty state", async ({ page }) => {
@@ -363,7 +399,40 @@ test.describe("public partner discovery", () => {
     await expect(cards).toHaveCount(initialCount);
   });
 
-  test("searches benefits and returns with filters intact", async ({ page }) => {
+  test("applies a partner search only after an explicit submit", async ({ page }) => {
+    await page.goto("/#benefits");
+    await waitForDirectoryControls(page);
+
+    const cards = page.getByTestId("partner-card");
+    const initialCount = await cards.count();
+    const firstPartnerName = (
+      await cards.first().locator('a[aria-label$=" 상세 보기"]').first().textContent()
+    )?.trim();
+    expect(firstPartnerName).toBeTruthy();
+    if (!firstPartnerName) {
+      return;
+    }
+
+    const searchInput = page.getByTestId("partner-search-input");
+    await searchInput.fill(firstPartnerName);
+
+    await expect(searchInput).toHaveValue(firstPartnerName);
+    await expect(searchInput).toHaveAttribute("enterkeyhint", "search");
+    expect(page.url()).not.toContain("q=");
+    await expect(cards).toHaveCount(initialCount);
+
+    await searchInput.press("Enter");
+    await expect(page).toHaveURL(/q=/);
+    await expect(cards).toHaveCount(1);
+
+    await searchInput.fill("");
+    await expect(page).toHaveURL(/q=/);
+    await page.getByRole("button", { name: "검색", exact: true }).click();
+    await expect(page).not.toHaveURL(/q=/);
+    await expect(cards).toHaveCount(initialCount);
+  });
+
+  test("keeps a submitted search in the partner detail return target", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     const benefitsSection = page.locator("#benefits");
@@ -384,10 +453,24 @@ test.describe("public partner discovery", () => {
 
     const resultCard = cards.first();
     await expect(resultCard).toBeVisible();
-    await resultCard.getByRole("link", { name: "제휴 상세 보기" }).click();
+    const detailLink = resultCard
+      .locator('a[aria-label$=" 상세 보기"]')
+      .first();
+    await expect(detailLink).toHaveAttribute("href", /returnTo=.*q%3D/);
+    await detailLink.click();
 
     await expect(page).toHaveURL(/returnTo=/);
-    await page.goBack();
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    const returnTo = await page.evaluate(
+      () => new URL(window.location.href).searchParams.get("returnTo"),
+    );
+    expect(returnTo).toContain("q=");
+    if (!returnTo) {
+      return;
+    }
+
+    await page.goto(new URL(returnTo, page.url()).toString());
 
     await expect(page).toHaveURL(/q=/);
     await expect(page.getByTestId("partner-search-input")).toHaveValue(firstPartnerName);

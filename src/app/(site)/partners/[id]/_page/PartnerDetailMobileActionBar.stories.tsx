@@ -67,17 +67,22 @@ export const BenefitAndInquiry: Story = {
     const actionBar = canvasElement.querySelector<HTMLElement>(
       "[data-partner-detail-mobile-action-bar]",
     );
+    const glassSurface = actionBar?.querySelector<HTMLElement>(
+      ".site-mobile-nav-glass",
+    );
 
     await expect(actionGrid).not.toBeNull();
     await expect(benefit).not.toBeNull();
     await expect(inquiry).not.toBeNull();
     await expect(actionGrid).toHaveClass("grid-cols-2", "gap-2");
     await expect(actionBar).toHaveClass("pb-safe-bottom-2");
+    await expect(glassSurface).not.toBeNull();
+    await expect(glassSurface).toHaveClass("rounded-[1.75rem]", "p-2");
     await expect(benefit).toHaveClass("h-12", "rounded-[1rem]", "bg-primary");
     await expect(inquiry).toHaveClass(
       "h-12",
-      "rounded-[1rem]",
-      "bg-surface-muted",
+      "rounded-[1.2rem]",
+      "bg-surface-overlay/75",
     );
     await expect(
       Math.abs(

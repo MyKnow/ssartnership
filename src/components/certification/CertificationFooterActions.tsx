@@ -2,10 +2,21 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import {
+  ArrowRightStartOnRectangleIcon,
+  KeyIcon,
+  TrashIcon,
+  UserCircleIcon,
+} from "@heroicons/react/24/outline";
+import {
+  CertificationSettingRow,
+  CertificationSettingsGroup,
+} from "@/components/certification/CertificationSettingsList";
 import Button from "@/components/ui/Button";
-import Surface from "@/components/ui/Surface";
+import Modal from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { buildMemberGateHref } from "@/lib/member-required-gates";
+import { getMemberAccountDeletionNavigation } from "@/lib/site-navigation";
 
 export default function CertificationFooterActions({
   canChangeProfilePhoto = false,
@@ -16,71 +27,94 @@ export default function CertificationFooterActions({
 }) {
   const { notify } = useToast();
   const router = useRouter();
-  const [deleting, setDeleting] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutConfirmationOpen, setLogoutConfirmationOpen] = useState(false);
+  const { deletionHref } = getMemberAccountDeletionNavigation(returnTo);
+
+  const logOut = async () => {
+    if (loggingOut) {
+      return;
+    }
+    setLoggingOut(true);
+    try {
+      const response = await fetch("/api/mm/logout", { method: "POST" });
+      if (!response.ok) {
+        notify("로그아웃에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+        return;
+      }
+      setLogoutConfirmationOpen(false);
+      notify("로그아웃되었습니다.");
+      router.replace("/");
+    } finally {
+      setLoggingOut(false);
+    }
+  };
 
   return (
-    <Surface
-      level="inset"
-      padding="lg"
-      className="flex w-full flex-wrap items-center gap-3"
-    >
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-foreground">계정 관리</p>
-      </div>
-      <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+    <>
+      <CertificationSettingsGroup title="보안">
         {canChangeProfilePhoto ? (
-          <Button
-            variant="ghost"
+          <CertificationSettingRow
+            icon={<UserCircleIcon className="h-5 w-5" />}
+            title="본인 사진"
+            description="인증 카드에 표시할 본인 사진을 변경합니다."
             href={buildMemberGateHref("profile-photo", returnTo)}
             prefetch={false}
-          >
-            본인 사진 변경
-          </Button>
+          />
         ) : null}
-        <Button
-          variant="ghost"
+        <CertificationSettingRow
+          icon={<KeyIcon className="h-5 w-5" />}
+          title="비밀번호"
+          description="현재 계정의 비밀번호를 변경합니다."
           href={buildMemberGateHref("change-password", returnTo)}
           prefetch={false}
+        />
+        <CertificationSettingRow
+          icon={<ArrowRightStartOnRectangleIcon className="h-5 w-5" />}
+          title="로그아웃"
+          description="이 기기에서 로그아웃합니다."
+          className="md:hidden"
+          onClick={() => setLogoutConfirmationOpen(true)}
+        />
+      </CertificationSettingsGroup>
+
+      <CertificationSettingsGroup title="계정">
+        <CertificationSettingRow
+          icon={<TrashIcon className="h-5 w-5" />}
+          title="회원 탈퇴"
+          description="혜택 이용을 포기하고 탈퇴합니다."
+          tone="danger"
+          href={deletionHref}
+          prefetch={false}
+        />
+      </CertificationSettingsGroup>
+
+      <Modal
+        open={logoutConfirmationOpen}
+        title="로그아웃하시겠습니까?"
+        description="이 기기에서 현재 계정의 세션을 종료합니다."
+        onClose={() => {
+          if (!loggingOut) {
+            setLogoutConfirmationOpen(false);
+          }
+        }}
+        bodyClassName="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"
+      >
+        <Button
+          variant="secondary"
+          disabled={loggingOut}
+          onClick={() => setLogoutConfirmationOpen(false)}
         >
-          비밀번호 변경하기
+          취소
         </Button>
         <Button
-          variant="danger"
-          loading={deleting}
-          loadingText="회원 탈퇴 중"
-          onClick={async () => {
-            if (deleting) {
-              return;
-            }
-            const first = window.confirm(
-              "정말 탈퇴하시겠습니까? 탈퇴 후에는 로그인과 혜택 이용이 중지됩니다.",
-            );
-            if (!first) {
-              return;
-            }
-            const second = window.confirm(
-              "한 번 더 확인합니다. 30일 후 개인 식별 정보와 프로필 사진이 익명화됩니다.",
-            );
-            if (!second) {
-              return;
-            }
-            setDeleting(true);
-            try {
-              const response = await fetch("/api/mm/delete", { method: "POST" });
-              if (response.ok) {
-                notify("회원 탈퇴가 처리되었습니다.");
-                router.replace("/");
-                return;
-              }
-              notify("회원 탈퇴에 실패했습니다.");
-            } finally {
-              setDeleting(false);
-            }
-          }}
+          onClick={() => void logOut()}
+          loading={loggingOut}
+          loadingText="로그아웃 중"
         >
-          회원 탈퇴
+          로그아웃
         </Button>
-      </div>
-    </Surface>
+      </Modal>
+    </>
   );
 }

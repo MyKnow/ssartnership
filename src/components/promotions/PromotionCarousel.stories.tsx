@@ -46,7 +46,7 @@ const meta = {
     viewport: { defaultViewport: "mobile1" },
     chromatic: { viewports: [360, 820, 1366] },
   },
-  args: { slides },
+  args: { slides, fullBleed: true },
 } satisfies Meta<typeof PromotionCarousel>;
 
 export default meta;

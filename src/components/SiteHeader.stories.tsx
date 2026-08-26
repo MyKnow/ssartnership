@@ -50,11 +50,35 @@ export const SignedIn: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await expect(canvas.getByRole("link", { name: "설정" })).toHaveAttribute(
+      "href",
+      "/settings?returnTo=%2F",
+    );
+    if (window.innerWidth < 768) {
+      await expect(canvas.getByRole("link", { name: "알림" })).toBeVisible();
+      await expect(canvas.queryByRole("button", { name: "테마 변경" })).not.toBeInTheDocument();
+      return;
+    }
     if (window.innerWidth < 1280) {
       await expect(
         await canvas.findByRole("link", { name: "내 인증" }),
       ).toHaveAttribute("href", "/certification");
     }
     await expect(canvas.getByRole("button", { name: "테마 변경" })).toBeVisible();
+  },
+};
+
+export const FocusedEmailVerification: Story = {
+  args: {
+    initialSession: signedInSession,
+  },
+  parameters: {
+    nextjs: {
+      navigation: { pathname: "/certification/email" },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.queryByRole("link", { name: "설정" })).not.toBeInTheDocument();
   },
 };

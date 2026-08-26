@@ -70,12 +70,12 @@ npm run build
 
 1. OS와 CPU Architecture 감지
 2. Node.js 24.18.1과 npm 11.16.0 확인
-3. 환경 파일이 하나도 없으면 gitignored `.env.local`에 local mock profile 생성
+3. `.env`가 없으면 gitignored `.env`에 local mock profile 생성
 4. `package-lock.json` 기반 dependency 설치
 5. container/local DB/code generation 필요 여부 판정
 6. doctor 전체 진단 실행
 
-dependency 설치는 `.npmrc` 정책과 lockfile registry identity를 먼저 검증하는 `install:trusted` 경계를 사용한다. 모든 lifecycle script를 비활성화하고 optional native package를 포함한 뒤, 현재 플랫폼의 고정된 esbuild binary 무결성과 버전을 직접 확인한다. 같은 명령을 반복해도 기존 tracked 파일이나 환경 파일을 덮어쓰지 않는다. 기존 환경 파일이 있으면 bootstrap은 내용을 변경하지 않는다.
+dependency 설치는 `.npmrc` 정책과 lockfile registry identity를 먼저 검증하는 `install:trusted` 경계를 사용한다. 모든 lifecycle script를 비활성화하고 optional native package를 포함한 뒤, 현재 플랫폼의 고정된 esbuild binary 무결성과 버전을 직접 확인한다. 같은 명령을 반복해도 기존 tracked 파일이나 환경 파일을 덮어쓰지 않는다. 기존 `.env`가 있으면 bootstrap은 내용을 변경하지 않는다. 프로젝트 루트의 실제 환경 파일은 `.env` 하나만 허용하고, `.env.example`은 실제 비밀값이 없는 공유용 변수 계약으로만 유지한다.
 
 CI에서는 `npm run bootstrap -- --ci`를 사용한다. clean checkout에는 secret 값을 출력하지 않는 임시 local mock profile을 생성하고, 의존성 설치 child process에는 application 환경을 전달하지 않는다. CI mode는 port 점유 검사만 생략한다.
 
@@ -106,7 +106,7 @@ Secret 값은 진단 결과에 포함하지 않는다. 실패 결과는 변수 �
 
 환경변수 이름은 OS와 관계없이 같은 대문자 이름을 사용한다. `PATH`, `Path`, `path`처럼 같은 의미의 이름을 혼용하지 않는다.
 
-bootstrap이 만드는 local mock profile은 외부 cloud, container, local DB 없이 화면과 테스트를 시작하기 위한 값만 포함한다. Secret은 machine에서 무작위로 생성하고 출력하지 않는다. Production credential을 local mock profile에 복사하지 않는다.
+bootstrap이 만드는 `.env` local mock profile은 외부 cloud, container, local DB 없이 화면과 테스트를 시작하기 위한 값만 포함한다. Secret은 machine에서 무작위로 생성하고 출력하지 않는다. Production credential을 local mock profile에 복사하지 않는다. `.env.local`, `.env.development`, `.env.development.local` 같은 추가 파일은 우선순위를 숨기므로 doctor와 bootstrap이 거부한다.
 
 Supabase 또는 Production profile을 선택하면 doctor는 필요한 cloud 변수, HTTPS URL, secret 길이, placeholder, Production/mock 충돌을 fail-closed로 검증한다. `.env` 처리는 shell의 `export`, `set`, `$VAR`, `%VAR%` 문법을 사용하지 않는다.
 

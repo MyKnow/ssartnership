@@ -1,8 +1,10 @@
 import { randomInt } from "node:crypto";
 import { createHmacDigest, verifyHmacDigest } from "@/lib/hmac.js";
 import { normalizeMemberEmail } from "@/lib/member-domain";
-
-export const MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS = 10 * 60;
+export {
+  MEMBER_EMAIL_RESEND_COOLDOWN_SECONDS,
+  MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS,
+} from "@/lib/member-email-verification-timing";
 
 export function getMemberEmailVerificationSecret() {
   const secret =

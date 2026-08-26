@@ -141,5 +141,6 @@ export async function POST(request: Request) {
     properties: { stage: "verify" },
   });
   revalidatePath("/certification");
+  revalidatePath("/certification/email");
   return NextResponse.json({ ok: true });
 }

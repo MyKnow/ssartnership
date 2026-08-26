@@ -38,9 +38,18 @@ function FooterSection({
   );
 }
 
-export default function Footer() {
+export default function Footer({
+  reserveMobileNavigationSpace = false,
+}: {
+  reserveMobileNavigationSpace?: boolean;
+}) {
   return (
-    <footer className="border-t border-border/70 bg-surface-overlay/90 py-6 backdrop-blur-xl">
+    <footer
+      data-site-footer-navigation-reserve={
+        reserveMobileNavigationSpace ? "" : undefined
+      }
+      className="border-t border-border/70 bg-surface-overlay/90 py-6 backdrop-blur-xl"
+    >
       <Container className="grid gap-8 text-sm text-muted-foreground" size="wide">
         <div className="grid gap-4">
           <Link
@@ -52,10 +61,6 @@ export default function Footer() {
           </Link>
           <p className="text-xs leading-6">
             Copyright © 2026 {SITE_NAME}. All rights reserved.
-          </p>
-          <p className="max-w-3xl text-xs leading-6">
-            Apple, Apple Watch, iPhone, and iPod touch are trademarks of Apple
-            Inc., registered in the U.S. and other countries.
           </p>
         </div>
 

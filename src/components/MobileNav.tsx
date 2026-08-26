@@ -1,183 +1,147 @@
 "use client";
 
-import { createPortal } from "react-dom";
-import { useEffect, useState } from "react";
-import UserMenu from "@/components/auth/UserMenu";
-import PwaInstallButton from "@/components/PwaInstallButton";
-import type { HeaderSession } from "@/lib/header-session";
-import { SITE_NAME } from "@/lib/site";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  HomeIcon,
+  MagnifyingGlassIcon,
+  TicketIcon,
+  UserCircleIcon,
+} from "@heroicons/react/24/outline";
+import {
+  HomeIcon as HomeSolidIcon,
+  TicketIcon as TicketSolidIcon,
+  UserCircleIcon as UserCircleSolidIcon,
+} from "@heroicons/react/24/solid";
 import { cn } from "@/lib/cn";
+import {
+  isFocusedSiteFlow,
+  isMyInfoPath,
+  isPartnerDetailPath,
+} from "@/lib/site-navigation";
 
-function DrawerSection({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-3xl border border-border bg-surface-muted/70 p-4">
-      <div className="mb-3">
-        <p className="text-sm font-semibold text-foreground">{title}</p>
-        {description ? (
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-        ) : null}
-      </div>
-      {children}
-    </section>
-  );
+const MOBILE_NAV_ITEMS = [
+  {
+    key: "home",
+    label: "홈",
+    href: "/",
+    isActive: (pathname: string) => pathname === "/",
+    Icon: HomeIcon,
+    ActiveIcon: HomeSolidIcon,
+  },
+  {
+    key: "coupons",
+    label: "쿠폰함",
+    href: "/coupons",
+    isActive: (pathname: string) => pathname.startsWith("/coupons"),
+    Icon: TicketIcon,
+    ActiveIcon: TicketSolidIcon,
+  },
+  {
+    key: "profile",
+    label: "내 정보",
+    href: "/certification",
+    isActive: (pathname: string) => isMyInfoPath(pathname),
+    Icon: UserCircleIcon,
+    ActiveIcon: UserCircleSolidIcon,
+  },
+] as const;
+
+function getMemberNavigationHref(
+  href: "/coupons" | "/certification",
+  signedIn: boolean,
+) {
+  if (signedIn) {
+    return href;
+  }
+
+  return `/auth/login?returnTo=${encodeURIComponent(href)}`;
 }
 
 export default function MobileNav({
-  initialSession,
+  signedInUserId,
 }: {
-  initialSession?: HeaderSession | null;
+  signedInUserId?: string | null;
 }) {
-  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const isSignedIn = Boolean(signedInUserId);
+  if (isFocusedSiteFlow(pathname) || isPartnerDetailPath(pathname)) {
+    return null;
+  }
 
-  useEffect(() => {
-    if (!open) {
+  const handleSearchClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (pathname !== "/") {
       return;
     }
 
-    document.body.style.overflow = "hidden";
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
+    const searchInput = document.querySelector<HTMLInputElement>(
+      "[data-testid='partner-search-input']",
+    );
+    if (!searchInput) {
+      return;
+    }
 
-    return () => {
-      document.body.style.overflow = "";
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
+    event.preventDefault();
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${window.location.search}#benefit-search`,
+    );
+    searchInput.scrollIntoView({
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+      block: "center",
+    });
+    window.requestAnimationFrame(() => searchInput.focus({ preventScroll: true }));
+  };
 
   return (
-    <>
-      <button
-        type="button"
-        className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-control text-foreground xl:hidden"
-        aria-label="메뉴 열기"
-        onClick={() => setOpen(true)}
-      >
-        <svg
-          width={18}
-          height={18}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M3 6h18" />
-          <path d="M3 12h18" />
-          <path d="M3 18h18" />
-        </svg>
-      </button>
+    <nav
+      aria-label="모바일 주요 탐색"
+      data-site-mobile-navigation
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-50 px-3 md:hidden"
+    >
+      <div className="mx-auto flex w-full max-w-md items-stretch gap-2">
+        <div className="site-mobile-nav-glass pointer-events-auto grid min-w-0 flex-1 grid-cols-3 rounded-[2.125rem] p-1">
+          {MOBILE_NAV_ITEMS.map((item) => {
+            const active = item.isActive(pathname);
+            const Icon = active ? item.ActiveIcon : item.Icon;
+            const href =
+              item.href === "/coupons" || item.href === "/certification"
+                ? getMemberNavigationHref(item.href, isSignedIn)
+                : item.href;
 
-      {open && typeof document !== "undefined"
-        ? createPortal(
-            <div
-              className={cn(
-                "fixed inset-0 isolate z-[70] xl:hidden",
-                open ? "pointer-events-auto" : "pointer-events-none",
-              )}
-              aria-hidden={!open}
-            >
-              <button
-                type="button"
+            return (
+              <Link
+                key={item.key}
+                href={href}
+                prefetch={false}
+                aria-current={active ? "page" : undefined}
                 className={cn(
-                  "absolute inset-0 z-0 bg-black/55 transition-opacity",
-                  open ? "opacity-100" : "opacity-0",
-                )}
-                aria-label="메뉴 닫기"
-                onClick={() => setOpen(false)}
-              />
-
-              <div
-                role="dialog"
-                aria-modal="true"
-                aria-label="메뉴"
-                className={cn(
-                  "fixed right-0 top-0 z-10 h-full w-[86vw] max-w-sm overflow-hidden rounded-l-[2rem] border-l border-border bg-surface-overlay shadow-overlay transition-transform",
-                  open ? "translate-x-0" : "translate-x-full",
+                  "site-mobile-nav-interactive flex min-h-[3.75rem] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[1.75rem] px-1 text-[11px] font-semibold leading-none text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+                  active && "site-mobile-nav-active text-primary-emphasis",
                 )}
               >
-                <div className="flex h-full flex-col bg-surface-overlay">
-                  <div className="border-b border-border px-6 pb-5 pt-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                          Menu
-                        </p>
-                        <p className="mt-2 text-lg font-semibold text-foreground">
-                          {SITE_NAME}
-                        </p>
-                      </div>
+                <Icon className="h-[1.375rem] w-[1.375rem]" aria-hidden="true" />
+                <span className="max-w-full truncate">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
 
-                      <button
-                        type="button"
-                        className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border bg-surface-control text-foreground"
-                        onClick={() => setOpen(false)}
-                        aria-label="메뉴 닫기"
-                      >
-                        <svg
-                          width={18}
-                          height={18}
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M18 6 6 18" />
-                          <path d="m6 6 12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto px-6 py-5">
-                    <div className="flex flex-col gap-4">
-                      <DrawerSection
-                        title="계정"
-                        description="로그인, 회원가입, 프로필, 알림 관련 메뉴입니다."
-                      >
-                        <UserMenu
-                          initialSession={initialSession}
-                          className="flex-col items-stretch"
-                          buttonClassName="w-full justify-between rounded-2xl px-4"
-                        />
-                      </DrawerSection>
-
-                      <DrawerSection
-                        title="앱"
-                        description="홈 화면에 추가해 앱처럼 실행할 수 있습니다."
-                      >
-                        <PwaInstallButton className="w-full justify-between rounded-2xl px-4" />
-                      </DrawerSection>
-                    </div>
-                  </div>
-
-                  <div className="border-t border-border px-6 py-4">
-                    <p className="text-xs text-muted-foreground">
-                      화면 밖 영역을 누르거나 ESC 키를 누르면 드로어가 닫힙니다.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
-    </>
+        <Link
+          href="/#benefit-search"
+          prefetch={false}
+          onClick={handleSearchClick}
+          aria-label="혜택 검색"
+          className="site-mobile-nav-glass site-mobile-nav-interactive pointer-events-auto flex h-[4.25rem] w-[4.25rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-full text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          <MagnifyingGlassIcon className="h-6 w-6" aria-hidden="true" />
+          <span className="text-[10px] font-semibold leading-none">검색</span>
+        </Link>
+      </div>
+    </nav>
   );
 }

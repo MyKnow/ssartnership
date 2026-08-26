@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   useCallback,
   startTransition,
@@ -18,8 +18,8 @@ import PartnerActiveFilters from "@/components/partner-filters/PartnerActiveFilt
 import PartnerDirectoryToolbar from "@/components/partner-filters/PartnerDirectoryToolbar";
 import MotionReveal from "@/components/ui/MotionReveal";
 import PartnerCardView from "@/components/PartnerCardView";
-import SectionHeading from "@/components/ui/SectionHeading";
 import EmptyState from "@/components/ui/EmptyState";
+import HomeDirectorySectionHeader from "@/components/home-view/HomeDirectorySectionHeader";
 import { cn } from "@/lib/cn";
 import { HOME_COPY } from "@/lib/content";
 import { trackProductEvent } from "@/lib/product-events";
@@ -58,6 +58,7 @@ export default function HomeView({
   loadedPartnerStateIds?: string[];
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const categoryKeys = useMemo(
     () => categories.map((category) => category.key),
@@ -77,6 +78,7 @@ export default function HomeView({
     key: "",
     limit: INITIAL_PARTNER_CARD_COUNT,
   });
+  const [searchInputValue, setSearchInputValue] = useState(searchValue);
   const directoryHydrated = useHydrated();
   const [localPopularityById, setLocalPopularityById] = useState<
     Record<string, PartnerPopularityMetrics | undefined>
@@ -93,8 +95,11 @@ export default function HomeView({
   const lastLoggedSearchRef = useRef("");
   const { notify } = useToast();
 
-  const replaceDirectoryState = useCallback(
-    (nextState: Partial<HomeDirectoryState>) => {
+  const updateDirectoryState = useCallback(
+    (
+      nextState: Partial<HomeDirectoryState>,
+      historyMode: "push" | "replace" = "replace",
+    ) => {
       const currentParams = new URLSearchParams(window.location.search);
       const currentDirectoryState = parseHomeDirectoryState(
         currentParams,
@@ -105,14 +110,35 @@ export default function HomeView({
         currentParams,
       );
       const query = params.toString();
-      window.history.replaceState(
-        null,
-        "",
-        query ? `${pathname}?${query}#benefits` : `${pathname}#benefits`,
-      );
+      const nextUrl = query
+        ? `${pathname}?${query}#benefits`
+        : `${pathname}#benefits`;
+
+      if (historyMode === "push") {
+        router.push(nextUrl);
+      } else {
+        window.history.replaceState(null, "", nextUrl);
+      }
     },
-    [categoryKeys, pathname],
+    [categoryKeys, pathname, router],
   );
+
+  const commitSearchValue = useCallback(
+    (nextValue: string) => {
+      if (nextValue === searchValue) {
+        return;
+      }
+
+      startTransition(() => {
+        updateDirectoryState({ q: nextValue }, "push");
+      });
+    },
+    [searchValue, updateDirectoryState],
+  );
+
+  useEffect(() => {
+    setSearchInputValue(searchValue);
+  }, [searchValue]);
 
   const directoryReturnTo = useMemo(() => {
     const query = searchParams.toString();
@@ -211,6 +237,26 @@ export default function HomeView({
       notify("정상적으로 제출되었습니다.");
     }
   }, [notify]);
+
+  useEffect(() => {
+    if (window.location.hash !== "#benefit-search") {
+      return;
+    }
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      const searchInput = document.querySelector<HTMLInputElement>(
+        "[data-testid='partner-search-input']",
+      );
+      if (!searchInput) {
+        return;
+      }
+
+      searchInput.scrollIntoView({ block: "center" });
+      searchInput.focus({ preventScroll: true });
+    });
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, []);
 
   useEffect(() => {
     const missingPartnerIds = displayPartnerIds.filter(
@@ -320,7 +366,7 @@ export default function HomeView({
 
   const handleCategoryChange = (nextCategory: CategoryKey | "all") => {
     startTransition(() => {
-      replaceDirectoryState({ category: nextCategory });
+      updateDirectoryState({ category: nextCategory });
     });
     trackProductEvent({
       eventName: "category_filter_change",
@@ -334,7 +380,7 @@ export default function HomeView({
 
   const handleSortChange = (nextSort: PartnerSortOption) => {
     startTransition(() => {
-      replaceDirectoryState({ sort: nextSort });
+      updateDirectoryState({ sort: nextSort });
     });
     trackProductEvent({
       eventName: "sort_change",
@@ -350,7 +396,7 @@ export default function HomeView({
     nextCampus: HomeDirectoryState["campus"],
   ) => {
     startTransition(() => {
-      replaceDirectoryState({ campus: nextCampus });
+      updateDirectoryState({ campus: nextCampus });
     });
   };
 
@@ -358,13 +404,13 @@ export default function HomeView({
     nextAudience: HomeDirectoryState["audience"],
   ) => {
     startTransition(() => {
-      replaceDirectoryState({ audience: nextAudience });
+      updateDirectoryState({ audience: nextAudience });
     });
   };
 
   const handleViewModeChange = (nextViewMode: HomeDirectoryState["view"]) => {
     startTransition(() => {
-      replaceDirectoryState({ view: nextViewMode });
+      updateDirectoryState({ view: nextViewMode });
     });
     trackProductEvent({
       eventName: "directory_view_change",
@@ -376,10 +422,12 @@ export default function HomeView({
     });
   };
 
-  const handleSearchChange = (nextValue: string) => {
-    startTransition(() => {
-      replaceDirectoryState({ q: nextValue });
-    });
+  const handleSearchInputChange = (nextValue: string) => {
+    setSearchInputValue(nextValue);
+  };
+
+  const handleSearchSubmit = () => {
+    commitSearchValue(searchInputValue);
   };
 
   const handleFavoriteChange = (partnerId: string, nextFavorited: boolean) => {
@@ -404,13 +452,8 @@ export default function HomeView({
 
   return (
     <MotionReveal delay={0.04}>
-      <section id="benefits" className="flex scroll-mt-24 flex-col gap-6 pt-10">
-        <SectionHeading
-          eyebrow="Directory"
-          title={HOME_COPY.categoryTitle}
-          description={HOME_COPY.categoryDescription}
-          headingLevel="h2"
-        />
+      <section id="benefits" className="flex scroll-mt-24 flex-col gap-4 pt-7">
+        <HomeDirectorySectionHeader />
         <div className="grid min-w-0 gap-6 min-[840px]:grid-cols-[minmax(15rem,17rem)_minmax(0,1fr)] min-[840px]:items-start min-[1200px]:grid-cols-[18rem_minmax(0,1fr)]">
           <div
             className="min-w-0 min-[840px]:sticky min-[840px]:top-24 min-[840px]:self-start"
@@ -423,8 +466,9 @@ export default function HomeView({
               categories={categories}
               activeCategory={activeCategory}
               onCategoryChange={handleCategoryChange}
-              searchValue={searchValue}
-              onSearchChange={handleSearchChange}
+              searchValue={searchInputValue}
+              onSearchChange={handleSearchInputChange}
+              onSearchSubmit={handleSearchSubmit}
               campusFilter={campusFilter}
               onCampusFilterChange={handleCampusFilterChange}
               appliesToFilter={appliesToFilter}
@@ -445,7 +489,7 @@ export default function HomeView({
               campusFilter={campusFilter}
               appliesToFilter={appliesToFilter}
               sortValue={sortValue}
-              onSearchChange={handleSearchChange}
+              onSearchChange={commitSearchValue}
               onCategoryChange={handleCategoryChange}
               onCampusFilterChange={handleCampusFilterChange}
               onAppliesToFilterChange={handleAppliesToFilterChange}
@@ -455,6 +499,8 @@ export default function HomeView({
               resultCount={directoryResultCount}
               viewMode={viewMode}
               onViewModeChange={handleViewModeChange}
+              sortValue={sortValue}
+              onSortChange={handleSortChange}
             />
           {displayPartners.length === 0 ? (
             <div data-testid="partner-no-results">

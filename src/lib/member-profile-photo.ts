@@ -23,7 +23,7 @@ export function requiresMemberProfilePhotoUpdate(value: unknown) {
     return false;
   }
   const status = normalizeMemberProfilePhotoReviewStatus(value);
-  return status === "missing";
+  return status === "missing" || status === "rejected";
 }
 
 export function getMemberProfilePhotoAccessState(value: unknown) {
@@ -45,7 +45,7 @@ export function getMemberProfilePhotoAccessState(value: unknown) {
   }
   if (status === "rejected") {
     return {
-      requiresSubmission: false,
+      requiresSubmission: true,
       restrictCertification: true,
       message:
         "본인 사진을 다시 제출해 주세요. 승인 전에는 인증 서비스를 이용할 수 없습니다.",

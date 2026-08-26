@@ -9,6 +9,7 @@ import {
   buildLocalDevelopmentEnv,
   classifyPlatform,
   collectDoctorDiagnostics,
+  findUnexpectedProjectEnvironmentFiles,
   loadProjectEnvironment,
   printDiagnostics,
   repositoryRoot,
@@ -60,8 +61,17 @@ process.stdout.write(`PASS Platform: ${platform.label} (${platform.support})\n`)
 process.stdout.write(`PASS Runtime: Node.js ${REQUIRED_NODE_VERSION}, npm ${REQUIRED_NPM_VERSION}\n`);
 
 const currentEnvironment = loadProjectEnvironment({ root: repositoryRoot });
+const unexpectedEnvironmentFiles = findUnexpectedProjectEnvironmentFiles({
+  root: repositoryRoot,
+});
+if (unexpectedEnvironmentFiles.length > 0) {
+  fail(
+    `지원하지 않는 환경 파일이 있습니다: ${unexpectedEnvironmentFiles.join(", ")}.`,
+    "검토한 값을 .env로 통합하고 추가 환경 파일을 제거하세요.",
+  );
+}
 if (currentEnvironment.loadedFiles.length === 0) {
-  const envPath = join(repositoryRoot, ".env.local");
+  const envPath = join(repositoryRoot, ".env");
   if (!existsSync(envPath)) {
     writeFileSync(
       envPath,
@@ -69,7 +79,7 @@ if (currentEnvironment.loadedFiles.length === 0) {
       { encoding: "utf8", flag: "wx", mode: 0o600 },
     );
     process.stdout.write(
-      "PASS Environment: 로컬 mock 개발용 .env.local을 생성했습니다. Secret 값은 출력하지 않았습니다.\n",
+      "PASS Environment: 로컬 mock 개발용 .env를 생성했습니다. Secret 값은 출력하지 않았습니다.\n",
     );
   }
 } else {

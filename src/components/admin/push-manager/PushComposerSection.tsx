@@ -293,11 +293,6 @@ function RecipientListModal({
           )}
         </div>
 
-        <div className="flex justify-end">
-          <Button variant="secondary" onClick={onClose}>
-            닫기
-          </Button>
-        </div>
       </div>
     </Modal>
   );

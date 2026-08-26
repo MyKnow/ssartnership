@@ -18,8 +18,16 @@ const certificationPagePath = new URL(
   "../src/app/(site)/certification/page.tsx",
   import.meta.url,
 );
+const settingsPagePath = new URL(
+  "../src/app/(site)/settings/page.tsx",
+  import.meta.url,
+);
 const certificationFooterPath = new URL(
   "../src/components/certification/CertificationFooterActions.tsx",
+  import.meta.url,
+);
+const certificationAccountSettingsPath = new URL(
+  "../src/components/certification/CertificationAccountSettings.tsx",
   import.meta.url,
 );
 const certificationPhotoPagePath = new URL(
@@ -44,11 +52,11 @@ const profileSyncPath = new URL(
   import.meta.url,
 );
 
-test("사진이 없는 회원만 사진 제출 전까지 일반 이용을 막고, 검토 상태는 인증 기능만 제한한다", () => {
+test("사진이 없거나 반려된 회원은 재제출까지 일반 이용을 막고, 검토 중에는 인증 기능만 제한한다", () => {
   assert.equal(requiresMemberProfilePhotoUpdate("missing"), true);
   assert.equal(requiresMemberProfilePhotoUpdate("approved"), false);
   assert.equal(requiresMemberProfilePhotoUpdate("pending"), false);
-  assert.equal(requiresMemberProfilePhotoUpdate("rejected"), false);
+  assert.equal(requiresMemberProfilePhotoUpdate("rejected"), true);
   assert.equal(requiresMemberProfilePhotoUpdate(null), false);
 });
 
@@ -69,7 +77,7 @@ test("사진 상태는 사용자에게 필요한 다음 행동만 노출한다",
     message: "본인 사진 변경 요청을 검토하고 있습니다. 인증 서비스를 이용하려면 검토가 끝날 때까지 기다려 주세요.",
   });
   assert.deepEqual(getMemberProfilePhotoAccessState("rejected"), {
-    requiresSubmission: false,
+    requiresSubmission: true,
     restrictCertification: true,
     message: "본인 사진을 다시 제출해 주세요. 승인 전에는 인증 서비스를 이용할 수 없습니다.",
   });
@@ -104,10 +112,18 @@ test("사진 제출 경로는 공통 게이트 해석기로 자기 재진입을 
   assert.match(layout, /currentPath: returnTo/);
 });
 
-test("인증 화면의 사진 CTA는 원래 목적지를 사진 화면까지 보존한다", async () => {
-  const [certificationPage, certificationFooter, certificationPhotoPage] =
+test("인증 화면과 설정의 사진 CTA는 각 원래 목적지를 사진 화면까지 보존한다", async () => {
+  const [
+    certificationPage,
+    settingsPage,
+    certificationAccountSettings,
+    certificationFooter,
+    certificationPhotoPage,
+  ] =
     await Promise.all([
       readFile(certificationPagePath, "utf8"),
+      readFile(settingsPagePath, "utf8"),
+      readFile(certificationAccountSettingsPath, "utf8"),
       readFile(certificationFooterPath, "utf8"),
       readFile(certificationPhotoPagePath, "utf8"),
     ]);
@@ -117,8 +133,10 @@ test("인증 화면의 사진 CTA는 원래 목적지를 사진 화면까지 보
     /href=\{buildMemberGateHref\("profile-photo", returnTo\)\}/,
   );
   assert.doesNotMatch(certificationPage, /href="\/certification\/photo"/);
+  assert.doesNotMatch(certificationPage, /CertificationAccountSettings/);
+  assert.match(settingsPage, /returnTo=\{settingsHref\}/);
   assert.match(
-    certificationPage,
+    certificationAccountSettings,
     /<CertificationFooterActions[\s\S]*returnTo=\{returnTo\}/,
   );
   assert.match(

@@ -56,6 +56,14 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["public.certification.qr-valid"],
   },
   {
+    routePath: "/certification/email",
+    surface: "public",
+    authScope: "member",
+    viewComponent: "MemberEmailVerificationView",
+    dataSources: ["api-route", "service", "storybook"],
+    requiredScenarioIds: ["public.certification.qr-valid"],
+  },
+  {
     routePath: "/certification/photo",
     surface: "public",
     authScope: "member",
@@ -102,6 +110,22 @@ const mockRouteInventoryBase = [
     viewComponent: "NotificationsView",
     dataSources: ["api-route", "storybook"],
     requiredScenarioIds: ["public.notifications.default"],
+  },
+  {
+    routePath: "/settings",
+    surface: "public",
+    authScope: "member",
+    viewComponent: "MemberSettingsView",
+    dataSources: ["service", "storybook"],
+    requiredScenarioIds: ["public.certification.qr-valid"],
+  },
+  {
+    routePath: "/settings/delete-account",
+    surface: "public",
+    authScope: "member",
+    viewComponent: "MemberAccountDeletionView",
+    dataSources: ["api-route", "storybook"],
+    requiredScenarioIds: ["public.certification.qr-valid"],
   },
   {
     routePath: "/partner-registration",
@@ -694,6 +718,11 @@ const routeContracts: Record<string, RouteContractDefinition> = {
     screenContractId: "member.certification",
     primaryTask: "내 SSAFY 구성원 인증 상태와 QR을 제시한다.",
   },
+  "/certification/email": {
+    routeKind: "canonical",
+    screenContractId: "member.certification-email",
+    primaryTask: "로그인과 비밀번호 재설정에 사용할 이메일을 인증한다.",
+  },
   "/certification/photo": {
     routeKind: "canonical",
     screenContractId: "member.certification-photo",
@@ -723,6 +752,16 @@ const routeContracts: Record<string, RouteContractDefinition> = {
     routeKind: "canonical",
     screenContractId: "member.notifications",
     primaryTask: "내 알림을 확인하고 읽음 상태를 관리한다.",
+  },
+  "/settings": {
+    routeKind: "canonical",
+    screenContractId: "member.settings",
+    primaryTask: "계정 연결 정보와 로그인 보안을 관리한다.",
+  },
+  "/settings/delete-account": {
+    routeKind: "canonical",
+    screenContractId: "member.account-deletion",
+    primaryTask: "탈퇴에 따른 영향을 확인하고 최종 탈퇴 요청을 진행한다.",
   },
   "/partner-registration": {
     routeKind: "canonical",

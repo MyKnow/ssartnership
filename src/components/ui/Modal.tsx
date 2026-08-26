@@ -1,5 +1,6 @@
 "use client";
 
+import { XMarkIcon } from "@heroicons/react/24/outline";
 import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
@@ -160,9 +161,9 @@ export default function Modal({
                 type="button"
                 onClick={onClose}
                 aria-label="모달 닫기"
-                className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-control border border-border bg-surface-control px-3 text-sm font-medium text-foreground transition-colors hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border/80 bg-surface-control text-foreground shadow-flat transition-interactive duration-200 ease-out hover:-translate-y-px hover:border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-overlay"
               >
-                닫기
+                <XMarkIcon className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
             <div className={cn("mt-4 min-h-0 flex-1", bodyClassName)}>

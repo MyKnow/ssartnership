@@ -2,7 +2,9 @@
 
 import dynamic from "next/dynamic";
 import Image from "next/image";
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/cn";
+import TabletImageCarousel from "@/components/partner-image-carousel/TabletImageCarousel";
 import ThumbStrip from "@/components/partner-image-carousel/ThumbStrip";
 import { useCarouselController } from "@/components/partner-image-carousel/useCarouselController";
 import { isProxiedCachedImageUrl } from "@/lib/image-cache";
@@ -51,12 +53,17 @@ export default function PartnerImageCarousel({
   imageFit?: "cover" | "contain";
   showThumbnails?: boolean;
 }) {
+  const requestedThumbPlacement = "bottom";
+  const stageRef = useRef<HTMLDivElement | null>(null);
   const {
     cachedImages,
     hasImages,
     activeIndex,
+    navigationDirection,
     activeImage,
     canNavigate,
+    canGoPrev,
+    canGoNext,
     rootRef,
     activeThumbRef,
     thumbStripRef,
@@ -73,65 +80,125 @@ export default function PartnerImageCarousel({
     activateImage,
     goNext,
     goPrev,
+    goNextBounded,
+    goPrevBounded,
+    beginHorizontalSwipe,
+    endHorizontalSwipe,
+    cancelHorizontalSwipe,
+    consumeSwipeClick,
+    handleHorizontalWheel,
     resetInteractiveState,
   } = useCarouselController({
     images,
     matchHeightSelector,
+    thumbPlacement: requestedThumbPlacement,
   });
   const imageAspectClassName = variant === "hero" ? "aspect-square" : "aspect-[4/3]";
+  const showTabletCarousel = variant === "main" && hasImages && showThumbnails;
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) {
+      return;
+    }
+
+    const handleWheel = (event: WheelEvent) => {
+      if (handleHorizontalWheel(event.deltaX, event.deltaY)) {
+        event.preventDefault();
+      }
+    };
+
+    stage.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      stage.removeEventListener("wheel", handleWheel);
+    };
+  }, [handleHorizontalWheel]);
 
   return (
     <div
       ref={rootRef}
       data-partner-image-carousel={variant}
-      className={cn(
-        "grid min-w-0 items-start gap-3",
-        showThumbnails && thumbPlacement === "side"
-          ? "xl:grid-cols-[minmax(0,1fr)_7.5rem] xl:items-start"
-          : "xl:grid-cols-1 xl:items-start",
-        className,
-      )}
+      className={cn("relative min-w-0", className)}
     >
-      <button
-        type="button"
-        className={cn(
-          "relative w-full overflow-hidden rounded-3xl border border-border bg-surface-muted",
-          imageAspectClassName,
-        )}
-        onClick={() => {
-          if (hasImages) {
-            setOpen(true);
-          }
-        }}
-        aria-label={`${name} 이미지 크게 보기`}
-      >
-        {hasImages ? (
-          <Image
-            src={activeImage}
-            alt={name}
-            fill
-            sizes="(max-width: 1279px) 100vw, 50vw"
-            className={imageFit === "contain" ? "object-contain" : "object-cover"}
-            fetchPriority={priority ? "high" : undefined}
-            loading={priority ? undefined : "eager"}
-            priority={priority}
-            unoptimized={isProxiedCachedImageUrl(activeImage)}
-          />
-        ) : (
-          placeholder
-        )}
-      </button>
-
-      {hasImages && showThumbnails ? (
-        <ThumbStrip
+      {showTabletCarousel ? (
+        <TabletImageCarousel
           images={cachedImages}
+          name={name}
           activeIndex={activeIndex}
-          placement={thumbPlacement}
-          activeThumbRef={activeThumbRef}
-          thumbStripRef={thumbStripRef}
+          navigationDirection={navigationDirection}
+          canGoPrev={canGoPrev}
+          canGoNext={canGoNext}
           onSelect={activateImage}
+          onOpen={() => setOpen(true)}
+          onPrev={goPrevBounded}
+          onNext={goNextBounded}
+          onSwipeStart={beginHorizontalSwipe}
+          onSwipeEnd={endHorizontalSwipe}
+          onSwipeCancel={cancelHorizontalSwipe}
+          shouldIgnoreSwipeClick={consumeSwipeClick}
+          onHorizontalWheel={handleHorizontalWheel}
         />
       ) : null}
+
+      <div
+        ref={stageRef}
+        data-partner-image-carousel-stage
+        className={cn(
+          "grid min-w-0 items-start gap-3 overscroll-x-none",
+          showTabletCarousel
+            ? "md:pointer-events-none md:absolute md:inset-x-0 md:top-0 md:invisible"
+            : "xl:grid-cols-1 xl:items-start",
+        )}
+      >
+        <button
+          type="button"
+          data-partner-image-main-frame
+          className={cn(
+            "relative w-full overflow-hidden rounded-3xl border border-border bg-surface-muted",
+            imageAspectClassName,
+            "touch-pan-y",
+          )}
+          onPointerDown={(event) => beginHorizontalSwipe(event.clientX)}
+          onPointerUp={(event) => endHorizontalSwipe(event.clientX)}
+          onPointerCancel={cancelHorizontalSwipe}
+          onClick={() => {
+            if (consumeSwipeClick()) {
+              return;
+            }
+            if (hasImages) {
+              setOpen(true);
+            }
+          }}
+          aria-label={`${name} 이미지 크게 보기`}
+        >
+          {hasImages ? (
+            <Image
+              src={activeImage}
+              alt={name}
+              fill
+              sizes="(max-width: 1279px) 100vw, 50vw"
+              className={imageFit === "contain" ? "object-contain" : "object-cover"}
+              fetchPriority={priority ? "high" : undefined}
+              loading={priority ? undefined : "eager"}
+              priority={priority}
+              unoptimized={isProxiedCachedImageUrl(activeImage)}
+            />
+          ) : (
+            placeholder
+          )}
+        </button>
+
+        {hasImages && showThumbnails ? (
+          <ThumbStrip
+            images={cachedImages}
+            activeIndex={activeIndex}
+            placement={thumbPlacement}
+            activeThumbRef={activeThumbRef}
+            thumbStripRef={thumbStripRef}
+            onSelect={activateImage}
+          />
+        ) : null}
+      </div>
 
       {isOpen ? (
         <LightboxModal

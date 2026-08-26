@@ -18,6 +18,10 @@ const gateEntrypointPaths = [
 
 const gateCompletionPaths = [
   new URL("../src/components/auth/ChangePasswordForm.tsx", import.meta.url),
+  new URL(
+    "../src/components/member-manual-import/ManualMemberPasswordSetupView.tsx",
+    import.meta.url,
+  ),
   new URL("../src/components/auth/PolicyConsentForm.tsx", import.meta.url),
   new URL("../src/app/auth/consent/page.tsx", import.meta.url),
   new URL("../src/app/(site)/certification/photo/page.tsx", import.meta.url),
@@ -151,6 +155,22 @@ test("회원 게이트 진입점과 완료 화면은 공통 리디렉션 계약�
   ]);
   for (const source of entrypoints) assert.match(source, /getMemberRequiredGateRedirect/);
   for (const source of completions) assert.match(source, /getMemberGateCompletionReturnTo/);
+});
+
+test("관리자 발급 비밀번호 작업 완료는 사진 화면을 가정하지 않고 서버 게이트를 다시 거친다", async () => {
+  const source = await readFile(
+    new URL(
+      "../src/components/member-manual-import/ManualMemberPasswordSetupView.tsx",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  assert.match(
+    source,
+    /window\.location\.replace\(\s*getMemberGateCompletionReturnTo\(\s*"\/",\s*"change-password"\s*\)/,
+  );
+  assert.doesNotMatch(source, /router\.replace\(\s*"\/certification\/photo"\s*\)/);
 });
 
 test("관리자 보호 레이아웃도 프록시가 전달한 실제 요청 경로를 사용한다", async () => {

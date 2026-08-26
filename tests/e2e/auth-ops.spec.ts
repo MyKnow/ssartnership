@@ -134,7 +134,6 @@ test.describe("auth and partner portal operation flows", () => {
     );
 
     await page.goto("/auth/signup");
-    await page.waitForLoadState("networkidle");
     const generation = page.getByRole("combobox", { name: "기수" });
     const generationOption = generation.locator('option[value]:not([value=""])').first();
     await expect(generationOption).toBeAttached();

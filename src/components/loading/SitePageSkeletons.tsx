@@ -1,6 +1,7 @@
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
 import Skeleton from "@/components/ui/Skeleton";
+import Surface from "@/components/ui/Surface";
 
 function StaticSkeleton({ className }: { className?: string }) {
   return <Skeleton animated={false} className={className} />;
@@ -9,20 +10,39 @@ function StaticSkeleton({ className }: { className?: string }) {
 function LoadingHeader() {
   return (
     <>
-      <div
-        aria-hidden="true"
-        className="min-safe-site-header"
-      />
+      <div aria-hidden="true" className="safe-site-header-spacer" />
       <header className="fixed inset-x-0 top-0 z-40">
         <div className="border-b border-border bg-surface-overlay/90 pt-safe-top backdrop-blur">
-          <Container className="flex items-center justify-between gap-3 py-4" size="wide">
+          <Container
+            className="flex items-center justify-between gap-3 py-3"
+            size="wide"
+          >
             <StaticSkeleton className="h-7 w-36 rounded-lg" />
             <div className="flex items-center gap-2">
-              <StaticSkeleton className="hidden h-10 w-28 rounded-full sm:block" />
-              <StaticSkeleton className="h-10 w-10 rounded-full" />
-              <StaticSkeleton className="h-10 w-10 rounded-full" />
-              <StaticSkeleton className="h-10 w-10 rounded-full" />
+              <StaticSkeleton className="hidden h-11 w-28 rounded-full sm:block" />
+              <StaticSkeleton className="h-11 w-11 rounded-full" />
+              <StaticSkeleton className="h-11 w-11 rounded-full" />
+              <StaticSkeleton className="h-11 w-11 rounded-full" />
             </div>
+          </Container>
+        </div>
+      </header>
+    </>
+  );
+}
+
+function FocusedMemberLoadingHeader() {
+  return (
+    <>
+      <div aria-hidden="true" className="safe-site-header-spacer" />
+      <header className="fixed inset-x-0 top-0 z-40">
+        <div className="border-b border-border bg-surface-overlay/90 pt-safe-top backdrop-blur">
+          <Container
+            className="flex items-center justify-between gap-3 py-3"
+            size="wide"
+          >
+            <StaticSkeleton className="h-7 w-24 rounded-lg !bg-border/60" />
+            <StaticSkeleton className="h-11 w-11 rounded-full !bg-border/60" />
           </Container>
         </div>
       </header>
@@ -51,12 +71,10 @@ function SectionHeadingSkeleton({
 
 function HeroSkeleton() {
   return (
-    <section className="hero-surface animate-pulse motion-reduce:animate-none rounded-3xl px-8 py-10 shadow-floating">
-      <StaticSkeleton className="h-4 w-40 rounded-lg bg-white/15 dark:bg-white/10" />
-      <StaticSkeleton className="mt-4 h-10 w-full max-w-2xl rounded-xl bg-white/15 dark:bg-white/10" />
-      <StaticSkeleton className="mt-4 h-4 w-full max-w-2xl rounded-lg bg-white/15 dark:bg-white/10" />
-      <StaticSkeleton className="mt-2 h-4 w-full max-w-xl rounded-lg bg-white/15 dark:bg-white/10" />
-    </section>
+    <section
+      aria-hidden="true"
+      className="relative aspect-[21/9] w-full animate-pulse bg-surface-muted motion-reduce:animate-none"
+    />
   );
 }
 
@@ -82,39 +100,42 @@ function PartnerCardSkeleton() {
   );
 }
 
-function FilterBarSkeleton() {
+function HomeFilterBarSkeleton() {
   return (
-    <div className="animate-pulse motion-reduce:animate-none rounded-[28px] border border-border bg-surface-elevated p-5 shadow-raised">
-      <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-        <div className="flex items-start gap-3">
-          <StaticSkeleton className="h-12 w-12 shrink-0 rounded-2xl" />
-          <div className="min-w-0 flex-1">
-            <StaticSkeleton className="h-6 w-48" />
-            <StaticSkeleton className="mt-2 h-4 w-full max-w-lg" />
-          </div>
-        </div>
-        <div className="flex justify-end">
-          <StaticSkeleton className="h-12 w-32 rounded-full" />
-        </div>
+    <div className="animate-pulse motion-reduce:animate-none rounded-card border border-border/80 bg-surface-inset p-3 min-[840px]:p-4">
+      <div className="flex items-end gap-2 min-[840px]:block">
+        <StaticSkeleton className="h-11 min-w-0 flex-1 rounded-input" />
+        <StaticSkeleton className="h-11 w-20 shrink-0 rounded-control min-[840px]:hidden" />
       </div>
-
-      <div className="mt-6 flex flex-col gap-4">
-        <div className="animate-pulse motion-reduce:animate-none flex flex-wrap gap-2">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <StaticSkeleton key={index} className="h-11 w-24 rounded-full" />
+      <div className="mt-3 flex gap-2 overflow-hidden">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <StaticSkeleton
+            key={index}
+            className="h-11 w-20 shrink-0 rounded-full"
+          />
+        ))}
+      </div>
+      <div className="mt-4 hidden border-t border-border/70 pt-4 min-[840px]:block">
+        <StaticSkeleton className="h-4 w-20 rounded-lg" />
+        <StaticSkeleton className="mt-2 h-3 w-48 rounded-lg" />
+        <div className="mt-4 grid gap-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index}>
+              <StaticSkeleton className="h-4 w-16 rounded-lg" />
+              <StaticSkeleton className="mt-2 h-11 w-full rounded-control" />
+            </div>
           ))}
         </div>
-        <div className="animate-pulse motion-reduce:animate-none flex flex-col gap-3 rounded-2xl border border-border bg-surface-inset p-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex-1">
-            <StaticSkeleton className="h-4 w-10 rounded-lg" />
-            <StaticSkeleton className="mt-2 h-12 w-full rounded-2xl" />
-          </div>
-          <div className="md:w-56">
-            <StaticSkeleton className="h-4 w-36 rounded-lg" />
-            <StaticSkeleton className="mt-2 h-12 w-full rounded-2xl" />
-          </div>
-        </div>
       </div>
+    </div>
+  );
+}
+
+function HomeDirectorySectionHeaderSkeleton() {
+  return (
+    <div className="flex items-center gap-3">
+      <StaticSkeleton className="h-6 w-32 shrink-0 rounded-lg" />
+      <StaticSkeleton className="h-px min-w-0 flex-1 rounded-none" />
     </div>
   );
 }
@@ -164,7 +185,10 @@ function AuthCardSkeleton({
         ))}
 
         {Array.from({ length: extraRows }).map((_, index) => (
-          <div key={index} className="grid gap-2 rounded-2xl border border-border/70 bg-surface-inset/70 p-4">
+          <div
+            key={index}
+            className="grid gap-2 rounded-2xl border border-border/70 bg-surface-inset/70 p-4"
+          >
             <StaticSkeleton className="h-4 w-28 rounded-lg" />
             <StaticSkeleton className="h-12 w-full rounded-2xl" />
           </div>
@@ -172,7 +196,9 @@ function AuthCardSkeleton({
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <StaticSkeleton className="h-12 w-40 rounded-full" />
-          {secondaryAction ? <StaticSkeleton className="h-12 w-32 rounded-full" /> : null}
+          {secondaryAction ? (
+            <StaticSkeleton className="h-12 w-32 rounded-full" />
+          ) : null}
         </div>
       </div>
     </Card>
@@ -268,7 +294,10 @@ function SuggestGuideSkeleton() {
       </div>
       <div className="grid gap-3">
         {Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} className="rounded-card border border-border/70 bg-surface-inset/80 p-4">
+          <div
+            key={index}
+            className="rounded-card border border-border/70 bg-surface-inset/80 p-4"
+          >
             <StaticSkeleton className="h-5 w-20" />
             <StaticSkeleton className="mt-2 h-4 w-full" />
             <StaticSkeleton className="mt-2 h-4 w-full max-w-sm" />
@@ -284,35 +313,15 @@ export function HomePageSkeleton() {
     <div className="min-h-screen bg-background">
       <LoadingHeader />
       <main>
-        <Container className="pb-16 pt-10">
-          <div className="space-y-6">
-            <HeroSkeleton />
-
-            <section className="rounded-panel border border-border/70 bg-surface-overlay px-5 py-5 shadow-flat backdrop-blur-md sm:px-6 sm:py-6">
-              <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                <div className="flex items-start gap-3">
-                  <StaticSkeleton className="h-12 w-12 shrink-0 rounded-2xl" />
-                  <div className="min-w-0 flex-1">
-                    <StaticSkeleton className="h-6 w-48" />
-                    <StaticSkeleton className="mt-2 h-4 w-full max-w-lg" />
-                  </div>
-                </div>
-                <div className="flex justify-end">
-                  <StaticSkeleton className="h-12 w-32 rounded-full" />
-                </div>
-              </div>
+        <HeroSkeleton />
+        <Container className="pb-16 pt-0">
+          <div>
+            <section className="mt-7 space-y-4">
+              <HomeDirectorySectionHeaderSkeleton />
+              <HomeFilterBarSkeleton />
             </section>
 
-            <section className="flex flex-col gap-6">
-              <SectionHeadingSkeleton
-                eyebrowWidth="w-16"
-                titleWidth="w-40"
-                descriptionWidth="max-w-md"
-              />
-              <FilterBarSkeleton />
-            </section>
-
-            <section>
+            <section className="mt-10">
               <div className="grid justify-items-center gap-x-4 gap-y-6 sm:grid-cols-2 sm:justify-items-stretch xl:grid-cols-3 xl:gap-x-6">
                 {Array.from({ length: 3 }).map((_, index) => (
                   <PartnerCardSkeleton key={index} />
@@ -333,13 +342,9 @@ export function HomePartnerExploreSkeleton() {
       className="scroll-mt-24"
       aria-label="제휴 탐색 로딩"
     >
-      <section className="mt-10 flex flex-col gap-6">
-        <SectionHeadingSkeleton
-          eyebrowWidth="w-16"
-          titleWidth="w-40"
-          descriptionWidth="max-w-md"
-        />
-        <FilterBarSkeleton />
+      <section className="mt-7 space-y-4">
+        <HomeDirectorySectionHeaderSkeleton />
+        <HomeFilterBarSkeleton />
       </section>
 
       <section className="mt-10">
@@ -389,7 +394,11 @@ export function AuthChangePasswordPageSkeleton() {
       <LoadingHeader />
       <main>
         <Container className="pb-16 pt-10">
-          <AuthCardSkeleton fieldCount={2} secondaryAction={false} titleWidth="w-40" />
+          <AuthCardSkeleton
+            fieldCount={2}
+            secondaryAction={false}
+            titleWidth="w-40"
+          />
         </Container>
       </main>
     </div>
@@ -479,7 +488,10 @@ export function NotificationsPageSkeleton() {
               <StaticSkeleton className="h-5 w-20 rounded-lg" />
             </div>
 
-            <Card padding="none" className="mx-auto w-full max-w-3xl overflow-hidden">
+            <Card
+              padding="none"
+              className="mx-auto w-full max-w-3xl overflow-hidden"
+            >
               <div className="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-3.5 sm:px-5 sm:py-4">
                 <div className="min-w-0">
                   <StaticSkeleton className="h-5 w-24" />
@@ -582,6 +594,37 @@ export function CertificationPageSkeleton() {
                 </div>
               </div>
             </div>
+          </div>
+        </Container>
+      </main>
+    </div>
+  );
+}
+
+export function MemberEmailVerificationPageSkeleton() {
+  return (
+    <div className="min-h-screen bg-background">
+      <FocusedMemberLoadingHeader />
+      <main aria-busy="true" aria-label="로그인·복구 이메일 불러오는 중">
+        <Container className="pb-16 pt-10">
+          <div className="mx-auto w-full max-w-2xl space-y-6">
+            <div className="space-y-3">
+              <StaticSkeleton className="h-11 w-40 rounded-[1rem] !bg-border/60" />
+              <StaticSkeleton className="h-10 w-56 rounded-xl !bg-border/60" />
+              <StaticSkeleton className="h-5 w-full max-w-lg !bg-border/60" />
+            </div>
+
+            <Surface level="elevated" padding="lg" className="space-y-6">
+              <div className="space-y-2">
+                <StaticSkeleton className="h-4 w-12 rounded-lg" />
+                <StaticSkeleton className="h-7 w-64 max-w-full rounded-xl" />
+              </div>
+              <div className="grid gap-2">
+                <StaticSkeleton className="h-4 w-16 rounded-lg" />
+                <StaticSkeleton className="h-12 w-full rounded-[1rem]" />
+              </div>
+              <StaticSkeleton className="h-12 w-full rounded-[1rem]" />
+            </Surface>
           </div>
         </Container>
       </main>

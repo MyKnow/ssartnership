@@ -274,6 +274,17 @@ const routeOwnedStateOverrides: Partial<
     "async-pending",
     "setup-token",
   ],
+  "/certification/email": [
+    "default",
+    "validation-error",
+    "pending",
+    "expired",
+    "success",
+    "error",
+    "long-korean",
+    "mobile-overflow",
+    "async-pending",
+  ],
   "/certification/photo": [
     "default",
     "validation-error",
@@ -284,6 +295,20 @@ const routeOwnedStateOverrides: Partial<
     "mobile-overflow",
     "image-gallery",
     "broken-image",
+    "async-pending",
+  ],
+  "/settings": [
+    "default",
+    "unauthorized",
+    "long-korean",
+    "mobile-overflow",
+    "async-pending",
+  ],
+  "/settings/delete-account": [
+    "default",
+    "unauthorized",
+    "long-korean",
+    "mobile-overflow",
     "async-pending",
   ],
   "/admin/graduate-verifications": [

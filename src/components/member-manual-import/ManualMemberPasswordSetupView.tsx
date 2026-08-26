@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import PasswordInput from "@/components/ui/PasswordInput";
+import { getMemberGateCompletionReturnTo } from "@/lib/member-required-gates";
 import { PASSWORD_POLICY_MESSAGE, isValidPasswordPolicy } from "@/lib/validation";
 
 export default function ManualMemberPasswordSetupView({
@@ -14,7 +14,6 @@ export default function ManualMemberPasswordSetupView({
   /** Story/test-only token. Production links keep the value in the URL fragment. */
   initialToken?: string;
 }) {
-  const router = useRouter();
   const [token, setToken] = useState(initialToken ?? "");
   const [ready, setReady] = useState(Boolean(initialToken));
   const [password, setPassword] = useState("");
@@ -56,8 +55,9 @@ export default function ManualMemberPasswordSetupView({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message ?? "비밀번호를 설정하지 못했습니다.");
-      router.replace("/certification/photo");
-      router.refresh();
+      window.location.replace(
+        getMemberGateCompletionReturnTo("/", "change-password"),
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "비밀번호를 설정하지 못했습니다.");
     } finally {
@@ -68,7 +68,7 @@ export default function ManualMemberPasswordSetupView({
   return (
     <Card className="mx-auto max-w-lg">
       <h1 className="text-ko-title text-2xl font-semibold">계정 비밀번호 설정</h1>
-      <p className="text-ko-pretty mt-2 text-sm text-muted-foreground">설정 후에는 본인 사진을 제출해 주세요. 사진 검토 중에도 일반 서비스는 이용할 수 있습니다.</p>
+      <p className="text-ko-pretty mt-2 text-sm text-muted-foreground">설정 후 필요한 추가 절차가 있으면 이어서 안내합니다. 승인된 본인 사진은 다시 제출하지 않아도 됩니다.</p>
       <form className="mt-6 grid gap-4" onSubmit={submit} noValidate>
         <label className="grid gap-2 text-sm font-medium">새 비밀번호<PasswordInput value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" /></label>
         <label className="grid gap-2 text-sm font-medium">새 비밀번호 확인<PasswordInput value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" /></label>

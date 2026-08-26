@@ -1,6 +1,7 @@
 "use client";
 
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, userEvent, within } from "storybook/test";
 import HomeView from "@/components/HomeView";
 import HomeDirectoryError from "@/components/home-view/HomeDirectoryError";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -73,6 +74,35 @@ export const Empty: Story = {
 
 export const Many: Story = {
   args: { partners: Array.from({ length: 18 }, (_, index) => createPartner(index + 1)) },
+};
+
+export const MobileFilterDisclosure: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const disclosure = canvas.getByRole("button", { name: "필터 펼쳐보기" });
+
+    await expect(disclosure).toHaveAttribute("aria-expanded", "false");
+    await expect(
+      canvas.queryByTestId("partner-mobile-filter-fields"),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(disclosure);
+
+    await expect(disclosure).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      canvas.getByTestId("partner-mobile-filter-fields"),
+    ).toBeVisible();
+    await userEvent.selectOptions(
+      canvas.getByTestId("partner-campus-filter-mobile-inline"),
+      "seoul",
+    );
+    await userEvent.click(disclosure);
+
+    await expect(disclosure).toHaveAttribute("aria-expanded", "false");
+    await expect(
+      canvas.queryByTestId("partner-mobile-filter-fields"),
+    ).not.toBeInTheDocument();
+  },
 };
 
 export const LongKorean: Story = {

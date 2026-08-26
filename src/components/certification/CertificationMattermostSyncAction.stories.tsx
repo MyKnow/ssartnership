@@ -1,12 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import CertificationMattermostSyncAction from "@/components/certification/CertificationMattermostSyncAction";
+import { CertificationSettingsGroup } from "@/components/certification/CertificationSettingsList";
 import { ToastProvider } from "@/components/ui/Toast";
 
 function CertificationMattermostSyncActionStory() {
   return (
     <div className="mx-auto w-full max-w-2xl p-4">
       <ToastProvider>
-        <CertificationMattermostSyncAction />
+        <CertificationSettingsGroup title="연결 정보">
+          <CertificationMattermostSyncAction />
+        </CertificationSettingsGroup>
       </ToastProvider>
     </div>
   );
