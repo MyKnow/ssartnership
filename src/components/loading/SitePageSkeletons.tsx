@@ -313,7 +313,9 @@ export function HomePageSkeleton() {
     <div className="min-h-screen bg-background">
       <LoadingHeader />
       <main>
-        <HeroSkeleton />
+        <div className="lg:mx-auto lg:max-w-[min(var(--grid-wide),calc(100vw-1.5rem))] lg:px-8">
+          <HeroSkeleton />
+        </div>
         <Container className="pb-16 pt-0">
           <div>
             <section className="mt-7 space-y-4">

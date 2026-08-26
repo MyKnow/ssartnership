@@ -1,3 +1,4 @@
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { ArrowRightIcon } from "@heroicons/react/24/outline";
 import Button from "@/components/ui/Button";
 
@@ -12,7 +13,7 @@ export default function PartnerCardActions({
   detailHref: string;
   canNavigate: boolean;
   compact?: boolean;
-  onDetailClick: () => void;
+  onDetailClick: (event: ReactMouseEvent<HTMLElement>) => void;
 }) {
   if (!compact) {
     return !isActive ? (

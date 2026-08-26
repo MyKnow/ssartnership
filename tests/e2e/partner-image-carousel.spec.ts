@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-const partnerPath =
-  "/partners/cafe-ssafy-001?returnTo=%2F%3Fview%3Dlist%23benefits";
+const partnerPath = "/partners/cafe-ssafy-001";
 
 test("keeps tablet gallery wheel navigation inside the page", async ({ page }) => {
   const invalidImageLayoutWarnings: string[] = [];
@@ -68,4 +67,73 @@ test("keeps tablet gallery wheel navigation inside the page", async ({ page }) =
     carousel.getByRole("button", { name: "이미지 3 크게 보기", exact: true }),
   ).toBeVisible();
   expect(invalidImageLayoutWarnings).toEqual([]);
+});
+
+test("preserves the document scroll position while changing gallery images", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await page.goto(partnerPath);
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => document.fonts.ready);
+
+  const carousel = page.locator(
+    "[data-partner-image-carousel=main] [data-partner-image-tablet-carousel]",
+  );
+  await expect(carousel).toBeVisible();
+  await carousel.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(400);
+
+  const assertScrollPositionIsPreserved = async (
+    action: () => Promise<void>,
+  ) => {
+    const beforeScrollY = await page.evaluate(() => window.scrollY);
+    await action();
+    await page.waitForTimeout(500);
+    const afterScrollY = await page.evaluate(() => window.scrollY);
+    expect(Math.abs(afterScrollY - beforeScrollY)).toBeLessThanOrEqual(1);
+  };
+
+  await assertScrollPositionIsPreserved(async () => {
+    await carousel.getByRole("button", { name: "다음 이미지", exact: true }).click();
+    await expect(
+      carousel.getByRole("button", { name: "이미지 2 크게 보기", exact: true }),
+    ).toBeVisible();
+  });
+
+  await assertScrollPositionIsPreserved(async () => {
+    await carousel.locator('button[aria-label$="이미지 3 선택"]').click();
+    await expect(
+      carousel.getByRole("button", { name: "이미지 3 크게 보기", exact: true }),
+    ).toBeVisible();
+  });
+});
+
+test("does not pull the mobile page down to the active thumbnail after a swipe", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 844 });
+  await page.goto(partnerPath);
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => document.fonts.ready);
+
+  const gallery = page.locator("[data-partner-detail-gallery]");
+  const mainFrame = gallery.locator("[data-partner-image-main-frame]");
+  await expect(mainFrame).toBeVisible();
+  await gallery.evaluate((element) => {
+    const galleryTop = element.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo(0, Math.max(0, galleryTop - 650));
+  });
+  await page.waitForTimeout(400);
+
+  const beforeScrollY = await page.evaluate(() => window.scrollY);
+  await mainFrame.dispatchEvent("pointerdown", { clientX: 280 });
+  await mainFrame.dispatchEvent("pointerup", { clientX: 120 });
+  await expect(
+    gallery.getByRole("button", { name: "이미지 2", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.waitForTimeout(500);
+
+  const afterScrollY = await page.evaluate(() => window.scrollY);
+  expect(Math.abs(afterScrollY - beforeScrollY)).toBeLessThanOrEqual(1);
 });

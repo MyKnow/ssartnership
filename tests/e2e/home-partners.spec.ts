@@ -17,6 +17,45 @@ async function typeSearch(page: Page, value: string) {
 }
 
 test.describe("public partner discovery", () => {
+  test("aligns the desktop ad carousel with the partner directory container", async ({
+    page,
+  }) => {
+    for (const viewport of [
+      { width: 360, height: 844, fullWidth: true },
+      { width: 820, height: 1180, fullWidth: true },
+      { width: 1366, height: 900, fullWidth: false },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto("/");
+      await page.waitForLoadState("networkidle");
+      await page.evaluate(() => document.fonts.ready);
+
+      const [carouselBox, directoryBox] = await Promise.all([
+        page.locator("[data-promotion-carousel-media]").first().boundingBox(),
+        page.locator("#benefits").boundingBox(),
+      ]);
+      expect(carouselBox).not.toBeNull();
+      expect(directoryBox).not.toBeNull();
+      if (!carouselBox || !directoryBox) {
+        continue;
+      }
+
+      if (viewport.fullWidth) {
+        expect(carouselBox.x).toBeCloseTo(0, 1);
+        expect(carouselBox.width).toBeCloseTo(viewport.width, 1);
+      } else {
+        expect(carouselBox.x).toBeCloseTo(directoryBox.x, 1);
+        expect(carouselBox.width).toBeCloseTo(directoryBox.width, 1);
+      }
+
+      const documentWidth = await page.evaluate(() => ({
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+      }));
+      expect(documentWidth.scrollWidth).toBe(documentWidth.clientWidth);
+    }
+  });
+
   test("keeps the mobile list summary compact without a separate detail action", async ({ page }) => {
     for (const width of [320, 360, 390]) {
       await page.setViewportSize({ width, height: 844 });
@@ -432,7 +471,9 @@ test.describe("public partner discovery", () => {
     await expect(cards).toHaveCount(initialCount);
   });
 
-  test("keeps a submitted search in the partner detail return target", async ({ page }) => {
+  test("uses a clean detail URL and restores a submitted search with browser back", async ({
+    page,
+  }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     const benefitsSection = page.locator("#benefits");
@@ -450,29 +491,43 @@ test.describe("public partner discovery", () => {
 
     await typeSearch(page, firstPartnerName);
     await expect(page).toHaveURL(/q=/);
+    await expect(cards).toHaveCount(1);
+    const directoryUrl = page.url();
 
     const resultCard = cards.first();
     await expect(resultCard).toBeVisible();
     const detailLink = resultCard
       .locator('a[aria-label$=" 상세 보기"]')
       .first();
-    await expect(detailLink).toHaveAttribute("href", /returnTo=.*q%3D/);
-    await detailLink.click();
-
-    await expect(page).toHaveURL(/returnTo=/);
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await page.waitForLoadState("networkidle");
-    const returnTo = await page.evaluate(
-      () => new URL(window.location.href).searchParams.get("returnTo"),
-    );
-    expect(returnTo).toContain("q=");
-    if (!returnTo) {
+    await expect(detailLink).toHaveAttribute("href", /^\/partners\/[^?#]+$/);
+    const detailHref = await detailLink.getAttribute("href");
+    expect(detailHref).toBeTruthy();
+    if (!detailHref) {
       return;
     }
+    const cleanDetailUrl = new URL(detailHref, page.url()).toString();
+    await detailLink.click();
 
-    await page.goto(new URL(returnTo, page.url()).toString());
+    await expect(page).toHaveURL(/\/partners\/[^?#]+$/);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.goBack();
 
-    await expect(page).toHaveURL(/q=/);
+    await expect(page).toHaveURL(directoryUrl);
     await expect(page.getByTestId("partner-search-input")).toHaveValue(firstPartnerName);
+    await expect(cards).toHaveCount(1);
+
+    await resultCard.locator("[data-partner-card-media]").click();
+
+    await expect(page).toHaveURL(/\/partners\/[^?#]+$/);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.goBack();
+
+    await expect(page).toHaveURL(directoryUrl);
+    await expect(page.getByTestId("partner-search-input")).toHaveValue(firstPartnerName);
+    await expect(cards).toHaveCount(1);
+
+    await page.goto(`${cleanDetailUrl}?returnTo=%2F%23benefits`);
+    await expect(page).toHaveURL(cleanDetailUrl);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
 });
