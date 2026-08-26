@@ -195,6 +195,15 @@ body {
     padding-bottom: calc(env(safe-area-inset-bottom) + 7.75rem);
   }
 
+  body:has([data-site-mobile-navigation]) [data-site-header-theme-toggle] {
+    display: flex;
+  }
+
+  body:has([data-site-mobile-navigation]) [data-site-footer-theme-mode],
+  body:has([data-site-mobile-navigation]) [data-site-footer-notifications] {
+    display: none;
+  }
+
   body:has([data-site-mobile-navigation]) [data-toast-viewport] {
     bottom: calc(env(safe-area-inset-bottom) + 6.25rem);
   }

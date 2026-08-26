@@ -106,12 +106,20 @@ export default function Footer({
           </FooterSection>
 
           <FooterSection title="설정">
-            <ThemeModeButtons />
+            <div data-site-footer-theme-mode>
+              <ThemeModeButtons />
+            </div>
             <PwaInstallButton variant="secondary" className="w-full justify-start" />
-            <Button variant="secondary" href="/notifications" className="w-full justify-start gap-2">
-              <BellIcon className="h-5 w-5" />
-              알림센터
-            </Button>
+            <div data-site-footer-notifications>
+              <Button
+                variant="secondary"
+                href="/notifications"
+                className="w-full justify-start gap-2"
+              >
+                <BellIcon className="h-5 w-5" />
+                알림센터
+              </Button>
+            </div>
           </FooterSection>
 
           <FooterSection title="약관">
