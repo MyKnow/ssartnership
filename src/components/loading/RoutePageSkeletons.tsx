@@ -153,15 +153,17 @@ function PartnerSetupHeroSkeleton() {
 function PartnerDetailMediaSkeleton() {
   return (
     <div className="grid gap-6">
-      <div className="grid gap-6 md:grid-cols-2 md:items-stretch">
-        <Skeleton className="order-2 h-[24rem] w-full rounded-[2rem] border border-border bg-surface-muted md:order-2" />
-        <Card className="order-1 min-h-[24rem] space-y-4 p-6 sm:p-8 md:order-1">
-          <Skeleton className="h-5 w-20" />
-          <Skeleton className="h-12 w-full max-w-2xl" />
-          <Skeleton className="h-4 w-full max-w-xl" />
-          <Skeleton className="h-4 w-full max-w-lg" />
-        </Card>
-      </div>
+      <Card className="grid grid-cols-[5rem_minmax(0,1fr)] items-center gap-4 p-4 sm:p-5 md:grid-cols-[7rem_minmax(0,1fr)]">
+        <Skeleton className="aspect-square w-20 rounded-card md:w-28" />
+        <div className="min-w-0 space-y-3">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-8 w-16 rounded-full" />
+            <Skeleton className="h-8 w-12 rounded-full" />
+            <Skeleton className="h-8 w-8 rounded-full" />
+          </div>
+          <Skeleton className="h-9 w-full max-w-sm" />
+        </div>
+      </Card>
       <Skeleton className="h-48 w-full rounded-[2rem] border border-border bg-surface-muted" />
     </div>
   );
@@ -312,10 +314,6 @@ export function PublicPartnerDetailSkeleton() {
       <main>
         <Container className="pb-16 pt-10">
           <div className="flex flex-col gap-6">
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-12 w-12 rounded-full" />
-              <Skeleton className="h-12 w-28 rounded-full" />
-            </div>
             <PartnerDetailMediaSkeleton />
             <Card className="space-y-4 p-6 sm:p-8">
               <Skeleton className="h-6 w-28" />
@@ -323,6 +321,7 @@ export function PublicPartnerDetailSkeleton() {
                 <Skeleton className="h-24 w-full rounded-2xl" />
                 <Skeleton className="h-24 w-full rounded-2xl" />
               </div>
+              <Skeleton className="h-16 w-full rounded-[1.4rem]" />
             </Card>
             <PartnerReviewSectionSkeleton />
           </div>

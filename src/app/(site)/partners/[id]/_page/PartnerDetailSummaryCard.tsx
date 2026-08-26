@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import {
   CalendarDaysIcon,
+  ChevronDownIcon,
   MapPinIcon,
   UserGroupIcon,
 } from "@heroicons/react/24/outline";
@@ -76,12 +77,15 @@ export default function PartnerDetailSummaryCard({
   );
   const showBranchScope =
     !isOnlineService && partner.branchScopeType && partner.branchScopeType !== "single_location";
+  const detailDescription = partner.detailDescription?.trim() ?? "";
+  const tags = (partner.tags ?? []).map((tag) => tag.trim()).filter(Boolean);
+  const hasIntroduction = Boolean(detailDescription || tags.length > 0);
   const hasAdditionalInformation = Boolean(
     partner.period.start ||
       partner.period.end ||
       showBranchScope ||
       partner.branchScopeNote ||
-      (partner.tags?.length ?? 0) > 0,
+      hasIntroduction,
   );
 
   return (
@@ -205,7 +209,7 @@ export default function PartnerDetailSummaryCard({
                 id={`partner-detail-additional-information-${partner.id}`}
                 className="ui-section-title text-ko-title text-balance"
               >
-                이용 기간 및 태그
+                추가 정보
               </h3>
               <div className="grid min-w-0 gap-5">
                 {partner.period.start || partner.period.end ? (
@@ -233,21 +237,65 @@ export default function PartnerDetailSummaryCard({
                     </p>
                   </div>
                 ) : null}
-                {(partner.tags?.length ?? 0) > 0 ? (
-                  <div>
-                    <p className="ui-caption">태그</p>
-                    <ul
-                      data-partner-tag-list
-                      aria-label="제휴처 태그"
-                      className="mt-2 flex flex-wrap gap-2"
+                {hasIntroduction ? (
+                  <details
+                    data-partner-introduction-disclosure
+                    className="group min-w-0 overflow-hidden rounded-[1.4rem] border border-border/80 bg-surface-inset"
+                  >
+                    <summary className="flex min-h-14 min-w-0 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 outline-none transition-colors hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/25 [&::-webkit-details-marker]:hidden sm:px-5">
+                      <span className="min-w-0 flex-1">
+                        <span className="ui-label block text-foreground">
+                          제휴처 소개·태그
+                        </span>
+                        <span
+                          data-partner-introduction-teaser
+                          className="ui-caption mt-1 block truncate text-muted-foreground"
+                        >
+                          {detailDescription || `등록된 소개 없이 태그 ${tags.length}개가 있습니다.`}
+                        </span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        {tags.length > 0 ? (
+                          <span className="rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
+                            태그 {tags.length}개
+                          </span>
+                        ) : null}
+                        <ChevronDownIcon
+                          className="size-5 text-muted-foreground transition-transform duration-200 group-open:rotate-180"
+                          aria-hidden="true"
+                        />
+                      </span>
+                    </summary>
+                    <div
+                      data-partner-introduction-content
+                      className="grid gap-5 border-t border-border/70 px-4 py-4 sm:px-5 sm:py-5"
                     >
-                      {(partner.tags ?? []).map((tag) => (
-                        <li key={tag} data-partner-tag>
-                          <Chip style={chipStyle}>#{tag}</Chip>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                      {detailDescription ? (
+                        <div>
+                          <p className="ui-caption">소개</p>
+                          <p className="text-ko-pretty mt-2 whitespace-pre-line text-sm leading-7 text-muted-foreground sm:text-base">
+                            {detailDescription}
+                          </p>
+                        </div>
+                      ) : null}
+                      {tags.length > 0 ? (
+                        <div>
+                          <p className="ui-caption">태그</p>
+                          <ul
+                            data-partner-tag-list
+                            aria-label="제휴처 태그"
+                            className="mt-2 flex flex-wrap gap-2"
+                          >
+                            {tags.map((tag) => (
+                              <li key={tag} data-partner-tag>
+                                <Chip style={chipStyle}>#{tag}</Chip>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </div>
+                  </details>
                 ) : null}
               </div>
             </section>

@@ -267,11 +267,11 @@ export default async function PartnerDetailPage({
             >
               <div
                 data-partner-detail-hero-info
-                className="grid min-w-0 gap-4 rounded-card border border-border bg-surface p-5 shadow-flat md:gap-0 md:grid-cols-[7rem_minmax(0,1fr)] md:items-center"
+                className="grid min-w-0 grid-cols-[5rem_minmax(0,1fr)] items-center gap-4 rounded-card border border-border bg-surface p-4 shadow-flat sm:p-5 md:grid-cols-[7rem_minmax(0,1fr)]"
               >
                 <PartnerImageCarousel
                   key={`${carouselKey}:thumbnail`}
-                  className="mx-auto w-full max-w-none md:mx-0 md:max-w-28 md:self-center"
+                  className="w-full max-w-20 self-center md:max-w-28"
                   images={partner.thumbnail ? [partner.thumbnail] : []}
                   name={partner.name}
                   variant="hero"
@@ -279,7 +279,7 @@ export default async function PartnerDetailPage({
                   showThumbnails={false}
                   priority
                 />
-                <div className="flex min-w-0 flex-col gap-4 md:ml-4 md:justify-center">
+                <div className="flex min-w-0 flex-col justify-center gap-3">
                   <PartnerDetailHeroMeta
                     partnerId={partner.id}
                     categoryLabel={categoryLabel}
@@ -291,8 +291,7 @@ export default async function PartnerDetailPage({
                   <PageHeader
                     className="border-0 border-b-0 pb-0"
                     title={partner.name}
-                    titleClassName="text-[clamp(1.75rem,2vw,2.25rem)]"
-                    description={partner.detailDescription || undefined}
+                    titleClassName="text-[clamp(1.5rem,5.5vw,2.25rem)]"
                   />
                 </div>
               </div>
