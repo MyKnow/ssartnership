@@ -73,7 +73,7 @@ function HeroSkeleton() {
   return (
     <section
       aria-hidden="true"
-      className="relative left-1/2 aspect-[21/9] w-screen -translate-x-1/2 animate-pulse bg-surface-muted motion-reduce:animate-none"
+      className="relative aspect-[21/9] w-full animate-pulse bg-surface-muted motion-reduce:animate-none"
     />
   );
 }
@@ -313,10 +313,9 @@ export function HomePageSkeleton() {
     <div className="min-h-screen bg-background">
       <LoadingHeader />
       <main>
+        <HeroSkeleton />
         <Container className="pb-16 pt-0">
           <div>
-            <HeroSkeleton />
-
             <section className="mt-7 space-y-4">
               <HomeDirectorySectionHeaderSkeleton />
               <HomeFilterBarSkeleton />

@@ -109,16 +109,15 @@ export default async function Home() {
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
       <main>
+        <PromotionCarousel
+          slides={resolvedPromotionSlides}
+          headingLevel="h1"
+          className="mt-0"
+        />
         <Container className="pb-16 pt-0" size="wide">
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-          />
-          <PromotionCarousel
-            slides={resolvedPromotionSlides}
-            headingLevel="h1"
-            fullBleed
-            className="mt-0"
           />
           <Suspense fallback={<HomePartnerExploreSkeleton />}>
             <HomeContent

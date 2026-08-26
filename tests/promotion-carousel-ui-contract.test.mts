@@ -40,12 +40,16 @@ test("홈 프로모션은 설명 블록 없이 뷰포트 전체 폭의 21:9 직�
   assert.doesNotMatch(source, /rounded-overlay/);
   assert.match(
     homePageSource,
-    /<PromotionCarousel[\s\S]*headingLevel="h1"[\s\S]*fullBleed/,
+    /<main>\s*<PromotionCarousel[\s\S]*headingLevel="h1"[\s\S]*?\/>\s*<Container className="pb-16 pt-0"/,
   );
   assert.match(homePageSource, /<Container className="pb-16 pt-0"/);
   assert.match(
     skeletonSource,
-    /function HeroSkeleton\(\)[\s\S]*aspect-\[21\/9\][\s\S]*w-screen/,
+    /function HeroSkeleton\(\)[\s\S]*aspect-\[21\/9\][\s\S]*w-full/,
+  );
+  assert.match(
+    skeletonSource,
+    /<main>\s*<HeroSkeleton \/>\s*<Container className="pb-16 pt-0"/,
   );
   assert.match(siteHeaderSource, /className="safe-site-header-spacer"/);
   assert.match(siteHeaderSource, /style=\{headerHeight \? \{ height: headerHeight \}/);
