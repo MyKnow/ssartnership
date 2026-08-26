@@ -1,12 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
-import PageHeader from "@/components/ui/PageHeader";
 import PartnerImageCarousel from "@/components/PartnerImageCarousel";
 import AppErrorScreen from "@/components/errors/AppErrorScreen";
 import { PublicPartnerDetailSkeleton } from "@/components/loading/RoutePageSkeletons";
 import type { Partner } from "@/lib/types";
 import PartnerDetailContactSection from "./PartnerDetailContactSection";
-import PartnerDetailHeroMeta from "./PartnerDetailHeroMeta";
+import PartnerDetailHeroContent from "./PartnerDetailHeroContent";
 import PartnerDetailMobileActionBar from "./PartnerDetailMobileActionBar";
 import PartnerDetailSummaryCard from "./PartnerDetailSummaryCard";
 
@@ -60,29 +59,23 @@ function PartnerDetailScreenStory({ value }: { value: Partner }) {
       >
         <div
           data-partner-detail-hero-info
-          className="grid min-w-0 gap-4 rounded-card border border-border bg-surface p-5 shadow-flat md:gap-0 md:grid-cols-[7rem_minmax(0,1fr)] md:items-center"
+          className="grid min-w-0 grid-cols-1 items-stretch gap-4 rounded-card border border-border bg-surface p-4 shadow-flat min-[480px]:grid-cols-[auto_minmax(0,1fr)] min-[480px]:gap-3 sm:p-5 md:gap-5"
         >
           <PartnerImageCarousel
-            className="mx-auto w-full max-w-none md:mx-0 md:max-w-28 md:self-center"
+            className="aspect-square w-full self-start justify-self-stretch min-[480px]:h-full min-[480px]:min-h-20 min-[480px]:min-w-20 min-[480px]:w-auto min-[480px]:self-stretch min-[480px]:justify-self-start"
             images={value.thumbnail ? [value.thumbnail] : []}
             name={value.name}
             variant="hero"
             showThumbnails={false}
           />
-          <div className="flex min-w-0 flex-col gap-4 md:ml-4 md:justify-center">
-            <PartnerDetailHeroMeta
-              partnerId={value.id}
-              categoryLabel="건강"
-              currentUserId={null}
-              favoriteCount={32}
-            />
-            <PageHeader
-              className="border-0 border-b-0 pb-0"
-              title={value.name}
-              titleClassName="text-[clamp(1.75rem,2vw,2.25rem)]"
-              description={value.detailDescription || undefined}
-            />
-          </div>
+          <PartnerDetailHeroContent
+            partnerName={value.name}
+            partnerId={value.id}
+            categoryLabel="건강"
+            currentUserId={null}
+            favoriteCount={32}
+            period={value.period}
+          />
         </div>
       </div>
 
@@ -229,40 +222,84 @@ export const Default: Story = {
     await expect(heroInfo).toHaveClass(
       "rounded-card",
       "border",
+      "grid-cols-1",
+      "items-stretch",
       "gap-4",
-      "p-5",
-      "md:gap-0",
-      "md:grid-cols-[7rem_minmax(0,1fr)]",
-      "md:items-center",
+      "p-4",
+      "min-[480px]:grid-cols-[auto_minmax(0,1fr)]",
+      "min-[480px]:gap-3",
+      "sm:p-5",
+      "md:gap-5",
     );
-    const heroMeta = canvasElement.querySelector<HTMLElement>(
-      "[data-partner-detail-hero-meta]",
+    const heroContent = canvasElement.querySelector<HTMLElement>(
+      "[data-partner-detail-hero-content]",
     );
-    await expect(heroMeta).not.toBeNull();
-    await expect(within(heroMeta!).getByText("건강")).toBeVisible();
+    await expect(heroContent).not.toBeNull();
+    await expect(heroContent).toHaveClass(
+      "grid",
+      "content-center",
+      "self-stretch",
+      "grid-cols-[minmax(0,1fr)_auto]",
+    );
+    const categoryLabel = heroContent!.querySelector<HTMLElement>(
+      "[data-partner-category-label]",
+    );
+    await expect(categoryLabel).not.toBeNull();
+    await expect(categoryLabel).toHaveTextContent("건강");
+    await expect(categoryLabel).not.toHaveClass("rounded-full", "border");
+    const heroActions = within(heroContent!).getByRole("group", {
+      name: "제휴처 보조 기능",
+    });
+    await expect(heroActions).toBeVisible();
     await expect(
-      within(heroMeta!).getByRole("button", { name: "공유 링크 복사" }),
+      within(heroActions).getByRole("button", { name: "공유 링크 복사" }),
     ).toBeVisible();
-    await expect(
-      within(heroMeta!).queryByLabelText("이용 기간 2026-01-01부터 2099-12-31까지"),
-    ).toBeNull();
+    const periodBadge = within(heroInfo!).getByLabelText(
+      "이용 기간 2026-01-01부터 2099-12-31까지",
+    );
+    await expect(periodBadge).toBeVisible();
+    await expect(periodBadge).toHaveClass("text-muted-foreground");
+    await expect(periodBadge).not.toHaveClass("rounded-full", "border", "bg-surface-inset");
     const heroCarousel = canvasElement.querySelector<HTMLElement>(
       '[data-partner-image-carousel="hero"]',
     );
     await expect(heroCarousel).not.toBeNull();
     await expect(heroCarousel).toHaveClass(
-      "max-w-none",
-      "md:max-w-28",
-      "md:self-center",
+      "aspect-square",
+      "w-full",
+      "self-start",
+      "justify-self-stretch",
+      "min-[480px]:h-full",
+      "min-[480px]:min-h-20",
+      "min-[480px]:min-w-20",
+      "min-[480px]:w-auto",
+      "min-[480px]:self-stretch",
+      "min-[480px]:justify-self-start",
     );
+    await expect(heroCarousel).not.toHaveClass("md:row-span-2");
+    const heroCarouselBox = heroCarousel!.getBoundingClientRect();
+    const heroContentBox = heroContent!.getBoundingClientRect();
     await expect(
-      canvasElement.querySelector<HTMLElement>("[data-partner-detail-hero-info] > div:nth-child(2)"),
-    ).toHaveClass("md:ml-4", "md:justify-center");
+      Math.abs(heroCarouselBox.width - heroCarouselBox.height),
+    ).toBeLessThanOrEqual(1);
+    if (canvasElement.ownerDocument.documentElement.clientWidth >= 480) {
+      await expect(
+        Math.abs(heroCarouselBox.height - heroContentBox.height),
+      ).toBeLessThanOrEqual(1);
+    } else {
+      await expect(
+        Math.abs(heroCarouselBox.width - heroContentBox.width),
+      ).toBeLessThanOrEqual(1);
+      await expect(heroCarouselBox.bottom).toBeLessThanOrEqual(heroContentBox.top);
+    }
+    await expect(
+      within(heroInfo!).queryByText(partner.detailDescription!),
+    ).not.toBeInTheDocument();
     await expect(heroInfo).toContainElement(imageCarouselButton);
     await expect(imageCarouselButton).toHaveClass("aspect-square");
-    const periodBadge = summaryCard.querySelector('[aria-label^="이용 기간"]');
-    await expect(periodBadge).toBeInTheDocument();
-    await expect(periodBadge).toHaveClass("h-8", "px-4", "py-1", "text-xs");
+    await expect(
+      summaryCard.querySelector('[aria-label^="이용 기간"]'),
+    ).toBeNull();
     await expect(
       canvas.queryByRole("link", { name: "혜택 목록으로" }),
     ).toBeNull();
@@ -370,25 +407,49 @@ export const Default: Story = {
       ).toHaveClass("h-px", "w-full", "min-[480px]:h-8", "min-[480px]:w-px");
     });
 
-    const additionalInformation = summaryCard.querySelector<HTMLElement>(
-      "[data-additional-information-section]",
+    const introduction = summaryCard.querySelector<HTMLElement>(
+      "[data-partner-introduction-section]",
     );
-    await expect(additionalInformation).not.toBeNull();
+    await expect(introduction).not.toBeNull();
     await expect(
-      within(additionalInformation!).getByRole("heading", {
+      within(introduction!).getByRole("heading", {
+        level: 2,
+        name: "제휴처 소개",
+      }),
+    ).toBeVisible();
+    await expect(
+      introduction?.querySelector("[data-partner-introduction-content]"),
+    ).toHaveTextContent(partner.detailDescription!);
+    await expect(
+      introduction?.querySelector("[data-partner-introduction-container]"),
+    ).toHaveClass("rounded-card", "border", "bg-surface-inset");
+    await expect(
+      Boolean(
+        introduction &&
+          (introduction.compareDocumentPosition(benefitList) &
+            Node.DOCUMENT_POSITION_FOLLOWING),
+      ),
+    ).toBe(true);
+
+    const tagSection = summaryCard.querySelector<HTMLElement>(
+      "[data-partner-tags-section]",
+    );
+    await expect(tagSection).not.toBeNull();
+    await expect(
+      within(tagSection!).getByRole("heading", {
         level: 3,
-        name: "이용 기간 및 태그",
+        name: "태그",
       }),
     ).toBeInTheDocument();
-    await expect(additionalInformation).not.toHaveTextContent("이용 조건");
-    await expect(additionalInformation).toHaveTextContent("#운동");
-    await expect(additionalInformation).not.toHaveTextContent("제휴처 소개");
-    await expect(additionalInformation?.querySelector("details")).toBeNull();
+    await expect(tagSection).not.toHaveTextContent("이용 조건");
+    await expect(tagSection?.querySelector("p")).toBeNull();
+    await expect(tagSection?.querySelector("details")).toBeNull();
 
     const tagList = summaryCard.querySelector<HTMLElement>(
       "[data-partner-tag-list]",
     );
     await expect(tagList).not.toBeNull();
+    await expect(tagList).toBeVisible();
     await expect(tagList?.querySelectorAll("[data-partner-tag]")).toHaveLength(5);
     await expect(tagList).not.toHaveTextContent("+");
 
@@ -406,6 +467,8 @@ export const ManyAndLongKorean: Story = {
     value: {
       ...partner,
       name: "서울 캠퍼스 구성원을 위한 긴 이름의 체형 교정과 건강 관리 전문 제휴처",
+      detailDescription: `SSAFY 구성원이 수업 전후와 주말에도 편하게 이용할 수 있도록 상담부터 예약, 준비물, 현장 이용 순서까지 자세히 안내하는 제휴처입니다. ${"긴 한국어 소개 문장이 화면 폭을 밀어내지 않고 자연스럽게 줄바꿈됩니다. ".repeat(3)}`,
+      tags: ["운동", "역삼", "예약", "건강", "상담", "주말", "샤워실", "개인락커"],
       benefits: Array.from(
         { length: 7 },
         (_, index) => `구성원 맞춤 혜택 ${index + 1}번과 이용 조건을 함께 확인해 주세요`,
@@ -415,6 +478,21 @@ export const ManyAndLongKorean: Story = {
         (_, index) => `상세 이용 조건 ${index + 1}번은 현장 상황에 따라 달라질 수 있습니다`,
       ),
     },
+  },
+  play: async ({ canvasElement }) => {
+    const hero = canvasElement.querySelector<HTMLElement>(
+      "[data-partner-detail-hero-info]",
+    );
+    const introduction = canvasElement.querySelector<HTMLElement>(
+      "[data-partner-introduction-section]",
+    );
+    await expect(hero).not.toBeNull();
+    await expect(introduction).not.toBeNull();
+    await expect(introduction).toBeVisible();
+    await expect(canvasElement.querySelector("details")).toBeNull();
+    await expect(
+      canvasElement.ownerDocument.documentElement.scrollWidth,
+    ).toBeLessThanOrEqual(canvasElement.ownerDocument.documentElement.clientWidth);
   },
 };
 
@@ -445,6 +523,17 @@ export const Empty: Story = {
       tags: [],
       detailDescription: null,
     },
+  },
+  play: async ({ canvasElement }) => {
+    await expect(
+      canvasElement.querySelector("[data-partner-introduction-section]"),
+    ).toBeNull();
+    await expect(
+      canvasElement.querySelector("[data-partner-introduction-container]"),
+    ).toBeNull();
+    await expect(
+      canvasElement.querySelector("[data-partner-detail-hero-info] header p"),
+    ).toBeNull();
   },
 };
 

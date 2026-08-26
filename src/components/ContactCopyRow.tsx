@@ -48,7 +48,7 @@ export default function ContactCopyRow({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 overflow-hidden border border-border bg-surface-muted",
+        "flex items-center gap-2 overflow-visible border border-border bg-surface-muted",
         compact
           ? "mt-0 min-h-[3.75rem] rounded-[0.85rem] p-2"
           : "mt-4 rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5",

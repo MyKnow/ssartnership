@@ -15,8 +15,12 @@ const focusableSelector = [
 ].join(",");
 
 function getFocusableElements(container: HTMLElement) {
-  return Array.from(container.querySelectorAll<HTMLElement>(focusableSelector)).filter(
-    (element) => !element.hasAttribute("hidden") && element.getAttribute("aria-hidden") !== "true",
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(focusableSelector),
+  ).filter(
+    (element) =>
+      !element.hasAttribute("hidden") &&
+      element.getAttribute("aria-hidden") !== "true",
   );
 }
 
@@ -27,6 +31,7 @@ export default function Modal({
   onClose,
   children,
   panelClassName,
+  titleClassName,
   bodyClassName,
 }: {
   open: boolean;
@@ -35,6 +40,7 @@ export default function Modal({
   onClose: () => void;
   children: React.ReactNode;
   panelClassName?: string;
+  titleClassName?: string;
   bodyClassName?: string;
 }) {
   const portalRoot = typeof document === "undefined" ? null : document.body;
@@ -66,7 +72,10 @@ export default function Modal({
       return;
     }
 
-    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    openerRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     const frame = window.requestAnimationFrame(() => {
       const panel = panelRef.current;
       if (!panel) {
@@ -146,29 +155,35 @@ export default function Modal({
             panelClassName,
           )}
         >
-            <div className="flex min-w-0 items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 id={titleId} className="text-xl font-semibold tracking-[-0.02em] text-foreground">
-                  {title}
-                </h2>
-                {description ? (
-                  <p id={descriptionId} className="mt-2 ui-body">
-                    {description}
-                  </p>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="모달 닫기"
-                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border/80 bg-surface-control text-foreground shadow-flat transition-interactive duration-200 ease-out hover:-translate-y-px hover:border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-overlay"
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2
+                id={titleId}
+                className={cn(
+                  "text-xl font-semibold tracking-[-0.02em] text-foreground",
+                  titleClassName,
+                )}
               >
-                <XMarkIcon className="h-5 w-5" aria-hidden="true" />
-              </button>
+                {title}
+              </h2>
+              {description ? (
+                <p id={descriptionId} className="mt-2 ui-body">
+                  {description}
+                </p>
+              ) : null}
             </div>
-            <div className={cn("mt-4 min-h-0 flex-1", bodyClassName)}>
-              {children}
-            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="모달 닫기"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border/80 bg-surface-control text-foreground shadow-flat transition-interactive duration-200 ease-out hover:-translate-y-px hover:border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-overlay"
+            >
+              <XMarkIcon className="h-5 w-5" aria-hidden="true" />
+            </button>
+          </div>
+          <div className={cn("mt-4 min-h-0 flex-1", bodyClassName)}>
+            {children}
+          </div>
         </div>
       </div>
     ) : null,

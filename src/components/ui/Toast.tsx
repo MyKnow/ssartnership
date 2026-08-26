@@ -1,5 +1,6 @@
 "use client";
 
+import { XMarkIcon } from "@heroicons/react/24/outline";
 import {
   createContext,
   useCallback,
@@ -27,15 +28,25 @@ const noopToastContext: ToastContextValue = {
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const mountedRef = useRef(true);
-  const removalTimersRef = useRef<number[]>([]);
+  const removalTimersRef = useRef(new Map<string, number>());
 
   useEffect(() => {
+    const removalTimers = removalTimersRef.current;
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      removalTimersRef.current.forEach((timer) => window.clearTimeout(timer));
-      removalTimersRef.current = [];
+      removalTimers.forEach((timer) => window.clearTimeout(timer));
+      removalTimers.clear();
     };
+  }, []);
+
+  const dismiss = useCallback((id: string) => {
+    const timer = removalTimersRef.current.get(id);
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      removalTimersRef.current.delete(id);
+    }
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
   const notify = useCallback((message: string) => {
@@ -49,11 +60,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       setToasts((prev) => prev.filter((toast) => toast.id !== id));
-      removalTimersRef.current = removalTimersRef.current.filter(
-        (timerId) => timerId !== timer,
-      );
+      removalTimersRef.current.delete(id);
     }, 2500);
-    removalTimersRef.current = [...removalTimersRef.current, timer];
+    removalTimersRef.current.set(id, timer);
   }, []);
 
   const value = useMemo(() => ({ notify }), [notify]);
@@ -68,10 +77,21 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            role="status"
-            className="pointer-events-auto w-full translate-y-0 rounded-[1.25rem] border border-border/80 bg-surface-overlay px-4 py-3 text-sm text-foreground opacity-100 shadow-overlay backdrop-blur-xl transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none sm:w-auto sm:min-w-[18rem]"
+            data-toast-item
+            className="ui-toast-glass pointer-events-auto flex min-h-11 w-full translate-y-0 items-center gap-2 rounded-[1.25rem] py-1 pl-4 pr-1 text-sm text-foreground opacity-100 transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none sm:w-auto sm:min-w-[18rem]"
           >
-            {toast.message}
+            <span role="status" className="min-w-0 flex-1">
+              {toast.message}
+            </span>
+            <button
+              type="button"
+              aria-label="알림 닫기"
+              title="알림 닫기"
+              className="transition-fade-colors inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-control hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface-overlay"
+              onClick={() => dismiss(toast.id)}
+            >
+              <XMarkIcon className="h-5 w-5" aria-hidden="true" />
+            </button>
           </div>
         ))}
       </div>

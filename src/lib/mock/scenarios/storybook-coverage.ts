@@ -97,6 +97,16 @@ const mockStorybookScenarioCoverageBase = [
     viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
   },
   {
+    routePath: "/install",
+    scenarioId: "public.install.guide",
+    storyId: "screens-public-pwainstallguideview--android",
+    storyFile: "src/components/pwa/PwaInstallGuideView.stories.tsx",
+    renderKind: "actual-view",
+    actualViewComponent: "PwaInstallGuideView",
+    coveredStateKeys: ["default", "long-korean", "mobile-overflow"],
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
+  {
     routePath: "/legal/[kind]",
     scenarioId: "public.legal.document",
     storyId: "screens-public-legalpolicyview--default",

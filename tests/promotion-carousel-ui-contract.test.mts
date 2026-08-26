@@ -17,7 +17,7 @@ const siteHeaderSourceUrl = new URL(
 );
 const globalsSourceUrl = new URL("../src/app/globals.css", import.meta.url);
 
-test("홈 프로모션은 설명 블록 없이 뷰포트 전체 폭의 21:9 직사각형으로 표시된다", async () => {
+test("홈 프로모션은 좁은 화면에서는 전체 폭, 데스크톱에서는 제휴처 컨테이너 폭의 21:9 직사각형으로 표시된다", async () => {
   const [source, homePageSource, skeletonSource, siteHeaderSource, globalsSource] =
     await Promise.all([
       readFile(carouselSourceUrl, "utf8"),
@@ -42,6 +42,10 @@ test("홈 프로모션은 설명 블록 없이 뷰포트 전체 폭의 21:9 직�
     homePageSource,
     /<main>\s*<PromotionCarousel[\s\S]*headingLevel="h1"[\s\S]*?\/>\s*<Container className="pb-16 pt-0"/,
   );
+  assert.match(
+    homePageSource,
+    /className="mt-0 lg:mx-auto lg:max-w-\[min\(var\(--grid-wide\),calc\(100vw-1\.5rem\)\)\] lg:px-8"/,
+  );
   assert.match(homePageSource, /<Container className="pb-16 pt-0"/);
   assert.match(
     skeletonSource,
@@ -49,7 +53,7 @@ test("홈 프로모션은 설명 블록 없이 뷰포트 전체 폭의 21:9 직�
   );
   assert.match(
     skeletonSource,
-    /<main>\s*<HeroSkeleton \/>\s*<Container className="pb-16 pt-0"/,
+    /<main>\s*<div className="lg:mx-auto lg:max-w-\[min\(var\(--grid-wide\),calc\(100vw-1\.5rem\)\)\] lg:px-8">\s*<HeroSkeleton \/>\s*<\/div>\s*<Container className="pb-16 pt-0"/,
   );
   assert.match(siteHeaderSource, /className="safe-site-header-spacer"/);
   assert.match(siteHeaderSource, /style=\{headerHeight \? \{ height: headerHeight \}/);

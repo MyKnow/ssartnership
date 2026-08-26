@@ -153,15 +153,21 @@ function PartnerSetupHeroSkeleton() {
 function PartnerDetailMediaSkeleton() {
   return (
     <div className="grid gap-6">
-      <div className="grid gap-6 md:grid-cols-2 md:items-stretch">
-        <Skeleton className="order-2 h-[24rem] w-full rounded-[2rem] border border-border bg-surface-muted md:order-2" />
-        <Card className="order-1 min-h-[24rem] space-y-4 p-6 sm:p-8 md:order-1">
-          <Skeleton className="h-5 w-20" />
-          <Skeleton className="h-12 w-full max-w-2xl" />
-          <Skeleton className="h-4 w-full max-w-xl" />
-          <Skeleton className="h-4 w-full max-w-lg" />
-        </Card>
-      </div>
+      <Card className="grid grid-cols-1 items-stretch gap-4 p-4 min-[480px]:grid-cols-[auto_minmax(0,1fr)] min-[480px]:gap-3 sm:p-5 md:gap-5">
+        <Skeleton className="aspect-square w-full self-start justify-self-stretch rounded-card min-[480px]:h-full min-[480px]:min-h-20 min-[480px]:min-w-20 min-[480px]:w-auto min-[480px]:self-stretch min-[480px]:justify-self-start" />
+        <div className="grid min-w-0 content-center self-stretch grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 sm:gap-x-4 sm:gap-y-2">
+          <div className="col-start-1 row-start-1 flex items-center gap-2 self-center">
+            <Skeleton className="size-2 rounded-full" />
+            <Skeleton className="h-3 w-12 rounded-md" />
+          </div>
+          <Skeleton className="col-start-2 row-start-1 h-10 w-20 rounded-full" />
+          <Skeleton className="col-span-2 row-start-2 h-9 w-full max-w-sm" />
+          <div className="col-span-2 row-start-3 flex items-center gap-2">
+            <Skeleton className="size-4 rounded-md" />
+            <Skeleton className="h-3 w-40 rounded-md" />
+          </div>
+        </div>
+      </Card>
       <Skeleton className="h-48 w-full rounded-[2rem] border border-border bg-surface-muted" />
     </div>
   );
@@ -312,16 +318,24 @@ export function PublicPartnerDetailSkeleton() {
       <main>
         <Container className="pb-16 pt-10">
           <div className="flex flex-col gap-6">
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-12 w-12 rounded-full" />
-              <Skeleton className="h-12 w-28 rounded-full" />
-            </div>
             <PartnerDetailMediaSkeleton />
             <Card className="space-y-4 p-6 sm:p-8">
+              <div className="space-y-3">
+                <Skeleton className="h-6 w-28" />
+                <Skeleton className="h-4 w-full max-w-3xl" />
+                <Skeleton className="h-4 w-full max-w-2xl" />
+              </div>
               <Skeleton className="h-6 w-28" />
               <div className="grid gap-4 md:grid-cols-2">
                 <Skeleton className="h-24 w-full rounded-2xl" />
                 <Skeleton className="h-24 w-full rounded-2xl" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-10" />
+                <div className="flex gap-2">
+                  <Skeleton className="h-8 w-20 rounded-full" />
+                  <Skeleton className="h-8 w-20 rounded-full" />
+                </div>
               </div>
             </Card>
             <PartnerReviewSectionSkeleton />

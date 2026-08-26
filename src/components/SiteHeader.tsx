@@ -118,7 +118,7 @@ export default function SiteHeader({
                   </Button>
                 </div>
               ) : null}
-              <div className="hidden md:flex">
+              <div data-site-header-theme-toggle className="hidden md:flex">
                 <ThemeToggle />
               </div>
               {initialSession ? (

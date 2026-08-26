@@ -9,6 +9,7 @@
 - `surface-control`: input/select/textarea/button 같은 조작 요소
 - `surface-elevated`: 핵심 카드, CTA, 주요 섹션
 - `surface-overlay`: modal, drawer, toast
+- `toast-glass / toast-glass-border / toast-glass-highlight`: 일시적 overlay 피드백의 반투명 tint, 외곽선, 상단 highlight
 - `border / border-strong`: 보더 강도 2단계
 - `foreground / foreground-soft / muted-foreground`: 텍스트 위계
 - `primary / primary-emphasis / primary-soft`: 핵심 액션 색

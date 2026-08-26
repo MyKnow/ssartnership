@@ -105,11 +105,13 @@ export function useCarouselController({
       return;
     }
 
-    thumb.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-      inline: "center",
-    });
+    const targetLeft =
+      thumb.offsetLeft - strip.clientWidth / 2 + thumb.offsetWidth / 2;
+    const nextLeft = Math.max(
+      0,
+      Math.min(targetLeft, strip.scrollWidth - strip.clientWidth),
+    );
+    strip.scrollTo({ left: nextLeft, behavior: "smooth" });
   }, [activeIndex, thumbPlacement]);
 
   const resetInteractiveState = () => {

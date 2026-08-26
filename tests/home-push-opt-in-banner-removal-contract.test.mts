@@ -18,7 +18,7 @@ test("홈은 알림 설정 배너 없이 캐러셀 다음에 혜택 디렉터리
   );
   assert.match(
     skeletonSource,
-    /<HeroSkeleton \/>\s*<Container[\s\S]*?<section className="mt-7 space-y-4">\s*<HomeDirectorySectionHeaderSkeleton \/>\s*<HomeFilterBarSkeleton \/>/,
+    /<HeroSkeleton \/>\s*<\/div>\s*<Container[\s\S]*?<section className="mt-7 space-y-4">\s*<HomeDirectorySectionHeaderSkeleton \/>\s*<HomeFilterBarSkeleton \/>/,
   );
 
   await Promise.all([
