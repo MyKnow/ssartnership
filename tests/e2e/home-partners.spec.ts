@@ -120,12 +120,21 @@ test.describe("public partner discovery", () => {
     await page.setViewportSize({ width: 360, height: 844 });
     await page.goto("/?view=list#benefits");
     await page.waitForLoadState("networkidle");
+    await waitForDirectoryControls(page);
 
     const searchBox = await page.getByTestId("partner-search-input").boundingBox();
+    const disclosure = page.getByTestId("partner-mobile-filter-disclosure");
+    const disclosureBox = await disclosure.boundingBox();
+    expect(searchBox).not.toBeNull();
+    expect(disclosureBox).not.toBeNull();
+    if (searchBox && disclosureBox) {
+      expect(searchBox.y).toBeLessThan(disclosureBox.y);
+    }
+
+    await disclosure.click();
     const categoryBox = await page
       .getByRole("group", { name: "제휴처 카테고리" })
       .boundingBox();
-    expect(searchBox).not.toBeNull();
     expect(categoryBox).not.toBeNull();
     if (searchBox && categoryBox) {
       expect(searchBox.y).toBeLessThan(categoryBox.y);
@@ -207,11 +216,13 @@ test.describe("public partner discovery", () => {
     await page.waitForLoadState("networkidle");
     await waitForDirectoryControls(page);
 
-    await page.getByText("고급 필터", { exact: true }).click();
-    await page.getByTestId("partner-campus-filter").selectOption("seoul");
+    await page.getByTestId("partner-mobile-filter-disclosure").click();
+    await page
+      .getByTestId("partner-campus-filter-mobile-inline")
+      .selectOption("seoul");
     await expect(page).toHaveURL(/campus=seoul/);
 
-    const activeFilters = page.getByTestId("partner-active-filters");
+    const activeFilters = page.getByLabel("적용된 상세 필터");
     await expect(activeFilters).toBeVisible();
     await activeFilters.getByRole("button", { name: "서울 캠퍼스 필터 해제" }).click();
     await expect(page).not.toHaveURL(/campus=seoul/);

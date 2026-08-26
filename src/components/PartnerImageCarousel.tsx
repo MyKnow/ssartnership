@@ -118,7 +118,7 @@ export default function PartnerImageCarousel({
     <div
       ref={rootRef}
       data-partner-image-carousel={variant}
-      className={cn("min-w-0", className)}
+      className={cn("relative min-w-0", className)}
     >
       {showTabletCarousel ? (
         <TabletImageCarousel
@@ -145,7 +145,9 @@ export default function PartnerImageCarousel({
         data-partner-image-carousel-stage
         className={cn(
           "grid min-w-0 items-start gap-3 overscroll-x-none",
-          showTabletCarousel ? "md:hidden" : "xl:grid-cols-1 xl:items-start",
+          showTabletCarousel
+            ? "md:pointer-events-none md:absolute md:inset-x-0 md:top-0 md:invisible"
+            : "xl:grid-cols-1 xl:items-start",
         )}
       >
         <button

@@ -1,9 +1,19 @@
 import { expect, test } from "@playwright/test";
 
 const partnerPath =
-  "/partners/f9af4ff7-6c28-4f74-95dc-e1a48bf4c8ac?returnTo=%2F%3Fview%3Dlist%23benefits";
+  "/partners/cafe-ssafy-001?returnTo=%2F%3Fview%3Dlist%23benefits";
 
 test("keeps tablet gallery wheel navigation inside the page", async ({ page }) => {
+  const invalidImageLayoutWarnings: string[] = [];
+  page.on("console", (message) => {
+    if (
+      message.type() === "warning" &&
+      message.text().includes('has "fill" and a height value of 0')
+    ) {
+      invalidImageLayoutWarnings.push(message.text());
+    }
+  });
+
   await page.setViewportSize({ width: 820, height: 1180 });
   await page.goto(partnerPath);
   await page.waitForLoadState("networkidle");
@@ -41,7 +51,7 @@ test("keeps tablet gallery wheel navigation inside the page", async ({ page }) =
     carousel.getByRole("button", { name: "이미지 2 크게 보기", exact: true }),
   ).toBeVisible();
   expect(new URL(page.url()).pathname).toBe(
-    "/partners/f9af4ff7-6c28-4f74-95dc-e1a48bf4c8ac",
+    "/partners/cafe-ssafy-001",
   );
 
   const visibleNextPreview = carousel.locator(
@@ -57,4 +67,5 @@ test("keeps tablet gallery wheel navigation inside the page", async ({ page }) =
   await expect(
     carousel.getByRole("button", { name: "이미지 3 크게 보기", exact: true }),
   ).toBeVisible();
+  expect(invalidImageLayoutWarnings).toEqual([]);
 });
