@@ -1,5 +1,4 @@
 import Image from "next/image";
-import type { StaticImageData } from "next/image";
 import Link from "next/link";
 import {
   ArrowRightIcon,
@@ -14,19 +13,12 @@ import Container from "@/components/ui/Container";
 import ShellHeader from "@/components/ui/ShellHeader";
 import type { PwaInstallPlatform } from "@/lib/pwa-install";
 import { buildPwaInstallGuideHref } from "@/lib/pwa-install";
-import androidChromeMenuImage from "../../assets/install-guides/android-chrome-menu.png";
-import androidChromeToolbarImage from "../../assets/install-guides/android-chrome-toolbar.png";
-import iosSafariAddConfirmationImage from "../../assets/install-guides/ios-safari-add-confirmation.png";
-import iosSafariMenuImage from "../../assets/install-guides/ios-safari-menu.png";
-import iosSafariShareActionsImage from "../../assets/install-guides/ios-safari-share-actions.png";
-import iosSafariShareSheetImage from "../../assets/install-guides/ios-safari-share-sheet.png";
-import iosSafariToolbarImage from "../../assets/install-guides/ios-safari-toolbar.png";
 
 type GuideStep = {
   title: string;
   description: string;
   image?: {
-    src: StaticImageData;
+    src: string;
     alt: string;
     objectPosition: string;
   };
@@ -54,7 +46,7 @@ const guideConfig: Record<PwaInstallPlatform, GuideConfig> = {
         description:
           "세로 점 3개 또는 ‘업데이트 가능’ 아이콘으로 표시된 브라우저 메뉴 버튼을 누릅니다.",
         image: {
-          src: androidChromeToolbarImage,
+          src: "/install-guides/android-chrome-toolbar.png",
           alt: "Android Chrome 오른쪽 위에 더보기 메뉴 버튼이 표시된 화면",
           objectPosition: "center top",
         },
@@ -64,7 +56,7 @@ const guideConfig: Record<PwaInstallPlatform, GuideConfig> = {
         description:
           "메뉴 아래쪽의 ‘앱 설치’ 또는 ‘홈 화면에 추가’를 선택합니다.",
         image: {
-          src: androidChromeMenuImage,
+          src: "/install-guides/android-chrome-menu.png",
           alt: "Android Chrome 더보기 메뉴에 홈 화면에 추가 항목이 표시된 화면",
           objectPosition: "right 78%",
         },
@@ -92,7 +84,7 @@ const guideConfig: Record<PwaInstallPlatform, GuideConfig> = {
         description:
           "최신 Safari에서는 주소창 오른쪽의 점 3개를 누릅니다. 공유 버튼이 바로 보이면 다음 단계로 이동하세요.",
         image: {
-          src: iosSafariToolbarImage,
+          src: "/install-guides/ios-safari-toolbar.png",
           alt: "iPhone Safari 하단 주소창 오른쪽에 더보기 버튼이 표시된 화면",
           objectPosition: "center bottom",
         },
@@ -101,7 +93,7 @@ const guideConfig: Record<PwaInstallPlatform, GuideConfig> = {
         title: "메뉴에서 공유를 누르세요",
         description: "네모 위로 화살표가 올라가는 모양의 ‘공유’를 선택합니다.",
         image: {
-          src: iosSafariMenuImage,
+          src: "/install-guides/ios-safari-menu.png",
           alt: "iPhone Safari 더보기 메뉴에 공유 항목이 표시된 화면",
           objectPosition: "right 77%",
         },
@@ -111,7 +103,7 @@ const guideConfig: Record<PwaInstallPlatform, GuideConfig> = {
         description:
           "공유할 앱 목록 아래 빠른 동작의 오른쪽 끝에 있는 ‘더 보기’를 눌러 전체 동작을 펼칩니다.",
         image: {
-          src: iosSafariShareSheetImage,
+          src: "/install-guides/ios-safari-share-sheet.png",
           alt: "iPhone Safari 공유 시트의 빠른 동작에 더 보기 버튼이 표시된 화면",
           objectPosition: "center 76%",
         },
@@ -121,7 +113,7 @@ const guideConfig: Record<PwaInstallPlatform, GuideConfig> = {
         description:
           "펼쳐진 동작 목록에서 ‘홈 화면에 추가’를 찾아 누릅니다.",
         image: {
-          src: iosSafariShareActionsImage,
+          src: "/install-guides/ios-safari-share-actions.png",
           alt: "iPhone Safari 공유 동작 목록에 홈 화면에 추가가 표시된 화면",
           objectPosition: "center 76%",
         },
@@ -131,7 +123,7 @@ const guideConfig: Record<PwaInstallPlatform, GuideConfig> = {
         description:
           "‘싸트너십’ 이름과 ssartnership.myknow.xyz 주소를 확인한 뒤 오른쪽 위 ‘추가’를 누릅니다.",
         image: {
-          src: iosSafariAddConfirmationImage,
+          src: "/install-guides/ios-safari-add-confirmation.png",
           alt: "iPhone 홈 화면에 추가 확인 화면에 싸트너십 이름과 운영 주소가 표시된 화면",
           objectPosition: "center 18%",
         },

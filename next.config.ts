@@ -103,6 +103,9 @@ const nextConfig: NextConfig = {
       {
         pathname: "/mock/partners/**",
       },
+      {
+        pathname: "/install-guides/**",
+      },
     ],
   },
   async headers() {

@@ -11,6 +11,10 @@ const guideViewSource = readFileSync(
   new URL("../src/components/pwa/PwaInstallGuideView.tsx", import.meta.url),
   "utf8",
 );
+const nextConfigSource = readFileSync(
+  new URL("../next.config.ts", import.meta.url),
+  "utf8",
+);
 
 test("Android 브라우저는 Android 설치 안내로 분기한다", () => {
   assert.equal(
@@ -127,6 +131,7 @@ test("모바일 설치 안내는 현재 화면에서 바로 누를 조작과 실
   );
   assert.doesNotMatch(guideViewSource, /실제 화면/);
   assert.doesNotMatch(guideViewSource, /<figcaption/);
+  assert.match(nextConfigSource, /pathname: "\/install-guides\/\*\*"/);
 
   for (const imageName of [
     "android-chrome-toolbar.png",
@@ -139,7 +144,7 @@ test("모바일 설치 안내는 현재 화면에서 바로 누를 조작과 실
   ]) {
     assert.equal(
       existsSync(
-        new URL(`../src/assets/install-guides/${imageName}`, import.meta.url),
+        new URL(`../public/install-guides/${imageName}`, import.meta.url),
       ),
       true,
       `${imageName} 시뮬레이터 화면 자료가 있어야 한다`,
