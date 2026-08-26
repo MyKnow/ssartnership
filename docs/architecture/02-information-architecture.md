@@ -39,6 +39,7 @@ page route의 기계 판독 기준은 `src/lib/mock/scenarios/route-inventory.ts
 | `/support/bug-report` | `(site)/support/bug-report/page.tsx` | 버그/문의 제보 |
 | `/verify/[token]` | `(site)/verify/[token]/page.tsx` | 인증 QR 검증 |
 | `/certification` | `(site)/certification/page.tsx` | 회원 인증 카드 |
+| `/settings` | `(site)/settings/page.tsx` | 회원 계정 연결·보안 설정 |
 | `/notifications` | `(site)/notifications/page.tsx` | 회원 알림함 |
 | `/coupons` | `(site)/coupons/page.tsx` | 회원 쿠폰 지갑 |
 | `/partner-registration` | `(site)/partner-registration/page.tsx` | 파트너사와 제휴처 등록 신청 |
@@ -140,7 +141,7 @@ page route의 기계 판독 기준은 `src/lib/mock/scenarios/route-inventory.ts
 
 ### `canonical` — 42개
 
-- 공개·회원: `/`, `/campuses/[campus]`, `/certification`, `/coupons`, `/events/[slug]`, `/legal/[kind]`, `/notifications`, `/partner-registration`, `/partners/[id]`, `/suggest`, `/support/bug-report`
+- 공개·회원: `/`, `/campuses/[campus]`, `/certification`, `/coupons`, `/events/[slug]`, `/legal/[kind]`, `/notifications`, `/partner-registration`, `/partners/[id]`, `/settings`, `/suggest`, `/support/bug-report`
 - 인증: `/auth/login`, `/auth/reset`, `/auth/signup`
 - 관리자: `/admin`, `/admin/admins`, `/admin/advertisement`, `/admin/categories`, `/admin/companies`, `/admin/cycle`, `/admin/event`, `/admin/event/[slug]`, `/admin/logs`, `/admin/members`, `/admin/members/[memberId]`, `/admin/notifications`, `/admin/partner-registrations`, `/admin/partner-requests`, `/admin/partners`, `/admin/partners/[partnerId]`, `/admin/partners/new`, `/admin/push`, `/admin/reviews`
 - 파트너: `/partner/account`, `/partner/companies/[companyId]`, `/partner/companies/[companyId]/plans`, `/partner/companies/[companyId]/services/[partnerId]`, `/partner/companies/[companyId]/services/new`, `/partner/login`, `/partner/notifications`, `/partner/reset`, `/partner/support`
@@ -168,7 +169,7 @@ Query 호환 규칙으로 `/admin/partners?tab=requests`는 `/admin/partner-requ
 | 비회원 | public header, event link, 검색 | 이벤트 | `/`, `/events/[slug]` | 공개 |
 | 비회원 | public header, 홈 첫 viewport | 혜택 찾기 | `/`, `/campuses/[campus]`, `/partners/[id]` | visibility가 공개 가능한 제휴처 |
 | 비회원 | footer, 제휴 CTA | 참여·지원 | `/partner-registration`, `/suggest`, `/support/bug-report`, `/legal/[kind]` | 공개, 제출 경계 rate limit |
-| SSAFY 회원 | 사용자 메뉴 | 내 활동 | `/certification`, `/coupons`, `/notifications` | member session |
+| SSAFY 회원 | 사용자 메뉴·공용 헤더 설정 아이콘 | 내 활동·계정 설정 | `/certification`, `/coupons`, `/notifications`, `/settings` | member session |
 | SSAFY 회원 | 이벤트/제휴처 CTA | 참여·이용 | `/events/[slug]`, `/partners/[id]` | member eligibility를 서버에서 재검증 |
 | 파트너 | 로그인 후 shell | 홈·제휴처 | `/partner`, `/partner/companies/[companyId]`, 회사별 services | partner session + company scope |
 | 파트너 | 모바일 하단 메뉴 | 알림 | `/partner/notifications` | 접근 가능한 company audience |
@@ -185,7 +186,7 @@ Query 호환 규칙으로 `/admin/partners?tab=requests`는 `/admin/partner-requ
 
 `tests/e2e/fixtures/routes.ts`가 smoke/redirect 기대값의 기준이다.
 
-- 회원 보호: `/certification`, `/coupons`, `/notifications`는 비로그인 시 `/auth/login`으로 이동한다.
+- 회원 보호: `/certification`, `/coupons`, `/notifications`, `/settings`는 비로그인 시 `/auth/login`으로 이동한다.
 - 파트너 보호: `/partner`, `/partner/notifications`, `/partner/plans`, `/partner/support`, `/partner/companies/*`, `/partner/services/*`는 비로그인 시 `/partner/login`으로 이동한다.
 - 관리자 보호: `/admin`과 대부분의 `/admin/*` protected 화면은 비인증 상태에서 `/auth/login`으로 이동한다. 회원 세션이 있으면 `/admin/session`을 거쳐 관리자 세션 bridge를 시도한다.
 - `(site)` layout은 로그인된 회원에게 필수 약관 동의 또는 강제 비밀번호 변경이 필요하면 각각 `/auth/consent`, `/auth/change-password`로 보낸다.

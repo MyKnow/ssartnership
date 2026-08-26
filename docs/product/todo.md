@@ -59,7 +59,7 @@
 - [x] auth/security log raw exception redaction 적용
 - [x] 회원/파트너 session mutation route same-origin guard 전체 적용
 
-주의: 관리자 Basic Auth 값은 Vercel Production/Preview env와 gitignored `.env.local`에만 저장한다. 코드 반영 전 기존 Production 배포본은 `/admin/login` 화면에 Basic Auth challenge를 걸지 않으므로, 배포 후 `/admin/login` 401 challenge를 다시 확인한다.
+주의: 관리자 Basic Auth 값은 Vercel Production/Preview env와 단일 gitignored `.env`에만 저장한다. 코드 반영 전 기존 Production 배포본은 `/admin/login` 화면에 Basic Auth challenge를 걸지 않으므로, 배포 후 `/admin/login` 401 challenge를 다시 확인한다.
 2026-07-05 21:47 KST 확인: `SSAFY_VERIFY_LIVE_SMOKE=1 npm run test:ssafy-verify:live` 통과, Production `/admin/login`은 Basic Auth 없이 200 응답.
 2026-07-05 22:02 KST 확인: Vercel wrapper로 Production/Preview에 `ADMIN_BASIC_AUTH_USERNAME`, `ADMIN_BASIC_AUTH_PASSWORD`를 등록하고, legacy Mattermost env 15개를 제거했다. 로컬 빌드 서버에서 `/admin/login`은 무인증 401, Basic Auth 포함 200을 반환했다. 로컬 `.env`의 Mattermost 직접 연동 값도 제거했다. 로컬 Vercel wrapper token은 복호화할 수 없어 필요 시 `SSARTNERSHIP_VERCEL_TOKEN`을 다시 입력한다.
 
@@ -69,9 +69,9 @@
    완료: required policy 조회를 캐시하고, member 조회와 policy 조회를 병렬화했다.
 
 2. [x] 공개 홈의 초기 응답 경로에서 세션/푸시 조회와 client hydration 비용 줄이기
-   대상: `src/app/(site)/page.tsx`, `src/components/HomeContent.tsx`, `src/components/HomePushOptInBannerGate.tsx`, `src/components/HomeView.tsx`, `src/components/PushOptInBanner.tsx`
+   대상: `src/app/(site)/page.tsx`, `src/components/HomeContent.tsx`, `src/components/HomeView.tsx`
    이유: 홈은 세션 확인 뒤 파트너 목록과 push preferences를 기다리고, 화면 자체도 client component 비중이 높아 첫 콘텐츠와 상호작용 가능 시점이 늦어진다.
-   완료: 홈 shell(hero/header)과 push opt-in을 서버 경계로 분리하고, 카테고리/파트너 조회를 `HomeContent` 서버 컴포넌트 뒤로 늦춰 초기 응답을 먼저 내보내게 했다.
+   완료: 홈 shell(hero/header)과 카테고리/파트너 조회를 `HomeContent` 서버 컴포넌트 경계로 분리하고, 홈 push opt-in 배너와 관련 조회를 제거했다.
 
 3. [x] 홈 스켈레톤 DOM 및 애니메이션 비용 줄이기
    대상: `src/app/(site)/loading.tsx`, `src/components/loading/SitePageSkeletons.tsx`, `src/components/ui/Skeleton.tsx`

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Pencil } from "lucide-react";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import InlineMessage from "@/components/ui/InlineMessage";
@@ -54,7 +55,9 @@ export default function MemberEmailVerificationView({
   const [lockedEmail, setLockedEmail] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [codeExpiresAt, setCodeExpiresAt] = useState<number | null>(null);
-  const [resendAvailableAt, setResendAvailableAt] = useState<number | null>(null);
+  const [resendAvailableAt, setResendAvailableAt] = useState<number | null>(
+    null,
+  );
   const [now, setNow] = useState(() => Date.now());
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -68,6 +71,9 @@ export default function MemberEmailVerificationView({
     resendAvailableAt,
     now,
   );
+  const hasCompleteCode = /^\d{6}$/.test(code);
+  const hasValidEmail = isValidEmail(email.trim().toLowerCase());
+  const currentStep = lockedEmail ? 2 : 1;
 
   useEffect(() => {
     if (codeExpiresAt === null && resendAvailableAt === null) {
@@ -171,7 +177,9 @@ export default function MemberEmailVerificationView({
       return;
     }
     if (codeRemainingSeconds === 0) {
-      setErrorMessage("인증 코드의 유효시간이 끝났습니다. 새 코드를 받아 주세요.");
+      setErrorMessage(
+        "인증 코드의 유효시간이 끝났습니다. 새 코드를 받아 주세요.",
+      );
       return;
     }
     if (!/^\d{6}$/.test(code)) {
@@ -219,73 +227,98 @@ export default function MemberEmailVerificationView({
   };
 
   return (
-    <div className="space-y-5">
-      <InlineMessage
-        title="별도 로그인 수단"
-        description="MM 인증과 이메일 인증은 서로를 대체하는 전환 절차가 아닙니다. MM 사용이 어려워질 때도 계정에 접근할 수 있도록 이메일을 미리 등록할 수 있습니다."
-      />
-
-      <Surface level="elevated" padding="lg" className="space-y-6">
-        <div>
-          <p className="ui-kicker">{lockedEmail ? "2단계" : "1단계"}</p>
-          <h2 className="mt-2 text-lg font-semibold text-foreground">
-            {lockedEmail
-              ? "이메일로 받은 코드를 입력해 주세요"
-              : emailVerified
-                ? "새 이메일을 인증해 주세요"
-                : "사용할 이메일을 입력해 주세요"}
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            {lockedEmail
-              ? "코드를 보낸 이메일은 인증이 끝날 때까지 고정됩니다."
-              : "인증을 마친 이메일은 로그인과 비밀번호 재설정에 사용됩니다."}
-          </p>
-        </div>
-
-        {lockedEmail ? (
-          <div className="space-y-5">
-            <div className="rounded-[1.25rem] border border-border bg-surface-inset px-4 py-4">
-              <p className="text-xs font-semibold text-muted-foreground">
-                인증 코드를 보낸 이메일
-              </p>
-              <p className="mt-2 break-all text-sm font-semibold text-foreground">
-                {lockedEmail}
-              </p>
-            </div>
-
-            {codeRemainingSeconds === 0 ? (
-              <InlineMessage
-                tone="warning"
-                title="인증 코드 만료"
-                description="유효시간이 끝났습니다. 같은 이메일로 새 인증 코드를 받아 주세요."
-                role="status"
-              />
-            ) : null}
-
-            <form
-              className="space-y-5"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void verifyCode();
-              }}
-            >
-              <label className="grid gap-2 text-sm font-medium text-foreground">
-                <span className="flex flex-wrap items-center justify-between gap-2">
-                  <span>6자리 인증 코드</span>
-                  <span
-                    role="timer"
-                    aria-label={`인증 코드 유효시간 ${formatMemberEmailRemainingTime(codeRemainingSeconds)}`}
-                    className={
-                      codeRemainingSeconds === 0
-                        ? "font-semibold tabular-nums text-danger"
-                        : "font-semibold tabular-nums text-primary"
-                    }
-                  >
-                    {formatMemberEmailRemainingTime(codeRemainingSeconds)}
-                  </span>
+    <Surface level="elevated" padding="lg" className="space-y-6">
+      <div>
+        <nav aria-label={`인증 단계 ${currentStep}/2`}>
+          <ol className="grid grid-cols-2 gap-1.5">
+            {[1, 2].map((step) => (
+              <li
+                key={step}
+                aria-current={step === currentStep ? "step" : undefined}
+              >
+                <span className="sr-only">
+                  {step}단계 {step === 1 ? "이메일 입력" : "인증 코드 입력"}
                 </span>
+                <span
+                  aria-hidden="true"
+                  className={`block h-1 rounded-full ${
+                    step <= currentStep ? "bg-primary" : "bg-border"
+                  }`}
+                />
+              </li>
+            ))}
+          </ol>
+        </nav>
+        <p className="ui-kicker mt-3">{currentStep}단계</p>
+        <h2 className="mt-2 text-lg font-semibold text-foreground">
+          {lockedEmail
+            ? "이메일로 받은 코드를 입력해 주세요"
+            : emailVerified
+              ? "변경할 이메일을 입력해 주세요"
+              : "사용할 이메일을 입력해 주세요"}
+        </h2>
+      </div>
+
+      {lockedEmail ? (
+        <div className="space-y-5">
+          <div className="rounded-[1.25rem] border border-border bg-surface-inset px-4 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-muted-foreground">
+                  인증 코드를 보낸 이메일
+                </p>
+                <p className="mt-2 break-all text-sm font-semibold text-foreground">
+                  {lockedEmail}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                ariaLabel="다른 이메일 입력"
+                title="다른 이메일 입력"
+                disabled={sending || verifying}
+                onClick={editAnotherEmail}
+              >
+                <Pencil aria-hidden="true" size={18} />
+              </Button>
+            </div>
+          </div>
+
+          {codeRemainingSeconds === 0 ? (
+            <InlineMessage
+              tone="warning"
+              title="인증 코드 만료"
+              description="유효시간이 끝났습니다. 같은 이메일로 새 인증 코드를 받아 주세요."
+              role="status"
+            />
+          ) : null}
+
+          <form
+            className="space-y-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void verifyCode();
+            }}
+          >
+            <label className="grid gap-2 text-sm font-medium text-foreground">
+              <span className="flex flex-wrap items-center justify-between gap-2">
+                <span>6자리 인증 코드</span>
+                <span
+                  role="timer"
+                  aria-label={`인증 코드 유효시간 ${formatMemberEmailRemainingTime(codeRemainingSeconds)}`}
+                  className={
+                    codeRemainingSeconds === 0
+                      ? "font-semibold tabular-nums text-danger"
+                      : "font-semibold tabular-nums text-primary"
+                  }
+                >
+                  {formatMemberEmailRemainingTime(codeRemainingSeconds)}
+                </span>
+              </span>
+              <div className="flex items-stretch gap-2">
                 <Input
                   ref={codeInputRef}
+                  className="min-w-0 flex-1"
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   maxLength={6}
@@ -297,74 +330,24 @@ export default function MemberEmailVerificationView({
                   placeholder="000000"
                   disabled={verifying || sending || codeRemainingSeconds === 0}
                   aria-invalid={Boolean(errorMessage)}
-                  aria-describedby={errorMessage ? "member-email-error" : undefined}
+                  aria-describedby={
+                    errorMessage ? "member-email-error" : undefined
+                  }
                 />
-              </label>
-
-              {errorMessage ? (
-                <FormMessage id="member-email-error" variant="error">
-                  {errorMessage}
-                </FormMessage>
-              ) : null}
-
-              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
                 <Button
-                  type="submit"
-                  className="w-full"
-                  loading={verifying}
-                  loadingText="확인 중"
-                  disabled={sending || codeRemainingSeconds === 0}
-                >
-                  이메일 인증 완료하기
-                </Button>
-                <Button
+                  type="button"
                   variant="secondary"
-                  className="w-full sm:w-auto"
+                  className="shrink-0 px-3"
                   loading={sending}
                   loadingText="전송 중"
                   disabled={verifying || resendRemainingSeconds > 0}
                   onClick={() => void requestCode()}
                 >
                   {resendRemainingSeconds > 0
-                    ? `${resendRemainingSeconds}초 후 재전송`
-                    : "인증 코드 재전송"}
+                    ? `재전송 ${resendRemainingSeconds}초`
+                    : "재전송"}
                 </Button>
               </div>
-            </form>
-
-            <Button
-              variant="ghost"
-              className="w-full"
-              disabled={sending || verifying}
-              onClick={editAnotherEmail}
-            >
-              다른 이메일 입력
-            </Button>
-          </div>
-        ) : (
-          <form
-            className="space-y-5"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void requestCode();
-            }}
-          >
-            <label className="grid gap-2 text-sm font-medium text-foreground">
-              이메일
-              <Input
-                ref={emailInputRef}
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(event) => {
-                  setEmail(event.target.value);
-                  setErrorMessage(null);
-                }}
-                placeholder="name@example.com"
-                disabled={sending || verifying}
-                aria-invalid={Boolean(errorMessage)}
-                aria-describedby={errorMessage ? "member-email-error" : undefined}
-              />
             </label>
 
             {errorMessage ? (
@@ -376,17 +359,63 @@ export default function MemberEmailVerificationView({
             <Button
               type="submit"
               className="w-full"
-              loading={sending}
-              loadingText="인증 코드 전송 중"
-              disabled={verifying || resendRemainingSeconds > 0}
+              loading={verifying}
+              loadingText="확인 중"
+              disabled={
+                sending || codeRemainingSeconds === 0 || !hasCompleteCode
+              }
             >
-              {resendRemainingSeconds > 0
-                ? `${resendRemainingSeconds}초 후 다시 요청`
-                : "인증 코드 보내기"}
+              이메일 인증 완료하기
             </Button>
           </form>
-        )}
-      </Surface>
-    </div>
+        </div>
+      ) : (
+        <form
+          className="space-y-5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void requestCode();
+          }}
+        >
+          <label className="grid gap-2 text-sm font-medium text-foreground">
+            이메일
+            <Input
+              ref={emailInputRef}
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                setErrorMessage(null);
+              }}
+              placeholder="name@example.com"
+              disabled={sending || verifying}
+              aria-invalid={Boolean(errorMessage)}
+              aria-describedby={errorMessage ? "member-email-error" : undefined}
+            />
+          </label>
+
+          {errorMessage ? (
+            <FormMessage id="member-email-error" variant="error">
+              {errorMessage}
+            </FormMessage>
+          ) : null}
+
+          <Button
+            type="submit"
+            className="w-full"
+            loading={sending}
+            loadingText="인증 코드 전송 중"
+            disabled={
+              verifying || resendRemainingSeconds > 0 || !hasValidEmail
+            }
+          >
+            {resendRemainingSeconds > 0
+              ? `${resendRemainingSeconds}초 후 다시 요청`
+              : "인증 코드 보내기"}
+          </Button>
+        </form>
+      )}
+    </Surface>
   );
 }

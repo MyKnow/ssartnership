@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
@@ -35,6 +36,17 @@ function createAuditReport(advisories: AdvisoryFixture[]) {
 
   return { vulnerabilities };
 }
+
+test("security audit uses the repository npm runner on every platform", () => {
+  const source = readFileSync(
+    new URL("../scripts/security-audit.mjs", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /import \{ runNpmArguments \} from "\.\/lib\/package-manager\.mjs"/);
+  assert.match(source, /runNpmArguments\(args,/);
+  assert.doesNotMatch(source, /execFileSync\("npm"/);
+});
 
 test("production advisories always fail even when their URL is tracked for development", () => {
   const [tracked] = ALLOWED_DEVELOPMENT_ADVISORIES.values();

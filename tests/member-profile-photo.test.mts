@@ -18,8 +18,16 @@ const certificationPagePath = new URL(
   "../src/app/(site)/certification/page.tsx",
   import.meta.url,
 );
+const settingsPagePath = new URL(
+  "../src/app/(site)/settings/page.tsx",
+  import.meta.url,
+);
 const certificationFooterPath = new URL(
   "../src/components/certification/CertificationFooterActions.tsx",
+  import.meta.url,
+);
+const certificationAccountSettingsPath = new URL(
+  "../src/components/certification/CertificationAccountSettings.tsx",
   import.meta.url,
 );
 const certificationPhotoPagePath = new URL(
@@ -104,10 +112,18 @@ test("사진 제출 경로는 공통 게이트 해석기로 자기 재진입을 
   assert.match(layout, /currentPath: returnTo/);
 });
 
-test("인증 화면의 사진 CTA는 원래 목적지를 사진 화면까지 보존한다", async () => {
-  const [certificationPage, certificationFooter, certificationPhotoPage] =
+test("인증 화면과 설정의 사진 CTA는 각 원래 목적지를 사진 화면까지 보존한다", async () => {
+  const [
+    certificationPage,
+    settingsPage,
+    certificationAccountSettings,
+    certificationFooter,
+    certificationPhotoPage,
+  ] =
     await Promise.all([
       readFile(certificationPagePath, "utf8"),
+      readFile(settingsPagePath, "utf8"),
+      readFile(certificationAccountSettingsPath, "utf8"),
       readFile(certificationFooterPath, "utf8"),
       readFile(certificationPhotoPagePath, "utf8"),
     ]);
@@ -117,8 +133,10 @@ test("인증 화면의 사진 CTA는 원래 목적지를 사진 화면까지 보
     /href=\{buildMemberGateHref\("profile-photo", returnTo\)\}/,
   );
   assert.doesNotMatch(certificationPage, /href="\/certification\/photo"/);
+  assert.doesNotMatch(certificationPage, /CertificationAccountSettings/);
+  assert.match(settingsPage, /returnTo=\{settingsHref\}/);
   assert.match(
-    certificationPage,
+    certificationAccountSettings,
     /<CertificationFooterActions[\s\S]*returnTo=\{returnTo\}/,
   );
   assert.match(

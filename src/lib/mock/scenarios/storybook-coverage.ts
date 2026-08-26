@@ -177,6 +177,27 @@ const mockStorybookScenarioCoverageBase = [
     viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
   },
   {
+    routePath: "/settings",
+    scenarioId: "public.certification.qr-valid",
+    storyId: "screens-member-membersettingsview--unverified",
+    storyFile:
+      "src/components/certification/CertificationAccountActions.stories.tsx",
+    renderKind: "actual-view",
+    actualViewComponent: "MemberSettingsView",
+    coveredStateKeys: ["default", "mobile-overflow"],
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
+  {
+    routePath: "/settings/delete-account",
+    scenarioId: "public.certification.qr-valid",
+    storyId: "screens-member-memberaccountdeletionview--default",
+    storyFile: "src/components/settings/MemberAccountDeletionView.stories.tsx",
+    renderKind: "actual-view",
+    actualViewComponent: "MemberAccountDeletionView",
+    coveredStateKeys: ["default", "mobile-overflow"],
+    viewportKeys: ["mobile-360", "tablet-820", "desktop-1366"],
+  },
+  {
     routePath: "/certification/email",
     scenarioId: "public.certification.qr-valid",
     storyId: "screens-member-memberemailverificationview--unverified",

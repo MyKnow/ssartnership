@@ -2,6 +2,8 @@ import { defineConfig } from "@playwright/test";
 
 const port = process.env.STORYBOOK_VISUAL_PORT ?? "6007";
 const baseURL = `http://127.0.0.1:${port}`;
+const chromiumChannel =
+  process.env.PLAYWRIGHT_CHROMIUM_CHANNEL === "chrome" ? "chrome" : undefined;
 
 export default defineConfig({
   testDir: "./tests/visual",
@@ -14,6 +16,7 @@ export default defineConfig({
   use: {
     baseURL,
     browserName: "chromium",
+    ...(chromiumChannel ? { channel: chromiumChannel } : {}),
     colorScheme: "light",
     locale: "ko-KR",
     screenshot: "only-on-failure",

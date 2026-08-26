@@ -4,9 +4,11 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
   BellIcon,
+  Cog6ToothIcon,
   IdentificationIcon,
   TicketIcon,
 } from "@heroicons/react/24/outline";
+import { usePathname } from "next/navigation";
 import { BellAlertIcon } from "@heroicons/react/24/solid";
 import ThemeToggle from "@/components/ThemeToggle";
 import Button from "@/components/ui/Button";
@@ -23,9 +25,14 @@ import {
 import {
   useNotificationUnreadCount,
 } from "@/hooks/useNotificationUnreadCount";
+import {
+  buildSettingsHref,
+  isFocusedSiteFlow,
+  isSettingsPath,
+} from "@/lib/site-navigation";
 
 const UserMenu = dynamic(() => import("@/components/auth/UserMenu"));
-const MobileNav = dynamic(() => import("@/components/MobileNav"));
+const TabletMenu = dynamic(() => import("@/components/TabletMenu"));
 
 export default function SiteHeader({
   suggestHref = "/suggest",
@@ -35,6 +42,7 @@ export default function SiteHeader({
   initialSession?: HeaderSession | null;
 }) {
   const { hidden, headerHeight, headerRef } = useAutoHideHeader();
+  const pathname = usePathname();
   const [notificationUnreadCount] = useNotificationUnreadCount(
     initialSession?.notificationUnreadCount ?? 0,
   );
@@ -43,7 +51,7 @@ export default function SiteHeader({
     <>
       <div
         aria-hidden="true"
-        className="min-safe-site-header"
+        className="safe-site-header-spacer"
         style={headerHeight ? { height: headerHeight } : undefined}
       />
       <header className="fixed inset-x-0 top-0 z-40">
@@ -97,7 +105,7 @@ export default function SiteHeader({
                 </div>
               ) : null}
               {initialSession ? (
-                <div className="xl:hidden">
+                <div className="hidden md:block xl:hidden">
                   <Button
                     variant="secondary"
                     size="icon"
@@ -110,11 +118,11 @@ export default function SiteHeader({
                   </Button>
                 </div>
               ) : null}
-              <div className="flex">
+              <div className="hidden md:flex">
                 <ThemeToggle />
               </div>
               {initialSession ? (
-                <div className="max-[359px]:hidden xl:hidden">
+                <div className="hidden md:block xl:hidden">
                   <Button
                     variant="secondary"
                     size="icon"
@@ -152,7 +160,22 @@ export default function SiteHeader({
                   </Button>
                 </div>
               ) : null}
-              <MobileNav initialSession={initialSession} />
+              {initialSession && !isFocusedSiteFlow(pathname) ? (
+                <div>
+                  <Button
+                    variant={isSettingsPath(pathname) ? "soft" : "secondary"}
+                    size="icon"
+                    href={buildSettingsHref(pathname)}
+                    prefetch={false}
+                    ariaLabel="설정"
+                    ariaCurrent={isSettingsPath(pathname) ? "page" : undefined}
+                    title="설정"
+                  >
+                    <Cog6ToothIcon className="h-5 w-5" />
+                  </Button>
+                </div>
+              ) : null}
+              <TabletMenu initialSession={initialSession} />
             </div>
           </Container>
         </div>

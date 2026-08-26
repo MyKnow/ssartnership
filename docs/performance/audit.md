@@ -7,7 +7,7 @@ Reviewed: 2026-04-10
 ### P1. Public home bundle is larger than necessary
 
 - [`src/components/HomeView.tsx`](/Users/myknow/coding/ssartnership/src/components/HomeView.tsx) is still the large client boundary for filters and cards, but the shell around it now streams separately through [`src/components/HomeContent.tsx`](/Users/myknow/coding/ssartnership/src/components/HomeContent.tsx).
-- Public hero/header/push-opt-in content now renders outside the heavy client boundary in [`src/app/(site)/page.tsx`](/Users/myknow/coding/ssartnership/src/app/(site)/page.tsx) and [`src/components/HomePushOptInBannerGate.tsx`](/Users/myknow/coding/ssartnership/src/components/HomePushOptInBannerGate.tsx).
+- Public promotion/header content renders outside the heavy client boundary in [`src/app/(site)/page.tsx`](/Users/myknow/coding/ssartnership/src/app/(site)/page.tsx), and the former home push opt-in banner no longer interrupts the initial response path.
 - [`src/components/loading/SitePageSkeletons.tsx`](/Users/myknow/coding/ssartnership/src/components/loading/SitePageSkeletons.tsx) now uses a static header placeholder and a slimmer home grid, so the loading state does less work before the real page arrives.
 - Result: the page should start painting earlier, and client hydration is concentrated in the interactive list instead of the whole landing shell.
 

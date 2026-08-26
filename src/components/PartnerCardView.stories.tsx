@@ -92,25 +92,29 @@ export const InteractivePublicCard: Story = {
     const titleLink = canvas.getByRole("link", {
       name: "역삼 캠퍼스 샐러드 바 상세 보기",
     });
-    const detailLink = canvas.getByRole("link", { name: "제휴 상세 보기" });
+    const card = canvas.getByTestId("partner-card");
     await expect(titleLink).toHaveAttribute(
       "href",
       "/partners/partner-1",
     );
-    await expect(detailLink).toHaveAttribute("href", "/partners/partner-1");
+    await expect(
+      canvas.queryByRole("link", { name: "제휴 상세 보기" }),
+    ).not.toBeInTheDocument();
+    await expect(card).toHaveClass(
+      "cursor-pointer",
+      "motion-safe:hover:-translate-y-0.5",
+      "focus-within:ring-2",
+    );
     await userEvent.click(canvas.getByRole("button", { name: "식음료 필터 적용" }));
     await expect(args.onCategoryClick).toHaveBeenCalledWith("food");
 
     await expect(canvas.queryByRole("link", { name: "지도 보기" })).not.toBeInTheDocument();
     await expect(canvas.queryByRole("link", { name: "혜택 이용" })).not.toBeInTheDocument();
     await expect(canvas.queryByRole("link", { name: "문의하기" })).not.toBeInTheDocument();
-    [titleLink, detailLink].forEach((link) => {
-      link.addEventListener("click", (event) => event.preventDefault(), {
-        once: true,
-      });
+    titleLink.addEventListener("click", (event) => event.preventDefault(), {
+      once: true,
     });
     await userEvent.click(titleLink);
-    await userEvent.click(detailLink);
   },
 };
 
@@ -383,7 +387,8 @@ export const WithoutDetailHref: Story = {
     await userEvent.click(card);
     await expect(card).not.toHaveAttribute("role", "link");
     await expect(
-      canvas.getByRole("button", { name: "제휴 상세 보기" }),
-    ).toBeDisabled();
+      canvas.queryByRole("link", { name: "제휴 상세 보기" }),
+    ).not.toBeInTheDocument();
+    await expect(card).not.toHaveClass("cursor-pointer");
   },
 };

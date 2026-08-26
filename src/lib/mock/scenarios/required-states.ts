@@ -297,6 +297,20 @@ const routeOwnedStateOverrides: Partial<
     "broken-image",
     "async-pending",
   ],
+  "/settings": [
+    "default",
+    "unauthorized",
+    "long-korean",
+    "mobile-overflow",
+    "async-pending",
+  ],
+  "/settings/delete-account": [
+    "default",
+    "unauthorized",
+    "long-korean",
+    "mobile-overflow",
+    "async-pending",
+  ],
   "/admin/graduate-verifications": [
     "default",
     "empty",

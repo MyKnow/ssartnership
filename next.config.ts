@@ -57,6 +57,9 @@ if (process.env.NODE_ENV === "production") {
 
 const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
+  // The mobile search island occupies the framework indicator's default
+  // bottom-left position. Keep local QA aligned with the shipped navigation.
+  devIndicators: false,
   // Public Readiness runs the project-pinned semantic TypeScript check before
   // build. Next 16's embedded worker has crashed independently, so keep the
   // verified standalone check as the single required type gate.

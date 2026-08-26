@@ -19,8 +19,6 @@ import {
 import ThemeToggle from "@/components/ThemeToggle";
 import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
-import ScrollToTopFab from "@/components/ScrollToTopFab";
-import FloatingActionGroup from "@/components/FloatingActionGroup";
 import AdminQuickNavigatorProvider, {
   AdminQuickNavigatorTrigger,
 } from "@/components/admin/AdminQuickNavigator";
@@ -463,17 +461,14 @@ export default function AdminShellView({
             </Container>
           </header>
 
-          <FloatingActionGroup className="!bottom-[calc(5rem+env(safe-area-inset-bottom))] md:!bottom-safe-bottom-5">
-            <ScrollToTopFab />
-            <main id="admin-main-content" tabIndex={-1}>
-              <Container
-                className="pb-[calc(5.75rem+env(safe-area-inset-bottom))] pt-8 md:pb-16"
-                size="dashboard"
-              >
-                {children}
-              </Container>
-            </main>
-          </FloatingActionGroup>
+          <main id="admin-main-content" tabIndex={-1}>
+            <Container
+              className="pb-[calc(5.75rem+env(safe-area-inset-bottom))] pt-8 md:pb-16"
+              size="dashboard"
+            >
+              {children}
+            </Container>
+          </main>
         </div>
       </div>
       </div>

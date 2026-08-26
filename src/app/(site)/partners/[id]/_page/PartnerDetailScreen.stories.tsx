@@ -60,16 +60,16 @@ function PartnerDetailScreenStory({ value }: { value: Partner }) {
       >
         <div
           data-partner-detail-hero-info
-          className="grid min-w-0 gap-4 rounded-card border border-border bg-surface p-6 shadow-flat md:gap-0 md:grid-cols-[140px_minmax(0,1fr)] md:items-stretch"
+          className="grid min-w-0 gap-4 rounded-card border border-border bg-surface p-5 shadow-flat md:gap-0 md:grid-cols-[7rem_minmax(0,1fr)] md:items-center"
         >
           <PartnerImageCarousel
-            className="mx-auto w-full max-w-none md:mx-0 md:max-w-[140px] md:self-center"
+            className="mx-auto w-full max-w-none md:mx-0 md:max-w-28 md:self-center"
             images={value.thumbnail ? [value.thumbnail] : []}
             name={value.name}
             variant="hero"
             showThumbnails={false}
           />
-          <div className="flex min-w-0 flex-col gap-4 md:ml-4">
+          <div className="flex min-w-0 flex-col gap-4 md:ml-4 md:justify-center">
             <PartnerDetailHeroMeta
               partnerId={value.id}
               categoryLabel="건강"
@@ -77,9 +77,10 @@ function PartnerDetailScreenStory({ value }: { value: Partner }) {
               favoriteCount={32}
             />
             <PageHeader
-              className="h-full border-0 border-b-0 pb-0"
+              className="border-0 border-b-0 pb-0"
               title={value.name}
-              description="핵심 혜택을 확인하고 바로 이용할 수 있습니다."
+              titleClassName="text-[clamp(1.75rem,2vw,2.25rem)]"
+              description={value.detailDescription || undefined}
             />
           </div>
         </div>
@@ -150,6 +151,22 @@ export const Default: Story = {
     const canvas = within(canvasElement);
     const benefitList = canvas.getByRole("list", { name: "제휴 혜택" });
     await expect(within(benefitList).getAllByRole("listitem")).toHaveLength(2);
+    const benefitConditions = canvasElement.querySelector<HTMLElement>(
+      "[data-partner-benefit-conditions]",
+    );
+    await expect(benefitConditions).not.toBeNull();
+    const conditionList = within(benefitConditions!).getByRole("list", {
+      name: "이용 조건",
+    });
+    await expect(within(conditionList).getAllByRole("listitem")).toHaveLength(2);
+    await expect(conditionList).toHaveClass(
+      "rounded-[1.4rem]",
+      "bg-border/80",
+    );
+    await expect(benefitConditions).toHaveTextContent("내 인증 화면 제시");
+    await expect(
+      benefitList.compareDocumentPosition(benefitConditions!),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     await expect(canvas.queryByText("SSAFY 구성원 혜택")).not.toBeInTheDocument();
     await expect(
       canvas.queryByText("방문하거나 이용하기 전에 적용 대상과 기간을 확인하세요."),
@@ -213,10 +230,10 @@ export const Default: Story = {
       "rounded-card",
       "border",
       "gap-4",
-      "p-6",
+      "p-5",
       "md:gap-0",
-      "md:grid-cols-[140px_minmax(0,1fr)]",
-      "md:items-stretch",
+      "md:grid-cols-[7rem_minmax(0,1fr)]",
+      "md:items-center",
     );
     const heroMeta = canvasElement.querySelector<HTMLElement>(
       "[data-partner-detail-hero-meta]",
@@ -235,12 +252,12 @@ export const Default: Story = {
     await expect(heroCarousel).not.toBeNull();
     await expect(heroCarousel).toHaveClass(
       "max-w-none",
-      "md:max-w-[140px]",
+      "md:max-w-28",
       "md:self-center",
     );
     await expect(
       canvasElement.querySelector<HTMLElement>("[data-partner-detail-hero-info] > div:nth-child(2)"),
-    ).toHaveClass("md:ml-4");
+    ).toHaveClass("md:ml-4", "md:justify-center");
     await expect(heroInfo).toContainElement(imageCarouselButton);
     await expect(imageCarouselButton).toHaveClass("aspect-square");
     const periodBadge = summaryCard.querySelector('[aria-label^="이용 기간"]');
@@ -360,10 +377,10 @@ export const Default: Story = {
     await expect(
       within(additionalInformation!).getByRole("heading", {
         level: 3,
-        name: "이용조건 및 태그",
+        name: "이용 기간 및 태그",
       }),
     ).toBeInTheDocument();
-    await expect(additionalInformation).toHaveTextContent("이용 조건");
+    await expect(additionalInformation).not.toHaveTextContent("이용 조건");
     await expect(additionalInformation).toHaveTextContent("#운동");
     await expect(additionalInformation).not.toHaveTextContent("제휴처 소개");
     await expect(additionalInformation?.querySelector("details")).toBeNull();
@@ -398,6 +415,22 @@ export const ManyAndLongKorean: Story = {
         (_, index) => `상세 이용 조건 ${index + 1}번은 현장 상황에 따라 달라질 수 있습니다`,
       ),
     },
+  },
+};
+
+export const SingleCondition: Story = {
+  args: {
+    value: {
+      ...partner,
+      conditions: ["결제 시 명함 또는 싸트너십 인증 화면 제시"],
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const conditionList = canvas.getByRole("list", { name: "이용 조건" });
+
+    await expect(within(conditionList).getAllByRole("listitem")).toHaveLength(1);
+    await expect(conditionList).not.toHaveClass("md:grid-cols-2");
   },
 };
 

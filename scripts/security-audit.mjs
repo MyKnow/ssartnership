@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
+
+import { runNpmArguments } from "./lib/package-manager.mjs";
 
 export function advisoryKey({ packageName, url }) {
   return `${packageName}:${url}`;
@@ -23,29 +24,25 @@ export const ALLOWED_DEVELOPMENT_ADVISORIES = new Map(
   ].map((advisory) => [advisoryKey(advisory), advisory]),
 );
 
-function runNpmAuditJson({ omitDev = false } = {}) {
+export function runNpmAuditJson({ omitDev = false } = {}) {
   const args = ["audit", "--json", "--audit-level=moderate"];
   if (omitDev) {
     args.push("--omit=dev");
   }
 
-  try {
-    return execFileSync("npm", args, {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-  } catch (error) {
-    if (
-      error &&
-      typeof error === "object" &&
-      "stdout" in error &&
-      typeof error.stdout === "string" &&
-      error.stdout.trim()
-    ) {
-      return error.stdout;
-    }
-    throw error;
+  const result = runNpmArguments(args, {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (typeof result.stdout === "string" && result.stdout.trim()) {
+    return result.stdout;
   }
+  if (result.error) {
+    throw result.error;
+  }
+  throw new Error(
+    `npm audit가 JSON 출력 없이 종료 코드 ${result.status ?? 1}로 실패했습니다.`,
+  );
 }
 
 export function collectAdvisories(report) {

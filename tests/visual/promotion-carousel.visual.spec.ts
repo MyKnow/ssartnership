@@ -43,23 +43,22 @@ for (const viewport of viewports) {
       const rect = media.getBoundingClientRect();
       const style = getComputedStyle(media);
       return {
+        left: rect.left,
+        right: rect.right,
         width: rect.width,
         height: rect.height,
-        maxHeight: style.maxHeight,
+        borderRadius: style.borderRadius,
         clientWidth: document.documentElement.clientWidth,
         scrollWidth: document.documentElement.scrollWidth,
       };
     });
 
     expect(metrics.scrollWidth).toBe(metrics.clientWidth);
+    expect(metrics.left).toBeCloseTo(0, 1);
+    expect(metrics.right).toBeCloseTo(metrics.clientWidth, 1);
+    expect(metrics.width).toBeCloseTo(metrics.clientWidth, 1);
     expect(metrics.height / metrics.width).toBeCloseTo(9 / 21, 3);
-    if (viewport.width >= 1024) {
-      expect(metrics.height).toBeLessThanOrEqual(448);
-      expect(metrics.maxHeight).toBe("448px");
-    } else if (viewport.width >= 768) {
-      expect(metrics.height).toBeLessThanOrEqual(320);
-      expect(metrics.maxHeight).toBe("320px");
-    }
+    expect(metrics.borderRadius).toBe("0px");
 
     await expect(page).toHaveScreenshot(
       `promotion-carousel-${viewport.key}.png`,

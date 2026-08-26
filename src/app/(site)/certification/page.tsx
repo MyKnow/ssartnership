@@ -10,9 +10,6 @@ import {
 } from "@/lib/member-profile-view";
 import { getSignedUserSession } from "@/lib/user-auth";
 import CertificationView from "@/components/certification/CertificationView";
-import CertificationFooterActions from "@/components/certification/CertificationFooterActions";
-import CertificationEmailSummary from "@/components/certification/CertificationEmailSummary";
-import CertificationMattermostSyncAction from "@/components/certification/CertificationMattermostSyncAction";
 import { SITE_NAME } from "@/lib/site";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { listCohortCardThemes } from "@/lib/cohort-card-themes";
@@ -122,20 +119,6 @@ export default async function CertificationPage({
               initialTimestamp={initialTimestamp}
               cohortCardThemes={cohortCardThemes}
             />}
-            {member.mattermostAccountId ? (
-              <CertificationMattermostSyncAction />
-            ) : null}
-            <CertificationEmailSummary
-              email={member.email}
-              emailVerified={Boolean(member.emailVerifiedAt)}
-              returnTo={returnTo}
-            />
-            <div className="mt-10 w-full border-t border-border/70 pt-8">
-              <CertificationFooterActions
-                canChangeProfilePhoto
-                returnTo={returnTo}
-              />
-            </div>
           </div>
         </Container>
       </main>

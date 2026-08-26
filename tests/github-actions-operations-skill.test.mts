@@ -1180,7 +1180,11 @@ test("the run auditor emits structural evidence for hostile text and confines ou
   const externalTmp = join(tempRoot, "external-tmp");
   mkdirSync(symlinkedRepository);
   mkdirSync(externalTmp);
-  symlinkSync(externalTmp, join(symlinkedRepository, ".tmp"));
+  symlinkSync(
+    externalTmp,
+    join(symlinkedRepository, ".tmp"),
+    process.platform === "win32" ? "junction" : "dir",
+  );
   assert.throws(
     () => auditor.writeAuditFile(
       ".tmp/actions-audit/run-2.json",

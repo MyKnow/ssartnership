@@ -6,10 +6,8 @@ const root = new URL("..", import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, root), "utf8");
 
 const timingModulePromise = import(
-  new URL(
-    "../src/lib/member-email-verification-timing.ts",
-    import.meta.url,
-  ).href
+  new URL("../src/lib/member-email-verification-timing.ts", import.meta.url)
+    .href
 );
 const challengeRepositoryModulePromise = import(
   new URL(
@@ -34,12 +32,7 @@ test("회원 이메일 인증 시간은 10분 유효·60초 재전송 대기 계
   assert.equal(getMemberEmailDeadline(undefined, 60, 1_000), 61_000);
   assert.equal(getMemberEmailDeadline(-1, 60, 1_000), 61_000);
   assert.equal(
-    resolveMemberEmailDeadline(
-      "1970-01-01T00:01:01.000Z",
-      600,
-      600,
-      1_000,
-    ),
+    resolveMemberEmailDeadline("1970-01-01T00:01:01.000Z", 600, 600, 1_000),
     61_000,
   );
   assert.equal(resolveMemberEmailDeadline("invalid", 60, 60, 1_000), 61_000);
@@ -141,7 +134,8 @@ test("challenge repository는 RPC 결과를 검증하고 provider 세부 오류�
     MemberEmailChallengeStorageError,
     SupabaseMemberEmailVerificationChallengeRepository,
   } = await challengeRepositoryModulePromise;
-  const calls: Array<{ name: string; parameters: Record<string, unknown> }> = [];
+  const calls: Array<{ name: string; parameters: Record<string, unknown> }> =
+    [];
   const repository = new SupabaseMemberEmailVerificationChallengeRepository(
     async (name: string, parameters: Record<string, unknown>) => {
       calls.push({ name, parameters });
@@ -187,9 +181,11 @@ test("challenge repository는 RPC 결과를 검증하고 provider 세부 오류�
   );
 
   const providerDetail = "secret-db-host member@example.com";
-  const failureRepository = new SupabaseMemberEmailVerificationChallengeRepository(
-    async () => ({ data: null, error: { message: providerDetail } }),
-  );
+  const failureRepository =
+    new SupabaseMemberEmailVerificationChallengeRepository(async () => ({
+      data: null,
+      error: { message: providerDetail },
+    }));
   await assert.rejects(
     failureRepository.reserve({
       memberId: "00000000-0000-4000-8000-000000000401",
@@ -202,29 +198,93 @@ test("challenge repository는 RPC 결과를 검증하고 provider 세부 오류�
       assert.ok(error instanceof Error);
       assert.equal(error.name, MemberEmailChallengeStorageError.name);
       assert.equal(error.message, "member_email_challenge_storage_failed");
-      assert.doesNotMatch(JSON.stringify(error), /secret-db-host|member@example\.com/);
+      assert.doesNotMatch(
+        JSON.stringify(error),
+        /secret-db-host|member@example\.com/,
+      );
       return true;
     },
   );
 });
 
-test("내 인증 화면은 이메일 폼 대신 별도 흐름으로 이동하는 요약 카드만 제공한다", () => {
+test("설정 화면은 이메일 폼 대신 별도 흐름으로 이동하는 요약 설정 행만 제공한다", () => {
   const certificationPage = read("src/app/(site)/certification/page.tsx");
+  const settingsPage = read("src/app/(site)/settings/page.tsx");
+  const settingsView = read("src/components/settings/MemberSettingsView.tsx");
+  const accountSettings = read(
+    "src/components/certification/CertificationAccountSettings.tsx",
+  );
+  const mattermostSync = read(
+    "src/components/certification/CertificationMattermostSyncAction.tsx",
+  );
+  const footerActions = read(
+    "src/components/certification/CertificationFooterActions.tsx",
+  );
   const emailPage = read("src/app/(site)/certification/email/page.tsx");
   const summary = read(
     "src/components/certification/CertificationEmailSummary.tsx",
   );
 
-  assert.match(certificationPage, /CertificationEmailSummary/);
+  assert.doesNotMatch(certificationPage, /CertificationAccountSettings/);
+  assert.match(settingsPage, /MemberSettingsView/);
+  assert.match(settingsView, /CertificationAccountSettings/);
+  assert.match(accountSettings, /CertificationEmailSummary/);
   assert.doesNotMatch(certificationPage, /CertificationEmailAction/);
   assert.match(summary, /로그인·복구 이메일/);
   assert.match(summary, /\/certification\/email/);
+  assert.doesNotMatch(
+    summary,
+    /MM 사용이 어려울 때 로그인과 비밀번호 재설정에 사용할 수 있습니다\./,
+  );
+  assert.match(summary, /emailVerified && email\s*\? email/);
+  assert.match(
+    mattermostSync,
+    /MM에서 현재 이름, 아이디, 트랙, 프로필 사진을 가져옵니다\./,
+  );
+  assert.match(footerActions, /현재 계정의 비밀번호를 변경합니다\./);
   assert.match(emailPage, /MemberEmailVerificationView/);
   assert.match(emailPage, /sanitizeReturnTo/);
   assert.match(emailPage, /로그인·복구 이메일/);
 });
 
-test("별도 이메일 인증 화면은 전송 후 이메일 고정·만료 타이머·재전송 카운트다운을 제공한다", () => {
+test("로그인·복구 이메일 화면은 간결한 헤더와 전용 로딩 골격을 제공한다", () => {
+  const emailPage = read("src/app/(site)/certification/email/page.tsx");
+  const emailView = read(
+    "src/components/certification/MemberEmailVerificationView.tsx",
+  );
+  const emailLoading = read("src/app/(site)/certification/email/loading.tsx");
+  const skeletons = read("src/components/loading/SitePageSkeletons.tsx");
+  const story = read(
+    "src/components/certification/MemberEmailVerificationView.stories.tsx",
+  );
+
+  assert.doesNotMatch(emailPage, /eyebrow="Member"/);
+  assert.match(
+    emailPage,
+    /로그인과 비밀번호 재설정에 사용할 이메일을 인증합니다\./,
+  );
+  assert.doesNotMatch(emailPage, /MM 사용 여부와 별개로/);
+  assert.match(emailPage, /className="border-b-0"/);
+  assert.doesNotMatch(emailView, /title="별도 로그인 수단"/);
+  assert.doesNotMatch(emailView, /MM 인증과 이메일 인증은 서로를 대체하는/);
+  assert.doesNotMatch(
+    emailView,
+    /인증을 마친 이메일은 로그인과 비밀번호 재설정에 사용됩니다\./,
+  );
+  assert.match(emailLoading, /MemberEmailVerificationPageSkeleton/);
+  assert.doesNotMatch(emailLoading, /CertificationPageSkeleton/);
+  assert.match(
+    skeletons,
+    /export function MemberEmailVerificationPageSkeleton\(\)/,
+  );
+  assert.doesNotMatch(story, /eyebrow="Member"/);
+  assert.match(
+    story,
+    /로그인과 비밀번호 재설정에 사용할 이메일을 인증합니다\./,
+  );
+});
+
+test("별도 이메일 인증 화면은 전송 후 이메일 고정·만료 타이머·입력행 재전송을 제공한다", () => {
   const view = read(
     "src/components/certification/MemberEmailVerificationView.tsx",
   );
@@ -233,9 +293,24 @@ test("별도 이메일 인증 화면은 전송 후 이메일 고정·만료 타�
   assert.match(view, /role="timer"/);
   assert.match(view, /formatMemberEmailRemainingTime/);
   assert.match(view, /인증 코드 유효시간/);
-  assert.match(view, /인증 코드 재전송/);
-  assert.match(view, /후 재전송/);
-  assert.match(view, /다른 이메일 입력/);
+  assert.match(view, /const currentStep = lockedEmail \? 2 : 1/);
+  assert.match(view, /aria-label=\{`인증 단계 \$\{currentStep\}\/2`\}/);
+  assert.match(view, /step <= currentStep \? "bg-primary" : "bg-border"/);
+  assert.match(view, /변경할 이메일을 입력해 주세요/);
+  assert.match(view, /const hasValidEmail = isValidEmail\(email\.trim\(\)\.toLowerCase\(\)\)/);
+  assert.match(view, /resendRemainingSeconds > 0 \|\| !hasValidEmail/);
+  assert.match(view, /재전송 \$\{resendRemainingSeconds\}초/);
+  assert.doesNotMatch(
+    view,
+    /코드를 보낸 이메일은 인증이 끝날 때까지 고정됩니다\./,
+  );
+  assert.match(view, /ariaLabel="다른 이메일 입력"/);
+  assert.match(view, /<Pencil aria-hidden="true" size=\{18\} \/>/);
+  assert.match(
+    view,
+    /const hasCompleteCode = \/\^\\d\{6\}\$\/\.test\(code\)/,
+  );
+  assert.match(view, /codeRemainingSeconds === 0 \|\| !hasCompleteCode/);
   assert.match(view, /codeRemainingSeconds === 0/);
   assert.match(view, /resendRemainingSeconds > 0/);
   assert.match(view, /router\.replace\(completionHref\)/);

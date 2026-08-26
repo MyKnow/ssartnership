@@ -1,3 +1,5 @@
+"use client";
+
 import {
   ArrowRightIcon,
   BuildingStorefrontIcon,
@@ -6,10 +8,13 @@ import {
   SparklesIcon,
   TicketIcon,
 } from "@heroicons/react/24/outline";
+import Link from "next/link";
+import { useId, useState } from "react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import ShellHeader from "@/components/ui/ShellHeader";
+import { cn } from "@/lib/cn";
 import type { AvailableAdCoupon } from "@/lib/repositories/ad-package-repository";
 
 const dateFormatter = new Intl.DateTimeFormat("ko-KR", {
@@ -32,13 +37,6 @@ function formatDate(value: string) {
   return `${dateFormatter.format(date)}까지`;
 }
 
-function formatGlobalRemaining(value: number | null) {
-  if (value === null) {
-    return "전체 제한 없음";
-  }
-  return `전체 ${value.toLocaleString("ko-KR")}회 남음`;
-}
-
 function buildWalletSections(coupons: AvailableAdCoupon[]): CouponWalletSection[] {
   return [
     {
@@ -51,45 +49,71 @@ function buildWalletSections(coupons: AvailableAdCoupon[]): CouponWalletSection[
 
 function CouponWalletAccordionItem({
   item,
-  accordionName,
-  defaultOpen = false,
+  isOpen,
+  onToggle,
 }: {
   item: AvailableAdCoupon;
-  accordionName: string;
-  defaultOpen?: boolean;
+  isOpen: boolean;
+  onToggle: () => void;
 }) {
-  const { coupon, remainingGlobalUses, remainingMemberUses } = item;
+  const { coupon, remainingMemberUses } = item;
   const assignedCode = item.assignedCode ?? coupon.code;
   const detailHref = `/partners/${encodeURIComponent(coupon.partnerId)}#coupons`;
   const hasTerms = coupon.terms.length > 0;
+  const useHref =
+    coupon.redemptionType === "onsite" && coupon.hasOnsitePassword && item.issueId
+      ? `/coupons?issueId=${encodeURIComponent(item.issueId)}`
+      : null;
+  const contentId = useId();
 
   return (
-    <details
-      className="group rounded-panel border border-border bg-surface shadow-flat transition hover:border-strong open:border-primary/30 open:bg-surface-elevated"
-      name={accordionName}
-      open={defaultOpen ? true : undefined}
+    <article
+      className={cn(
+        "group relative rounded-panel border border-border bg-surface shadow-flat transition-surface duration-200 ease-out hover:border-strong hover:bg-surface-elevated hover-shadow-raised focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/15 focus-within:ring-offset-2 focus-within:ring-offset-background",
+        isOpen ? "border-primary/30 bg-surface-elevated" : null,
+      )}
     >
-      <summary className="grid cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-4 outline-none transition hover:bg-surface-muted/60 focus-visible:bg-surface-muted/60 focus-visible:ring-2 focus-visible:ring-primary/20 sm:px-5 [&::-webkit-details-marker]:hidden">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-controls={contentId}
+        aria-expanded={isOpen}
+        className="absolute inset-x-0 top-0 z-0 h-24 cursor-pointer rounded-t-panel outline-none"
+      >
+        <span className="sr-only">
+          {coupon.title} 사용 조건 {isOpen ? "접기" : "펼치기"}
+        </span>
+      </button>
+      <div className="pointer-events-none relative z-10 grid min-h-24 grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-4 sm:px-5">
         <div className="min-w-0">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Badge variant="success" className="tracking-normal">
               {coupon.discountLabel || "쿠폰"}
             </Badge>
-            <span className="inline-flex min-w-0 max-w-full items-center gap-1 text-xs font-semibold text-muted-foreground">
+            <Link
+              href={detailHref}
+              aria-label={`${coupon.partnerName} 제휴처 상세 보기`}
+              className="pointer-events-auto -my-2 -ml-2 inline-flex min-h-11 min-w-0 max-w-full items-center gap-1 rounded-[0.875rem] px-2 text-xs font-semibold text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+            >
               <BuildingStorefrontIcon className="size-4 shrink-0" aria-hidden="true" />
               <span className="block min-w-0 truncate">{coupon.partnerName}</span>
-            </span>
+            </Link>
           </div>
           <h3 className="mt-3 truncate text-ko-title text-base font-semibold leading-7 text-foreground sm:text-lg">
             {coupon.title}
           </h3>
         </div>
-        <span className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] border border-border bg-surface-control text-muted-foreground transition group-open:rotate-180 group-open:border-primary/20 group-open:bg-primary-soft group-open:text-primary">
+        <span
+          className={cn(
+            "mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] border border-border bg-surface-control text-muted-foreground transition",
+            isOpen && "rotate-180 border-primary/20 bg-primary-soft text-primary",
+          )}
+        >
           <ChevronDownIcon className="size-5" aria-hidden="true" />
         </span>
-      </summary>
+      </div>
 
-      <div className="border-t border-border/70 px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
+      <div id={contentId} hidden={!isOpen} className="px-4 pb-4 sm:px-5 sm:pb-5">
         <div className={hasTerms ? "grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]" : "grid gap-3"}>
           {hasTerms ? (
             <div className="min-w-0 space-y-3">
@@ -125,12 +149,6 @@ function CouponWalletAccordionItem({
               </p>
             </div>
             <div>
-              <p className="text-xs font-medium text-muted-foreground">전체 잔여 수량</p>
-              <p className="mt-1 font-semibold text-foreground">
-                {formatGlobalRemaining(remainingGlobalUses)}
-              </p>
-            </div>
-            <div>
               <p className="text-xs font-medium text-muted-foreground">만료일</p>
               <p className="mt-1 inline-flex min-w-0 items-center gap-1 font-semibold text-foreground">
                 <CalendarDaysIcon className="size-4 shrink-0" aria-hidden="true" />
@@ -145,24 +163,19 @@ function CouponWalletAccordionItem({
                 </p>
               </div>
             ) : null}
-            {coupon.redemptionType === "onsite" && coupon.hasOnsitePassword && item.issueId ? (
-              <Button
-                href={`/coupons?issueId=${encodeURIComponent(item.issueId)}`}
-                variant="primary"
-                className="mt-1 w-full justify-center"
-              >
-                사용하기
-                <ArrowRightIcon className="size-4" aria-hidden="true" />
-              </Button>
-            ) : null}
-            <Button href={detailHref} variant="primary" className="mt-1 w-full justify-center">
-              제휴처 상세 보기
-              <ArrowRightIcon className="size-4" aria-hidden="true" />
-            </Button>
           </div>
         </div>
       </div>
-    </details>
+
+      {useHref ? (
+        <div className="relative z-10 px-4 pb-4 sm:px-5 sm:pb-5">
+          <Button href={useHref} variant="primary" className="w-full justify-center">
+            사용하기
+            <ArrowRightIcon className="size-4" aria-hidden="true" />
+          </Button>
+        </div>
+      ) : null}
+    </article>
   );
 }
 
@@ -188,6 +201,10 @@ function CouponWalletEmpty() {
 }
 
 function CouponWalletSectionView({ section }: { section: CouponWalletSection }) {
+  const [openCouponId, setOpenCouponId] = useState<string | null>(
+    section.items[0]?.issueId ?? section.items[0]?.coupon.id ?? null,
+  );
+
   if (section.items.length === 0) {
     return <CouponWalletEmpty />;
   }
@@ -209,12 +226,15 @@ function CouponWalletSectionView({ section }: { section: CouponWalletSection }) 
         </Badge>
       </div>
       <div className="grid gap-3">
-        {section.items.map((item, index) => (
+        {section.items.map((item) => (
           <CouponWalletAccordionItem
             key={item.issueId ?? item.coupon.id}
-            accordionName={`coupon-wallet-${section.id}`}
             item={item}
-            defaultOpen={index === 0}
+            isOpen={openCouponId === (item.issueId ?? item.coupon.id)}
+            onToggle={() => {
+              const itemId = item.issueId ?? item.coupon.id;
+              setOpenCouponId((current) => (current === itemId ? null : itemId));
+            }}
           />
         ))}
       </div>
