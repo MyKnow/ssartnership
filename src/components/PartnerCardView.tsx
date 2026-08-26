@@ -55,6 +55,18 @@ export default function PartnerCardView({
   } = createPartnerCardPresentation(partner, viewerAuthenticated, returnTo);
   const canNavigate = detailHref.length > 0 && !lockKind;
 
+  const hasDirectoryQuery = () => window.location.search.length > 0;
+  const navigateToDetail = () => {
+    if (hasDirectoryQuery()) {
+      // Next can coalesce a query-only list update with an immediate route
+      // change. A document navigation keeps that list query as its own
+      // browser-history entry before opening the detail page.
+      window.location.assign(detailHref);
+      return;
+    }
+    router.push(detailHref);
+  };
+
   if (lockKind) {
     return (
       <PartnerCardLockState
@@ -93,7 +105,28 @@ export default function PartnerCardView({
     }
 
     trackPartnerClick("card_surface");
-    router.push(detailHref);
+    navigateToDetail();
+  };
+  const handleDetailLinkClick = (
+    event: ReactMouseEvent<HTMLElement>,
+    source: "title_link" | "detail_cta",
+  ) => {
+    trackPartnerClick(source);
+    if (
+      event.defaultPrevented ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey ||
+      event.button !== 0
+    ) {
+      return;
+    }
+    if (!hasDirectoryQuery()) {
+      return;
+    }
+    event.preventDefault();
+    navigateToDetail();
   };
 
   return (
@@ -120,21 +153,7 @@ export default function PartnerCardView({
         canNavigate={canNavigate}
         isActive={isActive}
         onCategoryClick={onCategoryClick}
-        onTitleClick={(event) => {
-          trackPartnerClick("title_link");
-          if (
-            event.defaultPrevented ||
-            event.metaKey ||
-            event.ctrlKey ||
-            event.shiftKey ||
-            event.altKey ||
-            event.button !== 0
-          ) {
-            return;
-          }
-          event.preventDefault();
-          router.push(detailHref);
-        }}
+        onTitleClick={(event) => handleDetailLinkClick(event, "title_link")}
         headerAction={
           currentUserId ? (
             <PartnerFavoriteButton
@@ -166,9 +185,7 @@ export default function PartnerCardView({
         detailHref={detailHref}
         canNavigate={canNavigate}
         compact={variant === "list"}
-        onDetailClick={() =>
-          trackPartnerClick("detail_cta")
-        }
+        onDetailClick={(event) => handleDetailLinkClick(event, "detail_cta")}
       />
     </article>
   );

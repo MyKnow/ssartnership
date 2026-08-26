@@ -112,7 +112,7 @@ export default async function Home() {
         <PromotionCarousel
           slides={resolvedPromotionSlides}
           headingLevel="h1"
-          className="mt-0"
+          className="mt-0 lg:mx-auto lg:max-w-[min(var(--grid-wide),calc(100vw-1.5rem))] lg:px-8"
         />
         <Container className="pb-16 pt-0" size="wide">
           <script

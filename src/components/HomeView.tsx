@@ -140,11 +140,6 @@ export default function HomeView({
     setSearchInputValue(searchValue);
   }, [searchValue]);
 
-  const directoryReturnTo = useMemo(() => {
-    const query = searchParams.toString();
-    return query ? `${pathname}?${query}#benefits` : `${pathname}#benefits`;
-  }, [pathname, searchParams]);
-
   const categoryMap = useMemo(() => {
     return createHomeCategoryMap(categories);
   }, [categories]);
@@ -543,7 +538,6 @@ export default function HomeView({
                     metrics={localPopularityById?.[partner.id]}
                     onCategoryClick={handleCategoryChange}
                     onFavoriteChange={handleFavoriteChange}
-                    returnTo={directoryReturnTo}
                     variant={viewMode}
                   />
                 ))}

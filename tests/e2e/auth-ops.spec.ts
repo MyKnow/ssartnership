@@ -25,7 +25,7 @@ test.describe("auth and partner portal operation flows", () => {
     await expect(page.getByRole("button", { name: "비밀번호 설정 완료" })).toBeDisabled();
   });
 
-  test("preserves the partner detail return path through member certification login", async ({ page }) => {
+  test("uses the canonical partner detail path through member certification login", async ({ page }) => {
     const loginWarmup = await page.request.get("/auth/login");
     expect(loginWarmup.ok()).toBe(true);
 
@@ -35,7 +35,7 @@ test.describe("auth and partner portal operation flows", () => {
     const benefitAction = page.getByRole("link", { name: "혜택 이용하기" }).first();
     await expect(benefitAction).toHaveAttribute(
       "href",
-      "/auth/login?returnTo=%2Fpartners%2Fhealth-001%3FreturnTo%3D%252F%253Fcategory%253Dhealth%2523benefits",
+      "/auth/login?returnTo=%2Fpartners%2Fhealth-001",
     );
 
     await Promise.all([
@@ -45,7 +45,7 @@ test.describe("auth and partner portal operation flows", () => {
     const loginUrl = new URL(page.url());
     const benefitUseReturnTo = loginUrl.searchParams.get("returnTo") ?? "";
     const decodedReturnTo = decodeURIComponent(benefitUseReturnTo);
-    expect(decodedReturnTo).toBe("/partners/health-001?returnTo=/?category=health#benefits");
+    expect(decodedReturnTo).toBe("/partners/health-001");
   });
 
   test("@critical member login shows field-level validation before submitting", async ({ page }) => {

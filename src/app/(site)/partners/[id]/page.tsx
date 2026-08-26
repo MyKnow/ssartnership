@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import AnalyticsEventOnMount from "@/components/analytics/AnalyticsEventOnMount";
 import SiteHeader from "@/components/SiteHeader";
 import { getHeaderSession } from "@/lib/header-session";
@@ -20,7 +20,6 @@ import PartnerDetailMobileActionBar from "./_page/PartnerDetailMobileActionBar";
 import PartnerDetailReviews, {
   PartnerDetailReviewsFallback,
 } from "./_page/PartnerDetailReviews";
-import { sanitizeReturnTo } from "@/lib/return-to";
 import { getPartnerDetailBenefitMode } from "@/lib/partner-detail-benefit-action";
 import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
 import type { OfflinePartnerBenefitAction } from "@/components/partner/PartnerBenefitUseAction";
@@ -184,11 +183,11 @@ export default async function PartnerDetailPage({
   const rawReturnTo = Array.isArray(resolvedSearchParams.returnTo)
     ? resolvedSearchParams.returnTo[0]
     : resolvedSearchParams.returnTo;
-  const directoryReturnTo = sanitizeReturnTo(rawReturnTo, "/#benefits");
   const partnerPath = `/partners/${encodeURIComponent(partner.id)}`;
-  const partnerReturnTo = rawReturnTo
-    ? `${partnerPath}?${new URLSearchParams({ returnTo: directoryReturnTo }).toString()}`
-    : partnerPath;
+  if (!isPreview && rawReturnTo !== undefined) {
+    redirect(partnerPath);
+  }
+  const partnerReturnTo = partnerPath;
   const resolvedBenefitUseAction =
     benefitUseAction?.type === "certification"
       ? {
