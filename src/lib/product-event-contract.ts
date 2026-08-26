@@ -158,7 +158,7 @@ function parseProperties(
     case "pwa_install_click":
       return z
         .object({
-          iosInstallHint: z.boolean().optional(),
+          platform: z.enum(["android", "ios", "other"]).optional(),
           hasDeferredPrompt: z.boolean().optional(),
         })
         .strip()

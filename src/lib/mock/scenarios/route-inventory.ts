@@ -96,6 +96,14 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["public.event.detail"],
   },
   {
+    routePath: "/install",
+    surface: "public",
+    authScope: "public",
+    viewComponent: "PwaInstallGuideView",
+    dataSources: ["storybook"],
+    requiredScenarioIds: ["public.install.guide"],
+  },
+  {
     routePath: "/legal/[kind]",
     surface: "public",
     authScope: "public",
@@ -742,6 +750,11 @@ const routeContracts: Record<string, RouteContractDefinition> = {
     routeKind: "conditional",
     screenContractId: "member.event-winner-form",
     primaryTask: "당첨자 정보를 안전하게 제출한다.",
+  },
+  "/install": {
+    routeKind: "canonical",
+    screenContractId: "public.install-guide",
+    primaryTask: "현재 기기에 맞는 홈 화면 설치 절차를 확인한다.",
   },
   "/legal/[kind]": {
     routeKind: "canonical",

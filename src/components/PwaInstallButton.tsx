@@ -3,9 +3,12 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { ArrowDownTrayIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { trackProductEvent } from "@/lib/product-events";
+import {
+  buildPwaInstallGuideHref,
+  getBrowserPwaInstallPlatform,
+} from "@/lib/pwa-install";
 import Button from "@/components/ui/Button";
 import type { ButtonVariant } from "@/components/ui/Button";
-import { useToast } from "@/components/ui/Toast";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -20,14 +23,6 @@ function isStandaloneMode() {
     window.matchMedia("(display-mode: standalone)").matches ||
     (window.navigator as Navigator & { standalone?: boolean }).standalone === true
   );
-}
-
-function isIosBrowser() {
-  if (typeof navigator === "undefined") {
-    return false;
-  }
-  const ua = navigator.userAgent;
-  return /iPad|iPhone|iPod/.test(ua);
 }
 
 function subscribeClient() {
@@ -50,7 +45,6 @@ export default function PwaInstallButton({
     useState<BeforeInstallPromptEvent | null>(null);
   const [appInstalled, setAppInstalled] = useState(false);
   const [pending, setPending] = useState(false);
-  const { notify } = useToast();
 
   useEffect(() => {
     if (!isClient) {
@@ -58,6 +52,9 @@ export default function PwaInstallButton({
     }
 
     const onBeforeInstallPrompt = (event: Event) => {
+      if (getBrowserPwaInstallPlatform() !== "other") {
+        return;
+      }
       event.preventDefault();
       setDeferredPrompt(event as BeforeInstallPromptEvent);
     };
@@ -65,7 +62,6 @@ export default function PwaInstallButton({
     const onInstalled = () => {
       setAppInstalled(true);
       setDeferredPrompt(null);
-      notify("앱이 설치되었습니다.");
     };
 
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
@@ -75,9 +71,8 @@ export default function PwaInstallButton({
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onInstalled);
     };
-  }, [isClient, notify]);
+  }, [isClient]);
 
-  const iosInstallHint = isClient && isIosBrowser();
   const standalone = isClient && isStandaloneMode();
 
   if (!isClient) {
@@ -86,51 +81,49 @@ export default function PwaInstallButton({
 
   const installed = standalone || appInstalled;
   const InstallIcon = installed ? CheckCircleIcon : ArrowDownTrayIcon;
+  const platform = getBrowserPwaInstallPlatform();
+  const guideHref = buildPwaInstallGuideHref(platform);
+  const canPromptDirectly = platform === "other" && deferredPrompt !== null;
 
-  const handleInstall = async () => {
-    if (pending || installed) {
-      return;
-    }
-    setPending(true);
+  const trackInstallClick = () => {
     trackProductEvent({
       eventName: "pwa_install_click",
       targetType: "pwa",
       properties: {
-        iosInstallHint,
-        hasDeferredPrompt: Boolean(deferredPrompt),
+        platform,
+        hasDeferredPrompt: canPromptDirectly,
       },
     });
-    if (deferredPrompt) {
-      try {
-        await deferredPrompt.prompt();
-        const result = await deferredPrompt.userChoice;
-        if (result.outcome === "accepted") {
-          notify("설치가 시작되었습니다.");
-        } else {
-          notify("설치를 취소했습니다.");
-        }
-        setDeferredPrompt(null);
-        return;
-      } finally {
-        setPending(false);
-      }
+  };
+
+  const handleInstall = async () => {
+    if (installed || pending) {
+      return;
     }
 
-    if (iosInstallHint) {
-      notify("브라우저의 공유 버튼에서 '홈 화면에 추가'를 선택해 설치해 주세요.");
-    } else {
-      notify("브라우저 메뉴에서 '앱 설치' 또는 '홈 화면에 추가'를 선택해 주세요.");
+    trackInstallClick();
+    if (!canPromptDirectly || !deferredPrompt) {
+      return;
     }
-    setPending(false);
+
+    setPending(true);
+    try {
+      await deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      setDeferredPrompt(null);
+    } finally {
+      setPending(false);
+    }
   };
 
   return (
     <Button
       variant={variant}
-      onClick={() => void handleInstall()}
+      href={installed || canPromptDirectly ? undefined : guideHref}
+      onClick={installed ? undefined : () => void handleInstall()}
       disabled={installed}
       loading={pending}
-      loadingText="설치 준비 중"
+      loadingText="설치 창 여는 중"
       className={className}
     >
       <InstallIcon className="h-5 w-5" aria-hidden="true" />

@@ -13,7 +13,7 @@
 | 제휴 상세 | `/partners/[id]`, `_page/*` | visibility, benefit visibility, period, contacts, coupons, reviews |
 | 프로모션 | `PromotionCarousel`, `promotions/events.ts` | authenticated/year/campus audience |
 | 공유/연락 | `ShareLinkButton`, `ContactCopyRow`, detail contact section | map/reservation/inquiry/benefit action links |
-| PWA 설치 | `PwaProvider`, `PwaInstallButton`, manifest | standalone display, viewport fit |
+| PWA 설치 | `/install`, `PwaProvider`, `PwaInstallButton`, manifest | Android/iOS·iPadOS 판별, 데스크톱 native prompt, 플랫폼별 설치 안내, standalone display |
 
 ## Authentication/member
 
