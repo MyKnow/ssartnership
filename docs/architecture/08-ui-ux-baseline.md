@@ -36,7 +36,7 @@
 - `Footer`는 public site footer와 campus select를 포함한다.
 - `RouteScrollManager`는 route 전환 시 scroll 동작을 관리한다.
 - `ThemeProvider`, `ThemeToggle`, `ThemeModeButtons`는 light/dark mode를 관리한다.
-- `PwaProvider`, `PwaInstallButton`은 install prompt를 관리한다.
+- `PwaProvider`는 앱 실행 기반을 관리하고, `PwaInstallButton`은 데스크톱 네이티브 install prompt 또는 `/install`의 플랫폼별 안내로 연결한다.
 
 public header는 브랜드와 계정·알림·쿠폰·테마·전체 메뉴처럼 전역 동작만 담당하며 홈 내부 section으로 이동하는 1차 메뉴를 중복 제공하지 않는다. `내 인증`, 쿠폰, 알림, 계정은 인증 사용자 메뉴에 둔다. 파트너 모바일 1차 메뉴는 `홈`, `제휴처`, `알림`, `더보기` 네 개이며 데스크톱 sidebar는 같은 목적지를 펼친다.
 

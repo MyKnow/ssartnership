@@ -27,6 +27,16 @@ export const mockScenarios = [
     seed: { routeParams: { campus: "seoul" } },
   },
   {
+    id: "public.install.guide",
+    label: "플랫폼별 PWA 설치 안내",
+    surface: "public",
+    description: "Android, iPhone·iPad, 기타 브라우저의 홈 화면 설치 절차를 안내합니다.",
+    syntheticOnly: true,
+    dataSources: ["storybook"],
+    requiredStates: ["Android 안내", "iPhone·iPad 안내", "기타 브라우저 안내"],
+    seed: { query: { platform: "android" } },
+  },
+  {
     id: "public.partner.detail.member",
     label: "제휴처 상세 회원 접근",
     surface: "public",

@@ -47,6 +47,15 @@
 - 반응형·분석: 본문은 좁은 읽기 폭과 안정된 heading anchor를 쓴다. `policy_view`에 kind/version을 기록한다.
 - 수용 기준: URL version과 표시 버전이 같고 긴 링크·표가 320px viewport를 밀지 않는다.
 
+<!-- screen-contract: public.install-guide -->
+## `/install` — 기기별 앱 설치 안내
+
+- 목표·위계: 감지된 플랫폼 → 현재 화면에서 바로 수행할 플랫폼별 설치 절차 → 설치 실패 도움말 → 다른 기기 안내 순이다. 이미 안내 화면을 보고 있으므로 ‘싸트너십을 여세요’ 같은 선행 단계는 반복하지 않는다.
+- 액션·흐름: Footer와 전체 메뉴의 `앱 설치`는 Android와 iOS·iPadOS를 판별해 `platform` query가 있는 안내 화면으로 이동한다. 데스크톱에서 브라우저가 `beforeinstallprompt`를 제공하면 같은 버튼으로 네이티브 설치 창을 바로 열고, 제공하지 않을 때만 기타 환경 안내로 이동한다. 설치된 PWA에서는 `앱으로 실행 중`으로 비활성화한다.
+- 경계·상태: `platform`은 `android`, `ios`, `other`만 허용하고 알 수 없는 값은 기타 환경으로 정규화한다. 최신 iPadOS의 데스크톱 사용자 에이전트는 `MacIntel`과 터치 입력을 함께 확인한다.
+- 반응형·분석: 320px부터 단계 설명 다음에 시뮬레이터 화면 크롭이 흐르고, 태블릿 이상에서는 설명과 화면을 나란히 배치한다. 화면 자료는 브라우저 버전별 위치를 이해시키는 보조 자료이며 별도의 장식 Chip 없이 버튼 이름을 적은 텍스트 절차가 항상 독립적으로 유효해야 한다. 데스크톱에서는 설치 절차와 도움말을 두 열로 배치한다. `pwa_install_click`에는 원문 user agent 대신 정규화한 플랫폼과 네이티브 프롬프트 준비 여부만 기록한다.
+- 수용 기준: Android는 한국어 Chrome과 운영 도메인 화면으로 앱 설치·홈 화면 추가를 안내한다. iPhone·iPad는 운영 도메인의 Safari 화면으로 더보기 → 공유 → 공유 시트 더 보기 → 홈 화면에 추가 → 추가 확인을 안내하고, 자동 판별이 다를 때 다른 기기 안내로 전환할 수 있다. 설치 가능한 데스크톱 Chrome·Edge에서는 사용자 클릭 한 번으로 브라우저 설치 창이 열린다.
+
 <!-- screen-contract: public.partner-registration -->
 ## `/partner-registration` — 제휴 등록 신청
 
