@@ -88,6 +88,14 @@ test("glass 탐색은 safe area와 하단 피드백 영역을 보호한다", asy
   assert.match(source, /--navigation-glass:/);
   assert.match(source, /backdrop-filter: blur\(24px\) saturate\(180%\)/);
   assert.match(source, /\[data-toast-viewport\]/);
+  assert.match(
+    source,
+    /body:has\(\[data-partner-detail-mobile-action-bar\]\) \[data-toast-viewport\] \{\s*bottom: calc\(env\(safe-area-inset-bottom\) \+ 6rem\);/,
+  );
+  assert.match(
+    source,
+    /body:has\(\[data-partner-detail-desktop-action-fab\]\) \[data-toast-viewport\] \{\s*bottom: 6rem;/,
+  );
   assert.match(actionBarSource, /bottom-0/);
   assert.match(actionBarSource, /pb-safe-bottom-2/);
   assert.match(

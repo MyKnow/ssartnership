@@ -62,16 +62,17 @@ test("파트너 이미지 캐러셀은 대표 이미지만 1:1, 추가 이미지
   );
 });
 
-test("파트너 hero 메타 액션은 칩 높이에 맞추고 44px 터치 영역을 확장한다", () => {
-  const meta = readRepoFile(
-    "src/app/(site)/partners/[id]/_page/PartnerDetailHeroMeta.tsx",
+test("파트너 hero 액션은 32px 시각 크기와 44px 터치 영역을 유지한다", () => {
+  const hero = readRepoFile(
+    "src/app/(site)/partners/[id]/_page/PartnerDetailHeroContent.tsx",
   );
   const favorite = readRepoFile("src/components/partner-favorites/PartnerFavoriteButton.tsx");
   const share = readRepoFile("src/components/ShareLinkButton.tsx");
 
-  assert.match(meta, /min-h-8 px-2\.5 py-1/);
-  assert.match(meta, /after:min-h-11 after:min-w-11/);
-  assert.match(meta, /!relative !h-8 !min-h-0 !min-w-0/);
+  assert.match(hero, /data-partner-detail-hero-actions/);
+  assert.match(hero, /!relative !h-8 !min-h-0 !min-w-0/);
+  assert.match(hero, /relative !h-8 !w-8/);
+  assert.match(hero, /after:min-h-11 after:min-w-11/);
   assert.match(favorite, /className\?: string/);
   assert.match(share, /className\?: string/);
 });

@@ -27,4 +27,4 @@
 ## Feedback
 - 짧은 폼 메시지는 `FormMessage`
 - 문맥 안내/주의는 `InlineMessage`
-- Toast는 일시적 확인용
+- Toast는 일시적 확인용이며 자동 소멸과 함께 우측 닫기 버튼으로 즉시 제거할 수 있어야 한다. 표면은 semantic toast glass token, blur, 얇은 highlight로 구성하고 라이트·다크 모드에서 문구 대비를 유지한다.

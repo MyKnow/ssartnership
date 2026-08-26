@@ -4,6 +4,7 @@
 - `Card tone="default"`는 독립 섹션/패널, `muted`는 내부 inset, `elevated`는 주요 카드/CTA, `hero`는 강한 강조 표면으로 사용한다.
 - 카드 내부의 보조 행, 입력 그룹, 세부 정보 박스는 `Surface level="inset"`을 우선 사용한다.
 - modal, drawer, toast처럼 화면 위에 뜨는 레이어는 `Surface level="overlay"` 또는 `bg-surface-overlay`를 사용한다.
+- Toast는 일시적 피드백이라는 제한된 범위에서 `ui-toast-glass` overlay를 사용하며, 일반 카드나 본문 패널로 glass 표현을 확장하지 않는다.
 
 ## ShellHeader
 - 페이지 진입부의 제목, 설명, 우측 액션을 통일한다.
