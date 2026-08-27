@@ -76,7 +76,7 @@ export const ResetPassword: Story = {
 
     await expect(graduateTab).toHaveFocus();
     await expect(graduateTab).toHaveAttribute("aria-selected", "true");
-    await expect(canvas.getByRole("textbox", { name: "수료생 이메일" })).toBeVisible();
+    await expect(canvas.getByRole("textbox", { name: "이메일" })).toBeVisible();
   },
 };
 

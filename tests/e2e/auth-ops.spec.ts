@@ -101,13 +101,22 @@ test.describe("auth and partner portal operation flows", () => {
     await expect(page.getByRole("tab")).toHaveCount(2);
     await expect(page.getByRole("tab", { name: "이메일 초대", exact: true })).toHaveCount(0);
     await expect(memberTab).toHaveAttribute("aria-selected", "true");
+    await expect(
+      page.getByText("가입 때 연결한 Mattermost 계정으로 인증 코드를 받으면 새 비밀번호를 설정할 수 있습니다."),
+    ).toHaveCount(0);
+    await expect(page.getByRole("combobox", { name: "기수" })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Mattermost ID" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Mattermost로 인증 코드 받기" })).toHaveClass(/mt-2/);
+    await expect(page.getByRole("link", { name: "기존 회원 복구 신청" })).toHaveCount(0);
 
     await memberTab.focus();
     await page.keyboard.press("ArrowRight");
 
     await expect(graduateTab).toBeFocused();
     await expect(graduateTab).toHaveAttribute("aria-selected", "true");
-    await expect(page.getByRole("textbox", { name: "수료생 이메일" })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "이메일" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "이메일로 인증 코드 받기" })).toHaveClass(/w-full/);
+    await expect(page.getByRole("link", { name: "기존 회원 복구 신청" })).toHaveCount(0);
   });
 
   test("signup switches its child panel before opening the graduate certificate application", async ({ page }) => {
@@ -189,7 +198,7 @@ test.describe("auth and partner portal operation flows", () => {
     await generationOption.evaluate((option) => option.removeAttribute("disabled"));
     await page.getByRole("textbox", { name: "Mattermost ID" }).fill("myknow");
     await generation.selectOption(generationValue!);
-    await page.getByRole("button", { name: "Mattermost DM으로 코드 받기" }).click();
+    await page.getByRole("button", { name: "Mattermost로 인증 코드 받기" }).click();
 
     await expect(
       page.getByText("입력한 Mattermost 계정으로 인증 코드를 보냈습니다.", { exact: true }),
@@ -208,33 +217,12 @@ test.describe("auth and partner portal operation flows", () => {
     await expect(page.getByText("이미 가입된 회원입니다.")).toBeVisible();
   });
 
-  test("offers site-password login and an existing-member recovery application when Mattermost is unavailable", async ({ page }) => {
+  test("keeps existing-member recovery links out of password reset tabs", async ({ page }) => {
     await page.goto("/auth/reset");
 
-    const emailRegistration = page.getByRole("link", { name: /로그인 후 이메일 등록/ });
-    await expect(emailRegistration).toHaveAttribute(
-      "href",
-      "/auth/login?returnTo=%2Fcertification%2Femail",
-    );
-    const existingMemberRecovery = page.getByRole("link", { name: "기존 회원 복구 신청" });
-    await expect(existingMemberRecovery).toHaveAttribute(
-      "href",
-      "/auth/signup/graduate?kind=recovery",
-    );
-
-    await Promise.all([
-      page.waitForURL(/\/auth\/login\?returnTo=%2Fcertification%2Femail$/),
-      emailRegistration.click(),
-    ]);
-    await page.waitForLoadState("networkidle");
-    await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible();
-    await expect(page.getByRole("textbox", { name: "Mattermost 아이디" })).toBeVisible();
-
-    await page.goto("/auth/signup/graduate?kind=recovery");
-    await expect(page.getByRole("heading", { name: "기존 회원 복구" })).toBeVisible();
-    await expect(
-      page.getByText(/관리자가 기존 회원을 명시적으로 선택한 경우에만 이메일 로그인과 초기 비밀번호를 연결합니다/),
-    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "기존 회원 복구 신청" })).toHaveCount(0);
+    await page.getByRole("tab", { name: "수료생", exact: true }).click();
+    await expect(page.getByRole("link", { name: "기존 회원 복구 신청" })).toHaveCount(0);
   });
 
   test("partner login maps safe server validation errors to fields", async ({ page }) => {

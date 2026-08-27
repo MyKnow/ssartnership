@@ -1,7 +1,6 @@
 "use client";
 
 import { useId, useState, type KeyboardEvent } from "react";
-import Link from "next/link";
 import GraduatePasswordResetForm from "@/components/auth/GraduatePasswordResetForm";
 import MattermostCodeVerificationForm from "@/components/auth/MattermostCodeVerificationForm";
 
@@ -99,9 +98,6 @@ export default function PasswordResetMethodTabs({
       </div>
       {method === "mattermost" ? (
         <section id={memberPanelId} role="tabpanel" aria-labelledby={memberTabId}>
-          <p className="mt-5 text-sm text-muted-foreground">
-            가입 때 연결한 Mattermost 계정으로 인증 코드를 받으면 새 비밀번호를 설정할 수 있습니다.
-          </p>
           <MattermostCodeVerificationForm
             purpose="reset_password"
             activeSenderGenerations={activeSenderGenerations}
@@ -113,17 +109,6 @@ export default function PasswordResetMethodTabs({
           <GraduatePasswordResetForm />
         </section>
       )}
-      <div className="mt-5 grid gap-2 border-t border-border pt-4 text-sm text-muted-foreground">
-        <Link
-          href="/auth/login?returnTo=%2Fcertification%2Femail"
-          className="font-medium underline underline-offset-4 hover:text-foreground"
-        >
-          기존 사이트 비밀번호를 알고 있나요? 로그인 후 이메일 등록
-        </Link>
-        <Link href="/auth/signup/graduate?kind=recovery" className="font-medium underline underline-offset-4 hover:text-foreground">
-          기존 사이트 비밀번호도 모르면 기존 회원 복구 신청
-        </Link>
-      </div>
     </div>
   );
 }

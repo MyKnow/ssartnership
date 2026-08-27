@@ -54,10 +54,10 @@ test("이메일 필수 화면은 완료 목적지를 정규화하고 필수 상�
   assert.match(pageHeader, /emailRegistrationRequired\s*\?\s*\{\}/);
   assert.match(pageHeader, /Mattermost를 사용할 수 없는 계정이에요/);
 
-  assert.match(
+  assert.doesNotMatch(
     resetTabs,
     /href="\/auth\/login\?returnTo=%2Fcertification%2Femail"/,
   );
-  assert.match(resetTabs, /로그인 후 이메일 등록/);
+  assert.doesNotMatch(resetTabs, /로그인 후 이메일 등록/);
   assert.doesNotMatch(resetTabs, /href="\/auth\/recover-email"/);
 });

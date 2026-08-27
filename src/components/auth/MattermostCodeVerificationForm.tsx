@@ -105,12 +105,12 @@ export default function MattermostCodeVerificationForm({
   }, [codeExpiresAt]);
 
   function focusFirstField(nextErrors: Partial<Record<"username" | "generation", string>>) {
-    if (nextErrors.username) {
-      usernameRef.current?.focus();
-      return;
-    }
     if (nextErrors.generation) {
       generationRef.current?.focus();
+      return;
+    }
+    if (nextErrors.username) {
+      usernameRef.current?.focus();
     }
   }
 
@@ -246,23 +246,6 @@ export default function MattermostCodeVerificationForm({
         </p>
       ) : null}
       <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-        Mattermost ID
-        <Input
-          ref={usernameRef}
-          name="username"
-          autoComplete="username"
-          value={username}
-          onChange={(event) => {
-            setUsername(event.target.value);
-            setFieldErrors((current) => ({ ...current, username: undefined }));
-          }}
-          placeholder="예: myknow"
-          aria-invalid={Boolean(fieldErrors.username) || undefined}
-          className={getFieldErrorClass(Boolean(fieldErrors.username))}
-        />
-        {fieldErrors.username ? <FormMessage variant="error">{fieldErrors.username}</FormMessage> : null}
-      </label>
-      <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
         기수
         <Select
           ref={generationRef}
@@ -302,9 +285,26 @@ export default function MattermostCodeVerificationForm({
         </Select>
         {fieldErrors.generation ? <FormMessage variant="error">{fieldErrors.generation}</FormMessage> : null}
       </label>
+      <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+        Mattermost ID
+        <Input
+          ref={usernameRef}
+          name="username"
+          autoComplete="username"
+          value={username}
+          onChange={(event) => {
+            setUsername(event.target.value);
+            setFieldErrors((current) => ({ ...current, username: undefined }));
+          }}
+          placeholder="예시: myknow"
+          aria-invalid={Boolean(fieldErrors.username) || undefined}
+          className={getFieldErrorClass(Boolean(fieldErrors.username))}
+        />
+        {fieldErrors.username ? <FormMessage variant="error">{fieldErrors.username}</FormMessage> : null}
+      </label>
       {error ? <FormMessage variant="error">{error}</FormMessage> : null}
-      <Button type="submit" loading={pending} loadingText="코드 전송 중">
-        Mattermost DM으로 코드 받기
+      <Button type="submit" className="mt-2 w-full" loading={pending} loadingText="코드 전송 중">
+        Mattermost로 인증 코드 받기
       </Button>
     </form>
   );
