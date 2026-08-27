@@ -9,6 +9,7 @@ import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { requiresMemberProfilePhotoUpdate } from "@/lib/member-profile-photo";
 import { classifyMemberLoginIdentifier } from "@/lib/member-domain";
 import { hashMemberEmailIdentifier } from "@/lib/member-email-verification";
+import { requiresMemberEmailRegistration } from "@/lib/member-required-gates";
 import {
   resolveActiveMemberForLoginWithSource,
   type LoginMemberResolution,
@@ -77,6 +78,8 @@ export async function POST(request: Request) {
           password_hash: null,
           password_salt: null,
           must_change_password: mockMember.mustChangePassword,
+          email_verified_at: null,
+          mattermost_login_disabled_at: null,
         },
         authenticationMethod: "manual",
       };
@@ -145,6 +148,10 @@ export async function POST(request: Request) {
     const requiresProfilePhotoUpdate = requiresMemberProfilePhotoUpdate(
       photoState.reviewStatus,
     );
+    const requiresEmailRegistration = requiresMemberEmailRegistration({
+      mattermostLoginDisabledAt: member.mattermost_login_disabled_at,
+      emailVerifiedAt: member.email_verified_at,
+    });
     await setUserSession(member.id, Boolean(member.must_change_password), {
       persistent: autoLogin,
       authenticationMethod: resolvedLogin.authenticationMethod,
@@ -167,6 +174,7 @@ export async function POST(request: Request) {
         properties: {
           mustChangePassword: Boolean(member.must_change_password),
           requiresConsent: policyStatus.requiresConsent,
+          requiresEmailRegistration,
           requiresProfilePhotoUpdate,
           autoLogin,
           provider,
@@ -177,6 +185,7 @@ export async function POST(request: Request) {
       ok: true,
       mustChangePassword: Boolean(member.must_change_password),
       requiresConsent: policyStatus.requiresConsent,
+      requiresEmailRegistration,
       requiresProfilePhotoUpdate,
     });
   } catch {

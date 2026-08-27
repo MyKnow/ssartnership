@@ -9,6 +9,7 @@ import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "./hmac.js";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { requiresMemberProfilePhotoUpdate } from "@/lib/member-profile-photo";
+import { requiresMemberEmailRegistration } from "@/lib/member-required-gates";
 import {
   getMockMemberById,
   isMockMemberAuthEnabled,
@@ -337,6 +338,7 @@ export async function getUserSession() {
       ...session,
       mustChangePassword: member.mustChangePassword,
       requiresConsent: consentSnapshotIsFresh ? false : policyStatus.requiresConsent,
+      requiresEmailRegistration: false,
       requiresProfilePhotoUpdate: requiresMemberProfilePhotoUpdate(
         photoState.reviewStatus,
       ),
@@ -346,7 +348,7 @@ export async function getUserSession() {
   const supabase = getSupabaseAdminClient();
   const memberPromise = supabase
     .from("members")
-    .select("id,must_change_password")
+    .select("id,must_change_password,email_verified_at,mattermost_login_disabled_at")
     .eq("id", session.userId)
     .is("deleted_at", null)
     .maybeSingle();
@@ -377,6 +379,10 @@ export async function getUserSession() {
     ...session,
     mustChangePassword: Boolean(member.must_change_password),
     requiresConsent: consentSnapshotIsFresh ? false : policyStatus.requiresConsent,
+    requiresEmailRegistration: requiresMemberEmailRegistration({
+      mattermostLoginDisabledAt: member.mattermost_login_disabled_at,
+      emailVerifiedAt: member.email_verified_at,
+    }),
     requiresProfilePhotoUpdate: requiresMemberProfilePhotoUpdate(
       photoState.reviewStatus,
     ),

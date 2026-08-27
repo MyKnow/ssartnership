@@ -208,14 +208,14 @@ test.describe("auth and partner portal operation flows", () => {
     await expect(page.getByText("이미 가입된 회원입니다.")).toBeVisible();
   });
 
-  test("offers email recovery and an existing-member recovery application when Mattermost is unavailable", async ({ page }) => {
-    const recoveryWarmup = await page.request.get("/auth/recover-email");
-    expect(recoveryWarmup.ok()).toBe(true);
-
+  test("offers site-password login and an existing-member recovery application when Mattermost is unavailable", async ({ page }) => {
     await page.goto("/auth/reset");
 
-    const emailRecovery = page.getByRole("link", { name: /이메일 로그인 복구/ });
-    await expect(emailRecovery).toHaveAttribute("href", "/auth/recover-email");
+    const emailRegistration = page.getByRole("link", { name: /로그인 후 이메일 등록/ });
+    await expect(emailRegistration).toHaveAttribute(
+      "href",
+      "/auth/login?returnTo=%2Fcertification%2Femail",
+    );
     const existingMemberRecovery = page.getByRole("link", { name: "기존 회원 복구 신청" });
     await expect(existingMemberRecovery).toHaveAttribute(
       "href",
@@ -223,17 +223,12 @@ test.describe("auth and partner portal operation flows", () => {
     );
 
     await Promise.all([
-      page.waitForURL(/\/auth\/recover-email$/),
-      emailRecovery.click(),
+      page.waitForURL(/\/auth\/login\?returnTo=%2Fcertification%2Femail$/),
+      emailRegistration.click(),
     ]);
     await page.waitForLoadState("networkidle");
-    await expect(page.getByRole("heading", { name: "이메일 로그인 복구" })).toBeVisible();
-    await expect(page.getByRole("textbox", { name: "기존 아이디 또는 이메일" })).toBeVisible();
-    const passwordSubmit = page.getByRole("button", { name: "기존 비밀번호 확인" });
-    await expect(passwordSubmit).toBeEnabled();
-    await passwordSubmit.click();
-    await expect(page.getByText("아이디 또는 이메일을 입력해 주세요.")).toBeVisible();
-    await expect(page.getByText("기존 사이트 비밀번호를 입력해 주세요.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "로그인" })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Mattermost 아이디" })).toBeVisible();
 
     await page.goto("/auth/signup/graduate?kind=recovery");
     await expect(page.getByRole("heading", { name: "기존 회원 복구" })).toBeVisible();

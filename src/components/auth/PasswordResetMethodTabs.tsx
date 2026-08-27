@@ -114,8 +114,11 @@ export default function PasswordResetMethodTabs({
         </section>
       )}
       <div className="mt-5 grid gap-2 border-t border-border pt-4 text-sm text-muted-foreground">
-        <Link href="/auth/recover-email" className="font-medium underline underline-offset-4 hover:text-foreground">
-          Mattermost를 사용할 수 없지만 기존 사이트 비밀번호는 알고 있나요? 이메일 로그인 복구
+        <Link
+          href="/auth/login?returnTo=%2Fcertification%2Femail"
+          className="font-medium underline underline-offset-4 hover:text-foreground"
+        >
+          기존 사이트 비밀번호를 알고 있나요? 로그인 후 이메일 등록
         </Link>
         <Link href="/auth/signup/graduate?kind=recovery" className="font-medium underline underline-offset-4 hover:text-foreground">
           기존 사이트 비밀번호도 모르면 기존 회원 복구 신청

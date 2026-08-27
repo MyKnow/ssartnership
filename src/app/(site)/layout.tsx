@@ -24,6 +24,7 @@ export default async function SiteLayout({
     returnTo,
     mustChangePassword: session?.mustChangePassword,
     requiresConsent: session?.requiresConsent,
+    requiresEmailRegistration: session?.requiresEmailRegistration,
     requiresProfilePhotoUpdate: session?.requiresProfilePhotoUpdate,
   });
   if (requiredGateRedirect) {

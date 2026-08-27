@@ -5,6 +5,7 @@ import {
   buildMemberGateHref,
   getMemberGateCompletionReturnTo,
   getMemberRequiredGateRedirect,
+  requiresMemberEmailRegistration,
   resolveMemberRequiredGate,
 } from "@/lib/member-required-gates";
 
@@ -24,6 +25,7 @@ const gateCompletionPaths = [
   ),
   new URL("../src/components/auth/PolicyConsentForm.tsx", import.meta.url),
   new URL("../src/app/auth/consent/page.tsx", import.meta.url),
+  new URL("../src/app/(site)/certification/email/page.tsx", import.meta.url),
   new URL("../src/app/(site)/certification/photo/page.tsx", import.meta.url),
   new URL(
     "../src/components/graduate-verification/GraduateProfilePhotoForm.tsx",
@@ -56,37 +58,48 @@ const certificationMattermostSyncActionPath = new URL(
   import.meta.url,
 );
 
-test("강제 비밀번호 변경은 약관 동의와 본인 사진 제출보다 항상 먼저 처리한다", () => {
-  const cases = [
-    { state: {}, expected: null },
-    { state: { requiresProfilePhotoUpdate: true }, expected: "profile-photo" },
-    { state: { requiresConsent: true }, expected: "consent" },
-    {
-      state: { requiresConsent: true, requiresProfilePhotoUpdate: true },
-      expected: "consent",
-    },
-    { state: { mustChangePassword: true }, expected: "change-password" },
-    {
-      state: { mustChangePassword: true, requiresProfilePhotoUpdate: true },
-      expected: "change-password",
-    },
-    {
-      state: { mustChangePassword: true, requiresConsent: true },
-      expected: "change-password",
-    },
-    {
-      state: {
-        mustChangePassword: true,
-        requiresConsent: true,
-        requiresProfilePhotoUpdate: true,
-      },
-      expected: "change-password",
-    },
-  ] as const;
-
-  for (const { state, expected } of cases) {
-    assert.equal(resolveMemberRequiredGate(state), expected);
+test("회원 필수 게이트는 비밀번호, 약관, 이메일, 사진 순서를 모든 조합에서 지킨다", () => {
+  for (let stateMask = 0; stateMask < 16; stateMask += 1) {
+    const state = {
+      mustChangePassword: Boolean(stateMask & 8),
+      requiresConsent: Boolean(stateMask & 4),
+      requiresEmailRegistration: Boolean(stateMask & 2),
+      requiresProfilePhotoUpdate: Boolean(stateMask & 1),
+    };
+    const expected = state.mustChangePassword
+      ? "change-password"
+      : state.requiresConsent
+        ? "consent"
+        : state.requiresEmailRegistration
+          ? "email-registration"
+          : state.requiresProfilePhotoUpdate
+            ? "profile-photo"
+            : null;
+    assert.equal(resolveMemberRequiredGate(state), expected, `state mask ${stateMask}`);
   }
+});
+
+test("이메일 등록 게이트는 Mattermost 로그인이 비활성이고 이메일이 미인증일 때만 필요하다", () => {
+  assert.equal(requiresMemberEmailRegistration({}), false);
+  assert.equal(
+    requiresMemberEmailRegistration({
+      mattermostLoginDisabledAt: "2026-08-27T10:00:00.000Z",
+    }),
+    true,
+  );
+  assert.equal(
+    requiresMemberEmailRegistration({
+      emailVerifiedAt: "2026-08-27T10:00:00.000Z",
+    }),
+    false,
+  );
+  assert.equal(
+    requiresMemberEmailRegistration({
+      mattermostLoginDisabledAt: "2026-08-27T10:00:00.000Z",
+      emailVerifiedAt: "2026-08-27T10:05:00.000Z",
+    }),
+    false,
+  );
 });
 
 test("상위 게이트가 필요한 경우 원래 목적지를 보존한 안전한 경로로 보낸다", () => {
@@ -96,6 +109,7 @@ test("상위 게이트가 필요한 경우 원래 목적지를 보존한 안전�
       returnTo: "/partners?tab=benefit",
       mustChangePassword: true,
       requiresConsent: true,
+      requiresEmailRegistration: true,
       requiresProfilePhotoUpdate: true,
     }),
     "/auth/change-password?returnTo=%2Fpartners%3Ftab%3Dbenefit",
@@ -107,6 +121,15 @@ test("상위 게이트가 필요한 경우 원래 목적지를 보존한 안전�
 });
 
 test("현재 게이트 경로는 다시 같은 게이트로 리디렉션하지 않는다", () => {
+  assert.equal(
+    getMemberRequiredGateRedirect({
+      currentPath: "/certification/email?returnTo=%2F",
+      returnTo: "/certification/email?returnTo=%2F",
+      requiresEmailRegistration: true,
+      requiresProfilePhotoUpdate: true,
+    }),
+    null,
+  );
   assert.equal(
     getMemberRequiredGateRedirect({
       currentPath: "/certification/photo?returnTo=%2F",
@@ -121,6 +144,7 @@ test("현재 게이트 경로는 다시 같은 게이트로 리디렉션하지 �
       returnTo: "/",
       mustChangePassword: true,
       requiresConsent: true,
+      requiresEmailRegistration: true,
       requiresProfilePhotoUpdate: true,
     }),
     null,
@@ -128,6 +152,13 @@ test("현재 게이트 경로는 다시 같은 게이트로 리디렉션하지 �
 });
 
 test("게이트 완료 후 자기 경로 또는 외부 returnTo로 되돌아가지 않는다", () => {
+  assert.equal(
+    getMemberGateCompletionReturnTo(
+      "/certification/email?returnTo=%2F",
+      "email-registration",
+    ),
+    "/",
+  );
   assert.equal(
     getMemberGateCompletionReturnTo(
       "/certification/photo?returnTo=%2F",

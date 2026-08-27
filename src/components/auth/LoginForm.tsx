@@ -203,6 +203,7 @@ export default function LoginForm({
           returnTo: safeReturnTo,
           mustChangePassword: Boolean(data.mustChangePassword),
           requiresConsent: Boolean(data.requiresConsent),
+          requiresEmailRegistration: Boolean(data.requiresEmailRegistration),
           requiresProfilePhotoUpdate: Boolean(data.requiresProfilePhotoUpdate),
         }) ?? safeReturnTo;
       router.replace(nextHref);
