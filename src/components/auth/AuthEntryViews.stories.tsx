@@ -20,7 +20,9 @@ type Story = StoryObj<typeof meta>;
 export const Login: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const username = canvas.getByLabelText("아이디 또는 이메일");
+    const usernameTab = canvas.getByRole("tab", { name: "아이디" });
+    const emailTab = canvas.getByRole("tab", { name: "이메일" });
+    const username = canvas.getByLabelText("Mattermost 아이디");
     const password = canvas.getByLabelText("비밀번호");
     const autoLogin = canvas.getByRole("checkbox", { name: "자동 로그인" });
     const loginButton = canvas.getByRole("button", { name: "로그인" });
@@ -28,6 +30,8 @@ export const Login: Story = {
     const divider = canvas.getByRole("separator");
     const signupButton = canvas.getByRole("link", { name: "회원가입" });
     const orderedElements = [
+      usernameTab,
+      emailTab,
       username,
       password,
       autoLogin,
@@ -35,6 +39,9 @@ export const Login: Story = {
       divider,
       signupButton,
     ];
+
+    await expect(usernameTab).toHaveAttribute("aria-selected", "true");
+    await expect(emailTab).toHaveAttribute("aria-selected", "false");
 
     await expect(
       canvas.queryByText("아이디와 사이트 비밀번호로 싸트너십에 로그인합니다."),

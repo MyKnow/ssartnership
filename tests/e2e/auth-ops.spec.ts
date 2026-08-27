@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { MEMBER_LOGIN_METHOD_STORAGE_KEY } from "../../src/lib/member-login-method-preference.client";
 
 let hasWarmedAuthRoute = false;
 
@@ -7,7 +8,7 @@ test.describe("auth and partner portal operation flows", () => {
     if (!hasWarmedAuthRoute) {
       await page.goto("/auth/login");
       await expect(
-        page.getByRole("textbox", { name: "아이디 또는 이메일" }),
+        page.getByRole("textbox", { name: "Mattermost 아이디" }),
       ).toBeVisible();
       hasWarmedAuthRoute = true;
     }
@@ -52,16 +53,42 @@ test.describe("auth and partner portal operation flows", () => {
     await page.goto("/auth/login");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByRole("textbox", { name: "아이디 또는 이메일" })).toHaveAttribute(
+    const usernameTab = page.getByRole("tab", { name: "아이디" });
+    const emailTab = page.getByRole("tab", { name: "이메일" });
+
+    await expect(usernameTab).toHaveAttribute("aria-selected", "true");
+    await expect(emailTab).toHaveAttribute("aria-selected", "false");
+    await expect(page.getByRole("textbox", { name: "Mattermost 아이디" })).toHaveAttribute(
       "placeholder",
-      "예시: myknow@example.com",
+      "예시: myknow",
     );
     await expect(page.getByRole("checkbox", { name: "자동 로그인" })).toBeChecked();
 
     await page.getByRole("button", { name: "로그인" }).click();
 
-    await expect(page.getByText("아이디 또는 이메일을 입력해 주세요.")).toBeVisible();
+    await expect(page.getByText("Mattermost 아이디를 입력해 주세요.")).toBeVisible();
     await expect(page.getByText("비밀번호를 입력해 주세요.")).toBeVisible();
+
+    await emailTab.click();
+    await expect(emailTab).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("textbox", { name: "이메일" })).toHaveAttribute(
+      "placeholder",
+      "예시: myknow@example.com",
+    );
+
+    await page.reload();
+    await expect(usernameTab).toHaveAttribute("aria-selected", "true");
+
+    await page.evaluate((storageKey) => {
+      window.localStorage.setItem(storageKey, "email");
+    }, MEMBER_LOGIN_METHOD_STORAGE_KEY);
+    await page.reload();
+    await expect(emailTab).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("textbox", { name: "이메일" })).toBeVisible();
+
+    await page.evaluate((storageKey) => {
+      window.localStorage.removeItem(storageKey);
+    }, MEMBER_LOGIN_METHOD_STORAGE_KEY);
   });
 
   test("signup switches its child panel before opening the graduate certificate application", async ({ page }) => {

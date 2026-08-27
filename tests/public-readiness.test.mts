@@ -166,7 +166,7 @@ test("auth E2E mock reset waits for a semantic application readiness boundary", 
   assert.ok(resetIndex > readinessIndex, "mock reset must follow route readiness");
   assert.match(
     authOperations,
-    /getByRole\("textbox", \{ name: "아이디 또는 이메일" \}\)[\s\S]*?\.toBeVisible\(\);[\s\S]*?page\.request\.post\("\/api\/e2e\/mock\/reset"\)/,
+    /getByRole\("textbox", \{ name: "Mattermost 아이디" \}\)[\s\S]*?\.toBeVisible\(\);[\s\S]*?page\.request\.post\("\/api\/e2e\/mock\/reset"\)/,
   );
 });
 
