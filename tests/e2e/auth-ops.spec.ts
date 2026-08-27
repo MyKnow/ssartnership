@@ -91,6 +91,25 @@ test.describe("auth and partner portal operation flows", () => {
     }, MEMBER_LOGIN_METHOD_STORAGE_KEY);
   });
 
+  test("@critical password reset exposes only member and graduate paths", async ({ page }) => {
+    await page.goto("/auth/reset");
+    await page.waitForLoadState("networkidle");
+
+    const memberTab = page.getByRole("tab", { name: "운영진·재학생", exact: true });
+    const graduateTab = page.getByRole("tab", { name: "수료생", exact: true });
+
+    await expect(page.getByRole("tab")).toHaveCount(2);
+    await expect(page.getByRole("tab", { name: "이메일 초대", exact: true })).toHaveCount(0);
+    await expect(memberTab).toHaveAttribute("aria-selected", "true");
+
+    await memberTab.focus();
+    await page.keyboard.press("ArrowRight");
+
+    await expect(graduateTab).toBeFocused();
+    await expect(graduateTab).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("textbox", { name: "수료생 이메일" })).toBeVisible();
+  });
+
   test("signup switches its child panel before opening the graduate certificate application", async ({ page }) => {
     await page.goto("/auth/signup");
     await page.waitForLoadState("networkidle");

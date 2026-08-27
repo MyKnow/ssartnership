@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, within } from "storybook/test";
+import { expect, userEvent, within } from "storybook/test";
 import {
   LoginPageView,
   ResetPasswordPageView,
@@ -62,6 +62,22 @@ export const Login: Story = {
 
 export const ResetPassword: Story = {
   render: () => <ResetPasswordPageView activeSenderGenerations={[15]} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const memberTab = canvas.getByRole("tab", { name: "운영진·재학생" });
+    const graduateTab = canvas.getByRole("tab", { name: "수료생" });
+
+    await expect(canvas.getAllByRole("tab")).toHaveLength(2);
+    await expect(canvas.queryByRole("tab", { name: "이메일 초대" })).not.toBeInTheDocument();
+    await expect(memberTab).toHaveAttribute("aria-selected", "true");
+
+    memberTab.focus();
+    await userEvent.keyboard("{ArrowRight}");
+
+    await expect(graduateTab).toHaveFocus();
+    await expect(graduateTab).toHaveAttribute("aria-selected", "true");
+    await expect(canvas.getByRole("textbox", { name: "수료생 이메일" })).toBeVisible();
+  },
 };
 
 export const Signup: Story = {
