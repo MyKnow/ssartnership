@@ -1,3 +1,10 @@
+---
+title: Elements
+type: design-system
+status: current
+authority: normative
+---
+
 # Elements
 
 ## Buttons

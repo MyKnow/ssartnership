@@ -1,3 +1,10 @@
+---
+title: Components
+type: design-system
+status: current
+authority: normative
+---
+
 # Components
 
 ## Card / Surface

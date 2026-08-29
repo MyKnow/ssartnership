@@ -116,9 +116,22 @@ tests/
   ssafy-cycle-simulation.test.mts 기수 / 수료생 시뮬레이션 테스트
 
 docs/
-  performance/            성능 측정 문서
-  security/               보안 정리 문서
+  index.md                Repository Knowledge map
+  product/                제품 의도, 흐름, 화면 계약
+  requirements/           교차 기능 요구사항
+  specs/                  기능별 spec / plan / tasks
+  architecture/           현행 기술 경계
+  decisions/              Architecture Decision Records
+  plans/                  active / completed / tech debt
+  operations/             문서 lifecycle, runbook, 운영 감사
+  performance/            성능 baseline, 측정, 감사
+  security/               보안 정책과 시점 감사
+  testing/                테스트·Storybook 운영 계약
+  design-system/          UI foundation과 component 규칙
+  history/                만료·대체된 역사 기록
 ```
+
+프로젝트 지식은 [Repository Knowledge Map](./docs/index.md)에서 탐색합니다. 문서 상태·메타데이터·이동 규칙은 [문서 수명주기](./docs/operations/documentation-lifecycle.md)를 따릅니다.
 
 ## 로컬 실행
 
@@ -142,7 +155,7 @@ npm run dev
 - 고정 runtime: Node.js 24.18.1, npm 11.16.0
 - `bootstrap`: 검증된 `install:trusted` 경계의 lockfile 설치, 로컬 mock 환경 생성, 환경 진단
 - `doctor`: 환경을 변경하지 않고 OS/Architecture/runtime/env/cloud 연결/port/filesystem/native dependency 상태를 `PASS`/`WARN`/`FAIL`로 진단
-- 상세 계약: [교차 플랫폼 개발환경 운영 문서](./docs/operations/cross-platform-development.md)
+- 상세 계약: [교차 플랫폼 개발환경 운영 문서](./docs/operations/runbooks/cross-platform-development.md)
 
 개발 서버:
 
@@ -371,7 +384,7 @@ erDiagram
 
 - 로그인 식별자는 Mattermost 아이디 또는 **인증된 이메일**이다. 이메일은 `/certification`에서 6자리 코드로 등록·변경한다.
 - `mm_username`은 로그인 입력과 디렉토리 조회에 쓰는 변경 가능한 외부 식별자다. 회원 테이블에서는 nullable FK만 보유하고, MM 세부값은 `mm_user_directory`가 보관한다.
-- `member_ssafy_verifications`는 더 이상 런타임에서 읽지 않는 SSAFY Verify 레거시 proof다. Production에는 2026-08-13 기준 13행이 남아 있고 기존 `members.ssafy_*` 컬럼은 이미 제거됐다. 삭제 조건과 승인 경계는 [SSAFY Verify 레거시 삭제 준비도 감사](docs/operations/ssafy-verify-legacy-removal-readiness-2026-08-13.md)를 따른다.
+- `member_ssafy_verifications`는 더 이상 런타임에서 읽지 않는 SSAFY Verify 레거시 proof다. Production에는 2026-08-13 기준 13행이 남아 있고 기존 `members.ssafy_*` 컬럼은 이미 제거됐다. 삭제 조건과 승인 경계는 [SSAFY Verify 레거시 삭제 준비도](docs/plans/active/ssafy-verify-legacy-removal.md)를 따른다.
 - 기수 계산은 `ssafy_cycle_settings`와 날짜를 사용한다. 예를 들어 `generation = 15`는 15기이며, 현재 시점에 따라 교육생·수료생 역할 표시는 파생한다.
 - 반·강의실·반장·CA 등 운영에 불필요한 닉네임 파생값은 저장하지 않는다.
 

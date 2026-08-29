@@ -135,6 +135,8 @@ test("local prepush shares the change classifier while explicit promotion gates 
     packageJson.scripts["verify:change"],
     "node scripts/verify-change.mjs",
   );
+  assert.equal(packageJson.scripts["check:docs"], "node scripts/check-docs.mjs");
+  assert.match(readRepoFile("scripts/verify-change.mjs"), /runRequired\("check:docs"\)/);
   assert.doesNotMatch(quick, /\bbuild\b|test:e2e:ci/);
   assert.match(
     packageJson.scripts["verify:release"],
@@ -433,7 +435,7 @@ test("playwright config can use the CI-hosted Chrome channel", () => {
 });
 
 test("public repository exposes a responsible disclosure security policy", () => {
-  const securityPolicy = readRepoFile("SECURITY.md");
+  const securityPolicy = readRepoFile("docs/SECURITY.md");
 
   assert.match(securityPolicy, /SSARTNERSHIP Security Policy/);
   assert.match(securityPolicy, /myknow@ssafy\.com/);
@@ -442,7 +444,7 @@ test("public repository exposes a responsible disclosure security policy", () =>
 });
 
 test("public readiness TODO keeps the launch blocker remediation tracked", () => {
-  const todo = readRepoFile("docs/product/todo.md");
+  const todo = readRepoFile("docs/history/product/todo-2026-08-13.md");
 
   assert.match(todo, /공개 readiness 보완/);
   assert.match(todo, /Issue #55/);

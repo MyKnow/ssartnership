@@ -20,6 +20,7 @@
     "check:install-scripts": "node scripts/check-install-scripts.mjs",
     "install:trusted": "node scripts/install-dependencies.mjs",
     "check:lockfile": "node scripts/check-lockfile.mjs",
+    "check:docs": "node scripts/check-docs.mjs",
     "build": "next build --webpack",
     "typecheck:ci": "node scripts/typecheck-ci.mjs",
     "storybook": "storybook dev -p 6006",

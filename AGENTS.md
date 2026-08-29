@@ -34,6 +34,9 @@ src/lib/supabase/         Supabase server clients
 supabase/migrations/      Database migrations
 supabase/schema.sql       Current schema snapshot
 tests/                    Node test files for domain logic and helpers
+docs/index.md             Repository Knowledge map and source-of-truth entrypoint
+docs/specs/               Feature spec/plan/tasks lifecycle artifacts
+docs/plans/               Active, completed, and tech-debt execution knowledge
 .agents/skills/           Project-local agent skills
 .codex/agents/            Codex sub-agent role definitions
 ```
@@ -56,7 +59,7 @@ Project-local skills, tracked with this repository:
 - `github-actions-operations`: mandatory before any operation that can trigger or affect GitHub Actions, and after every failed, cancelled, unexpectedly skipped, retrying, flaky, or error-bearing run; update its failure ledger before the next trigger
 - `ssartnership-ui-ux`: project visual system, Korean UI states, routing/error recovery, prototype promotion, and UI QA
 - `member-required-gate-redirects`: member password, consent, profile-photo, and `returnTo` gate priority/loop prevention
-- `docs-governance`: repository documentation placement and taxonomy
+- `docs-governance`: Repository Knowledge placement, metadata, lifecycle, links, and source-of-truth governance
 
 Codex-local skills are cross-project tools and are intentionally not copied into this repository. Use them when installed: frontend, backend, data, security, testing, research, documentation, deployment, Git, `ui-prototyping`, `source-backed-dashboard`, and `analytics-dashboard-template` skills. Keep a project-specific rule in a project-local skill instead of adding it to a Codex-local skill.
 
@@ -71,6 +74,8 @@ node --test tests/<focused-test>.test.mts
 ```
 
 Before pushing, run `npm run verify:change`. It classifies the actual diff and uses the same risk tier as GitHub Actions. Run `npm run verify:release` before promoting `dev` to `main`, or whenever the build, E2E, dependency, migration, authentication/security, or CI policy boundary changes.
+
+All documentation changes must pass `npm run check:docs`. Start document discovery at `docs/index.md`; keep `AGENTS.md` as a map and working-rule file instead of duplicating detailed project knowledge there.
 
 Run `next build` only when the change touches build/runtime behavior broadly or the user asks for production verification.
 

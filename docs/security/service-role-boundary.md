@@ -1,3 +1,10 @@
+---
+title: Service Role 접근 경계
+type: security-policy
+status: current
+authority: normative
+---
+
 # Service Role 접근 경계
 
 ## 목적
