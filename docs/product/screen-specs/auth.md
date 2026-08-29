@@ -1,3 +1,10 @@
+---
+title: 회원 인증 화면 계약
+type: product-contract
+status: current
+authority: normative
+---
+
 # 회원 인증 화면 계약
 
 작성 기준일: 2026-07-17

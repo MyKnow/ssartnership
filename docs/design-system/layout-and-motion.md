@@ -1,3 +1,10 @@
+---
+title: Layout And Motion
+type: design-system
+status: current
+authority: normative
+---
+
 # Layout And Motion
 
 ## Grid

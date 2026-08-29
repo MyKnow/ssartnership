@@ -62,8 +62,10 @@ try {
     `변경 검증 실행: level=${policy.level}, profile=${policy.verifyProfile}\n`,
   );
 
+  runRequired("check:docs");
+
   if (policy.verifyProfile === "none") {
-    process.stdout.write("문서 전용 변경: 런타임 검증을 생략합니다.\n");
+    process.stdout.write("문서 전용 변경: 문서 계약 검증 후 런타임 검증을 생략합니다.\n");
   } else if (policy.verifyProfile === "quick") {
     runRequired("verify:quick");
   } else {
