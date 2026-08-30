@@ -43,16 +43,15 @@ export function useAutoHideHeader({
     }
 
     lastScrollYRef.current = window.scrollY;
-    let ticking = false;
+    let frame = 0;
 
     const onScroll = () => {
       const currentScrollY = window.scrollY;
-      if (ticking) {
+      if (frame) {
         return;
       }
 
-      ticking = true;
-      window.requestAnimationFrame(() => {
+      frame = window.requestAnimationFrame(() => {
         const delta = currentScrollY - lastScrollYRef.current;
 
         if (currentScrollY <= Math.max(topVisibleOffset, headerHeight)) {
@@ -75,12 +74,17 @@ export function useAutoHideHeader({
         }
 
         lastScrollYRef.current = currentScrollY;
-        ticking = false;
+        frame = 0;
       });
     };
 
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame) {
+        window.cancelAnimationFrame(frame);
+      }
+    };
   }, [headerHeight, hideThreshold, showThreshold, topVisibleOffset]);
 
   return {
