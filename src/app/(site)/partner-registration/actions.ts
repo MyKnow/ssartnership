@@ -124,7 +124,7 @@ export async function createPartnerRegistrationRequestAction(
     };
   }
 
-  await recordAttempt(identifier, false, PARTNER_REGISTRATION_RATE_LIMIT);
+  await recordAttempt(identifier, true, PARTNER_REGISTRATION_RATE_LIMIT);
 
   if (insertedRequest.created) {
     const [context, actor] = await Promise.all([
@@ -288,7 +288,7 @@ export async function createPartnerRegistrationExcelRequestAction(
     };
   }
 
-  await recordAttempt(identifier, false, PARTNER_REGISTRATION_RATE_LIMIT);
+  await recordAttempt(identifier, true, PARTNER_REGISTRATION_RATE_LIMIT);
 
   const [context, actor] = await Promise.all([
     getServerActionLogContext("/partner-registration"),

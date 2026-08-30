@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     const payload = validation.values;
     const safeCompanyUrlValue = validation.safeCompanyUrl;
 
-    await recordAttempt(identifier, false, SUGGEST_RATE_LIMIT);
+    await recordAttempt(identifier, true, SUGGEST_RATE_LIMIT);
 
     const recipient = process.env.SUGGEST_NOTIFY_EMAIL ?? BUG_REPORT_EMAIL;
     try {
