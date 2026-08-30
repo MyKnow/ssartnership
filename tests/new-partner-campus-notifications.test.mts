@@ -9,6 +9,31 @@ const modulePromise = import(
 ) as Promise<NewPartnerNotificationsModule>;
 
 describe("new partner campus-scoped notifications", () => {
+  it("expires stale publication processing leases after the retry window", async () => {
+    const { isPartnerPublicationNotificationLeaseExpired } = await modulePromise;
+    const now = new Date("2026-08-30T22:55:00.000Z");
+
+    assert.equal(isPartnerPublicationNotificationLeaseExpired(null, now), true);
+    assert.equal(
+      isPartnerPublicationNotificationLeaseExpired("invalid-date", now),
+      true,
+    );
+    assert.equal(
+      isPartnerPublicationNotificationLeaseExpired(
+        "2026-08-30T22:39:59.000Z",
+        now,
+      ),
+      true,
+    );
+    assert.equal(
+      isPartnerPublicationNotificationLeaseExpired(
+        "2026-08-30T22:40:01.000Z",
+        now,
+      ),
+      false,
+    );
+  });
+
   it("keeps nationwide partner notifications as all-audience sends", async () => {
     const { buildNewPartnerPushAudienceFromCampusMembers } = await modulePromise;
 
@@ -93,5 +118,37 @@ describe("new partner campus-scoped notifications", () => {
     assert.match(reviewSource, /sendAndRecordCampusScopedNewPartnerNotification/);
     assert.match(cronSource, /runPendingPartnerPublicationNotifications/);
     assert.doesNotMatch(cronSource, /message:\s*error\.message/);
+  });
+
+  it("claims and clears a publication processing lease before recording sent state", () => {
+    const source = readFileSync("src/lib/new-partner-notifications.ts", "utf8");
+    const migration = readFileSync(
+      "supabase/migrations/20260830225353_add_partner_publication_notification_processing_lease.sql",
+      "utf8",
+    );
+    const schema = readFileSync("supabase/schema.sql", "utf8");
+
+    assert.match(source, /claimPartnerPublicationNotificationLease/);
+    assert.match(source, /clearPartnerPublicationNotificationLease/);
+    assert.match(
+      source,
+      /const lease = await claimPartnerPublicationNotificationLease\(params\.partnerId\);[\s\S]*if \(lease !== "acquired"\)/,
+    );
+    assert.match(
+      source,
+      /await clearPartnerPublicationNotificationLease\(params\.partnerId\);[\s\S]*throw error;/,
+    );
+    assert.match(
+      source,
+      /new_partner_notification_sent_at:\s*now,[\s\S]*new_partner_notification_processing_at:\s*null/,
+    );
+    assert.match(
+      migration,
+      /add column if not exists new_partner_notification_processing_at timestamp with time zone/i,
+    );
+    assert.match(
+      schema,
+      /new_partner_notification_processing_at timestamp with time zone/i,
+    );
   });
 });

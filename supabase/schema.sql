@@ -118,6 +118,7 @@ create table if not exists partners (
 create table if not exists partner_publication_notification_states (
   partner_id uuid primary key references partners(id) on delete cascade,
   new_partner_notification_sent_at timestamp with time zone,
+  new_partner_notification_processing_at timestamp with time zone,
   updated_at timestamp with time zone not null default now()
 );
 
