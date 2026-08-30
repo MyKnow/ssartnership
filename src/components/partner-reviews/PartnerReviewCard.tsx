@@ -185,7 +185,6 @@ export default function PartnerReviewCard({
                 fill
                 sizes="(max-width: 640px) 30vw, 120px"
                 className="object-cover"
-                unoptimized
               />
             </button>
           ))}

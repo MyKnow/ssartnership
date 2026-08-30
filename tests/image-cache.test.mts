@@ -81,6 +81,64 @@ test("concurrent preloads for the same image share one in-flight request", async
   }
 });
 
+test("responsive preloads let the browser choose the optimized candidate", async () => {
+  const { preloadCachedImageUrl } = await imageCacheModulePromise;
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const responsiveImage = { sizes: "", srcset: "" };
+
+  class ResponsiveImage {
+    decoding = "";
+    onerror: (() => void) | null = null;
+    onload: (() => void) | null = null;
+    get sizes() {
+      return responsiveImage.sizes;
+    }
+
+    set sizes(value: string) {
+      responsiveImage.sizes = value;
+    }
+
+    get srcset() {
+      return responsiveImage.srcset;
+    }
+
+    set srcset(value: string) {
+      responsiveImage.srcset = value;
+    }
+
+    decode() {
+      return Promise.resolve();
+    }
+
+    set src(_value: string) {
+      queueMicrotask(() => this.onload?.());
+    }
+  }
+
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: { Image: ResponsiveImage },
+  });
+
+  try {
+    await preloadCachedImageUrl("/_next/image?url=next-responsive&w=3840&q=75", {
+      srcSet: "/_next/image?url=next-responsive&w=640&q=75 640w",
+      sizes: "100vw",
+    });
+    assert.equal(
+      responsiveImage.srcset,
+      "/_next/image?url=next-responsive&w=640&q=75 640w",
+    );
+    assert.equal(responsiveImage.sizes, "100vw");
+  } finally {
+    if (originalWindow) {
+      Object.defineProperty(globalThis, "window", originalWindow);
+    } else {
+      Reflect.deleteProperty(globalThis, "window");
+    }
+  }
+});
+
 test("the warmed image registry evicts its oldest entry after 256 urls", async () => {
   const { isCachedImageUrlPreloaded, preloadCachedImageUrl } =
     await imageCacheModulePromise;

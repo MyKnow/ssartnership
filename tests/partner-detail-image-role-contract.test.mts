@@ -136,12 +136,17 @@ test("반응형 제휴처 갤러리는 현재 이미지를 한 번만 렌더링�
   );
 });
 
-test("제휴처 갤러리는 현재 이미지의 다음 한 장만 미리 불러온다", () => {
+test("제휴처 갤러리는 다음 한 장을 화면 크기에 맞춰 미리 불러온다", () => {
   const controller = readRepoFile(
     "src/components/partner-image-carousel/useCarouselController.ts",
   );
 
-  assert.match(controller, /warmCachedImageUrl\(cachedImages\[activeIndex \+ 1\]\)/);
+  assert.match(controller, /getImageProps\(\{/);
+  assert.match(controller, /sizes: "\(max-width: 767px\) 100vw, 65vw"/);
+  assert.match(
+    controller,
+    /warmCachedImageUrl\(props\.src,[\s\S]*srcSet: props\.srcSet,[\s\S]*sizes: props\.sizes/,
+  );
   assert.match(controller, /\[activeIndex, cachedImages, hasImages\]/);
   assert.doesNotMatch(controller, /warmCachedImageUrls/);
   assert.doesNotMatch(controller, /cachedImages\.slice\(1\)/);

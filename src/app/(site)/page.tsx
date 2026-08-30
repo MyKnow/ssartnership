@@ -24,6 +24,7 @@ import { getHeaderSession } from "@/lib/header-session";
 import { getMemberCanonicalProfile } from "@/lib/member-profile-view";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { resolvePartnerAudienceFromMemberYear } from "@/lib/partner-audience";
+import { loadHomePartnerDirectoryState } from "@/lib/home-partner-directory";
 
 export const revalidate = 300;
 
@@ -73,6 +74,17 @@ export default async function Home() {
       ? getMemberCanonicalProfile(session.userId)
       : Promise.resolve(null),
   ]);
+  const viewerAudience = resolvePartnerAudienceFromMemberYear(
+    member?.generation ?? null,
+    new Date(),
+    undefined,
+    { graduateVerifiedAt: member?.graduateVerifiedAt ?? null },
+  );
+  const directoryPromise = loadHomePartnerDirectoryState({
+    viewerAuthenticated: Boolean(session?.userId),
+    currentUserId: session?.userId ?? null,
+    viewerAudience,
+  });
   const resolvedPromotionSlides = await getHomePromotionSlides({
     authenticated: Boolean(session?.userId),
     year: member?.generation ?? null,
@@ -127,12 +139,8 @@ export default async function Home() {
             <HomeContent
               viewerAuthenticated={Boolean(session?.userId)}
               currentUserId={session?.userId ?? null}
-              viewerAudience={resolvePartnerAudienceFromMemberYear(
-                member?.generation ?? null,
-                new Date(),
-                undefined,
-                { graduateVerifiedAt: member?.graduateVerifiedAt ?? null },
-              )}
+              viewerAudience={viewerAudience}
+              directoryPromise={directoryPromise}
             />
           </Suspense>
         </Container>

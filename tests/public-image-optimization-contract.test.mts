@@ -7,6 +7,7 @@ const sourcePaths = [
   "../src/components/PartnerImageCarousel.tsx",
   "../src/components/partner-image-carousel/TabletImageCarousel.tsx",
   "../src/components/partner-image-carousel/ThumbStrip.tsx",
+  "../src/components/partner-reviews/PartnerReviewCard.tsx",
 ] as const;
 
 test("공개 제휴 이미지는 화면 크기별 Next 이미지 최적화를 사용한다", async () => {

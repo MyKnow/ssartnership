@@ -44,7 +44,10 @@ export function isProxiedCachedImageUrl(src?: string | null) {
   return Boolean(src?.startsWith(PROXY_PREFIX));
 }
 
-export function preloadCachedImageUrl(src?: string | null) {
+export function preloadCachedImageUrl(
+  src?: string | null,
+  responsive?: { srcSet?: string; sizes?: string },
+) {
   if (typeof window === "undefined") {
     return Promise.resolve();
   }
@@ -83,6 +86,12 @@ export function preloadCachedImageUrl(src?: string | null) {
     image.decoding = "async";
     image.onload = finish;
     image.onerror = fail;
+    if (responsive?.srcSet) {
+      image.srcset = responsive.srcSet;
+    }
+    if (responsive?.sizes) {
+      image.sizes = responsive.sizes;
+    }
     image.src = url;
 
     if (typeof image.decode === "function") {
@@ -102,8 +111,11 @@ export function preloadCachedImageUrls(
   return Promise.allSettled(urls.map((url) => preloadCachedImageUrl(url)));
 }
 
-export function warmCachedImageUrl(src?: string | null) {
-  void preloadCachedImageUrl(src).catch(() => undefined);
+export function warmCachedImageUrl(
+  src?: string | null,
+  responsive?: { srcSet?: string; sizes?: string },
+) {
+  void preloadCachedImageUrl(src, responsive).catch(() => undefined);
 }
 
 export function warmCachedImageUrls(urls: Array<string | null | undefined>) {
