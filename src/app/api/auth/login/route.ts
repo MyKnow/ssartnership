@@ -21,6 +21,10 @@ import {
 } from "@/lib/member-auth-security";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
+  JsonRequestBodyError,
+  readJsonRequestBodyWithinLimit,
+} from "@/lib/request-body-limit";
+import {
   getMockMemberById,
   isMockMemberAuthEnabled,
   MOCK_MEMBER_ID,
@@ -28,6 +32,7 @@ import {
 } from "@/lib/mock/member";
 
 export const runtime = "nodejs";
+const MAX_MEMBER_LOGIN_JSON_BODY_BYTES = 8 * 1024;
 
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
@@ -36,11 +41,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const payload = (await request.json()) as {
+    const payload = await readJsonRequestBodyWithinLimit<{
       identifier?: unknown;
       password?: unknown;
       autoLogin?: unknown;
-    };
+    }>(request, MAX_MEMBER_LOGIN_JSON_BODY_BYTES);
     const rawIdentifier = String(payload.identifier ?? "").trim();
     const password = String(payload.password ?? "").trim();
     const autoLogin = payload.autoLogin === true;
@@ -179,16 +184,21 @@ export async function POST(request: Request) {
       requiresConsent: policyStatus.requiresConsent,
       requiresProfilePhotoUpdate,
     });
-  } catch {
+  } catch (error) {
+    const bodyTooLarge =
+      error instanceof JsonRequestBodyError && error.code === "body_too_large";
     if (!isMockMemberAuthEnabled()) {
       await logAuthSecurity({
         ...context,
         eventName: "member_login",
         status: "failure",
         actorType: "guest",
-        properties: { reason: "exception" },
+        properties: { reason: bodyTooLarge ? "body_too_large" : "exception" },
       });
       await delayMemberAuthAttempt("login", true);
+    }
+    if (bodyTooLarge) {
+      return NextResponse.json({ error: "login_failed" }, { status: 413 });
     }
     return NextResponse.json({ error: "login_failed" }, { status: 503 });
   }

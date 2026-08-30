@@ -7,10 +7,15 @@ import {
   getSafeNotificationRouteError,
 } from "@/lib/notifications/safe-error";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import {
+  JsonRequestBodyError,
+  readJsonRequestBodyWithinLimit,
+} from "@/lib/request-body-limit";
 import { upsertOperationalPushSubscription } from "@/lib/operational-notifications";
 import { withServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
+const MAX_ADMIN_PUSH_SUBSCRIPTION_JSON_BODY_BYTES = 16 * 1024;
 
 function getPushDeviceUserAgent(request: NextRequest) {
   const userAgent = request.headers.get("user-agent")?.trim() ?? "";
@@ -36,9 +41,23 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const body = (await request.json().catch(() => {
+      let body: { subscription?: PushSubscriptionJSON };
+      try {
+        body = await readJsonRequestBodyWithinLimit<{
+          subscription?: PushSubscriptionJSON;
+        }>(request, MAX_ADMIN_PUSH_SUBSCRIPTION_JSON_BODY_BYTES);
+      } catch (error) {
+        if (
+          error instanceof JsonRequestBodyError &&
+          error.code === "body_too_large"
+        ) {
+          return NextResponse.json(
+            { message: "요청 본문이 너무 큽니다." },
+            { status: 413 },
+          );
+        }
         throw new NotificationRequestError("요청 본문 형식을 확인해 주세요.");
-      })) as { subscription?: PushSubscriptionJSON };
+      }
       if (!body.subscription) {
         return NextResponse.json({ message: "Push 구독 정보가 필요합니다." }, { status: 400 });
       }

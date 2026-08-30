@@ -6,9 +6,14 @@ import {
   upsertAdminOperationalNotificationPreferences,
 } from "@/lib/operational-notifications";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import {
+  JsonRequestBodyError,
+  readJsonRequestBodyWithinLimit,
+} from "@/lib/request-body-limit";
 import { withServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
+const MAX_ADMIN_NOTIFICATION_PREFERENCES_JSON_BODY_BYTES = 4 * 1024;
 
 function toOptionalBoolean(value: unknown) {
   return typeof value === "boolean" ? value : undefined;
@@ -60,7 +65,24 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+      let body: Record<string, unknown>;
+      try {
+        body = await readJsonRequestBodyWithinLimit<Record<string, unknown>>(
+          request,
+          MAX_ADMIN_NOTIFICATION_PREFERENCES_JSON_BODY_BYTES,
+        );
+      } catch (error) {
+        if (
+          error instanceof JsonRequestBodyError &&
+          error.code === "body_too_large"
+        ) {
+          return NextResponse.json(
+            { message: "알림 설정 요청이 너무 큽니다." },
+            { status: 413 },
+          );
+        }
+        body = {};
+      }
       const preferences = await timing.measure("query", () =>
         upsertAdminOperationalNotificationPreferences(session.adminId, {
           enabled: toOptionalBoolean(body.enabled),
