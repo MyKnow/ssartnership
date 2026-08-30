@@ -61,6 +61,9 @@ test("관리자 제휴 생성·수정 실패도 회사 정리 실패를 숨기�
     updateSource,
     /cleanupPartnerCompanyProvision\(supabase, companyProvision\)\.catch\(/,
   );
-  assert.match(createSource, /cause: \{ originalError: error, cleanupError \}/);
+  assert.match(
+    createSource,
+    /cause: \{ originalError: error, cleanupError, persistenceCleanupError \}/,
+  );
   assert.match(updateSource, /cause: \{ originalError: error, cleanupError \}/);
 });
