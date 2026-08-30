@@ -25,6 +25,7 @@ import {
   normalizeImageUpload,
   validateNormalizedImageUpload,
 } from "@/lib/image-upload/transform.server";
+import { forEachWithConcurrency } from "@/lib/async-concurrency";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/uuid";
 
@@ -56,6 +57,7 @@ type ImageUploadSessionRow = {
 
 const MAX_SIGNED_UPLOADS_PER_REQUEST = 20;
 const STORAGE_RETRY_DELAYS_MS = [0, 120, 300] as const;
+const EXPIRE_STALE_CONCURRENCY = 4;
 
 function asSessionRow(value: unknown): ImageUploadSessionRow {
   return value as ImageUploadSessionRow;
@@ -787,7 +789,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
     >>;
     if (sessions.length === 0) return 0;
     let expiredCount = 0;
-    for (const session of sessions) {
+    await forEachWithConcurrency(sessions, EXPIRE_STALE_CONCURRENCY, async (session) => {
       const removals = await Promise.all([
         supabase.storage.from(session.storage_bucket).remove(getSessionStoragePaths(session)),
         ...(session.final_bucket && session.final_path
@@ -806,7 +808,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
           })
           .eq("id", session.id)
           .in("status", ["signed", "processing", "ready", "attaching", "failed"]);
-        continue;
+        return;
       }
       const { error: updateError } = await supabase
         .from("image_upload_sessions")
@@ -822,7 +824,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         throw new Error("만료된 이미지 업로드 상태를 저장하지 못했습니다.");
       }
       expiredCount += 1;
-    }
+    });
     return expiredCount;
   }
 }
