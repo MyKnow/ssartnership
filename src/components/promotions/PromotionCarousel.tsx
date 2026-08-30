@@ -9,15 +9,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import CarouselSlideIndicators from "@/components/ui/CarouselSlideIndicators";
+import { getCachedImageUrl } from "@/lib/image-cache";
 import { trackProductEvent } from "@/lib/product-events";
 import type { PromotionSlide } from "@/lib/promotions/catalog";
 
 function isInlineImageSrc(src: string) {
   return src.startsWith("blob:") || src.startsWith("data:");
-}
-
-function isRemoteImageSrc(src: string) {
-  return /^https?:\/\//.test(src);
 }
 
 export default function PromotionCarousel({
@@ -157,7 +154,7 @@ export default function PromotionCarousel({
                   />
                 ) : (
                   <Image
-                    src={slide.imageSrc}
+                    src={getCachedImageUrl(slide.imageSrc)}
                     alt={slide.imageAlt}
                     fill
                     sizes={
@@ -166,7 +163,6 @@ export default function PromotionCarousel({
                         : "(min-width: 1024px) 50vw, calc(100vw - 64px)"
                     }
                     priority={index === 0}
-                    unoptimized={isRemoteImageSrc(slide.imageSrc)}
                     className="object-cover"
                   />
                 )}

@@ -8,7 +8,6 @@ import TabletImageCarousel from "@/components/partner-image-carousel/TabletImage
 import ThumbStrip from "@/components/partner-image-carousel/ThumbStrip";
 import { useCarouselController } from "@/components/partner-image-carousel/useCarouselController";
 import CarouselSlideIndicators from "@/components/ui/CarouselSlideIndicators";
-import { isProxiedCachedImageUrl } from "@/lib/image-cache";
 
 const LightboxModal = dynamic(
   () => import("@/components/partner-image-carousel/LightboxModal"),
@@ -200,7 +199,6 @@ export default function PartnerImageCarousel({
                   fetchPriority={priority ? "high" : undefined}
                   loading="eager"
                   priority={priority}
-                  unoptimized={isProxiedCachedImageUrl(activeImage)}
                 />
               ) : (
                 placeholder

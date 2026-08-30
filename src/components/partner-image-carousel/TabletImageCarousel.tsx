@@ -7,7 +7,6 @@ import {
 import Image from "next/image";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { cn } from "@/lib/cn";
-import { isProxiedCachedImageUrl } from "@/lib/image-cache";
 import CarouselSlideIndicators from "@/components/ui/CarouselSlideIndicators";
 
 type HorizontalSwipeHandler = (clientX: number) => void;
@@ -66,7 +65,6 @@ function PreviewCard({
               : "(min-width: 768px) 46vw, 100vw"
           }
           className="scale-[1.04] object-cover blur-[1.5px] saturate-75"
-          unoptimized={isProxiedCachedImageUrl(image)}
           loading={depth === 1 ? "eager" : "lazy"}
           fetchPriority={depth === 1 ? "auto" : "low"}
         />
@@ -270,7 +268,6 @@ export default function TabletImageCarousel({
                   : "(max-width: 767px) 100vw, 65vw"
               }
               className={imageFit === "contain" ? "object-contain" : "object-cover"}
-              unoptimized={isProxiedCachedImageUrl(activeImage)}
               loading="eager"
               fetchPriority={priority ? "high" : undefined}
               priority={priority}
