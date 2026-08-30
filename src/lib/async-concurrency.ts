@@ -35,3 +35,20 @@ export async function forEachWithConcurrency<T>(
 
   await Promise.all(Array.from({ length: workerCount }, () => worker()));
 }
+
+/**
+ * Maps items with bounded concurrency while retaining the input order in the
+ * returned array. This is useful for memory-heavy work where an unbounded
+ * `Promise.all(items.map(...))` would otherwise process every item at once.
+ */
+export async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  task: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  await forEachWithConcurrency(items, concurrency, async (item, index) => {
+    results[index] = await task(item, index);
+  });
+  return results;
+}

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { mapWithConcurrency } from "@/lib/async-concurrency";
 import { SITE_NAME } from "@/lib/site";
 import { createHmacDigest } from "@/lib/hmac.js";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -49,6 +50,7 @@ export const MANUAL_MEMBER_IMPORT_STAGING_BUCKET = "manual-member-import-staging
 const IMPORT_TTL_MS = 24 * 60 * 60 * 1000;
 const PASSWORD_ACTION_TTL_MS = 24 * 60 * 60 * 1000;
 const PROCESSING_LEASE_MS = 15 * 60 * 1000;
+const MANUAL_IMPORT_IMAGE_PREPARE_CONCURRENCY = 4;
 const MANUAL_MEMBER_IMPORT_REISSUE_KEY_PREFIX = "manual-member-import-reissue:";
 const MANUAL_MEMBER_IMPORT_REISSUE_INTERRUPTED_MESSAGE = "새 초기 설정 링크 발급이 중단되었습니다. 수신 여부를 확인한 뒤 새 링크 발급을 다시 진행해 주세요.";
 
@@ -620,29 +622,53 @@ export async function prepareManualMemberImport(input: {
       input.photos.map((photo) => [photo.filename.toLowerCase(), photo]),
     );
     const imageUploadRepository = getImageUploadRepository();
-    const insertRows = await Promise.all(rowsResult.acceptedRows.map(async (row) => {
-      const photo = row.photoFilename
-        ? photoByFilename.get(row.photoFilename.toLowerCase()) ?? null
-        : null;
-      const rowId = randomUUID();
-      if (photo) {
-        if (!photo.uploadId) {
-          throw new Error("사진 업로드 정보를 확인해 주세요.");
+    const insertRows = await mapWithConcurrency(
+      rowsResult.acceptedRows,
+      MANUAL_IMPORT_IMAGE_PREPARE_CONCURRENCY,
+      async (row) => {
+        const photo = row.photoFilename
+          ? photoByFilename.get(row.photoFilename.toLowerCase()) ?? null
+          : null;
+        const rowId = randomUUID();
+        if (photo) {
+          if (!photo.uploadId) {
+            throw new Error("사진 업로드 정보를 확인해 주세요.");
+          }
+          const attached = await imageUploadRepository.attach({
+            actor: { kind: "admin", id: input.adminId },
+            purpose: "manual-member-import",
+            uploadId: photo.uploadId,
+            role: "profile",
+            policy: resolveImageTransformPolicy("manual-member-import", "profile"),
+            destination: {
+              bucket: MEMBER_PROFILE_IMAGES_BUCKET,
+              path: `manual-import/uploads/${photo.uploadId}.webp`,
+              isPublic: false,
+              cacheControl: "private, no-store",
+            },
+            resource: { type: "manual_member_import_row", id: rowId },
+          });
+          return {
+            id: rowId,
+            batch_id: batch.id,
+            row_number: row.rowNumber,
+            generation: row.generation,
+            display_name: row.name,
+            campus: row.campus,
+            mm_username: row.mmId,
+            email: row.email,
+            email_normalized: row.email,
+            photo_filename: row.photoFilename,
+            staging_bucket: MEMBER_PROFILE_IMAGES_BUCKET,
+            staging_path: attached.path,
+            photo_content_type: "image/webp",
+            photo_size_bytes: null,
+            image_upload_id: photo.uploadId,
+            photo_sha256: attached.sha256,
+            photo_width: attached.width,
+            photo_height: attached.height,
+          };
         }
-        const attached = await imageUploadRepository.attach({
-          actor: { kind: "admin", id: input.adminId },
-          purpose: "manual-member-import",
-          uploadId: photo.uploadId,
-          role: "profile",
-          policy: resolveImageTransformPolicy("manual-member-import", "profile"),
-          destination: {
-            bucket: MEMBER_PROFILE_IMAGES_BUCKET,
-            path: `manual-import/uploads/${photo.uploadId}.webp`,
-            isPublic: false,
-            cacheControl: "private, no-store",
-          },
-          resource: { type: "manual_member_import_row", id: rowId },
-        });
         return {
           id: rowId,
           batch_id: batch.id,
@@ -654,33 +680,13 @@ export async function prepareManualMemberImport(input: {
           email: row.email,
           email_normalized: row.email,
           photo_filename: row.photoFilename,
-          staging_bucket: MEMBER_PROFILE_IMAGES_BUCKET,
-          staging_path: attached.path,
-          photo_content_type: "image/webp",
+          staging_bucket: null,
+          staging_path: null,
+          photo_content_type: null,
           photo_size_bytes: null,
-          image_upload_id: photo.uploadId,
-          photo_sha256: attached.sha256,
-          photo_width: attached.width,
-          photo_height: attached.height,
         };
-      }
-      return {
-        id: rowId,
-        batch_id: batch.id,
-        row_number: row.rowNumber,
-        generation: row.generation,
-        display_name: row.name,
-        campus: row.campus,
-        mm_username: row.mmId,
-        email: row.email,
-        email_normalized: row.email,
-        photo_filename: row.photoFilename,
-        staging_bucket: null,
-        staging_path: null,
-        photo_content_type: null,
-        photo_size_bytes: null,
-      };
-    }));
+      },
+    );
     const { error: rowsError } = await supabase
       .from("manual_member_import_rows")
       .insert(insertRows);

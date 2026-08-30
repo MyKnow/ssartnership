@@ -25,7 +25,10 @@ import {
   normalizeImageUpload,
   validateNormalizedImageUpload,
 } from "@/lib/image-upload/transform.server";
-import { forEachWithConcurrency } from "@/lib/async-concurrency";
+import {
+  forEachWithConcurrency,
+  mapWithConcurrency,
+} from "@/lib/async-concurrency";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/uuid";
 
@@ -58,6 +61,7 @@ type ImageUploadSessionRow = {
 const MAX_SIGNED_UPLOADS_PER_REQUEST = 20;
 const STORAGE_RETRY_DELAYS_MS = [0, 120, 300] as const;
 const EXPIRE_STALE_CONCURRENCY = 4;
+const COMPLETE_UPLOAD_CONCURRENCY = 4;
 
 function asSessionRow(value: unknown): ImageUploadSessionRow {
   return value as ImageUploadSessionRow;
@@ -269,8 +273,10 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
       }),
     );
 
-    const completed = await Promise.all(
-      uploadIds.map(async (id) => {
+    const completed = await mapWithConcurrency(
+      uploadIds,
+      COMPLETE_UPLOAD_CONCURRENCY,
+      async (id) => {
         const session = sessionsById.get(id);
         if (!session) throw new Error("이미지 업로드 세션을 찾을 수 없습니다.");
         if (new Date(session.expires_at).getTime() <= now.getTime()) {
@@ -417,7 +423,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
             ? error
             : new Error("이미지를 처리하지 못했습니다.");
         }
-      }),
+      },
     );
     return completed;
   }
