@@ -9,6 +9,7 @@ import InlineMessage from "@/components/ui/InlineMessage";
 import Modal from "@/components/ui/Modal";
 import { resolveAppleWalletCardStatusAfterRevoke } from "@/lib/wallet/wallet-pass-card-state";
 import { APPLE_WALLET_CONSENT_VERSION } from "@/lib/wallet/wallet-pass-request";
+import { createClientUuid } from "@/lib/client-uuid";
 
 type PendingAction = "issue" | "download" | "revoke" | null;
 
@@ -21,7 +22,7 @@ type AppleWalletPassSectionProps = {
 };
 
 function createIdempotencyKey() {
-  return crypto.randomUUID().replaceAll("-", "");
+  return createClientUuid().replaceAll("-", "");
 }
 
 async function readApiResponse(response: Response) {

@@ -31,6 +31,7 @@ import {
   saveImageUploadDraftFiles,
 } from "@/lib/image-upload/draft.client";
 import { getClientSafeRequestError } from "@/lib/client-safe-request-error";
+import { createClientUuid } from "@/lib/client-uuid";
 
 export default function PartnerReviewForm({
   partnerId,
@@ -56,7 +57,9 @@ export default function PartnerReviewForm({
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [mediaProcessing, setMediaProcessing] = useState(false);
-  const [submissionId, setSubmissionId] = useState(() => review?.id ?? crypto.randomUUID());
+  const [submissionId, setSubmissionId] = useState(
+    () => review?.id ?? createClientUuid(),
+  );
   const [draftHydrated, setDraftHydrated] = useState(false);
   const draftRestoringRef = useRef(false);
   const titleRef = useRef<HTMLInputElement>(null);

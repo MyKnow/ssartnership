@@ -10,6 +10,7 @@ import {
   getClientSafeRequestError,
 } from "@/lib/client-safe-request-error";
 import { getProductSessionId } from "@/lib/product-events";
+import { createClientUuid } from "@/lib/client-uuid";
 import type { CohortCardTheme } from "@/lib/cohort-card-themes";
 
 type VerificationMember = {
@@ -25,13 +26,6 @@ type BenefitUseResponse = {
   ok?: boolean;
   message?: string;
 };
-
-function createIdempotencyKey() {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
 
 export default function PartnerBenefitVerificationView({
   partnerId,
@@ -73,7 +67,7 @@ export default function PartnerBenefitVerificationView({
     }
 
     if (!idempotencyKeyRef.current) {
-      idempotencyKeyRef.current = createIdempotencyKey();
+      idempotencyKeyRef.current = createClientUuid();
     }
 
     setIsSubmitting(true);

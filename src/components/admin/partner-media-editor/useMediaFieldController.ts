@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getCachedImageUrl } from "@/lib/image-cache";
+import { createClientUuid } from "@/lib/client-uuid";
 import {
   getImageUploadSourceError,
   prepareImageUploadSource,
@@ -119,7 +120,7 @@ export default function useMediaFieldController({
 
   const queueFile = async (file: File, index: number, insertAt?: number) => {
     const sourceFile = await prepareImageUploadSource(file, policy);
-    const pendingId = crypto.randomUUID();
+    const pendingId = createClientUuid();
     const objectUrl = URL.createObjectURL(sourceFile);
     const sourceUrl = objectUrl;
     createdBlobUrlsRef.current.add(objectUrl);
@@ -198,7 +199,7 @@ export default function useMediaFieldController({
 
     setError(null);
     enqueueCrop({
-      id: crypto.randomUUID(),
+      id: createClientUuid(),
       sourceUrl: getCachedImageUrl(safe),
       aspectRatio,
       outputName: inferOutputName(role, typeof insertAt === "number" ? insertAt : items.length),
@@ -226,7 +227,7 @@ export default function useMediaFieldController({
       const safeIndex =
         typeof insertAt === "number" ? insertAt + index : items.length + index;
       enqueueCrop({
-        id: crypto.randomUUID(),
+        id: createClientUuid(),
         sourceUrl: getCachedImageUrl(safeUrl),
         aspectRatio,
         outputName: inferOutputName(role, safeIndex),
