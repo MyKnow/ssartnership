@@ -265,6 +265,7 @@ security definer
 set search_path = pg_catalog, public
 as $$
 declare
+  request_row public.partner_plan_upgrade_requests%rowtype;
   invoice_row public.partner_billing_invoices%rowtype;
   payment_row public.partner_billing_payments%rowtype;
   tax_document_row public.partner_tax_documents%rowtype;
@@ -280,13 +281,21 @@ begin
       message = 'partner_plan_payment_invalid_request';
   end if;
 
-  select invoice.* into invoice_row
-  from public.partner_billing_invoices as invoice
-  join public.partner_plan_upgrade_requests as request
-    on request.id = p_request_id
-   and request.billing_invoice_id = invoice.id
-   and invoice.upgrade_request_id = request.id
-  for update of invoice;
+  select * into request_row
+  from public.partner_plan_upgrade_requests
+  where id = p_request_id
+  for update;
+  if not found or request_row.status <> 'pending' then
+    raise exception using
+      errcode = 'P0001',
+      message = 'partner_plan_payment_request_state_conflict';
+  end if;
+
+  select * into invoice_row
+  from public.partner_billing_invoices
+  where id = request_row.billing_invoice_id
+    and upgrade_request_id = request_row.id
+  for update;
   if not found then
     raise exception using
       errcode = 'P0001',
@@ -447,6 +456,7 @@ begin
     select * into tax_document_row
     from public.partner_tax_documents
     where invoice_id = invoice_row.id
+      and status in ('requested', 'pending_issue')
     for update;
     if not found then
       continue;

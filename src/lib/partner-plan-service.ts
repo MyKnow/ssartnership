@@ -243,6 +243,9 @@ function getCreateUpgradeBillingErrorMessage(error: SupabaseMutationError) {
 
 function getConfirmBankTransferErrorMessage(error: SupabaseMutationError) {
   const message = error.message ?? "";
+  if (message.includes("partner_plan_payment_request_state_conflict")) {
+    return "처리 대기 중인 업그레이드 요청만 입금 확인할 수 있습니다.";
+  }
   if (message.includes("partner_plan_payment_invoice_not_found")) {
     return "청구서를 찾을 수 없습니다.";
   }

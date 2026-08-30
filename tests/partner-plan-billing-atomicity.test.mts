@@ -92,7 +92,15 @@ describe("atomic partner plan billing transitions", () => {
       "confirm_partner_plan_bank_transfer_payment",
     );
 
-    assert.match(sql, /for update of invoice;/i);
+    assert.match(
+      sql,
+      /from public\.partner_plan_upgrade_requests[\s\S]*for update;/i,
+    );
+    assert.match(sql, /request_row\.status <> 'pending'/i);
+    assert.match(
+      sql,
+      /from public\.partner_billing_invoices[\s\S]*for update;/i,
+    );
     assert.match(sql, /set status = 'paid'/i);
     assert.match(sql, /set status = 'confirmed'/i);
     assert.match(sql, /target_tax_document_status := case/i);
@@ -139,6 +147,10 @@ describe("atomic partner plan billing transitions", () => {
     assert.match(sql, /update public\.partner_billing_invoices/i);
     assert.match(sql, /update public\.partner_billing_payments/i);
     assert.match(sql, /update public\.partner_tax_documents/i);
+    assert.match(
+      sql,
+      /from public\.partner_tax_documents[\s\S]*status in \('requested', 'pending_issue'\)[\s\S]*for update;/i,
+    );
     assert.match(sql, /update public\.partner_plan_upgrade_requests/i);
     assert.match(sql, /insert into public\.partner_brand_plan_events/i);
   });
