@@ -2,7 +2,10 @@ import { revalidatePath } from "next/cache";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { hashPassword, isValidPassword } from "@/lib/password";
 import { PASSWORD_POLICY_MESSAGE } from "@/lib/validation";
-import { parseResetPasswordCompleteBody } from "./parsers";
+import {
+  MemberAuthRouteBodyError,
+  parseResetPasswordCompleteBody,
+} from "./parsers";
 import {
   createMemberAuthThrottleContext,
   getMemberAuthBlockedScope,
@@ -255,6 +258,15 @@ export async function handleResetPasswordCompletePost(request: Request) {
     );
     return response;
   } catch (error) {
+    if (error instanceof MemberAuthRouteBodyError) {
+      return failResetPasswordComplete({
+        context,
+        throttleContext,
+        error: "invalid_request",
+        status: 400,
+        reason: "invalid_body",
+      });
+    }
     return failResetPasswordCompleteException({ context, error });
   }
 }

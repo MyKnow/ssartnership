@@ -15,9 +15,14 @@ import { resolveNotificationTemplate } from "@/lib/notification-templates/reposi
 import { renderNotificationTemplate } from "@/lib/notification-templates/template";
 import { isBlocked, recordAttempt, SUGGEST_RATE_LIMIT } from "@/lib/rate-limit";
 import { validateSuggestPayload } from "@/lib/suggest-validation";
+import {
+  JsonRequestBodyError,
+  readJsonRequestBodyWithinLimit,
+} from "@/lib/request-body-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+const MAX_SUGGEST_JSON_BODY_BYTES = 16 * 1024;
 
 function errorResponse(message: string, status: number, code: string) {
   return NextResponse.json({ ok: false, code, message }, { status });
@@ -42,9 +47,22 @@ export async function POST(request: Request) {
       );
     }
 
-    const rawPayload = (await request.json()) as Parameters<
-      typeof validateSuggestPayload
-    >[0];
+    let rawPayload: Parameters<typeof validateSuggestPayload>[0];
+    try {
+      rawPayload = await readJsonRequestBodyWithinLimit<
+        Parameters<typeof validateSuggestPayload>[0]
+      >(request, MAX_SUGGEST_JSON_BODY_BYTES);
+    } catch (error) {
+      if (!(error instanceof JsonRequestBodyError)) {
+        throw error;
+      }
+      await recordAttempt(identifier, false, SUGGEST_RATE_LIMIT);
+      return errorResponse(
+        error.message,
+        error.code === "body_too_large" ? 413 : 400,
+        "suggest_invalid_body",
+      );
+    }
     const validation = validateSuggestPayload(rawPayload);
     if (!validation.ok) {
       return errorResponse(validation.message, 400, validation.code);

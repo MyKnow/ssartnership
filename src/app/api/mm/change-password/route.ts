@@ -11,6 +11,10 @@ import {
   recordMemberAuthAttempt,
 } from "@/lib/member-auth-security";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import {
+  MemberAuthRouteBodyError,
+  parseMemberAuthJsonBody,
+} from "@/app/api/mm/_shared/parsers";
 
 export const runtime = "nodejs";
 
@@ -67,10 +71,10 @@ export async function POST(request: Request) {
       await delayMemberAuthAttempt("change-password", true);
       return NextResponse.json({ error: "blocked" }, { status: 429 });
     }
-    const payload = (await request.json()) as {
+    const payload = await parseMemberAuthJsonBody<{
       currentPassword?: string;
       nextPassword?: string;
-    };
+    }>(request);
     const currentPassword = String(payload.currentPassword ?? "").trim();
     const nextPassword = String(payload.nextPassword ?? "").trim();
     if (!currentPassword || !nextPassword) {
@@ -202,6 +206,18 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof MemberAuthRouteBodyError) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_password_change",
+        status: "failure",
+        actorType: "guest",
+        properties: { reason: "invalid_body" },
+      });
+      await delayMemberAuthAttempt("change-password");
+      return NextResponse.json({ error: "change_failed" }, { status: 400 });
+    }
+
     await logAuthSecurity({
       ...context,
       eventName: "member_password_change",

@@ -14,6 +14,7 @@ import {
   getPartnerPortalPasswordChangeErrorStatus,
   PartnerPortalPasswordChangeError,
 } from "@/lib/partner-password-errors";
+import { PartnerPortalRouteBodyError, readPartnerPortalJsonBody } from "@/lib/partner-auth/route-body";
 import { getPartnerSession, setPartnerSession } from "@/lib/partner-session";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
@@ -79,10 +80,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "blocked" }, { status: 429 });
     }
 
-    const payload = (await request.json()) as {
+    const payload = await readPartnerPortalJsonBody<{
       currentPassword?: string;
       nextPassword?: string;
-    };
+    }>(request);
     const currentPassword = String(payload.currentPassword ?? "").trim();
     const nextPassword = String(payload.nextPassword ?? "").trim();
     if (!currentPassword || !nextPassword) {
@@ -132,6 +133,36 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof PartnerPortalRouteBodyError) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "partner_password_change",
+        status: "failure",
+        actorType: sessionAccountId ? "partner" : "guest",
+        actorId: sessionAccountId || null,
+        identifier: sessionLoginId || null,
+        properties: {
+          reason: "invalid_body",
+        },
+      });
+      await recordPartnerAuthAttempt(
+        "change-password",
+        {
+          ipAddress: context.ipAddress ?? null,
+          accountIdentifier: sessionLoginId || null,
+        },
+        false,
+      ).catch(() => undefined);
+      await delayPartnerAuthAttempt("change-password");
+      return NextResponse.json(
+        {
+          error: "invalid_body",
+          message: error.message,
+        },
+        { status: 400 },
+      );
+    }
+
     if (error instanceof PartnerPortalPasswordChangeError) {
       await logAuthSecurity({
         ...context,

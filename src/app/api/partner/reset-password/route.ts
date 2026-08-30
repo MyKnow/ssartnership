@@ -14,6 +14,7 @@ import {
 import {
   requestPartnerPortalPasswordReset,
 } from "@/lib/partner-auth";
+import { PartnerPortalRouteBodyError, readPartnerPortalJsonBody } from "@/lib/partner-auth/route-body";
 import { normalizePartnerLoginId } from "@/lib/partner-utils";
 import { isValidEmail } from "@/lib/validation";
 import { isPartnerPortalMock } from "@/lib/partner-portal";
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const payload = (await request.json()) as { email?: string };
+    const payload = await readPartnerPortalJsonBody<{ email?: string }>(request);
     const rawEmail = String(payload.email ?? "").trim();
     normalizedEmail = normalizePartnerLoginId(rawEmail);
     const throttleContext = {
@@ -118,6 +119,29 @@ export async function POST(request: Request) {
         : {}),
     });
   } catch (error) {
+    if (error instanceof PartnerPortalRouteBodyError) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "partner_password_reset",
+        status: "failure",
+        actorType: "guest",
+        properties: { reason: "invalid_body" },
+      });
+      await recordPartnerAuthAttempt(
+        "reset-password",
+        {
+          ipAddress: context.ipAddress ?? null,
+          accountIdentifier: normalizedEmail || null,
+        },
+        false,
+      ).catch(() => undefined);
+      await delayPartnerAuthAttempt("reset-password");
+      return NextResponse.json(
+        { error: "invalid_body", message: error.message },
+        { status: 400 },
+      );
+    }
+
     if (error instanceof PartnerPortalPasswordResetError) {
       const isAccountStateError =
         error.code === "not_found" ||
