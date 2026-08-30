@@ -1,9 +1,9 @@
 "use client";
 
 import {
-  getGraduateProfileHeifSpatialExtentError,
-  getGraduateProfilePhotoPixelError,
-} from "@/lib/graduate-profile-photo.client";
+  getHeifSpatialExtentError,
+  getImagePixelError,
+} from "@/lib/image-upload/heif";
 import {
   validateImageUploadSource,
   type ImageTransformPolicy,
@@ -48,7 +48,7 @@ function createWebpFile(blob: Blob, source: File) {
 
 export function shouldUseServerImageTransformFallback(error: unknown) {
   const message = error instanceof Error ? error.message : "";
-  return !/^(사진 해상도는|이미지 해상도가|이미지 데이터를|HEIC\/HEIF 사진의 해상도)/u.test(message);
+  return !/^(사진 해상도는|이미지 해상도가|이미지 데이터를|HEIC\/HEIF (?:사진|이미지)의 해상도)/u.test(message);
 }
 
 export function getImageUploadSourceError(
@@ -60,16 +60,20 @@ export function getImageUploadSourceError(
 
 async function decodeHeifToWebp(file: File, policy: ImageTransformPolicy) {
   const source = await file.arrayBuffer();
-  const spatialExtentError = getGraduateProfileHeifSpatialExtentError(source);
+  const spatialExtentError = getHeifSpatialExtentError(source, policy.maxInputPixels);
   if (spatialExtentError) {
     throw new Error(spatialExtentError);
   }
 
   const { decode } = await import("@discourse/heic");
   const imageData = await decode(source);
-  const pixelError = getGraduateProfilePhotoPixelError(imageData.width, imageData.height);
-  if (pixelError || imageData.width * imageData.height > policy.maxInputPixels) {
-    throw new Error(pixelError ?? "이미지 해상도가 너무 큽니다.");
+  const pixelError = getImagePixelError(
+    imageData.width,
+    imageData.height,
+    policy.maxInputPixels,
+  );
+  if (pixelError) {
+    throw new Error(pixelError);
   }
   if (imageData.data.byteLength !== imageData.width * imageData.height * 4) {
     throw new Error("이미지 데이터를 안전하게 읽지 못했습니다.");
