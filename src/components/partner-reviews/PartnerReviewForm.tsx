@@ -30,6 +30,7 @@ import {
   saveImageUploadDraft,
   saveImageUploadDraftFiles,
 } from "@/lib/image-upload/draft.client";
+import { getClientSafeRequestError } from "@/lib/client-safe-request-error";
 
 export default function PartnerReviewForm({
   partnerId,
@@ -238,13 +239,16 @@ export default function PartnerReviewForm({
       });
       await clearImageUploadDraft(draftKey);
     } catch (error) {
-      const message =
-        error instanceof Error && error.message
-          ? error.message
-          : isEditMode
+      setFormError(
+        getClientSafeRequestError(error, {
+          requestFailed: isEditMode
+            ? "리뷰 수정에 실패했습니다. 잠시 후 다시 시도해 주세요."
+            : "리뷰 등록에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+          networkUnavailable: isEditMode
             ? "리뷰 수정에 실패했습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요."
-            : "리뷰 등록에 실패했습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.";
-      setFormError(message);
+            : "리뷰 등록에 실패했습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.",
+        }).message,
+      );
     } finally {
       setPending(false);
     }

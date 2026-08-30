@@ -7,6 +7,10 @@ import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import Select from "@/components/ui/Select";
 import Skeleton from "@/components/ui/Skeleton";
+import {
+  ClientSafeRequestError,
+  getClientSafeRequestError,
+} from "@/lib/client-safe-request-error";
 import type {
   PartnerReview,
   PartnerReviewReaction,
@@ -49,7 +53,8 @@ async function fetchPartnerReviewList(
   const response = await fetch(url, { cache: "no-store", signal: options?.signal });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(
+    throw new ClientSafeRequestError(
+      "request_failed",
       typeof data.message === "string" ? data.message : fallbackMessage,
     );
   }
@@ -288,9 +293,11 @@ export default function PartnerReviewSection({
         return;
       }
       setErrorMessage(
-        error instanceof Error && error.message
-          ? error.message
-          : "리뷰를 불러오지 못했습니다.",
+        getClientSafeRequestError(error, {
+          requestFailed: "리뷰를 불러오지 못했습니다.",
+          networkUnavailable:
+            "리뷰를 불러오지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
+        }).message,
       );
     } finally {
       if (requestId === activeListRequestIdRef.current) {
@@ -331,9 +338,11 @@ export default function PartnerReviewSection({
         return;
       }
       setErrorMessage(
-        error instanceof Error && error.message
-          ? error.message
-          : "리뷰를 더 불러오지 못했습니다.",
+        getClientSafeRequestError(error, {
+          requestFailed: "리뷰를 더 불러오지 못했습니다.",
+          networkUnavailable:
+            "리뷰를 더 불러오지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
+        }).message,
       );
     } finally {
       if (requestId === activeListRequestIdRef.current) {
@@ -361,9 +370,13 @@ export default function PartnerReviewSection({
         return;
       }
       await refreshList(sort, rating, onlyWithImages, "delete");
-    } catch {
+    } catch (error) {
       setErrorMessage(
-        "리뷰 삭제 중 네트워크 오류가 발생했습니다. 다시 시도해 주세요.",
+        getClientSafeRequestError(error, {
+          requestFailed: "리뷰 삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+          networkUnavailable:
+            "리뷰 삭제 중 네트워크 오류가 발생했습니다. 다시 시도해 주세요.",
+        }).message,
       );
     } finally {
       setDeletingReviewId(null);
@@ -393,9 +406,13 @@ export default function PartnerReviewSection({
         return;
       }
       await refreshList(sort, rating, onlyWithImages, "moderate");
-    } catch {
+    } catch (error) {
       setErrorMessage(
-        "리뷰 상태 변경 중 네트워크 오류가 발생했습니다. 다시 시도해 주세요.",
+        getClientSafeRequestError(error, {
+          requestFailed: "리뷰 상태 변경에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+          networkUnavailable:
+            "리뷰 상태 변경 중 네트워크 오류가 발생했습니다. 다시 시도해 주세요.",
+        }).message,
       );
     } finally {
       setModeratingReviewId(null);
@@ -454,10 +471,14 @@ export default function PartnerReviewSection({
           current.map((item) => (item.id === reviewId ? data.review : item)),
         );
       });
-    } catch {
+    } catch (error) {
       restorePreviousReview();
       setErrorMessage(
-        "리뷰 반응 처리 중 네트워크 오류가 발생했습니다. 다시 시도해 주세요.",
+        getClientSafeRequestError(error, {
+          requestFailed: "리뷰 반응에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+          networkUnavailable:
+            "리뷰 반응 처리 중 네트워크 오류가 발생했습니다. 다시 시도해 주세요.",
+        }).message,
       );
     } finally {
       setReactingReviewId(null);
