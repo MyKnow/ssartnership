@@ -66,6 +66,33 @@ function applyReviewSort<T extends { order(column: string, options: { ascending:
   return query.order("created_at", { ascending: false });
 }
 
+async function getFilteredReviewSummary(
+  partnerId: string,
+  rating: string,
+  imagesOnly: boolean,
+) {
+  const supabase = getSupabaseAdminClient();
+  let query = supabase
+    .from("partner_reviews")
+    .select("rating")
+    .eq("partner_id", partnerId)
+    .is("deleted_at", null)
+    .is("hidden_at", null);
+  if (rating !== "all") {
+    query = query.eq("rating", Number(rating));
+  }
+  if (imagesOnly) {
+    query = query.not("images", "eq", "{}");
+  }
+  const { data, error } = await query;
+  if (error) {
+    throw new Error(error.message);
+  }
+  return buildPartnerReviewSummary(
+    ((data ?? []) as { rating: number }[]).map((item) => item.rating),
+  );
+}
+
 async function listReviewRows(
   partnerId: string,
   sort: string,
@@ -76,20 +103,22 @@ async function listReviewRows(
   includeHidden: boolean,
 ) {
   const supabase = getSupabaseAdminClient();
-  const baseQuery = applyReviewSort(
-    supabase.from("partner_reviews").select(REVIEW_SELECT).eq("partner_id", partnerId),
-    sort,
-  );
-  const ratingFilteredQuery =
-    rating === "all" ? baseQuery : baseQuery.eq("rating", Number(rating));
-  const activeQuery = ratingFilteredQuery.is("deleted_at", null);
-  const visibilityFilteredQuery = includeHidden
-    ? activeQuery
-    : activeQuery.is("hidden_at", null);
-  const filteredQuery = imagesOnly
-    ? visibilityFilteredQuery.not("images", "eq", "{}")
-    : visibilityFilteredQuery;
-  const { data, error } = await filteredQuery.range(offset, offset + limit);
+  let filteredQuery = supabase
+    .from("partner_reviews")
+    .select(REVIEW_SELECT)
+    .eq("partner_id", partnerId)
+    .is("deleted_at", null);
+  if (!includeHidden) {
+    filteredQuery = filteredQuery.is("hidden_at", null);
+  }
+  if (rating !== "all") {
+    filteredQuery = filteredQuery.eq("rating", Number(rating));
+  }
+  if (imagesOnly) {
+    filteredQuery = filteredQuery.not("images", "eq", "{}");
+  }
+  const sortedQuery = applyReviewSort(filteredQuery, sort);
+  const { data, error } = await sortedQuery.range(offset, offset + limit);
   if (error) {
     throw new Error(error.message);
   }
@@ -166,7 +195,7 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
       throw new Error(error.message);
     }
 
-    return buildPartnerReviewSummary((data ?? []).map((item) => item.rating as number));
+    return buildPartnerReviewSummary((data ?? []).map((item) => item.rating));
   }
 
   async listPartnerReviews(context: PartnerReviewListContext) {
@@ -188,12 +217,12 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
       rows.map((row) => row.id),
       context.currentUserId,
     );
-    const items = rows.map((row) => mapReview(row, context.currentUserId, reactionStates.get(row.id)));
-    const summary = buildPartnerReviewSummary(
-      rows
-        .filter((row) => row.deleted_at === null && row.hidden_at === null)
-        .map((row) => row.rating),
+    const summary = await getFilteredReviewSummary(
+      context.partnerId,
+      rating,
+      Boolean(context.imagesOnly),
     );
+    const items = rows.map((row) => mapReview(row, context.currentUserId, reactionStates.get(row.id)));
     return {
       summary,
       items,

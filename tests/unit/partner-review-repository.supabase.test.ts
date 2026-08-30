@@ -96,12 +96,95 @@ describe("SupabasePartnerReviewRepository", () => {
       imagesOnly: true,
     });
 
-    expect(not).toHaveBeenCalledTimes(1);
+    expect(not).toHaveBeenCalledTimes(2);
     expect(not).toHaveBeenCalledWith("images", "eq", "{}");
     expect(range).toHaveBeenCalledTimes(1);
     expect(range).toHaveBeenCalledWith(2, 4);
     expect(result.items.map((review) => review.id)).toEqual(["review-1", "review-2"]);
     expect(result.nextOffset).toBe(4);
     expect(result.hasMore).toBe(true);
+  });
+
+  test("리뷰 요약은 현재 페이지가 아니라 전체 필터 결과를 기준으로 계산한다", async () => {
+    const pagedRows = [createReviewRow(1), createReviewRow(2), createReviewRow(3)];
+    pagedRows[0].rating = 5;
+    pagedRows[1].rating = 4;
+    pagedRows[2].rating = 3;
+    const summaryRows = [
+      { rating: 5 },
+      { rating: 4 },
+      { rating: 3 },
+      { rating: 1 },
+    ];
+
+    const listRange = vi.fn(async () => ({ data: pagedRows, error: null }));
+    const listBuilder = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      is: vi.fn(),
+      not: vi.fn(),
+      order: vi.fn(),
+      range: listRange,
+    };
+    listBuilder.select.mockReturnValue(listBuilder);
+    listBuilder.eq.mockReturnValue(listBuilder);
+    listBuilder.is.mockReturnValue(listBuilder);
+    listBuilder.not.mockReturnValue(listBuilder);
+    listBuilder.order.mockReturnValue(listBuilder);
+
+    const summaryBuilder = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      is: vi.fn(),
+      not: vi.fn(),
+      then: undefined as
+        | Promise<{ data: { rating: number }[]; error: null }>["then"]
+        | undefined,
+    };
+    summaryBuilder.select.mockReturnValue(summaryBuilder);
+    summaryBuilder.eq.mockReturnValue(summaryBuilder);
+    summaryBuilder.is.mockReturnValue(summaryBuilder);
+    summaryBuilder.not.mockReturnValue(summaryBuilder);
+    const summaryPromise = Promise.resolve({
+      data: summaryRows,
+      error: null,
+    });
+    summaryBuilder.then = summaryPromise.then.bind(summaryPromise);
+
+    const reactionBuilder = {
+      select: vi.fn(),
+      in: vi.fn(async () => ({ data: [], error: null })),
+    };
+    reactionBuilder.select.mockReturnValue(reactionBuilder);
+
+    let reviewQueryCount = 0;
+    const from = vi.fn((table: string) => {
+      if (table === "partner_reviews") {
+        reviewQueryCount += 1;
+        return reviewQueryCount === 1 ? listBuilder : summaryBuilder;
+      }
+      if (table === "partner_review_reactions") {
+        return reactionBuilder;
+      }
+      throw new Error(`Unexpected table: ${table}`);
+    });
+    getSupabaseAdminClient.mockReturnValue({ from });
+
+    const { SupabasePartnerReviewRepository } = await import(
+      "../../src/lib/repositories/supabase/partner-review-repository.supabase"
+    );
+    const repository = new SupabasePartnerReviewRepository();
+    const result = await repository.listPartnerReviews({
+      partnerId: "partner-1",
+      offset: 0,
+      limit: 2,
+      rating: "all",
+    });
+
+    expect(result.items).toHaveLength(2);
+    expect(result.summary.totalCount).toBe(4);
+    expect(result.summary.averageRating).toBe(3.3);
+    expect(result.summary.distribution[5]).toBe(1);
+    expect(result.summary.distribution[1]).toBe(1);
   });
 });
