@@ -42,6 +42,7 @@ import type { CreatedPartnerRecord } from "@/app/admin/(protected)/_actions/shar
 import { readFormIdempotencyKey } from "@/lib/form-idempotency";
 import { getPartnerVisibilityState } from "@/lib/partner-visibility";
 import { hashCouponVerificationPassword } from "@/lib/coupon-verification-password";
+import { rollbackCreatedPartnerPersistence } from "@/lib/partner-create-rollback";
 
 type AdminPartnerBranchPayload = {
   branchScopeType: PartnerBranchScopeType;
@@ -302,14 +303,31 @@ async function createPartnerRecord(
       })),
     });
   } catch (error) {
-    if (createdPartner) {
-      await supabase.from("partners").delete().eq("id", partnerId);
-    }
-    if (createdBrandProfileId) {
-      await supabase
-        .from("partner_brand_profiles")
-        .delete()
-        .eq("id", createdBrandProfileId);
+    let persistenceCleanupError: unknown = null;
+    try {
+      await rollbackCreatedPartnerPersistence({
+        originalError: error,
+        operations: [
+          ...(createdPartner
+            ? [{
+                stage: "partner",
+                run: () => supabase.from("partners").delete().eq("id", partnerId),
+              }]
+            : []),
+          ...(createdBrandProfileId
+            ? [{
+                stage: "partner_brand_profile",
+                run: () =>
+                  supabase
+                    .from("partner_brand_profiles")
+                    .delete()
+                    .eq("id", createdBrandProfileId),
+              }]
+            : []),
+        ],
+      });
+    } catch (cleanupError) {
+      persistenceCleanupError = cleanupError;
     }
     await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
     try {
@@ -318,6 +336,9 @@ async function createPartnerRecord(
       throw new Error("partner_company_cleanup_failed", {
         cause: { originalError: error, cleanupError },
       });
+    }
+    if (persistenceCleanupError) {
+      throw persistenceCleanupError;
     }
     throw error;
   }

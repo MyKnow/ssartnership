@@ -31,7 +31,8 @@ import {
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { setUserSession, UserSessionIssueError } from "@/lib/user-auth";
 import { attachMattermostSignupProfileImage } from "@/lib/member-signup-profile";
-import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
+import { rollbackCreatedSignupMember } from "@/lib/member-signup-rollback";
 
 export const runtime = "nodejs";
 
@@ -279,7 +280,12 @@ export async function POST(request: Request) {
         uploadId: parsed.data.profileImageUploadId,
         ownerId: verification.signupUploadOwnerId,
       });
-      await supabase.from("members").delete().eq("id", inserted.id);
+      await rollbackCreatedSignupMember({
+        memberId: inserted.id,
+        originalError: error,
+        deleteMember: (memberId) =>
+          supabase.from("members").delete().eq("id", memberId),
+      });
       throw error;
     }
 

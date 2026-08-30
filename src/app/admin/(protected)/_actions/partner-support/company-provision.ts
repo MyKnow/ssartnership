@@ -81,6 +81,7 @@ export async function ensurePartnerCompanyRow(
       createdCompany: false,
       createdAccount: false,
       createdLink: false,
+      updatedAccountPreviousValues: null,
     };
   }
 
@@ -90,6 +91,7 @@ export async function ensurePartnerCompanyRow(
   let createdCompany = false;
   let createdAccount = false;
   let createdLink = false;
+  let updatedAccountPreviousValues: PartnerCompanyProvision["updatedAccountPreviousValues"] = null;
 
   try {
     if (hasCompanySelection) {
@@ -116,6 +118,7 @@ export async function ensurePartnerCompanyRow(
         createdCompany: false,
         createdAccount: false,
         createdLink: false,
+        updatedAccountPreviousValues: null,
       };
     }
 
@@ -179,6 +182,11 @@ export async function ensurePartnerCompanyRow(
     }
 
     if (existingAccount) {
+      updatedAccountPreviousValues = {
+        display_name: existingAccount.display_name,
+        email: existingAccount.email ?? null,
+        is_active: existingAccount.is_active ?? null,
+      };
       const { data: updatedAccount, error: updateError } = await supabase
         .from("partner_accounts")
         .update({
@@ -194,6 +202,19 @@ export async function ensurePartnerCompanyRow(
         throw new Error(updateError.message);
       }
       account = normalizePartnerAccountRow(updatedAccount as PartnerAccountRow);
+      cleanupTasks.push(async () => {
+        const cleaned = await runPartnerCompanyCleanup(
+          "partner_account_restore",
+          () =>
+            supabase
+              .from("partner_accounts")
+              .update(updatedAccountPreviousValues!)
+              .eq("id", existingAccount.id),
+        );
+        if (!cleaned) {
+          throw new Error("partner_company_cleanup_failed");
+        }
+      });
     } else {
       const passwordRecord = hashPassword(generateTempPassword(12));
       const { data: createdAccountRow, error: createAccountError } = await supabase
@@ -273,6 +294,7 @@ export async function ensurePartnerCompanyRow(
       createdCompany,
       createdAccount,
       createdLink,
+      updatedAccountPreviousValues,
     };
   } catch (error) {
     await runProvisionCleanupTasks(cleanupTasks, error);
@@ -312,6 +334,17 @@ export async function cleanupPartnerCompanyProvision(
           supabase
             .from("partner_accounts")
             .delete()
+            .eq("id", provision.account!.id),
+      ),
+    );
+  } else if (provision.updatedAccountPreviousValues && provision.account) {
+    cleanupResults.push(
+      await runPartnerCompanyCleanup(
+        "partner_account_restore",
+        () =>
+          supabase
+            .from("partner_accounts")
+            .update(provision.updatedAccountPreviousValues!)
             .eq("id", provision.account!.id),
       ),
     );
