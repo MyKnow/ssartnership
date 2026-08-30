@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { forEachWithConcurrency } from "@/lib/async-concurrency";
+import { ensureCronApiAccess, getCronErrorResponse } from "@/lib/cron-route";
 import { removeGraduateStoredObject } from "@/lib/graduate-verification-storage";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -8,11 +9,6 @@ export const runtime = "nodejs";
 const CLEANUP_BATCH_SIZE = 100;
 const CLEANUP_CONCURRENCY = 8;
 const UNCONSUMED_UPLOAD_RETENTION_MS = 24 * 60 * 60 * 1000;
-
-function isAuthorizedByCronSecret(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  return Boolean(secret && request.headers.get("authorization") === `Bearer ${secret}`);
-}
 
 type QuarantinedUpload = {
   id: string;
@@ -123,9 +119,8 @@ async function deleteExpiredProfileImages(nowIso: string) {
 }
 
 export async function GET(request: NextRequest) {
-  if (!isAuthorizedByCronSecret(request)) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
+  const denied = ensureCronApiAccess(request);
+  if (denied) return denied;
 
   try {
     const now = new Date();
@@ -143,9 +138,6 @@ export async function GET(request: NextRequest) {
       processedAt: nowIso,
     });
   } catch {
-    return NextResponse.json(
-      { ok: false, message: "수료생 인증 파일 정리를 완료하지 못했습니다." },
-      { status: 500 },
-    );
+    return getCronErrorResponse("cleanup-graduate-verification-files");
   }
 }

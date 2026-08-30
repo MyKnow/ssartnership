@@ -1,24 +1,15 @@
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
+import { ensureCronApiAccess, getCronErrorResponse } from "@/lib/cron-route";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
 const ARCHIVE_EVENT_BATCH_SIZE = 100;
-const ARCHIVE_ERROR_MESSAGE = "만료된 프로모션을 정리하지 못했습니다.";
-
-function isAuthorizedByCronSecret(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    return false;
-  }
-  return request.headers.get("authorization") === `Bearer ${secret}`;
-}
 
 export async function GET(request: NextRequest) {
-  if (!isAuthorizedByCronSecret(request)) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
+  const denied = ensureCronApiAccess(request);
+  if (denied) return denied;
 
   const supabase = getSupabaseAdminClient();
   const nowIso = new Date().toISOString();
@@ -33,10 +24,7 @@ export async function GET(request: NextRequest) {
     console.error("[archive-expired-promotions] event query failed", {
       code: eventQueryError.code,
     });
-    return NextResponse.json(
-      { ok: false, message: ARCHIVE_ERROR_MESSAGE },
-      { status: 500 },
-    );
+    return getCronErrorResponse("archive-expired-promotions");
   }
 
   const slugs = (expiredEvents ?? [])
@@ -60,10 +48,7 @@ export async function GET(request: NextRequest) {
     console.error("[archive-expired-promotions] event update failed", {
       code: eventUpdateError.code,
     });
-    return NextResponse.json(
-      { ok: false, message: ARCHIVE_ERROR_MESSAGE },
-      { status: 500 },
-    );
+    return getCronErrorResponse("archive-expired-promotions");
   }
 
   const { data: updatedSlides, error: slideUpdateError } = await supabase
@@ -76,10 +61,7 @@ export async function GET(request: NextRequest) {
     console.error("[archive-expired-promotions] slide update failed", {
       code: slideUpdateError.code,
     });
-    return NextResponse.json(
-      { ok: false, message: ARCHIVE_ERROR_MESSAGE },
-      { status: 500 },
-    );
+    return getCronErrorResponse("archive-expired-promotions");
   }
 
   revalidatePath("/");

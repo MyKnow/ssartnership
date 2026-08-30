@@ -20,13 +20,26 @@ export async function GET(request: NextRequest, context: { params: Promise<{ ima
       return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 400 });
     }
     const supabase = getSupabaseAdminClient();
-    const { data } = await timing.measure("query", () => supabase
+    const { data: queueRequest, error: queueError } = await timing.measure("queue", () => supabase
+      .from("graduate_verification_requests")
+      .select("id")
+      .eq("profile_image_id", imageId)
+      .in("status", ["submitted", "in_review"])
+      .maybeSingle());
+    if (queueError || !queueRequest?.id) {
+      return NextResponse.json({ message: "본인 사진을 찾을 수 없습니다." }, { status: 404 });
+    }
+    const { data, error } = await timing.measure("query", () => supabase
       .from("member_profile_images")
       .select("storage_path")
       .eq("id", imageId)
+      .eq("graduate_verification_request_id", queueRequest.id)
+      .is("member_id", null)
+      .eq("status", "pending")
+      .is("deleted_at", null)
       .maybeSingle());
     const path = (data as { storage_path?: string | null } | null)?.storage_path;
-    if (!path) return NextResponse.json({ message: "본인 사진을 찾을 수 없습니다." }, { status: 404 });
+    if (error || !path) return NextResponse.json({ message: "본인 사진을 찾을 수 없습니다." }, { status: 404 });
     const body = await timing.measure("storage", () => downloadPrivateMemberProfileImage(path));
     if (!body) return NextResponse.json({ message: "본인 사진을 불러오지 못했습니다." }, { status: 404 });
     const session = await timing.measure("session", () => getAdminSession());

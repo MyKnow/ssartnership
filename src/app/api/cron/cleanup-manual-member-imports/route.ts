@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { forEachWithConcurrency } from "@/lib/async-concurrency";
+import { ensureCronApiAccess, getCronErrorResponse } from "@/lib/cron-route";
 import { removeGraduateStoredObject } from "@/lib/graduate-verification-storage";
 import { getRetrySafeExpirableBatchIds } from "@/lib/member-manual-import/cleanup";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -8,15 +9,9 @@ export const runtime = "nodejs";
 const BATCH_SIZE = 50;
 const CLEANUP_CONCURRENCY = 8;
 
-function isAuthorizedByCronSecret(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  return Boolean(secret && request.headers.get("authorization") === `Bearer ${secret}`);
-}
-
 export async function GET(request: NextRequest) {
-  if (!isAuthorizedByCronSecret(request)) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
+  const denied = ensureCronApiAccess(request);
+  if (denied) return denied;
   try {
     const supabase = getSupabaseAdminClient();
     const now = new Date().toISOString();
@@ -76,6 +71,6 @@ export async function GET(request: NextRequest) {
       : 0;
     return NextResponse.json({ ok: true, expired, removedFiles, processedAt: now });
   } catch {
-    return NextResponse.json({ ok: false, message: "가져오기 임시 파일을 정리하지 못했습니다." }, { status: 500 });
+    return getCronErrorResponse("cleanup-manual-member-imports");
   }
 }

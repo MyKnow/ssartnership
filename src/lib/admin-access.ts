@@ -169,6 +169,16 @@ export async function requireMemberSignupRequestAdmin(
   redirect(options?.redirectTo ?? "/admin?error=permission_denied");
 }
 
+function canAccessNotificationTemplates(
+  session: AdminSession,
+  action: AdminPermissionAction,
+) {
+  return (
+    session.account.permissionId === "super_admin"
+    && canAdmin(session.account.permissions, "notification_templates", action)
+  );
+}
+
 /**
  * Notification content can contain operational policy and recovery guidance.
  * Keep template access non-delegable to the Super Admin account.
@@ -185,10 +195,7 @@ export async function requireNotificationTemplateAdmin(
     action,
     options,
   );
-  if (
-    session.account.permissionId === "super_admin"
-    && canAdmin(session.account.permissions, "notification_templates", action)
-  ) {
+  if (canAccessNotificationTemplates(session, action)) {
     return session;
   }
 
@@ -287,6 +294,42 @@ export async function getAdminApiPermissionSession(
   }
 
   return { session } satisfies AdminApiPermissionResult;
+}
+
+export async function getNotificationTemplateAdminApiSession(
+  request: NextRequest,
+  action: AdminPermissionAction,
+): Promise<AdminApiPermissionResult> {
+  const result = await getAdminApiPermissionSession(
+    request,
+    "notification_templates",
+    action,
+  );
+  if ("response" in result || canAccessNotificationTemplates(result.session, action)) {
+    return result;
+  }
+
+  const { session } = result;
+  await logAuthSecurity({
+    ...getRequestLogContext(request),
+    eventName: "admin_access",
+    status: "blocked",
+    actorType: "admin",
+    actorId: session.adminId,
+    identifier: session.loginId,
+    properties: {
+      reason: "super_admin_required",
+      resource: "notification_templates",
+      action,
+    },
+  });
+
+  return {
+    response: NextResponse.json(
+      { message: "관리자 권한이 필요합니다." },
+      { status: 403 },
+    ),
+  } satisfies AdminApiPermissionResult;
 }
 
 export async function ensureAdminApiPermission(

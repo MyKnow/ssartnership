@@ -25,7 +25,8 @@ test("알림 템플릿 첫 화면은 상세 본문과 테스트 수신자 조회
   assert.match(repository, /const \{ bodyTemplate, \.\.\.summary \} = template/);
   assert.match(
     route,
-    /ensureAdminApiPermission\(\s*request,\s*"notification_templates",\s*"read",\s*\)/,
+    /getNotificationTemplateAdminApiSession\(\s*request,\s*"read",?\s*\)/,
   );
+  assert.match(route, /const \{ session \} = access/);
   assert.match(route, /listNotificationTemplateTestRecipients/);
 });

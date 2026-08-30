@@ -13,7 +13,7 @@ test("알림 템플릿 상세 API는 읽기 권한과 이벤트·채널 계약�
 
   assert.match(
     route,
-    /ensureAdminApiPermission\(\s*request,\s*"notification_templates",\s*"read"/,
+    /getNotificationTemplateAdminApiSession\(\s*request,\s*"read"/,
   );
   assert.match(route, /getNotificationTemplateDefinition\(eventKey\)/);
   assert.match(route, /definition\.channel !== channel/);

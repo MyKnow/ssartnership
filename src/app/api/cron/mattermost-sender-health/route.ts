@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { forEachWithConcurrency } from "@/lib/async-concurrency";
+import { ensureCronApiAccess, getCronErrorResponse } from "@/lib/cron-route";
 import { MattermostApiError, MattermostClient } from "@/lib/mattermost/client";
 import { getMattermostSenderKeyring } from "@/lib/mattermost-senders/config";
 import { mattermostSenderRepository } from "@/lib/mattermost-senders/repository";
@@ -15,11 +16,6 @@ type SenderHealthCheckResult = {
   errorCode?: MattermostSenderSafeErrorCode;
 };
 
-function isAuthorizedByCronSecret(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  return Boolean(secret && request.headers.get("authorization") === `Bearer ${secret}`);
-}
-
 function toSafeHealthErrorCode(error: unknown): MattermostSenderSafeErrorCode {
   if (error instanceof MattermostApiError) {
     return error.code;
@@ -28,9 +24,8 @@ function toSafeHealthErrorCode(error: unknown): MattermostSenderSafeErrorCode {
 }
 
 export async function GET(request: NextRequest) {
-  if (!isAuthorizedByCronSecret(request)) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
+  const denied = ensureCronApiAccess(request);
+  if (denied) return denied;
 
   let senders;
   try {
@@ -38,10 +33,7 @@ export async function GET(request: NextRequest) {
       getMattermostSenderKeyring(),
     );
   } catch {
-    return NextResponse.json(
-      { ok: false, message: "Mattermost Sender 상태를 확인하지 못했습니다." },
-      { status: 500 },
-    );
+    return getCronErrorResponse("mattermost-sender-health");
   }
 
   const client = new MattermostClient();

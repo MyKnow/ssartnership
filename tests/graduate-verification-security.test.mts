@@ -41,3 +41,20 @@ test("수료생 비밀번호 설정 토큰은 서버 URL 경로·쿼리에 포�
   assert.doesNotMatch(emailSource, /auth\/graduate\/setup\/\$\{encodeURIComponent/);
   assert.doesNotMatch(setupPage, /params\s*:/);
 });
+
+test("수료생 검토 이미지 API는 현재 검토 큐의 선택된 사진만 조회한다", () => {
+  const route = readFileSync(
+    new URL(
+      "../src/app/api/admin/graduate-verifications/images/[imageId]/route.ts",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  assert.match(route, /\.from\("graduate_verification_requests"\)/);
+  assert.match(route, /\.eq\("profile_image_id", imageId\)/);
+  assert.match(route, /\.in\("status", \["submitted", "in_review"\]\)/);
+  assert.match(route, /\.eq\("graduate_verification_request_id", queueRequest\.id\)/);
+  assert.match(route, /\.eq\("status", "pending"\)/);
+  assert.match(route, /\.is\("deleted_at", null\)/);
+});

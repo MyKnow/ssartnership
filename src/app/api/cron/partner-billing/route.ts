@@ -1,23 +1,13 @@
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
+import { ensureCronApiAccess, getCronErrorResponse } from "@/lib/cron-route";
 import { runPartnerBillingOverdueDowngrades } from "@/lib/partner-plan-service";
 
 export const runtime = "nodejs";
 
-const PARTNER_BILLING_CRON_ERROR_MESSAGE = "Partner billing cron failed";
-
-function isAuthorizedByCronSecret(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    return false;
-  }
-  return request.headers.get("authorization") === `Bearer ${secret}`;
-}
-
 export async function GET(request: NextRequest) {
-  if (!isAuthorizedByCronSecret(request)) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
+  const denied = ensureCronApiAccess(request);
+  if (denied) return denied;
 
   try {
     const result = await runPartnerBillingOverdueDowngrades();
@@ -33,12 +23,6 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("[partner-billing-cron] failed", error);
 
-    return NextResponse.json(
-      {
-        ok: false,
-        message: PARTNER_BILLING_CRON_ERROR_MESSAGE,
-      },
-      { status: 500 },
-    );
+    return getCronErrorResponse("partner-billing");
   }
 }

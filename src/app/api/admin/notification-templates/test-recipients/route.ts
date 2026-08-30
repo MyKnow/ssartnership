@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ensureAdminApiPermission } from "@/lib/admin-access";
-import { getAdminSession } from "@/lib/auth";
+import { getNotificationTemplateAdminApiSession } from "@/lib/admin-access";
 import { listNotificationTemplateTestRecipients } from "@/lib/notification-templates/test-delivery.server";
 import { withServerTiming } from "@/lib/server-timing";
 
@@ -8,22 +7,18 @@ export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   return withServerTiming(async (timing) => {
-    const denied = await timing.measure("auth", () =>
-      ensureAdminApiPermission(
-        request,
-        "notification_templates",
-        "read",
-      ),
+    const access = await timing.measure("auth", () =>
+      getNotificationTemplateAdminApiSession(request, "read"),
     );
-    if (denied) {
-      return denied;
+    if ("response" in access) {
+      return access.response;
     }
+    const { session } = access;
 
     try {
-      const adminSession = await getAdminSession();
       const recipients = await timing.measure("query", () =>
         listNotificationTemplateTestRecipients({
-          preferredMemberId: adminSession?.adminId ?? null,
+          preferredMemberId: session.adminId,
         }),
       );
       return NextResponse.json(recipients);

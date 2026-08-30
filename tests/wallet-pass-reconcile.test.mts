@@ -364,8 +364,9 @@ test("reconciliation route is secret-gated and scheduled without exposing pass i
   );
   const vercel = readFileSync(new URL("../vercel.json", import.meta.url), "utf8");
 
-  assert.match(route, /process\.env\.CRON_SECRET/);
-  assert.match(route, /request\.headers\.get\("authorization"\)/);
+  assert.match(route, /ensureCronApiAccess\(request/);
+  assert.match(route, /getCronErrorResponse\("reconcile-apple-wallet-passes"/);
+  assert.match(route, /"cache-control": "no-store"/);
   assert.doesNotMatch(route, /isAdminSession|adminAuthorized/);
   assert.match(route, /reconcileInstalledAppleWalletPasses\(\)/);
   assert.match(route, /scheduleProductEventLog/);

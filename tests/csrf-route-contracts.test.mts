@@ -12,6 +12,7 @@ const STATE_CHANGING_CRON_GET_ROUTES = [
   "partner-billing",
   "purge-expired-operational-logs",
   "push-expiring-partners",
+  "reconcile-apple-wallet-passes",
   "rss",
 ] as const;
 
@@ -25,6 +26,13 @@ test("state-changing cron GET routes require the Vercel cron bearer secret only"
   };
   const configuredCronPaths = new Set(
     (vercelConfig.crons ?? []).map((entry) => entry.path),
+  );
+  const cronAccess = read("../src/lib/cron-route.ts");
+
+  assert.match(cronAccess, /process\.env\.CRON_SECRET/);
+  assert.match(
+    cronAccess,
+    /request\.headers\.get\("authorization"\) === `Bearer \$\{secret\}`/,
   );
 
   for (const routeName of STATE_CHANGING_CRON_GET_ROUTES) {
@@ -41,17 +49,12 @@ test("state-changing cron GET routes require the Vercel cron bearer secret only"
       /export async function GET\(request: NextRequest\)/,
       `${relativePath} must keep Vercel cron GET compatibility`,
     );
-    assert.match(source, /process\.env\.CRON_SECRET/);
     assert.match(
       source,
-      /request\.headers\.get\("authorization"\) === `Bearer \$\{secret\}`/,
-      `${relativePath} must require the configured bearer credential`,
-    );
-    assert.match(
-      source,
-      /if \(!isAuthorizedByCronSecret\(request\)\)/,
+      /ensureCronApiAccess\(request/,
       `${relativePath} must gate execution on the bearer credential alone`,
     );
+    assert.doesNotMatch(source, /process\.env\.CRON_SECRET/);
     assert.doesNotMatch(
       source,
       /isAdminSession|getAdminSession|getSignedUserSession|@\/lib\/auth|cookies\(|request\.cookies|admin_session|user_session|partner_session/,

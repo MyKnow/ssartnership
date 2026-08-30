@@ -1,19 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
+import { ensureCronApiAccess, getCronErrorResponse } from "@/lib/cron-route";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
-function isAuthorizedByCronSecret(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  return Boolean(secret && request.headers.get("authorization") === `Bearer ${secret}`);
-}
-
 export async function GET(request: NextRequest) {
   const context = getRequestLogContext(request);
-  if (!isAuthorizedByCronSecret(request)) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
+  const denied = ensureCronApiAccess(request);
+  if (denied) return denied;
 
   const { data, error } = await getSupabaseAdminClient().rpc(
     "purge_expired_operational_logs",
@@ -24,10 +19,7 @@ export async function GET(request: NextRequest) {
       requestId: context.requestId,
       code: error.code,
     });
-    return NextResponse.json(
-      { ok: false, message: "만료된 운영 로그를 정리하지 못했습니다." },
-      { status: 500 },
-    );
+    return getCronErrorResponse("purge-expired-operational-logs");
   }
 
   await logAdminAudit({
