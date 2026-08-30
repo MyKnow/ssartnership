@@ -187,22 +187,45 @@ function updateMockBillingProfiles(
   globalScope.__mockPartnerBillingProfiles = updater(getMockBillingProfiles());
 }
 
+async function assertSupabaseAccountCompaniesAccess(input: {
+  accountId: string;
+  companyIds: string[];
+}) {
+  const companyIds = [...new Set(input.companyIds)];
+  if (companyIds.length === 0) {
+    return;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("partner_account_companies")
+    .select("company_id")
+    .eq("account_id", input.accountId)
+    .in("company_id", companyIds)
+    .eq("is_active", true);
+
+  const accessibleCompanyIds = new Set(
+    ((data ?? []) as Array<{ company_id?: string | null }>).flatMap((row) =>
+      row.company_id ? [row.company_id] : [],
+    ),
+  );
+
+  if (
+    error ||
+    companyIds.some((companyId) => !accessibleCompanyIds.has(companyId))
+  ) {
+    throw new Error("파트너사 접근 권한이 없습니다.");
+  }
+}
+
 async function assertSupabaseAccountCompanyAccess(input: {
   accountId: string;
   companyId: string;
 }) {
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("partner_account_companies")
-    .select("id")
-    .eq("account_id", input.accountId)
-    .eq("company_id", input.companyId)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (error || !data) {
-    throw new Error("파트너사 접근 권한이 없습니다.");
-  }
+  await assertSupabaseAccountCompaniesAccess({
+    accountId: input.accountId,
+    companyIds: [input.companyId],
+  });
 }
 
 export function toPartnerBillingProfileFormValues(
@@ -227,15 +250,38 @@ export async function getPartnerBillingProfiles(input: {
   accountId: string;
   companyId: string;
 }) {
+  return getPartnerBillingProfilesForCompanies({
+    accountId: input.accountId,
+    companyIds: [input.companyId],
+  });
+}
+
+export async function getPartnerBillingProfilesForCompanies(input: {
+  accountId: string;
+  companyIds: string[];
+}): Promise<PartnerBillingProfileRecord[]> {
+  const companyIds = [...new Set(input.companyIds)];
+  if (companyIds.length === 0) {
+    return [];
+  }
+
   if (isPartnerPortalMock) {
     return sortBillingProfiles(
       getMockBillingProfiles().filter((profile) =>
-        isPartnerBillingProfileVisibleInCompanyScope(profile, input),
+        companyIds.some((companyId) =>
+          isPartnerBillingProfileVisibleInCompanyScope(profile, {
+            accountId: input.accountId,
+            companyId,
+          }),
+        ),
       ),
     );
   }
 
-  await assertSupabaseAccountCompanyAccess(input);
+  await assertSupabaseAccountCompaniesAccess({
+    accountId: input.accountId,
+    companyIds,
+  });
   const supabase = getSupabaseAdminClient();
   const selectColumns =
     "id,company_id,account_id,label,payer_name,business_registration_number,business_name,representative_name,business_address,business_type,business_item,tax_invoice_email,tax_document_type,is_default,last_used_at,archived_at,created_at,updated_at";
@@ -249,7 +295,7 @@ export async function getPartnerBillingProfiles(input: {
       supabase
         .from("partner_billing_profiles")
         .select(selectColumns)
-        .eq("company_id", input.companyId)
+        .in("company_id", companyIds)
         .is("account_id", null)
         .is("archived_at", null),
     ]);

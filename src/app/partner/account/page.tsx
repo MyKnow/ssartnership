@@ -6,7 +6,7 @@ import {
   createPartnerBillingProfileAction,
   setDefaultPartnerBillingProfileAction,
 } from "@/app/partner/account/actions";
-import { getPartnerBillingProfiles } from "@/lib/partner-billing-profiles";
+import { getPartnerBillingProfilesForCompanies } from "@/lib/partner-billing-profiles";
 import { getPartnerBillingActionErrorMessage } from "@/lib/partner-billing-action-errors";
 import { getPartnerPasswordChangeHref } from "@/lib/partner-portal-paths";
 import { getPartnerPortalCompanySummaries } from "@/lib/partner-portal-scope";
@@ -54,19 +54,10 @@ export default async function PartnerAccountPage({
     redirect("/partner");
   }
 
-  const profileGroups = await Promise.all(
-    companies.map((company) =>
-      getPartnerBillingProfiles({
-        accountId: session.accountId,
-        companyId: company.id,
-      }),
-    ),
-  );
-  const profiles = [
-    ...new Map(
-      profileGroups.flat().map((profile) => [profile.id, profile] as const),
-    ).values(),
-  ];
+  const profiles = await getPartnerBillingProfilesForCompanies({
+    accountId: session.accountId,
+    companyIds: companies.map((company) => company.id),
+  });
   const status = readSearchParam(params.status);
   const statusMessage =
     status === "created"

@@ -46,10 +46,6 @@ type PartnerReviewRow = {
 const REVIEW_SELECT =
   "id,partner_id,member_id,rating,title,body,images,created_at,updated_at,deleted_at,hidden_at,members!partner_reviews_member_id_fkey(display_name,generation)";
 
-function hasImages(row: PartnerReviewRow) {
-  return (row.images ?? []).length > 0;
-}
-
 function applyReviewSort<T extends { order(column: string, options: { ascending: boolean }): T }>(
   query: T,
   sort: string,
@@ -87,61 +83,21 @@ async function listReviewRows(
   const ratingFilteredQuery =
     rating === "all" ? baseQuery : baseQuery.eq("rating", Number(rating));
   const activeQuery = ratingFilteredQuery.is("deleted_at", null);
-  const filteredQuery = includeHidden ? activeQuery : activeQuery.is("hidden_at", null);
-
-  if (!imagesOnly) {
-    const { data, error } = await filteredQuery.range(offset, offset + limit);
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const rows = (data ?? []) as PartnerReviewRow[];
-    return {
-      rows: rows.slice(0, limit),
-      hasMore: rows.length > limit,
-    };
+  const visibilityFilteredQuery = includeHidden
+    ? activeQuery
+    : activeQuery.is("hidden_at", null);
+  const filteredQuery = imagesOnly
+    ? visibilityFilteredQuery.not("images", "eq", "{}")
+    : visibilityFilteredQuery;
+  const { data, error } = await filteredQuery.range(offset, offset + limit);
+  if (error) {
+    throw new Error(error.message);
   }
 
-  const pageSize = Math.max(25, Math.min(100, limit * 5));
-  const collected: PartnerReviewRow[] = [];
-  let skipped = 0;
-  let scanOffset = 0;
-
-  while (true) {
-    const { data, error } = await filteredQuery.range(scanOffset, scanOffset + pageSize - 1);
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const rows = (data ?? []) as PartnerReviewRow[];
-    if (rows.length === 0) {
-      break;
-    }
-
-    for (const row of rows) {
-      if (!hasImages(row)) {
-        continue;
-      }
-      if (skipped < offset) {
-        skipped += 1;
-        continue;
-      }
-      collected.push(row);
-      if (collected.length > limit) {
-        break;
-      }
-    }
-
-    if (collected.length > limit || rows.length < pageSize) {
-      break;
-    }
-
-    scanOffset += pageSize;
-  }
-
+  const rows = (data ?? []) as PartnerReviewRow[];
   return {
-    rows: collected.slice(0, limit),
-    hasMore: collected.length > limit,
+    rows: rows.slice(0, limit),
+    hasMore: rows.length > limit,
   };
 }
 
