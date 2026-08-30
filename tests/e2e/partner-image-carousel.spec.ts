@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { waitForPageReady } from "./page-ready";
+import { waitForPageReady, waitForScrollStability } from "./page-ready";
 
 const partnerPath = "/partners/cafe-ssafy-001";
 
@@ -79,14 +79,14 @@ test("preserves the document scroll position while changing gallery images", asy
   );
   await waitForPageReady(page, carousel);
   await carousel.scrollIntoViewIfNeeded();
-  await page.waitForTimeout(400);
+  await waitForScrollStability(page);
 
   const assertScrollPositionIsPreserved = async (
     action: () => Promise<void>,
   ) => {
     const beforeScrollY = await page.evaluate(() => window.scrollY);
     await action();
-    await page.waitForTimeout(500);
+    await waitForScrollStability(page);
     const afterScrollY = await page.evaluate(() => window.scrollY);
     expect(Math.abs(afterScrollY - beforeScrollY)).toBeLessThanOrEqual(1);
   };
@@ -123,7 +123,7 @@ test("moves exactly one image per mobile swipe without pulling the page", async 
     const galleryTop = element.getBoundingClientRect().top + window.scrollY;
     window.scrollTo(0, Math.max(0, galleryTop - 650));
   });
-  await page.waitForTimeout(400);
+  await waitForScrollStability(page);
 
   const beforeScrollY = await page.evaluate(() => window.scrollY);
   const indicators = gallery.locator("[data-carousel-slide-indicators] button");
@@ -136,7 +136,7 @@ test("moves exactly one image per mobile swipe without pulling the page", async 
   await mainFrame.dispatchEvent("pointerup", { clientX: 12 });
   await expect(indicators.nth(1)).toHaveAttribute("aria-pressed", "true");
   await expect(indicators.nth(2)).toHaveAttribute("aria-pressed", "false");
-  await page.waitForTimeout(500);
+  await waitForScrollStability(page);
 
   const afterScrollY = await page.evaluate(() => window.scrollY);
   expect(Math.abs(afterScrollY - beforeScrollY)).toBeLessThanOrEqual(1);
