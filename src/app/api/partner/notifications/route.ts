@@ -3,6 +3,11 @@ import { isPartnerPortalCompanyAllowed } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import {
+  NotificationRequestError,
+  createNotificationStorageError,
+  getSafeNotificationRouteError,
+} from "@/lib/notifications/safe-error";
 
 export const runtime = "nodejs";
 
@@ -45,7 +50,7 @@ async function getUnreadCount(accountId: string) {
     .is("read_at", null);
 
   if (error) {
-    throw new Error(error.message);
+    throw createNotificationStorageError(error);
   }
 
   return count ?? 0;
@@ -61,11 +66,11 @@ async function parseNotificationIds(request: NextRequest) {
   try {
     payload = JSON.parse(raw);
   } catch {
-    throw new Error("요청 본문 형식을 확인해 주세요.");
+    throw new NotificationRequestError("요청 본문 형식을 확인해 주세요.");
   }
 
   if (!payload || typeof payload !== "object") {
-    throw new Error("요청 본문 형식을 확인해 주세요.");
+    throw new NotificationRequestError("요청 본문 형식을 확인해 주세요.");
   }
 
   const notificationIds = (payload as { notificationIds?: unknown }).notificationIds;
@@ -74,7 +79,7 @@ async function parseNotificationIds(request: NextRequest) {
   }
 
   if (!Array.isArray(notificationIds)) {
-    throw new Error("알림 선택값을 확인해 주세요.");
+    throw new NotificationRequestError("알림 선택값을 확인해 주세요.");
   }
 
   const normalized = [
@@ -86,7 +91,7 @@ async function parseNotificationIds(request: NextRequest) {
   ];
 
   if (normalized.some((id) => !uuidPattern.test(id))) {
-    throw new Error("알림 ID 형식을 확인해 주세요.");
+    throw new NotificationRequestError("알림 ID 형식을 확인해 주세요.");
   }
 
   return normalized;
@@ -107,10 +112,10 @@ async function getScopedNotificationIds(
       .is("company_id", null),
   ]);
   if (companyResult.error) {
-    throw new Error(companyResult.error.message);
+    throw createNotificationStorageError(companyResult.error);
   }
   if (globalResult.error) {
-    throw new Error(globalResult.error.message);
+    throw createNotificationStorageError(globalResult.error);
   }
   return [
     ...(companyResult.data ?? []),
@@ -127,50 +132,59 @@ export async function GET(request: NextRequest) {
   if (companyId && !isPartnerPortalCompanyAllowed(session, companyId)) {
     return NextResponse.json({ message: "권한이 없습니다." }, { status: 403 });
   }
-  const supabase = getSupabaseAdminClient();
-  let notificationIds: string[] | null = null;
-  if (companyId) {
-    try {
+  try {
+    const supabase = getSupabaseAdminClient();
+    let notificationIds: string[] | null = null;
+    if (companyId) {
       notificationIds = await getScopedNotificationIds(supabase, companyId);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "알림을 불러오지 못했습니다.";
-      return NextResponse.json({ message }, { status: 500 });
     }
+    if (notificationIds && notificationIds.length === 0) {
+      return NextResponse.json({ unreadCount: 0, items: [] });
+    }
+    let countQuery = supabase
+      .from("partner_notification_recipients")
+      .select("id", { count: "exact", head: true })
+      .eq("account_id", session.accountId)
+      .is("deleted_at", null)
+      .is("read_at", null);
+    let listQuery = supabase
+      .from("partner_notification_recipients")
+      .select("id,read_at,deleted_at,created_at,notification:partner_notifications(id,type,title,body,target_url,metadata,company_id,created_at)")
+      .eq("account_id", session.accountId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (notificationIds) {
+      countQuery = countQuery.in("notification_id", notificationIds);
+      listQuery = listQuery.in("notification_id", notificationIds);
+    }
+    const [
+      { count, error: countError },
+      { data, error: listError },
+    ] = await Promise.all([countQuery, listQuery]);
+    if (countError) {
+      throw createNotificationStorageError(countError);
+    }
+    if (listError) {
+      throw createNotificationStorageError(listError);
+    }
+    return NextResponse.json({
+      ok: true,
+      summary: { unreadCount: count ?? 0 },
+      unreadCount: count ?? 0,
+      items: data ?? [],
+    });
+  } catch (error) {
+    console.error("[partner-notifications] list failed", error);
+    const safeError = getSafeNotificationRouteError(
+      error,
+      "알림을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    return NextResponse.json(
+      { message: safeError.message },
+      { status: safeError.status },
+    );
   }
-  if (notificationIds && notificationIds.length === 0) {
-    return NextResponse.json({ unreadCount: 0, items: [] });
-  }
-  let countQuery = supabase
-    .from("partner_notification_recipients")
-    .select("id", { count: "exact", head: true })
-    .eq("account_id", session.accountId)
-    .is("deleted_at", null)
-    .is("read_at", null);
-  let listQuery = supabase
-    .from("partner_notification_recipients")
-    .select("id,read_at,deleted_at,created_at,notification:partner_notifications(id,type,title,body,target_url,metadata,company_id,created_at)")
-    .eq("account_id", session.accountId)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(30);
-  if (notificationIds) {
-    countQuery = countQuery.in("notification_id", notificationIds);
-    listQuery = listQuery.in("notification_id", notificationIds);
-  }
-  const [{ count }, { data, error }] = await Promise.all([
-    countQuery,
-    listQuery,
-  ]);
-  if (error) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
-  }
-  return NextResponse.json({
-    ok: true,
-    summary: { unreadCount: count ?? 0 },
-    unreadCount: count ?? 0,
-    items: data ?? [],
-  });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -203,15 +217,21 @@ export async function PATCH(request: NextRequest) {
 
     const { error } = await query;
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
 
     const unreadCount = await getUnreadCount(auth.accountId);
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "알림을 처리하지 못했습니다.";
-    return NextResponse.json({ message }, { status: 400 });
+    console.error("[partner-notifications] mark read failed", error);
+    const safeError = getSafeNotificationRouteError(
+      error,
+      "알림을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    return NextResponse.json(
+      { message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }
 
@@ -244,14 +264,20 @@ export async function DELETE(request: NextRequest) {
 
     const { error } = await query;
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
 
     const unreadCount = await getUnreadCount(auth.accountId);
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "알림을 삭제하지 못했습니다.";
-    return NextResponse.json({ message }, { status: 400 });
+    console.error("[partner-notifications] delete failed", error);
+    const safeError = getSafeNotificationRouteError(
+      error,
+      "알림을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    return NextResponse.json(
+      { message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }

@@ -12,6 +12,7 @@ import type {
   NotificationListContext,
   NotificationRepository,
 } from "@/lib/repositories/notification-repository";
+import { createNotificationStorageError } from "@/lib/notifications/safe-error";
 
 type NotificationRow = {
   id: string;
@@ -141,7 +142,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
         .maybeSingle();
       notificationData = existingResult.data;
       if (existingResult.error) {
-        throw new Error(existingResult.error.message);
+        throw createNotificationStorageError(existingResult.error);
       }
       if (notificationData) {
         return {
@@ -153,7 +154,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
     }
 
     if (notificationResult.error) {
-      throw new Error(notificationResult.error.message);
+      throw createNotificationStorageError(notificationResult.error);
     }
     if (!notificationData) {
       throw new Error("알림을 저장하지 못했습니다.");
@@ -187,14 +188,14 @@ export class SupabaseNotificationRepository implements NotificationRepository {
         .from("member_notifications")
         .insert(memberNotificationRows);
       if (memberNotificationError) {
-        throw new Error(memberNotificationError.message);
+        throw createNotificationStorageError(memberNotificationError);
       }
 
       const { error: deliveryError } = await supabase
         .from("notification_deliveries")
         .insert(deliveryRows);
       if (deliveryError) {
-        throw new Error(deliveryError.message);
+        throw createNotificationStorageError(deliveryError);
       }
     }
 
@@ -217,7 +218,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       delivered_at: input.deliveredAt ?? (input.status === "sent" ? new Date().toISOString() : null),
     });
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
   }
 
@@ -231,7 +232,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       .update({ metadata })
       .eq("id", notificationId);
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
   }
 
@@ -245,7 +246,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       .is("read_at", null);
 
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
 
     return count ?? 0;
@@ -279,10 +280,10 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       await Promise.all([unreadPromise, listPromise]);
 
     if (unreadError) {
-      throw new Error(unreadError.message);
+      throw createNotificationStorageError(unreadError);
     }
     if (listError) {
-      throw new Error(listError.message);
+      throw createNotificationStorageError(listError);
     }
 
     const rows = (data ?? []) as MemberNotificationRow[];
@@ -308,7 +309,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       .maybeSingle();
 
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
     if (!data) {
       return null;
@@ -332,7 +333,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       .maybeSingle();
 
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
     return Boolean(data);
   }
@@ -353,7 +354,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       .maybeSingle();
 
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
     return Boolean(data);
   }
@@ -373,7 +374,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       .select("id");
 
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
     return data?.length ?? 0;
   }
@@ -392,7 +393,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       .select("id");
 
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
     return data?.length ?? 0;
   }

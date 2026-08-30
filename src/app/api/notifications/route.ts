@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { notificationRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSignedUserSession } from "@/lib/user-auth";
+import { getSafeNotificationRouteError } from "@/lib/notifications/safe-error";
 
 export const runtime = "nodejs";
 
@@ -56,9 +57,15 @@ export async function GET(request: NextRequest) {
       hasMore: result.hasMore,
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "알림을 불러오지 못했습니다.";
-    return NextResponse.json({ message }, { status: 400 });
+    console.error("[member-notifications] list failed", error);
+    const safeError = getSafeNotificationRouteError(
+      error,
+      "알림을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    return NextResponse.json(
+      { message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }
 
@@ -73,9 +80,15 @@ export async function PATCH(request: NextRequest) {
     const unreadCount = await notificationRepository.getUnreadNotificationCount(auth.userId);
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "알림을 처리하지 못했습니다.";
-    return NextResponse.json({ message }, { status: 400 });
+    console.error("[member-notifications] mark all read failed", error);
+    const safeError = getSafeNotificationRouteError(
+      error,
+      "알림을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    return NextResponse.json(
+      { message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }
 
@@ -90,8 +103,14 @@ export async function DELETE(request: NextRequest) {
     const unreadCount = await notificationRepository.getUnreadNotificationCount(auth.userId);
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "알림을 삭제하지 못했습니다.";
-    return NextResponse.json({ message }, { status: 400 });
+    console.error("[member-notifications] delete all failed", error);
+    const safeError = getSafeNotificationRouteError(
+      error,
+      "알림을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    return NextResponse.json(
+      { message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }

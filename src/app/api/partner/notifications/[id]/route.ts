@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPartnerSession } from "@/lib/partner-session";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import {
+  createNotificationStorageError,
+  getSafeNotificationRouteError,
+} from "@/lib/notifications/safe-error";
 
 export const runtime = "nodejs";
 
@@ -18,7 +22,7 @@ async function getUnreadCount(accountId: string) {
     .is("read_at", null);
 
   if (error) {
-    throw new Error(error.message);
+    throw createNotificationStorageError(error);
   }
 
   return count ?? 0;
@@ -55,7 +59,7 @@ export async function PATCH(
       .select("id")
       .maybeSingle();
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
     if (!data) {
       return NextResponse.json({ message: "알림을 찾을 수 없습니다." }, { status: 404 });
@@ -63,9 +67,15 @@ export async function PATCH(
     const unreadCount = await getUnreadCount(session.accountId);
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "알림을 처리하지 못했습니다.";
-    return NextResponse.json({ message }, { status: 400 });
+    console.error("[partner-notification] mark read failed", error);
+    const safeError = getSafeNotificationRouteError(
+      error,
+      "알림을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    return NextResponse.json(
+      { message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }
 
@@ -100,7 +110,7 @@ export async function DELETE(
       .select("id")
       .maybeSingle();
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
     if (!data) {
       return NextResponse.json({ message: "알림을 찾을 수 없습니다." }, { status: 404 });
@@ -108,8 +118,14 @@ export async function DELETE(
     const unreadCount = await getUnreadCount(session.accountId);
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "알림을 삭제하지 못했습니다.";
-    return NextResponse.json({ message }, { status: 400 });
+    console.error("[partner-notification] delete failed", error);
+    const safeError = getSafeNotificationRouteError(
+      error,
+      "알림을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    return NextResponse.json(
+      { message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }

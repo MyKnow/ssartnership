@@ -11,6 +11,10 @@ import {
   deactivatePushSubscription,
 } from "@/lib/push";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import {
+  NotificationRequestError,
+  getSafeNotificationRouteError,
+} from "@/lib/notifications/safe-error";
 
 export const runtime = "nodejs";
 
@@ -31,7 +35,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = (await request.json()) as {
+    const body = (await request.json().catch(() => {
+      throw new NotificationRequestError("요청 본문 형식을 확인해 주세요.");
+    })) as {
       endpoint?: string | null;
       subscriptionId?: string | null;
       scope?: "device" | "all";
@@ -77,8 +83,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true, preferences });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "알림 해제에 실패했습니다.";
-    return NextResponse.json({ message }, { status: 400 });
+    console.error("[member-push-unsubscribe] request failed", error);
+    const safeError = getSafeNotificationRouteError(
+      error,
+      "알림 구독을 해제하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    return NextResponse.json(
+      { message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }

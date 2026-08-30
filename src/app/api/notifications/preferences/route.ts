@@ -3,6 +3,10 @@ import { getRequestLogContext, scheduleProductEventLog } from "@/lib/activity-lo
 import { getSignedUserSession } from "@/lib/user-auth";
 import { updateMemberNotificationPreferences } from "@/lib/notification-preferences";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import {
+  NotificationRequestError,
+  getSafeNotificationRouteError,
+} from "@/lib/notifications/safe-error";
 
 export const runtime = "nodejs";
 
@@ -28,7 +32,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const appliedAt = new Date().toISOString();
-    const body = (await request.json()) as Record<string, unknown>;
+    const body = (await request.json().catch(() => {
+      throw new NotificationRequestError("요청 본문 형식을 확인해 주세요.");
+    })) as Record<string, unknown>;
     const preferences = await updateMemberNotificationPreferences(
       session.userId,
       {
@@ -66,8 +72,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true, preferences, appliedAt });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "알림 설정을 저장하지 못했습니다.";
-    return NextResponse.json({ message }, { status: 400 });
+    console.error("[member-notification-preferences] update failed", error);
+    const safeError = getSafeNotificationRouteError(
+      error,
+      "알림 설정을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    return NextResponse.json(
+      { message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }
