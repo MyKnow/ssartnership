@@ -69,6 +69,15 @@ function assertRequestInvoiceLockOrder(sql: string) {
   );
 }
 
+function assertPartnerLockPrecedesDowngradeDecision(sql: string) {
+  const partnerLock = sql.indexOf("from public.partners");
+  const decision = sql.indexOf(
+    "should_downgrade_partner := partner_row.plan_tier <> 'basic'",
+  );
+  assert.ok(partnerLock >= 0, "partner row lock must exist");
+  assert.ok(decision > partnerLock, "partner row must be locked before downgrade decision");
+}
+
 describe("atomic partner plan billing transitions", () => {
   it("creates the request and all billing records in one locked service-role RPC", async () => {
     const migration = await migrationPromise;
@@ -162,6 +171,7 @@ describe("atomic partner plan billing transitions", () => {
     const invoiceLock = lockedTransition.indexOf("from public.partner_billing_invoices");
     const partnerLock = lockedTransition.indexOf("from public.partners");
     assert.ok(partnerLock > invoiceLock);
+    assertPartnerLockPrecedesDowngradeDecision(lockedTransition);
     assert.match(
       sql,
       /should_downgrade_partner := partner_row\.plan_tier <> 'basic'[\s\S]*partner_row\.plan_tier is not distinct from request_row\.current_plan_tier/i,

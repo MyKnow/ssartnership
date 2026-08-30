@@ -16427,11 +16427,6 @@ begin
       continue;
     end if;
 
-    should_downgrade_partner := partner_row.plan_tier <> 'basic'
-      and (
-        invoice_row.upgrade_request_id is null
-        or partner_row.plan_tier is not distinct from request_row.current_plan_tier
-      );
     if invoice_row.requested_plan_tier = 'basic'
       or invoice_row.due_at + interval '7 days' > p_now then
       continue;
@@ -16445,6 +16440,12 @@ begin
     if not found then
       continue;
     end if;
+
+    should_downgrade_partner := partner_row.plan_tier <> 'basic'
+      and (
+        invoice_row.upgrade_request_id is null
+        or partner_row.plan_tier is not distinct from request_row.current_plan_tier
+      );
 
     select * into payment_row
     from public.partner_billing_payments
