@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { MOCK_MEMBER_ID } from "../src/lib/mock/member.ts";
+import { resetProductEventThrottleForTests } from "../src/lib/product-event-throttle.ts";
+import { MAX_BULK_JSON_BODY_BYTES, MAX_STANDARD_JSON_BODY_BYTES } from "../src/lib/request-body-limit.ts";
 import { decryptApplePushToken } from "../src/lib/wallet/apple/apple-wallet-device-token.ts";
 import { deriveAppleWalletAuthenticationToken } from "../src/lib/wallet/wallet-pass-token.ts";
 
@@ -81,6 +83,32 @@ function createApplePassHeaders(
       masterKey,
     )}`,
   };
+}
+
+function createStreamedJsonRequest(
+  url: string,
+  bodyText: string,
+  init?: { headers?: HeadersInit },
+) {
+  const encoder = new TextEncoder();
+  const midpoint = Math.floor(bodyText.length / 2);
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode(bodyText.slice(0, midpoint)));
+      controller.enqueue(encoder.encode(bodyText.slice(midpoint)));
+      controller.close();
+    },
+  });
+
+  return new Request(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+    body,
+    duplex: "half",
+  } as RequestInit & { duplex: "half" });
 }
 
 test("apple wallet registration route encrypts push tokens and returns 201/200", async () => {
@@ -324,14 +352,21 @@ test("apple wallet web-service routes emit privacy-safe device observability onl
     ),
     "utf8",
   );
+  const logRoute = readFileSync(
+    new URL("../src/app/api/wallet/apple/v1/log/route.ts", import.meta.url),
+    "utf8",
+  );
 
   assert.match(registrationRoute, /wallet_pass_device_register/);
   assert.match(registrationRoute, /wallet_pass_device_unregister/);
   assert.match(syncRoute, /wallet_pass_sync/);
   assert.match(registrationRoute, /scheduleProductEventLog/);
   assert.match(syncRoute, /scheduleProductEventLog/);
+  assert.match(logRoute, /consumeProductEventIngressQuota/);
   assert.doesNotMatch(registrationRoute, /queueMicrotask/);
   assert.doesNotMatch(syncRoute, /queueMicrotask/);
+  assert.doesNotMatch(registrationRoute, /request\.json\(/);
+  assert.doesNotMatch(logRoute, /request\.json\(/);
   assert.doesNotMatch(registrationRoute, /import\("@\/lib\/activity-logs"\)/);
   assert.doesNotMatch(syncRoute, /import\("@\/lib\/activity-logs"\)/);
 
@@ -356,6 +391,71 @@ test("apple wallet web-service routes emit privacy-safe device observability onl
   }
 
   assert.match(syncRoute, /syncScope:\s*"device_updates"/);
+});
+
+test("apple wallet registration route distinguishes malformed 400 from oversized 413", async () => {
+  const issued = await issueMockPass();
+  const route = await import(
+    "../src/app/api/wallet/apple/v1/devices/[deviceId]/registrations/[passTypeId]/[serialNumber]/route.ts"
+  );
+  const params = {
+    params: Promise.resolve({
+      deviceId: `device-invalid-${crypto.randomUUID()}`,
+      passTypeId: process.env.APPLE_WALLET_PASS_TYPE_ID ?? "",
+      serialNumber: issued.pass.serialNumber,
+    }),
+  };
+
+  const malformedResponse = await route.POST(
+    new Request("https://example.com/api/wallet/apple/v1/devices", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...createApplePassHeaders(issued.pass.publicId),
+      },
+      body: "not-json",
+    }),
+    params,
+  );
+  assert.equal(malformedResponse.status, 400);
+  assert.deepEqual(await malformedResponse.json(), {
+    message: "pushToken 형식이 올바르지 않습니다.",
+  });
+
+  const declaredOversizedResponse = await route.POST(
+    new Request("https://example.com/api/wallet/apple/v1/devices", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "content-length": String(MAX_STANDARD_JSON_BODY_BYTES + 1),
+        ...createApplePassHeaders(issued.pass.publicId),
+      },
+      body: "{}",
+    }),
+    params,
+  );
+  assert.equal(declaredOversizedResponse.status, 413);
+  assert.deepEqual(await declaredOversizedResponse.json(), {
+    message: "요청이 너무 큽니다.",
+  });
+
+  const streamedOversizedBody = JSON.stringify({
+    pushToken: "a".repeat(MAX_STANDARD_JSON_BODY_BYTES),
+  });
+  const streamedOversizedResponse = await route.POST(
+    createStreamedJsonRequest(
+      "https://example.com/api/wallet/apple/v1/devices",
+      streamedOversizedBody,
+      {
+        headers: createApplePassHeaders(issued.pass.publicId),
+      },
+    ),
+    params,
+  );
+  assert.equal(streamedOversizedResponse.status, 413);
+  assert.deepEqual(await streamedOversizedResponse.json(), {
+    message: "요청이 너무 큽니다.",
+  });
 });
 
 test("apple wallet latest pass route honors authorization and If-Modified-Since before rebuilding", async () => {
@@ -417,6 +517,7 @@ test("apple wallet latest pass route honors authorization and If-Modified-Since 
 
 test("apple wallet log route validates the schema and never echoes logs", async () => {
   applyAppleWalletEnv();
+  resetProductEventThrottleForTests();
   const logRoute = await import(
     "../src/app/api/wallet/apple/v1/log/route.ts"
   );
@@ -439,4 +540,95 @@ test("apple wallet log route validates the schema and never echoes logs", async 
   );
   assert.equal(validResponse.status, 200);
   assert.equal(await validResponse.text(), "");
+});
+
+test("apple wallet log route distinguishes malformed 400 from oversized 413", async () => {
+  applyAppleWalletEnv();
+  resetProductEventThrottleForTests();
+  const logRoute = await import(
+    "../src/app/api/wallet/apple/v1/log/route.ts"
+  );
+
+  const malformedResponse = await logRoute.POST(
+    new Request("https://example.com/api/wallet/apple/v1/log", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-for": "198.51.100.10",
+      },
+      body: "not-json",
+    }),
+  );
+  assert.equal(malformedResponse.status, 400);
+  assert.deepEqual(await malformedResponse.json(), {
+    message: "로그 본문 형식이 올바르지 않습니다.",
+  });
+
+  const declaredOversizedResponse = await logRoute.POST(
+    new Request("https://example.com/api/wallet/apple/v1/log", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "content-length": String(MAX_BULK_JSON_BODY_BYTES + 1),
+        "x-forwarded-for": "198.51.100.11",
+      },
+      body: "{}",
+    }),
+  );
+  assert.equal(declaredOversizedResponse.status, 413);
+  assert.deepEqual(await declaredOversizedResponse.json(), {
+    message: "요청이 너무 큽니다.",
+  });
+
+  const streamedOversizedBody = JSON.stringify({
+    logs: ["x".repeat(MAX_BULK_JSON_BODY_BYTES)],
+  });
+  const streamedOversizedResponse = await logRoute.POST(
+    createStreamedJsonRequest(
+      "https://example.com/api/wallet/apple/v1/log",
+      streamedOversizedBody,
+      {
+        headers: {
+          "x-forwarded-for": "198.51.100.12",
+        },
+      },
+    ),
+  );
+  assert.equal(streamedOversizedResponse.status, 413);
+  assert.deepEqual(await streamedOversizedResponse.json(), {
+    message: "요청이 너무 큽니다.",
+  });
+});
+
+test("apple wallet log route rate-limits repeated public IP ingress without surfacing an error", async () => {
+  applyAppleWalletEnv();
+  resetProductEventThrottleForTests();
+  const logRoute = await import(
+    "../src/app/api/wallet/apple/v1/log/route.ts"
+  );
+  const headers = {
+    "content-type": "application/json",
+    "x-forwarded-for": "198.51.100.99",
+  };
+
+  for (let index = 0; index < 240; index += 1) {
+    const response = await logRoute.POST(
+      new Request("https://example.com/api/wallet/apple/v1/log", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ logs: [`message-${index}`] }),
+      }),
+    );
+    assert.equal(response.status, 200);
+  }
+
+  const throttledResponse = await logRoute.POST(
+    new Request("https://example.com/api/wallet/apple/v1/log", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ logs: ["message-throttled"] }),
+    }),
+  );
+  assert.equal(throttledResponse.status, 200);
+  assert.equal(await throttledResponse.text(), "");
 });

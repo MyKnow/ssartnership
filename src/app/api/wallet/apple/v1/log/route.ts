@@ -1,3 +1,5 @@
+import { getRequestLogContext } from "@/lib/activity-logs";
+import { consumeProductEventIngressQuota } from "@/lib/product-event-throttle";
 import {
   appleWalletEmptyResponse,
   appleWalletJsonResponse,
@@ -14,12 +16,14 @@ export async function POST(request: Request) {
     return configStatus.response;
   }
 
+  const context = getRequestLogContext(request);
+  if (!consumeProductEventIngressQuota({ ipAddress: context.ipAddress })) {
+    return appleWalletEmptyResponse(200);
+  }
+
   const parsedBody = await parseAppleWalletLogBody(request);
   if (!parsedBody.success) {
-    return appleWalletJsonResponse(
-      { message: "로그 본문 형식이 올바르지 않습니다." },
-      400,
-    );
+    return appleWalletJsonResponse({ message: parsedBody.message }, parsedBody.status);
   }
 
   return appleWalletEmptyResponse(200);
