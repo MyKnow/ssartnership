@@ -1,11 +1,12 @@
-import type { PartnerPortalServiceMetrics } from "./partner-dashboard.ts";
+import {
+  createEmptyPartnerPortalMetrics,
+  type PartnerPortalServiceMetrics,
+} from "./partner-dashboard.ts";
 import {
   applyPartnerMetricRollupRows,
-  buildPartnerMetricRollupRowsFromEventLogs,
-  fetchPartnerMetricRollupRows,
-  fetchPartnerMetricEventLogRows,
   PARTNER_METRIC_EVENT_NAMES,
 } from "./partner-metric-rollups.ts";
+import { loadPartnerMetricAggregateRows } from "./partner-metric-loader.ts";
 import { listMockPartnerPortalSetupsInternal } from "./mock/partner-portal/store.ts";
 import { isPartnerPortalMock } from "./partner-portal.ts";
 import { getSupabaseAdminClient } from "./supabase/server.ts";
@@ -19,20 +20,7 @@ export type PartnerServiceMetricsSnapshot = {
   warningMessage?: string | null;
 };
 
-export function createEmptyPartnerServiceMetrics(): PartnerPortalServiceMetrics {
-  return {
-    favoriteCount: 0,
-    detailViews: 0,
-    detailUv: 0,
-    cardClicks: 0,
-    mapClicks: 0,
-    reservationClicks: 0,
-    inquiryClicks: 0,
-    benefitUsageCount: 0,
-    reviewCount: 0,
-    totalClicks: 0,
-  };
-}
+export const createEmptyPartnerServiceMetrics = createEmptyPartnerPortalMetrics;
 
 function getMockPartnerServiceMetrics(partnerId: string): PartnerServiceMetricsSnapshot {
   const setup = listMockPartnerPortalSetupsInternal().find((candidate) =>
@@ -61,8 +49,8 @@ export async function getPartnerServiceMetrics(
     hasPartialFailure = true;
   };
   const metrics = createEmptyPartnerServiceMetrics();
-  const [rollupResult, engagementCounts] = await Promise.all([
-    fetchPartnerMetricRollupRows(supabase, {
+  const [metricRowsResult, engagementCounts] = await Promise.all([
+    loadPartnerMetricAggregateRows(supabase, {
       partnerIds: [partnerId],
       metricNames: PARTNER_METRIC_EVENT_NAMES,
       metricKinds: ["pv", "uv"],
@@ -74,31 +62,19 @@ export async function getPartnerServiceMetrics(
     ),
   ]);
 
-  if (rollupResult.errorMessage) {
+  if (metricRowsResult.failure) {
     markPartialFailure();
-    console.error("[partner-service-metrics] event query failed", {
+    const queryLabel =
+      metricRowsResult.failure.stage === "rollup"
+        ? "event query failed"
+        : "fallback event query failed";
+    console.error(`[partner-service-metrics] ${queryLabel}`, {
       partnerId,
-      message: rollupResult.errorMessage,
+      message: metricRowsResult.failure.errorMessage,
     });
   } else {
     const metricsByPartnerId = new Map([[partnerId, metrics]]);
-    if (rollupResult.rows.length > 0) {
-      applyPartnerMetricRollupRows(metricsByPartnerId, rollupResult.rows);
-    } else {
-      const fallbackResult = await fetchPartnerMetricEventLogRows(supabase, [partnerId]);
-      if (fallbackResult.errorMessage) {
-        markPartialFailure();
-        console.error("[partner-service-metrics] fallback event query failed", {
-          partnerId,
-          message: fallbackResult.errorMessage,
-        });
-      } else {
-        applyPartnerMetricRollupRows(
-          metricsByPartnerId,
-          buildPartnerMetricRollupRowsFromEventLogs(fallbackResult.rows, partnerId),
-        );
-      }
-    }
+    applyPartnerMetricRollupRows(metricsByPartnerId, metricRowsResult.rows);
   }
 
   if (engagementCounts.engagementErrorMessage) {
