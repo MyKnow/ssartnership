@@ -13,26 +13,14 @@ import {
   recordImageUploadAttempt,
 } from "@/lib/image-upload/rate-limit";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 
 export const runtime = "nodejs";
 
 const MAX_JSON_BYTES = 32 * 1024;
-
-async function readJsonBody(request: Request) {
-  const declaredLength = Number(request.headers.get("content-length"));
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_JSON_BYTES) {
-    return null;
-  }
-  const text = await request.text().catch(() => "");
-  if (!text || Buffer.byteLength(text, "utf8") > MAX_JSON_BYTES) {
-    return null;
-  }
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return null;
-  }
-}
 
 export async function POST(request: NextRequest) {
   if (
@@ -43,7 +31,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, message: "요청을 확인해 주세요." }, { status: 403 });
   }
 
-  const parsed = parseImageUploadCompleteRequest(await readJsonBody(request));
+  let body: unknown;
+  try {
+    body = await readRouteJsonBodyWithinLimit<unknown>(request, {
+      maximumBytes: MAX_JSON_BYTES,
+      invalidMessage: "이미지 업로드 요청을 확인해 주세요.",
+      tooLargeMessage: "이미지 업로드 요청이 너무 큽니다.",
+    });
+  } catch (error) {
+    if (error instanceof RouteJsonBodyError) {
+      return NextResponse.json(
+        { ok: false, message: error.message },
+        { status: error.status },
+      );
+    }
+    throw error;
+  }
+
+  const parsed = parseImageUploadCompleteRequest(body);
   if (!parsed) {
     return NextResponse.json(
       { ok: false, message: "이미지 업로드 요청을 확인해 주세요." },

@@ -10,11 +10,13 @@ import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
   NotificationRequestError,
   getSafeNotificationRouteError,
+  shouldLogNotificationRouteError,
 } from "@/lib/notifications/safe-error";
 import {
   MAX_PARTNER_NOTIFICATION_BODY_BYTES,
   normalizePartnerNotificationIds,
 } from "@/lib/partner-notification-input";
+import { readRouteJsonBodyWithinLimit } from "@/lib/route-json-body";
 
 export const runtime = "nodejs";
 
@@ -45,28 +47,15 @@ async function requirePartnerNotificationSession(request: NextRequest) {
 }
 
 async function parseNotificationIds(request: NextRequest) {
-  const contentLength = Number(request.headers.get("content-length"));
-  if (
-    Number.isFinite(contentLength) &&
-    contentLength > MAX_PARTNER_NOTIFICATION_BODY_BYTES
-  ) {
-    throw new NotificationRequestError("요청 본문이 너무 큽니다.");
-  }
-
-  const raw = await request.text();
-  if (Buffer.byteLength(raw, "utf8") > MAX_PARTNER_NOTIFICATION_BODY_BYTES) {
-    throw new NotificationRequestError("요청 본문이 너무 큽니다.");
-  }
-  if (!raw.trim()) {
+  if (!request.body) {
     return null;
   }
 
-  let payload: unknown;
-  try {
-    payload = JSON.parse(raw);
-  } catch {
-    throw new NotificationRequestError("요청 본문 형식을 확인해 주세요.");
-  }
+  const payload = await readRouteJsonBodyWithinLimit<unknown>(request, {
+    maximumBytes: MAX_PARTNER_NOTIFICATION_BODY_BYTES,
+    invalidMessage: "요청 본문 형식을 확인해 주세요.",
+    tooLargeMessage: "요청 본문이 너무 큽니다.",
+  });
 
   if (!payload || typeof payload !== "object") {
     throw new NotificationRequestError("요청 본문 형식을 확인해 주세요.");
@@ -128,7 +117,9 @@ export async function PATCH(request: NextRequest) {
     });
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
-    console.error("[partner-notifications] mark read failed", error);
+    if (shouldLogNotificationRouteError(error)) {
+      console.error("[partner-notifications] mark read failed", error);
+    }
     const safeError = getSafeNotificationRouteError(
       error,
       "알림을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -154,7 +145,9 @@ export async function DELETE(request: NextRequest) {
     });
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
-    console.error("[partner-notifications] delete failed", error);
+    if (shouldLogNotificationRouteError(error)) {
+      console.error("[partner-notifications] delete failed", error);
+    }
     const safeError = getSafeNotificationRouteError(
       error,
       "알림을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.",
