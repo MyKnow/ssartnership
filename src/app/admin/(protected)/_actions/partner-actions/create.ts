@@ -312,9 +312,13 @@ async function createPartnerRecord(
         .eq("id", createdBrandProfileId);
     }
     await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
-    await cleanupPartnerCompanyProvision(supabase, companyProvision).catch(
-      () => undefined,
-    );
+    try {
+      await cleanupPartnerCompanyProvision(supabase, companyProvision);
+    } catch (cleanupError) {
+      throw new Error("partner_company_cleanup_failed", {
+        cause: { originalError: error, cleanupError },
+      });
+    }
     throw error;
   }
 

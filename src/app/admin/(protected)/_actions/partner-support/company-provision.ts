@@ -35,6 +35,27 @@ async function runPartnerCompanyCleanup(
   return false;
 }
 
+async function runProvisionCleanupTasks(
+  cleanupTasks: Array<() => Promise<void>>,
+  originalError: unknown,
+) {
+  let cleanupFailed = false;
+
+  for (const cleanup of cleanupTasks.reverse()) {
+    try {
+      await cleanup();
+    } catch {
+      cleanupFailed = true;
+    }
+  }
+
+  if (cleanupFailed) {
+    throw new Error("partner_company_cleanup_failed", {
+      cause: originalError,
+    });
+  }
+}
+
 export async function ensurePartnerCompanyRow(
   supabase: AdminSupabaseClient,
   companyInput: PartnerCompanyInput,
@@ -254,9 +275,7 @@ export async function ensurePartnerCompanyRow(
       createdLink,
     };
   } catch (error) {
-    for (const cleanup of cleanupTasks.reverse()) {
-      await cleanup().catch(() => undefined);
-    }
+    await runProvisionCleanupTasks(cleanupTasks, error);
     throw error;
   }
 }

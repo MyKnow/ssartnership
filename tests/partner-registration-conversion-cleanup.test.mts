@@ -18,7 +18,7 @@ test("등록 신청 승인 변환 실패 시 이번 시도에 생성한 리소�
   assert.match(source, /cleanupPartnerCompanyProvision\(supabase, resources\.companyProvision\)/);
   assert.match(source, /conversion rollback failed/);
   assert.match(source, /partner_registration_conversion_cleanup_failed/);
-  assert.match(
+  assert.doesNotMatch(
     source,
     /await rollbackRegistrationConversionResources\(supabase, resources\)\.catch\(/,
   );
@@ -34,6 +34,33 @@ test("등록 승인 정리 쿼리 실패를 성공으로 삼키지 않는다", a
   );
 
   assert.match(source, /runPartnerCompanyCleanup/);
+  assert.match(source, /runProvisionCleanupTasks/);
   assert.match(source, /\[partner-company-provision\] cleanup failed/);
   assert.match(source, /partner_company_cleanup_failed/);
+  assert.match(source, /cause: originalError/);
+  assert.doesNotMatch(source, /await cleanup\(\)\.catch\(\(\) => undefined\)/);
+});
+
+test("관리자 제휴 생성·수정 실패도 회사 정리 실패를 숨기지 않는다", async () => {
+  const [createSource, updateSource] = await Promise.all([
+    readFile(
+      new URL("src/app/admin/(protected)/_actions/partner-actions/create.ts", root),
+      "utf8",
+    ),
+    readFile(
+      new URL("src/app/admin/(protected)/_actions/partner-actions/update.ts", root),
+      "utf8",
+    ),
+  ]);
+
+  assert.doesNotMatch(
+    createSource,
+    /cleanupPartnerCompanyProvision\(supabase, companyProvision\)\.catch\(/,
+  );
+  assert.doesNotMatch(
+    updateSource,
+    /cleanupPartnerCompanyProvision\(supabase, companyProvision\)\.catch\(/,
+  );
+  assert.match(createSource, /cause: \{ originalError: error, cleanupError \}/);
+  assert.match(updateSource, /cause: \{ originalError: error, cleanupError \}/);
 });

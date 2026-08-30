@@ -494,9 +494,13 @@ async function createPartnerFromPortalRegistrationRequest({
 
     return { partners: createdPartners, created: createdPartners.length > 0 };
   } catch (error) {
-    await rollbackRegistrationConversionResources(supabase, resources).catch(
-      () => undefined,
-    );
+    try {
+      await rollbackRegistrationConversionResources(supabase, resources);
+    } catch (cleanupError) {
+      throw new Error("partner_registration_conversion_cleanup_failed", {
+        cause: { originalError: error, cleanupError },
+      });
+    }
     throw error;
   }
 }
