@@ -14,6 +14,27 @@ import {
 } from "./shared";
 import { buildPartnerCompanySlug } from "./slug";
 
+type CleanupQueryResult = {
+  error: { code?: string; message: string } | null;
+};
+
+async function runPartnerCompanyCleanup(
+  stage: string,
+  operation: () => PromiseLike<CleanupQueryResult>,
+) {
+  const { error } = await operation();
+  if (!error) {
+    return true;
+  }
+
+  console.error("[partner-company-provision] cleanup failed", {
+    stage,
+    code: error.code ?? null,
+    message: error.message,
+  });
+  return false;
+}
+
 export async function ensurePartnerCompanyRow(
   supabase: AdminSupabaseClient,
   companyInput: PartnerCompanyInput,
@@ -103,7 +124,17 @@ export async function ensurePartnerCompanyRow(
     company = normalizePartnerCompanyRow(created as PartnerCompanyRow);
     createdCompany = true;
     cleanupTasks.push(async () => {
-      await supabase.from("partner_companies").delete().eq("id", company?.id ?? "");
+      const cleaned = await runPartnerCompanyCleanup(
+        "partner_company",
+        () =>
+          supabase
+            .from("partner_companies")
+            .delete()
+            .eq("id", company?.id ?? ""),
+      );
+      if (!cleaned) {
+        throw new Error("partner_company_cleanup_failed");
+      }
     });
 
     if (!company) {
@@ -167,7 +198,17 @@ export async function ensurePartnerCompanyRow(
       account = normalizePartnerAccountRow(createdAccountRow as PartnerAccountRow);
       createdAccount = true;
       cleanupTasks.push(async () => {
-        await supabase.from("partner_accounts").delete().eq("id", account?.id ?? "");
+        const cleaned = await runPartnerCompanyCleanup(
+          "partner_account",
+          () =>
+            supabase
+              .from("partner_accounts")
+              .delete()
+              .eq("id", account?.id ?? ""),
+        );
+        if (!cleaned) {
+          throw new Error("partner_company_cleanup_failed");
+        }
       });
     }
 
@@ -191,11 +232,18 @@ export async function ensurePartnerCompanyRow(
 
     createdLink = true;
     cleanupTasks.push(async () => {
-      await supabase
-        .from("partner_account_companies")
-        .delete()
-        .eq("account_id", accountId)
-        .eq("company_id", companyId);
+      const cleaned = await runPartnerCompanyCleanup(
+        "partner_account_company",
+        () =>
+          supabase
+            .from("partner_account_companies")
+            .delete()
+            .eq("account_id", accountId)
+            .eq("company_id", companyId),
+      );
+      if (!cleaned) {
+        throw new Error("partner_company_cleanup_failed");
+      }
     });
 
     return {
@@ -221,19 +269,49 @@ export async function cleanupPartnerCompanyProvision(
     return;
   }
 
+  const cleanupResults: boolean[] = [];
+
   if (provision.createdLink && provision.account) {
-    await supabase
-      .from("partner_account_companies")
-      .delete()
-      .eq("account_id", provision.account.id)
-      .eq("company_id", provision.company.id);
+    cleanupResults.push(
+      await runPartnerCompanyCleanup(
+        "partner_account_company",
+        () =>
+          supabase
+            .from("partner_account_companies")
+            .delete()
+            .eq("account_id", provision.account!.id)
+            .eq("company_id", provision.company!.id),
+      ),
+    );
   }
 
   if (provision.createdAccount && provision.account) {
-    await supabase.from("partner_accounts").delete().eq("id", provision.account.id);
+    cleanupResults.push(
+      await runPartnerCompanyCleanup(
+        "partner_account",
+        () =>
+          supabase
+            .from("partner_accounts")
+            .delete()
+            .eq("id", provision.account!.id),
+      ),
+    );
   }
 
   if (provision.createdCompany) {
-    await supabase.from("partner_companies").delete().eq("id", provision.company.id);
+    cleanupResults.push(
+      await runPartnerCompanyCleanup(
+        "partner_company",
+        () =>
+          supabase
+            .from("partner_companies")
+            .delete()
+            .eq("id", provision.company!.id),
+      ),
+    );
+  }
+
+  if (cleanupResults.includes(false)) {
+    throw new Error("partner_company_cleanup_failed");
   }
 }

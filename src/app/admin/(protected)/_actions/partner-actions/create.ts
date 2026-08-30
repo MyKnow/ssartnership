@@ -21,6 +21,7 @@ import {
   type PartnerBranchDraft,
   type PartnerBranchScopeType,
 } from "@/lib/partner-branch-registration";
+import { persistPartnerBranchLinks } from "@/lib/partner-branch-links.server";
 import type { PartnerCreateFormState } from "@/lib/partner-form-state";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
@@ -165,79 +166,6 @@ async function ensureAdminPartnerBrandProfile({
   };
 }
 
-async function persistAdminPartnerBranchLinks({
-  supabase,
-  partnerId,
-  companyId,
-  brandProfileId,
-  branches,
-}: {
-  supabase: ReturnType<typeof getSupabaseAdminClient>;
-  partnerId: string;
-  companyId: string | null;
-  brandProfileId: string | null;
-  branches: PartnerBranchDraft[];
-}) {
-  if (!companyId || !brandProfileId || branches.length === 0) {
-    return;
-  }
-
-  for (const branch of branches) {
-    const { data: existingBranch, error: branchLookupError } = await supabase
-      .from("partner_company_branches")
-      .select("id")
-      .eq("company_id", companyId)
-      .eq("brand_profile_id", brandProfileId)
-      .eq("branch_key", branch.branchKey)
-      .maybeSingle();
-    if (branchLookupError) {
-      throw new Error(branchLookupError.message);
-    }
-
-    let branchId = (existingBranch as { id?: string } | null)?.id ?? null;
-    if (!branchId) {
-      const { data: createdBranch, error: branchCreateError } = await supabase
-        .from("partner_company_branches")
-        .insert({
-          company_id: companyId,
-          brand_profile_id: brandProfileId,
-          branch_key: branch.branchKey,
-          branch_code: branch.branchCode,
-          name: branch.branchName,
-          address: branch.address,
-          branch_type: branch.branchType,
-          campus_slugs: branch.campusSlugs,
-          map_url: branch.mapUrl,
-          phone: branch.phone,
-          memo: branch.memo,
-          is_active: true,
-        })
-        .select("id")
-        .single();
-      if (branchCreateError) {
-        throw new Error(branchCreateError.message);
-      }
-      branchId = (createdBranch as { id: string }).id;
-    }
-
-    const { error: offerBranchError } = await supabase
-      .from("partner_offer_branches")
-      .upsert(
-        {
-          partner_id: partnerId,
-          branch_id: branchId,
-          status: "active",
-          source: "admin",
-          memo: branch.memo,
-        },
-        { onConflict: "partner_id,branch_id" },
-      );
-    if (offerBranchError) {
-      throw new Error(offerBranchError.message);
-    }
-  }
-}
-
 async function createPartnerRecord(
   formData: FormData,
   adminAccount: AdminScopeAccountLike,
@@ -355,12 +283,23 @@ async function createPartnerRecord(
       }
     }
 
-    await persistAdminPartnerBranchLinks({
+    await persistPartnerBranchLinks({
       supabase,
       partnerId,
       companyId: companyProvision.company?.id ?? null,
       brandProfileId: brandProfile.brandProfileId,
-      branches: branchPayload.branches,
+      source: "admin",
+      branches: branchPayload.branches.map((branch) => ({
+        branchKey: branch.branchKey,
+        branchCode: branch.branchCode,
+        name: branch.branchName,
+        address: branch.address,
+        branchType: branch.branchType,
+        campusSlugs: branch.campusSlugs,
+        mapUrl: branch.mapUrl,
+        phone: branch.phone,
+        memo: branch.memo,
+      })),
     });
   } catch (error) {
     if (createdPartner) {
@@ -373,7 +312,9 @@ async function createPartnerRecord(
         .eq("id", createdBrandProfileId);
     }
     await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
-    await cleanupPartnerCompanyProvision(supabase, companyProvision);
+    await cleanupPartnerCompanyProvision(supabase, companyProvision).catch(
+      () => undefined,
+    );
     throw error;
   }
 
