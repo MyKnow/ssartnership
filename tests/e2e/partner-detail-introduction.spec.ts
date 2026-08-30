@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { waitForPageReady } from "./page-ready";
 
 const viewports = [
   { width: 360, height: 844 },
@@ -24,11 +25,10 @@ test.describe("partner detail introduction", () => {
     for (const viewport of viewports) {
       await page.setViewportSize(viewport);
       await page.goto("/partners/health-001");
-      await page.waitForLoadState("networkidle");
-      await page.evaluate(() => document.fonts.ready);
 
       const detailContainer = page.locator("main > div.mx-auto.w-full").first();
       const hero = page.locator("[data-partner-detail-hero-info]");
+      await waitForPageReady(page, hero);
       const title = hero.getByRole("heading", { level: 1 });
       const [detailContainerStyles, detailContainerBox] = await Promise.all([
         detailContainer.evaluate((element) => {

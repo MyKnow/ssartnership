@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { waitForPageReady } from "./page-ready";
 
 const partnerPath = "/partners/cafe-ssafy-001";
 
@@ -15,13 +16,11 @@ test("keeps tablet gallery wheel navigation inside the page", async ({ page }) =
 
   await page.setViewportSize({ width: 820, height: 1180 });
   await page.goto(partnerPath);
-  await page.waitForLoadState("networkidle");
-  await page.evaluate(() => document.fonts.ready);
 
   const carousel = page.locator(
     "[data-partner-image-carousel=main] [data-partner-image-tablet-carousel]",
   );
-  await expect(carousel).toBeVisible();
+  await waitForPageReady(page, carousel);
   await carousel.scrollIntoViewIfNeeded();
 
   const activeImage = carousel.locator("[data-partner-image-carousel-active]");
@@ -74,13 +73,11 @@ test("preserves the document scroll position while changing gallery images", asy
 }) => {
   await page.setViewportSize({ width: 820, height: 1180 });
   await page.goto(partnerPath);
-  await page.waitForLoadState("networkidle");
-  await page.evaluate(() => document.fonts.ready);
 
   const carousel = page.locator(
     "[data-partner-image-carousel=main] [data-partner-image-tablet-carousel]",
   );
-  await expect(carousel).toBeVisible();
+  await waitForPageReady(page, carousel);
   await carousel.scrollIntoViewIfNeeded();
   await page.waitForTimeout(400);
 
@@ -118,12 +115,10 @@ test("moves exactly one image per mobile swipe without pulling the page", async 
 }) => {
   await page.setViewportSize({ width: 360, height: 844 });
   await page.goto(partnerPath);
-  await page.waitForLoadState("networkidle");
-  await page.evaluate(() => document.fonts.ready);
 
   const gallery = page.locator("[data-partner-detail-gallery]");
   const mainFrame = gallery.locator("[data-partner-image-main-frame]");
-  await expect(mainFrame).toBeVisible();
+  await waitForPageReady(page, mainFrame);
   await gallery.evaluate((element) => {
     const galleryTop = element.getBoundingClientRect().top + window.scrollY;
     window.scrollTo(0, Math.max(0, galleryTop - 650));
@@ -152,10 +147,10 @@ test("uses the full-bleed gallery lead only below the mobile breakpoint", async 
 }) => {
   await page.setViewportSize({ width: 360, height: 844 });
   await page.goto(partnerPath);
-  await page.evaluate(() => document.fonts.ready);
 
   const gallery = page.locator("[data-partner-detail-gallery]");
   const hero = page.locator("[data-partner-detail-hero-info]");
+  await waitForPageReady(page, hero);
   const mainFrame = gallery.locator("[data-partner-image-main-frame]");
   const thumbnailRail = gallery.locator("[data-partner-image-thumbnail-rail]");
   const indicators = gallery.locator("[data-carousel-slide-indicators]");

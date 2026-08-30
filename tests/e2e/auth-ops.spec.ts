@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { waitForPageReady } from "./page-ready";
 
 let hasWarmedAuthRoute = false;
 
@@ -30,7 +31,10 @@ test.describe("auth and partner portal operation flows", () => {
     expect(loginWarmup.ok()).toBe(true);
 
     await page.goto("/partners/health-001?returnTo=%2F%3Fcategory%3Dhealth%23benefits");
-    await page.waitForLoadState("networkidle");
+    await waitForPageReady(
+      page,
+      page.getByRole("banner").getByRole("link", { name: "로그인", exact: true }),
+    );
 
     await expect(
       page.getByRole("banner").getByRole("link", { name: "로그인", exact: true }),
@@ -107,7 +111,10 @@ test.describe("auth and partner portal operation flows", () => {
 
   test("@critical member login shows field-level validation before submitting", async ({ page }) => {
     await page.goto("/auth/login");
-    await page.waitForLoadState("networkidle");
+    await waitForPageReady(
+      page,
+      page.getByRole("textbox", { name: "아이디 또는 이메일" }),
+    );
 
     await expect(page.getByRole("textbox", { name: "아이디 또는 이메일" })).toHaveAttribute(
       "placeholder",
@@ -123,10 +130,9 @@ test.describe("auth and partner portal operation flows", () => {
 
   test("signup switches its child panel before opening the graduate certificate application", async ({ page }) => {
     await page.goto("/auth/signup");
-    await page.waitForLoadState("networkidle");
-    await page.evaluate(() => document.fonts?.ready);
 
     const memberTab = page.getByRole("tab", { name: "운영진·재학생", exact: true });
+    await waitForPageReady(page, memberTab);
     await expect(memberTab).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("textbox", { name: "Mattermost ID" })).toHaveAttribute(
       "placeholder",
@@ -237,8 +243,8 @@ test.describe("auth and partner portal operation flows", () => {
       page.waitForURL(/\/auth\/recover-email$/),
       emailRecovery.click(),
     ]);
-    await page.waitForLoadState("networkidle");
-    await expect(page.getByRole("heading", { name: "이메일 로그인 복구" })).toBeVisible();
+    const recoveryHeading = page.getByRole("heading", { name: "이메일 로그인 복구" });
+    await waitForPageReady(page, recoveryHeading);
     await expect(page.getByRole("textbox", { name: "기존 아이디 또는 이메일" })).toBeVisible();
     const passwordSubmit = page.getByRole("button", { name: "기존 비밀번호 확인" });
     await expect(passwordSubmit).toBeEnabled();

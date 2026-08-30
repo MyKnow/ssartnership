@@ -50,6 +50,7 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
     "node_modules",
     ".next",
     ".next-e2e",
+    ".next-perf-review",
     "next-env.d.ts",
   ]);
 
@@ -149,6 +150,7 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
     "utf8",
   );
   assert.match(eslintConfig, /"\.next-e2e\/\*\*"/);
+  assert.match(eslintConfig, /"\.next-perf-review\/\*\*"/);
 
   const adminConsoleSpec = await readFile(
     new URL("./e2e/admin-console.spec.ts", import.meta.url),

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { waitForPageReady } from "./page-ready";
 
 const ONE_PIXEL_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
@@ -81,8 +82,9 @@ test.describe("graduate verification application", () => {
     );
 
     await page.goto("/auth/signup/graduate");
-    await page.waitForLoadState("networkidle");
-    await page.getByRole("textbox", { name: "이메일" }).fill("graduate@example.com");
+    const emailInput = page.getByRole("textbox", { name: "이메일" });
+    await waitForPageReady(page, emailInput);
+    await emailInput.fill("graduate@example.com");
     await page.getByRole("button", { name: "인증 코드 보내기" }).click();
     await expect(page.getByText(/인증 코드 만료까지 [45]:[0-5]\d 남음/)).toBeVisible();
     await page.getByRole("textbox", { name: "인증 코드" }).fill("123456");
