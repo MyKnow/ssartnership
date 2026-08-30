@@ -40,3 +40,27 @@ export async function deletePartnerMediaUrls(urls: Array<string | null | undefin
     throw new Error(error.message);
   }
 }
+
+export async function cleanupPartnerMediaOrThrow(input: {
+  urls: Array<string | null | undefined>;
+  originalError: unknown;
+  logContext: string;
+}) {
+  try {
+    await deletePartnerMediaUrls(input.urls);
+  } catch (cleanupError) {
+    console.error(`[${input.logContext}] attached media cleanup failed`, cleanupError);
+    throw new Error("partner_media_cleanup_failed", {
+      cause: { originalError: input.originalError, cleanupError },
+    });
+  }
+}
+
+export async function rethrowAfterPartnerMediaCleanup(input: {
+  urls: Array<string | null | undefined>;
+  originalError: unknown;
+  logContext: string;
+}): Promise<never> {
+  await cleanupPartnerMediaOrThrow(input);
+  throw input.originalError;
+}

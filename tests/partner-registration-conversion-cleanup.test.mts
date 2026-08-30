@@ -63,7 +63,10 @@ test("관리자 제휴 생성·수정 실패도 회사 정리 실패를 숨기�
   );
   assert.match(
     createSource,
-    /cause: \{ originalError: error, cleanupError, persistenceCleanupError \}/,
+    /cause: \{[\s\S]{0,180}originalError,[\s\S]{0,180}cleanupError,[\s\S]{0,180}persistenceCleanupError,[\s\S]{0,180}mediaCleanupError/,
   );
-  assert.match(updateSource, /cause: \{ originalError: error, cleanupError \}/);
+  assert.match(
+    updateSource,
+    /cause: \{ originalError: error, cleanupError, mediaCleanupError \}/,
+  );
 });

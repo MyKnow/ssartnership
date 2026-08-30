@@ -7,7 +7,9 @@ import {
   resolveCreatedManagedCampusSlugs,
 } from "@/lib/admin-scope";
 import { sendAndRecordCampusScopedNewPartnerNotification } from "@/lib/new-partner-notifications";
-import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
+import {
+  cleanupPartnerMediaOrThrow,
+} from "@/lib/partner-media-storage";
 import {
   DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
   createFallbackSingleBranch,
@@ -219,16 +221,38 @@ async function cleanupPartnerCreateAttempt({
     persistenceCleanupError = cleanupError;
   }
 
-  await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
+  let mediaCleanupError: unknown = null;
+  try {
+    await cleanupPartnerMediaOrThrow({
+      urls: media.uploadedUrls,
+      originalError,
+      logContext: "admin-partner-create",
+    });
+  } catch (cleanupError) {
+    mediaCleanupError = cleanupError;
+  }
   try {
     await cleanupPartnerCompanyProvision(supabase, companyProvision);
   } catch (cleanupError) {
     throw new Error("partner_company_cleanup_failed", {
-      cause: { originalError, cleanupError, persistenceCleanupError },
+      cause: {
+        originalError,
+        cleanupError,
+        persistenceCleanupError,
+        mediaCleanupError,
+      },
+    });
+  }
+  if (persistenceCleanupError && mediaCleanupError) {
+    throw new Error("partner_create_cleanup_failed", {
+      cause: { originalError, persistenceCleanupError, mediaCleanupError },
     });
   }
   if (persistenceCleanupError) {
     throw persistenceCleanupError;
+  }
+  if (mediaCleanupError) {
+    throw mediaCleanupError;
   }
 }
 

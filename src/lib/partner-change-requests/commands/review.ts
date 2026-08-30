@@ -111,7 +111,12 @@ export async function approveSupabaseRequest(input: PartnerChangeRequestReviewIn
     currentMediaUrls,
     collectPartnerChangeRequestRequestedMediaUrls(summary),
   );
-  await deletePartnerMediaUrls(removedMediaUrls).catch(() => undefined);
+  await deletePartnerMediaUrls(removedMediaUrls).catch((cleanupError) => {
+    console.error(
+      "[partner-change-request] approved media cleanup failed",
+      cleanupError,
+    );
+  });
 
   const approved = await fetchRequestSummary(supabase, input.requestId);
   if (!approved) {
@@ -222,7 +227,12 @@ export async function rejectSupabaseRequest(input: PartnerChangeRequestReviewInp
     collectPartnerChangeRequestRequestedMediaUrls(rejected);
   await deletePartnerMediaUrls(
     requestedMediaUrls.filter((url) => !currentMediaUrls.includes(url)),
-  ).catch(() => undefined);
+  ).catch((cleanupError) => {
+    console.error(
+      "[partner-change-request] rejected media cleanup failed",
+      cleanupError,
+    );
+  });
 
   return rejected;
 }

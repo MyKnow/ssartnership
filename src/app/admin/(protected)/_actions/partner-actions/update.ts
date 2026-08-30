@@ -2,7 +2,10 @@ import { redirect } from "next/navigation";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { assertAdminCanAccessManagedCampuses } from "@/lib/admin-scope";
 import { buildAuditChangeSummary } from "@/lib/audit-change-summary";
-import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
+import {
+  cleanupPartnerMediaOrThrow,
+  deletePartnerMediaUrls,
+} from "@/lib/partner-media-storage";
 import {
   clearNewPartnerNotificationSent,
   sendAndRecordCampusScopedNewPartnerNotification,
@@ -291,13 +294,25 @@ export async function updatePartnerAction(formData: FormData) {
       }
     }
   } catch (error) {
-    await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
+    let mediaCleanupError: unknown = null;
+    try {
+      await cleanupPartnerMediaOrThrow({
+        urls: media.uploadedUrls,
+        originalError: error,
+        logContext: "admin-partner-update",
+      });
+    } catch (cleanupError) {
+      mediaCleanupError = cleanupError;
+    }
     try {
       await cleanupPartnerCompanyProvision(supabase, companyProvision);
     } catch (cleanupError) {
       throw new Error("partner_company_cleanup_failed", {
-        cause: { originalError: error, cleanupError },
+        cause: { originalError: error, cleanupError, mediaCleanupError },
       });
+    }
+    if (mediaCleanupError) {
+      throw mediaCleanupError;
     }
     redirectAdminActionError(
       redirectPath,
@@ -317,7 +332,9 @@ export async function updatePartnerAction(formData: FormData) {
     images: media.images,
   });
   const removedUrls = previousUrls.filter((url) => !nextUrls.includes(url));
-  await deletePartnerMediaUrls(removedUrls).catch(() => undefined);
+  await deletePartnerMediaUrls(removedUrls).catch((cleanupError) => {
+    console.error("[admin-partner-update] stale media cleanup failed", cleanupError);
+  });
 
   const nextCompany = companyProvision?.company ?? previousCompany;
   const nextCategoryLabel =
