@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRequestLogContext, scheduleProductEventLog } from "@/lib/activity-logs";
+import { getSafePublicRouteError } from "@/lib/public-route-safe-errors";
 import { partnerReviewRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
@@ -121,11 +122,15 @@ export async function PATCH(
         { status: 400 },
       );
     }
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : "리뷰 수정에 실패했습니다. 잠시 후 다시 시도해 주세요.";
-    return NextResponse.json({ ok: false, message }, { status: 503 });
+    console.error("[partner-review] update failed", error);
+    const safeError = getSafePublicRouteError(
+      error,
+      "리뷰 수정에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    return NextResponse.json(
+      { ok: false, message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }
 
@@ -190,10 +195,14 @@ export async function DELETE(
     });
     return NextResponse.json({ ok: true, summary });
   } catch (error) {
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : "리뷰 삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.";
-    return NextResponse.json({ ok: false, message }, { status: 503 });
+    console.error("[partner-review] delete failed", error);
+    const safeError = getSafePublicRouteError(
+      error,
+      "리뷰 삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    return NextResponse.json(
+      { ok: false, message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }

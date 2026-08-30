@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getRequestLogContext, scheduleProductEventLog } from "@/lib/activity-logs";
+import { getSafePublicRouteError } from "@/lib/public-route-safe-errors";
 import { partnerReviewRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
@@ -168,10 +169,14 @@ export async function POST(
       return NextResponse.json({ ok: true, review: retriedReview, summary, idempotent: true });
     }
     await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : "리뷰 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.";
-    return NextResponse.json({ ok: false, message }, { status: 503 });
+    console.error("[partner-reviews] create failed", error);
+    const safeError = getSafePublicRouteError(
+      error,
+      "리뷰 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    return NextResponse.json(
+      { ok: false, message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }

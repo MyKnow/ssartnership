@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSafePublicRouteError } from "@/lib/public-route-safe-errors";
 import { partnerFavoriteRepository, partnerRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
@@ -92,12 +93,14 @@ export async function POST(
     );
     return NextResponse.json({ favorite: payload.favorite });
   } catch (error) {
+    console.error("[partner-favorite] update failed", error);
+    const safeError = getSafePublicRouteError(
+      error,
+      "즐겨찾기를 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    );
     return NextResponse.json(
-      {
-        message:
-          error instanceof Error ? error.message : "즐겨찾기를 처리하지 못했습니다.",
-      },
-      { status: 500 },
+      { message: safeError.message },
+      { status: safeError.status },
     );
   }
 }

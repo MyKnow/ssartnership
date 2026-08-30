@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRequestLogContext, scheduleProductEventLog } from "@/lib/activity-logs";
+import { getSafePublicRouteError } from "@/lib/public-route-safe-errors";
 import { partnerReviewRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
@@ -109,11 +110,14 @@ export async function PATCH(
     }
     return NextResponse.json({ ok: true, review });
   } catch (error) {
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : "리뷰 반응에 실패했습니다. 잠시 후 다시 시도해 주세요.";
-    const status = message.includes("찾을 수 없습니다.") ? 404 : 503;
-    return NextResponse.json({ ok: false, message }, { status });
+    console.error("[partner-review-reaction] update failed", error);
+    const safeError = getSafePublicRouteError(
+      error,
+      "리뷰 반응에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    return NextResponse.json(
+      { ok: false, message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }

@@ -27,6 +27,7 @@ import {
   resolvePartnerRegistrationBranchPayload,
   resolvePartnerRegistrationMediaPayload,
 } from "@/lib/partner-registration-submit.server";
+import { getSafePartnerRegistrationError } from "@/lib/partner-registration-safe-errors";
 import { isE2eMockMutationEnabled } from "@/lib/e2e-mutation-mode";
 import { PARTNER_REGISTRATION_RATE_LIMIT, isBlocked, recordAttempt } from "@/lib/rate-limit";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -112,15 +113,14 @@ export async function createPartnerRegistrationRequestAction(
       branches,
     });
   } catch (error) {
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : "신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-    console.error("[partner-registration] insert failed", message);
+    console.error("[partner-registration] insert failed", error);
+    const safeError = getSafePartnerRegistrationError(
+      error,
+      "신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    );
     return {
       status: "error",
-      message,
-      fieldErrors: message.includes("지점") ? { branchListText: message } : undefined,
+      ...safeError,
     };
   }
 
@@ -277,14 +277,14 @@ export async function createPartnerRegistrationExcelRequestAction(
       context: { source: "public_excel" },
     });
   } catch (error) {
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : "신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-    console.error("[partner-registration:xlsx] insert failed", message);
+    console.error("[partner-registration:xlsx] insert failed", error);
+    const safeError = getSafePartnerRegistrationError(
+      error,
+      "신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    );
     return {
       status: "error",
-      message,
+      ...safeError,
     };
   }
 
