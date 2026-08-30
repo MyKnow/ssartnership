@@ -7,6 +7,7 @@ import {
   type AdPackageMetricEvent,
 } from "@/lib/ad-packages";
 import {
+  assertValidAdCouponCodeBatch,
   getCouponIssueCountSnapshot,
   getMemberIssueCountSnapshot,
   isMemberIssueLimitReached,
@@ -697,6 +698,7 @@ export class MockAdPackageRepository implements AdPackageRepository {
 
   async addCouponCodes(input: AddAdCouponCodesInput): Promise<AddAdCouponCodesResult> {
     const existing = this.couponCodes.get(input.couponId) ?? new Set<string>();
+    assertValidAdCouponCodeBatch(input.codes);
     const normalized = [...new Set(input.codes.map((code) => code.trim()).filter(Boolean))];
     const addedCount = normalized.filter((code) => !existing.has(code)).length;
     normalized.forEach((code) => existing.add(code));
