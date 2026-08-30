@@ -1,4 +1,5 @@
 import { createNotificationStorageError } from "@/lib/notifications/safe-error";
+import { listMockPartnerPortalSetupsInternal } from "@/lib/mock/partner-portal/store";
 import { isPartnerPortalMock } from "@/lib/partner-portal";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -84,26 +85,209 @@ type PartnerStoredNotificationRepository = {
   }): Promise<number>;
 };
 
+type MockPartnerStoredNotificationRecipient = {
+  id: string;
+  accountId: string;
+  notificationId: string;
+  readAt: string | null;
+  deletedAt: string | null;
+  createdAt: string;
+};
+
+type MockPartnerStoredNotificationState = {
+  notifications: Map<string, StoredPartnerNotificationRelation>;
+  recipients: MockPartnerStoredNotificationRecipient[];
+};
+
+const mockPartnerNotificationGlobalScope = globalThis as typeof globalThis & {
+  __mockPartnerStoredNotificationState?: MockPartnerStoredNotificationState;
+};
+
+const MOCK_GLOBAL_PARTNER_NOTIFICATION_ID =
+  "10000000-0000-4000-8000-000000000001";
+
+function createMockNotificationId(index: number) {
+  return `10000000-0000-4000-8000-${String(index + 2).padStart(12, "0")}`;
+}
+
+function createMockRecipientId(index: number) {
+  return `20000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`;
+}
+
+function createMockPartnerStoredNotificationState(): MockPartnerStoredNotificationState {
+  const setups = listMockPartnerPortalSetupsInternal();
+  const notifications = new Map<string, StoredPartnerNotificationRelation>();
+  notifications.set(MOCK_GLOBAL_PARTNER_NOTIFICATION_ID, {
+    id: MOCK_GLOBAL_PARTNER_NOTIFICATION_ID,
+    type: "plan",
+    title: "파트너 포털 운영 안내",
+    body: "새로운 운영 소식과 제휴 현황을 확인해 주세요.",
+    target_url: "/partner",
+    metadata: { source: "mock" },
+    company_id: null,
+    created_at: "2026-08-30T09:00:00.000Z",
+  });
+
+  const companyNotificationIds = new Map<string, string>();
+  const companySetups = new Map(
+    setups.map((setup) => [setup.company.id, setup] as const),
+  );
+  [...companySetups.values()].forEach((setup, index) => {
+    const notificationId = createMockNotificationId(index);
+    companyNotificationIds.set(setup.company.id, notificationId);
+    notifications.set(notificationId, {
+      id: notificationId,
+      type: "plan",
+      title: `${setup.company.name} 운영 현황이 업데이트되었습니다`,
+      body: "이번 달 제휴 운영 현황과 플랜 정보를 확인해 주세요.",
+      target_url: `/partner/companies/${setup.company.id}/plans`,
+      metadata: { source: "mock" },
+      company_id: setup.company.id,
+      created_at: new Date(
+        Date.parse("2026-08-30T08:00:00.000Z") - index * 60_000,
+      ).toISOString(),
+    });
+  });
+
+  const recipients: MockPartnerStoredNotificationRecipient[] = [];
+  const accountSetups = new Map(
+    setups.map((setup) => [setup.account.id, setup] as const),
+  );
+  for (const setup of accountSetups.values()) {
+    const accessibleCompanyIds = setup.account.linkedCompanyIds ?? [
+      setup.company.id,
+    ];
+    const notificationIds = [
+      MOCK_GLOBAL_PARTNER_NOTIFICATION_ID,
+      ...accessibleCompanyIds
+        .map((companyId) => companyNotificationIds.get(companyId) ?? null)
+        .filter((id): id is string => Boolean(id)),
+    ];
+
+    for (const notificationId of notificationIds) {
+      const notification = notifications.get(notificationId);
+      if (!notification) {
+        continue;
+      }
+      recipients.push({
+        id: createMockRecipientId(recipients.length),
+        accountId: setup.account.id,
+        notificationId,
+        readAt: null,
+        deletedAt: null,
+        createdAt: notification.created_at,
+      });
+    }
+  }
+
+  return { notifications, recipients };
+}
+
+function getMockPartnerStoredNotificationState() {
+  if (!mockPartnerNotificationGlobalScope.__mockPartnerStoredNotificationState) {
+    mockPartnerNotificationGlobalScope.__mockPartnerStoredNotificationState =
+      createMockPartnerStoredNotificationState();
+  }
+  return mockPartnerNotificationGlobalScope.__mockPartnerStoredNotificationState;
+}
+
+export function resetMockPartnerStoredNotificationStore() {
+  delete mockPartnerNotificationGlobalScope.__mockPartnerStoredNotificationState;
+}
+
 function createMockPartnerStoredNotificationRepository(): PartnerStoredNotificationRepository {
+  function isSelected(
+    recipient: MockPartnerStoredNotificationRecipient,
+    accountId: string,
+    notificationIds?: string[] | null,
+  ) {
+    return (
+      recipient.accountId === accountId &&
+      (!notificationIds || notificationIds.includes(recipient.notificationId))
+    );
+  }
+
   return {
-    async listScopedNotificationIds() {
-      return [];
+    async listScopedNotificationIds(companyId) {
+      return [...getMockPartnerStoredNotificationState().notifications.values()]
+        .filter(
+          (notification) =>
+            notification.company_id == null ||
+            notification.company_id === companyId,
+        )
+        .map((notification) => notification.id);
     },
 
-    async countUnread() {
-      return 0;
+    async countUnread({ accountId, notificationIds }) {
+      return getMockPartnerStoredNotificationState().recipients.filter(
+        (recipient) =>
+          isSelected(recipient, accountId, notificationIds) &&
+          recipient.deletedAt == null &&
+          recipient.readAt == null,
+      ).length;
     },
 
-    async list() {
-      return [];
+    async list({ accountId, notificationIds, limit }) {
+      const state = getMockPartnerStoredNotificationState();
+      return state.recipients
+        .filter(
+          (recipient) =>
+            isSelected(recipient, accountId, notificationIds) &&
+            recipient.deletedAt == null,
+        )
+        .sort((left, right) => {
+          if (left.createdAt === right.createdAt) {
+            return right.id.localeCompare(left.id);
+          }
+          return right.createdAt.localeCompare(left.createdAt);
+        })
+        .slice(0, limit)
+        .map((recipient) => {
+          const notification = state.notifications.get(recipient.notificationId);
+          return {
+            id: recipient.id,
+            read_at: recipient.readAt,
+            deleted_at: recipient.deletedAt,
+            created_at: recipient.createdAt,
+            notification: notification
+              ? {
+                  ...notification,
+                  metadata: notification.metadata
+                    ? { ...notification.metadata }
+                    : notification.metadata,
+                }
+              : null,
+          };
+        });
     },
 
-    async markRead() {
-      return 0;
+    async markRead({ accountId, notificationIds, now }) {
+      let updatedCount = 0;
+      for (const recipient of getMockPartnerStoredNotificationState().recipients) {
+        if (
+          isSelected(recipient, accountId, notificationIds) &&
+          recipient.deletedAt == null &&
+          recipient.readAt == null
+        ) {
+          recipient.readAt = now;
+          updatedCount += 1;
+        }
+      }
+      return updatedCount;
     },
 
-    async softDelete() {
-      return 0;
+    async softDelete({ accountId, notificationIds, now }) {
+      let updatedCount = 0;
+      for (const recipient of getMockPartnerStoredNotificationState().recipients) {
+        if (
+          isSelected(recipient, accountId, notificationIds) &&
+          recipient.deletedAt == null
+        ) {
+          recipient.deletedAt = now;
+          updatedCount += 1;
+        }
+      }
+      return updatedCount;
     },
   };
 }

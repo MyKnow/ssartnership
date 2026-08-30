@@ -175,20 +175,20 @@ function renderManualMemberPasswordReset(variables: EmailVariables) {
 function renderPartnerSuggestionReceived(variables: EmailVariables) {
   const contactName = getText(variables, "contactName", "담당자");
   const contactRole = getText(variables, "contactRole", "");
-  const recipientLabel = [contactName, contactRole].filter(Boolean).join(" ");
+  const contactLabel = [contactName, contactRole].filter(Boolean).join(" ");
   return renderTransactionalEmail({
-    preheader: "보내주신 제휴 제안을 접수했습니다.",
-    kicker: "제휴 제안",
-    title: "제안을 접수했습니다",
+    preheader: "새 제휴 제안을 확인해 주세요.",
+    kicker: "제휴 제안 운영 알림",
+    title: "새 제휴 제안이 접수되었습니다",
     titleSingleLine: true,
     lead: [
-      `${recipientLabel}님, ${SITE_NAME}에 보내주신 제휴 제안을 접수했습니다.`,
-      "담당자가 내용을 확인한 뒤 안내드리겠습니다.",
+      `${SITE_NAME} 운영 검토가 필요한 제휴 제안입니다.`,
+      `${contactLabel}에게 회신하려면 이 메일에 답장해 주세요.`,
     ],
     panels: [
       {
         tone: "info",
-        title: "접수 내용",
+        title: "제안 내용",
         body: [
           `파트너사명 · ${getText(variables, "companyName", "-")}`,
           `사업 분야 · ${getText(variables, "businessArea", "-")}`,

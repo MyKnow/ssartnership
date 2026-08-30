@@ -153,6 +153,26 @@ function createStoredNotificationEntry(
   };
 }
 
+async function loadStoredNotificationEntries(
+  accountId: string | null | undefined,
+  companyMap: Map<string, PartnerCompanyRow>,
+) {
+  if (!accountId) {
+    return { items: [] as PartnerNotificationEntry[], error: null as unknown };
+  }
+
+  const result = await listPartnerStoredNotifications({ accountId, limit: 30 }).then(
+    (value) => ({ rows: value.items, error: null as unknown }),
+    (error: unknown) => ({ rows: [] as StoredPartnerNotificationRow[], error }),
+  );
+  return {
+    items: result.rows
+      .map((row) => createStoredNotificationEntry(row, companyMap))
+      .filter((item): item is PartnerNotificationEntry => Boolean(item)),
+    error: result.error,
+  };
+}
+
 
 async function queryAuditLogs(params: {
   supabase: ReturnType<typeof getSupabaseAdminClient>;
@@ -503,15 +523,10 @@ async function loadSupabasePartnerNotificationCenter(
       }),
   ].filter((item): item is PartnerNotificationEntry => Boolean(item));
 
-  const storedNotificationResult = accountId
-    ? await listPartnerStoredNotifications({
-        accountId,
-        limit: 30,
-      }).then(
-        (result) => ({ items: result.items, error: null as Error | null }),
-        (error: unknown) => ({ items: [] as StoredPartnerNotificationRow[], error }),
-      )
-    : { items: [] as StoredPartnerNotificationRow[], error: null as Error | null };
+  const storedNotificationResult = await loadStoredNotificationEntries(
+    accountId,
+    companyMap,
+  );
 
   if (storedNotificationResult.error) {
     markPartialFailure();
@@ -521,11 +536,12 @@ async function loadSupabasePartnerNotificationCenter(
     );
   }
 
-  const storedItems = storedNotificationResult.items
-    .map((row) => createStoredNotificationEntry(row, companyMap))
-    .filter((item): item is PartnerNotificationEntry => Boolean(item));
-
-  const items = sortEntries([...storedItems, ...requestItems, ...reviewItems, ...operationItems]);
+  const items = sortEntries([
+    ...storedNotificationResult.items,
+    ...requestItems,
+    ...reviewItems,
+    ...operationItems,
+  ]);
   return {
     summary: buildSummary(items, companies.length, services.length),
     items,
@@ -587,30 +603,22 @@ async function loadMockPartnerNotificationCenter(
     )
   ).flat();
 
-  const operationItems: PartnerNotificationEntry[] = [];
-  if (accountId) {
-    operationItems.push({
-      id: `mock-account:${accountId}`,
-      category: "operation",
-      status: "updated",
-      tone: "primary",
-      badgeLabel: "계정",
-      title: "파트너사 계정 정보가 수정되었습니다",
-      body: "Mock 환경에서는 계정 관련 운영 알림이 제한적으로 표시됩니다.",
-      companyId: null,
-      companyName: "파트너사 계정",
-      partnerId: null,
-      partnerName: null,
-      href: "/partner",
-      createdAt: new Date().toISOString(),
-    });
-  }
+  const storedNotificationResult = await loadStoredNotificationEntries(
+    accountId,
+    companyMap,
+  );
 
-  const items = sortEntries([...requestItems, ...reviewItems, ...operationItems]);
+  const items = sortEntries([
+    ...storedNotificationResult.items,
+    ...requestItems,
+    ...reviewItems,
+  ]);
   return {
     summary: buildSummary(items, companyMap.size, serviceMap.size),
     items,
-    warningMessage: null,
+    warningMessage: storedNotificationResult.error
+      ? "일부 알림을 불러오지 못했습니다. 새로고침하면 최신 상태로 다시 시도합니다."
+      : null,
   };
 }
 

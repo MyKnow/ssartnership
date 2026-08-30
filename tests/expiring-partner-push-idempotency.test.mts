@@ -2,10 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 type PushOpsModule = typeof import("../src/lib/push/ops.ts");
+type OperationalNotificationsModule = typeof import(
+  "../src/lib/operational-notifications.ts"
+);
+type DedupeInput = Parameters<
+  OperationalNotificationsModule["claimOperationalNotificationDedupe"]
+>[0];
 
 const pushOpsModulePromise = import(
   new URL("../src/lib/push/ops.ts", import.meta.url).href,
 ) as Promise<PushOpsModule>;
+const operationalNotificationsModulePromise = import(
+  new URL("../src/lib/operational-notifications.ts", import.meta.url).href,
+) as Promise<OperationalNotificationsModule>;
 
 test("만료 예정 회원 푸시는 동일 제휴 종료 건 재실행을 한 번만 발송한다", async () => {
   const {
@@ -122,4 +131,132 @@ test("만료 예정 회원 푸시는 delivery 부분 실패를 cron 성공으로
       message: "회원 푸시 1건의 발송 결과를 확정하지 못했습니다.",
     },
   ]);
+});
+
+for (const failingAudience of ["admin", "partner"] as const) {
+  test(`만료 예정 ${failingAudience} 알림 생성 실패는 dedupe 예약을 해제해 다음 cron에서 재시도한다`, async () => {
+    const { runOperationalExpiringPartnerNotifications } =
+      await pushOpsModulePromise;
+    const partner = {
+      id: `partner-retry-${failingAudience}`,
+      name: `재시도 ${failingAudience}`,
+      period_end: "2026-09-07",
+      company_id: "company-retry-1",
+      category_label: "카페",
+      location: "서울 강남구",
+    };
+    const claimedKeys = new Set<string>();
+    const releasedAudiences: Array<DedupeInput["audience"]> = [];
+    const createAttempts = { admin: 0, partner: 0 };
+    let shouldFail = true;
+
+    const dependencies = {
+      claimDedupe: async (input: DedupeInput) => {
+        if (claimedKeys.has(input.dedupeKey)) {
+          return false;
+        }
+        claimedKeys.add(input.dedupeKey);
+        return true;
+      },
+      releaseDedupe: async (input: DedupeInput) => {
+        assert.equal(claimedKeys.delete(input.dedupeKey), true);
+        releasedAudiences.push(input.audience);
+      },
+      createAdminNotification: async () => {
+        createAttempts.admin += 1;
+        if (failingAudience === "admin" && shouldFail) {
+          shouldFail = false;
+          throw new Error("admin create failed");
+        }
+        return { notificationId: "admin-notification-1", recipientCount: 1 };
+      },
+      createPartnerNotification: async () => {
+        createAttempts.partner += 1;
+        if (failingAudience === "partner" && shouldFail) {
+          shouldFail = false;
+          throw new Error("partner create failed");
+        }
+        return { notificationId: "partner-notification-1", recipientCount: 1 };
+      },
+    };
+
+    const first = await runOperationalExpiringPartnerNotifications(
+      [partner],
+      7,
+      dependencies,
+    );
+    const retry = await runOperationalExpiringPartnerNotifications(
+      [partner],
+      7,
+      dependencies,
+    );
+
+    assert.equal(first.ok, false);
+    assert.equal(first.partialFailure, true);
+    assert.equal(first.summary.failed, 1);
+    assert.deepEqual(releasedAudiences, [failingAudience]);
+    assert.equal(retry.ok, true);
+    assert.equal(retry.partialFailure, false);
+    assert.equal(retry.summary.failed, 0);
+    assert.equal(retry.summary.skippedDuplicates, 1);
+    assert.equal(retry.summary.adminCreated, failingAudience === "admin" ? 1 : 0);
+    assert.equal(
+      retry.summary.partnerCreated,
+      failingAudience === "partner" ? 1 : 0,
+    );
+    assert.deepEqual(createAttempts, {
+      admin: failingAudience === "admin" ? 2 : 1,
+      partner: failingAudience === "partner" ? 2 : 1,
+    });
+    assert.equal(claimedKeys.size, 2);
+  });
+}
+
+test("저장 상태가 불확실한 알림 실패는 dedupe 예약을 유지해 중복 생성을 막는다", async () => {
+  const {
+    createDedupedOperationalNotification,
+    OperationalNotificationPersistenceUncertainError,
+  } = await operationalNotificationsModulePromise;
+  const dedupe: DedupeInput = {
+    dedupeKey: "uncertain-notification-1",
+    audience: "admin",
+    notificationType: "expiring_partner",
+    targetId: "partner-uncertain-1",
+  };
+  const claimedKeys = new Set<string>();
+  let releaseCalls = 0;
+  let createCalls = 0;
+  const claim = async (input: DedupeInput) => {
+    if (claimedKeys.has(input.dedupeKey)) {
+      return false;
+    }
+    claimedKeys.add(input.dedupeKey);
+    return true;
+  };
+  const release = async () => {
+    releaseCalls += 1;
+  };
+  const create = async () => {
+    createCalls += 1;
+    throw new OperationalNotificationPersistenceUncertainError(
+      "cleanup uncertain",
+      { cause: new Error("delete failed") },
+    );
+  };
+
+  await assert.rejects(
+    createDedupedOperationalNotification({ dedupe, claim, release, create }),
+    OperationalNotificationPersistenceUncertainError,
+  );
+  const retry = await createDedupedOperationalNotification({
+    dedupe,
+    claim,
+    release,
+    create,
+  });
+
+  assert.equal(retry, null);
+  assert.equal(createCalls, 1);
+  assert.equal(releaseCalls, 0);
+  assert.deepEqual([...claimedKeys], [dedupe.dedupeKey]);
 });

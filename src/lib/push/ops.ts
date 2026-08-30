@@ -12,8 +12,11 @@ import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
   claimOperationalNotificationDedupe,
   createAdminOperationalNotification,
+  createDedupedOperationalNotification,
   createPartnerOperationalNotification,
+  releaseOperationalNotificationDedupe,
 } from "@/lib/operational-notifications";
+import type { OperationalNotificationDedupeInput } from "@/lib/operational-notifications";
 import {
   createExpiringPartnershipDedupeKey,
 } from "@/lib/partner-notification-routing";
@@ -78,6 +81,13 @@ const EXPIRING_PARTNER_NOTIFICATION_CONCURRENCY = 4;
 const EXPIRING_PARTNER_MEMBER_PUSH_DAYS_BEFORE = 7;
 
 type ExpiringPartnerCampaignSender = typeof sendAdminNotificationCampaign;
+
+type OperationalExpiringPartnerDependencies = {
+  claimDedupe?: typeof claimOperationalNotificationDedupe;
+  releaseDedupe?: typeof releaseOperationalNotificationDedupe;
+  createAdminNotification?: typeof createAdminOperationalNotification;
+  createPartnerNotification?: typeof createPartnerOperationalNotification;
+};
 
 export function getKstDateString(daysFromToday = 0, baseDate = new Date()) {
   const now = new Date(baseDate.getTime() + daysFromToday * 24 * 60 * 60 * 1000);
@@ -240,7 +250,16 @@ export async function runExpiringPartnerPushBatch(
 export async function runOperationalExpiringPartnerNotifications(
   partners: ExpiringPartnerTarget[],
   daysBefore: number,
+  dependencies: OperationalExpiringPartnerDependencies = {},
 ) {
+  const claimDedupe =
+    dependencies.claimDedupe ?? claimOperationalNotificationDedupe;
+  const releaseDedupe =
+    dependencies.releaseDedupe ?? releaseOperationalNotificationDedupe;
+  const createAdminNotification =
+    dependencies.createAdminNotification ?? createAdminOperationalNotification;
+  const createPartnerNotification =
+    dependencies.createPartnerNotification ?? createPartnerOperationalNotification;
   const summary: OperationalExpiringPartnerSummary = {
     processedPartners: partners.length,
     adminCreated: 0,
@@ -269,34 +288,39 @@ export async function runOperationalExpiringPartnerNotifications(
       });
 
       try {
-        const shouldCreateAdminNotification = await claimOperationalNotificationDedupe({
-          dedupeKey: adminDedupeKey,
-          audience: "admin",
-          notificationType: "expiring_partner",
-          targetId: partner.id,
+        const adminNotificationCreated = await createDedupedOperationalNotification({
+          dedupe: {
+            dedupeKey: adminDedupeKey,
+            audience: "admin",
+            notificationType: "expiring_partner",
+            targetId: partner.id,
+          },
+          claim: claimDedupe,
+          release: releaseDedupe,
+          create: () =>
+            createAdminNotification({
+              type: "expiring_partner",
+              title: `제휴 종료 ${daysBefore}일 전`,
+              body: `${partner.name} 제휴가 ${partner.period_end}에 종료됩니다.`,
+              targetUrl: `/admin/partners?query=${encodeURIComponent(partner.name)}`,
+              metadata: {
+                partnerId: partner.id,
+                companyId: partner.company_id ?? null,
+                daysBefore,
+                endDate: partner.period_end,
+              },
+              templateContext: {
+                kind: "admin_expiring_partner",
+                partnerName: partner.name,
+                partnerCategory: partner.category_label?.trim() || "제휴",
+                partnerLocation: partner.location?.trim() || "",
+                periodEnd: partner.period_end,
+                daysUntilEnd: String(daysBefore),
+                adminUrl: `/admin/partners?query=${encodeURIComponent(partner.name)}`,
+              },
+            }),
         });
-        if (shouldCreateAdminNotification) {
-          await createAdminOperationalNotification({
-            type: "expiring_partner",
-            title: `제휴 종료 ${daysBefore}일 전`,
-            body: `${partner.name} 제휴가 ${partner.period_end}에 종료됩니다.`,
-            targetUrl: `/admin/partners?query=${encodeURIComponent(partner.name)}`,
-            metadata: {
-              partnerId: partner.id,
-              companyId: partner.company_id ?? null,
-              daysBefore,
-              endDate: partner.period_end,
-            },
-            templateContext: {
-              kind: "admin_expiring_partner",
-              partnerName: partner.name,
-              partnerCategory: partner.category_label?.trim() || "제휴",
-              partnerLocation: partner.location?.trim() || "",
-              periodEnd: partner.period_end,
-              daysUntilEnd: String(daysBefore),
-              adminUrl: `/admin/partners?query=${encodeURIComponent(partner.name)}`,
-            },
-          });
+        if (adminNotificationCreated) {
           summary.adminCreated += 1;
         } else {
           summary.skippedDuplicates += 1;
@@ -318,37 +342,49 @@ export async function runOperationalExpiringPartnerNotifications(
         summary.skippedWithoutCompany += 1;
         return;
       }
+      const companyId = partner.company_id;
 
       try {
-        const shouldCreatePartnerNotification = await claimOperationalNotificationDedupe({
-          dedupeKey: partnerDedupeKey,
-          audience: "partner",
-          notificationType: "expiring_partner",
-          targetId: partner.id,
+        const partnerNotificationCreated = await createDedupedOperationalNotification({
+          dedupe: {
+            dedupeKey: partnerDedupeKey,
+            audience: "partner",
+            notificationType: "expiring_partner",
+            targetId: partner.id,
+          },
+          claim: claimDedupe,
+          release: releaseDedupe,
+          create: () =>
+            createPartnerNotification({
+              type: "expiring_partner",
+              companyId,
+              title: `제휴 종료 ${daysBefore}일 전`,
+              body: `${partner.name} 제휴가 ${partner.period_end}에 종료됩니다.`,
+              targetUrl: getCompanyScopedPartnerServiceHref(
+                companyId,
+                partner.id,
+              ),
+              metadata: {
+                partnerId: partner.id,
+                companyId,
+                daysBefore,
+                endDate: partner.period_end,
+              },
+              templateContext: {
+                kind: "partner_expiring_partner",
+                partnerName: partner.name,
+                partnerCategory: partner.category_label?.trim() || "제휴",
+                partnerLocation: partner.location?.trim() || "",
+                periodEnd: partner.period_end,
+                daysUntilEnd: String(daysBefore),
+                partnerUrl: getCompanyScopedPartnerServiceHref(
+                  companyId,
+                  partner.id,
+                ),
+              },
+            }),
         });
-        if (shouldCreatePartnerNotification) {
-          await createPartnerOperationalNotification({
-            type: "expiring_partner",
-            companyId: partner.company_id,
-            title: `제휴 종료 ${daysBefore}일 전`,
-            body: `${partner.name} 제휴가 ${partner.period_end}에 종료됩니다.`,
-            targetUrl: getCompanyScopedPartnerServiceHref(partner.company_id, partner.id),
-            metadata: {
-              partnerId: partner.id,
-              companyId: partner.company_id,
-              daysBefore,
-              endDate: partner.period_end,
-            },
-            templateContext: {
-              kind: "partner_expiring_partner",
-              partnerName: partner.name,
-              partnerCategory: partner.category_label?.trim() || "제휴",
-              partnerLocation: partner.location?.trim() || "",
-              periodEnd: partner.period_end,
-              daysUntilEnd: String(daysBefore),
-              partnerUrl: getCompanyScopedPartnerServiceHref(partner.company_id, partner.id),
-            },
-          });
+        if (partnerNotificationCreated) {
           summary.partnerCreated += 1;
         } else {
           summary.skippedDuplicates += 1;

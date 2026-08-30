@@ -20,6 +20,7 @@ import {
   readJsonRequestBodyWithinLimit,
 } from "@/lib/request-body-limit";
 import { getClientIp } from "@/lib/client-ip";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +36,18 @@ function getClientIdentifier(request: Request) {
 
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
+  if (
+    !isTrustedSameOriginRequest(request, {
+      allowedContentTypes: ["application/json"],
+    })
+  ) {
+    return errorResponse(
+      "올바르지 않은 요청입니다.",
+      403,
+      "suggest_request_not_allowed",
+    );
+  }
+
   try {
     const identifier = getClientIdentifier(request);
     const blockingState = await isBlocked(identifier, SUGGEST_RATE_LIMIT);
@@ -75,7 +88,7 @@ export async function POST(request: Request) {
     const payload = validation.values;
     const safeCompanyUrlValue = validation.safeCompanyUrl;
 
-    const recipient = process.env.SUGGEST_NOTIFY_EMAIL ?? BUG_REPORT_EMAIL;
+    const recipient = process.env.SUGGEST_NOTIFY_EMAIL?.trim() || BUG_REPORT_EMAIL;
     try {
       getEmailDeliveryConfig();
     } catch (error) {
@@ -113,8 +126,7 @@ export async function POST(request: Request) {
     });
 
     await sendTransactionalEmail({
-      to: payload.contactEmail,
-      bcc: recipient,
+      to: recipient,
       replyTo: payload.contactEmail,
       subject,
       text: renderedBody.text,

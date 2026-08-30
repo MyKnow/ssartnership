@@ -50,6 +50,39 @@ const OPERATIONAL_PUSH_CONCURRENCY = 8;
 const OPERATIONAL_DELIVERY_CONCURRENCY = 8;
 const OPERATIONAL_EMAIL_CONCURRENCY = 4;
 
+export class OperationalNotificationPersistenceUncertainError extends Error {
+  constructor(message: string, options: { cause: unknown }) {
+    super(message, options);
+    this.name = "OperationalNotificationPersistenceUncertainError";
+  }
+}
+
+async function rollbackCreatedOperationalNotification(input: {
+  supabase: ReturnType<typeof getSupabaseAdminClient>;
+  audience: "admin" | "partner";
+  notificationId: string;
+  originalError: unknown;
+}) {
+  try {
+    const table =
+      input.audience === "admin" ? "admin_notifications" : "partner_notifications";
+    const { error } = await input.supabase
+      .from(table)
+      .delete()
+      .eq("id", input.notificationId);
+    if (error) {
+      throw new Error(error.message);
+    }
+  } catch (cleanupError) {
+    throw new OperationalNotificationPersistenceUncertainError(
+      "알림 생성이 부분 실패했고 저장된 알림을 정리하지 못했습니다.",
+      {
+        cause: new AggregateError([input.originalError, cleanupError]),
+      },
+    );
+  }
+}
+
 async function getWebPush() {
   if (!webPushPromise) {
     webPushPromise = import("web-push").then((module) => {
@@ -472,91 +505,126 @@ export async function createAdminOperationalNotification(input: {
     throw new Error(notificationError?.message ?? "관리자 알림을 저장하지 못했습니다.");
   }
 
-  const { data: profileRows, error: profileError } = await supabase
-    .from("admin_profiles")
-    .select("member_id")
-    .eq("is_active", true);
-  if (profileError) {
-    throw new Error(profileError.message);
-  }
-
-  const adminIds = Array.from(
-    new Set(
-      (profileRows ?? [])
-        .map((profile) => profile.member_id)
-        .filter((memberId): memberId is string => Boolean(memberId)),
-    ),
-  );
-  const { data: preferenceRows, error: preferenceError } = adminIds.length
-    ? await supabase
-        .from("admin_notification_preferences")
-        .select(
-          "admin_id,enabled,portal_enabled,push_enabled,security_enabled,partner_request_enabled,expiring_partner_enabled",
-        )
-        .in("admin_id", adminIds)
-    : { data: [], error: null };
-  if (preferenceError) {
-    throw new Error(preferenceError.message);
-  }
-
-  const preferenceByAdminId = new Map(
-    (preferenceRows ?? []).map((preference) => [
-      preference.admin_id,
-      preference,
-    ]),
-  );
-  const admins = adminIds.map((adminId) => ({
-    id: adminId,
-    channels: resolveAdminNotificationChannels({
-      type: input.type,
-      requestedChannels: input.requestedChannels ?? [...ADMIN_NOTIFICATION_CHANNELS],
-      preferences: toAdminPreferences(
-        (preferenceByAdminId.get(adminId) ?? null) as Record<string, unknown> | null,
-      ),
-    }),
-  }));
-
-  const recipientRows = admins
-    .filter((admin) => admin.channels.includes("portal"))
-    .map((admin) => ({
-      notification_id: notification.id,
-      admin_id: admin.id,
-    }));
-  if (recipientRows.length > 0) {
-    const { error } = await supabase
-      .from("admin_notification_recipients")
-      .insert(recipientRows);
-    if (error) {
-      throw new Error(error.message);
+  let recipientRows: Array<{ notification_id: string; admin_id: string }> = [];
+  let pushTargetAdminIds: string[] = [];
+  try {
+    const { data: profileRows, error: profileError } = await supabase
+      .from("admin_profiles")
+      .select("member_id")
+      .eq("is_active", true);
+    if (profileError) {
+      throw new Error(profileError.message);
     }
-    await forEachWithConcurrency(
-      recipientRows,
-      OPERATIONAL_DELIVERY_CONCURRENCY,
-      async (row) => {
-        await recordAdminDelivery({
-          notificationId: notification.id,
-          adminId: row.admin_id,
-          channel: "portal",
-          status: "sent",
-        });
-      },
+
+    const adminIds = Array.from(
+      new Set(
+        (profileRows ?? [])
+          .map((profile) => profile.member_id)
+          .filter((memberId): memberId is string => Boolean(memberId)),
+      ),
     );
+    const { data: preferenceRows, error: preferenceError } = adminIds.length
+      ? await supabase
+          .from("admin_notification_preferences")
+          .select(
+            "admin_id,enabled,portal_enabled,push_enabled,security_enabled,partner_request_enabled,expiring_partner_enabled",
+          )
+          .in("admin_id", adminIds)
+      : { data: [], error: null };
+    if (preferenceError) {
+      throw new Error(preferenceError.message);
+    }
+
+    const preferenceByAdminId = new Map(
+      (preferenceRows ?? []).map((preference) => [
+        preference.admin_id,
+        preference,
+      ]),
+    );
+    const admins = adminIds.map((adminId) => ({
+      id: adminId,
+      channels: resolveAdminNotificationChannels({
+        type: input.type,
+        requestedChannels: input.requestedChannels ?? [...ADMIN_NOTIFICATION_CHANNELS],
+        preferences: toAdminPreferences(
+          (preferenceByAdminId.get(adminId) ?? null) as Record<string, unknown> | null,
+        ),
+      }),
+    }));
+
+    recipientRows = admins
+      .filter((admin) => admin.channels.includes("portal"))
+      .map((admin) => ({
+        notification_id: String(notification.id),
+        admin_id: admin.id,
+      }));
+    if (recipientRows.length > 0) {
+      const { error } = await supabase
+        .from("admin_notification_recipients")
+        .insert(recipientRows);
+      if (error) {
+        throw new Error(error.message);
+      }
+      await forEachWithConcurrency(
+        recipientRows,
+        OPERATIONAL_DELIVERY_CONCURRENCY,
+        async (row) => {
+          await recordAdminDelivery({
+            notificationId: String(notification.id),
+            adminId: row.admin_id,
+            channel: "portal",
+            status: "sent",
+          });
+        },
+      );
+    }
+
+    pushTargetAdminIds = admins
+      .filter((admin) => admin.channels.includes("push"))
+      .map((admin) => admin.id);
+  } catch (error) {
+    await rollbackCreatedOperationalNotification({
+      supabase,
+      audience: "admin",
+      notificationId: String(notification.id),
+      originalError: error,
+    });
+    throw error;
   }
 
-  const pushTargetAdminIds = admins
-    .filter((admin) => admin.channels.includes("push"))
-    .map((admin) => admin.id);
   if (pushTargetAdminIds.length > 0) {
-    await sendAdminPushDeliveries({
-      notificationId: notification.id,
-      type: input.type,
-      title: input.title,
-      body: input.body,
-      targetUrl,
-      adminIds: pushTargetAdminIds,
-      templateContext: input.templateContext,
-      templateVariant: input.templateVariant,
-    });
+    try {
+      await sendAdminPushDeliveries({
+        notificationId: String(notification.id),
+        type: input.type,
+        title: input.title,
+        body: input.body,
+        targetUrl,
+        adminIds: pushTargetAdminIds,
+        templateContext: input.templateContext,
+        templateVariant: input.templateVariant,
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "관리자 푸시 발송 준비에 실패했습니다.";
+      console.error(
+        "[operational-notifications] admin push preparation failed",
+        errorMessage,
+      );
+      await forEachWithConcurrency(
+        pushTargetAdminIds,
+        OPERATIONAL_DELIVERY_CONCURRENCY,
+        async (adminId) => {
+          await recordAdminDelivery({
+            notificationId: String(notification.id),
+            adminId,
+            channel: "push",
+            status: "failed",
+            errorMessage,
+          });
+        },
+      );
+    }
   }
 
   return { notificationId: String(notification.id), recipientCount: recipientRows.length };
@@ -571,34 +639,33 @@ export async function notifyAdminsOfPartnerRegistrationRequest(input: {
   categoryLabel: string;
   location: string;
 }) {
-  const claimed = await claimOperationalNotificationDedupe({
-    dedupeKey: `partner-registration-request:${input.requestId}`,
-    audience: "admin",
-    notificationType: "partner_registration_request",
-    targetId: input.requestId,
-  });
-  if (!claimed) {
-    return null;
-  }
-
-  return createAdminOperationalNotification({
-    type: "partner_registration_request",
-    title: input.partnerName,
-    body: `회사: ${input.companyName}\n카테고리: ${input.categoryLabel}\n위치: ${input.location}\n신청자: ${input.requesterName}`,
-    targetUrl: "/admin/partner-registrations?status=pending",
-    metadata: {
-      partnerRegistrationRequestId: input.requestId,
-      source: input.source,
+  return createDedupedOperationalNotification({
+    dedupe: {
+      dedupeKey: `partner-registration-request:${input.requestId}`,
+      audience: "admin",
+      notificationType: "partner_registration_request",
+      targetId: input.requestId,
     },
-    templateContext: {
-      kind: "admin_partner_registration_request",
-      companyName: input.companyName,
-      partnerName: input.partnerName,
-      requesterName: input.requesterName,
-      partnerCategory: input.categoryLabel,
-      partnerLocation: input.location,
-      requestUrl: "/admin/partner-registrations?status=pending",
-    },
+    create: () =>
+      createAdminOperationalNotification({
+        type: "partner_registration_request",
+        title: input.partnerName,
+        body: `회사: ${input.companyName}\n카테고리: ${input.categoryLabel}\n위치: ${input.location}\n신청자: ${input.requesterName}`,
+        targetUrl: "/admin/partner-registrations?status=pending",
+        metadata: {
+          partnerRegistrationRequestId: input.requestId,
+          source: input.source,
+        },
+        templateContext: {
+          kind: "admin_partner_registration_request",
+          companyName: input.companyName,
+          partnerName: input.partnerName,
+          requesterName: input.requesterName,
+          partnerCategory: input.categoryLabel,
+          partnerLocation: input.location,
+          requestUrl: "/admin/partner-registrations?status=pending",
+        },
+      }),
   });
 }
 
@@ -760,65 +827,88 @@ export async function createPartnerOperationalNotification(input: {
     throw new Error(notificationError?.message ?? "파트너 알림을 저장하지 못했습니다.");
   }
 
-  const accountQuery = supabase
-    .from("partner_accounts")
-    .select(
-      "id,display_name,email,login_id,is_active,preferences:partner_notification_preferences(enabled,portal_enabled,push_enabled,email_enabled,plan_enabled,expiring_partner_enabled,metrics_enabled),links:partner_account_companies!inner(company_id,is_active)",
-    )
-    .eq("is_active", true);
+  let accounts: Array<{
+    id: string;
+    displayName: string;
+    email: string;
+    channels: PartnerNotificationChannel[];
+  }> = [];
+  let recipientRows: Array<{ notification_id: string; account_id: string }> = [];
+  try {
+    const accountQuery = supabase
+      .from("partner_accounts")
+      .select(
+        "id,display_name,email,login_id,is_active,preferences:partner_notification_preferences(enabled,portal_enabled,push_enabled,email_enabled,plan_enabled,expiring_partner_enabled,metrics_enabled),links:partner_account_companies!inner(company_id,is_active)",
+      )
+      .eq("is_active", true);
 
-  const { data: accountRows, error: accountError } =
-    input.accountIds && input.accountIds.length > 0
-      ? await accountQuery.in("id", input.accountIds)
-      : input.companyId
-        ? await accountQuery.eq("links.company_id", input.companyId).eq("links.is_active", true)
-        : await accountQuery;
+    const { data: accountRows, error: accountError } =
+      input.accountIds && input.accountIds.length > 0
+        ? await accountQuery.in("id", input.accountIds)
+        : input.companyId
+          ? await accountQuery
+              .eq("links.company_id", input.companyId)
+              .eq("links.is_active", true)
+          : await accountQuery;
 
-  if (accountError) {
-    throw new Error(accountError.message);
-  }
-
-  const accounts = (accountRows ?? []).map((row) => {
-    const preferenceRow = Array.isArray(row.preferences)
-      ? row.preferences[0] ?? null
-      : row.preferences;
-    return {
-      id: String(row.id),
-      displayName: String(row.display_name ?? "담당자"),
-      email: String(row.email ?? row.login_id ?? ""),
-      channels: resolvePartnerNotificationChannels({
-        type: input.type,
-        requestedChannels: input.requestedChannels ?? [...PARTNER_NOTIFICATION_CHANNELS],
-        preferences: toPartnerPreferences(preferenceRow as Record<string, unknown> | null),
-      }),
-    };
-  });
-
-  const recipientRows = accounts
-    .filter((account) => account.channels.includes("portal"))
-    .map((account) => ({
-      notification_id: notification.id,
-      account_id: account.id,
-    }));
-  if (recipientRows.length > 0) {
-    const { error } = await supabase
-      .from("partner_notification_recipients")
-      .insert(recipientRows);
-    if (error) {
-      throw new Error(error.message);
+    if (accountError) {
+      throw new Error(accountError.message);
     }
-    await forEachWithConcurrency(
-      recipientRows,
-      OPERATIONAL_DELIVERY_CONCURRENCY,
-      async (row) => {
-        await recordPartnerDelivery({
-          notificationId: notification.id,
-          accountId: row.account_id,
-          channel: "portal",
-          status: "sent",
-        });
-      },
-    );
+
+    accounts = (accountRows ?? []).map((row) => {
+      const preferenceRow = Array.isArray(row.preferences)
+        ? row.preferences[0] ?? null
+        : row.preferences;
+      return {
+        id: String(row.id),
+        displayName: String(row.display_name ?? "담당자"),
+        email: String(row.email ?? row.login_id ?? ""),
+        channels: resolvePartnerNotificationChannels({
+          type: input.type,
+          requestedChannels: input.requestedChannels ?? [
+            ...PARTNER_NOTIFICATION_CHANNELS,
+          ],
+          preferences: toPartnerPreferences(
+            preferenceRow as Record<string, unknown> | null,
+          ),
+        }),
+      };
+    });
+
+    recipientRows = accounts
+      .filter((account) => account.channels.includes("portal"))
+      .map((account) => ({
+        notification_id: String(notification.id),
+        account_id: account.id,
+      }));
+    if (recipientRows.length > 0) {
+      const { error } = await supabase
+        .from("partner_notification_recipients")
+        .insert(recipientRows);
+      if (error) {
+        throw new Error(error.message);
+      }
+      await forEachWithConcurrency(
+        recipientRows,
+        OPERATIONAL_DELIVERY_CONCURRENCY,
+        async (row) => {
+          await recordPartnerDelivery({
+            notificationId: String(notification.id),
+            accountId: row.account_id,
+            channel: "portal",
+            status: "sent",
+          });
+        },
+      );
+    }
+  } catch (error) {
+    await rollbackCreatedOperationalNotification({
+      supabase,
+      audience: "partner",
+      notificationId: String(notification.id),
+      originalError: error,
+    });
+    throw error;
   }
 
   const emailTargets = accounts.filter((account) => account.channels.includes("email"));
@@ -859,16 +949,38 @@ export async function createPartnerOperationalNotification(input: {
     .filter((account) => account.channels.includes("push"))
     .map((account) => account.id);
   if (pushTargetAccountIds.length > 0) {
-    await sendPartnerPushDeliveries({
-      notificationId: notification.id,
-      type: input.type,
-      title: input.title,
-      body: input.body,
-      targetUrl,
-      accountIds: pushTargetAccountIds,
-      templateContext: input.templateContext,
-      templateVariant: input.templateVariant,
-    });
+    try {
+      await sendPartnerPushDeliveries({
+        notificationId: String(notification.id),
+        type: input.type,
+        title: input.title,
+        body: input.body,
+        targetUrl,
+        accountIds: pushTargetAccountIds,
+        templateContext: input.templateContext,
+        templateVariant: input.templateVariant,
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "파트너 푸시 발송 준비에 실패했습니다.";
+      console.error(
+        "[operational-notifications] partner push preparation failed",
+        errorMessage,
+      );
+      await forEachWithConcurrency(
+        pushTargetAccountIds,
+        OPERATIONAL_DELIVERY_CONCURRENCY,
+        async (accountId) => {
+          await recordPartnerDelivery({
+            notificationId: String(notification.id),
+            accountId,
+            channel: "push",
+            status: "failed",
+            errorMessage,
+          });
+        },
+      );
+    }
   }
 
   return { notificationId: String(notification.id), recipientCount: recipientRows.length };
@@ -986,12 +1098,16 @@ async function sendPartnerPushDeliveries(input: {
   );
 }
 
-export async function claimOperationalNotificationDedupe(input: {
+export type OperationalNotificationDedupeInput = {
   dedupeKey: string;
   audience: "admin" | "partner";
   notificationType: string;
   targetId: string;
-}) {
+};
+
+export async function claimOperationalNotificationDedupe(
+  input: OperationalNotificationDedupeInput,
+) {
   const supabase = getSupabaseAdminClient();
   const { error } = await supabase.from("operational_notification_dedupes").insert({
     dedupe_key: input.dedupeKey,
@@ -1007,4 +1123,52 @@ export async function claimOperationalNotificationDedupe(input: {
     return false;
   }
   throw new Error(error.message);
+}
+
+export async function releaseOperationalNotificationDedupe(
+  input: OperationalNotificationDedupeInput,
+) {
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase
+    .from("operational_notification_dedupes")
+    .delete()
+    .eq("dedupe_key", input.dedupeKey)
+    .eq("audience", input.audience)
+    .eq("notification_type", input.notificationType)
+    .eq("target_id", input.targetId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function createDedupedOperationalNotification<T>(input: {
+  dedupe: OperationalNotificationDedupeInput;
+  create: () => Promise<T>;
+  claim?: typeof claimOperationalNotificationDedupe;
+  release?: typeof releaseOperationalNotificationDedupe;
+}): Promise<T | null> {
+  const claim = input.claim ?? claimOperationalNotificationDedupe;
+  const release = input.release ?? releaseOperationalNotificationDedupe;
+  const claimed = await claim(input.dedupe);
+  if (!claimed) {
+    return null;
+  }
+
+  try {
+    return await input.create();
+  } catch (creationError) {
+    if (creationError instanceof OperationalNotificationPersistenceUncertainError) {
+      throw creationError;
+    }
+    try {
+      await release(input.dedupe);
+    } catch (releaseError) {
+      throw new Error(
+        "알림 생성에 실패했고 중복 방지 예약을 해제하지 못했습니다.",
+        { cause: new AggregateError([creationError, releaseError]) },
+      );
+    }
+    throw creationError;
+  }
 }
