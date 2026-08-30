@@ -8,12 +8,12 @@ import {
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
   JsonRequestBodyError,
+  MAX_STANDARD_JSON_BODY_BYTES,
   readJsonRequestBodyWithinLimit,
 } from "@/lib/request-body-limit";
 import { withServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
-const MAX_ADMIN_NOTIFICATION_PREFERENCES_JSON_BODY_BYTES = 4 * 1024;
 
 function toOptionalBoolean(value: unknown) {
   return typeof value === "boolean" ? value : undefined;
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       try {
         body = await readJsonRequestBodyWithinLimit<Record<string, unknown>>(
           request,
-          MAX_ADMIN_NOTIFICATION_PREFERENCES_JSON_BODY_BYTES,
+          MAX_STANDARD_JSON_BODY_BYTES,
         );
       } catch (error) {
         if (

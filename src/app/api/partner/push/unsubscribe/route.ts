@@ -3,9 +3,13 @@ import { getPartnerSession } from "@/lib/partner-session";
 import { deactivateOperationalPushSubscription } from "@/lib/operational-notifications";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
-  NotificationRequestError,
   getSafeNotificationRouteError,
+  shouldLogNotificationRouteError,
 } from "@/lib/notifications/safe-error";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 
 export const runtime = "nodejs";
 
@@ -23,13 +27,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
   }
   try {
-    const body = (await request.json().catch(() => {
-      throw new NotificationRequestError("요청 본문 형식을 확인해 주세요.");
-    })) as {
+    const body = await readRouteJsonBodyWithinLimit<{
       endpoint?: string | null;
       subscriptionId?: string | null;
       scope?: "device" | "all";
-    };
+    }>(request, {
+      maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+      invalidMessage: "요청 본문 형식을 확인해 주세요.",
+      tooLargeMessage: "Push 구독 해제 요청이 너무 큽니다.",
+    });
     await deactivateOperationalPushSubscription({
       ownerType: "partner",
       ownerId: session.accountId,
@@ -39,7 +45,9 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("[partner-push-unsubscribe] request failed", error);
+    if (shouldLogNotificationRouteError(error)) {
+      console.error("[partner-push-unsubscribe] request failed", error);
+    }
     const safeError = getSafeNotificationRouteError(
       error,
       "알림 구독을 해제하지 못했습니다. 잠시 후 다시 시도해 주세요.",

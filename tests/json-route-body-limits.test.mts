@@ -6,6 +6,14 @@ import {
   JsonRequestBodyError,
   readJsonRequestBodyWithinLimit,
 } from "../src/lib/request-body-limit.ts";
+import {
+  getSafeNotificationRouteError,
+  shouldLogNotificationRouteError,
+} from "../src/lib/notifications/safe-error.ts";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "../src/lib/route-json-body.ts";
 
 const root = new URL("..", import.meta.url);
 
@@ -80,7 +88,7 @@ test("관리자 알림 설정은 인증 뒤 본문을 읽고 두 종류의 초�
 
   assert.match(
     source,
-    /MAX_ADMIN_NOTIFICATION_PREFERENCES_JSON_BODY_BYTES = 4 \* 1024/,
+    /MAX_STANDARD_JSON_BODY_BYTES/,
   );
   assert.match(source, /error\.code === "body_too_large"/);
   assert.match(source, /\{ message: "알림 설정 요청이 너무 큽니다\." \}/);
@@ -114,7 +122,7 @@ test("수료생 업로드 서명과 관리자 push 구독도 bounded JSON reader
 
   assert.match(
     graduateSource,
-    /MAX_GRADUATE_UPLOAD_SIGN_JSON_BODY_BYTES = 4 \* 1024/,
+    /MAX_STANDARD_JSON_BODY_BYTES/,
   );
   assert.match(graduateSource, /await readJsonRequestBodyWithinLimit/);
   assert.match(graduateSource, /error\.code === "body_too_large"/);
@@ -123,10 +131,85 @@ test("수료생 업로드 서명과 관리자 push 구독도 bounded JSON reader
 
   assert.match(
     adminPushSource,
-    /MAX_ADMIN_PUSH_SUBSCRIPTION_JSON_BODY_BYTES = 16 \* 1024/,
+    /MAX_PUSH_SUBSCRIPTION_JSON_BODY_BYTES/,
   );
   assert.match(adminPushSource, /await readJsonRequestBodyWithinLimit/);
   assert.match(adminPushSource, /error\.code === "body_too_large"/);
   assert.match(adminPushSource, /\{ status: 413 \}/);
   assert.doesNotMatch(adminPushSource, /request\.json\(/);
+});
+
+test("route JSON helper는 malformed와 oversized 본문을 안전한 상태로 구분한다", async () => {
+  const options = {
+    maximumBytes: 32,
+    invalidMessage: "본문 형식을 확인해 주세요.",
+    tooLargeMessage: "본문이 너무 큽니다.",
+  };
+
+  await assert.rejects(
+    readRouteJsonBodyWithinLimit(
+      new Request("https://ssartnership.example/api/test", {
+        method: "POST",
+        headers: { "content-length": "33" },
+        body: "{}",
+      }),
+      options,
+    ),
+    (error: unknown) => {
+      assert.ok(error instanceof RouteJsonBodyError);
+      assert.equal(error.code, "body_too_large");
+      assert.equal(error.status, 413);
+      assert.equal(error.message, "본문이 너무 큽니다.");
+      assert.deepEqual(getSafeNotificationRouteError(error, "fallback"), {
+        message: "본문이 너무 큽니다.",
+        status: 413,
+      });
+      assert.equal(shouldLogNotificationRouteError(error), false);
+      assert.equal(
+        shouldLogNotificationRouteError(new Error("storage unavailable")),
+        true,
+      );
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    readRouteJsonBodyWithinLimit(
+      new Request("https://ssartnership.example/api/test", {
+        method: "POST",
+        body: "not-json",
+      }),
+      options,
+    ),
+    (error: unknown) =>
+      error instanceof RouteJsonBodyError &&
+      error.code === "invalid_json" &&
+      error.status === 400 &&
+      error.message === "본문 형식을 확인해 주세요.",
+  );
+});
+
+test("회원·파트너·관리자 알림 JSON 경로는 공용 bounded reader를 사용한다", async () => {
+  const routePaths = [
+    "src/app/api/admin/push/unsubscribe/route.ts",
+    "src/app/api/notifications/preferences/route.ts",
+    "src/app/api/partner/notifications/preferences/route.ts",
+    "src/app/api/partner/push/subscribe/route.ts",
+    "src/app/api/partner/push/unsubscribe/route.ts",
+    "src/app/api/push/subscribe/route.ts",
+    "src/app/api/push/unsubscribe/route.ts",
+  ];
+  const sources = await Promise.all(routePaths.map(readSource));
+
+  for (const source of sources) {
+    assert.match(source, /readRouteJsonBodyWithinLimit/);
+    assert.doesNotMatch(source, /request\.json\(/);
+  }
+
+  const safeErrorSource = await readSource(
+    "src/lib/notifications/safe-error.ts",
+  );
+  assert.match(safeErrorSource, /error instanceof RouteJsonBodyError/);
+  assert.match(safeErrorSource, /status: error\.status/);
+  assert.match(safeErrorSource, /shouldLogNotificationRouteError/);
 });

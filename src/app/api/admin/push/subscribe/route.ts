@@ -5,17 +5,18 @@ import { isPushConfigured } from "@/lib/push";
 import {
   NotificationRequestError,
   getSafeNotificationRouteError,
+  shouldLogNotificationRouteError,
 } from "@/lib/notifications/safe-error";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
   JsonRequestBodyError,
+  MAX_PUSH_SUBSCRIPTION_JSON_BODY_BYTES,
   readJsonRequestBodyWithinLimit,
 } from "@/lib/request-body-limit";
 import { upsertOperationalPushSubscription } from "@/lib/operational-notifications";
 import { withServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
-const MAX_ADMIN_PUSH_SUBSCRIPTION_JSON_BODY_BYTES = 16 * 1024;
 
 function getPushDeviceUserAgent(request: NextRequest) {
   const userAgent = request.headers.get("user-agent")?.trim() ?? "";
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
       try {
         body = await readJsonRequestBodyWithinLimit<{
           subscription?: PushSubscriptionJSON;
-        }>(request, MAX_ADMIN_PUSH_SUBSCRIPTION_JSON_BODY_BYTES);
+        }>(request, MAX_PUSH_SUBSCRIPTION_JSON_BODY_BYTES);
       } catch (error) {
         if (
           error instanceof JsonRequestBodyError &&
@@ -73,7 +74,9 @@ export async function POST(request: NextRequest) {
       invalidateAdminNotificationSettingsCache(session.adminId);
       return NextResponse.json({ ok: true, preferences });
     } catch (error) {
-      console.error("[admin-push-subscribe] subscription failed", error);
+      if (shouldLogNotificationRouteError(error)) {
+        console.error("[admin-push-subscribe] subscription failed", error);
+      }
       const safeError = getSafeNotificationRouteError(
         error,
         "알림 구독에 실패했습니다. 잠시 후 다시 시도해 주세요.",

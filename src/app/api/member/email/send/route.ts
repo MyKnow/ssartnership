@@ -23,6 +23,11 @@ import { normalizeMemberEmail } from "@/lib/member-domain";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getSignedUserSession } from "@/lib/user-auth";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 
 export const runtime = "nodejs";
 
@@ -47,9 +52,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = (await request.json().catch(() => null)) as {
+  let body: {
     email?: unknown;
-  } | null;
+  } | null = null;
+  try {
+    body = await readRouteJsonBodyWithinLimit<{ email?: unknown }>(request, {
+      maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+      invalidMessage: "이메일 주소를 확인해 주세요.",
+      tooLargeMessage: "요청 본문이 너무 큽니다.",
+    });
+  } catch (error) {
+    if (error instanceof RouteJsonBodyError && error.code === "body_too_large") {
+      return NextResponse.json(
+        { ok: false, message: error.message },
+        { status: error.status },
+      );
+    }
+  }
   const email = normalizeMemberEmail(body?.email);
   if (!email) {
     return NextResponse.json(

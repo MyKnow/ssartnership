@@ -7,6 +7,12 @@ export class RequestBodyTooLargeError extends Error {
 
 export type JsonRequestBodyErrorCode = 'invalid_json' | 'body_too_large';
 
+export const MAX_STANDARD_JSON_BODY_BYTES = 4 * 1024;
+export const MAX_EXTENDED_JSON_BODY_BYTES = 16 * 1024;
+export const MAX_PUSH_SUBSCRIPTION_JSON_BODY_BYTES =
+  MAX_EXTENDED_JSON_BODY_BYTES;
+export const MAX_BULK_JSON_BODY_BYTES = 128 * 1024;
+
 export class JsonRequestBodyError extends Error {
   readonly code: JsonRequestBodyErrorCode;
 

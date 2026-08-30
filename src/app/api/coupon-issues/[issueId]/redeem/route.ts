@@ -5,6 +5,11 @@ import { adPackageRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { normalizeCouponVerificationPassword } from "@/lib/coupon-verification-password";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 
 export const runtime = "nodejs";
 
@@ -70,12 +75,20 @@ export async function POST(
 
   let body: RedeemRequestBody = {};
   try {
-    const parsed = await request.json();
+    const parsed = await readRouteJsonBodyWithinLimit<unknown>(request, {
+      maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+      invalidMessage: "잘못된 요청입니다.",
+      tooLargeMessage: "요청이 너무 큽니다.",
+    });
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
       body = parsed as RedeemRequestBody;
     }
-  } catch {
-    return NextResponse.json({ ok: false, message: "잘못된 요청입니다." }, { status: 400 });
+  } catch (error) {
+    const message = error instanceof RouteJsonBodyError
+      ? error.message
+      : "잘못된 요청입니다.";
+    const status = error instanceof RouteJsonBodyError ? error.status : 400;
+    return NextResponse.json({ ok: false, message }, { status });
   }
 
   const onsitePassword = body.onsitePassword;

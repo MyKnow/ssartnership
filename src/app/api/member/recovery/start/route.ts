@@ -10,6 +10,11 @@ import { resolveMemberForEmailRecovery } from "@/lib/member-authentication";
 import { setMemberEmailRecoverySession } from "@/lib/member-email-recovery-session";
 import { verifyPassword } from "@/lib/password";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 
 export const runtime = "nodejs";
 
@@ -21,10 +26,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "요청을 확인해 주세요." }, { status: 403 });
   }
 
-  const body = (await request.json().catch(() => null)) as {
+  let body: {
     identifier?: unknown;
     password?: unknown;
-  } | null;
+  } | null = null;
+  try {
+    body = await readRouteJsonBodyWithinLimit<{
+      identifier?: unknown;
+      password?: unknown;
+    }>(request, {
+      maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+      invalidMessage: GENERIC_ERROR,
+      tooLargeMessage: "요청 본문이 너무 큽니다.",
+    });
+  } catch (error) {
+    if (error instanceof RouteJsonBodyError && error.code === "body_too_large") {
+      return NextResponse.json(
+        { ok: false, message: error.message },
+        { status: error.status },
+      );
+    }
+  }
   const identifier = String(body?.identifier ?? "").trim();
   const password = String(body?.password ?? "");
   const throttle = {

@@ -6,7 +6,12 @@ import {
   issueAdminMemberPasswordReset,
   type AdminMemberPasswordResetDelivery,
 } from "@/lib/admin-member-password-reset";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 import { withServerTiming } from "@/lib/server-timing";
 import { isUuid } from "@/lib/uuid";
 
@@ -40,7 +45,21 @@ export async function POST(
       return permission.response;
     }
 
-    const body = await request.json().catch(() => null) as { delivery?: unknown } | null;
+    let body: { delivery?: unknown } | null;
+    try {
+      body = await readRouteJsonBodyWithinLimit<{ delivery?: unknown } | null>(
+        request,
+        {
+          maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          invalidMessage: "재발급 방식을 확인해 주세요.",
+        },
+      );
+    } catch (error) {
+      if (error instanceof RouteJsonBodyError) {
+        return response({ ok: false, message: error.message }, error.status);
+      }
+      throw error;
+    }
     const delivery = body?.delivery;
     if (delivery !== "copy" && delivery !== "email") {
       return response({ ok: false, message: "재발급 방식을 확인해 주세요." }, 400);

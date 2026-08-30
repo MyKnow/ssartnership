@@ -27,6 +27,11 @@ import {
   RESET_PASSWORD_COMPLETION_COOKIE_NAME,
 } from "@/lib/reset-password-session";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -78,7 +83,19 @@ export async function POST(request: Request) {
   if (!isTrustedSameOriginRequest(request, { allowedContentTypes: ["application/json"] })) {
     return NextResponse.json({ ok: false, error: "invalid_request" }, { status: 403 });
   }
-  const body = await request.json().catch(() => null);
+  let body: unknown;
+  try {
+    body = await readRouteJsonBodyWithinLimit<unknown>(request, {
+      maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+      invalidMessage: "invalid_request",
+      tooLargeMessage: "invalid_request",
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { ok: false, error: "invalid_request" },
+      { status: error instanceof RouteJsonBodyError ? error.status : 400 },
+    );
+  }
   const value = body && typeof body === "object" && !Array.isArray(body)
     ? body as Record<string, unknown>
     : {};

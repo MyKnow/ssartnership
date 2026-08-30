@@ -10,6 +10,11 @@ import {
 } from "@/lib/partner-benefit-usage-service";
 import { buildPartnerBenefitUseLogProperties } from "@/lib/partner-benefit-use-logging";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { isMockDataSource } from "@/lib/mock/member";
 
@@ -17,7 +22,6 @@ export const runtime = "nodejs";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const MAX_BODY_BYTES = 4 * 1024;
 
 type BenefitUseRequestBody = {
   benefitId?: unknown;
@@ -177,20 +181,23 @@ export async function POST(
     return NextResponse.json({ ok: false, message: "제휴처 정보를 확인할 수 없습니다." }, { status: 400 });
   }
 
-  const contentLength = Number(request.headers.get("content-length") ?? "0");
-  if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
-    return NextResponse.json({ ok: false, message: "요청이 너무 큽니다." }, { status: 413 });
-  }
-
   let body: BenefitUseRequestBody;
   try {
-    const parsed = await request.json();
+    const parsed = await readRouteJsonBodyWithinLimit<unknown>(request, {
+      maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+      invalidMessage: "잘못된 요청입니다.",
+      tooLargeMessage: "요청이 너무 큽니다.",
+    });
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       throw new Error("invalid_body");
     }
     body = parsed as BenefitUseRequestBody;
-  } catch {
-    return NextResponse.json({ ok: false, message: "잘못된 요청입니다." }, { status: 400 });
+  } catch (error) {
+    const message = error instanceof RouteJsonBodyError
+      ? error.message
+      : "잘못된 요청입니다.";
+    const status = error instanceof RouteJsonBodyError ? error.status : 400;
+    return NextResponse.json({ ok: false, message }, { status });
   }
 
   const context = getRequestLogContext(request);

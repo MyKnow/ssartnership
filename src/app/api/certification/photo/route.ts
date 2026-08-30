@@ -6,6 +6,11 @@ import {
 } from "@/lib/graduate-verification-rate-limit";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 
 export const runtime = "nodejs";
 
@@ -26,10 +31,27 @@ export async function POST(request: Request) {
   if (await isGraduateVerificationBlocked(rateLimitContext)) {
     return NextResponse.json({ ok: false, message: "사진 변경 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
   }
-  const body = (await request.json().catch(() => null)) as {
+  let body: {
     uploadId?: unknown;
     uploadSource?: unknown;
-  } | null;
+  } | null = null;
+  try {
+    body = await readRouteJsonBodyWithinLimit<{
+      uploadId?: unknown;
+      uploadSource?: unknown;
+    }>(request, {
+      maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+      invalidMessage: "사진 업로드를 확인해 주세요.",
+      tooLargeMessage: "요청 본문이 너무 큽니다.",
+    });
+  } catch (error) {
+    if (error instanceof RouteJsonBodyError && error.code === "body_too_large") {
+      return NextResponse.json(
+        { ok: false, message: error.message },
+        { status: error.status },
+      );
+    }
+  }
   const uploadId = typeof body?.uploadId === "string" ? body.uploadId.trim() : "";
   if (!UUID_PATTERN.test(uploadId) || body?.uploadSource !== "common") {
     await recordGraduateVerificationAttempt({ ...rateLimitContext, success: false });

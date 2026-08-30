@@ -11,11 +11,11 @@ import { getVerifiedGraduateApplicationChallenge } from "@/lib/graduate-verifica
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
   JsonRequestBodyError,
+  MAX_STANDARD_JSON_BODY_BYTES,
   readJsonRequestBodyWithinLimit,
 } from "@/lib/request-body-limit";
 
 export const runtime = "nodejs";
-const MAX_GRADUATE_UPLOAD_SIGN_JSON_BODY_BYTES = 4 * 1024;
 
 function isGraduateUploadKind(value: unknown): value is "certificate" {
   return value === "certificate";
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       kind?: unknown;
       contentType?: unknown;
       size?: unknown;
-    }>(request, MAX_GRADUATE_UPLOAD_SIGN_JSON_BODY_BYTES);
+    }>(request, MAX_STANDARD_JSON_BODY_BYTES);
   } catch (error) {
     await recordGraduateVerificationAttempt({ ...rateLimitContext, success: false });
     return NextResponse.json(

@@ -14,6 +14,11 @@ import {
   submitGraduateVerificationRequest,
 } from "@/lib/graduate-verification-service";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 
 export const runtime = "nodejs";
 
@@ -57,7 +62,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "제출 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
   }
 
-  const body = (await request.json().catch(() => null)) as GraduateSubmissionBody | null;
+  let body: GraduateSubmissionBody | null = null;
+  try {
+    body = await readRouteJsonBodyWithinLimit<GraduateSubmissionBody>(request, {
+      maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+      invalidMessage: "업로드 파일을 확인해 주세요.",
+      tooLargeMessage: "요청 본문이 너무 큽니다.",
+    });
+  } catch (error) {
+    if (error instanceof RouteJsonBodyError && error.code === "body_too_large") {
+      return NextResponse.json(
+        { ok: false, message: error.message },
+        { status: error.status },
+      );
+    }
+  }
   if (
     !body ||
     (body.certificateUploadId !== undefined && typeof body.certificateUploadId !== "string") ||

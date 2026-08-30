@@ -1,4 +1,5 @@
 import { PushError } from "@/lib/push/types";
+import { RouteJsonBodyError } from "@/lib/route-json-body";
 
 export class NotificationRequestError extends Error {
   constructor(message: string) {
@@ -17,6 +18,9 @@ export function getSafeNotificationRouteError(
   error: unknown,
   fallback: string,
 ) {
+  if (error instanceof RouteJsonBodyError) {
+    return { message: error.message, status: error.status };
+  }
   if (
     error instanceof NotificationRequestError ||
     (error instanceof PushError && error.code === "invalid_request")
@@ -25,4 +29,8 @@ export function getSafeNotificationRouteError(
   }
 
   return { message: fallback, status: 503 as const };
+}
+
+export function shouldLogNotificationRouteError(error: unknown) {
+  return getSafeNotificationRouteError(error, "").status >= 500;
 }

@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { partnerFavoriteRepository, partnerRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 import { getSignedUserSession } from "@/lib/user-auth";
 
 function safeDecodeSegment(value: string) {
@@ -53,11 +58,22 @@ export async function POST(
 
   let payload: { favorite?: unknown };
   try {
-    payload = (await request.json()) as { favorite?: unknown };
-  } catch {
+    payload = await readRouteJsonBodyWithinLimit<{ favorite?: unknown }>(
+      request,
+      {
+        maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+        invalidMessage: "잘못된 요청입니다.",
+        tooLargeMessage: "요청이 너무 큽니다.",
+      },
+    );
+  } catch (error) {
     return NextResponse.json(
-      { message: "잘못된 요청입니다." },
-      { status: 400 },
+      {
+        message: error instanceof RouteJsonBodyError
+          ? error.message
+          : "잘못된 요청입니다.",
+      },
+      { status: error instanceof RouteJsonBodyError ? error.status : 400 },
     );
   }
 

@@ -4,7 +4,12 @@ import { getAdminLogAccessPolicy, selectAllowedLogGroups } from '@/lib/admin-log
 import { getRequestLogContext, logAdminAudit } from '@/lib/activity-logs';
 import { getAdminSession } from '@/lib/auth';
 import { exportAdminLogsCsv, type LogGroup, type LogRangePreset } from '@/lib/log-insights';
+import { MAX_STANDARD_JSON_BODY_BYTES } from '@/lib/request-body-limit';
 import { isTrustedSameOriginRequest } from '@/lib/request-guards';
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from '@/lib/route-json-body';
 import { withServerTiming } from '@/lib/server-timing';
 
 export const runtime = 'nodejs';
@@ -72,7 +77,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: '관리자 인증이 필요합니다.' }, { status: 401 });
     }
 
-    const body = parseExportRequestBody(await request.json().catch(() => null));
+    let requestBody: unknown;
+    try {
+      requestBody = await readRouteJsonBodyWithinLimit<unknown>(request, {
+        maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+        invalidMessage: '내보내기 요청 형식이 올바르지 않습니다.',
+      });
+    } catch (error) {
+      if (error instanceof RouteJsonBodyError) {
+        return NextResponse.json({ message: error.message }, { status: error.status });
+      }
+      throw error;
+    }
+
+    const body = parseExportRequestBody(requestBody);
     if (!body) {
       return NextResponse.json({ message: '내보내기 요청 형식이 올바르지 않습니다.' }, { status: 400 });
     }

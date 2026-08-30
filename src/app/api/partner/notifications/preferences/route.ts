@@ -6,9 +6,13 @@ import {
 } from "@/lib/operational-notifications";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
-  NotificationRequestError,
   getSafeNotificationRouteError,
+  shouldLogNotificationRouteError,
 } from "@/lib/notifications/safe-error";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 
 export const runtime = "nodejs";
 
@@ -54,9 +58,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
   }
   try {
-    const body = (await request.json().catch(() => {
-      throw new NotificationRequestError("요청 본문 형식을 확인해 주세요.");
-    })) as Record<string, unknown>;
+    const body = await readRouteJsonBodyWithinLimit<Record<string, unknown>>(
+      request,
+      {
+        maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+        invalidMessage: "요청 본문 형식을 확인해 주세요.",
+        tooLargeMessage: "알림 설정 요청이 너무 큽니다.",
+      },
+    );
     const preferences =
       await upsertPartnerOperationalNotificationPreferences(session.accountId, {
         enabled: toOptionalBoolean(body.enabled),
@@ -69,7 +78,9 @@ export async function POST(request: NextRequest) {
       });
     return NextResponse.json({ ok: true, preferences });
   } catch (error) {
-    console.error("[partner-notification-preferences] update failed", error);
+    if (shouldLogNotificationRouteError(error)) {
+      console.error("[partner-notification-preferences] update failed", error);
+    }
     const safeError = getSafeNotificationRouteError(
       error,
       "알림 설정을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",

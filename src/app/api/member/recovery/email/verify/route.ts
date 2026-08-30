@@ -14,6 +14,11 @@ import { normalizeMemberEmail } from "@/lib/member-domain";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { setUserSession } from "@/lib/user-auth";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 
 export const runtime = "nodejs";
 
@@ -38,10 +43,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "recovery_expired", message: "복구 세션이 만료되었습니다. 기존 비밀번호를 다시 확인해 주세요." }, { status: 401 });
   }
 
-  const body = (await request.json().catch(() => null)) as {
+  let body: {
     email?: unknown;
     code?: unknown;
-  } | null;
+  } | null = null;
+  try {
+    body = await readRouteJsonBodyWithinLimit<{
+      email?: unknown;
+      code?: unknown;
+    }>(request, {
+      maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+      invalidMessage: "이메일과 6자리 인증 코드를 확인해 주세요.",
+      tooLargeMessage: "요청 본문이 너무 큽니다.",
+    });
+  } catch (error) {
+    if (error instanceof RouteJsonBodyError && error.code === "body_too_large") {
+      return NextResponse.json(
+        { ok: false, message: error.message },
+        { status: error.status },
+      );
+    }
+  }
   const email = normalizeMemberEmail(body?.email);
   const code = typeof body?.code === "string" ? body.code.trim() : "";
   if (!email || !/^\d{6}$/.test(code)) {
