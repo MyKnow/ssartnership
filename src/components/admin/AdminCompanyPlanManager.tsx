@@ -7,6 +7,7 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
 import Textarea from "@/components/ui/Textarea";
+import AdminPlanWindowFields from "@/components/admin/AdminPlanWindowFields";
 import {
   PARTNER_COMPANY_PLAN_DEFINITIONS,
   type PartnerCompanyPlanTier,
@@ -306,24 +307,17 @@ export default function AdminCompanyPlanManager({
 
                 <form id={formId} action={updatePartnerBrandPlan} className="grid gap-3 md:grid-cols-5 md:items-end">
                   <input type="hidden" name="partnerId" value={brand.id} />
-                  <label className="grid gap-2 text-sm font-medium text-foreground">
-                    플랜
-                    <Select name="planTier" defaultValue={brand.planTier}>
-                      {PARTNER_COMPANY_PLAN_DEFINITIONS.map((definition) => (
-                        <option key={definition.tier} value={definition.tier}>
-                          {definition.label}
-                        </option>
-                      ))}
-                    </Select>
-                  </label>
-                  <label className="grid gap-2 text-sm font-medium text-foreground">
-                    시작일
-                    <Input name="planStartedAt" type="date" defaultValue={toDateInputValue(brand.planStartedAt)} />
-                  </label>
-                  <label className="grid gap-2 text-sm font-medium text-foreground">
-                    만료일
-                    <Input name="planExpiresAt" type="date" defaultValue={toDateInputValue(brand.planExpiresAt)} />
-                  </label>
+                  <input type="hidden" name="expectedPlanTier" value={brand.planTier} />
+                  <input
+                    type="hidden"
+                    name="expectedPlanUpdatedAt"
+                    value={brand.planUpdatedAt ?? ""}
+                  />
+                  <AdminPlanWindowFields
+                    initialPlanTier={brand.planTier}
+                    initialPlanStartedAt={toDateInputValue(brand.planStartedAt)}
+                    initialPlanExpiresAt={toDateInputValue(brand.planExpiresAt)}
+                  />
                   <label className="grid gap-2 text-sm font-medium text-foreground md:col-span-2">
                     메모
                     <Input name="note" placeholder="수동 결제 확인, 계약 조건 등" />

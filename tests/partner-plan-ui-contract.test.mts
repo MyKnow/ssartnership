@@ -14,6 +14,14 @@ const adminCompanyPlanManagerSourceUrl = new URL(
   "../src/components/admin/AdminCompanyPlanManager.tsx",
   import.meta.url,
 );
+const adminPlanWindowFieldsSourceUrl = new URL(
+  "../src/components/admin/AdminPlanWindowFields.tsx",
+  import.meta.url,
+);
+const adminPlanActionsSourceUrl = new URL(
+  "../src/app/admin/(protected)/_actions/plan-actions.ts",
+  import.meta.url,
+);
 const partnerDashboardViewSourceUrl = new URL(
   "../src/components/partner/PartnerDashboardView.tsx",
   import.meta.url,
@@ -64,6 +72,22 @@ test("partner plan date and expiry day helpers are reused from the shared helper
 
   assert.match(adminSource, /formatPartnerPlanDateTime/);
   assert.doesNotMatch(adminSource, /function formatDateTime\(/);
+});
+
+test("administrator plan edits preserve render-time version and validate the window before submit", async () => {
+  const [managerSource, fieldsSource, actionSource] = await Promise.all([
+    readFile(adminCompanyPlanManagerSourceUrl, "utf8"),
+    readFile(adminPlanWindowFieldsSourceUrl, "utf8"),
+    readFile(adminPlanActionsSourceUrl, "utf8"),
+  ]);
+
+  assert.match(managerSource, /name="expectedPlanTier" value=\{brand\.planTier\}/);
+  assert.match(managerSource, /name="expectedPlanUpdatedAt"/);
+  assert.match(fieldsSource, /isPartnerPlanWindowOrderValid/);
+  assert.match(fieldsSource, /setCustomValidity/);
+  assert.match(actionSource, /isPartnerPlanWindowOrderValid/);
+  assert.match(actionSource, /expectedPlanTier: parsePlanTier/);
+  assert.match(actionSource, /expectedPlanUpdatedAt: parseNullableIsoTimestamp/);
 });
 
 test("partner visibility copy uses the shared domain label without local drift", async () => {
