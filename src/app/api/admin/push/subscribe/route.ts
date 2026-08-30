@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { invalidateAdminNotificationSettingsCache } from "@/lib/admin-notifications.server";
 import { isPushConfigured } from "@/lib/push";
+import {
+  NotificationRequestError,
+  getSafeNotificationRouteError,
+} from "@/lib/notifications/safe-error";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { upsertOperationalPushSubscription } from "@/lib/operational-notifications";
 import { withServerTiming } from "@/lib/server-timing";
@@ -32,7 +36,9 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const body = (await request.json()) as { subscription?: PushSubscriptionJSON };
+      const body = (await request.json().catch(() => {
+        throw new NotificationRequestError("요청 본문 형식을 확인해 주세요.");
+      })) as { subscription?: PushSubscriptionJSON };
       if (!body.subscription) {
         return NextResponse.json({ message: "Push 구독 정보가 필요합니다." }, { status: 400 });
       }
@@ -49,9 +55,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, preferences });
     } catch (error) {
       console.error("[admin-push-subscribe] subscription failed", error);
+      const safeError = getSafeNotificationRouteError(
+        error,
+        "알림 구독에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      );
       return NextResponse.json(
-        { message: "알림 구독에 실패했습니다. 잠시 후 다시 시도해 주세요." },
-        { status: 503 },
+        { message: safeError.message },
+        { status: safeError.status },
       );
     }
   });

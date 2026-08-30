@@ -1,4 +1,5 @@
 import { normalizeNotificationTargetUrl } from "@/lib/notifications/shared";
+import { forEachWithConcurrency } from "@/lib/async-concurrency";
 import {
   ADMIN_NOTIFICATION_CHANNELS,
   PARTNER_NOTIFICATION_CHANNELS,
@@ -15,9 +16,9 @@ import {
 } from "@/lib/partner-notification-routing";
 import { sendPartnerOperationalNotificationEmail } from "@/lib/partner-email";
 import { getPushEnv, isPushConfigured } from "@/lib/push/config";
+import { buildTrustedPushSubscriptionRequest, validateTrustedPushSubscription } from "@/lib/push/subscription-trust";
 import type { SubscriptionInput, WebPushModule } from "@/lib/push/types";
 import { PushError } from "@/lib/push/types";
-import { sanitizeHttpUrl } from "@/lib/validation";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { isPartnerPortalMock } from "@/lib/partner-portal";
 import {
@@ -43,16 +44,8 @@ type PushSubscriptionDevice = {
   lastSuccessAt: string | null;
 };
 
-type OperationalSubscriptionInput = {
-  endpoint?: string;
-  expirationTime?: number | null;
-  keys?: {
-    p256dh?: string;
-    auth?: string;
-  };
-};
-
 let webPushPromise: Promise<WebPushModule> | null = null;
+const OPERATIONAL_PUSH_CONCURRENCY = 8;
 
 async function getWebPush() {
   if (!webPushPromise) {
@@ -63,28 +56,6 @@ async function getWebPush() {
     });
   }
   return webPushPromise;
-}
-
-function validateSubscription(input: OperationalSubscriptionInput) {
-  const endpoint = sanitizeHttpUrl(input.endpoint);
-  if (!endpoint?.startsWith("https://")) {
-    throw new PushError("invalid_request", "유효한 Push 구독 정보를 찾을 수 없습니다.");
-  }
-  const p256dh = input.keys?.p256dh?.trim();
-  const auth = input.keys?.auth?.trim();
-  if (!p256dh || !auth) {
-    throw new PushError("invalid_request", "Push 구독 키가 누락되었습니다.");
-  }
-
-  return {
-    endpoint,
-    p256dh,
-    auth,
-    expirationTime:
-      typeof input.expirationTime === "number" && Number.isFinite(input.expirationTime)
-        ? new Date(input.expirationTime).toISOString()
-        : null,
-  };
 }
 
 function getDeviceLabel(userAgent: string | null) {
@@ -265,13 +236,14 @@ export async function upsertOperationalPushSubscription(input: {
   subscription: SubscriptionInput;
   userAgent?: string | null;
 }) {
-  const validated = validateSubscription(input.subscription);
   if (input.ownerType === "partner" && isPartnerPortalMock) {
     return upsertPartnerOperationalNotificationPreferences(input.ownerId, {
       enabled: true,
       pushEnabled: true,
     });
   }
+
+  const validated = await validateTrustedPushSubscription(input.subscription);
 
   const supabase = getSupabaseAdminClient();
   const table =
@@ -706,49 +678,56 @@ async function sendAdminPushDeliveries(input: {
     tag: `${input.type}:${input.notificationId}`,
   });
 
-  for (const subscription of data ?? []) {
-    try {
-      await webpush.sendNotification(
-        {
-          endpoint: subscription.endpoint,
-          expirationTime: null,
-          keys: { p256dh: subscription.p256dh, auth: subscription.auth },
-        },
-        serialized,
-      );
-      await markOperationalPushResult({
-        table: "admin_push_subscriptions",
-        id: subscription.id,
-        ok: true,
-      });
-      await recordAdminDelivery({
-        notificationId: input.notificationId,
-        adminId: subscription.admin_id,
-        channel: "push",
-        status: "sent",
-      });
-    } catch (error) {
-      const statusCode =
-        typeof error === "object" && error && "statusCode" in error
-          ? Number((error as { statusCode?: number }).statusCode)
-          : null;
-      const errorMessage = error instanceof Error ? error.message : "푸시 발송 실패";
-      await markOperationalPushResult({
-        table: "admin_push_subscriptions",
-        id: subscription.id,
-        ok: false,
-        errorMessage,
-        deactivate: statusCode === 404 || statusCode === 410,
-      });
-      await recordAdminDelivery({
-        notificationId: input.notificationId,
-        adminId: subscription.admin_id,
-        channel: "push",
-        status: "failed",
-        errorMessage,
-      });
-    }
-  }
+  await forEachWithConcurrency(
+    data ?? [],
+    OPERATIONAL_PUSH_CONCURRENCY,
+    async (subscription) => {
+      try {
+        await webpush.sendNotification(
+          await buildTrustedPushSubscriptionRequest({
+            endpoint: subscription.endpoint,
+            p256dh: subscription.p256dh,
+            auth: subscription.auth,
+          }),
+          serialized,
+        );
+        await markOperationalPushResult({
+          table: "admin_push_subscriptions",
+          id: subscription.id,
+          ok: true,
+        });
+        await recordAdminDelivery({
+          notificationId: input.notificationId,
+          adminId: subscription.admin_id,
+          channel: "push",
+          status: "sent",
+        });
+      } catch (error) {
+        const statusCode =
+          typeof error === "object" && error && "statusCode" in error
+            ? Number((error as { statusCode?: number }).statusCode)
+            : null;
+        const isInvalidSubscription =
+          error instanceof PushError &&
+          (error as InstanceType<typeof PushError>).code === "invalid_request";
+        const errorMessage = error instanceof Error ? error.message : "푸시 발송 실패";
+        await markOperationalPushResult({
+          table: "admin_push_subscriptions",
+          id: subscription.id,
+          ok: false,
+          errorMessage,
+          deactivate: isInvalidSubscription || statusCode === 404 || statusCode === 410,
+        });
+        await recordAdminDelivery({
+          notificationId: input.notificationId,
+          adminId: subscription.admin_id,
+          channel: "push",
+          status: "failed",
+          errorMessage,
+        });
+      }
+    },
+  );
 }
 
 export async function createPartnerOperationalNotification(input: {
@@ -965,49 +944,56 @@ async function sendPartnerPushDeliveries(input: {
     tag: `${input.type}:${input.notificationId}`,
   });
 
-  for (const subscription of data ?? []) {
-    try {
-      await webpush.sendNotification(
-        {
-          endpoint: subscription.endpoint,
-          expirationTime: null,
-          keys: { p256dh: subscription.p256dh, auth: subscription.auth },
-        },
-        serialized,
-      );
-      await markOperationalPushResult({
-        table: "partner_push_subscriptions",
-        id: subscription.id,
-        ok: true,
-      });
-      await recordPartnerDelivery({
-        notificationId: input.notificationId,
-        accountId: subscription.account_id,
-        channel: "push",
-        status: "sent",
-      });
-    } catch (error) {
-      const statusCode =
-        typeof error === "object" && error && "statusCode" in error
-          ? Number((error as { statusCode?: number }).statusCode)
-          : null;
-      const errorMessage = error instanceof Error ? error.message : "푸시 발송 실패";
-      await markOperationalPushResult({
-        table: "partner_push_subscriptions",
-        id: subscription.id,
-        ok: false,
-        errorMessage,
-        deactivate: statusCode === 404 || statusCode === 410,
-      });
-      await recordPartnerDelivery({
-        notificationId: input.notificationId,
-        accountId: subscription.account_id,
-        channel: "push",
-        status: "failed",
-        errorMessage,
-      });
-    }
-  }
+  await forEachWithConcurrency(
+    data ?? [],
+    OPERATIONAL_PUSH_CONCURRENCY,
+    async (subscription) => {
+      try {
+        await webpush.sendNotification(
+          await buildTrustedPushSubscriptionRequest({
+            endpoint: subscription.endpoint,
+            p256dh: subscription.p256dh,
+            auth: subscription.auth,
+          }),
+          serialized,
+        );
+        await markOperationalPushResult({
+          table: "partner_push_subscriptions",
+          id: subscription.id,
+          ok: true,
+        });
+        await recordPartnerDelivery({
+          notificationId: input.notificationId,
+          accountId: subscription.account_id,
+          channel: "push",
+          status: "sent",
+        });
+      } catch (error) {
+        const statusCode =
+          typeof error === "object" && error && "statusCode" in error
+            ? Number((error as { statusCode?: number }).statusCode)
+            : null;
+        const isInvalidSubscription =
+          error instanceof PushError &&
+          (error as InstanceType<typeof PushError>).code === "invalid_request";
+        const errorMessage = error instanceof Error ? error.message : "푸시 발송 실패";
+        await markOperationalPushResult({
+          table: "partner_push_subscriptions",
+          id: subscription.id,
+          ok: false,
+          errorMessage,
+          deactivate: isInvalidSubscription || statusCode === 404 || statusCode === 410,
+        });
+        await recordPartnerDelivery({
+          notificationId: input.notificationId,
+          accountId: subscription.account_id,
+          channel: "push",
+          status: "failed",
+          errorMessage,
+        });
+      }
+    },
+  );
 }
 
 export async function claimOperationalNotificationDedupe(input: {

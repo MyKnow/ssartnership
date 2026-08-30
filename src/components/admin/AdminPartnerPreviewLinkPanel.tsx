@@ -6,6 +6,9 @@ import Button from "@/components/ui/Button";
 import InlineMessage from "@/components/ui/InlineMessage";
 import { useToast } from "@/components/ui/Toast";
 import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
+import { PARTNER_PREVIEW_TOKEN_TTL_MS } from "@/lib/partner-preview";
+
+const PARTNER_PREVIEW_TOKEN_TTL_HOURS = PARTNER_PREVIEW_TOKEN_TTL_MS / (60 * 60 * 1_000);
 
 export type PartnerPreviewLinkActionResult = {
   previewUrl: string;
@@ -117,7 +120,8 @@ export default function AdminPartnerPreviewLinkPanel({
           <h3 className="ui-section-title text-ko-title">미리보기 링크</h3>
           <p className="ui-body text-ko-pretty">
             제휴사에 실제 사용자 화면을 안내할 때 사용하는 비공개 링크입니다. 새
-            링크를 생성하면 기존 링크는 즉시 사용할 수 없게 됩니다.
+            링크를 생성하면 기존 링크는 즉시 사용할 수 없게 되며, 발급 후{" "}
+            {PARTNER_PREVIEW_TOKEN_TTL_HOURS}시간 뒤 자동 만료됩니다.
           </p>
         </div>
 

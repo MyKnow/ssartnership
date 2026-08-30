@@ -128,7 +128,8 @@ create table if not exists partner_preview_tokens (
   token_nonce text,
   token_auth_tag text,
   token_key_version smallint,
-  created_at timestamp with time zone not null default now()
+  created_at timestamp with time zone not null default now(),
+  expires_at timestamp with time zone not null
 );
 
 alter table partner_preview_tokens
@@ -150,6 +151,15 @@ alter table partner_preview_tokens
       and token_key_version between 1 and 99
     )
   );
+
+alter table partner_preview_tokens
+  drop constraint if exists partner_preview_tokens_expires_after_create_check;
+alter table partner_preview_tokens
+  add constraint partner_preview_tokens_expires_after_create_check
+  check (expires_at > created_at);
+
+create index if not exists partner_preview_tokens_expires_at_idx
+  on public.partner_preview_tokens(expires_at);
 
 create or replace function public.infer_partner_campus_slugs(input_location text)
 returns text[]

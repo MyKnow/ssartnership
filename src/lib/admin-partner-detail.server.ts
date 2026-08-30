@@ -21,6 +21,7 @@ import type { CampusSlug } from "@/lib/campuses";
 import type { PartnerBenefitActionType } from "@/lib/partner-benefit-action";
 import type { PartnerBenefitVisibility } from "@/lib/partner-benefit-visibility";
 import type { PartnerVisibility } from "@/lib/types";
+import { isMissingPartnerPreviewExpiryColumnError } from "@/lib/partner-preview";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 type PartnerCompanyRow = {
@@ -124,6 +125,26 @@ export async function getAdminPartnerDetailCoreReadModel({
 }) {
   try {
     const supabase = getSupabaseAdminClient();
+    const previewTokenPromise = (async () => {
+      let previewTokenResult = await supabase
+        .from("partner_preview_tokens")
+        .select("created_at,expires_at,token_ciphertext,token_nonce,token_auth_tag,token_key_version")
+        .eq("partner_id", partnerId)
+        .maybeSingle();
+
+      if (
+        previewTokenResult.error &&
+        isMissingPartnerPreviewExpiryColumnError(previewTokenResult.error.message)
+      ) {
+        previewTokenResult = await supabase
+          .from("partner_preview_tokens")
+          .select("created_at,token_ciphertext,token_nonce,token_auth_tag,token_key_version")
+          .eq("partner_id", partnerId)
+          .maybeSingle();
+      }
+
+      return previewTokenResult;
+    })();
     const [partnerResult, previewTokenResult] = await Promise.all([
       supabase
         .from("partners")
@@ -134,14 +155,10 @@ export async function getAdminPartnerDetailCoreReadModel({
         )
         .eq("id", partnerId)
         .maybeSingle(),
-      supabase
-        .from("partner_preview_tokens")
-        .select("created_at,token_ciphertext,token_nonce,token_auth_tag,token_key_version")
-        .eq("partner_id", partnerId)
-        .maybeSingle(),
+      previewTokenPromise,
     ]);
 
-    if (partnerResult.error) {
+    if (partnerResult.error || previewTokenResult.error) {
       return { status: "error" as const };
     }
     const partner = partnerResult.data as unknown as AdminPartnerDetailRow | null;
@@ -160,7 +177,7 @@ export async function getAdminPartnerDetailCoreReadModel({
       partner,
       company,
       category,
-      previewToken: previewTokenResult.error ? null : previewTokenResult.data,
+      previewToken: previewTokenResult.data,
     };
   } catch (error) {
     console.error("[admin-partner-detail] core read model failed", error);

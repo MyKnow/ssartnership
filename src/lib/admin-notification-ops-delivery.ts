@@ -1,4 +1,5 @@
 import { notificationRepository } from "@/lib/repositories";
+import { forEachWithConcurrency } from "@/lib/async-concurrency";
 import { buildNotificationPayload } from "@/lib/push/payloads";
 import {
   MattermostApiError,
@@ -17,6 +18,8 @@ import {
   markPushFailure,
   markPushSuccess,
 } from "@/lib/push/logs";
+import { buildTrustedPushSubscriptionRequest } from "@/lib/push/subscription-trust";
+import { PushError } from "@/lib/push/types";
 import type { ResolvedPushAudience, StoredSubscription, WebPushModule } from "@/lib/push/types";
 import type {
   AdminNotificationComposerInput,
@@ -47,6 +50,8 @@ type ChannelDeliveryResult = {
   skipped: number;
   bookkeepingErrors: string[];
 };
+const MATTERMOST_SEND_CONCURRENCY = 4;
+const PUSH_SEND_CONCURRENCY = 8;
 
 function createBookkeepingWarning(
   channel: "push" | "mm",
@@ -140,14 +145,20 @@ async function markGroupMattermostFailure(input: {
   bookkeepingErrors: string[];
 }) {
   const code = toMattermostDeliveryCode(input.error);
-  await Promise.all(input.members.map((member) => recordMattermostDelivery({
-    notificationId: input.notificationId,
-    member,
-    status: "failed",
-    providerStatus: code,
-    errorMessage: getSafeMattermostDeliveryErrorMessage(code),
-    bookkeepingErrors: input.bookkeepingErrors,
-  })));
+  await forEachWithConcurrency(
+    input.members,
+    MATTERMOST_SEND_CONCURRENCY,
+    async (member) => {
+      await recordMattermostDelivery({
+        notificationId: input.notificationId,
+        member,
+        status: "failed",
+        providerStatus: code,
+        errorMessage: getSafeMattermostDeliveryErrorMessage(code),
+        bookkeepingErrors: input.bookkeepingErrors,
+      });
+    },
+  );
 }
 
 async function sendMattermostCampaignDeliveriesDirect(params: {
@@ -208,31 +219,36 @@ async function sendMattermostCampaignDeliveriesDirect(params: {
       const outcome = await withActiveMattermostSenderForGeneration(
         generation,
         async (session) => {
-          const outcomes = await Promise.all(members.map(async (member) => {
-            try {
-              const post = await session.sendDirectMessage(member.mattermostUserId, message);
-              await recordMattermostDelivery({
-                notificationId: params.notificationId,
-                member,
-                status: "sent",
-                providerNotificationId: post.id,
-                providerStatus: "sent",
-                bookkeepingErrors,
-              });
-              return "sent" as const;
-            } catch (error) {
-              const code = toMattermostDeliveryCode(error);
-              await recordMattermostDelivery({
-                notificationId: params.notificationId,
-                member,
-                status: "failed",
-                providerStatus: code,
-                errorMessage: getSafeMattermostDeliveryErrorMessage(code),
-                bookkeepingErrors,
-              });
-              return "failed" as const;
-            }
-          }));
+          const outcomes: Array<"sent" | "failed"> = Array(members.length);
+          await forEachWithConcurrency(
+            members,
+            MATTERMOST_SEND_CONCURRENCY,
+            async (member, index) => {
+              try {
+                const post = await session.sendDirectMessage(member.mattermostUserId, message);
+                await recordMattermostDelivery({
+                  notificationId: params.notificationId,
+                  member,
+                  status: "sent",
+                  providerNotificationId: post.id,
+                  providerStatus: "sent",
+                  bookkeepingErrors,
+                });
+                outcomes[index] = "sent";
+              } catch (error) {
+                const code = toMattermostDeliveryCode(error);
+                await recordMattermostDelivery({
+                  notificationId: params.notificationId,
+                  member,
+                  status: "failed",
+                  providerStatus: code,
+                  errorMessage: getSafeMattermostDeliveryErrorMessage(code),
+                  bookkeepingErrors,
+                });
+                outcomes[index] = "failed";
+              }
+            },
+          );
           return outcomes;
         },
       );
@@ -305,72 +321,77 @@ export async function sendPushCampaignDeliveries(params: {
   let failed = 0;
   const bookkeepingErrors: string[] = [];
 
-  for (const subscription of params.subscriptions) {
-    try {
-      await webpush.sendNotification(
-        {
-          endpoint: subscription.endpoint,
-          expirationTime: null,
-          keys: {
+  await forEachWithConcurrency(
+    params.subscriptions,
+    PUSH_SEND_CONCURRENCY,
+    async (subscription) => {
+      try {
+        await webpush.sendNotification(
+          await buildTrustedPushSubscriptionRequest({
+            endpoint: subscription.endpoint,
             p256dh: subscription.p256dh,
             auth: subscription.auth,
-          },
-        },
-        serialized,
-      );
-      sent += 1;
-      await runBookkeepingTasks([
-        markPushSuccess(subscription.id),
-        logPushDelivery({
-          messageLogId: messageLog.id,
-          memberId: subscription.member_id,
+          }),
+          serialized,
+        );
+        sent += 1;
+        await runBookkeepingTasks([
+          markPushSuccess(subscription.id),
+          logPushDelivery({
+            messageLogId: messageLog.id,
+            memberId: subscription.member_id,
+            subscriptionId: subscription.id,
+            payload,
+            status: "sent",
+          }),
+          notificationRepository.recordNotificationDelivery({
+            notificationId: params.notificationId,
+            memberId: subscription.member_id,
+            channel: "push",
+            status: "sent",
+          }),
+        ], "push", subscription.member_id, bookkeepingErrors);
+      } catch (error) {
+        failed += 1;
+        const statusCode =
+          typeof error === "object" && error && "statusCode" in error
+            ? Number((error as { statusCode?: number }).statusCode)
+            : null;
+        const deactivate =
+          (error instanceof PushError && error.code === "invalid_request") ||
+          statusCode === 404 ||
+          statusCode === 410;
+        console.error("[admin-notification-ops] push delivery failed", {
           subscriptionId: subscription.id,
-          payload,
-          status: "sent",
-        }),
-        notificationRepository.recordNotificationDelivery({
-          notificationId: params.notificationId,
           memberId: subscription.member_id,
-          channel: "push",
-          status: "sent",
-        }),
-      ], "push", subscription.member_id, bookkeepingErrors);
-    } catch (error) {
-      failed += 1;
-      const statusCode =
-        typeof error === "object" && error && "statusCode" in error
-          ? Number((error as { statusCode?: number }).statusCode)
-          : null;
-      console.error("[admin-notification-ops] push delivery failed", {
-        subscriptionId: subscription.id,
-        memberId: subscription.member_id,
-        error,
-      });
-      const safeErrorMessage = "푸시 알림 전송에 실패했습니다.";
-      await runBookkeepingTasks([
+          error,
+        });
+        const safeErrorMessage = "푸시 알림 전송에 실패했습니다.";
+        await runBookkeepingTasks([
         markPushFailure(
           subscription,
           safeErrorMessage,
-          statusCode === 404 || statusCode === 410,
+          deactivate,
         ),
-        logPushDelivery({
-          messageLogId: messageLog.id,
-          memberId: subscription.member_id,
-          subscriptionId: subscription.id,
-          payload,
-          status: "failed",
-          errorMessage: safeErrorMessage,
-        }),
-        notificationRepository.recordNotificationDelivery({
-          notificationId: params.notificationId,
-          memberId: subscription.member_id,
-          channel: "push",
-          status: "failed",
-          errorMessage: safeErrorMessage,
-        }),
-      ], "push", subscription.member_id, bookkeepingErrors);
-    }
-  }
+          logPushDelivery({
+            messageLogId: messageLog.id,
+            memberId: subscription.member_id,
+            subscriptionId: subscription.id,
+            payload,
+            status: "failed",
+            errorMessage: safeErrorMessage,
+          }),
+          notificationRepository.recordNotificationDelivery({
+            notificationId: params.notificationId,
+            memberId: subscription.member_id,
+            channel: "push",
+            status: "failed",
+            errorMessage: safeErrorMessage,
+          }),
+        ], "push", subscription.member_id, bookkeepingErrors);
+      }
+    },
+  );
 
   await finalizePushMessageLog({
     id: messageLog.id,

@@ -1,8 +1,7 @@
 import { getSupabaseAdminClient } from "../supabase/server.ts";
-import { sanitizeHttpUrl } from "../validation.ts";
 import { wrapPushDbError } from "./config.ts";
-import { PushError } from "./types.ts";
 import type { SubscriptionInput } from "./types.ts";
+import { validateTrustedPushSubscription } from "./subscription-trust.ts";
 import {
   getMemberPushPreferences,
   upsertMemberPushPreferences,
@@ -18,35 +17,13 @@ export type PushSubscriptionDevice = {
   lastSuccessAt: string | null;
 };
 
-function validateSubscription(input: SubscriptionInput) {
-  const endpoint = sanitizeHttpUrl(input.endpoint);
-  if (!endpoint?.startsWith("https://")) {
-    throw new PushError("invalid_request", "유효한 Push 구독 정보를 찾을 수 없습니다.");
-  }
-  const p256dh = input.keys?.p256dh?.trim();
-  const auth = input.keys?.auth?.trim();
-  if (!p256dh || !auth) {
-    throw new PushError("invalid_request", "Push 구독 키가 누락되었습니다.");
-  }
-
-  return {
-    endpoint,
-    p256dh,
-    auth,
-    expirationTime:
-      typeof input.expirationTime === "number" && Number.isFinite(input.expirationTime)
-        ? new Date(input.expirationTime).toISOString()
-        : null,
-  };
-}
-
 export async function upsertPushSubscription(params: {
   memberId: string;
   subscription: SubscriptionInput;
   userAgent?: string | null;
 }) {
   const { memberId, subscription, userAgent } = params;
-  const validated = validateSubscription(subscription);
+  const validated = await validateTrustedPushSubscription(subscription);
   const supabase = getSupabaseAdminClient();
 
   const { error } = await supabase.from("push_subscriptions").upsert(
