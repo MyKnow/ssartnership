@@ -15,12 +15,7 @@ const { registerHooks } = nodeModule as unknown as {
   }): void;
 };
 
-type QueryOperation =
-  | "delete"
-  | "insert"
-  | "select"
-  | "update"
-  | "upsert";
+type QueryOperation = "delete" | "insert" | "select" | "update" | "upsert";
 
 type QueryCall = {
   table: string;
@@ -52,6 +47,23 @@ const mockModules = new Map<string, string>([
     "@/lib/notification-templates/repository.server",
     `export async function resolveNotificationTemplate() {
       return { titleTemplate: "테스트 제목", bodyTemplate: "테스트 본문" };
+    }`,
+  ],
+  [
+    "@/lib/admin-accounts",
+    `export async function listAdminAccounts() {
+      const failure = globalThis.__operationalNotificationTestAdminAccountFailure;
+      if (failure) {
+        globalThis.__operationalNotificationTestAdminAccountFailure = null;
+        throw failure;
+      }
+      return globalThis.__operationalNotificationTestAdminAccounts ?? [
+        {
+          id: "admin-1",
+          isActive: true,
+          permissions: { notifications: { read: true } },
+        },
+      ];
     }`,
   ],
   [
@@ -147,7 +159,8 @@ class FakeQuery {
   }
 
   then<TResult1 = QueryResult, TResult2 = never>(
-    onfulfilled?: ((value: QueryResult) => TResult1 | PromiseLike<TResult1>) | null,
+    onfulfilled?:
+      ((value: QueryResult) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
   ) {
     return this.execute().then(onfulfilled, onrejected);
@@ -171,8 +184,9 @@ function installSupabase(handler: QueryHandler) {
       return new FakeQuery(table, handler);
     },
   };
-  (globalThis as Record<string, unknown>).__operationalNotificationTestSupabase =
-    supabase;
+  (
+    globalThis as Record<string, unknown>
+  ).__operationalNotificationTestSupabase = supabase;
   return supabase;
 }
 
@@ -182,6 +196,18 @@ function setPushConfigured(configured: boolean) {
   ).__operationalNotificationTestPushConfigured = configured;
 }
 
+function setAdminAccounts(accounts: unknown[]) {
+  (
+    globalThis as Record<string, unknown>
+  ).__operationalNotificationTestAdminAccounts = accounts;
+}
+
+function failNextAdminAccountLookup(error: Error) {
+  (
+    globalThis as Record<string, unknown>
+  ).__operationalNotificationTestAdminAccountFailure = error;
+}
+
 type OperationalNotificationsModule =
   typeof import("../src/lib/operational-notifications.ts");
 
@@ -189,7 +215,10 @@ const operationalNotificationsModulePromise = import(
   new URL("../src/lib/operational-notifications.ts", import.meta.url).href
 ) as Promise<OperationalNotificationsModule>;
 
-function notificationInsertResult(call: QueryCall, audience: "admin" | "partner") {
+function notificationInsertResult(
+  call: QueryCall,
+  audience: "admin" | "partner",
+) {
   if (
     call.table === `${audience}_notifications` &&
     call.operation === "insert"
@@ -219,17 +248,15 @@ function assertBaseNotificationDeleted(
   );
 }
 
-test("관리자 프로필 조회가 실패하면 먼저 만든 기본 알림을 삭제한다", async () => {
+test("관리자 계정 조회가 실패하면 먼저 만든 기본 알림을 삭제한다", async () => {
   const calls: QueryCall[] = [];
   installSupabase((call) => {
     calls.push(call);
     const inserted = notificationInsertResult(call, "admin");
     if (inserted) return inserted;
-    if (call.table === "admin_profiles") {
-      return { data: null, error: { message: "profile lookup failed" } };
-    }
     return { data: null, error: null };
   });
+  failNextAdminAccountLookup(new Error("account lookup failed"));
   setPushConfigured(false);
 
   const { createAdminOperationalNotification } =
@@ -238,10 +265,10 @@ test("관리자 프로필 조회가 실패하면 먼저 만든 기본 알림을 
     createAdminOperationalNotification({
       type: "security_alert",
       title: "보안 알림",
-      body: "프로필 조회 실패",
+      body: "계정 조회 실패",
       requestedChannels: ["portal"],
     }),
-    /profile lookup failed/,
+    /account lookup failed/,
   );
 
   assertBaseNotificationDeleted(calls, "admin");
@@ -283,9 +310,6 @@ for (const audience of ["admin", "partner"] as const) {
       calls.push(call);
       const inserted = notificationInsertResult(call, audience);
       if (inserted) return inserted;
-      if (call.table === "admin_profiles") {
-        return { data: [{ member_id: "admin-1" }], error: null };
-      }
       if (call.table === "admin_notification_preferences") {
         return { data: [], error: null };
       }
@@ -346,15 +370,15 @@ for (const audience of ["admin", "partner"] as const) {
       ) {
         return { data: null, error: { message: "rollback delete failed" } };
       }
-      if (call.table === "admin_profiles") {
-        return { data: null, error: { message: "profile lookup failed" } };
-      }
       if (call.table === "partner_accounts") {
         return { data: null, error: { message: "account lookup failed" } };
       }
       return { data: null, error: null };
     });
     setPushConfigured(false);
+    if (audience === "admin") {
+      failNextAdminAccountLookup(new Error("admin account lookup failed"));
+    }
 
     const {
       createAdminOperationalNotification,
@@ -378,7 +402,9 @@ for (const audience of ["admin", "partner"] as const) {
           });
 
     await assert.rejects(create, (error: unknown) => {
-      assert.ok(error instanceof OperationalNotificationPersistenceUncertainError);
+      assert.ok(
+        error instanceof OperationalNotificationPersistenceUncertainError,
+      );
       assert.ok(error.cause instanceof AggregateError);
       assert.deepEqual(
         error.cause.errors.map((cause) =>
@@ -386,7 +412,7 @@ for (const audience of ["admin", "partner"] as const) {
         ),
         [
           audience === "admin"
-            ? "profile lookup failed"
+            ? "admin account lookup failed"
             : "account lookup failed",
           "rollback delete failed",
         ],
@@ -404,9 +430,6 @@ for (const audience of ["admin", "partner"] as const) {
       calls.push(call);
       const inserted = notificationInsertResult(call, audience);
       if (inserted) return inserted;
-      if (call.table === "admin_profiles") {
-        return { data: [{ member_id: "admin-1" }], error: null };
-      }
       if (call.table === "admin_notification_preferences") {
         return { data: [], error: null };
       }
@@ -470,6 +493,69 @@ for (const audience of ["admin", "partner"] as const) {
     );
   });
 }
+
+test("관리자 알림은 활성 상태이며 알림 조회 권한이 있는 계정에만 전달한다", async () => {
+  const calls: QueryCall[] = [];
+  setAdminAccounts([
+    {
+      id: "admin-allowed",
+      isActive: true,
+      permissions: { notifications: { read: true } },
+    },
+    {
+      id: "admin-denied",
+      isActive: true,
+      permissions: { notifications: { read: false } },
+    },
+    {
+      id: "admin-inactive",
+      isActive: false,
+      permissions: { notifications: { read: true } },
+    },
+  ]);
+  installSupabase((call) => {
+    calls.push(call);
+    const inserted = notificationInsertResult(call, "admin");
+    if (inserted) return inserted;
+    if (call.table === "admin_notification_preferences") {
+      return { data: [], error: null };
+    }
+    return { data: null, error: null };
+  });
+  setPushConfigured(false);
+
+  try {
+    const { createAdminOperationalNotification } =
+      await operationalNotificationsModulePromise;
+    const result = await createAdminOperationalNotification({
+      type: "partner_registration_request",
+      title: "제휴 등록 요청",
+      body: "권한이 있는 관리자에게만 전달",
+      requestedChannels: ["portal"],
+    });
+
+    assert.equal(result.recipientCount, 1);
+    const recipientInsert = calls.find(
+      (call) =>
+        call.table === "admin_notification_recipients" &&
+        call.operation === "insert",
+    );
+    assert.deepEqual(recipientInsert?.payload, [
+      {
+        notification_id: "admin-notification-1",
+        admin_id: "admin-allowed",
+      },
+    ]);
+  } finally {
+    setAdminAccounts([
+      {
+        id: "admin-1",
+        isActive: true,
+        permissions: { notifications: { read: true } },
+      },
+    ]);
+  }
+});
 
 test("알림 생성 실패 후 dedupe 해제도 실패하면 두 원인을 AggregateError로 보존한다", async () => {
   const { createDedupedOperationalNotification } =

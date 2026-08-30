@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/auth";
+import { getAdminPersonalNotificationApiSession } from "@/lib/admin-access";
 import { invalidateAdminNotificationSettingsCache } from "@/lib/admin-notifications.server";
 import { isPushConfigured } from "@/lib/push";
 import {
@@ -31,14 +31,23 @@ export async function POST(request: NextRequest) {
         allowedContentTypes: ["application/json"],
       })
     ) {
-      return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
+      return NextResponse.json(
+        { message: "잘못된 요청입니다." },
+        { status: 403 },
+      );
     }
-    const session = await timing.measure("auth", () => getAdminSession());
-    if (!session) {
-      return NextResponse.json({ message: "관리자 인증이 필요합니다." }, { status: 401 });
+    const auth = await timing.measure("auth", () =>
+      getAdminPersonalNotificationApiSession(request),
+    );
+    if ("response" in auth) {
+      return auth.response;
     }
+    const { session } = auth;
     if (!isPushConfigured()) {
-      return NextResponse.json({ message: "서버 알림 설정이 아직 완료되지 않았습니다." }, { status: 503 });
+      return NextResponse.json(
+        { message: "서버 알림 설정이 아직 완료되지 않았습니다." },
+        { status: 503 },
+      );
     }
 
     try {
@@ -60,7 +69,10 @@ export async function POST(request: NextRequest) {
         throw new NotificationRequestError("요청 본문 형식을 확인해 주세요.");
       }
       if (!body.subscription) {
-        return NextResponse.json({ message: "Push 구독 정보가 필요합니다." }, { status: 400 });
+        return NextResponse.json(
+          { message: "Push 구독 정보가 필요합니다." },
+          { status: 400 },
+        );
       }
       const subscription = body.subscription;
       const preferences = await timing.measure("query", () =>

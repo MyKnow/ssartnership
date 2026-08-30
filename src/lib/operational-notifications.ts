@@ -1,5 +1,7 @@
 import { normalizeNotificationTargetUrl } from "@/lib/notifications/shared";
 import { forEachWithConcurrency } from "@/lib/async-concurrency";
+import { listAdminAccounts } from "@/lib/admin-accounts";
+import { canAdmin } from "@/lib/admin-permissions";
 import { getPushDeviceLabel } from "@/lib/push/device-label";
 import {
   ADMIN_NOTIFICATION_CHANNELS,
@@ -546,19 +548,15 @@ export async function createAdminOperationalNotification(input: {
   let recipientRows: Array<{ notification_id: string; admin_id: string }> = [];
   let pushTargetAdminIds: string[] = [];
   try {
-    const { data: profileRows, error: profileError } = await supabase
-      .from("admin_profiles")
-      .select("member_id")
-      .eq("is_active", true);
-    if (profileError) {
-      throw new Error(profileError.message);
-    }
-
     const adminIds = Array.from(
       new Set(
-        (profileRows ?? [])
-          .map((profile) => profile.member_id)
-          .filter((memberId): memberId is string => Boolean(memberId)),
+        (await listAdminAccounts())
+          .filter(
+            (account) =>
+              account.isActive &&
+              canAdmin(account.permissions, "notifications", "read"),
+          )
+          .map((account) => account.id),
       ),
     );
     const { data: preferenceRows, error: preferenceError } = adminIds.length

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/auth";
+import { getAdminPersonalNotificationApiSession } from "@/lib/admin-access";
 import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
 import { invalidateAdminNotificationReadCache } from "@/lib/admin-notifications.server";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
@@ -35,12 +35,18 @@ export async function PATCH(
         expectedOrigin: request.nextUrl.origin,
       })
     ) {
-      return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
+      return NextResponse.json(
+        { message: "잘못된 요청입니다." },
+        { status: 403 },
+      );
     }
-    const session = await timing.measure("auth", () => getAdminSession());
-    if (!session) {
-      return NextResponse.json({ message: "관리자 인증이 필요합니다." }, { status: 401 });
+    const auth = await timing.measure("auth", () =>
+      getAdminPersonalNotificationApiSession(request),
+    );
+    if ("response" in auth) {
+      return auth.response;
     }
+    const { session } = auth;
     const { id } = await params;
     const supabase = getSupabaseAdminClient();
     try {
@@ -65,7 +71,10 @@ export async function PATCH(
         return { unreadCount: await getUnreadCount(session.adminId) };
       });
       if (!result) {
-        return NextResponse.json({ message: "알림을 찾을 수 없습니다." }, { status: 404 });
+        return NextResponse.json(
+          { message: "알림을 찾을 수 없습니다." },
+          { status: 404 },
+        );
       }
       return NextResponse.json({ ok: true, summary: result });
     } catch (error) {
@@ -85,12 +94,18 @@ export async function DELETE(
         expectedOrigin: request.nextUrl.origin,
       })
     ) {
-      return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
+      return NextResponse.json(
+        { message: "잘못된 요청입니다." },
+        { status: 403 },
+      );
     }
-    const session = await timing.measure("auth", () => getAdminSession());
-    if (!session) {
-      return NextResponse.json({ message: "관리자 인증이 필요합니다." }, { status: 401 });
+    const auth = await timing.measure("auth", () =>
+      getAdminPersonalNotificationApiSession(request),
+    );
+    if ("response" in auth) {
+      return auth.response;
     }
+    const { session } = auth;
     const { id } = await params;
     const supabase = getSupabaseAdminClient();
     try {
@@ -115,7 +130,10 @@ export async function DELETE(
         return { unreadCount: await getUnreadCount(session.adminId) };
       });
       if (!result) {
-        return NextResponse.json({ message: "알림을 찾을 수 없습니다." }, { status: 404 });
+        return NextResponse.json(
+          { message: "알림을 찾을 수 없습니다." },
+          { status: 404 },
+        );
       }
       return NextResponse.json({ ok: true, summary: result });
     } catch (error) {
