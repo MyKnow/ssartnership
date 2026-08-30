@@ -76,12 +76,8 @@ export async function fetchPushDevices(currentEndpoint: string | null) {
   const response = await fetch(`/api/push/subscriptions?${params.toString()}`, {
     method: "GET",
   });
-  const data = (await response.json().catch(() => null)) as {
-    message?: string;
-    devices?: PushDeviceSummary[];
-  } | null;
-  if (!response.ok) {
-    throw new Error(data?.message ?? "Push 기기 목록을 불러오지 못했습니다.");
-  }
+  const data = await parsePushSettingsJson<{ devices?: PushDeviceSummary[] }>(
+    response,
+  );
   return data?.devices ?? [];
 }

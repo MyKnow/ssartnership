@@ -5,6 +5,11 @@ import { getPartnerChangeRequestContext } from "@/lib/partner-change-requests";
 import { getPartnerSession } from "@/lib/partner-session";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { partnerReviewRepository } from "@/lib/repositories";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 
 export const runtime = "nodejs";
 
@@ -36,7 +41,21 @@ export async function PATCH(
   }
 
   const { reviewId } = await context.params;
-  const body = await request.json().catch(() => ({}));
+  let body: unknown = {};
+  try {
+    body = await readRouteJsonBodyWithinLimit<unknown>(request, {
+      maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+      invalidMessage: "요청값을 확인해 주세요.",
+      tooLargeMessage: "요청이 너무 큽니다.",
+    });
+  } catch (error) {
+    if (error instanceof RouteJsonBodyError && error.code === "body_too_large") {
+      return NextResponse.json(
+        { ok: false, message: error.message },
+        { status: error.status },
+      );
+    }
+  }
   const action = parseModerationAction((body as { action?: unknown }).action);
   if (!reviewId || !action) {
     return NextResponse.json({ ok: false, message: "요청값을 확인해 주세요." }, { status: 400 });

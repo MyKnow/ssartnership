@@ -1,16 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { resolvePartnerSetupCompletionFallbackPayload } from "../src/lib/partner-auth/setup.ts";
 import {
+  buildPartnerSetupCompletionPayload,
   buildPartnerSetupIssuePayload,
   buildPartnerSetupSelect,
   resolvePartnerSetupSchemaCapabilitiesFromAccount,
+  resolvePartnerSetupSchemaCapabilitiesFromError,
 } from "../src/lib/partner-auth/setup-schema.ts";
 
 const commonPayload = {
   password_hash: "hash",
   password_salt: "salt",
+  auth_session_version: 2,
   must_change_password: false,
   is_active: true,
   email_verified_at: "2026-04-28T00:00:00.000Z",
@@ -19,9 +21,11 @@ const commonPayload = {
 };
 
 test("completion fallback payload drops hash and expiry when both columns are unavailable", () => {
-  const payload = resolvePartnerSetupCompletionFallbackPayload(
+  const payload = buildPartnerSetupCompletionPayload(
     commonPayload,
-    "Could not find the 'initial_setup_token_hash' column and 'initial_setup_expires_at' column",
+    resolvePartnerSetupSchemaCapabilitiesFromError(
+      "Could not find the 'initial_setup_token_hash' column and 'initial_setup_expires_at' column",
+    ),
   );
 
   assert.equal("initial_setup_token_hash" in payload, false);
@@ -30,9 +34,11 @@ test("completion fallback payload drops hash and expiry when both columns are un
 });
 
 test("completion fallback payload keeps hash and drops expiry when only expiry column is unavailable", () => {
-  const payload = resolvePartnerSetupCompletionFallbackPayload(
+  const payload = buildPartnerSetupCompletionPayload(
     commonPayload,
-    "Could not find the 'initial_setup_expires_at' column",
+    resolvePartnerSetupSchemaCapabilitiesFromError(
+      "Could not find the 'initial_setup_expires_at' column",
+    ),
   );
 
   assert.equal(payload.initial_setup_token_hash, null);
@@ -110,4 +116,25 @@ test("buildPartnerSetupIssuePayload chooses hash or plain token fields from capa
 
   assert.equal(plainPayload.initial_setup_token, "plain-token");
   assert.equal("initial_setup_token_hash" in plainPayload, false);
+});
+
+test("partner setup completion update stays compare-and-swap guarded by token and incomplete state", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const [setupSource, accountSource] = await Promise.all([
+    readFile(new URL("../src/lib/partner-auth/setup.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/partner-auth/accounts.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(setupSource, /builder\.is\("initial_setup_completed_at", null\)/);
+  assert.match(setupSource, /eq\(\s*"initial_setup_token_hash",\s*account\.initial_setup_token_hash,/);
+  assert.match(setupSource, /eq\("initial_setup_token", account\.initial_setup_token\)/);
+  assert.match(setupSource, /\.select\("id"\)\s*\.maybeSingle\(\)/);
+  assert.match(setupSource, /const latestAccount = await getSupabasePartnerPortalAccountById\(account\.id\);/);
+  assert.match(setupSource, /auth_session_version: Math\.max\(1, Number\(account\.auth_session_version \?\? 1\)\) \+ 1,/);
+  assert.match(setupSource, /isMissingPartnerAuthSessionVersionColumnError\(attempt\.error\.message\)/);
+  assert.match(setupSource, /omitPartnerAuthSessionVersion\(candidate\.payload\)/);
+  assert.match(setupSource, /throw new PartnerPortalSetupError\(\s*"already_completed",/);
+  assert.match(accountSource, /ACCOUNT_SELECT_BASE/);
+  assert.match(accountSource, /withPartnerAuthSessionVersionFallback/);
+  assert.match(accountSource, /selectAttempts\.push\(plan\.select\.replace\(",auth_session_version", ""\)\)/);
 });

@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
 import { cache } from "react";
-import { getCachedImageUrl } from "@/lib/image-cache";
 import { createEmptyPartnerServiceMetrics } from "@/lib/partner-service-metrics";
 import {
   getBenefitUseAction,
@@ -77,9 +76,12 @@ const getActiveCouponsSafe = cache(async (partnerId: string) => {
   }
 });
 
-const getIssuedCouponsSafe = cache(async (memberId: string) => {
+const getIssuedCouponsSafe = cache(async (memberId: string, partnerId: string) => {
   try {
-    return await adPackageRepository.listIssuedCouponsForMember({ memberId });
+    return await adPackageRepository.listIssuedCouponsForMember({
+      memberId,
+      partnerIds: [partnerId],
+    });
   } catch (error) {
     if (isMissingAdCouponSchemaError(error)) {
       return [] as AvailableAdCoupon[];
@@ -151,7 +153,6 @@ export type PartnerDetailPageData = {
   partner: Partner;
   categoryLabel: string;
   isActive: boolean;
-  thumbnailUrl: string;
   mapLink: string | undefined;
   normalizedLinks: {
     benefitActionType: string;
@@ -227,7 +228,6 @@ export async function getPartnerDetailPageData(
   const category = categories.find((item) => item.key === resolvedPartner.category);
   const categoryLabel = category?.label ?? "알 수 없음";
   const isActive = isWithinPeriod(resolvedPartner.period.start, resolvedPartner.period.end);
-  const thumbnailUrl = resolvedPartner.thumbnail ? getCachedImageUrl(resolvedPartner.thumbnail) : "";
   const mapLink = getMapLink(resolvedPartner.mapUrl, resolvedPartner.location, resolvedPartner.name) ?? undefined;
   const normalizedLinks = isActive
     ? normalizeBenefitUseInquiry({
@@ -260,7 +260,7 @@ export async function getPartnerDetailPageData(
   const [adCoupons, memberCoupons] = await Promise.all([
     getActiveCouponsSafe(resolvedPartner.id),
     currentUserId
-      ? getIssuedCouponsSafe(currentUserId)
+      ? getIssuedCouponsSafe(currentUserId, resolvedPartner.id)
       : Promise.resolve([] as AvailableAdCoupon[]),
   ]);
   const issuedAdCoupons = memberCoupons.filter(
@@ -276,7 +276,6 @@ export async function getPartnerDetailPageData(
     partner: resolvedPartner,
     categoryLabel,
     isActive,
-    thumbnailUrl,
     mapLink,
     normalizedLinks,
     benefitUseAction,
@@ -286,7 +285,7 @@ export async function getPartnerDetailPageData(
     badgeStyle: category?.color
       ? {
           backgroundColor: withAlpha(category.color, "1f"),
-          color: category.color,
+          color: "var(--foreground)",
         }
       : undefined,
     chipStyle: category?.color

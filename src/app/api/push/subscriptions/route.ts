@@ -6,6 +6,7 @@ import {
 import { getSignedUserSession } from "@/lib/user-auth";
 import { listPushSubscriptionDevices } from "@/lib/push";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import { getSafeNotificationRouteError } from "@/lib/notifications/safe-error";
 
 export const runtime = "nodejs";
 
@@ -34,8 +35,14 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ ok: true, devices });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Push 기기 목록을 불러오지 못했습니다.";
-    return NextResponse.json({ message }, { status: 400 });
+    console.error("[member-push-subscriptions] request failed", error);
+    const safeError = getSafeNotificationRouteError(
+      error,
+      "Push 기기 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    return NextResponse.json(
+      { message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }

@@ -23,10 +23,16 @@ import { isMattermostLoginDisabledForGeneration } from "@/lib/member-email-login
 import { parseMemberSignupCompleteInput } from "@/lib/member-signup";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import { MAX_EXTENDED_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { setUserSession, UserSessionIssueError } from "@/lib/user-auth";
 import { attachMattermostSignupProfileImage } from "@/lib/member-signup-profile";
-import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
+import { rollbackCreatedSignupMember } from "@/lib/member-signup-rollback";
 
 export const runtime = "nodejs";
 
@@ -87,7 +93,18 @@ export async function POST(request: Request) {
   if (!verification) {
     return errorResponse("verification_expired", 401);
   }
-  const body = await request.json().catch(() => null);
+  let body: unknown = null;
+  try {
+    body = await readRouteJsonBodyWithinLimit<unknown>(request, {
+      maximumBytes: MAX_EXTENDED_JSON_BODY_BYTES,
+      invalidMessage: "invalid_request",
+      tooLargeMessage: "invalid_request",
+    });
+  } catch (error) {
+    if (error instanceof RouteJsonBodyError && error.code === "body_too_large") {
+      return errorResponse("invalid_request", error.status);
+    }
+  }
   const parsed = parseMemberSignupCompleteInput(body);
   if (!parsed.ok) {
     return errorResponse("invalid_request", 400, { fieldErrors: parsed.fieldErrors });
@@ -263,7 +280,12 @@ export async function POST(request: Request) {
         uploadId: parsed.data.profileImageUploadId,
         ownerId: verification.signupUploadOwnerId,
       });
-      await supabase.from("members").delete().eq("id", inserted.id);
+      await rollbackCreatedSignupMember({
+        memberId: inserted.id,
+        originalError: error,
+        deleteMember: (memberId) =>
+          supabase.from("members").delete().eq("id", memberId),
+      });
       throw error;
     }
 

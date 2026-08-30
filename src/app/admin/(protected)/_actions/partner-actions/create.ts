@@ -6,9 +6,7 @@ import {
   type AdminScopeAccountLike,
   resolveCreatedManagedCampusSlugs,
 } from "@/lib/admin-scope";
-import {
-  sendAndRecordCampusScopedNewPartnerNotification,
-} from "@/lib/new-partner-notifications";
+import { sendAndRecordCampusScopedNewPartnerNotification } from "@/lib/new-partner-notifications";
 import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
 import {
   DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
@@ -21,6 +19,7 @@ import {
   type PartnerBranchDraft,
   type PartnerBranchScopeType,
 } from "@/lib/partner-branch-registration";
+import { persistPartnerBranchLinks } from "@/lib/partner-branch-links.server";
 import type { PartnerCreateFormState } from "@/lib/partner-form-state";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
@@ -37,10 +36,16 @@ import {
   parsePartnerCompanyPayload,
   parsePartnerPayload,
 } from "@/app/admin/(protected)/_actions/shared-parsers";
-import type { CreatedPartnerRecord } from "@/app/admin/(protected)/_actions/shared-types";
+import type {
+  CreatedPartnerRecord,
+  PartnerCompanyProvision,
+  PartnerMediaInput,
+} from "@/app/admin/(protected)/_actions/shared-types";
 import { readFormIdempotencyKey } from "@/lib/form-idempotency";
 import { getPartnerVisibilityState } from "@/lib/partner-visibility";
 import { hashCouponVerificationPassword } from "@/lib/coupon-verification-password";
+import { rollbackCreatedPartnerPersistence } from "@/lib/partner-create-rollback";
+import { resolvePartnerCreateInsertOutcome } from "@/lib/partner-create-idempotency";
 
 type AdminPartnerBranchPayload = {
   branchScopeType: PartnerBranchScopeType;
@@ -165,76 +170,65 @@ async function ensureAdminPartnerBrandProfile({
   };
 }
 
-async function persistAdminPartnerBranchLinks({
+async function cleanupPartnerCreateAttempt({
   supabase,
   partnerId,
-  companyId,
-  brandProfileId,
-  branches,
+  createdPartner,
+  createdBrandProfileId,
+  media,
+  companyProvision,
+  originalError,
 }: {
   supabase: ReturnType<typeof getSupabaseAdminClient>;
   partnerId: string;
-  companyId: string | null;
-  brandProfileId: string | null;
-  branches: PartnerBranchDraft[];
+  createdPartner: boolean;
+  createdBrandProfileId: string | null;
+  media: PartnerMediaInput;
+  companyProvision: PartnerCompanyProvision | null;
+  originalError: unknown;
 }) {
-  if (!companyId || !brandProfileId || branches.length === 0) {
-    return;
+  let persistenceCleanupError: unknown = null;
+  try {
+    await rollbackCreatedPartnerPersistence({
+      originalError,
+      operations: [
+        ...(createdPartner
+          ? [
+              {
+                stage: "partner",
+                run: () =>
+                  supabase.from("partners").delete().eq("id", partnerId),
+              },
+            ]
+          : []),
+        ...(createdBrandProfileId
+          ? [
+              {
+                stage: "partner_brand_profile",
+                run: () =>
+                  supabase
+                    .from("partner_brand_profiles")
+                    .delete()
+                    .eq("id", createdBrandProfileId),
+              },
+            ]
+          : []),
+      ],
+    });
+  } catch (cleanupError) {
+    persistenceCleanupError = cleanupError;
   }
 
-  for (const branch of branches) {
-    const { data: existingBranch, error: branchLookupError } = await supabase
-      .from("partner_company_branches")
-      .select("id")
-      .eq("company_id", companyId)
-      .eq("brand_profile_id", brandProfileId)
-      .eq("branch_key", branch.branchKey)
-      .maybeSingle();
-    if (branchLookupError) {
-      throw new Error(branchLookupError.message);
-    }
-
-    let branchId = (existingBranch as { id?: string } | null)?.id ?? null;
-    if (!branchId) {
-      const { data: createdBranch, error: branchCreateError } = await supabase
-        .from("partner_company_branches")
-        .insert({
-          company_id: companyId,
-          brand_profile_id: brandProfileId,
-          branch_key: branch.branchKey,
-          branch_code: branch.branchCode,
-          name: branch.branchName,
-          address: branch.address,
-          branch_type: branch.branchType,
-          campus_slugs: branch.campusSlugs,
-          map_url: branch.mapUrl,
-          phone: branch.phone,
-          memo: branch.memo,
-          is_active: true,
-        })
-        .select("id")
-        .single();
-      if (branchCreateError) {
-        throw new Error(branchCreateError.message);
-      }
-      branchId = (createdBranch as { id: string }).id;
-    }
-
-    const { error: offerBranchError } = await supabase
-      .from("partner_offer_branches")
-      .upsert(
-        {
-          partner_id: partnerId,
-          branch_id: branchId,
-          status: "active",
-          source: "admin",
-          memo: branch.memo,
-        },
-        { onConflict: "partner_id,branch_id" },
-      );
-    if (offerBranchError) {
-      throw new Error(offerBranchError.message);
-    }
+  await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
+  try {
+    await cleanupPartnerCompanyProvision(supabase, companyProvision);
+  } catch (cleanupError) {
+    throw new Error("partner_company_cleanup_failed", {
+      cause: { originalError, cleanupError, persistenceCleanupError },
+    });
+  }
+  if (persistenceCleanupError) {
+    throw persistenceCleanupError;
   }
 }
 
@@ -258,9 +252,10 @@ async function createPartnerRecord(
   );
 
   const supabase = getSupabaseAdminClient();
-  let companyProvision = null;
+  let companyProvision: PartnerCompanyProvision | null = null;
   let createdBrandProfileId: string | null = null;
   let createdPartner = false;
+  let cleanupAttempted = false;
 
   try {
     companyProvision = await ensurePartnerCompanyRow(
@@ -282,15 +277,14 @@ async function createPartnerRecord(
       payload,
       companyName,
     });
-    const brandProfile =
-      companyProvision?.company?.id
-        ? await ensureAdminPartnerBrandProfile({
-            supabase,
-            companyId: companyProvision.company.id,
-            payload,
-            media,
-          })
-        : { brandProfileId: null, created: false };
+    const brandProfile = companyProvision?.company?.id
+      ? await ensureAdminPartnerBrandProfile({
+          supabase,
+          companyId: companyProvision.company.id,
+          payload,
+          media,
+        })
+      : { brandProfileId: null, created: false };
     if (brandProfile.created) {
       createdBrandProfileId = brandProfile.brandProfileId;
     }
@@ -326,54 +320,94 @@ async function createPartnerRecord(
       branch_scope_note: branchPayload.branchScopeNote,
     });
 
-    if (error?.code === "23505") {
-      const { data: existingPartner, error: existingPartnerError } = await supabase
-        .from("partners")
-        .select("id")
-        .eq("id", partnerId)
-        .maybeSingle();
-      if (existingPartnerError || !existingPartner) {
-        throw new Error(error.message);
-      }
-    } else if (error) {
-      throw new Error(error.message);
-    } else {
-      createdPartner = true;
+    const insertOutcome = await resolvePartnerCreateInsertOutcome({
+      insertError: error,
+      loadExistingPartner: async () => {
+        const { data: existingPartner, error: existingPartnerError } =
+          await supabase
+            .from("partners")
+            .select("id")
+            .eq("id", partnerId)
+            .maybeSingle();
+        return {
+          exists: Boolean(existingPartner),
+          error: existingPartnerError,
+        };
+      },
+      cleanupDuplicateAttempt: async () => {
+        // The idempotency key already owns a completed partner. This retry
+        // must be a no-op before benefit or branch-link side effects can run.
+        cleanupAttempted = true;
+        await cleanupPartnerCreateAttempt({
+          supabase,
+          partnerId,
+          createdPartner: false,
+          createdBrandProfileId,
+          media,
+          companyProvision,
+          originalError: new Error("partner_create_idempotent_retry"),
+        });
+      },
+    });
+    if (insertOutcome === "duplicate") {
+      return {
+        partnerId,
+        created: false,
+        payload,
+        managedCampusSlugs,
+        companyProvision: null,
+        media: { ...media, uploadedUrls: [] },
+        supabase,
+      };
     }
+    createdPartner = true;
 
     if (createdPartner && payload.benefitItems.length > 0) {
-      const { error: benefitError } = await supabase.from("partner_benefits").insert(
-        payload.benefitItems.map((benefit, displayOrder) => ({
-          partner_id: partnerId,
-          title: benefit.title,
-          max_apply_count: benefit.maxApplyCount ?? null,
-          display_order: displayOrder,
-        })),
-      );
+      const { error: benefitError } = await supabase
+        .from("partner_benefits")
+        .insert(
+          payload.benefitItems.map((benefit, displayOrder) => ({
+            partner_id: partnerId,
+            title: benefit.title,
+            max_apply_count: benefit.maxApplyCount ?? null,
+            display_order: displayOrder,
+          })),
+        );
       if (benefitError) {
         throw new Error(benefitError.message);
       }
     }
 
-    await persistAdminPartnerBranchLinks({
+    await persistPartnerBranchLinks({
       supabase,
       partnerId,
       companyId: companyProvision.company?.id ?? null,
       brandProfileId: brandProfile.brandProfileId,
-      branches: branchPayload.branches,
+      source: "admin",
+      branches: branchPayload.branches.map((branch) => ({
+        branchKey: branch.branchKey,
+        branchCode: branch.branchCode,
+        name: branch.branchName,
+        address: branch.address,
+        branchType: branch.branchType,
+        campusSlugs: branch.campusSlugs,
+        mapUrl: branch.mapUrl,
+        phone: branch.phone,
+        memo: branch.memo,
+      })),
     });
   } catch (error) {
-    if (createdPartner) {
-      await supabase.from("partners").delete().eq("id", partnerId);
+    if (!cleanupAttempted) {
+      await cleanupPartnerCreateAttempt({
+        supabase,
+        partnerId,
+        createdPartner,
+        createdBrandProfileId,
+        media,
+        companyProvision,
+        originalError: error,
+      });
     }
-    if (createdBrandProfileId) {
-      await supabase
-        .from("partner_brand_profiles")
-        .delete()
-        .eq("id", createdBrandProfileId);
-    }
-    await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
-    await cleanupPartnerCompanyProvision(supabase, companyProvision);
     throw error;
   }
 
@@ -482,7 +516,10 @@ export async function createPartnerFormActionImpl(
   } catch (error) {
     return {
       status: "error",
-      errorCode: getSafeAdminActionErrorCode(error, "partner_form_invalid_request"),
+      errorCode: getSafeAdminActionErrorCode(
+        error,
+        "partner_form_invalid_request",
+      ),
     };
   }
 

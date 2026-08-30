@@ -4,39 +4,88 @@ import { getSupabaseAdminClient } from "../supabase/server.ts";
 import type { PartnerPortalAccountRow } from "./types.ts";
 import { getPartnerSetupLookupPlans } from "./setup-schema.ts";
 
+export const ACCOUNT_SELECT_BASE =
+  "id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at,updated_at";
 const ACCOUNT_SELECT =
-  "id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at";
+  `${ACCOUNT_SELECT_BASE},auth_session_version`;
+
+export function isMissingPartnerAuthSessionVersionColumnError(
+  errorMessage: string,
+) {
+  return (
+    errorMessage.includes("Could not find the 'auth_session_version' column") ||
+    errorMessage.includes('column "auth_session_version" does not exist') ||
+    errorMessage.includes("partner_accounts.auth_session_version does not exist")
+  );
+}
+
+export function withPartnerAuthSessionVersionFallback(
+  account: PartnerPortalAccountRow | null,
+): PartnerPortalAccountRow | null {
+  if (!account) {
+    return null;
+  }
+
+  return {
+    ...account,
+    auth_session_version: Number.isInteger(account.auth_session_version) &&
+      Number(account.auth_session_version) >= 1
+      ? Number(account.auth_session_version)
+      : 1,
+  };
+}
+
+async function selectPartnerAccountMaybeSingle(
+  runSelect: (
+    select: string,
+  ) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+) {
+  const primary = await runSelect(ACCOUNT_SELECT);
+
+  if (!primary.error) {
+    return withPartnerAuthSessionVersionFallback(
+      (primary.data as PartnerPortalAccountRow | null) ?? null,
+    );
+  }
+
+  if (!isMissingPartnerAuthSessionVersionColumnError(primary.error.message)) {
+    throw primary.error;
+  }
+
+  const fallback = await runSelect(ACCOUNT_SELECT_BASE);
+
+  if (fallback.error) {
+    throw fallback.error;
+  }
+
+  return withPartnerAuthSessionVersionFallback(
+    (fallback.data as PartnerPortalAccountRow | null) ?? null,
+  );
+}
 
 export async function findSupabasePartnerPortalAccount(
   loginIdOrEmail: string,
 ): Promise<PartnerPortalAccountRow | null> {
   const supabase = getSupabaseAdminClient();
-  const select = ACCOUNT_SELECT;
+  const byLoginId = await selectPartnerAccountMaybeSingle((select) =>
+    supabase
+      .from("partner_accounts")
+      .select(select)
+      .eq("login_id", loginIdOrEmail)
+      .maybeSingle(),
+  );
 
-  const { data: byLoginId, error: loginError } = await supabase
-    .from("partner_accounts")
-    .select(select)
-    .eq("login_id", loginIdOrEmail)
-    .maybeSingle();
-
-  if (loginError) {
-    throw loginError;
-  }
   if (byLoginId) {
-    return byLoginId as PartnerPortalAccountRow;
+    return byLoginId;
   }
 
-  const { data: byEmail, error: emailError } = await supabase
-    .from("partner_accounts")
-    .select(select)
-    .eq("email", loginIdOrEmail)
-    .maybeSingle();
-
-  if (emailError) {
-    throw emailError;
-  }
-
-  return (byEmail as PartnerPortalAccountRow | null) ?? null;
+  return selectPartnerAccountMaybeSingle((select) =>
+    supabase
+      .from("partner_accounts")
+      .select(select)
+      .eq("email", loginIdOrEmail)
+      .maybeSingle(),
+  );
 }
 
 export async function findSupabasePartnerPortalSetupAccount(token: string) {
@@ -45,26 +94,40 @@ export async function findSupabasePartnerPortalSetupAccount(token: string) {
   let lastSchemaError: Error | null = null;
 
   for (const plan of getPartnerSetupLookupPlans(ACCOUNT_SELECT)) {
-    const { data, error } = await supabase
-      .from("partner_accounts")
-      .select(plan.select)
-      .eq(plan.matchColumn, plan.usesHashedToken ? tokenHash : token)
-      .maybeSingle();
-
-    if (!error) {
-      return (data as PartnerPortalAccountRow | null) ?? null;
+    const selectAttempts = [plan.select];
+    if (plan.select.includes("auth_session_version")) {
+      selectAttempts.push(plan.select.replace(",auth_session_version", ""));
     }
 
-    const isSchemaFallbackError =
-      error.message.includes("initial_setup_token_hash") ||
-      error.message.includes("initial_setup_token") ||
-      error.message.includes("initial_setup_expires_at");
+    for (const select of selectAttempts) {
+      const { data, error } = await supabase
+        .from("partner_accounts")
+        .select(select)
+        .eq(plan.matchColumn, plan.usesHashedToken ? tokenHash : token)
+        .maybeSingle();
 
-    if (!isSchemaFallbackError) {
-      throw error;
+      if (!error) {
+        return withPartnerAuthSessionVersionFallback(
+          (data as PartnerPortalAccountRow | null) ?? null,
+        );
+      }
+
+      if (isMissingPartnerAuthSessionVersionColumnError(error.message)) {
+        continue;
+      }
+
+      const isSchemaFallbackError =
+        error.message.includes("initial_setup_token_hash") ||
+        error.message.includes("initial_setup_token") ||
+        error.message.includes("initial_setup_expires_at");
+
+      if (!isSchemaFallbackError) {
+        throw error;
+      }
+
+      lastSchemaError = error;
+      break;
     }
-
-    lastSchemaError = error;
   }
 
   if (lastSchemaError) {
@@ -76,17 +139,13 @@ export async function findSupabasePartnerPortalSetupAccount(token: string) {
 
 export async function getSupabasePartnerPortalAccountById(accountId: string) {
   const supabase = getSupabaseAdminClient();
-  const { data: account, error } = await supabase
-    .from("partner_accounts")
-    .select(ACCOUNT_SELECT)
-    .eq("id", accountId)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  return (account as PartnerPortalAccountRow | null) ?? null;
+  return selectPartnerAccountMaybeSingle((select) =>
+    supabase
+      .from("partner_accounts")
+      .select(select)
+      .eq("id", accountId)
+      .maybeSingle(),
+  );
 }
 
 export function normalizeSupabasePartnerLoginId(loginId: string) {

@@ -15,6 +15,7 @@ import {
   Store,
 } from "lucide-react";
 import BrandWordmark from "@/components/BrandWordmark";
+import PartnerLogoutButton from "@/components/partner/PartnerLogoutButton";
 import PartnerPendingLink from "@/components/partner/PartnerPendingLink";
 import ThemeToggle from "@/components/ThemeToggle";
 import Container from "@/components/ui/Container";
@@ -226,14 +227,14 @@ function MobileTopBar({
         <div className="flex items-center gap-2">
           <ThemeToggle />
           {session ? (
-            <PartnerPendingLink
-              href="/partner/logout"
-              prefetch={false}
-              aria-label="로그아웃"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-[1rem] border border-danger/20 bg-danger/10 text-danger shadow-flat transition-interactive hover:-translate-y-px hover:bg-danger/12"
+            <PartnerLogoutButton
+              formClassName="inline-flex"
+              size="icon"
+              ariaLabel="로그아웃"
+              title="로그아웃"
             >
               <LogOut className="h-5 w-5" />
-            </PartnerPendingLink>
+            </PartnerLogoutButton>
           ) : (
             <PartnerPendingLink
               href="/"
@@ -459,14 +460,13 @@ function DashboardSidebar({
             <ExternalLink className="h-4 w-4" />
             <span className="hidden xl:inline">사용자 화면</span>
           </PartnerPendingLink>
-          <PartnerPendingLink
-            href="/partner/logout"
-            prefetch={false}
-            className="flex min-h-11 items-center justify-center gap-3 rounded-[1rem] border border-danger/20 bg-danger/10 px-3 text-sm font-semibold text-danger shadow-flat transition-interactive hover:-translate-y-px xl:justify-start"
+          <PartnerLogoutButton
+            formClassName="w-full"
+            className="w-full px-3 xl:justify-start"
           >
             <LogOut className="h-4 w-4" />
             <span className="hidden xl:inline">로그아웃</span>
-          </PartnerPendingLink>
+          </PartnerLogoutButton>
         </div>
       </div>
     </aside>

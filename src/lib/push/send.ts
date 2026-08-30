@@ -4,6 +4,7 @@ import { getCampaignTemplateKey } from "@/lib/notification-templates/catalog";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
 import { renderNotificationTemplate } from "@/lib/notification-templates/template";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
+import { forEachWithConcurrency } from "../async-concurrency.ts";
 import { getPushEnv, isPushConfigured, wrapPushDbError } from "./config.ts";
 import { getDefaultPushAudience, resolvePushAudience } from "./audience.ts";
 import {
@@ -19,6 +20,7 @@ import {
   sanitizeNotificationUrl,
 } from "./payloads.ts";
 import { getActiveSubscriptionPushPreferences } from "./preferences.ts";
+import { buildTrustedPushSubscriptionRequest } from "./subscription-trust.ts";
 import {
   PushError,
 } from "./types.ts";
@@ -32,6 +34,7 @@ import type {
 } from "./types.ts";
 
 let webPushPromise: Promise<WebPushModule> | null = null;
+const PUSH_SEND_CONCURRENCY = 8;
 
 async function getWebPush() {
   if (!webPushPromise) {
@@ -219,69 +222,73 @@ export async function sendPushToAudience(
   let delivered = 0;
   let failed = 0;
 
-  for (const subscription of targets) {
-    try {
-      await webpush.sendNotification(
-        {
-          endpoint: subscription.endpoint,
-          expirationTime: null,
-          keys: {
+  await forEachWithConcurrency(
+    targets,
+    PUSH_SEND_CONCURRENCY,
+    async (subscription) => {
+      try {
+        await webpush.sendNotification(
+          await buildTrustedPushSubscriptionRequest({
+            endpoint: subscription.endpoint,
             p256dh: subscription.p256dh,
             auth: subscription.auth,
-          },
-        },
-        serialized,
-      );
-      delivered += 1;
-      await Promise.all([
-        markPushSuccess(subscription.id),
-        logPushDelivery({
-          messageLogId: messageLog.id,
-          memberId: subscription.member_id,
-          subscriptionId: subscription.id,
-          payload,
-          status: "sent",
-        }),
-        createdNotification
-          ? notificationRepository.recordNotificationDelivery({
-              notificationId: createdNotification.notification.id,
-              memberId: subscription.member_id,
-              channel: "push",
-              status: "sent",
-            })
-          : Promise.resolve(),
-      ]);
-    } catch (error) {
-      failed += 1;
-      const statusCode =
-        typeof error === "object" && error && "statusCode" in error
-          ? Number((error as { statusCode?: number }).statusCode)
-          : null;
-      const errorMessage =
-        error instanceof Error ? error.message : "푸시 알림 전송에 실패했습니다.";
-      const deactivate = statusCode === 404 || statusCode === 410;
-      await Promise.all([
-        markPushFailure(subscription, errorMessage, deactivate),
-        logPushDelivery({
-          messageLogId: messageLog.id,
-          memberId: subscription.member_id,
-          subscriptionId: subscription.id,
-          payload,
-          status: "failed",
-          errorMessage,
-        }),
-        createdNotification
-          ? notificationRepository.recordNotificationDelivery({
-              notificationId: createdNotification.notification.id,
-              memberId: subscription.member_id,
-              channel: "push",
-              status: "failed",
-              errorMessage,
-            })
-          : Promise.resolve(),
-      ]);
-    }
-  }
+          }),
+          serialized,
+        );
+        delivered += 1;
+        await Promise.all([
+          markPushSuccess(subscription.id),
+          logPushDelivery({
+            messageLogId: messageLog.id,
+            memberId: subscription.member_id,
+            subscriptionId: subscription.id,
+            payload,
+            status: "sent",
+          }),
+          createdNotification
+            ? notificationRepository.recordNotificationDelivery({
+                notificationId: createdNotification.notification.id,
+                memberId: subscription.member_id,
+                channel: "push",
+                status: "sent",
+              })
+            : Promise.resolve(),
+        ]);
+      } catch (error) {
+        failed += 1;
+        const statusCode =
+          typeof error === "object" && error && "statusCode" in error
+            ? Number((error as { statusCode?: number }).statusCode)
+            : null;
+        const errorMessage =
+          error instanceof Error ? error.message : "푸시 알림 전송에 실패했습니다.";
+        const deactivate =
+          (error instanceof PushError && error.code === "invalid_request") ||
+          statusCode === 404 ||
+          statusCode === 410;
+        await Promise.all([
+          markPushFailure(subscription, errorMessage, deactivate),
+          logPushDelivery({
+            messageLogId: messageLog.id,
+            memberId: subscription.member_id,
+            subscriptionId: subscription.id,
+            payload,
+            status: "failed",
+            errorMessage,
+          }),
+          createdNotification
+            ? notificationRepository.recordNotificationDelivery({
+                notificationId: createdNotification.notification.id,
+                memberId: subscription.member_id,
+                channel: "push",
+                status: "failed",
+                errorMessage,
+              })
+            : Promise.resolve(),
+        ]);
+      }
+    },
+  );
 
   await finalizePushMessageLog({
     id: messageLog.id,
@@ -340,45 +347,48 @@ export async function sendPushTemplateTest(input: {
   let delivered = 0;
   let failed = 0;
 
-  for (const subscription of subscriptions) {
-    try {
-      await webpush.sendNotification(
-        {
-          endpoint: subscription.endpoint,
-          expirationTime: null,
-          keys: {
+  await forEachWithConcurrency(
+    subscriptions,
+    PUSH_SEND_CONCURRENCY,
+    async (subscription) => {
+      try {
+        await webpush.sendNotification(
+          await buildTrustedPushSubscriptionRequest({
+            endpoint: subscription.endpoint,
             p256dh: subscription.p256dh,
             auth: subscription.auth,
-          },
-        },
-        serialized,
-      );
-      delivered += 1;
-      await Promise.all([
-        markPushSuccess(subscription.id),
-        logPushDelivery({
-          messageLogId: messageLog.id,
-          memberId: subscription.member_id,
-          subscriptionId: subscription.id,
-          payload: input.payload,
-          status: "sent",
-        }),
-      ]);
-    } catch {
-      failed += 1;
-      await Promise.all([
-        markPushFailure(subscription, "템플릿 테스트 푸시 발송 실패", false),
-        logPushDelivery({
-          messageLogId: messageLog.id,
-          memberId: subscription.member_id,
-          subscriptionId: subscription.id,
-          payload: input.payload,
-          status: "failed",
-          errorMessage: "템플릿 테스트 푸시 발송 실패",
-        }),
-      ]);
-    }
-  }
+          }),
+          serialized,
+        );
+        delivered += 1;
+        await Promise.all([
+          markPushSuccess(subscription.id),
+          logPushDelivery({
+            messageLogId: messageLog.id,
+            memberId: subscription.member_id,
+            subscriptionId: subscription.id,
+            payload: input.payload,
+            status: "sent",
+          }),
+        ]);
+      } catch (error) {
+        failed += 1;
+        const deactivate =
+          error instanceof PushError && error.code === "invalid_request";
+        await Promise.all([
+          markPushFailure(subscription, "템플릿 테스트 푸시 발송 실패", deactivate),
+          logPushDelivery({
+            messageLogId: messageLog.id,
+            memberId: subscription.member_id,
+            subscriptionId: subscription.id,
+            payload: input.payload,
+            status: "failed",
+            errorMessage: "템플릿 테스트 푸시 발송 실패",
+          }),
+        ]);
+      }
+    },
+  );
 
   await finalizePushMessageLog({
     id: messageLog.id,

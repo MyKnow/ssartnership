@@ -21,7 +21,7 @@ export type PushSettingsApiResponse = {
   message?: string;
   preferences?: PushPreferenceState;
   appliedAt?: string;
-} | null;
+};
 
 export type PushDeviceSummary = {
   id: string;

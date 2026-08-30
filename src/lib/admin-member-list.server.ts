@@ -8,6 +8,10 @@ import type {
 } from "@/components/admin/member-manager/selectors";
 import type { AdminMemberPageSize } from "@/lib/admin-ia";
 import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
+import {
+  getAdminSearchLikePattern,
+  normalizeAdminSearchQuery,
+} from "@/lib/admin-search-query";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { unstable_cache } from "next/cache";
 
@@ -284,7 +288,7 @@ export function parseAdminMemberListFilters(
   params: AdminMemberSearchParams,
 ): AdminMemberListFilters {
   return {
-    searchValue: getAdminMemberSearchParam(params, "q")?.trim().slice(0, 100) ?? "",
+    searchValue: normalizeAdminSearchQuery(getAdminMemberSearchParam(params, "q")),
     sortValue: parseSort(getAdminMemberSearchParam(params, "sort")),
     filterValue: parseMemberStatus(getAdminMemberSearchParam(params, "status")),
     mattermostLifecycleFilter: parseMemberLifecycleFilter(
@@ -376,13 +380,6 @@ function mergeMemberIdFilters(filters: Array<MemberIdFilter | null>): MemberIdFi
     included: included ? [...included] : null,
     excluded: [...excluded],
   };
-}
-
-function escapeLikePattern(value: string) {
-  return value
-    .replaceAll("\\", "\\\\")
-    .replaceAll("%", "\\%")
-    .replaceAll("_", "\\_");
 }
 
 function canUseMemberSearchOrFilter(value: string) {
@@ -559,7 +556,7 @@ async function getMemberSearchIds(
     return null;
   }
 
-  const pattern = `%${escapeLikePattern(searchValue)}%`;
+  const pattern = getAdminSearchLikePattern(searchValue);
   const useOrFilter = canUseMemberSearchOrFilter(searchValue);
   const directSearchQueries = useOrFilter
     ? [

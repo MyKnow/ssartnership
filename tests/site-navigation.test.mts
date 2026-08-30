@@ -7,6 +7,7 @@ import {
   isFocusedSiteFlow,
   isMyInfoPath,
   isPartnerDetailPath,
+  shouldSuppressPwaVisitRecommendation,
 } from "@/lib/site-navigation";
 
 test("설정 진입은 현재 내부 화면을 복귀 경로로 보존한다", () => {
@@ -71,4 +72,25 @@ test("파트너 상세는 CTA에 집중할 수 있도록 모바일 공용 탐색
   assert.equal(isPartnerDetailPath("/partners/partner-id"), true);
   assert.equal(isPartnerDetailPath("/partners"), false);
   assert.equal(isPartnerDetailPath("/partners/partner-id/benefit-use"), false);
+});
+
+test("앱 설치 권장은 집중 흐름과 설치·파트너 화면에서 숨긴다", () => {
+  assert.equal(shouldSuppressPwaVisitRecommendation("/"), false);
+  assert.equal(shouldSuppressPwaVisitRecommendation("/campuses/seoul"), false);
+  assert.equal(shouldSuppressPwaVisitRecommendation("/auth/login"), true);
+  assert.equal(shouldSuppressPwaVisitRecommendation("/install"), true);
+  assert.equal(
+    shouldSuppressPwaVisitRecommendation("/install?platform=ios"),
+    true,
+  );
+  assert.equal(
+    shouldSuppressPwaVisitRecommendation("/partners/partner-id"),
+    true,
+  );
+  assert.equal(
+    shouldSuppressPwaVisitRecommendation(
+      "/partners/partner-id/benefit-use",
+    ),
+    true,
+  );
 });

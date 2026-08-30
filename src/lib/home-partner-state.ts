@@ -66,12 +66,38 @@ export async function getHomePartnerState(input: {
     };
   }
 
-  let favoriteCounts = new Map<string, number>();
-  try {
-    favoriteCounts = await partnerFavoriteRepository.getFavoriteCounts(partnerIds);
-  } catch (error) {
-    console.error("[home-partner-state] favorite counts query failed", error);
-  }
+  const favoriteCountsPromise = partnerFavoriteRepository
+    .getFavoriteCounts(partnerIds)
+    .catch((error) => {
+      console.error("[home-partner-state] favorite counts query failed", error);
+      return new Map<string, number>();
+    });
+  const popularityMetricsPromise = canUsePopularityMetrics()
+    ? getAdminPartnerMetrics(partnerIds)
+        .then(({ metricsByPartnerId }) => metricsByPartnerId)
+        .catch((error) => {
+          console.error(
+            "[home-partner-state] popularity metrics query failed",
+            error,
+          );
+          return new Map<string, PartnerPopularityMetrics>();
+        })
+    : Promise.resolve(new Map<string, PartnerPopularityMetrics>());
+  const favoritePartnerIdsPromise = input.currentUserId
+    ? partnerFavoriteRepository
+        .getMemberFavoritePartnerIds(input.currentUserId, partnerIds)
+        .catch((error) => {
+          console.error("[home-partner-state] favorite state query failed", error);
+          return new Set<string>();
+        })
+    : Promise.resolve(new Set<string>());
+
+  const [favoriteCounts, popularityMetrics, favoritePartnerIds] =
+    await Promise.all([
+      favoriteCountsPromise,
+      popularityMetricsPromise,
+      favoritePartnerIdsPromise,
+    ]);
 
   for (const partnerId of partnerIds) {
     partnerPopularityById[partnerId] = {
@@ -81,35 +107,17 @@ export async function getHomePartnerState(input: {
     };
   }
 
-  if (canUsePopularityMetrics()) {
-    try {
-      const { metricsByPartnerId } = await getAdminPartnerMetrics(partnerIds);
-      for (const [partnerId, metrics] of metricsByPartnerId.entries()) {
-        partnerPopularityById[partnerId] = {
-          favoriteCount:
-            favoriteCounts.get(partnerId) ?? metrics.favoriteCount ?? 0,
-          reviewCount: metrics.reviewCount,
-          detailViews: metrics.detailViews,
-        };
-      }
-    } catch (error) {
-      console.error("[home-partner-state] popularity metrics query failed", error);
-    }
+  for (const [partnerId, metrics] of popularityMetrics.entries()) {
+    partnerPopularityById[partnerId] = {
+      favoriteCount:
+        favoriteCounts.get(partnerId) ?? metrics.favoriteCount ?? 0,
+      reviewCount: metrics.reviewCount,
+      detailViews: metrics.detailViews,
+    };
   }
 
-  if (input.currentUserId) {
-    try {
-      const favoritePartnerIds =
-        await partnerFavoriteRepository.getMemberFavoritePartnerIds(
-          input.currentUserId,
-          partnerIds,
-        );
-      for (const partnerId of favoritePartnerIds) {
-        partnerFavoriteStateById[partnerId] = true;
-      }
-    } catch (error) {
-      console.error("[home-partner-state] favorite state query failed", error);
-    }
+  for (const partnerId of favoritePartnerIds) {
+    partnerFavoriteStateById[partnerId] = true;
   }
 
   return {

@@ -6,6 +6,7 @@ import {
   getPartnerPortalSetupErrorStatus,
   isPartnerPortalSetupError,
 } from "@/lib/partner-auth";
+import { PartnerPortalRouteBodyError, readPartnerPortalJsonBody } from "@/lib/partner-auth/route-body";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
@@ -38,10 +39,10 @@ export async function POST(
   const { token } = await context.params;
 
   try {
-    const payload = (await request.json()) as {
+    const payload = await readPartnerPortalJsonBody<{
       password?: string;
       confirmPassword?: string;
-    };
+    }>(request);
 
     const result = await completePartnerPortalInitialSetup({
       token,
@@ -63,6 +64,25 @@ export async function POST(
 
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
+    if (error instanceof PartnerPortalRouteBodyError) {
+      await logAuthSecurity({
+        ...getRequestLogContext(request),
+        eventName: "partner_initial_setup",
+        status: "failure",
+        actorType: "guest",
+        properties: {
+          reason: "invalid_body",
+        },
+      });
+      return NextResponse.json(
+        {
+          error: "invalid_body",
+          message: error.message,
+        },
+        { status: 400 },
+      );
+    }
+
     if (isPartnerPortalSetupError(error)) {
       await logAuthSecurity({
         ...getRequestLogContext(request),

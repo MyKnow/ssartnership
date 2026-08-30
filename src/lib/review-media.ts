@@ -34,7 +34,15 @@ export function parseReviewMediaManifest(
     return null;
   }
 
-  if (!parsed || typeof parsed !== "object") {
+  return parseReviewMediaManifestValue(parsed);
+}
+
+export function parseReviewMediaManifestValue(
+  value: unknown,
+): ReviewMediaManifest | null {
+  const parsed = value;
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     return null;
   }
 

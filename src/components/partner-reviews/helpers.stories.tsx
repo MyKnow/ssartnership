@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 import {
   appendPartnerReviewList,
-  buildReviewFormData,
+  buildReviewRequestBody,
   formatPartnerReviewDate,
   getPartnerReviewRatingLabel,
   getPartnerReviewRatingOptions,
@@ -20,7 +20,7 @@ function PartnerReviewHelpersPreview() {
     url: "blob:review",
     uploadId: "00000000-0000-4000-8000-000000000002",
   };
-  const formData = buildReviewFormData({
+  const requestBody = buildReviewRequestBody({
     reviewId: "00000000-0000-4000-8000-000000000001",
     rating: 5,
     title: "좋아요",
@@ -44,11 +44,11 @@ function PartnerReviewHelpersPreview() {
       <div>formatted-invalid:{formatPartnerReviewDate("not-a-date")}</div>
       <div>rating-label:{getPartnerReviewRatingLabel("5")}</div>
       <div>rating-options:{getPartnerReviewRatingOptions().length}</div>
-      <div>form-rating:{String(formData.get("rating"))}</div>
-      <div>form-title:{String(formData.get("title"))}</div>
-      <div>form-body:{String(formData.get("body"))}</div>
-      <div>form-manifest:{String(formData.get("imagesManifest"))}</div>
-      <div>form-image-binary-count:{formData.getAll("imageFiles").length}</div>
+      <div>request-rating:{String(requestBody.rating)}</div>
+      <div>request-title:{requestBody.title}</div>
+      <div>request-body:{requestBody.body}</div>
+      <div>request-manifest:{JSON.stringify(requestBody.imagesManifest)}</div>
+      <div>request-has-image-binary:{String("imageFiles" in requestBody)}</div>
       <div>merged:{merged.map((item) => item.id).join(",")}</div>
     </div>
   );
@@ -70,15 +70,15 @@ export const Summary: Story = {
     await expect(canvas.getByText("formatted-invalid:")).toBeInTheDocument();
     await expect(canvas.getByText("rating-label:5점")).toBeInTheDocument();
     await expect(canvas.getByText("rating-options:6")).toBeInTheDocument();
-    await expect(canvas.getByText("form-rating:5")).toBeInTheDocument();
-    await expect(canvas.getByText("form-title:좋아요")).toBeInTheDocument();
-    await expect(canvas.getByText("form-body:재방문 의사 있습니다.")).toBeInTheDocument();
+    await expect(canvas.getByText("request-rating:5")).toBeInTheDocument();
+    await expect(canvas.getByText("request-title:좋아요")).toBeInTheDocument();
+    await expect(canvas.getByText("request-body:재방문 의사 있습니다.")).toBeInTheDocument();
     await expect(
       canvas.getByText(
-        'form-manifest:{"images":[{"kind":"existing","url":"https://example.com/review.webp"},{"kind":"upload","uploadId":"00000000-0000-4000-8000-000000000002"}]}',
+        'request-manifest:{"images":[{"kind":"existing","url":"https://example.com/review.webp"},{"kind":"upload","uploadId":"00000000-0000-4000-8000-000000000002"}]}',
       ),
     ).toBeInTheDocument();
-    await expect(canvas.getByText("form-image-binary-count:0")).toBeInTheDocument();
+    await expect(canvas.getByText("request-has-image-binary:false")).toBeInTheDocument();
     await expect(canvas.getByText("merged:review-1,review-2,review-3")).toBeInTheDocument();
   },
 };

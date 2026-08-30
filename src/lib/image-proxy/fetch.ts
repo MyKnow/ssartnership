@@ -4,9 +4,15 @@ import https from "node:https";
 import net from "node:net";
 import type { IncomingHttpHeaders, RequestOptions } from "node:http";
 import { isPublicIpAddress } from "./ip";
-import { IMAGE_FETCH_TIMEOUT_MS, ImageProxyError, MAX_IMAGE_BYTES } from "./shared";
+import {
+  IMAGE_FETCH_TIMEOUT_MS,
+  ImageProxyError,
+  MAX_IMAGE_BYTES,
+  resolveAllowedImageContentType,
+} from "./shared";
 
 export type FetchPublicImageOptions = {
+  allowedContentTypes?: readonly string[];
   maxBytes?: number;
 };
 
@@ -127,8 +133,11 @@ export async function fetchPublicImage(
     throw new ImageProxyError("Failed to fetch image", 502);
   }
 
-  const contentType = getContentType(response.headers);
-  if (!contentType.startsWith("image/")) {
+  const contentType = resolveAllowedImageContentType(
+    getContentType(response.headers),
+    options.allowedContentTypes,
+  );
+  if (!contentType) {
     response.resume();
     throw new ImageProxyError("Unsupported media type", 415);
   }

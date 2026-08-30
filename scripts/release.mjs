@@ -60,6 +60,29 @@ function currentVersion() {
   return JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 }
 
+function hasUnstagedChanges(paths) {
+  const result = spawnSync("git", ["diff", "--quiet", "--", ...paths], {
+    cwd: repositoryRoot,
+  });
+  if (result.error) {
+    throw new Error("버전 파일 변경 상태를 확인하지 못했습니다.");
+  }
+  return result.status !== 0;
+}
+
+function ensureVersionFilesDoNotHaveUnstagedChanges() {
+  const versionFiles = ["package.json", "package-lock.json"];
+  if (hasUnstagedChanges(versionFiles)) {
+    throw new Error(
+      "버전 파일(package.json, package-lock.json)에 unstaged 변경이 있습니다. 먼저 정리하거나 stage하세요.",
+    );
+  }
+}
+
+function stageReleaseVersionFiles() {
+  runGit(["add", "--", "package.json", "package-lock.json"]);
+}
+
 async function askChoice(readline, prompt, choices) {
   while (true) {
     process.stdout.write(`${prompt}\n`);
@@ -192,16 +215,17 @@ try {
   runRequiredScript("prepush");
 
   if (releaseType !== "none") {
+    ensureVersionFilesDoNotHaveUnstagedChanges();
     requireSuccessfulResult(
       runNpmArguments(["version", releaseType, "--no-git-tag-version"]),
       `npm version ${releaseType}`,
     );
+    stageReleaseVersionFiles();
   }
   if (!hasGitChanges()) {
     throw new Error("커밋할 변경사항이 없습니다.");
   }
 
-  runGit(["add", "-A"]);
   runGit(["commit", "-m", message]);
   runGit(["push", "--no-verify", "origin", branch]);
   process.stdout.write(

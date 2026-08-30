@@ -4,9 +4,14 @@ import { isE2eMockMutationEnabled } from "@/lib/e2e-mutation-mode";
 import { sendMemberEmailVerificationCode } from "@/lib/member-email";
 import { getMemberEmailRecoverySession, clearMemberEmailRecoverySession } from "@/lib/member-email-recovery-session";
 import {
+  issueMemberEmailChallenge,
+  MemberEmailChallengeIssueError,
+} from "@/lib/member-email-verification-challenge";
+import {
   generateMemberEmailVerificationCode,
   hashMemberEmailIdentifier,
   hashMemberEmailVerificationCode,
+  MEMBER_EMAIL_RESEND_COOLDOWN_SECONDS,
   MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS,
 } from "@/lib/member-email-verification";
 import {
@@ -18,8 +23,17 @@ import { normalizeMemberEmail } from "@/lib/member-domain";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { setUserSession } from "@/lib/user-auth";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
+import { SupabaseMemberEmailRecoveryChallengeRepository } from "@/lib/repositories/supabase/member-email-recovery-challenge-repository.supabase";
 
 export const runtime = "nodejs";
+
+const recoveryChallengeRepository =
+  new SupabaseMemberEmailRecoveryChallengeRepository();
 
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
@@ -36,7 +50,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "recovery_expired", message: "복구 세션이 만료되었습니다. 기존 비밀번호를 다시 확인해 주세요." }, { status: 401 });
   }
 
-  const body = (await request.json().catch(() => null)) as { email?: unknown } | null;
+  let body: { email?: unknown } | null = null;
+  try {
+    body = await readRouteJsonBodyWithinLimit<{ email?: unknown }>(request, {
+      maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+      invalidMessage: "이메일 주소를 확인해 주세요.",
+      tooLargeMessage: "요청 본문이 너무 큽니다.",
+    });
+  } catch (error) {
+    if (error instanceof RouteJsonBodyError && error.code === "body_too_large") {
+      return NextResponse.json(
+        { ok: false, message: error.message },
+        { status: error.status },
+      );
+    }
+  }
   const email = normalizeMemberEmail(body?.email);
   if (!email) {
     return NextResponse.json({ ok: false, message: "이메일 주소를 확인해 주세요." }, { status: 400 });
@@ -45,7 +73,18 @@ export async function POST(request: Request) {
     ipAddress: context.ipAddress ?? null,
     accountIdentifier: hashMemberEmailIdentifier(email),
   };
-  if (await getMemberEmailVerificationBlockingState("recovery-send", rateLimitContext)) {
+  const blockingState = await getMemberEmailVerificationBlockingState("recovery-send", rateLimitContext);
+  if (!blockingState.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "unavailable",
+        message: "인증 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
+  }
+  if (blockingState.blocked) {
     return NextResponse.json({ ok: false, error: "rate_limited", message: "인증 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
   }
 
@@ -85,49 +124,96 @@ export async function POST(request: Request) {
   }
 
   const code = generateMemberEmailVerificationCode();
-  const { data: challenge, error: challengeError } = await supabase
-    .from("member_email_challenges")
-    .insert({
-      member_id: recovery.memberId,
-      email_normalized: email,
-      purpose: "email_recovery",
-      code_hash: hashMemberEmailVerificationCode(email, code),
-      expires_at: new Date(Date.now() + MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS * 1_000).toISOString(),
-    })
-    .select("id")
-    .single();
-  if (challengeError || !challenge?.id) {
-    return NextResponse.json({ ok: false, message: "인증 요청을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요." }, { status: 503 });
-  }
-
-  await recordMemberEmailVerificationAttempt("recovery-send", rateLimitContext, false);
+  const issuedAt = Date.now();
+  const expiresAt = new Date(
+    issuedAt + MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS * 1_000,
+  ).toISOString();
+  const resendAvailableAt = new Date(
+    issuedAt + MEMBER_EMAIL_RESEND_COOLDOWN_SECONDS * 1_000,
+  ).toISOString();
+  let reservation;
   try {
-    if (!isE2eMockMutationEnabled()) {
-      await sendMemberEmailVerificationCode({ to: email, code });
+    reservation = await issueMemberEmailChallenge(
+      {
+        memberId: recovery.memberId,
+        emailNormalized: email,
+        codeHash: hashMemberEmailVerificationCode(email, code),
+        expiresAt,
+        resendAvailableAt,
+      },
+      {
+        repository: recoveryChallengeRepository,
+        beforeDelivery: async () => {
+          const attemptRecord = await recordMemberEmailVerificationAttempt(
+            "recovery-send",
+            rateLimitContext,
+            false,
+          );
+          if (!attemptRecord.ok) {
+            throw new Error(attemptRecord.code);
+          }
+        },
+        deliver: async () => {
+          if (!isE2eMockMutationEnabled()) {
+            await sendMemberEmailVerificationCode({ to: email, code });
+          }
+        },
+      },
+    );
+    if (!reservation.accepted) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "resend_cooldown",
+          message: "새 인증 코드는 잠시 후 다시 요청할 수 있습니다.",
+          retryAfterSeconds: reservation.retryAfterSeconds,
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(reservation.retryAfterSeconds),
+          },
+        },
+      );
     }
-    await logAuthSecurity({
-      ...context,
-      eventName: "member_email_recovery",
-      status: "success",
-      actorType: "member",
-      actorId: recovery.memberId,
-      properties: { stage: "email_send" },
-    });
-    return NextResponse.json({
-      ok: true,
-      expiresInSeconds: MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS,
-      ...(isE2eMockMutationEnabled() ? { testCode: code } : {}),
-    });
-  } catch {
-    await supabase.from("member_email_challenges").delete().eq("id", challenge.id);
+  } catch (error) {
+    const deliveryFailed = error instanceof MemberEmailChallengeIssueError;
     await logAuthSecurity({
       ...context,
       eventName: "member_email_recovery",
       status: "failure",
       actorType: "member",
       actorId: recovery.memberId,
-      properties: { stage: "email_send", reason: "delivery_failed" },
+      properties: {
+        stage: "email_send",
+        reason: deliveryFailed ? "delivery_failed" : "reservation_failed",
+      },
     });
-    return NextResponse.json({ ok: false, message: "인증 코드를 보내지 못했습니다. 잠시 후 다시 시도해 주세요." }, { status: 503 });
+    return NextResponse.json(
+      {
+        ok: false,
+        message: deliveryFailed
+          ? "인증 코드를 보내지 못했습니다. 잠시 후 다시 시도해 주세요."
+          : "인증 요청을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
   }
+
+  await logAuthSecurity({
+    ...context,
+    eventName: "member_email_recovery",
+    status: "success",
+    actorType: "member",
+    actorId: recovery.memberId,
+    properties: { stage: "email_send" },
+  });
+  return NextResponse.json({
+    ok: true,
+    expiresAt,
+    expiresInSeconds: MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS,
+    resendAvailableAt,
+    resendAvailableInSeconds: MEMBER_EMAIL_RESEND_COOLDOWN_SECONDS,
+    ...(isE2eMockMutationEnabled() ? { testCode: code } : {}),
+  });
 }

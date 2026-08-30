@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { LogOut } from "lucide-react";
 import Button from "@/components/ui/Button";
+import PartnerLogoutButton from "@/components/partner/PartnerLogoutButton";
 import PartnerPendingButtonLink from "@/components/partner/PartnerPendingButtonLink";
 import { TECH_SUPPORT_HREF } from "@/lib/support-mail";
 import type { PartnerSession } from "@/lib/partner-session";
@@ -45,8 +46,6 @@ export default function PartnerPortalActionLinks({
     );
   }
 
-  const authHref = "/partner/logout";
-
   return (
     <>
       {isDashboardRoute ? null : (
@@ -73,20 +72,19 @@ export default function PartnerPortalActionLinks({
       </PartnerPendingButtonLink>
       {supportLink}
       {logoutIconOnly ? (
-        <PartnerPendingButtonLink
+        <PartnerLogoutButton
           variant="danger"
           size="icon"
-          href={authHref}
-          prefetch={false}
+          formClassName="inline-flex"
           ariaLabel="로그아웃"
           title="로그아웃"
         >
           <LogOut className="h-5 w-5" />
-        </PartnerPendingButtonLink>
+        </PartnerLogoutButton>
       ) : (
-        <PartnerPendingButtonLink variant="danger" href={authHref} prefetch={false}>
+        <PartnerLogoutButton formClassName="inline-flex" variant="danger">
           로그아웃
-        </PartnerPendingButtonLink>
+        </PartnerLogoutButton>
       )}
       {showPublicHome ? (
         <PartnerPendingButtonLink variant="ghost" href="/" className="hidden sm:inline-flex">

@@ -164,3 +164,30 @@ export function resolvePartnerBrandPlanWindow(input: {
     planExpiresAt: input.planExpiresAt ?? null,
   };
 }
+
+export function isPartnerPlanWindowOrderValid(input: {
+  planStartedAt?: string | null;
+  planExpiresAt?: string | null;
+}) {
+  const planStartedAt = input.planStartedAt?.trim();
+  const planExpiresAt = input.planExpiresAt?.trim();
+  if (!planStartedAt || !planExpiresAt) {
+    return true;
+  }
+
+  const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/;
+  if (
+    dateOnlyPattern.test(planStartedAt) &&
+    dateOnlyPattern.test(planExpiresAt)
+  ) {
+    return planExpiresAt >= planStartedAt;
+  }
+
+  const startedAtMs = Date.parse(planStartedAt);
+  const expiresAtMs = Date.parse(planExpiresAt);
+  return (
+    Number.isFinite(startedAtMs) &&
+    Number.isFinite(expiresAtMs) &&
+    expiresAtMs > startedAtMs
+  );
+}

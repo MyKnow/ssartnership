@@ -7,7 +7,7 @@ import type {
   RecordPartnerBenefitUsageInput,
   PartnerBenefitUsageRecord,
 } from "@/lib/repositories/partner-benefit-usage-repository";
-import { getEffectivePartnerBenefitMaxApplyCount } from "@/lib/partner-benefit-items";
+import { assertPartnerBenefitUsageMemberAndCount } from "@/lib/repositories/partner-benefit-usage-repository-guards";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 type VerificationRow = {
@@ -91,13 +91,11 @@ async function loadAdminUsageReferences(input: {
   if (benefitResult.error) throw new Error(benefitResult.error.message);
   if (memberResult.error) throw new Error(memberResult.error.message);
   if (!benefitResult.data) throw new Error("partner_benefit_usage_benefit_not_found");
-  if (!memberResult.data) throw new Error("partner_benefit_usage_member_not_found");
-  if (
-    input.useCount >
-    getEffectivePartnerBenefitMaxApplyCount(benefitResult.data.max_apply_count)
-  ) {
-    throw new Error("partner_benefit_usage_use_count_exceeded");
-  }
+  assertPartnerBenefitUsageMemberAndCount({
+    memberExists: Boolean(memberResult.data),
+    maxApplyCount: benefitResult.data.max_apply_count,
+    useCount: input.useCount,
+  });
   return {
     benefit: benefitResult.data as { id: string; title: string; max_apply_count: number | null },
     member: memberResult.data as MemberLookupRow,

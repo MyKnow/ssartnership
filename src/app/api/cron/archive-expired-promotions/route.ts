@@ -1,23 +1,15 @@
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminSession } from "@/lib/auth";
+import { ensureCronApiAccess, getCronErrorResponse } from "@/lib/cron-route";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
-function isAuthorizedByCronSecret(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    return false;
-  }
-  return request.headers.get("authorization") === `Bearer ${secret}`;
-}
+const ARCHIVE_EVENT_BATCH_SIZE = 100;
 
 export async function GET(request: NextRequest) {
-  const adminAuthorized = await isAdminSession();
-  if (!adminAuthorized && !isAuthorizedByCronSecret(request)) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
+  const denied = ensureCronApiAccess(request);
+  if (denied) return denied;
 
   const supabase = getSupabaseAdminClient();
   const nowIso = new Date().toISOString();
@@ -25,13 +17,14 @@ export async function GET(request: NextRequest) {
     .from("promotion_events")
     .select("slug")
     .eq("is_active", true)
-    .lt("ends_at", nowIso);
+    .lt("ends_at", nowIso)
+    .limit(ARCHIVE_EVENT_BATCH_SIZE);
 
   if (eventQueryError) {
-    return NextResponse.json(
-      { ok: false, message: eventQueryError.message },
-      { status: 500 },
-    );
+    console.error("[archive-expired-promotions] event query failed", {
+      code: eventQueryError.code,
+    });
+    return getCronErrorResponse("archive-expired-promotions");
   }
 
   const slugs = (expiredEvents ?? [])
@@ -52,10 +45,10 @@ export async function GET(request: NextRequest) {
     .update({ is_active: false })
     .in("slug", slugs);
   if (eventUpdateError) {
-    return NextResponse.json(
-      { ok: false, message: eventUpdateError.message },
-      { status: 500 },
-    );
+    console.error("[archive-expired-promotions] event update failed", {
+      code: eventUpdateError.code,
+    });
+    return getCronErrorResponse("archive-expired-promotions");
   }
 
   const { data: updatedSlides, error: slideUpdateError } = await supabase
@@ -65,10 +58,10 @@ export async function GET(request: NextRequest) {
     .eq("is_active", true)
     .select("id");
   if (slideUpdateError) {
-    return NextResponse.json(
-      { ok: false, message: slideUpdateError.message },
-      { status: 500 },
-    );
+    console.error("[archive-expired-promotions] slide update failed", {
+      code: slideUpdateError.code,
+    });
+    return getCronErrorResponse("archive-expired-promotions");
   }
 
   revalidatePath("/");

@@ -18,10 +18,82 @@ export type CreateNotificationResult = {
   alreadyExists?: boolean;
 };
 
+export type NotificationCampaignClaimDisposition =
+  | "claimed"
+  | "resumed"
+  | "in_progress"
+  | "completed";
+
+export type NotificationCampaignClaimInput = Omit<
+  NotificationBroadcastInput,
+  "idempotencyKey"
+> & {
+  idempotencyKey: string;
+  leaseDurationSeconds: number;
+};
+
+export type NotificationCampaignClaimResult = {
+  notification: NotificationRecord;
+  recipientMemberIds: string[];
+  disposition: NotificationCampaignClaimDisposition;
+  attemptToken: string | null;
+};
+
+export type FinalizeNotificationCampaignInput = {
+  notificationId: string;
+  attemptToken: string;
+  metadata: Record<string, unknown>;
+};
+
+export type NotificationDeliveryClaimDisposition =
+  | "claimed"
+  | "sent"
+  | "in_progress"
+  | "needs_reconciliation";
+
+export type NotificationDeliveryClaimInput = {
+  notificationId: string;
+  memberId: string;
+  channel: "push";
+  provider: "web_push";
+  providerCampaignId: string;
+  providerIdempotencyKey: string;
+  leaseDurationSeconds: number;
+};
+
+export type NotificationDeliveryClaimResult = {
+  deliveryId: string;
+  disposition: NotificationDeliveryClaimDisposition;
+};
+
+export type NotificationDeliveryTransition =
+  | "sending"
+  | "sent"
+  | "failed"
+  | "needs_reconciliation";
+
+export type TransitionNotificationDeliveryInput = {
+  deliveryId: string;
+  transition: NotificationDeliveryTransition;
+  errorMessage?: string | null;
+};
+
 export interface NotificationRepository {
   createNotification(
     input: NotificationBroadcastInput,
   ): Promise<CreateNotificationResult>;
+  claimNotificationCampaign(
+    input: NotificationCampaignClaimInput,
+  ): Promise<NotificationCampaignClaimResult>;
+  finalizeNotificationCampaign(
+    input: FinalizeNotificationCampaignInput,
+  ): Promise<boolean>;
+  claimNotificationDelivery(
+    input: NotificationDeliveryClaimInput,
+  ): Promise<NotificationDeliveryClaimResult>;
+  transitionNotificationDelivery(
+    input: TransitionNotificationDeliveryInput,
+  ): Promise<boolean>;
   updateNotificationMetadata(
     notificationId: string,
     metadata: Record<string, unknown>,

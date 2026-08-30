@@ -13,6 +13,7 @@ import {
 } from "./api";
 import { derivePushSettingsStatus } from "./status";
 import {
+  getPushSettingsClientError,
   getServiceWorkerRegistration,
   urlBase64ToUint8Array,
 } from "./device";
@@ -104,7 +105,9 @@ export function usePushSettingsController({
     let cancelled = false;
     async function loadDevices() {
       try {
-        const nextDevices = await fetchPushDevices(deviceState.subscriptionEndpoint);
+        const nextDevices = await fetchPushDevices(
+          deviceState.subscriptionEndpoint,
+        );
         if (!cancelled) {
           setDevices(nextDevices);
         }
@@ -140,7 +143,9 @@ export function usePushSettingsController({
       return;
     }
     if (deviceState.iosNeedsInstall) {
-      notify("iPhone/iPad에서는 홈 화면에 추가한 뒤 설치된 앱에서 알림을 켤 수 있습니다.");
+      notify(
+        "iPhone/iPad에서는 홈 화면에 추가한 뒤 설치된 앱에서 알림을 켤 수 있습니다.",
+      );
       return;
     }
     if (!vapidPublicKey) {
@@ -178,7 +183,7 @@ export function usePushSettingsController({
       await refreshDevices(subscription.endpoint);
       notify("기기 알림을 켰습니다.");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "알림 구독에 실패했습니다.");
+      notify(getPushSettingsClientError(error, "알림 구독").message);
     } finally {
       setPendingAction(null);
     }
@@ -202,7 +207,7 @@ export function usePushSettingsController({
         `이 기기 알림 수신을 철회했습니다. (${formatKoreanDateTimeToMinute(new Date())})`,
       );
     } catch (error) {
-      notify(error instanceof Error ? error.message : "알림 해제에 실패했습니다.");
+      notify(getPushSettingsClientError(error, "알림 해제").message);
     } finally {
       setPendingAction(null);
     }
@@ -220,7 +225,9 @@ export function usePushSettingsController({
     try {
       const registration = await getServiceWorkerRegistration();
       const subscription = await registration.pushManager.getSubscription();
-      const data = await unsubscribePushEveryDevice(subscription?.endpoint ?? null);
+      const data = await unsubscribePushEveryDevice(
+        subscription?.endpoint ?? null,
+      );
       if (subscription) {
         await subscription.unsubscribe().catch(() => undefined);
       }
@@ -235,7 +242,7 @@ export function usePushSettingsController({
         `모든 기기 알림 수신을 철회했습니다. (${formatKoreanDateTimeToMinute(new Date())})`,
       );
     } catch (error) {
-      notify(error instanceof Error ? error.message : "전체 알림 해제에 실패했습니다.");
+      notify(getPushSettingsClientError(error, "전체 알림 해제").message);
     } finally {
       setPendingAction(null);
     }
@@ -269,9 +276,7 @@ export function usePushSettingsController({
         notify("알림 설정을 저장했습니다.");
       }
     } catch (error) {
-      notify(
-        error instanceof Error ? error.message : "알림 설정 저장에 실패했습니다.",
-      );
+      notify(getPushSettingsClientError(error, "알림 설정 저장").message);
     } finally {
       setPendingAction(null);
     }
@@ -306,9 +311,7 @@ export function usePushSettingsController({
       }
       notify("알림 설정을 저장했습니다.");
     } catch (error) {
-      notify(
-        error instanceof Error ? error.message : "알림 설정 저장에 실패했습니다.",
-      );
+      notify(getPushSettingsClientError(error, "알림 설정 저장").message);
     } finally {
       setPendingAction(null);
     }
@@ -330,7 +333,7 @@ export function usePushSettingsController({
       await refreshDevices();
       notify("기기 연결을 해제했습니다.");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "기기 연결 해제에 실패했습니다.");
+      notify(getPushSettingsClientError(error, "기기 연결 해제").message);
     } finally {
       setPendingAction(null);
     }

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   getAdPackageDefinition,
   isAdCouponDownloadable,
@@ -9,6 +10,7 @@ import {
   type AdCouponIssuanceType,
 } from "@/lib/ad-packages";
 import {
+  assertValidAdCouponCodeBatch,
   getCouponIssueCountSnapshot,
   getMemberIssueCountSnapshot,
   isMemberIssueLimitReached,
@@ -42,6 +44,8 @@ import type {
   UpdateAdCouponInput,
 } from "@/lib/repositories/ad-package-repository";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+
+const AD_COUPON_CODE_WRITE_BATCH_SIZE = 1_000;
 
 const AD_METRIC_EVENT_NAMES = [
   "home_banner_click",
@@ -1078,24 +1082,52 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
   ): Promise<AvailableAdCoupon[]> {
     if (!input.memberId) return [];
     const supabase = getSupabaseAdminClient();
-    const { data: issueData, error: issueError } = await supabase
+    const partnerIds = input.partnerIds
+      ? [...new Set(input.partnerIds.filter(Boolean))]
+      : null;
+    if (partnerIds && partnerIds.length === 0) return [];
+
+    const scopedCouponResult = partnerIds
+      ? await supabase
+          .from("ad_coupons")
+          .select(AD_COUPON_SELECT)
+          .in("partner_id", partnerIds)
+      : { data: null, error: null };
+    if (scopedCouponResult.error) {
+      throw new Error(scopedCouponResult.error.message);
+    }
+    const scopedCouponRows = partnerIds
+      ? ((scopedCouponResult.data ?? []) as AdCouponRow[])
+      : null;
+    if (scopedCouponRows?.length === 0) return [];
+
+    let issueQuery = supabase
       .from("ad_coupon_issues")
       .select("id,coupon_id,member_id,assigned_code,issued_at,used_at")
       .eq("member_id", input.memberId)
       .eq("status", "issued")
       .is("used_at", null)
       .order("issued_at", { ascending: false });
+    if (scopedCouponRows) {
+      issueQuery = issueQuery.in(
+        "coupon_id",
+        scopedCouponRows.map((row) => row.id),
+      );
+    }
+    const { data: issueData, error: issueError } = await issueQuery;
     if (issueError) throw new Error(issueError.message);
     const issues = (issueData ?? []) as CouponIssueRow[];
     if (issues.length === 0) return [];
     const couponIds = [...new Set(issues.map((issue) => issue.coupon_id))];
-    const { data: couponData, error: couponError } = await supabase
-      .from("ad_coupons")
-      .select(AD_COUPON_SELECT)
-      .in("id", couponIds);
-    if (couponError) throw new Error(couponError.message);
+    const couponResult = scopedCouponRows
+      ? { data: scopedCouponRows, error: null }
+      : await supabase
+          .from("ad_coupons")
+          .select(AD_COUPON_SELECT)
+          .in("id", couponIds);
+    if (couponResult.error) throw new Error(couponResult.error.message);
     const coupons = new Map(
-      ((couponData ?? []) as AdCouponRow[]).map((row) => [row.id, mapCouponRow(row)]),
+      ((couponResult.data ?? []) as AdCouponRow[]).map((row) => [row.id, mapCouponRow(row)]),
     );
     const now = input.now ?? new Date();
     return issues.flatMap((issue) => {
@@ -1110,29 +1142,38 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
 
   async addCouponCodes(input: AddAdCouponCodesInput): Promise<AddAdCouponCodesResult> {
     const supabase = getSupabaseAdminClient();
+    assertValidAdCouponCodeBatch(input.codes);
     const uniqueCodes = [...new Set(input.codes.map((code) => code.trim()).filter(Boolean))];
     if (uniqueCodes.length === 0) return { addedCount: 0, skippedCount: 0 };
-    const { data: existing, error: existingError } = await supabase
-      .from("ad_coupon_codes")
-      .select("code")
-      .eq("coupon_id", input.couponId)
-      .in("code", uniqueCodes);
-    if (existingError) throw new Error(existingError.message);
-    const existingCodes = new Set((existing ?? []).map((row) => String((row as { code: string }).code)));
-    const rows = await Promise.all(uniqueCodes
-      .filter((code) => !existingCodes.has(code))
-      .map(async (code) => ({
-        coupon_id: input.couponId,
-        code,
-        code_hash: Array.from(new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(code))))
-          .map((value) => value.toString(16).padStart(2, "0")).join(""),
-        status: "available",
-      })));
-    if (rows.length > 0) {
-      const { error } = await supabase.from("ad_coupon_codes").insert(rows);
+
+    let addedCount = 0;
+    for (
+      let offset = 0;
+      offset < uniqueCodes.length;
+      offset += AD_COUPON_CODE_WRITE_BATCH_SIZE
+    ) {
+      const rows = uniqueCodes
+        .slice(offset, offset + AD_COUPON_CODE_WRITE_BATCH_SIZE)
+        .map((code) => ({
+          coupon_id: input.couponId,
+          code,
+          code_hash: createHash("sha256").update(code).digest("hex"),
+          status: "available",
+        }));
+      const { data, error } = await supabase
+        .from("ad_coupon_codes")
+        .upsert(rows, {
+          onConflict: "coupon_id,code_hash",
+          ignoreDuplicates: true,
+        })
+        .select("id");
       if (error) throw new Error(error.message);
+      addedCount += data?.length ?? 0;
     }
-    return { addedCount: rows.length, skippedCount: uniqueCodes.length - rows.length };
+    return {
+      addedCount,
+      skippedCount: uniqueCodes.length - addedCount,
+    };
   }
 
   async redeemCouponIssue(

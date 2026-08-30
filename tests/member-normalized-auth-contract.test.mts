@@ -292,20 +292,24 @@ test("관리자 캠페인 발송은 policy ledger와 MM 디렉터리만 사용�
   assert.match(delivery, /mattermostUserId/);
 });
 
-test("운영 알림 수신자는 활성 admin profile로만 결정한다", () => {
+test("운영 알림 수신자는 활성 상태와 알림 조회 권한으로 결정한다", () => {
   const operationalNotifications = readRepoFile(
     "src/lib/operational-notifications.ts",
   );
 
-  assert.match(operationalNotifications, /\.from\("admin_profiles"\)/);
-  assert.match(operationalNotifications, /\.eq\("is_active", true\)/);
+  assert.match(operationalNotifications, /listAdminAccounts\(\)/);
+  assert.match(operationalNotifications, /account\.isActive/);
+  assert.match(
+    operationalNotifications,
+    /canAdmin\(account\.permissions, "notifications", "read"\)/,
+  );
   assert.match(
     operationalNotifications,
     /\.from\("admin_notification_preferences"\)/,
   );
   assert.doesNotMatch(
     operationalNotifications,
-    /admin_permission_id|SUPER_ADMIN_USERNAME|\.from\("members"\)[\s\S]{0,500}admin_notification_preferences/,
+    /admin_permission_id|SUPER_ADMIN_USERNAME|\.from\("admin_profiles"\)|\.from\("members"\)[\s\S]{0,500}admin_notification_preferences/,
   );
 });
 

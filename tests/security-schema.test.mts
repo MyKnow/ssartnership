@@ -122,7 +122,10 @@ test("제휴처 미리보기 토큰은 해시와 별도로 암호화된 표시�
   assert.match(schemaSql, /token_nonce\s+text/i);
   assert.match(schemaSql, /token_auth_tag\s+text/i);
   assert.match(schemaSql, /token_key_version\s+smallint/i);
+  assert.match(schemaSql, /expires_at\s+timestamp with time zone not null/i);
   assert.match(schemaSql, /partner_preview_tokens_encrypted_fields_check[\s\S]*token_ciphertext is null/i);
+  assert.match(schemaSql, /partner_preview_tokens_expires_after_create_check[\s\S]*expires_at > created_at/i);
+  assert.match(schemaSql, /partner_preview_tokens_expires_at_idx/i);
 });
 
 test("수동 가져오기 staging과 설정 토큰은 서버 전용 제약을 둔다", () => {

@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import QRCode from "qrcode";
 import { cn } from "@/lib/cn";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
@@ -85,24 +84,27 @@ export default function CertificationQrButton({
       return;
     }
     let cancelled = false;
-    QRCode.toDataURL(verifyUrl, {
-      width: 256,
-      margin: 1,
-      color: {
-        dark: "#0f172a",
-        light: "#ffffff",
-      },
-    })
-      .then((dataUrl) => {
+
+    void (async () => {
+      try {
+        const { default: QRCode } = await import("qrcode");
+        const dataUrl = await QRCode.toDataURL(verifyUrl, {
+          width: 256,
+          margin: 1,
+          color: {
+            dark: "#0f172a",
+            light: "#ffffff",
+          },
+        });
         if (!cancelled) {
           setQrDataUrl(dataUrl);
         }
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) {
           setError("QR 생성에 실패했습니다.");
         }
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;

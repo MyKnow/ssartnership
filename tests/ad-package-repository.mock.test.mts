@@ -530,6 +530,38 @@ describe("mock ad package repository", () => {
     assert.equal(valid.ok, true);
   });
 
+  it("limits issued coupon reads to the requested partners", async () => {
+    const repository = new MockAdPackageRepository();
+    const restaurantCoupon = await createCodeCoupon(repository);
+    const healthCoupon = await repository.createCoupon({
+      partnerId: "health-001",
+      title: "헬스 발급 쿠폰",
+      status: "active",
+      redemptionType: "code",
+      ...activeCouponWindow(),
+    });
+    const memberId = "member-partner-filter";
+
+    assert.equal(
+      (await repository.issueCoupon({ couponId: restaurantCoupon.id, memberId })).ok,
+      true,
+    );
+    assert.equal(
+      (await repository.issueCoupon({ couponId: healthCoupon.id, memberId })).ok,
+      true,
+    );
+
+    const issued = await repository.listIssuedCouponsForMember({
+      memberId,
+      partnerIds: ["health-001"],
+    });
+
+    assert.deepEqual(
+      issued.map((item) => item.coupon.id),
+      [healthCoupon.id],
+    );
+  });
+
   it("hides a wallet coupon after a member reaches a periodic issue limit", async () => {
     const repository = new MockAdPackageRepository();
     const coupon = await repository.createCoupon({

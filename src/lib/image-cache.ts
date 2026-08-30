@@ -1,6 +1,23 @@
 const PROXY_PREFIX = "/api/image?url=";
+const MAX_WARMED_IMAGE_URLS = 256;
 const warmedImageUrls = new Set<string>();
 const pendingImagePreloads = new Map<string, Promise<void>>();
+
+function rememberWarmedImageUrl(url: string) {
+  if (warmedImageUrls.has(url)) {
+    return;
+  }
+
+  warmedImageUrls.add(url);
+  if (warmedImageUrls.size <= MAX_WARMED_IMAGE_URLS) {
+    return;
+  }
+
+  const oldestUrl = warmedImageUrls.values().next().value;
+  if (oldestUrl) {
+    warmedImageUrls.delete(oldestUrl);
+  }
+}
 
 function shouldBypassProxy(src: string) {
   if (
@@ -51,7 +68,7 @@ export function preloadCachedImageUrl(src?: string | null) {
         return;
       }
       settled = true;
-      warmedImageUrls.add(url);
+      rememberWarmedImageUrl(url);
       resolve();
     };
 

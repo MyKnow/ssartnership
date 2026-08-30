@@ -25,6 +25,10 @@ import {
   normalizeImageUpload,
   validateNormalizedImageUpload,
 } from "@/lib/image-upload/transform.server";
+import {
+  forEachWithConcurrency,
+  mapWithConcurrency,
+} from "@/lib/async-concurrency";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/uuid";
 
@@ -56,6 +60,8 @@ type ImageUploadSessionRow = {
 
 const MAX_SIGNED_UPLOADS_PER_REQUEST = 20;
 const STORAGE_RETRY_DELAYS_MS = [0, 120, 300] as const;
+const EXPIRE_STALE_CONCURRENCY = 4;
+const COMPLETE_UPLOAD_CONCURRENCY = 4;
 
 function asSessionRow(value: unknown): ImageUploadSessionRow {
   return value as ImageUploadSessionRow;
@@ -267,8 +273,10 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
       }),
     );
 
-    const completed = await Promise.all(
-      uploadIds.map(async (id) => {
+    const completed = await mapWithConcurrency(
+      uploadIds,
+      COMPLETE_UPLOAD_CONCURRENCY,
+      async (id) => {
         const session = sessionsById.get(id);
         if (!session) throw new Error("이미지 업로드 세션을 찾을 수 없습니다.");
         if (new Date(session.expires_at).getTime() <= now.getTime()) {
@@ -295,7 +303,10 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
           } satisfies CompletedImageUpload;
         }
         if (session.status === "processing") {
-          throw new Error("이미지를 처리 중입니다. 잠시 후 다시 시도해 주세요.");
+          throw new ImageUploadError(
+            "upload_processing",
+            "이미지를 처리 중입니다. 잠시 후 다시 시도해 주세요.",
+          );
         }
         if (session.status !== "signed") {
           throw new Error("이미지 업로드 상태를 확인해 주세요.");
@@ -347,7 +358,10 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
             } satisfies CompletedImageUpload;
           }
           if (latest.status === "processing") {
-            throw new Error("이미지를 처리 중입니다. 잠시 후 다시 시도해 주세요.");
+            throw new ImageUploadError(
+              "upload_processing",
+              "이미지를 처리 중입니다. 잠시 후 다시 시도해 주세요.",
+            );
           }
           throw new Error("이미지 업로드 상태를 확인해 주세요.");
         }
@@ -415,7 +429,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
             ? error
             : new Error("이미지를 처리하지 못했습니다.");
         }
-      }),
+      },
     );
     return completed;
   }
@@ -787,7 +801,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
     >>;
     if (sessions.length === 0) return 0;
     let expiredCount = 0;
-    for (const session of sessions) {
+    await forEachWithConcurrency(sessions, EXPIRE_STALE_CONCURRENCY, async (session) => {
       const removals = await Promise.all([
         supabase.storage.from(session.storage_bucket).remove(getSessionStoragePaths(session)),
         ...(session.final_bucket && session.final_path
@@ -806,7 +820,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
           })
           .eq("id", session.id)
           .in("status", ["signed", "processing", "ready", "attaching", "failed"]);
-        continue;
+        return;
       }
       const { error: updateError } = await supabase
         .from("image_upload_sessions")
@@ -822,20 +836,14 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         throw new Error("만료된 이미지 업로드 상태를 저장하지 못했습니다.");
       }
       expiredCount += 1;
-    }
+    });
     return expiredCount;
   }
 }
 
-let repository: ImageUploadRepository | null = null;
-
-export function getImageUploadRepository() {
-  repository ??= new SupabaseImageUploadRepository();
-  return repository;
-}
-
-export function getSignedImageUploadHeaders() {
-  const anonKey = process.env.SUPABASE_ANON_KEY;
+export function getSupabaseSignedImageUploadHeaders(
+  anonKey = process.env.SUPABASE_ANON_KEY,
+) {
   if (!anonKey) {
     throw new Error("SUPABASE_ANON_KEY 환경 변수가 필요합니다.");
   }

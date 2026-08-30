@@ -156,7 +156,15 @@ describe("member anonymization private Storage orchestration", () => {
   });
 
   test("purges relational data only after every private object deletion succeeds", async () => {
-    const supabase = createSupabaseMock();
+    const supabase = createSupabaseMock({
+      plan: {
+        profile_image_paths: ["profiles/member.webp"],
+        certificate_paths: [
+          "certificates/member.pdf",
+          "certificates/member-old.pdf",
+        ],
+      },
+    });
     getSupabaseAdminClient.mockReturnValue(supabase);
     const { anonymizeDeletedMember } = await import("../../src/lib/member-lifecycle");
 
@@ -164,7 +172,7 @@ describe("member anonymization private Storage orchestration", () => {
     expect(supabase.calls).toEqual([
       "rpc:get_deleted_member_anonymization_storage_plan",
       "storage:member-profile-images:profiles/member.webp",
-      "storage:graduate-certificates:certificates/member.pdf",
+      "storage:graduate-certificates:certificates/member.pdf,certificates/member-old.pdf",
       "rpc:anonymize_deleted_member",
     ]);
   });

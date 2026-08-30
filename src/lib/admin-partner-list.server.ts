@@ -7,6 +7,7 @@ import { getPartnerBillingInvoiceSummariesForUpgradeRequests } from "@/lib/partn
 import { normalizePartnerVisibility } from "@/lib/partner-visibility";
 import type { AdminPartnerListFilters } from "@/lib/admin-ia";
 import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
+import { getAdminSearchLikePattern } from "@/lib/admin-search-query";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { unstable_cache } from "next/cache";
 
@@ -115,10 +116,6 @@ function normalizeRelation<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
 }
 
-function getPartnerNameSearchPattern(value: string) {
-  return `%${value.replace(/[\\%_]/g, "\\$&")}%`;
-}
-
 /**
  * Server read model for the high-frequency partner list and plan view.
  * It keeps pagination, campus scope, minimal projections, and relationship
@@ -188,7 +185,7 @@ async function getAdminPartnerListReadModelUnbounded({
   if (!showPlans && normalizedFilters.searchValue) {
     partnersQuery = partnersQuery.ilike(
       "name",
-      getPartnerNameSearchPattern(normalizedFilters.searchValue),
+      getAdminSearchLikePattern(normalizedFilters.searchValue),
     );
   }
   if (!showPlans && normalizedFilters.visibility !== "all") {

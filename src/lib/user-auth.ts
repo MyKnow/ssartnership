@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
+import { cache } from "react";
 import {
   evaluateRequiredPolicyStatus,
   getActiveRequiredPolicies,
@@ -148,7 +149,7 @@ async function getRawSignedUserSession() {
  * remains active. This DB check is deliberate: cookie signatures alone cannot
  * revoke access after a soft delete.
  */
-export async function getSignedUserSession() {
+export const getSignedUserSession = cache(async () => {
   const session = (await getRawSignedUserSession()) as SignedUserSession | null;
   if (!session?.userId) {
     return null;
@@ -175,7 +176,7 @@ export async function getSignedUserSession() {
   } catch {
     return null;
   }
-}
+});
 
 export const getActiveUserSession = getSignedUserSession;
 

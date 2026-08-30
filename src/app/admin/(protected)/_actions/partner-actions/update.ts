@@ -292,7 +292,13 @@ export async function updatePartnerAction(formData: FormData) {
     }
   } catch (error) {
     await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
-    await cleanupPartnerCompanyProvision(supabase, companyProvision);
+    try {
+      await cleanupPartnerCompanyProvision(supabase, companyProvision);
+    } catch (cleanupError) {
+      throw new Error("partner_company_cleanup_failed", {
+        cause: { originalError: error, cleanupError },
+      });
+    }
     redirectAdminActionError(
       redirectPath,
       getSafeAdminActionErrorCode(error, "partner_update_failed"),

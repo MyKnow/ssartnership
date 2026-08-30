@@ -1,9 +1,21 @@
 import { NextResponse } from "next/server";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { clearPartnerSession, getPartnerSession } from "@/lib/partner-session";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
-export async function GET(request: Request) {
+export async function POST(request: Request) {
   const context = getRequestLogContext(request);
+  if (!isTrustedSameOriginRequest(request)) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "partner_logout",
+      status: "failure",
+      actorType: "guest",
+      properties: { reason: "same_origin_failed" },
+    });
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
   const session = await getPartnerSession();
 
   await clearPartnerSession();
@@ -23,5 +35,5 @@ export async function GET(request: Request) {
     });
   }
 
-  return NextResponse.redirect(new URL("/partner/login", request.url));
+  return NextResponse.redirect(new URL("/partner/login", request.url), 303);
 }

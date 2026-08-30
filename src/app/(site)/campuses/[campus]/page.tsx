@@ -1,22 +1,29 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import CampusLandingView from "@/components/campuses/CampusLandingView";
 import SiteHeader from "@/components/SiteHeader";
-import { getAdminPartnerMetrics } from "@/lib/admin-partner-metrics";
 import {
   CAMPUS_DIRECTORY,
   getCampusBySlug,
   getCampusPartners,
   type CampusSlug,
 } from "@/lib/campuses";
-import { partnerFavoriteRepository, partnerRepository } from "@/lib/repositories";
+import { partnerRepository } from "@/lib/repositories";
 import { getHeaderSession } from "@/lib/header-session";
 import { getPartnerViewerContext } from "@/lib/partner-view-context";
-import type { PartnerPopularityMetrics } from "@/lib/partner-popularity";
+import { getHomePartnerState } from "@/lib/home-partner-state";
+import type { PartnerAudienceKey } from "@/lib/partner-audience";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import { canViewPartnerDetails } from "@/lib/partner-visibility";
 import { buildCampusSeoMetadata, buildCampusStructuredData } from "@/lib/seo/campuses";
 import { createCanonicalAlternates } from "@/lib/seo";
+
+const getCampusCategoriesCached = cache(() => partnerRepository.getCategories());
+const getCampusPartnersCached = cache(
+  (authenticated: boolean, viewerAudience?: PartnerAudienceKey | null) =>
+    partnerRepository.getPartners({ authenticated, viewerAudience }),
+);
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
@@ -42,8 +49,8 @@ export async function generateMetadata({
   }
 
   const [categories, partners] = await Promise.all([
-    partnerRepository.getCategories(),
-    partnerRepository.getPartners({ authenticated: false }),
+    getCampusCategoriesCached(),
+    getCampusPartnersCached(false),
   ]);
 
   const campusPartners = getCampusPartners(partners, campus.slug).filter((partner) =>
@@ -108,8 +115,11 @@ export default async function CampusLandingPage({
   const viewerContext = await getPartnerViewerContext(headerSession?.userId);
 
   const [categories, partners] = await Promise.all([
-    partnerRepository.getCategories(),
-    partnerRepository.getPartners(viewerContext),
+    getCampusCategoriesCached(),
+    getCampusPartnersCached(
+      viewerContext.authenticated,
+      viewerContext.viewerAudience,
+    ),
   ]);
 
   const campusPartners = getCampusPartners(partners, campus.slug).map((partner) => {
@@ -126,62 +136,11 @@ export default async function CampusLandingPage({
     canViewPartnerDetails(partner.visibility, false, partner.period),
   );
   const campusPartnerIds = campusPartners.map((partner) => partner.id);
-  const campusPopularityById: Record<string, PartnerPopularityMetrics> = {};
-  let campusFavoriteCounts = new Map<string, number>();
-  try {
-    campusFavoriteCounts = await partnerFavoriteRepository.getFavoriteCounts(
-      campusPartnerIds,
-    );
-  } catch (error) {
-    console.error("[campus-page] favorite counts query failed", error);
-  }
-
-  let campusFavoriteStateById = {} as Record<string, boolean>;
-  if (headerSession?.userId) {
-    try {
-      const favoriteIds = await partnerFavoriteRepository.getMemberFavoritePartnerIds(
-        headerSession.userId,
-        campusPartnerIds,
-      );
-      campusFavoriteStateById = Object.fromEntries(
-        Array.from(favoriteIds).map((partnerId) => [partnerId, true] as const),
-      ) as Record<string, boolean>;
-    } catch (error) {
-      console.error("[campus-page] favorite state query failed", error);
-    }
-  }
-
-  for (const partnerId of campusPartnerIds) {
-    campusPopularityById[partnerId] = {
-      favoriteCount: campusFavoriteCounts.get(partnerId) ?? 0,
-      reviewCount: 0,
-      detailViews: 0,
-    };
-  }
-
-  const hasSupabaseEnv =
-    Boolean(process.env.SUPABASE_URL) &&
-    Boolean(
-      process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
-    );
-  const usePopularityMetrics =
-    hasSupabaseEnv &&
-    process.env.NEXT_PUBLIC_DATA_SOURCE !== "mock" &&
-    process.env.NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE !== "mock";
-  if (usePopularityMetrics && campusPartnerIds.length > 0) {
-    try {
-      const { metricsByPartnerId } = await getAdminPartnerMetrics(campusPartnerIds);
-      for (const [partnerId, metrics] of metricsByPartnerId.entries()) {
-        campusPopularityById[partnerId] = {
-          favoriteCount: campusFavoriteCounts.get(partnerId) ?? 0,
-          reviewCount: metrics.reviewCount,
-          detailViews: metrics.detailViews,
-        };
-      }
-    } catch (error) {
-      console.error("[campus-page] popularity metrics query failed", error);
-    }
-  }
+  const campusPartnerState = await getHomePartnerState({
+    partnerIds: campusPartnerIds,
+    partnerIdLimit: campusPartnerIds.length,
+    currentUserId: headerSession?.userId ?? null,
+  });
   const categoryLabels = Array.from(
     new Set(
       publicCampusPartners
@@ -211,9 +170,9 @@ export default async function CampusLandingPage({
         partners={campusPartners}
         viewerAuthenticated={Boolean(headerSession?.userId)}
         currentUserId={headerSession?.userId ?? null}
-        partnerPopularityById={campusPopularityById}
-        partnerFavoriteStateById={campusFavoriteStateById}
-        loadedPartnerStateIds={campusPartnerIds}
+        partnerPopularityById={campusPartnerState.partnerPopularityById}
+        partnerFavoriteStateById={campusPartnerState.partnerFavoriteStateById}
+        loadedPartnerStateIds={campusPartnerState.loadedPartnerIds}
         structuredData={campusJsonLd}
       />
     </div>

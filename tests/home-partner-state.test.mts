@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const homePartnerStateModulePromise = import(
@@ -43,4 +44,19 @@ test("getHomePartnerState can load the full server-rendered partner set", async 
   assert.equal(state.loadedPartnerIds.length, partnerIds.length);
   assert.deepEqual(state.loadedPartnerIds, partnerIds);
   assert.equal(Object.keys(state.partnerPopularityById).length, partnerIds.length);
+});
+
+test("home partner state starts independent data sources in parallel", () => {
+  const source = readFileSync(
+    new URL("../src/lib/home-partner-state.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /const favoriteCountsPromise =/);
+  assert.match(source, /const popularityMetricsPromise =/);
+  assert.match(source, /const favoritePartnerIdsPromise =/);
+  assert.match(
+    source,
+    /await Promise\.all\(\[\s*favoriteCountsPromise,\s*popularityMetricsPromise,\s*favoritePartnerIdsPromise,\s*\]\)/,
+  );
 });

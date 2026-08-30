@@ -22,7 +22,11 @@ import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identi
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getCampaignTemplateKey } from "@/lib/notification-templates/catalog";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
-import { renderNotificationTemplate } from "@/lib/notification-templates/template";
+import {
+  NOTIFICATION_TEMPLATE_MAX_BODY_LENGTH,
+  NOTIFICATION_TEMPLATE_MAX_TITLE_LENGTH,
+  renderNotificationTemplate,
+} from "@/lib/notification-templates/template";
 import {
   mergeNotificationTemplateVariables,
   type NotificationTemplateContext,
@@ -215,6 +219,9 @@ type NotificationCampaignMetadata = {
     channels: AdminNotificationChannelPreview[];
   };
   adminOperationIdempotencyKey?: string;
+  campaignAttemptToken?: string;
+  campaignClaimedAt?: string;
+  campaignLeaseExpiresAt?: string | null;
   channelResults?: AdminNotificationSendResult["channelResults"];
   warnings?: string[];
   campaignStatus?: AdminNotificationOperationLog["status"];
@@ -274,6 +281,7 @@ type PushMessageLogRow = {
 };
 
 let webPushPromise: Promise<WebPushModule> | null = null;
+const NOTIFICATION_CAMPAIGN_LEASE_SECONDS = 10 * 60;
 
 export function isMattermostNotificationConfigured() {
   return isMattermostConfigured();
@@ -345,7 +353,20 @@ async function buildAudienceContext(
   const notificationType = input.notificationType;
   const validationMessages: string[] = [];
   const rawUrl = input.url?.trim() ?? "";
+  const normalizedTitle = input.title.trim();
+  const normalizedBody = input.body.trim();
 
+  if (!normalizedTitle || !normalizedBody) {
+    validationMessages.push("알림 제목과 내용을 모두 입력해 주세요.");
+  }
+  if (
+    normalizedTitle.length > NOTIFICATION_TEMPLATE_MAX_TITLE_LENGTH ||
+    normalizedBody.length > NOTIFICATION_TEMPLATE_MAX_BODY_LENGTH
+  ) {
+    validationMessages.push(
+      `알림 제목은 ${NOTIFICATION_TEMPLATE_MAX_TITLE_LENGTH.toLocaleString("ko-KR")}자 이하, 내용은 ${NOTIFICATION_TEMPLATE_MAX_BODY_LENGTH.toLocaleString("ko-KR")}자 이하로 입력해 주세요.`,
+    );
+  }
   if (selectedChannels.length === 0) {
     validationMessages.push("최소 한 개 이상의 채널을 선택해 주세요.");
   }
@@ -598,13 +619,16 @@ async function buildAudienceContext(
   };
 }
 
-function toPushPayload(input: AdminNotificationComposerInput) {
+function toPushPayload(
+  input: AdminNotificationComposerInput,
+  notificationId: string,
+) {
   return {
     type: input.notificationType as PushNotificationType,
     title: input.title.trim(),
     body: input.body.trim(),
     url: normalizeNotificationTargetUrl(input.url) ?? "/notifications",
-    tag: `${input.notificationType}-${Date.now()}`,
+    tag: `admin-notification:${notificationId}`,
   };
 }
 
@@ -676,19 +700,55 @@ export async function sendAdminNotificationCampaign(
     templateVariables,
   );
 
-  const created = await notificationRepository.createNotification({
-    type: input.notificationType,
-    title: renderedInAppTitle,
-    body: renderedInAppBody,
-    targetUrl: context.destinationUrl,
-    metadata,
-    idempotencyKey: input.idempotencyKey,
-    recipientMemberIds: context.selectedChannels.includes("in_app")
-      ? context.eligibleMemberIds.in_app
-      : [],
-  });
+  const campaignRecipients = context.selectedChannels.includes("in_app")
+    ? context.eligibleMemberIds.in_app
+    : [];
+  const retrySafeIdempotencyKey =
+    source === "automatic" &&
+    input.notificationType === "expiring_partner" &&
+    context.selectedChannels.includes("push") &&
+    !context.selectedChannels.includes("mm")
+      ? input.idempotencyKey?.trim() || null
+      : null;
+  const claimedCampaign = retrySafeIdempotencyKey
+    ? await notificationRepository.claimNotificationCampaign({
+        type: input.notificationType,
+        title: renderedInAppTitle,
+        body: renderedInAppBody,
+        targetUrl: context.destinationUrl,
+        metadata,
+        createdByMemberId: null,
+        idempotencyKey: retrySafeIdempotencyKey,
+        recipientMemberIds: campaignRecipients,
+        leaseDurationSeconds: NOTIFICATION_CAMPAIGN_LEASE_SECONDS,
+      })
+    : null;
+  const created = claimedCampaign
+    ? null
+    : await notificationRepository.createNotification({
+        type: input.notificationType,
+        title: renderedInAppTitle,
+        body: renderedInAppBody,
+        targetUrl: context.destinationUrl,
+        metadata,
+        idempotencyKey: input.idempotencyKey,
+        recipientMemberIds: campaignRecipients,
+      });
 
-  if (created.alreadyExists) {
+  if (
+    claimedCampaign?.disposition === "completed" ||
+    claimedCampaign?.disposition === "in_progress"
+  ) {
+    return {
+      notificationId: claimedCampaign.notification.id,
+      preview: context.preview,
+      channelResults: structuredClone(EMPTY_CHANNEL_RESULTS),
+      warnings: ["같은 발송 요청이 이미 처리 중이거나 완료되었습니다."],
+      alreadyExists: true,
+    };
+  }
+
+  if (created?.alreadyExists) {
     return {
       notificationId: created.notification.id,
       preview: context.preview,
@@ -696,6 +756,11 @@ export async function sendAdminNotificationCampaign(
       warnings: ["같은 발송 요청이 이미 처리 중이거나 완료되었습니다."],
       alreadyExists: true,
     };
+  }
+
+  const notification = claimedCampaign?.notification ?? created?.notification;
+  if (!notification) {
+    throw new Error("알림 캠페인 저장 상태를 확인하지 못했습니다.");
   }
 
   const channelResults: AdminNotificationSendResult["channelResults"] = structuredClone(EMPTY_CHANNEL_RESULTS);
@@ -711,8 +776,8 @@ export async function sendAdminNotificationCampaign(
 
   if (context.selectedChannels.includes("push")) {
     const pushResult = await sendPushCampaignDeliveries({
-      notificationId: created.notification.id,
-      payload: toPushPayload(input),
+      notificationId: notification.id,
+      payload: toPushPayload(input, notification.id),
       source,
       templateContext: input.templateContext,
       resolvedAudience: context.resolvedAudience,
@@ -726,7 +791,8 @@ export async function sendAdminNotificationCampaign(
       skipped: pushResult.skipped,
     };
     warnings.push(...pushResult.bookkeepingErrors);
-    channelResults.push.skipped = context.members.length - context.eligibleMemberIds.push.length;
+    channelResults.push.skipped =
+      context.members.length - context.eligibleMemberIds.push.length;
   }
 
   if (context.selectedChannels.includes("mm")) {
@@ -736,7 +802,7 @@ export async function sendAdminNotificationCampaign(
         && Boolean(member.mattermostUserId),
     );
     const mmResult = await sendMattermostCampaignDeliveries({
-      notificationId: created.notification.id,
+      notificationId: notification.id,
       notificationType: input.notificationType,
       title: input.title,
       body: input.body,
@@ -752,7 +818,8 @@ export async function sendAdminNotificationCampaign(
       skipped: mmResult.skipped,
     };
     warnings.push(...mmResult.bookkeepingErrors);
-    channelResults.mm.skipped = context.members.length - context.eligibleMemberIds.mm.length;
+    channelResults.mm.skipped =
+      context.members.length - context.eligibleMemberIds.mm.length;
   }
 
   const completedMetadata = {
@@ -763,21 +830,32 @@ export async function sendAdminNotificationCampaign(
     completedAt: new Date().toISOString(),
   } satisfies NotificationCampaignMetadata;
   try {
-    await notificationRepository.updateNotificationMetadata(
-      created.notification.id,
-      completedMetadata,
-    );
+    if (claimedCampaign?.attemptToken) {
+      const finalized = await notificationRepository.finalizeNotificationCampaign({
+        notificationId: notification.id,
+        attemptToken: claimedCampaign.attemptToken,
+        metadata: completedMetadata,
+      });
+      if (!finalized) {
+        warnings.push("발송 결과 기록이 최신 실행에 반영되지 않았습니다.");
+      }
+    } else {
+      await notificationRepository.updateNotificationMetadata(
+        notification.id,
+        completedMetadata,
+      );
+    }
   } catch (error) {
     const warning = "발송 결과 기록을 저장하지 못했습니다.";
     warnings.push(warning);
     console.error(
-      `[admin-notification-ops] final metadata update failed for notification ${created.notification.id}`,
+      `[admin-notification-ops] final metadata update failed for notification ${notification.id}`,
       error,
     );
   }
 
   return {
-    notificationId: created.notification.id,
+    notificationId: notification.id,
     preview: context.preview,
     channelResults,
     warnings,

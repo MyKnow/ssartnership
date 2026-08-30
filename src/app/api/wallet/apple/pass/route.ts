@@ -3,6 +3,11 @@ import { unstable_noStore as noStore } from "next/cache";
 import { getRequestLogContext, scheduleProductEventLog } from "@/lib/activity-logs";
 import { consumeProductEventQuota } from "@/lib/product-event-throttle";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 import { getSignedUserSession } from "@/lib/user-auth";
 import {
   revokeAppleWalletPassRequestSchema,
@@ -35,7 +40,8 @@ function consumeWalletPassQuota(
     allowed: consumeProductEventQuota({
       eventName,
       ipAddress: context.ipAddress,
-      sessionId: userId,
+      actorKey: `member:${userId}`,
+      scopeKey: "wallet-pass",
     }),
   };
 }
@@ -74,7 +80,18 @@ async function requireSignedUserId() {
 }
 
 async function parseJsonBody(request: NextRequest) {
-  return request.json().catch(() => null);
+  try {
+    return await readRouteJsonBodyWithinLimit<unknown>(request, {
+      maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+      invalidMessage: "요청 본문 형식을 확인해 주세요.",
+      tooLargeMessage: "요청이 너무 큽니다.",
+    });
+  } catch (error) {
+    if (error instanceof RouteJsonBodyError && error.code === "body_too_large") {
+      throw error;
+    }
+    return null;
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -145,7 +162,15 @@ export async function POST(request: NextRequest) {
     return jsonMessage("요청이 많습니다. 잠시 후 다시 시도해 주세요.", 429);
   }
 
-  const body = await parseJsonBody(request);
+  let body: unknown;
+  try {
+    body = await parseJsonBody(request);
+  } catch (error) {
+    if (error instanceof RouteJsonBodyError) {
+      return jsonMessage(error.message, error.status);
+    }
+    return jsonMessage("Apple Wallet 발급 요청을 확인해 주세요.", 400);
+  }
   const parsed = issueAppleWalletPassRequestSchema.safeParse(body);
   if (!parsed.success) {
     return jsonMessage("Apple Wallet 발급 요청을 확인해 주세요.", 400);
@@ -207,7 +232,15 @@ export async function DELETE(request: NextRequest) {
     return jsonMessage("요청이 많습니다. 잠시 후 다시 시도해 주세요.", 429);
   }
 
-  const body = await parseJsonBody(request);
+  let body: unknown;
+  try {
+    body = await parseJsonBody(request);
+  } catch (error) {
+    if (error instanceof RouteJsonBodyError) {
+      return jsonMessage(error.message, error.status);
+    }
+    return jsonMessage("Apple Wallet 폐기 요청을 확인해 주세요.", 400);
+  }
   const parsed = revokeAppleWalletPassRequestSchema.safeParse(body);
   if (!parsed.success) {
     return jsonMessage("Apple Wallet 폐기 요청을 확인해 주세요.", 400);

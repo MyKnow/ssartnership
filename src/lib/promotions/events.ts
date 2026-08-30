@@ -14,6 +14,7 @@ import {
 import { CAMPUS_DIRECTORY } from "@/lib/campuses";
 import { getSsafyMemberLifecycle, SSAFY_STAFF_YEAR } from "@/lib/ssafy-year";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { cache } from "react";
 
 type PromotionEventRow = {
   id: string;
@@ -473,10 +474,10 @@ export async function listManagedEventCampaigns(options?: {
   }
 }
 
-export async function getManagedEventCampaign(slug: string) {
+export const getManagedEventCampaign = cache(async (slug: string) => {
   const campaigns = await listManagedEventCampaigns({ includeInactive: true });
   return campaigns.find((campaign) => campaign.slug === slug) ?? null;
-}
+});
 
 export async function getHomePromotionSlides(
   viewer: PromotionSlideViewer = { authenticated: false, year: null, campus: null },

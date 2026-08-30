@@ -16,6 +16,7 @@ import type {
   WalletPassPlatform,
   WalletPassRepository,
 } from "@/lib/repositories/wallet-pass-repository";
+import { normalizeAppleWalletDeviceRegistrationReadLimit } from "@/lib/wallet/apple/limits";
 
 type WalletPassRow = {
   id: string;
@@ -236,15 +237,19 @@ export class SupabaseWalletPassRepository implements WalletPassRepository {
     return data ? toWalletPass(data as WalletPassRow) : null;
   }
 
-  async listAppleWalletDeviceRegistrationsForPass(passId: string) {
+  async listAppleWalletDeviceRegistrationsForPass(input: {
+    passId: string;
+    limit: number;
+  }) {
     const { data, error } = await getSupabaseAdminClient()
       .from("apple_wallet_device_registrations")
       .select(
         "id,pass_id,device_library_identifier_hash,push_token_ciphertext,push_token_iv,push_token_auth_tag,push_token_key_version,last_registered_at,removed_at,created_at,updated_at",
       )
-      .eq("pass_id", passId)
+      .eq("pass_id", input.passId)
       .is("removed_at", null)
-      .order("updated_at", { ascending: false });
+      .order("updated_at", { ascending: false })
+      .limit(normalizeAppleWalletDeviceRegistrationReadLimit(input.limit));
     if (error) {
       throw new Error(error.message);
     }

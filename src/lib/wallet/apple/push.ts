@@ -1,9 +1,10 @@
 import { connect } from "node:http2";
+import { forEachWithConcurrency } from "../../async-concurrency.ts";
 import { getAppleWalletConfigStatus } from "./config";
 import { normalizeApplePushToken } from "./apple-wallet-device-token";
+import { MAX_APPLE_WALLET_PUSH_TOKENS_PER_BATCH } from "./limits";
 
 const APNS_ORIGIN = "https://api.push.apple.com";
-const MAX_PUSH_TOKENS_PER_BATCH = 1_000;
 const DEFAULT_CONCURRENCY = 8;
 
 type AppleWalletPushTransportInput = {
@@ -135,7 +136,10 @@ export async function sendAppleWalletPassUpdate(
   const uniqueValidTokens = [
     ...new Set(parsedTokens.filter((token): token is string => Boolean(token))),
   ];
-  const normalizedTokens = uniqueValidTokens.slice(0, MAX_PUSH_TOKENS_PER_BATCH);
+  const normalizedTokens = uniqueValidTokens.slice(
+    0,
+    MAX_APPLE_WALLET_PUSH_TOKENS_PER_BATCH,
+  );
   const truncatedTokenCount = uniqueValidTokens.length - normalizedTokens.length;
   const result: AppleWalletPushResult = {
     delivered: 0,
@@ -155,13 +159,10 @@ export async function sendAppleWalletPassUpdate(
     1,
     Math.min(options.concurrency ?? DEFAULT_CONCURRENCY, 16),
   );
-  let cursor = 0;
-
-  const worker = async () => {
-    while (cursor < normalizedTokens.length) {
-      const pushToken = normalizedTokens[cursor];
-      cursor += 1;
-      if (!pushToken) continue;
+  await forEachWithConcurrency(
+    normalizedTokens,
+    concurrency,
+    async (pushToken) => {
       try {
         const response = await transport({
           pushToken,
@@ -172,7 +173,7 @@ export async function sendAppleWalletPassUpdate(
         });
         if (response.statusCode === 200) {
           result.delivered += 1;
-          continue;
+          return;
         }
         const reasonCode = mapReasonCode(response.statusCode, response.reason);
         result.failed += 1;
@@ -184,14 +185,7 @@ export async function sendAppleWalletPassUpdate(
         result.failed += 1;
         result.reasonCodes.push("request_failed");
       }
-    }
-  };
-
-  await Promise.all(
-    Array.from(
-      { length: Math.min(concurrency, normalizedTokens.length) },
-      () => worker(),
-    ),
+    },
   );
   return {
     ...result,

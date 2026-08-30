@@ -38,16 +38,10 @@ function FooterSection({
   );
 }
 
-export default function Footer({
-  reserveMobileNavigationSpace = false,
-}: {
-  reserveMobileNavigationSpace?: boolean;
-}) {
+export default function Footer() {
   return (
     <footer
-      data-site-footer-navigation-reserve={
-        reserveMobileNavigationSpace ? "" : undefined
-      }
+      data-site-footer
       className="border-t border-border/70 bg-surface-overlay/90 py-6 backdrop-blur-xl"
     >
       <Container className="grid gap-8 text-sm text-muted-foreground" size="wide">

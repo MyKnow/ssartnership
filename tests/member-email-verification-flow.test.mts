@@ -116,9 +116,8 @@ test("인증 코드 발급 RPC는 회원 단위 잠금·재전송 대기·최신
 test("인증 코드 전송 API는 원자 예약과 서버 재전송 대기 계약을 사용한다", () => {
   const route = read("src/app/api/member/email/send/route.ts");
 
-  assert.match(route, /reserveMemberEmailVerificationChallenge/);
-  assert.match(route, /markMemberEmailVerificationChallengeSent/);
-  assert.match(route, /deleteMemberEmailVerificationChallenge/);
+  assert.match(route, /issueMemberEmailChallenge/);
+  assert.match(route, /MemberEmailChallengeIssueError/);
   assert.match(route, /MEMBER_EMAIL_RESEND_COOLDOWN_SECONDS/);
   assert.match(route, /code:\s*"resend_cooldown"/);
   assert.match(route, /retryAfterSeconds/);
@@ -127,6 +126,140 @@ test("인증 코드 전송 API는 원자 예약과 서버 재전송 대기 계�
   assert.match(route, /expiresAt/);
   assert.match(route, /resendAvailableAt/);
   assert.doesNotMatch(route, /\.from\("member_email_challenges"\)/);
+});
+
+test("공통 challenge 발급 수명주기는 전송 완료와 실패 rollback을 한 경계로 묶는다", async () => {
+  const {
+    issueMemberEmailChallenge,
+    MemberEmailChallengeIssueError,
+  } = await import(
+    new URL(
+      "../src/lib/member-email-verification-challenge.ts",
+      import.meta.url,
+    ).href
+  );
+  const input = {
+    memberId: "00000000-0000-4000-8000-000000000401",
+    emailNormalized: "member@example.com",
+    codeHash: "a".repeat(64),
+    expiresAt: "2026-08-31T04:00:00.000Z",
+    resendAvailableAt: "2026-08-31T03:51:00.000Z",
+  };
+  const calls: string[] = [];
+  const repository = {
+    reserve: async () => {
+      calls.push("reserve");
+      return {
+        accepted: true as const,
+        challengeId: "00000000-0000-4000-8000-000000000402",
+        retryAfterSeconds: 0 as const,
+      };
+    },
+    markSent: async () => {
+      calls.push("mark-sent");
+    },
+    deletePending: async () => {
+      calls.push("delete-pending");
+    },
+  };
+
+  assert.equal(
+    (
+      await issueMemberEmailChallenge(input, {
+        repository,
+        beforeDelivery: async () => {
+          calls.push("before-delivery");
+        },
+        deliver: async () => {
+          calls.push("deliver");
+        },
+      })
+    ).accepted,
+    true,
+  );
+  assert.deepEqual(calls, [
+    "reserve",
+    "before-delivery",
+    "deliver",
+    "mark-sent",
+  ]);
+
+  calls.length = 0;
+  await assert.rejects(
+    issueMemberEmailChallenge(input, {
+      repository,
+      deliver: async () => {
+        calls.push("deliver");
+        throw new Error("provider detail");
+      },
+    }),
+    MemberEmailChallengeIssueError,
+  );
+  assert.deepEqual(calls, ["reserve", "deliver", "delete-pending"]);
+
+  calls.length = 0;
+  await assert.rejects(
+    issueMemberEmailChallenge(input, {
+      repository,
+      beforeDelivery: async () => {
+        calls.push("before-delivery");
+        throw new Error("required attempt record failed");
+      },
+      deliver: async () => {
+        calls.push("deliver");
+      },
+    }),
+    MemberEmailChallengeIssueError,
+  );
+  assert.deepEqual(calls, [
+    "reserve",
+    "before-delivery",
+    "delete-pending",
+  ]);
+});
+
+test("공통 challenge 발급 수명주기는 재전송 대기 중 delivery를 실행하지 않는다", async () => {
+  const { issueMemberEmailChallenge } = await import(
+    new URL(
+      "../src/lib/member-email-verification-challenge.ts",
+      import.meta.url,
+    ).href
+  );
+  let delivered = false;
+  const result = await issueMemberEmailChallenge(
+    {
+      memberId: "00000000-0000-4000-8000-000000000401",
+      emailNormalized: "member@example.com",
+      codeHash: "a".repeat(64),
+      expiresAt: "2026-08-31T04:00:00.000Z",
+      resendAvailableAt: "2026-08-31T03:51:00.000Z",
+    },
+    {
+      repository: {
+        reserve: async () => ({
+          accepted: false as const,
+          challengeId: "00000000-0000-4000-8000-000000000402",
+          retryAfterSeconds: 42,
+        }),
+        markSent: async () => {
+          throw new Error("must not run");
+        },
+        deletePending: async () => {
+          throw new Error("must not run");
+        },
+      },
+      deliver: async () => {
+        delivered = true;
+      },
+    },
+  );
+
+  assert.deepEqual(result, {
+    accepted: false,
+    challengeId: "00000000-0000-4000-8000-000000000402",
+    retryAfterSeconds: 42,
+  });
+  assert.equal(delivered, false);
 });
 
 test("challenge repository는 RPC 결과를 검증하고 provider 세부 오류를 마스킹한다", async () => {

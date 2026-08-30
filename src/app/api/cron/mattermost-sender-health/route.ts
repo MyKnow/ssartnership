@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminSession } from "@/lib/auth";
+import { forEachWithConcurrency } from "@/lib/async-concurrency";
+import { ensureCronApiAccess, getCronErrorResponse } from "@/lib/cron-route";
 import { MattermostApiError, MattermostClient } from "@/lib/mattermost/client";
 import { getMattermostSenderKeyring } from "@/lib/mattermost-senders/config";
 import { mattermostSenderRepository } from "@/lib/mattermost-senders/repository";
@@ -7,10 +8,13 @@ import type { MattermostSenderSafeErrorCode } from "@/lib/mattermost-senders/typ
 
 export const runtime = "nodejs";
 
-function isAuthorizedByCronSecret(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  return Boolean(secret && request.headers.get("authorization") === `Bearer ${secret}`);
-}
+const SENDER_HEALTH_CHECK_CONCURRENCY = 4;
+
+type SenderHealthCheckResult = {
+  generation: number;
+  status: "healthy" | "failed";
+  errorCode?: MattermostSenderSafeErrorCode;
+};
 
 function toSafeHealthErrorCode(error: unknown): MattermostSenderSafeErrorCode {
   if (error instanceof MattermostApiError) {
@@ -20,10 +24,8 @@ function toSafeHealthErrorCode(error: unknown): MattermostSenderSafeErrorCode {
 }
 
 export async function GET(request: NextRequest) {
-  const adminAuthorized = await isAdminSession();
-  if (!adminAuthorized && !isAuthorizedByCronSecret(request)) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
+  const denied = ensureCronApiAccess(request);
+  if (denied) return denied;
 
   let senders;
   try {
@@ -31,52 +33,49 @@ export async function GET(request: NextRequest) {
       getMattermostSenderKeyring(),
     );
   } catch {
-    return NextResponse.json(
-      { ok: false, message: "Mattermost Sender 상태를 확인하지 못했습니다." },
-      { status: 500 },
-    );
+    return getCronErrorResponse("mattermost-sender-health");
   }
 
   const client = new MattermostClient();
-  const results: Array<{
-    generation: number;
-    status: "healthy" | "failed";
-    errorCode?: MattermostSenderSafeErrorCode;
-  }> = [];
+  const results = new Array<SenderHealthCheckResult>(senders.length);
 
-  for (const sender of senders) {
-    try {
-      await client.withAuthenticatedSender(sender.credentials, async (session) => {
-        let user;
-        try {
-          user = await session.getUserById(sender.senderMattermostUserId);
-        } catch (error) {
-          // The health target is the configured Sender itself. A 404 here is
-          // therefore an access failure, unlike a missing signup target.
-          if (error instanceof MattermostApiError && error.code === "not_found") {
-            throw new MattermostApiError("forbidden", 404);
+  await forEachWithConcurrency(
+    senders,
+    SENDER_HEALTH_CHECK_CONCURRENCY,
+    async (sender, index) => {
+      try {
+        await client.withAuthenticatedSender(sender.credentials, async (session) => {
+          let user;
+          try {
+            user = await session.getUserById(sender.senderMattermostUserId);
+          } catch (error) {
+            // The health target is the configured Sender itself. A 404 here is
+            // therefore an access failure, unlike a missing signup target.
+            if (error instanceof MattermostApiError && error.code === "not_found") {
+              throw new MattermostApiError("forbidden", 404);
+            }
+            throw error;
           }
-          throw error;
-        }
-        if (user.id !== sender.senderMattermostUserId || user.deleteAt > 0) {
-          throw new MattermostApiError("forbidden", 403);
-        }
-      });
-      await mattermostSenderRepository.recordHealthSuccess(sender.id);
-      results.push({ generation: sender.generation, status: "healthy" });
-    } catch (error) {
-      const errorCode = toSafeHealthErrorCode(error);
-      await mattermostSenderRepository.recordHealthFailure({
-        senderId: sender.id,
-        errorCode,
-      }).catch(() => undefined);
-      results.push({ generation: sender.generation, status: "failed", errorCode });
-      console.error("[mattermost-sender-health] sender check failed", {
-        generation: sender.generation,
-        errorCode,
-      });
-    }
-  }
+          if (user.id !== sender.senderMattermostUserId || user.deleteAt > 0) {
+            throw new MattermostApiError("forbidden", 403);
+          }
+        });
+        await mattermostSenderRepository.recordHealthSuccess(sender.id);
+        results[index] = { generation: sender.generation, status: "healthy" };
+      } catch (error) {
+        const errorCode = toSafeHealthErrorCode(error);
+        await mattermostSenderRepository.recordHealthFailure({
+          senderId: sender.id,
+          errorCode,
+        }).catch(() => undefined);
+        results[index] = { generation: sender.generation, status: "failed", errorCode };
+        console.error("[mattermost-sender-health] sender check failed", {
+          generation: sender.generation,
+          errorCode,
+        });
+      }
+    },
+  );
 
   return NextResponse.json({
     ok: true,

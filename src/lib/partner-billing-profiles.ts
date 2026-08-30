@@ -187,22 +187,45 @@ function updateMockBillingProfiles(
   globalScope.__mockPartnerBillingProfiles = updater(getMockBillingProfiles());
 }
 
+async function assertSupabaseAccountCompaniesAccess(input: {
+  accountId: string;
+  companyIds: string[];
+}) {
+  const companyIds = [...new Set(input.companyIds)];
+  if (companyIds.length === 0) {
+    return;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("partner_account_companies")
+    .select("company_id")
+    .eq("account_id", input.accountId)
+    .in("company_id", companyIds)
+    .eq("is_active", true);
+
+  const accessibleCompanyIds = new Set(
+    ((data ?? []) as Array<{ company_id?: string | null }>).flatMap((row) =>
+      row.company_id ? [row.company_id] : [],
+    ),
+  );
+
+  if (
+    error ||
+    companyIds.some((companyId) => !accessibleCompanyIds.has(companyId))
+  ) {
+    throw new Error("파트너사 접근 권한이 없습니다.");
+  }
+}
+
 async function assertSupabaseAccountCompanyAccess(input: {
   accountId: string;
   companyId: string;
 }) {
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("partner_account_companies")
-    .select("id")
-    .eq("account_id", input.accountId)
-    .eq("company_id", input.companyId)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (error || !data) {
-    throw new Error("파트너사 접근 권한이 없습니다.");
-  }
+  await assertSupabaseAccountCompaniesAccess({
+    accountId: input.accountId,
+    companyIds: [input.companyId],
+  });
 }
 
 export function toPartnerBillingProfileFormValues(
@@ -227,15 +250,38 @@ export async function getPartnerBillingProfiles(input: {
   accountId: string;
   companyId: string;
 }) {
+  return getPartnerBillingProfilesForCompanies({
+    accountId: input.accountId,
+    companyIds: [input.companyId],
+  });
+}
+
+export async function getPartnerBillingProfilesForCompanies(input: {
+  accountId: string;
+  companyIds: string[];
+}): Promise<PartnerBillingProfileRecord[]> {
+  const companyIds = [...new Set(input.companyIds)];
+  if (companyIds.length === 0) {
+    return [];
+  }
+
   if (isPartnerPortalMock) {
     return sortBillingProfiles(
       getMockBillingProfiles().filter((profile) =>
-        isPartnerBillingProfileVisibleInCompanyScope(profile, input),
+        companyIds.some((companyId) =>
+          isPartnerBillingProfileVisibleInCompanyScope(profile, {
+            accountId: input.accountId,
+            companyId,
+          }),
+        ),
       ),
     );
   }
 
-  await assertSupabaseAccountCompanyAccess(input);
+  await assertSupabaseAccountCompaniesAccess({
+    accountId: input.accountId,
+    companyIds,
+  });
   const supabase = getSupabaseAdminClient();
   const selectColumns =
     "id,company_id,account_id,label,payer_name,business_registration_number,business_name,representative_name,business_address,business_type,business_item,tax_invoice_email,tax_document_type,is_default,last_used_at,archived_at,created_at,updated_at";
@@ -249,7 +295,7 @@ export async function getPartnerBillingProfiles(input: {
       supabase
         .from("partner_billing_profiles")
         .select(selectColumns)
-        .eq("company_id", input.companyId)
+        .in("company_id", companyIds)
         .is("account_id", null)
         .is("archived_at", null),
     ]);
@@ -272,56 +318,21 @@ export async function getPartnerBillingProfiles(input: {
   return sortBillingProfiles([...profilesById.values()]);
 }
 
-async function unsetOtherDefaultProfiles(input: {
-  accountId: string;
-  companyId: string;
-  exceptProfileId?: string;
-}) {
-  if (isPartnerPortalMock) {
-    updateMockBillingProfiles((profiles) =>
-      profiles.map((profile) =>
-        profile.accountId === input.accountId &&
-        !profile.archivedAt &&
-        profile.id !== input.exceptProfileId
-          ? { ...profile, isDefault: false }
-          : profile,
-      ),
-    );
-    return;
-  }
-
-  const supabase = getSupabaseAdminClient();
-  let query = supabase
-    .from("partner_billing_profiles")
-    .update({ is_default: false })
-    .eq("account_id", input.accountId)
-    .is("archived_at", null);
-  if (input.exceptProfileId) {
-    query = query.neq("id", input.exceptProfileId);
-  }
-  const { error } = await query;
-  if (error) {
-    throw new Error(error.message);
-  }
-}
-
 export async function createPartnerBillingProfile(input: {
   accountId: string;
   companyId: string;
   form: PartnerBillingProfileFormInput;
 }) {
   const normalized = normalizePartnerBillingProfileFormInput(input.form);
-  const existingProfiles = await getPartnerBillingProfiles(input);
-  const shouldBeDefault =
-    normalized.isDefault ||
-    existingProfiles.every((profile) => profile.accountId !== input.accountId);
   const createdAt = nowIso();
 
-  if (shouldBeDefault) {
-    await unsetOtherDefaultProfiles(input);
-  }
-
   if (isPartnerPortalMock) {
+    const existingProfiles = await getPartnerBillingProfiles(input);
+    const shouldBeDefault =
+      normalized.isDefault ||
+      existingProfiles.every(
+        (profile) => profile.accountId !== input.accountId,
+      );
     const profile: PartnerBillingProfileRecord = {
       id: randomUUID(),
       companyId: input.companyId,
@@ -336,34 +347,41 @@ export async function createPartnerBillingProfile(input: {
       createdAt,
       updatedAt: createdAt,
     };
-    updateMockBillingProfiles((profiles) => [...profiles, profile]);
+    updateMockBillingProfiles((profiles) => [
+      ...(shouldBeDefault
+        ? profiles.map((item) =>
+            item.accountId === input.accountId &&
+            !item.archivedAt &&
+            item.isDefault
+              ? { ...item, isDefault: false }
+              : item,
+          )
+        : profiles),
+      profile,
+    ]);
     return profile;
   }
 
   await assertSupabaseAccountCompanyAccess(input);
   const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("partner_billing_profiles")
-    .insert({
-      account_id: input.accountId,
-      company_id: input.companyId,
-      label: normalized.label,
-      payer_name: normalized.payerName,
-      business_registration_number:
+  const { data, error } = await supabase.rpc(
+    "create_partner_billing_profile_atomically",
+    {
+      p_account_id: input.accountId,
+      p_company_id: input.companyId,
+      p_label: normalized.label,
+      p_payer_name: normalized.payerName,
+      p_business_registration_number:
         normalized.billingProfile.businessRegistrationNumber,
-      business_name: normalized.billingProfile.businessName,
-      representative_name: normalized.billingProfile.representativeName,
-      business_address: normalized.billingProfile.businessAddress,
-      business_type: normalized.billingProfile.businessType,
-      business_item: normalized.billingProfile.businessItem,
-      tax_invoice_email: normalized.billingProfile.taxInvoiceEmail,
-      tax_document_type: "tax_invoice",
-      is_default: shouldBeDefault,
-    })
-    .select(
-      "id,company_id,account_id,label,payer_name,business_registration_number,business_name,representative_name,business_address,business_type,business_item,tax_invoice_email,tax_document_type,is_default,last_used_at,archived_at,created_at,updated_at",
-    )
-    .single();
+      p_business_name: normalized.billingProfile.businessName,
+      p_representative_name: normalized.billingProfile.representativeName,
+      p_business_address: normalized.billingProfile.businessAddress,
+      p_business_type: normalized.billingProfile.businessType,
+      p_business_item: normalized.billingProfile.businessItem,
+      p_tax_invoice_email: normalized.billingProfile.taxInvoiceEmail,
+      p_make_default: normalized.isDefault,
+    },
+  );
   if (error || !data) {
     throw new Error(error?.message ?? "프로필을 저장하지 못했습니다.");
   }
@@ -395,18 +413,16 @@ export async function setDefaultPartnerBillingProfile(input: {
     );
   }
 
-  await unsetOtherDefaultProfiles({
-    accountId: input.accountId,
-    companyId: input.companyId,
-    exceptProfileId: input.profileId,
-  });
-
   if (isPartnerPortalMock) {
     const updatedAt = nowIso();
     updateMockBillingProfiles((profiles) =>
       profiles.map((item) =>
-        item.id === input.profileId
-          ? { ...item, isDefault: true, updatedAt }
+        item.accountId === input.accountId && !item.archivedAt
+          ? item.id === input.profileId
+            ? { ...item, isDefault: true, updatedAt }
+            : item.isDefault
+              ? { ...item, isDefault: false }
+              : item
           : item,
       ),
     );
@@ -414,12 +430,14 @@ export async function setDefaultPartnerBillingProfile(input: {
   }
 
   const supabase = getSupabaseAdminClient();
-  const { error } = await supabase
-    .from("partner_billing_profiles")
-    .update({ is_default: true })
-    .eq("id", input.profileId)
-    .eq("account_id", input.accountId)
-    .is("archived_at", null);
+  const { error } = await supabase.rpc(
+    "set_partner_billing_profile_default",
+    {
+      p_account_id: input.accountId,
+      p_company_id: input.companyId,
+      p_profile_id: input.profileId,
+    },
+  );
   if (error) {
     throw new Error(error.message);
   }

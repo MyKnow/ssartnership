@@ -24,7 +24,8 @@ const scriptPath =
   ".agents/skills/github-actions-operations/scripts/audit-actions-run.mjs";
 const retainedAuditPath =
   ".agents/skills/github-actions-operations/references/retained-actions-audit.md";
-
+const CHECKOUT_ACTION_REF = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1";
+const SETUP_NODE_ACTION_REF = "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0";
 const reviewedWorkflowNpmCommands = new Set([
   "npm audit --omit=dev",
   "npm run audit:security",
@@ -116,13 +117,13 @@ function workflowInstallBoundaryErrors(workflow: string) {
       continue;
     }
     const installIndex = job.source.indexOf(`run: ${installCommand}`);
-    const setupIndex = job.source.indexOf("uses: actions/setup-node@v7");
-    const checkoutIndex = job.source.indexOf("uses: actions/checkout@v7");
+    const setupIndex = job.source.indexOf(`uses: ${SETUP_NODE_ACTION_REF}`);
+    const checkoutIndex = job.source.indexOf(`uses: ${CHECKOUT_ACTION_REF}`);
     const preInstallSource = job.source.slice(0, installIndex);
     if (
       checkoutIndex < 0
       || checkoutIndex > installIndex
-      || !/uses: actions\/checkout@v7[\s\S]*?persist-credentials:\s*false/.test(
+      || !new RegExp(`uses:\\s*${CHECKOUT_ACTION_REF.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?persist-credentials:\\s*false`).test(
         preInstallSource,
       )
     ) {
@@ -766,7 +767,7 @@ test("every Actions dependency install uses the trusted wrapper with pinned Node
       [],
       `${workflowName}: every npm-executing job requires its own trusted install boundary`,
     );
-    for (const checkout of workflow.matchAll(/uses: actions\/checkout@v7([\s\S]*?)(?=\n\s+- name:|$)/g)) {
+    for (const checkout of workflow.matchAll(new RegExp(`uses:\\s*${CHECKOUT_ACTION_REF.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([\\s\\S]*?)(?=\\n\\s+- name:|$)`, "g"))) {
       assert.match(
         checkout[1] ?? "",
         /persist-credentials:\s*false/,
@@ -798,10 +799,10 @@ test("trusted install and secret ordering is enforced independently per job", ()
   const missingInstall = `jobs:
   first:
     steps:
-      - uses: actions/checkout@v7
+      - uses: ${CHECKOUT_ACTION_REF}
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      - uses: ${SETUP_NODE_ACTION_REF}
         env:
           NPM_CONFIG_CACHE: \${{ github.workspace }}/.tmp/npm-cache
         with:
@@ -813,10 +814,10 @@ test("trusted install and secret ordering is enforced independently per job", ()
   const preinstallSecret = `jobs:
   second:
     steps:
-      - uses: actions/checkout@v7
+      - uses: ${CHECKOUT_ACTION_REF}
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      - uses: ${SETUP_NODE_ACTION_REF}
         env:
           NPM_CONFIG_CACHE: \${{ github.workspace }}/.tmp/npm-cache
         with:
@@ -829,7 +830,7 @@ test("trusted install and secret ordering is enforced independently per job", ()
   const missingCheckout = `jobs:
   second:
     steps:
-      - uses: actions/setup-node@v7
+      - uses: ${SETUP_NODE_ACTION_REF}
         env:
           NPM_CONFIG_CACHE: \${{ github.workspace }}/.tmp/npm-cache
         with:
@@ -887,6 +888,15 @@ test("raw workflow dependency install detection rejects command variants", () =>
     unreviewedWorkflowNpmCommands("run: npx playwright install chromium"),
     [],
   );
+});
+
+test("Dependabot keeps pinned GitHub Actions refs reviewable", () => {
+  const config = read(".github/dependabot.yml");
+
+  assert.match(config, /^version:\s*2$/m);
+  assert.match(config, /package-ecosystem:\s*github-actions/);
+  assert.match(config, /directory:\s*["']\/["']/);
+  assert.match(config, /interval:\s*weekly/);
 });
 
 test("secret-bearing Actions keep credentials out of dependency installation", () => {

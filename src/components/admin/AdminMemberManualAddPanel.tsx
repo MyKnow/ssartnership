@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import JSZip from "jszip";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   useManualMemberImportDraft,
@@ -115,6 +114,7 @@ async function readPhotoZip(file: File) {
   if (file.size <= 0 || file.size > MANUAL_MEMBER_IMPORT_LIMITS.zipBytes) {
     throw new Error("사진 ZIP은 100MB 이하만 업로드할 수 있습니다.");
   }
+  const { default: JSZip } = await import("jszip");
   const zip = await JSZip.loadAsync(file);
   const entries = Object.values(zip.files).filter((entry) => !entry.dir);
   if (entries.length > MANUAL_MEMBER_IMPORT_LIMITS.maxRows) {

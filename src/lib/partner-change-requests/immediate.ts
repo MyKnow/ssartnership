@@ -4,6 +4,7 @@ import { buildAdminMutationAuditProperties } from "../admin-mutation-audit.ts";
 import { normalizePartnerBenefitActionType } from "../partner-benefit-action.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 import { getSupabaseRequestContext } from "./context.ts";
+import { requirePartnerChangeRequestAuditContext } from "./contracts.ts";
 import {
   arraysEqual,
   collectPartnerMediaUrls,
@@ -18,12 +19,10 @@ import { wrapPartnerChangeRequestDbError } from "./shared.ts";
 export async function updateSupabasePartnerImmediateFields(
   input: PartnerImmediateUpdateInput,
 ): Promise<PartnerImmediateUpdateResult> {
-  if (!input.auditContext) {
-    throw new PartnerChangeRequestError(
-      "invalid_request",
-      "감사 요청 문맥이 없어 제휴처 정보를 저장할 수 없습니다.",
-    );
-  }
+  const auditContext = requirePartnerChangeRequestAuditContext(
+    input.auditContext,
+    "감사 요청 문맥이 없어 제휴처 정보를 저장할 수 없습니다.",
+  );
   const context = await getSupabaseRequestContext(input.companyIds, input.partnerId);
   if (!context) {
     throw new PartnerChangeRequestError(
@@ -80,7 +79,7 @@ export async function updateSupabasePartnerImmediateFields(
       p_reservation_link: input.reservationLink,
       p_inquiry_link: input.inquiryLink,
       ...buildAtomicAuditRpcContext(
-        input.auditContext,
+        auditContext,
         buildAdminMutationAuditProperties({
           outcome: "success",
           properties: {

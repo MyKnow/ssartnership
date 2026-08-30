@@ -27,18 +27,16 @@ import {
   resolvePartnerRegistrationBranchPayload,
   resolvePartnerRegistrationMediaPayload,
 } from "@/lib/partner-registration-submit.server";
+import { getSafePartnerRegistrationError } from "@/lib/partner-registration-safe-errors";
 import { isE2eMockMutationEnabled } from "@/lib/e2e-mutation-mode";
 import { PARTNER_REGISTRATION_RATE_LIMIT, isBlocked, recordAttempt } from "@/lib/rate-limit";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { readFormIdempotencyKey } from "@/lib/form-idempotency";
 import { notifyAdminsOfPartnerRegistrationRequest } from "@/lib/operational-notifications";
+import { getClientIp } from "@/lib/client-ip";
 
 function getClientIdentifier(headerStore: Awaited<ReturnType<typeof headers>>) {
-  const forwarded = headerStore.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0]?.trim() || "unknown";
-  }
-  return headerStore.get("x-real-ip") ?? "unknown";
+  return getClientIp(headerStore) ?? "unknown";
 }
 
 export async function createPartnerRegistrationRequestAction(
@@ -50,14 +48,23 @@ export async function createPartnerRegistrationRequestAction(
   const identifier = getClientIdentifier(headerStore);
   const mockMutation = isE2eMockMutationEnabled();
 
-  if (
-    !mockMutation &&
-    (await isBlocked(identifier, PARTNER_REGISTRATION_RATE_LIMIT))
-  ) {
-    return {
-      status: "error",
-      message: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
-    };
+  if (!mockMutation) {
+    const blockingState = await isBlocked(
+      identifier,
+      PARTNER_REGISTRATION_RATE_LIMIT,
+    );
+    if (!blockingState.ok) {
+      return {
+        status: "error",
+        message: "신청 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      };
+    }
+    if (blockingState.blocked) {
+      return {
+        status: "error",
+        message: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+      };
+    }
   }
 
   const validation = validatePartnerRegistrationInput(formData);
@@ -112,19 +119,18 @@ export async function createPartnerRegistrationRequestAction(
       branches,
     });
   } catch (error) {
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : "신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-    console.error("[partner-registration] insert failed", message);
+    console.error("[partner-registration] insert failed", error);
+    const safeError = getSafePartnerRegistrationError(
+      error,
+      "신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    );
     return {
       status: "error",
-      message,
-      fieldErrors: message.includes("지점") ? { branchListText: message } : undefined,
+      ...safeError,
     };
   }
 
-  await recordAttempt(identifier, false, PARTNER_REGISTRATION_RATE_LIMIT);
+  await recordAttempt(identifier, true, PARTNER_REGISTRATION_RATE_LIMIT);
 
   if (insertedRequest.created) {
     const [context, actor] = await Promise.all([
@@ -211,7 +217,17 @@ export async function createPartnerRegistrationExcelRequestAction(
   const headerStore = await headers();
   const identifier = getClientIdentifier(headerStore);
 
-  if (await isBlocked(identifier, PARTNER_REGISTRATION_RATE_LIMIT)) {
+  const blockingState = await isBlocked(
+    identifier,
+    PARTNER_REGISTRATION_RATE_LIMIT,
+  );
+  if (!blockingState.ok) {
+    return {
+      status: "error",
+      message: "신청 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    };
+  }
+  if (blockingState.blocked) {
     return {
       status: "error",
       message: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
@@ -277,18 +293,18 @@ export async function createPartnerRegistrationExcelRequestAction(
       context: { source: "public_excel" },
     });
   } catch (error) {
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : "신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-    console.error("[partner-registration:xlsx] insert failed", message);
+    console.error("[partner-registration:xlsx] insert failed", error);
+    const safeError = getSafePartnerRegistrationError(
+      error,
+      "신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    );
     return {
       status: "error",
-      message,
+      ...safeError,
     };
   }
 
-  await recordAttempt(identifier, false, PARTNER_REGISTRATION_RATE_LIMIT);
+  await recordAttempt(identifier, true, PARTNER_REGISTRATION_RATE_LIMIT);
 
   const [context, actor] = await Promise.all([
     getServerActionLogContext("/partner-registration"),

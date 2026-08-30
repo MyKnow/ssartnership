@@ -73,7 +73,7 @@ public header는 브랜드와 계정·알림·쿠폰·테마·전체 메뉴처�
 
 ## Partner portal UI composition
 
-- shell: `PartnerPortalShellView`, `PartnerPortalHeader`, `PartnerPortalFooter`, action links.
+- shell: `PartnerPortalShellView`, 반응형 내비게이션, pending/logout action controls.
 - setup/auth: `PartnerSetupForm`, `PartnerLoginSetupToast`, password reset/change forms.
 - dashboard: `PartnerDashboardView`, `PartnerCompanySelectionView`, metrics panel.
 - service detail: `PartnerServiceDetailView`, summary/contact/metric/pending/history sections.

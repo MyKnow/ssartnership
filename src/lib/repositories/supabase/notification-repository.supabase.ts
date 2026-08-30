@@ -9,9 +9,18 @@ import {
 } from "@/lib/notifications/shared";
 import type {
   CreateNotificationResult,
+  FinalizeNotificationCampaignInput,
+  NotificationCampaignClaimDisposition,
+  NotificationCampaignClaimInput,
+  NotificationCampaignClaimResult,
+  NotificationDeliveryClaimDisposition,
+  NotificationDeliveryClaimInput,
+  NotificationDeliveryClaimResult,
   NotificationListContext,
   NotificationRepository,
+  TransitionNotificationDeliveryInput,
 } from "@/lib/repositories/notification-repository";
+import { createNotificationStorageError } from "@/lib/notifications/safe-error";
 
 type NotificationRow = {
   id: string;
@@ -26,6 +35,19 @@ type NotificationRow = {
 
 const NOTIFICATION_SELECT =
   "id,type,title,body,target_url,metadata,created_by_member_id,created_at";
+
+const NOTIFICATION_CAMPAIGN_CLAIM_DISPOSITIONS = new Set<NotificationCampaignClaimDisposition>([
+  "claimed",
+  "resumed",
+  "in_progress",
+  "completed",
+]);
+const NOTIFICATION_DELIVERY_CLAIM_DISPOSITIONS = new Set<NotificationDeliveryClaimDisposition>([
+  "claimed",
+  "sent",
+  "in_progress",
+  "needs_reconciliation",
+]);
 
 type MemberNotificationRow = {
   id: string;
@@ -141,7 +163,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
         .maybeSingle();
       notificationData = existingResult.data;
       if (existingResult.error) {
-        throw new Error(existingResult.error.message);
+        throw createNotificationStorageError(existingResult.error);
       }
       if (notificationData) {
         return {
@@ -153,7 +175,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
     }
 
     if (notificationResult.error) {
-      throw new Error(notificationResult.error.message);
+      throw createNotificationStorageError(notificationResult.error);
     }
     if (!notificationData) {
       throw new Error("알림을 저장하지 못했습니다.");
@@ -187,18 +209,155 @@ export class SupabaseNotificationRepository implements NotificationRepository {
         .from("member_notifications")
         .insert(memberNotificationRows);
       if (memberNotificationError) {
-        throw new Error(memberNotificationError.message);
+        throw createNotificationStorageError(memberNotificationError);
       }
 
       const { error: deliveryError } = await supabase
         .from("notification_deliveries")
         .insert(deliveryRows);
       if (deliveryError) {
-        throw new Error(deliveryError.message);
+        throw createNotificationStorageError(deliveryError);
       }
     }
 
     return { notification, recipientMemberIds };
+  }
+
+  async claimNotificationCampaign(
+    input: NotificationCampaignClaimInput,
+  ): Promise<NotificationCampaignClaimResult> {
+    const targetUrl = normalizeNotificationTargetUrl(input.targetUrl);
+    const idempotencyKey = input.idempotencyKey.trim();
+    if (!targetUrl || !idempotencyKey) {
+      throw new Error("알림 발송 요청이 올바르지 않습니다.");
+    }
+
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase.rpc("claim_notification_campaign", {
+      p_type: input.type,
+      p_title: input.title,
+      p_body: input.body,
+      p_target_url: targetUrl,
+      p_metadata: input.metadata ?? {},
+      p_created_by_member_id: input.createdByMemberId ?? null,
+      p_idempotency_key: idempotencyKey,
+      p_recipient_member_ids: Array.from(
+        new Set(input.recipientMemberIds.filter((value) => value.trim().length > 0)),
+      ),
+      p_lease_seconds: input.leaseDurationSeconds,
+    });
+    if (error) {
+      throw createNotificationStorageError(error);
+    }
+
+    const result = data as {
+      disposition?: unknown;
+      attempt_token?: unknown;
+      notification?: NotificationRow | null;
+      recipient_member_ids?: unknown;
+    } | null;
+    const disposition = result?.disposition;
+    if (
+      typeof disposition !== "string" ||
+      !NOTIFICATION_CAMPAIGN_CLAIM_DISPOSITIONS.has(
+        disposition as NotificationCampaignClaimDisposition,
+      ) ||
+      !result?.notification
+    ) {
+      throw new Error("알림 캠페인 실행 상태를 확인하지 못했습니다.");
+    }
+
+    const attemptToken =
+      typeof result.attempt_token === "string" ? result.attempt_token : null;
+    if (
+      (disposition === "claimed" || disposition === "resumed") &&
+      !attemptToken
+    ) {
+      throw new Error("알림 캠페인 실행 토큰을 확인하지 못했습니다.");
+    }
+    const recipientMemberIds = Array.isArray(result.recipient_member_ids)
+      ? result.recipient_member_ids.filter(
+          (value): value is string => typeof value === "string",
+        )
+      : [];
+
+    return {
+      notification: mapNotificationRow(result.notification),
+      recipientMemberIds,
+      disposition: disposition as NotificationCampaignClaimDisposition,
+      attemptToken,
+    };
+  }
+
+  async finalizeNotificationCampaign(
+    input: FinalizeNotificationCampaignInput,
+  ) {
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase.rpc("finalize_notification_campaign", {
+      p_notification_id: input.notificationId,
+      p_attempt_token: input.attemptToken,
+      p_metadata: input.metadata,
+    });
+    if (error) {
+      throw createNotificationStorageError(error);
+    }
+    return data === true;
+  }
+
+  async claimNotificationDelivery(
+    input: NotificationDeliveryClaimInput,
+  ): Promise<NotificationDeliveryClaimResult> {
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase.rpc("claim_notification_delivery", {
+      p_notification_id: input.notificationId,
+      p_member_id: input.memberId,
+      p_channel: input.channel,
+      p_provider: input.provider,
+      p_provider_campaign_id: input.providerCampaignId ?? null,
+      p_provider_idempotency_key: input.providerIdempotencyKey,
+      p_lease_seconds: input.leaseDurationSeconds,
+    });
+    if (error) {
+      throw createNotificationStorageError(error);
+    }
+
+    const result = data as {
+      delivery_id?: unknown;
+      disposition?: unknown;
+    } | null;
+    const disposition = result?.disposition;
+    if (
+      typeof result?.delivery_id !== "string" ||
+      typeof disposition !== "string" ||
+      !NOTIFICATION_DELIVERY_CLAIM_DISPOSITIONS.has(
+        disposition as NotificationDeliveryClaimDisposition,
+      )
+    ) {
+      throw new Error("알림 전송 실행 상태를 확인하지 못했습니다.");
+    }
+
+    return {
+      deliveryId: result.delivery_id,
+      disposition: disposition as NotificationDeliveryClaimDisposition,
+    };
+  }
+
+  async transitionNotificationDelivery(
+    input: TransitionNotificationDeliveryInput,
+  ) {
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase.rpc(
+      "transition_notification_delivery",
+      {
+        p_delivery_id: input.deliveryId,
+        p_transition: input.transition,
+        p_error_message: input.errorMessage ?? null,
+      },
+    );
+    if (error) {
+      throw createNotificationStorageError(error);
+    }
+    return data === true;
   }
 
   async recordNotificationDelivery(input: NotificationDeliveryInput) {
@@ -217,7 +376,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       delivered_at: input.deliveredAt ?? (input.status === "sent" ? new Date().toISOString() : null),
     });
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
   }
 
@@ -231,7 +390,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       .update({ metadata })
       .eq("id", notificationId);
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
   }
 
@@ -245,7 +404,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       .is("read_at", null);
 
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
 
     return count ?? 0;
@@ -279,10 +438,10 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       await Promise.all([unreadPromise, listPromise]);
 
     if (unreadError) {
-      throw new Error(unreadError.message);
+      throw createNotificationStorageError(unreadError);
     }
     if (listError) {
-      throw new Error(listError.message);
+      throw createNotificationStorageError(listError);
     }
 
     const rows = (data ?? []) as MemberNotificationRow[];
@@ -308,7 +467,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       .maybeSingle();
 
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
     if (!data) {
       return null;
@@ -332,7 +491,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       .maybeSingle();
 
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
     return Boolean(data);
   }
@@ -353,7 +512,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       .maybeSingle();
 
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
     return Boolean(data);
   }
@@ -373,7 +532,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       .select("id");
 
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
     return data?.length ?? 0;
   }
@@ -392,7 +551,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       .select("id");
 
     if (error) {
-      throw new Error(error.message);
+      throw createNotificationStorageError(error);
     }
     return data?.length ?? 0;
   }

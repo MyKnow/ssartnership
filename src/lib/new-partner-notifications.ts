@@ -4,6 +4,7 @@ import {
   normalizeCampusSlugs,
   type CampusSlug,
 } from "@/lib/campuses";
+import { forEachWithConcurrency } from "@/lib/async-concurrency";
 import { sendAdminNotificationCampaign } from "@/lib/admin-notification-ops";
 import {
   createNewPartnerPayload,
@@ -37,7 +38,11 @@ export type CampusScopedNewPartnerNotificationResult =
     }
   | {
       sent: false;
-      reason: "no_campus" | "no_member";
+      reason:
+        | "no_campus"
+        | "no_member"
+        | "already_sent"
+        | "already_processing";
       audience: null;
       notificationId: null;
     };
@@ -62,6 +67,7 @@ type PartnerPublicationNotificationRow = {
 type PartnerPublicationNotificationStateRow = {
   partner_id: string;
   new_partner_notification_sent_at: string | null;
+  new_partner_notification_processing_at?: string | null;
 };
 
 export type PendingPartnerPublicationNotificationResult = {
@@ -70,6 +76,14 @@ export type PendingPartnerPublicationNotificationResult = {
   skipped: number;
   failures: Array<{ partnerId: string; message: string }>;
 };
+
+const PUBLICATION_NOTIFICATION_CONCURRENCY = 4;
+const PARTNER_PUBLICATION_NOTIFICATION_LEASE_MS = 15 * 60 * 1_000;
+
+type PartnerPublicationNotificationLeaseOutcome =
+  | "acquired"
+  | "already_sent"
+  | "already_processing";
 
 function getCampusDisplayValues(slugs: CampusSlug[]) {
   return Array.from(
@@ -243,6 +257,7 @@ export async function recordNewPartnerNotificationSent(partnerId: string) {
       {
         partner_id: partnerId,
         new_partner_notification_sent_at: now,
+        new_partner_notification_processing_at: null,
         updated_at: now,
       },
       { onConflict: "partner_id" },
@@ -261,6 +276,7 @@ export async function clearNewPartnerNotificationSent(partnerId: string) {
       {
         partner_id: partnerId,
         new_partner_notification_sent_at: null,
+        new_partner_notification_processing_at: null,
         updated_at: now,
       },
       { onConflict: "partner_id" },
@@ -271,14 +287,160 @@ export async function clearNewPartnerNotificationSent(partnerId: string) {
   }
 }
 
+export function isPartnerPublicationNotificationLeaseExpired(
+  processingAt: string | null | undefined,
+  now = new Date(),
+) {
+  if (!processingAt) {
+    return true;
+  }
+
+  const processingTime = new Date(processingAt).getTime();
+  if (!Number.isFinite(processingTime)) {
+    return true;
+  }
+
+  return processingTime <= now.getTime() - PARTNER_PUBLICATION_NOTIFICATION_LEASE_MS;
+}
+
+function isPartnerPublicationNotificationStateConflict(error: {
+  code?: string;
+  message?: string;
+}) {
+  return (
+    error.code === "23505" ||
+    error.message?.includes("duplicate key value violates unique constraint") === true
+  );
+}
+
+async function claimPartnerPublicationNotificationLease(
+  partnerId: string,
+): Promise<PartnerPublicationNotificationLeaseOutcome> {
+  const supabase = getSupabaseAdminClient();
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const staleBefore = new Date(
+    now.getTime() - PARTNER_PUBLICATION_NOTIFICATION_LEASE_MS,
+  ).toISOString();
+
+  const claimExistingLease = async (mode: "fresh" | "stale") => {
+    let query = supabase
+      .from("partner_publication_notification_states")
+      .update({
+        new_partner_notification_processing_at: nowIso,
+        updated_at: nowIso,
+      })
+      .eq("partner_id", partnerId)
+      .is("new_partner_notification_sent_at", null);
+
+    query =
+      mode === "fresh"
+        ? query.is("new_partner_notification_processing_at", null)
+        : query.lt("new_partner_notification_processing_at", staleBefore);
+
+    const { data, error } = await query.select("partner_id").maybeSingle();
+    if (error) {
+      throw new Error(error.message);
+    }
+    return Boolean(data?.partner_id);
+  };
+
+  if (await claimExistingLease("fresh")) {
+    return "acquired";
+  }
+  if (await claimExistingLease("stale")) {
+    return "acquired";
+  }
+
+  const { error: insertError } = await supabase
+    .from("partner_publication_notification_states")
+    .insert({
+      partner_id: partnerId,
+      new_partner_notification_sent_at: null,
+      new_partner_notification_processing_at: nowIso,
+      updated_at: nowIso,
+    });
+
+  if (!insertError) {
+    return "acquired";
+  }
+  if (!isPartnerPublicationNotificationStateConflict(insertError)) {
+    throw new Error(insertError.message);
+  }
+
+  const { data: stateRow, error: stateError } = await supabase
+    .from("partner_publication_notification_states")
+    .select(
+      "partner_id,new_partner_notification_sent_at,new_partner_notification_processing_at",
+    )
+    .eq("partner_id", partnerId)
+    .maybeSingle();
+
+  if (stateError) {
+    throw new Error(stateError.message);
+  }
+
+  const state = stateRow as PartnerPublicationNotificationStateRow | null;
+  if (state?.new_partner_notification_sent_at) {
+    return "already_sent";
+  }
+  if (
+    !state ||
+    isPartnerPublicationNotificationLeaseExpired(
+      state.new_partner_notification_processing_at,
+      now,
+    )
+  ) {
+    if (await claimExistingLease(state ? "stale" : "fresh")) {
+      return "acquired";
+    }
+  }
+
+  return "already_processing";
+}
+
+async function clearPartnerPublicationNotificationLease(partnerId: string) {
+  const now = new Date().toISOString();
+  const { error } = await getSupabaseAdminClient()
+    .from("partner_publication_notification_states")
+    .update({
+      new_partner_notification_processing_at: null,
+      updated_at: now,
+    })
+    .eq("partner_id", partnerId)
+    .is("new_partner_notification_sent_at", null);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 export async function sendAndRecordCampusScopedNewPartnerNotification(
   params: Parameters<typeof sendCampusScopedNewPartnerNotification>[0],
 ) {
-  const result = await sendCampusScopedNewPartnerNotification(params);
-  if (result.sent) {
-    await recordNewPartnerNotificationSent(params.partnerId);
+  const lease = await claimPartnerPublicationNotificationLease(params.partnerId);
+  if (lease !== "acquired") {
+    return {
+      sent: false,
+      reason: lease,
+      audience: null,
+      notificationId: null,
+    } satisfies CampusScopedNewPartnerNotificationResult;
   }
-  return result;
+
+  try {
+    const result = await sendCampusScopedNewPartnerNotification(params);
+    if (result.sent) {
+      await recordNewPartnerNotificationSent(params.partnerId);
+      return result;
+    }
+
+    await clearPartnerPublicationNotificationLease(params.partnerId);
+    return result;
+  } catch (error) {
+    await clearPartnerPublicationNotificationLease(params.partnerId);
+    throw error;
+  }
 }
 
 function getCategoryLabel(
@@ -351,33 +513,37 @@ export async function runPendingPartnerPublicationNotifications(
     failures: [],
   };
 
-  for (const partner of pendingPartners) {
-    try {
-      const notificationResult =
-        await sendAndRecordCampusScopedNewPartnerNotification({
+  await forEachWithConcurrency(
+    pendingPartners,
+    PUBLICATION_NOTIFICATION_CONCURRENCY,
+    async (partner) => {
+      try {
+        const notificationResult =
+          await sendAndRecordCampusScopedNewPartnerNotification({
+            partnerId: partner.id,
+            name: partner.name,
+            location: partner.location,
+            categoryLabel: getCategoryLabel(partner.categories),
+            campusSlugs: partner.campus_slugs ?? [],
+            benefitSummary: (partner.benefits ?? []).join("\n"),
+            conditions: (partner.conditions ?? []).join("\n"),
+            periodStart: partner.period_start,
+            periodEnd: partner.period_end,
+            mapUrl: partner.map_url,
+          });
+        if (notificationResult.sent) {
+          result.sent += 1;
+        } else {
+          result.skipped += 1;
+        }
+      } catch (error) {
+        result.failures.push({
           partnerId: partner.id,
-          name: partner.name,
-          location: partner.location,
-          categoryLabel: getCategoryLabel(partner.categories),
-          campusSlugs: partner.campus_slugs ?? [],
-          benefitSummary: (partner.benefits ?? []).join("\n"),
-          conditions: (partner.conditions ?? []).join("\n"),
-          periodStart: partner.period_start,
-          periodEnd: partner.period_end,
-          mapUrl: partner.map_url,
+          message: error instanceof Error ? error.message : "알 수 없는 오류",
         });
-      if (notificationResult.sent) {
-        result.sent += 1;
-      } else {
-        result.skipped += 1;
       }
-    } catch (error) {
-      result.failures.push({
-        partnerId: partner.id,
-        message: error instanceof Error ? error.message : "알 수 없는 오류",
-      });
-    }
-  }
+    },
+  );
 
   return result;
 }

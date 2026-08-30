@@ -1,8 +1,8 @@
 import type { NotificationTemplateDefinition } from "./catalog";
 
 const PLACEHOLDER_PATTERN = /\{([A-Za-z][A-Za-z0-9_]*)\}/g;
-const MAX_TITLE_LENGTH = 2_000;
-const MAX_BODY_LENGTH = 20_000;
+export const NOTIFICATION_TEMPLATE_MAX_TITLE_LENGTH = 2_000;
+export const NOTIFICATION_TEMPLATE_MAX_BODY_LENGTH = 20_000;
 
 export function extractTemplateVariables(value: string) {
   const variables: string[] = [];
@@ -24,7 +24,10 @@ export function validateNotificationTemplate(
   if (!title || !body) {
     throw new Error("알림 제목과 내용을 모두 입력해 주세요.");
   }
-  if (title.length > MAX_TITLE_LENGTH || body.length > MAX_BODY_LENGTH) {
+  if (
+    title.length > NOTIFICATION_TEMPLATE_MAX_TITLE_LENGTH ||
+    body.length > NOTIFICATION_TEMPLATE_MAX_BODY_LENGTH
+  ) {
     throw new Error("알림 템플릿이 허용된 길이를 초과했습니다.");
   }
 

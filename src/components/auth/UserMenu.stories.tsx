@@ -36,6 +36,24 @@ export const Guest: Story = {
   },
 };
 
+export const GuestWithReturnTo: Story = {
+  args: {
+    initialSession: null,
+    guestAuthReturnTo: "/partners/partner-1",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("link", { name: "로그인" })).toHaveAttribute(
+      "href",
+      "/auth/login?returnTo=%2Fpartners%2Fpartner-1",
+    );
+    await expect(canvas.getByRole("link", { name: "회원가입" })).toHaveAttribute(
+      "href",
+      "/auth/signup?returnTo=%2Fpartners%2Fpartner-1",
+    );
+  },
+};
+
 export const SignedInCancelLogout: Story = {
   args: {
     initialSession: signedInSession,

@@ -5,7 +5,7 @@ import {
   invalidateAdminNotificationReadCache,
 } from "@/lib/admin-notifications.server";
 import { conditionalJsonResponse } from "@/lib/conditional-json-response";
-import { getAdminSession } from "@/lib/auth";
+import { getAdminPersonalNotificationApiSession } from "@/lib/admin-access";
 import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -26,17 +26,12 @@ async function requireAdminNotificationSession(request: NextRequest) {
     return { response: getInvalidRequestResponse() };
   }
 
-  const session = await getAdminSession();
-  if (!session) {
-    return {
-      response: NextResponse.json(
-        { message: "관리자 인증이 필요합니다." },
-        { status: 401 },
-      ),
-    };
+  const auth = await getAdminPersonalNotificationApiSession(request);
+  if ("response" in auth) {
+    return auth;
   }
 
-  return { adminId: session.adminId };
+  return { adminId: auth.session.adminId };
 }
 
 async function getUnreadCount(adminId: string) {
@@ -75,7 +70,8 @@ export async function GET(request: NextRequest) {
       offset: request.nextUrl.searchParams.get("offset"),
       limit: request.nextUrl.searchParams.get("limit"),
     });
-    const includeSummary = request.nextUrl.searchParams.get("includeSummary") !== "0";
+    const includeSummary =
+      request.nextUrl.searchParams.get("includeSummary") !== "0";
     const readModel = await timing.measure("query", () =>
       getCachedAdminNotificationInboxReadModel({
         adminId,
@@ -97,7 +93,9 @@ export async function GET(request: NextRequest) {
       items: result.items,
       nextOffset: result.nextOffset,
       hasMore: result.hasMore,
-      ...(includeSummary ? { summary: { unreadCount: result.unreadCount } } : {}),
+      ...(includeSummary
+        ? { summary: { unreadCount: result.unreadCount } }
+        : {}),
     };
     return conditionalJsonResponse(request, response);
   });

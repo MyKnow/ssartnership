@@ -1,7 +1,8 @@
 import {
   normalizeAdminIdentifier,
   validateAdminIdentifier,
-} from "@/lib/validation";
+} from "./validation.ts";
+import { getTrustedPlatformClientIp } from "./client-ip.ts";
 
 export const ADMIN_LOGIN_ERROR_CODES = [
   "invalid_credentials",
@@ -184,11 +185,7 @@ export function shouldChallengeAdminBasicAuth(input: {
 export function getForwardedClientIp(
   headers: Pick<Headers, "get">,
 ): string | null {
-  const forwarded = headers.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0]?.trim() || null;
-  }
-  return headers.get("x-real-ip");
+  return getTrustedPlatformClientIp(headers);
 }
 
 function parseAdminAllowedIps() {

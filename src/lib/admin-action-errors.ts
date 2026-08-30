@@ -68,6 +68,12 @@ export const adminActionErrorMessages: Record<string, string> = {
   partner_company_plan_pending_exists: "이미 처리 대기 중인 업그레이드 요청이 있습니다.",
   partner_company_plan_processed: "이미 처리된 업그레이드 요청입니다.",
   partner_company_plan_payment_unconfirmed: "입금 확인 후 플랜을 승인할 수 있습니다.",
+  partner_company_plan_invoice_missing: "청구서를 찾을 수 없습니다.",
+  partner_company_plan_partner_missing: "제휴처를 찾을 수 없습니다.",
+  partner_company_plan_rejection_paid:
+    "입금 확인이 완료된 청구는 반려할 수 없습니다.",
+  partner_company_plan_state_changed:
+    "제휴처 플랜이 변경되었습니다. 현재 상태를 확인한 뒤 다시 시도해 주세요.",
   review_invalid_request: "리뷰 입력값을 확인해 주세요.",
   review_not_found: "대상을 찾을 수 없습니다.",
   admin_usage_invalid_request: "혜택 적용 이력 입력값을 확인해 주세요.",

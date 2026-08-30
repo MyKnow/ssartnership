@@ -35,7 +35,7 @@ export async function isImageUploadBlocked(
   input: { ipAddress?: string | null; accountIdentifier?: string | null },
 ) {
   const keys = getKeys(action, input);
-  return keys.length > 0 ? getBlockingState(keys, CONFIG[action]) : null;
+  return getBlockingState(keys, CONFIG[action]);
 }
 
 export async function recordImageUploadAttempt(
@@ -43,7 +43,5 @@ export async function recordImageUploadAttempt(
   input: { ipAddress?: string | null; accountIdentifier?: string | null; success: boolean },
 ) {
   const keys = getKeys(action, input);
-  if (keys.length > 0) {
-    await recordAttemptBatch(keys, input.success, CONFIG[action]);
-  }
+  return recordAttemptBatch(keys, input.success, CONFIG[action]);
 }

@@ -101,6 +101,7 @@ export function toStorageError(error) {
 export function createSafeStorageOperationError(context, error) {
   const { status, code } = extractStorageErrorDetails(error);
   const storageError = new Error(`${context}: ${formatStorageError(error)}`);
+  storageError.stack = `${storageError.name}: ${storageError.message}`;
 
   if (typeof status === "number") {
     storageError.status = status;

@@ -10,6 +10,10 @@ import {
   recordRequiredPolicyConsent,
 } from "@/lib/policy-documents";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import {
+  MemberAuthRouteBodyError,
+  parseMemberAuthJsonBody,
+} from "@/app/api/mm/_shared/parsers";
 
 export const runtime = "nodejs";
 
@@ -43,12 +47,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    const payload = (await request.json()) as {
+    const payload = await parseMemberAuthJsonBody<{
       servicePolicyId?: string;
       privacyPolicyId?: string;
       marketingPolicyId?: string | null;
       marketingPolicyChecked?: boolean;
-    };
+    }>(request);
 
     if (!payload.servicePolicyId || !payload.privacyPolicyId) {
       await logAuthSecurity({
@@ -132,6 +136,17 @@ export async function POST(request: Request) {
       redirectTo: session.mustChangePassword ? "/auth/change-password" : "/",
     });
   } catch (error) {
+    if (error instanceof MemberAuthRouteBodyError) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_policy_consent",
+        status: "failure",
+        actorType: "guest",
+        properties: { reason: "invalid_body" },
+      });
+      return NextResponse.json({ error: "invalid_body" }, { status: 400 });
+    }
+
     await logAuthSecurity({
       ...context,
       eventName: "member_policy_consent",

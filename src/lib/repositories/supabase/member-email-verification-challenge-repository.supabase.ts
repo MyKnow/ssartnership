@@ -17,10 +17,16 @@ type RpcResponse = {
   error: unknown;
 };
 
-type RpcExecutor = (
+export type MemberEmailChallengeRpcExecutor = (
   functionName: string,
   parameters: Record<string, unknown>,
 ) => PromiseLike<RpcResponse>;
+
+export type MemberEmailChallengeRpcNames = {
+  reserve: string;
+  markSent: string;
+  deletePending: string;
+};
 
 function executeRpc(
   functionName: string,
@@ -66,12 +72,17 @@ function parseReservation(
   };
 }
 
-export class SupabaseMemberEmailVerificationChallengeRepository
+export class SupabaseMemberEmailChallengeRepository
   implements MemberEmailVerificationChallengeRepository
 {
-  private readonly runRpc: RpcExecutor;
+  private readonly rpcNames: MemberEmailChallengeRpcNames;
+  private readonly runRpc: MemberEmailChallengeRpcExecutor;
 
-  constructor(runRpc: RpcExecutor = executeRpc) {
+  constructor(
+    rpcNames: MemberEmailChallengeRpcNames,
+    runRpc: MemberEmailChallengeRpcExecutor = executeRpc,
+  ) {
+    this.rpcNames = rpcNames;
     this.runRpc = runRpc;
   }
 
@@ -80,7 +91,7 @@ export class SupabaseMemberEmailVerificationChallengeRepository
   ): Promise<ReserveMemberEmailVerificationChallengeResult> {
     try {
       const { data, error } = await this.runRpc(
-        "reserve_member_email_verification_challenge",
+        this.rpcNames.reserve,
         {
           p_member_id: input.memberId,
           p_email_normalized: input.emailNormalized,
@@ -103,17 +114,15 @@ export class SupabaseMemberEmailVerificationChallengeRepository
   }
 
   async markSent(challengeId: string) {
-    await this.requireTrueRpc(
-      "mark_member_email_verification_challenge_sent",
-      { p_challenge_id: challengeId },
-    );
+    await this.requireTrueRpc(this.rpcNames.markSent, {
+      p_challenge_id: challengeId,
+    });
   }
 
   async deletePending(challengeId: string) {
-    await this.requireTrueRpc(
-      "delete_pending_member_email_verification_challenge",
-      { p_challenge_id: challengeId },
-    );
+    await this.requireTrueRpc(this.rpcNames.deletePending, {
+      p_challenge_id: challengeId,
+    });
   }
 
   private async requireTrueRpc(
@@ -131,6 +140,18 @@ export class SupabaseMemberEmailVerificationChallengeRepository
       }
       throw new MemberEmailChallengeStorageError();
     }
+  }
+}
+
+const VERIFICATION_CHALLENGE_RPC_NAMES = {
+  reserve: "reserve_member_email_verification_challenge",
+  markSent: "mark_member_email_verification_challenge_sent",
+  deletePending: "delete_pending_member_email_verification_challenge",
+} satisfies MemberEmailChallengeRpcNames;
+
+export class SupabaseMemberEmailVerificationChallengeRepository extends SupabaseMemberEmailChallengeRepository {
+  constructor(runRpc?: MemberEmailChallengeRpcExecutor) {
+    super(VERIFICATION_CHALLENGE_RPC_NAMES, runRpc);
   }
 }
 

@@ -23,6 +23,8 @@ import {
 import { isUuid } from "@/lib/uuid";
 import {
   hashPartnerPreviewToken,
+  isMissingPartnerPreviewExpiryColumnError,
+  isPartnerPreviewLinkActive,
   isValidPartnerPreviewToken,
 } from "@/lib/partner-preview";
 
@@ -206,7 +208,7 @@ const getCachedPartnerRowById = unstable_cache(
 );
 
 function toVisiblePartner(row: PartnerRow, categoryKey: string): Partner {
-  const galleryImages = row.thumbnail ? row.images ?? [] : (row.images ?? []).slice(1);
+  const galleryImages = row.images ?? [];
   const thumbnail = row.thumbnail ?? row.images?.[0] ?? null;
   return {
     id: row.id,
@@ -300,18 +302,37 @@ async function hasValidPreviewToken(id: string, token: string) {
     return false;
   }
 
-  const { data, error } = await getSupabaseAdminClient()
+  const nowIso = new Date().toISOString();
+  const supabase = getSupabaseAdminClient();
+  let { data, error } = await supabase
     .from("partner_preview_tokens")
-    .select("partner_id")
+    .select("partner_id,created_at,expires_at")
     .eq("partner_id", id)
     .eq("token_hash", hashPartnerPreviewToken(token))
+    .gt("expires_at", nowIso)
     .maybeSingle();
+
+  if (error && isMissingPartnerPreviewExpiryColumnError(error.message)) {
+    ({ data, error } = await supabase
+      .from("partner_preview_tokens")
+      .select("partner_id,created_at")
+      .eq("partner_id", id)
+      .eq("token_hash", hashPartnerPreviewToken(token))
+      .maybeSingle());
+  }
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return Boolean(data);
+  return Boolean(
+    data &&
+      isPartnerPreviewLinkActive(
+        "expires_at" in data ? data.expires_at : null,
+        new Date(nowIso),
+        data.created_at ?? null,
+      ),
+  );
 }
 
 export class SupabasePartnerRepository implements PartnerRepository {

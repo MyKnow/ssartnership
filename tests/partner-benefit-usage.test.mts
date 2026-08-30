@@ -352,19 +352,22 @@ test("repository benefit and infrastructure errors keep distinct service codes",
 });
 
 test("mock admin usage repository supports create, update, list, and delete", async () => {
-  const repository = new MockPartnerBenefitUsageRepository([
-    {
-      partnerId: "partner-admin-crud",
-      location: "서울 강남구 테헤란로 212",
-      ...activePartnerPeriod(),
-      benefitItems: [
-        { id: "benefit-1", title: "첫 번째 혜택", maxApplyCount: null },
-        { id: "benefit-2", title: "두 번째 혜택", maxApplyCount: null },
-      ],
-      pinHash: null,
-      pinSalt: null,
-    },
-  ]);
+  const repository = new MockPartnerBenefitUsageRepository(
+    [
+      {
+        partnerId: "partner-admin-crud",
+        location: "서울 강남구 테헤란로 212",
+        ...activePartnerPeriod(),
+        benefitItems: [
+          { id: "benefit-1", title: "첫 번째 혜택", maxApplyCount: null },
+          { id: "benefit-2", title: "두 번째 혜택", maxApplyCount: null },
+        ],
+        pinHash: null,
+        pinSalt: null,
+      },
+    ],
+    ["member-1", "member-2"],
+  );
   const baseInput = {
     partnerId: "partner-admin-crud",
     memberId: "member-1",
@@ -395,6 +398,97 @@ test("mock admin usage repository supports create, update, list, and delete", as
 
   await repository.deleteAdminUsage({ partnerId: "partner-admin-crud", usageId: created.usageId });
   assert.equal((await repository.listUsageHistory({ partnerId: "partner-admin-crud", page: 1, pageSize: 25 })).total, 0);
+});
+
+test("mock admin usage rejects unknown members on create and update", async () => {
+  const repository = new MockPartnerBenefitUsageRepository(
+    [
+      {
+        partnerId: "partner-admin-members",
+        location: "서울 강남구 테헤란로 212",
+        ...activePartnerPeriod(),
+        benefitItems: [
+          { id: "benefit-1", title: "회원 확인 혜택", maxApplyCount: 2 },
+        ],
+        pinHash: null,
+        pinSalt: null,
+      },
+    ],
+    ["member-known"],
+  );
+  const baseInput = {
+    partnerId: "partner-admin-members",
+    memberId: "member-known",
+    benefitId: "benefit-1",
+    useCount: 1,
+    verifiedAt: "2026-07-23T00:00:00.000Z",
+  };
+  const created = await repository.createAdminUsage(baseInput);
+
+  await assert.rejects(
+    () => repository.createAdminUsage({ ...baseInput, memberId: "member-unknown" }),
+    /partner_benefit_usage_member_not_found/,
+  );
+  await assert.rejects(
+    () => repository.updateAdminUsage({
+      ...baseInput,
+      usageId: created.usageId,
+      memberId: "member-unknown",
+    }),
+    /partner_benefit_usage_member_not_found/,
+  );
+});
+
+test("mock admin usage enforces effective benefit limits on create and update", async () => {
+  const repository = new MockPartnerBenefitUsageRepository(
+    [
+      {
+        partnerId: "partner-admin-limits",
+        location: "서울 강남구 테헤란로 212",
+        ...activePartnerPeriod(),
+        benefitItems: [
+          { id: "benefit-default-limit", title: "기본 1회 혜택", maxApplyCount: null },
+          { id: "benefit-explicit-limit", title: "최대 2회 혜택", maxApplyCount: 2 },
+        ],
+        pinHash: null,
+        pinSalt: null,
+      },
+    ],
+    ["member-known"],
+  );
+  const baseInput = {
+    partnerId: "partner-admin-limits",
+    memberId: "member-known",
+    benefitId: "benefit-explicit-limit",
+    useCount: 1,
+    verifiedAt: "2026-07-23T00:00:00.000Z",
+  };
+  const created = await repository.createAdminUsage(baseInput);
+
+  await assert.rejects(
+    () => repository.createAdminUsage({
+      ...baseInput,
+      benefitId: "benefit-default-limit",
+      useCount: 2,
+    }),
+    /partner_benefit_usage_use_count_exceeded/,
+  );
+  await assert.rejects(
+    () => repository.updateAdminUsage({
+      ...baseInput,
+      usageId: created.usageId,
+      useCount: 3,
+    }),
+    /partner_benefit_usage_use_count_exceeded/,
+  );
+
+  const listed = await repository.listUsageHistory({
+    partnerId: "partner-admin-limits",
+    page: 1,
+    pageSize: 25,
+  });
+  assert.equal(listed.items[0]?.useCount, 1);
+  assert.equal(listed.items[0]?.benefitId, "benefit-explicit-limit");
 });
 
 test("missing benefit use maximum defaults to one per confirmation", async () => {

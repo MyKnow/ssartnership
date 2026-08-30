@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/auth";
+import { getAdminPersonalNotificationApiSession } from "@/lib/admin-access";
 import { invalidateAdminNotificationSettingsCache } from "@/lib/admin-notifications.server";
 import {
   getAdminOperationalNotificationPreferences,
   upsertAdminOperationalNotificationPreferences,
 } from "@/lib/operational-notifications";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import {
+  JsonRequestBodyError,
+  MAX_STANDARD_JSON_BODY_BYTES,
+  readJsonRequestBodyWithinLimit,
+} from "@/lib/request-body-limit";
 import { withServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
@@ -21,13 +26,19 @@ export async function GET(request: NextRequest) {
         expectedOrigin: request.nextUrl.origin,
       })
     ) {
-      return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
+      return NextResponse.json(
+        { message: "잘못된 요청입니다." },
+        { status: 403 },
+      );
     }
 
-    const session = await timing.measure("auth", () => getAdminSession());
-    if (!session) {
-      return NextResponse.json({ message: "관리자 인증이 필요합니다." }, { status: 401 });
+    const auth = await timing.measure("auth", () =>
+      getAdminPersonalNotificationApiSession(request),
+    );
+    if ("response" in auth) {
+      return auth.response;
     }
+    const { session } = auth;
 
     try {
       const preferences = await timing.measure("query", () =>
@@ -52,15 +63,38 @@ export async function POST(request: NextRequest) {
         allowedContentTypes: ["application/json"],
       })
     ) {
-      return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
+      return NextResponse.json(
+        { message: "잘못된 요청입니다." },
+        { status: 403 },
+      );
     }
-    const session = await timing.measure("auth", () => getAdminSession());
-    if (!session) {
-      return NextResponse.json({ message: "관리자 인증이 필요합니다." }, { status: 401 });
+    const auth = await timing.measure("auth", () =>
+      getAdminPersonalNotificationApiSession(request),
+    );
+    if ("response" in auth) {
+      return auth.response;
     }
+    const { session } = auth;
 
     try {
-      const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+      let body: Record<string, unknown>;
+      try {
+        body = await readJsonRequestBodyWithinLimit<Record<string, unknown>>(
+          request,
+          MAX_STANDARD_JSON_BODY_BYTES,
+        );
+      } catch (error) {
+        if (
+          error instanceof JsonRequestBodyError &&
+          error.code === "body_too_large"
+        ) {
+          return NextResponse.json(
+            { message: "알림 설정 요청이 너무 큽니다." },
+            { status: 413 },
+          );
+        }
+        body = {};
+      }
       const preferences = await timing.measure("query", () =>
         upsertAdminOperationalNotificationPreferences(session.adminId, {
           enabled: toOptionalBoolean(body.enabled),
@@ -68,7 +102,9 @@ export async function POST(request: NextRequest) {
           pushEnabled: toOptionalBoolean(body.pushEnabled),
           securityEnabled: toOptionalBoolean(body.securityEnabled),
           partnerRequestEnabled: toOptionalBoolean(body.partnerRequestEnabled),
-          expiringPartnerEnabled: toOptionalBoolean(body.expiringPartnerEnabled),
+          expiringPartnerEnabled: toOptionalBoolean(
+            body.expiringPartnerEnabled,
+          ),
         }),
       );
       invalidateAdminNotificationSettingsCache(session.adminId);

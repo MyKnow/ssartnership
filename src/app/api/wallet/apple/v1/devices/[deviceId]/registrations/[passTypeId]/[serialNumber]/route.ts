@@ -185,10 +185,7 @@ export async function POST(
 
   const parsedBody = await parseAppleWalletRegistrationBody(request);
   if (!parsedBody.success) {
-    return appleWalletJsonResponse(
-      { message: "pushToken 형식이 올바르지 않습니다." },
-      400,
-    );
+    return appleWalletJsonResponse({ message: parsedBody.message }, parsedBody.status);
   }
 
   try {

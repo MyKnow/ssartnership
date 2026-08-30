@@ -192,6 +192,64 @@ test("product event throttle rejects bursty repeated events", async () => {
   resetProductEventThrottleForTests();
 });
 
+test("authenticated product event throttle ignores caller-controlled session rotation", async () => {
+  const { consumeProductEventQuota, resetProductEventThrottleForTests } =
+    await productEventThrottleModulePromise;
+
+  resetProductEventThrottleForTests();
+
+  for (let index = 0; index < 30; index += 1) {
+    assert.equal(
+      consumeProductEventQuota(
+        {
+          eventName: "partner_benefit_use_pin_attempt",
+          ipAddress: `203.0.113.${index + 1}`,
+          actorKey: "member:member-1",
+          scopeKey: "partner:partner-1",
+          sessionId: `rotated-session-${index}`,
+        },
+        1_000,
+      ),
+      true,
+    );
+  }
+
+  assert.equal(
+    consumeProductEventQuota(
+      {
+        eventName: "partner_benefit_use_pin_attempt",
+        ipAddress: "203.0.113.10",
+        actorKey: "member:member-1",
+        scopeKey: "partner:partner-1",
+        sessionId: "fresh-attacker-session",
+      },
+      1_000,
+    ),
+    false,
+  );
+
+  resetProductEventThrottleForTests();
+});
+
+test("PIN and redemption routes throttle on authenticated identities, not analytics sessions", () => {
+  const routePaths = [
+    "src/app/api/partners/[id]/benefit-use/route.ts",
+    "src/app/api/coupon-issues/[issueId]/redeem/route.ts",
+    "src/app/api/coupons/[couponId]/redeem/route.ts",
+  ] as const;
+
+  for (const path of routePaths) {
+    const source = readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+    const quotaCall = source.match(
+      /consumeProductEventQuota\(\{[\s\S]*?\}\)/,
+    )?.[0];
+    assert.ok(quotaCall, path);
+    assert.match(quotaCall, /actorKey: `member:\$\{session\.userId\}`/, path);
+    assert.match(quotaCall, /scopeKey:/, path);
+    assert.doesNotMatch(quotaCall, /sessionId/, path);
+  }
+});
+
 test("product event ingress throttle limits requests before their body is parsed", async () => {
   const { consumeProductEventIngressQuota, resetProductEventThrottleForTests } =
     await productEventThrottleModulePromise;
@@ -214,21 +272,87 @@ test("product event ingress throttle limits requests before their body is parsed
 });
 
 test("client IP uses Vercel's canonical forwarded header before proxy fallbacks", async () => {
-  const { getClientIp } = await clientIpModulePromise;
+  const { getClientIp, getTrustedPlatformClientIp } = await clientIpModulePromise;
+  const originalVercel = process.env.VERCEL;
+
+  try {
+    process.env.VERCEL = "1";
+
+    assert.equal(
+      getClientIp(
+        new Headers({
+          "x-vercel-forwarded-for": "203.0.113.12, 10.0.0.2",
+          "x-forwarded-for": "198.51.100.20",
+          "x-real-ip": "198.51.100.21",
+        }),
+      ),
+      "203.0.113.12",
+    );
+    assert.equal(
+      getClientIp(
+        new Headers({
+          "x-forwarded-for": "198.51.100.22",
+          "x-real-ip": "198.51.100.23",
+        }),
+      ),
+      null,
+    );
+    assert.equal(
+      getTrustedPlatformClientIp(
+        new Headers({
+          "x-vercel-forwarded-for": "203.0.113.12, 10.0.0.2",
+          "x-forwarded-for": "198.51.100.20",
+        }),
+      ),
+      "203.0.113.12",
+    );
+    assert.equal(
+      getTrustedPlatformClientIp(
+        new Headers({
+          "x-forwarded-for": "203.0.113.12",
+          "x-real-ip": "203.0.113.13",
+        }),
+      ),
+      null,
+    );
+
+    process.env.VERCEL = "";
+
+    assert.equal(
+      getClientIp(
+        new Headers({
+          "x-forwarded-for": "198.51.100.22",
+          "x-real-ip": "198.51.100.23",
+        }),
+      ),
+      "198.51.100.23",
+    );
+  } finally {
+    if (originalVercel === undefined) {
+      delete process.env.VERCEL;
+    } else {
+      process.env.VERCEL = originalVercel;
+    }
+  }
+});
+
+test("admin IP allowlist never trusts caller-controlled proxy fallbacks", async () => {
+  const { getForwardedClientIp } = await adminSecurityModulePromise;
 
   assert.equal(
-    getClientIp(
+    getForwardedClientIp(
       new Headers({
-        "x-vercel-forwarded-for": "203.0.113.12, 10.0.0.2",
-        "x-forwarded-for": "198.51.100.20",
-        "x-real-ip": "198.51.100.21",
+        "x-vercel-forwarded-for": "203.0.113.30",
+        "x-forwarded-for": "198.51.100.30",
       }),
     ),
-    "203.0.113.12",
+    "203.0.113.30",
   );
   assert.equal(
-    getClientIp(new Headers({ "x-forwarded-for": "198.51.100.22" })),
-    "198.51.100.22",
+    getForwardedClientIp(
+      new Headers({ "x-forwarded-for": "203.0.113.30" }),
+    ),
+    null,
   );
 });
 

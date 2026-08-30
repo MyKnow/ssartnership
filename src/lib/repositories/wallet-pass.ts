@@ -1,12 +1,12 @@
 import { MockWalletPassRepository } from "@/lib/repositories/mock/wallet-pass-repository.mock";
 import { SupabaseWalletPassRepository } from "@/lib/repositories/supabase/wallet-pass-repository.supabase";
 import type { WalletPassRepository } from "@/lib/repositories/wallet-pass-repository";
+import {
+  selectRuntimeDataAccess,
+  type RuntimeDataAccessEnvironment,
+} from "@/lib/runtime-data-access";
 
-export type WalletPassRepositoryEnvironment = {
-  NEXT_PUBLIC_DATA_SOURCE?: string;
-  SUPABASE_URL?: string;
-  SUPABASE_SERVICE_ROLE_KEY?: string;
-};
+export type WalletPassRepositoryEnvironment = RuntimeDataAccessEnvironment;
 
 export class WalletPassRepositoryUnavailableError extends Error {
   readonly code = "wallet_pass_repository_unavailable" as const;
@@ -40,18 +40,26 @@ class UnavailableWalletPassRepository implements WalletPassRepository {
 export function createWalletPassRepository(
   environment: WalletPassRepositoryEnvironment,
 ): WalletPassRepository {
-  if (environment.NEXT_PUBLIC_DATA_SOURCE === "mock") {
+  const dataAccess = getWalletPassRepositoryDataAccess(environment);
+
+  if (dataAccess.source === "mock") {
     return new MockWalletPassRepository();
   }
 
-  const hasSupabaseAdminEnv =
-    Boolean(environment.SUPABASE_URL?.trim()) &&
-    Boolean(environment.SUPABASE_SERVICE_ROLE_KEY?.trim());
-  if (!hasSupabaseAdminEnv) {
+  if (dataAccess.source === "unavailable") {
     return new UnavailableWalletPassRepository();
   }
 
   return new SupabaseWalletPassRepository();
+}
+
+export function getWalletPassRepositoryDataAccess(
+  environment: WalletPassRepositoryEnvironment,
+) {
+  return selectRuntimeDataAccess({
+    capability: "admin",
+    environment,
+  });
 }
 
 export const walletPassRepository = createWalletPassRepository({

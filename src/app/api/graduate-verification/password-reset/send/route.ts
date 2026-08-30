@@ -15,6 +15,11 @@ import { findGraduateVerifiedMemberByEmail } from "@/lib/graduate-verification-s
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { isValidEmail } from "@/lib/validation";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 
 export const runtime = "nodejs";
 
@@ -29,7 +34,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "요청을 확인해 주세요." }, { status: 403 });
   }
 
-  const body = (await request.json().catch(() => null)) as { email?: unknown } | null;
+  let body: { email?: unknown } | null = null;
+  try {
+    body = await readRouteJsonBodyWithinLimit<{ email?: unknown }>(request, {
+      maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+      invalidMessage: "이메일 주소를 확인해 주세요.",
+      tooLargeMessage: "요청 본문이 너무 큽니다.",
+    });
+  } catch (error) {
+    if (error instanceof RouteJsonBodyError && error.code === "body_too_large") {
+      return NextResponse.json(
+        { ok: false, message: error.message },
+        { status: error.status },
+      );
+    }
+  }
   const email = normalizeGraduateEmail(String(body?.email ?? ""));
   if (!isValidEmail(email)) {
     return NextResponse.json({ ok: false, message: "이메일 주소를 확인해 주세요." }, { status: 400 });
@@ -40,7 +59,24 @@ export async function POST(request: Request) {
     ipAddress: context.ipAddress,
     accountIdentifier: hashGraduateEmailIdentifier(email),
   };
-  if (await isGraduateVerificationBlocked(rateLimitContext)) {
+  const blockingState = await isGraduateVerificationBlocked(rateLimitContext);
+  if (!blockingState.ok) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "graduate_password_reset",
+      status: "failure",
+      actorType: "guest",
+      properties: { stage: "send", reason: blockingState.code },
+    });
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "비밀번호 재설정 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
+  }
+  if (blockingState.blocked) {
     await logAuthSecurity({
       ...context,
       eventName: "graduate_password_reset",

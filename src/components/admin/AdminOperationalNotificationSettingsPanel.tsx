@@ -7,6 +7,11 @@ import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import type { AdminNotificationPreferenceState } from "@/lib/partner-notification-routing";
 import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
+import {
+  getServiceWorkerRegistration,
+  parsePushSettingsJson,
+  urlBase64ToUint8Array,
+} from "@/components/push/push-settings/device";
 
 type AdminOperationalNotificationSettingsPanelProps = {
   pushConfigured: boolean;
@@ -15,24 +20,16 @@ type AdminOperationalNotificationSettingsPanelProps = {
   deviceCount: number;
 };
 
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = `${base64String}${padding}`.replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = window.atob(base64);
-  return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
-}
-
 async function postJson(url: string, body: Record<string, unknown>) {
   const response = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error("요청을 처리하지 못했습니다.");
-  }
-  return data;
+  return parsePushSettingsJson<{
+    message?: string;
+    preferences?: AdminNotificationPreferenceState;
+  }>(response);
 }
 
 export default function AdminOperationalNotificationSettingsPanel({
@@ -84,7 +81,7 @@ export default function AdminOperationalNotificationSettingsPanel({
         if (permission !== "granted") {
           throw new Error("브라우저 알림 권한이 필요합니다.");
         }
-        const registration = await navigator.serviceWorker.ready;
+        const registration = await getServiceWorkerRegistration();
         const subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(publicKey),

@@ -8,26 +8,53 @@ import { getPartnerViewerContext } from "@/lib/partner-view-context";
 import { partnerRepository } from "@/lib/repositories";
 import {
   assertReviewMediaExistingUrls,
-  parseReviewMediaManifest,
   REVIEW_MEDIA_BUCKET,
+  type ReviewMediaManifest,
 } from "@/lib/review-media";
 import {
   buildReviewMediaStoragePath,
+  deleteReviewMediaUrls,
 } from "@/lib/review-media-storage";
 import {
-  assertNoDirectImageFileSubmission,
   resolveImageTransformPolicy,
 } from "@/lib/image-upload/policy";
-import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
+import { ImageUploadError } from "@/lib/image-upload/repository";
 import {
-  normalizeReviewDraftInput,
-  validateReviewDraftInput,
+  INVALID_REVIEW_MEDIA_MESSAGE,
+  parseReviewSubmissionRequest,
   type ReviewFieldErrors,
+  type ParsedReviewSubmission,
 } from "@/lib/review-validation";
+import { MAX_EXTENDED_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 import { getUserSession } from "@/lib/user-auth";
 
-const REVIEW_ID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const INVALID_REVIEW_BODY_MESSAGE = "리뷰 요청 형식을 확인해 주세요.";
+const OVERSIZED_REVIEW_BODY_MESSAGE = "리뷰 요청이 너무 큽니다.";
+
+class ReviewMediaInputError extends Error {
+  constructor(message = INVALID_REVIEW_MEDIA_MESSAGE) {
+    super(message);
+    this.name = "ReviewMediaInputError";
+  }
+}
+
+export function getReviewMediaInputFieldErrors(
+  error: unknown,
+): ReviewFieldErrors | null {
+  return error instanceof ReviewMediaInputError
+    ? { images: error.message }
+    : null;
+}
+
+export function isReviewImageUploadUnavailable(error: unknown) {
+  return error instanceof ImageUploadError
+    && error.code === "image_upload_unavailable";
+}
 
 export async function getReviewMemberSession() {
   return getUserSession();
@@ -82,75 +109,66 @@ function clampListNumber(
   return Math.max(min, Math.min(max, parsed));
 }
 
-export function parseReviewFormFields(formData: FormData):
-  | {
-      ok: true;
-      rating: number;
-      title: string;
-      body: string;
-    }
+export async function readPartnerReviewSubmission(request: Request): Promise<
+  | { ok: true; values: ParsedReviewSubmission }
   | {
       ok: false;
-      fieldErrors: ReviewFieldErrors;
-    } {
-  const ratingRaw = String(formData.get("rating") ?? "").trim();
-  const rating = Number.parseInt(ratingRaw, 10);
-  const normalized = normalizeReviewDraftInput({
-    rating,
-    title: String(formData.get("title") ?? ""),
-    body: String(formData.get("body") ?? ""),
-  });
-  const manifest = parseReviewMediaManifest(String(formData.get("imagesManifest") ?? ""));
-  const fieldErrors = validateReviewDraftInput({
-    ...normalized,
-    imageCount: manifest?.images.length ?? 0,
-  });
-
-  if (Object.keys(fieldErrors).length > 0) {
-    return {
-      ok: false,
-      fieldErrors,
-    };
+      status: 400 | 413;
+      message?: string;
+      fieldErrors?: ReviewFieldErrors;
+    }
+> {
+  let body: unknown;
+  try {
+    body = await readRouteJsonBodyWithinLimit<unknown>(request, {
+      maximumBytes: MAX_EXTENDED_JSON_BODY_BYTES,
+      invalidMessage: INVALID_REVIEW_BODY_MESSAGE,
+      tooLargeMessage: OVERSIZED_REVIEW_BODY_MESSAGE,
+    });
+  } catch (error) {
+    if (error instanceof RouteJsonBodyError) {
+      return { ok: false, status: error.status, message: error.message };
+    }
+    throw error;
   }
 
+  const parsed = parseReviewSubmissionRequest(body);
+  if (parsed.ok) {
+    return parsed;
+  }
+  if (parsed.reason === "invalid_fields") {
+    return { ok: false, status: 400, fieldErrors: parsed.fieldErrors };
+  }
   return {
-    ok: true,
-    rating: normalized.rating,
-    title: normalized.title,
-    body: normalized.body,
+    ok: false,
+    status: 400,
+    message: INVALID_REVIEW_BODY_MESSAGE,
   };
 }
 
-export function parseRequestedReviewId(formData: FormData) {
-  const raw = String(formData.get("reviewId") ?? "").trim();
-  return REVIEW_ID_PATTERN.test(raw) ? raw : null;
-}
-
 export async function resolveReviewMediaPayload(
-  formData: FormData,
+  manifest: ReviewMediaManifest,
   partnerId: string,
   reviewId: string,
   memberId: string,
   allowedExistingUrls: readonly string[] = [],
 ) {
-  const manifestRaw = String(formData.get("imagesManifest") ?? "");
-  const manifest = parseReviewMediaManifest(manifestRaw);
-
-  if (manifestRaw.trim() && !manifest) {
-    throw new Error("리뷰 사진 형식을 확인해 주세요.");
+  const entries = manifest.images;
+  try {
+    assertReviewMediaExistingUrls(manifest, allowedExistingUrls);
+  } catch {
+    throw new ReviewMediaInputError();
   }
-  assertNoDirectImageFileSubmission(formData, ["imageFiles"]);
-
-  const entries = manifest?.images ?? [];
-  assertReviewMediaExistingUrls(manifest, allowedExistingUrls);
   if (entries.length > 5) {
-    throw new Error("리뷰 사진은 최대 5장까지 업로드할 수 있습니다.");
+    throw new ReviewMediaInputError(
+      "리뷰 사진은 최대 5장까지 업로드할 수 있습니다.",
+    );
   }
 
   const images: string[] = [];
-  const uploadRepository = getImageUploadRepository();
+  const uploadedUrls: string[] = [];
   const attachUpload = async (uploadId: string, imageIndex: number) => {
-    const attached = await uploadRepository.attach({
+    const attached = await getImageUploadRepository().attach({
       actor: { kind: "member", id: memberId },
       purpose: "review",
       uploadId,
@@ -169,19 +187,28 @@ export async function resolveReviewMediaPayload(
     return attached.url;
   };
 
-  for (const entry of entries) {
-    if (entry.kind === "existing") {
-      images.push(entry.url);
-      continue;
+  try {
+    for (const entry of entries) {
+      if (entry.kind === "existing") {
+        images.push(entry.url);
+        continue;
+      }
+      if (!entry.uploadId) {
+        throw new ReviewMediaInputError(
+          "완료된 공통 이미지 업로드를 확인해 주세요.",
+        );
+      }
+      const uploadedUrl = await attachUpload(entry.uploadId, images.length);
+      images.push(uploadedUrl);
+      uploadedUrls.push(uploadedUrl);
     }
-    if (!entry.uploadId) {
-      throw new Error("완료된 공통 이미지 업로드를 확인해 주세요.");
-    }
-    images.push(await attachUpload(entry.uploadId, images.length));
+  } catch (error) {
+    await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);
+    throw error;
   }
 
   return {
     images,
-    uploadedUrls: [],
+    uploadedUrls,
   };
 }

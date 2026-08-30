@@ -1,6 +1,8 @@
 type ProductEventThrottleInput = {
   eventName: string;
   ipAddress?: string | null;
+  actorKey?: string | null;
+  scopeKey?: string | null;
   sessionId?: string | null;
 };
 
@@ -23,9 +25,12 @@ function normalizeKeyPart(value: string | null | undefined, fallback: string) {
 }
 
 function buildActorKey(input: ProductEventThrottleInput) {
+  if (input.actorKey) {
+    return `actor:${normalizeKeyPart(input.actorKey, 'authenticated-actor')}`;
+  }
   const ipKey = normalizeKeyPart(input.ipAddress, 'unknown-ip');
   const sessionKey = normalizeKeyPart(input.sessionId, 'anonymous-session');
-  return `${ipKey}:${sessionKey}`;
+  return `anonymous:${ipKey}:${sessionKey}`;
 }
 
 function buildIngressKey(ipAddress: string | null | undefined) {
@@ -81,13 +86,14 @@ export function consumeProductEventQuota(
 
   const actorKey = buildActorKey(input);
   const eventName = normalizeKeyPart(input.eventName, 'unknown-event');
+  const scopeKey = normalizeKeyPart(input.scopeKey, 'all-scopes');
   const allEventsAllowed = consumeBucket(
     `all:${actorKey}`,
     MAX_EVENTS_PER_WINDOW,
     now,
   );
   const sameEventAllowed = consumeBucket(
-    `event:${actorKey}:${eventName}`,
+    `event:${actorKey}:${eventName}:${scopeKey}`,
     MAX_SAME_EVENT_PER_WINDOW,
     now,
   );
