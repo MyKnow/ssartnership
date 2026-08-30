@@ -1,3 +1,4 @@
+import { forEachWithConcurrency } from "@/lib/async-concurrency";
 import { getMattermostDisplayName } from "@/lib/mm-member-sync/snapshot";
 import { MattermostApiError, type MattermostAuthenticatedSession } from "@/lib/mattermost/client";
 import { mattermostSenderRepository } from "@/lib/mattermost-senders/repository";
@@ -10,6 +11,7 @@ import type { MmUserDirectorySyncResult, MmUserDirectorySnapshot } from "./share
 import { mergeDirectorySnapshot } from "./shared";
 
 const CHANNEL_MEMBERS_PAGE_SIZE = 200;
+const GENERATION_COLLECTION_CONCURRENCY = 3;
 const USER_LOOKUP_CONCURRENCY = 8;
 
 type SelectableYearSnapshotBatch = {
@@ -158,7 +160,14 @@ export async function getAllSelectableUserSnapshots() {
     ]);
   }
 
-  const batches = await Promise.all(activeGenerations.map(collectGenerationSnapshots));
+  const batches = new Array<SelectableYearSnapshotBatch>(activeGenerations.length);
+  await forEachWithConcurrency(
+    activeGenerations,
+    GENERATION_COLLECTION_CONCURRENCY,
+    async (generation, index) => {
+      batches[index] = await collectGenerationSnapshots(generation);
+    },
+  );
   return mergeSelectableYearSnapshotBatches(
     batches.length > 0 ? batches : [createSnapshotBatch()],
   );
