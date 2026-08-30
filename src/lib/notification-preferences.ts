@@ -9,6 +9,7 @@ import {
   getMemberPushPreferences,
   upsertMemberPushPreferences,
 } from "@/lib/push";
+import { getPushDeviceLabel } from "@/lib/push/device-label";
 import type { PushPreferenceState, PushSubscriptionDevice } from "@/lib/push";
 
 const dataSource = process.env.NEXT_PUBLIC_DATA_SOURCE;
@@ -28,28 +29,6 @@ function getMockPreferences(memberId: string) {
   const initial = { ...DEFAULT_PUSH_PREFERENCES };
   mockPreferenceStore.set(memberId, initial);
   return initial;
-}
-
-function getMockDeviceLabel(userAgent: string | null) {
-  const source = userAgent ?? "";
-  const browser = source.includes("Chrome")
-    ? "Chrome"
-    : source.includes("Safari")
-      ? "Safari"
-      : source.includes("Firefox")
-        ? "Firefox"
-        : "브라우저";
-  const os = source.includes("Mac")
-    ? "macOS"
-    : source.includes("Windows")
-      ? "Windows"
-      : source.includes("Android")
-        ? "Android"
-        : source.includes("iPhone") || source.includes("iPad")
-          ? "iOS"
-          : "기기";
-
-  return `${browser} · ${os}`;
 }
 
 export function isMockNotificationPreferenceMode() {
@@ -75,7 +54,7 @@ export function upsertMockPushDevice(params: {
   const devices = mockPushDeviceStore.get(params.memberId) ?? [];
   const nextDevice: PushSubscriptionDevice = {
     id: params.endpoint,
-    label: getMockDeviceLabel(params.userAgent ?? null),
+    label: getPushDeviceLabel(params.userAgent ?? null),
     userAgent: params.userAgent ?? null,
     isCurrent: true,
     createdAt:

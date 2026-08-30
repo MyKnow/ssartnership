@@ -1,5 +1,6 @@
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 import { wrapPushDbError } from "./config.ts";
+import { getPushDeviceLabel } from "./device-label.ts";
 import type { SubscriptionInput } from "./types.ts";
 import { validateTrustedPushSubscription } from "./subscription-trust.ts";
 import {
@@ -89,42 +90,6 @@ export async function deactivatePushSubscription(params: {
   return getMemberPushPreferences(memberId);
 }
 
-function getDeviceLabel(userAgent: string | null) {
-  const source = userAgent ?? "";
-  const clientHints = source.includes("client-hints=")
-    ? source.slice(source.indexOf("client-hints="))
-    : "";
-  const browser =
-    clientHints.includes("Microsoft Edge") || source.includes("Edg/")
-      ? "Edge"
-      : clientHints.includes("Google Chrome") ||
-          clientHints.includes("Chromium") ||
-          source.includes("Chrome/")
-        ? "Chrome"
-      : source.includes("Firefox/")
-        ? "Firefox"
-        : source.includes("Safari/") && !clientHints
-          ? "Safari"
-          : "브라우저";
-  const os =
-    clientHints.includes("macOS") ||
-    source.includes("Mac OS X") ||
-    source.includes("macOS") ||
-    source.includes("Macintosh")
-      ? "macOS"
-      : clientHints.includes("Windows") || source.includes("Windows")
-        ? "Windows"
-        : clientHints.includes("Android") || source.includes("Android")
-          ? "Android"
-          : source.includes("iPhone") || source.includes("iPad") || source.includes("iOS")
-            ? "iOS"
-            : source.includes("Linux")
-              ? "Linux"
-              : "기기";
-
-  return `${browser} · ${os}`;
-}
-
 export async function listPushSubscriptionDevices(params: {
   memberId: string;
   currentEndpoint?: string | null;
@@ -143,7 +108,7 @@ export async function listPushSubscriptionDevices(params: {
 
   return (data ?? []).map((row) => ({
     id: String(row.id),
-    label: getDeviceLabel(row.user_agent),
+    label: getPushDeviceLabel(row.user_agent),
     userAgent: row.user_agent ?? null,
     isCurrent: Boolean(params.currentEndpoint && row.endpoint === params.currentEndpoint),
     createdAt: row.created_at ?? null,

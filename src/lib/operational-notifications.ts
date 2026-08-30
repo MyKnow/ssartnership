@@ -1,5 +1,6 @@
 import { normalizeNotificationTargetUrl } from "@/lib/notifications/shared";
 import { forEachWithConcurrency } from "@/lib/async-concurrency";
+import { getPushDeviceLabel } from "@/lib/push/device-label";
 import {
   ADMIN_NOTIFICATION_CHANNELS,
   PARTNER_NOTIFICATION_CHANNELS,
@@ -56,29 +57,6 @@ async function getWebPush() {
     });
   }
   return webPushPromise;
-}
-
-function getDeviceLabel(userAgent: string | null) {
-  const source = userAgent ?? "";
-  const browser = source.includes("Edg/")
-    ? "Edge"
-    : source.includes("Chrome/")
-      ? "Chrome"
-      : source.includes("Firefox/")
-        ? "Firefox"
-        : source.includes("Safari/")
-          ? "Safari"
-          : "브라우저";
-  const os = source.includes("Mac")
-    ? "macOS"
-    : source.includes("Windows")
-      ? "Windows"
-      : source.includes("Android")
-        ? "Android"
-        : source.includes("iPhone") || source.includes("iPad")
-          ? "iOS"
-          : "기기";
-  return `${browser} · ${os}`;
 }
 
 function toTargetUrl(value?: string | null, fallback = "/") {
@@ -338,7 +316,7 @@ export async function listOperationalPushSubscriptionDevices(input: {
 
   return (data ?? []).map((row) => ({
     id: String(row.id),
-    label: getDeviceLabel(row.user_agent),
+    label: getPushDeviceLabel(row.user_agent),
     userAgent: row.user_agent ?? null,
     isCurrent: Boolean(input.currentEndpoint && row.endpoint === input.currentEndpoint),
     createdAt: row.created_at ?? null,
