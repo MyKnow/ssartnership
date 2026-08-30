@@ -127,6 +127,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, redirectTo: "/" });
   } catch {
     await recordMemberEmailVerificationAttempt("recovery-verify", rateLimitContext, false);
-    return NextResponse.json({ ok: false, message: "이메일 로그인 전환을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요." }, { status: 503 });
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "이메일 복구를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
   }
 }

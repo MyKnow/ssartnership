@@ -159,30 +159,75 @@ async function queryAuditLogs(params: {
   targetType: string;
   actions: string[];
   targetIds?: string[];
+  propertiesContains?: Record<string, string>;
   limit?: number;
 }) {
-  const query = params.targetIds && params.targetIds.length > 0
-    ? params.supabase
-        .from("admin_audit_logs")
-        .select("id,action,target_type,target_id,properties,created_at")
-        .eq("target_type", params.targetType)
-        .in("action", params.actions)
-        .in("target_id", params.targetIds)
-        .order("created_at", { ascending: false })
-        .limit(params.limit ?? 20)
-    : params.supabase
-        .from("admin_audit_logs")
-        .select("id,action,target_type,target_id,properties,created_at")
-        .eq("target_type", params.targetType)
-        .in("action", params.actions)
-        .order("created_at", { ascending: false })
-        .limit(params.limit ?? 20);
+  let query = params.supabase
+    .from("admin_audit_logs")
+    .select("id,action,target_type,target_id,properties,created_at")
+    .eq("target_type", params.targetType)
+    .in("action", params.actions);
+
+  if (params.targetIds && params.targetIds.length > 0) {
+    query = query.in("target_id", params.targetIds);
+  }
+
+  if (params.propertiesContains) {
+    query = query.contains("properties", params.propertiesContains);
+  }
+
+  query = query.order("created_at", { ascending: false }).limit(params.limit ?? 20);
 
   const { data, error } = await query;
   return {
     rows: (data ?? []) as PartnerAuditLogRow[],
     error: error ? error.message : null,
   };
+}
+
+async function queryPartnerAccountCompanyAuditLogs(params: {
+  supabase: ReturnType<typeof getSupabaseAdminClient>;
+  companyIds: string[];
+  accountId?: string | null;
+  limit?: number;
+}) {
+  const scopedCompanyIds = normalizeIds(params.companyIds);
+  if (scopedCompanyIds.length === 0) {
+    return { rows: [] as PartnerAuditLogRow[], error: null as string | null };
+  }
+
+  const results = await Promise.all(
+    scopedCompanyIds.map((companyId) =>
+      queryAuditLogs({
+        supabase: params.supabase,
+        targetType: "partner_account_company",
+        actions: ["partner_account_company_update"],
+        propertiesContains: params.accountId
+          ? { accountId: params.accountId, companyId }
+          : { companyId },
+        limit: params.limit ?? 20,
+      }),
+    ),
+  );
+
+  const error = results.find((result) => result.error)?.error ?? null;
+  const dedupedRows = new Map<string, PartnerAuditLogRow>();
+  for (const result of results) {
+    for (const row of result.rows) {
+      dedupedRows.set(row.id, row);
+    }
+  }
+
+  const rows = [...dedupedRows.values()]
+    .sort((left, right) => {
+      if (left.created_at === right.created_at) {
+        return right.id.localeCompare(left.id);
+      }
+      return right.created_at.localeCompare(left.created_at);
+    })
+    .slice(0, params.limit ?? 20);
+
+  return { rows, error };
 }
 
 async function loadSupabasePartnerNotificationCenter(
@@ -339,10 +384,10 @@ async function loadSupabasePartnerNotificationCenter(
             limit: 10,
           })
         : Promise.resolve({ rows: [] as PartnerAuditLogRow[], error: null as string | null }),
-      queryAuditLogs({
+      queryPartnerAccountCompanyAuditLogs({
         supabase,
-        targetType: "partner_account_company",
-        actions: ["partner_account_company_update"],
+        companyIds,
+        accountId,
         limit: 20,
       }),
     ]);

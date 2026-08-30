@@ -39,6 +39,8 @@ test("이메일 소유 확인은 코드 hash만 저장하고 원자 RPC 성공 �
   assert.doesNotMatch(verifyRoute, /\.rpc\(/);
   assert.match(verifyRoute, /setUserSession/);
   assert.match(verifyRoute, /clearMemberEmailRecoverySession/);
+  assert.match(verifyRoute, /이메일 복구를 완료하지 못했습니다/);
+  assert.doesNotMatch(verifyRoute, /이메일 로그인 전환을 완료하지 못했습니다/);
   assert.match(migration, /challenge_row\.attempt_count\s*>=\s*5/);
   assert.match(migration, /challenge_row\.delivery_status <> 'sent'/);
   assert.match(migration, /purpose = 'email_recovery'[\s\S]+order by created_at desc, id desc/);
