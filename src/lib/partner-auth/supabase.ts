@@ -8,6 +8,7 @@ export {
   commitSupabasePartnerPortalPasswordReset,
   prepareSupabasePartnerPortalPasswordReset,
   requestSupabasePartnerPortalPasswordReset,
+  rollbackSupabasePartnerPortalPasswordReset,
 } from "./reset.ts";
 export {
   completeSupabasePartnerPortalInitialSetup,

@@ -1,7 +1,10 @@
 import { cookies } from "next/headers";
 import { cache } from "react";
 import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "./hmac.js";
-import { revalidatePartnerSessionAccess } from "./partner-session-access.ts";
+import {
+  loadCurrentPartnerSessionAccess,
+  revalidatePartnerSessionAccess,
+} from "./partner-session-access.ts";
 
 const COOKIE_NAME = "partner_session";
 const SESSION_TTL_DAYS = 7;
@@ -12,6 +15,7 @@ export type PartnerSession = {
   loginId: string;
   displayName: string;
   companyIds: string[];
+  authSessionVersion: number;
   mustChangePassword: boolean;
   issuedAt: number;
   expiresAt: number;
@@ -53,6 +57,10 @@ function verifyToken(token: string) {
       typeof parsed.loginId !== "string" ||
       typeof parsed.displayName !== "string" ||
       !Array.isArray(parsed.companyIds) ||
+      (parsed.authSessionVersion !== undefined &&
+        (typeof parsed.authSessionVersion !== "number" ||
+          !Number.isInteger(parsed.authSessionVersion) ||
+          parsed.authSessionVersion < 1)) ||
       (parsed.mustChangePassword !== undefined &&
         typeof parsed.mustChangePassword !== "boolean") ||
       typeof parsed.issuedAt !== "number" ||
@@ -74,6 +82,7 @@ function verifyToken(token: string) {
       loginId: parsed.loginId,
       displayName: parsed.displayName,
       companyIds: parsed.companyIds,
+      authSessionVersion: parsed.authSessionVersion ?? 1,
       mustChangePassword: Boolean(parsed.mustChangePassword),
       issuedAt: parsed.issuedAt,
       expiresAt: parsed.expiresAt,
@@ -99,13 +108,24 @@ export async function setPartnerSession(session: {
   companyIds: string[];
   mustChangePassword?: boolean;
 }) {
+  const access = await loadCurrentPartnerSessionAccess(session.accountId);
+  if (
+    !access?.isActive ||
+    access.companyIds.length === 0 ||
+    !Number.isInteger(access.authSessionVersion) ||
+    access.authSessionVersion < 1
+  ) {
+    throw new Error("활성 파트너 세션을 발급할 수 없습니다.");
+  }
+
   const now = Date.now();
   const payload = JSON.stringify({
     accountId: session.accountId,
-    loginId: session.loginId,
-    displayName: session.displayName,
-    companyIds: session.companyIds,
-    mustChangePassword: Boolean(session.mustChangePassword),
+    loginId: access.loginId,
+    displayName: access.displayName,
+    companyIds: access.companyIds,
+    authSessionVersion: access.authSessionVersion,
+    mustChangePassword: access.mustChangePassword,
     issuedAt: now,
     expiresAt: now + SESSION_TTL_MS,
   });

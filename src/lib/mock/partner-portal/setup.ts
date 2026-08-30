@@ -95,6 +95,7 @@ export async function completeMockPartnerPortalInitialSetup(
 
   setup.account.passwordHash = passwordRecord.hash;
   setup.account.passwordSalt = passwordRecord.salt;
+  setup.account.authSessionVersion += 1;
   setup.account.mustChangePassword = false;
   setup.account.emailVerifiedAt = completedAt;
   setup.account.initialSetupCompletedAt = completedAt;

@@ -70,6 +70,7 @@ function createStorySession({
     loginId,
     displayName,
     companyIds: [...companyIds],
+    authSessionVersion: 1,
     mustChangePassword: false,
     issuedAt: STORY_NOW,
     expiresAt: STORY_NOW + 7 * 24 * 60 * 60 * 1000,

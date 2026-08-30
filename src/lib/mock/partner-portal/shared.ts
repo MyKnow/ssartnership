@@ -12,6 +12,7 @@ export type MockPortalAccountRecord = {
   displayName: string;
   email: string;
   linkedCompanyIds?: string[];
+  authSessionVersion: number;
   mustChangePassword: boolean;
   emailVerifiedAt: string | null;
   initialSetupCompletedAt: string | null;
@@ -61,6 +62,7 @@ function createMockPortalAccountRecord({
     loginId,
     displayName,
     email,
+    authSessionVersion: 1,
     mustChangePassword: true,
     emailVerifiedAt: null,
     initialSetupCompletedAt: null,

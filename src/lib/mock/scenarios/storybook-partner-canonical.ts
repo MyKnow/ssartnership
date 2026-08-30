@@ -22,6 +22,7 @@ export const partnerCanonicalStorySession = {
   loginId: "partner@cafessafy.example",
   displayName: "김도연",
   companyIds: [PARTNER_CANONICAL_STORY_COMPANY_ID],
+  authSessionVersion: 1,
   mustChangePassword: false,
   issuedAt: 1_783_210_200,
   expiresAt: 1_783_296_600,

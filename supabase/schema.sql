@@ -475,6 +475,7 @@ create table if not exists partner_accounts (
   initial_setup_token_hash text,
   initial_setup_link_sent_at timestamp with time zone,
   initial_setup_expires_at timestamp with time zone,
+  auth_session_version integer not null default 1,
   must_change_password boolean not null default true,
   is_active boolean not null default true,
   last_login_at timestamp with time zone,

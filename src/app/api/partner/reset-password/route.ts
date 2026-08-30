@@ -17,11 +17,6 @@ import {
 import { normalizePartnerLoginId } from "@/lib/partner-utils";
 import { isValidEmail } from "@/lib/validation";
 import { isPartnerPortalMock } from "@/lib/partner-portal";
-import { sendPartnerPortalTemporaryPasswordEmail } from "@/lib/partner-email";
-import {
-  commitSupabasePartnerPortalPasswordReset,
-  prepareSupabasePartnerPortalPasswordReset,
-} from "@/lib/partner-auth/supabase";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
@@ -101,19 +96,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_email" }, { status: 400 });
     }
 
-    const result = isPartnerPortalMock
-      ? await requestPartnerPortalPasswordReset(normalizedEmail)
-      : await (async () => {
-          const preparedReset =
-            await prepareSupabasePartnerPortalPasswordReset(normalizedEmail);
-          await sendPartnerPortalTemporaryPasswordEmail({
-            to: preparedReset.emailSentTo,
-            displayName: preparedReset.account.displayName,
-            loginId: preparedReset.account.loginId,
-            temporaryPassword: preparedReset.temporaryPassword,
-          });
-          return commitSupabasePartnerPortalPasswordReset(preparedReset);
-        })();
+    const result = await requestPartnerPortalPasswordReset(normalizedEmail);
 
     await recordPartnerAuthAttempt("reset-password", throttleContext, true);
     await logAuthSecurity({

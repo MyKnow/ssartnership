@@ -34,10 +34,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "이메일 주소를 확인해 주세요." }, { status: 400 });
   }
   try {
-    await issueManualMemberPasswordReset(email).catch(() => false);
-    await recordMemberAuthAttempt("reset-password", throttle, true);
+    const resetResult = await issueManualMemberPasswordReset(email);
+    await recordMemberAuthAttempt("reset-password", throttle, resetResult.ok);
+    if (!resetResult.ok) {
+      await delayMemberAuthAttempt("reset-password");
+    }
     return NextResponse.json({ ok: true, message: GENERIC_MESSAGE });
   } catch {
+    await recordMemberAuthAttempt("reset-password", throttle, false).catch(() => undefined);
     await delayMemberAuthAttempt("reset-password", true);
     return NextResponse.json({ ok: false, message: "비밀번호 재설정 요청을 처리하지 못했습니다." }, { status: 503 });
   }
