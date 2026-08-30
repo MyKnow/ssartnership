@@ -6,6 +6,7 @@ import type {
   PartnerPortalSetupResult,
 } from "../../partner-portal.ts";
 import { PartnerPortalSetupError } from "../../partner-portal-errors.ts";
+import { getPartnerSetupLinkState } from "../../partner-auth/setup-link.ts";
 import type { MockPortalSetupRecord } from "./shared.ts";
 import { cloneSetupSummary } from "./shared.ts";
 import {
@@ -52,10 +53,19 @@ export async function listMockPartnerPortalSetups() {
 
 export async function getMockPartnerPortalSetupContext(token: string) {
   const setup = findMockPartnerPortalSetup(token);
-  if (!setup) {
+  if (!setup || getMockPartnerSetupLinkState(setup) !== "usable") {
     return null;
   }
   return toMockPartnerPortalSetupContext(setup);
+}
+
+function getMockPartnerSetupLinkState(setup: MockPortalSetupRecord) {
+  return getPartnerSetupLinkState({
+    isActive: setup.account.isActive,
+    hasToken: setup.account.setupToken === setup.token,
+    expiresAt: setup.account.setupExpiresAt,
+    completedAt: setup.account.initialSetupCompletedAt,
+  });
 }
 
 export async function completeMockPartnerPortalInitialSetup(
@@ -69,7 +79,19 @@ export async function completeMockPartnerPortalInitialSetup(
     );
   }
 
-  if (setup.account.initialSetupCompletedAt) {
+  const linkState = getMockPartnerSetupLinkState(setup);
+  if (
+    linkState === "inactive" ||
+    linkState === "missing_token" ||
+    linkState === "expired"
+  ) {
+    throw new PartnerPortalSetupError(
+      "not_found",
+      "초기 설정 링크를 찾을 수 없습니다.",
+    );
+  }
+
+  if (linkState === "completed") {
     throw new PartnerPortalSetupError(
       "already_completed",
       "이미 초기 설정이 완료되었습니다.",

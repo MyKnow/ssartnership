@@ -19,7 +19,8 @@ export type MockPortalAccountRecord = {
   isActive: boolean;
   passwordHash: string;
   passwordSalt: string;
-  setupToken: string;
+  setupToken: string | null;
+  setupExpiresAt: string | null;
   lastLoginAt: string | null;
 };
 
@@ -70,6 +71,7 @@ function createMockPortalAccountRecord({
     passwordHash: "mock-initial-password-hash",
     passwordSalt: "mock-initial-password-salt",
     setupToken,
+    setupExpiresAt: "2099-01-01T00:00:00.000Z",
     lastLoginAt: null,
   };
 }

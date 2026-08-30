@@ -12,6 +12,8 @@ type PartnerPortalModule = typeof import("../src/lib/partner-portal");
 type PartnerAuthModule = typeof import("../src/lib/partner-auth");
 type PartnerAuthRepositoryModule =
   typeof import("../src/lib/partner-auth/repository");
+type MockPartnerPortalStoreModule =
+  typeof import("../src/lib/mock/partner-portal/store");
 
 process.env.NEXT_PUBLIC_DATA_SOURCE =
   process.env.NEXT_PUBLIC_DATA_SOURCE ?? "mock";
@@ -39,6 +41,9 @@ const partnerAuthModulePromise = import(
 const partnerAuthRepositoryModulePromise = import(
   new URL("../src/lib/partner-auth/repository.ts", import.meta.url).href
 ) as Promise<PartnerAuthRepositoryModule>;
+const mockPartnerPortalStoreModulePromise = import(
+  new URL("../src/lib/mock/partner-portal/store.ts", import.meta.url).href
+) as Promise<MockPartnerPortalStoreModule>;
 
 function createTestAuditContext(
   actorType: "admin" | "partner",
@@ -109,10 +114,99 @@ test("completes initial setup with a password only", async () => {
   assert.equal(result.companyId, "mock-partner-company-cafe-ssafy");
 
   const updatedContext = await getMockPartnerPortalSetupContext(token);
-  assert.equal(updatedContext?.isSetupComplete, true);
-  assert.equal(updatedContext?.account.mustChangePassword, false);
-  assert.ok(updatedContext?.account.emailVerifiedAt);
-  assert.ok(updatedContext?.account.initialSetupCompletedAt);
+  assert.equal(updatedContext, null);
+});
+
+test("rejects inactive setup links from context and completion", async () => {
+  const {
+    completeMockPartnerPortalInitialSetup,
+    getMockPartnerPortalSetupContext,
+    mockPartnerPortalSetupTokens,
+  } = await mockPartnerPortalModulePromise;
+  const { getMockPartnerPortalStore } =
+    await mockPartnerPortalStoreModulePromise;
+  const { PartnerPortalSetupError } = await partnerPortalModulePromise;
+  const token = mockPartnerPortalSetupTokens[0].token;
+  const setup = getMockPartnerPortalStore().setups[0];
+  assert.ok(setup);
+  setup.account.isActive = false;
+
+  assert.equal(await getMockPartnerPortalSetupContext(token), null);
+  await assert.rejects(
+    completeMockPartnerPortalInitialSetup({
+      token,
+      password: "Partner!123",
+      confirmPassword: "Partner!123",
+    }),
+    (error: unknown) =>
+      error instanceof PartnerPortalSetupError && error.code === "not_found",
+  );
+});
+
+test("rejects expired setup links from context and completion", async () => {
+  const {
+    completeMockPartnerPortalInitialSetup,
+    getMockPartnerPortalSetupContext,
+    mockPartnerPortalSetupTokens,
+  } = await mockPartnerPortalModulePromise;
+  const { getMockPartnerPortalStore } =
+    await mockPartnerPortalStoreModulePromise;
+  const { PartnerPortalSetupError } = await partnerPortalModulePromise;
+  const token = mockPartnerPortalSetupTokens[0].token;
+  const setup = getMockPartnerPortalStore().setups[0];
+  assert.ok(setup);
+  setup.account.setupExpiresAt = "2000-01-01T00:00:00.000Z";
+
+  assert.equal(await getMockPartnerPortalSetupContext(token), null);
+  await assert.rejects(
+    completeMockPartnerPortalInitialSetup({
+      token,
+      password: "Partner!123",
+      confirmPassword: "Partner!123",
+    }),
+    (error: unknown) =>
+      error instanceof PartnerPortalSetupError && error.code === "not_found",
+  );
+});
+
+test("rejects setup links with missing tokens and completed setup links", async () => {
+  const {
+    completeMockPartnerPortalInitialSetup,
+    getMockPartnerPortalSetupContext,
+    mockPartnerPortalSetupTokens,
+  } = await mockPartnerPortalModulePromise;
+  const { getMockPartnerPortalStore } =
+    await mockPartnerPortalStoreModulePromise;
+  const { PartnerPortalSetupError } = await partnerPortalModulePromise;
+  const store = getMockPartnerPortalStore();
+  const pendingToken = mockPartnerPortalSetupTokens[0].token;
+  const pendingSetup = store.setups[0];
+  assert.ok(pendingSetup);
+  pendingSetup.account.setupToken = null;
+
+  assert.equal(await getMockPartnerPortalSetupContext(pendingToken), null);
+  await assert.rejects(
+    completeMockPartnerPortalInitialSetup({
+      token: pendingToken,
+      password: "Partner!123",
+      confirmPassword: "Partner!123",
+    }),
+    (error: unknown) =>
+      error instanceof PartnerPortalSetupError && error.code === "not_found",
+  );
+
+  const completedToken = mockPartnerPortalSetupTokens[1].token;
+  assert.equal(await getMockPartnerPortalSetupContext(completedToken), null);
+  await assert.rejects(
+    completeMockPartnerPortalInitialSetup({
+      token: completedToken,
+      password: "Partner!123",
+      confirmPassword: "Partner!123",
+    }),
+    (error: unknown) =>
+      error instanceof PartnerPortalSetupError &&
+      error.code === "already_completed",
+  );
 });
 
 test("rejects password mismatch", async () => {

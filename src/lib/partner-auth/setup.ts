@@ -19,6 +19,7 @@ import {
   resolvePartnerSetupSchemaCapabilitiesFromAccount,
   resolvePartnerSetupSchemaCapabilitiesFromError,
 } from "./setup-schema.ts";
+import { getPartnerSetupLinkState } from "./setup-link.ts";
 
 const INITIAL_SETUP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -161,14 +162,15 @@ export async function getSupabasePartnerPortalSetupContext(
 ): Promise<PartnerPortalSetupContext | null> {
   const account = await findSupabasePartnerPortalSetupAccount(token);
   const expiresAt = account ? resolveSetupExpiry(account) : null;
-  if (
-    !account ||
-    !account.is_active ||
-    !hasSetupToken(account) ||
-    !expiresAt ||
-    new Date(expiresAt).getTime() <= Date.now() ||
-    account.initial_setup_completed_at
-  ) {
+  const linkState = account
+    ? getPartnerSetupLinkState({
+        isActive: account.is_active === true,
+        hasToken: hasSetupToken(account),
+        expiresAt,
+        completedAt: account.initial_setup_completed_at ?? null,
+      })
+    : null;
+  if (!account || linkState !== "usable") {
     return null;
   }
 
@@ -191,20 +193,27 @@ export async function completeSupabasePartnerPortalInitialSetup(
 ): Promise<PartnerPortalSetupResult> {
   const account = await findSupabasePartnerPortalSetupAccount(input.token);
   const expiresAt = account ? resolveSetupExpiry(account) : null;
+  const linkState = account
+    ? getPartnerSetupLinkState({
+        isActive: account.is_active === true,
+        hasToken: hasSetupToken(account),
+        expiresAt,
+        completedAt: account.initial_setup_completed_at ?? null,
+      })
+    : null;
 
-  if (!account || !hasSetupToken(account)) {
+  if (
+    !account ||
+    linkState === "inactive" ||
+    linkState === "missing_token" ||
+    linkState === "expired"
+  ) {
     throw new PartnerPortalSetupError(
       "not_found",
       "초기 설정 링크를 찾을 수 없습니다.",
     );
   }
-  if (!expiresAt || new Date(expiresAt).getTime() <= Date.now()) {
-    throw new PartnerPortalSetupError(
-      "not_found",
-      "초기 설정 링크를 찾을 수 없습니다.",
-    );
-  }
-  if (account.initial_setup_completed_at) {
+  if (linkState === "completed") {
     throw new PartnerPortalSetupError(
       "already_completed",
       "이미 초기 설정이 완료되었습니다.",
