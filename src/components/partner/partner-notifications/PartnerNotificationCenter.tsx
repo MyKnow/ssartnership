@@ -18,7 +18,7 @@ import {
   type PartnerNotificationCenterData,
   type PartnerNotificationEntry,
   type PartnerNotificationStatus,
-} from "@/lib/partner-notifications";
+} from "@/lib/partner-notification-contract";
 import {
   derivePartnerNotificationUiModel,
   filterPartnerNotificationUiModels,

@@ -2,8 +2,8 @@ import PartnerNotificationCenter from "@/components/partner/partner-notification
 import PartnerNotificationSettingsPanel from "@/components/partner/partner-notifications/PartnerNotificationSettingsPanel";
 import Container from "@/components/ui/Container";
 import ShellHeader from "@/components/ui/ShellHeader";
+import type { PartnerNotificationCenterData } from "@/lib/partner-notification-contract";
 import type { PartnerNotificationPreferenceState } from "@/lib/partner-notification-routing";
-import type { PartnerNotificationCenterData } from "@/lib/partner-notifications";
 
 export type PartnerNotificationsScreenProps = {
   data: PartnerNotificationCenterData;
