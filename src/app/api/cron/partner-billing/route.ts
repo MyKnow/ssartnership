@@ -4,6 +4,8 @@ import { runPartnerBillingOverdueDowngrades } from "@/lib/partner-plan-service";
 
 export const runtime = "nodejs";
 
+const PARTNER_BILLING_CRON_ERROR_MESSAGE = "Partner billing cron failed";
+
 function isAuthorizedByCronSecret(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret) {
@@ -29,10 +31,12 @@ export async function GET(request: NextRequest) {
       ...result,
     });
   } catch (error) {
+    console.error("[partner-billing-cron] failed", error);
+
     return NextResponse.json(
       {
         ok: false,
-        message: error instanceof Error ? error.message : "Partner billing cron failed",
+        message: PARTNER_BILLING_CRON_ERROR_MESSAGE,
       },
       { status: 500 },
     );
