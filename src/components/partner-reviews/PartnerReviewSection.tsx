@@ -37,8 +37,16 @@ type PartnerReviewListResponse = {
   hasMore: boolean;
 };
 
-async function fetchPartnerReviewList(url: string, fallbackMessage: string) {
-  const response = await fetch(url, { cache: "no-store" });
+function isAbortedRequest(error: unknown) {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+async function fetchPartnerReviewList(
+  url: string,
+  fallbackMessage: string,
+  options?: { signal?: AbortSignal },
+) {
+  const response = await fetch(url, { cache: "no-store", signal: options?.signal });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(
@@ -136,13 +144,28 @@ export default function PartnerReviewSection({
     url: string;
     promise: Promise<PartnerReviewListResponse>;
   } | null>(null);
+  const activeListRequestIdRef = useRef(0);
+  const activeListRequestAbortControllerRef = useRef<AbortController | null>(null);
 
   const includeHiddenReviews = accessMode === "partner";
   const reviewWriteLoginHref = `/auth/login?returnTo=${encodeURIComponent(`/partners/${encodeURIComponent(partnerId)}`)}`;
   const listRefreshing = isPartnerReviewListRefreshing(pendingMode);
-  const listBusy = pendingMode !== "idle" && pendingMode !== "react";
+  const listBusy = pendingMode !== "idle";
   const loadingMore = pendingMode === "loadMore";
   const pendingMessage = getPartnerReviewPendingMessage(pendingMode);
+
+  function abortActiveListRequest() {
+    activeListRequestAbortControllerRef.current?.abort();
+    activeListRequestAbortControllerRef.current = null;
+  }
+
+  useEffect(
+    () => () => {
+      activeListRequestIdRef.current += 1;
+      abortActiveListRequest();
+    },
+    [],
+  );
 
   function showSubmittedReview(result: {
     review: PartnerReview;
@@ -234,6 +257,10 @@ export default function PartnerReviewSection({
     nextOnlyWithImages = onlyWithImages,
     mode: PartnerReviewPendingMode = "refresh",
   ) {
+    abortActiveListRequest();
+    const controller = new AbortController();
+    activeListRequestAbortControllerRef.current = controller;
+    const requestId = activeListRequestIdRef.current += 1;
     setPendingMode(mode);
     setErrorMessage(null);
     prefetchedNextPageRef.current = null;
@@ -241,7 +268,11 @@ export default function PartnerReviewSection({
       const data = await fetchPartnerReviewList(
         buildListUrl(nextSort, nextRating, nextOnlyWithImages),
         "리뷰를 불러오지 못했습니다.",
+        { signal: controller.signal },
       );
+      if (requestId !== activeListRequestIdRef.current) {
+        return;
+      }
 
       startTransition(() => {
         setSummary(data.summary);
@@ -250,15 +281,22 @@ export default function PartnerReviewSection({
         setHasMore(data.hasMore);
         setSort(nextSort);
         setRating(nextRating);
+        setOnlyWithImages(nextOnlyWithImages);
       });
     } catch (error) {
+      if (isAbortedRequest(error) || requestId !== activeListRequestIdRef.current) {
+        return;
+      }
       setErrorMessage(
         error instanceof Error && error.message
           ? error.message
           : "리뷰를 불러오지 못했습니다.",
       );
     } finally {
-      setPendingMode("idle");
+      if (requestId === activeListRequestIdRef.current) {
+        activeListRequestAbortControllerRef.current = null;
+        setPendingMode("idle");
+      }
     }
   }
 
@@ -266,6 +304,7 @@ export default function PartnerReviewSection({
     if (listBusy || !hasMore) {
       return;
     }
+    const requestId = activeListRequestIdRef.current += 1;
     setPendingMode("loadMore");
     setErrorMessage(null);
     try {
@@ -279,24 +318,37 @@ export default function PartnerReviewSection({
         prefetched ??
         fetchPartnerReviewList(url, "리뷰를 더 불러오지 못했습니다.")
       );
+      if (requestId !== activeListRequestIdRef.current) {
+        return;
+      }
 
       setSummary(data.summary);
       setReviews((current) => appendPartnerReviewList(current, data.items));
       setNextOffset(data.nextOffset);
       setHasMore(data.hasMore);
     } catch (error) {
+      if (isAbortedRequest(error) || requestId !== activeListRequestIdRef.current) {
+        return;
+      }
       setErrorMessage(
         error instanceof Error && error.message
           ? error.message
           : "리뷰를 더 불러오지 못했습니다.",
       );
     } finally {
-      setPendingMode("idle");
+      if (requestId === activeListRequestIdRef.current) {
+        setPendingMode("idle");
+      }
     }
   }
 
   async function deleteReview(reviewId: string) {
+    if (listBusy) {
+      return;
+    }
+
     setDeletingReviewId(reviewId);
+    setPendingMode("delete");
     setErrorMessage(null);
     try {
       const response = await fetch(
@@ -309,16 +361,22 @@ export default function PartnerReviewSection({
         return;
       }
       await refreshList(sort, rating, onlyWithImages, "delete");
+    } catch {
+      setErrorMessage(
+        "리뷰 삭제 중 네트워크 오류가 발생했습니다. 다시 시도해 주세요.",
+      );
     } finally {
       setDeletingReviewId(null);
+      setPendingMode("idle");
     }
   }
 
   async function moderateReview(reviewId: string, action: "hide" | "restore") {
-    if (accessMode !== "partner") {
+    if (accessMode !== "partner" || listBusy) {
       return;
     }
     setModeratingReviewId(reviewId);
+    setPendingMode("moderate");
     setErrorMessage(null);
     try {
       const response = await fetch(
@@ -335,13 +393,21 @@ export default function PartnerReviewSection({
         return;
       }
       await refreshList(sort, rating, onlyWithImages, "moderate");
+    } catch {
+      setErrorMessage(
+        "리뷰 상태 변경 중 네트워크 오류가 발생했습니다. 다시 시도해 주세요.",
+      );
     } finally {
       setModeratingReviewId(null);
+      setPendingMode("idle");
     }
   }
 
   async function reactToReview(reviewId: string, reaction: PartnerReviewReaction | null) {
-    if (reactingReviewId === reviewId) {
+    if (reactingReviewId !== null) {
+      return;
+    }
+    if (pendingMode !== "idle") {
       return;
     }
 
@@ -353,6 +419,13 @@ export default function PartnerReviewSection({
     setReactingReviewId(reviewId);
     setPendingMode("react");
     setErrorMessage(null);
+    const restorePreviousReview = () => {
+      startTransition(() => {
+        setReviews((current) =>
+          current.map((item) => (item.id === reviewId ? previousReview : item)),
+        );
+      });
+    };
     startTransition(() => {
       setReviews((current) =>
         current.map((item) =>
@@ -372,11 +445,7 @@ export default function PartnerReviewSection({
       );
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        startTransition(() => {
-          setReviews((current) =>
-            current.map((item) => (item.id === reviewId ? previousReview : item)),
-          );
-        });
+        restorePreviousReview();
         setErrorMessage(data.message ?? "리뷰 반응에 실패했습니다.");
         return;
       }
@@ -385,6 +454,11 @@ export default function PartnerReviewSection({
           current.map((item) => (item.id === reviewId ? data.review : item)),
         );
       });
+    } catch {
+      restorePreviousReview();
+      setErrorMessage(
+        "리뷰 반응 처리 중 네트워크 오류가 발생했습니다. 다시 시도해 주세요.",
+      );
     } finally {
       setReactingReviewId(null);
       setPendingMode("idle");
@@ -498,7 +572,6 @@ export default function PartnerReviewSection({
                         const nextOnlyWithImages = event.target.checked;
                         setComposerOpen(false);
                         setEditingReviewId(null);
-                        setOnlyWithImages(nextOnlyWithImages);
                         void refreshList(sort, rating, nextOnlyWithImages);
                       }}
                       className="h-4 w-4 rounded border-border text-primary accent-primary"
@@ -570,7 +643,7 @@ export default function PartnerReviewSection({
                         review={review}
                         deleting={deletingReviewId === review.id}
                         moderating={moderatingReviewId === review.id}
-                        reactionPending={reactingReviewId === review.id}
+                        reactionPending={reactingReviewId !== null}
                         showOwnerActions={showWriteControls}
                         showHiddenContent={includeHiddenReviews}
                         showModerationActions={accessMode === "partner"}

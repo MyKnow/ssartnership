@@ -52,6 +52,24 @@ test("파트너 리뷰는 단일 컨테이너 안에서 리뷰 항목만 Divider
     section,
     /<Button variant="secondary" href=\{reviewWriteLoginHref\}>\s*로그인 후 리뷰 작성\s*<\/Button>/,
   );
+  assert.match(section, /const activeListRequestIdRef = useRef\(0\)/);
+  assert.match(section, /const activeListRequestAbortControllerRef = useRef<AbortController \| null>\(null\)/);
+  assert.match(section, /activeListRequestAbortControllerRef\.current\?\.abort\(\)/);
+  assert.match(section, /const requestId = activeListRequestIdRef\.current \+= 1/);
+  assert.match(section, /signal: controller\.signal/);
+  assert.match(section, /if \(requestId !== activeListRequestIdRef\.current\) \{\s*return;\s*\}/);
+  assert.match(section, /const listBusy = pendingMode !== "idle";/);
+  assert.match(section, /if \(reactingReviewId !== null\) \{\s*return;\s*\}/);
+  assert.match(section, /reactionPending=\{reactingReviewId !== null\}/);
+  assert.match(section, /리뷰 삭제 중 네트워크 오류/);
+  assert.match(section, /리뷰 상태 변경 중 네트워크 오류/);
+  assert.match(section, /리뷰 반응 처리 중 네트워크 오류/);
+
+  const imageFilterHandler = section.match(
+    /type="checkbox"[\s\S]*?onChange=\{\(event\) => \{([\s\S]*?)\n\s*\}\}/,
+  )?.[1];
+  assert.ok(imageFilterHandler);
+  assert.doesNotMatch(imageFilterHandler, /setOnlyWithImages\(/);
   assert.match(section, /<PartnerReviewCard[\s\S]*embedded/);
   assert.match(section, /className="py-5 first:pt-0 last:pb-0"/);
   assert.doesNotMatch(section, /index === reviews\.length - 1/);
