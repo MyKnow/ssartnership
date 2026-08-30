@@ -180,3 +180,22 @@ test("partner logout is a same-origin POST exposed only through live POST forms"
   assert.match(logoutButton, /role="status"/);
   assert.match(logoutButton, /aria-live="polite"/);
 });
+
+test("관리자 엑셀 업로드 API는 same-origin multipart 요청만 허용한다", () => {
+  const route = read("../src/app/api/admin/ad-coupons/[couponId]/codes/route.ts");
+  const guardIndex = route.indexOf("if (!isTrustedSameOriginRequest(request, {");
+  const authIndex = route.indexOf('requireAdminPermission("home_ads", "update"');
+  const formDataIndex = route.indexOf("await request.formData()");
+
+  assert.match(route, /isTrustedSameOriginRequest/);
+  assert.match(route, /allowedContentTypes: \["multipart\/form-data"\]/);
+  assert.ok(guardIndex >= 0, "관리자 쿠폰 코드 업로드는 same-origin 검증이 필요합니다.");
+  assert.ok(
+    guardIndex < authIndex,
+    "same-origin 검증은 관리자 권한 확인 전에 실행되어야 합니다.",
+  );
+  assert.ok(
+    guardIndex < formDataIndex,
+    "same-origin 검증은 multipart body 파싱 전에 실행되어야 합니다.",
+  );
+});
