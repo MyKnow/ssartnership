@@ -7,6 +7,7 @@ import {
   resolveImageUploadActorForRoute,
 } from "@/lib/image-upload/auth.server";
 import { parseImageUploadCompleteRequest } from "@/lib/image-upload/http";
+import { ImageUploadError } from "@/lib/image-upload/repository";
 import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
 import {
   isImageUploadBlocked,
@@ -96,7 +97,8 @@ export async function POST(request: NextRequest) {
       actor: actorResult.actor.kind,
       error: error instanceof Error ? error.message : "unknown",
     });
-    const isProcessing = error instanceof Error && error.message.includes("처리 중");
+    const isProcessing = error instanceof ImageUploadError
+      && error.code === "upload_processing";
     return NextResponse.json(
       {
         ok: false,

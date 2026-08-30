@@ -303,7 +303,10 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
           } satisfies CompletedImageUpload;
         }
         if (session.status === "processing") {
-          throw new Error("이미지를 처리 중입니다. 잠시 후 다시 시도해 주세요.");
+          throw new ImageUploadError(
+            "upload_processing",
+            "이미지를 처리 중입니다. 잠시 후 다시 시도해 주세요.",
+          );
         }
         if (session.status !== "signed") {
           throw new Error("이미지 업로드 상태를 확인해 주세요.");
@@ -355,7 +358,10 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
             } satisfies CompletedImageUpload;
           }
           if (latest.status === "processing") {
-            throw new Error("이미지를 처리 중입니다. 잠시 후 다시 시도해 주세요.");
+            throw new ImageUploadError(
+              "upload_processing",
+              "이미지를 처리 중입니다. 잠시 후 다시 시도해 주세요.",
+            );
           }
           throw new Error("이미지 업로드 상태를 확인해 주세요.");
         }
