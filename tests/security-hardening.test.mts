@@ -273,44 +273,67 @@ test("product event ingress throttle limits requests before their body is parsed
 
 test("client IP uses Vercel's canonical forwarded header before proxy fallbacks", async () => {
   const { getClientIp, getTrustedPlatformClientIp } = await clientIpModulePromise;
+  const originalVercel = process.env.VERCEL;
 
-  assert.equal(
-    getClientIp(
-      new Headers({
-        "x-vercel-forwarded-for": "203.0.113.12, 10.0.0.2",
-        "x-forwarded-for": "198.51.100.20",
-        "x-real-ip": "198.51.100.21",
-      }),
-    ),
-    "203.0.113.12",
-  );
-  assert.equal(
-    getClientIp(
-      new Headers({
-        "x-forwarded-for": "198.51.100.22",
-        "x-real-ip": "198.51.100.23",
-      }),
-    ),
-    "198.51.100.23",
-  );
-  assert.equal(
-    getTrustedPlatformClientIp(
-      new Headers({
-        "x-vercel-forwarded-for": "203.0.113.12, 10.0.0.2",
-        "x-forwarded-for": "198.51.100.20",
-      }),
-    ),
-    "203.0.113.12",
-  );
-  assert.equal(
-    getTrustedPlatformClientIp(
-      new Headers({
-        "x-forwarded-for": "203.0.113.12",
-        "x-real-ip": "203.0.113.13",
-      }),
-    ),
-    null,
-  );
+  try {
+    process.env.VERCEL = "1";
+
+    assert.equal(
+      getClientIp(
+        new Headers({
+          "x-vercel-forwarded-for": "203.0.113.12, 10.0.0.2",
+          "x-forwarded-for": "198.51.100.20",
+          "x-real-ip": "198.51.100.21",
+        }),
+      ),
+      "203.0.113.12",
+    );
+    assert.equal(
+      getClientIp(
+        new Headers({
+          "x-forwarded-for": "198.51.100.22",
+          "x-real-ip": "198.51.100.23",
+        }),
+      ),
+      null,
+    );
+    assert.equal(
+      getTrustedPlatformClientIp(
+        new Headers({
+          "x-vercel-forwarded-for": "203.0.113.12, 10.0.0.2",
+          "x-forwarded-for": "198.51.100.20",
+        }),
+      ),
+      "203.0.113.12",
+    );
+    assert.equal(
+      getTrustedPlatformClientIp(
+        new Headers({
+          "x-forwarded-for": "203.0.113.12",
+          "x-real-ip": "203.0.113.13",
+        }),
+      ),
+      null,
+    );
+
+    process.env.VERCEL = "";
+
+    assert.equal(
+      getClientIp(
+        new Headers({
+          "x-forwarded-for": "198.51.100.22",
+          "x-real-ip": "198.51.100.23",
+        }),
+      ),
+      "198.51.100.23",
+    );
+  } finally {
+    if (originalVercel === undefined) {
+      delete process.env.VERCEL;
+    } else {
+      process.env.VERCEL = originalVercel;
+    }
+  }
 });
 
 test("admin IP allowlist never trusts caller-controlled proxy fallbacks", async () => {
