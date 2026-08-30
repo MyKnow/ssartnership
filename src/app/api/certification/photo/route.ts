@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { submitMemberProfileImageReplacement } from "@/lib/graduate-verification-service";
+import {
+  GraduateVerificationServiceError,
+  submitMemberProfileImageReplacement,
+} from "@/lib/graduate-verification-service";
 import {
   isGraduateVerificationBlocked,
   recordGraduateVerificationAttempt,
@@ -66,9 +69,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, result });
   } catch (error) {
     await recordGraduateVerificationAttempt({ ...rateLimitContext, success: false });
+    console.error("[certification-photo] replacement failed", {
+      code:
+        error instanceof GraduateVerificationServiceError
+          ? error.code
+          : "unexpected_error",
+    });
+    const message =
+      error instanceof GraduateVerificationServiceError
+        ? error.message
+        : "본인 사진 변경 요청을 저장하지 못했습니다.";
     return NextResponse.json({
       ok: false,
-      message: error instanceof Error ? error.message : "본인 사진 변경 요청을 저장하지 못했습니다.",
+      message,
     }, { status: 400 });
   }
 }
