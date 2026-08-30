@@ -3,9 +3,8 @@ import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { isE2eMockMutationEnabled } from "@/lib/e2e-mutation-mode";
 import { sendMemberEmailVerificationCode } from "@/lib/member-email";
 import {
-  deleteMemberEmailVerificationChallenge,
-  markMemberEmailVerificationChallengeSent,
-  reserveMemberEmailVerificationChallenge,
+  issueMemberEmailChallenge,
+  MemberEmailChallengeIssueError,
 } from "@/lib/member-email-verification-challenge";
 import {
   generateMemberEmailVerificationCode,
@@ -150,15 +149,32 @@ export async function POST(request: Request) {
   const resendAvailableAt = new Date(
     issuedAt + MEMBER_EMAIL_RESEND_COOLDOWN_SECONDS * 1_000,
   ).toISOString();
-  let challengeId: string;
+  let reservation;
   try {
-    const reservation = await reserveMemberEmailVerificationChallenge({
-      memberId: session.userId,
-      emailNormalized: email,
-      codeHash: hashMemberEmailVerificationCode(email, code),
-      expiresAt,
-      resendAvailableAt,
-    });
+    reservation = await issueMemberEmailChallenge(
+      {
+        memberId: session.userId,
+        emailNormalized: email,
+        codeHash: hashMemberEmailVerificationCode(email, code),
+        expiresAt,
+        resendAvailableAt,
+      },
+      {
+        beforeDelivery: async () => {
+          // A successful send intentionally counts toward the resend cap.
+          await recordMemberEmailVerificationAttempt(
+            "send",
+            rateLimitContext,
+            false,
+          );
+        },
+        deliver: async () => {
+          if (!isE2eMockMutationEnabled()) {
+            await sendMemberEmailVerificationCode({ to: email, code });
+          }
+        },
+      },
+    );
     if (!reservation.accepted) {
       await logAuthSecurity({
         ...context,
@@ -183,56 +199,44 @@ export async function POST(request: Request) {
         },
       );
     }
-    challengeId = reservation.challengeId;
-  } catch {
-    return NextResponse.json(
-      {
-        ok: false,
-        message: "인증 요청을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.",
-      },
-      { status: 503 },
-    );
-  }
-
-  // A successful send intentionally counts toward the resend cap.
-  await recordMemberEmailVerificationAttempt("send", rateLimitContext, false);
-  try {
-    if (!isE2eMockMutationEnabled()) {
-      await sendMemberEmailVerificationCode({ to: email, code });
-    }
-    await markMemberEmailVerificationChallengeSent(challengeId);
-    await logAuthSecurity({
-      ...context,
-      eventName: "member_email_verification",
-      status: "success",
-      actorType: "member",
-      actorId: session.userId,
-      properties: { stage: "send" },
-    });
-    return NextResponse.json({
-      ok: true,
-      expiresAt,
-      expiresInSeconds: MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS,
-      resendAvailableAt,
-      resendAvailableInSeconds: MEMBER_EMAIL_RESEND_COOLDOWN_SECONDS,
-      ...(isE2eMockMutationEnabled() ? { testCode: code } : {}),
-    });
-  } catch {
-    await deleteMemberEmailVerificationChallenge(challengeId).catch(() => {});
+  } catch (error) {
+    const deliveryFailed = error instanceof MemberEmailChallengeIssueError;
     await logAuthSecurity({
       ...context,
       eventName: "member_email_verification",
       status: "failure",
       actorType: "member",
       actorId: session.userId,
-      properties: { stage: "send", reason: "delivery_failed" },
+      properties: {
+        stage: "send",
+        reason: deliveryFailed ? "delivery_failed" : "reservation_failed",
+      },
     });
     return NextResponse.json(
       {
         ok: false,
-        message: "인증 코드를 보내지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        message: deliveryFailed
+          ? "인증 코드를 보내지 못했습니다. 잠시 후 다시 시도해 주세요."
+          : "인증 요청을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.",
       },
       { status: 503 },
     );
   }
+
+  await logAuthSecurity({
+    ...context,
+    eventName: "member_email_verification",
+    status: "success",
+    actorType: "member",
+    actorId: session.userId,
+    properties: { stage: "send" },
+  });
+  return NextResponse.json({
+    ok: true,
+    expiresAt,
+    expiresInSeconds: MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS,
+    resendAvailableAt,
+    resendAvailableInSeconds: MEMBER_EMAIL_RESEND_COOLDOWN_SECONDS,
+    ...(isE2eMockMutationEnabled() ? { testCode: code } : {}),
+  });
 }

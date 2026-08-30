@@ -10,9 +10,13 @@ import {
   recordMemberEmailVerificationAttempt,
 } from "@/lib/member-email-rate-limit";
 import { buildReservedMemberIdentifierHashes } from "@/lib/member-identifier-reservations";
+import {
+  completeMemberEmailRecovery,
+  getMemberEmailRecoveryHttpFailure,
+  isMemberEmailVerificationCodeFailure,
+} from "@/lib/member-email-verification-service";
 import { normalizeMemberEmail } from "@/lib/member-domain";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { setUserSession } from "@/lib/user-auth";
 import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
 import {
@@ -21,12 +25,6 @@ import {
 } from "@/lib/route-json-body";
 
 export const runtime = "nodejs";
-
-type RecoveryCompletion = {
-  verified?: unknown;
-  reason?: unknown;
-  mustChangePassword?: unknown;
-};
 
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
@@ -83,42 +81,36 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { data, error } = await getSupabaseAdminClient().rpc(
-      "complete_member_email_recovery",
-      {
-        p_member_id: recovery.memberId,
-        p_email_normalized: email,
-        p_email_reservation_hash: emailReservationHash,
-        p_code_hash: hashMemberEmailVerificationCode(email, code),
-      },
-    );
-    const completion = data && typeof data === "object" && !Array.isArray(data)
-      ? data as RecoveryCompletion
-      : null;
-    if (error || completion?.verified !== true) {
-      const reason = typeof completion?.reason === "string" ? completion.reason : "invalid_code";
-      await recordMemberEmailVerificationAttempt("recovery-verify", rateLimitContext, false);
+    const completion = await completeMemberEmailRecovery({
+      memberId: recovery.memberId,
+      emailNormalized: email,
+      emailReservationHash,
+      codeHash: hashMemberEmailVerificationCode(email, code),
+    });
+    if (!completion.verified) {
+      if (isMemberEmailVerificationCodeFailure(completion.reason)) {
+        await recordMemberEmailVerificationAttempt(
+          "recovery-verify",
+          rateLimitContext,
+          false,
+        );
+      }
       await logAuthSecurity({
         ...context,
         eventName: "member_email_recovery",
         status: "failure",
         actorType: "member",
         actorId: recovery.memberId,
-        properties: { stage: "email_verify", reason },
+        properties: { stage: "email_verify", reason: completion.reason },
       });
-      const isEmailConflict = reason === "email_conflict" || reason === "email_reserved";
+      const failure = getMemberEmailRecoveryHttpFailure(completion.reason);
       return NextResponse.json(
-        {
-          ok: false,
-          message: isEmailConflict
-            ? "사용할 수 없는 이메일입니다. 다른 이메일로 다시 인증해 주세요."
-            : "인증 코드가 올바르지 않거나 만료되었습니다.",
-        },
-        { status: isEmailConflict ? 409 : 400 },
+        { ok: false, message: failure.message },
+        { status: failure.status },
       );
     }
 
-    await setUserSession(recovery.memberId, completion.mustChangePassword === true, {
+    await setUserSession(recovery.memberId, completion.mustChangePassword, {
       authenticationMethod: "email",
       freshAuthentication: true,
     });

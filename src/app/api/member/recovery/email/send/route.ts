@@ -4,9 +4,14 @@ import { isE2eMockMutationEnabled } from "@/lib/e2e-mutation-mode";
 import { sendMemberEmailVerificationCode } from "@/lib/member-email";
 import { getMemberEmailRecoverySession, clearMemberEmailRecoverySession } from "@/lib/member-email-recovery-session";
 import {
+  issueMemberEmailChallenge,
+  MemberEmailChallengeIssueError,
+} from "@/lib/member-email-verification-challenge";
+import {
   generateMemberEmailVerificationCode,
   hashMemberEmailIdentifier,
   hashMemberEmailVerificationCode,
+  MEMBER_EMAIL_RESEND_COOLDOWN_SECONDS,
   MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS,
 } from "@/lib/member-email-verification";
 import {
@@ -23,8 +28,12 @@ import {
   RouteJsonBodyError,
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
+import { SupabaseMemberEmailRecoveryChallengeRepository } from "@/lib/repositories/supabase/member-email-recovery-challenge-repository.supabase";
 
 export const runtime = "nodejs";
+
+const recoveryChallengeRepository =
+  new SupabaseMemberEmailRecoveryChallengeRepository();
 
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
@@ -104,49 +113,93 @@ export async function POST(request: Request) {
   }
 
   const code = generateMemberEmailVerificationCode();
-  const { data: challenge, error: challengeError } = await supabase
-    .from("member_email_challenges")
-    .insert({
-      member_id: recovery.memberId,
-      email_normalized: email,
-      purpose: "email_recovery",
-      code_hash: hashMemberEmailVerificationCode(email, code),
-      expires_at: new Date(Date.now() + MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS * 1_000).toISOString(),
-    })
-    .select("id")
-    .single();
-  if (challengeError || !challenge?.id) {
-    return NextResponse.json({ ok: false, message: "인증 요청을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요." }, { status: 503 });
-  }
-
-  await recordMemberEmailVerificationAttempt("recovery-send", rateLimitContext, false);
+  const issuedAt = Date.now();
+  const expiresAt = new Date(
+    issuedAt + MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS * 1_000,
+  ).toISOString();
+  const resendAvailableAt = new Date(
+    issuedAt + MEMBER_EMAIL_RESEND_COOLDOWN_SECONDS * 1_000,
+  ).toISOString();
+  let reservation;
   try {
-    if (!isE2eMockMutationEnabled()) {
-      await sendMemberEmailVerificationCode({ to: email, code });
+    reservation = await issueMemberEmailChallenge(
+      {
+        memberId: recovery.memberId,
+        emailNormalized: email,
+        codeHash: hashMemberEmailVerificationCode(email, code),
+        expiresAt,
+        resendAvailableAt,
+      },
+      {
+        repository: recoveryChallengeRepository,
+        beforeDelivery: async () => {
+          await recordMemberEmailVerificationAttempt(
+            "recovery-send",
+            rateLimitContext,
+            false,
+          );
+        },
+        deliver: async () => {
+          if (!isE2eMockMutationEnabled()) {
+            await sendMemberEmailVerificationCode({ to: email, code });
+          }
+        },
+      },
+    );
+    if (!reservation.accepted) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "resend_cooldown",
+          message: "새 인증 코드는 잠시 후 다시 요청할 수 있습니다.",
+          retryAfterSeconds: reservation.retryAfterSeconds,
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(reservation.retryAfterSeconds),
+          },
+        },
+      );
     }
-    await logAuthSecurity({
-      ...context,
-      eventName: "member_email_recovery",
-      status: "success",
-      actorType: "member",
-      actorId: recovery.memberId,
-      properties: { stage: "email_send" },
-    });
-    return NextResponse.json({
-      ok: true,
-      expiresInSeconds: MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS,
-      ...(isE2eMockMutationEnabled() ? { testCode: code } : {}),
-    });
-  } catch {
-    await supabase.from("member_email_challenges").delete().eq("id", challenge.id);
+  } catch (error) {
+    const deliveryFailed = error instanceof MemberEmailChallengeIssueError;
     await logAuthSecurity({
       ...context,
       eventName: "member_email_recovery",
       status: "failure",
       actorType: "member",
       actorId: recovery.memberId,
-      properties: { stage: "email_send", reason: "delivery_failed" },
+      properties: {
+        stage: "email_send",
+        reason: deliveryFailed ? "delivery_failed" : "reservation_failed",
+      },
     });
-    return NextResponse.json({ ok: false, message: "인증 코드를 보내지 못했습니다. 잠시 후 다시 시도해 주세요." }, { status: 503 });
+    return NextResponse.json(
+      {
+        ok: false,
+        message: deliveryFailed
+          ? "인증 코드를 보내지 못했습니다. 잠시 후 다시 시도해 주세요."
+          : "인증 요청을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
   }
+
+  await logAuthSecurity({
+    ...context,
+    eventName: "member_email_recovery",
+    status: "success",
+    actorType: "member",
+    actorId: recovery.memberId,
+    properties: { stage: "email_send" },
+  });
+  return NextResponse.json({
+    ok: true,
+    expiresAt,
+    expiresInSeconds: MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS,
+    resendAvailableAt,
+    resendAvailableInSeconds: MEMBER_EMAIL_RESEND_COOLDOWN_SECONDS,
+    ...(isE2eMockMutationEnabled() ? { testCode: code } : {}),
+  });
 }
