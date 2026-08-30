@@ -499,6 +499,7 @@ test.describe("public partner discovery", () => {
     await expect(page).toHaveURL(/\/partners\/[^?#]+$/);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await page.goBack();
+    await waitForDirectoryControls(page);
 
     await expect(page).toHaveURL(directoryUrl);
     await expect(page.getByTestId("partner-search-input")).toHaveValue(firstPartnerName);
@@ -509,6 +510,7 @@ test.describe("public partner discovery", () => {
     await expect(page).toHaveURL(/\/partners\/[^?#]+$/);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await page.goBack();
+    await waitForDirectoryControls(page);
 
     await expect(page).toHaveURL(directoryUrl);
     await expect(page.getByTestId("partner-search-input")).toHaveValue(firstPartnerName);
