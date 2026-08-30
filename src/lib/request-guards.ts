@@ -75,3 +75,20 @@ export function isTrustedSameOriginRequest(
 
   return true;
 }
+
+export function isTrustedAdminSessionNavigation(request: SameOriginRequest) {
+  if (request.method && request.method.toUpperCase() !== "GET") {
+    return false;
+  }
+
+  const fetchMode = request.headers.get("sec-fetch-mode");
+  const fetchSite = request.headers.get("sec-fetch-site");
+  if (fetchMode !== null || fetchSite !== null) {
+    return (
+      fetchMode === "navigate"
+      && (fetchSite === "same-origin" || fetchSite === "none")
+    );
+  }
+
+  return isTrustedSameOriginRequest(request);
+}

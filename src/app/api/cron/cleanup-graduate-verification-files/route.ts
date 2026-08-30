@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminSession } from "@/lib/auth";
 import { removeGraduateStoredObject } from "@/lib/graduate-verification-storage";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -116,8 +115,7 @@ async function deleteExpiredProfileImages(nowIso: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const adminAuthorized = await isAdminSession();
-  if (!adminAuthorized && !isAuthorizedByCronSecret(request)) {
+  if (!isAuthorizedByCronSecret(request)) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 

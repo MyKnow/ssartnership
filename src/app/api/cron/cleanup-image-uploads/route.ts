@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminSession } from "@/lib/auth";
 import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
 import { expireMattermostSignupApprovalRequests } from "@/lib/mm-signup-approval/repository";
 
@@ -11,7 +10,7 @@ function isAuthorizedByCronSecret(request: NextRequest) {
 }
 /** Removes expired private staging objects in bounded batches. */
 export async function GET(request: NextRequest) {
-  if (!await isAdminSession() && !isAuthorizedByCronSecret(request)) {
+  if (!isAuthorizedByCronSecret(request)) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
   try {

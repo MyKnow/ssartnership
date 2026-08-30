@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminSession } from "@/lib/auth";
 import { logAdminAudit, getRequestLogContext } from "@/lib/activity-logs";
 import {
   anonymizeDeletedMember,
@@ -15,8 +14,7 @@ function isAuthorizedByCronSecret(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const context = getRequestLogContext(request);
-  const adminAuthorized = await isAdminSession();
-  if (!adminAuthorized && !isAuthorizedByCronSecret(request)) {
+  if (!isAuthorizedByCronSecret(request)) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
@@ -38,7 +36,7 @@ export async function GET(request: NextRequest) {
     await logAdminAudit({
       ...context,
       action: "member_delete",
-      actorId: adminAuthorized ? "admin" : "system",
+      actorId: "system",
       targetType: "member",
       targetId: null,
       properties: {

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminSession } from "@/lib/auth";
 import { removeGraduateStoredObject } from "@/lib/graduate-verification-storage";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -12,7 +11,7 @@ function isAuthorizedByCronSecret(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  if (!await isAdminSession() && !isAuthorizedByCronSecret(request)) {
+  if (!isAuthorizedByCronSecret(request)) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
   try {

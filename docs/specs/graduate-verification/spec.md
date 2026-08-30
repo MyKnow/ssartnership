@@ -100,7 +100,7 @@ draft/submitted/needs_resubmission → withdrawn
 
 ## 배치 작업
 
-`/api/cron/cleanup-graduate-verification-files`는 `CRON_SECRET` 또는 관리자 세션을 요구한다.
+`/api/cron/cleanup-graduate-verification-files`는 `CRON_SECRET` Bearer 인증을 요구한다. 관리자 브라우저 세션은 배치 실행 권한으로 사용하지 않는다.
 
 1. 24시간이 지난 미소비 intake upload 삭제
 2. `certificate_delete_after`가 지난 수료증 삭제 및 `certificate_deleted_at` 기록

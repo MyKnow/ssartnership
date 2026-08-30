@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminSession } from "@/lib/auth";
 import { MattermostApiError, MattermostClient } from "@/lib/mattermost/client";
 import { getMattermostSenderKeyring } from "@/lib/mattermost-senders/config";
 import { mattermostSenderRepository } from "@/lib/mattermost-senders/repository";
@@ -20,8 +19,7 @@ function toSafeHealthErrorCode(error: unknown): MattermostSenderSafeErrorCode {
 }
 
 export async function GET(request: NextRequest) {
-  const adminAuthorized = await isAdminSession();
-  if (!adminAuthorized && !isAuthorizedByCronSecret(request)) {
+  if (!isAuthorizedByCronSecret(request)) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 

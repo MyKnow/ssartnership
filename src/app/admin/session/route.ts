@@ -5,6 +5,7 @@ import {
   sanitizeAdminReturnTo,
 } from "@/lib/admin-session-bridge";
 import { setAdminSession } from "@/lib/auth";
+import { isTrustedAdminSessionNavigation } from "@/lib/request-guards";
 import { getSignedUserSession } from "@/lib/user-auth";
 
 export async function GET(request: NextRequest) {
@@ -13,6 +14,21 @@ export async function GET(request: NextRequest) {
     "/admin",
   );
   const context = getRequestLogContext(request);
+
+  if (!isTrustedAdminSessionNavigation(request)) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "admin_access",
+      status: "blocked",
+      actorType: "guest",
+      properties: {
+        reason: "same_origin_failed",
+        stage: "session_bridge",
+      },
+    });
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
   const memberSession = await getSignedUserSession();
 
   if (!memberSession?.userId) {

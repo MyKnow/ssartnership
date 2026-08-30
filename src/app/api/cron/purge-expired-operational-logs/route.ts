@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminSession } from "@/lib/auth";
 import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -12,9 +11,7 @@ function isAuthorizedByCronSecret(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const context = getRequestLogContext(request);
-  const adminAuthorized = await isAdminSession();
-
-  if (!adminAuthorized && !isAuthorizedByCronSecret(request)) {
+  if (!isAuthorizedByCronSecret(request)) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
@@ -36,7 +33,7 @@ export async function GET(request: NextRequest) {
   await logAdminAudit({
     ...context,
     action: "log_retention_purge",
-    actorId: adminAuthorized ? "admin" : "system",
+    actorId: "system",
     targetType: "operational_logs",
     targetId: null,
     properties: data ?? {},
