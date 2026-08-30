@@ -83,7 +83,7 @@ test("관리자 알림 설정은 인증 뒤 본문을 읽고 두 종류의 초�
   );
   const postSource = source.slice(source.indexOf("export async function POST"));
   const guardIndex = postSource.indexOf("if (");
-  const sessionIndex = postSource.indexOf("const session =");
+  const authIndex = postSource.indexOf("const auth =");
   const parserIndex = postSource.indexOf("await readJsonRequestBodyWithinLimit");
 
   assert.match(
@@ -94,7 +94,7 @@ test("관리자 알림 설정은 인증 뒤 본문을 읽고 두 종류의 초�
   assert.match(source, /\{ message: "알림 설정 요청이 너무 큽니다\." \}/);
   assert.match(source, /\{ status: 413 \}/);
   assert.ok(
-    guardIndex >= 0 && sessionIndex > guardIndex && parserIndex > sessionIndex,
+    guardIndex >= 0 && authIndex > guardIndex && parserIndex > authIndex,
   );
 
   await assertBodyTooLarge(
