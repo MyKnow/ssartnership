@@ -8,7 +8,7 @@ import {
 } from "@/lib/image-upload/auth.server";
 import { parseImageUploadCompleteRequest } from "@/lib/image-upload/http";
 import { ImageUploadError } from "@/lib/image-upload/repository";
-import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import {
   isImageUploadBlocked,
   recordImageUploadAttempt,
@@ -109,15 +109,23 @@ export async function POST(request: NextRequest) {
     });
     const isProcessing = error instanceof ImageUploadError
       && error.code === "upload_processing";
+    const isUnavailable = error instanceof ImageUploadError
+      && error.code === "image_upload_unavailable";
     return NextResponse.json(
       {
         ok: false,
-        code: isProcessing ? "upload_processing" : "upload_complete_failed",
+        code: isProcessing
+          ? "upload_processing"
+          : isUnavailable
+            ? "image_upload_unavailable"
+            : "upload_complete_failed",
         message: isProcessing
           ? "이미지를 처리 중입니다. 잠시 후 자동으로 다시 확인합니다."
-          : "이미지를 처리하지 못했습니다. 이미지를 다시 선택해 주세요.",
+          : isUnavailable
+            ? "현재 환경에서는 이미지 업로드를 사용할 수 없습니다."
+            : "이미지를 처리하지 못했습니다. 이미지를 다시 선택해 주세요.",
       },
-      { status: isProcessing ? 409 : 422 },
+      { status: isProcessing ? 409 : isUnavailable ? 503 : 422 },
     );
   }
 }

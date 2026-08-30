@@ -27,7 +27,7 @@ import {
 import {
   type ImageUploadActor,
 } from "@/lib/image-upload/repository";
-import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import {
   sendGraduateAccountSetupEmail,
   sendGraduateVerificationRejectionEmail,

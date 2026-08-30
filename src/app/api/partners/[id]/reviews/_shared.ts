@@ -18,7 +18,8 @@ import {
 import {
   resolveImageTransformPolicy,
 } from "@/lib/image-upload/policy";
-import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
+import { ImageUploadError } from "@/lib/image-upload/repository";
 import {
   INVALID_REVIEW_MEDIA_MESSAGE,
   parseReviewSubmissionRequest,
@@ -48,6 +49,11 @@ export function getReviewMediaInputFieldErrors(
   return error instanceof ReviewMediaInputError
     ? { images: error.message }
     : null;
+}
+
+export function isReviewImageUploadUnavailable(error: unknown) {
+  return error instanceof ImageUploadError
+    && error.code === "image_upload_unavailable";
 }
 
 export async function getReviewMemberSession() {
@@ -161,9 +167,8 @@ export async function resolveReviewMediaPayload(
 
   const images: string[] = [];
   const uploadedUrls: string[] = [];
-  const uploadRepository = getImageUploadRepository();
   const attachUpload = async (uploadId: string, imageIndex: number) => {
-    const attached = await uploadRepository.attach({
+    const attached = await getImageUploadRepository().attach({
       actor: { kind: "member", id: memberId },
       purpose: "review",
       uploadId,

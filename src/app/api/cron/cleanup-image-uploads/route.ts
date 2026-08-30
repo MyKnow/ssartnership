@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureCronApiAccess, getCronErrorResponse } from "@/lib/cron-route";
-import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { expireMattermostSignupApprovalRequests } from "@/lib/mm-signup-approval/repository";
 
 export const runtime = "nodejs";

@@ -4,6 +4,8 @@ import { NextRequest } from "next/server";
 const {
   deletePartnerStoredNotificationsMock,
   getPartnerSessionMock,
+  imageUploadCompleteMock,
+  imageUploadSignMock,
   isImageUploadBlockedMock,
   isPartnerPortalCompanyAllowedMock,
   isTrustedSameOriginRequestMock,
@@ -13,6 +15,8 @@ const {
 } = vi.hoisted(() => ({
   deletePartnerStoredNotificationsMock: vi.fn(),
   getPartnerSessionMock: vi.fn(),
+  imageUploadCompleteMock: vi.fn(),
+  imageUploadSignMock: vi.fn(),
   isImageUploadBlockedMock: vi.fn(),
   isPartnerPortalCompanyAllowedMock: vi.fn(),
   isTrustedSameOriginRequestMock: vi.fn(),
@@ -57,10 +61,10 @@ vi.mock("@/lib/image-upload/auth.server", () => {
   };
 });
 
-vi.mock("@/lib/image-upload/repository.supabase", () => ({
+vi.mock("@/lib/image-upload/repository.server", () => ({
   getImageUploadRepository: vi.fn(() => ({
-    complete: vi.fn(),
-    sign: vi.fn(),
+    complete: imageUploadCompleteMock,
+    sign: imageUploadSignMock,
   })),
   getSignedImageUploadHeaders: vi.fn(() => ({})),
 }));
@@ -76,6 +80,7 @@ import {
 } from "../../src/app/api/partner/notifications/route";
 import { POST as completeImageUpload } from "../../src/app/api/uploads/images/complete/route";
 import { POST as signImageUpload } from "../../src/app/api/uploads/images/sign/route";
+import { ImageUploadError } from "../../src/lib/image-upload/repository";
 
 const ORIGIN = "https://ssartnership.example.com";
 const PARTNER_NOTIFICATIONS_URL = `${ORIGIN}/api/partner/notifications`;
@@ -150,6 +155,8 @@ describe("remaining bounded JSON routes", () => {
     resolveImageUploadActorForRouteMock.mockResolvedValue({
       actor: { kind: "member", id: "member-1" },
     });
+    imageUploadSignMock.mockResolvedValue([]);
+    imageUploadCompleteMock.mockResolvedValue([]);
   });
 
   describe.each([
@@ -356,5 +363,58 @@ describe("remaining bounded JSON routes", () => {
     expect(response.status).toBe(503);
     expect(isImageUploadBlockedMock).toHaveBeenCalledTimes(1);
     expect(recordImageUploadAttemptMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "sign",
+      IMAGE_SIGN_URL,
+      invokeImageUploadSign,
+      imageUploadSignMock,
+      {
+        purpose: "review",
+        actorMode: "member",
+        uploads: [{
+          clientId: "review-image",
+          role: "image",
+          fileName: "review.webp",
+          contentType: "image/webp",
+          size: 1_024,
+        }],
+      },
+    ],
+    [
+      "complete",
+      IMAGE_COMPLETE_URL,
+      invokeImageUploadComplete,
+      imageUploadCompleteMock,
+      {
+        purpose: "review",
+        actorMode: "member",
+        uploadIds: ["03f5459b-dfee-4558-907a-509a396312f5"],
+      },
+    ],
+  ] as const)("이미지 %s은 저장소 미지원 환경을 동일한 503 계약으로 알린다", async (
+    _label,
+    url,
+    invoke,
+    operation,
+    body,
+  ) => {
+    operation.mockRejectedValueOnce(
+      new ImageUploadError(
+        "image_upload_unavailable",
+        "현재 환경에서는 이미지 업로드를 사용할 수 없습니다.",
+      ),
+    );
+
+    const response = await invoke(createRequest(url, JSON.stringify(body)));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      code: "image_upload_unavailable",
+      message: "현재 환경에서는 이미지 업로드를 사용할 수 없습니다.",
+    });
   });
 });

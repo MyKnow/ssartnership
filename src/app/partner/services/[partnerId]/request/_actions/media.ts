@@ -4,7 +4,7 @@ import {
   assertNoDirectImageFileSubmission,
   resolveImageTransformPolicy,
 } from "@/lib/image-upload/policy";
-import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import {
   assertPartnerMediaExistingUrls,
   parsePartnerMediaManifest,

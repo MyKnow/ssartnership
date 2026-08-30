@@ -5,7 +5,7 @@ import {
   type MattermostSignupParseReason,
 } from "@/lib/mm-signup-approval";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { getSignupApprovalExpiresAt } from "@/lib/image-upload/signup";
 import { attachMattermostSignupApprovalProfileImage } from "@/lib/member-signup-profile";
 import { forEachWithConcurrency } from "@/lib/async-concurrency";

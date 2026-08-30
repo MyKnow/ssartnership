@@ -26,7 +26,7 @@ import {
 } from "@/lib/promotion-slide-storage-server";
 import { resolveImageUploadActorForServerAction } from "@/lib/image-upload/auth.server";
 import { resolveImageTransformPolicy } from "@/lib/image-upload/policy";
-import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { PROMOTION_SLIDES_BUCKET } from "@/lib/promotion-slide-storage";
 import { logAdminAction } from "./shared-helpers";
 

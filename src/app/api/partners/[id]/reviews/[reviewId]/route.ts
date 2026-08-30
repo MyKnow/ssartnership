@@ -10,6 +10,7 @@ import {
   ensureVisibleReviewPartner,
   getReviewMediaInputFieldErrors,
   getReviewMemberSession,
+  isReviewImageUploadUnavailable,
   readPartnerReviewSubmission,
   resolveReviewMediaPayload,
 } from "../_shared";
@@ -115,6 +116,16 @@ export async function PATCH(
     return NextResponse.json({ ok: true, review, summary });
   } catch (error) {
     await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);
+    if (isReviewImageUploadUnavailable(error)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "image_upload_unavailable",
+          message: "현재 환경에서는 이미지 업로드를 사용할 수 없습니다.",
+        },
+        { status: 503 },
+      );
+    }
     const mediaFieldErrors = getReviewMediaInputFieldErrors(error);
     if (mediaFieldErrors) {
       return NextResponse.json(

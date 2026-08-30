@@ -15,7 +15,7 @@ import {
   storeMemberProfileImage,
 } from "@/lib/graduate-verification-storage";
 import { resolveImageTransformPolicy } from "@/lib/image-upload/policy";
-import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import {
   findMmUserDirectoryEntryByUserId,
   upsertMmUserDirectorySnapshot,

@@ -31,7 +31,7 @@ import {
   assertNoDirectImageFileSubmission,
   resolveImageTransformPolicy,
 } from "@/lib/image-upload/policy";
-import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { PARTNER_MEDIA_BUCKET } from "@/lib/partner-media";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 

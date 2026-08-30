@@ -841,15 +841,9 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
   }
 }
 
-let repository: ImageUploadRepository | null = null;
-
-export function getImageUploadRepository() {
-  repository ??= new SupabaseImageUploadRepository();
-  return repository;
-}
-
-export function getSignedImageUploadHeaders() {
-  const anonKey = process.env.SUPABASE_ANON_KEY;
+export function getSupabaseSignedImageUploadHeaders(
+  anonKey = process.env.SUPABASE_ANON_KEY,
+) {
   if (!anonKey) {
     throw new Error("SUPABASE_ANON_KEY 환경 변수가 필요합니다.");
   }
