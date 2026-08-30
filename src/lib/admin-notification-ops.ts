@@ -22,7 +22,11 @@ import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identi
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getCampaignTemplateKey } from "@/lib/notification-templates/catalog";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
-import { renderNotificationTemplate } from "@/lib/notification-templates/template";
+import {
+  NOTIFICATION_TEMPLATE_MAX_BODY_LENGTH,
+  NOTIFICATION_TEMPLATE_MAX_TITLE_LENGTH,
+  renderNotificationTemplate,
+} from "@/lib/notification-templates/template";
 import {
   mergeNotificationTemplateVariables,
   type NotificationTemplateContext,
@@ -345,7 +349,20 @@ async function buildAudienceContext(
   const notificationType = input.notificationType;
   const validationMessages: string[] = [];
   const rawUrl = input.url?.trim() ?? "";
+  const normalizedTitle = input.title.trim();
+  const normalizedBody = input.body.trim();
 
+  if (!normalizedTitle || !normalizedBody) {
+    validationMessages.push("알림 제목과 내용을 모두 입력해 주세요.");
+  }
+  if (
+    normalizedTitle.length > NOTIFICATION_TEMPLATE_MAX_TITLE_LENGTH ||
+    normalizedBody.length > NOTIFICATION_TEMPLATE_MAX_BODY_LENGTH
+  ) {
+    validationMessages.push(
+      `알림 제목은 ${NOTIFICATION_TEMPLATE_MAX_TITLE_LENGTH.toLocaleString("ko-KR")}자 이하, 내용은 ${NOTIFICATION_TEMPLATE_MAX_BODY_LENGTH.toLocaleString("ko-KR")}자 이하로 입력해 주세요.`,
+    );
+  }
   if (selectedChannels.length === 0) {
     validationMessages.push("최소 한 개 이상의 채널을 선택해 주세요.");
   }

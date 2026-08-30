@@ -197,7 +197,7 @@ test("발송 로그는 완료 메타데이터가 있으면 delivery 재조회 �
 });
 
 test("관리자 발송 API는 요청 재시도 키와 안전한 오류 매핑을 사용한다", async () => {
-  const [broadcastSource, previewSource, repositorySource, migrationSource] =
+  const [broadcastSource, previewSource, repositorySource, migrationSource, bodyHelperSource] =
     await Promise.all([
       readFile(
         new URL("../src/app/api/push/admin/broadcast/route.ts", import.meta.url),
@@ -221,19 +221,27 @@ test("관리자 발송 API는 요청 재시도 키와 안전한 오류 매핑을
         ),
         "utf8",
       ),
+      readFile(
+        new URL("../src/lib/admin-notification-route-body.ts", import.meta.url),
+        "utf8",
+      ),
     ]);
 
   assert.match(broadcastSource, /idempotencyKey/);
   assert.match(broadcastSource, /withServerTiming/);
+  assert.match(broadcastSource, /readAdminNotificationJsonBody/);
   assert.match(broadcastSource, /알림 발송에 실패했습니다\. 잠시 후 다시 시도해 주세요\./);
   assert.doesNotMatch(broadcastSource, /error instanceof Error \? error\.message/);
   assert.match(previewSource, /withServerTiming/);
+  assert.match(previewSource, /readAdminNotificationJsonBody/);
   assert.match(previewSource, /알림 검토 정보를 불러오지 못했습니다\. 잠시 후 다시 시도해 주세요\./);
   assert.doesNotMatch(previewSource, /error instanceof Error \? error\.message/);
   assert.match(repositorySource, /onConflict: "idempotency_key"/);
   assert.match(repositorySource, /alreadyExists: true/);
   assert.match(migrationSource, /notifications_idempotency_key_unique/);
   assert.match(migrationSource, /unique \(idempotency_key\)/);
+  assert.match(bodyHelperSource, /MAX_ADMIN_NOTIFICATION_JSON_BODY_BYTES/);
+  assert.match(bodyHelperSource, /알림 요청 본문이 너무 큽니다\./);
 });
 
 test("알림 발송 후처리 경고는 provider 오류 원문을 UI 계약에 저장하지 않는다", async () => {
