@@ -1,21 +1,10 @@
 import { PartnerChangeRequestError } from "../../partner-change-request-errors.ts";
-import { normalizeCampusSlugs } from "../../campuses.ts";
 import { getSupabaseAdminClient } from "../../supabase/server.ts";
-import {
-  sanitizeHttpUrl,
-  sanitizePartnerLinkValue,
-  validateDateRange,
-} from "../../validation.ts";
-import { normalizePartnerDetailDescription } from "../../partner-detail-description.ts";
 import { getSupabaseRequestContext } from "../context.ts";
 import {
-  arraysEqual,
-  normalizeAudience,
-  normalizeHttpUrlList,
-  normalizeOptionalText,
-  normalizeRequiredText,
-  normalizeTextList,
-} from "../normalizers.ts";
+  assertPartnerChangeRequestHasChanges,
+  normalizePartnerChangeRequestCreateFields,
+} from "../contracts.ts";
 import { toSummary } from "../summary.ts";
 import {
   REQUEST_SELECT,
@@ -41,85 +30,39 @@ export async function createSupabaseRequest(
     );
   }
 
-  const requestedConditions = normalizeTextList(input.requestedConditions);
-  const requestedBenefits = normalizeTextList(input.requestedBenefits);
-  const requestedAppliesTo = normalizeAudience(input.requestedAppliesTo);
-  const requestedTags = normalizeTextList(input.requestedTags);
-  const requestedPartnerName = normalizeRequiredText(input.requestedPartnerName);
-  const requestedPartnerLocation = normalizeRequiredText(
-    input.requestedPartnerLocation,
+  const normalized = normalizePartnerChangeRequestCreateFields(input);
+  assertPartnerChangeRequestHasChanges(
+    {
+      partnerName: context.partnerName,
+      partnerLocation: context.partnerLocation,
+      detailDescription: context.detailDescription,
+      mapUrl: context.mapUrl,
+      campusSlugs: context.currentCampusSlugs,
+      conditions: context.currentConditions,
+      benefits: context.currentBenefits,
+      appliesTo: context.currentAppliesTo,
+      periodStart: context.periodStart,
+      periodEnd: context.periodEnd,
+    },
+    normalized,
   );
-  const requestedDetailDescription = normalizePartnerDetailDescription(
-    input.requestedDetailDescription,
-  );
-  const requestedMapUrl = sanitizeHttpUrl(input.requestedMapUrl ?? undefined);
-  const requestedCampusSlugs = normalizeCampusSlugs(input.requestedCampusSlugs);
-  const requestedThumbnail = normalizeOptionalText(input.requestedThumbnail);
-  const requestedImages = normalizeHttpUrlList(input.requestedImages);
-  const requestedReservationLink = sanitizePartnerLinkValue(
-    input.requestedReservationLink ?? undefined,
-  );
-  const requestedInquiryLink = sanitizePartnerLinkValue(
-    input.requestedInquiryLink ?? undefined,
-  );
-  const requestedPeriodStart = normalizeOptionalText(input.requestedPeriodStart);
-  const requestedPeriodEnd = normalizeOptionalText(input.requestedPeriodEnd);
-
-  const dateRangeError = validateDateRange(
+  const {
+    requestedConditions,
+    requestedBenefits,
+    requestedAppliesTo,
+    requestedTags,
+    requestedPartnerName,
+    requestedPartnerLocation,
+    requestedDetailDescription,
+    requestedMapUrl,
+    requestedCampusSlugs,
+    requestedThumbnail,
+    requestedImages,
+    requestedReservationLink,
+    requestedInquiryLink,
     requestedPeriodStart,
     requestedPeriodEnd,
-  );
-  if (dateRangeError) {
-    throw new PartnerChangeRequestError("invalid_request", dateRangeError);
-  }
-  if (!requestedPartnerName || !requestedPartnerLocation) {
-    throw new PartnerChangeRequestError(
-      "invalid_request",
-      "제휴처명과 지점 위치를 입력해 주세요.",
-    );
-  }
-  if (requestedCampusSlugs.length === 0) {
-    throw new PartnerChangeRequestError(
-      "invalid_request",
-      "노출 캠퍼스를 하나 이상 선택해 주세요.",
-    );
-  }
-
-  if (
-    context.partnerName === requestedPartnerName &&
-    context.partnerLocation === requestedPartnerLocation &&
-    context.detailDescription === requestedDetailDescription &&
-    context.mapUrl === requestedMapUrl &&
-    arraysEqual(context.currentCampusSlugs, requestedCampusSlugs) &&
-    requestedConditions.length === 0 &&
-    requestedBenefits.length === 0 &&
-    requestedAppliesTo.length === 0 &&
-    !requestedPeriodStart &&
-    !requestedPeriodEnd
-  ) {
-    throw new PartnerChangeRequestError(
-      "invalid_request",
-      "변경 요청 값을 입력해 주세요.",
-    );
-  }
-
-  if (
-    context.partnerName === requestedPartnerName &&
-    context.partnerLocation === requestedPartnerLocation &&
-    context.detailDescription === requestedDetailDescription &&
-    context.mapUrl === requestedMapUrl &&
-    arraysEqual(context.currentCampusSlugs, requestedCampusSlugs) &&
-    arraysEqual(context.currentConditions, requestedConditions) &&
-    arraysEqual(context.currentBenefits, requestedBenefits) &&
-    arraysEqual(context.currentAppliesTo, requestedAppliesTo) &&
-    context.periodStart === requestedPeriodStart &&
-    context.periodEnd === requestedPeriodEnd
-  ) {
-    throw new PartnerChangeRequestError(
-      "no_changes",
-      "현재 값과 다른 변경이 없어 요청을 보낼 수 없습니다.",
-    );
-  }
+  } = normalized;
 
   const supabase = getSupabaseAdminClient();
   const { error: companyAccessError } = await supabase

@@ -1,5 +1,6 @@
 import { PartnerChangeRequestError } from "../../partner-change-request-errors.ts";
 import { normalizePartnerBenefitActionType } from "../../partner-benefit-action.ts";
+import { requirePartnerChangeRequestAuditContext } from "../../partner-change-requests/contracts.ts";
 import type { PartnerImmediateUpdateInput } from "../../partner-change-requests/shared.ts";
 import { arraysEqual, collectServiceMediaUrls, normalizeHttpUrlList } from "./normalizers.ts";
 import { findService } from "./service-store.ts";
@@ -7,6 +8,10 @@ import { findService } from "./service-store.ts";
 export async function updateMockPartnerImmediateFields(
   input: PartnerImmediateUpdateInput,
 ) {
+  requirePartnerChangeRequestAuditContext(
+    input.auditContext,
+    "감사 요청 문맥이 없어 제휴처 정보를 저장할 수 없습니다.",
+  );
   const service = findService(input.partnerId);
   if (!service || !input.companyIds.includes(service.companyId)) {
     throw new PartnerChangeRequestError(

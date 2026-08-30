@@ -1,19 +1,15 @@
 import { PartnerChangeRequestError } from "../../partner-change-request-errors.ts";
-import { normalizeCampusSlugs } from "../../campuses.ts";
-import { normalizePartnerDetailDescription } from "../../partner-detail-description.ts";
+import {
+  assertPartnerChangeRequestHasChanges,
+  normalizePartnerChangeRequestCreateFields,
+  requirePartnerChangeRequestAuditContext,
+} from "../../partner-change-requests/contracts.ts";
 import type {
   PartnerChangeRequestCancelInput,
   PartnerChangeRequestCreateInput,
   PartnerChangeRequestReviewInput,
 } from "../../partner-change-requests/shared.ts";
 import {
-  arraysEqual,
-  normalizeAudience,
-  normalizeHttpUrlList,
-  normalizeOptionalLink,
-  normalizeOptionalText,
-  normalizeRequiredText,
-  normalizeTextList,
   toSummary,
 } from "./normalizers.ts";
 import { findDisplayNameByAccountId, findRequest, findPendingRequest, findService, getStore } from "./service-store.ts";
@@ -36,52 +32,39 @@ export async function createMockPartnerChangeRequest(
     );
   }
 
-  const requestedConditions = normalizeTextList(input.requestedConditions);
-  const requestedBenefits = normalizeTextList(input.requestedBenefits);
-  const requestedAppliesTo = normalizeAudience(input.requestedAppliesTo);
-  const requestedTags = normalizeTextList(input.requestedTags);
-  const requestedPartnerName = normalizeRequiredText(input.requestedPartnerName);
-  const requestedPartnerLocation = normalizeRequiredText(
-    input.requestedPartnerLocation,
+  const normalized = normalizePartnerChangeRequestCreateFields(input);
+  assertPartnerChangeRequestHasChanges(
+    {
+      partnerName: service.partnerName,
+      partnerLocation: service.partnerLocation,
+      detailDescription: service.detailDescription,
+      mapUrl: service.mapUrl,
+      campusSlugs: service.currentCampusSlugs,
+      conditions: service.currentConditions,
+      benefits: service.currentBenefits,
+      appliesTo: service.currentAppliesTo,
+      periodStart: service.periodStart,
+      periodEnd: service.periodEnd,
+    },
+    normalized,
   );
-  const requestedDetailDescription = normalizePartnerDetailDescription(
-    input.requestedDetailDescription,
-  );
-  const requestedMapUrl = normalizeOptionalText(input.requestedMapUrl);
-  const requestedCampusSlugs = normalizeCampusSlugs(input.requestedCampusSlugs);
-  const requestedThumbnail = normalizeOptionalText(input.requestedThumbnail);
-  const requestedImages = normalizeHttpUrlList(input.requestedImages);
-  const requestedReservationLink = normalizeOptionalLink(
-    input.requestedReservationLink,
-  );
-  const requestedInquiryLink = normalizeOptionalLink(input.requestedInquiryLink);
-  const requestedPeriodStart = normalizeOptionalText(input.requestedPeriodStart);
-  const requestedPeriodEnd = normalizeOptionalText(input.requestedPeriodEnd);
-
-  if (requestedCampusSlugs.length === 0) {
-    throw new PartnerChangeRequestError(
-      "invalid_request",
-      "노출 캠퍼스를 하나 이상 선택해 주세요.",
-    );
-  }
-
-  if (
-    service.partnerName === requestedPartnerName &&
-    service.partnerLocation === requestedPartnerLocation &&
-    service.detailDescription === requestedDetailDescription &&
-    service.mapUrl === requestedMapUrl &&
-    arraysEqual(service.currentConditions, requestedConditions) &&
-    arraysEqual(service.currentBenefits, requestedBenefits) &&
-    arraysEqual(service.currentAppliesTo, requestedAppliesTo) &&
-    arraysEqual(service.currentCampusSlugs, requestedCampusSlugs) &&
-    service.periodStart === requestedPeriodStart &&
-    service.periodEnd === requestedPeriodEnd
-  ) {
-    throw new PartnerChangeRequestError(
-      "no_changes",
-      "현재 값과 다른 변경이 없어 요청을 보낼 수 없습니다.",
-    );
-  }
+  const {
+    requestedConditions,
+    requestedBenefits,
+    requestedAppliesTo,
+    requestedTags,
+    requestedPartnerName,
+    requestedPartnerLocation,
+    requestedDetailDescription,
+    requestedMapUrl,
+    requestedCampusSlugs,
+    requestedThumbnail,
+    requestedImages,
+    requestedReservationLink,
+    requestedInquiryLink,
+    requestedPeriodStart,
+    requestedPeriodEnd,
+  } = normalized;
 
   const now = new Date().toISOString();
   const record = {
@@ -175,6 +158,10 @@ export async function cancelMockPartnerChangeRequest(
 export async function approveMockPartnerChangeRequest(
   input: PartnerChangeRequestReviewInput,
 ) {
+  requirePartnerChangeRequestAuditContext(
+    input.auditContext,
+    "감사 요청 문맥이 없어 변경 요청을 승인할 수 없습니다.",
+  );
   const request = findRequest(input.requestId);
   if (!request) {
     throw new PartnerChangeRequestError("not_found", "요청을 찾을 수 없습니다.");
@@ -210,6 +197,10 @@ export async function approveMockPartnerChangeRequest(
 export async function rejectMockPartnerChangeRequest(
   input: PartnerChangeRequestReviewInput,
 ) {
+  requirePartnerChangeRequestAuditContext(
+    input.auditContext,
+    "감사 요청 문맥이 없어 변경 요청을 거절할 수 없습니다.",
+  );
   const request = findRequest(input.requestId);
   if (!request) {
     throw new PartnerChangeRequestError("not_found", "요청을 찾을 수 없습니다.");

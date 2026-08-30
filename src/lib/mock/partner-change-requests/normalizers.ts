@@ -1,7 +1,13 @@
-import { normalizePartnerAudience } from "../../partner-audience.ts";
 import { inferCampusSlugsFromLocation, normalizeCampusSlugs } from "../../campuses.ts";
 import { normalizePartnerBenefitActionType } from "../../partner-benefit-action.ts";
 import { normalizePartnerBenefitItems } from "../../partner-benefit-items.ts";
+import {
+  normalizeAudience,
+  normalizeHttpUrlList,
+  normalizeOptionalText,
+  normalizeRequiredText,
+  normalizeTextList,
+} from "../../partner-change-requests/normalizers.ts";
 import { sanitizeHttpUrl, sanitizePartnerLinkValue } from "../../validation.ts";
 import type {
   PartnerChangeRequestSummary,
@@ -11,62 +17,17 @@ import type {
   MockChangeRequestServiceRecord,
 } from "./shared.ts";
 
-export function normalizeOptionalText(value?: string | null) {
-  const normalized = String(value ?? "").trim();
-  return normalized || null;
-}
-
-export function normalizeRequiredText(value?: string | null) {
-  return String(value ?? "").trim();
-}
+export {
+  arraysEqual,
+  normalizeAudience,
+  normalizeHttpUrlList,
+  normalizeOptionalText,
+  normalizeRequiredText,
+  normalizeTextList,
+} from "../../partner-change-requests/normalizers.ts";
 
 export function normalizeOptionalLink(value?: string | null) {
   return sanitizePartnerLinkValue(value ?? undefined);
-}
-
-export function normalizeHttpUrlList(
-  values?: Array<string | null | undefined> | null,
-) {
-  const seen = new Set<string>();
-  const next: string[] = [];
-
-  for (const value of values ?? []) {
-    const normalized = sanitizeHttpUrl(value ?? undefined);
-    if (!normalized || seen.has(normalized)) {
-      continue;
-    }
-    seen.add(normalized);
-    next.push(normalized);
-  }
-
-  return next;
-}
-
-export function normalizeTextList(values?: string[] | null) {
-  const seen = new Set<string>();
-  const next: string[] = [];
-
-  for (const value of values ?? []) {
-    const normalized = String(value ?? "").trim();
-    if (!normalized || seen.has(normalized)) {
-      continue;
-    }
-    seen.add(normalized);
-    next.push(normalized);
-  }
-
-  return next;
-}
-
-export function arraysEqual(a: string[], b: string[]) {
-  if (a.length !== b.length) {
-    return false;
-  }
-  return a.every((value, index) => value === b[index]);
-}
-
-export function normalizeAudience(values?: string[] | null) {
-  return normalizePartnerAudience(values);
 }
 
 export function collectServiceMediaUrls(service?: MockChangeRequestServiceRecord | null) {

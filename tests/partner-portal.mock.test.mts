@@ -35,6 +35,18 @@ const partnerAuthRepositoryModulePromise = import(
   new URL("../src/lib/partner-auth/repository.ts", import.meta.url).href
 ) as Promise<PartnerAuthRepositoryModule>;
 
+function createTestAuditContext(actorType: "admin" | "partner", actorId: string) {
+  return {
+    principal: { actorType, actorId },
+    request: {
+      requestId: crypto.randomUUID(),
+      path: "/partner/mock",
+      userAgent: "node:test",
+      ipAddress: "127.0.0.1",
+    },
+  };
+}
+
 beforeEach(async () => {
   const { resetMockPartnerPortalStore } = await mockPartnerPortalModulePromise;
   const { resetMockPartnerChangeRequestStore } =
@@ -357,6 +369,10 @@ test("updates immediate partner fields without approval", async () => {
   const result = await updateMockPartnerImmediateFields({
     companyIds: ["mock-partner-company-cafe-ssafy"],
     partnerId: "mock-partner-service-cafe-ssafy-yeoksam",
+    auditContext: createTestAuditContext(
+      "partner",
+      "mock-partner-account-cafe-ssafy",
+    ),
     thumbnail: "https://example.com/cafe-ssafy-thumb.webp",
     images: [
       "https://example.com/cafe-ssafy-1.webp",
@@ -386,6 +402,101 @@ test("updates immediate partner fields without approval", async () => {
   assert.equal(updatedContext?.inquiryLink, "02-999-1111");
 });
 
+test("mock partner mutations enforce the production audit and date contracts", async () => {
+  const {
+    updateMockPartnerImmediateFields,
+    createMockPartnerChangeRequest,
+  } = await mockPartnerChangeRequestModulePromise;
+
+  await assert.rejects(
+    updateMockPartnerImmediateFields({
+      companyIds: ["mock-partner-company-cafe-ssafy"],
+      partnerId: "mock-partner-service-cafe-ssafy-yeoksam",
+      thumbnail: null,
+      images: [],
+      tags: ["모임"],
+      reservationLink: null,
+      inquiryLink: null,
+    } as never),
+    /감사 요청 문맥이 없어 제휴처 정보를 저장할 수 없습니다/,
+  );
+
+  await assert.rejects(
+    createMockPartnerChangeRequest({
+      companyIds: ["mock-partner-company-cafe-ssafy"],
+      partnerId: "mock-partner-service-cafe-ssafy-yeoksam",
+      requestedByAccountId: "mock-partner-account-cafe-ssafy",
+      requestedByLoginId: "partner@cafessafy.example",
+      requestedByDisplayName: "김도연",
+      requestedPartnerName: "카페 싸피 역삼본점",
+      requestedPartnerLocation: "서울 강남구 역삼로 125",
+      requestedMapUrl: null,
+      requestedCampusSlugs: ["seoul"],
+      requestedConditions: ["평일만 사용"],
+      requestedBenefits: ["추가 혜택"],
+      requestedAppliesTo: ["student"],
+      requestedTags: [],
+      requestedThumbnail: null,
+      requestedImages: [],
+      requestedReservationLink: null,
+      requestedInquiryLink: null,
+      requestedPeriodStart: "2026-10-31",
+      requestedPeriodEnd: "2026-04-01",
+    }),
+    /제휴 종료일은 시작일보다 빠를 수 없습니다/,
+  );
+
+  await assert.rejects(
+    createMockPartnerChangeRequest({
+      companyIds: ["mock-partner-company-cafe-ssafy"],
+      partnerId: "mock-partner-service-cafe-ssafy-yeoksam",
+      requestedByAccountId: "mock-partner-account-cafe-ssafy",
+      requestedByLoginId: "partner@cafessafy.example",
+      requestedByDisplayName: "김도연",
+      requestedPartnerName: "카페 싸피 역삼본점",
+      requestedPartnerLocation: "서울 강남구 역삼로 125",
+      requestedMapUrl: null,
+      requestedCampusSlugs: ["seoul"],
+      requestedConditions: ["평일만 사용"],
+      requestedBenefits: ["추가 혜택"],
+      requestedAppliesTo: [],
+      requestedTags: [],
+      requestedThumbnail: null,
+      requestedImages: [],
+      requestedReservationLink: null,
+      requestedInquiryLink: null,
+      requestedPeriodStart: "2026-02-31",
+      requestedPeriodEnd: null,
+    }),
+    /제휴 시작일 형식을 확인해 주세요/,
+  );
+
+  await assert.rejects(
+    createMockPartnerChangeRequest({
+      companyIds: ["mock-partner-company-cafe-ssafy"],
+      partnerId: "mock-partner-service-cafe-ssafy-yeoksam",
+      requestedByAccountId: "mock-partner-account-cafe-ssafy",
+      requestedByLoginId: "partner@cafessafy.example",
+      requestedByDisplayName: "김도연",
+      requestedPartnerName: "카페 싸피 역삼본점",
+      requestedPartnerLocation: "서울 강남구 역삼로 125",
+      requestedMapUrl: null,
+      requestedCampusSlugs: ["seoul"],
+      requestedConditions: ["평일만 사용"],
+      requestedBenefits: ["추가 혜택"],
+      requestedAppliesTo: [],
+      requestedTags: [],
+      requestedThumbnail: null,
+      requestedImages: [],
+      requestedReservationLink: null,
+      requestedInquiryLink: null,
+      requestedPeriodStart: null,
+      requestedPeriodEnd: null,
+    }),
+    /적용 대상을 하나 이상 선택해 주세요/,
+  );
+});
+
 test("creates and approves partner change requests for approval-required fields only", async () => {
   const {
     updateMockPartnerImmediateFields,
@@ -397,6 +508,10 @@ test("creates and approves partner change requests for approval-required fields 
   await updateMockPartnerImmediateFields({
     companyIds: ["mock-partner-company-cafe-ssafy"],
     partnerId: "mock-partner-service-cafe-ssafy-yeoksam",
+    auditContext: createTestAuditContext(
+      "partner",
+      "mock-partner-account-cafe-ssafy",
+    ),
     thumbnail: "https://example.com/cafe-ssafy-thumb.webp",
     images: [
       "https://example.com/cafe-ssafy-1.webp",
@@ -455,6 +570,7 @@ test("creates and approves partner change requests for approval-required fields 
   await approveMockPartnerChangeRequest({
     requestId: request.id,
     adminId: "admin",
+    auditContext: createTestAuditContext("admin", "admin"),
   });
 
   const updatedContext = await getMockPartnerChangeRequestContext(
