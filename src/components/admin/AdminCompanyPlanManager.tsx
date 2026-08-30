@@ -9,11 +9,14 @@ import SubmitButton from "@/components/ui/SubmitButton";
 import Textarea from "@/components/ui/Textarea";
 import {
   PARTNER_COMPANY_PLAN_DEFINITIONS,
-  getPartnerCompanyPlanDefinition,
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
 import type { PartnerBillingInvoiceRecord } from "@/lib/partner-plan-service";
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import {
+  formatPartnerPlanDateTime,
+  getPartnerPlanBadgeLabel,
+  getPartnerPlanBadgeVariant,
+} from "@/lib/partner-plan-ui";
 import {
   approvePartnerPlanUpgradeRequest,
   confirmPartnerPlanBankTransferPayment,
@@ -65,10 +68,6 @@ export type AdminCompanyPlanEvent = {
   note: string;
   createdAt: string;
 };
-
-function formatDateTime(value?: string | null) {
-  return value ? formatKoreanDateTimeToMinute(value) : "없음";
-}
 
 function toDateInputValue(value?: string | null) {
   if (!value) {
@@ -139,8 +138,11 @@ function getTaxDocumentStatusLabel(
 }
 
 function PlanBadge({ tier }: { tier: PartnerCompanyPlanTier }) {
-  const definition = getPartnerCompanyPlanDefinition(tier);
-  return <Badge variant={tier === "boost" ? "primary" : tier === "partner" ? "success" : "neutral"}>{definition.label}</Badge>;
+  return (
+    <Badge variant={getPartnerPlanBadgeVariant(tier)}>
+      {getPartnerPlanBadgeLabel(tier)}
+    </Badge>
+  );
 }
 
 export default function AdminCompanyPlanManager({
@@ -209,7 +211,7 @@ export default function AdminCompanyPlanManager({
                       <div>
                         <h3 className="text-lg font-semibold text-foreground">{request.brandName}</h3>
                         <p className="text-sm text-muted-foreground">
-                          {request.companyName} · 요청자 {request.requestedByDisplayName ?? "담당자"} · {formatDateTime(request.createdAt)}
+                          {request.companyName} · 요청자 {request.requestedByDisplayName ?? "담당자"} · {formatPartnerPlanDateTime(request.createdAt)}
                         </p>
                       </div>
                     </div>
@@ -221,14 +223,14 @@ export default function AdminCompanyPlanManager({
                   <div className="grid gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4 text-sm md:grid-cols-3">
                     <p><span className="font-semibold text-foreground">입금자명</span><br />{request.payerName}</p>
                     <p><span className="font-semibold text-foreground">청구번호</span><br />{billing?.invoiceNumber ?? "미생성"}</p>
-                    <p><span className="font-semibold text-foreground">납부기한</span><br />{formatDateTime(billing?.dueAt)}</p>
+                    <p><span className="font-semibold text-foreground">납부기한</span><br />{formatPartnerPlanDateTime(billing?.dueAt)}</p>
                     <p>
                       <span className="font-semibold text-foreground">공급가액 / VAT</span><br />
                       {billing ? `${formatCurrency(billing.supplyAmountKrw)} / ${formatCurrency(billing.vatAmountKrw)}` : "미생성"}
                     </p>
                     <p>
                       <span className="font-semibold text-foreground">청구 기간</span><br />
-                      {billing ? `${formatDateTime(billing.servicePeriodStart)} - ${formatDateTime(billing.servicePeriodEnd)}` : "미생성"}
+                      {billing ? `${formatPartnerPlanDateTime(billing.servicePeriodStart)} - ${formatPartnerPlanDateTime(billing.servicePeriodEnd)}` : "미생성"}
                     </p>
                     <p><span className="font-semibold text-foreground">요청 메모</span><br />{request.memo || "없음"}</p>
                   </div>
@@ -298,7 +300,7 @@ export default function AdminCompanyPlanManager({
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    플랜 수정 {formatDateTime(brand.planUpdatedAt)}
+                    플랜 수정 {formatPartnerPlanDateTime(brand.planUpdatedAt)}
                   </p>
                 </div>
 
@@ -357,7 +359,7 @@ export default function AdminCompanyPlanManager({
                     <PlanBadge tier={event.nextPlanTier} />
                     {event.note ? <span className="text-sm text-muted-foreground">{event.note}</span> : null}
                   </div>
-                  <span className="text-xs text-muted-foreground">{formatDateTime(event.createdAt)}</span>
+                  <span className="text-xs text-muted-foreground">{formatPartnerPlanDateTime(event.createdAt)}</span>
                 </Card>
               );
             })}
