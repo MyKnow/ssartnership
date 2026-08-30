@@ -16,7 +16,7 @@ test("이미지 업로드 만료 정리는 bounded concurrency로 처리한다",
 
   assert.match(
     source,
-    /import \{ forEachWithConcurrency \} from "@\/lib\/async-concurrency";/,
+    /import\s*\{[\s\S]*forEachWithConcurrency[\s\S]*\}\s*from "@\/lib\/async-concurrency";/,
   );
   assert.match(source, /const EXPIRE_STALE_CONCURRENCY = 4;/);
   assert.match(
