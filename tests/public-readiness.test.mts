@@ -154,6 +154,13 @@ test("local prepush shares the change classifier while explicit promotion gates 
 
   const release = readRepoFile("scripts/release.mjs");
   assert.match(release, /runRequiredScript\("prepush"\)/);
+  assert.match(release, /ensureVersionFilesDoNotHaveUnstagedChanges/);
+  assert.match(release, /stageReleaseVersionFiles/);
+  assert.doesNotMatch(release, /runGit\(\["add", "-A"\]\)/);
+  assert.match(
+    release,
+    /runGit\(\["add", "--", "package\.json", "package-lock\.json"\]\)/,
+  );
   assert.doesNotMatch(release, /runRequiredScript\("build-storybook"\)/);
   assert.doesNotMatch(release, /runRequiredScript\("test-storybook"\)/);
   assert.doesNotMatch(release, /runRequiredScript\("test:visual"\)/);

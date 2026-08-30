@@ -37,6 +37,23 @@ test("회원가입 성공 전환은 중복 RSC 갱신 없이 한 번만 이동�
   assert.doesNotMatch(successTransition, /router\.refresh\(\);/);
 });
 
+test("회원가입 완료는 검증된 원래 목적지를 요청하고 그 경로로 한 번만 복귀한다", async () => {
+  const [form, route] = await Promise.all([
+    readFile(
+      new URL(
+        "../src/components/auth/MattermostSignupCompleteForm.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(new URL("../src/app/api/mm/signup/route.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(form, /returnTo:\s*sanitizeReturnTo\(returnTo, "\/"\)/);
+  assert.match(form, /router\.replace\(data\.redirectTo \?\? "\/"\)/);
+  assert.match(route, /redirectTo:\s*sanitizeReturnTo\(/);
+});
+
 test("회원가입 완료 요청은 이미지 바이트 대신 프로필 업로드 ID만 전송한다", async () => {
   const source = await readFile(
     new URL("../src/components/auth/MattermostSignupCompleteForm.tsx", import.meta.url),

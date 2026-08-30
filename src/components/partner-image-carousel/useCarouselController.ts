@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getCachedImageUrl,
-  warmCachedImageUrls,
+  warmCachedImageUrl,
 } from "@/lib/image-cache";
 import {
   clampCarouselZoom,
@@ -83,8 +83,8 @@ export function useCarouselController({
       return;
     }
 
-    warmCachedImageUrls(cachedImages.slice(1));
-  }, [cachedImages, hasImages]);
+    warmCachedImageUrl(cachedImages[activeIndex + 1]);
+  }, [activeIndex, cachedImages, hasImages]);
 
   useEffect(() => {
     const thumb = activeThumbRef.current;

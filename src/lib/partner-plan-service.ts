@@ -16,6 +16,8 @@ import { resolvePartnerBillingProfileForPlanRequest } from "@/lib/partner-billin
 import { listMockPartnerPortalCompanySetups } from "@/lib/mock/partner-portal/store";
 import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
 import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { normalizePartnerVisibility } from "@/lib/partner-visibility";
+import type { PartnerVisibility } from "@/lib/types";
 import {
   assertPartnerPlanUpgradeTransition,
   normalizePartnerPlanUpgradeRequestStatus,
@@ -37,7 +39,7 @@ export type PartnerBrandPlanRecord = {
   companyName: string;
   companySlug: string;
   location: string;
-  visibility: string;
+  visibility: PartnerVisibility;
   periodStart: string | null;
   periodEnd: string | null;
   planTier: PartnerCompanyPlanTier;
@@ -247,7 +249,7 @@ function mapBrand(row: BrandRow): PartnerBrandPlanRecord {
     companyName: company?.name ?? "미지정",
     companySlug: company?.slug ?? "",
     location: row.location ?? "",
-    visibility: row.visibility ?? "public",
+    visibility: normalizePartnerVisibility(row.visibility),
     periodStart: row.period_start ?? null,
     periodEnd: row.period_end ?? null,
     planTier,

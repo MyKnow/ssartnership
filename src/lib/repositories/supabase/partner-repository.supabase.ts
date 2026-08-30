@@ -206,7 +206,7 @@ const getCachedPartnerRowById = unstable_cache(
 );
 
 function toVisiblePartner(row: PartnerRow, categoryKey: string): Partner {
-  const galleryImages = row.thumbnail ? row.images ?? [] : (row.images ?? []).slice(1);
+  const galleryImages = row.images ?? [];
   const thumbnail = row.thumbnail ?? row.images?.[0] ?? null;
   return {
     id: row.id,

@@ -32,8 +32,27 @@ test.describe("auth and partner portal operation flows", () => {
     await page.goto("/partners/health-001?returnTo=%2F%3Fcategory%3Dhealth%23benefits");
     await page.waitForLoadState("networkidle");
 
-    const benefitAction = page.getByRole("link", { name: "혜택 이용하기" }).first();
+    await expect(
+      page.getByRole("banner").getByRole("link", { name: "로그인", exact: true }),
+    ).toHaveAttribute("href", "/auth/login?returnTo=%2Fpartners%2Fhealth-001");
+    await expect(
+      page.getByRole("banner").getByRole("link", {
+        name: "회원가입",
+        exact: true,
+      }),
+    ).toHaveAttribute("href", "/auth/signup?returnTo=%2Fpartners%2Fhealth-001");
+
+    const benefitAction = page.getByRole("link", {
+      name: "로그인 후 혜택 이용하기",
+    }).first();
+    const reviewWriteAction = page.getByRole("link", {
+      name: "로그인 후 리뷰 작성",
+    });
     await expect(benefitAction).toHaveAttribute(
+      "href",
+      "/auth/login?returnTo=%2Fpartners%2Fhealth-001",
+    );
+    await expect(reviewWriteAction).toHaveAttribute(
       "href",
       "/auth/login?returnTo=%2Fpartners%2Fhealth-001",
     );
@@ -46,6 +65,44 @@ test.describe("auth and partner portal operation flows", () => {
     const benefitUseReturnTo = loginUrl.searchParams.get("returnTo") ?? "";
     const decodedReturnTo = decodeURIComponent(benefitUseReturnTo);
     expect(decodedReturnTo).toBe("/partners/health-001");
+
+    const signupAction = page.getByRole("main").getByRole("link", {
+      name: "회원가입",
+      exact: true,
+    });
+    const headerSignupAction = page.getByRole("banner").getByRole("link", {
+      name: "회원가입",
+      exact: true,
+    });
+    await expect(headerSignupAction).toHaveAttribute(
+      "href",
+      "/auth/signup?returnTo=%2Fpartners%2Fhealth-001",
+    );
+    await expect(signupAction).toHaveAttribute(
+      "href",
+      "/auth/signup?returnTo=%2Fpartners%2Fhealth-001",
+    );
+    await signupAction.click();
+    await expect(page).toHaveURL(
+      /\/auth\/signup\?returnTo=%2Fpartners%2Fhealth-001$/,
+    );
+
+    await page.goBack();
+    await expect(page).toHaveURL(
+      /\/auth\/login\?returnTo=%2Fpartners%2Fhealth-001$/,
+    );
+    const demoLoginAction = page.getByRole("main").getByRole("link", {
+      name: "촬영용 데모 시작",
+    });
+    await expect(demoLoginAction).toHaveAttribute(
+      "href",
+      "/auth/mock?returnTo=%2Fpartners%2Fhealth-001",
+    );
+    await demoLoginAction.click();
+    await expect(page).toHaveURL(/\/partners\/health-001$/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "바디라인 피트니스" }),
+    ).toBeVisible();
   });
 
   test("@critical member login shows field-level validation before submitting", async ({ page }) => {

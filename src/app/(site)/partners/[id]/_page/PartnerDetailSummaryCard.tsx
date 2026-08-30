@@ -201,7 +201,7 @@ export default function PartnerDetailSummaryCard({
                 className="grid min-w-0 grid-cols-2 gap-1.5 min-[480px]:grid-cols-3 sm:gap-2"
                 itemClassName="min-w-0"
                 badgeClassName="min-h-9 w-full !border-primary !bg-primary px-1 text-[11px] tracking-[0.02em] !text-primary-foreground shadow-flat sm:px-3 sm:text-xs sm:tracking-[0.04em]"
-                inactiveBadgeClassName="min-h-9 w-full border-dashed border-border bg-transparent px-1 text-[11px] tracking-[0.02em] text-foreground sm:px-3 sm:text-xs sm:tracking-[0.04em]"
+                inactiveBadgeClassName="min-h-9 w-full border-border/45 bg-surface-muted/35 px-1 text-[11px] tracking-[0.02em] text-muted-foreground shadow-none sm:px-3 sm:text-xs sm:tracking-[0.04em]"
                 showAllOptions
               />
             </PartnerDetailInfoRow>

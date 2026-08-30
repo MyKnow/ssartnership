@@ -32,6 +32,14 @@ export function isPartnerDetailPath(pathname: string) {
   return /^\/partners\/[^/]+$/.test(pathname);
 }
 
+export function shouldSuppressPwaVisitRecommendation(pathname: string) {
+  return (
+    isFocusedSiteFlow(pathname) ||
+    pathname.startsWith("/install") ||
+    pathname.startsWith("/partners/")
+  );
+}
+
 export function isMyInfoPath(pathname: string) {
   return (
     pathname.startsWith("/certification") ||

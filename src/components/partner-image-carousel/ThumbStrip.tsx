@@ -54,8 +54,8 @@ export default function ThumbStrip({
             className="h-full w-full object-cover"
             sizes={placement === "side" ? "120px" : "(min-width: 1280px) 15vw, 96px"}
             unoptimized
-            loading="lazy"
-            fetchPriority="low"
+            loading={index === activeIndex ? "eager" : "lazy"}
+            fetchPriority={index === activeIndex ? "auto" : "low"}
           />
         </button>
       ))}

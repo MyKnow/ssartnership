@@ -125,7 +125,7 @@ export default function PartnerBenefitUseAction({
         href={action.requiresLogin ? loginHref : undefined}
         onClick={action.requiresLogin ? undefined : openDialog}
       >
-        혜택 이용하기
+        {action.requiresLogin ? "로그인 후 혜택 이용하기" : "혜택 이용하기"}
       </Button>
 
       {isOpen && portalRoot

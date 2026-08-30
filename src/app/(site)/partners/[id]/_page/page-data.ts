@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
 import { cache } from "react";
-import { getCachedImageUrl } from "@/lib/image-cache";
 import { createEmptyPartnerServiceMetrics } from "@/lib/partner-service-metrics";
 import {
   getBenefitUseAction,
@@ -151,7 +150,6 @@ export type PartnerDetailPageData = {
   partner: Partner;
   categoryLabel: string;
   isActive: boolean;
-  thumbnailUrl: string;
   mapLink: string | undefined;
   normalizedLinks: {
     benefitActionType: string;
@@ -227,7 +225,6 @@ export async function getPartnerDetailPageData(
   const category = categories.find((item) => item.key === resolvedPartner.category);
   const categoryLabel = category?.label ?? "알 수 없음";
   const isActive = isWithinPeriod(resolvedPartner.period.start, resolvedPartner.period.end);
-  const thumbnailUrl = resolvedPartner.thumbnail ? getCachedImageUrl(resolvedPartner.thumbnail) : "";
   const mapLink = getMapLink(resolvedPartner.mapUrl, resolvedPartner.location, resolvedPartner.name) ?? undefined;
   const normalizedLinks = isActive
     ? normalizeBenefitUseInquiry({
@@ -276,7 +273,6 @@ export async function getPartnerDetailPageData(
     partner: resolvedPartner,
     categoryLabel,
     isActive,
-    thumbnailUrl,
     mapLink,
     normalizedLinks,
     benefitUseAction,
@@ -286,7 +282,7 @@ export async function getPartnerDetailPageData(
     badgeStyle: category?.color
       ? {
           backgroundColor: withAlpha(category.color, "1f"),
-          color: category.color,
+          color: "var(--foreground)",
         }
       : undefined,
     chipStyle: category?.color

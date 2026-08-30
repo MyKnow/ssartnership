@@ -23,6 +23,7 @@ import {
   isMyInfoPath,
   isPartnerDetailPath,
 } from "@/lib/site-navigation";
+import { usePwaStandaloneMode } from "@/hooks/usePwaStandaloneMode";
 
 const MOBILE_NAV_ITEMS = [
   {
@@ -62,7 +63,7 @@ function getMemberNavigationHref(
   return `/auth/login?returnTo=${encodeURIComponent(href)}`;
 }
 
-export default function MobileNav({
+export function MobileNavSurface({
   signedInUserId,
 }: {
   signedInUserId?: string | null;
@@ -175,4 +176,18 @@ export default function MobileNav({
       />
     </>
   );
+}
+
+export default function MobileNav({
+  signedInUserId,
+}: {
+  signedInUserId?: string | null;
+}) {
+  const standalone = usePwaStandaloneMode();
+
+  if (!standalone) {
+    return null;
+  }
+
+  return <MobileNavSurface signedInUserId={signedInUserId} />;
 }

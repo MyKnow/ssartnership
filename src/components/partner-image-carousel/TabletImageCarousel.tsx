@@ -20,6 +20,7 @@ function PreviewCard({
   name,
   position,
   depth,
+  visibleFrom,
   onSelect,
   shouldIgnoreClick,
 }: {
@@ -28,6 +29,7 @@ function PreviewCard({
   name: string;
   position: "previous" | "next";
   depth: number;
+  visibleFrom: "sm" | "md";
   onSelect: (index: number) => void;
   shouldIgnoreClick: () => boolean;
 }) {
@@ -44,21 +46,27 @@ function PreviewCard({
         data-partner-image-carousel-preview={position}
         className={cn(
           "pointer-events-none absolute top-1/2 aspect-[4/3] -translate-y-1/2 overflow-hidden rounded-card border border-border bg-surface-muted shadow-flat",
-      )}
-      style={{
-        width: `${widthPercent}%`,
-        [position === "previous" ? "left" : "right"]: `${insetPercent}%`,
-        zIndex: 10 - depth,
-        opacity: Math.max(0.42, 1 - (depth - 1) * 0.18),
-      }}
+        )}
+        style={{
+          width: `${widthPercent}%`,
+          [position === "previous" ? "left" : "right"]: `${insetPercent}%`,
+          zIndex: 10 - depth,
+          opacity: Math.max(0.42, 1 - (depth - 1) * 0.18),
+        }}
       >
         <Image
           src={image}
           alt=""
           fill
-          sizes="(min-width: 768px) 46vw, 100vw"
+          sizes={
+            visibleFrom === "sm"
+              ? "(min-width: 640px) 46vw, 100vw"
+              : "(min-width: 768px) 46vw, 100vw"
+          }
           className="scale-[1.04] object-cover blur-[1.5px] saturate-75"
           unoptimized={isProxiedCachedImageUrl(image)}
+          loading={depth === 1 ? "eager" : "lazy"}
+          fetchPriority={depth === 1 ? "auto" : "low"}
         />
         <span
           aria-hidden="true"
@@ -100,6 +108,7 @@ export default function TabletImageCarousel({
   onSwipeCancel,
   shouldIgnoreSwipeClick,
   onHorizontalWheel,
+  visibleFrom = "md",
 }: {
   images: string[];
   name: string;
@@ -116,6 +125,7 @@ export default function TabletImageCarousel({
   onSwipeCancel: () => void;
   shouldIgnoreSwipeClick: () => boolean;
   onHorizontalWheel: HorizontalWheelHandler;
+  visibleFrom?: "sm" | "md";
 }) {
   const carouselSurfaceRef = useRef<HTMLDivElement | null>(null);
   const activeImage = images[activeIndex];
@@ -167,7 +177,10 @@ export default function TabletImageCarousel({
     <section
       aria-label={`${name} 이미지`}
       data-partner-image-tablet-carousel
-      className="hidden min-w-0 md:block"
+      className={cn(
+        "hidden min-w-0",
+        visibleFrom === "sm" ? "sm:block" : "md:block",
+      )}
     >
       <div
         ref={carouselSurfaceRef}
@@ -183,6 +196,7 @@ export default function TabletImageCarousel({
             name={name}
             position="previous"
             depth={depth}
+            visibleFrom={visibleFrom}
             onSelect={onSelect}
             shouldIgnoreClick={shouldIgnoreSwipeClick}
             key={`previous-${image}-${index}`}
@@ -213,9 +227,14 @@ export default function TabletImageCarousel({
               src={activeImage}
               alt={name}
               fill
-              sizes="(min-width: 768px) 65vw, 100vw"
+              sizes={
+                visibleFrom === "sm"
+                  ? "(min-width: 640px) 65vw, 100vw"
+                  : "(min-width: 768px) 65vw, 100vw"
+              }
               className="object-cover"
               unoptimized={isProxiedCachedImageUrl(activeImage)}
+              loading="eager"
               priority={activeIndex < 2}
             />
           </span>
@@ -228,6 +247,7 @@ export default function TabletImageCarousel({
             name={name}
             position="next"
             depth={depth}
+            visibleFrom={visibleFrom}
             onSelect={onSelect}
             shouldIgnoreClick={shouldIgnoreSwipeClick}
             key={`next-${image}-${index}`}
@@ -239,7 +259,10 @@ export default function TabletImageCarousel({
             type="button"
             onClick={onPrev}
             aria-label="이전 이미지"
-            className="absolute inset-y-0 left-0 z-20 my-auto hidden h-11 w-11 items-center justify-center rounded-full border border-border bg-surface/90 text-foreground shadow-flat backdrop-blur transition-interactive hover:border-strong hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:inline-flex"
+            className={cn(
+              "absolute inset-y-0 left-0 z-20 my-auto hidden h-11 w-11 items-center justify-center rounded-full border border-border bg-surface/90 text-foreground shadow-flat backdrop-blur transition-interactive hover:border-strong hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+              visibleFrom === "sm" ? "sm:inline-flex" : "md:inline-flex",
+            )}
           >
             <ChevronLeftIcon className="h-5 w-5" aria-hidden="true" />
           </button>
@@ -249,7 +272,10 @@ export default function TabletImageCarousel({
             type="button"
             onClick={onNext}
             aria-label="다음 이미지"
-            className="absolute inset-y-0 right-0 z-20 my-auto hidden h-11 w-11 items-center justify-center rounded-full border border-border bg-surface/90 text-foreground shadow-flat backdrop-blur transition-interactive hover:border-strong hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:inline-flex"
+            className={cn(
+              "absolute inset-y-0 right-0 z-20 my-auto hidden h-11 w-11 items-center justify-center rounded-full border border-border bg-surface/90 text-foreground shadow-flat backdrop-blur transition-interactive hover:border-strong hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+              visibleFrom === "sm" ? "sm:inline-flex" : "md:inline-flex",
+            )}
           >
             <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
           </button>

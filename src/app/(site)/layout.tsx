@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Footer from "@/components/Footer";
 import MobileNav from "@/components/MobileNav";
+import PwaVisitRecommendation from "@/components/pwa/PwaVisitRecommendation";
 import RoutePageViewTracker from "@/components/analytics/RoutePageViewTracker";
 import { getMemberRequiredGateRedirect } from "@/lib/member-required-gates";
 import { getForwardedRequestPath } from "@/lib/request-path";
@@ -35,8 +36,9 @@ export default async function SiteLayout({
         <RoutePageViewTracker area="site" />
       </Suspense>
       <MobileNav signedInUserId={session?.userId} />
+      <PwaVisitRecommendation />
       <div className="flex-1">{children}</div>
-      <Footer reserveMobileNavigationSpace />
+      <Footer />
     </div>
   );
 }

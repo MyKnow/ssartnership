@@ -95,6 +95,33 @@ export const PrefetchesNextPage: Story = {
   play: async ({ canvasElement, loaded }) => {
     const fetchMock = getFetchMock(loaded);
     const canvas = within(canvasElement);
+    const reviewContainer = canvasElement.querySelector<HTMLElement>(
+      "[data-partner-review-container]",
+    );
+    await expect(reviewContainer).not.toBeNull();
+    await expect(
+      reviewContainer!.querySelector("[data-partner-review-summary]"),
+    ).not.toBeNull();
+    await expect(
+      reviewContainer!.querySelector("[data-partner-review-filters]"),
+    ).not.toBeNull();
+    await expect(
+      reviewContainer!.querySelector("[data-partner-review-list]"),
+    ).not.toBeNull();
+    await expect(
+      reviewContainer!.querySelectorAll("[data-partner-review-divider]"),
+    ).toHaveLength(2);
+    await expect(
+      reviewContainer!.querySelectorAll("[data-partner-review-item-divider]"),
+    ).toHaveLength(9);
+    await expect(
+      reviewContainer!.querySelectorAll("article[data-partner-review-item]"),
+    ).toHaveLength(10);
+    await expect(canvas.queryByText("목록")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("10개 표시")).not.toBeInTheDocument();
+    await expect(
+      canvas.getByText("사진이 있는 리뷰만 보기"),
+    ).toBeInTheDocument();
 
     await expect(canvas.getByText("현재 10개 표시 중입니다.")).toBeInTheDocument();
     await waitFor(() => {

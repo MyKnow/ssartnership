@@ -77,6 +77,34 @@ test("파트너 hero 액션은 32px 시각 크기와 44px 터치 영역을 유�
   assert.match(share, /className\?: string/);
 });
 
+test("파트너 모바일 hero는 카테고리와 액션, 이름, 날짜의 세 행으로 읽힌다", () => {
+  const hero = readRepoFile(
+    "src/app/(site)/partners/[id]/_page/PartnerDetailHeroContent.tsx",
+  );
+
+  assert.match(
+    hero,
+    /grid-cols-\[minmax\(0,1fr\)_auto\][\s\S]*sm:grid-cols-\[auto_minmax\(0,1fr\)_auto\]/,
+  );
+  assert.match(hero, /data-partner-detail-meta[\s\S]*className="contents"/);
+  assert.match(
+    hero,
+    /PartnerCategoryBadge[\s\S]*col-start-1 row-start-1[\s\S]*sm:row-start-1/,
+  );
+  assert.match(
+    hero,
+    /data-partner-detail-hero-actions[\s\S]*col-start-2 row-start-1[\s\S]*sm:col-start-3 sm:row-start-2/,
+  );
+  assert.match(
+    hero,
+    /PageHeader[\s\S]*col-span-2 col-start-1 row-start-2[\s\S]*sm:row-start-2/,
+  );
+  assert.match(
+    hero,
+    /PartnerDetailPeriodMeta[\s\S]*col-span-2 col-start-1 row-start-3[\s\S]*sm:col-span-1 sm:col-start-2 sm:row-start-1/,
+  );
+});
+
 test("파트너 혜택 이용 FAB는 화면 우측에 고정된다", () => {
   const actionBar = readRepoFile(
     "src/app/(site)/partners/[id]/_page/PartnerDetailMobileActionBar.tsx",

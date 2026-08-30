@@ -116,6 +116,13 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
     "utf8",
   );
   assert.match(releaseScript, /runRequiredScript\("prepush"\)/);
+  assert.match(releaseScript, /ensureVersionFilesDoNotHaveUnstagedChanges/);
+  assert.match(releaseScript, /stageReleaseVersionFiles/);
+  assert.doesNotMatch(releaseScript, /runGit\(\["add", "-A"\]\)/);
+  assert.match(
+    releaseScript,
+    /runGit\(\["add", "--", "package\.json", "package-lock\.json"\]\)/,
+  );
   assert.doesNotMatch(releaseScript, /runRequiredScript\("build-storybook"\)/);
   assert.doesNotMatch(releaseScript, /runRequiredScript\("test-storybook"\)/);
   assert.doesNotMatch(releaseScript, /runRequiredScript\("test:visual"\)/);
@@ -234,7 +241,7 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
   assert.ok(publicPartnerNavigationTest);
   assert.match(
     publicPartnerNavigationTest,
-    /await waitForDirectoryControls\(page\)/,
+    /await (?:gotoDirectory\(page, "\/"\)|waitForDirectoryControls\(page\))/,
   );
   assert.match(publicPartnerNavigationTest, /await Promise\.all\(\[/);
   assert.match(
@@ -245,9 +252,9 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
     publicPartnerNavigationTest.indexOf("page.waitForURL") <
       publicPartnerNavigationTest.indexOf("publicPartnerLink.click"),
   );
-  assert.ok(
-    publicPartnerNavigationTest.lastIndexOf('page.waitForLoadState("networkidle")') >
-      publicPartnerNavigationTest.lastIndexOf('getByRole("heading"'),
+  assert.doesNotMatch(
+    publicPartnerNavigationTest,
+    /page\.waitForLoadState\("networkidle"\)/,
   );
   assert.doesNotMatch(
     publicPartnerNavigationTest,
