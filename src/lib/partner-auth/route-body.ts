@@ -4,9 +4,15 @@ import {
 } from "@/lib/request-body-limit";
 
 export class PartnerPortalRouteBodyError extends Error {
-  constructor(message = "요청 본문 형식을 확인해 주세요.") {
+  readonly status: 400 | 413;
+
+  constructor(
+    message = "요청 본문 형식을 확인해 주세요.",
+    status: 400 | 413 = 400,
+  ) {
     super(message);
     this.name = "PartnerPortalRouteBodyError";
+    this.status = status;
   }
 }
 
@@ -23,7 +29,10 @@ export async function readPartnerPortalJsonBody<T>(request: Request) {
       throw error;
     }
     if (error instanceof JsonRequestBodyError) {
-      throw new PartnerPortalRouteBodyError(error.message);
+      throw new PartnerPortalRouteBodyError(
+        error.message,
+        error.code === "body_too_large" ? 413 : 400,
+      );
     }
     throw new PartnerPortalRouteBodyError();
   }
