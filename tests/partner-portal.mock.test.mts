@@ -400,6 +400,16 @@ test("active partner portal repository exposes the same mock auth and setup cont
 test("builds a company dashboard with aggregate metrics and service statuses", async () => {
   const { getMockPartnerPortalDashboard } =
     await mockPartnerPortalModulePromise;
+  const { getMockPartnerPortalStore } =
+    await mockPartnerPortalStoreModulePromise;
+  const store = getMockPartnerPortalStore();
+  const cafeService = store.setups[0]?.company.services[0];
+  const gymService = store.setups[1]?.company.services[0];
+  assert.ok(cafeService);
+  assert.ok(gymService);
+  cafeService.metrics.benefitUsageCount = 7;
+  gymService.metrics.benefitUsageCount = 11;
+
   const dashboard = await getMockPartnerPortalDashboard([
     "mock-partner-company-cafe-ssafy",
     "mock-partner-company-urban-gym",
@@ -410,10 +420,21 @@ test("builds a company dashboard with aggregate metrics and service statuses", a
   assert.equal(dashboard.totals.detailViews, 5650);
   assert.equal(dashboard.totals.totalClicks, 2096);
   assert.equal(dashboard.totals.reviewCount, 104);
+  assert.equal(dashboard.totals.benefitUsageCount, 18);
   assert.equal(dashboard.companies[0]?.services.length, 6);
   assert.equal(dashboard.companies[1]?.services.length, 2);
+  assert.equal(
+    dashboard.companies[0]?.services[0]?.metrics.benefitUsageCount,
+    7,
+  );
+  assert.equal(
+    dashboard.companies[1]?.services[0]?.metrics.benefitUsageCount,
+    11,
+  );
   assert.equal(dashboard.companies[0]?.totals.detailViews, 3850);
   assert.equal(dashboard.companies[0]?.totals.detailUv, 1284);
+  assert.equal(dashboard.companies[0]?.totals.benefitUsageCount, 7);
+  assert.equal(dashboard.companies[1]?.totals.benefitUsageCount, 11);
   assert.equal(dashboard.companies[0]?.services[0]?.planTier, "basic");
   assert.equal(dashboard.companies[0]?.services[0]?.metrics.detailUv, 0);
   assert.equal(dashboard.companies[0]?.services[1]?.planTier, "partner");
