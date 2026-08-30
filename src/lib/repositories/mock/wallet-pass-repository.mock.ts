@@ -19,6 +19,7 @@ import type {
   WalletPassPlatform,
   WalletPassRepository,
 } from "@/lib/repositories/wallet-pass-repository";
+import { normalizeAppleWalletDeviceRegistrationReadLimit } from "@/lib/wallet/apple/limits";
 
 type OperationRecord = {
   operation: "issue" | "revoke";
@@ -116,11 +117,15 @@ export class MockWalletPassRepository implements WalletPassRepository {
     return pass ? cloneRecord(pass) : null;
   }
 
-  async listAppleWalletDeviceRegistrationsForPass(passId: string) {
+  async listAppleWalletDeviceRegistrationsForPass(input: {
+    passId: string;
+    limit: number;
+  }) {
     return cloneRecord(
-      (this.registrations.get(passId) ?? []).filter(
-        (candidate) => candidate.removedAt === null,
-      ),
+      (this.registrations.get(input.passId) ?? [])
+        .filter((candidate) => candidate.removedAt === null)
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+        .slice(0, normalizeAppleWalletDeviceRegistrationReadLimit(input.limit)),
     );
   }
 

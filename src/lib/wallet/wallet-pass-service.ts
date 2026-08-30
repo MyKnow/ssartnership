@@ -17,6 +17,10 @@ import {
   type EncryptedApplePushToken,
 } from "@/lib/wallet/apple/apple-wallet-device-token";
 import {
+  APPLE_WALLET_DEVICE_CLEANUP_CONCURRENCY,
+  MAX_APPLE_WALLET_PUSH_TOKENS_PER_BATCH,
+} from "@/lib/wallet/apple/limits";
+import {
   buildWalletPassDisplaySnapshot,
   getMemberWalletPassEligibility,
   getWalletPassEligibilityMessage,
@@ -387,7 +391,10 @@ export async function notifyAppleWalletPassChange(
 ) {
   const config = requireAppleWalletConfig();
   const registrations = await walletPassRepository
-    .listAppleWalletDeviceRegistrationsForPass(pass.id);
+    .listAppleWalletDeviceRegistrationsForPass({
+      passId: pass.id,
+      limit: MAX_APPLE_WALLET_PUSH_TOKENS_PER_BATCH,
+    });
   let tokenReadFailures = 0;
   const tokens = registrations.flatMap((registration) => {
     if (registration.pushTokenKeyVersion !== 1) {
@@ -429,8 +436,10 @@ export async function notifyAppleWalletPassChange(
   const result = await (options.sendUpdate ?? sendAppleWalletPassUpdate)(tokens);
   if (result.invalidTokens.length > 0) {
     const invalidTokenSet = new Set(result.invalidTokens);
-    await Promise.all(
-      registrations.map(async (registration) => {
+    await forEachWithConcurrency(
+      registrations,
+      APPLE_WALLET_DEVICE_CLEANUP_CONCURRENCY,
+      async (registration) => {
         try {
           const token = decryptApplePushToken(
             {
@@ -451,7 +460,7 @@ export async function notifyAppleWalletPassChange(
         } catch {
           return;
         }
-      }),
+      },
     );
   }
   const combinedResult = {

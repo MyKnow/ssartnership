@@ -82,4 +82,24 @@ describe("Apple Wallet APNs update", () => {
     assert.deepEqual(result.reasonCodes, ["wallet_disabled"]);
     assert.equal(result.failed, 1);
   });
+
+  it("bounds one notification batch before starting APNs transports", async () => {
+    setConfiguredEnv();
+    let transportCalls = 0;
+    const tokens = Array.from({ length: 1_001 }, (_, index) =>
+      index.toString(16).padStart(64, "0"));
+
+    const result = await sendAppleWalletPassUpdate(tokens, {
+      transport: async () => {
+        transportCalls += 1;
+        return { statusCode: 200 };
+      },
+      concurrency: 16,
+    });
+
+    assert.equal(transportCalls, 1_000);
+    assert.equal(result.delivered, 1_000);
+    assert.equal(result.failed, 1);
+    assert.deepEqual(result.reasonCodes, ["batch_truncated"]);
+  });
 });

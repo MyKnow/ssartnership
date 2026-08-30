@@ -122,7 +122,7 @@ test("apple wallet registration route encrypts push tokens and returns 201/200",
 
   const { walletPassRepository } = await import("../src/lib/repositories/wallet-pass.ts");
   const registrations = await walletPassRepository.listAppleWalletDeviceRegistrationsForPass(
-    issued.pass.id,
+    { passId: issued.pass.id, limit: 10 },
   );
   assert.equal(registrations.length >= 1, true);
   assert.equal(registrations[0]?.pushTokenCiphertext.includes("b".repeat(64)), false);

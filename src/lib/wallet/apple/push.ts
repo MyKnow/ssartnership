@@ -2,9 +2,9 @@ import { connect } from "node:http2";
 import { forEachWithConcurrency } from "../../async-concurrency.ts";
 import { getAppleWalletConfigStatus } from "./config";
 import { normalizeApplePushToken } from "./apple-wallet-device-token";
+import { MAX_APPLE_WALLET_PUSH_TOKENS_PER_BATCH } from "./limits";
 
 const APNS_ORIGIN = "https://api.push.apple.com";
-const MAX_PUSH_TOKENS_PER_BATCH = 1_000;
 const DEFAULT_CONCURRENCY = 8;
 
 type AppleWalletPushTransportInput = {
@@ -136,7 +136,10 @@ export async function sendAppleWalletPassUpdate(
   const uniqueValidTokens = [
     ...new Set(parsedTokens.filter((token): token is string => Boolean(token))),
   ];
-  const normalizedTokens = uniqueValidTokens.slice(0, MAX_PUSH_TOKENS_PER_BATCH);
+  const normalizedTokens = uniqueValidTokens.slice(
+    0,
+    MAX_APPLE_WALLET_PUSH_TOKENS_PER_BATCH,
+  );
   const truncatedTokenCount = uniqueValidTokens.length - normalizedTokens.length;
   const result: AppleWalletPushResult = {
     delivered: 0,
