@@ -1788,7 +1788,19 @@ export async function completeManualMemberPasswordAction(input: {
   };
 }
 
-export async function issueManualMemberPasswordReset(email: string) {
+export type ManualMemberPasswordResetIssueResult =
+  | {
+      ok: true;
+      reason: "issued";
+    }
+  | {
+      ok: false;
+      reason: "not_found" | "already_pending";
+    };
+
+export async function issueManualMemberPasswordReset(
+  email: string,
+): Promise<ManualMemberPasswordResetIssueResult> {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("members")
@@ -1797,8 +1809,14 @@ export async function issueManualMemberPasswordReset(email: string) {
     .not("email_verified_at", "is", null)
     .is("deleted_at", null)
     .maybeSingle();
-  if (error || !data?.id || data.must_change_password || !data.email_normalized) {
-    return false;
+  if (error) {
+    throw error;
+  }
+  if (!data?.id || !data.email_normalized) {
+    return { ok: false, reason: "not_found" };
+  }
+  if (data.must_change_password) {
+    return { ok: false, reason: "already_pending" };
   }
   const token = await createManualPasswordAction({
     memberId: data.id as string,
@@ -1810,5 +1828,5 @@ export async function issueManualMemberPasswordReset(email: string) {
     displayName: String(data.display_name ?? "회원"),
     token,
   });
-  return true;
+  return { ok: true, reason: "issued" };
 }

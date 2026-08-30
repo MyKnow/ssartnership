@@ -105,6 +105,13 @@ test("수동 초기 설정과 이메일 재설정은 토큰 해시만 서버에 
   assert.doesNotMatch(complete, /properties:\s*\{[^}]*token/i);
   assert.match(reset, /hashMemberEmailIdentifier/);
   assert.match(reset, /issueManualMemberPasswordReset/);
+  assert.match(reset, /recordMemberAuthAttempt\("reset-password", throttle, resetResult\.ok\)/);
+  assert.match(reset, /if \(!resetResult\.ok\) \{\s*await delayMemberAuthAttempt\("reset-password"\);/);
+  assert.match(reset, /recordMemberAuthAttempt\("reset-password", throttle, false\)\.catch\(\(\) => undefined\)/);
+  assert.match(service, /if \(error\) \{\s*throw error;\s*\}/);
+  assert.match(service, /return \{ ok: false, reason: "not_found" \};/);
+  assert.match(service, /return \{ ok: false, reason: "already_pending" \};/);
+  assert.match(service, /return \{ ok: true, reason: "issued" \};/);
   assert.match(service, /deliveryChannel: "email"/);
   assert.match(service, /deliveryChannel: "mattermost"/);
 });
