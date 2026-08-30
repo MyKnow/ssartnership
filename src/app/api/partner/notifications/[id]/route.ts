@@ -1,32 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  deletePartnerStoredNotifications,
+  markPartnerStoredNotificationsRead,
+} from "@/lib/partner-notification-store";
 import { getPartnerSession } from "@/lib/partner-session";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
-  createNotificationStorageError,
   getSafeNotificationRouteError,
 } from "@/lib/notifications/safe-error";
+import { isValidPartnerNotificationId } from "@/lib/partner-notification-input";
 
 export const runtime = "nodejs";
-
-const uuidPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-async function getUnreadCount(accountId: string) {
-  const supabase = getSupabaseAdminClient();
-  const { count, error } = await supabase
-    .from("partner_notification_recipients")
-    .select("id", { count: "exact", head: true })
-    .eq("account_id", accountId)
-    .is("deleted_at", null)
-    .is("read_at", null);
-
-  if (error) {
-    throw createNotificationStorageError(error);
-  }
-
-  return count ?? 0;
-}
 
 export async function PATCH(
   request: NextRequest,
@@ -44,28 +28,21 @@ export async function PATCH(
     return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
   }
   const { id } = await params;
-  if (!uuidPattern.test(id)) {
+  if (!isValidPartnerNotificationId(id)) {
     return NextResponse.json({ message: "알림 ID 형식을 확인해 주세요." }, { status: 400 });
   }
-  const supabase = getSupabaseAdminClient();
   try {
-    const now = new Date().toISOString();
-    const { data, error } = await supabase
-      .from("partner_notification_recipients")
-      .update({ read_at: now, updated_at: now })
-      .eq("account_id", session.accountId)
-      .eq("notification_id", id)
-      .is("deleted_at", null)
-      .select("id")
-      .maybeSingle();
-    if (error) {
-      throw createNotificationStorageError(error);
-    }
-    if (!data) {
+    const result = await markPartnerStoredNotificationsRead({
+      accountId: session.accountId,
+      notificationIds: [id],
+    });
+    if (result.updatedCount === 0) {
       return NextResponse.json({ message: "알림을 찾을 수 없습니다." }, { status: 404 });
     }
-    const unreadCount = await getUnreadCount(session.accountId);
-    return NextResponse.json({ ok: true, summary: { unreadCount } });
+    return NextResponse.json({
+      ok: true,
+      summary: { unreadCount: result.unreadCount },
+    });
   } catch (error) {
     console.error("[partner-notification] mark read failed", error);
     const safeError = getSafeNotificationRouteError(
@@ -95,28 +72,21 @@ export async function DELETE(
     return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
   }
   const { id } = await params;
-  if (!uuidPattern.test(id)) {
+  if (!isValidPartnerNotificationId(id)) {
     return NextResponse.json({ message: "알림 ID 형식을 확인해 주세요." }, { status: 400 });
   }
-  const supabase = getSupabaseAdminClient();
   try {
-    const now = new Date().toISOString();
-    const { data, error } = await supabase
-      .from("partner_notification_recipients")
-      .update({ deleted_at: now, updated_at: now })
-      .eq("account_id", session.accountId)
-      .eq("notification_id", id)
-      .is("deleted_at", null)
-      .select("id")
-      .maybeSingle();
-    if (error) {
-      throw createNotificationStorageError(error);
-    }
-    if (!data) {
+    const result = await deletePartnerStoredNotifications({
+      accountId: session.accountId,
+      notificationIds: [id],
+    });
+    if (result.updatedCount === 0) {
       return NextResponse.json({ message: "알림을 찾을 수 없습니다." }, { status: 404 });
     }
-    const unreadCount = await getUnreadCount(session.accountId);
-    return NextResponse.json({ ok: true, summary: { unreadCount } });
+    return NextResponse.json({
+      ok: true,
+      summary: { unreadCount: result.unreadCount },
+    });
   } catch (error) {
     console.error("[partner-notification] delete failed", error);
     const safeError = getSafeNotificationRouteError(

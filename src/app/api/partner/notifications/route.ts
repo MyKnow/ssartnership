@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isPartnerPortalCompanyAllowed } from "@/lib/partner-portal-scope";
+import {
+  deletePartnerStoredNotifications,
+  listPartnerStoredNotifications,
+  markPartnerStoredNotificationsRead,
+} from "@/lib/partner-notification-store";
 import { getPartnerSession } from "@/lib/partner-session";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   NotificationRequestError,
-  createNotificationStorageError,
   getSafeNotificationRouteError,
 } from "@/lib/notifications/safe-error";
+import {
+  MAX_PARTNER_NOTIFICATION_BODY_BYTES,
+  normalizePartnerNotificationIds,
+} from "@/lib/partner-notification-input";
 
 export const runtime = "nodejs";
-
-const uuidPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function getInvalidRequestResponse() {
   return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
@@ -40,24 +44,19 @@ async function requirePartnerNotificationSession(request: NextRequest) {
   return { accountId: session.accountId, session };
 }
 
-async function getUnreadCount(accountId: string) {
-  const supabase = getSupabaseAdminClient();
-  const { count, error } = await supabase
-    .from("partner_notification_recipients")
-    .select("id", { count: "exact", head: true })
-    .eq("account_id", accountId)
-    .is("deleted_at", null)
-    .is("read_at", null);
-
-  if (error) {
-    throw createNotificationStorageError(error);
+async function parseNotificationIds(request: NextRequest) {
+  const contentLength = Number(request.headers.get("content-length"));
+  if (
+    Number.isFinite(contentLength) &&
+    contentLength > MAX_PARTNER_NOTIFICATION_BODY_BYTES
+  ) {
+    throw new NotificationRequestError("요청 본문이 너무 큽니다.");
   }
 
-  return count ?? 0;
-}
-
-async function parseNotificationIds(request: NextRequest) {
   const raw = await request.text();
+  if (Buffer.byteLength(raw, "utf8") > MAX_PARTNER_NOTIFICATION_BODY_BYTES) {
+    throw new NotificationRequestError("요청 본문이 너무 큽니다.");
+  }
   if (!raw.trim()) {
     return null;
   }
@@ -73,54 +72,9 @@ async function parseNotificationIds(request: NextRequest) {
     throw new NotificationRequestError("요청 본문 형식을 확인해 주세요.");
   }
 
-  const notificationIds = (payload as { notificationIds?: unknown }).notificationIds;
-  if (notificationIds === undefined) {
-    return null;
-  }
-
-  if (!Array.isArray(notificationIds)) {
-    throw new NotificationRequestError("알림 선택값을 확인해 주세요.");
-  }
-
-  const normalized = [
-    ...new Set(
-      notificationIds
-        .map((value) => (typeof value === "string" ? value.trim() : ""))
-        .filter(Boolean),
-    ),
-  ];
-
-  if (normalized.some((id) => !uuidPattern.test(id))) {
-    throw new NotificationRequestError("알림 ID 형식을 확인해 주세요.");
-  }
-
-  return normalized;
-}
-
-async function getScopedNotificationIds(
-  supabase: ReturnType<typeof getSupabaseAdminClient>,
-  companyId: string,
-) {
-  const [companyResult, globalResult] = await Promise.all([
-    supabase
-      .from("partner_notifications")
-      .select("id")
-      .eq("company_id", companyId),
-    supabase
-      .from("partner_notifications")
-      .select("id")
-      .is("company_id", null),
-  ]);
-  if (companyResult.error) {
-    throw createNotificationStorageError(companyResult.error);
-  }
-  if (globalResult.error) {
-    throw createNotificationStorageError(globalResult.error);
-  }
-  return [
-    ...(companyResult.data ?? []),
-    ...(globalResult.data ?? []),
-  ].map((row) => row.id as string);
+  return normalizePartnerNotificationIds(
+    (payload as { notificationIds?: unknown }).notificationIds,
+  );
 }
 
 export async function GET(request: NextRequest) {
@@ -133,46 +87,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: "권한이 없습니다." }, { status: 403 });
   }
   try {
-    const supabase = getSupabaseAdminClient();
-    let notificationIds: string[] | null = null;
-    if (companyId) {
-      notificationIds = await getScopedNotificationIds(supabase, companyId);
-    }
-    if (notificationIds && notificationIds.length === 0) {
+    const result = await listPartnerStoredNotifications({
+      accountId: session.accountId,
+      companyId,
+      limit: 30,
+    });
+    if (companyId && result.isEmptyScope) {
       return NextResponse.json({ unreadCount: 0, items: [] });
-    }
-    let countQuery = supabase
-      .from("partner_notification_recipients")
-      .select("id", { count: "exact", head: true })
-      .eq("account_id", session.accountId)
-      .is("deleted_at", null)
-      .is("read_at", null);
-    let listQuery = supabase
-      .from("partner_notification_recipients")
-      .select("id,read_at,deleted_at,created_at,notification:partner_notifications(id,type,title,body,target_url,metadata,company_id,created_at)")
-      .eq("account_id", session.accountId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(30);
-    if (notificationIds) {
-      countQuery = countQuery.in("notification_id", notificationIds);
-      listQuery = listQuery.in("notification_id", notificationIds);
-    }
-    const [
-      { count, error: countError },
-      { data, error: listError },
-    ] = await Promise.all([countQuery, listQuery]);
-    if (countError) {
-      throw createNotificationStorageError(countError);
-    }
-    if (listError) {
-      throw createNotificationStorageError(listError);
     }
     return NextResponse.json({
       ok: true,
-      summary: { unreadCount: count ?? 0 },
-      unreadCount: count ?? 0,
-      items: data ?? [],
+      summary: { unreadCount: result.unreadCount },
+      unreadCount: result.unreadCount,
+      items: result.items,
     });
   } catch (error) {
     console.error("[partner-notifications] list failed", error);
@@ -195,32 +122,10 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const notificationIds = await parseNotificationIds(request);
-    const now = new Date().toISOString();
-    const supabase = getSupabaseAdminClient();
-    let query = supabase
-      .from("partner_notification_recipients")
-      .update({ read_at: now, updated_at: now })
-      .eq("account_id", auth.accountId)
-      .is("deleted_at", null)
-      .is("read_at", null);
-
-    if (notificationIds && notificationIds.length === 0) {
-      return NextResponse.json({
-        ok: true,
-        summary: { unreadCount: await getUnreadCount(auth.accountId) },
-      });
-    }
-
-    if (notificationIds) {
-      query = query.in("notification_id", notificationIds);
-    }
-
-    const { error } = await query;
-    if (error) {
-      throw createNotificationStorageError(error);
-    }
-
-    const unreadCount = await getUnreadCount(auth.accountId);
+    const { unreadCount } = await markPartnerStoredNotificationsRead({
+      accountId: auth.accountId,
+      notificationIds,
+    });
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
     console.error("[partner-notifications] mark read failed", error);
@@ -243,31 +148,10 @@ export async function DELETE(request: NextRequest) {
 
   try {
     const notificationIds = await parseNotificationIds(request);
-    const now = new Date().toISOString();
-    const supabase = getSupabaseAdminClient();
-    let query = supabase
-      .from("partner_notification_recipients")
-      .update({ deleted_at: now, updated_at: now })
-      .eq("account_id", auth.accountId)
-      .is("deleted_at", null);
-
-    if (notificationIds && notificationIds.length === 0) {
-      return NextResponse.json({
-        ok: true,
-        summary: { unreadCount: await getUnreadCount(auth.accountId) },
-      });
-    }
-
-    if (notificationIds) {
-      query = query.in("notification_id", notificationIds);
-    }
-
-    const { error } = await query;
-    if (error) {
-      throw createNotificationStorageError(error);
-    }
-
-    const unreadCount = await getUnreadCount(auth.accountId);
+    const { unreadCount } = await deletePartnerStoredNotifications({
+      accountId: auth.accountId,
+      notificationIds,
+    });
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
     console.error("[partner-notifications] delete failed", error);

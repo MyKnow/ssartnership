@@ -1,4 +1,3 @@
-import { PartnerPortalSetupError } from "./partner-portal-errors.ts";
 export {
   PartnerPortalSetupError,
   type PartnerPortalSetupErrorCode,
@@ -82,28 +81,21 @@ export type PartnerPortalDemoSetupSummary = {
 };
 
 export interface PartnerPortalRepository {
+  authenticateLogin(
+    loginId: string,
+    password: string,
+  ): Promise<PartnerPortalLoginResult>;
+  requestPasswordReset(email: string): Promise<PartnerPortalPasswordResetResult>;
+  changePassword(input: {
+    accountId: string;
+    currentPassword: string;
+    nextPassword: string;
+  }): Promise<PartnerPortalPasswordChangeResult>;
   listDemoSetups(): Promise<PartnerPortalDemoSetupSummary[]>;
   getSetupContext(token: string): Promise<PartnerPortalSetupContext | null>;
   completeInitialSetup(
     input: PartnerPortalSetupInput,
   ): Promise<PartnerPortalSetupResult>;
-}
-
-class UnconfiguredPartnerPortalRepository implements PartnerPortalRepository {
-  async listDemoSetups(): Promise<PartnerPortalDemoSetupSummary[]> {
-    return [];
-  }
-
-  async getSetupContext(): Promise<PartnerPortalSetupContext | null> {
-    return null;
-  }
-
-  async completeInitialSetup(): Promise<PartnerPortalSetupResult> {
-    throw new PartnerPortalSetupError(
-      "not_found",
-      "제휴 포털 초기 설정 경로가 아직 연결되지 않았습니다.",
-    );
-  }
 }
 
 const dataSource =
@@ -112,6 +104,3 @@ const dataSource =
   "supabase";
 
 export const isPartnerPortalMock = dataSource !== "supabase";
-
-export const partnerPortalRepository: PartnerPortalRepository =
-  new UnconfiguredPartnerPortalRepository();

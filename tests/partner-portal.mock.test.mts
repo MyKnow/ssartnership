@@ -7,6 +7,7 @@ type OperationalNotificationsModule = typeof import("../src/lib/operational-noti
 type PartnerPlanServiceModule = typeof import("../src/lib/partner-plan-service");
 type PartnerPortalModule = typeof import("../src/lib/partner-portal");
 type PartnerAuthModule = typeof import("../src/lib/partner-auth");
+type PartnerAuthRepositoryModule = typeof import("../src/lib/partner-auth/repository");
 
 process.env.NEXT_PUBLIC_DATA_SOURCE = process.env.NEXT_PUBLIC_DATA_SOURCE ?? "mock";
 process.env.NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE =
@@ -30,6 +31,9 @@ const partnerPlanServiceModulePromise = import(
 const partnerAuthModulePromise = import(
   new URL("../src/lib/partner-auth.ts", import.meta.url).href
 ) as Promise<PartnerAuthModule>;
+const partnerAuthRepositoryModulePromise = import(
+  new URL("../src/lib/partner-auth/repository.ts", import.meta.url).href
+) as Promise<PartnerAuthRepositoryModule>;
 
 beforeEach(async () => {
   const { resetMockPartnerPortalStore } = await mockPartnerPortalModulePromise;
@@ -236,6 +240,39 @@ test("supports one partner account linked to multiple companies", async () => {
   assert.equal(dashboard.totals.companyCount, 1);
   assert.equal(dashboard.companies[0]?.id, "mock-partner-company-urban-gym");
   assert.equal(dashboard.companies[0]?.services.length, 2);
+});
+
+test("active partner portal repository exposes the same mock auth and setup contract", async () => {
+  const { activePartnerPortalRepository } = await partnerAuthRepositoryModulePromise;
+  const { mockPartnerPortalSetupTokens } = await mockPartnerPortalModulePromise;
+
+  const token = mockPartnerPortalSetupTokens[0].token;
+  const setupContext = await activePartnerPortalRepository.getSetupContext(token);
+  assert.equal(setupContext?.account.loginId, mockPartnerPortalSetupTokens[0].loginId);
+
+  await activePartnerPortalRepository.completeInitialSetup({
+    token,
+    password: "Partner!123",
+    confirmPassword: "Partner!123",
+  });
+
+  const login = await activePartnerPortalRepository.authenticateLogin(
+    mockPartnerPortalSetupTokens[0].loginId,
+    "Partner!123",
+  );
+  assert.equal(login.account.mustChangePassword, false);
+
+  const reset = await activePartnerPortalRepository.requestPasswordReset(
+    mockPartnerPortalSetupTokens[0].loginId,
+  );
+  assert.equal(reset.account.mustChangePassword, true);
+
+  const changed = await activePartnerPortalRepository.changePassword({
+    accountId: reset.account.id,
+    currentPassword: reset.temporaryPassword,
+    nextPassword: "Partner!456",
+  });
+  assert.equal(changed.account.mustChangePassword, false);
 });
 
 test("builds a company dashboard with aggregate metrics and service statuses", async () => {

@@ -19,6 +19,10 @@ import {
   createReviewEntry,
   sortEntries,
 } from "@/lib/partner-notifications-operation";
+import {
+  listPartnerStoredNotifications,
+  type StoredPartnerNotificationRow,
+} from "@/lib/partner-notification-store";
 import { getPartnerScopedHrefFromLegacyTarget } from "@/lib/partner-portal-paths";
 
 export type PartnerNotificationCategory = "request" | "review" | "operation" | "plan";
@@ -158,32 +162,6 @@ type PartnerAuditLogRow = {
   target_id: string | null;
   properties: Record<string, unknown> | null;
   created_at: string;
-};
-
-type StoredPartnerNotificationRow = {
-  id: string;
-  read_at: string | null;
-  created_at: string;
-  notification?:
-    | {
-        id: string;
-        type: string;
-        title: string;
-        body: string;
-        target_url: string;
-        company_id: string | null;
-        created_at: string;
-      }
-    | {
-        id: string;
-        type: string;
-        title: string;
-        body: string;
-        target_url: string;
-        company_id: string | null;
-        created_at: string;
-      }[]
-    | null;
 };
 
 function normalizeIds(ids: string[]) {
@@ -538,26 +516,24 @@ async function loadSupabasePartnerNotificationCenter(
   ].filter((item): item is PartnerNotificationEntry => Boolean(item));
 
   const storedNotificationResult = accountId
-    ? await supabase
-        .from("partner_notification_recipients")
-        .select(
-          "id,read_at,created_at,notification:partner_notifications(id,type,title,body,target_url,company_id,created_at)",
-        )
-        .eq("account_id", accountId)
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
-        .limit(30)
-    : { data: [], error: null as null | { message: string } };
+    ? await listPartnerStoredNotifications({
+        accountId,
+        limit: 30,
+      }).then(
+        (result) => ({ items: result.items, error: null as Error | null }),
+        (error: unknown) => ({ items: [] as StoredPartnerNotificationRow[], error }),
+      )
+    : { items: [] as StoredPartnerNotificationRow[], error: null as Error | null };
 
   if (storedNotificationResult.error) {
     markPartialFailure();
     console.error(
       "[partner-notifications] stored notification query failed",
-      storedNotificationResult.error.message,
+      storedNotificationResult.error,
     );
   }
 
-  const storedItems = ((storedNotificationResult.data ?? []) as StoredPartnerNotificationRow[])
+  const storedItems = storedNotificationResult.items
     .map((row) => createStoredNotificationEntry(row, companyMap))
     .filter((item): item is PartnerNotificationEntry => Boolean(item));
 
