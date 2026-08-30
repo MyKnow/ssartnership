@@ -47,6 +47,8 @@ type PushSubscriptionDevice = {
 
 let webPushPromise: Promise<WebPushModule> | null = null;
 const OPERATIONAL_PUSH_CONCURRENCY = 8;
+const OPERATIONAL_DELIVERY_CONCURRENCY = 8;
+const OPERATIONAL_EMAIL_CONCURRENCY = 4;
 
 async function getWebPush() {
   if (!webPushPromise) {
@@ -527,15 +529,17 @@ export async function createAdminOperationalNotification(input: {
     if (error) {
       throw new Error(error.message);
     }
-    await Promise.all(
-      recipientRows.map((row) =>
-        recordAdminDelivery({
+    await forEachWithConcurrency(
+      recipientRows,
+      OPERATIONAL_DELIVERY_CONCURRENCY,
+      async (row) => {
+        await recordAdminDelivery({
           notificationId: notification.id,
           adminId: row.admin_id,
           channel: "portal",
           status: "sent",
-        }),
-      ),
+        });
+      },
     );
   }
 
@@ -610,16 +614,18 @@ async function sendAdminPushDeliveries(input: {
 }) {
   const supabase = getSupabaseAdminClient();
   if (!isPushConfigured()) {
-    await Promise.all(
-      input.adminIds.map((adminId) =>
-        recordAdminDelivery({
+    await forEachWithConcurrency(
+      input.adminIds,
+      OPERATIONAL_DELIVERY_CONCURRENCY,
+      async (adminId) => {
+        await recordAdminDelivery({
           notificationId: input.notificationId,
           adminId,
           channel: "push",
           status: "skipped",
           errorMessage: "Web Push 환경 변수가 설정되지 않았습니다.",
-        }),
-      ),
+        });
+      },
     );
     return;
   }
@@ -801,21 +807,25 @@ export async function createPartnerOperationalNotification(input: {
     if (error) {
       throw new Error(error.message);
     }
-    await Promise.all(
-      recipientRows.map((row) =>
-        recordPartnerDelivery({
+    await forEachWithConcurrency(
+      recipientRows,
+      OPERATIONAL_DELIVERY_CONCURRENCY,
+      async (row) => {
+        await recordPartnerDelivery({
           notificationId: notification.id,
           accountId: row.account_id,
           channel: "portal",
           status: "sent",
-        }),
-      ),
+        });
+      },
     );
   }
 
   const emailTargets = accounts.filter((account) => account.channels.includes("email"));
-  await Promise.all(
-    emailTargets.map(async (account) => {
+  await forEachWithConcurrency(
+    emailTargets,
+    OPERATIONAL_EMAIL_CONCURRENCY,
+    async (account) => {
       try {
         await sendPartnerOperationalNotificationEmail({
           to: account.email,
@@ -842,7 +852,7 @@ export async function createPartnerOperationalNotification(input: {
           errorMessage: error instanceof Error ? error.message : "이메일 발송 설정이 없습니다.",
         });
       }
-    }),
+    },
   );
 
   const pushTargetAccountIds = accounts
@@ -876,16 +886,18 @@ async function sendPartnerPushDeliveries(input: {
 }) {
   const supabase = getSupabaseAdminClient();
   if (!isPushConfigured()) {
-    await Promise.all(
-      input.accountIds.map((accountId) =>
-        recordPartnerDelivery({
+    await forEachWithConcurrency(
+      input.accountIds,
+      OPERATIONAL_DELIVERY_CONCURRENCY,
+      async (accountId) => {
+        await recordPartnerDelivery({
           notificationId: input.notificationId,
           accountId,
           channel: "push",
           status: "skipped",
           errorMessage: "Web Push 환경 변수가 설정되지 않았습니다.",
-        }),
-      ),
+        });
+      },
     );
     return;
   }

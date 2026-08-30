@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import type { MemberWalletPass } from "../src/lib/repositories/wallet-pass-repository.ts";
 
 const signerCertificatePem = `-----BEGIN CERTIFICATE-----
 MIIDJzCCAg+gAwIBAgIUL9LhxGZsKfYjc6iSEuI75iMyInAwDQYJKoZIhvcNAQEL
@@ -62,6 +63,33 @@ function getBaselineConfigStatus() {
   });
   assert.equal(status.ok, true);
   return status;
+}
+
+function createRevokedWalletPass(index: number): MemberWalletPass {
+  const timestamp = "2026-08-30T00:00:00.000Z";
+  return {
+    id: `concurrency-pass-${index}`,
+    memberId: `concurrency-member-${index}`,
+    platform: "apple",
+    publicId: `concurrency-public-${index}`,
+    serialNumber: `concurrency-serial-${index}`,
+    credentialStatus: "revoked",
+    installationStatus: "installed",
+    syncStatus: "failed",
+    consentVersion: 1,
+    consentedAt: timestamp,
+    currentRevision: 1,
+    currentSnapshotHash: `concurrency-snapshot-${index}`,
+    currentSnapshot: {},
+    issuedAt: timestamp,
+    revokedAt: timestamp,
+    lastSyncAttemptedAt: timestamp,
+    lastSyncedAt: null,
+    lastSyncErrorCode: "retry",
+    lastSyncErrorAt: timestamp,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
 }
 
 test("daily reconciliation persists a changed snapshot before the Apple update", async () => {
@@ -200,6 +228,48 @@ test("daily reconciliation persists a changed snapshot before the Apple update",
   assert.equal(revokedConverged.skipReason, null);
   assert.deepEqual(revokedConverged.configWarningCodes, []);
   assert.equal(revokedConverged.certificateExpiresInDays, 365);
+});
+
+test("daily reconciliation bounds independent pass work while preserving one visit per pass", async () => {
+  const repository = walletPassRepository as typeof walletPassRepository & {
+    listAppleWalletPassesForReconciliation: (
+      input: { afterPassId?: string | null; limit: number },
+    ) => Promise<MemberWalletPass[]>;
+  };
+  const originalList = repository.listAppleWalletPassesForReconciliation;
+  const passes = Array.from({ length: 4 }, (_, index) =>
+    createRevokedWalletPass(index),
+  );
+  repository.listAppleWalletPassesForReconciliation = async ({ afterPassId }) =>
+    afterPassId ? [] : passes;
+
+  let active = 0;
+  let maximumActive = 0;
+  const visited = new Set<string>();
+  try {
+    const result = await reconcileInstalledAppleWalletPasses({
+      batchSize: 4,
+      maxPasses: 4,
+      concurrency: 2,
+      configStatus: getBaselineConfigStatus(),
+      notifyPassChange: async (pass) => {
+        active += 1;
+        maximumActive = Math.max(maximumActive, active);
+        visited.add(pass.id);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        active -= 1;
+        return { delivered: 1, invalidTokens: [], failed: 0, reasonCodes: [] };
+      },
+    });
+
+    assert.equal(maximumActive, 2);
+    assert.deepEqual([...visited].sort(), passes.map((pass) => pass.id).sort());
+    assert.equal(result.scanned, 4);
+    assert.equal(result.failed, 0);
+    assert.equal(result.truncated, true);
+  } finally {
+    repository.listAppleWalletPassesForReconciliation = originalList;
+  }
 });
 
 test("reconciliation surfaces safe skip reasons and certificate warnings", async () => {
