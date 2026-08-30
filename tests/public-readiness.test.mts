@@ -8,6 +8,7 @@ function readRepoFile(pathname: string) {
 
 const WORKFLOW_FILES = [
   "admin-performance.yml",
+  "cross-platform-development.yml",
   "preview-migrations.yml",
   "preview-sync.yml",
   "production-migrations.yml",
@@ -16,16 +17,26 @@ const WORKFLOW_FILES = [
 ] as const;
 
 const VERIFIED_SUPABASE_CLI_VERSION = "2.114.0";
+const CHECKOUT_ACTION_SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1";
+const CHECKOUT_ACTION_VERSION = "v7.0.1";
+const SETUP_NODE_ACTION_SHA = "820762786026740c76f36085b0efc47a31fe5020";
+const SETUP_NODE_ACTION_VERSION = "v7.0.0";
+const SUPABASE_SETUP_CLI_ACTION_SHA = "3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf";
+const SUPABASE_SETUP_CLI_ACTION_VERSION = "v2.1.1";
 
 test("GitHub Actions use the Node 24 action runtime and project runtime with read-only repository access", () => {
   for (const filename of WORKFLOW_FILES) {
     const workflow = readRepoFile(`.github/workflows/${filename}`);
     const checkoutVersions = [
-      ...workflow.matchAll(/actions\/checkout@(v\d+(?:\.\d+)*)/g),
-    ].map((match) => match[1]);
+      ...workflow.matchAll(
+        new RegExp(`actions/checkout@(${CHECKOUT_ACTION_SHA})\\s+#\\s+(${CHECKOUT_ACTION_VERSION})`, "g"),
+      ),
+    ].map((match) => `${match[1]}#${match[2]}`);
     const setupNodeVersions = [
-      ...workflow.matchAll(/actions\/setup-node@(v\d+(?:\.\d+)*)/g),
-    ].map((match) => match[1]);
+      ...workflow.matchAll(
+        new RegExp(`actions/setup-node@(${SETUP_NODE_ACTION_SHA})\\s+#\\s+(${SETUP_NODE_ACTION_VERSION})`, "g"),
+      ),
+    ].map((match) => `${match[1]}#${match[2]}`);
     const projectNodeVersions = [
       ...workflow.matchAll(/node-version:\s*["']?([^\s"'#]+)["']?/g),
     ].map((match) => match[1]);
@@ -33,14 +44,14 @@ test("GitHub Actions use the Node 24 action runtime and project runtime with rea
     assert.ok(checkoutVersions.length > 0, `${filename}: checkout action missing`);
     assert.deepEqual(
       new Set(checkoutVersions),
-      new Set(["v7"]),
-      `${filename}: checkout must use the Node 24 runtime release`,
+      new Set([`${CHECKOUT_ACTION_SHA}#${CHECKOUT_ACTION_VERSION}`]),
+      `${filename}: checkout must use the reviewed upstream SHA with a readable release comment`,
     );
     assert.ok(setupNodeVersions.length > 0, `${filename}: setup-node action missing`);
     assert.deepEqual(
       new Set(setupNodeVersions),
-      new Set(["v7"]),
-      `${filename}: setup-node must use the Node 24 runtime release`,
+      new Set([`${SETUP_NODE_ACTION_SHA}#${SETUP_NODE_ACTION_VERSION}`]),
+      `${filename}: setup-node must use the reviewed upstream SHA with a readable release comment`,
     );
     assert.equal(
       projectNodeVersions.length,
@@ -189,16 +200,18 @@ test("active workflows use the current Node 24 GitHub action majors", () => {
   for (const workflowName of workflowNames) {
     const workflow = readFileSync(new URL(workflowName, workflowsDirectory), "utf8");
     const actions = workflow.matchAll(
-      /uses:\s*actions\/(checkout|setup-node)@([^\s#]+)/g,
+      /uses:\s*actions\/(checkout|setup-node)@([0-9a-f]{40})\s+#\s+(v\d+(?:\.\d+)*)/g,
     );
 
     for (const action of actions) {
       actionCount += 1;
-      assert.equal(
-        action[2],
-        "v7",
-        `${workflowName} must use actions/${action[1]}@v7`,
-      );
+      if (action[1] === "checkout") {
+        assert.equal(action[2], CHECKOUT_ACTION_SHA, `${workflowName} must pin checkout to the reviewed SHA`);
+        assert.equal(action[3], CHECKOUT_ACTION_VERSION, `${workflowName} must document the checkout release`);
+      } else {
+        assert.equal(action[2], SETUP_NODE_ACTION_SHA, `${workflowName} must pin setup-node to the reviewed SHA`);
+        assert.equal(action[3], SETUP_NODE_ACTION_VERSION, `${workflowName} must document the setup-node release`);
+      }
     }
   }
 
@@ -224,7 +237,9 @@ test("active Supabase workflows pin the Production-validated CLI version", () =>
 
     for (let index = 0; index < lines.length; index += 1) {
       const setupCliUse = lines[index].match(
-        /^(\s*)uses:\s*supabase\/setup-cli@v2\s*$/,
+        new RegExp(
+          `^(\\s*)uses:\\s*supabase/setup-cli@${SUPABASE_SETUP_CLI_ACTION_SHA}\\s+#\\s+${SUPABASE_SETUP_CLI_ACTION_VERSION}\\s*$`,
+        ),
       );
       if (!setupCliUse) {
         continue;
@@ -255,7 +270,7 @@ test("active Supabase workflows pin the Production-validated CLI version", () =>
       assert.equal(
         configuredVersion,
         VERIFIED_SUPABASE_CLI_VERSION,
-        `${workflowName}: supabase/setup-cli must use the Production-validated version`,
+        `${workflowName}: supabase/setup-cli must keep the Production-validated CLI version`,
       );
     }
   }
@@ -264,6 +279,15 @@ test("active Supabase workflows pin the Production-validated CLI version", () =>
     setupCliStepCount > 0,
     "expected at least one active Supabase setup-cli step",
   );
+});
+
+test("Dependabot tracks pinned GitHub Actions workflow refs", () => {
+  const config = readRepoFile(".github/dependabot.yml");
+
+  assert.match(config, /^version:\s*2$/m);
+  assert.match(config, /package-ecosystem:\s*github-actions/);
+  assert.match(config, /directory:\s*["']\/["']/);
+  assert.match(config, /schedule:\s*\n\s+interval:\s*weekly/);
 });
 
 test("Storybook interaction and visual baselines are explicit manual tools", () => {
