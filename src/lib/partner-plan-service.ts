@@ -262,27 +262,33 @@ function getCancelUpgradeBillingErrorMessage(
 ) {
   const message = error.message ?? "";
   if (message.includes("partner_plan_cancel_request_state_conflict")) {
-    return "이미 처리된 업그레이드 요청입니다.";
+    return action === "반려"
+      ? "partner_company_plan_processed"
+      : "이미 처리된 업그레이드 요청입니다.";
   }
   if (message.includes("partner_plan_cancel_paid_invoice_conflict")) {
-    return `입금 확인이 완료된 청구는 ${action}할 수 없습니다.`;
+    return action === "반려"
+      ? "partner_company_plan_rejection_paid"
+      : "입금 확인이 완료된 청구는 취소할 수 없습니다.";
   }
-  return `업그레이드 요청을 ${action}하지 못했습니다. 잠시 후 다시 시도해 주세요.`;
+  return action === "반려"
+    ? "partner_company_plan_invalid_request"
+    : "업그레이드 요청을 취소하지 못했습니다. 잠시 후 다시 시도해 주세요.";
 }
 
 function getApproveUpgradeBillingErrorMessage(error: SupabaseMutationError) {
   const message = error.message ?? "";
   if (message.includes("partner_plan_approval_request_state_conflict")) {
-    return "이미 처리된 업그레이드 요청입니다.";
+    return "partner_company_plan_processed";
   }
   if (message.includes("partner_plan_approval_invoice_not_found")) {
-    return "청구서를 찾을 수 없습니다.";
+    return "partner_company_plan_invoice_missing";
   }
   if (message.includes("partner_plan_approval_invoice_unpaid_conflict")) {
-    return "입금 확인 후 플랜을 승인할 수 있습니다.";
+    return "partner_company_plan_payment_unconfirmed";
   }
   if (message.includes("partner_plan_approval_partner_not_found")) {
-    return "제휴처를 찾을 수 없습니다.";
+    return "partner_company_plan_partner_missing";
   }
   if (message.includes("partner_plan_approval_partner_state_conflict")) {
     return "partner_company_plan_state_changed";
@@ -962,14 +968,18 @@ export async function reviewPartnerPlanUpgradeRequest(input: {
     .eq("id", input.requestId)
     .maybeSingle();
   if (error || !data) {
-    throw new Error("업그레이드 요청을 찾을 수 없습니다.");
+    throw new Error("partner_company_plan_missing_request");
   }
 
   const request = mapUpgradeRequest(data as UpgradeRequestRow);
   if (!request.partnerId) {
-    throw new Error("제휴처를 찾을 수 없습니다.");
+    throw new Error("partner_company_plan_partner_missing");
   }
-  assertPartnerPlanUpgradeTransition(request.status, input.nextStatus);
+  try {
+    assertPartnerPlanUpgradeTransition(request.status, input.nextStatus);
+  } catch {
+    throw new Error("partner_company_plan_processed");
+  }
   const reviewedAt = new Date().toISOString();
   const adminNote = normalizePlanUpgradeMemo(input.adminNote);
   const billingByRequestId =

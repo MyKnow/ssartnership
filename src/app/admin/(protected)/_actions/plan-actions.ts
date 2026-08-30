@@ -268,12 +268,10 @@ async function reviewPartnerPlanRequestAction(
       adminNote: getString(formData, "adminNote"),
     });
   } catch (error) {
-    const message =
-      error instanceof Error && error.message.includes("이미 처리된")
-        ? "partner_company_plan_processed"
-        : error instanceof Error && error.message.includes("입금 확인")
-          ? "partner_company_plan_payment_unconfirmed"
-          : getSafeAdminActionErrorCode(error, "partner_company_plan_invalid_request");
+    const message = getSafeAdminActionErrorCode(
+      error,
+      "partner_company_plan_invalid_request",
+    );
     redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, message, {
       action: `partner_plan_upgrade_${nextStatus}`,
       targetType: "partner_plan_upgrade_request",
