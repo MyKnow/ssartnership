@@ -9,10 +9,35 @@ import type {
   PartnerChangeRequestCreateInput,
   PartnerChangeRequestReviewInput,
 } from "../../partner-change-requests/shared.ts";
+import { toSummary } from "./normalizers.ts";
 import {
-  toSummary,
-} from "./normalizers.ts";
-import { findDisplayNameByAccountId, findRequest, findPendingRequest, findService, getStore } from "./service-store.ts";
+  findDisplayNameByAccountId,
+  findRequest,
+  findPendingRequest,
+  findService,
+  getStore,
+} from "./service-store.ts";
+
+function applyApprovedRequestToMockService(
+  service: NonNullable<ReturnType<typeof findService>>,
+  request: NonNullable<ReturnType<typeof findRequest>>,
+) {
+  service.partnerName = request.requestedPartnerName;
+  service.partnerLocation = request.requestedPartnerLocation;
+  service.detailDescription = request.requestedDetailDescription ?? null;
+  service.mapUrl = request.requestedMapUrl;
+  service.currentConditions = [...request.requestedConditions];
+  service.currentBenefits = [...request.requestedBenefits];
+  service.currentAppliesTo = [...request.requestedAppliesTo];
+  service.currentCampusSlugs = [...request.requestedCampusSlugs];
+  service.tags = [...request.requestedTags];
+  service.thumbnail = request.requestedThumbnail;
+  service.images = [...request.requestedImages];
+  service.reservationLink = request.requestedReservationLink;
+  service.inquiryLink = request.requestedInquiryLink;
+  service.periodStart = request.requestedPeriodStart;
+  service.periodEnd = request.requestedPeriodEnd;
+}
 
 export async function createMockPartnerChangeRequest(
   input: PartnerChangeRequestCreateInput,
@@ -43,6 +68,11 @@ export async function createMockPartnerChangeRequest(
       conditions: service.currentConditions,
       benefits: service.currentBenefits,
       appliesTo: service.currentAppliesTo,
+      tags: service.tags,
+      thumbnail: service.thumbnail,
+      images: service.images,
+      reservationLink: service.reservationLink,
+      inquiryLink: service.inquiryLink,
       periodStart: service.periodStart,
       periodEnd: service.periodEnd,
     },
@@ -130,7 +160,10 @@ export async function cancelMockPartnerChangeRequest(
 ) {
   const request = findRequest(input.requestId);
   if (!request) {
-    throw new PartnerChangeRequestError("not_found", "요청을 찾을 수 없습니다.");
+    throw new PartnerChangeRequestError(
+      "not_found",
+      "요청을 찾을 수 없습니다.",
+    );
   }
   if (request.status !== "pending") {
     throw new PartnerChangeRequestError(
@@ -164,7 +197,10 @@ export async function approveMockPartnerChangeRequest(
   );
   const request = findRequest(input.requestId);
   if (!request) {
-    throw new PartnerChangeRequestError("not_found", "요청을 찾을 수 없습니다.");
+    throw new PartnerChangeRequestError(
+      "not_found",
+      "요청을 찾을 수 없습니다.",
+    );
   }
   if (request.status !== "pending") {
     throw new PartnerChangeRequestError(
@@ -175,16 +211,7 @@ export async function approveMockPartnerChangeRequest(
 
   const service = findService(request.partnerId);
   if (service) {
-    service.partnerName = request.requestedPartnerName;
-    service.partnerLocation = request.requestedPartnerLocation;
-    service.detailDescription = request.requestedDetailDescription ?? null;
-    service.mapUrl = request.requestedMapUrl;
-    service.currentConditions = [...request.requestedConditions];
-    service.currentBenefits = [...request.requestedBenefits];
-    service.currentAppliesTo = [...request.requestedAppliesTo];
-    service.currentCampusSlugs = [...request.requestedCampusSlugs];
-    service.periodStart = request.requestedPeriodStart;
-    service.periodEnd = request.requestedPeriodEnd;
+    applyApprovedRequestToMockService(service, request);
   }
 
   request.status = "approved";
@@ -203,7 +230,10 @@ export async function rejectMockPartnerChangeRequest(
   );
   const request = findRequest(input.requestId);
   if (!request) {
-    throw new PartnerChangeRequestError("not_found", "요청을 찾을 수 없습니다.");
+    throw new PartnerChangeRequestError(
+      "not_found",
+      "요청을 찾을 수 없습니다.",
+    );
   }
   if (request.status !== "pending") {
     throw new PartnerChangeRequestError(

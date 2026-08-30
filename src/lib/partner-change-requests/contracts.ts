@@ -36,7 +36,9 @@ export function normalizePartnerChangeRequestCreateFields(
     input.requestedAppliesTo,
   );
   const requestedTags = normalizeTextList(input.requestedTags);
-  const requestedPartnerName = normalizeRequiredText(input.requestedPartnerName);
+  const requestedPartnerName = normalizeRequiredText(
+    input.requestedPartnerName,
+  );
   const requestedPartnerLocation = normalizeRequiredText(
     input.requestedPartnerLocation,
   );
@@ -53,7 +55,9 @@ export function normalizePartnerChangeRequestCreateFields(
   const requestedInquiryLink = sanitizePartnerLinkValue(
     input.requestedInquiryLink ?? undefined,
   );
-  const requestedPeriodStart = normalizeOptionalText(input.requestedPeriodStart);
+  const requestedPeriodStart = normalizeOptionalText(
+    input.requestedPeriodStart,
+  );
   const requestedPeriodEnd = normalizeOptionalText(input.requestedPeriodEnd);
 
   const dateRangeError = validateDateRange(
@@ -111,6 +115,11 @@ export function assertPartnerChangeRequestHasChanges(
     conditions: string[];
     benefits: string[];
     appliesTo: string[];
+    tags: string[];
+    thumbnail: string | null;
+    images: string[];
+    reservationLink: string | null;
+    inquiryLink: string | null;
     periodStart: string | null;
     periodEnd: string | null;
   },
@@ -128,6 +137,11 @@ export function assertPartnerChangeRequestHasChanges(
     arraysEqual(current.conditions, requested.requestedConditions) &&
     arraysEqual(current.benefits, requested.requestedBenefits) &&
     arraysEqual(current.appliesTo, requested.requestedAppliesTo) &&
+    arraysEqual(current.tags, requested.requestedTags) &&
+    current.thumbnail === requested.requestedThumbnail &&
+    arraysEqual(current.images, requested.requestedImages) &&
+    current.reservationLink === requested.requestedReservationLink &&
+    current.inquiryLink === requested.requestedInquiryLink &&
     current.periodStart === requested.requestedPeriodStart &&
     current.periodEnd === requested.requestedPeriodEnd
   ) {

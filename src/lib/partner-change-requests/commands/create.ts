@@ -16,7 +16,10 @@ import {
 export async function createSupabaseRequest(
   input: PartnerChangeRequestCreateInput,
 ) {
-  const context = await getSupabaseRequestContext(input.companyIds, input.partnerId);
+  const context = await getSupabaseRequestContext(
+    input.companyIds,
+    input.partnerId,
+  );
   if (!context) {
     throw new PartnerChangeRequestError(
       "forbidden",
@@ -41,6 +44,11 @@ export async function createSupabaseRequest(
       conditions: context.currentConditions,
       benefits: context.currentBenefits,
       appliesTo: context.currentAppliesTo,
+      tags: context.currentTags,
+      thumbnail: context.thumbnail,
+      images: context.images,
+      reservationLink: context.reservationLink,
+      inquiryLink: context.inquiryLink,
       periodStart: context.periodStart,
       periodEnd: context.periodEnd,
     },
@@ -128,7 +136,9 @@ export async function createSupabaseRequest(
     );
   }
 
-  const summary = created ? toSummary(created as PartnerChangeRequestRow) : null;
+  const summary = created
+    ? toSummary(created as PartnerChangeRequestRow)
+    : null;
   if (!summary) {
     throw new PartnerChangeRequestError(
       "not_found",
