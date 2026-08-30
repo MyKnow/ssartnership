@@ -8,8 +8,14 @@ import {
 } from "../../notifications/shared.ts";
 import type {
   CreateNotificationResult,
+  FinalizeNotificationCampaignInput,
+  NotificationCampaignClaimInput,
+  NotificationCampaignClaimResult,
+  NotificationDeliveryClaimInput,
+  NotificationDeliveryClaimResult,
   NotificationListContext,
   NotificationRepository,
+  TransitionNotificationDeliveryInput,
 } from "../notification-repository.ts";
 
 type MockNotification = NotificationRecord;
@@ -38,6 +44,7 @@ type MockNotificationDelivery = {
   providerStatus: string | null;
   deliveredAt: string | null;
   createdAt: string;
+  updatedAt: string;
 };
 
 type MockNotificationStore = {
@@ -91,6 +98,57 @@ function createMockNotificationId() {
   return `mock-notification-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function ensureMockNotificationRecipients(
+  notificationId: string,
+  recipientMemberIds: string[],
+  now: string,
+) {
+  const store = getStore();
+  for (const memberId of Array.from(new Set(recipientMemberIds))) {
+    if (
+      !store.memberNotifications.some(
+        (item) =>
+          item.notificationId === notificationId && item.memberId === memberId,
+      )
+    ) {
+      store.memberNotifications.unshift({
+        id: createMockNotificationId(),
+        notificationId,
+        memberId,
+        readAt: null,
+        deletedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+    if (
+      !store.deliveries.some(
+        (item) =>
+          item.notificationId === notificationId &&
+          item.memberId === memberId &&
+          item.channel === "in_app",
+      )
+    ) {
+      store.deliveries.unshift({
+        id: createMockNotificationId(),
+        notificationId,
+        memberId,
+        channel: "in_app",
+        status: "sent",
+        errorMessage: null,
+        provider: null,
+        providerNotificationId: null,
+        providerCampaignId: null,
+        providerIdempotencyKey: null,
+        providerStatus: null,
+        deliveredAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  }
+}
+
 export class MockNotificationRepository implements NotificationRepository {
   async createNotification(
     input: NotificationBroadcastInput,
@@ -135,37 +193,299 @@ export class MockNotificationRepository implements NotificationRepository {
       new Set((input.recipientMemberIds ?? []).filter((value) => value.trim().length > 0)),
     );
 
-    for (const memberId of recipientMemberIds) {
-      store.memberNotifications.unshift({
-        id: createMockNotificationId(),
-        notificationId: notification.id,
-        memberId,
-        readAt: null,
-        deletedAt: null,
-        createdAt: now,
-        updatedAt: now,
-      });
-      store.deliveries.unshift({
-        id: createMockNotificationId(),
-        notificationId: notification.id,
-        memberId,
-        channel: "in_app",
-        status: "sent",
-        errorMessage: null,
-        provider: null,
-        providerNotificationId: null,
-        providerCampaignId: null,
-        providerIdempotencyKey: null,
-        providerStatus: null,
-        deliveredAt: now,
-        createdAt: now,
-      });
-    }
+    ensureMockNotificationRecipients(notification.id, recipientMemberIds, now);
 
     return {
       notification,
       recipientMemberIds,
     };
+  }
+
+  async claimNotificationCampaign(
+    input: NotificationCampaignClaimInput,
+  ): Promise<NotificationCampaignClaimResult> {
+    const targetUrl = normalizeNotificationTargetUrl(input.targetUrl);
+    if (
+      !targetUrl ||
+      !input.type.trim() ||
+      !input.title.trim() ||
+      !input.body.trim() ||
+      !input.idempotencyKey.trim() ||
+      input.leaseDurationSeconds < 30 ||
+      input.leaseDurationSeconds > 3600
+    ) {
+      throw new Error("알림 발송 요청이 올바르지 않습니다.");
+    }
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const store = getStore();
+    let notification = store.notifications.find(
+      (item) =>
+        item.metadata?.adminOperationIdempotencyKey ===
+        input.idempotencyKey.trim(),
+    );
+
+    if (notification) {
+      if (notification.type !== input.type) {
+        throw new Error("알림 캠페인 재시도 키가 다른 유형과 충돌했습니다.");
+      }
+      const status = notification.metadata?.campaignStatus;
+      if (status === "sent" || status === "no_target") {
+        return {
+          notification,
+          recipientMemberIds: [],
+          disposition: "completed",
+          attemptToken: null,
+        };
+      }
+
+      const leaseExpiresAt =
+        typeof notification.metadata?.campaignLeaseExpiresAt === "string"
+          ? Date.parse(notification.metadata.campaignLeaseExpiresAt)
+          : Number.NaN;
+      if (status === "pending" && leaseExpiresAt > now.getTime()) {
+        return {
+          notification,
+          recipientMemberIds: [],
+          disposition: "in_progress",
+          attemptToken: null,
+        };
+      }
+    }
+
+    const attemptToken = createMockNotificationId();
+    const previousMetadata = Object.fromEntries(
+      Object.entries(notification?.metadata ?? {}).filter(
+        ([key]) =>
+          key !== "completedAt" &&
+          key !== "channelResults" &&
+          key !== "warnings",
+      ),
+    );
+    const inputMetadata = Object.fromEntries(
+      Object.entries(input.metadata ?? {}).filter(
+        ([key]) =>
+          key !== "completedAt" &&
+          key !== "channelResults" &&
+          key !== "warnings",
+      ),
+    );
+    const claimedMetadata = {
+      ...previousMetadata,
+      ...inputMetadata,
+      adminOperationIdempotencyKey: input.idempotencyKey.trim(),
+      campaignStatus: "pending",
+      campaignAttemptToken: attemptToken,
+      campaignClaimedAt: nowIso,
+      campaignLeaseExpiresAt: new Date(
+        now.getTime() + input.leaseDurationSeconds * 1000,
+      ).toISOString(),
+    };
+    const disposition = notification ? "resumed" : "claimed";
+
+    if (!notification) {
+      notification = {
+        id: createMockNotificationId(),
+        type: input.type,
+        title: input.title,
+        body: input.body,
+        targetUrl,
+        metadata: claimedMetadata,
+        createdByMemberId: input.createdByMemberId ?? null,
+        createdAt: nowIso,
+      };
+      store.notifications.unshift(notification);
+    } else {
+      notification.title = input.title;
+      notification.body = input.body;
+      notification.targetUrl = targetUrl;
+      notification.metadata = claimedMetadata;
+    }
+
+    const recipientMemberIds = Array.from(
+      new Set(input.recipientMemberIds.filter((value) => value.trim().length > 0)),
+    );
+    ensureMockNotificationRecipients(
+      notification.id,
+      recipientMemberIds,
+      nowIso,
+    );
+
+    return {
+      notification,
+      recipientMemberIds,
+      disposition,
+      attemptToken,
+    };
+  }
+
+  async finalizeNotificationCampaign(
+    input: FinalizeNotificationCampaignInput,
+  ) {
+    const notification = getStore().notifications.find(
+      (item) => item.id === input.notificationId,
+    );
+    if (
+      !notification ||
+      notification.metadata?.campaignStatus !== "pending" ||
+      notification.metadata?.campaignAttemptToken !== input.attemptToken
+    ) {
+      return false;
+    }
+
+    const status = input.metadata.campaignStatus;
+    if (
+      status !== "sent" &&
+      status !== "partial_failed" &&
+      status !== "failed" &&
+      status !== "no_target"
+    ) {
+      throw new Error("알림 캠페인 완료 상태가 올바르지 않습니다.");
+    }
+
+    notification.metadata = {
+      ...notification.metadata,
+      ...input.metadata,
+      campaignAttemptToken: input.attemptToken,
+      campaignLeaseExpiresAt: null,
+    };
+    return true;
+  }
+
+  async claimNotificationDelivery(
+    input: NotificationDeliveryClaimInput,
+  ): Promise<NotificationDeliveryClaimResult> {
+    if (
+      input.channel !== "push" ||
+      input.provider !== "web_push" ||
+      !input.memberId ||
+      !input.providerIdempotencyKey.trim() ||
+      input.leaseDurationSeconds < 30 ||
+      input.leaseDurationSeconds > 3600
+    ) {
+      throw new Error("알림 전송 요청이 올바르지 않습니다.");
+    }
+    const store = getStore();
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const existing = store.deliveries.find(
+      (item) =>
+        item.provider === input.provider &&
+        item.providerIdempotencyKey === input.providerIdempotencyKey,
+    );
+
+    if (!existing) {
+      const deliveryId = createMockNotificationId();
+      store.deliveries.unshift({
+        id: deliveryId,
+        notificationId: input.notificationId,
+        memberId: input.memberId,
+        channel: input.channel,
+        status: "pending",
+        errorMessage: null,
+        provider: input.provider ?? null,
+        providerNotificationId: null,
+        providerCampaignId: input.providerCampaignId ?? null,
+        providerIdempotencyKey: input.providerIdempotencyKey,
+        providerStatus: "claimed",
+        deliveredAt: null,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      });
+      return { deliveryId, disposition: "claimed" };
+    }
+
+    if (
+      existing.notificationId !== input.notificationId ||
+      existing.memberId !== input.memberId ||
+      existing.channel !== input.channel ||
+      existing.providerCampaignId !== (input.providerCampaignId ?? null)
+    ) {
+      throw new Error("알림 전송 재시도 키가 다른 대상과 충돌했습니다.");
+    }
+    if (existing.status === "sent") {
+      return { deliveryId: existing.id, disposition: "sent" };
+    }
+    if (existing.providerStatus === "needs_reconciliation") {
+      return {
+        deliveryId: existing.id,
+        disposition: "needs_reconciliation",
+      };
+    }
+    if (existing.status === "failed") {
+      existing.status = "pending";
+      existing.providerStatus = "claimed";
+      existing.errorMessage = null;
+      existing.deliveredAt = null;
+      existing.updatedAt = nowIso;
+      return { deliveryId: existing.id, disposition: "claimed" };
+    }
+
+    const leaseExpired =
+      Date.parse(existing.updatedAt) <=
+      now.getTime() - input.leaseDurationSeconds * 1000;
+    if (leaseExpired && existing.providerStatus === "claimed") {
+      existing.updatedAt = nowIso;
+      return { deliveryId: existing.id, disposition: "claimed" };
+    }
+    if (leaseExpired && existing.providerStatus === "sending") {
+      existing.providerStatus = "needs_reconciliation";
+      existing.errorMessage = "provider_delivery_outcome_unknown";
+      existing.updatedAt = nowIso;
+      return {
+        deliveryId: existing.id,
+        disposition: "needs_reconciliation",
+      };
+    }
+    return { deliveryId: existing.id, disposition: "in_progress" };
+  }
+
+  async transitionNotificationDelivery(
+    input: TransitionNotificationDeliveryInput,
+  ) {
+    const delivery = getStore().deliveries.find(
+      (item) => item.id === input.deliveryId,
+    );
+    if (
+      !delivery ||
+      delivery.channel !== "push" ||
+      delivery.provider !== "web_push" ||
+      delivery.status !== "pending"
+    ) {
+      return false;
+    }
+
+    const now = new Date().toISOString();
+    if (input.transition === "sending") {
+      if (delivery.providerStatus !== "claimed") return false;
+      delivery.providerStatus = "sending";
+    } else if (input.transition === "sent") {
+      if (delivery.providerStatus !== "sending") return false;
+      delivery.status = "sent";
+      delivery.providerStatus = "sent";
+      delivery.errorMessage = null;
+      delivery.deliveredAt = now;
+    } else if (input.transition === "failed") {
+      if (delivery.providerStatus !== "sending") return false;
+      delivery.status = "failed";
+      delivery.providerStatus = "failed";
+      delivery.errorMessage = input.errorMessage ?? "푸시 알림 전송에 실패했습니다.";
+      delivery.deliveredAt = null;
+    } else {
+      if (
+        delivery.providerStatus !== "sending" &&
+        delivery.providerStatus !== "claimed"
+      ) {
+        return false;
+      }
+      delivery.providerStatus = "needs_reconciliation";
+      delivery.errorMessage =
+        input.errorMessage ?? "provider_delivery_outcome_unknown";
+      delivery.deliveredAt = null;
+    }
+    delivery.updatedAt = now;
+    return true;
   }
 
   async recordNotificationDelivery(input: NotificationDeliveryInput) {
@@ -184,6 +504,7 @@ export class MockNotificationRepository implements NotificationRepository {
       providerStatus: input.providerStatus ?? null,
       deliveredAt: now,
       createdAt: now,
+      updatedAt: now,
     });
   }
 

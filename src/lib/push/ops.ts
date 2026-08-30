@@ -75,6 +75,9 @@ export type OperationalExpiringPartnerFailure = {
 };
 
 const EXPIRING_PARTNER_NOTIFICATION_CONCURRENCY = 4;
+const EXPIRING_PARTNER_MEMBER_PUSH_DAYS_BEFORE = 7;
+
+type ExpiringPartnerCampaignSender = typeof sendAdminNotificationCampaign;
 
 export function getKstDateString(daysFromToday = 0, baseDate = new Date()) {
   const now = new Date(baseDate.getTime() + daysFromToday * 24 * 60 * 60 * 1000);
@@ -125,9 +128,24 @@ export function mergePushBatchSummary(
   } satisfies PushBatchSummary;
 }
 
+export function createExpiringPartnerPushIdempotencyKey(
+  partner: Pick<ExpiringPartnerTarget, "id" | "period_end">,
+) {
+  return [
+    "expiring-partnership",
+    "member",
+    partner.id,
+    EXPIRING_PARTNER_MEMBER_PUSH_DAYS_BEFORE,
+    partner.period_end,
+  ].join(":");
+}
+
 export async function runExpiringPartnerPushBatch(
   partners: ExpiringPartnerTarget[],
+  dependencies: { sendCampaign?: ExpiringPartnerCampaignSender } = {},
 ) {
+  const sendCampaign =
+    dependencies.sendCampaign ?? sendAdminNotificationCampaign;
   let summary: PushBatchSummary = {
     processedPartners: partners.length,
     targeted: 0,
@@ -146,7 +164,7 @@ export async function runExpiringPartnerPushBatch(
           name: partner.name,
           endDate: partner.period_end,
         });
-        const result = await sendAdminNotificationCampaign(
+        const result = await sendCampaign(
           {
             notificationType: "expiring_partner",
             title: payload.title,
@@ -167,6 +185,8 @@ export async function runExpiringPartnerPushBatch(
               daysUntilEnd: getDaysUntilEnd(partner.period_end),
               partnerUrl: payload.url,
             },
+            idempotencyKey:
+              createExpiringPartnerPushIdempotencyKey(partner),
           },
           "automatic",
         );
@@ -184,6 +204,13 @@ export async function runExpiringPartnerPushBatch(
             summary.failed +
             result.channelResults.push.failed,
         };
+        if (result.channelResults.push.failed > 0) {
+          failures.push({
+            partnerId: partner.id,
+            name: partner.name,
+            message: `회원 푸시 ${result.channelResults.push.failed}건의 발송 결과를 확정하지 못했습니다.`,
+          });
+        }
       } catch (error) {
         const message =
           error instanceof Error

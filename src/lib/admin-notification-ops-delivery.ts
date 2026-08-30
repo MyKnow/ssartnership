@@ -52,6 +52,7 @@ type ChannelDeliveryResult = {
 };
 const MATTERMOST_SEND_CONCURRENCY = 4;
 const PUSH_SEND_CONCURRENCY = 8;
+const PUSH_DELIVERY_LEASE_SECONDS = 5 * 60;
 
 function createBookkeepingWarning(
   channel: "push" | "mm",
@@ -77,6 +78,174 @@ async function runBookkeepingTasks(
       console.error(`[admin-notification-ops] ${warning}`, result.reason);
     }
   }
+}
+
+export async function finalizeSuccessfulPushDelivery(
+  deliveryId: string,
+  repository: Pick<
+    typeof notificationRepository,
+    "transitionNotificationDelivery"
+  > = notificationRepository,
+) {
+  try {
+    if (
+      await repository.transitionNotificationDelivery({
+        deliveryId,
+        transition: "sent",
+      })
+    ) {
+      return "sent" as const;
+    }
+  } catch (error) {
+    console.error(
+      "[admin-notification-ops] push success transition failed",
+      { deliveryId, error },
+    );
+  }
+
+  try {
+    await repository.transitionNotificationDelivery({
+      deliveryId,
+      transition: "needs_reconciliation",
+      errorMessage: "provider_success_ledger_unknown",
+    });
+  } catch (error) {
+    console.error(
+      "[admin-notification-ops] push reconciliation transition failed",
+      { deliveryId, error },
+    );
+  }
+  return "needs_reconciliation" as const;
+}
+
+type PushDeliveryRepository = Pick<
+  typeof notificationRepository,
+  "claimNotificationDelivery" | "transitionNotificationDelivery"
+>;
+
+type PushDeliveryAttemptResult =
+  | { outcome: "sent"; providerCalled: boolean }
+  | { outcome: "failed"; warning: string }
+  | {
+      outcome: "provider_failed";
+      error: unknown;
+      ledgerWarning: string | null;
+    }
+  | { outcome: "needs_reconciliation"; warning: string };
+
+export async function runPushDeliveryAttempt(
+  input: {
+    claim: Parameters<PushDeliveryRepository["claimNotificationDelivery"]>[0];
+    send: () => Promise<void>;
+  },
+  repository: PushDeliveryRepository = notificationRepository,
+): Promise<PushDeliveryAttemptResult> {
+  const memberId = input.claim.memberId;
+  let claimedDelivery: Awaited<
+    ReturnType<PushDeliveryRepository["claimNotificationDelivery"]>
+  >;
+  try {
+    claimedDelivery = await repository.claimNotificationDelivery(input.claim);
+  } catch (error) {
+    console.error("[admin-notification-ops] push delivery claim failed", {
+      memberId,
+      error,
+    });
+    return {
+      outcome: "failed",
+      warning: `푸시 발송 상태를 저장하지 못했습니다. (회원 ${memberId})`,
+    };
+  }
+
+  if (claimedDelivery.disposition === "sent") {
+    return { outcome: "sent", providerCalled: false };
+  }
+  if (claimedDelivery.disposition === "needs_reconciliation") {
+    return {
+      outcome: "failed",
+      warning: `푸시 발송 결과를 확정하지 못했습니다. (회원 ${memberId})`,
+    };
+  }
+  if (claimedDelivery.disposition === "in_progress") {
+    return {
+      outcome: "failed",
+      warning: `푸시 발송이 이미 진행 중입니다. (회원 ${memberId})`,
+    };
+  }
+
+  try {
+    const markedSending =
+      await repository.transitionNotificationDelivery({
+        deliveryId: claimedDelivery.deliveryId,
+        transition: "sending",
+      });
+    if (!markedSending) {
+      return {
+        outcome: "failed",
+        warning: `푸시 발송 상태를 선점하지 못했습니다. (회원 ${memberId})`,
+      };
+    }
+  } catch (error) {
+    console.error("[admin-notification-ops] push delivery lease failed", {
+      memberId,
+      error,
+    });
+    return {
+      outcome: "failed",
+      warning: `푸시 발송 상태를 저장하지 못했습니다. (회원 ${memberId})`,
+    };
+  }
+
+  let providerFailed = false;
+  let providerError: unknown;
+  try {
+    await input.send();
+  } catch (error) {
+    providerFailed = true;
+    providerError = error;
+  }
+
+  if (providerFailed) {
+    const safeErrorMessage = "푸시 알림 전송에 실패했습니다.";
+    let ledgerWarning: string | null = null;
+    try {
+      const markedFailed =
+        await repository.transitionNotificationDelivery({
+          deliveryId: claimedDelivery.deliveryId,
+          transition: "failed",
+          errorMessage: safeErrorMessage,
+        });
+      if (!markedFailed) {
+        ledgerWarning =
+          `푸시 실패 상태를 확정하지 못했습니다. (회원 ${memberId})`;
+      }
+    } catch (error) {
+      ledgerWarning =
+        `푸시 실패 상태를 저장하지 못했습니다. (회원 ${memberId})`;
+      console.error(
+        "[admin-notification-ops] push failure transition failed",
+        { memberId, error },
+      );
+    }
+    return {
+      outcome: "provider_failed",
+      error: providerError,
+      ledgerWarning,
+    };
+  }
+
+  const successResolution = await finalizeSuccessfulPushDelivery(
+    claimedDelivery.deliveryId,
+    repository,
+  );
+  if (successResolution === "sent") {
+    return { outcome: "sent", providerCalled: true };
+  }
+  return {
+    outcome: "needs_reconciliation",
+    warning:
+      `푸시 발송 성공 여부를 원장에 확정하지 못했습니다. (회원 ${memberId})`,
+  };
 }
 
 function toMattermostDeliveryCode(error: unknown) {
@@ -325,17 +494,89 @@ export async function sendPushCampaignDeliveries(params: {
     params.subscriptions,
     PUSH_SEND_CONCURRENCY,
     async (subscription) => {
-      try {
-        await webpush.sendNotification(
-          await buildTrustedPushSubscriptionRequest({
-            endpoint: subscription.endpoint,
-            p256dh: subscription.p256dh,
-            auth: subscription.auth,
-          }),
-          serialized,
+      const providerIdempotencyKey =
+        `ssartnership:${params.notificationId}:push:${subscription.id}`;
+      const attempt = await runPushDeliveryAttempt({
+        claim: {
+          notificationId: params.notificationId,
+          memberId: subscription.member_id,
+          channel: "push",
+          provider: "web_push",
+          providerCampaignId: params.notificationId,
+          providerIdempotencyKey,
+          leaseDurationSeconds: PUSH_DELIVERY_LEASE_SECONDS,
+        },
+        send: async () => {
+          await webpush.sendNotification(
+            await buildTrustedPushSubscriptionRequest({
+              endpoint: subscription.endpoint,
+              p256dh: subscription.p256dh,
+              auth: subscription.auth,
+            }),
+            serialized,
+          );
+        },
+      });
+
+      if (attempt.outcome === "failed") {
+        failed += 1;
+        bookkeepingErrors.push(attempt.warning);
+        return;
+      }
+
+      if (attempt.outcome === "provider_failed") {
+        failed += 1;
+        if (attempt.ledgerWarning) {
+          bookkeepingErrors.push(attempt.ledgerWarning);
+        }
+        const statusCode =
+          typeof attempt.error === "object" &&
+          attempt.error &&
+          "statusCode" in attempt.error
+            ? Number((attempt.error as { statusCode?: number }).statusCode)
+            : null;
+        const deactivate =
+          (attempt.error instanceof PushError &&
+            attempt.error.code === "invalid_request") ||
+          statusCode === 404 ||
+          statusCode === 410;
+        console.error("[admin-notification-ops] push delivery failed", {
+          subscriptionId: subscription.id,
+          memberId: subscription.member_id,
+          error: attempt.error,
+        });
+        const safeErrorMessage = "푸시 알림 전송에 실패했습니다.";
+        await runBookkeepingTasks(
+          [
+            markPushFailure(subscription, safeErrorMessage, deactivate),
+            logPushDelivery({
+              messageLogId: messageLog.id,
+              memberId: subscription.member_id,
+              subscriptionId: subscription.id,
+              payload,
+              status: "failed",
+              errorMessage: safeErrorMessage,
+            }),
+          ],
+          "push",
+          subscription.member_id,
+          bookkeepingErrors,
         );
+        return;
+      }
+
+      if (attempt.outcome === "sent") {
         sent += 1;
-        await runBookkeepingTasks([
+        if (!attempt.providerCalled) {
+          return;
+        }
+      } else {
+        failed += 1;
+        bookkeepingErrors.push(attempt.warning);
+      }
+
+      await runBookkeepingTasks(
+        [
           markPushSuccess(subscription.id),
           logPushDelivery({
             messageLogId: messageLog.id,
@@ -344,52 +585,11 @@ export async function sendPushCampaignDeliveries(params: {
             payload,
             status: "sent",
           }),
-          notificationRepository.recordNotificationDelivery({
-            notificationId: params.notificationId,
-            memberId: subscription.member_id,
-            channel: "push",
-            status: "sent",
-          }),
-        ], "push", subscription.member_id, bookkeepingErrors);
-      } catch (error) {
-        failed += 1;
-        const statusCode =
-          typeof error === "object" && error && "statusCode" in error
-            ? Number((error as { statusCode?: number }).statusCode)
-            : null;
-        const deactivate =
-          (error instanceof PushError && error.code === "invalid_request") ||
-          statusCode === 404 ||
-          statusCode === 410;
-        console.error("[admin-notification-ops] push delivery failed", {
-          subscriptionId: subscription.id,
-          memberId: subscription.member_id,
-          error,
-        });
-        const safeErrorMessage = "푸시 알림 전송에 실패했습니다.";
-        await runBookkeepingTasks([
-        markPushFailure(
-          subscription,
-          safeErrorMessage,
-          deactivate,
-        ),
-          logPushDelivery({
-            messageLogId: messageLog.id,
-            memberId: subscription.member_id,
-            subscriptionId: subscription.id,
-            payload,
-            status: "failed",
-            errorMessage: safeErrorMessage,
-          }),
-          notificationRepository.recordNotificationDelivery({
-            notificationId: params.notificationId,
-            memberId: subscription.member_id,
-            channel: "push",
-            status: "failed",
-            errorMessage: safeErrorMessage,
-          }),
-        ], "push", subscription.member_id, bookkeepingErrors);
-      }
+        ],
+        "push",
+        subscription.member_id,
+        bookkeepingErrors,
+      );
     },
   );
 
