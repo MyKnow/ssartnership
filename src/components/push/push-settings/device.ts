@@ -1,17 +1,18 @@
 "use client";
 
+import {
+  ClientSafeRequestError,
+  getClientSafeRequestError,
+  type ClientSafeRequestErrorCode,
+} from "@/lib/client-safe-request-error";
 import type { PushSettingsApiResponse } from "./types";
 
-export type PushSettingsClientErrorCode =
-  "request_failed" | "network_unavailable" | "invalid_response";
+export type PushSettingsClientErrorCode = ClientSafeRequestErrorCode;
 
-export class PushSettingsClientError extends Error {
-  readonly code: PushSettingsClientErrorCode;
-
+export class PushSettingsClientError extends ClientSafeRequestError {
   constructor(code: PushSettingsClientErrorCode, message: string) {
-    super(message);
+    super(code, message);
     this.name = "PushSettingsClientError";
-    this.code = code;
   }
 }
 
@@ -41,16 +42,16 @@ export function getPushSettingsClientError(
     );
   }
 
-  if (error instanceof TypeError) {
-    return new PushSettingsClientError(
+  const safeError = getClientSafeRequestError(error, {
+    requestFailed: buildPushSettingsSafeMessage(actionLabel, "request_failed"),
+    networkUnavailable: buildPushSettingsSafeMessage(
+      actionLabel,
       "network_unavailable",
-      buildPushSettingsSafeMessage(actionLabel, "network_unavailable"),
-    );
-  }
-
+    ),
+  });
   return new PushSettingsClientError(
-    "request_failed",
-    buildPushSettingsSafeMessage(actionLabel, "request_failed"),
+    safeError.code,
+    buildPushSettingsSafeMessage(actionLabel, safeError.code),
   );
 }
 
