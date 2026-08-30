@@ -34,10 +34,22 @@ export async function getServiceWorkerRegistration() {
   return navigator.serviceWorker.register("/sw.js");
 }
 
-export async function parsePushSettingsJson(response: Response) {
-  const data = (await response.json().catch(() => null)) as PushSettingsApiResponse;
+export async function parsePushSettingsJson<
+  T extends object = PushSettingsApiResponse,
+>(response: Response): Promise<T> {
+  const data = (await response.json().catch(() => null)) as unknown;
+  const message =
+    data &&
+    typeof data === "object" &&
+    "message" in data &&
+    typeof data.message === "string"
+      ? data.message
+      : null;
   if (!response.ok) {
-    throw new Error(data?.message ?? "요청에 실패했습니다.");
+    throw new Error(message ?? "요청에 실패했습니다.");
   }
-  return data;
+  if (!data || typeof data !== "object") {
+    throw new Error("서버 응답을 확인하지 못했습니다. 다시 시도해 주세요.");
+  }
+  return data as T;
 }
