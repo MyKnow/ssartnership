@@ -33,13 +33,10 @@ import { PARTNER_REGISTRATION_RATE_LIMIT, isBlocked, recordAttempt } from "@/lib
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { readFormIdempotencyKey } from "@/lib/form-idempotency";
 import { notifyAdminsOfPartnerRegistrationRequest } from "@/lib/operational-notifications";
+import { getClientIp } from "@/lib/client-ip";
 
 function getClientIdentifier(headerStore: Awaited<ReturnType<typeof headers>>) {
-  const forwarded = headerStore.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0]?.trim() || "unknown";
-  }
-  return headerStore.get("x-real-ip") ?? "unknown";
+  return getClientIp(headerStore) ?? "unknown";
 }
 
 export async function createPartnerRegistrationRequestAction(

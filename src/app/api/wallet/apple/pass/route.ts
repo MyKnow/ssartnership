@@ -40,7 +40,8 @@ function consumeWalletPassQuota(
     allowed: consumeProductEventQuota({
       eventName,
       ipAddress: context.ipAddress,
-      sessionId: userId,
+      actorKey: `member:${userId}`,
+      scopeKey: "wallet-pass",
     }),
   };
 }

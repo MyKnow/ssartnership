@@ -19,6 +19,7 @@ import {
   JsonRequestBodyError,
   readJsonRequestBodyWithinLimit,
 } from "@/lib/request-body-limit";
+import { getClientIp } from "@/lib/client-ip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,11 +30,7 @@ function errorResponse(message: string, status: number, code: string) {
 }
 
 function getClientIdentifier(request: Request) {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0]?.trim() ?? "unknown";
-  }
-  return request.headers.get("x-real-ip") ?? "unknown";
+  return getClientIp(request.headers) ?? "unknown";
 }
 
 export async function POST(request: Request) {

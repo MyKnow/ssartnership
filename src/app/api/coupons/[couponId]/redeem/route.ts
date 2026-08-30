@@ -101,7 +101,8 @@ export async function POST(
     !consumeProductEventQuota({
       eventName: "coupon_redeem",
       ipAddress: context.ipAddress,
-      sessionId,
+      actorKey: `member:${session.userId}`,
+      scopeKey: `coupon:${couponId}`,
     })
   ) {
     return NextResponse.json(

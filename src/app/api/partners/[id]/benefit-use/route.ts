@@ -205,7 +205,8 @@ export async function POST(
   if (!consumeProductEventQuota({
     eventName: "partner_benefit_use_pin_attempt",
     ipAddress: context.ipAddress,
-    sessionId,
+    actorKey: `member:${session.userId}`,
+    scopeKey: `partner:${partnerId}`,
   })) {
     return NextResponse.json(
       { ok: false, message: "요청이 많습니다. 잠시 후 다시 시도해 주세요." },
