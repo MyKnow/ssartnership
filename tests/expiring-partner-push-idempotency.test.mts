@@ -2,18 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 type PushOpsModule = typeof import("../src/lib/push/ops.ts");
-type OperationalNotificationsModule = typeof import(
-  "../src/lib/operational-notifications.ts"
-);
+type OperationalNotificationsModule =
+  typeof import("../src/lib/operational-notifications.ts");
 type DedupeInput = Parameters<
   OperationalNotificationsModule["claimOperationalNotificationDedupe"]
 >[0];
 
 const pushOpsModulePromise = import(
-  new URL("../src/lib/push/ops.ts", import.meta.url).href,
+  new URL("../src/lib/push/ops.ts", import.meta.url).href
 ) as Promise<PushOpsModule>;
 const operationalNotificationsModulePromise = import(
-  new URL("../src/lib/operational-notifications.ts", import.meta.url).href,
+  new URL("../src/lib/operational-notifications.ts", import.meta.url).href
 ) as Promise<OperationalNotificationsModule>;
 
 test("만료 예정 회원 푸시는 동일 제휴 종료 건 재실행을 한 번만 발송한다", async () => {
@@ -70,7 +69,10 @@ test("만료 예정 회원 푸시는 동일 제휴 종료 건 재실행을 한 �
     createExpiringPartnerPushIdempotencyKey(partner),
   );
   assert.equal(calls[1]?.idempotencyKey, calls[0]?.idempotencyKey);
-  assert.deepEqual(calls.map((call) => call.source), ["automatic", "automatic"]);
+  assert.deepEqual(
+    calls.map((call) => call.source),
+    ["automatic", "automatic"],
+  );
   assert.deepEqual(first.summary, {
     processedPartners: 1,
     targeted: 3,
@@ -199,7 +201,10 @@ for (const failingAudience of ["admin", "partner"] as const) {
     assert.equal(retry.partialFailure, false);
     assert.equal(retry.summary.failed, 0);
     assert.equal(retry.summary.skippedDuplicates, 1);
-    assert.equal(retry.summary.adminCreated, failingAudience === "admin" ? 1 : 0);
+    assert.equal(
+      retry.summary.adminCreated,
+      failingAudience === "admin" ? 1 : 0,
+    );
     assert.equal(
       retry.summary.partnerCreated,
       failingAudience === "partner" ? 1 : 0,

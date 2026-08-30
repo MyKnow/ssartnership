@@ -6,9 +6,7 @@ import {
   type AdminScopeAccountLike,
   resolveCreatedManagedCampusSlugs,
 } from "@/lib/admin-scope";
-import {
-  sendAndRecordCampusScopedNewPartnerNotification,
-} from "@/lib/new-partner-notifications";
+import { sendAndRecordCampusScopedNewPartnerNotification } from "@/lib/new-partner-notifications";
 import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
 import {
   DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
@@ -211,15 +209,14 @@ async function createPartnerRecord(
       payload,
       companyName,
     });
-    const brandProfile =
-      companyProvision?.company?.id
-        ? await ensureAdminPartnerBrandProfile({
-            supabase,
-            companyId: companyProvision.company.id,
-            payload,
-            media,
-          })
-        : { brandProfileId: null, created: false };
+    const brandProfile = companyProvision?.company?.id
+      ? await ensureAdminPartnerBrandProfile({
+          supabase,
+          companyId: companyProvision.company.id,
+          payload,
+          media,
+        })
+      : { brandProfileId: null, created: false };
     if (brandProfile.created) {
       createdBrandProfileId = brandProfile.brandProfileId;
     }
@@ -256,11 +253,12 @@ async function createPartnerRecord(
     });
 
     if (error?.code === "23505") {
-      const { data: existingPartner, error: existingPartnerError } = await supabase
-        .from("partners")
-        .select("id")
-        .eq("id", partnerId)
-        .maybeSingle();
+      const { data: existingPartner, error: existingPartnerError } =
+        await supabase
+          .from("partners")
+          .select("id")
+          .eq("id", partnerId)
+          .maybeSingle();
       if (existingPartnerError || !existingPartner) {
         throw new Error(error.message);
       }
@@ -271,14 +269,16 @@ async function createPartnerRecord(
     }
 
     if (createdPartner && payload.benefitItems.length > 0) {
-      const { error: benefitError } = await supabase.from("partner_benefits").insert(
-        payload.benefitItems.map((benefit, displayOrder) => ({
-          partner_id: partnerId,
-          title: benefit.title,
-          max_apply_count: benefit.maxApplyCount ?? null,
-          display_order: displayOrder,
-        })),
-      );
+      const { error: benefitError } = await supabase
+        .from("partner_benefits")
+        .insert(
+          payload.benefitItems.map((benefit, displayOrder) => ({
+            partner_id: partnerId,
+            title: benefit.title,
+            max_apply_count: benefit.maxApplyCount ?? null,
+            display_order: displayOrder,
+          })),
+        );
       if (benefitError) {
         throw new Error(benefitError.message);
       }
@@ -309,20 +309,25 @@ async function createPartnerRecord(
         originalError: error,
         operations: [
           ...(createdPartner
-            ? [{
-                stage: "partner",
-                run: () => supabase.from("partners").delete().eq("id", partnerId),
-              }]
+            ? [
+                {
+                  stage: "partner",
+                  run: () =>
+                    supabase.from("partners").delete().eq("id", partnerId),
+                },
+              ]
             : []),
           ...(createdBrandProfileId
-            ? [{
-                stage: "partner_brand_profile",
-                run: () =>
-                  supabase
-                    .from("partner_brand_profiles")
-                    .delete()
-                    .eq("id", createdBrandProfileId),
-              }]
+            ? [
+                {
+                  stage: "partner_brand_profile",
+                  run: () =>
+                    supabase
+                      .from("partner_brand_profiles")
+                      .delete()
+                      .eq("id", createdBrandProfileId),
+                },
+              ]
             : []),
         ],
       });
@@ -334,7 +339,7 @@ async function createPartnerRecord(
       await cleanupPartnerCompanyProvision(supabase, companyProvision);
     } catch (cleanupError) {
       throw new Error("partner_company_cleanup_failed", {
-        cause: { originalError: error, cleanupError },
+        cause: { originalError: error, cleanupError, persistenceCleanupError },
       });
     }
     if (persistenceCleanupError) {
@@ -448,7 +453,10 @@ export async function createPartnerFormActionImpl(
   } catch (error) {
     return {
       status: "error",
-      errorCode: getSafeAdminActionErrorCode(error, "partner_form_invalid_request"),
+      errorCode: getSafeAdminActionErrorCode(
+        error,
+        "partner_form_invalid_request",
+      ),
     };
   }
 
