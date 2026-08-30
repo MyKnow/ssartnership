@@ -1,5 +1,7 @@
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "./hmac.js";
+import { revalidatePartnerSessionAccess } from "./partner-session-access.ts";
 
 const COOKIE_NAME = "partner_session";
 const SESSION_TTL_DAYS = 7;
@@ -123,6 +125,10 @@ export async function clearPartnerSession() {
   store.delete(COOKIE_NAME);
 }
 
-export async function getPartnerSession() {
-  return getSignedPartnerSession();
-}
+export const getPartnerSession = cache(async () => {
+  const signedSession = await getSignedPartnerSession();
+  if (!signedSession) {
+    return null;
+  }
+  return revalidatePartnerSessionAccess(signedSession);
+});

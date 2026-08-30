@@ -15,7 +15,11 @@ import {
   SITE_RSS_URL,
   SITE_TITLE,
 } from "@/lib/site";
-import { buildSiteUrl, createCanonicalAlternates } from "@/lib/seo";
+import {
+  buildSiteUrl,
+  createCanonicalAlternates,
+  serializeJsonLd,
+} from "@/lib/seo";
 import { getHeaderSession } from "@/lib/header-session";
 import { getMemberCanonicalProfile } from "@/lib/member-profile-view";
 import { getSignedUserSession } from "@/lib/user-auth";
@@ -117,7 +121,7 @@ export default async function Home() {
         <Container className="pb-16 pt-0" size="wide">
           <script
             type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+            dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
           />
           <Suspense fallback={<HomePartnerExploreSkeleton />}>
             <HomeContent

@@ -6,7 +6,7 @@ import SiteHeader from "@/components/SiteHeader";
 import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
 import { SITE_NAME } from "@/lib/site";
-import { createCanonicalAlternates } from "@/lib/seo";
+import { createCanonicalAlternates, serializeJsonLd } from "@/lib/seo";
 import { getPartnerViewerContext } from "@/lib/partner-view-context";
 import PartnerDetailContactSection from "./_page/PartnerDetailContactSection";
 import PartnerDetailAccessGate from "./_page/PartnerDetailAccessGate";
@@ -269,13 +269,13 @@ export default async function PartnerDetailPage({
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{
-              __html: JSON.stringify(breadcrumbJsonLd),
+              __html: serializeJsonLd(breadcrumbJsonLd),
             }}
           />
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{
-              __html: JSON.stringify(partnerJsonLd),
+              __html: serializeJsonLd(partnerJsonLd),
             }}
           />
           {!isPreview ? (

@@ -1,6 +1,10 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { fetchPublicImage, ImageProxyError } from "@/lib/image-proxy";
+import {
+  fetchPublicImage,
+  ImageProxyError,
+  PUBLIC_RASTER_IMAGE_CONTENT_TYPES,
+} from "@/lib/image-proxy";
 import { sanitizeHttpUrl } from "@/lib/validation";
 
 const WEEK_SECONDS = 60 * 60 * 24 * 7;
@@ -22,13 +26,16 @@ export async function GET(request: NextRequest) {
 
   try {
     const parsed = new URL(safeTarget);
-    const { body, contentType } = await fetchPublicImage(parsed);
+    const { body, contentType } = await fetchPublicImage(parsed, {
+      allowedContentTypes: PUBLIC_RASTER_IMAGE_CONTENT_TYPES,
+    });
 
     return new NextResponse(body, {
       status: 200,
       headers: {
         "content-type": contentType,
         "cache-control": `public, max-age=${5 * 60}, s-maxage=${WEEK_SECONDS}, stale-while-revalidate=${WEEK_SECONDS}`,
+        "x-content-type-options": "nosniff",
       },
     });
   } catch (error) {

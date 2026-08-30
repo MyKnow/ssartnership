@@ -2,6 +2,7 @@ import HeroSection from "@/components/HeroSection";
 import HomeView from "@/components/HomeView";
 import Container from "@/components/ui/Container";
 import type { PartnerPopularityMetrics } from "@/lib/partner-popularity";
+import { serializeJsonLd } from "@/lib/seo";
 import type { Category, Partner } from "@/lib/types";
 
 export type CampusLandingViewProps = {
@@ -39,7 +40,7 @@ export default function CampusLandingView({
         {structuredData ? (
           <script
             type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+            dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
           />
         ) : null}
         <HeroSection
