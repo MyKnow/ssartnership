@@ -27,7 +27,7 @@ test("관리자 회원 목록은 페이지에서 DB 조회를 분리하고 서�
   assert.match(readModelSource, /memberQuery = memberQuery\.range\(/);
   assert.match(readModelSource, /from \+ pageSize - 1/);
   assert.match(readModelSource, /shouldRedirectToLastPage: page > totalPages/);
-  assert.match(readModelSource, /escapeLikePattern\(searchValue\)/);
+  assert.match(readModelSource, /getAdminSearchLikePattern\(searchValue\)/);
   assert.match(readModelSource, /is\("deleted_at", null\)/);
   assert.match(pageSource, /redirect\(`\/admin\/members\?/);
 });
@@ -191,7 +191,7 @@ test("회원 목록 URL 필터는 알려진 값만 수용하고 검색 입력을
     marketingEnabled: "enabled",
   });
 
-  assert.equal(filters.searchValue, "가".repeat(100));
+  assert.equal(filters.searchValue, "가".repeat(80));
   assert.equal(filters.sortValue, "name");
   assert.equal(filters.filterValue, "mustChangePassword");
   assert.equal(filters.mattermostLifecycleFilter, "graduated");

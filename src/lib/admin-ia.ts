@@ -1,3 +1,5 @@
+import { normalizeAdminSearchQuery } from "@/lib/admin-search-query";
+
 export const ADMIN_MEMBER_PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
 
 export type AdminMemberPageSize =
@@ -107,7 +109,7 @@ export function parseAdminPartnerListFilters(input: {
   const sort = input.sort;
 
   return {
-    searchValue: (input.q ?? "").trim().slice(0, 100),
+    searchValue: normalizeAdminSearchQuery(input.q),
     categoryKey: parseAdminPartnerCategoryKey(input.category),
     visibility:
       visibility === "public" ||

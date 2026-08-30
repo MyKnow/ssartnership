@@ -1,4 +1,8 @@
 import {
+  getAdminSearchLikePattern,
+  normalizeAdminSearchQuery,
+} from "@/lib/admin-search-query";
+import {
   getMockMemberById,
   isMockDataSource,
   MOCK_MEMBER_ID,
@@ -8,7 +12,6 @@ import { unstable_cache } from "next/cache";
 
 const DEFAULT_RECIPIENT_LIMIT = 30;
 const MAX_RECIPIENT_LIMIT = 50;
-const MAX_RECIPIENT_QUERY_LENGTH = 80;
 const INITIAL_RECIPIENT_CACHE_SECONDS = 3;
 
 export type AdminPushRecipientOption = {
@@ -40,14 +43,7 @@ type DirectoryMatchRow = {
 };
 
 export function normalizeAdminPushRecipientSearch(value: string | null | undefined) {
-  return String(value ?? "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .slice(0, MAX_RECIPIENT_QUERY_LENGTH);
-}
-
-function getSafeSearchPattern(query: string) {
-  return `%${query.replace(/[\\%_]/g, "\\$&")}%`;
+  return normalizeAdminSearchQuery(value);
 }
 
 function normalizeLimit(value: number | null | undefined) {
@@ -109,12 +105,12 @@ async function querySupabaseRecipientOptions({
   let memberResult: Awaited<typeof memberQuery>;
   if (query) {
     const [nameResult, directoryResult] = await Promise.all([
-      memberQuery.ilike("display_name", getSafeSearchPattern(query)),
+      memberQuery.ilike("display_name", getAdminSearchLikePattern(query)),
       supabase
         .from("mm_user_directory")
         .select("id")
         .eq("is_active", true)
-        .ilike("mm_username", getSafeSearchPattern(query))
+        .ilike("mm_username", getAdminSearchLikePattern(query))
         .limit(limit),
     ]);
     memberResult = nameResult;
