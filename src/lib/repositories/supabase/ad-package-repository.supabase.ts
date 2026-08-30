@@ -1078,24 +1078,52 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
   ): Promise<AvailableAdCoupon[]> {
     if (!input.memberId) return [];
     const supabase = getSupabaseAdminClient();
-    const { data: issueData, error: issueError } = await supabase
+    const partnerIds = input.partnerIds
+      ? [...new Set(input.partnerIds.filter(Boolean))]
+      : null;
+    if (partnerIds && partnerIds.length === 0) return [];
+
+    const scopedCouponResult = partnerIds
+      ? await supabase
+          .from("ad_coupons")
+          .select(AD_COUPON_SELECT)
+          .in("partner_id", partnerIds)
+      : { data: null, error: null };
+    if (scopedCouponResult.error) {
+      throw new Error(scopedCouponResult.error.message);
+    }
+    const scopedCouponRows = partnerIds
+      ? ((scopedCouponResult.data ?? []) as AdCouponRow[])
+      : null;
+    if (scopedCouponRows?.length === 0) return [];
+
+    let issueQuery = supabase
       .from("ad_coupon_issues")
       .select("id,coupon_id,member_id,assigned_code,issued_at,used_at")
       .eq("member_id", input.memberId)
       .eq("status", "issued")
       .is("used_at", null)
       .order("issued_at", { ascending: false });
+    if (scopedCouponRows) {
+      issueQuery = issueQuery.in(
+        "coupon_id",
+        scopedCouponRows.map((row) => row.id),
+      );
+    }
+    const { data: issueData, error: issueError } = await issueQuery;
     if (issueError) throw new Error(issueError.message);
     const issues = (issueData ?? []) as CouponIssueRow[];
     if (issues.length === 0) return [];
     const couponIds = [...new Set(issues.map((issue) => issue.coupon_id))];
-    const { data: couponData, error: couponError } = await supabase
-      .from("ad_coupons")
-      .select(AD_COUPON_SELECT)
-      .in("id", couponIds);
-    if (couponError) throw new Error(couponError.message);
+    const couponResult = scopedCouponRows
+      ? { data: scopedCouponRows, error: null }
+      : await supabase
+          .from("ad_coupons")
+          .select(AD_COUPON_SELECT)
+          .in("id", couponIds);
+    if (couponResult.error) throw new Error(couponResult.error.message);
     const coupons = new Map(
-      ((couponData ?? []) as AdCouponRow[]).map((row) => [row.id, mapCouponRow(row)]),
+      ((couponResult.data ?? []) as AdCouponRow[]).map((row) => [row.id, mapCouponRow(row)]),
     );
     const now = input.now ?? new Date();
     return issues.flatMap((issue) => {

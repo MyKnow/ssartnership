@@ -4,6 +4,7 @@ import {
   normalizeCampusSlugs,
   type CampusSlug,
 } from "@/lib/campuses";
+import { forEachWithConcurrency } from "@/lib/async-concurrency";
 import { sendAdminNotificationCampaign } from "@/lib/admin-notification-ops";
 import {
   createNewPartnerPayload,
@@ -70,6 +71,8 @@ export type PendingPartnerPublicationNotificationResult = {
   skipped: number;
   failures: Array<{ partnerId: string; message: string }>;
 };
+
+const PUBLICATION_NOTIFICATION_CONCURRENCY = 4;
 
 function getCampusDisplayValues(slugs: CampusSlug[]) {
   return Array.from(
@@ -351,33 +354,37 @@ export async function runPendingPartnerPublicationNotifications(
     failures: [],
   };
 
-  for (const partner of pendingPartners) {
-    try {
-      const notificationResult =
-        await sendAndRecordCampusScopedNewPartnerNotification({
+  await forEachWithConcurrency(
+    pendingPartners,
+    PUBLICATION_NOTIFICATION_CONCURRENCY,
+    async (partner) => {
+      try {
+        const notificationResult =
+          await sendAndRecordCampusScopedNewPartnerNotification({
+            partnerId: partner.id,
+            name: partner.name,
+            location: partner.location,
+            categoryLabel: getCategoryLabel(partner.categories),
+            campusSlugs: partner.campus_slugs ?? [],
+            benefitSummary: (partner.benefits ?? []).join("\n"),
+            conditions: (partner.conditions ?? []).join("\n"),
+            periodStart: partner.period_start,
+            periodEnd: partner.period_end,
+            mapUrl: partner.map_url,
+          });
+        if (notificationResult.sent) {
+          result.sent += 1;
+        } else {
+          result.skipped += 1;
+        }
+      } catch (error) {
+        result.failures.push({
           partnerId: partner.id,
-          name: partner.name,
-          location: partner.location,
-          categoryLabel: getCategoryLabel(partner.categories),
-          campusSlugs: partner.campus_slugs ?? [],
-          benefitSummary: (partner.benefits ?? []).join("\n"),
-          conditions: (partner.conditions ?? []).join("\n"),
-          periodStart: partner.period_start,
-          periodEnd: partner.period_end,
-          mapUrl: partner.map_url,
+          message: error instanceof Error ? error.message : "알 수 없는 오류",
         });
-      if (notificationResult.sent) {
-        result.sent += 1;
-      } else {
-        result.skipped += 1;
       }
-    } catch (error) {
-      result.failures.push({
-        partnerId: partner.id,
-        message: error instanceof Error ? error.message : "알 수 없는 오류",
-      });
-    }
-  }
+    },
+  );
 
   return result;
 }

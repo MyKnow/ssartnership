@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { forEachWithConcurrency } from "@/lib/async-concurrency";
 import { removeGraduateStoredObject } from "@/lib/graduate-verification-storage";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
 const CLEANUP_BATCH_SIZE = 100;
+const CLEANUP_CONCURRENCY = 8;
 const UNCONSUMED_UPLOAD_RETENTION_MS = 24 * 60 * 60 * 1000;
 
 function isAuthorizedByCronSecret(request: NextRequest) {
@@ -41,15 +43,19 @@ async function deleteQuarantinedUploads(now: Date) {
 
   const uploads = (data ?? []) as QuarantinedUpload[];
   let deleted = 0;
-  for (const upload of uploads) {
+  await forEachWithConcurrency(uploads, CLEANUP_CONCURRENCY, async (upload) => {
     try {
       await removeGraduateStoredObject(upload.storage_bucket, upload.storage_path);
-      await supabase.from("graduate_verification_uploads").delete().eq("id", upload.id);
+      const { error: deleteError } = await supabase
+        .from("graduate_verification_uploads")
+        .delete()
+        .eq("id", upload.id);
+      if (deleteError) throw deleteError;
       deleted += 1;
     } catch {
       // A later cron run retries the same private object. Avoid logging paths or other PII.
     }
-  }
+  });
   return deleted;
 }
 
@@ -67,20 +73,21 @@ async function deleteExpiredCertificates(nowIso: string) {
 
   const requests = (data ?? []) as CertificateForDeletion[];
   let deleted = 0;
-  for (const request of requests) {
-    if (!request.certificate_storage_path) continue;
+  await forEachWithConcurrency(requests, CLEANUP_CONCURRENCY, async (request) => {
+    if (!request.certificate_storage_path) return;
     try {
       await removeGraduateStoredObject("graduate-certificates", request.certificate_storage_path);
-      await supabase
+      const { error: updateError } = await supabase
         .from("graduate_verification_requests")
         .update({ certificate_deleted_at: nowIso, certificate_storage_path: null })
         .eq("id", request.id)
         .is("certificate_deleted_at", null);
+      if (updateError) throw updateError;
       deleted += 1;
     } catch {
       // Keep the record eligible for a safe retry without exposing a private path.
     }
-  }
+  });
   return deleted;
 }
 
@@ -98,19 +105,20 @@ async function deleteExpiredProfileImages(nowIso: string) {
 
   const images = (data ?? []) as ProfileImageForDeletion[];
   let deleted = 0;
-  for (const image of images) {
+  await forEachWithConcurrency(images, CLEANUP_CONCURRENCY, async (image) => {
     try {
       await removeGraduateStoredObject("member-profile-images", image.storage_path);
-      await supabase
+      const { error: updateError } = await supabase
         .from("member_profile_images")
         .update({ deleted_at: nowIso })
         .eq("id", image.id)
         .is("deleted_at", null);
+      if (updateError) throw updateError;
       deleted += 1;
     } catch {
       // Keep the record eligible for a safe retry without exposing a private path.
     }
-  }
+  });
   return deleted;
 }
 

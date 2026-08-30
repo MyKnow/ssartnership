@@ -664,13 +664,20 @@ export class MockAdPackageRepository implements AdPackageRepository {
     input: ListIssuedCouponsForMemberInput,
   ): Promise<AvailableAdCoupon[]> {
     const now = input.now ?? new Date();
+    const partnerIds = input.partnerIds
+      ? new Set(input.partnerIds.filter(Boolean))
+      : null;
     const items: AvailableAdCoupon[] = [];
     for (const issue of this.issues) {
       if (issue.memberId !== input.memberId || issue.usedAt) {
         continue;
       }
       const coupon = this.coupons.find((item) => item.id === issue.couponId);
-      if (!coupon || new Date(coupon.usageEndsAt).getTime() < now.getTime()) {
+      if (
+        !coupon ||
+        (partnerIds && !partnerIds.has(coupon.partnerId)) ||
+        new Date(coupon.usageEndsAt).getTime() < now.getTime()
+      ) {
         continue;
       }
       const available = toAvailableCoupon(coupon, 0);

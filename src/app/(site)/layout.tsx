@@ -17,9 +17,11 @@ export default async function SiteLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const headerStore = await headers();
+  const [headerStore, session] = await Promise.all([
+    headers(),
+    getUserSession(),
+  ]);
   const returnTo = sanitizeReturnTo(getForwardedRequestPath(headerStore), "/");
-  const session = await getUserSession();
   const requiredGateRedirect = getMemberRequiredGateRedirect({
     currentPath: returnTo,
     returnTo,

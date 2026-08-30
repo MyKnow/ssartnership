@@ -38,7 +38,13 @@ export async function GET(request: NextRequest) {
     .in("period_end", targetDates);
 
   if (error) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
+    console.error("[push-expiring-partners] partner query failed", {
+      reasonCode: "partner_query_failed",
+    });
+    return NextResponse.json(
+      { message: "만료 예정 제휴처를 불러오지 못했습니다." },
+      { status: 500 },
+    );
   }
 
   const activePartners = filterExpiringPartnersForPush(

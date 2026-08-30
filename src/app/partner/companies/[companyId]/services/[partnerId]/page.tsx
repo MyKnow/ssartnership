@@ -109,7 +109,16 @@ export default async function PartnerCompanyServiceDetailPage({
     context.brandPlanTier,
     "timeseries",
   );
-  const [reviewData, publicReviewSummary, serviceMetricsSnapshot, metricTimeseries] =
+  const paramsDataPromise = searchParams
+    ?? Promise.resolve<PartnerServiceDetailPageSearchParams>({});
+  const [
+    reviewData,
+    publicReviewSummary,
+    serviceMetricsSnapshot,
+    metricTimeseries,
+    paramsData,
+    coupons,
+  ] =
     await Promise.all([
       partnerReviewRepository.listPartnerReviews({
         partnerId,
@@ -140,8 +149,9 @@ export default async function PartnerCompanyServiceDetailPage({
             },
             warningMessage: `${getPartnerCompanyPlanDefinition(context.brandPlanTier).label} 플랜에서는 시계열 상세 지표가 제공되지 않습니다.`,
           }),
+      paramsDataPromise,
+      adPackageRepository.listActiveCouponsForPartner(partnerId).catch(() => []),
     ]);
-  const paramsData = (await searchParams) ?? {};
   const requestedUsageBenefit = readSearchParam(paramsData.usageBenefit);
   const selectedUsageBenefit = context.currentBenefits.includes(requestedUsageBenefit)
     ? requestedUsageBenefit
@@ -156,8 +166,6 @@ export default async function PartnerCompanyServiceDetailPage({
     serviceMetricsSnapshot.metrics,
     context.brandPlanTier,
   );
-  const coupons = await adPackageRepository.listActiveCouponsForPartner(partnerId).catch(() => []);
-
   const mode = readSearchParam(paramsData.mode) === "edit" ? "edit" : "view";
   const errorCode = readSearchParam(paramsData.error);
   const successCode = readSearchParam(paramsData.success);

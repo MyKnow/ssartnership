@@ -92,5 +92,6 @@ describe("new partner campus-scoped notifications", () => {
     assert.match(reviewSource, /shouldNotifyPartnerBecamePublic/);
     assert.match(reviewSource, /sendAndRecordCampusScopedNewPartnerNotification/);
     assert.match(cronSource, /runPendingPartnerPublicationNotifications/);
+    assert.doesNotMatch(cronSource, /message:\s*error\.message/);
   });
 });

@@ -3,6 +3,7 @@ import {
   createExpiringPartnerPayload,
   getPushDestinationLabel,
 } from "./payloads.ts";
+import { forEachWithConcurrency } from "../async-concurrency.ts";
 import { sendAdminNotificationCampaign } from "@/lib/admin-notification-ops";
 import { isPushConfigured } from "./config.ts";
 import { parsePushAudience } from "./audience.ts";
@@ -73,6 +74,8 @@ export type OperationalExpiringPartnerFailure = {
   message: string;
 };
 
+const EXPIRING_PARTNER_NOTIFICATION_CONCURRENCY = 4;
+
 export function getKstDateString(daysFromToday = 0, baseDate = new Date()) {
   const now = new Date(baseDate.getTime() + daysFromToday * 24 * 60 * 60 * 1000);
   const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
@@ -133,67 +136,71 @@ export async function runExpiringPartnerPushBatch(
   };
   const failures: PushBatchFailure[] = [];
 
-  for (const partner of partners) {
-    try {
-      const payload = createExpiringPartnerPayload({
-        partnerId: partner.id,
-        name: partner.name,
-        endDate: partner.period_end,
-      });
-      const result = await sendAdminNotificationCampaign(
-        {
-          notificationType: "expiring_partner",
-          title: payload.title,
-          body: payload.body,
-          url: payload.url,
-          audience: { scope: "all" },
-          channels: {
-            in_app: true,
-            push: true,
-            mm: false,
+  await forEachWithConcurrency(
+    partners,
+    EXPIRING_PARTNER_NOTIFICATION_CONCURRENCY,
+    async (partner) => {
+      try {
+        const payload = createExpiringPartnerPayload({
+          partnerId: partner.id,
+          name: partner.name,
+          endDate: partner.period_end,
+        });
+        const result = await sendAdminNotificationCampaign(
+          {
+            notificationType: "expiring_partner",
+            title: payload.title,
+            body: payload.body,
+            url: payload.url,
+            audience: { scope: "all" },
+            channels: {
+              in_app: true,
+              push: true,
+              mm: false,
+            },
+            templateContext: {
+              kind: "expiring_partner",
+              partnerName: partner.name,
+              partnerCategory: partner.category_label?.trim() || "제휴",
+              partnerLocation: partner.location?.trim() || "",
+              periodEnd: partner.period_end,
+              daysUntilEnd: getDaysUntilEnd(partner.period_end),
+              partnerUrl: payload.url,
+            },
           },
-          templateContext: {
-            kind: "expiring_partner",
-            partnerName: partner.name,
-            partnerCategory: partner.category_label?.trim() || "제휴",
-            partnerLocation: partner.location?.trim() || "",
-            periodEnd: partner.period_end,
-            daysUntilEnd: getDaysUntilEnd(partner.period_end),
-            partnerUrl: payload.url,
-          },
-        },
-        "automatic",
-      );
-      summary = {
-        ...summary,
-        targeted:
-          summary.targeted +
-          result.channelResults.in_app.targeted +
-          result.channelResults.push.targeted,
-        delivered:
-          summary.delivered +
-          result.channelResults.in_app.sent +
-          result.channelResults.push.sent,
-        failed:
-          summary.failed +
-          result.channelResults.push.failed,
-      };
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "만료 예정 알림 발송에 실패했습니다.";
-      failures.push({
-        partnerId: partner.id,
-        name: partner.name,
-        message,
-      });
-      summary = {
-        ...summary,
-        failed: summary.failed + 1,
-      };
-    }
-  }
+          "automatic",
+        );
+        summary = {
+          ...summary,
+          targeted:
+            summary.targeted +
+            result.channelResults.in_app.targeted +
+            result.channelResults.push.targeted,
+          delivered:
+            summary.delivered +
+            result.channelResults.in_app.sent +
+            result.channelResults.push.sent,
+          failed:
+            summary.failed +
+            result.channelResults.push.failed,
+        };
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "만료 예정 알림 발송에 실패했습니다.";
+        failures.push({
+          partnerId: partner.id,
+          name: partner.name,
+          message,
+        });
+        summary = {
+          ...summary,
+          failed: summary.failed + 1,
+        };
+      }
+    },
+  );
 
   return {
     ok: failures.length === 0,
@@ -217,118 +224,122 @@ export async function runOperationalExpiringPartnerNotifications(
   };
   const failures: OperationalExpiringPartnerFailure[] = [];
 
-  for (const partner of partners) {
-    const adminDedupeKey = createExpiringPartnershipDedupeKey({
-      audience: "admin",
-      partnerId: partner.id,
-      daysBefore,
-      endDate: partner.period_end,
-    });
-    const partnerDedupeKey = createExpiringPartnershipDedupeKey({
-      audience: "partner",
-      partnerId: partner.id,
-      daysBefore,
-      endDate: partner.period_end,
-    });
-
-    try {
-      const shouldCreateAdminNotification = await claimOperationalNotificationDedupe({
-        dedupeKey: adminDedupeKey,
-        audience: "admin",
-        notificationType: "expiring_partner",
-        targetId: partner.id,
-      });
-      if (shouldCreateAdminNotification) {
-        await createAdminOperationalNotification({
-          type: "expiring_partner",
-          title: `제휴 종료 ${daysBefore}일 전`,
-          body: `${partner.name} 제휴가 ${partner.period_end}에 종료됩니다.`,
-          targetUrl: `/admin/partners?query=${encodeURIComponent(partner.name)}`,
-          metadata: {
-            partnerId: partner.id,
-            companyId: partner.company_id ?? null,
-            daysBefore,
-            endDate: partner.period_end,
-          },
-          templateContext: {
-            kind: "admin_expiring_partner",
-            partnerName: partner.name,
-            partnerCategory: partner.category_label?.trim() || "제휴",
-            partnerLocation: partner.location?.trim() || "",
-            periodEnd: partner.period_end,
-            daysUntilEnd: String(daysBefore),
-            adminUrl: `/admin/partners?query=${encodeURIComponent(partner.name)}`,
-          },
-        });
-        summary.adminCreated += 1;
-      } else {
-        summary.skippedDuplicates += 1;
-      }
-    } catch (error) {
-      summary.failed += 1;
-      failures.push({
+  await forEachWithConcurrency(
+    partners,
+    EXPIRING_PARTNER_NOTIFICATION_CONCURRENCY,
+    async (partner) => {
+      const adminDedupeKey = createExpiringPartnershipDedupeKey({
         audience: "admin",
         partnerId: partner.id,
-        name: partner.name,
-        message:
-          error instanceof Error
-            ? error.message
-            : "관리자 종료 임박 알림 생성에 실패했습니다.",
+        daysBefore,
+        endDate: partner.period_end,
       });
-    }
-
-    if (!partner.company_id) {
-      summary.skippedWithoutCompany += 1;
-      continue;
-    }
-
-    try {
-      const shouldCreatePartnerNotification = await claimOperationalNotificationDedupe({
-        dedupeKey: partnerDedupeKey,
+      const partnerDedupeKey = createExpiringPartnershipDedupeKey({
         audience: "partner",
-        notificationType: "expiring_partner",
-        targetId: partner.id,
+        partnerId: partner.id,
+        daysBefore,
+        endDate: partner.period_end,
       });
-      if (shouldCreatePartnerNotification) {
-        await createPartnerOperationalNotification({
-          type: "expiring_partner",
-          companyId: partner.company_id,
-          title: `제휴 종료 ${daysBefore}일 전`,
-          body: `${partner.name} 제휴가 ${partner.period_end}에 종료됩니다.`,
-          targetUrl: getCompanyScopedPartnerServiceHref(partner.company_id, partner.id),
-          metadata: {
-            partnerId: partner.id,
+
+      try {
+        const shouldCreateAdminNotification = await claimOperationalNotificationDedupe({
+          dedupeKey: adminDedupeKey,
+          audience: "admin",
+          notificationType: "expiring_partner",
+          targetId: partner.id,
+        });
+        if (shouldCreateAdminNotification) {
+          await createAdminOperationalNotification({
+            type: "expiring_partner",
+            title: `제휴 종료 ${daysBefore}일 전`,
+            body: `${partner.name} 제휴가 ${partner.period_end}에 종료됩니다.`,
+            targetUrl: `/admin/partners?query=${encodeURIComponent(partner.name)}`,
+            metadata: {
+              partnerId: partner.id,
+              companyId: partner.company_id ?? null,
+              daysBefore,
+              endDate: partner.period_end,
+            },
+            templateContext: {
+              kind: "admin_expiring_partner",
+              partnerName: partner.name,
+              partnerCategory: partner.category_label?.trim() || "제휴",
+              partnerLocation: partner.location?.trim() || "",
+              periodEnd: partner.period_end,
+              daysUntilEnd: String(daysBefore),
+              adminUrl: `/admin/partners?query=${encodeURIComponent(partner.name)}`,
+            },
+          });
+          summary.adminCreated += 1;
+        } else {
+          summary.skippedDuplicates += 1;
+        }
+      } catch (error) {
+        summary.failed += 1;
+        failures.push({
+          audience: "admin",
+          partnerId: partner.id,
+          name: partner.name,
+          message:
+            error instanceof Error
+              ? error.message
+              : "관리자 종료 임박 알림 생성에 실패했습니다.",
+        });
+      }
+
+      if (!partner.company_id) {
+        summary.skippedWithoutCompany += 1;
+        return;
+      }
+
+      try {
+        const shouldCreatePartnerNotification = await claimOperationalNotificationDedupe({
+          dedupeKey: partnerDedupeKey,
+          audience: "partner",
+          notificationType: "expiring_partner",
+          targetId: partner.id,
+        });
+        if (shouldCreatePartnerNotification) {
+          await createPartnerOperationalNotification({
+            type: "expiring_partner",
             companyId: partner.company_id,
-            daysBefore,
-            endDate: partner.period_end,
-          },
-          templateContext: {
-            kind: "partner_expiring_partner",
-            partnerName: partner.name,
-            partnerCategory: partner.category_label?.trim() || "제휴",
-            partnerLocation: partner.location?.trim() || "",
-            periodEnd: partner.period_end,
-            daysUntilEnd: String(daysBefore),
-            partnerUrl: getCompanyScopedPartnerServiceHref(partner.company_id, partner.id),
-          },
+            title: `제휴 종료 ${daysBefore}일 전`,
+            body: `${partner.name} 제휴가 ${partner.period_end}에 종료됩니다.`,
+            targetUrl: getCompanyScopedPartnerServiceHref(partner.company_id, partner.id),
+            metadata: {
+              partnerId: partner.id,
+              companyId: partner.company_id,
+              daysBefore,
+              endDate: partner.period_end,
+            },
+            templateContext: {
+              kind: "partner_expiring_partner",
+              partnerName: partner.name,
+              partnerCategory: partner.category_label?.trim() || "제휴",
+              partnerLocation: partner.location?.trim() || "",
+              periodEnd: partner.period_end,
+              daysUntilEnd: String(daysBefore),
+              partnerUrl: getCompanyScopedPartnerServiceHref(partner.company_id, partner.id),
+            },
+          });
+          summary.partnerCreated += 1;
+        } else {
+          summary.skippedDuplicates += 1;
+        }
+      } catch (error) {
+        summary.failed += 1;
+        failures.push({
+          audience: "partner",
+          partnerId: partner.id,
+          name: partner.name,
+          message:
+            error instanceof Error
+              ? error.message
+              : "파트너 종료 임박 알림 생성에 실패했습니다.",
         });
-        summary.partnerCreated += 1;
-      } else {
-        summary.skippedDuplicates += 1;
       }
-    } catch (error) {
-      summary.failed += 1;
-      failures.push({
-        audience: "partner",
-        partnerId: partner.id,
-        name: partner.name,
-        message:
-          error instanceof Error
-            ? error.message
-            : "파트너 종료 임박 알림 생성에 실패했습니다.",
-      });
-    }
-  }
+    },
+  );
 
   return {
     ok: failures.length === 0,

@@ -76,9 +76,12 @@ const getActiveCouponsSafe = cache(async (partnerId: string) => {
   }
 });
 
-const getIssuedCouponsSafe = cache(async (memberId: string) => {
+const getIssuedCouponsSafe = cache(async (memberId: string, partnerId: string) => {
   try {
-    return await adPackageRepository.listIssuedCouponsForMember({ memberId });
+    return await adPackageRepository.listIssuedCouponsForMember({
+      memberId,
+      partnerIds: [partnerId],
+    });
   } catch (error) {
     if (isMissingAdCouponSchemaError(error)) {
       return [] as AvailableAdCoupon[];
@@ -257,7 +260,7 @@ export async function getPartnerDetailPageData(
   const [adCoupons, memberCoupons] = await Promise.all([
     getActiveCouponsSafe(resolvedPartner.id),
     currentUserId
-      ? getIssuedCouponsSafe(currentUserId)
+      ? getIssuedCouponsSafe(currentUserId, resolvedPartner.id)
       : Promise.resolve([] as AvailableAdCoupon[]),
   ]);
   const issuedAdCoupons = memberCoupons.filter(

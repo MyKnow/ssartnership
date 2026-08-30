@@ -9,7 +9,6 @@ import {
   getMemberCanonicalProfile,
   getMemberProfileImageUrl,
 } from "@/lib/member-profile-view";
-import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { getMemberProfilePhotoAccessState } from "@/lib/member-profile-photo";
 import { listCohortCardThemes } from "@/lib/cohort-card-themes";
 import { getPartnerServiceMode } from "@/lib/partner-service-mode";
@@ -65,10 +64,17 @@ export default async function PartnerBenefitUsePage({
     returnTo?: string | string[];
   }>;
 }) {
-  const session = await getSignedUserSession();
-  const resolvedParams = await params;
+  const [session, resolvedParams, resolvedSearchParams] = await Promise.all([
+    getSignedUserSession(),
+    params,
+    searchParams ?? Promise.resolve<{
+      benefit?: string | string[];
+      benefitId?: string | string[];
+      useCount?: string | string[];
+      returnTo?: string | string[];
+    }>({}),
+  ]);
   const partnerId = decodeURIComponent(resolvedParams.id ?? "").trim();
-  const resolvedSearchParams = (await searchParams) ?? {};
   const rawReturnTo = Array.isArray(resolvedSearchParams.returnTo)
     ? resolvedSearchParams.returnTo[0]
     : resolvedSearchParams.returnTo;
@@ -130,11 +136,10 @@ export default async function PartnerBenefitUsePage({
     redirect(detailPath);
   }
 
-  const [headerSession, member, cohortCardThemes, photoState] = await Promise.all([
+  const [headerSession, member, cohortCardThemes] = await Promise.all([
     getHeaderSession(session.userId),
     getMemberCanonicalProfile(session.userId),
     listCohortCardThemes(),
-    getMemberProfilePhotoState(session.userId),
   ]);
   if (!member) {
     redirect(
@@ -144,7 +149,9 @@ export default async function PartnerBenefitUsePage({
     );
   }
 
-  const photoAccess = getMemberProfilePhotoAccessState(photoState.reviewStatus);
+  const photoAccess = getMemberProfilePhotoAccessState(
+    member.profilePhotoReviewStatus,
+  );
   const profileImageUrl =
     !photoAccess.restrictCertification &&
     member.activeProfileImageId &&

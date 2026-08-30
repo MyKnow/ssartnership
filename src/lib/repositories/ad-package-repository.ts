@@ -234,6 +234,7 @@ export type IssueAdCouponResult =
 
 export type ListIssuedCouponsForMemberInput = {
   memberId: string;
+  partnerIds?: string[];
   now?: Date;
 };
 

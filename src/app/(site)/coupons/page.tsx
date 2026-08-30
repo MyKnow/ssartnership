@@ -34,18 +34,18 @@ export default async function CouponsPage({
     redirect(`/auth/login?returnTo=${encodeURIComponent("/coupons")}`);
   }
 
-  const [member, headerSession] = await Promise.all([
+  const [member, headerSession, coupons, params] = await Promise.all([
     getMemberCanonicalProfile(session.userId),
     getHeaderSession(session.userId),
+    adPackageRepository.listIssuedCouponsForMember({
+      memberId: session.userId,
+    }),
+    searchParams ?? Promise.resolve<{ issueId?: string | string[] }>({}),
   ]);
   if (!member) {
     redirect(`/auth/login?returnTo=${encodeURIComponent("/coupons")}`);
   }
 
-  const coupons = await adPackageRepository.listIssuedCouponsForMember({
-    memberId: session.userId,
-  });
-  const params = (await searchParams) ?? {};
   const rawIssueId = Array.isArray(params.issueId) ? params.issueId[0] : params.issueId;
   const selectedItem = rawIssueId
     ? coupons.find((item) => item.issueId === rawIssueId && item.coupon.redemptionType === "onsite")
