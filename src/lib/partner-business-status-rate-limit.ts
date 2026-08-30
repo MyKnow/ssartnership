@@ -64,7 +64,10 @@ export async function consumePartnerBusinessStatusLookupQuota(
       keys,
       PARTNER_BUSINESS_STATUS_RATE_LIMIT,
     );
-    if (existingBlock) {
+    if (!existingBlock.ok) {
+      return { ok: false, code: "unavailable" };
+    }
+    if (existingBlock.blocked) {
       return { ok: false, code: "blocked" };
     }
 
@@ -83,7 +86,10 @@ export async function consumePartnerBusinessStatusLookupQuota(
       keys,
       PARTNER_BUSINESS_STATUS_RATE_LIMIT,
     );
-    return newlyBlocked
+    if (!newlyBlocked.ok) {
+      return { ok: false, code: "unavailable" };
+    }
+    return newlyBlocked.blocked
       ? { ok: false, code: "blocked" }
       : { ok: true };
   } catch {

@@ -87,7 +87,21 @@ export async function POST(request: Request) {
       };
     } else {
       const blockedState = await getMemberAuthBlockingState("login", throttleContext);
-      if (blockedState) {
+      if (!blockedState.ok) {
+        await logAuthSecurity({
+          ...context,
+          eventName: "member_login",
+          status: "failure",
+          actorType: "guest",
+          properties: {
+            reason: blockedState.code,
+            provider: requestedProvider,
+          },
+        });
+        await delayMemberAuthAttempt("login", true);
+        return NextResponse.json({ error: "login_failed" }, { status: 503 });
+      }
+      if (blockedState.blocked) {
         await logAuthSecurity({
           ...context,
           eventName: "member_login",

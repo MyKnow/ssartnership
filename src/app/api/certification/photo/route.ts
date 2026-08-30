@@ -31,7 +31,17 @@ export async function POST(request: Request) {
     route: "member-profile-photo-submit" as const,
     accountIdentifier: session.userId,
   };
-  if (await isGraduateVerificationBlocked(rateLimitContext)) {
+  const blockingState = await isGraduateVerificationBlocked(rateLimitContext);
+  if (!blockingState.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "사진 변경 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
+  }
+  if (blockingState.blocked) {
     return NextResponse.json({ ok: false, message: "사진 변경 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
   }
   let body: {

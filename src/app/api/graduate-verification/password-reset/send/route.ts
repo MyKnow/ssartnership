@@ -59,7 +59,24 @@ export async function POST(request: Request) {
     ipAddress: context.ipAddress,
     accountIdentifier: hashGraduateEmailIdentifier(email),
   };
-  if (await isGraduateVerificationBlocked(rateLimitContext)) {
+  const blockingState = await isGraduateVerificationBlocked(rateLimitContext);
+  if (!blockingState.ok) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "graduate_password_reset",
+      status: "failure",
+      actorType: "guest",
+      properties: { stage: "send", reason: blockingState.code },
+    });
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "비밀번호 재설정 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
+  }
+  if (blockingState.blocked) {
     await logAuthSecurity({
       ...context,
       eventName: "graduate_password_reset",

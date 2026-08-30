@@ -146,7 +146,10 @@ describe("remaining bounded JSON routes", () => {
     });
     markPartnerStoredNotificationsReadMock.mockResolvedValue({ unreadCount: 0 });
     deletePartnerStoredNotificationsMock.mockResolvedValue({ unreadCount: 0 });
-    isImageUploadBlockedMock.mockResolvedValue(false);
+    isImageUploadBlockedMock.mockResolvedValue({ ok: true, blocked: false });
+    resolveImageUploadActorForRouteMock.mockResolvedValue({
+      actor: { kind: "member", id: "member-1" },
+    });
   });
 
   describe.each([
@@ -304,5 +307,54 @@ describe("remaining bounded JSON routes", () => {
     expect(response.status).toBe(403);
     expect(resolveImageUploadActorForRouteMock).not.toHaveBeenCalled();
     expect(isImageUploadBlockedMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "sign",
+      IMAGE_SIGN_URL,
+      invokeImageUploadSign,
+      {
+        purpose: "review",
+        actorMode: "member",
+        uploads: [
+          {
+            clientId: "review-image",
+            role: "image",
+            fileName: "review.webp",
+            contentType: "image/webp",
+            size: 1_024,
+          },
+        ],
+      },
+    ],
+    [
+      "complete",
+      IMAGE_COMPLETE_URL,
+      invokeImageUploadComplete,
+      {
+        purpose: "review",
+        actorMode: "member",
+        uploadIds: ["03f5459b-dfee-4558-907a-509a396312f5"],
+      },
+    ],
+  ] as const)("이미지 %s은 rate-limit 저장소 실패 시 업로드 동작 전에 503으로 닫힌다", async (
+    _label,
+    url,
+    invoke,
+    body,
+  ) => {
+    isImageUploadBlockedMock.mockResolvedValueOnce({
+      ok: false,
+      code: "rate_limit_storage_failed",
+    });
+
+    const response = await invoke(
+      createRequest(url, JSON.stringify(body)),
+    );
+
+    expect(response.status).toBe(503);
+    expect(isImageUploadBlockedMock).toHaveBeenCalledTimes(1);
+    expect(recordImageUploadAttemptMock).not.toHaveBeenCalled();
   });
 });

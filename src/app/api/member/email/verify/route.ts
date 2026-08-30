@@ -81,7 +81,25 @@ export async function POST(request: Request) {
     ipAddress: context.ipAddress ?? null,
     accountIdentifier: hashMemberEmailIdentifier(email),
   };
-  if (await getMemberEmailVerificationBlockingState("verify", rateLimitContext)) {
+  const blockingState = await getMemberEmailVerificationBlockingState("verify", rateLimitContext);
+  if (!blockingState.ok) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_email_verification",
+      status: "failure",
+      actorType: "member",
+      actorId: session.userId,
+      properties: { stage: "verify", reason: blockingState.code },
+    });
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "인증 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
+  }
+  if (blockingState.blocked) {
     await logAuthSecurity({
       ...context,
       eventName: "member_email_verification",

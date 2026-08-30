@@ -196,6 +196,26 @@ test("공통 challenge 발급 수명주기는 전송 완료와 실패 rollback�
     MemberEmailChallengeIssueError,
   );
   assert.deepEqual(calls, ["reserve", "deliver", "delete-pending"]);
+
+  calls.length = 0;
+  await assert.rejects(
+    issueMemberEmailChallenge(input, {
+      repository,
+      beforeDelivery: async () => {
+        calls.push("before-delivery");
+        throw new Error("required attempt record failed");
+      },
+      deliver: async () => {
+        calls.push("deliver");
+      },
+    }),
+    MemberEmailChallengeIssueError,
+  );
+  assert.deepEqual(calls, [
+    "reserve",
+    "before-delivery",
+    "delete-pending",
+  ]);
 });
 
 test("공통 challenge 발급 수명주기는 재전송 대기 중 delivery를 실행하지 않는다", async () => {

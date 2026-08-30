@@ -60,7 +60,25 @@ export async function POST(request: Request) {
       "login",
       throttleContext,
     );
-    if (blockedState) {
+    if (!blockedState.ok) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_login",
+        status: "failure",
+        actorType: "guest",
+        identifier: username || null,
+        properties: { reason: blockedState.code },
+      });
+      await delayMemberAuthAttempt("login", true);
+      return NextResponse.json(
+        {
+          error: "login_failed",
+          message: "로그인에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+        },
+        { status: 503 },
+      );
+    }
+    if (blockedState.blocked) {
       await logAuthSecurity({
         ...context,
         eventName: "member_login",

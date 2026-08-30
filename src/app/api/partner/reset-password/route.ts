@@ -53,7 +53,25 @@ export async function POST(request: Request) {
       "reset-password",
       throttleContext,
     );
-    if (blockedState) {
+    if (!blockedState.ok) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "partner_password_reset",
+        status: "failure",
+        actorType: "guest",
+        identifier: normalizedEmail || null,
+        properties: { reason: blockedState.code },
+      });
+      await delayPartnerAuthAttempt("reset-password", true);
+      return NextResponse.json(
+        {
+          error: "send_failed",
+          message: "임시 비밀번호 전송에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+        },
+        { status: 503 },
+      );
+    }
+    if (blockedState.blocked) {
       await logAuthSecurity({
         ...context,
         eventName: "partner_password_reset",

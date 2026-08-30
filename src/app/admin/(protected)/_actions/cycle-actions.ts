@@ -269,7 +269,14 @@ export async function testMattermostSenderCandidateAction(formData: FormData) {
     ipAddress: logContext.ipAddress,
   };
   const blocked = await getMattermostSenderTestBlockingState(rateLimitInput);
-  if (blocked) {
+  if (!blocked.ok) {
+    redirectMattermostSenderError(
+      "mattermost_sender_configuration_failed",
+      "mattermost_sender_test",
+      { candidateId, reasonCode: blocked.code },
+    );
+  }
+  if (blocked.blocked) {
     redirectMattermostSenderError(
       "mattermost_sender_test_rate_limited",
       "mattermost_sender_test",

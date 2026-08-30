@@ -73,7 +73,18 @@ export async function POST(request: Request) {
     ipAddress: context.ipAddress ?? null,
     accountIdentifier: hashMemberEmailIdentifier(email),
   };
-  if (await getMemberEmailVerificationBlockingState("recovery-send", rateLimitContext)) {
+  const blockingState = await getMemberEmailVerificationBlockingState("recovery-send", rateLimitContext);
+  if (!blockingState.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "unavailable",
+        message: "인증 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
+  }
+  if (blockingState.blocked) {
     return NextResponse.json({ ok: false, error: "rate_limited", message: "인증 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
   }
 
@@ -133,11 +144,14 @@ export async function POST(request: Request) {
       {
         repository: recoveryChallengeRepository,
         beforeDelivery: async () => {
-          await recordMemberEmailVerificationAttempt(
+          const attemptRecord = await recordMemberEmailVerificationAttempt(
             "recovery-send",
             rateLimitContext,
             false,
           );
+          if (!attemptRecord.ok) {
+            throw new Error(attemptRecord.code);
+          }
         },
         deliver: async () => {
           if (!isE2eMockMutationEnabled()) {

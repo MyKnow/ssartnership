@@ -109,7 +109,22 @@ export async function POST(request: Request) {
     accountIdentifier: null,
   };
   const blocked = await getMemberAuthBlockingState("mattermost-code-verify", throttleContext);
-  if (blocked) {
+  if (!blocked.ok) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_mattermost_code",
+      status: "failure",
+      actorType: "guest",
+      properties: {
+        purpose,
+        phase: "verify",
+        reason: blocked.code,
+      },
+    });
+    await delayMemberAuthAttempt("mattermost-code-verify", true);
+    return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
+  }
+  if (blocked.blocked) {
     await logAuthSecurity({
       ...context,
       eventName: "member_mattermost_code",

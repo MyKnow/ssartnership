@@ -99,7 +99,18 @@ export async function handleResetPasswordCompletePost(request: Request) {
       "reset-password",
       throttleContext,
     );
-    if (blockedState) {
+    if (!blockedState.ok) {
+      return failResetPasswordComplete({
+        context,
+        throttleContext,
+        error: "reset_failed",
+        status: 503,
+        reason: blockedState.code,
+        identifier: tokenPayload.mmUserId,
+        recordFailure: false,
+      });
+    }
+    if (blockedState.blocked) {
       return failResetPasswordComplete({
         context,
         throttleContext,

@@ -77,9 +77,21 @@ export async function loginAction(formData: FormData) {
   };
 
   const blockedState = isPartnerPortalMock
-    ? null
+    ? { ok: true as const, blocked: false as const }
     : await getPartnerAuthBlockingState("login", throttleContext);
-  if (blockedState) {
+  if (!blockedState.ok) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "partner_login",
+      status: "failure",
+      actorType: "guest",
+      identifier: loginId || null,
+      properties: { reason: blockedState.code },
+    });
+    await delayPartnerAuthAttempt("login", true);
+    redirect(buildPartnerLoginErrorRedirect("server_error", loginId));
+  }
+  if (blockedState.blocked) {
     return redirectPartnerLoginFailure({
       context,
       throttleContext,

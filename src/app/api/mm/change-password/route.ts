@@ -55,7 +55,25 @@ export async function POST(request: Request) {
       "change-password",
       throttleContext,
     );
-    if (blockedState) {
+    if (!blockedState.ok) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_password_change",
+        status: "failure",
+        actorType: "member",
+        actorId: session.userId,
+        properties: { reason: blockedState.code },
+      });
+      await delayMemberAuthAttempt("change-password", true);
+      return NextResponse.json(
+        {
+          error: "change_failed",
+          message: "비밀번호 변경에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+        },
+        { status: 503 },
+      );
+    }
+    if (blockedState.blocked) {
       await logAuthSecurity({
         ...context,
         eventName: "member_password_change",

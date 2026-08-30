@@ -37,7 +37,15 @@ export async function POST(request: Request) {
   const context = getRequestLogContext(request);
   try {
     const identifier = getClientIdentifier(request);
-    if (await isBlocked(identifier, SUGGEST_RATE_LIMIT)) {
+    const blockingState = await isBlocked(identifier, SUGGEST_RATE_LIMIT);
+    if (!blockingState.ok) {
+      return errorResponse(
+        "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        503,
+        "suggest_unavailable",
+      );
+    }
+    if (blockingState.blocked) {
       return NextResponse.json(
         { message: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." },
         { status: 429 },
@@ -66,8 +74,6 @@ export async function POST(request: Request) {
     }
     const payload = validation.values;
     const safeCompanyUrlValue = validation.safeCompanyUrl;
-
-    await recordAttempt(identifier, true, SUGGEST_RATE_LIMIT);
 
     const recipient = process.env.SUGGEST_NOTIFY_EMAIL ?? BUG_REPORT_EMAIL;
     try {
@@ -114,6 +120,7 @@ export async function POST(request: Request) {
       text: renderedBody.text,
       html: renderedBody.html,
     });
+    await recordAttempt(identifier, true, SUGGEST_RATE_LIMIT);
 
     const actor = await resolveCurrentActor();
     scheduleProductEventLog({

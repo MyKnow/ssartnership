@@ -50,7 +50,18 @@ export async function POST(request: Request) {
   const confirmPassword = String(body?.confirmPassword ?? "");
   const tokenHash = token ? hashOpaqueToken(token) : "missing";
   const throttle = { ipAddress: context.ipAddress, accountIdentifier: tokenHash };
-  if (await getMemberAuthBlockingState("manual-password-action", throttle)) {
+  const blockingState = await getMemberAuthBlockingState("manual-password-action", throttle);
+  if (!blockingState.ok) {
+    await delayMemberAuthAttempt("manual-password-action", true);
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "비밀번호를 설정하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
+  }
+  if (blockingState.blocked) {
     await delayMemberAuthAttempt("manual-password-action", true);
     return NextResponse.json({ ok: false, message: "시도가 너무 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
   }

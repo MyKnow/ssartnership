@@ -63,7 +63,17 @@ export async function POST(request: Request) {
 
   const accountIdentifier = hashGraduateEmailIdentifier(email);
   const rateLimitContext = { route: "graduate-email-verify" as const, ipAddress: context.ipAddress, accountIdentifier };
-  if (await isGraduateVerificationBlocked(rateLimitContext)) {
+  const blockingState = await isGraduateVerificationBlocked(rateLimitContext);
+  if (!blockingState.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "인증 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
+  }
+  if (blockingState.blocked) {
     return NextResponse.json({ ok: false, message: "인증 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
   }
 

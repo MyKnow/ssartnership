@@ -80,7 +80,25 @@ export async function POST(request: Request) {
     ipAddress: context.ipAddress ?? null,
     accountIdentifier: hashMemberEmailIdentifier(email),
   };
-  if (await getMemberEmailVerificationBlockingState("send", rateLimitContext)) {
+  const blockingState = await getMemberEmailVerificationBlockingState("send", rateLimitContext);
+  if (!blockingState.ok) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_email_verification",
+      status: "failure",
+      actorType: "member",
+      actorId: session.userId,
+      properties: { stage: "send", reason: blockingState.code },
+    });
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "인증 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
+  }
+  if (blockingState.blocked) {
     await logAuthSecurity({
       ...context,
       eventName: "member_email_verification",
@@ -162,11 +180,14 @@ export async function POST(request: Request) {
       {
         beforeDelivery: async () => {
           // A successful send intentionally counts toward the resend cap.
-          await recordMemberEmailVerificationAttempt(
+          const attemptRecord = await recordMemberEmailVerificationAttempt(
             "send",
             rateLimitContext,
             false,
           );
+          if (!attemptRecord.ok) {
+            throw new Error(attemptRecord.code);
+          }
         },
         deliver: async () => {
           if (!isE2eMockMutationEnabled()) {

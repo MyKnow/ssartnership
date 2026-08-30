@@ -32,11 +32,13 @@ test("NTS 조회 한도는 원자적 기록이 차단을 만들면 호출자를 
       getBlockingState: async () =>
         blocked
           ? {
+              ok: true,
+              blocked: true,
               identifier:
                 "partner-business-status:account:account-1:company:company-1",
               blockedUntil: "2026-08-31T12:00:00.000Z",
             }
-          : null,
+          : { ok: true, blocked: false },
       recordAttemptBatch: async () => {
         recordCalls += 1;
         blocked = true;
@@ -57,7 +59,7 @@ test("NTS 조회 한도 저장소 오류는 upstream으로 우회하지 않는�
   const result = await consumePartnerBusinessStatusLookupQuota(
     { accountId: "account-1", companyId: "company-1" },
     {
-      getBlockingState: async () => null,
+      getBlockingState: async () => ({ ok: true, blocked: false }),
       recordAttemptBatch: async () => ({
         ok: false,
         code: "rate_limit_storage_failed",
@@ -68,4 +70,24 @@ test("NTS 조회 한도 저장소 오류는 upstream으로 우회하지 않는�
   );
 
   assert.deepEqual(result, { ok: false, code: "unavailable" });
+});
+
+test("NTS 조회 한도 조회 저장소 오류도 upstream으로 우회하지 않는다", async () => {
+  let recordCalls = 0;
+  const result = await consumePartnerBusinessStatusLookupQuota(
+    { accountId: "account-1", companyId: "company-1" },
+    {
+      getBlockingState: async () => ({
+        ok: false,
+        code: "rate_limit_storage_failed",
+      }),
+      recordAttemptBatch: async () => {
+        recordCalls += 1;
+        return { ok: true, attemptedCount: 1, failedCount: 0 };
+      },
+    },
+  );
+
+  assert.deepEqual(result, { ok: false, code: "unavailable" });
+  assert.equal(recordCalls, 0);
 });

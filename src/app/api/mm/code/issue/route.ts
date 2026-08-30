@@ -60,7 +60,22 @@ export async function POST(request: Request) {
     accountIdentifier: hashOpaqueToken(`mm-code:${parsed.data.username}`),
   };
   const blocked = await getMemberAuthBlockingState("mattermost-code-issue", throttleContext);
-  if (blocked) {
+  if (!blocked.ok) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "member_mattermost_code",
+      status: "failure",
+      actorType: "guest",
+      properties: {
+        purpose,
+        phase: "issue",
+        reason: blocked.code,
+      },
+    });
+    await delayMemberAuthAttempt("mattermost-code-issue", true);
+    return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
+  }
+  if (blocked.blocked) {
     await logAuthSecurity({
       ...context,
       eventName: "member_mattermost_code",

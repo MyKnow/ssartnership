@@ -75,7 +75,17 @@ export async function POST(request: NextRequest) {
     ipAddress: getRequestLogContext(request).ipAddress,
     accountIdentifier: imageUploadActorIdentifier(actorResult.actor),
   };
-  if (await isImageUploadBlocked("complete", rateLimitContext)) {
+  const blockingState = await isImageUploadBlocked("complete", rateLimitContext);
+  if (!blockingState.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "이미지 처리 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
+  }
+  if (blockingState.blocked) {
     return NextResponse.json(
       { ok: false, message: "사진 처리 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." },
       { status: 429 },

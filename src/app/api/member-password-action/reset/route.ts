@@ -43,7 +43,18 @@ export async function POST(request: Request) {
     ipAddress: context.ipAddress,
     accountIdentifier: email ? hashMemberEmailIdentifier(email) : null,
   };
-  if (await getMemberAuthBlockingState("reset-password", throttle)) {
+  const blockingState = await getMemberAuthBlockingState("reset-password", throttle);
+  if (!blockingState.ok) {
+    await delayMemberAuthAttempt("reset-password", true);
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "비밀번호 재설정 요청을 처리하지 못했습니다.",
+      },
+      { status: 503 },
+    );
+  }
+  if (blockingState.blocked) {
     await delayMemberAuthAttempt("reset-password", true);
     return NextResponse.json({ ok: false, message: "시도가 너무 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
   }

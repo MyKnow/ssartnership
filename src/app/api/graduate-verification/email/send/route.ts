@@ -77,7 +77,23 @@ export async function POST(request: Request) {
     accountIdentifier,
   };
   const blockingState = await getGraduateEmailSendBlockingState(rateLimitContext);
-  if (blockingState) {
+  if (!blockingState.ok) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "graduate_email_verification",
+      status: "failure",
+      actorType: "guest",
+      properties: { reason: blockingState.code, stage: "send" },
+    }).catch(() => undefined);
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "인증 요청을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
+  }
+  if (blockingState.blocked) {
     await logAuthSecurity({
       ...context,
       eventName: "graduate_email_verification",

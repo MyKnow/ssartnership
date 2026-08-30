@@ -48,14 +48,23 @@ export async function createPartnerRegistrationRequestAction(
   const identifier = getClientIdentifier(headerStore);
   const mockMutation = isE2eMockMutationEnabled();
 
-  if (
-    !mockMutation &&
-    (await isBlocked(identifier, PARTNER_REGISTRATION_RATE_LIMIT))
-  ) {
-    return {
-      status: "error",
-      message: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
-    };
+  if (!mockMutation) {
+    const blockingState = await isBlocked(
+      identifier,
+      PARTNER_REGISTRATION_RATE_LIMIT,
+    );
+    if (!blockingState.ok) {
+      return {
+        status: "error",
+        message: "신청 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      };
+    }
+    if (blockingState.blocked) {
+      return {
+        status: "error",
+        message: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+      };
+    }
   }
 
   const validation = validatePartnerRegistrationInput(formData);
@@ -208,7 +217,17 @@ export async function createPartnerRegistrationExcelRequestAction(
   const headerStore = await headers();
   const identifier = getClientIdentifier(headerStore);
 
-  if (await isBlocked(identifier, PARTNER_REGISTRATION_RATE_LIMIT)) {
+  const blockingState = await isBlocked(
+    identifier,
+    PARTNER_REGISTRATION_RATE_LIMIT,
+  );
+  if (!blockingState.ok) {
+    return {
+      status: "error",
+      message: "신청 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    };
+  }
+  if (blockingState.blocked) {
     return {
       status: "error",
       message: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",

@@ -71,7 +71,18 @@ export async function POST(request: Request) {
     ipAddress: context.ipAddress ?? null,
     accountIdentifier: hashMemberEmailIdentifier(email),
   };
-  if (await getMemberEmailVerificationBlockingState("recovery-verify", rateLimitContext)) {
+  const blockingState = await getMemberEmailVerificationBlockingState("recovery-verify", rateLimitContext);
+  if (!blockingState.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "unavailable",
+        message: "인증 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
+  }
+  if (blockingState.blocked) {
     return NextResponse.json({ ok: false, error: "rate_limited", message: "인증 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
   }
   const emailReservationHash = buildReservedMemberIdentifierHashes({ emailNormalized: email })
