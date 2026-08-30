@@ -1,5 +1,7 @@
 import {
+  createUnavailablePartnerPortalRepository,
   isPartnerPortalMock,
+  partnerPortalDataAccess,
   type PartnerPortalRepository,
   type PartnerPortalDemoSetupSummary,
 } from "../partner-portal.ts";
@@ -27,7 +29,9 @@ export const supabasePartnerPortalRepository: PartnerPortalRepository = {
 
 export const activePartnerPortalRepository = isPartnerPortalMock
   ? mockPartnerPortalRepository
-  : supabasePartnerPortalRepository;
+  : partnerPortalDataAccess.source === "supabase"
+    ? supabasePartnerPortalRepository
+    : createUnavailablePartnerPortalRepository();
 
 export async function listPartnerPortalDemoSetups(): Promise<
   PartnerPortalDemoSetupSummary[]

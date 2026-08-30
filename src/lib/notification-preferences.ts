@@ -11,12 +11,22 @@ import {
 } from "@/lib/push";
 import { getPushDeviceLabel } from "@/lib/push/device-label";
 import type { PushPreferenceState, PushSubscriptionDevice } from "@/lib/push";
+import {
+  assertRuntimeDataAccessAvailable,
+  selectRuntimeDataAccess,
+} from "@/lib/runtime-data-access";
 
-const dataSource = process.env.NEXT_PUBLIC_DATA_SOURCE;
-const hasSupabaseEnv =
-  !!process.env.SUPABASE_URL &&
-  (!!process.env.SUPABASE_ANON_KEY || !!process.env.SUPABASE_SERVICE_ROLE_KEY);
-const useMockPreferences = dataSource === "mock" || !hasSupabaseEnv;
+export const notificationPreferenceDataAccess = selectRuntimeDataAccess({
+  capability: "admin",
+});
+const useMockPreferences = notificationPreferenceDataAccess.source === "mock";
+
+function assertNotificationPreferenceDataAccessAvailable() {
+  assertRuntimeDataAccessAvailable(
+    notificationPreferenceDataAccess,
+    "알림 설정 저장소를 사용할 수 없습니다.",
+  );
+}
 
 const mockPreferenceStore = new Map<string, PushPreferenceState>();
 const mockPushDeviceStore = new Map<string, PushSubscriptionDevice[]>();
@@ -95,6 +105,7 @@ export function deactivateAllMockPushDevices(memberId: string) {
 }
 
 export async function getMemberNotificationPreferences(memberId: string) {
+  assertNotificationPreferenceDataAccessAvailable();
   if (useMockPreferences) {
     const preferences = getMockPreferences(memberId);
     return {
@@ -134,6 +145,7 @@ export async function updateMemberNotificationPreferences(
     userAgent?: string | null;
   },
 ) {
+  assertNotificationPreferenceDataAccessAvailable();
   if (useMockPreferences) {
     const current = getMockPreferences(memberId);
     const hasPushDevice = (mockPushDeviceStore.get(memberId) ?? []).length > 0;

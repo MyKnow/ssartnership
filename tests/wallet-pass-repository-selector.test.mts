@@ -40,6 +40,16 @@ test("missing Supabase admin configuration fails closed only when wallet storage
       SUPABASE_URL: " ",
       SUPABASE_SERVICE_ROLE_KEY: " ",
     },
+    {
+      NEXT_PUBLIC_DATA_SOURCE: "supabase",
+      SUPABASE_URL: "https://project.example.invalid",
+      SUPABASE_ANON_KEY: "test-anon-key",
+    },
+    {
+      NEXT_PUBLIC_DATA_SOURCE: "fixture",
+      SUPABASE_URL: "https://project.example.invalid",
+      SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key",
+    },
     {},
   ]) {
     const repository = createWalletPassRepository(environment);

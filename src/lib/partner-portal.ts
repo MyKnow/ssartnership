@@ -1,3 +1,8 @@
+import {
+  createUnavailableDataAccessProxy,
+  selectRuntimeDataAccess,
+} from "./runtime-data-access.ts";
+
 export {
   PartnerPortalSetupError,
   type PartnerPortalSetupErrorCode,
@@ -98,9 +103,16 @@ export interface PartnerPortalRepository {
   ): Promise<PartnerPortalSetupResult>;
 }
 
-const dataSource =
-  process.env.NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE ??
-  process.env.NEXT_PUBLIC_DATA_SOURCE ??
-  "supabase";
+export const partnerPortalDataAccess = selectRuntimeDataAccess({
+  capability: "admin",
+  sourcePreference: "partner-portal",
+});
 
-export const isPartnerPortalMock = dataSource !== "supabase";
+export const isPartnerPortalMock = partnerPortalDataAccess.source === "mock";
+
+export function createUnavailablePartnerPortalRepository() {
+  return createUnavailableDataAccessProxy<PartnerPortalRepository>(
+    partnerPortalDataAccess,
+    "파트너 포털 저장소를 사용할 수 없습니다.",
+  );
+}

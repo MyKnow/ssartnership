@@ -5,6 +5,10 @@ import {
   recordMockMarketingPolicyConsent,
   recordMockRequiredPolicyConsent,
 } from "@/lib/mock/member";
+import {
+  assertRuntimeDataAccessAvailable,
+  selectRuntimeDataAccess,
+} from "@/lib/runtime-data-access";
 
 export const REQUIRED_POLICY_KINDS = ["service", "privacy"] as const;
 export const OPTIONAL_POLICY_KINDS = ["marketing"] as const;
@@ -108,11 +112,17 @@ const POLICY_SELECT =
   "id,kind,version,title,summary,content,is_active,effective_at,created_at,updated_at";
 const MEMBER_POLICY_CONSENT_SELECT = "kind,version,agreed_at";
 
-const dataSource = process.env.NEXT_PUBLIC_DATA_SOURCE;
-const hasSupabaseAdminEnv = Boolean(
-  process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY,
-);
-const useMockPolicies = dataSource === "mock" || !hasSupabaseAdminEnv;
+export const policyDocumentDataAccess = selectRuntimeDataAccess({
+  capability: "admin",
+});
+const useMockPolicies = policyDocumentDataAccess.source === "mock";
+
+function assertPolicyDocumentDataAccessAvailable() {
+  assertRuntimeDataAccessAvailable(
+    policyDocumentDataAccess,
+    "정책 문서 저장소를 사용할 수 없습니다.",
+  );
+}
 
 const mockPolicyDocuments: PolicyDocument[] = [
   {
@@ -198,6 +208,7 @@ export function getMemberPolicyConsentVersionsFromRows(
 }
 
 export async function getMemberPolicyConsentVersions(memberId: string) {
+  assertPolicyDocumentDataAccessAvailable();
   if (useMockPolicies) {
     const state = getMockMemberPolicyState(memberId);
     if (!state) {
@@ -230,6 +241,7 @@ export async function getMemberPolicyConsentVersions(memberId: string) {
 }
 
 async function queryActiveRequiredPolicies(): Promise<RequiredPolicyMap> {
+  assertPolicyDocumentDataAccessAvailable();
   if (useMockPolicies) {
     return Object.fromEntries(
       REQUIRED_POLICY_KINDS.map((kind) => [
@@ -288,6 +300,7 @@ async function queryPolicyDocumentByKind(
   kind: PolicyKind,
   version?: number | null,
 ) {
+  assertPolicyDocumentDataAccessAvailable();
   if (useMockPolicies) {
     return (
       mockPolicyDocuments.find(
@@ -331,6 +344,7 @@ export async function getPolicyDocumentByKind(
 }
 
 export async function getPolicyDocumentsByKind(kind: PolicyKind) {
+  assertPolicyDocumentDataAccessAvailable();
   if (useMockPolicies) {
     return mockPolicyDocuments
       .filter((policy) => policy.kind === kind)
@@ -508,6 +522,7 @@ export async function recordMarketingPolicyConsent(input: {
   ipAddress?: string | null;
   userAgent?: string | null;
 }) {
+  assertPolicyDocumentDataAccessAvailable();
   const agreedAt = new Date().toISOString();
 
   if (useMockPolicies) {
@@ -591,6 +606,7 @@ export async function recordRequiredPolicyConsent(input: {
   ipAddress?: string | null;
   userAgent?: string | null;
 }) {
+  assertPolicyDocumentDataAccessAvailable();
   if (useMockPolicies) {
     recordMockRequiredPolicyConsent(input.memberId, {
       service: input.activePolicies.service.version,
