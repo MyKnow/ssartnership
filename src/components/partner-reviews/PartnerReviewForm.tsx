@@ -13,7 +13,7 @@ import {
   validateReviewDraftInput,
   type ReviewFieldErrors,
 } from "@/lib/review-validation";
-import { buildReviewFormData } from "./helpers";
+import { buildReviewRequestBody } from "./helpers";
 import ReviewStarsInput from "./ReviewStarsInput";
 import ReviewImageUploader from "@/components/review-media/ReviewImageUploader";
 import {
@@ -197,13 +197,17 @@ export default function PartnerReviewForm({
           : `/api/partners/${encodeURIComponent(partnerId)}/reviews`,
         {
           method: isEditMode ? "PATCH" : "POST",
-          body: buildReviewFormData({
-            rating: normalized.rating,
-            title: normalized.title,
-            body: normalized.body,
-            items: submittedItems,
-            reviewId,
-          }),
+          headers: { "content-type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify(
+            buildReviewRequestBody({
+              rating: normalized.rating,
+              title: normalized.title,
+              body: normalized.body,
+              items: submittedItems,
+              reviewId,
+            }),
+          ),
         },
       );
 

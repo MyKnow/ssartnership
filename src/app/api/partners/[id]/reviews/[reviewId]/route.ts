@@ -7,8 +7,9 @@ import {
 } from "@/lib/review-media-storage";
 import {
   ensureVisibleReviewPartner,
+  getReviewMediaInputFieldErrors,
   getReviewMemberSession,
-  parseReviewFormFields,
+  readPartnerReviewSubmission,
   resolveReviewMediaPayload,
 } from "../_shared";
 
@@ -20,7 +21,7 @@ export async function PATCH(
 ) {
   if (
     !isTrustedSameOriginRequest(request, {
-      allowedContentTypes: ["multipart/form-data"],
+      allowedContentTypes: ["application/json"],
     })
   ) {
     return NextResponse.json(
@@ -60,20 +61,26 @@ export async function PATCH(
     );
   }
 
-  const formData = await request.formData();
-  const parsed = parseReviewFormFields(formData);
-  if (!parsed.ok) {
+  const submission = await readPartnerReviewSubmission(request);
+  if (!submission.ok) {
     return NextResponse.json(
-      { ok: false, fieldErrors: parsed.fieldErrors },
-      { status: 400 },
+      {
+        ok: false,
+        ...(submission.message ? { message: submission.message } : {}),
+        ...(submission.fieldErrors
+          ? { fieldErrors: submission.fieldErrors }
+          : {}),
+      },
+      { status: submission.status },
     );
   }
+  const payload = submission.values;
 
   let uploadedUrls: string[] = [];
 
   try {
     const media = await resolveReviewMediaPayload(
-      formData,
+      payload.imagesManifest,
       id,
       reviewId,
       session.userId,
@@ -83,9 +90,9 @@ export async function PATCH(
     const review = await partnerReviewRepository.updatePartnerReview({
       reviewId,
       memberId: session.userId,
-      rating: parsed.rating,
-      title: parsed.title,
-      body: parsed.body,
+      rating: payload.rating,
+      title: payload.title,
+      body: payload.body,
       images: media.images,
     });
     const removedUrls = ownedReview.images.filter((url) => !media.images.includes(url));
@@ -100,13 +107,20 @@ export async function PATCH(
       targetId: review.id,
       properties: {
         partnerId: id,
-        rating: parsed.rating,
+        rating: payload.rating,
         imageCount: media.images.length,
       },
     });
     return NextResponse.json({ ok: true, review, summary });
   } catch (error) {
     await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);
+    const mediaFieldErrors = getReviewMediaInputFieldErrors(error);
+    if (mediaFieldErrors) {
+      return NextResponse.json(
+        { ok: false, fieldErrors: mediaFieldErrors },
+        { status: 400 },
+      );
+    }
     const message =
       error instanceof Error && error.message
         ? error.message
