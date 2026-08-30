@@ -88,16 +88,52 @@ test("모바일 갤러리는 정보 카드보다 먼저 오고 태블릿부터 �
   );
   assert.match(lead, /border border-border/);
   assert.match(carousel, /rounded-none sm:rounded-3xl/);
-  assert.match(carousel, /hidden min-w-0 sm:block/);
+  assert.match(carousel, /const shouldRenderThumbStrip =/);
+  assert.match(
+    carousel,
+    /showTabletCarousel &&[\s\S]*tabletCarouselFrom === "sm" &&[\s\S]*hideThumbnailsOnMobile/,
+  );
   assert.match(carousel, /tabletCarouselFrom = "md"/);
   assert.match(carousel, /visibleFrom=\{tabletCarouselFrom\}/);
+  assert.match(carousel, /!showTabletCarousel \? \(/);
+  assert.doesNotMatch(carousel, /showTabletCarousel[\s\S]*sm:invisible/);
+  assert.doesNotMatch(carousel, /showTabletCarousel[\s\S]*md:invisible/);
   assert.match(carousel, /CarouselSlideIndicators/);
   assert.match(tabletCarousel, /visibleFrom=\{visibleFrom\}/);
   assert.match(
     tabletCarousel,
     /visibleFrom === "sm"[\s\S]*\(min-width: 640px\) 46vw[\s\S]*\(min-width: 768px\) 46vw/,
   );
+  assert.match(tabletCarousel, /const \[isExpandedCarousel, setIsExpandedCarousel\]/);
+  assert.match(tabletCarousel, /window\.matchMedia/);
+  assert.match(
+    tabletCarousel,
+    /\{isExpandedCarousel[\s\S]*previousPreviews\.map[\s\S]*nextPreviews\.map/,
+  );
   assert.match(promotionCarousel, /CarouselSlideIndicators/);
+});
+
+test("반응형 제휴처 갤러리는 현재 이미지를 한 번만 렌더링한다", () => {
+  const carousel = readRepoFile("src/components/PartnerImageCarousel.tsx");
+  const responsiveCarousel = readRepoFile(
+    "src/components/partner-image-carousel/TabletImageCarousel.tsx",
+  );
+
+  assert.match(
+    carousel,
+    /\{showTabletCarousel \? \([\s\S]*<TabletImageCarousel[\s\S]*\) : null\}/,
+  );
+  assert.match(carousel, /\{!showTabletCarousel \? \([\s\S]*data-partner-image-carousel-stage/);
+  assert.match(responsiveCarousel, /data-partner-image-main-frame/);
+  assert.match(responsiveCarousel, /data-partner-image-carousel-active/);
+  assert.match(
+    responsiveCarousel,
+    /data-partner-image-carousel-expanded=\{isExpandedCarousel\}/,
+  );
+  assert.match(
+    responsiveCarousel,
+    /\(max-width: 639px\) 100vw, 65vw[\s\S]*\(max-width: 767px\) 100vw, 65vw/,
+  );
 });
 
 test("제휴처 갤러리는 현재 이미지의 다음 한 장만 미리 불러온다", () => {

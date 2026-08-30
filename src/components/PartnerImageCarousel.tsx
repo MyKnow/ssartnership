@@ -102,6 +102,14 @@ export default function PartnerImageCarousel({
   });
   const imageAspectClassName = variant === "hero" ? "aspect-square" : "aspect-[4/3]";
   const showTabletCarousel = variant === "main" && hasImages && showThumbnails;
+  const shouldRenderThumbStrip =
+    hasImages &&
+    showThumbnails &&
+    !(
+      showTabletCarousel &&
+      tabletCarouselFrom === "sm" &&
+      hideThumbnailsOnMobile
+    );
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -145,93 +153,102 @@ export default function PartnerImageCarousel({
           shouldIgnoreSwipeClick={consumeSwipeClick}
           onHorizontalWheel={handleHorizontalWheel}
           visibleFrom={tabletCarouselFrom}
+          imageFit={imageFit}
+          mobileFullBleed={mobileFullBleed}
+          priority={priority}
         />
       ) : null}
 
-      <div
-        ref={stageRef}
-        data-partner-image-carousel-stage
-        className={cn(
-          "grid min-w-0 items-start gap-3 overscroll-x-none",
-          showTabletCarousel
-            ? tabletCarouselFrom === "sm"
-              ? "sm:pointer-events-none sm:absolute sm:inset-x-0 sm:top-0 sm:invisible"
-              : "md:pointer-events-none md:absolute md:inset-x-0 md:top-0 md:invisible"
-            : "xl:grid-cols-1 xl:items-start",
-        )}
-      >
-        <div className="relative min-w-0">
-          <button
-            type="button"
-            data-partner-image-main-frame
-            className={cn(
-              "relative w-full overflow-hidden border border-border bg-surface-muted",
-              mobileFullBleed ? "rounded-none sm:rounded-3xl" : "rounded-3xl",
-              imageAspectClassName,
-              "touch-pan-y",
-            )}
-            onPointerDown={(event) => beginHorizontalSwipe(event.clientX)}
-            onPointerUp={(event) => endHorizontalSwipe(event.clientX)}
-            onPointerCancel={cancelHorizontalSwipe}
-            onClick={() => {
-              if (consumeSwipeClick()) {
-                return;
-              }
-              if (hasImages) {
-                setOpen(true);
-              }
-            }}
-            aria-label={`${name} 이미지 크게 보기`}
-          >
-            {hasImages ? (
-              <Image
-                src={activeImage}
-                alt={name}
-                fill
-                sizes="(max-width: 1279px) 100vw, 50vw"
-                className={imageFit === "contain" ? "object-contain" : "object-cover"}
-                fetchPriority={priority ? "high" : undefined}
-                loading="eager"
-                priority={priority}
-                unoptimized={isProxiedCachedImageUrl(activeImage)}
-              />
-            ) : (
-              placeholder
-            )}
-          </button>
-
-          {mobileFullBleed && cachedImages.length > 1 ? (
-            <div className="absolute inset-x-0 bottom-3 z-10 flex justify-center px-4 sm:hidden">
-              <div className="rounded-full border border-white/25 bg-black/35 px-3 py-1 shadow-flat backdrop-blur-md">
-                <CarouselSlideIndicators
-                  labels={cachedImages.map(
-                    (_, index) => `${name} 이미지 ${index + 1} 선택`,
-                  )}
-                  activeIndex={activeIndex}
-                  onSelect={activateImage}
+      {!showTabletCarousel ? (
+        <div
+          ref={stageRef}
+          data-partner-image-carousel-stage
+          className="grid min-w-0 items-start gap-3 overscroll-x-none xl:grid-cols-1 xl:items-start"
+        >
+          <div className="relative min-w-0">
+            <button
+              type="button"
+              data-partner-image-main-frame
+              className={cn(
+                "relative w-full overflow-hidden border border-border bg-surface-muted",
+                mobileFullBleed ? "rounded-none sm:rounded-3xl" : "rounded-3xl",
+                imageAspectClassName,
+                "touch-pan-y",
+              )}
+              onPointerDown={(event) => beginHorizontalSwipe(event.clientX)}
+              onPointerUp={(event) => endHorizontalSwipe(event.clientX)}
+              onPointerCancel={cancelHorizontalSwipe}
+              onClick={() => {
+                if (consumeSwipeClick()) {
+                  return;
+                }
+                if (hasImages) {
+                  setOpen(true);
+                }
+              }}
+              aria-label={`${name} 이미지 크게 보기`}
+            >
+              {hasImages ? (
+                <Image
+                  src={activeImage}
+                  alt={name}
+                  fill
+                  sizes="(max-width: 1279px) 100vw, 50vw"
+                  className={
+                    imageFit === "contain" ? "object-contain" : "object-cover"
+                  }
+                  fetchPriority={priority ? "high" : undefined}
+                  loading="eager"
+                  priority={priority}
+                  unoptimized={isProxiedCachedImageUrl(activeImage)}
                 />
-              </div>
-            </div>
-          ) : null}
-        </div>
+              ) : (
+                placeholder
+              )}
+            </button>
 
-        {hasImages && showThumbnails ? (
-          <div
-            className={
-              hideThumbnailsOnMobile ? "hidden min-w-0 sm:block" : undefined
-            }
-          >
-            <ThumbStrip
-              images={cachedImages}
-              activeIndex={activeIndex}
-              placement={thumbPlacement}
-              activeThumbRef={activeThumbRef}
-              thumbStripRef={thumbStripRef}
-              onSelect={activateImage}
-            />
+            {mobileFullBleed && cachedImages.length > 1 ? (
+              <div className="absolute inset-x-0 bottom-3 z-10 flex justify-center px-4 sm:hidden">
+                <div className="rounded-full border border-white/25 bg-black/35 px-3 py-1 shadow-flat backdrop-blur-md">
+                  <CarouselSlideIndicators
+                    labels={cachedImages.map(
+                      (_, index) => `${name} 이미지 ${index + 1} 선택`,
+                    )}
+                    activeIndex={activeIndex}
+                    onSelect={activateImage}
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
+
+      {shouldRenderThumbStrip ? (
+        <div
+          className={cn(
+            "min-w-0",
+            showTabletCarousel && tabletCarouselFrom === "sm"
+              ? "sm:hidden"
+              : showTabletCarousel
+                ? hideThumbnailsOnMobile
+                  ? "hidden sm:block md:hidden"
+                  : "md:hidden"
+                : hideThumbnailsOnMobile
+                  ? "hidden sm:block"
+                  : undefined,
+          )}
+        >
+          <ThumbStrip
+            images={cachedImages}
+            activeIndex={activeIndex}
+            placement={thumbPlacement}
+            activeThumbRef={activeThumbRef}
+            thumbStripRef={thumbStripRef}
+            onSelect={activateImage}
+          />
+        </div>
+      ) : null}
 
       {isOpen ? (
         <LightboxModal

@@ -54,7 +54,7 @@ test("keeps tablet gallery wheel navigation inside the page", async ({ page }) =
   );
 
   const visibleNextPreview = carousel.locator(
-    'button[aria-label$="이미지 3 선택"]',
+    '[data-partner-image-carousel-preview="next"] + button[aria-label$="이미지 3 선택"]',
   );
   const previewBox = await visibleNextPreview.boundingBox();
   expect(previewBox).not.toBeNull();
@@ -102,7 +102,11 @@ test("preserves the document scroll position while changing gallery images", asy
   });
 
   await assertScrollPositionIsPreserved(async () => {
-    await carousel.locator('button[aria-label$="이미지 3 선택"]').click();
+    await carousel
+      .locator(
+        '[data-partner-image-carousel-preview="next"] + button[aria-label$="이미지 3 선택"]',
+      )
+      .click();
     await expect(
       carousel.getByRole("button", { name: "이미지 3 크게 보기", exact: true }),
     ).toBeVisible();
@@ -155,6 +159,9 @@ test("uses the full-bleed gallery lead only below the mobile breakpoint", async 
   const mainFrame = gallery.locator("[data-partner-image-main-frame]");
   const thumbnailRail = gallery.locator("[data-partner-image-thumbnail-rail]");
   const indicators = gallery.locator("[data-carousel-slide-indicators]");
+  const responsiveCarousel = gallery.locator(
+    "[data-partner-image-tablet-carousel]",
+  );
   const [mobileGalleryBox, mobileHeroBox] = await Promise.all([
     gallery.boundingBox(),
     hero.boundingBox(),
@@ -181,6 +188,13 @@ test("uses the full-bleed gallery lead only below the mobile breakpoint", async 
   await expect(hero).toHaveCSS("border-bottom-right-radius", "24px");
   await expect(thumbnailRail).toBeHidden();
   await expect(indicators).toBeVisible();
+  await expect(responsiveCarousel).toHaveAttribute(
+    "data-partner-image-carousel-expanded",
+    "false",
+  );
+  await expect(
+    gallery.locator("[data-partner-image-carousel-preview]"),
+  ).toHaveCount(0);
 
   await indicators.locator("button").nth(1).click();
   await expect(indicators.locator("button").nth(1)).toHaveAttribute(
@@ -207,7 +221,15 @@ test("uses the full-bleed gallery lead only below the mobile breakpoint", async 
   );
   await expect(hero).toHaveCSS("border-top-width", "1px");
   await expect(expandedCarousel).toBeVisible();
-  await expect(mainFrame).toBeHidden();
+  await expect(expandedCarousel).toHaveAttribute(
+    "data-partner-image-carousel-expanded",
+    "true",
+  );
+  await expect(
+    expandedCarousel.locator("[data-partner-image-carousel-preview]"),
+  ).not.toHaveCount(0);
+  await expect(mainFrame).toBeVisible();
+  await expect(gallery.locator("[data-partner-image-main-frame]")).toHaveCount(1);
   await expect(thumbnailRail).toBeHidden();
   await expect(indicators).toBeHidden();
   expect(
