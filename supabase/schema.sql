@@ -13011,7 +13011,8 @@ end;
 $$;
 
 create or replace function public.expire_pending_member_signup_approval_requests(
-  p_now timestamp with time zone default now()
+  p_now timestamp with time zone default now(),
+  p_limit integer default 100
 )
 returns jsonb
 language plpgsql
@@ -13023,12 +13024,20 @@ declare
   expired_requests jsonb := '[]'::jsonb;
 begin
   for request_row in
-    select id, profile_image_upload_id
-    from public.member_signup_approval_requests
-    where status = 'pending'
-      and expires_at <= p_now
-    order by expires_at asc
-    for update skip locked
+    select request.id,
+           request.profile_image_upload_id,
+           upload.owner_id as profile_image_owner_id
+    from public.member_signup_approval_requests request
+    left join public.image_upload_sessions upload
+      on upload.id = request.profile_image_upload_id
+     and upload.owner_kind = 'signup'
+     and upload.purpose = 'member-signup-profile'
+     and upload.role = 'profile'
+    where request.status = 'pending'
+      and request.expires_at <= p_now
+    order by request.expires_at asc
+    limit least(greatest(coalesce(p_limit, 100), 1), 100)
+    for update of request skip locked
   loop
     update public.member_signup_approval_requests
     set status = 'rejected',
@@ -13044,7 +13053,8 @@ begin
     if found then
       expired_requests := expired_requests || jsonb_build_array(jsonb_build_object(
         'request_id', request_row.id,
-        'profile_image_upload_id', request_row.profile_image_upload_id
+        'profile_image_upload_id', request_row.profile_image_upload_id,
+        'profile_image_owner_id', request_row.profile_image_owner_id
       ));
     end if;
   end loop;
@@ -13056,10 +13066,10 @@ revoke all on function public.approve_member_signup_approval_request(uuid, uuid,
 revoke all on function public.approve_member_signup_approval_request(uuid, uuid, text, integer, text) from anon;
 revoke all on function public.approve_member_signup_approval_request(uuid, uuid, text, integer, text) from authenticated;
 grant execute on function public.approve_member_signup_approval_request(uuid, uuid, text, integer, text) to service_role;
-revoke all on function public.expire_pending_member_signup_approval_requests(timestamp with time zone) from public;
-revoke all on function public.expire_pending_member_signup_approval_requests(timestamp with time zone) from anon;
-revoke all on function public.expire_pending_member_signup_approval_requests(timestamp with time zone) from authenticated;
-grant execute on function public.expire_pending_member_signup_approval_requests(timestamp with time zone) to service_role;
+revoke all on function public.expire_pending_member_signup_approval_requests(timestamp with time zone, integer) from public;
+revoke all on function public.expire_pending_member_signup_approval_requests(timestamp with time zone, integer) from anon;
+revoke all on function public.expire_pending_member_signup_approval_requests(timestamp with time zone, integer) from authenticated;
+grant execute on function public.expire_pending_member_signup_approval_requests(timestamp with time zone, integer) to service_role;
 
 alter table public.partners
   add column if not exists benefit_verification_pin_hash text,

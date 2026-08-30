@@ -8,6 +8,10 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
 import { getSignupApprovalExpiresAt } from "@/lib/image-upload/signup";
 import { attachMattermostSignupApprovalProfileImage } from "@/lib/member-signup-profile";
+import { forEachWithConcurrency } from "@/lib/async-concurrency";
+
+const EXPIRED_APPROVAL_BATCH_SIZE = 100;
+const EXPIRED_APPROVAL_CLEANUP_CONCURRENCY = 4;
 
 const SAFE_REQUEST_SELECT = [
   "id",
@@ -364,31 +368,39 @@ export async function rejectMattermostSignupApprovalRequest(input: {
 export async function expireMattermostSignupApprovalRequests(now = new Date()) {
   const { data, error } = await getSupabaseAdminClient().rpc(
     "expire_pending_member_signup_approval_requests",
-    { p_now: now.toISOString() },
+    {
+      p_now: now.toISOString(),
+      p_limit: EXPIRED_APPROVAL_BATCH_SIZE,
+    },
   );
   if (error) {
     throw new MattermostSignupApprovalRepositoryError("decision_failed");
   }
   const rows = Array.isArray(data) ? data : [];
   let cleanupPending = 0;
-  for (const row of rows) {
-    if (!row || typeof row !== "object") continue;
-    const record = row as Record<string, unknown>;
-    if (typeof record.request_id !== "string" || typeof record.profile_image_upload_id !== "string") {
-      continue;
-    }
-    const context = await getMattermostSignupApprovalProfileImageContext(record.request_id);
-    if (!context?.ownerId) continue;
-    try {
-      await getImageUploadRepository().discard({
-        actor: { kind: "signup", id: context.ownerId },
-        purpose: "member-signup-profile",
-        uploadId: record.profile_image_upload_id,
-        now,
-      });
-    } catch {
-      cleanupPending += 1;
-    }
-  }
+  await forEachWithConcurrency(
+    rows,
+    EXPIRED_APPROVAL_CLEANUP_CONCURRENCY,
+    async (row) => {
+      if (!row || typeof row !== "object") return;
+      const record = row as Record<string, unknown>;
+      if (
+        typeof record.profile_image_upload_id !== "string"
+        || typeof record.profile_image_owner_id !== "string"
+      ) {
+        return;
+      }
+      try {
+        await getImageUploadRepository().discard({
+          actor: { kind: "signup", id: record.profile_image_owner_id },
+          purpose: "member-signup-profile",
+          uploadId: record.profile_image_upload_id,
+          now,
+        });
+      } catch {
+        cleanupPending += 1;
+      }
+    },
+  );
   return { expiredRequests: rows.length, cleanupPending };
 }
