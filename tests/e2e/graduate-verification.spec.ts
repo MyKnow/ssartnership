@@ -1,11 +1,20 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { expect, test } from "@playwright/test";
 import { waitForPageReady } from "./page-ready";
 
-const ONE_PIXEL_PNG = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
-  "base64",
-);
 const PROFILE_IMAGE_UPLOAD_ID = "03f5459b-dfee-4558-907a-509a396312f5";
+const REPOSITORY_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+);
+const CROPPABLE_PROFILE_IMAGE_PATH = path.join(
+  REPOSITORY_ROOT,
+  "public",
+  "icon-192.png",
+);
 
 test.describe("graduate verification application", () => {
   test("submits the verified email, inferred cohort, certificate, and cropped profile photo", async ({
@@ -116,13 +125,15 @@ test.describe("graduate verification application", () => {
     await expect(page.getByText("PDF(최대 10MB)")).toBeVisible();
     await expect(page.getByText("PDF, 최대 10MB, 5페이지 이하")).toHaveCount(0);
     await expect(submitButton).toBeDisabled();
-    await page.getByLabel("본인 사진 파일 선택").setInputFiles({
-      name: "profile.png",
-      mimeType: "image/png",
-      buffer: ONE_PIXEL_PNG,
-    });
+    await page
+      .getByLabel("본인 사진 파일 선택")
+      .setInputFiles(CROPPABLE_PROFILE_IMAGE_PATH);
     await expect(page.getByText("이미지 편집")).toBeVisible();
+    const cropDialogTitle = page.getByTestId("image-crop-dialog-title");
+    await expect(cropDialogTitle).toBeVisible();
+    await expect(page.locator(".reactEasyCrop_Container")).toBeVisible();
     await page.getByRole("button", { name: "적용" }).click();
+    await expect(cropDialogTitle).toHaveCount(0, { timeout: 15_000 });
     await expect(page.getByText("사진 크롭 완료")).toHaveCount(0);
     await expect(
       page.getByText("얼굴이 분명하게 보이는 사진(최대 5MB)"),
@@ -131,7 +142,11 @@ test.describe("graduate verification application", () => {
       page.getByText("JPEG, PNG, WebP, HEIC, HEIF · 최대 5MB · 얼굴이 분명하게 보이는 사진"),
     ).toHaveCount(0);
     await expect(submitButton).toBeDisabled();
-    await page.getByRole("button", { name: "선택한 본인 사진 크게 보기" }).click();
+    const photoPreviewButton = page.getByRole("button", {
+      name: "선택한 본인 사진 크게 보기",
+    });
+    await expect(photoPreviewButton).toBeVisible();
+    await photoPreviewButton.click();
     await expect(
       page.getByRole("dialog", { name: "선택한 본인 사진 확대" }),
     ).toBeVisible();

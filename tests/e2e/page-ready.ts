@@ -1,8 +1,24 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
 export async function waitForPageReady(page: Page, readyLocator: Locator) {
-  await page.evaluate(() => document.fonts?.ready ?? Promise.resolve());
-  await expect(readyLocator).toBeVisible();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await expect(readyLocator).toBeVisible();
+
+    try {
+      await page.evaluate(async () => {
+        if (!document.fonts || document.fonts.status === "loaded") {
+          return;
+        }
+
+        await document.fonts.ready;
+      });
+      return;
+    } catch (error) {
+      if (attempt === 2 || !isExecutionContextDestroyedError(error)) {
+        throw error;
+      }
+    }
+  }
 }
 
 export async function waitForScrollStability(page: Page) {
@@ -33,4 +49,11 @@ export async function waitForScrollStability(page: Page) {
       window.requestAnimationFrame(tick);
     });
   });
+}
+
+function isExecutionContextDestroyedError(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.includes("Execution context was destroyed")
+  );
 }
