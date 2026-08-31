@@ -305,7 +305,7 @@ export async function clearUserSession() {
   store.delete(COOKIE_NAME);
 }
 
-export async function getUserSession() {
+export const getUserSession = cache(async () => {
   noStore();
   const session = (await getSignedUserSession()) as SignedUserSession | null;
   if (!session?.userId) {
@@ -338,4 +338,4 @@ export async function getUserSession() {
       photoState.reviewStatus,
     ),
   };
-}
+});
