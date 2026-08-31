@@ -55,6 +55,7 @@ type ButtonProps = {
   type?: "button" | "submit" | "reset";
   href?: string;
   prefetch?: boolean;
+  reloadDocument?: boolean;
   target?: string;
   rel?: string;
   onClick?: (event: React.MouseEvent<HTMLElement>) => void;
@@ -95,6 +96,7 @@ export default function Button({
   type = "button",
   href,
   prefetch,
+  reloadDocument,
   target,
   rel,
   onClick,
@@ -157,7 +159,7 @@ export default function Button({
       onClick: handleLinkClick,
     };
 
-    if (isInternalHref(href)) {
+    if (isInternalHref(href) && !reloadDocument) {
       return (
         <Link href={href} prefetch={prefetch ?? false} {...sharedProps}>
           {content}
