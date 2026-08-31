@@ -84,15 +84,16 @@ test("관리자 알림 설정은 인증 뒤 본문을 읽고 두 종류의 초�
   const postSource = source.slice(source.indexOf("export async function POST"));
   const guardIndex = postSource.indexOf("if (");
   const authIndex = postSource.indexOf("const auth =");
-  const parserIndex = postSource.indexOf("await readJsonRequestBodyWithinLimit");
+  const parserIndex = postSource.indexOf("await readRouteJsonBodyWithinLimit");
 
-  assert.match(
-    source,
-    /MAX_STANDARD_JSON_BODY_BYTES/,
-  );
-  assert.match(source, /error\.code === "body_too_large"/);
-  assert.match(source, /\{ message: "알림 설정 요청이 너무 큽니다\." \}/);
-  assert.match(source, /\{ status: 413 \}/);
+  assert.match(source, /MAX_STANDARD_JSON_BODY_BYTES/);
+  assert.match(source, /maximumBytes: MAX_STANDARD_JSON_BODY_BYTES/);
+  assert.match(source, /invalidMessage: "요청 본문 형식을 확인해 주세요\."/);
+  assert.match(source, /tooLargeMessage: "알림 설정 요청이 너무 큽니다\."/);
+  assert.match(source, /getSafeNotificationRouteError/);
+  assert.match(source, /status: safeError\.status/);
+  assert.doesNotMatch(source, /readJsonRequestBodyWithinLimit/);
+  assert.doesNotMatch(source, /body = \{\}/);
   assert.ok(
     guardIndex >= 0 && authIndex > guardIndex && parserIndex > authIndex,
   );
@@ -191,6 +192,7 @@ test("route JSON helper는 malformed와 oversized 본문을 안전한 상태로 
 
 test("회원·파트너·관리자 알림 JSON 경로는 공용 bounded reader를 사용한다", async () => {
   const routePaths = [
+    "src/app/api/admin/notifications/preferences/route.ts",
     "src/app/api/admin/push/unsubscribe/route.ts",
     "src/app/api/notifications/preferences/route.ts",
     "src/app/api/partner/notifications/preferences/route.ts",
