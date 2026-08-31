@@ -13,7 +13,6 @@ import CertificationView from "@/components/certification/CertificationView";
 import { SITE_NAME } from "@/lib/site";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { listCohortCardThemes } from "@/lib/cohort-card-themes";
-import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { getMemberProfilePhotoAccessState } from "@/lib/member-profile-photo";
 import Button from "@/components/ui/Button";
 import { buildMemberGateHref } from "@/lib/member-required-gates";
@@ -67,17 +66,18 @@ export default async function CertificationPage({
     redirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
 
-  const [headerSession, cohortCardThemes, photoState, member] = await Promise.all([
+  const [headerSession, cohortCardThemes, member] = await Promise.all([
     getHeaderSession(session.userId),
     listCohortCardThemes(),
-    getMemberProfilePhotoState(session.userId),
     getMemberCanonicalProfile(session.userId),
   ]);
-  const photoAccess = getMemberProfilePhotoAccessState(photoState.reviewStatus);
 
   if (!member) {
     redirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
+  const photoAccess = getMemberProfilePhotoAccessState(
+    member.profilePhotoReviewStatus,
+  );
 
   return (
     <div className="min-h-screen bg-background">

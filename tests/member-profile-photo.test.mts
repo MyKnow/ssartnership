@@ -112,6 +112,17 @@ test("사진 제출 경로는 공통 게이트 해석기로 자기 재진입을 
   assert.match(layout, /currentPath: returnTo/);
 });
 
+test("내 인증 화면은 canonical 프로필의 사진 검토 상태를 재사용한다", async () => {
+  const certificationPage = await readFile(certificationPagePath, "utf8");
+
+  assert.match(certificationPage, /getMemberCanonicalProfile/);
+  assert.match(
+    certificationPage,
+    /getMemberProfilePhotoAccessState\(\s*member\.profilePhotoReviewStatus,?\s*\)/,
+  );
+  assert.doesNotMatch(certificationPage, /getMemberProfilePhotoState/);
+});
+
 test("인증 화면과 설정의 사진 CTA는 각 원래 목적지를 사진 화면까지 보존한다", async () => {
   const [
     certificationPage,
