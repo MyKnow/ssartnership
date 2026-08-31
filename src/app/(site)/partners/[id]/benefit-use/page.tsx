@@ -10,6 +10,7 @@ import {
   getMemberProfileImageUrl,
 } from "@/lib/member-profile-view";
 import { getMemberProfilePhotoAccessState } from "@/lib/member-profile-photo";
+import { resolvePartnerAudienceFromMemberYear } from "@/lib/partner-audience";
 import { listCohortCardThemes } from "@/lib/cohort-card-themes";
 import { getPartnerServiceMode } from "@/lib/partner-service-mode";
 import {
@@ -28,7 +29,6 @@ import {
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { SITE_NAME } from "@/lib/site";
 import { getSignedUserSession } from "@/lib/user-auth";
-import { getPartnerViewerContext } from "@/lib/partner-view-context";
 
 export const dynamic = "force-dynamic";
 
@@ -98,10 +98,24 @@ export default async function PartnerBenefitUsePage({
     redirect(`/auth/login?returnTo=${encodeURIComponent(requestedPath)}`);
   }
 
-  const viewerContext = await getPartnerViewerContext(session.userId);
+  const member = await getMemberCanonicalProfile(session.userId);
+  if (!member) {
+    redirect(
+      `/auth/login?returnTo=${encodeURIComponent(
+        getBenefitUsePath(partnerId, rawBenefitId ?? benefit ?? "", requestedUseCount ?? 1, returnTo),
+      )}`,
+    );
+  }
+
+  const viewerAudience = resolvePartnerAudienceFromMemberYear(
+    member.generation,
+    new Date(),
+    undefined,
+    { graduateVerifiedAt: member.graduateVerifiedAt },
+  );
   const partner = await partnerRepository.getPartnerById(partnerId, {
     authenticated: true,
-    viewerAudience: viewerContext.viewerAudience,
+    viewerAudience,
   });
   if (
     !partner ||
@@ -136,18 +150,10 @@ export default async function PartnerBenefitUsePage({
     redirect(detailPath);
   }
 
-  const [headerSession, member, cohortCardThemes] = await Promise.all([
+  const [headerSession, cohortCardThemes] = await Promise.all([
     getHeaderSession(session.userId),
-    getMemberCanonicalProfile(session.userId),
     listCohortCardThemes(),
   ]);
-  if (!member) {
-    redirect(
-      `/auth/login?returnTo=${encodeURIComponent(
-        getBenefitUsePath(partnerId, selectedBenefit.id, useCount, returnTo),
-      )}`,
-    );
-  }
 
   const photoAccess = getMemberProfilePhotoAccessState(
     member.profilePhotoReviewStatus,

@@ -203,8 +203,11 @@ test("인증 카드와 아바타 API는 private 이미지 ledger만 제공한다
   }
 });
 
-test("홈·쿠폰·제휴 접근 권한은 정규화 회원 프로필만 사용한다", () => {
+test("홈·쿠폰·제휴 접근 권한은 정규화 회원 관계만 사용한다", () => {
   const partnerViewContext = readRepoFile("src/lib/partner-view-context.ts");
+  const memberAudienceSnapshot = readRepoFile(
+    "src/lib/member-audience-snapshot.ts",
+  );
   const couponsPage = readRepoFile("src/app/(site)/coupons/page.tsx");
   const homePage = readRepoFile("src/app/(site)/page.tsx");
   const partnerDetailPage = readRepoFile(
@@ -214,7 +217,13 @@ test("홈·쿠폰·제휴 접근 권한은 정규화 회원 프로필만 사용�
     "src/app/api/partners/home-state/route.ts",
   );
 
-  assert.match(partnerViewContext, /getMemberCanonicalProfile/);
+  assert.match(partnerViewContext, /getMemberAudienceSnapshot/);
+  assert.match(memberAudienceSnapshot, /\.select\("id,generation"\)/);
+  assert.match(memberAudienceSnapshot, /\.from\("graduate_profiles"\)/);
+  assert.doesNotMatch(
+    memberAudienceSnapshot,
+    /display_name|campus|mattermost_account_id|getMemberProfilePhotoState|mm_user_directory/,
+  );
   assert.match(couponsPage, /getMemberCanonicalProfile/);
   assert.match(homePage, /getMemberCanonicalProfile/);
   assert.match(partnerDetailPage, /getPartnerViewerContext/);
@@ -223,6 +232,7 @@ test("홈·쿠폰·제휴 접근 권한은 정규화 회원 프로필만 사용�
 
   for (const source of [
     partnerViewContext,
+    memberAudienceSnapshot,
     couponsPage,
     homePage,
     partnerDetailPage,
