@@ -1,5 +1,6 @@
 import type { Category, Partner } from "@/lib/types";
 import type {
+  AdminPartnerOption,
   PartnerRepository,
   PartnerViewContext,
   PublicPartnerSeoEntry,
@@ -176,6 +177,14 @@ const partners: Partner[] = [
 ];
 
 export class MockPartnerRepository implements PartnerRepository {
+  async listAdminPartnerOptions(): Promise<AdminPartnerOption[]> {
+    return partners
+      .map((partner) => ({ id: partner.id, name: partner.name }))
+      .sort((left, right) =>
+        left.name.localeCompare(right.name, "ko") || left.id.localeCompare(right.id),
+      );
+  }
+
   async getCategories(): Promise<Category[]> {
     return categories;
   }

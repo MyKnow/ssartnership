@@ -6,6 +6,7 @@ import { normalizeCampusSlugs, type CampusSlug } from "@/lib/campuses";
 import { normalizePartnerBenefitActionType } from "@/lib/partner-benefit-action";
 import { toLeanPublicDirectoryPartner } from "@/lib/public-partner-directory";
 import type {
+  AdminPartnerOption,
   PartnerRepository,
   PartnerViewContext,
   PublicPartnerSeoEntry,
@@ -82,6 +83,11 @@ type PublicPartnerSeoRow = {
     | { label?: string | null }
     | Array<{ label?: string | null }>
     | null;
+};
+
+type AdminPartnerOptionRow = {
+  id: string;
+  name: string;
 };
 
 type PublicCacheScope = "partners" | "categories";
@@ -549,6 +555,21 @@ async function hasValidPreviewToken(id: string, token: string) {
 }
 
 export class SupabasePartnerRepository implements PartnerRepository {
+  async listAdminPartnerOptions(): Promise<AdminPartnerOption[]> {
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("partners")
+      .select("id,name")
+      .order("name", { ascending: true })
+      .order("id", { ascending: true });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return (data ?? []) as AdminPartnerOptionRow[];
+  }
+
   async getCategories(): Promise<Category[]> {
     const versionKey = await getPublicCacheVersionKey(["categories"]);
     const data = await getCachedCategories(versionKey);

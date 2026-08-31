@@ -23,8 +23,15 @@ export type PublicPartnerSeoOptions = {
   limit?: number;
 };
 
+export type AdminPartnerOption = {
+  id: string;
+  name: string;
+};
+
 export interface PartnerRepository {
   getCategories(): Promise<Category[]>;
+  /** Returns only the fields required by admin partner selectors. */
+  listAdminPartnerOptions(): Promise<AdminPartnerOption[]>;
   getPartners(context?: PartnerViewContext): Promise<Partner[]>;
   getPartnersForCampus(
     campusSlug: CampusSlug,
