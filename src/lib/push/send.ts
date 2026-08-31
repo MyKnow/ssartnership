@@ -61,7 +61,8 @@ async function countAudienceMembers(audience: ResolvedPushAudience) {
   const supabase = getSupabaseAdminClient();
   let query = supabase
     .from("members")
-    .select("id", { count: "exact", head: true });
+    .select("id", { count: "exact", head: true })
+    .is("deleted_at", null);
   if (audience.scope === "year" && audience.year !== null) {
     query = query.eq("generation", audience.year);
   }
@@ -490,7 +491,7 @@ export async function sendPushTemplateTest(input: {
           serialized,
         );
         delivered += 1;
-        await Promise.all([
+        await settlePushBookkeeping([
           markPushSuccess(subscription.id),
           logPushDelivery({
             messageLogId: messageLog.id,
@@ -499,12 +500,20 @@ export async function sendPushTemplateTest(input: {
             payload: input.payload,
             status: "sent",
           }),
-        ]);
+        ], "sent");
       } catch (error) {
         failed += 1;
+        const statusCode =
+          typeof error === "object" &&
+          error &&
+          "statusCode" in error
+            ? Number((error as { statusCode?: number }).statusCode)
+            : null;
         const deactivate =
-          error instanceof PushError && error.code === "invalid_request";
-        await Promise.all([
+          (error instanceof PushError && error.code === "invalid_request") ||
+          statusCode === 404 ||
+          statusCode === 410;
+        await settlePushBookkeeping([
           markPushFailure(subscription, "템플릿 테스트 푸시 발송 실패", deactivate),
           logPushDelivery({
             messageLogId: messageLog.id,
@@ -514,7 +523,7 @@ export async function sendPushTemplateTest(input: {
             status: "failed",
             errorMessage: "템플릿 테스트 푸시 발송 실패",
           }),
-        ]);
+        ], "failed");
       }
     },
   );

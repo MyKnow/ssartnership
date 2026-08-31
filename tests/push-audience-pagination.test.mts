@@ -18,6 +18,11 @@ test("notification audience reads page large result sets and chunk large filters
   assert.match(audience, /collectPagedRows/);
   assert.match(audience, /collectRowsByFilterChunks/);
   assert.match(audience, /\.range\(from, to\)/);
+  assert.equal(
+    (audience.match(/\.is\("deleted_at", null\)/g) ?? []).length,
+    2,
+    "paged and explicit member audiences must both exclude deleted members",
+  );
 
   assert.match(operations, /collectPagedRows/);
   assert.match(operations, /collectPagedRowsByFilterChunks/);
@@ -30,6 +35,10 @@ test("notification audience reads page large result sets and chunk large filters
   assert.match(send, /collectPagedRowsByFilterChunks/);
   assert.match(send, /collectRowsByFilterChunks/);
   assert.doesNotMatch(send, /\.in\("member_id", resolvedAudience\.memberIds\)/);
+  assert.match(
+    send,
+    /\.select\("id", \{ count: "exact", head: true \}\)[\s\S]*\.is\("deleted_at", null\)/,
+  );
 
   assert.match(newPartner, /collectPagedRows/);
   assert.match(newPartner, /\.range\(from, to\)/);

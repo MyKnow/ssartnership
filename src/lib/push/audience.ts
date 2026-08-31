@@ -26,6 +26,7 @@ async function listAudienceMemberIds(input: {
     null,
     async (from, to) => {
       let query = supabase.from("members").select("id");
+      query = query.is("deleted_at", null);
       if (input.year !== undefined) {
         query = query.eq("generation", input.year);
       }
@@ -159,6 +160,7 @@ export async function resolvePushAudience(
       const { data, error } = await supabase
         .from("members")
         .select("id,display_name,mattermost_account_id")
+        .is("deleted_at", null)
         .in("id", [...memberIdChunk]);
       if (error) {
         throw wrapPushDbError(error, "발송 대상을 불러오지 못했습니다.");

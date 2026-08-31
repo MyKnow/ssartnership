@@ -18430,18 +18430,21 @@ begin
   )
   into resolved_recipient_ids
   from public.members as member
-  where normalized_scope = 'all'
-    or (
-      normalized_scope = 'year'
-      and member.generation = p_generation
-    )
-    or (
-      normalized_scope = 'campus'
-      and member.campus = p_campus
-    )
-    or (
-      normalized_scope = 'member'
-      and member.id = any(coalesce(p_recipient_member_ids, '{}'::uuid[]))
+  where member.deleted_at is null
+    and (
+      normalized_scope = 'all'
+      or (
+        normalized_scope = 'year'
+        and member.generation = p_generation
+      )
+      or (
+        normalized_scope = 'campus'
+        and member.campus = p_campus
+      )
+      or (
+        normalized_scope = 'member'
+        and member.id = any(coalesce(p_recipient_member_ids, '{}'::uuid[]))
+      )
     );
 
   return public.attach_notification_recipients(

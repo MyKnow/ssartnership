@@ -29,6 +29,10 @@ test("notification recipients are attached atomically from a database-scoped aud
     assert.match(source, /from public\.members as member/i);
     assert.match(
       source,
+      /where member\.deleted_at is null[\s\S]*normalized_scope = 'all'/i,
+    );
+    assert.match(
+      source,
       /revoke all on function public\.attach_notification_recipients\(uuid, uuid\[\]\) from authenticated;/i,
     );
     assert.match(
@@ -59,4 +63,73 @@ test("notification recipients are attached atomically from a database-scoped aud
   assert.match(send, /let providerError: unknown = null/);
   assert.match(send, /if \(!providerError\)/);
   assert.doesNotMatch(send, /listAllPushMemberIds/);
+  assert.match(send, /\.is\("deleted_at", null\)/);
+});
+
+test("mock notification repository keeps audience attachment behavior aligned with the supabase contract", async () => {
+  const scope = globalThis as typeof globalThis & {
+    __mockNotificationStore?: unknown;
+  };
+  delete scope.__mockNotificationStore;
+
+  const { MockNotificationRepository } = await import(
+    "../src/lib/repositories/mock/notification-repository.mock.ts"
+  );
+  const repository = new MockNotificationRepository();
+  const created = await repository.createNotification({
+    type: "new_partner",
+    title: "새 제휴처",
+    body: "mock audience",
+    targetUrl: "/notifications",
+    recipientMemberIds: [],
+  });
+
+  assert.equal(
+    await repository.addNotificationAudienceRecipients(created.notification.id, {
+      scope: "all",
+    }),
+    8,
+  );
+  assert.equal(
+    await repository.getUnreadNotificationCount("mock-member-jung-minho"),
+    1,
+  );
+  assert.equal(
+    await repository.getUnreadNotificationCount("mock-student-16"),
+    1,
+  );
+
+  const campusCreated = await repository.createNotification({
+    type: "new_partner",
+    title: "서울 캠퍼스",
+    body: "campus audience",
+    targetUrl: "/notifications",
+    recipientMemberIds: [],
+  });
+  assert.equal(
+    await repository.addNotificationAudienceRecipients(campusCreated.notification.id, {
+      scope: "campus",
+      campus: "서울",
+    }),
+    5,
+  );
+  assert.equal(
+    await repository.getUnreadNotificationCount("mock-student-15"),
+    1,
+  );
+
+  const yearCreated = await repository.createNotification({
+    type: "new_partner",
+    title: "15기",
+    body: "year audience",
+    targetUrl: "/notifications",
+    recipientMemberIds: [],
+  });
+  assert.equal(
+    await repository.addNotificationAudienceRecipients(yearCreated.notification.id, {
+      scope: "year",
+      year: 15,
+    }),
+    2,
+  );
 });

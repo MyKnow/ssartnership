@@ -18,6 +18,8 @@ import type {
   NotificationRepository,
   TransitionNotificationDeliveryInput,
 } from "../notification-repository.ts";
+import { MOCK_MEMBER_ID, getMockMemberById } from "../../mock/member.ts";
+import { mockPreviewMembers } from "../../mock/member-preview.ts";
 
 type MockNotification = NotificationRecord;
 
@@ -150,6 +152,41 @@ function ensureMockNotificationRecipients(
   }
 }
 
+function listMockAudienceMemberIds(audience: NotificationRecipientAudience) {
+  const mockMembers = [
+    ...mockPreviewMembers.map((member) => ({
+      id: member.id,
+      generation: member.generation,
+      campus: member.campus,
+    })),
+    getMockMemberById(MOCK_MEMBER_ID),
+  ]
+    .filter((member): member is { id: string; generation: number; campus: string | null } =>
+      Boolean(member),
+    )
+    .filter(
+      (member, index, allMembers) =>
+        allMembers.findIndex((candidate) => candidate.id === member.id) === index,
+    );
+
+  if (audience.scope === "all") {
+    return mockMembers.map((member) => member.id);
+  }
+  if (audience.scope === "year") {
+    return mockMembers
+      .filter((member) => member.generation === audience.year)
+      .map((member) => member.id);
+  }
+  if (audience.scope === "campus") {
+    return mockMembers
+      .filter((member) => member.campus === audience.campus)
+      .map((member) => member.id);
+  }
+  return Array.from(
+    new Set((audience.memberIds ?? []).map((value) => value.trim()).filter(Boolean)),
+  );
+}
+
 export class MockNotificationRepository implements NotificationRepository {
   async createNotification(
     input: NotificationBroadcastInput,
@@ -223,7 +260,7 @@ export class MockNotificationRepository implements NotificationRepository {
     notificationId: string,
     audience: NotificationRecipientAudience,
   ) {
-    const recipientMemberIds = audience.memberIds ?? [];
+    const recipientMemberIds = listMockAudienceMemberIds(audience);
     await this.addNotificationRecipients(notificationId, recipientMemberIds);
     return new Set(recipientMemberIds).size;
   }
