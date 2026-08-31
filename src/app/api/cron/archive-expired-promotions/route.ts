@@ -17,23 +17,34 @@ export async function GET(request: NextRequest) {
 
   const supabase = getSupabaseAdminClient();
   const nowIso = new Date().toISOString();
-  const { data: expiredEvents, error: eventQueryError } = await supabase
-    .from("promotion_events")
-    .select("slug")
-    .eq("is_active", true)
-    .lt("ends_at", nowIso)
-    .limit(ARCHIVE_EVENT_BATCH_SIZE);
+  const { data, error } = await supabase.rpc("archive_expired_promotions_batch", {
+    input_now: nowIso,
+    input_limit: ARCHIVE_EVENT_BATCH_SIZE,
+  });
 
-  if (eventQueryError) {
-    console.error("[archive-expired-promotions] event query failed", {
-      code: eventQueryError.code,
+  if (error) {
+    console.error("[archive-expired-promotions] archive rpc failed", {
+      code: error.code,
     });
     return getCronErrorResponse("archive-expired-promotions");
   }
 
-  const slugs = (expiredEvents ?? [])
-    .map((event) => String(event.slug ?? "").trim())
-    .filter(Boolean);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) {
+    console.error("[archive-expired-promotions] archive rpc returned no row");
+    return getCronErrorResponse("archive-expired-promotions");
+  }
+
+  const slugs = Array.isArray(row.archived_event_slugs)
+    ? row.archived_event_slugs
+        .map((slug: unknown) => (typeof slug === "string" ? slug.trim() : ""))
+        .filter(Boolean)
+    : [];
+  const archivedSlides = Number(row.archived_slide_count ?? 0);
+  if (!Number.isFinite(archivedSlides) || archivedSlides < 0) {
+    console.error("[archive-expired-promotions] archive rpc returned invalid slide count");
+    return getCronErrorResponse("archive-expired-promotions");
+  }
 
   if (slugs.length === 0) {
     return NextResponse.json({
@@ -42,30 +53,6 @@ export async function GET(request: NextRequest) {
       archivedSlides: 0,
       archivedAt: nowIso,
     });
-  }
-
-  const { error: eventUpdateError } = await supabase
-    .from("promotion_events")
-    .update({ is_active: false })
-    .in("slug", slugs);
-  if (eventUpdateError) {
-    console.error("[archive-expired-promotions] event update failed", {
-      code: eventUpdateError.code,
-    });
-    return getCronErrorResponse("archive-expired-promotions");
-  }
-
-  const { data: updatedSlides, error: slideUpdateError } = await supabase
-    .from("promotion_slides")
-    .update({ is_active: false })
-    .in("event_slug", slugs)
-    .eq("is_active", true)
-    .select("id");
-  if (slideUpdateError) {
-    console.error("[archive-expired-promotions] slide update failed", {
-      code: slideUpdateError.code,
-    });
-    return getCronErrorResponse("archive-expired-promotions");
   }
 
   revalidateTag(PROMOTION_EVENTS_CACHE_TAG, "max");
@@ -82,7 +69,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     archivedEvents: slugs.length,
-    archivedSlides: updatedSlides?.length ?? 0,
+    archivedSlides,
     slugs,
     archivedAt: nowIso,
   });

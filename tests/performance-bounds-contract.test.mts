@@ -39,7 +39,8 @@ test("만료 프로모션 정리는 한 번에 100건만 조회하고 내부 오
   const source = read("../src/app/api/cron/archive-expired-promotions/route.ts");
 
   assert.match(source, /const ARCHIVE_EVENT_BATCH_SIZE = 100;/);
-  assert.match(source, /\.limit\(ARCHIVE_EVENT_BATCH_SIZE\)/);
+  assert.match(source, /input_limit: ARCHIVE_EVENT_BATCH_SIZE/);
+  assert.match(source, /rpc\("archive_expired_promotions_batch"/);
   assert.match(source, /getCronErrorResponse\("archive-expired-promotions"\)/);
   assert.doesNotMatch(source, /message: \w+Error\.message/);
 });

@@ -39,4 +39,16 @@ test("promotion mutations invalidate raw cache tags", () => {
     archiveRouteSource,
     /revalidateTag\(PROMOTION_SLIDES_CACHE_TAG, "max"\)/,
   );
+  assert.match(
+    archiveRouteSource,
+    /rpc\("archive_expired_promotions_batch"/,
+  );
+  assert.doesNotMatch(
+    archiveRouteSource,
+    /\.from\("promotion_events"\)\s*\.update\(\{ is_active: false \}\)/,
+  );
+  assert.doesNotMatch(
+    archiveRouteSource,
+    /\.from\("promotion_slides"\)\s*\.update\(\{ is_active: false \}\)/,
+  );
 });
