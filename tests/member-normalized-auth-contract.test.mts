@@ -173,6 +173,9 @@ test("일괄 MM 동기화와 관리자 아바타 조회는 정규화된 디렉�
 
 test("인증 카드와 아바타 API는 private 이미지 ledger만 제공한다", () => {
   const certificationPage = readRepoFile("src/app/(site)/certification/page.tsx");
+  const certificationMemberView = readRepoFile(
+    "src/lib/certification-member-view.server.ts",
+  );
   const verificationPage = readRepoFile("src/app/(site)/verify/[token]/page.tsx");
   const certificationAvatar = readRepoFile(
     "src/app/api/certification/avatar/[token]/route.ts",
@@ -195,7 +198,8 @@ test("인증 카드와 아바타 API는 private 이미지 ledger만 제공한다
     );
   }
 
-  assert.match(certificationPage, /getMemberCanonicalProfile/);
+  assert.match(certificationPage, /getCertificationMemberView/);
+  assert.match(certificationMemberView, /getMemberCanonicalProfile/);
   assert.match(verificationPage, /getMemberCanonicalProfile/);
   for (const source of [certificationAvatar, memberAvatar, currentPhoto]) {
     assert.match(source, /getActiveMemberProfileImage/);
@@ -207,6 +211,9 @@ test("홈·쿠폰·제휴 접근 권한은 정규화 회원 관계만 사용한�
   const partnerViewContext = readRepoFile("src/lib/partner-view-context.ts");
   const memberAudienceSnapshot = readRepoFile(
     "src/lib/member-audience-snapshot.ts",
+  );
+  const certificationMemberView = readRepoFile(
+    "src/lib/certification-member-view.server.ts",
   );
   const couponsPage = readRepoFile("src/app/(site)/coupons/page.tsx");
   const homePage = readRepoFile("src/app/(site)/page.tsx");
@@ -224,7 +231,8 @@ test("홈·쿠폰·제휴 접근 권한은 정규화 회원 관계만 사용한�
     memberAudienceSnapshot,
     /display_name|campus|mattermost_account_id|getMemberProfilePhotoState|mm_user_directory/,
   );
-  assert.match(couponsPage, /getMemberCanonicalProfile/);
+  assert.match(couponsPage, /getCertificationMemberView/);
+  assert.match(certificationMemberView, /getMemberCanonicalProfile/);
   assert.match(homePage, /getMemberCanonicalProfile/);
   assert.match(partnerDetailPage, /getPartnerViewerContext/);
   assert.match(homeStateRoute, /getSignedUserSession/);
@@ -233,6 +241,7 @@ test("홈·쿠폰·제휴 접근 권한은 정규화 회원 관계만 사용한�
   for (const source of [
     partnerViewContext,
     memberAudienceSnapshot,
+    certificationMemberView,
     couponsPage,
     homePage,
     partnerDetailPage,

@@ -5,11 +5,7 @@ import Container from "@/components/ui/Container";
 import PageHeader from "@/components/ui/PageHeader";
 import PartnerBenefitVerificationView from "@/components/partner/PartnerBenefitVerificationView";
 import { getHeaderSession } from "@/lib/header-session";
-import {
-  getMemberCanonicalProfile,
-  getMemberProfileImageUrl,
-} from "@/lib/member-profile-view";
-import { getMemberProfilePhotoAccessState } from "@/lib/member-profile-photo";
+import { getCertificationMemberView } from "@/lib/certification-member-view.server";
 import { resolvePartnerAudienceFromMemberYear } from "@/lib/partner-audience";
 import { listCohortCardThemes } from "@/lib/cohort-card-themes.server";
 import { getPartnerServiceMode } from "@/lib/partner-service-mode";
@@ -98,14 +94,15 @@ export default async function PartnerBenefitUsePage({
     redirect(`/auth/login?returnTo=${encodeURIComponent(requestedPath)}`);
   }
 
-  const member = await getMemberCanonicalProfile(session.userId);
-  if (!member) {
+  const memberView = await getCertificationMemberView(session.userId);
+  if (!memberView) {
     redirect(
       `/auth/login?returnTo=${encodeURIComponent(
         getBenefitUsePath(partnerId, rawBenefitId ?? benefit ?? "", requestedUseCount ?? 1, returnTo),
       )}`,
     );
   }
+  const { member } = memberView;
 
   const viewerAudience = resolvePartnerAudienceFromMemberYear(
     member.generation,
@@ -155,17 +152,6 @@ export default async function PartnerBenefitUsePage({
     listCohortCardThemes(),
   ]);
 
-  const photoAccess = getMemberProfilePhotoAccessState(
-    member.profilePhotoReviewStatus,
-  );
-  const profileImageUrl =
-    !photoAccess.restrictCertification &&
-    member.activeProfileImageId &&
-    member.profilePhotoReviewStatus === "approved" &&
-    !member.mustChangePassword
-      ? getMemberProfileImageUrl(member.id)
-      : null;
-
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
@@ -189,14 +175,7 @@ export default async function PartnerBenefitUsePage({
               benefitId={selectedBenefit.id}
               benefit={selectedBenefit.title}
               useCount={useCount}
-              member={{
-                mattermostUsername: member.mattermostUsername,
-                displayName: member.displayName,
-                generation: member.generation,
-                campus: member.campus,
-                graduateVerifiedAt: member.graduateVerifiedAt,
-                profileImageUrl,
-              }}
+              member={member}
               cohortCardThemes={cohortCardThemes}
               initialTimestamp={new Date().toISOString()}
               pinConfigured={Boolean(

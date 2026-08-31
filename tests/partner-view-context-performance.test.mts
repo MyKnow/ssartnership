@@ -66,11 +66,15 @@ test("member audience snapshot preserves mock generation and graduate verificati
   }
 });
 
-test("benefit-use derives viewer audience from the canonical profile it already loads", () => {
+test("benefit-use derives viewer audience from the certification member view it already loads", () => {
   const source = readRepoFile("src/app/(site)/partners/[id]/benefit-use/page.tsx");
+  const certificationMemberView = readRepoFile(
+    "src/lib/certification-member-view.server.ts",
+  );
 
   assert.match(source, /resolvePartnerAudienceFromMemberYear/);
-  assert.match(source, /const member = await getMemberCanonicalProfile\(session\.userId\)/);
+  assert.match(source, /getCertificationMemberView\(session\.userId\)/);
+  assert.match(certificationMemberView, /getMemberCanonicalProfile\(memberId\)/);
   assert.match(source, /const viewerAudience = resolvePartnerAudienceFromMemberYear\(/);
   assert.match(
     source,
@@ -78,7 +82,7 @@ test("benefit-use derives viewer audience from the canonical profile it already 
   );
   assert.doesNotMatch(source, /getPartnerViewerContext/);
   assert.equal(
-    (source.match(/getMemberCanonicalProfile\(session\.userId\)/g) ?? []).length,
+    (source.match(/getCertificationMemberView\(session\.userId\)/g) ?? []).length,
     1,
   );
 });
