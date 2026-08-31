@@ -43,15 +43,28 @@ test("normalizeHomePartnerStateIds deduplicates and caps visible partner ids", a
 });
 
 test("global popularity can cover the full directory while member state stays batch bounded", async () => {
-  const { HOME_PARTNER_STATE_BATCH_LIMIT, getHomePartnerPopularityById, getHomePartnerState } =
-    await homePartnerStateModulePromise;
+  const {
+    HOME_PARTNER_STATE_BATCH_LIMIT,
+    getHomePartnerMemberState,
+    getHomePartnerPopularityById,
+  } = await homePartnerStateModulePromise;
   const partnerIds = Array.from(
     { length: HOME_PARTNER_STATE_BATCH_LIMIT + 6 },
     (_, index) => `partner-${index + 1}`,
   );
 
-  const popularityByPartnerId = await getHomePartnerPopularityById(partnerIds);
-  const state = await getHomePartnerState({ partnerIds, currentUserId: null });
+  const popularityByPartnerId = await getHomePartnerPopularityById(partnerIds, {
+    canUsePopularityMetrics: () => false,
+    getAdminPartnerMetrics: async () => {
+      throw new Error("admin metrics must stay disabled");
+    },
+    getFavoriteCounts: async (requestedIds) =>
+      new Map(requestedIds.map((partnerId) => [partnerId, 0])),
+  });
+  const state = await getHomePartnerMemberState({
+    partnerIds,
+    currentUserId: null,
+  });
 
   assert.equal(Object.keys(popularityByPartnerId).length, partnerIds.length);
   assert.equal(state.loadedPartnerIds.length, HOME_PARTNER_STATE_BATCH_LIMIT);
