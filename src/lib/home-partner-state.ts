@@ -1,4 +1,7 @@
-import { getAdminPartnerMetrics } from "@/lib/admin-partner-metrics";
+import {
+  getAdminPartnerMetrics,
+  type AdminPartnerMetricsResult,
+} from "@/lib/admin-partner-metrics";
 import type { PartnerPopularityMetrics } from "@/lib/partner-popularity";
 import { partnerFavoriteRepository } from "@/lib/repositories";
 
@@ -9,6 +12,11 @@ export type HomePartnerState = {
   partnerFavoriteStateById: Record<string, boolean>;
   partnerPopularityById: Record<string, PartnerPopularityMetrics>;
 };
+
+export type HomePartnerMemberState = Pick<
+  HomePartnerState,
+  "loadedPartnerIds" | "partnerFavoriteStateById"
+>;
 
 const hasSupabaseEnv =
   Boolean(process.env.SUPABASE_URL) &&
@@ -23,6 +31,21 @@ function canUsePopularityMetrics() {
     process.env.NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE !== "mock"
   );
 }
+
+export type HomePartnerPopularityDependencies = {
+  canUsePopularityMetrics(): boolean;
+  getAdminPartnerMetrics(
+    partnerIds: string[],
+  ): Promise<AdminPartnerMetricsResult>;
+  getFavoriteCounts(partnerIds: string[]): Promise<Map<string, number>>;
+};
+
+const homePartnerPopularityDependencies: HomePartnerPopularityDependencies = {
+  canUsePopularityMetrics,
+  getAdminPartnerMetrics,
+  getFavoriteCounts: (partnerIds) =>
+    partnerFavoriteRepository.getFavoriteCounts(partnerIds),
+};
 
 export function normalizeHomePartnerStateIds(
   values: string[],
@@ -46,58 +69,42 @@ export function normalizeHomePartnerStateIds(
   return ids;
 }
 
-export async function getHomePartnerState(input: {
-  partnerIds: string[];
-  currentUserId?: string | null;
-  partnerIdLimit?: number;
-}): Promise<HomePartnerState> {
-  const partnerIds = normalizeHomePartnerStateIds(
-    input.partnerIds,
-    input.partnerIdLimit ?? HOME_PARTNER_STATE_BATCH_LIMIT,
-  );
+async function loadHomePartnerPopularity(
+  partnerIds: string[],
+  dependencies: HomePartnerPopularityDependencies,
+): Promise<Record<string, PartnerPopularityMetrics>> {
   const partnerPopularityById: Record<string, PartnerPopularityMetrics> = {};
-  const partnerFavoriteStateById: Record<string, boolean> = {};
 
   if (partnerIds.length === 0) {
-    return {
-      loadedPartnerIds: [],
-      partnerFavoriteStateById,
-      partnerPopularityById,
-    };
+    return partnerPopularityById;
   }
 
-  const favoriteCountsPromise = partnerFavoriteRepository
-    .getFavoriteCounts(partnerIds)
-    .catch((error) => {
+  const getFavoriteCountsFallback = () =>
+    dependencies.getFavoriteCounts(partnerIds).catch((error) => {
       console.error("[home-partner-state] favorite counts query failed", error);
       return new Map<string, number>();
     });
-  const popularityMetricsPromise = canUsePopularityMetrics()
-    ? getAdminPartnerMetrics(partnerIds)
-        .then(({ metricsByPartnerId }) => metricsByPartnerId)
-        .catch((error) => {
-          console.error(
-            "[home-partner-state] popularity metrics query failed",
-            error,
-          );
-          return new Map<string, PartnerPopularityMetrics>();
-        })
-    : Promise.resolve(new Map<string, PartnerPopularityMetrics>());
-  const favoritePartnerIdsPromise = input.currentUserId
-    ? partnerFavoriteRepository
-        .getMemberFavoritePartnerIds(input.currentUserId, partnerIds)
-        .catch((error) => {
-          console.error("[home-partner-state] favorite state query failed", error);
-          return new Set<string>();
-        })
-    : Promise.resolve(new Set<string>());
+  let favoriteCounts = new Map<string, number>();
+  let popularityMetrics: ReadonlyMap<string, PartnerPopularityMetrics> =
+    new Map();
 
-  const [favoriteCounts, popularityMetrics, favoritePartnerIds] =
-    await Promise.all([
-      favoriteCountsPromise,
-      popularityMetricsPromise,
-      favoritePartnerIdsPromise,
-    ]);
+  if (dependencies.canUsePopularityMetrics()) {
+    try {
+      const metricsResult = await dependencies.getAdminPartnerMetrics(partnerIds);
+      popularityMetrics = metricsResult.metricsByPartnerId;
+      if (metricsResult.warningMessage) {
+        favoriteCounts = await getFavoriteCountsFallback();
+      }
+    } catch (error) {
+      console.error(
+        "[home-partner-state] popularity metrics query failed",
+        error,
+      );
+      favoriteCounts = await getFavoriteCountsFallback();
+    }
+  } else {
+    favoriteCounts = await getFavoriteCountsFallback();
+  }
 
   for (const partnerId of partnerIds) {
     partnerPopularityById[partnerId] = {
@@ -116,6 +123,36 @@ export async function getHomePartnerState(input: {
     };
   }
 
+  return partnerPopularityById;
+}
+
+export async function getHomePartnerPopularityById(
+  partnerIds: string[],
+  dependencies: HomePartnerPopularityDependencies =
+    homePartnerPopularityDependencies,
+) {
+  const normalizedIds = normalizeHomePartnerStateIds(partnerIds, partnerIds.length);
+  return loadHomePartnerPopularity(normalizedIds, dependencies);
+}
+
+export async function getHomePartnerMemberState(input: {
+  partnerIds: string[];
+  currentUserId?: string | null;
+}): Promise<HomePartnerMemberState> {
+  const partnerIds = normalizeHomePartnerStateIds(input.partnerIds);
+  const partnerFavoriteStateById: Record<string, boolean> = {};
+  if (partnerIds.length === 0) {
+    return { loadedPartnerIds: [], partnerFavoriteStateById };
+  }
+  const favoritePartnerIds = input.currentUserId
+    ? await partnerFavoriteRepository
+        .getMemberFavoritePartnerIds(input.currentUserId, partnerIds)
+        .catch((error) => {
+          console.error("[home-partner-state] favorite state query failed", error);
+          return new Set<string>();
+        })
+    : new Set<string>();
+
   for (const partnerId of favoritePartnerIds) {
     partnerFavoriteStateById[partnerId] = true;
   }
@@ -123,6 +160,27 @@ export async function getHomePartnerState(input: {
   return {
     loadedPartnerIds: partnerIds,
     partnerFavoriteStateById,
+  };
+}
+
+export async function getHomePartnerState(input: {
+  partnerIds: string[];
+  currentUserId?: string | null;
+}): Promise<HomePartnerState> {
+  const partnerIds = normalizeHomePartnerStateIds(input.partnerIds);
+  const popularityPromise = loadHomePartnerPopularity(
+    partnerIds,
+    homePartnerPopularityDependencies,
+  );
+  const memberStatePromise = getHomePartnerMemberState({
+    partnerIds,
+    currentUserId: input.currentUserId,
+  });
+  const [partnerPopularityById, memberState] =
+    await Promise.all([popularityPromise, memberStatePromise]);
+
+  return {
+    ...memberState,
     partnerPopularityById,
   };
 }

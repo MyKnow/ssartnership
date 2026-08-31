@@ -39,13 +39,12 @@ export async function GET(request: Request) {
 
   const session = await getSignedUserSession().catch(() => null);
   const viewerContext = await getPartnerViewerContext(session?.userId);
-  const allowedPartners = await partnerRepository.getPartners({
-    authenticated: viewerContext.authenticated,
-    viewerAudience: viewerContext.viewerAudience,
-  });
-  const allowedIds = new Set(allowedPartners.map((partner) => partner.id));
-  const partnerIds = requestedIds.filter((partnerId) =>
-    allowedIds.has(partnerId),
+  const partnerIds = await partnerRepository.getHomeStateAuthorizedPartnerIds(
+    requestedIds,
+    {
+      authenticated: viewerContext.authenticated,
+      viewerAudience: viewerContext.viewerAudience,
+    },
   );
 
   const state = await getHomePartnerState({

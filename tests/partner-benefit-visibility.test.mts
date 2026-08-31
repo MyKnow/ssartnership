@@ -169,3 +169,15 @@ test("mock partner repository applies benefit masking at list boundary", async (
   const studentHealth = studentPartners.find((partner) => partner.id === "health-001");
   assert.equal(studentHealth?.reservationLink, "https://booking.naver.com/");
 });
+
+test("mock home-state authorization keeps requested directory entries, including locked placeholders", async () => {
+  const { MockPartnerRepository } = await mockPartnerRepositoryPromise;
+  const repository = new MockPartnerRepository();
+
+  const ids = await repository.getHomeStateAuthorizedPartnerIds(
+    ["restaurant-001", "cafe-001", "missing", "health-001"],
+    { authenticated: false },
+  );
+
+  assert.deepEqual(ids, ["restaurant-001", "cafe-001", "health-001"]);
+});

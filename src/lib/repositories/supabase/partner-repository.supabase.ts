@@ -20,7 +20,7 @@ import {
   maskPartnerBenefitsForAccess,
   normalizePartnerBenefitVisibility,
 } from "@/lib/partner-benefit-visibility";
-import { isUuid } from "@/lib/uuid";
+import { isUuid, normalizeUuidList } from "@/lib/uuid";
 import {
   hashPartnerPreviewToken,
   isMissingPartnerPreviewExpiryColumnError,
@@ -353,6 +353,32 @@ export class SupabasePartnerRepository implements PartnerRepository {
     const versionKey = await getPublicCacheVersionKey(["partners", "categories"]);
     const rows = await getCachedPartnerRows(versionKey);
     return rows.map((item) => mapPartnerForList(item, context));
+  }
+
+  async getHomeStateAuthorizedPartnerIds(
+    ids: string[],
+    context: PartnerViewContext = { authenticated: false },
+  ): Promise<string[]> {
+    void context;
+    const normalizedIds = normalizeUuidList(ids);
+    if (normalizedIds.length === 0) {
+      return [];
+    }
+
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("partners")
+      .select("id")
+      .in("id", normalizedIds);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const existingIds = new Set(
+      (data ?? []).map((row) => (row as { id: string }).id),
+    );
+    return normalizedIds.filter((id) => existingIds.has(id));
   }
 
   async getPartnerById(

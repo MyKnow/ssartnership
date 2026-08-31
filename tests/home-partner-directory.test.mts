@@ -118,6 +118,58 @@ test("buildHomePartnerDirectory keeps the shared home filters on the server path
   assert.equal(result.hasMore, false);
 });
 
+test("loadHomePartnerDirectory keeps global popularity ordering while preloading only the first 24 member states", async () => {
+  const { HOME_PARTNER_STATE_BATCH_LIMIT } = await import(
+    new URL("../src/lib/home-partner-state.ts", import.meta.url).href
+  );
+  const { loadHomePartnerDirectory } = await homePartnerDirectoryModulePromise;
+  const partners = Array.from({ length: HOME_PARTNER_STATE_BATCH_LIMIT + 6 }, (_, index) =>
+    createPartner({
+      id: `partner-${index + 1}`,
+      name: `제휴처 ${index + 1}`,
+      category: index === 28 ? "cafe" : "health",
+    }),
+  );
+  const popularityRequests: string[][] = [];
+  const memberStateRequests: string[][] = [];
+
+  const directory = await loadHomePartnerDirectory(
+    {
+      viewerAuthenticated: true,
+      currentUserId: "member-1",
+      query: { activeCategory: "health" },
+    },
+    {
+      getCategories: async () => [],
+      getPartners: async () => partners,
+      getPopularityByPartnerId: async (partnerIds) => {
+        popularityRequests.push(partnerIds);
+        return Object.fromEntries(
+          partnerIds.map((partnerId) => [partnerId, {
+            favoriteCount: partnerId === "partner-30" ? 100 : 0,
+            reviewCount: 0,
+            detailViews: 0,
+          }]),
+        );
+      },
+      getMemberState: async ({ partnerIds }) => {
+        memberStateRequests.push(partnerIds);
+        return { loadedPartnerIds: partnerIds, partnerFavoriteStateById: {} };
+      },
+    },
+  );
+
+  assert.deepEqual(popularityRequests, [partners.map((partner) => partner.id)]);
+  assert.equal(popularityRequests[0].includes("partner-29"), true);
+  assert.equal(directory.displayPartnerIds.includes("partner-29"), false);
+  assert.equal(directory.displayPartnerIds[0], "partner-30");
+  assert.equal(memberStateRequests[0].length, HOME_PARTNER_STATE_BATCH_LIMIT);
+  assert.deepEqual(memberStateRequests[0], directory.displayPartnerIds.slice(0, 24));
+  assert.equal(memberStateRequests[0][0], "partner-30");
+  assert.equal(memberStateRequests[0].includes("partner-24"), false);
+  assert.deepEqual(directory.partnerState.loadedPartnerIds, memberStateRequests[0]);
+});
+
 test("loadHomePartnerDirectoryState converts an unavailable repository into a recoverable state", async () => {
   const { loadHomePartnerDirectoryState } = await homePartnerDirectoryModulePromise;
   const errors: unknown[][] = [];
