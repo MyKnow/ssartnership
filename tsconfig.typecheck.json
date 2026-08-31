@@ -12,6 +12,7 @@
     "node_modules",
     ".next",
     ".next-e2e",
+    ".next-perf-review",
     "next-env.d.ts"
   ]
 }

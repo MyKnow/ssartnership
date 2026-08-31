@@ -50,6 +50,7 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
     "node_modules",
     ".next",
     ".next-e2e",
+    ".next-perf-review",
     "next-env.d.ts",
   ]);
 
@@ -108,8 +109,8 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
     new URL("./e2e/partner-detail-introduction.spec.ts", import.meta.url),
     "utf8",
   );
-  const readinessHelpers = await readFile(
-    new URL("./e2e/readiness.ts", import.meta.url),
+  const pageReadyHelpers = await readFile(
+    new URL("./e2e/page-ready.ts", import.meta.url),
     "utf8",
   );
   for (const criticalPath of [
@@ -165,6 +166,7 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
     "utf8",
   );
   assert.match(eslintConfig, /"\.next-e2e\/\*\*"/);
+  assert.match(eslintConfig, /"\.next-perf-review\/\*\*"/);
 
   const adminConsoleSpec = await readFile(
     new URL("./e2e/admin-console.spec.ts", import.meta.url),
@@ -285,24 +287,17 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
   ]) {
     assert.doesNotMatch(source, /waitForLoadState\("networkidle"\)/);
   }
-  assert.match(readinessHelpers, /waitUntil: "domcontentloaded"/);
-  assert.match(
-    readinessHelpers,
-    /getByRole\("navigation", \{ name: "파트너 등록 단계" \}\)/,
-  );
-  assert.match(
-    partnerImageCarousel,
-    /await waitForPartnerDetailGallery\(page\)/,
-  );
+  assert.match(pageReadyHelpers, /export async function waitForPageReady/);
+  assert.match(pageReadyHelpers, /document\.fonts\.ready/);
+  assert.match(pageReadyHelpers, /Execution context was destroyed/);
+  assert.match(pageReadyHelpers, /export async function waitForScrollStability/);
   const introductionTest = partnerDetailIntroduction.match(
     /test\("puts the period in the header and keeps introduction and tags plain",[\s\S]*?\n  \}\);/,
   )?.[0];
   assert.ok(introductionTest);
-  assert.equal(introductionTest.match(/page\.goto\(/g)?.length ?? 0, 0);
-  assert.match(
-    partnerDetailIntroduction,
-    /gotoPartnerDetail\(page, "\/partners\/health-001"\)/,
-  );
+  assert.match(partnerDetailIntroduction, /await page\.goto\("\/partners\/health-001"\)/);
+  assert.match(partnerImageCarousel, /await page\.goto\(partnerPath\)/);
+  assert.match(partnerRegistration, /await page\.goto\("\/partner-registration"\)/);
   assert.match(graduateVerification, /await expect\(applyCropButton\)\.toBeEnabled\(\)/);
 });
 

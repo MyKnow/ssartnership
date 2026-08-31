@@ -1,10 +1,5 @@
 import { expect, test } from "@playwright/test";
-import {
-  gotoAuthLogin,
-  gotoAuthSignup,
-  gotoPartnerDetail,
-  gotoPasswordReset,
-} from "./readiness";
+import { waitForPageReady } from "./page-ready";
 
 let hasWarmedAuthRoute = false;
 
@@ -35,9 +30,10 @@ test.describe("auth and partner portal operation flows", () => {
     const loginWarmup = await page.request.get("/auth/login");
     expect(loginWarmup.ok()).toBe(true);
 
-    await gotoPartnerDetail(
+    await page.goto("/partners/health-001?returnTo=%2F%3Fcategory%3Dhealth%23benefits");
+    await waitForPageReady(
       page,
-      "/partners/health-001?returnTo=%2F%3Fcategory%3Dhealth%23benefits",
+      page.getByRole("banner").getByRole("link", { name: "로그인", exact: true }),
     );
 
     await expect(
@@ -114,7 +110,11 @@ test.describe("auth and partner portal operation flows", () => {
   });
 
   test("@critical member login shows field-level validation before submitting", async ({ page }) => {
-    await gotoAuthLogin(page);
+    await page.goto("/auth/login");
+    await waitForPageReady(
+      page,
+      page.getByRole("textbox", { name: "아이디 또는 이메일" }),
+    );
 
     await expect(page.getByRole("textbox", { name: "아이디 또는 이메일" })).toHaveAttribute(
       "placeholder",
@@ -129,9 +129,10 @@ test.describe("auth and partner portal operation flows", () => {
   });
 
   test("signup switches its child panel before opening the graduate certificate application", async ({ page }) => {
-    await gotoAuthSignup(page);
+    await page.goto("/auth/signup");
 
     const memberTab = page.getByRole("tab", { name: "운영진·재학생", exact: true });
+    await waitForPageReady(page, memberTab);
     await expect(memberTab).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("textbox", { name: "Mattermost ID" })).toHaveAttribute(
       "placeholder",
@@ -228,7 +229,7 @@ test.describe("auth and partner portal operation flows", () => {
     const recoveryWarmup = await page.request.get("/auth/recover-email");
     expect(recoveryWarmup.ok()).toBe(true);
 
-    await gotoPasswordReset(page);
+    await page.goto("/auth/reset");
 
     const emailRecovery = page.getByRole("link", { name: /이메일 로그인 복구/ });
     await expect(emailRecovery).toHaveAttribute("href", "/auth/recover-email");
@@ -242,7 +243,8 @@ test.describe("auth and partner portal operation flows", () => {
       page.waitForURL(/\/auth\/recover-email$/),
       emailRecovery.click(),
     ]);
-    await expect(page.getByRole("heading", { name: "이메일 로그인 복구" })).toBeVisible();
+    const recoveryHeading = page.getByRole("heading", { name: "이메일 로그인 복구" });
+    await waitForPageReady(page, recoveryHeading);
     await expect(page.getByRole("textbox", { name: "기존 아이디 또는 이메일" })).toBeVisible();
     const passwordSubmit = page.getByRole("button", { name: "기존 비밀번호 확인" });
     await expect(passwordSubmit).toBeEnabled();
