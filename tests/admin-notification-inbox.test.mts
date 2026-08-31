@@ -66,7 +66,7 @@ test("admin notification inbox maps recipient rows into client records", async (
   });
 
   assert.equal(result.unreadCount, 3);
-  assert.equal(result.nextOffset, 12);
+  assert.equal(result.nextOffset, 13);
   assert.equal(result.hasMore, true);
   assert.equal(result.items.length, 2);
   assert.deepEqual(result.items[0], {
@@ -128,6 +128,30 @@ test("admin notification list result clamps pagination values", async () => {
     unreadCount: 0,
     items: [],
     nextOffset: 4,
+    hasMore: false,
+  });
+});
+
+test("admin notification paging advances even when a joined row is dropped", async () => {
+  const { buildAdminNotificationListResult } = await modulePromise;
+
+  const result = buildAdminNotificationListResult({
+    unreadCount: 0,
+    rows: [
+      {
+        id: "recipient-missing-notification",
+        notification: null,
+      },
+    ],
+    offset: 7,
+    limit: 10,
+    hasMore: false,
+  });
+
+  assert.deepEqual(result, {
+    unreadCount: 0,
+    items: [],
+    nextOffset: 8,
     hasMore: false,
   });
 });
@@ -202,6 +226,31 @@ test("관리자 알림 설정 API는 실패 원문을 숨기고 응답 시간을
   assert.doesNotMatch(
     source,
     /return NextResponse\.json\(\{\s*preferences:\s*await/,
+  );
+});
+
+test("알림 목록 조회는 동일 created_at 충돌에도 안정적인 2차 정렬을 사용한다", async () => {
+  const [adminReadModelSource, memberRepositorySource] = await Promise.all([
+    readFile(
+      new URL("../src/lib/admin-notifications.server.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/lib/repositories/supabase/notification-repository.supabase.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(
+    adminReadModelSource,
+    /\.order\("created_at", \{ ascending: false \}\)\s*\.order\("id", \{ ascending: false \}\)/,
+  );
+  assert.match(
+    memberRepositorySource,
+    /\.order\("created_at", \{ ascending: false \}\)\s*\.order\("id", \{ ascending: false \}\)/,
   );
 });
 

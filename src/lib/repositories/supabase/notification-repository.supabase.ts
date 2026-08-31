@@ -441,6 +441,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       .eq("member_id", context.memberId)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .range(offset, offset + limit);
 
     const [{ count, error: unreadError }, { data, error: listError }] =
