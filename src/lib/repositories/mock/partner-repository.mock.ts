@@ -7,6 +7,32 @@ import { getPartnerAudienceLabel } from "@/lib/partner-audience";
 import { canViewPartnerDetails } from "@/lib/partner-visibility";
 import { maskPartnerBenefitsForAccess } from "@/lib/partner-benefit-visibility";
 
+function buildDirectorySearchText(partner: Partner) {
+  return [
+    partner.name,
+    partner.location,
+    partner.reservationLink ?? "",
+    partner.inquiryLink ?? "",
+    partner.conditions.join(" "),
+    partner.benefits.join(" "),
+    partner.appliesTo.map((item) => getPartnerAudienceLabel(item)).join(" "),
+    (partner.tags ?? []).join(" "),
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function toLeanPublicDirectoryPartner(partner: Partner): Partner {
+  return {
+    ...partner,
+    conditions: [],
+    benefits: [],
+    benefitItems: [],
+    images: [],
+    directorySearchText: buildDirectorySearchText(partner),
+  };
+}
+
 const categories: Category[] = [
   {
     key: "health",
@@ -182,7 +208,7 @@ export class MockPartnerRepository implements PartnerRepository {
   ): Promise<Partner[]> {
     return partners.map((partner) => {
       if (canViewPartnerDetails(partner.visibility, context.authenticated)) {
-        return maskPartnerBenefitsForAccess({
+        const summaryPartner: Partner = {
           id: partner.id,
           name: partner.name,
           category: partner.category,
@@ -198,26 +224,16 @@ export class MockPartnerRepository implements PartnerRepository {
           reservationLink: partner.reservationLink,
           inquiryLink: partner.inquiryLink,
           period: partner.period,
-          conditions: [],
-          benefits: [],
-          benefitItems: [],
+          conditions: partner.conditions,
+          benefits: partner.benefits,
+          benefitItems: partner.benefitItems,
           appliesTo: partner.appliesTo,
           images: [],
           tags: partner.tags ?? [],
-          directorySearchText: [
-            partner.name,
-            partner.location,
-            partner.reservationLink ?? "",
-            partner.inquiryLink ?? "",
-            partner.conditions.join(" "),
-            partner.benefits.join(" "),
-            partner.appliesTo.map((item) => getPartnerAudienceLabel(item)).join(" "),
-            (partner.tags ?? []).join(" "),
-          ]
-            .join(" ")
-            .toLowerCase(),
           branchScopeType: partner.branchScopeType,
-        }, context);
+        };
+        const maskedPartner = maskPartnerBenefitsForAccess(summaryPartner, context);
+        return toLeanPublicDirectoryPartner(maskedPartner);
       }
       return {
         id: partner.id,

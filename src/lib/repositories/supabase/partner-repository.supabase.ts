@@ -305,7 +305,33 @@ function toLockedPartner(row: PartnerRow, categoryKey: string): Partner {
   };
 }
 
-function toVisiblePublicDirectoryPartner(row: PartnerRow, categoryKey: string): Partner {
+function buildDirectorySearchText(partner: Partner) {
+  return [
+    partner.name,
+    partner.location,
+    partner.reservationLink ?? "",
+    partner.inquiryLink ?? "",
+    partner.conditions.join(" "),
+    partner.benefits.join(" "),
+    partner.appliesTo.map((item) => getPartnerAudienceLabel(item)).join(" "),
+    (partner.tags ?? []).join(" "),
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function toLeanPublicDirectoryPartner(partner: Partner): Partner {
+  return {
+    ...partner,
+    conditions: [],
+    benefits: [],
+    benefitItems: [],
+    images: [],
+    directorySearchText: buildDirectorySearchText(partner),
+  };
+}
+
+function toVisiblePublicDirectorySummaryPartner(row: PartnerRow, categoryKey: string): Partner {
   const appliesTo = normalizePartnerAudience(row.applies_to);
   return {
     id: row.id,
@@ -329,24 +355,15 @@ function toVisiblePublicDirectoryPartner(row: PartnerRow, categoryKey: string): 
       start: normalizeDate(row.period_start),
       end: normalizeDate(row.period_end),
     },
-    conditions: [],
-    benefits: [],
-    benefitItems: [],
+    conditions: row.conditions ?? [],
+    benefits: row.benefits ?? [],
+    benefitItems: normalizePartnerBenefitItems((row.benefits ?? []).map((title, index) => ({
+      id: `legacy-public-directory-benefit-${row.id}-${index + 1}`,
+      title,
+    }))),
     appliesTo,
     images: [],
     tags: row.tags ?? [],
-    directorySearchText: [
-      row.name,
-      row.location,
-      row.reservation_link ?? "",
-      row.inquiry_link ?? "",
-      (row.conditions ?? []).join(" "),
-      (row.benefits ?? []).join(" "),
-      appliesTo.map((item) => getPartnerAudienceLabel(item)).join(" "),
-      (row.tags ?? []).join(" "),
-    ]
-      .join(" ")
-      .toLowerCase(),
     branchScopeType: row.branch_scope_type ?? "single_location",
   };
 }
@@ -370,10 +387,9 @@ function mapPartnerForPublicDirectory(
   const categoryKey = extractCategoryKey(row.categories) ?? "health";
   const visibility = normalizePartnerVisibility(row.visibility);
   if (canViewPartnerDetails(visibility, context.authenticated)) {
-    return maskPartnerBenefitsForAccess(
-      toVisiblePublicDirectoryPartner(row, categoryKey),
-      context,
-    );
+    const summaryPartner = toVisiblePublicDirectorySummaryPartner(row, categoryKey);
+    const maskedPartner = maskPartnerBenefitsForAccess(summaryPartner, context);
+    return toLeanPublicDirectoryPartner(maskedPartner);
   }
   return toLockedPartner(row, categoryKey);
 }

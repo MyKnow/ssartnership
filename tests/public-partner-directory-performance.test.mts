@@ -42,8 +42,14 @@ test("Supabase public directory projection omits heavy detail fields", () => {
   assert.match(publicProjection, /benefits/);
   assert.match(supabaseRepositorySource, /getCachedPublicDirectoryPartnerRows/);
   assert.match(supabaseRepositorySource, /async getPublicDirectoryPartners/);
-  assert.match(supabaseRepositorySource, /directorySearchText:[\s\S]*row\.conditions/);
-  assert.match(supabaseRepositorySource, /directorySearchText:[\s\S]*row\.benefits/);
+  assert.match(
+    supabaseRepositorySource,
+    /const summaryPartner = toVisiblePublicDirectorySummaryPartner\(row, categoryKey\);[\s\S]*const maskedPartner = maskPartnerBenefitsForAccess\(summaryPartner, context\);[\s\S]*return toLeanPublicDirectoryPartner\(maskedPartner\);/,
+  );
+  assert.match(
+    supabaseRepositorySource,
+    /function toLeanPublicDirectoryPartner\(partner: Partner\): Partner \{[\s\S]*conditions: \[],[\s\S]*benefits: \[],[\s\S]*benefitItems: \[],[\s\S]*directorySearchText: buildDirectorySearchText\(partner\)/,
+  );
 });
 
 test("public feeds and campus listings consume the lean public directory loader", () => {
