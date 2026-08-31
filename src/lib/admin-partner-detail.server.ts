@@ -219,7 +219,7 @@ export async function getAdminPartnerDetailOperationalReadModel({
     const supabase = getSupabaseAdminClient();
     const couponManagementDataPromise = canReadCoupons
       ? Promise.all([
-          adPackageRepository.listAdminCampaigns(),
+          adPackageRepository.listAdminCampaignsForPartner(partnerId),
           adPackageRepository.listAdminCouponsForPartner(partnerId),
         ])
       : Promise.resolve<[AdCampaignWithStats[], AdCoupon[]]>([[], []]);

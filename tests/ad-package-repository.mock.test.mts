@@ -37,6 +37,22 @@ async function createCodeCoupon(
 }
 
 describe("mock ad package repository", () => {
+  it("lists campaign metrics only for the requested partner", async () => {
+    const repository = new MockAdPackageRepository();
+
+    const campaigns = await repository.listAdminCampaignsForPartner(
+      "restaurant-001",
+    );
+
+    assert.deepEqual(
+      campaigns.map((campaign) => campaign.id),
+      ["campaign-restaurant-boost"],
+    );
+    assert.ok(
+      campaigns.every((campaign) => campaign.partnerId === "restaurant-001"),
+    );
+  });
+
   it("keeps blank member periodic limits unlimited without bypassing the total member limit", async () => {
     const repository = new MockAdPackageRepository();
     const now = Date.now();

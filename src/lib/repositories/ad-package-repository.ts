@@ -192,6 +192,7 @@ export type RedeemAdCouponResult =
 
 export interface AdPackageRepository {
   listAdminCampaigns(options?: { now?: Date }): Promise<AdCampaignWithStats[]>;
+  listAdminCampaignsForPartner(partnerId: string): Promise<AdCampaignWithStats[]>;
   listAdminCampaignOptions(): Promise<AdCampaignOption[]>;
   listAdminCouponsForPartner(partnerId: string): Promise<AdCoupon[]>;
   getAdminCouponById(couponId: string): Promise<AdCoupon | null>;

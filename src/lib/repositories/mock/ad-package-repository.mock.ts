@@ -269,6 +269,13 @@ export class MockAdPackageRepository implements AdPackageRepository {
     });
   }
 
+  async listAdminCampaignsForPartner(
+    partnerId: string,
+  ): Promise<AdCampaignWithStats[]> {
+    const campaigns = await this.listAdminCampaigns();
+    return campaigns.filter((campaign) => campaign.partnerId === partnerId);
+  }
+
   async listAdminCouponsForPartner(partnerId: string): Promise<AdCoupon[]> {
     return this.coupons
       .filter((coupon) => coupon.partnerId === partnerId)

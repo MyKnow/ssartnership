@@ -6,6 +6,7 @@ import {
   normalizeAdChannelsForTier,
   normalizeAdPackageTier,
   summarizeAdPackageMetrics,
+  type AdPackageMetrics,
   type AdPackageMetricEvent,
   type AdCouponIssuanceType,
 } from "@/lib/ad-packages";
@@ -158,6 +159,16 @@ type EventLogRow = {
   target_type: string | null;
   target_id: string | null;
   properties: unknown;
+};
+
+type AdCampaignMetricRow = {
+  campaign_id: string;
+  home_banner_clicks: number | string | null;
+  coupon_views: number | string | null;
+  coupon_copies: number | string | null;
+  coupon_intent_count: number | string | null;
+  coupon_redemptions: number | string | null;
+  ad_push_sends: number | string | null;
 };
 
 function extractPartnerName(join: PartnerJoin | undefined, fallback = "제휴처") {
@@ -340,6 +351,24 @@ function countByKey<T extends Record<string, unknown>>(rows: T[], key: keyof T) 
   return counts;
 }
 
+function normalizeAdMetricCount(value: number | string | null) {
+  const count = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(count) && count >= 0
+    ? Math.min(Math.floor(count), Number.MAX_SAFE_INTEGER)
+    : 0;
+}
+
+function mapAdCampaignMetricRow(row: AdCampaignMetricRow): AdPackageMetrics {
+  return {
+    homeBannerClicks: normalizeAdMetricCount(row.home_banner_clicks),
+    couponViews: normalizeAdMetricCount(row.coupon_views),
+    couponCopies: normalizeAdMetricCount(row.coupon_copies),
+    couponIntentCount: normalizeAdMetricCount(row.coupon_intent_count),
+    couponRedemptions: normalizeAdMetricCount(row.coupon_redemptions),
+    adPushSends: normalizeAdMetricCount(row.ad_push_sends),
+  };
+}
+
 function isMissingAdPackageSchemaMessage(message: string, tableName: string) {
   return (
     message.includes(tableName) &&
@@ -456,6 +485,102 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
           events,
           redemptionCount: campaignUseCounts.get(campaign.id) ?? 0,
         }),
+      };
+    });
+  }
+
+  async listAdminCampaignsForPartner(
+    partnerId: string,
+  ): Promise<AdCampaignWithStats[]> {
+    if (!partnerId) {
+      return [];
+    }
+
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("ad_campaigns")
+      .select(
+        "id,partner_id,package_tier,title,description,sponsor_label,status,starts_at,ends_at,channels,monthly_price_krw,notes,created_at,updated_at,partners(name)",
+      )
+      .eq("partner_id", partnerId)
+      .order("updated_at", { ascending: false });
+    if (error) {
+      if (isMissingAdPackageSchemaMessage(error.message, "ad_campaigns")) {
+        return [];
+      }
+      throw new Error(error.message);
+    }
+
+    const campaignRows = (data ?? []) as AdCampaignRow[];
+    const campaignIds = campaignRows.map((row) => row.id);
+    if (campaignIds.length === 0) {
+      return [];
+    }
+
+    const [couponResult, redemptionResult, metricsResult] = await Promise.all([
+      supabase
+        .from("ad_coupons")
+        .select(AD_COUPON_SELECT)
+        .eq("partner_id", partnerId)
+        .in("campaign_id", campaignIds)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("ad_coupon_redemptions")
+        .select("coupon_id,campaign_id")
+        .eq("partner_id", partnerId)
+        .in("campaign_id", campaignIds)
+        .eq("status", "redeemed"),
+      supabase.rpc("get_admin_partner_ad_campaign_metrics", {
+        input_partner_id: partnerId,
+      }),
+    ]);
+    if (couponResult.error) {
+      throw new Error(couponResult.error.message);
+    }
+    if (redemptionResult.error) {
+      throw new Error(redemptionResult.error.message);
+    }
+    if (metricsResult.error) {
+      throw new Error(metricsResult.error.message);
+    }
+
+    const redemptionRows = (redemptionResult.data ?? []) as Array<{
+      coupon_id: string | null;
+      campaign_id: string | null;
+    }>;
+    const couponUseCounts = countByKey(redemptionRows, "coupon_id");
+    const coupons = ((couponResult.data ?? []) as AdCouponRow[]).map((row) =>
+      mapCouponRow(row, couponUseCounts.get(row.id) ?? 0),
+    );
+    const couponsByCampaignId = new Map<string, AdCoupon[]>();
+    for (const coupon of coupons) {
+      if (!coupon.campaignId) {
+        continue;
+      }
+      const campaignCoupons = couponsByCampaignId.get(coupon.campaignId) ?? [];
+      campaignCoupons.push(coupon);
+      couponsByCampaignId.set(coupon.campaignId, campaignCoupons);
+    }
+    const metricsByCampaignId = new Map(
+      ((metricsResult.data ?? []) as AdCampaignMetricRow[]).map((row) => [
+        row.campaign_id,
+        mapAdCampaignMetricRow(row),
+      ]),
+    );
+
+    return campaignRows.map((row) => {
+      const campaign = mapCampaignRow(row);
+      return {
+        ...campaign,
+        coupons: couponsByCampaignId.get(campaign.id) ?? [],
+        metrics: metricsByCampaignId.get(campaign.id) ?? {
+          homeBannerClicks: 0,
+          couponViews: 0,
+          couponCopies: 0,
+          couponIntentCount: 0,
+          couponRedemptions: 0,
+          adPushSends: 0,
+        },
       };
     });
   }
