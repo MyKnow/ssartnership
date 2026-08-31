@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   buildScopedRateLimitKey,
   getBlockingState,
@@ -21,10 +22,24 @@ type ImageProxyRateLimitDependencies = {
 
 export type ImageProxyRateLimitResult =
   | { readonly ok: true }
-  | { readonly ok: false; readonly code: "blocked" | "unavailable" };
+  | {
+      readonly ok: false;
+      readonly code: "blocked";
+      readonly retryAfterSeconds: number;
+    }
+  | { readonly ok: false; readonly code: "unavailable" };
 
 function normalizeIdentifier(value: string) {
-  return value.trim().toLowerCase();
+  return createHash("sha256")
+    .update(`public-image-proxy:ip:${value.trim().toLowerCase()}`)
+    .digest("hex");
+}
+
+function getRetryAfterSeconds(blockedUntil: string, now: number) {
+  const blockedUntilMs = Date.parse(blockedUntil);
+  return Number.isFinite(blockedUntilMs)
+    ? Math.max(1, Math.ceil((blockedUntilMs - now) / 1_000))
+    : 60;
 }
 
 export function getImageProxyRateLimitKey(ipAddress: string) {
@@ -40,10 +55,7 @@ export async function consumeImageProxyRequestQuota(
   input: { ipAddress?: string | null },
   dependencies: ImageProxyRateLimitDependencies = {},
 ): Promise<ImageProxyRateLimitResult> {
-  const ipAddress = input.ipAddress?.trim();
-  if (!ipAddress) {
-    return { ok: true };
-  }
+  const ipAddress = input.ipAddress?.trim() || "unknown";
 
   const readBlockingState = dependencies.getBlockingState ?? getBlockingState;
   const persistAttempt = dependencies.recordAttemptBatch ?? recordAttemptBatch;
@@ -55,7 +67,14 @@ export async function consumeImageProxyRequestQuota(
       return { ok: false, code: "unavailable" };
     }
     if (existingBlock.blocked) {
-      return { ok: false, code: "blocked" };
+      return {
+        ok: false,
+        code: "blocked",
+        retryAfterSeconds: getRetryAfterSeconds(
+          existingBlock.blockedUntil,
+          Date.now(),
+        ),
+      };
     }
 
     const recorded = await persistAttempt(
@@ -73,7 +92,14 @@ export async function consumeImageProxyRequestQuota(
     }
 
     return newlyBlocked.blocked
-      ? { ok: false, code: "blocked" }
+      ? {
+          ok: false,
+          code: "blocked",
+          retryAfterSeconds: getRetryAfterSeconds(
+            newlyBlocked.blockedUntil,
+            Date.now(),
+          ),
+        }
       : { ok: true };
   } catch {
     return { ok: false, code: "unavailable" };

@@ -5,17 +5,22 @@ const imageProxyRateLimitModulePromise = import(
   new URL("../src/lib/image-proxy-rate-limit.ts", import.meta.url).href
 );
 
-test("image proxy quota skips rate limiting when no trusted IP is available", async () => {
-  const { consumeImageProxyRequestQuota } = await imageProxyRateLimitModulePromise;
+test("image proxy quota uses a durable shared bucket when no trusted IP is available", async () => {
+  const { consumeImageProxyRequestQuota, getImageProxyRateLimitKey } =
+    await imageProxyRateLimitModulePromise;
+  const key = getImageProxyRateLimitKey("unknown");
 
   const result = await consumeImageProxyRequestQuota(
     { ipAddress: null },
     {
-      getBlockingState: async () => {
-        throw new Error("should not read blocking state");
+      getBlockingState: async (keys: string[]) => {
+        assert.deepEqual(keys, [key]);
+        return { ok: true, blocked: false } as const;
       },
-      recordAttemptBatch: async () => {
-        throw new Error("should not record attempts");
+      recordAttemptBatch: async (keys: string[], success: boolean) => {
+        assert.deepEqual(keys, [key]);
+        assert.equal(success, false);
+        return { ok: true, attemptedCount: 1, failedCount: 0 } as const;
       },
     },
   );
@@ -23,7 +28,7 @@ test("image proxy quota skips rate limiting when no trusted IP is available", as
   assert.deepEqual(result, { ok: true });
 });
 
-test("image proxy quota returns blocked when the key is already blocked", async () => {
+test("image proxy quota returns blocked with a retry hint when the key is already blocked", async () => {
   const { consumeImageProxyRequestQuota, getImageProxyRateLimitKey } =
     await imageProxyRateLimitModulePromise;
 
@@ -38,7 +43,7 @@ test("image proxy quota returns blocked when the key is already blocked", async 
           ok: true,
           blocked: true,
           identifier: key,
-          blockedUntil: "2026-08-31T01:00:00.000Z",
+          blockedUntil: new Date(Date.now() + 60_000).toISOString(),
         } as const;
       },
       recordAttemptBatch: async () => {
@@ -48,7 +53,12 @@ test("image proxy quota returns blocked when the key is already blocked", async 
     },
   );
 
-  assert.deepEqual(result, { ok: false, code: "blocked" });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "blocked");
+  if (result.code === "blocked") {
+    assert.ok(result.retryAfterSeconds >= 59);
+    assert.ok(result.retryAfterSeconds <= 60);
+  }
   assert.equal(recordCalled, false);
 });
 
@@ -71,7 +81,7 @@ test("image proxy quota records a request and rechecks the block state", async (
           ok: true,
           blocked: true,
           identifier: key,
-          blockedUntil: "2026-08-31T01:00:00.000Z",
+          blockedUntil: new Date(Date.now() + 60_000).toISOString(),
         } as const;
       },
       recordAttemptBatch: async (keys: string[], success: boolean) => {
@@ -83,7 +93,20 @@ test("image proxy quota records a request and rechecks the block state", async (
   );
 
   assert.equal(calls, 2);
-  assert.deepEqual(result, { ok: false, code: "blocked" });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "blocked");
+  if (result.code === "blocked") {
+    assert.ok(result.retryAfterSeconds >= 59);
+    assert.ok(result.retryAfterSeconds <= 60);
+  }
+});
+
+test("image proxy quota stores a hashed caller key", async () => {
+  const { getImageProxyRateLimitKey } = await imageProxyRateLimitModulePromise;
+
+  const key = getImageProxyRateLimitKey("203.0.113.12");
+  assert.match(key, /^public-image-proxy:ip:[0-9a-f]{64}$/u);
+  assert.doesNotMatch(key, /203\.0\.113\.12/u);
 });
 
 test("image proxy quota reports unavailable when persistence fails", async () => {

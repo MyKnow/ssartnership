@@ -19,7 +19,13 @@ export async function GET(request: NextRequest) {
     ipAddress: context.ipAddress,
   });
   if (!quota.ok && quota.code === "blocked") {
-    return NextResponse.json({ error: "Too many image requests" }, { status: 429 });
+    return NextResponse.json(
+      { error: "Too many image requests" },
+      {
+        status: 429,
+        headers: { "Retry-After": String(quota.retryAfterSeconds) },
+      },
+    );
   }
   if (!quota.ok) {
     return NextResponse.json(
