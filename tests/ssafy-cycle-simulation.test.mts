@@ -5,7 +5,7 @@ const yearModulePromise = import(
   new URL("../src/lib/ssafy-year.ts", import.meta.url).href
 );
 const cycleModulePromise = import(
-  new URL("../src/lib/ssafy-cycle-settings.ts", import.meta.url).href
+  new URL("../src/lib/ssafy-cycle-settings-core.ts", import.meta.url).href
 );
 
 const simulationDate = new Date("2027-07-09T00:00:00+09:00");
