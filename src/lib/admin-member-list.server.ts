@@ -15,7 +15,6 @@ import {
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { unstable_cache } from "next/cache";
 
-export const ADMIN_MEMBER_OPTION_SAMPLE_LIMIT = 5_000;
 export const ADMIN_MEMBER_TREND_SAMPLE_LIMIT = 5_000;
 export const ADMIN_MEMBER_READ_MODEL_TIMEOUT_MS = 5_000;
 export const ADMIN_MEMBER_OPTIONAL_READ_MODEL_TIMEOUT_MS = 750;
@@ -77,9 +76,9 @@ type AdminMemberListPageIndexRow = {
   trend_created_ats: Array<string | null> | null;
 };
 
-type AdminMemberOptionDatabaseRow = {
-  generation: number | null;
-  campus: string | null;
+type AdminMemberOptionRow = {
+  generations: Array<number | null> | null;
+  campuses: Array<string | null> | null;
 };
 
 type AdminMemberPolicyDatabaseRow = {
@@ -152,15 +151,14 @@ const getCachedAdminMemberPolicyContext = unstable_cache(
 
 const getCachedAdminMemberOptions = unstable_cache(
   async () => {
-    const { data, error } = await getSupabaseAdminClient()
-      .from("members")
-      .select("generation,campus")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT);
+    const { data, error } = await getSupabaseAdminClient().rpc(
+      "get_admin_member_filter_options",
+    );
+
+    const row = ((data ?? []) as AdminMemberOptionRow[])[0] ?? null;
 
     return {
-      data: (data ?? []) as AdminMemberOptionDatabaseRow[],
+      data: row,
       hasError: Boolean(error),
     };
   },
@@ -541,7 +539,7 @@ async function getAdminMemberListReadModelUnbounded({
         withAdminReadModelTimeout(
           getCachedAdminMemberOptions(),
           {
-            data: [] as AdminMemberOptionDatabaseRow[],
+            data: null as AdminMemberOptionRow | null,
             hasError: true,
           },
           ADMIN_MEMBER_OPTIONAL_READ_MODEL_TIMEOUT_MS,
@@ -703,19 +701,18 @@ async function getAdminMemberListReadModelUnbounded({
     });
     const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
     const latestUpdatedAt = getLatestMemberUpdatedAt(safeMembers);
-    const optionRows = optionsResult.data;
     const options = {
       campuses: Array.from(
         new Set(
-          optionRows
-            .map((row) => (typeof row.campus === "string" ? row.campus.trim() : ""))
+          (optionsResult.data?.campuses ?? [])
+            .map((campus) => (typeof campus === "string" ? campus.trim() : ""))
             .filter(Boolean),
         ),
       ).sort((a, b) => a.localeCompare(b, "ko")),
       years: Array.from(
         new Set(
-          optionRows
-            .map((row) => row.generation)
+          (optionsResult.data?.generations ?? [])
+            .map((generation) => generation)
             .filter((generation): generation is number => typeof generation === "number"),
         ),
       ).sort((a, b) => b - a),

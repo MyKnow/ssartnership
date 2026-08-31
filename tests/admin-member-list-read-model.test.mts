@@ -125,10 +125,13 @@ test("회원 목록 read-model은 오류를 안전한 상태로 돌려준다", a
   assert.match(source, /unstable_cache/);
   assert.match(source, /ADMIN_MEMBER_OPTIONS_CACHE_REVALIDATE_SECONDS = 60/);
   assert.match(source, /getCachedAdminMemberOptions\(\)/);
+  assert.match(source, /rpc\(\s*"get_admin_member_filter_options"/);
   assert.match(source, /ADMIN_MEMBER_POLICY_CACHE_REVALIDATE_SECONDS = 3/);
   assert.match(source, /getCachedAdminMemberPolicyContext\(\)/);
   assert.match(source, /select\("id,kind,version"\)/);
   assert.doesNotMatch(source, /select\(POLICY_SELECT\)/);
+  assert.doesNotMatch(source, /select\("generation,campus"\)/);
+  assert.doesNotMatch(source, /limit\(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT\)/);
   assert.doesNotMatch(source, /getMemberProfilePhotoStates\(memberIds\)/);
   assert.match(source, /input_search_pattern:/);
   assert.match(source, /getAdminSearchLikePattern\(filters\.searchValue\)/);
@@ -140,6 +143,27 @@ test("회원 목록 read-model은 오류를 안전한 상태로 돌려준다", a
   assert.doesNotMatch(source, /getSsafyCycleSettings/);
   assert.doesNotMatch(source, /cycleSettings/);
   assert.doesNotMatch(source, /Error\.message/);
+});
+
+test("회원 필터 옵션은 전체 활성 회원 기준 distinct RPC를 사용한다", async () => {
+  const [source, migrationSource] = await Promise.all([
+    readFile(memberReadModelPath, "utf8"),
+    readFile(
+      new URL(
+        "../supabase/migrations/20260831120053_add_admin_member_filter_options.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(source, /optionsResult\.data\?\.campuses/);
+  assert.match(source, /optionsResult\.data\?\.generations/);
+  assert.match(migrationSource, /create or replace function public\.get_admin_member_filter_options\(\)/);
+  assert.match(migrationSource, /select distinct members\.generation/);
+  assert.match(migrationSource, /select distinct btrim\(members\.campus\)/);
+  assert.match(migrationSource, /where members\.deleted_at is null/);
+  assert.match(migrationSource, /grant execute on function public\.get_admin_member_filter_options\(\) to service_role;/);
 });
 
 test("기수 전체 MM 중단은 실제 변경 대상 수를 별도로 계산해 UI에 전달한다", async () => {
