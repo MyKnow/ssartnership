@@ -10,6 +10,10 @@ const supabaseRepositorySource = readFileSync(
   new URL("../src/lib/repositories/supabase/partner-repository.supabase.ts", import.meta.url),
   "utf8",
 );
+const publicDirectorySource = readFileSync(
+  new URL("../src/lib/public-partner-directory.ts", import.meta.url),
+  "utf8",
+);
 const sitemapSource = readFileSync(
   new URL("../src/app/sitemap.ts", import.meta.url),
   "utf8",
@@ -48,7 +52,11 @@ test("Supabase public directory projection omits heavy detail fields", () => {
   );
   assert.match(
     supabaseRepositorySource,
-    /function toLeanPublicDirectoryPartner\(partner: Partner\): Partner \{[\s\S]*conditions: \[],[\s\S]*benefits: \[],[\s\S]*benefitItems: \[],[\s\S]*directorySearchText: buildDirectorySearchText\(partner\)/,
+    /import \{ toLeanPublicDirectoryPartner \} from "@\/lib\/public-partner-directory"/,
+  );
+  assert.match(
+    publicDirectorySource,
+    /function toLeanPublicDirectoryPartner\(partner: Partner\): Partner \{[\s\S]*conditions: \[],[\s\S]*benefits: \[],[\s\S]*benefitItems: \[],[\s\S]*directorySearchText: buildPartnerDirectorySearchText\(partner\)/,
   );
 });
 

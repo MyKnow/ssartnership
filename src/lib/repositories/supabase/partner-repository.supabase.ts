@@ -1,12 +1,10 @@
 import type { Category, Partner } from "@/lib/types";
 import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
 import { cache } from "react";
-import {
-  getPartnerAudienceLabel,
-  normalizePartnerAudience,
-} from "@/lib/partner-audience";
+import { normalizePartnerAudience } from "@/lib/partner-audience";
 import { normalizeCampusSlugs } from "@/lib/campuses";
 import { normalizePartnerBenefitActionType } from "@/lib/partner-benefit-action";
+import { toLeanPublicDirectoryPartner } from "@/lib/public-partner-directory";
 import type {
   PartnerRepository,
   PartnerViewContext,
@@ -302,32 +300,6 @@ function toLockedPartner(row: PartnerRow, categoryKey: string): Partner {
     thumbnail: null,
     images: [],
     tags: [],
-  };
-}
-
-function buildDirectorySearchText(partner: Partner) {
-  return [
-    partner.name,
-    partner.location,
-    partner.reservationLink ?? "",
-    partner.inquiryLink ?? "",
-    partner.conditions.join(" "),
-    partner.benefits.join(" "),
-    partner.appliesTo.map((item) => getPartnerAudienceLabel(item)).join(" "),
-    (partner.tags ?? []).join(" "),
-  ]
-    .join(" ")
-    .toLowerCase();
-}
-
-function toLeanPublicDirectoryPartner(partner: Partner): Partner {
-  return {
-    ...partner,
-    conditions: [],
-    benefits: [],
-    benefitItems: [],
-    images: [],
-    directorySearchText: buildDirectorySearchText(partner),
   };
 }
 
