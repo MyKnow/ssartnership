@@ -169,7 +169,7 @@ test("admin navigation separates personal inbox from notification operations", a
 });
 
 test("admin notification API never returns storage errors to the browser", async () => {
-  const [listSource, itemSource] = await Promise.all([
+  const [listSource, itemSource, storeSource] = await Promise.all([
     readFile(
       new URL("../src/app/api/admin/notifications/route.ts", import.meta.url),
       "utf8",
@@ -179,6 +179,10 @@ test("admin notification API never returns storage errors to the browser", async
         "../src/app/api/admin/notifications/[id]/route.ts",
         import.meta.url,
       ),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/lib/admin-notification-store.ts", import.meta.url),
       "utf8",
     ),
   ]);
@@ -191,18 +195,29 @@ test("admin notification API never returns storage errors to the browser", async
     "알림을 불러오지 못했습니다.",
   );
   assert.match(listSource, /알림을 불러오지 못했습니다\./);
-  assert.match(listSource, /getSafeAdminMessage/);
+  assert.match(listSource, /getSafeNotificationRouteError/);
   assert.match(listSource, /includeSummary/);
   assert.match(listSource, /includeUnreadCount: includeSummary/);
   assert.match(listSource, /includeSummary[\s\S]*\? \{ summary:/);
   assert.match(listSource, /getCachedAdminNotificationInboxReadModel/);
   assert.match(listSource, /invalidateAdminNotificationReadCache/);
-  assert.match(itemSource, /getSafeAdminMessage/);
+  assert.match(itemSource, /getSafeNotificationRouteError/);
+  assert.match(listSource, /markAdminStoredNotificationsRead/);
+  assert.match(listSource, /deleteAdminStoredNotifications/);
+  assert.match(itemSource, /markAdminStoredNotificationsRead/);
+  assert.match(itemSource, /deleteAdminStoredNotifications/);
+  assert.match(storeSource, /createNotificationStorageError/);
+  assert.match(storeSource, /admin_notification_recipients/);
+  assert.doesNotMatch(listSource, /getSupabaseAdminClient/);
+  assert.doesNotMatch(itemSource, /getSupabaseAdminClient/);
   assert.doesNotMatch(listSource, /message:\s*unreadResult\.error\.message/);
   assert.doesNotMatch(listSource, /message:\s*inboxResult\.error\.message/);
   assert.doesNotMatch(listSource, /error instanceof Error \? error\.message/);
   assert.doesNotMatch(itemSource, /error instanceof Error \? error\.message/);
   assert.doesNotMatch(itemSource, /throw new Error\(error\.message\)/);
+  assert.doesNotMatch(listSource, /\{ status: 400 \}/);
+  assert.match(listSource, /status: safeError\.status/);
+  assert.match(itemSource, /status: safeError\.status/);
   assert.match(itemSource, /withServerTiming/);
   assert.match(itemSource, /timing\.measure\("auth"/);
   assert.match(itemSource, /timing\.measure\("query"/);

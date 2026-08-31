@@ -4,11 +4,17 @@ import {
   getCachedAdminNotificationInboxReadModel,
   invalidateAdminNotificationReadCache,
 } from "@/lib/admin-notifications.server";
+import {
+  deleteAdminStoredNotifications,
+  markAdminStoredNotificationsRead,
+} from "@/lib/admin-notification-store";
 import { conditionalJsonResponse } from "@/lib/conditional-json-response";
 import { getAdminPersonalNotificationApiSession } from "@/lib/admin-access";
-import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
+import {
+  getSafeNotificationRouteError,
+  shouldLogNotificationRouteError,
+} from "@/lib/notifications/safe-error";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { withServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
@@ -32,22 +38,6 @@ async function requireAdminNotificationSession(request: NextRequest) {
   }
 
   return { adminId: auth.session.adminId };
-}
-
-async function getUnreadCount(adminId: string) {
-  const supabase = getSupabaseAdminClient();
-  const { count, error } = await supabase
-    .from("admin_notification_recipients")
-    .select("id", { count: "exact", head: true })
-    .eq("admin_id", adminId)
-    .is("deleted_at", null)
-    .is("read_at", null);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return count ?? 0;
 }
 
 export async function GET(request: NextRequest) {
@@ -108,23 +98,26 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
-    const now = new Date().toISOString();
-    const supabase = getSupabaseAdminClient();
-    const { error } = await supabase
-      .from("admin_notification_recipients")
-      .update({ read_at: now, updated_at: now })
-      .eq("admin_id", auth.adminId)
-      .is("deleted_at", null)
-      .is("read_at", null);
-    if (error) {
-      throw new Error(error.message);
-    }
+    const result = await markAdminStoredNotificationsRead({
+      adminId: auth.adminId,
+    });
     invalidateAdminNotificationReadCache(auth.adminId);
-    const unreadCount = await getUnreadCount(auth.adminId);
-    return NextResponse.json({ ok: true, summary: { unreadCount } });
+    return NextResponse.json({
+      ok: true,
+      summary: { unreadCount: result.unreadCount },
+    });
   } catch (error) {
-    const message = getSafeAdminMessage(error, "알림을 처리하지 못했습니다.");
-    return NextResponse.json({ message }, { status: 400 });
+    if (shouldLogNotificationRouteError(error)) {
+      console.error("[admin-notifications] mark read failed", error);
+    }
+    const safeError = getSafeNotificationRouteError(
+      error,
+      "알림을 처리하지 못했습니다.",
+    );
+    return NextResponse.json(
+      { message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }
 
@@ -135,21 +128,25 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    const now = new Date().toISOString();
-    const supabase = getSupabaseAdminClient();
-    const { error } = await supabase
-      .from("admin_notification_recipients")
-      .update({ deleted_at: now, updated_at: now })
-      .eq("admin_id", auth.adminId)
-      .is("deleted_at", null);
-    if (error) {
-      throw new Error(error.message);
-    }
+    const result = await deleteAdminStoredNotifications({
+      adminId: auth.adminId,
+    });
     invalidateAdminNotificationReadCache(auth.adminId);
-    const unreadCount = await getUnreadCount(auth.adminId);
-    return NextResponse.json({ ok: true, summary: { unreadCount } });
+    return NextResponse.json({
+      ok: true,
+      summary: { unreadCount: result.unreadCount },
+    });
   } catch (error) {
-    const message = getSafeAdminMessage(error, "알림을 삭제하지 못했습니다.");
-    return NextResponse.json({ message }, { status: 400 });
+    if (shouldLogNotificationRouteError(error)) {
+      console.error("[admin-notifications] delete failed", error);
+    }
+    const safeError = getSafeNotificationRouteError(
+      error,
+      "알림을 삭제하지 못했습니다.",
+    );
+    return NextResponse.json(
+      { message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }
