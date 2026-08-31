@@ -184,6 +184,23 @@ test("mock home-state authorization keeps requested directory entries, including
   assert.deepEqual(ids, ["restaurant-001", "cafe-001", "health-001"]);
 });
 
+test("mock partner repository scopes full and public directory reads by campus", async () => {
+  const { MockPartnerRepository } = await mockPartnerRepositoryPromise;
+  const repository = new MockPartnerRepository();
+
+  const [seoulPartners, daejeonPartners, publicSeoulPartners] = await Promise.all([
+    repository.getPartnersForCampus("seoul", { authenticated: true }),
+    repository.getPartnersForCampus("daejeon", { authenticated: true }),
+    repository.getPublicDirectoryPartnersForCampus("seoul", {
+      authenticated: false,
+    }),
+  ]);
+
+  assert.ok(seoulPartners.length > 0);
+  assert.deepEqual(daejeonPartners, []);
+  assert.equal(publicSeoulPartners.length, seoulPartners.length);
+});
+
 test("mock public directory keeps public benefit search text without serializing rich arrays", async () => {
   const { MockPartnerRepository } = await mockPartnerRepositoryPromise;
   const repository = new MockPartnerRepository();

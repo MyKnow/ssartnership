@@ -8,6 +8,7 @@ import type {
 import { toLeanPublicDirectoryPartner } from "@/lib/public-partner-directory";
 import { canViewPartnerDetails } from "@/lib/partner-visibility";
 import { maskPartnerBenefitsForAccess } from "@/lib/partner-benefit-visibility";
+import { getCampusPartners, type CampusSlug } from "@/lib/campuses";
 
 const categories: Category[] = [
   {
@@ -257,6 +258,14 @@ export class MockPartnerRepository implements PartnerRepository {
     });
   }
 
+  async getPublicDirectoryPartnersForCampus(
+    campusSlug: CampusSlug,
+    context: PartnerViewContext = { authenticated: false },
+  ): Promise<Partner[]> {
+    const directoryPartners = await this.getPublicDirectoryPartners(context);
+    return getCampusPartners(directoryPartners, campusSlug);
+  }
+
   async getPartners(
     context: PartnerViewContext = { authenticated: false },
   ): Promise<Partner[]> {
@@ -282,6 +291,14 @@ export class MockPartnerRepository implements PartnerRepository {
         tags: [],
       };
     });
+  }
+
+  async getPartnersForCampus(
+    campusSlug: CampusSlug,
+    context: PartnerViewContext = { authenticated: false },
+  ): Promise<Partner[]> {
+    const directoryPartners = await this.getPartners(context);
+    return getCampusPartners(directoryPartners, campusSlug);
   }
 
   async getHomeStateAuthorizedPartnerIds(ids: string[]): Promise<string[]> {

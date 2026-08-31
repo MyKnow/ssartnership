@@ -104,7 +104,7 @@ test("mock SEO projection mirrors public visibility and repository limits", () =
   assert.match(mockRepositorySource, /entries\.slice\(0, limit\)/);
 });
 
-test("sitemap and RSS consume the SEO projection while campus keeps the home directory projection", () => {
+test("sitemap and RSS consume the SEO projection while campus uses a database-scoped directory projection", () => {
   for (const source of [sitemapSource, rssSource]) {
     assert.match(source, /getPublicPartnerSeoEntries/);
     assert.doesNotMatch(source, /getPublicDirectoryPartners/);
@@ -115,7 +115,17 @@ test("sitemap and RSS consume the SEO projection while campus keeps the home dir
     /getPublicPartnerSeoEntries\(\{\s*limit: 20,\s*\}\)/,
   );
   assert.doesNotMatch(rssSource, /\.slice\(0, 20\)/);
-  assert.match(campusSource, /getPublicDirectoryPartners/);
+  assert.match(campusSource, /getPublicDirectoryPartnersForCampus/);
+  assert.match(campusSource, /getPartnersForCampus/);
+  assert.doesNotMatch(campusSource, /getCampusPartners\(partners/);
+  assert.match(
+    supabaseRepositorySource,
+    /getCachedPublicDirectoryPartnerRowsForCampus[\s\S]*\.contains\("campus_slugs", \[campusSlug\]\)/,
+  );
+  assert.match(
+    supabaseRepositorySource,
+    /getCachedPartnerRowsForCampus[\s\S]*\.contains\("campus_slugs", \[campusSlug\]\)/,
+  );
 });
 
 test("dynamic sitemap and RSS cache/failure contracts remain intact", () => {

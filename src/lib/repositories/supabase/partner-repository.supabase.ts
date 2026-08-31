@@ -2,7 +2,7 @@ import type { Category, Partner } from "@/lib/types";
 import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
 import { cache } from "react";
 import { normalizePartnerAudience } from "@/lib/partner-audience";
-import { normalizeCampusSlugs } from "@/lib/campuses";
+import { normalizeCampusSlugs, type CampusSlug } from "@/lib/campuses";
 import { normalizePartnerBenefitActionType } from "@/lib/partner-benefit-action";
 import { toLeanPublicDirectoryPartner } from "@/lib/public-partner-directory";
 import type {
@@ -237,6 +237,52 @@ const getCachedPublicDirectoryPartnerRows = unstable_cache(
     return (data ?? []) as PartnerRow[];
   },
   ["partner-repository", "partners", "public-directory", "versioned"],
+  {
+    revalidate: false,
+    tags: ["partners"],
+  },
+);
+
+const getCachedPartnerRowsForCampus = unstable_cache(
+  async (versionKey: string, campusSlug: CampusSlug): Promise<PartnerRow[]> => {
+    void versionKey;
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("partners")
+      .select(PARTNER_SELECT_COLUMNS)
+      .contains("campus_slugs", [campusSlug])
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return (data ?? []) as PartnerRow[];
+  },
+  ["partner-repository", "partners", "campus", "versioned"],
+  {
+    revalidate: false,
+    tags: ["partners"],
+  },
+);
+
+const getCachedPublicDirectoryPartnerRowsForCampus = unstable_cache(
+  async (versionKey: string, campusSlug: CampusSlug): Promise<PartnerRow[]> => {
+    void versionKey;
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("partners")
+      .select(PUBLIC_DIRECTORY_SELECT_COLUMNS)
+      .contains("campus_slugs", [campusSlug])
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return (data ?? []) as PartnerRow[];
+  },
+  ["partner-repository", "partners", "public-directory", "campus", "versioned"],
   {
     revalidate: false,
     tags: ["partners"],
@@ -522,11 +568,32 @@ export class SupabasePartnerRepository implements PartnerRepository {
     return rows.map((item) => mapPartnerForList(item, context));
   }
 
+  async getPartnersForCampus(
+    campusSlug: CampusSlug,
+    context: PartnerViewContext = { authenticated: false },
+  ): Promise<Partner[]> {
+    const versionKey = await getPublicCacheVersionKey(["partners", "categories"]);
+    const rows = await getCachedPartnerRowsForCampus(versionKey, campusSlug);
+    return rows.map((item) => mapPartnerForList(item, context));
+  }
+
   async getPublicDirectoryPartners(
     context: PartnerViewContext = { authenticated: false },
   ): Promise<Partner[]> {
     const versionKey = await getPublicCacheVersionKey(["partners", "categories"]);
     const rows = await getCachedPublicDirectoryPartnerRows(versionKey);
+    return rows.map((item) => mapPartnerForPublicDirectory(item, context));
+  }
+
+  async getPublicDirectoryPartnersForCampus(
+    campusSlug: CampusSlug,
+    context: PartnerViewContext = { authenticated: false },
+  ): Promise<Partner[]> {
+    const versionKey = await getPublicCacheVersionKey(["partners", "categories"]);
+    const rows = await getCachedPublicDirectoryPartnerRowsForCampus(
+      versionKey,
+      campusSlug,
+    );
     return rows.map((item) => mapPartnerForPublicDirectory(item, context));
   }
 

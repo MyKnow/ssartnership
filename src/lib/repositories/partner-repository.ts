@@ -1,5 +1,6 @@
 import type { Category, Partner } from "@/lib/types";
 import type { PartnerAudienceKey } from "@/lib/partner-audience";
+import type { CampusSlug } from "@/lib/campuses";
 
 export type PartnerViewContext = {
   authenticated: boolean;
@@ -25,7 +26,15 @@ export type PublicPartnerSeoOptions = {
 export interface PartnerRepository {
   getCategories(): Promise<Category[]>;
   getPartners(context?: PartnerViewContext): Promise<Partner[]>;
+  getPartnersForCampus(
+    campusSlug: CampusSlug,
+    context?: PartnerViewContext,
+  ): Promise<Partner[]>;
   getPublicDirectoryPartners(context?: PartnerViewContext): Promise<Partner[]>;
+  getPublicDirectoryPartnersForCampus(
+    campusSlug: CampusSlug,
+    context?: PartnerViewContext,
+  ): Promise<Partner[]>;
   /** Returns only currently active public partner fields used by sitemap and RSS. */
   getPublicPartnerSeoEntries(
     options?: PublicPartnerSeoOptions,

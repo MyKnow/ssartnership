@@ -6,7 +6,6 @@ import SiteHeader from "@/components/SiteHeader";
 import {
   CAMPUS_DIRECTORY,
   getCampusBySlug,
-  getCampusPartners,
   type CampusSlug,
 } from "@/lib/campuses";
 import { partnerRepository } from "@/lib/repositories";
@@ -25,11 +24,20 @@ import { createCanonicalAlternates } from "@/lib/seo";
 
 const getCampusCategoriesCached = cache(() => partnerRepository.getCategories());
 const getCampusPartnersCached = cache(
-  (authenticated: boolean, viewerAudience?: PartnerAudienceKey | null) =>
-    partnerRepository.getPartners({ authenticated, viewerAudience }),
+  (
+    campusSlug: CampusSlug,
+    authenticated: boolean,
+    viewerAudience?: PartnerAudienceKey | null,
+  ) =>
+    partnerRepository.getPartnersForCampus(campusSlug, {
+      authenticated,
+      viewerAudience,
+    }),
 );
-const getCampusPublicDirectoryPartnersCached = cache(() =>
-  partnerRepository.getPublicDirectoryPartners({ authenticated: false }),
+const getCampusPublicDirectoryPartnersCached = cache((campusSlug: CampusSlug) =>
+  partnerRepository.getPublicDirectoryPartnersForCampus(campusSlug, {
+    authenticated: false,
+  }),
 );
 
 export const dynamic = "force-dynamic";
@@ -57,10 +65,10 @@ export async function generateMetadata({
 
   const [categories, partners] = await Promise.all([
     getCampusCategoriesCached(),
-    getCampusPublicDirectoryPartnersCached(),
+    getCampusPublicDirectoryPartnersCached(campus.slug),
   ]);
 
-  const campusPartners = getCampusPartners(partners, campus.slug).filter((partner) =>
+  const campusPartners = partners.filter((partner) =>
     canViewPartnerDetails(partner.visibility, false, partner.period),
   );
   const categoryLabels = Array.from(
@@ -125,13 +133,14 @@ export default async function CampusLandingPage({
     getCampusCategoriesCached(),
     viewerContext.authenticated
       ? getCampusPartnersCached(
+          campus.slug,
           viewerContext.authenticated,
           viewerContext.viewerAudience,
         )
-      : getCampusPublicDirectoryPartnersCached(),
+      : getCampusPublicDirectoryPartnersCached(campus.slug),
   ]);
 
-  const campusPartners = getCampusPartners(partners, campus.slug).map((partner) => {
+  const campusPartners = partners.map((partner) => {
     if (isWithinPeriod(partner.period.start, partner.period.end)) {
       return partner;
     }
