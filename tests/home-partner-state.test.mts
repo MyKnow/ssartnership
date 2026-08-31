@@ -58,7 +58,7 @@ test("global popularity can cover the full directory while member state stays ba
     getAdminPartnerMetrics: async () => {
       throw new Error("admin metrics must stay disabled");
     },
-    getFavoriteCounts: async (requestedIds) =>
+    getFavoriteCounts: async (requestedIds: string[]) =>
       new Map(requestedIds.map((partnerId) => [partnerId, 0])),
   });
   const state = await getHomePartnerMemberState({
