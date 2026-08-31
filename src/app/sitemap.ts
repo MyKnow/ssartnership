@@ -1,7 +1,6 @@
 import type { MetadataRoute } from "next";
 import { CAMPUS_DIRECTORY, getCampusPageHref } from "@/lib/campuses";
 import { partnerRepository } from "@/lib/repositories";
-import { canViewPartnerDetails } from "@/lib/partner-visibility";
 import { createSitemapEntry } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -15,15 +14,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   try {
-    const partners = await partnerRepository.getPublicDirectoryPartners({
-      authenticated: false,
-    });
-    const publicPartners = partners.filter((partner) =>
-      canViewPartnerDetails(partner.visibility, false, partner.period),
-    );
+    const partners = await partnerRepository.getPublicPartnerSeoEntries();
 
     entries.push(
-      ...publicPartners.map((partner) =>
+      ...partners.map((partner) =>
         createSitemapEntry(
           `/partners/${encodeURIComponent(partner.id)}`,
           "weekly",

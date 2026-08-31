@@ -8,6 +8,8 @@ import { toLeanPublicDirectoryPartner } from "@/lib/public-partner-directory";
 import type {
   PartnerRepository,
   PartnerViewContext,
+  PublicPartnerSeoEntry,
+  PublicPartnerSeoOptions,
 } from "@/lib/repositories/partner-repository";
 import { unstable_cache } from "next/cache";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -26,6 +28,7 @@ import {
   isPartnerPreviewLinkActive,
   isValidPartnerPreviewToken,
 } from "@/lib/partner-preview";
+import { getKstDateString } from "@/lib/partner-utils";
 
 type PartnerRow = {
   id: string;
@@ -69,6 +72,18 @@ type CategoryRow = {
   color?: string | null;
 };
 
+type PublicPartnerSeoRow = {
+  id: string;
+  name: string;
+  location: string;
+  period_start: string | null;
+  period_end: string | null;
+  categories?:
+    | { label?: string | null }
+    | Array<{ label?: string | null }>
+    | null;
+};
+
 type PublicCacheScope = "partners" | "categories";
 
 type PublicCacheVersionRow = {
@@ -86,6 +101,8 @@ const PARTNER_SELECT_COLUMNS =
   "id,name,category_id,created_at,updated_at,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,partner_benefits(id,title,max_apply_count,display_order),applies_to,images,tags,visibility,benefit_visibility,branch_scope_type,branch_scope_note,categories(key)";
 const PUBLIC_DIRECTORY_SELECT_COLUMNS =
   "id,name,category_id,created_at,location,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,tags,visibility,benefit_visibility,branch_scope_type,categories(key)";
+const PUBLIC_PARTNER_SEO_SELECT_COLUMNS =
+  "id,name,location,period_start,period_end,categories(label)";
 
 function normalizeDate(value: string | null | undefined) {
   return value ?? "미정";
@@ -220,6 +237,37 @@ const getCachedPublicDirectoryPartnerRows = unstable_cache(
     return (data ?? []) as PartnerRow[];
   },
   ["partner-repository", "partners", "public-directory", "versioned"],
+  {
+    revalidate: false,
+    tags: ["partners"],
+  },
+);
+
+const getCachedPublicPartnerSeoRows = unstable_cache(
+  async (
+    versionKey: string,
+    activeDate: string,
+    limit: number | null,
+  ): Promise<PublicPartnerSeoRow[]> => {
+    void versionKey;
+    const supabase = getSupabaseAdminClient();
+    const baseQuery = supabase
+      .from("partners")
+      .select(PUBLIC_PARTNER_SEO_SELECT_COLUMNS)
+      .eq("visibility", "public")
+      .or(`period_start.is.null,period_start.lte.${activeDate}`)
+      .or(`period_end.is.null,period_end.gte.${activeDate}`)
+      .order("created_at", { ascending: false });
+    const query = limit === null ? baseQuery : baseQuery.limit(limit);
+    const { data, error } = await query;
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return (data ?? []) as PublicPartnerSeoRow[];
+  },
+  ["partner-repository", "partners", "public-seo", "versioned"],
   {
     revalidate: false,
     tags: ["partners"],
@@ -392,6 +440,25 @@ function mapPartnerForPublicDirectory(
   return toLockedPartner(row, categoryKey);
 }
 
+function mapPublicPartnerSeoEntry(
+  row: PublicPartnerSeoRow,
+): PublicPartnerSeoEntry {
+  const category = Array.isArray(row.categories)
+    ? row.categories[0]
+    : row.categories;
+
+  return {
+    id: row.id,
+    name: row.name,
+    categoryLabel: category?.label ?? "제휴",
+    location: row.location,
+    period: {
+      start: row.period_start,
+      end: row.period_end,
+    },
+  };
+}
+
 async function getPartnerRow(id: string) {
   const versionKey = await getPublicCacheVersionKey(["partners", "categories"]);
   return getCachedPartnerRowById(id, versionKey);
@@ -461,6 +528,23 @@ export class SupabasePartnerRepository implements PartnerRepository {
     const versionKey = await getPublicCacheVersionKey(["partners", "categories"]);
     const rows = await getCachedPublicDirectoryPartnerRows(versionKey);
     return rows.map((item) => mapPartnerForPublicDirectory(item, context));
+  }
+
+  async getPublicPartnerSeoEntries(
+    options: PublicPartnerSeoOptions = {},
+  ): Promise<PublicPartnerSeoEntry[]> {
+    const versionKey = await getPublicCacheVersionKey(["partners", "categories"]);
+    const activeDate = getKstDateString();
+    const limit =
+      Number.isSafeInteger(options.limit) && (options.limit ?? -1) >= 0
+        ? (options.limit ?? null)
+        : null;
+    const rows = await getCachedPublicPartnerSeoRows(
+      versionKey,
+      activeDate,
+      limit,
+    );
+    return rows.map(mapPublicPartnerSeoEntry);
   }
 
   async getHomeStateAuthorizedPartnerIds(ids: string[]): Promise<string[]> {

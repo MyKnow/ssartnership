@@ -2,6 +2,8 @@ import type { Category, Partner } from "@/lib/types";
 import type {
   PartnerRepository,
   PartnerViewContext,
+  PublicPartnerSeoEntry,
+  PublicPartnerSeoOptions,
 } from "@/lib/repositories/partner-repository";
 import { toLeanPublicDirectoryPartner } from "@/lib/public-partner-directory";
 import { canViewPartnerDetails } from "@/lib/partner-visibility";
@@ -175,6 +177,32 @@ const partners: Partner[] = [
 export class MockPartnerRepository implements PartnerRepository {
   async getCategories(): Promise<Category[]> {
     return categories;
+  }
+
+  async getPublicPartnerSeoEntries(
+    options: PublicPartnerSeoOptions = {},
+  ): Promise<PublicPartnerSeoEntry[]> {
+    const entries = partners
+      .filter((partner) =>
+        canViewPartnerDetails(partner.visibility, false, partner.period),
+      )
+      .map((partner) => ({
+        id: partner.id,
+        name: partner.name,
+        categoryLabel:
+          categories.find((category) => category.key === partner.category)
+            ?.label ?? "제휴",
+        location: partner.location,
+        period: {
+          start: partner.period.start || null,
+          end: partner.period.end || null,
+        },
+      }));
+    const limit = options.limit;
+
+    return Number.isSafeInteger(limit) && (limit ?? -1) >= 0
+      ? entries.slice(0, limit)
+      : entries;
   }
 
   async getPublicDirectoryPartners(

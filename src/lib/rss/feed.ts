@@ -1,5 +1,4 @@
 import { partnerRepository } from "@/lib/repositories";
-import { canViewPartnerDetails } from "@/lib/partner-visibility";
 import { SITE_LEGACY_NAME, SITE_NAME, SITE_RSS_URL } from "@/lib/site";
 import { buildRssFeedXml, type RssFeedItem } from "@/lib/rss.ts";
 import { buildSiteUrl } from "@/lib/seo";
@@ -15,24 +14,17 @@ function formatPeriod(start?: string | null, end?: string | null) {
 }
 
 export async function buildPartnerRssFeedItems(): Promise<RssFeedItem[]> {
-  const [categories, partners] = await Promise.all([
-    partnerRepository.getCategories(),
-    partnerRepository.getPublicDirectoryPartners({ authenticated: false }),
-  ]);
-  const categoryMap = new Map(
-    categories.map((category) => [category.key, category.label]),
-  );
-  const publicPartners = partners.filter((partner) =>
-    canViewPartnerDetails(partner.visibility, false, partner.period),
-  );
+  const partners = await partnerRepository.getPublicPartnerSeoEntries({
+    limit: 20,
+  });
   const now = Date.now();
 
-  return publicPartners.slice(0, 20).map((partner, index) => ({
+  return partners.map((partner, index) => ({
     title: partner.name,
     link: toAbsoluteUrl(`/partners/${encodeURIComponent(partner.id)}`),
-    description: `${SITE_NAME}의 ${categoryMap.get(partner.category) ?? "제휴"} 정보입니다. ${partner.location} · ${formatPeriod(partner.period.start, partner.period.end)}.`,
+    description: `${SITE_NAME}의 ${partner.categoryLabel} 정보입니다. ${partner.location} · ${formatPeriod(partner.period.start, partner.period.end)}.`,
     pubDate: new Date(now - index * 60_000),
-    category: categoryMap.get(partner.category) ?? "제휴",
+    category: partner.categoryLabel,
   }));
 }
 
