@@ -9,6 +9,7 @@ import {
   sendAdminNotificationCampaign,
   type AdminNotificationComposerInput,
 } from "@/lib/admin-notification-ops";
+import { toCsvCell } from "@/lib/csv";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type { EventCampaign, EventConditionKey } from "@/lib/promotions/catalog";
 
@@ -409,11 +410,6 @@ export function buildEventRewardAdminOverview(
   };
 }
 
-function csvCell(value: string | number | null | undefined) {
-  const text = String(value ?? "");
-  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
-}
-
 function conditionStatusLabel(
   row: EventRewardAdminMemberRow,
   key: EventConditionKey,
@@ -462,7 +458,7 @@ export function createEventRewardCsv(overview: EventRewardAdminOverview) {
   ]);
 
   return `\uFEFF${[headers, ...rows]
-    .map((row) => row.map((value) => csvCell(value)).join(","))
+    .map((row) => row.map((value) => toCsvCell(value)).join(","))
     .join("\n")}`;
 }
 
@@ -550,7 +546,7 @@ export function createEventRewardComparisonCsv(
   ]);
 
   return `\uFEFF${[headers, ...rows]
-    .map((row) => row.map((value) => csvCell(value)).join(","))
+    .map((row) => row.map((value) => toCsvCell(value)).join(","))
     .join("\n")}`;
 }
 
