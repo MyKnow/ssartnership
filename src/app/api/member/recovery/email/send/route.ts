@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
+import { getRequestLogContext } from "@/lib/activity-logs";
 import { isE2eMockMutationEnabled } from "@/lib/e2e-mutation-mode";
 import { sendMemberEmailVerificationCode } from "@/lib/member-email";
 import { getMemberEmailRecoverySession, clearMemberEmailRecoverySession } from "@/lib/member-email-recovery-session";
@@ -20,6 +20,7 @@ import {
 } from "@/lib/member-email-rate-limit";
 import { hasReservedMemberIdentifier } from "@/lib/member-identifier-reservations";
 import { normalizeMemberEmail } from "@/lib/member-domain";
+import { logMemberEmailSecurity } from "@/lib/member-email-security-log";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { setUserSession } from "@/lib/user-auth";
@@ -75,6 +76,14 @@ export async function POST(request: Request) {
   };
   const blockingState = await getMemberEmailVerificationBlockingState("recovery-send", rateLimitContext);
   if (!blockingState.ok) {
+    await logMemberEmailSecurity({
+      context,
+      flow: "recovery",
+      stage: "send",
+      status: "failure",
+      actorId: recovery.memberId,
+      reason: blockingState.code,
+    });
     return NextResponse.json(
       {
         ok: false,
@@ -85,6 +94,14 @@ export async function POST(request: Request) {
     );
   }
   if (blockingState.blocked) {
+    await logMemberEmailSecurity({
+      context,
+      flow: "recovery",
+      stage: "send",
+      status: "blocked",
+      actorId: recovery.memberId,
+      reason: "rate_limit",
+    });
     return NextResponse.json({ ok: false, error: "rate_limited", message: "인증 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
   }
 
@@ -161,6 +178,14 @@ export async function POST(request: Request) {
       },
     );
     if (!reservation.accepted) {
+      await logMemberEmailSecurity({
+        context,
+        flow: "recovery",
+        stage: "send",
+        status: "blocked",
+        actorId: recovery.memberId,
+        reason: "resend_cooldown",
+      });
       return NextResponse.json(
         {
           ok: false,
@@ -178,16 +203,13 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     const deliveryFailed = error instanceof MemberEmailChallengeIssueError;
-    await logAuthSecurity({
-      ...context,
-      eventName: "member_email_recovery",
+    await logMemberEmailSecurity({
+      context,
+      flow: "recovery",
+      stage: "send",
       status: "failure",
-      actorType: "member",
       actorId: recovery.memberId,
-      properties: {
-        stage: "email_send",
-        reason: deliveryFailed ? "delivery_failed" : "reservation_failed",
-      },
+      reason: deliveryFailed ? "delivery_failed" : "reservation_failed",
     });
     return NextResponse.json(
       {
@@ -200,13 +222,12 @@ export async function POST(request: Request) {
     );
   }
 
-  await logAuthSecurity({
-    ...context,
-    eventName: "member_email_recovery",
+  await logMemberEmailSecurity({
+    context,
+    flow: "recovery",
+    stage: "send",
     status: "success",
-    actorType: "member",
     actorId: recovery.memberId,
-    properties: { stage: "email_send" },
   });
   return NextResponse.json({
     ok: true,

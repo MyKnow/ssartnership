@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
+import { getRequestLogContext } from "@/lib/activity-logs";
 import {
   hashMemberEmailIdentifier,
   hashMemberEmailVerificationCode,
@@ -16,6 +16,7 @@ import {
   isMemberEmailVerificationCodeFailure,
 } from "@/lib/member-email-verification-service";
 import { normalizeMemberEmail } from "@/lib/member-domain";
+import { logMemberEmailSecurity } from "@/lib/member-email-security-log";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
@@ -83,13 +84,13 @@ export async function POST(request: Request) {
   };
   const blockingState = await getMemberEmailVerificationBlockingState("verify", rateLimitContext);
   if (!blockingState.ok) {
-    await logAuthSecurity({
-      ...context,
-      eventName: "member_email_verification",
+    await logMemberEmailSecurity({
+      context,
+      flow: "verification",
+      stage: "verify",
       status: "failure",
-      actorType: "member",
       actorId: session.userId,
-      properties: { stage: "verify", reason: blockingState.code },
+      reason: blockingState.code,
     });
     return NextResponse.json(
       {
@@ -100,13 +101,13 @@ export async function POST(request: Request) {
     );
   }
   if (blockingState.blocked) {
-    await logAuthSecurity({
-      ...context,
-      eventName: "member_email_verification",
+    await logMemberEmailSecurity({
+      context,
+      flow: "verification",
+      stage: "verify",
       status: "blocked",
-      actorType: "member",
       actorId: session.userId,
-      properties: { stage: "verify", reason: "rate_limit" },
+      reason: "rate_limit",
     });
     return NextResponse.json(
       { ok: false, message: "인증 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요." },
@@ -139,13 +140,13 @@ export async function POST(request: Request) {
           false,
         );
       }
-      await logAuthSecurity({
-        ...context,
-        eventName: "member_email_verification",
+      await logMemberEmailSecurity({
+        context,
+        flow: "verification",
+        stage: "verify",
         status: "failure",
-        actorType: "member",
         actorId: session.userId,
-        properties: { stage: "verify", reason: completion.reason },
+        reason: completion.reason,
       });
       const failure = getMemberEmailVerificationHttpFailure(completion.reason);
       return NextResponse.json(
@@ -154,13 +155,13 @@ export async function POST(request: Request) {
       );
     }
   } catch {
-    await logAuthSecurity({
-      ...context,
-      eventName: "member_email_verification",
+    await logMemberEmailSecurity({
+      context,
+      flow: "verification",
+      stage: "verify",
       status: "failure",
-      actorType: "member",
       actorId: session.userId,
-      properties: { stage: "verify", reason: "state_update_failed" },
+      reason: "state_update_failed",
     });
     return NextResponse.json(
       {
@@ -172,13 +173,12 @@ export async function POST(request: Request) {
   }
 
   await recordMemberEmailVerificationAttempt("verify", rateLimitContext, true);
-  await logAuthSecurity({
-    ...context,
-    eventName: "member_email_verification",
+  await logMemberEmailSecurity({
+    context,
+    flow: "verification",
+    stage: "verify",
     status: "success",
-    actorType: "member",
     actorId: session.userId,
-    properties: { stage: "verify" },
   });
   revalidatePath("/certification");
   revalidatePath("/certification/email");
