@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import LightboxModal from "@/components/partner-image-carousel/LightboxModal";
 import { clampCarouselZoom, normalizeCarouselIndex } from "@/components/partner-image-carousel/helpers";
 import type { CarouselOffset } from "@/components/partner-image-carousel/types";
+import { getCachedImageUrl } from "@/lib/image-cache";
 
 export default function PartnerReviewLightbox({
   images,
@@ -22,7 +23,7 @@ export default function PartnerReviewLightbox({
   const offsetStartRef = useRef<CarouselOffset>({ x: 0, y: 0 });
   const portalRoot = typeof document === "undefined" ? null : document.body;
   const canNavigate = images.length > 1;
-  const activeImage = images[index] ?? images[0] ?? "";
+  const activeImage = getCachedImageUrl(images[index] ?? images[0] ?? "");
 
   useEffect(() => {
     setIndex(initialIndex);

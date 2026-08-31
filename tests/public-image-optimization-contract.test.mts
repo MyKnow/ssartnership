@@ -8,6 +8,7 @@ const sourcePaths = [
   "../src/components/partner-image-carousel/TabletImageCarousel.tsx",
   "../src/components/partner-image-carousel/ThumbStrip.tsx",
   "../src/components/partner-reviews/PartnerReviewCard.tsx",
+  "../src/components/partner-reviews/PartnerReviewLightbox.tsx",
 ] as const;
 
 test("공개 제휴 이미지는 화면 크기별 Next 이미지 최적화를 사용한다", async () => {
@@ -34,4 +35,19 @@ test("공개 제휴 이미지는 화면 크기별 Next 이미지 최적화를 �
   for (const source of partnerImageSources) {
     assert.doesNotMatch(source, /unoptimized/);
   }
+
+  const reviewCard = await readFile(
+    new URL("../src/components/partner-reviews/PartnerReviewCard.tsx", import.meta.url),
+    "utf8",
+  );
+  const reviewLightbox = await readFile(
+    new URL("../src/components/partner-reviews/PartnerReviewLightbox.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(reviewCard, /getCachedImageUrl\(image\)/);
+  assert.match(
+    reviewLightbox,
+    /const activeImage = getCachedImageUrl\(/,
+  );
 });

@@ -10,6 +10,7 @@ import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import { cn } from "@/lib/cn";
+import { getCachedImageUrl } from "@/lib/image-cache";
 import type { PartnerReview, PartnerReviewReaction } from "@/lib/partner-reviews";
 import { formatPartnerReviewDate } from "./helpers";
 import PartnerReviewLightbox from "./PartnerReviewLightbox";
@@ -180,7 +181,7 @@ export default function PartnerReviewCard({
               aria-label={`리뷰 사진 ${index + 1} 크게 보기`}
             >
               <Image
-                src={image}
+                src={getCachedImageUrl(image)}
                 alt=""
                 fill
                 sizes="(max-width: 640px) 30vw, 120px"
