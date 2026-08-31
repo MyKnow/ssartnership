@@ -18,6 +18,13 @@ export type CreateNotificationResult = {
   alreadyExists?: boolean;
 };
 
+export type NotificationRecipientAudience = {
+  scope: "all" | "year" | "campus" | "member";
+  year?: number | null;
+  campus?: string | null;
+  memberIds?: string[] | null;
+};
+
 export type NotificationCampaignClaimDisposition =
   | "claimed"
   | "resumed"
@@ -82,6 +89,14 @@ export interface NotificationRepository {
   createNotification(
     input: NotificationBroadcastInput,
   ): Promise<CreateNotificationResult>;
+  addNotificationRecipients(
+    notificationId: string,
+    recipientMemberIds: string[],
+  ): Promise<void>;
+  addNotificationAudienceRecipients(
+    notificationId: string,
+    audience: NotificationRecipientAudience,
+  ): Promise<number>;
   claimNotificationCampaign(
     input: NotificationCampaignClaimInput,
   ): Promise<NotificationCampaignClaimResult>;

@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { getMemberNotificationPreferences } from "@/lib/notification-preferences";
 import { fetchMemberVisibleReviewCountInRange } from "@/lib/partner-counts";
-import { collectPagedRows } from "@/lib/log-insights/paging";
+import { collectPagedRows } from "@/lib/supabase/paging";
 import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
 import { getPolicyDocumentByKind } from "@/lib/policy-documents";
 import { getPushPreferencesOrDefault } from "@/lib/push";

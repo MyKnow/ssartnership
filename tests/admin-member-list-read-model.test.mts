@@ -23,11 +23,15 @@ test("관리자 회원 목록은 페이지에서 DB 조회를 분리하고 서�
 
   assert.match(pageSource, /getAdminMemberListReadModel/);
   assert.doesNotMatch(pageSource, /getSupabaseAdminClient/);
-  assert.match(readModelSource, /\{ count: "exact" \},/);
-  assert.match(readModelSource, /memberQuery = memberQuery\.range\(/);
-  assert.match(readModelSource, /from \+ pageSize - 1/);
+  assert.match(readModelSource, /rpc\("get_admin_member_list_page"/);
+  assert.match(readModelSource, /input_offset: from/);
+  assert.match(readModelSource, /input_page_size: pageSize/);
+  assert.match(readModelSource, /input_trend_limit: ADMIN_MEMBER_TREND_SAMPLE_LIMIT/);
+  assert.match(readModelSource, /\.in\("id", memberIds\)/);
+  assert.match(readModelSource, /orderAdminMemberRowsByPage/);
+  assert.doesNotMatch(readModelSource, /memberQuery\.range\(/);
   assert.match(readModelSource, /shouldRedirectToLastPage: page > totalPages/);
-  assert.match(readModelSource, /getAdminSearchLikePattern\(searchValue\)/);
+  assert.match(readModelSource, /getAdminSearchLikePattern\(filters\.searchValue\)/);
   assert.match(readModelSource, /is\("deleted_at", null\)/);
   assert.match(pageSource, /redirect\(`\/admin\/members\?/);
 });
@@ -76,8 +80,9 @@ test("회원 목록은 추이 query를 핵심 목록과 분리해 먼저 렌더�
 
   assert.match(pageSource, /<Suspense/);
   assert.match(pageSource, /<AdminMemberTrendSection/);
-  assert.match(readModelSource, /memberTrendQuery\s*\.then/);
-  assert.doesNotMatch(readModelSource, /\[memberResult, memberTrendResult\]/);
+  assert.match(readModelSource, /indexRow\.trend_created_ats/);
+  assert.match(readModelSource, /Promise\.resolve<AdminMemberTrendReadModel>/);
+  assert.match(readModelSource, /isSampled: totalCount > trendCreatedAts\.length/);
   assert.match(trendSectionSource, /await trend/);
 });
 
@@ -125,14 +130,13 @@ test("회원 목록 read-model은 오류를 안전한 상태로 돌려준다", a
   assert.match(source, /select\("id,kind,version"\)/);
   assert.doesNotMatch(source, /select\(POLICY_SELECT\)/);
   assert.doesNotMatch(source, /getMemberProfilePhotoStates\(memberIds\)/);
-  assert.match(source, /mm_user_directory!inner\(id\)/);
-  assert.match(source, /ilike\("mm_user_directory\.mm_username"/);
-  assert.match(source, /ilike\("mm_user_directory\.mm_user_id"/);
-  assert.match(source, /email_normalized\.ilike\.\$\{pattern\}/);
-  assert.match(source, /ilike\("email_normalized", pattern\)/);
-  assert.match(source, /canUseMemberSearchOrFilter/);
-  assert.match(source, /referencedTable: "mm_user_directory"/);
-  assert.match(source, /searchResults\.some\(\(result\) => Boolean\(result\.error\)\)/);
+  assert.match(source, /input_search_pattern:/);
+  assert.match(source, /getAdminSearchLikePattern\(filters\.searchValue\)/);
+  assert.match(source, /input_service_policy_id:/);
+  assert.match(source, /input_marketing_enabled:/);
+  assert.doesNotMatch(source, /getMemberSearchIds/);
+  assert.doesNotMatch(source, /getPreferenceFilteredMemberIds/);
+  assert.doesNotMatch(source, /getPolicyConsentFilteredMemberIds/);
   assert.doesNotMatch(source, /getSsafyCycleSettings/);
   assert.doesNotMatch(source, /cycleSettings/);
   assert.doesNotMatch(source, /Error\.message/);
@@ -168,14 +172,17 @@ test("회원 수동 추가의 기수 설정은 핵심 목록과 분리해 스트
   assert.match(pageSource, /getSsafyCycleSettings\(\)\.catch/);
 });
 
-test("회원 고급 필터는 독립적인 설정·동의 조회를 병렬화한다", async () => {
+test("회원 고급 필터는 전체 ID 집합 대신 DB 페이지 RPC에 전달한다", async () => {
   const source = await readFile(memberReadModelPath, "utf8");
 
-  assert.equal(
-    (source.match(/Promise\.all\(\s*activeFilters\.map/g) ?? []).length,
-    2,
-  );
-  assert.match(source, /filterResults\.some\(\(result\) => result === undefined\)/);
+  assert.match(source, /rpc\("get_admin_member_list_page"/);
+  assert.match(source, /input_service_consent: filters\.serviceConsentFilter/);
+  assert.match(source, /input_privacy_consent: filters\.privacyConsentFilter/);
+  assert.match(source, /input_marketing_consent: filters\.marketingConsentFilter/);
+  assert.match(source, /input_announcement_enabled: filters\.announcementEnabledFilter/);
+  assert.match(source, /input_mm_enabled: filters\.mmEnabledFilter/);
+  assert.doesNotMatch(source, /\.select\("member_id"\)/);
+  assert.doesNotMatch(source, /toInList|mergeMemberIdFilters/);
 });
 
 test("회원 목록 URL 필터는 알려진 값만 수용하고 검색 입력을 제한한다", () => {

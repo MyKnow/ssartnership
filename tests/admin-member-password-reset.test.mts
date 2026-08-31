@@ -131,18 +131,32 @@ test("관리자 재발급은 한 개의 활성 링크만 유지하고 실제 이
 });
 
 test("회원 목록과 상세는 이메일 식별과 검색을 함께 제공한다", async () => {
-  const [readModel, selectors, listItem, detailView, detailPage, manager] = await Promise.all([
+  const [
+    readModel,
+    selectors,
+    listItem,
+    detailView,
+    detailPage,
+    manager,
+    memberListFilterMigration,
+  ] = await Promise.all([
     read("src/lib/admin-member-list.server.ts"),
     read("src/components/admin/member-manager/selectors.ts"),
     read("src/components/admin/AdminMemberListItem.tsx"),
     read("src/components/admin/AdminMemberDetailView.tsx"),
     read("src/app/admin/(protected)/members/[memberId]/page.tsx"),
     read("src/components/admin/AdminMemberManager.tsx"),
+    read(
+      "supabase/migrations/20260831111653_filter_admin_member_list_in_database.sql",
+    ),
   ]);
 
   assert.match(readModel, /email,email_normalized/);
-  assert.match(readModel, /email_normalized\.ilike\.\$\{pattern\}/);
-  assert.match(readModel, /\.ilike\("email_normalized", pattern\)/);
+  assert.match(readModel, /getAdminSearchLikePattern\(filters\.searchValue\)/);
+  assert.match(
+    memberListFilterMigration,
+    /members\.email_normalized ilike input_search_pattern/,
+  );
   assert.match(readModel, /email: member\.email \?\? member\.email_normalized/);
   assert.match(selectors, /member\.email \?\? ""/);
   assert.match(listItem, /member\.mmUsername[\s\S]*?member\.email/);

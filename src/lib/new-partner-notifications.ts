@@ -12,6 +12,7 @@ import {
   type PushAudience,
 } from "@/lib/push";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { collectPagedRows } from "@/lib/supabase/paging";
 import type { NotificationTemplateContext } from "@/lib/notification-templates/context";
 import {
   getPartnerVisibilityState,
@@ -166,19 +167,30 @@ export async function resolveNewPartnerPushAudience(
   }
 
   const targetCampusValues = getCampusDisplayValues(normalizedCampusSlugs);
-  const { data, error } = await getSupabaseAdminClient()
-    .from("members")
-    .select("id,campus")
-    .in("campus", targetCampusValues)
-    .order("display_name", { ascending: true });
-
-  if (error) {
-    throw new Error("신규 제휴 알림 대상을 불러오지 못했습니다.");
-  }
+  const supabase = getSupabaseAdminClient();
+  const result = await collectPagedRows<NewPartnerAudienceMember>(
+    null,
+    async (from, to) => {
+      const { data, error } = await supabase
+        .from("members")
+        .select("id,campus")
+        .in("campus", targetCampusValues)
+        .order("display_name", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) {
+        throw new Error("신규 제휴 알림 대상을 불러오지 못했습니다.");
+      }
+      return {
+        rows: (data ?? []) as NewPartnerAudienceMember[],
+        error: false,
+      };
+    },
+  );
 
   return buildNewPartnerPushAudienceFromCampusMembers(
     normalizedCampusSlugs,
-    (data ?? []) as NewPartnerAudienceMember[],
+    result.rows,
   );
 }
 

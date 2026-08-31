@@ -14,6 +14,7 @@ import type {
   NotificationDeliveryClaimInput,
   NotificationDeliveryClaimResult,
   NotificationListContext,
+  NotificationRecipientAudience,
   NotificationRepository,
   TransitionNotificationDeliveryInput,
 } from "../notification-repository.ts";
@@ -199,6 +200,32 @@ export class MockNotificationRepository implements NotificationRepository {
       notification,
       recipientMemberIds,
     };
+  }
+
+  async addNotificationRecipients(
+    notificationId: string,
+    recipientMemberIds: string[],
+  ) {
+    const notification = getStore().notifications.find(
+      (item) => item.id === notificationId,
+    );
+    if (!notification) {
+      throw new Error("알림을 찾을 수 없습니다.");
+    }
+    ensureMockNotificationRecipients(
+      notificationId,
+      recipientMemberIds,
+      new Date().toISOString(),
+    );
+  }
+
+  async addNotificationAudienceRecipients(
+    notificationId: string,
+    audience: NotificationRecipientAudience,
+  ) {
+    const recipientMemberIds = audience.memberIds ?? [];
+    await this.addNotificationRecipients(notificationId, recipientMemberIds);
+    return new Set(recipientMemberIds).size;
   }
 
   async claimNotificationCampaign(

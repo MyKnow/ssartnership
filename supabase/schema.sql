@@ -18227,6 +18227,432 @@ revoke all on function public.cleanup_image_upload_quota_windows(timestamp with 
 revoke all on function public.cleanup_image_upload_quota_windows(timestamp with time zone, integer) from authenticated;
 grant execute on function public.cleanup_image_upload_quota_windows(timestamp with time zone, integer) to service_role;
 
+-- Source: 20260831110053_scope_admin_partner_audit_logs.sql
+create index if not exists admin_audit_logs_properties_path_ops_idx
+  on public.admin_audit_logs using gin (properties jsonb_path_ops);
+
+create or replace function public.get_admin_partner_audit_logs(
+  input_partner_id uuid,
+  input_company_target_id uuid,
+  input_company_property_id uuid
+)
+returns table (
+  id uuid,
+  actor_id text,
+  action text,
+  target_type text,
+  target_id text,
+  properties jsonb,
+  created_at timestamp with time zone
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  select
+    audit_logs.id,
+    audit_logs.actor_id,
+    audit_logs.action,
+    audit_logs.target_type,
+    audit_logs.target_id,
+    audit_logs.properties,
+    audit_logs.created_at
+  from public.admin_audit_logs as audit_logs
+  where input_partner_id is not null
+    and audit_logs.action in (
+      'partner_create',
+      'partner_update',
+      'partner_change_request_approve',
+      'partner_change_request_reject',
+      'partner_portal_immediate_update',
+      'partner_portal_change_request_submit',
+      'partner_portal_change_request_cancel',
+      'partner_company_create',
+      'partner_company_update',
+      'partner_company_delete'
+    )
+    and audit_logs.target_type in (
+      'partner',
+      'partner_company',
+      'partner_change_request'
+    )
+    and (
+      audit_logs.target_id = input_partner_id::text
+      or (
+        input_company_target_id is not null
+        and audit_logs.target_id = input_company_target_id::text
+      )
+      or audit_logs.properties @> pg_catalog.jsonb_build_object(
+        'partnerId',
+        input_partner_id::text
+      )
+      or (
+        input_company_property_id is not null
+        and audit_logs.properties @> pg_catalog.jsonb_build_object(
+          'companyId',
+          input_company_property_id::text
+        )
+      )
+    )
+  order by audit_logs.created_at desc, audit_logs.id desc
+  limit 200;
+$$;
+
+revoke all on function public.get_admin_partner_audit_logs(uuid, uuid, uuid) from public;
+revoke all on function public.get_admin_partner_audit_logs(uuid, uuid, uuid) from anon;
+revoke all on function public.get_admin_partner_audit_logs(uuid, uuid, uuid) from authenticated;
+grant execute on function public.get_admin_partner_audit_logs(uuid, uuid, uuid) to service_role;
+
+-- Source: 20260831110855_attach_notification_recipients_atomically.sql
+create or replace function public.attach_notification_recipients(
+  p_notification_id uuid,
+  p_recipient_member_ids uuid[]
+)
+returns integer
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  normalized_recipient_ids uuid[];
+  attached_at timestamp with time zone := pg_catalog.clock_timestamp();
+begin
+  if p_notification_id is null then
+    raise exception using
+      errcode = '22023',
+      message = 'notification_recipient_attachment_invalid';
+  end if;
+
+  perform 1
+  from public.notifications
+  where id = p_notification_id
+  for update;
+  if not found then
+    raise exception using
+      errcode = 'P0002',
+      message = 'notification_not_found';
+  end if;
+
+  select coalesce(
+    pg_catalog.array_agg(distinct recipients.member_id),
+    '{}'::uuid[]
+  )
+  into normalized_recipient_ids
+  from pg_catalog.unnest(
+    coalesce(p_recipient_member_ids, '{}'::uuid[])
+  ) as recipients(member_id)
+  where recipients.member_id is not null;
+
+  insert into public.member_notifications (
+    notification_id,
+    member_id,
+    read_at,
+    deleted_at,
+    created_at,
+    updated_at
+  )
+  select
+    p_notification_id,
+    recipients.member_id,
+    null,
+    null,
+    attached_at,
+    attached_at
+  from pg_catalog.unnest(normalized_recipient_ids) as recipients(member_id)
+  on conflict (notification_id, member_id) do nothing;
+
+  insert into public.notification_deliveries (
+    notification_id,
+    member_id,
+    channel,
+    status,
+    delivered_at,
+    created_at,
+    updated_at
+  )
+  select
+    p_notification_id,
+    recipients.member_id,
+    'in_app',
+    'sent',
+    attached_at,
+    attached_at,
+    attached_at
+  from pg_catalog.unnest(normalized_recipient_ids) as recipients(member_id)
+  where not exists (
+    select 1
+    from public.notification_deliveries as existing_delivery
+    where existing_delivery.notification_id = p_notification_id
+      and existing_delivery.member_id = recipients.member_id
+      and existing_delivery.channel = 'in_app'
+  );
+
+  return pg_catalog.cardinality(normalized_recipient_ids);
+end;
+$$;
+
+revoke all on function public.attach_notification_recipients(uuid, uuid[]) from public;
+revoke all on function public.attach_notification_recipients(uuid, uuid[]) from anon;
+revoke all on function public.attach_notification_recipients(uuid, uuid[]) from authenticated;
+grant execute on function public.attach_notification_recipients(uuid, uuid[]) to service_role;
+
+create or replace function public.attach_notification_audience(
+  p_notification_id uuid,
+  p_scope text,
+  p_generation integer,
+  p_campus text,
+  p_recipient_member_ids uuid[]
+)
+returns integer
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  normalized_scope text := pg_catalog.btrim(coalesce(p_scope, ''));
+  resolved_recipient_ids uuid[];
+begin
+  if normalized_scope not in ('all', 'year', 'campus', 'member')
+    or (normalized_scope = 'year' and p_generation is null)
+    or (
+      normalized_scope = 'campus'
+      and pg_catalog.btrim(coalesce(p_campus, '')) = ''
+    ) then
+    raise exception using
+      errcode = '22023',
+      message = 'notification_audience_attachment_invalid';
+  end if;
+
+  select coalesce(
+    pg_catalog.array_agg(member.id order by member.id),
+    '{}'::uuid[]
+  )
+  into resolved_recipient_ids
+  from public.members as member
+  where normalized_scope = 'all'
+    or (
+      normalized_scope = 'year'
+      and member.generation = p_generation
+    )
+    or (
+      normalized_scope = 'campus'
+      and member.campus = p_campus
+    )
+    or (
+      normalized_scope = 'member'
+      and member.id = any(coalesce(p_recipient_member_ids, '{}'::uuid[]))
+    );
+
+  return public.attach_notification_recipients(
+    p_notification_id,
+    resolved_recipient_ids
+  );
+end;
+$$;
+
+revoke all on function public.attach_notification_audience(
+  uuid, text, integer, text, uuid[]
+) from public;
+revoke all on function public.attach_notification_audience(
+  uuid, text, integer, text, uuid[]
+) from anon;
+revoke all on function public.attach_notification_audience(
+  uuid, text, integer, text, uuid[]
+) from authenticated;
+grant execute on function public.attach_notification_audience(
+  uuid, text, integer, text, uuid[]
+) to service_role;
+
+-- Source: 20260831111653_filter_admin_member_list_in_database.sql
+-- Keep the administrator member-list intersection in PostgreSQL so preference
+-- and policy filters never have to materialize the full matching member-id set
+-- in the application process.
+create or replace function public.get_admin_member_list_page(
+  input_search_pattern text default null,
+  input_generation integer default null,
+  input_campus text default null,
+  input_password_status text default 'all',
+  input_mattermost_lifecycle text default 'all',
+  input_service_policy_id uuid default null,
+  input_privacy_policy_id uuid default null,
+  input_marketing_policy_id uuid default null,
+  input_service_consent text default 'all',
+  input_privacy_consent text default 'all',
+  input_marketing_consent text default 'all',
+  input_push_enabled text default 'all',
+  input_announcement_enabled text default 'all',
+  input_new_partner_enabled text default 'all',
+  input_expiring_partner_enabled text default 'all',
+  input_review_enabled text default 'all',
+  input_mm_enabled text default 'all',
+  input_marketing_enabled text default 'all',
+  input_sort text default 'recent',
+  input_offset integer default 0,
+  input_page_size integer default 20,
+  input_trend_limit integer default 5000
+)
+returns table (
+  member_ids uuid[],
+  total_count bigint,
+  trend_created_ats timestamp with time zone[]
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, public
+as $$
+  with filtered_members as materialized (
+    select
+      members.id,
+      members.display_name,
+      members.created_at,
+      members.updated_at
+    from public.members as members
+    left join public.mm_user_directory as directory
+      on directory.id = members.mattermost_account_id
+    left join public.push_preferences as preferences
+      on preferences.member_id = members.id
+    left join public.member_policy_consents as service_consent
+      on service_consent.member_id = members.id
+     and service_consent.policy_document_id = input_service_policy_id
+    left join public.member_policy_consents as privacy_consent
+      on privacy_consent.member_id = members.id
+     and privacy_consent.policy_document_id = input_privacy_policy_id
+    left join public.member_policy_consents as marketing_consent
+      on marketing_consent.member_id = members.id
+     and marketing_consent.policy_document_id = input_marketing_policy_id
+    where members.deleted_at is null
+      and (
+        input_search_pattern is null
+        or members.display_name ilike input_search_pattern
+        or members.manual_login_id ilike input_search_pattern
+        or members.email_normalized ilike input_search_pattern
+        or directory.mm_username ilike input_search_pattern
+        or directory.mm_user_id ilike input_search_pattern
+      )
+      and (input_generation is null or members.generation = input_generation)
+      and (input_campus is null or members.campus = input_campus)
+      and case input_password_status
+        when 'all' then true
+        when 'mustChangePassword' then members.must_change_password
+        when 'normal' then not members.must_change_password
+        else false
+      end
+      and case input_mattermost_lifecycle
+        when 'all' then true
+        when 'disabled' then members.mattermost_login_disabled_at is not null
+        when 'graduated' then members.mattermost_login_disabled_reason = 'generation_completed'
+        when 'departed' then members.mattermost_login_disabled_reason = 'member_departed'
+        else false
+      end
+      and case input_service_consent
+        when 'all' then true
+        when 'agreed' then service_consent.member_id is not null
+        when 'pending' then service_consent.member_id is null
+        else false
+      end
+      and case input_privacy_consent
+        when 'all' then true
+        when 'agreed' then privacy_consent.member_id is not null
+        when 'pending' then privacy_consent.member_id is null
+        else false
+      end
+      and (
+        input_marketing_policy_id is null
+        or case input_marketing_consent
+          when 'all' then true
+          when 'agreed' then
+            marketing_consent.member_id is not null
+            and coalesce(preferences.marketing_enabled, false)
+          when 'pending' then not (
+            marketing_consent.member_id is not null
+            and coalesce(preferences.marketing_enabled, false)
+          )
+          else false
+        end
+      )
+      and case input_push_enabled
+        when 'all' then true
+        when 'enabled' then coalesce(preferences.enabled, false)
+        when 'disabled' then not coalesce(preferences.enabled, false)
+        else false
+      end
+      and case input_announcement_enabled
+        when 'all' then true
+        when 'enabled' then coalesce(preferences.announcement_enabled, true)
+        when 'disabled' then not coalesce(preferences.announcement_enabled, true)
+        else false
+      end
+      and case input_new_partner_enabled
+        when 'all' then true
+        when 'enabled' then coalesce(preferences.new_partner_enabled, true)
+        when 'disabled' then not coalesce(preferences.new_partner_enabled, true)
+        else false
+      end
+      and case input_expiring_partner_enabled
+        when 'all' then true
+        when 'enabled' then coalesce(preferences.expiring_partner_enabled, true)
+        when 'disabled' then not coalesce(preferences.expiring_partner_enabled, true)
+        else false
+      end
+      and case input_review_enabled
+        when 'all' then true
+        when 'enabled' then coalesce(preferences.review_enabled, true)
+        when 'disabled' then not coalesce(preferences.review_enabled, true)
+        else false
+      end
+      and case input_mm_enabled
+        when 'all' then true
+        when 'enabled' then coalesce(preferences.mm_enabled, true)
+        when 'disabled' then not coalesce(preferences.mm_enabled, true)
+        else false
+      end
+      and case input_marketing_enabled
+        when 'all' then true
+        when 'enabled' then coalesce(preferences.marketing_enabled, false)
+        when 'disabled' then not coalesce(preferences.marketing_enabled, false)
+        else false
+      end
+  )
+  select
+    array(
+      select page_member.id
+      from filtered_members as page_member
+      order by
+        case when input_sort = 'name' then page_member.display_name end asc nulls last,
+        case when input_sort = 'updated' then page_member.updated_at end desc nulls first,
+        case
+          when coalesce(input_sort, 'recent') not in ('name', 'updated')
+            then page_member.created_at
+        end desc nulls first,
+        page_member.id asc
+      limit least(
+        greatest(coalesce(input_page_size, 20), 1),
+        100
+      )
+      offset greatest(coalesce(input_offset, 0), 0)
+    ) as member_ids,
+    (
+      select pg_catalog.count(*)::bigint
+      from filtered_members
+    ) as total_count,
+    array(
+      select trend_member.created_at
+      from filtered_members as trend_member
+      order by trend_member.created_at desc nulls first, trend_member.id asc
+      limit least(
+        greatest(coalesce(input_trend_limit, 5000), 1),
+        5000
+      )
+    ) as trend_created_ats;
+$$;
+
+revoke all on function public.get_admin_member_list_page(text, integer, text, text, text, uuid, uuid, uuid, text, text, text, text, text, text, text, text, text, text, text, integer, integer, integer) from public;
+revoke all on function public.get_admin_member_list_page(text, integer, text, text, text, uuid, uuid, uuid, text, text, text, text, text, text, text, text, text, text, text, integer, integer, integer) from anon;
+revoke all on function public.get_admin_member_list_page(text, integer, text, text, text, uuid, uuid, uuid, text, text, text, text, text, text, text, text, text, text, text, integer, integer, integer) from authenticated;
+grant execute on function public.get_admin_member_list_page(text, integer, text, text, text, uuid, uuid, uuid, text, text, text, text, text, text, text, text, text, text, text, integer, integer, integer) to service_role;
+
 -- Final server-only access boundary. Keep this block after every public table
 -- and function definition in the executable schema snapshot.
 do $public_access_hardening$

@@ -272,8 +272,11 @@ test("푸시 대상과 발송 화면은 세대·MM 디렉터리 관계만 사용
   );
   assert.doesNotMatch(recipientSearch, /getMmUserDirectoryEntriesByAccountIds/);
   assert.match(adminPushReadModel, /generation,campus/);
-  assert.match(audience, /\.eq\("generation", audience\.year\)/);
-  assert.match(send, /\.eq\("generation", resolvedAudience\.year\)/);
+  assert.match(audience, /listAudienceMemberIds\(\{ year: audience\.year \}\)/);
+  assert.match(audience, /collectPagedRows<AudienceMemberIdRow>/);
+  assert.match(send, /materializeMemberIds: false/);
+  assert.match(send, /listNotificationRecipientPage/);
+  assert.match(send, /collectPagedRowsByFilterChunks/);
 });
 
 test("관리자 캠페인 발송은 policy ledger와 MM 디렉터리만 사용한다", () => {
@@ -283,7 +286,8 @@ test("관리자 캠페인 발송은 policy ledger와 MM 디렉터리만 사용�
   assert.match(operations, /getMmUserDirectoryEntriesByAccountIds/);
   assert.match(operations, /\.from\("member_policy_consents"\)/);
   assert.match(operations, /\.eq\("policy_document_id", activeMarketingPolicy\.id\)/);
-  assert.match(operations, /\.eq\("generation", resolvedAudience\.year\)/);
+  assert.match(operations, /listAudienceMembers\(resolvedAudience\)/);
+  assert.match(operations, /collectPagedRowsByFilterChunks/);
   assert.doesNotMatch(
     operations,
     /mm_user_id,mm_username|marketing_policy_version|marketing_policy_consented_at|\.eq\("year"/,
