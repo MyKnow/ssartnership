@@ -1,5 +1,6 @@
 import { sanitizeHttpUrl } from "./validation.ts";
 import { assertExistingImageManifestUrls } from "./image-upload/policy.ts";
+import { extractPublicStorageObjectPath } from "./public-storage-url.ts";
 
 export const REVIEW_MEDIA_BUCKET = "review-media";
 export const REVIEW_IMAGE_ASPECT_RATIO = 1;
@@ -103,33 +104,5 @@ function parseReviewMediaEntry(value: unknown): ReviewMediaManifestEntry | null 
 }
 
 export function extractReviewMediaStoragePath(url: string) {
-  const safeUrl = sanitizeHttpUrl(url);
-  if (!safeUrl) {
-    return null;
-  }
-
-  try {
-    const parsed = new URL(safeUrl);
-    const marker = "/storage/v1/object/public/";
-    const index = parsed.pathname.indexOf(marker);
-    if (index < 0) {
-      return null;
-    }
-    const remainder = parsed.pathname.slice(index + marker.length);
-    const slashIndex = remainder.indexOf("/");
-    if (slashIndex < 0) {
-      return null;
-    }
-    const bucket = remainder.slice(0, slashIndex);
-    const path = remainder.slice(slashIndex + 1);
-    if (!bucket || !path) {
-      return null;
-    }
-    return {
-      bucket,
-      path: decodeURIComponent(path),
-    };
-  } catch {
-    return null;
-  }
+  return extractPublicStorageObjectPath(url);
 }
