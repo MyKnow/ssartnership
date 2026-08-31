@@ -70,7 +70,6 @@ test("legacy cache and partner metric helpers are not executable as public RPCs"
     "public.bump_public_cache_version(text)",
     "public.bump_partners_public_cache_version()",
     "public.bump_categories_public_cache_version()",
-    "public.sync_partner_benefit_cache_version()",
     "public.apply_partner_metric_event_rollups(uuid, text, text, text, text, timestamp with time zone)",
     "public.apply_partner_metric_event(uuid, text, text, text, text, timestamp with time zone)",
     "public.reconcile_partner_metric_rollups(uuid)",
@@ -84,6 +83,25 @@ test("legacy cache and partner metric helpers are not executable as public RPCs"
           new RegExp(`revoke all on function ${escapedSignature} from ${role};`),
         );
       }
+    }
+  }
+
+  for (const source of [migration, schema]) {
+    assert.match(
+      source,
+      /do \$sync_partner_benefit_cache_version_revoke\$/,
+    );
+    assert.match(
+      source,
+      /if to_regprocedure\('public\.sync_partner_benefit_cache_version\(\)'\) is not null then/,
+    );
+    for (const role of ["public", "anon", "authenticated"]) {
+      assert.match(
+        source,
+        new RegExp(
+          `revoke all on function public\\.sync_partner_benefit_cache_version\\(\\) from ${role};`,
+        ),
+      );
     }
   }
 });

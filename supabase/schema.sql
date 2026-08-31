@@ -18748,9 +18748,15 @@ revoke all on function public.bump_partners_public_cache_version() from authenti
 revoke all on function public.bump_categories_public_cache_version() from public;
 revoke all on function public.bump_categories_public_cache_version() from anon;
 revoke all on function public.bump_categories_public_cache_version() from authenticated;
-revoke all on function public.sync_partner_benefit_cache_version() from public;
-revoke all on function public.sync_partner_benefit_cache_version() from anon;
-revoke all on function public.sync_partner_benefit_cache_version() from authenticated;
+do $sync_partner_benefit_cache_version_revoke$
+begin
+  if to_regprocedure('public.sync_partner_benefit_cache_version()') is not null then
+    revoke all on function public.sync_partner_benefit_cache_version() from public;
+    revoke all on function public.sync_partner_benefit_cache_version() from anon;
+    revoke all on function public.sync_partner_benefit_cache_version() from authenticated;
+  end if;
+end
+$sync_partner_benefit_cache_version_revoke$;
 revoke all on function public.apply_partner_metric_event_rollups(uuid, text, text, text, text, timestamp with time zone) from public;
 revoke all on function public.apply_partner_metric_event_rollups(uuid, text, text, text, text, timestamp with time zone) from anon;
 revoke all on function public.apply_partner_metric_event_rollups(uuid, text, text, text, text, timestamp with time zone) from authenticated;
