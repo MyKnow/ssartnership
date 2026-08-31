@@ -77,6 +77,11 @@ type PublicCacheVersionRow = {
   updated_at: string | null;
 };
 
+type PublicCacheVersionSnapshot = {
+  rows: PublicCacheVersionRow[];
+  lookupFailed: boolean;
+};
+
 const PARTNER_SELECT_COLUMNS =
   "id,name,category_id,created_at,updated_at,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,partner_benefits(id,title,max_apply_count,display_order),applies_to,images,tags,visibility,benefit_visibility,branch_scope_type,branch_scope_note,categories(key)";
 const PUBLIC_DIRECTORY_SELECT_COLUMNS =
@@ -99,27 +104,48 @@ function extractCategoryKey(categories: PartnerRow["categories"]) {
   return undefined;
 }
 
+const getCachedPublicCacheVersionSnapshot = unstable_cache(
+  async (): Promise<PublicCacheVersionSnapshot> => {
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("public_cache_versions")
+      .select("scope,version,updated_at")
+      .in("scope", ["partners", "categories"]);
+
+    if (error) {
+      console.error(
+        "[partner-repository] public cache version lookup failed",
+        error.message,
+      );
+      return { rows: [], lookupFailed: true };
+    }
+
+    return {
+      rows: (data ?? []) as PublicCacheVersionRow[],
+      lookupFailed: false,
+    };
+  },
+  ["partner-repository", "public-cache-version-snapshot"],
+  {
+    revalidate: 30,
+    tags: ["partners", "categories"],
+  },
+);
+
+const getPublicCacheVersionSnapshot = cache(() =>
+  getCachedPublicCacheVersionSnapshot(),
+);
+
 const getPublicCacheVersionKeyByScopeKey = cache(async (scopeKey: string) => {
   const scopes = scopeKey.split(",").filter((value): value is PublicCacheScope =>
     value === "partners" || value === "categories",
   );
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("public_cache_versions")
-    .select("scope,version,updated_at")
-    .in("scope", scopes);
-
-  if (error) {
-    console.error(
-      "[partner-repository] public cache version lookup failed",
-      error.message,
-    );
+  const snapshot = await getPublicCacheVersionSnapshot();
+  if (snapshot.lookupFailed) {
     return scopes.map((scope) => `${scope}:legacy`).join("|");
   }
 
-  const rowsByScope = new Map(
-    ((data ?? []) as PublicCacheVersionRow[]).map((row) => [row.scope, row]),
-  );
+  const rowsByScope = new Map(snapshot.rows.map((row) => [row.scope, row]));
 
   return scopes
     .map((scope) => {
