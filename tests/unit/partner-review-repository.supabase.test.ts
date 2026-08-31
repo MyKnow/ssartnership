@@ -52,6 +52,20 @@ beforeEach(() => {
 describe("SupabasePartnerReviewRepository", () => {
   test("이미지 리뷰 필터와 limit + 1 페이지네이션을 단일 DB 쿼리로 적용한다", async () => {
     const reviewRows = [createReviewRow(1), createReviewRow(2), createReviewRow(3)];
+    const rpc = vi.fn(async () => ({
+      data: [
+        {
+          average_rating: 5,
+          total_count: 3,
+          rating_1_count: 0,
+          rating_2_count: 0,
+          rating_3_count: 0,
+          rating_4_count: 0,
+          rating_5_count: 3,
+        },
+      ],
+      error: null,
+    }));
     const range = vi.fn(async () => ({ data: reviewRows, error: null }));
     const not = vi.fn();
     const reviewBuilder = {
@@ -83,7 +97,7 @@ describe("SupabasePartnerReviewRepository", () => {
       }
       throw new Error(`Unexpected table: ${table}`);
     });
-    getSupabaseAdminClient.mockReturnValue({ from });
+    getSupabaseAdminClient.mockReturnValue({ from, rpc });
 
     const { SupabasePartnerReviewRepository } = await import(
       "../../src/lib/repositories/supabase/partner-review-repository.supabase"
@@ -96,10 +110,15 @@ describe("SupabasePartnerReviewRepository", () => {
       imagesOnly: true,
     });
 
-    expect(not).toHaveBeenCalledTimes(2);
+    expect(not).toHaveBeenCalledTimes(1);
     expect(not).toHaveBeenCalledWith("images", "eq", "{}");
     expect(range).toHaveBeenCalledTimes(1);
     expect(range).toHaveBeenCalledWith(2, 4);
+    expect(rpc).toHaveBeenCalledWith("get_partner_review_summary", {
+      input_partner_id: "partner-1",
+      input_rating: null,
+      input_images_only: true,
+    });
     expect(result.items.map((review) => review.id)).toEqual(["review-1", "review-2"]);
     expect(result.nextOffset).toBe(4);
     expect(result.hasMore).toBe(true);
@@ -110,12 +129,20 @@ describe("SupabasePartnerReviewRepository", () => {
     pagedRows[0].rating = 5;
     pagedRows[1].rating = 4;
     pagedRows[2].rating = 3;
-    const summaryRows = [
-      { rating: 5 },
-      { rating: 4 },
-      { rating: 3 },
-      { rating: 1 },
-    ];
+    const rpc = vi.fn(async () => ({
+      data: [
+        {
+          average_rating: 3.3,
+          total_count: 4,
+          rating_1_count: 1,
+          rating_2_count: 0,
+          rating_3_count: 1,
+          rating_4_count: 1,
+          rating_5_count: 1,
+        },
+      ],
+      error: null,
+    }));
 
     const listRange = vi.fn(async () => ({ data: pagedRows, error: null }));
     const listBuilder = {
@@ -132,43 +159,22 @@ describe("SupabasePartnerReviewRepository", () => {
     listBuilder.not.mockReturnValue(listBuilder);
     listBuilder.order.mockReturnValue(listBuilder);
 
-    const summaryBuilder = {
-      select: vi.fn(),
-      eq: vi.fn(),
-      is: vi.fn(),
-      not: vi.fn(),
-      then: undefined as
-        | Promise<{ data: { rating: number }[]; error: null }>["then"]
-        | undefined,
-    };
-    summaryBuilder.select.mockReturnValue(summaryBuilder);
-    summaryBuilder.eq.mockReturnValue(summaryBuilder);
-    summaryBuilder.is.mockReturnValue(summaryBuilder);
-    summaryBuilder.not.mockReturnValue(summaryBuilder);
-    const summaryPromise = Promise.resolve({
-      data: summaryRows,
-      error: null,
-    });
-    summaryBuilder.then = summaryPromise.then.bind(summaryPromise);
-
     const reactionBuilder = {
       select: vi.fn(),
       in: vi.fn(async () => ({ data: [], error: null })),
     };
     reactionBuilder.select.mockReturnValue(reactionBuilder);
 
-    let reviewQueryCount = 0;
     const from = vi.fn((table: string) => {
       if (table === "partner_reviews") {
-        reviewQueryCount += 1;
-        return reviewQueryCount === 1 ? listBuilder : summaryBuilder;
+        return listBuilder;
       }
       if (table === "partner_review_reactions") {
         return reactionBuilder;
       }
       throw new Error(`Unexpected table: ${table}`);
     });
-    getSupabaseAdminClient.mockReturnValue({ from });
+    getSupabaseAdminClient.mockReturnValue({ from, rpc });
 
     const { SupabasePartnerReviewRepository } = await import(
       "../../src/lib/repositories/supabase/partner-review-repository.supabase"
@@ -182,6 +188,11 @@ describe("SupabasePartnerReviewRepository", () => {
     });
 
     expect(result.items).toHaveLength(2);
+    expect(rpc).toHaveBeenCalledWith("get_partner_review_summary", {
+      input_partner_id: "partner-1",
+      input_rating: null,
+      input_images_only: false,
+    });
     expect(result.summary.totalCount).toBe(4);
     expect(result.summary.averageRating).toBe(3.3);
     expect(result.summary.distribution[5]).toBe(1);
