@@ -198,4 +198,125 @@ describe("SupabasePartnerReviewRepository", () => {
     expect(result.summary.distribution[5]).toBe(1);
     expect(result.summary.distribution[1]).toBe(1);
   });
+
+  test("리뷰 요약 RPC가 아직 없는 스키마에서는 bounded 평점 집계로 상세 페이지를 계속 렌더링한다", async () => {
+    const reviewRows = [createReviewRow(1), createReviewRow(2), createReviewRow(3)];
+    reviewRows[0].rating = 5;
+    reviewRows[1].rating = 4;
+    reviewRows[2].rating = 4;
+
+    const rpc = vi.fn(async () => ({
+      data: null,
+      error: {
+        message:
+          "Could not find the function public.get_partner_review_summary(input_images_only, input_partner_id, input_rating) in the schema cache",
+      },
+    }));
+
+    const listBuilder = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      is: vi.fn(),
+      not: vi.fn(),
+      order: vi.fn(),
+      range: vi.fn(async () => ({ data: reviewRows, error: null })),
+    };
+    listBuilder.select.mockReturnValue(listBuilder);
+    listBuilder.eq.mockReturnValue(listBuilder);
+    listBuilder.is.mockReturnValue(listBuilder);
+    listBuilder.not.mockReturnValue(listBuilder);
+    listBuilder.order.mockReturnValue(listBuilder);
+
+    const summaryBuilders: Array<{
+      select: ReturnType<typeof vi.fn>;
+      eq: ReturnType<typeof vi.fn>;
+      is: ReturnType<typeof vi.fn>;
+      not: ReturnType<typeof vi.fn>;
+      then: ReturnType<typeof vi.fn>;
+    }> = [];
+
+    function createSummaryBuilder() {
+      let selectedRating = 0;
+      const getResult = () => ({
+        count: reviewRows.filter((row) => row.rating === selectedRating).length,
+        error: null,
+      });
+      const summaryBuilder = {
+        select: vi.fn(),
+        eq: vi.fn((column: string, value: unknown) => {
+          if (column === "rating") {
+            selectedRating = Number(value);
+          }
+          return summaryBuilder;
+        }),
+        is: vi.fn(),
+        not: vi.fn(),
+        then: vi.fn(
+          (resolve: (value: ReturnType<typeof getResult>) => unknown) =>
+            Promise.resolve(getResult()).then(resolve),
+        ),
+      };
+      summaryBuilder.select.mockReturnValue(summaryBuilder);
+      summaryBuilder.is.mockReturnValue(summaryBuilder);
+      summaryBuilder.not.mockReturnValue(summaryBuilder);
+      summaryBuilders.push(summaryBuilder);
+      return summaryBuilder;
+    }
+
+    const reactionBuilder = {
+      select: vi.fn(),
+      in: vi.fn(async () => ({ data: [], error: null })),
+    };
+    reactionBuilder.select.mockReturnValue(reactionBuilder);
+
+    const from = vi.fn((table: string) => {
+      if (table === "partner_reviews") {
+        const callIndex = from.mock.calls.length;
+        return callIndex === 1 ? listBuilder : createSummaryBuilder();
+      }
+      if (table === "partner_review_reactions") {
+        return reactionBuilder;
+      }
+      throw new Error(`Unexpected table: ${table}`);
+    });
+    getSupabaseAdminClient.mockReturnValue({ from, rpc });
+
+    const { SupabasePartnerReviewRepository } = await import(
+      "../../src/lib/repositories/supabase/partner-review-repository.supabase"
+    );
+    const repository = new SupabasePartnerReviewRepository();
+    const result = await repository.listPartnerReviews({
+      partnerId: "partner-1",
+      offset: 0,
+      limit: 2,
+      imagesOnly: true,
+    });
+
+    expect(rpc).toHaveBeenCalledWith("get_partner_review_summary", {
+      input_partner_id: "partner-1",
+      input_rating: null,
+      input_images_only: true,
+    });
+    expect(summaryBuilders).toHaveLength(5);
+    for (const [index, summaryBuilder] of summaryBuilders.entries()) {
+      expect(summaryBuilder.select).toHaveBeenCalledWith("id", {
+        count: "exact",
+        head: true,
+      });
+      expect(summaryBuilder.eq).toHaveBeenCalledWith("rating", index + 1);
+      expect(summaryBuilder.not).toHaveBeenCalledWith("images", "eq", "{}");
+    }
+    expect(result.summary).toEqual({
+      averageRating: 4.3,
+      totalCount: 3,
+      distribution: {
+        1: 0,
+        2: 0,
+        3: 0,
+        4: 2,
+        5: 1,
+      },
+    });
+    expect(result.items).toHaveLength(2);
+  });
 });

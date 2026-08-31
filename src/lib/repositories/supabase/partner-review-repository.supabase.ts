@@ -53,6 +53,9 @@ type PartnerReviewSummaryRow = {
   rating_5_count: number | string | null;
 };
 
+const PARTNER_REVIEW_RATINGS = [1, 2, 3, 4, 5] as const;
+type PartnerReviewRating = (typeof PARTNER_REVIEW_RATINGS)[number];
+
 const REVIEW_SELECT =
   "id,partner_id,member_id,rating,title,body,images,created_at,updated_at,deleted_at,hidden_at,members!partner_reviews_member_id_fkey(display_name,generation)";
 
@@ -76,22 +79,7 @@ function applyReviewSort<T extends { order(column: string, options: { ascending:
   return query.order("created_at", { ascending: false });
 }
 
-async function getFilteredReviewSummary(
-  partnerId: string,
-  rating: string,
-  imagesOnly: boolean,
-) {
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase.rpc("get_partner_review_summary", {
-    input_partner_id: partnerId,
-    input_rating: rating === "all" ? null : Number(rating),
-    input_images_only: imagesOnly,
-  });
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const row = ((data ?? [])[0] ?? null) as PartnerReviewSummaryRow | null;
+function mapPartnerReviewSummaryRow(row: PartnerReviewSummaryRow | null) {
   if (!row) {
     return createEmptyPartnerReviewSummary();
   }
@@ -112,6 +100,93 @@ async function getFilteredReviewSummary(
       5: toCount(row.rating_5_count),
     },
   };
+}
+
+function isMissingPartnerReviewSummaryRpc(message: string) {
+  return (
+    message.includes("get_partner_review_summary") &&
+    (message.includes("schema cache") || message.includes("does not exist"))
+  );
+}
+
+async function getFilteredReviewSummaryFallback(
+  partnerId: string,
+  rating: string,
+  imagesOnly: boolean,
+) {
+  const supabase = getSupabaseAdminClient();
+  const selectedRatings: readonly PartnerReviewRating[] =
+    rating === "all"
+      ? PARTNER_REVIEW_RATINGS
+      : [Number(rating) as PartnerReviewRating];
+
+  const counts = await Promise.all(
+    selectedRatings.map(async (selectedRating) => {
+      let query = supabase
+        .from("partner_reviews")
+        .select("id", { count: "exact", head: true })
+        .eq("partner_id", partnerId)
+        .eq("rating", selectedRating)
+        .is("deleted_at", null)
+        .is("hidden_at", null);
+      if (imagesOnly) {
+        query = query.not("images", "eq", "{}");
+      }
+
+      const { count, error } = await query;
+      if (error) {
+        throw new Error(error.message);
+      }
+      return [selectedRating, count ?? 0] as const;
+    }),
+  );
+
+  const distribution = {
+    1: 0,
+    2: 0,
+    3: 0,
+    4: 0,
+    5: 0,
+  };
+  for (const [selectedRating, count] of counts) {
+    distribution[selectedRating] = count;
+  }
+
+  const totalCount = counts.reduce((sum, [, count]) => sum + count, 0);
+  if (totalCount === 0) {
+    return createEmptyPartnerReviewSummary();
+  }
+  const totalRating = counts.reduce(
+    (sum, [selectedRating, count]) => sum + selectedRating * count,
+    0,
+  );
+  return {
+    averageRating: Number((totalRating / totalCount).toFixed(1)),
+    totalCount,
+    distribution,
+  };
+}
+
+async function getFilteredReviewSummary(
+  partnerId: string,
+  rating: string,
+  imagesOnly: boolean,
+) {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase.rpc("get_partner_review_summary", {
+    input_partner_id: partnerId,
+    input_rating: rating === "all" ? null : Number(rating),
+    input_images_only: imagesOnly,
+  });
+  if (error) {
+    if (isMissingPartnerReviewSummaryRpc(error.message)) {
+      return getFilteredReviewSummaryFallback(partnerId, rating, imagesOnly);
+    }
+    throw new Error(error.message);
+  }
+
+  const row = ((data ?? [])[0] ?? null) as PartnerReviewSummaryRow | null;
+  return mapPartnerReviewSummaryRow(row);
 }
 
 async function listReviewRows(
