@@ -59,6 +59,8 @@ export const adminActionErrorMessages: Record<string, string> = {
   partner_account_invalid_email: "담당자 이메일 형식이 올바르지 않습니다.",
   partner_account_invalid_request: "파트너사 계정 입력값을 확인해 주세요.",
   partner_account_exists: "이미 존재하는 로그인 아이디입니다.",
+  partner_account_create_uncertain:
+    "파트너사 계정 생성 중 정리가 끝나지 않았을 수 있습니다. 계정 목록을 확인한 뒤 다시 시도해 주세요.",
   partner_account_company_missing: "연결할 계정과 회사를 찾을 수 없습니다.",
   partner_account_company_invalid_request: "연결 상태 입력값을 확인해 주세요.",
   regional_admin_scope_denied: "배정된 지역의 제휴처 또는 파트너사만 관리할 수 있습니다.",

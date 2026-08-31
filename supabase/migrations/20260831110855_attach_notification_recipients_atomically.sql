@@ -127,16 +127,16 @@ begin
     and (
       normalized_scope = 'all'
       or (
-      normalized_scope = 'year'
-      and member.generation = p_generation
+        normalized_scope = 'year'
+        and member.generation = p_generation
       )
       or (
-      normalized_scope = 'campus'
-      and member.campus = p_campus
+        normalized_scope = 'campus'
+        and member.campus = p_campus
       )
       or (
-      normalized_scope = 'member'
-      and member.id = any(coalesce(p_recipient_member_ids, '{}'::uuid[]))
+        normalized_scope = 'member'
+        and member.id = any(coalesce(p_recipient_member_ids, '{}'::uuid[]))
       )
     );
 
