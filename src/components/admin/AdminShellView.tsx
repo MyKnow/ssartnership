@@ -28,7 +28,7 @@ import {
   ADMIN_PREFETCH_HOVER_DELAY_MS,
   markAdminPrefetchIntent,
 } from "@/lib/admin-prefetch";
-import { useHeaderHeight } from "@/hooks/useAutoHideHeader";
+import { useHeaderHeight } from "@/hooks/useHeaderHeight";
 import {
   ADMIN_NAV_ICON_BY_KEY,
   type AdminNavGroup,
