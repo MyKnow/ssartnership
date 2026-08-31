@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   isMissingPartnerAuthSessionVersionColumnError,
+  omitPartnerAuthSessionVersion,
   withPartnerAuthSessionVersionFallback,
 } from "../src/lib/partner-auth/accounts.ts";
 
@@ -30,6 +31,20 @@ test("auth_session_version missing-column detection is narrow", () => {
     isMissingPartnerAuthSessionVersionColumnError("permission denied for table partner_accounts"),
     false,
   );
+});
+
+test("partner auth payload fallback omits only the session version without mutating input", () => {
+  const payload = {
+    password_hash: "hash",
+    auth_session_version: 3,
+    must_change_password: false,
+  };
+
+  assert.deepEqual(omitPartnerAuthSessionVersion(payload), {
+    password_hash: "hash",
+    must_change_password: false,
+  });
+  assert.equal(payload.auth_session_version, 3);
 });
 
 test("partner account fallback defaults auth_session_version to 1 only when missing or invalid", () => {

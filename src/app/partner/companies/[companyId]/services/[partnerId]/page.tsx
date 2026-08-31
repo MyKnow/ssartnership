@@ -25,6 +25,7 @@ import {
   partnerReviewRepository,
 } from "@/lib/repositories";
 import { SITE_NAME } from "@/lib/site";
+import { readFirstSearchParamOrEmpty } from "@/lib/search-params";
 import {
   cancelPartnerChangeRequestAction,
   savePartnerImmediateChanges,
@@ -39,13 +40,6 @@ type PartnerServiceDetailPageSearchParams = {
   usageBenefit?: string | string[];
   usagePage?: string | string[];
 };
-
-function readSearchParam(value?: string | string[]) {
-  if (Array.isArray(value)) {
-    return value[0] ?? "";
-  }
-  return value ?? "";
-}
 
 function parseUsagePage(value: string) {
   const page = Number.parseInt(value, 10);
@@ -152,23 +146,23 @@ export default async function PartnerCompanyServiceDetailPage({
       paramsDataPromise,
       adPackageRepository.listActiveCouponsForPartner(partnerId).catch(() => []),
     ]);
-  const requestedUsageBenefit = readSearchParam(paramsData.usageBenefit);
+  const requestedUsageBenefit = readFirstSearchParamOrEmpty(paramsData.usageBenefit);
   const selectedUsageBenefit = context.currentBenefits.includes(requestedUsageBenefit)
     ? requestedUsageBenefit
     : null;
   const benefitUsageHistory = await partnerBenefitUsageRepository.listUsageHistory({
     partnerId,
     benefit: selectedUsageBenefit,
-    page: parseUsagePage(readSearchParam(paramsData.usagePage)),
+    page: parseUsagePage(readFirstSearchParamOrEmpty(paramsData.usagePage)),
     pageSize: 25,
   });
   const filteredServiceMetrics = filterPartnerPortalMetricsForPlan(
     serviceMetricsSnapshot.metrics,
     context.brandPlanTier,
   );
-  const mode = readSearchParam(paramsData.mode) === "edit" ? "edit" : "view";
-  const errorCode = readSearchParam(paramsData.error);
-  const successCode = readSearchParam(paramsData.success);
+  const mode = readFirstSearchParamOrEmpty(paramsData.mode) === "edit" ? "edit" : "view";
+  const errorCode = readFirstSearchParamOrEmpty(paramsData.error);
+  const successCode = readFirstSearchParamOrEmpty(paramsData.success);
   const errorMessage = isPartnerChangeRequestErrorCode(errorCode)
     ? getPartnerChangeRequestErrorMessage(errorCode)
     : null;

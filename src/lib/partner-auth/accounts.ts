@@ -19,6 +19,14 @@ export function isMissingPartnerAuthSessionVersionColumnError(
   );
 }
 
+export function omitPartnerAuthSessionVersion<T extends Record<string, unknown>>(
+  payload: T,
+) {
+  const nextPayload = { ...payload };
+  delete nextPayload.auth_session_version;
+  return nextPayload;
+}
+
 export function withPartnerAuthSessionVersionFallback(
   account: PartnerPortalAccountRow | null,
 ): PartnerPortalAccountRow | null {

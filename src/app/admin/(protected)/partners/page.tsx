@@ -24,6 +24,7 @@ import {
 } from "@/lib/admin-scope";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import { AdminPartnersSkeletonContent } from "@/components/loading/AdminPageSkeletons";
+import { readFirstSearchParam } from "@/lib/search-params";
 
 export const dynamic = "force-dynamic";
 
@@ -42,10 +43,6 @@ type AdminPartnersSearchParams = {
   page?: string | string[];
   pageSize?: string | string[];
 };
-
-function getOneSearchParam(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] : value;
-}
 
 function buildPartnerListHref(input: {
   q?: string;
@@ -85,17 +82,17 @@ async function AdminPartnersContent({
   showHeader?: boolean;
 }) {
   const managedCampusFilter = getManagedCampusFilterValues(adminSession.account);
-  const partnerFormError = getOneSearchParam(params.error)
-    ? adminPartnersErrorMessages[getOneSearchParam(params.error) ?? ""]
+  const partnerFormError = readFirstSearchParam(params.error)
+    ? adminPartnersErrorMessages[readFirstSearchParam(params.error) ?? ""]
     : null;
 
   const requestedFilters = parseAdminPartnerListFilters({
-    q: getOneSearchParam(params.q),
-    category: getOneSearchParam(params.category),
-    visibility: getOneSearchParam(params.visibility),
-    sort: getOneSearchParam(params.sort),
-    page: getOneSearchParam(params.page),
-    pageSize: getOneSearchParam(params.pageSize),
+    q: readFirstSearchParam(params.q),
+    category: readFirstSearchParam(params.category),
+    visibility: readFirstSearchParam(params.visibility),
+    sort: readFirstSearchParam(params.sort),
+    page: readFirstSearchParam(params.page),
+    pageSize: readFirstSearchParam(params.pageSize),
   });
   const partnerList = await getAdminPartnerListReadModel({
     filters: requestedFilters,
@@ -214,7 +211,7 @@ export default async function AdminPartnersPage({
   });
   const canManageGlobalSections = !isRegionalAdminAccount(adminSession.account);
   const params = (await searchParams) ?? {};
-  const tab = getOneSearchParam(params.tab);
+  const tab = readFirstSearchParam(params.tab);
   const legacyTabRedirect = resolveAdminPartnerTabRedirect(tab);
   if (legacyTabRedirect) {
     permanentRedirect(legacyTabRedirect);

@@ -7,14 +7,9 @@ import type { PartnerPortalAccountRow } from "./types.ts";
 import {
   getSupabasePartnerPortalAccountById,
   isMissingPartnerAuthSessionVersionColumnError,
+  omitPartnerAuthSessionVersion,
 } from "./accounts.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
-
-function omitPartnerAuthSessionVersion<T extends Record<string, unknown>>(payload: T) {
-  const nextPayload = { ...payload };
-  delete nextPayload.auth_session_version;
-  return nextPayload;
-}
 
 export async function changeSupabasePartnerPortalPassword(input: {
   accountId: string;
