@@ -13,6 +13,7 @@ import {
   getSignedImageUploadHeaders,
 } from "@/lib/image-upload/repository.server";
 import { ImageUploadError } from "@/lib/image-upload/repository";
+import { buildImageUploadQuotaIdentifiers } from "@/lib/image-upload/quota";
 import {
   isImageUploadBlocked,
   recordImageUploadAttempt,
@@ -115,6 +116,7 @@ export async function POST(request: NextRequest) {
       actor: actorResult.actor,
       purpose: parsed.purpose,
       uploads: parsed.uploads,
+      quotaIdentifiers: buildImageUploadQuotaIdentifiers(rateLimitContext),
     });
     await recordImageUploadAttempt("sign", { ...rateLimitContext, success: true });
     return applyGuestCookie(
@@ -134,15 +136,23 @@ export async function POST(request: NextRequest) {
     });
     const isUnavailable = error instanceof ImageUploadError
       && error.code === "image_upload_unavailable";
+    const isQuotaExceeded = error instanceof ImageUploadError
+      && error.code === "image_upload_quota_exceeded";
     return NextResponse.json(
       {
         ok: false,
-        code: isUnavailable ? "image_upload_unavailable" : "upload_sign_failed",
-        message: isUnavailable
-          ? "현재 환경에서는 이미지 업로드를 사용할 수 없습니다."
-          : "이미지 업로드 URL을 발급하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        code: isQuotaExceeded
+          ? "image_upload_quota_exceeded"
+          : isUnavailable
+            ? "image_upload_unavailable"
+            : "upload_sign_failed",
+        message: isQuotaExceeded
+          ? "사진 업로드 한도를 초과했습니다. 잠시 후 다시 시도해 주세요."
+          : isUnavailable
+            ? "현재 환경에서는 이미지 업로드를 사용할 수 없습니다."
+            : "이미지 업로드 URL을 발급하지 못했습니다. 잠시 후 다시 시도해 주세요.",
       },
-      { status: 503 },
+      { status: isQuotaExceeded ? 429 : 503 },
     );
   }
 }
