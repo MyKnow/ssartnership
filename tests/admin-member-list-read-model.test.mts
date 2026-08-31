@@ -209,6 +209,17 @@ test("회원 고급 필터는 전체 ID 집합 대신 DB 페이지 RPC에 전달
   assert.doesNotMatch(source, /toInList|mergeMemberIdFilters/);
 });
 
+test("활성 마케팅 정책이 없으면 마케팅 동의 필터는 RPC 이전에 fail-closed 한다", async () => {
+  const source = await readFile(memberReadModelPath, "utf8");
+
+  assert.match(source, /const requiresMarketingConsentFilter =/);
+  assert.match(source, /filters\.marketingConsentFilter !== "all"/);
+  assert.match(
+    source,
+    /\(requiresMarketingConsentFilter && !activeMarketingPolicy\)/,
+  );
+});
+
 test("회원 목록 URL 필터는 알려진 값만 수용하고 검색 입력을 제한한다", () => {
   const filters = parseAdminMemberListFilters({
     q: `  ${"가".repeat(120)}  `,

@@ -18601,20 +18601,18 @@ as $$
         when 'pending' then privacy_consent.member_id is null
         else false
       end
-      and (
-        input_marketing_policy_id is null
-        or case input_marketing_consent
-          when 'all' then true
-          when 'agreed' then
-            marketing_consent.member_id is not null
-            and coalesce(preferences.marketing_enabled, false)
-          when 'pending' then not (
-            marketing_consent.member_id is not null
-            and coalesce(preferences.marketing_enabled, false)
-          )
-          else false
-        end
-      )
+      and case
+        when input_marketing_consent = 'all' then true
+        when input_marketing_policy_id is null then false
+        when input_marketing_consent = 'agreed' then
+          marketing_consent.member_id is not null
+          and coalesce(preferences.marketing_enabled, false)
+        when input_marketing_consent = 'pending' then not (
+          marketing_consent.member_id is not null
+          and coalesce(preferences.marketing_enabled, false)
+        )
+        else false
+      end
       and case input_push_enabled
         when 'all' then true
         when 'enabled' then coalesce(preferences.enabled, false)

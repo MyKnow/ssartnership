@@ -566,11 +566,17 @@ async function getAdminMemberListReadModelUnbounded({
       ]);
     const activePolicies = policyContext.requiredPolicies;
     const activeMarketingPolicy = policyContext.marketingPolicy;
-    const hasPolicyConsentFilter =
+    const hasRequiredPolicyConsentFilter =
       filters.serviceConsentFilter !== "all" ||
-      filters.privacyConsentFilter !== "all" ||
+      filters.privacyConsentFilter !== "all";
+    const requiresMarketingConsentFilter =
       filters.marketingConsentFilter !== "all";
-    if (hasPolicyConsentFilter && !activePolicies) {
+    const hasPolicyConsentFilter =
+      hasRequiredPolicyConsentFilter || requiresMarketingConsentFilter;
+    if (
+      (hasRequiredPolicyConsentFilter && !activePolicies) ||
+      (requiresMarketingConsentFilter && !activeMarketingPolicy)
+    ) {
       return createEmptyReadModel(filters);
     }
     const from = (page - 1) * pageSize;

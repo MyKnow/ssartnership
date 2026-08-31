@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const migrationPath = new URL(
-  "../supabase/migrations/20260831111653_filter_admin_member_list_in_database.sql",
+  "../supabase/migrations/20260831125549_fail_closed_admin_member_marketing_consent_filter.sql",
   import.meta.url,
 );
 const schemaPath = new URL("../supabase/schema.sql", import.meta.url);
@@ -95,12 +95,34 @@ test("현재 정책 동의와 마케팅 opt-in 계약을 SQL 필터가 유지한
   );
   assert.match(
     migration,
-    /input_marketing_policy_id is null[\s\S]*or case input_marketing_consent[\s\S]*when 'agreed' then[\s\S]*marketing_consent\.member_id is not null[\s\S]*and coalesce\(preferences\.marketing_enabled, false\)[\s\S]*when 'pending' then not/,
+    /case[\s\S]*when input_marketing_consent = 'all' then true[\s\S]*when input_marketing_policy_id is null then false[\s\S]*when input_marketing_consent = 'agreed' then[\s\S]*marketing_consent\.member_id is not null[\s\S]*and coalesce\(preferences\.marketing_enabled, false\)[\s\S]*when input_marketing_consent = 'pending' then not/,
   );
   assert.match(readModel, /input_service_policy_id: activePolicies\?\.service\.id \?\? null/);
   assert.match(readModel, /input_privacy_policy_id: activePolicies\?\.privacy\.id \?\? null/);
   assert.match(readModel, /input_marketing_policy_id: activeMarketingPolicy\?\.id \?\? null/);
-  assert.match(readModel, /hasPolicyConsentFilter && !activePolicies/);
+  assert.match(readModel, /hasRequiredPolicyConsentFilter && !activePolicies/);
+  assert.match(readModel, /requiresMarketingConsentFilter && !activeMarketingPolicy/);
+});
+
+test("활성 마케팅 정책이 없으면 agreed\/pending 마케팅 동의 필터는 fail-closed 계약을 유지한다", async () => {
+  const [migration, readModel] = await Promise.all([
+    readFile(migrationPath, "utf8"),
+    readFile(readModelPath, "utf8"),
+  ]);
+
+  assert.match(
+    migration,
+    /when input_marketing_consent = 'all' then true[\s\S]*when input_marketing_policy_id is null then false/,
+  );
+  assert.doesNotMatch(
+    migration,
+    /input_marketing_policy_id is null[\s\S]*or case input_marketing_consent/,
+  );
+  assert.match(readModel, /const requiresMarketingConsentFilter =/);
+  assert.match(
+    readModel,
+    /\(requiresMarketingConsentFilter && !activeMarketingPolicy\)/,
+  );
 });
 
 test("검색·회원 상태·MM 생명주기·정렬 계약과 service-role 전용 경계를 유지한다", async () => {
