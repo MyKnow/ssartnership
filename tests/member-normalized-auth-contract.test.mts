@@ -217,9 +217,9 @@ test("홈·쿠폰·제휴 접근 권한은 정규화 회원 프로필만 사용�
   assert.match(partnerViewContext, /getMemberCanonicalProfile/);
   assert.match(couponsPage, /getMemberCanonicalProfile/);
   assert.match(homePage, /getMemberCanonicalProfile/);
-  for (const source of [partnerDetailPage, homeStateRoute]) {
-    assert.match(source, /getPartnerViewerContext/);
-  }
+  assert.match(partnerDetailPage, /getPartnerViewerContext/);
+  assert.match(homeStateRoute, /getSignedUserSession/);
+  assert.doesNotMatch(homeStateRoute, /getPartnerViewerContext/);
 
   for (const source of [
     partnerViewContext,
