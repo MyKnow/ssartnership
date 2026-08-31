@@ -101,5 +101,8 @@ test("public image route applies the raster policy and disables MIME sniffing", 
     routeSource,
     /fetchPublicImage\(parsed,\s*\{[\s\S]*allowedContentTypes:\s*PUBLIC_RASTER_IMAGE_CONTENT_TYPES[\s\S]*\}\)/u,
   );
+  assert.match(routeSource, /consumeImageProxyRequestQuota/u);
+  assert.match(routeSource, /status:\s*429/u);
+  assert.match(routeSource, /status:\s*503/u);
   assert.match(routeSource, /"x-content-type-options":\s*"nosniff"/u);
 });

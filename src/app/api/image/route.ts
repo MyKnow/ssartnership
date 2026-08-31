@@ -1,5 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { getRequestLogContext } from "@/lib/activity-logs";
+import { consumeImageProxyRequestQuota } from "@/lib/image-proxy-rate-limit";
 import {
   fetchPublicImage,
   ImageProxyError,
@@ -12,6 +14,20 @@ const WEEK_SECONDS = 60 * 60 * 24 * 7;
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
+  const context = getRequestLogContext(request);
+  const quota = await consumeImageProxyRequestQuota({
+    ipAddress: context.ipAddress,
+  });
+  if (!quota.ok && quota.code === "blocked") {
+    return NextResponse.json({ error: "Too many image requests" }, { status: 429 });
+  }
+  if (!quota.ok) {
+    return NextResponse.json(
+      { error: "Image proxy unavailable" },
+      { status: 503 },
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const target = searchParams.get("url");
 
