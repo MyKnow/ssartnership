@@ -2,6 +2,7 @@ const SAFE_BRANCH_FILE_MESSAGES = new Set([
   "지점 XLSX 파일은 1MB 이하만 업로드할 수 있습니다.",
   "지점 목록은 .xlsx 파일만 업로드할 수 있습니다.",
   "지점 목록 시트를 찾지 못했습니다.",
+  "XLSX 파일의 크기나 구조를 확인해 주세요.",
 ]);
 
 const SAFE_BRANCH_ROW_MESSAGE_PATTERN =

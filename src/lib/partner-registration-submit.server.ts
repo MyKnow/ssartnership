@@ -35,6 +35,7 @@ import {
 import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { PARTNER_MEDIA_BUCKET } from "@/lib/partner-media";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { loadXlsxWorkbookWithinResourceLimits } from "@/lib/xlsx-resource-limits.server";
 
 export type PartnerRegistrationMediaPayload = {
   thumbnailUrl: string | null;
@@ -253,11 +254,8 @@ async function parsePartnerRegistrationBranchXlsxFile(
     throw new Error("지점 목록은 .xlsx 파일만 업로드할 수 있습니다.");
   }
 
-  const workbook = new ExcelJS.Workbook();
   const fileBuffer = Buffer.from(await file.arrayBuffer());
-  await workbook.xlsx.load(
-    fileBuffer as unknown as Parameters<typeof workbook.xlsx.load>[0],
-  );
+  const workbook = await loadXlsxWorkbookWithinResourceLimits(fileBuffer);
   const worksheet = workbook.worksheets[0];
   if (!worksheet) {
     throw new Error("지점 목록 시트를 찾지 못했습니다.");
