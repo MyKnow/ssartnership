@@ -10,3 +10,4 @@ export {
   collectPartnerMediaUrls,
   resolvePartnerMediaPayload,
 } from "./partner-support/media";
+export { rollbackPartnerUpdateMutation } from "./partner-support/update-rollback";

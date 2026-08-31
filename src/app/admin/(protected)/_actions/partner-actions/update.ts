@@ -22,6 +22,7 @@ import {
   cleanupPartnerCompanyProvision,
   collectPartnerMediaUrls,
   ensurePartnerCompanyRow,
+  rollbackPartnerUpdateMutation,
   resolvePartnerMediaPayload,
 } from "@/app/admin/(protected)/_actions/partner-support";
 import {
@@ -235,6 +236,7 @@ export async function updatePartnerAction(formData: FormData) {
     }
   }
 
+  let partnerMutationPersisted = false;
   try {
     const { data: updatedPartner, error } = await supabase
       .from("partners")
@@ -273,6 +275,7 @@ export async function updatePartnerAction(formData: FormData) {
     if (!updatedPartner?.id) {
       throw new Error("제휴처 저장 결과를 확인할 수 없습니다.");
     }
+    partnerMutationPersisted = true;
     const { error: deleteBenefitsError } = await supabase
       .from("partner_benefits")
       .delete()
@@ -294,6 +297,31 @@ export async function updatePartnerAction(formData: FormData) {
       }
     }
   } catch (error) {
+    let rollbackError: unknown = null;
+    if (partnerMutationPersisted) {
+      try {
+        await rollbackPartnerUpdateMutation({
+          supabase,
+          partnerId: id,
+          previousPartner,
+        });
+      } catch (rollbackFailure) {
+        rollbackError = rollbackFailure;
+      }
+    }
+    if (rollbackError) {
+      redirectAdminActionError(
+        redirectPath,
+        getSafeAdminActionErrorCode(rollbackError, "partner_update_failed"),
+        {
+          action: "partner_update",
+          targetType: "partner",
+          targetId: id,
+          properties: { stage: "rollback" },
+        },
+      );
+    }
+
     let mediaCleanupError: unknown = null;
     try {
       await cleanupPartnerMediaOrThrow({
@@ -321,7 +349,9 @@ export async function updatePartnerAction(formData: FormData) {
         action: "partner_update",
         targetType: "partner",
         targetId: id,
-        properties: { stage: "mutation" },
+        properties: {
+          stage: partnerMutationPersisted ? "mutation_rollback" : "mutation",
+        },
       },
     );
   }
