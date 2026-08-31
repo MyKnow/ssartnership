@@ -12,14 +12,62 @@ const simulationDate = new Date("2027-07-09T00:00:00+09:00");
 
 test("default cycle rules derive the 2027-07 state correctly", async () => {
   const {
+    DEFAULT_SSAFY_YEAR_RULE,
+    SSAFY_STAFF_YEAR,
+    getBackfillableSsafyYears,
     getCurrentSsafyYear,
     getCurrentSsafySemester,
+    getSelectableSsafyYears,
+    getSignupSsafyYearText,
+    getSignupSsafyYears,
     getSsafyMemberLifecycle,
     formatSsafyMemberLifecycleLabel,
   } = await yearModulePromise;
+  const {
+    getConfiguredBackfillableSsafyYears,
+    getConfiguredCurrentSsafyYear,
+    getConfiguredSelectableSsafyYears,
+    getConfiguredSignupSsafyYearText,
+    getConfiguredSignupSsafyYears,
+    getSsafyCycleOverview,
+    normalizeSsafyCycleSettings,
+  } = await cycleModulePromise;
+
+  const settings = normalizeSsafyCycleSettings({
+    anchor_year: DEFAULT_SSAFY_YEAR_RULE.anchorYear,
+    anchor_calendar_year: DEFAULT_SSAFY_YEAR_RULE.anchorCalendarYear,
+    anchor_month: DEFAULT_SSAFY_YEAR_RULE.anchorMonth,
+  });
 
   assert.equal(getCurrentSsafyYear(simulationDate), 18);
   assert.equal(getCurrentSsafySemester(simulationDate), 2);
+  assert.equal(getConfiguredCurrentSsafyYear(settings, simulationDate), 18);
+  assert.deepStrictEqual(
+    getConfiguredSelectableSsafyYears(settings, simulationDate),
+    getSelectableSsafyYears(simulationDate),
+  );
+  assert.deepStrictEqual(
+    getConfiguredSignupSsafyYears(settings, simulationDate),
+    getSignupSsafyYears(simulationDate),
+  );
+  assert.equal(
+    getConfiguredSignupSsafyYearText(settings, simulationDate),
+    getSignupSsafyYearText(simulationDate),
+  );
+  assert.deepStrictEqual(
+    getConfiguredBackfillableSsafyYears(settings, simulationDate),
+    getBackfillableSsafyYears(simulationDate),
+  );
+
+  const overview = getSsafyCycleOverview(settings, simulationDate);
+  assert.equal(overview.currentYear, getCurrentSsafyYear(simulationDate));
+  assert.equal(overview.currentSemester, getCurrentSsafySemester(simulationDate));
+  assert.deepStrictEqual(overview.studentYears, getSelectableSsafyYears(simulationDate));
+  assert.equal(overview.staffYear, SSAFY_STAFF_YEAR);
+  assert.equal(overview.graduateThresholdYear, getCurrentSsafyYear(simulationDate) - 2);
+  assert.equal(overview.nextSemesterStartLabel, "2028년 1월 1일");
+  assert.equal(overview.nextCohortStartLabel, "2028년 7월 1일");
+
   assert.deepStrictEqual(getSsafyMemberLifecycle(18, simulationDate), {
     kind: "student",
     currentYear: 18,

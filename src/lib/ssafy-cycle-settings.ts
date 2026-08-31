@@ -1,61 +1,14 @@
 import { unstable_cache } from "next/cache";
-
-export type SsafyYearRule = {
-  anchorYear: number;
-  anchorCalendarYear: number;
-  anchorMonth: number;
-};
-
-export const DEFAULT_SSAFY_YEAR_RULE: SsafyYearRule = {
-  anchorYear: 14,
-  anchorCalendarYear: 2025,
-  anchorMonth: 7,
-};
-
-function getSeoulDateParts(now: Date = new Date()) {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "numeric",
-  });
-
-  const parts = formatter.formatToParts(now);
-  const values = new Map(parts.map((part) => [part.type, part.value]));
-
-  return {
-    year: Number.parseInt(values.get("year") ?? "0", 10),
-    month: Number.parseInt(values.get("month") ?? "0", 10),
-  };
-}
-
-function getHalfYearIndex(calendarYear: number, month: number) {
-  return calendarYear * 2 + (month >= 7 ? 1 : 0);
-}
-
-function getCurrentSsafyYear(
-  now: Date = new Date(),
-  rule: SsafyYearRule = DEFAULT_SSAFY_YEAR_RULE,
-) {
-  const { year, month } = getSeoulDateParts(now);
-  const anchorIndex = getHalfYearIndex(
-    rule.anchorCalendarYear,
-    rule.anchorMonth,
-  );
-  const currentIndex = getHalfYearIndex(year, month);
-  return rule.anchorYear + (currentIndex - anchorIndex);
-}
-
-function getCurrentSsafySemester(now: Date = new Date()) {
-  const { month } = getSeoulDateParts(now);
-  return month >= 7 ? 2 : 1;
-}
-
-function formatSsafyYearLabel(year: number) {
-  if (year === 0) {
-    return "운영진";
-  }
-  return `${year}기`;
-}
+import {
+  DEFAULT_SSAFY_YEAR_RULE,
+  SSAFY_STAFF_YEAR,
+  formatSsafyYearLabel,
+  getCurrentSsafySemester,
+  getCurrentSsafyYear,
+  getSeoulDateParts,
+} from "./ssafy-year";
+import type { SsafyYearRule } from "./ssafy-year";
+export type { SsafyYearRule } from "./ssafy-year";
 
 async function loadSupabaseAdminClient() {
   const { getSupabaseAdminClient } = await import("./supabase/server");
@@ -232,7 +185,7 @@ export function getConfiguredSignupSsafyYears(
   settings: SsafyCycleSettings,
   now: Date = new Date(),
 ) {
-  return [...getConfiguredSelectableSsafyYears(settings, now), 0];
+  return [...getConfiguredSelectableSsafyYears(settings, now), SSAFY_STAFF_YEAR];
 }
 
 export function getConfiguredSignupSsafyYearText(
@@ -248,7 +201,7 @@ export function getConfiguredBackfillableSsafyYears(
   settings: SsafyCycleSettings,
   now: Date = new Date(),
 ) {
-  return [0, ...getConfiguredSelectableSsafyYears(settings, now)];
+  return [SSAFY_STAFF_YEAR, ...getConfiguredSelectableSsafyYears(settings, now)];
 }
 
 export function getSsafyCycleOverview(
@@ -271,7 +224,7 @@ export function getSsafyCycleOverview(
     currentYear,
     currentSemester,
     studentYears: getConfiguredSelectableSsafyYears(settings, now),
-    staffYear: 0,
+    staffYear: SSAFY_STAFF_YEAR,
     graduateThresholdYear: currentYear - 2,
     nextSemesterStartLabel,
     nextCohortStartLabel,
