@@ -19428,13 +19428,13 @@ as $$
   )
   select
     campaign.id as campaign_id,
-    pg_catalog.coalesce(event_counts.home_banner_clicks, 0::bigint),
-    pg_catalog.coalesce(event_counts.coupon_views, 0::bigint),
-    pg_catalog.coalesce(event_counts.coupon_copies, 0::bigint),
-    pg_catalog.coalesce(event_counts.coupon_intent_count, 0::bigint),
-    pg_catalog.coalesce(redemption_rollups.coupon_redemptions, 0::bigint),
-    pg_catalog.coalesce(event_counts.ad_push_sends, 0::bigint),
-    pg_catalog.coalesce(
+    coalesce(event_counts.home_banner_clicks, 0::bigint),
+    coalesce(event_counts.coupon_views, 0::bigint),
+    coalesce(event_counts.coupon_copies, 0::bigint),
+    coalesce(event_counts.coupon_intent_count, 0::bigint),
+    coalesce(redemption_rollups.coupon_redemptions, 0::bigint),
+    coalesce(event_counts.ad_push_sends, 0::bigint),
+    coalesce(
       redemption_rollups.coupon_redemption_counts,
       '{}'::jsonb
     )

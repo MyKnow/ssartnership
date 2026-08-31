@@ -122,6 +122,7 @@ test("광고 rollup SQL은 전체와 제휴처 범위, 쿠폰별 사용 횟수, 
     assert.match(sql, /coalesce\(event_counts\.coupon_intent_count,\s*0::bigint\)/i);
     assert.match(sql, /coalesce\(redemption_rollups\.coupon_redemptions,\s*0::bigint\)/i);
     assert.match(sql, /coalesce\(event_counts\.ad_push_sends,\s*0::bigint\)/i);
+    assert.doesNotMatch(sql, /pg_catalog\.coalesce\s*\(/i);
     assert.match(sql, /jsonb_object_agg\(/i);
     assert.match(sql, /security invoker/i);
     assert.match(sql, /set search_path = pg_catalog, public/i);
