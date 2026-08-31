@@ -123,6 +123,7 @@ export default function ImageCropDialog({
   const effectiveOutputHeight = policy?.height ?? outputHeight;
   const effectiveAspectRatio = policy?.aspectRatio ?? aspectRatio;
   const effectiveQuality = policy ? policy.quality / 100 : quality;
+  const canApply = requiresServerFallback ? Boolean(sourceFile) : croppedAreaPixels !== null;
 
   useEffect(() => {
     if (!open || !portalRoot) {
@@ -274,7 +275,7 @@ export default function ImageCropDialog({
               onClick={exportFile}
               loading={isExporting}
               loadingText={requiresServerFallback ? "서버 변환 준비 중" : "적용 중"}
-              disabled={requiresServerFallback && !sourceFile}
+              disabled={!canApply || isExporting}
               className={cn("min-w-0 sm:w-auto", isExporting ? "pointer-events-none" : null)}
             >
               {requiresServerFallback ? "서버 변환으로 계속" : "적용"}

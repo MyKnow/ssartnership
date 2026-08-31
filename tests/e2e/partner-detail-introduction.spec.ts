@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { gotoPartnerDetail, waitForFonts } from "./readiness";
 
 const viewports = [
   { width: 360, height: 844 },
@@ -21,11 +22,15 @@ test.describe("partner detail introduction", () => {
       });
     }
 
-    for (const viewport of viewports) {
+    await page.setViewportSize(viewports[0]);
+    await gotoPartnerDetail(page, "/partners/health-001");
+
+    for (const [index, viewport] of viewports.entries()) {
       await page.setViewportSize(viewport);
-      await page.goto("/partners/health-001");
-      await page.waitForLoadState("networkidle");
-      await page.evaluate(() => document.fonts.ready);
+      if (index > 0) {
+        await waitForFonts(page);
+        await expect(page.locator("[data-partner-detail-hero-info]")).toBeVisible();
+      }
 
       const detailContainer = page.locator("main > div.mx-auto.w-full").first();
       const hero = page.locator("[data-partner-detail-hero-info]");

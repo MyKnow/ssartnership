@@ -96,6 +96,22 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
     new URL("./e2e/partner-registration.spec.ts", import.meta.url),
     "utf8",
   );
+  const graduateVerification = await readFile(
+    new URL("./e2e/graduate-verification.spec.ts", import.meta.url),
+    "utf8",
+  );
+  const partnerImageCarousel = await readFile(
+    new URL("./e2e/partner-image-carousel.spec.ts", import.meta.url),
+    "utf8",
+  );
+  const partnerDetailIntroduction = await readFile(
+    new URL("./e2e/partner-detail-introduction.spec.ts", import.meta.url),
+    "utf8",
+  );
+  const readinessHelpers = await readFile(
+    new URL("./e2e/readiness.ts", import.meta.url),
+    "utf8",
+  );
   for (const criticalPath of [
     "/",
     "/auth/login",
@@ -260,6 +276,34 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
     publicPartnerNavigationTest,
     /force:\s*true|waitForTimeout|retry/,
   );
+  for (const source of [
+    authOperations,
+    partnerRegistration,
+    graduateVerification,
+    partnerImageCarousel,
+    partnerDetailIntroduction,
+  ]) {
+    assert.doesNotMatch(source, /waitForLoadState\("networkidle"\)/);
+  }
+  assert.match(readinessHelpers, /waitUntil: "domcontentloaded"/);
+  assert.match(
+    readinessHelpers,
+    /getByRole\("navigation", \{ name: "파트너 등록 단계" \}\)/,
+  );
+  assert.match(
+    partnerImageCarousel,
+    /await waitForPartnerDetailGallery\(page\)/,
+  );
+  const introductionTest = partnerDetailIntroduction.match(
+    /test\("puts the period in the header and keeps introduction and tags plain",[\s\S]*?\n  \}\);/,
+  )?.[0];
+  assert.ok(introductionTest);
+  assert.equal(introductionTest.match(/page\.goto\(/g)?.length ?? 0, 0);
+  assert.match(
+    partnerDetailIntroduction,
+    /gotoPartnerDetail\(page, "\/partners\/health-001"\)/,
+  );
+  assert.match(graduateVerification, /await expect\(applyCropButton\)\.toBeEnabled\(\)/);
 });
 
 test("Mattermost signup E2E waits for its finite form readiness instead of global network idle", async () => {

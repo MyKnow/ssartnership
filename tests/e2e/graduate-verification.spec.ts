@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { gotoGraduateSignup } from "./readiness";
 
 const ONE_PIXEL_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
@@ -80,8 +81,7 @@ test.describe("graduate verification application", () => {
       route.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
     );
 
-    await page.goto("/auth/signup/graduate");
-    await page.waitForLoadState("networkidle");
+    await gotoGraduateSignup(page);
     await page.getByRole("textbox", { name: "이메일" }).fill("graduate@example.com");
     await page.getByRole("button", { name: "인증 코드 보내기" }).click();
     await expect(page.getByText(/인증 코드 만료까지 [45]:[0-5]\d 남음/)).toBeVisible();
@@ -120,7 +120,10 @@ test.describe("graduate verification application", () => {
       buffer: ONE_PIXEL_PNG,
     });
     await expect(page.getByText("이미지 편집")).toBeVisible();
-    await page.getByRole("button", { name: "적용" }).click();
+    const applyCropButton = page.getByRole("button", { name: "적용" });
+    await expect(applyCropButton).toBeEnabled();
+    await applyCropButton.click();
+    await expect(page.getByText("이미지 편집")).toHaveCount(0);
     await expect(page.getByText("사진 크롭 완료")).toHaveCount(0);
     await expect(
       page.getByText("얼굴이 분명하게 보이는 사진(최대 5MB)"),

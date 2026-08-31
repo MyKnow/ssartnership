@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
+import { gotoPartnerRegistration } from "./readiness";
 
 test("@critical partner registration reaches a review-ready submit through all five steps", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 360, height: 844 });
-  await page.goto("/partner-registration");
-  await page.waitForLoadState("networkidle");
+  await gotoPartnerRegistration(page);
 
   const stepProgress = page.getByRole("navigation", { name: "파트너 등록 단계" });
   const currentStep = stepProgress.locator('button[aria-current="step"]:visible');

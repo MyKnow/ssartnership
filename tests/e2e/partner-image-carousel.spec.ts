@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { gotoPartnerDetail, waitForPartnerDetailGallery } from "./readiness";
 
 const partnerPath = "/partners/cafe-ssafy-001";
 
@@ -14,9 +15,8 @@ test("keeps tablet gallery wheel navigation inside the page", async ({ page }) =
   });
 
   await page.setViewportSize({ width: 820, height: 1180 });
-  await page.goto(partnerPath);
-  await page.waitForLoadState("networkidle");
-  await page.evaluate(() => document.fonts.ready);
+  await gotoPartnerDetail(page, partnerPath);
+  await waitForPartnerDetailGallery(page);
 
   const carousel = page.locator(
     "[data-partner-image-carousel=main] [data-partner-image-tablet-carousel]",
@@ -73,9 +73,8 @@ test("preserves the document scroll position while changing gallery images", asy
   page,
 }) => {
   await page.setViewportSize({ width: 820, height: 1180 });
-  await page.goto(partnerPath);
-  await page.waitForLoadState("networkidle");
-  await page.evaluate(() => document.fonts.ready);
+  await gotoPartnerDetail(page, partnerPath);
+  await waitForPartnerDetailGallery(page);
 
   const carousel = page.locator(
     "[data-partner-image-carousel=main] [data-partner-image-tablet-carousel]",
@@ -117,9 +116,8 @@ test("moves exactly one image per mobile swipe without pulling the page", async 
   page,
 }) => {
   await page.setViewportSize({ width: 360, height: 844 });
-  await page.goto(partnerPath);
-  await page.waitForLoadState("networkidle");
-  await page.evaluate(() => document.fonts.ready);
+  await gotoPartnerDetail(page, partnerPath);
+  await waitForPartnerDetailGallery(page);
 
   const gallery = page.locator("[data-partner-detail-gallery]");
   const mainFrame = gallery.locator("[data-partner-image-main-frame]");
@@ -151,8 +149,8 @@ test("uses the full-bleed gallery lead only below the mobile breakpoint", async 
   page,
 }) => {
   await page.setViewportSize({ width: 360, height: 844 });
-  await page.goto(partnerPath);
-  await page.evaluate(() => document.fonts.ready);
+  await gotoPartnerDetail(page, partnerPath);
+  await waitForPartnerDetailGallery(page);
 
   const gallery = page.locator("[data-partner-detail-gallery]");
   const hero = page.locator("[data-partner-detail-hero-info]");
