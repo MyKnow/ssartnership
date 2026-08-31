@@ -11,6 +11,13 @@ export const GRADUATE_UPLOAD_TTL_MS = 2 * 60 * 60 * 1000;
 
 export type GraduateUploadKind = "certificate" | "profile_image";
 
+export class GraduateUploadValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GraduateUploadValidationError";
+  }
+}
+
 type GraduateUploadOwner =
   | { challengeId: string; memberId?: never }
   | { challengeId?: never; memberId: string };
@@ -36,7 +43,7 @@ function assertUploadContentType(kind: GraduateUploadKind, contentType: string) 
   ) {
     return;
   }
-  throw new Error("업로드 파일 형식을 확인해 주세요.");
+  throw new GraduateUploadValidationError("업로드 파일 형식을 확인해 주세요.");
 }
 
 function assertUploadSize(kind: GraduateUploadKind, size: number) {
@@ -44,7 +51,7 @@ function assertUploadSize(kind: GraduateUploadKind, size: number) {
     ? MAX_GRADUATE_CERTIFICATE_BYTES
     : MAX_GRADUATE_PROFILE_IMAGE_BYTES;
   if (!Number.isSafeInteger(size) || size <= 0 || size > maxSize) {
-    throw new Error(
+    throw new GraduateUploadValidationError(
       kind === "certificate"
         ? "교육이수증은 10MB 이하만 업로드할 수 있습니다."
         : "본인 사진은 5MB 이하만 업로드할 수 있습니다.",
