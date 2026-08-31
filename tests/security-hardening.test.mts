@@ -271,7 +271,7 @@ test("product event ingress throttle limits requests before their body is parsed
   resetProductEventThrottleForTests();
 });
 
-test("client IP uses Vercel's canonical forwarded header before proxy fallbacks", async () => {
+test("client IP trusts only Vercel's canonical forwarded header on Vercel", async () => {
   const { getClientIp, getTrustedPlatformClientIp } = await clientIpModulePromise;
   const originalVercel = process.env.VERCEL;
 
@@ -321,11 +321,20 @@ test("client IP uses Vercel's canonical forwarded header before proxy fallbacks"
     assert.equal(
       getClientIp(
         new Headers({
+          "x-vercel-forwarded-for": "203.0.113.12",
           "x-forwarded-for": "198.51.100.22",
           "x-real-ip": "198.51.100.23",
         }),
       ),
-      "198.51.100.23",
+      null,
+    );
+    assert.equal(
+      getTrustedPlatformClientIp(
+        new Headers({
+          "x-vercel-forwarded-for": "203.0.113.12",
+        }),
+      ),
+      null,
     );
   } finally {
     if (originalVercel === undefined) {
@@ -336,24 +345,40 @@ test("client IP uses Vercel's canonical forwarded header before proxy fallbacks"
   }
 });
 
-test("admin IP allowlist never trusts caller-controlled proxy fallbacks", async () => {
+test("admin IP allowlist only trusts the Vercel platform header on Vercel", async () => {
   const { getForwardedClientIp } = await adminSecurityModulePromise;
+  const originalVercel = process.env.VERCEL;
 
-  assert.equal(
-    getForwardedClientIp(
-      new Headers({
-        "x-vercel-forwarded-for": "203.0.113.30",
-        "x-forwarded-for": "198.51.100.30",
-      }),
-    ),
-    "203.0.113.30",
-  );
-  assert.equal(
-    getForwardedClientIp(
-      new Headers({ "x-forwarded-for": "203.0.113.30" }),
-    ),
-    null,
-  );
+  try {
+    process.env.VERCEL = "1";
+    assert.equal(
+      getForwardedClientIp(
+        new Headers({
+          "x-vercel-forwarded-for": "203.0.113.30",
+          "x-forwarded-for": "198.51.100.30",
+        }),
+      ),
+      "203.0.113.30",
+    );
+
+    process.env.VERCEL = "";
+    assert.equal(
+      getForwardedClientIp(
+        new Headers({
+          "x-vercel-forwarded-for": "203.0.113.30",
+          "x-forwarded-for": "198.51.100.30",
+          "x-real-ip": "198.51.100.31",
+        }),
+      ),
+      null,
+    );
+  } finally {
+    if (originalVercel === undefined) {
+      delete process.env.VERCEL;
+    } else {
+      process.env.VERCEL = originalVercel;
+    }
+  }
 });
 
 test("same-origin request guard requires matching origin or trusted referrer", async () => {
