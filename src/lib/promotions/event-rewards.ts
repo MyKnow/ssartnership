@@ -3,7 +3,7 @@ import { getMemberNotificationPreferences } from "@/lib/notification-preferences
 import { fetchMemberVisibleReviewCountInRange } from "@/lib/partner-counts";
 import { collectPagedRows } from "@/lib/supabase/paging";
 import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
-import { getPolicyDocumentByKind } from "@/lib/policy-documents";
+import { getPolicyDocumentByKind } from "@/lib/policy-documents.server";
 import { getPushPreferencesOrDefault } from "@/lib/push";
 import {
   sendAdminNotificationCampaign,

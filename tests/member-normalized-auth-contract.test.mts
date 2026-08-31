@@ -96,7 +96,7 @@ test("운영 bootstrap과 Preview seed도 정규화된 관리자 관계를 사�
 });
 
 test("정책 동의는 회원 mirror 대신 consent ledger를 기준으로 판정한다", () => {
-  const policyDocuments = readRepoFile("src/lib/policy-documents.ts");
+  const policyDocuments = readRepoFile("src/lib/policy-documents.server.ts");
   const userAuth = readRepoFile("src/lib/user-auth.ts");
   const notificationPreferences = readRepoFile(
     "src/lib/notification-preferences.ts",

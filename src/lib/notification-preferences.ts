@@ -1,7 +1,7 @@
 import {
   getMemberPolicyConsentVersions,
   getPolicyDocumentByKind,
-} from "@/lib/policy-documents";
+} from "@/lib/policy-documents.server";
 import {
   countActivePushSubscriptions,
   DEFAULT_PUSH_PREFERENCES,

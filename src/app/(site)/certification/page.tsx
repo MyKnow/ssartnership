@@ -12,7 +12,7 @@ import { getSignedUserSession } from "@/lib/user-auth";
 import CertificationView from "@/components/certification/CertificationView";
 import { SITE_NAME } from "@/lib/site";
 import { sanitizeReturnTo } from "@/lib/return-to";
-import { listCohortCardThemes } from "@/lib/cohort-card-themes";
+import { listCohortCardThemes } from "@/lib/cohort-card-themes.server";
 import { getMemberProfilePhotoAccessState } from "@/lib/member-profile-photo";
 import Button from "@/components/ui/Button";
 import { buildMemberGateHref } from "@/lib/member-required-gates";

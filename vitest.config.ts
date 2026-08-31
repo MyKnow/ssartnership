@@ -15,6 +15,15 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.join(dirname, "src"),
+      "server-only": path.join(
+        dirname,
+        "node_modules",
+        "next",
+        "dist",
+        "compiled",
+        "server-only",
+        "empty.js",
+      ),
     },
   },
   optimizeDeps: {

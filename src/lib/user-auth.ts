@@ -5,7 +5,7 @@ import {
   evaluateRequiredPolicyStatus,
   getActiveRequiredPolicies,
   getMemberPolicyConsentVersions,
-} from "@/lib/policy-documents";
+} from "@/lib/policy-documents.server";
 import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "./hmac.js";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";

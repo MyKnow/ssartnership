@@ -12,7 +12,7 @@ import {
   getMemberProfileImageUrl,
 } from "@/lib/member-profile-view";
 import { getSignedUserSession } from "@/lib/user-auth";
-import { listCohortCardThemes } from "@/lib/cohort-card-themes";
+import { listCohortCardThemes } from "@/lib/cohort-card-themes.server";
 
 export const dynamic = "force-dynamic";
 

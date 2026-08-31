@@ -4,7 +4,7 @@ import {
   normalizeNotificationTargetUrl,
   type NotificationChannel,
 } from "@/lib/notifications/shared";
-import { getPolicyDocumentByKind } from "@/lib/policy-documents";
+import { getPolicyDocumentByKind } from "@/lib/policy-documents.server";
 import { getActiveSubscriptionPushPreferences } from "@/lib/push/preferences";
 import { getPushEnv, isPushConfigured } from "@/lib/push/config";
 import { resolvePushAudience } from "@/lib/push/audience";

@@ -11,7 +11,7 @@ import {
 } from "@/lib/member-profile-view";
 import { getMemberProfilePhotoAccessState } from "@/lib/member-profile-photo";
 import { resolvePartnerAudienceFromMemberYear } from "@/lib/partner-audience";
-import { listCohortCardThemes } from "@/lib/cohort-card-themes";
+import { listCohortCardThemes } from "@/lib/cohort-card-themes.server";
 import { getPartnerServiceMode } from "@/lib/partner-service-mode";
 import {
   isPartnerBenefitUseAvailable,

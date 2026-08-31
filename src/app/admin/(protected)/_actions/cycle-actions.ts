@@ -32,7 +32,7 @@ import {
 import {
   deleteCohortCardTheme,
   upsertCohortCardTheme,
-} from "@/lib/cohort-card-themes";
+} from "@/lib/cohort-card-themes.server";
 import { SITE_NAME } from "@/lib/site";
 import {
   logAdminAction,

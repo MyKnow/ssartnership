@@ -9,7 +9,7 @@ import Card from "@/components/ui/Card";
 import CertificationCardFrame from "@/components/certification/CertificationCardFrame";
 import { getHeaderSession } from "@/lib/header-session";
 import { SITE_NAME } from "@/lib/site";
-import { listCohortCardThemes } from "@/lib/cohort-card-themes";
+import { listCohortCardThemes } from "@/lib/cohort-card-themes.server";
 import {
   getCertificationRoleLabel,
   getCertificationScheme,

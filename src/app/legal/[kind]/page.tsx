@@ -8,7 +8,7 @@ import {
   getPolicyDocumentsByKind,
   getPolicyKindLabel,
   isPolicyKind,
-} from "@/lib/policy-documents";
+} from "@/lib/policy-documents.server";
 import { SITE_NAME } from "@/lib/site";
 
 type PageProps = {
