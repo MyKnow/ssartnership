@@ -1,10 +1,49 @@
 import { formatSsafyYearLabel } from "../ssafy-year.ts";
 import { getMmUserDirectoryEntriesByAccountIds } from "../mm-directory/identities.ts";
+import {
+  collectPagedRows,
+  collectRowsByFilterChunks,
+} from "../supabase/paging.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 import { parseMemberYearValue } from "../validation.ts";
 import { wrapPushDbError } from "./config.ts";
 import { PushError } from "./types.ts";
 import type { PushAudience, ResolvedPushAudience } from "./types.ts";
+
+type AudienceMemberIdRow = { id: string };
+type AudienceMemberRow = {
+  id: string;
+  display_name: string | null;
+  mattermost_account_id: string | null;
+};
+
+async function listAudienceMemberIds(input: {
+  year?: number;
+  campus?: string;
+}) {
+  const supabase = getSupabaseAdminClient();
+  const result = await collectPagedRows<AudienceMemberIdRow>(
+    null,
+    async (from, to) => {
+      let query = supabase.from("members").select("id");
+      query = query.is("deleted_at", null);
+      if (input.year !== undefined) {
+        query = query.eq("generation", input.year);
+      }
+      if (input.campus !== undefined) {
+        query = query.eq("campus", input.campus);
+      }
+      const { data, error } = await query
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (error) {
+        throw wrapPushDbError(error, "발송 대상을 불러오지 못했습니다.");
+      }
+      return { rows: (data ?? []) as AudienceMemberIdRow[], error: false };
+    },
+  );
+  return result.rows.map((item) => item.id);
+}
 
 export function getDefaultPushAudience(): PushAudience {
   return { scope: "all" };
@@ -62,8 +101,10 @@ export function parsePushAudience(input: unknown): PushAudience {
 
 export async function resolvePushAudience(
   audience: PushAudience,
+  options: { materializeMemberIds?: boolean } = {},
 ): Promise<ResolvedPushAudience> {
   const supabase = getSupabaseAdminClient();
+  const materializeMemberIds = options.materializeMemberIds !== false;
 
   if (audience.scope === "all") {
     return {
@@ -77,14 +118,9 @@ export async function resolvePushAudience(
   }
 
   if (audience.scope === "year") {
-    const { data, error } = await supabase
-      .from("members")
-      .select("id")
-      .eq("generation", audience.year);
-
-    if (error) {
-      throw wrapPushDbError(error, "발송 대상을 불러오지 못했습니다.");
-    }
+    const memberIds = materializeMemberIds
+      ? await listAudienceMemberIds({ year: audience.year })
+      : null;
 
     return {
       scope: "year",
@@ -92,19 +128,14 @@ export async function resolvePushAudience(
       year: audience.year,
       campus: null,
       memberId: null,
-      memberIds: (data ?? []).map((item) => item.id),
+      memberIds,
     };
   }
 
   if (audience.scope === "campus") {
-    const { data, error } = await supabase
-      .from("members")
-      .select("id")
-      .eq("campus", audience.campus);
-
-    if (error) {
-      throw wrapPushDbError(error, "발송 대상을 불러오지 못했습니다.");
-    }
+    const memberIds = materializeMemberIds
+      ? await listAudienceMemberIds({ campus: audience.campus })
+      : null;
 
     return {
       scope: "campus",
@@ -112,7 +143,7 @@ export async function resolvePushAudience(
       year: null,
       campus: audience.campus,
       memberId: null,
-      memberIds: (data ?? []).map((item) => item.id),
+      memberIds,
     };
   }
 
@@ -123,14 +154,21 @@ export async function resolvePushAudience(
     typeof audience.memberId === "string" ? audience.memberId.trim() : String(audience.memberId ?? "").trim();
   const targetIds =
     memberIds.length > 0 ? Array.from(new Set(memberIds)) : fallbackMemberId ? [fallbackMemberId] : [];
-  const { data, error } = await supabase
-    .from("members")
-    .select("id,display_name,mattermost_account_id")
-    .in("id", targetIds);
-
-  if (error) {
-    throw wrapPushDbError(error, "발송 대상을 불러오지 못했습니다.");
-  }
+  const memberResult = await collectRowsByFilterChunks<string, AudienceMemberRow>(
+    targetIds,
+    async (memberIdChunk) => {
+      const { data, error } = await supabase
+        .from("members")
+        .select("id,display_name,mattermost_account_id")
+        .is("deleted_at", null)
+        .in("id", [...memberIdChunk]);
+      if (error) {
+        throw wrapPushDbError(error, "발송 대상을 불러오지 못했습니다.");
+      }
+      return { rows: (data ?? []) as AudienceMemberRow[], error: false };
+    },
+  );
+  const data = memberResult.rows;
   if (!data || data.length === 0) {
     throw new PushError("not_found", "개인 발송 대상을 찾을 수 없습니다.");
   }

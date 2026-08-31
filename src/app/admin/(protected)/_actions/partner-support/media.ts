@@ -13,6 +13,7 @@ import {
 } from "@/lib/partner-media";
 import {
   buildPartnerMediaStoragePath,
+  rethrowAfterPartnerMediaCleanup,
 } from "@/lib/partner-media-storage";
 import type { PartnerMediaInput } from "../shared-types";
 
@@ -62,38 +63,47 @@ export async function resolvePartnerMediaPayload(
     if (!attached.url) {
       throw new Error("제휴처 이미지 URL을 만들지 못했습니다.");
     }
+    uploadedUrls.push(attached.url);
     return attached.url;
   };
 
-  if (thumbnailManifest?.thumbnail) {
-    if (thumbnailManifest.thumbnail.kind === "existing") {
-      thumbnail = thumbnailManifest.thumbnail.url;
-    } else {
-      if (!thumbnailManifest.thumbnail.uploadId) {
+  try {
+    if (thumbnailManifest?.thumbnail) {
+      if (thumbnailManifest.thumbnail.kind === "existing") {
+        thumbnail = thumbnailManifest.thumbnail.url;
+      } else {
+        if (!thumbnailManifest.thumbnail.uploadId) {
+          throw new Error("완료된 공통 이미지 업로드를 확인해 주세요.");
+        }
+        thumbnail = await attachUpload(thumbnailManifest.thumbnail.uploadId, "thumbnail", 0);
+      }
+    }
+
+    const images: string[] = [];
+    const galleryEntries = galleryManifest?.gallery ?? [];
+    for (const [index, entry] of galleryEntries.entries()) {
+      if (entry.kind === "existing") {
+        images.push(entry.url);
+        continue;
+      }
+      if (!entry.uploadId) {
         throw new Error("완료된 공통 이미지 업로드를 확인해 주세요.");
       }
-      thumbnail = await attachUpload(thumbnailManifest.thumbnail.uploadId, "thumbnail", 0);
+      images.push(await attachUpload(entry.uploadId, "gallery", index));
     }
-  }
 
-  const images: string[] = [];
-  const galleryEntries = galleryManifest?.gallery ?? [];
-  for (const [index, entry] of galleryEntries.entries()) {
-    if (entry.kind === "existing") {
-      images.push(entry.url);
-      continue;
-    }
-    if (!entry.uploadId) {
-      throw new Error("완료된 공통 이미지 업로드를 확인해 주세요.");
-    }
-    images.push(await attachUpload(entry.uploadId, "gallery", index));
+    return {
+      thumbnail,
+      images,
+      uploadedUrls,
+    };
+  } catch (originalError) {
+    return rethrowAfterPartnerMediaCleanup({
+      urls: uploadedUrls,
+      originalError,
+      logContext: "admin-partner-media",
+    });
   }
-
-  return {
-    thumbnail,
-    images,
-    uploadedUrls,
-  };
 }
 
 export function collectPartnerMediaUrls(

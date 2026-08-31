@@ -56,6 +56,7 @@ const sensitiveTables = [
   "graduate_email_challenges",
   "graduate_verification_uploads",
   "image_upload_sessions",
+  "image_upload_quota_windows",
   "member_password_action_tokens",
   "member_email_challenges",
   "manual_member_import_batches",

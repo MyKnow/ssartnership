@@ -10,9 +10,12 @@ import { createClient } from "@supabase/supabase-js";
 import {
   createSafeStorageOperationError,
   formatStorageError,
+  getPreviewStorageBucketName,
+  isInvalidPreviewRequiredStorageBucket,
   isPreviewRequiredStorageBucket,
   runStorageOperation,
   shouldAbortPreviewStorageObjectSync,
+  shouldSyncPreviewStorageBucket,
 } from "./supabase-sync-preview-storage.mjs";
 import { isMissingSupabasePoolerTenantErrorMessage } from "./supabase-db-health-lib.mjs";
 import {
@@ -549,7 +552,7 @@ async function seedPreviewMemberCredentials(previewUrl, previewServiceRoleKey) {
 }
 
 function bucketNameFrom(bucket) {
-  return bucket.id ?? bucket.name;
+  return getPreviewStorageBucketName(bucket);
 }
 
 function isFolderEntry(entry) {
@@ -769,9 +772,21 @@ async function syncStorageBuckets(productionUrl, productionServiceRoleKey, previ
     );
   }
 
-  const buckets = prodBuckets ?? [];
+  const discoveredBuckets = prodBuckets ?? [];
+  if (discoveredBuckets.some(isInvalidPreviewRequiredStorageBucket)) {
+    throw new Error(
+      "Preview required storage bucket member-profile-images must have consistent private bucket metadata.",
+    );
+  }
+  const buckets = discoveredBuckets.filter(shouldSyncPreviewStorageBucket);
+  const skippedBucketCount = discoveredBuckets.length - buckets.length;
+  if (skippedBucketCount > 0) {
+    console.log(
+      `Skipping ${skippedBucketCount} private or malformed production storage bucket(s) outside the Preview allowlist.`,
+    );
+  }
   if (buckets.length === 0) {
-    console.log("No production buckets found. Skipping storage sync.");
+    console.log("No eligible production buckets found. Skipping storage sync.");
     return;
   }
 

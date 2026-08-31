@@ -32,3 +32,11 @@ test("복구 승인에는 운영자가 선택한 기존 회원만 연결되고 �
   assert.match(queue, /name="existingMemberId"/);
   assert.match(actions, /getOptionalId\(formData, "existingMemberId", returnTo\)/);
 });
+
+test("수료생 인증 관리자 액션은 엔터티 ID를 공용 UUID 계약으로 검증한다", () => {
+  const actions = read("src/app/admin/(protected)/graduate-verifications/actions.ts");
+
+  assert.match(actions, /import \{ isUuid \} from "@\/lib\/uuid";/);
+  assert.equal(actions.match(/!isUuid\(value\)/g)?.length, 2);
+  assert.equal(actions.includes("/^[0-9a-f-]{36}$/i"), false);
+});

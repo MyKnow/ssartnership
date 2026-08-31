@@ -7,12 +7,9 @@ import CouponPartnerVerificationView from "@/components/coupons/CouponPartnerVer
 import { adPackageRepository } from "@/lib/repositories";
 import { SITE_NAME } from "@/lib/site";
 import { getHeaderSession } from "@/lib/header-session";
-import {
-  getMemberCanonicalProfile,
-  getMemberProfileImageUrl,
-} from "@/lib/member-profile-view";
+import { getCertificationMemberView } from "@/lib/certification-member-view.server";
 import { getSignedUserSession } from "@/lib/user-auth";
-import { listCohortCardThemes } from "@/lib/cohort-card-themes";
+import { listCohortCardThemes } from "@/lib/cohort-card-themes.server";
 
 export const dynamic = "force-dynamic";
 
@@ -34,15 +31,15 @@ export default async function CouponsPage({
     redirect(`/auth/login?returnTo=${encodeURIComponent("/coupons")}`);
   }
 
-  const [member, headerSession, coupons, params] = await Promise.all([
-    getMemberCanonicalProfile(session.userId),
+  const [memberView, headerSession, coupons, params] = await Promise.all([
+    getCertificationMemberView(session.userId),
     getHeaderSession(session.userId),
     adPackageRepository.listIssuedCouponsForMember({
       memberId: session.userId,
     }),
     searchParams ?? Promise.resolve<{ issueId?: string | string[] }>({}),
   ]);
-  if (!member) {
+  if (!memberView) {
     redirect(`/auth/login?returnTo=${encodeURIComponent("/coupons")}`);
   }
 
@@ -51,19 +48,6 @@ export default async function CouponsPage({
     ? coupons.find((item) => item.issueId === rawIssueId && item.coupon.redemptionType === "onsite")
     : null;
   const cohortCardThemes = selectedItem ? await listCohortCardThemes() : [];
-  const verificationMember = {
-    mattermostUsername: member.mattermostUsername,
-    displayName: member.displayName,
-    generation: member.generation,
-    campus: member.campus,
-    graduateVerifiedAt: member.graduateVerifiedAt,
-    profileImageUrl:
-      member.activeProfileImageId &&
-      member.profilePhotoReviewStatus === "approved" &&
-      !member.mustChangePassword
-        ? getMemberProfileImageUrl(member.id)
-        : null,
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -74,7 +58,7 @@ export default async function CouponsPage({
             <div className="mx-auto max-w-5xl">
               <CouponPartnerVerificationView
                 item={selectedItem}
-                member={verificationMember}
+                member={memberView.member}
                 cohortCardThemes={cohortCardThemes}
               />
             </div>

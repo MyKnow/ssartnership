@@ -74,6 +74,26 @@ export type AdCampaignOption = {
   label: string;
 };
 
+export type PreparedAdminCampaigns = {
+  options: AdCampaignOption[];
+  campaigns: Promise<AdCampaignWithStats[]>;
+};
+
+export function toAdCampaignOption(
+  campaign: Pick<
+    AdCampaign,
+    "id" | "partnerId" | "partnerName" | "sponsorLabel" | "title"
+  >,
+): AdCampaignOption {
+  const sponsor =
+    campaign.sponsorLabel.trim() || campaign.partnerName.trim() || "제휴처";
+  return {
+    id: campaign.id,
+    partnerId: campaign.partnerId,
+    label: `${sponsor} · ${campaign.title}`,
+  };
+}
+
 export type AdCouponRedemption = {
   id: string;
   couponId: string;
@@ -191,8 +211,10 @@ export type RedeemAdCouponResult =
     };
 
 export interface AdPackageRepository {
-  listAdminCampaigns(options?: { now?: Date }): Promise<AdCampaignWithStats[]>;
-  listAdminCampaignOptions(): Promise<AdCampaignOption[]>;
+  /** Shares one base campaign read between eager options and deferred stats. */
+  prepareAdminCampaigns(): Promise<PreparedAdminCampaigns>;
+  listAdminCampaigns(): Promise<AdCampaignWithStats[]>;
+  listAdminCampaignsForPartner(partnerId: string): Promise<AdCampaignWithStats[]>;
   listAdminCouponsForPartner(partnerId: string): Promise<AdCoupon[]>;
   getAdminCouponById(couponId: string): Promise<AdCoupon | null>;
   listActiveCouponsForPartner(

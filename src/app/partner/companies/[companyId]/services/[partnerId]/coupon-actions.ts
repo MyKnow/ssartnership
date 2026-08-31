@@ -38,6 +38,12 @@ export async function uploadPartnerCouponCodesAction(formData: FormData) {
   const couponId = String(formData.get("couponId") ?? "").trim();
   const scope = await assertPartnerPortalCompanyAccess(session, companyId);
   if (!scope || !partnerId || !couponId) throw new Error("제휴처 권한을 확인할 수 없습니다.");
+  const context = await getPartnerChangeRequestContext(
+    [scope.id],
+    partnerId,
+    session.accountId,
+  );
+  if (!context) throw new Error("제휴처 권한을 확인할 수 없습니다.");
   const coupon = (await adPackageRepository.listActiveCouponsForPartner(partnerId)).find((item) => item.id === couponId);
   if (!coupon || coupon.issuanceType !== "partner_code_pool") throw new Error("코드형 쿠폰만 코드를 등록할 수 있습니다.");
   const file = formData.get("codePoolFile");

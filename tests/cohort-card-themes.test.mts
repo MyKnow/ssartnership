@@ -3,11 +3,11 @@ import { test } from "node:test";
 import {
   getContrastRatio,
   getReadableTextColorForGradient,
-  listCohortCardThemes,
   parseCohortCardThemeDeletePayload,
   parseCohortCardThemePayload,
   type CohortCardTheme,
 } from "../src/lib/cohort-card-themes.ts";
+import { listCohortCardThemes } from "../src/lib/cohort-card-themes.server.ts";
 import {
   getCertificationRoleLabel,
   getCertificationScheme,

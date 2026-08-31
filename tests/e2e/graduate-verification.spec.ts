@@ -132,7 +132,9 @@ test.describe("graduate verification application", () => {
     const cropDialogTitle = page.getByTestId("image-crop-dialog-title");
     await expect(cropDialogTitle).toBeVisible();
     await expect(page.locator(".reactEasyCrop_Container")).toBeVisible();
-    await page.getByRole("button", { name: "적용" }).click();
+    const applyCropButton = page.getByRole("button", { name: "적용" });
+    await expect(applyCropButton).toBeEnabled();
+    await applyCropButton.click();
     await expect(cropDialogTitle).toHaveCount(0, { timeout: 15_000 });
     await expect(page.getByText("사진 크롭 완료")).toHaveCount(0);
     await expect(

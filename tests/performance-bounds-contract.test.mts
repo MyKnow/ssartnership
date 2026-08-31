@@ -39,7 +39,8 @@ test("만료 프로모션 정리는 한 번에 100건만 조회하고 내부 오
   const source = read("../src/app/api/cron/archive-expired-promotions/route.ts");
 
   assert.match(source, /const ARCHIVE_EVENT_BATCH_SIZE = 100;/);
-  assert.match(source, /\.limit\(ARCHIVE_EVENT_BATCH_SIZE\)/);
+  assert.match(source, /input_limit: ARCHIVE_EVENT_BATCH_SIZE/);
+  assert.match(source, /rpc\("archive_expired_promotions_batch"/);
   assert.match(source, /getCronErrorResponse\("archive-expired-promotions"\)/);
   assert.doesNotMatch(source, /message: \w+Error\.message/);
 });
@@ -65,4 +66,23 @@ test("이미지 정규화와 수동 회원 사진 준비는 공용 제한 동시
     manualImport,
     /Promise\.all\(rowsResult\.acceptedRows\.map/,
   );
+});
+
+test("관리자와 파트너 알림 일괄 변경은 행 본문 대신 영향 행 수만 반환한다", () => {
+  const sources = [
+    read("../src/lib/admin-notification-store.ts"),
+    read("../src/lib/partner-notification-store.ts"),
+  ];
+
+  for (const source of sources) {
+    assert.match(
+      source,
+      /\.update\(\{ read_at: now, updated_at: now \}, \{ count: "exact" \}\)/,
+    );
+    assert.match(
+      source,
+      /\.update\(\{ deleted_at: now, updated_at: now \}, \{ count: "exact" \}\)/,
+    );
+    assert.doesNotMatch(source, /query\.select\("id"\)/);
+  }
 });

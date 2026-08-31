@@ -17,6 +17,7 @@ import type {
   NotificationDeliveryClaimInput,
   NotificationDeliveryClaimResult,
   NotificationListContext,
+  NotificationRecipientAudience,
   NotificationRepository,
   TransitionNotificationDeliveryInput,
 } from "@/lib/repositories/notification-repository";
@@ -186,41 +187,49 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       new Set((input.recipientMemberIds ?? []).filter((value) => value.trim().length > 0)),
     );
 
-    if (recipientMemberIds.length > 0) {
-      const now = new Date().toISOString();
-      const memberNotificationRows = recipientMemberIds.map((memberId) => ({
-        notification_id: notification.id,
-        member_id: memberId,
-        read_at: null,
-        deleted_at: null,
-        created_at: now,
-        updated_at: now,
-      }));
-
-      const deliveryRows = recipientMemberIds.map((memberId) => ({
-        notification_id: notification.id,
-        member_id: memberId,
-        channel: "in_app",
-        status: "sent",
-        delivered_at: now,
-      }));
-
-      const { error: memberNotificationError } = await supabase
-        .from("member_notifications")
-        .insert(memberNotificationRows);
-      if (memberNotificationError) {
-        throw createNotificationStorageError(memberNotificationError);
-      }
-
-      const { error: deliveryError } = await supabase
-        .from("notification_deliveries")
-        .insert(deliveryRows);
-      if (deliveryError) {
-        throw createNotificationStorageError(deliveryError);
-      }
-    }
+    await this.addNotificationRecipients(notification.id, recipientMemberIds);
 
     return { notification, recipientMemberIds };
+  }
+
+  async addNotificationRecipients(
+    notificationId: string,
+    recipientMemberIds: string[],
+  ) {
+    const normalizedRecipientIds = Array.from(
+      new Set(recipientMemberIds.map((value) => value.trim()).filter(Boolean)),
+    );
+    const supabase = getSupabaseAdminClient();
+    const { error } = await supabase.rpc("attach_notification_recipients", {
+      p_notification_id: notificationId,
+      p_recipient_member_ids: normalizedRecipientIds,
+    });
+    if (error) {
+      throw createNotificationStorageError(error);
+    }
+  }
+
+  async addNotificationAudienceRecipients(
+    notificationId: string,
+    audience: NotificationRecipientAudience,
+  ) {
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase.rpc("attach_notification_audience", {
+      p_notification_id: notificationId,
+      p_scope: audience.scope,
+      p_generation: audience.year ?? null,
+      p_campus: audience.campus ?? null,
+      p_recipient_member_ids: Array.from(
+        new Set((audience.memberIds ?? []).map((value) => value.trim()).filter(Boolean)),
+      ),
+    });
+    if (error) {
+      throw createNotificationStorageError(error);
+    }
+    if (typeof data !== "number" || !Number.isSafeInteger(data) || data < 0) {
+      throw new Error("알림 수신자 저장 결과를 확인하지 못했습니다.");
+    }
+    return data;
   }
 
   async claimNotificationCampaign(
@@ -432,6 +441,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
       .eq("member_id", context.memberId)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .range(offset, offset + limit);
 
     const [{ count, error: unreadError }, { data, error: listError }] =

@@ -1,17 +1,18 @@
-import ExcelJS from "exceljs";
 import {
   AD_COUPON_CODE_BATCH_LIMIT,
   assertValidAdCouponCodeBatch,
   normalizeCouponCodeRows,
 } from "@/lib/ad-coupon-domain";
+import { loadXlsxWorkbookWithinResourceLimits } from "@/lib/xlsx-resource-limits.server";
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 export async function parseCouponCodeWorkbook(file: File) {
   if (!file || file.size === 0) return [];
   if (file.size > MAX_UPLOAD_BYTES) throw new Error("쿠폰 코드 파일은 5MB 이하만 업로드할 수 있습니다.");
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(Buffer.from(await file.arrayBuffer()) as never);
+  const workbook = await loadXlsxWorkbookWithinResourceLimits(
+    Buffer.from(await file.arrayBuffer()),
+  );
   const sheet = workbook.worksheets[0];
   if (!sheet) return [];
   const values: unknown[] = [];

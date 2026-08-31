@@ -174,4 +174,15 @@ test("review submission parser separates malformed body from field validation", 
       : null,
     "별점은 1점부터 5점까지 선택해 주세요.",
   );
+
+  const withoutClientReviewId = parseReviewSubmissionRequest({
+    rating: 5,
+    title: "시설이 깔끔해요",
+    body: "운동 기구와 샤워실이 모두 깔끔했습니다.",
+    imagesManifest: { images: [] },
+  });
+  assert.equal(withoutClientReviewId.ok, true);
+  if (withoutClientReviewId.ok) {
+    assert.equal(withoutClientReviewId.values.reviewId, null);
+  }
 });

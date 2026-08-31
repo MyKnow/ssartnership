@@ -691,10 +691,22 @@ export async function prepareManualMemberImport(input: {
       .from("manual_member_import_rows")
       .insert(insertRows);
     if (rowsError) {
-      await supabase.from("manual_member_import_batches").delete().eq("id", batch.id);
-      throw new Error("가져오기 행을 저장하지 못했습니다.");
+      const { error: cleanupBatchError } = await supabase
+        .from("manual_member_import_batches")
+        .delete()
+        .eq("id", batch.id);
+      if (cleanupBatchError) {
+        throw new Error("회원 가져오기 배치를 정리하지 못했습니다.");
+      }
+      throw new Error("회원 가져오기 행을 저장하지 못했습니다.");
     }
-    await supabase.from("manual_member_import_batches").update({ status: "ready" }).eq("id", batch.id);
+    const { error: readyError } = await supabase
+      .from("manual_member_import_batches")
+      .update({ status: "ready" })
+      .eq("id", batch.id);
+    if (readyError) {
+      throw new Error("회원 가져오기 배치 상태를 준비로 전환하지 못했습니다.");
+    }
     return { ok: true, batchId: batch.id as string, expiresAt };
   } catch (error) {
     return { ok: false, errors: [getSafeFailureMessage(error)] };

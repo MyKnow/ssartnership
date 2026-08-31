@@ -95,6 +95,7 @@ export async function PATCH(
   revalidatePartnerReviewPaths(result.partnerId);
   await logAdminAudit({
     ...getRequestLogContext(request),
+    actorType: "partner",
     actorId: session.accountId,
     action:
       action === "hide"

@@ -4,7 +4,7 @@ import {
   normalizeNotificationTargetUrl,
   type NotificationChannel,
 } from "@/lib/notifications/shared";
-import { getPolicyDocumentByKind } from "@/lib/policy-documents";
+import { getPolicyDocumentByKind } from "@/lib/policy-documents.server";
 import { getActiveSubscriptionPushPreferences } from "@/lib/push/preferences";
 import { getPushEnv, isPushConfigured } from "@/lib/push/config";
 import { resolvePushAudience } from "@/lib/push/audience";
@@ -20,6 +20,11 @@ import type {
 } from "@/lib/push/types";
 import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import {
+  collectPagedRows,
+  collectPagedRowsByFilterChunks,
+  collectRowsByFilterChunks,
+} from "@/lib/supabase/paging";
 import { getCampaignTemplateKey } from "@/lib/notification-templates/catalog";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
 import {
@@ -191,6 +196,27 @@ type AudienceMember = {
   senderGeneration: number | null;
 };
 
+type AudienceMemberRow = {
+  id: string;
+  mattermost_account_id: string | null;
+  display_name: string | null;
+  generation: number | null;
+  campus: string | null;
+};
+
+type AudiencePreferenceRow = {
+  member_id: string;
+  enabled: boolean;
+  announcement_enabled: boolean;
+  new_partner_enabled: boolean;
+  expiring_partner_enabled: boolean;
+  review_enabled: boolean;
+  mm_enabled: boolean;
+  marketing_enabled: boolean;
+};
+
+type MarketingConsentRow = { member_id: string };
+
 type AudienceContext = {
   resolvedAudience: ResolvedPushAudience;
   members: AudienceMember[];
@@ -300,27 +326,54 @@ async function getWebPush() {
 
 async function listAudienceMembers(resolvedAudience: ResolvedPushAudience) {
   const supabase = getSupabaseAdminClient();
-  const baseQuery = supabase
-    .from("members")
-    .select(
-      "id,mattermost_account_id,display_name,generation,campus",
+  const selectedMemberIds = resolvedAudience.memberIds;
+  const memberRows = selectedMemberIds
+    ? (
+        await collectRowsByFilterChunks<string, AudienceMemberRow>(
+          selectedMemberIds,
+          async (memberIdChunk) => {
+            const { data, error } = await supabase
+              .from("members")
+              .select(
+                "id,mattermost_account_id,display_name,generation,campus",
+              )
+              .in("id", [...memberIdChunk]);
+            if (error) {
+              throw new Error("발송 대상을 불러오지 못했습니다.");
+            }
+            return {
+              rows: (data ?? []) as AudienceMemberRow[],
+              error: false,
+            };
+          },
+        )
+      ).rows
+    : (
+        await collectPagedRows<AudienceMemberRow>(null, async (from, to) => {
+          const { data, error } = await supabase
+            .from("members")
+            .select(
+              "id,mattermost_account_id,display_name,generation,campus",
+            )
+            .order("display_name", { ascending: true })
+            .order("id", { ascending: true })
+            .range(from, to);
+          if (error) {
+            throw new Error("발송 대상을 불러오지 못했습니다.");
+          }
+          return {
+            rows: (data ?? []) as AudienceMemberRow[],
+            error: false,
+          };
+        })
+      ).rows;
+  const members = memberRows.sort((left, right) => {
+    const byName = (left.display_name ?? "").localeCompare(
+      right.display_name ?? "",
+      "ko-KR",
     );
-
-  const query =
-    resolvedAudience.scope === "year"
-      ? baseQuery.eq("generation", resolvedAudience.year)
-      : resolvedAudience.scope === "campus"
-        ? baseQuery.eq("campus", resolvedAudience.campus)
-        : resolvedAudience.scope === "member"
-          ? baseQuery.in("id", resolvedAudience.memberIds ?? (resolvedAudience.memberId ? [resolvedAudience.memberId] : []))
-          : baseQuery;
-
-  const { data, error } = await query.order("display_name", { ascending: true });
-  if (error) {
-    throw new Error("발송 대상을 불러오지 못했습니다.");
-  }
-
-  const members = data ?? [];
+    return byName || left.id.localeCompare(right.id);
+  });
   const directoryByAccountId = await getMmUserDirectoryEntriesByAccountIds(
     members
       .map((member) => member.mattermost_account_id)
@@ -410,40 +463,70 @@ async function buildAudienceContext(
 
   const [preferenceResult, subscriptionResult, marketingConsentResult] = await Promise.all([
     memberIds.length
-      ? supabase
-          .from("push_preferences")
-          .select(
-            "member_id,enabled,announcement_enabled,new_partner_enabled,expiring_partner_enabled,review_enabled,mm_enabled,marketing_enabled",
-          )
-          .in("member_id", memberIds)
-      : Promise.resolve({ data: [], error: null }),
+      ? collectRowsByFilterChunks<string, AudiencePreferenceRow>(
+          memberIds,
+          async (memberIdChunk) => {
+            const { data, error } = await supabase
+              .from("push_preferences")
+              .select(
+                "member_id,enabled,announcement_enabled,new_partner_enabled,expiring_partner_enabled,review_enabled,mm_enabled,marketing_enabled",
+              )
+              .in("member_id", [...memberIdChunk]);
+            if (error) {
+              throw new Error("발송 대상의 수신 설정을 불러오지 못했습니다.");
+            }
+            return {
+              rows: (data ?? []) as AudiencePreferenceRow[],
+              error: false,
+            };
+          },
+        )
+      : Promise.resolve({ rows: [] as AudiencePreferenceRow[], partialFailure: false }),
     memberIds.length
-      ? supabase
-          .from("push_subscriptions")
-          .select("id,member_id,endpoint,p256dh,auth")
-          .eq("is_active", true)
-          .in("member_id", memberIds)
-      : Promise.resolve({ data: [], error: null }),
+      ? collectPagedRowsByFilterChunks<string, StoredSubscription>(
+          memberIds,
+          async (memberIdChunk, from, to) => {
+            const { data, error } = await supabase
+              .from("push_subscriptions")
+              .select("id,member_id,endpoint,p256dh,auth")
+              .eq("is_active", true)
+              .in("member_id", [...memberIdChunk])
+              .order("id", { ascending: true })
+              .range(from, to);
+            if (error) {
+              throw new Error("발송 대상의 수신 설정을 불러오지 못했습니다.");
+            }
+            return {
+              rows: (data ?? []) as StoredSubscription[],
+              error: false,
+            };
+          },
+        )
+      : Promise.resolve({ rows: [] as StoredSubscription[], partialFailure: false }),
     activeMarketingPolicy && memberIds.length
-      ? supabase
-          .from("member_policy_consents")
-          .select("member_id")
-          .eq("policy_document_id", activeMarketingPolicy.id)
-          .in("member_id", memberIds)
-      : Promise.resolve({ data: [], error: null }),
+      ? collectRowsByFilterChunks<string, MarketingConsentRow>(
+          memberIds,
+          async (memberIdChunk) => {
+            const { data, error } = await supabase
+              .from("member_policy_consents")
+              .select("member_id")
+              .eq("policy_document_id", activeMarketingPolicy.id)
+              .in("member_id", [...memberIdChunk]);
+            if (error) {
+              throw new Error("발송 대상의 수신 설정을 불러오지 못했습니다.");
+            }
+            return {
+              rows: (data ?? []) as MarketingConsentRow[],
+              error: false,
+            };
+          },
+        )
+      : Promise.resolve({ rows: [] as MarketingConsentRow[], partialFailure: false }),
   ]);
-  if (
-    preferenceResult.error
-    || subscriptionResult.error
-    || marketingConsentResult.error
-  ) {
-    throw new Error("발송 대상의 수신 설정을 불러오지 못했습니다.");
-  }
-
-  const preferences = preferenceResult.data ?? [];
-  const subscriptions = subscriptionResult.data ?? [];
+  const preferences = preferenceResult.rows;
+  const subscriptions = subscriptionResult.rows;
   const marketingConsentedMemberIds = new Set(
-    (marketingConsentResult.data ?? []).map((consent) => consent.member_id),
+    marketingConsentResult.rows.map((consent) => consent.member_id),
   );
 
   const preferenceMap = new Map(

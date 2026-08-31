@@ -1,10 +1,15 @@
 import type { Category, Partner } from "@/lib/types";
 import type {
+  AdminPartnerOption,
   PartnerRepository,
   PartnerViewContext,
+  PublicPartnerSeoEntry,
+  PublicPartnerSeoOptions,
 } from "@/lib/repositories/partner-repository";
+import { toLeanPublicDirectoryPartner } from "@/lib/public-partner-directory";
 import { canViewPartnerDetails } from "@/lib/partner-visibility";
 import { maskPartnerBenefitsForAccess } from "@/lib/partner-benefit-visibility";
+import { getCampusPartners, type CampusSlug } from "@/lib/campuses";
 
 const categories: Category[] = [
   {
@@ -172,8 +177,102 @@ const partners: Partner[] = [
 ];
 
 export class MockPartnerRepository implements PartnerRepository {
+  async listAdminPartnerOptions(): Promise<AdminPartnerOption[]> {
+    return partners
+      .map((partner) => ({ id: partner.id, name: partner.name }))
+      .sort((left, right) =>
+        left.name.localeCompare(right.name, "ko") || left.id.localeCompare(right.id),
+      );
+  }
+
   async getCategories(): Promise<Category[]> {
     return categories;
+  }
+
+  async getPublicPartnerSeoEntries(
+    options: PublicPartnerSeoOptions = {},
+  ): Promise<PublicPartnerSeoEntry[]> {
+    const entries = partners
+      .filter((partner) =>
+        canViewPartnerDetails(partner.visibility, false, partner.period),
+      )
+      .map((partner) => ({
+        id: partner.id,
+        name: partner.name,
+        categoryLabel:
+          categories.find((category) => category.key === partner.category)
+            ?.label ?? "제휴",
+        location: partner.location,
+        period: {
+          start: partner.period.start || null,
+          end: partner.period.end || null,
+        },
+      }));
+    const limit = options.limit;
+
+    return Number.isSafeInteger(limit) && (limit ?? -1) >= 0
+      ? entries.slice(0, limit)
+      : entries;
+  }
+
+  async getPublicDirectoryPartners(
+    context: PartnerViewContext = { authenticated: false },
+  ): Promise<Partner[]> {
+    return partners.map((partner) => {
+      if (canViewPartnerDetails(partner.visibility, context.authenticated)) {
+        const summaryPartner: Partner = {
+          id: partner.id,
+          name: partner.name,
+          category: partner.category,
+          visibility: partner.visibility,
+          benefitVisibility: partner.benefitVisibility,
+          createdAt: partner.createdAt,
+          location: partner.location,
+          campusSlugs: partner.campusSlugs,
+          thumbnail: partner.thumbnail ?? null,
+          mapUrl: partner.mapUrl,
+          benefitActionType: partner.benefitActionType,
+          benefitActionLink: partner.benefitActionLink,
+          reservationLink: partner.reservationLink,
+          inquiryLink: partner.inquiryLink,
+          period: partner.period,
+          conditions: partner.conditions,
+          benefits: partner.benefits,
+          benefitItems: partner.benefitItems,
+          appliesTo: partner.appliesTo,
+          images: [],
+          tags: partner.tags ?? [],
+          branchScopeType: partner.branchScopeType,
+        };
+        const maskedPartner = maskPartnerBenefitsForAccess(summaryPartner, context);
+        return toLeanPublicDirectoryPartner(maskedPartner);
+      }
+      return {
+        id: partner.id,
+        name: "",
+        category: partner.category,
+        visibility: partner.visibility,
+        benefitVisibility: partner.benefitVisibility,
+        createdAt: partner.createdAt,
+        location: "",
+        campusSlugs: partner.campusSlugs,
+        period: { start: "", end: "" },
+        conditions: [],
+        benefits: [],
+        appliesTo: partner.appliesTo,
+        thumbnail: null,
+        images: [],
+        tags: [],
+      };
+    });
+  }
+
+  async getPublicDirectoryPartnersForCampus(
+    campusSlug: CampusSlug,
+    context: PartnerViewContext = { authenticated: false },
+  ): Promise<Partner[]> {
+    const directoryPartners = await this.getPublicDirectoryPartners(context);
+    return getCampusPartners(directoryPartners, campusSlug);
   }
 
   async getPartners(
@@ -201,6 +300,21 @@ export class MockPartnerRepository implements PartnerRepository {
         tags: [],
       };
     });
+  }
+
+  async getPartnersForCampus(
+    campusSlug: CampusSlug,
+    context: PartnerViewContext = { authenticated: false },
+  ): Promise<Partner[]> {
+    const directoryPartners = await this.getPartners(context);
+    return getCampusPartners(directoryPartners, campusSlug);
+  }
+
+  async getHomeStateAuthorizedPartnerIds(ids: string[]): Promise<string[]> {
+    const existingIds = new Set(partners.map((partner) => partner.id));
+    return [...new Set(ids.map((id) => id.trim()).filter(Boolean))].filter((id) =>
+      existingIds.has(id),
+    );
   }
 
   async getPartnerById(

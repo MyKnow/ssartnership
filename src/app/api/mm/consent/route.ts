@@ -8,7 +8,7 @@ import {
   getSelectedPolicyValidationError,
   recordMarketingPolicyConsent,
   recordRequiredPolicyConsent,
-} from "@/lib/policy-documents";
+} from "@/lib/policy-documents.server";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
   MemberAuthRouteBodyError,

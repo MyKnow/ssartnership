@@ -18,7 +18,7 @@ export type CampusLandingViewProps = {
   currentUserId: string | null;
   partnerPopularityById?: Record<string, PartnerPopularityMetrics | undefined>;
   partnerFavoriteStateById?: Record<string, boolean | undefined>;
-  loadedPartnerStateIds?: string[];
+  loadedFavoritePartnerIds?: string[];
   structuredData?: Record<string, unknown> | null;
 };
 
@@ -31,7 +31,7 @@ export default function CampusLandingView({
   currentUserId,
   partnerPopularityById,
   partnerFavoriteStateById,
-  loadedPartnerStateIds,
+  loadedFavoritePartnerIds,
   structuredData,
 }: CampusLandingViewProps) {
   return (
@@ -55,7 +55,7 @@ export default function CampusLandingView({
           currentUserId={currentUserId}
           partnerPopularityById={partnerPopularityById}
           partnerFavoriteStateById={partnerFavoriteStateById}
-          loadedPartnerStateIds={loadedPartnerStateIds}
+          loadedFavoritePartnerIds={loadedFavoritePartnerIds}
         />
       </Container>
     </main>

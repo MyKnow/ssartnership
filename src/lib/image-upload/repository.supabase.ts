@@ -17,6 +17,9 @@ import {
   ImageUploadError,
 } from "@/lib/image-upload/repository";
 import {
+  isHashedImageUploadQuotaIdentifier,
+} from "@/lib/image-upload/quota";
+import {
   resolveImageTransformPolicy,
   validateImageUploadSource,
   type ImageUploadPurpose,
@@ -43,6 +46,7 @@ type ImageUploadSessionRow = {
   source_storage_path: string | null;
   source_content_type: string | null;
   source_size_bytes: number | null;
+  quota_size_bytes: number;
   content_type: string | null;
   sha256: string | null;
   width: number | null;
@@ -59,9 +63,23 @@ type ImageUploadSessionRow = {
 };
 
 const MAX_SIGNED_UPLOADS_PER_REQUEST = 20;
+const MAX_QUOTA_IDENTIFIERS_PER_REQUEST = 4;
 const STORAGE_RETRY_DELAYS_MS = [0, 120, 300] as const;
 const EXPIRE_STALE_CONCURRENCY = 4;
 const COMPLETE_UPLOAD_CONCURRENCY = 4;
+const IMAGE_UPLOAD_QUOTA_RETENTION_MS = 24 * 60 * 60 * 1000;
+const IMAGE_UPLOAD_QUOTA_CLEANUP_LIMIT = 5000;
+
+type ReserveImageUploadSessionRow = {
+  id: string;
+  role: string;
+  storage_path: string;
+  source_content_type: string | null;
+  source_size_bytes: number;
+  quota_size_bytes: number;
+  signed_url_expires_at: string;
+  expires_at: string;
+};
 
 function asSessionRow(value: unknown): ImageUploadSessionRow {
   return value as ImageUploadSessionRow;
@@ -92,6 +110,27 @@ type SupabaseAdminClient = ReturnType<typeof getSupabaseAdminClient>;
 
 function getPublicUrl(supabase: SupabaseAdminClient, bucket: string, path: string) {
   return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+}
+
+function getQuotaIdentifiers(input: SignImageUploadInput) {
+  const normalized = input.quotaIdentifiers
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  const uniqueIdentifiers = [...new Set(normalized)];
+  if (
+    uniqueIdentifiers.length === 0
+    || uniqueIdentifiers.length > MAX_QUOTA_IDENTIFIERS_PER_REQUEST
+    || uniqueIdentifiers.some((value) => !isHashedImageUploadQuotaIdentifier(value))
+  ) {
+    throw new Error("이미지 업로드 식별자를 확인해 주세요.");
+  }
+  return uniqueIdentifiers;
+}
+
+function getErrorMessage(error: unknown) {
+  return error && typeof error === "object" && "message" in error
+    ? String((error as { message?: unknown }).message ?? "")
+    : "";
 }
 
 function assertOwnedSession(
@@ -203,26 +242,40 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         path: buildStagingPath(id, upload.fileName),
         sourceContentType: upload.contentType || null,
         sourceSizeBytes: upload.size,
+        quotaSizeBytes: policy.maxSourceBytes,
       };
     });
     const supabase = this.supabase;
-    const { error: insertError } = await supabase.from("image_upload_sessions").insert(
-      sessions.map((session) => ({
-        id: session.id,
-        owner_kind: input.actor.kind,
-        owner_id: input.actor.id,
-        purpose: input.purpose,
-        role: session.role,
-        storage_bucket: IMAGE_UPLOAD_STAGING_BUCKET,
-        storage_path: session.path,
-        source_storage_path: session.path,
-        source_content_type: session.sourceContentType,
-        source_size_bytes: session.sourceSizeBytes,
-        signed_url_expires_at: signedUrlExpiresAt.toISOString(),
-        expires_at: expiresAt.toISOString(),
-      })),
+    const { data: reservedCount, error: insertError } = await supabase.rpc(
+      "reserve_image_upload_sessions",
+      {
+        p_owner_kind: input.actor.kind,
+        p_owner_id: input.actor.id,
+        p_purpose: input.purpose,
+        p_quota_identifiers: getQuotaIdentifiers(input),
+        p_sessions: sessions.map((session) => ({
+          id: session.id,
+          role: session.role,
+          storage_path: session.path,
+          source_content_type: session.sourceContentType,
+          source_size_bytes: session.sourceSizeBytes,
+          quota_size_bytes: session.quotaSizeBytes,
+          signed_url_expires_at: signedUrlExpiresAt.toISOString(),
+          expires_at: expiresAt.toISOString(),
+        } satisfies ReserveImageUploadSessionRow)),
+      },
     );
     if (insertError) {
+      if (getErrorMessage(insertError).includes("image_upload_quota_exceeded")) {
+        throw new ImageUploadError(
+          "image_upload_quota_exceeded",
+          "사진 업로드 한도를 초과했습니다. 잠시 후 다시 시도해 주세요.",
+          { cause: insertError instanceof Error ? insertError : undefined },
+        );
+      }
+      throw new Error("이미지 업로드 세션을 만들지 못했습니다.");
+    }
+    if (reservedCount !== sessions.length) {
       throw new Error("이미지 업로드 세션을 만들지 못했습니다.");
     }
 
@@ -375,8 +428,18 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
           if (downloadError || !blob) {
             throw new Error("이미지 파일을 찾을 수 없습니다.");
           }
+          const sourceBuffer = Buffer.from(await blob.arrayBuffer());
+          if (
+            !claimedSession.source_size_bytes
+            || claimedSession.source_size_bytes !== sourceBuffer.byteLength
+          ) {
+            throw new ImageUploadError(
+              "upload_source_size_mismatch",
+              "이미지 원본 크기를 확인해 주세요.",
+            );
+          }
           const normalized = await normalizeImageUpload({
-            source: Buffer.from(await blob.arrayBuffer()),
+            source: sourceBuffer,
             declaredContentType: claimedSession.source_content_type,
             policy: resolveImageTransformPolicy(input.purpose, claimedSession.role),
           });
@@ -424,7 +487,14 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
             height: normalized.height,
           } satisfies CompletedImageUpload;
         } catch (error) {
-          await markFailed(supabase, claimedSession.id, "complete_failed", ["processing"]);
+          await markFailed(
+            supabase,
+            claimedSession.id,
+            error instanceof ImageUploadError && error.code === "upload_source_size_mismatch"
+              ? "source_size_mismatch"
+              : "complete_failed",
+            ["processing"],
+          );
           throw error instanceof Error
             ? error
             : new Error("이미지를 처리하지 못했습니다.");
@@ -770,7 +840,8 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
 
   async expireStale(now = new Date()): Promise<number> {
     const supabase = this.supabase;
-    const [signedResult, sessionResult] = await Promise.all([
+    const quotaCleanupBefore = new Date(now.getTime() - IMAGE_UPLOAD_QUOTA_RETENTION_MS);
+    const [signedResult, sessionResult, quotaCleanupResult] = await Promise.all([
       supabase
         .from("image_upload_sessions")
         .select("id,status,storage_bucket,storage_path,source_storage_path,final_bucket,final_path,failure_code")
@@ -783,6 +854,10 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         .in("status", ["signed", "processing", "ready", "attaching", "failed"])
         .lte("expires_at", now.toISOString())
         .limit(100),
+      supabase.rpc("cleanup_image_upload_quota_windows", {
+        p_before: quotaCleanupBefore.toISOString(),
+        p_limit: IMAGE_UPLOAD_QUOTA_CLEANUP_LIMIT,
+      }),
     ]);
     if (signedResult.error || sessionResult.error) {
       throw new Error("만료된 이미지 업로드를 조회하지 못했습니다.");
@@ -799,7 +874,6 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
       "id" | "status" | "storage_bucket" | "storage_path" | "source_storage_path"
       | "final_bucket" | "final_path" | "failure_code"
     >>;
-    if (sessions.length === 0) return 0;
     let expiredCount = 0;
     await forEachWithConcurrency(sessions, EXPIRE_STALE_CONCURRENCY, async (session) => {
       const removals = await Promise.all([
@@ -837,6 +911,9 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
       }
       expiredCount += 1;
     });
+    if (quotaCleanupResult.error) {
+      throw new Error("만료된 이미지 업로드 사용량 기록을 정리하지 못했습니다.");
+    }
     return expiredCount;
   }
 }

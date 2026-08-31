@@ -1,14 +1,16 @@
 import type { Category, Partner } from "@/lib/types";
 import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
 import { cache } from "react";
-import {
-  normalizePartnerAudience,
-} from "@/lib/partner-audience";
-import { normalizeCampusSlugs } from "@/lib/campuses";
+import { normalizePartnerAudience } from "@/lib/partner-audience";
+import { normalizeCampusSlugs, type CampusSlug } from "@/lib/campuses";
 import { normalizePartnerBenefitActionType } from "@/lib/partner-benefit-action";
+import { toLeanPublicDirectoryPartner } from "@/lib/public-partner-directory";
 import type {
+  AdminPartnerOption,
   PartnerRepository,
   PartnerViewContext,
+  PublicPartnerSeoEntry,
+  PublicPartnerSeoOptions,
 } from "@/lib/repositories/partner-repository";
 import { unstable_cache } from "next/cache";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -20,13 +22,14 @@ import {
   maskPartnerBenefitsForAccess,
   normalizePartnerBenefitVisibility,
 } from "@/lib/partner-benefit-visibility";
-import { isUuid } from "@/lib/uuid";
+import { isUuid, normalizeUuidList } from "@/lib/uuid";
 import {
   hashPartnerPreviewToken,
   isMissingPartnerPreviewExpiryColumnError,
   isPartnerPreviewLinkActive,
   isValidPartnerPreviewToken,
 } from "@/lib/partner-preview";
+import { getKstDateString } from "@/lib/partner-utils";
 
 type PartnerRow = {
   id: string;
@@ -70,6 +73,23 @@ type CategoryRow = {
   color?: string | null;
 };
 
+type PublicPartnerSeoRow = {
+  id: string;
+  name: string;
+  location: string;
+  period_start: string | null;
+  period_end: string | null;
+  categories?:
+    | { label?: string | null }
+    | Array<{ label?: string | null }>
+    | null;
+};
+
+type AdminPartnerOptionRow = {
+  id: string;
+  name: string;
+};
+
 type PublicCacheScope = "partners" | "categories";
 
 type PublicCacheVersionRow = {
@@ -78,8 +98,17 @@ type PublicCacheVersionRow = {
   updated_at: string | null;
 };
 
+type PublicCacheVersionSnapshot = {
+  rows: PublicCacheVersionRow[];
+  lookupFailed: boolean;
+};
+
 const PARTNER_SELECT_COLUMNS =
   "id,name,category_id,created_at,updated_at,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,partner_benefits(id,title,max_apply_count,display_order),applies_to,images,tags,visibility,benefit_visibility,branch_scope_type,branch_scope_note,categories(key)";
+const PUBLIC_DIRECTORY_SELECT_COLUMNS =
+  "id,name,category_id,created_at,location,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,tags,visibility,benefit_visibility,branch_scope_type,categories(key)";
+const PUBLIC_PARTNER_SEO_SELECT_COLUMNS =
+  "id,name,location,period_start,period_end,categories(label)";
 
 function normalizeDate(value: string | null | undefined) {
   return value ?? "미정";
@@ -98,27 +127,48 @@ function extractCategoryKey(categories: PartnerRow["categories"]) {
   return undefined;
 }
 
+const getCachedPublicCacheVersionSnapshot = unstable_cache(
+  async (): Promise<PublicCacheVersionSnapshot> => {
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("public_cache_versions")
+      .select("scope,version,updated_at")
+      .in("scope", ["partners", "categories"]);
+
+    if (error) {
+      console.error(
+        "[partner-repository] public cache version lookup failed",
+        error.message,
+      );
+      return { rows: [], lookupFailed: true };
+    }
+
+    return {
+      rows: (data ?? []) as PublicCacheVersionRow[],
+      lookupFailed: false,
+    };
+  },
+  ["partner-repository", "public-cache-version-snapshot"],
+  {
+    revalidate: 30,
+    tags: ["partners", "categories"],
+  },
+);
+
+const getPublicCacheVersionSnapshot = cache(() =>
+  getCachedPublicCacheVersionSnapshot(),
+);
+
 const getPublicCacheVersionKeyByScopeKey = cache(async (scopeKey: string) => {
   const scopes = scopeKey.split(",").filter((value): value is PublicCacheScope =>
     value === "partners" || value === "categories",
   );
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("public_cache_versions")
-    .select("scope,version,updated_at")
-    .in("scope", scopes);
-
-  if (error) {
-    console.error(
-      "[partner-repository] public cache version lookup failed",
-      error.message,
-    );
+  const snapshot = await getPublicCacheVersionSnapshot();
+  if (snapshot.lookupFailed) {
     return scopes.map((scope) => `${scope}:legacy`).join("|");
   }
 
-  const rowsByScope = new Map(
-    ((data ?? []) as PublicCacheVersionRow[]).map((row) => [row.scope, row]),
-  );
+  const rowsByScope = new Map(snapshot.rows.map((row) => [row.scope, row]));
 
   return scopes
     .map((scope) => {
@@ -171,6 +221,105 @@ const getCachedPartnerRows = unstable_cache(
     return (data ?? []) as PartnerRow[];
   },
   ["partner-repository", "partners", "versioned"],
+  {
+    revalidate: false,
+    tags: ["partners"],
+  },
+);
+
+const getCachedPublicDirectoryPartnerRows = unstable_cache(
+  async (versionKey: string): Promise<PartnerRow[]> => {
+    void versionKey;
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("partners")
+      .select(PUBLIC_DIRECTORY_SELECT_COLUMNS)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return (data ?? []) as PartnerRow[];
+  },
+  ["partner-repository", "partners", "public-directory", "versioned"],
+  {
+    revalidate: false,
+    tags: ["partners"],
+  },
+);
+
+const getCachedPartnerRowsForCampus = unstable_cache(
+  async (versionKey: string, campusSlug: CampusSlug): Promise<PartnerRow[]> => {
+    void versionKey;
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("partners")
+      .select(PARTNER_SELECT_COLUMNS)
+      .contains("campus_slugs", [campusSlug])
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return (data ?? []) as PartnerRow[];
+  },
+  ["partner-repository", "partners", "campus", "versioned"],
+  {
+    revalidate: false,
+    tags: ["partners"],
+  },
+);
+
+const getCachedPublicDirectoryPartnerRowsForCampus = unstable_cache(
+  async (versionKey: string, campusSlug: CampusSlug): Promise<PartnerRow[]> => {
+    void versionKey;
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("partners")
+      .select(PUBLIC_DIRECTORY_SELECT_COLUMNS)
+      .contains("campus_slugs", [campusSlug])
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return (data ?? []) as PartnerRow[];
+  },
+  ["partner-repository", "partners", "public-directory", "campus", "versioned"],
+  {
+    revalidate: false,
+    tags: ["partners"],
+  },
+);
+
+const getCachedPublicPartnerSeoRows = unstable_cache(
+  async (
+    versionKey: string,
+    activeDate: string,
+    limit: number | null,
+  ): Promise<PublicPartnerSeoRow[]> => {
+    void versionKey;
+    const supabase = getSupabaseAdminClient();
+    const baseQuery = supabase
+      .from("partners")
+      .select(PUBLIC_PARTNER_SEO_SELECT_COLUMNS)
+      .eq("visibility", "public")
+      .or(`period_start.is.null,period_start.lte.${activeDate}`)
+      .or(`period_end.is.null,period_end.gte.${activeDate}`)
+      .order("created_at", { ascending: false });
+    const query = limit === null ? baseQuery : baseQuery.limit(limit);
+    const { data, error } = await query;
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return (data ?? []) as PublicPartnerSeoRow[];
+  },
+  ["partner-repository", "partners", "public-seo", "versioned"],
   {
     revalidate: false,
     tags: ["partners"],
@@ -280,6 +429,43 @@ function toLockedPartner(row: PartnerRow, categoryKey: string): Partner {
   };
 }
 
+function toVisiblePublicDirectorySummaryPartner(row: PartnerRow, categoryKey: string): Partner {
+  const appliesTo = normalizePartnerAudience(row.applies_to);
+  return {
+    id: row.id,
+    name: row.name,
+    category: categoryKey,
+    visibility: normalizePartnerVisibility(row.visibility),
+    benefitVisibility: normalizePartnerBenefitVisibility(row.benefit_visibility),
+    createdAt: row.created_at,
+    location: row.location,
+    campusSlugs: normalizeCampusSlugs(row.campus_slugs ?? []),
+    thumbnail: row.thumbnail ?? null,
+    mapUrl: row.map_url ?? undefined,
+    benefitActionType: normalizePartnerBenefitActionType(
+      row.benefit_action_type,
+      row.benefit_action_link || row.reservation_link ? "external_link" : "none",
+    ),
+    benefitActionLink: row.benefit_action_link ?? undefined,
+    reservationLink: row.reservation_link ?? undefined,
+    inquiryLink: row.inquiry_link ?? undefined,
+    period: {
+      start: normalizeDate(row.period_start),
+      end: normalizeDate(row.period_end),
+    },
+    conditions: row.conditions ?? [],
+    benefits: row.benefits ?? [],
+    benefitItems: normalizePartnerBenefitItems((row.benefits ?? []).map((title, index) => ({
+      id: `legacy-public-directory-benefit-${row.id}-${index + 1}`,
+      title,
+    }))),
+    appliesTo,
+    images: [],
+    tags: row.tags ?? [],
+    branchScopeType: row.branch_scope_type ?? "single_location",
+  };
+}
+
 function mapPartnerForList(
   row: PartnerRow,
   context: PartnerViewContext,
@@ -290,6 +476,39 @@ function mapPartnerForList(
     return maskPartnerBenefitsForAccess(toVisiblePartner(row, categoryKey), context);
   }
   return toLockedPartner(row, categoryKey);
+}
+
+function mapPartnerForPublicDirectory(
+  row: PartnerRow,
+  context: PartnerViewContext,
+): Partner {
+  const categoryKey = extractCategoryKey(row.categories) ?? "health";
+  const visibility = normalizePartnerVisibility(row.visibility);
+  if (canViewPartnerDetails(visibility, context.authenticated)) {
+    const summaryPartner = toVisiblePublicDirectorySummaryPartner(row, categoryKey);
+    const maskedPartner = maskPartnerBenefitsForAccess(summaryPartner, context);
+    return toLeanPublicDirectoryPartner(maskedPartner);
+  }
+  return toLockedPartner(row, categoryKey);
+}
+
+function mapPublicPartnerSeoEntry(
+  row: PublicPartnerSeoRow,
+): PublicPartnerSeoEntry {
+  const category = Array.isArray(row.categories)
+    ? row.categories[0]
+    : row.categories;
+
+  return {
+    id: row.id,
+    name: row.name,
+    categoryLabel: category?.label ?? "제휴",
+    location: row.location,
+    period: {
+      start: row.period_start,
+      end: row.period_end,
+    },
+  };
 }
 
 async function getPartnerRow(id: string) {
@@ -336,6 +555,21 @@ async function hasValidPreviewToken(id: string, token: string) {
 }
 
 export class SupabasePartnerRepository implements PartnerRepository {
+  async listAdminPartnerOptions(): Promise<AdminPartnerOption[]> {
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("partners")
+      .select("id,name")
+      .order("name", { ascending: true })
+      .order("id", { ascending: true });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return (data ?? []) as AdminPartnerOptionRow[];
+  }
+
   async getCategories(): Promise<Category[]> {
     const versionKey = await getPublicCacheVersionKey(["categories"]);
     const data = await getCachedCategories(versionKey);
@@ -353,6 +587,74 @@ export class SupabasePartnerRepository implements PartnerRepository {
     const versionKey = await getPublicCacheVersionKey(["partners", "categories"]);
     const rows = await getCachedPartnerRows(versionKey);
     return rows.map((item) => mapPartnerForList(item, context));
+  }
+
+  async getPartnersForCampus(
+    campusSlug: CampusSlug,
+    context: PartnerViewContext = { authenticated: false },
+  ): Promise<Partner[]> {
+    const versionKey = await getPublicCacheVersionKey(["partners", "categories"]);
+    const rows = await getCachedPartnerRowsForCampus(versionKey, campusSlug);
+    return rows.map((item) => mapPartnerForList(item, context));
+  }
+
+  async getPublicDirectoryPartners(
+    context: PartnerViewContext = { authenticated: false },
+  ): Promise<Partner[]> {
+    const versionKey = await getPublicCacheVersionKey(["partners", "categories"]);
+    const rows = await getCachedPublicDirectoryPartnerRows(versionKey);
+    return rows.map((item) => mapPartnerForPublicDirectory(item, context));
+  }
+
+  async getPublicDirectoryPartnersForCampus(
+    campusSlug: CampusSlug,
+    context: PartnerViewContext = { authenticated: false },
+  ): Promise<Partner[]> {
+    const versionKey = await getPublicCacheVersionKey(["partners", "categories"]);
+    const rows = await getCachedPublicDirectoryPartnerRowsForCampus(
+      versionKey,
+      campusSlug,
+    );
+    return rows.map((item) => mapPartnerForPublicDirectory(item, context));
+  }
+
+  async getPublicPartnerSeoEntries(
+    options: PublicPartnerSeoOptions = {},
+  ): Promise<PublicPartnerSeoEntry[]> {
+    const versionKey = await getPublicCacheVersionKey(["partners", "categories"]);
+    const activeDate = getKstDateString();
+    const limit =
+      Number.isSafeInteger(options.limit) && (options.limit ?? -1) >= 0
+        ? (options.limit ?? null)
+        : null;
+    const rows = await getCachedPublicPartnerSeoRows(
+      versionKey,
+      activeDate,
+      limit,
+    );
+    return rows.map(mapPublicPartnerSeoEntry);
+  }
+
+  async getHomeStateAuthorizedPartnerIds(ids: string[]): Promise<string[]> {
+    const normalizedIds = normalizeUuidList(ids);
+    if (normalizedIds.length === 0) {
+      return [];
+    }
+
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("partners")
+      .select("id")
+      .in("id", normalizedIds);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const existingIds = new Set(
+      (data ?? []).map((row) => (row as { id: string }).id),
+    );
+    return normalizedIds.filter((id) => existingIds.has(id));
   }
 
   async getPartnerById(

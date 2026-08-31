@@ -96,7 +96,7 @@ test("운영 bootstrap과 Preview seed도 정규화된 관리자 관계를 사�
 });
 
 test("정책 동의는 회원 mirror 대신 consent ledger를 기준으로 판정한다", () => {
-  const policyDocuments = readRepoFile("src/lib/policy-documents.ts");
+  const policyDocuments = readRepoFile("src/lib/policy-documents.server.ts");
   const userAuth = readRepoFile("src/lib/user-auth.ts");
   const notificationPreferences = readRepoFile(
     "src/lib/notification-preferences.ts",
@@ -173,6 +173,9 @@ test("일괄 MM 동기화와 관리자 아바타 조회는 정규화된 디렉�
 
 test("인증 카드와 아바타 API는 private 이미지 ledger만 제공한다", () => {
   const certificationPage = readRepoFile("src/app/(site)/certification/page.tsx");
+  const certificationMemberView = readRepoFile(
+    "src/lib/certification-member-view.server.ts",
+  );
   const verificationPage = readRepoFile("src/app/(site)/verify/[token]/page.tsx");
   const certificationAvatar = readRepoFile(
     "src/app/api/certification/avatar/[token]/route.ts",
@@ -195,7 +198,8 @@ test("인증 카드와 아바타 API는 private 이미지 ledger만 제공한다
     );
   }
 
-  assert.match(certificationPage, /getMemberCanonicalProfile/);
+  assert.match(certificationPage, /getCertificationMemberView/);
+  assert.match(certificationMemberView, /getMemberCanonicalProfile/);
   assert.match(verificationPage, /getMemberCanonicalProfile/);
   for (const source of [certificationAvatar, memberAvatar, currentPhoto]) {
     assert.match(source, /getActiveMemberProfileImage/);
@@ -203,8 +207,14 @@ test("인증 카드와 아바타 API는 private 이미지 ledger만 제공한다
   }
 });
 
-test("홈·쿠폰·제휴 접근 권한은 정규화 회원 프로필만 사용한다", () => {
+test("홈·쿠폰·제휴 접근 권한은 정규화 회원 관계만 사용한다", () => {
   const partnerViewContext = readRepoFile("src/lib/partner-view-context.ts");
+  const memberAudienceSnapshot = readRepoFile(
+    "src/lib/member-audience-snapshot.ts",
+  );
+  const certificationMemberView = readRepoFile(
+    "src/lib/certification-member-view.server.ts",
+  );
   const couponsPage = readRepoFile("src/app/(site)/coupons/page.tsx");
   const homePage = readRepoFile("src/app/(site)/page.tsx");
   const partnerDetailPage = readRepoFile(
@@ -214,15 +224,24 @@ test("홈·쿠폰·제휴 접근 권한은 정규화 회원 프로필만 사용�
     "src/app/api/partners/home-state/route.ts",
   );
 
-  assert.match(partnerViewContext, /getMemberCanonicalProfile/);
-  assert.match(couponsPage, /getMemberCanonicalProfile/);
+  assert.match(partnerViewContext, /getMemberAudienceSnapshot/);
+  assert.match(memberAudienceSnapshot, /\.select\("id,generation"\)/);
+  assert.match(memberAudienceSnapshot, /\.from\("graduate_profiles"\)/);
+  assert.doesNotMatch(
+    memberAudienceSnapshot,
+    /display_name|campus|mattermost_account_id|getMemberProfilePhotoState|mm_user_directory/,
+  );
+  assert.match(couponsPage, /getCertificationMemberView/);
+  assert.match(certificationMemberView, /getMemberCanonicalProfile/);
   assert.match(homePage, /getMemberCanonicalProfile/);
-  for (const source of [partnerDetailPage, homeStateRoute]) {
-    assert.match(source, /getPartnerViewerContext/);
-  }
+  assert.match(partnerDetailPage, /getPartnerViewerContext/);
+  assert.match(homeStateRoute, /getSignedUserSession/);
+  assert.doesNotMatch(homeStateRoute, /getPartnerViewerContext/);
 
   for (const source of [
     partnerViewContext,
+    memberAudienceSnapshot,
+    certificationMemberView,
     couponsPage,
     homePage,
     partnerDetailPage,
@@ -272,8 +291,11 @@ test("푸시 대상과 발송 화면은 세대·MM 디렉터리 관계만 사용
   );
   assert.doesNotMatch(recipientSearch, /getMmUserDirectoryEntriesByAccountIds/);
   assert.match(adminPushReadModel, /generation,campus/);
-  assert.match(audience, /\.eq\("generation", audience\.year\)/);
-  assert.match(send, /\.eq\("generation", resolvedAudience\.year\)/);
+  assert.match(audience, /listAudienceMemberIds\(\{ year: audience\.year \}\)/);
+  assert.match(audience, /collectPagedRows<AudienceMemberIdRow>/);
+  assert.match(send, /materializeMemberIds: false/);
+  assert.match(send, /listNotificationRecipientPage/);
+  assert.match(send, /collectPagedRowsByFilterChunks/);
 });
 
 test("관리자 캠페인 발송은 policy ledger와 MM 디렉터리만 사용한다", () => {
@@ -283,7 +305,8 @@ test("관리자 캠페인 발송은 policy ledger와 MM 디렉터리만 사용�
   assert.match(operations, /getMmUserDirectoryEntriesByAccountIds/);
   assert.match(operations, /\.from\("member_policy_consents"\)/);
   assert.match(operations, /\.eq\("policy_document_id", activeMarketingPolicy\.id\)/);
-  assert.match(operations, /\.eq\("generation", resolvedAudience\.year\)/);
+  assert.match(operations, /listAudienceMembers\(resolvedAudience\)/);
+  assert.match(operations, /collectPagedRowsByFilterChunks/);
   assert.doesNotMatch(
     operations,
     /mm_user_id,mm_username|marketing_policy_version|marketing_policy_consented_at|\.eq\("year"/,

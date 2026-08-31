@@ -11,6 +11,7 @@ import {
   findSupabasePartnerPortalSetupAccount,
   getSupabasePartnerPortalAccountById,
   isMissingPartnerAuthSessionVersionColumnError,
+  omitPartnerAuthSessionVersion,
 } from "./accounts.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 import {
@@ -38,12 +39,6 @@ type PartnerSetupCompletionPayloadCandidate = {
   label: string;
   payload: ReturnType<typeof buildPartnerSetupCompletionPayload>;
 };
-
-function omitPartnerAuthSessionVersion<T extends Record<string, unknown>>(payload: T) {
-  const nextPayload = { ...payload };
-  delete nextPayload.auth_session_version;
-  return nextPayload;
-}
 
 export function resolvePartnerSetupCompletionFallbackPayload(
   commonPayload: PartnerSetupCompletionCommonPayload,

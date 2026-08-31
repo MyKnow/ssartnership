@@ -4,7 +4,7 @@ import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { clearAdminSession } from "@/lib/auth";
 import { setUserSession } from "@/lib/user-auth";
 import { verifyPassword } from "@/lib/password";
-import { getMemberRequiredPolicyStatus } from "@/lib/policy-documents";
+import { getMemberRequiredPolicyStatus } from "@/lib/policy-documents.server";
 import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { requiresMemberProfilePhotoUpdate } from "@/lib/member-profile-photo";
 import { classifyMemberLoginIdentifier } from "@/lib/member-domain";

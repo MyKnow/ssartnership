@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { getRequestLogContext } from "@/lib/activity-logs";
 import { hashGraduateEmailIdentifier } from "@/lib/graduate-verification-security";
-import { createGraduateVerificationSignedUpload } from "@/lib/graduate-verification-storage";
+import {
+  createGraduateVerificationSignedUpload,
+  GraduateUploadValidationError,
+} from "@/lib/graduate-verification-storage";
 import { getGraduateApplicationSession } from "@/lib/graduate-verification-security";
 import {
   isGraduateVerificationBlocked,
@@ -97,12 +100,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, upload });
   } catch (error) {
     await recordGraduateVerificationAttempt({ ...rateLimitContext, success: false });
+    if (error instanceof GraduateUploadValidationError) {
+      return NextResponse.json(
+        { ok: false, message: error.message },
+        { status: 400 },
+      );
+    }
+    console.error("[graduate-verification/upload-sign] failed", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
     return NextResponse.json(
       {
         ok: false,
-        message: error instanceof Error ? error.message : "업로드 URL을 발급하지 못했습니다.",
+        message: "업로드 URL을 발급하지 못했습니다. 잠시 후 다시 시도해 주세요.",
       },
-      { status: 400 },
+      { status: 503 },
     );
   }
 }

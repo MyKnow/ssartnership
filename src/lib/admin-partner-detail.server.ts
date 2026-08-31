@@ -93,22 +93,25 @@ const PARTNER_DETAIL_OVERVIEW_SELECT =
 const PARTNER_DETAIL_EDIT_SELECT =
   "id,created_at,name,category_id,company_id,location,detail_description,campus_slugs,managed_campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,partner_benefits(id,title,max_apply_count,display_order),applies_to,images,tags,visibility,benefit_visibility,benefit_verification_pin_hash,benefit_verification_pin_salt,company:partner_companies(id,name,slug,description,is_active,managed_campus_slugs),categories(id,key,label,color,description)";
 
-const PARTNER_AUDIT_ACTIONS = [
-  "partner_create",
-  "partner_update",
-  "partner_change_request_approve",
-  "partner_change_request_reject",
-  "partner_portal_immediate_update",
-  "partner_portal_change_request_submit",
-  "partner_portal_change_request_cancel",
-  "partner_company_create",
-  "partner_company_update",
-  "partner_company_delete",
-] as const;
-
 function parseUsagePage(value: string) {
   const page = Number.parseInt(value, 10);
   return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+export function resolveAdminPartnerAuditScope({
+  partnerId,
+  persistedCompanyId,
+  relatedCompanyId,
+}: {
+  partnerId: string;
+  persistedCompanyId: string | null;
+  relatedCompanyId: string | null;
+}) {
+  return {
+    input_partner_id: partnerId,
+    input_company_target_id: relatedCompanyId ?? persistedCompanyId,
+    input_company_property_id: relatedCompanyId,
+  };
 }
 
 /**
@@ -216,20 +219,18 @@ export async function getAdminPartnerDetailOperationalReadModel({
     const supabase = getSupabaseAdminClient();
     const couponManagementDataPromise = canReadCoupons
       ? Promise.all([
-          adPackageRepository.listAdminCampaigns(),
+          adPackageRepository.listAdminCampaignsForPartner(partnerId),
           adPackageRepository.listAdminCouponsForPartner(partnerId),
         ])
       : Promise.resolve<[AdCampaignWithStats[], AdCoupon[]]>([[], []]);
     const selectedUsageBenefit = (core.partner.benefits ?? []).includes(requestedUsageBenefit)
       ? requestedUsageBenefit
       : null;
-    const auditTargetIds = Array.from(
-      new Set(
-        [core.partner.id, core.company?.id ?? core.partner.company_id ?? null].filter(
-          (value): value is string => Boolean(value),
-        ),
-      ),
-    );
+    const partnerAuditScope = resolveAdminPartnerAuditScope({
+      partnerId: core.partner.id,
+      persistedCompanyId: core.partner.company_id ?? null,
+      relatedCompanyId: core.company?.id ?? null,
+    });
     const [
       metricsResult,
       reviewData,
@@ -255,30 +256,10 @@ export async function getAdminPartnerDetailOperationalReadModel({
         pageSize: 25,
       }),
       getPartnerMetricTimeseriesSnapshot(partnerId, core.partner.created_at),
-      supabase
-        .from("admin_audit_logs")
-        .select("id,actor_id,action,target_type,target_id,properties,created_at")
-        .in("action", PARTNER_AUDIT_ACTIONS as unknown as string[])
-        .in("target_type", ["partner", "partner_company", "partner_change_request"])
-        .order("created_at", { ascending: false })
-        .limit(200),
+      supabase.rpc("get_admin_partner_audit_logs", partnerAuditScope),
       fetchRequestSummariesForPartner(supabase, partnerId, { limit: 50 }),
     ]);
-    const partnerAuditLogs = (partnerAuditLogsResult.data ?? []).filter((log) => {
-      const properties = log.properties && typeof log.properties === "object"
-        ? (log.properties as Record<string, unknown>)
-        : null;
-      const logPartnerId =
-        typeof properties?.partnerId === "string" ? properties.partnerId : null;
-      const logCompanyId =
-        typeof properties?.companyId === "string" ? properties.companyId : null;
-
-      return (
-        auditTargetIds.includes(log.target_id ?? "") ||
-        logPartnerId === core.partner.id ||
-        logCompanyId === (core.company?.id ?? null)
-      );
-    });
+    const partnerAuditLogs = partnerAuditLogsResult.data ?? [];
 
     return {
       status: "ready" as const,

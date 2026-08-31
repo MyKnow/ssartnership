@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
+import { getRequestLogContext } from "@/lib/activity-logs";
 import { clearMemberEmailRecoverySession, getMemberEmailRecoverySession } from "@/lib/member-email-recovery-session";
 import {
   hashMemberEmailIdentifier,
@@ -16,6 +16,7 @@ import {
   isMemberEmailVerificationCodeFailure,
 } from "@/lib/member-email-verification-service";
 import { normalizeMemberEmail } from "@/lib/member-domain";
+import { logMemberEmailSecurity } from "@/lib/member-email-security-log";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { setUserSession } from "@/lib/user-auth";
 import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
@@ -73,6 +74,14 @@ export async function POST(request: Request) {
   };
   const blockingState = await getMemberEmailVerificationBlockingState("recovery-verify", rateLimitContext);
   if (!blockingState.ok) {
+    await logMemberEmailSecurity({
+      context,
+      flow: "recovery",
+      stage: "verify",
+      status: "failure",
+      actorId: recovery.memberId,
+      reason: blockingState.code,
+    });
     return NextResponse.json(
       {
         ok: false,
@@ -83,6 +92,14 @@ export async function POST(request: Request) {
     );
   }
   if (blockingState.blocked) {
+    await logMemberEmailSecurity({
+      context,
+      flow: "recovery",
+      stage: "verify",
+      status: "blocked",
+      actorId: recovery.memberId,
+      reason: "rate_limit",
+    });
     return NextResponse.json({ ok: false, error: "rate_limited", message: "인증 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
   }
   const emailReservationHash = buildReservedMemberIdentifierHashes({ emailNormalized: email })
@@ -106,13 +123,13 @@ export async function POST(request: Request) {
           false,
         );
       }
-      await logAuthSecurity({
-        ...context,
-        eventName: "member_email_recovery",
+      await logMemberEmailSecurity({
+        context,
+        flow: "recovery",
+        stage: "verify",
         status: "failure",
-        actorType: "member",
         actorId: recovery.memberId,
-        properties: { stage: "email_verify", reason: completion.reason },
+        reason: completion.reason,
       });
       const failure = getMemberEmailRecoveryHttpFailure(completion.reason);
       return NextResponse.json(
@@ -127,17 +144,24 @@ export async function POST(request: Request) {
     });
     await clearMemberEmailRecoverySession();
     await recordMemberEmailVerificationAttempt("recovery-verify", rateLimitContext, true);
-    await logAuthSecurity({
-      ...context,
-      eventName: "member_email_recovery",
+    await logMemberEmailSecurity({
+      context,
+      flow: "recovery",
+      stage: "verify",
       status: "success",
-      actorType: "member",
       actorId: recovery.memberId,
-      properties: { stage: "email_verify" },
     });
     return NextResponse.json({ ok: true, redirectTo: "/" });
   } catch {
     await recordMemberEmailVerificationAttempt("recovery-verify", rateLimitContext, false);
+    await logMemberEmailSecurity({
+      context,
+      flow: "recovery",
+      stage: "verify",
+      status: "failure",
+      actorId: recovery.memberId,
+      reason: "state_update_failed",
+    });
     return NextResponse.json(
       {
         ok: false,

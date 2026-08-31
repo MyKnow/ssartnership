@@ -18,7 +18,7 @@ import { isMockDataSource } from "@/lib/mock/member";
 import {
   getActiveRequiredPolicies,
   getPolicyDocumentByKind,
-} from "@/lib/policy-documents";
+} from "@/lib/policy-documents.server";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export type AdminMemberDetailReadModel = {

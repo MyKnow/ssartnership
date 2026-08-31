@@ -6,7 +6,10 @@ import { resolveImageTransformPolicy } from "../src/lib/image-upload/policy.ts";
 import {
   SupabaseImageUploadRepository,
 } from "../src/lib/image-upload/repository.supabase.ts";
-import { IMAGE_UPLOAD_STAGING_BUCKET } from "../src/lib/image-upload/repository.ts";
+import {
+  IMAGE_UPLOAD_STAGING_BUCKET,
+  ImageUploadError,
+} from "../src/lib/image-upload/repository.ts";
 
 type ImageUploadSession = {
   id: string;
@@ -296,4 +299,64 @@ test("Mattermost WebP가 complete 이후 같은 Staging 경로에서 지연되�
   assert.equal(state.stagingRemoved, true);
   assert.equal(state.stagingDownloadCount, 1);
   assert.ok(state.finalBuffer);
+});
+
+test("complete는 실제 원본 바이트 수가 세션 선언값과 다르면 변환 전에 거부한다", async () => {
+  const uploadId = "44444444-4444-4444-8444-444444444444";
+  const ownerId = "55555555-5555-4555-8555-555555555555";
+  const now = new Date("2026-08-31T00:00:00.000Z");
+  const source = await sharp({
+    create: {
+      width: 80,
+      height: 80,
+      channels: 3,
+      background: { r: 20, g: 30, b: 40 },
+    },
+  }).png().toBuffer();
+  const fakeSupabase = createFakeSupabase({
+    initialStagingBuffer: source,
+    session: {
+      id: uploadId,
+      owner_kind: "signup",
+      owner_id: ownerId,
+      purpose: "member-signup-profile",
+      role: "profile",
+      storage_bucket: IMAGE_UPLOAD_STAGING_BUCKET,
+      storage_path: `staging/${uploadId}.png`,
+      source_storage_path: `staging/${uploadId}.png`,
+      source_content_type: "image/png",
+      source_size_bytes: source.byteLength + 1,
+      content_type: null,
+      sha256: null,
+      width: null,
+      height: null,
+      final_bucket: null,
+      final_path: null,
+      final_url: null,
+      status: "signed",
+      signed_url_expires_at: "2026-08-31T00:10:00.000Z",
+      expires_at: "2026-08-31T02:00:00.000Z",
+      attached_resource_type: null,
+      attached_resource_id: null,
+      failure_code: null,
+    },
+  });
+  const repository = new SupabaseImageUploadRepository(fakeSupabase as never);
+
+  await assert.rejects(
+    repository.complete({
+      actor: { kind: "signup", id: ownerId },
+      purpose: "member-signup-profile",
+      uploadIds: [uploadId],
+      now,
+    }),
+    (error: unknown) => error instanceof ImageUploadError
+      && error.code === "upload_source_size_mismatch",
+  );
+
+  const state = fakeSupabase.getState();
+  assert.equal(state.session.status, "failed");
+  assert.equal(state.session.failure_code, "source_size_mismatch");
+  assert.equal(state.processedBuffer, null);
+  assert.deepEqual(state.uploadedPaths, []);
 });

@@ -37,6 +37,40 @@ async function createCodeCoupon(
 }
 
 describe("mock ad package repository", () => {
+  it("prepares campaign options with the trimmed sponsor fallback", async () => {
+    const repository = new MockAdPackageRepository();
+    const campaign = await repository.createCampaign({
+      partnerId: "restaurant-001",
+      packageTier: "boost",
+      title: "공백 스폰서 캠페인",
+      sponsorLabel: "   ",
+      ...activeCouponWindow(),
+    });
+
+    const prepared = await repository.prepareAdminCampaigns();
+    assert.equal(
+      prepared.options.find((option) => option.id === campaign.id)?.label,
+      "역삼 국밥집 · 공백 스폰서 캠페인",
+    );
+    assert.ok((await prepared.campaigns).some((item) => item.id === campaign.id));
+  });
+
+  it("lists campaign metrics only for the requested partner", async () => {
+    const repository = new MockAdPackageRepository();
+
+    const campaigns = await repository.listAdminCampaignsForPartner(
+      "restaurant-001",
+    );
+
+    assert.deepEqual(
+      campaigns.map((campaign) => campaign.id),
+      ["campaign-restaurant-boost"],
+    );
+    assert.ok(
+      campaigns.every((campaign) => campaign.partnerId === "restaurant-001"),
+    );
+  });
+
   it("keeps blank member periodic limits unlimited without bypassing the total member limit", async () => {
     const repository = new MockAdPackageRepository();
     const now = Date.now();
@@ -336,9 +370,7 @@ describe("mock ad package repository", () => {
     assert.equal(first.ok, true);
     assert.equal(first.redemption?.couponId, coupon.id);
 
-    const campaigns = await repository.listAdminCampaigns({
-      now: new Date("2026-07-15T12:00:00.000Z"),
-    });
+    const campaigns = await repository.listAdminCampaigns();
     const campaign = campaigns.find((item) => item.id === coupon.campaignId);
 
     assert.equal(campaign?.metrics.couponRedemptions, 1);
@@ -560,6 +592,41 @@ describe("mock ad package repository", () => {
       issued.map((item) => item.coupon.id),
       [healthCoupon.id],
     );
+  });
+
+  it("lists only unused issues that are active at the requested time", async () => {
+    const repository = new MockAdPackageRepository();
+    const coupon = await createCodeCoupon(repository);
+    const memberId = "member-active-issued-filter";
+    const issued = await repository.issueCoupon({ couponId: coupon.id, memberId });
+
+    assert.equal(issued.ok, true);
+    if (!issued.ok || !issued.issue.issueId) {
+      return;
+    }
+
+    const active = await repository.listIssuedCouponsForMember({
+      memberId,
+      now: new Date(coupon.usageStartsAt),
+    });
+    assert.deepEqual(active.map((item) => item.coupon.id), [coupon.id]);
+
+    const expired = await repository.listIssuedCouponsForMember({
+      memberId,
+      now: new Date(new Date(coupon.usageEndsAt).getTime() + 1),
+    });
+    assert.deepEqual(expired, []);
+
+    assert.equal(
+      (
+        await repository.redeemCouponIssue({
+          issueId: issued.issue.issueId,
+          memberId,
+        })
+      ).ok,
+      true,
+    );
+    assert.deepEqual(await repository.listIssuedCouponsForMember({ memberId }), []);
   });
 
   it("hides a wallet coupon after a member reaches a periodic issue limit", async () => {

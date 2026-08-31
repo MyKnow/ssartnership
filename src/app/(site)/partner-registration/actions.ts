@@ -119,6 +119,7 @@ export async function createPartnerRegistrationRequestAction(
       branches,
     });
   } catch (error) {
+    await recordAttempt(identifier, false, PARTNER_REGISTRATION_RATE_LIMIT);
     console.error("[partner-registration] insert failed", error);
     const safeError = getSafePartnerRegistrationError(
       error,
@@ -293,6 +294,7 @@ export async function createPartnerRegistrationExcelRequestAction(
       context: { source: "public_excel" },
     });
   } catch (error) {
+    await recordAttempt(identifier, false, PARTNER_REGISTRATION_RATE_LIMIT);
     console.error("[partner-registration:xlsx] insert failed", error);
     const safeError = getSafePartnerRegistrationError(
       error,

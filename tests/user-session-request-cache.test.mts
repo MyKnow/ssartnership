@@ -15,6 +15,31 @@ test("signed member session revalidation is memoized once per server request", (
   );
   assert.match(
     source,
-    /export async function getUserSession\(\) \{[\s\S]*?await getSignedUserSession\(\)/,
+    /\.select\("id,auth_session_version,must_change_password"\)/,
+  );
+  assert.match(
+    source,
+    /export const getUserSession = cache\(async \(\) => \{[\s\S]*?await getSignedUserSession\(\)/,
+  );
+  const getUserSessionSource = source.slice(
+    source.indexOf("export const getUserSession = cache"),
+  );
+  assert.doesNotMatch(
+    getUserSessionSource,
+    /\.from\("members"\)/,
+    "getUserSession should reuse the member snapshot from signed-session revalidation",
+  );
+});
+
+test("member profile photo state is memoized by member within one server request", () => {
+  const source = readFileSync(
+    new URL("../src/lib/member-profile-images.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /import \{ cache \} from "react"/);
+  assert.match(
+    source,
+    /export const getMemberProfilePhotoState = cache\(async \(memberId: string\) => \{[\s\S]*?getMemberProfilePhotoStates\(\[memberId\]\)[\s\S]*?\}\);/,
   );
 });

@@ -18,6 +18,10 @@ const certificationPagePath = new URL(
   "../src/app/(site)/certification/page.tsx",
   import.meta.url,
 );
+const certificationMemberViewPath = new URL(
+  "../src/lib/certification-member-view.server.ts",
+  import.meta.url,
+);
 const settingsPagePath = new URL(
   "../src/app/(site)/settings/page.tsx",
   import.meta.url,
@@ -110,6 +114,24 @@ test("사진 제출 경로는 공통 게이트 해석기로 자기 재진입을 
   assert.match(layout, /session\?\.requiresProfilePhotoUpdate/);
   assert.match(layout, /getMemberRequiredGateRedirect/);
   assert.match(layout, /currentPath: returnTo/);
+});
+
+test("내 인증 화면은 공용 서버 회원 뷰의 사진 검토 상태를 재사용한다", async () => {
+  const [certificationPage, certificationMemberView] = await Promise.all([
+    readFile(certificationPagePath, "utf8"),
+    readFile(certificationMemberViewPath, "utf8"),
+  ]);
+
+  assert.match(certificationPage, /getCertificationMemberView/);
+  assert.match(
+    certificationMemberView,
+    /getMemberProfilePhotoAccessState\(\s*source\.profilePhotoReviewStatus,?\s*\)/,
+  );
+  assert.match(certificationMemberView, /getMemberCanonicalProfile/);
+  assert.doesNotMatch(
+    certificationPage,
+    /getMemberProfilePhotoState|getMemberProfilePhotoAccessState/,
+  );
 });
 
 test("인증 화면과 설정의 사진 CTA는 각 원래 목적지를 사진 화면까지 보존한다", async () => {

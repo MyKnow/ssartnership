@@ -1,5 +1,5 @@
 import {
-  buildPartnerReviewSummary,
+  createEmptyPartnerReviewSummary,
   createEmptyPartnerReviewReactionState,
   getPartnerReviewAuthorRoleLabel,
   maskPartnerReviewAuthorName,
@@ -43,6 +43,19 @@ type PartnerReviewRow = {
   } | null;
 };
 
+type PartnerReviewSummaryRow = {
+  average_rating: number | string | null;
+  total_count: number | string | null;
+  rating_1_count: number | string | null;
+  rating_2_count: number | string | null;
+  rating_3_count: number | string | null;
+  rating_4_count: number | string | null;
+  rating_5_count: number | string | null;
+};
+
+const PARTNER_REVIEW_RATINGS = [1, 2, 3, 4, 5] as const;
+type PartnerReviewRating = (typeof PARTNER_REVIEW_RATINGS)[number];
+
 const REVIEW_SELECT =
   "id,partner_id,member_id,rating,title,body,images,created_at,updated_at,deleted_at,hidden_at,members!partner_reviews_member_id_fkey(display_name,generation)";
 
@@ -66,31 +79,114 @@ function applyReviewSort<T extends { order(column: string, options: { ascending:
   return query.order("created_at", { ascending: false });
 }
 
+function mapPartnerReviewSummaryRow(row: PartnerReviewSummaryRow | null) {
+  if (!row) {
+    return createEmptyPartnerReviewSummary();
+  }
+
+  const toCount = (value: number | string | null) => {
+    const count = Number(value ?? 0);
+    return Number.isSafeInteger(count) && count >= 0 ? count : 0;
+  };
+  const averageRating = Number(row.average_rating ?? 0);
+  return {
+    averageRating: Number.isFinite(averageRating) ? averageRating : 0,
+    totalCount: toCount(row.total_count),
+    distribution: {
+      1: toCount(row.rating_1_count),
+      2: toCount(row.rating_2_count),
+      3: toCount(row.rating_3_count),
+      4: toCount(row.rating_4_count),
+      5: toCount(row.rating_5_count),
+    },
+  };
+}
+
+function isMissingPartnerReviewSummaryRpc(message: string) {
+  return (
+    message.includes("get_partner_review_summary") &&
+    (message.includes("schema cache") || message.includes("does not exist"))
+  );
+}
+
+async function getFilteredReviewSummaryFallback(
+  partnerId: string,
+  rating: string,
+  imagesOnly: boolean,
+) {
+  const supabase = getSupabaseAdminClient();
+  const selectedRatings: readonly PartnerReviewRating[] =
+    rating === "all"
+      ? PARTNER_REVIEW_RATINGS
+      : [Number(rating) as PartnerReviewRating];
+
+  const counts = await Promise.all(
+    selectedRatings.map(async (selectedRating) => {
+      let query = supabase
+        .from("partner_reviews")
+        .select("id", { count: "exact", head: true })
+        .eq("partner_id", partnerId)
+        .eq("rating", selectedRating)
+        .is("deleted_at", null)
+        .is("hidden_at", null);
+      if (imagesOnly) {
+        query = query.not("images", "eq", "{}");
+      }
+
+      const { count, error } = await query;
+      if (error) {
+        throw new Error(error.message);
+      }
+      return [selectedRating, count ?? 0] as const;
+    }),
+  );
+
+  const distribution = {
+    1: 0,
+    2: 0,
+    3: 0,
+    4: 0,
+    5: 0,
+  };
+  for (const [selectedRating, count] of counts) {
+    distribution[selectedRating] = count;
+  }
+
+  const totalCount = counts.reduce((sum, [, count]) => sum + count, 0);
+  if (totalCount === 0) {
+    return createEmptyPartnerReviewSummary();
+  }
+  const totalRating = counts.reduce(
+    (sum, [selectedRating, count]) => sum + selectedRating * count,
+    0,
+  );
+  return {
+    averageRating: Number((totalRating / totalCount).toFixed(1)),
+    totalCount,
+    distribution,
+  };
+}
+
 async function getFilteredReviewSummary(
   partnerId: string,
   rating: string,
   imagesOnly: boolean,
 ) {
   const supabase = getSupabaseAdminClient();
-  let query = supabase
-    .from("partner_reviews")
-    .select("rating")
-    .eq("partner_id", partnerId)
-    .is("deleted_at", null)
-    .is("hidden_at", null);
-  if (rating !== "all") {
-    query = query.eq("rating", Number(rating));
-  }
-  if (imagesOnly) {
-    query = query.not("images", "eq", "{}");
-  }
-  const { data, error } = await query;
+  const { data, error } = await supabase.rpc("get_partner_review_summary", {
+    input_partner_id: partnerId,
+    input_rating: rating === "all" ? null : Number(rating),
+    input_images_only: imagesOnly,
+  });
   if (error) {
+    if (isMissingPartnerReviewSummaryRpc(error.message)) {
+      return getFilteredReviewSummaryFallback(partnerId, rating, imagesOnly);
+    }
     throw new Error(error.message);
   }
-  return buildPartnerReviewSummary(
-    ((data ?? []) as { rating: number }[]).map((item) => item.rating),
-  );
+
+  const row = ((data ?? [])[0] ?? null) as PartnerReviewSummaryRow | null;
+  return mapPartnerReviewSummaryRow(row);
 }
 
 async function listReviewRows(
@@ -183,19 +279,7 @@ async function getReviewReactionStates(
 
 export class SupabasePartnerReviewRepository implements PartnerReviewRepository {
   async getPartnerReviewSummary(partnerId: string) {
-    const supabase = getSupabaseAdminClient();
-    const { data, error } = await supabase
-      .from("partner_reviews")
-      .select("rating")
-      .eq("partner_id", partnerId)
-      .is("deleted_at", null)
-      .is("hidden_at", null);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return buildPartnerReviewSummary((data ?? []).map((item) => item.rating));
+    return getFilteredReviewSummary(partnerId, "all", false);
   }
 
   async listPartnerReviews(context: PartnerReviewListContext) {
@@ -213,15 +297,17 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
       Boolean(context.imagesOnly),
       Boolean(context.includeHidden),
     );
-    const reactionStates = await getReviewReactionStates(
-      rows.map((row) => row.id),
-      context.currentUserId,
-    );
-    const summary = await getFilteredReviewSummary(
-      context.partnerId,
-      rating,
-      Boolean(context.imagesOnly),
-    );
+    const [reactionStates, summary] = await Promise.all([
+      getReviewReactionStates(
+        rows.map((row) => row.id),
+        context.currentUserId,
+      ),
+      getFilteredReviewSummary(
+        context.partnerId,
+        rating,
+        Boolean(context.imagesOnly),
+      ),
+    ]);
     const items = rows.map((row) => mapReview(row, context.currentUserId, reactionStates.get(row.id)));
     return {
       summary,

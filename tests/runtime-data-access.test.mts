@@ -18,7 +18,7 @@ const ENVIRONMENT_KEYS = [
 type ConsumerModules = {
   repositories: typeof import("../src/lib/repositories/index.ts");
   notificationPreferences: typeof import("../src/lib/notification-preferences.ts");
-  policies: typeof import("../src/lib/policy-documents.ts");
+  policies: typeof import("../src/lib/policy-documents.server.ts");
   partnerPortal: typeof import("../src/lib/partner-portal.ts");
   walletPass: typeof import("../src/lib/repositories/wallet-pass.ts");
 };
@@ -69,7 +69,7 @@ async function loadConsumerModules(): Promise<ConsumerModules> {
     notificationPreferences: await importFresh(
       "../src/lib/notification-preferences.ts",
     ),
-    policies: await importFresh("../src/lib/policy-documents.ts"),
+    policies: await importFresh("../src/lib/policy-documents.server.ts"),
     partnerPortal: await importFresh("../src/lib/partner-portal.ts"),
     walletPass: await importFresh("../src/lib/repositories/wallet-pass.ts"),
   };

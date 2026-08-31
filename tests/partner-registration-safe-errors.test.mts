@@ -38,6 +38,18 @@ test("제휴 등록 액션은 지점 파일과 행 오류만 필드 안내로 �
       },
     },
   );
+  assert.deepEqual(
+    getSafePartnerRegistrationError(
+      new Error("XLSX 파일의 크기나 구조를 확인해 주세요."),
+      "fallback",
+    ),
+    {
+      message: "XLSX 파일의 크기나 구조를 확인해 주세요.",
+      fieldErrors: {
+        branchListText: "XLSX 파일의 크기나 구조를 확인해 주세요.",
+      },
+    },
+  );
 });
 
 test("공개·파트너 등록 액션은 raw error.message를 응답에 전달하지 않는다", async () => {

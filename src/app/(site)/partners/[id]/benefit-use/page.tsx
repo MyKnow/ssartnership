@@ -5,12 +5,9 @@ import Container from "@/components/ui/Container";
 import PageHeader from "@/components/ui/PageHeader";
 import PartnerBenefitVerificationView from "@/components/partner/PartnerBenefitVerificationView";
 import { getHeaderSession } from "@/lib/header-session";
-import {
-  getMemberCanonicalProfile,
-  getMemberProfileImageUrl,
-} from "@/lib/member-profile-view";
-import { getMemberProfilePhotoAccessState } from "@/lib/member-profile-photo";
-import { listCohortCardThemes } from "@/lib/cohort-card-themes";
+import { getCertificationMemberView } from "@/lib/certification-member-view.server";
+import { resolvePartnerAudienceFromMemberYear } from "@/lib/partner-audience";
+import { listCohortCardThemes } from "@/lib/cohort-card-themes.server";
 import { getPartnerServiceMode } from "@/lib/partner-service-mode";
 import {
   isPartnerBenefitUseAvailable,
@@ -28,7 +25,6 @@ import {
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { SITE_NAME } from "@/lib/site";
 import { getSignedUserSession } from "@/lib/user-auth";
-import { getPartnerViewerContext } from "@/lib/partner-view-context";
 
 export const dynamic = "force-dynamic";
 
@@ -98,10 +94,25 @@ export default async function PartnerBenefitUsePage({
     redirect(`/auth/login?returnTo=${encodeURIComponent(requestedPath)}`);
   }
 
-  const viewerContext = await getPartnerViewerContext(session.userId);
+  const memberView = await getCertificationMemberView(session.userId);
+  if (!memberView) {
+    redirect(
+      `/auth/login?returnTo=${encodeURIComponent(
+        getBenefitUsePath(partnerId, rawBenefitId ?? benefit ?? "", requestedUseCount ?? 1, returnTo),
+      )}`,
+    );
+  }
+  const { member } = memberView;
+
+  const viewerAudience = resolvePartnerAudienceFromMemberYear(
+    member.generation,
+    new Date(),
+    undefined,
+    { graduateVerifiedAt: member.graduateVerifiedAt },
+  );
   const partner = await partnerRepository.getPartnerById(partnerId, {
     authenticated: true,
-    viewerAudience: viewerContext.viewerAudience,
+    viewerAudience,
   });
   if (
     !partner ||
@@ -136,29 +147,10 @@ export default async function PartnerBenefitUsePage({
     redirect(detailPath);
   }
 
-  const [headerSession, member, cohortCardThemes] = await Promise.all([
+  const [headerSession, cohortCardThemes] = await Promise.all([
     getHeaderSession(session.userId),
-    getMemberCanonicalProfile(session.userId),
     listCohortCardThemes(),
   ]);
-  if (!member) {
-    redirect(
-      `/auth/login?returnTo=${encodeURIComponent(
-        getBenefitUsePath(partnerId, selectedBenefit.id, useCount, returnTo),
-      )}`,
-    );
-  }
-
-  const photoAccess = getMemberProfilePhotoAccessState(
-    member.profilePhotoReviewStatus,
-  );
-  const profileImageUrl =
-    !photoAccess.restrictCertification &&
-    member.activeProfileImageId &&
-    member.profilePhotoReviewStatus === "approved" &&
-    !member.mustChangePassword
-      ? getMemberProfileImageUrl(member.id)
-      : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -183,14 +175,7 @@ export default async function PartnerBenefitUsePage({
               benefitId={selectedBenefit.id}
               benefit={selectedBenefit.title}
               useCount={useCount}
-              member={{
-                mattermostUsername: member.mattermostUsername,
-                displayName: member.displayName,
-                generation: member.generation,
-                campus: member.campus,
-                graduateVerifiedAt: member.graduateVerifiedAt,
-                profileImageUrl,
-              }}
+              member={member}
               cohortCardThemes={cohortCardThemes}
               initialTimestamp={new Date().toISOString()}
               pinConfigured={Boolean(

@@ -6,13 +6,16 @@ import SiteHeader from "@/components/SiteHeader";
 import {
   CAMPUS_DIRECTORY,
   getCampusBySlug,
-  getCampusPartners,
   type CampusSlug,
 } from "@/lib/campuses";
 import { partnerRepository } from "@/lib/repositories";
 import { getHeaderSession } from "@/lib/header-session";
 import { getPartnerViewerContext } from "@/lib/partner-view-context";
-import { getHomePartnerState } from "@/lib/home-partner-state";
+import {
+  getHomePartnerMemberState,
+  getHomePartnerPopularityById,
+} from "@/lib/home-partner-state";
+import { buildHomePartnerDirectory } from "@/lib/home-partner-directory";
 import type { PartnerAudienceKey } from "@/lib/partner-audience";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import { canViewPartnerDetails } from "@/lib/partner-visibility";
@@ -21,8 +24,20 @@ import { createCanonicalAlternates } from "@/lib/seo";
 
 const getCampusCategoriesCached = cache(() => partnerRepository.getCategories());
 const getCampusPartnersCached = cache(
-  (authenticated: boolean, viewerAudience?: PartnerAudienceKey | null) =>
-    partnerRepository.getPartners({ authenticated, viewerAudience }),
+  (
+    campusSlug: CampusSlug,
+    authenticated: boolean,
+    viewerAudience?: PartnerAudienceKey | null,
+  ) =>
+    partnerRepository.getPartnersForCampus(campusSlug, {
+      authenticated,
+      viewerAudience,
+    }),
+);
+const getCampusPublicDirectoryPartnersCached = cache((campusSlug: CampusSlug) =>
+  partnerRepository.getPublicDirectoryPartnersForCampus(campusSlug, {
+    authenticated: false,
+  }),
 );
 
 export const dynamic = "force-dynamic";
@@ -50,10 +65,10 @@ export async function generateMetadata({
 
   const [categories, partners] = await Promise.all([
     getCampusCategoriesCached(),
-    getCampusPartnersCached(false),
+    getCampusPublicDirectoryPartnersCached(campus.slug),
   ]);
 
-  const campusPartners = getCampusPartners(partners, campus.slug).filter((partner) =>
+  const campusPartners = partners.filter((partner) =>
     canViewPartnerDetails(partner.visibility, false, partner.period),
   );
   const categoryLabels = Array.from(
@@ -116,13 +131,16 @@ export default async function CampusLandingPage({
 
   const [categories, partners] = await Promise.all([
     getCampusCategoriesCached(),
-    getCampusPartnersCached(
-      viewerContext.authenticated,
-      viewerContext.viewerAudience,
-    ),
+    viewerContext.authenticated
+      ? getCampusPartnersCached(
+          campus.slug,
+          viewerContext.authenticated,
+          viewerContext.viewerAudience,
+        )
+      : getCampusPublicDirectoryPartnersCached(campus.slug),
   ]);
 
-  const campusPartners = getCampusPartners(partners, campus.slug).map((partner) => {
+  const campusPartners = partners.map((partner) => {
     if (isWithinPeriod(partner.period.start, partner.period.end)) {
       return partner;
     }
@@ -135,12 +153,27 @@ export default async function CampusLandingPage({
   const publicCampusPartners = campusPartners.filter((partner) =>
     canViewPartnerDetails(partner.visibility, false, partner.period),
   );
-  const campusPartnerIds = campusPartners.map((partner) => partner.id);
-  const campusPartnerState = await getHomePartnerState({
-    partnerIds: campusPartnerIds,
-    partnerIdLimit: campusPartnerIds.length,
+  const popularityCandidates = buildHomePartnerDirectory({
+    partners: campusPartners,
+    viewerAuthenticated: viewerContext.authenticated,
+    popularityByPartnerId: {},
+  });
+  const partnerPopularityById = await getHomePartnerPopularityById(
+    popularityCandidates.displayPartnerIds,
+  );
+  const rankedDirectory = buildHomePartnerDirectory({
+    partners: campusPartners,
+    viewerAuthenticated: viewerContext.authenticated,
+    popularityByPartnerId: partnerPopularityById,
+  });
+  const memberState = await getHomePartnerMemberState({
+    partnerIds: rankedDirectory.displayPartnerIds,
     currentUserId: headerSession?.userId ?? null,
   });
+  const campusPartnerState = {
+    ...memberState,
+    partnerPopularityById,
+  };
   const categoryLabels = Array.from(
     new Set(
       publicCampusPartners
@@ -172,7 +205,7 @@ export default async function CampusLandingPage({
         currentUserId={headerSession?.userId ?? null}
         partnerPopularityById={campusPartnerState.partnerPopularityById}
         partnerFavoriteStateById={campusPartnerState.partnerFavoriteStateById}
-        loadedPartnerStateIds={campusPartnerState.loadedPartnerIds}
+        loadedFavoritePartnerIds={campusPartnerState.loadedFavoritePartnerIds}
         structuredData={campusJsonLd}
       />
     </div>

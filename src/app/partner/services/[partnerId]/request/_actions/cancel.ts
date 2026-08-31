@@ -39,6 +39,7 @@ export async function cancelPartnerChangeRequestActionImpl(formData: FormData) {
     });
     await logAdminAudit({
       ...(await getServerActionLogContext(getReturnUrl(partnerId, companyId))),
+      actorType: "partner",
       actorId: session.accountId,
       action: "partner_portal_change_request_cancel",
       targetType: "partner",

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { PartnerBenefit, PartnerBenefitDraft } from "@/lib/partner-benefit-items";
+import { createClientUuid } from "@/lib/client-uuid";
 
 type EditorRow = {
   id: string;
@@ -9,16 +10,9 @@ type EditorRow = {
   maxApplyCount: string;
 };
 
-function createId(index: number) {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `benefit-editor-${index + 1}`;
-}
-
 function toRows(items: readonly PartnerBenefit[]) {
   return items.map((item, index) => ({
-    id: item.id || createId(index),
+    id: item.id || `benefit-editor-${index + 1}`,
     title: item.title,
     maxApplyCount: item.maxApplyCount == null ? "" : String(item.maxApplyCount),
   }));
@@ -97,7 +91,7 @@ export default function PartnerBenefitItemsField({
       ))}
       <button
         type="button"
-        onClick={() => setRows((current) => [...current, { id: createId(current.length), title: "", maxApplyCount: "" }])}
+        onClick={() => setRows((current) => [...current, { id: createClientUuid(), title: "", maxApplyCount: "" }])}
         className="min-h-10 rounded-xl border border-dashed border-primary/35 bg-primary-soft px-3 text-sm font-semibold text-primary"
       >
         + 혜택 추가

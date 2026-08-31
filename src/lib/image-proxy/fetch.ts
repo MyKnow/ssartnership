@@ -56,13 +56,18 @@ async function resolvePublicImageAddress(hostname: string) {
   return publicAddresses[0];
 }
 
-function parseTargetPort(target: URL) {
+export function resolvePublicImageTargetPort(target: URL) {
+  if (target.protocol !== "http:" && target.protocol !== "https:") {
+    throw new ImageProxyError("Unsupported protocol", 400);
+  }
+
   if (!target.port) {
     return undefined;
   }
 
   const port = Number.parseInt(target.port, 10);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  const expectedPort = target.protocol === "https:" ? 443 : 80;
+  if (!Number.isInteger(port) || port !== expectedPort) {
     throw new ImageProxyError("Unsupported port", 400);
   }
 
@@ -96,7 +101,7 @@ export async function fetchPublicImage(
   const requestOptions: RequestOptions = {
     protocol: target.protocol,
     hostname: resolvedAddress,
-    port: parseTargetPort(target),
+    port: resolvePublicImageTargetPort(target),
     method: "GET",
     path: `${target.pathname}${target.search}`,
     headers: {

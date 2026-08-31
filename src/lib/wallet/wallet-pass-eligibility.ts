@@ -4,7 +4,7 @@ import {
   evaluateRequiredPolicyStatus,
   getActiveRequiredPolicies,
   getMemberPolicyConsentVersions,
-} from "@/lib/policy-documents";
+} from "@/lib/policy-documents.server";
 import {
   getMemberCanonicalProfile,
   type MemberCanonicalProfile,

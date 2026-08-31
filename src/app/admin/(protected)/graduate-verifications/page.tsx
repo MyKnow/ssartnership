@@ -12,6 +12,7 @@ import {
 } from "@/lib/admin-graduate-verification-queue.server";
 import { parseAdminReviewQueuePagination } from "@/lib/admin-ia";
 import { getAdminReviewQueueFeedback } from "@/lib/admin-review-queue";
+import { readFirstSearchParam } from "@/lib/search-params";
 import { redirect } from "next/navigation";
 import {
   approveGraduateVerificationAction,
@@ -29,10 +30,6 @@ type GraduateVerificationSearchParams = {
   requestPage?: string | string[];
   setupEmailRetryPage?: string | string[];
 };
-
-function getOneSearchParam(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] : value;
-}
 
 function buildGraduateQueueHref({
   requestPage,
@@ -64,10 +61,10 @@ async function AdminGraduateVerificationsContent({
   params: GraduateVerificationSearchParams;
 }) {
   const requestPagination = parseAdminReviewQueuePagination({
-    page: getOneSearchParam(params.requestPage),
+    page: readFirstSearchParam(params.requestPage),
   });
   const setupEmailRetryPagination = parseAdminReviewQueuePagination({
-    page: getOneSearchParam(params.setupEmailRetryPage),
+    page: readFirstSearchParam(params.setupEmailRetryPage),
   });
   const requestQueuePromise = getAdminGraduateVerificationRequestQueueReadModel(
     {
@@ -111,8 +108,8 @@ async function AdminGraduateVerificationsContent({
           resendSetupEmail: resendGraduateAccountSetupEmailAction,
         }}
         feedback={getAdminReviewQueueFeedback({
-          error: getOneSearchParam(params.error),
-          success: getOneSearchParam(params.success),
+          error: readFirstSearchParam(params.error),
+          success: readFirstSearchParam(params.success),
         })}
         returnTo={returnTo}
         requestPagination={resolvedRequestPagination}

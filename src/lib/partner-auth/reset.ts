@@ -7,6 +7,7 @@ import {
   findSupabasePartnerPortalAccount,
   isMissingPartnerAuthSessionVersionColumnError,
   normalizeSupabasePartnerLoginId,
+  omitPartnerAuthSessionVersion,
 } from "./accounts.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 
@@ -27,12 +28,6 @@ type CommittedPartnerPortalPasswordReset = PreparedPartnerPortalPasswordReset & 
   committedAuthSessionVersion: number;
   usedAuthSessionVersion: boolean;
 };
-
-function omitPartnerAuthSessionVersion<T extends Record<string, unknown>>(payload: T) {
-  const nextPayload = { ...payload };
-  delete nextPayload.auth_session_version;
-  return nextPayload;
-}
 
 export async function prepareSupabasePartnerPortalPasswordReset(
   email: string,

@@ -7,7 +7,7 @@ import {
   getSelectedPolicyValidationError,
   recordMarketingPolicyConsent,
   recordRequiredPolicyConsent,
-} from "@/lib/policy-documents";
+} from "@/lib/policy-documents.server";
 import { hashPassword } from "@/lib/password";
 import {
   getMattermostCodeSession,

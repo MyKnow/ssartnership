@@ -5,7 +5,7 @@ import {
   evaluateRequiredPolicyStatus,
   getActiveRequiredPolicies,
   getMemberPolicyConsentVersions,
-} from "@/lib/policy-documents";
+} from "@/lib/policy-documents.server";
 import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "./hmac.js";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -158,7 +158,7 @@ export const getSignedUserSession = cache(async () => {
   if (isMockMemberAuthEnabled()) {
     const member = getMockMemberById(session.userId);
     return member?.authSessionVersion === session.authSessionVersion
-      ? session
+      ? { ...session, mustChangePassword: member.mustChangePassword }
       : null;
   }
 
@@ -166,12 +166,12 @@ export const getSignedUserSession = cache(async () => {
     const supabase = getSupabaseAdminClient();
     const { data } = await supabase
       .from("members")
-      .select("id,auth_session_version")
+      .select("id,auth_session_version,must_change_password")
       .eq("id", session.userId)
       .is("deleted_at", null)
       .maybeSingle();
     return data?.id && data.auth_session_version === session.authSessionVersion
-      ? session
+      ? { ...session, mustChangePassword: Boolean(data.must_change_password) }
       : null;
   } catch {
     return null;
@@ -305,66 +305,22 @@ export async function clearUserSession() {
   store.delete(COOKIE_NAME);
 }
 
-export async function getUserSession() {
+export const getUserSession = cache(async () => {
   noStore();
   const session = (await getSignedUserSession()) as SignedUserSession | null;
   if (!session?.userId) {
     return null;
   }
 
-  if (isMockMemberAuthEnabled()) {
-    const member = getMockMemberById(session.userId);
-    if (!member) {
-      return null;
-    }
-
-    const activePoliciesPromise = getActiveRequiredPolicies();
-    const consentVersionsPromise = getMemberPolicyConsentVersions(session.userId);
-    const photoStatePromise = getMemberProfilePhotoState(session.userId);
-    const [activePolicies, consentVersions, photoState] = await Promise.all([
-      activePoliciesPromise,
-      consentVersionsPromise,
-      photoStatePromise,
-    ]);
-    const policyStatus = evaluateRequiredPolicyStatus(
-      consentVersions,
-      activePolicies,
-    );
-    const consentSnapshotIsFresh =
-      session.policyConsentSnapshot?.serviceVersion === activePolicies.service.version &&
-      session.policyConsentSnapshot?.privacyVersion === activePolicies.privacy.version;
-
-    return {
-      ...session,
-      mustChangePassword: member.mustChangePassword,
-      requiresConsent: consentSnapshotIsFresh ? false : policyStatus.requiresConsent,
-      requiresProfilePhotoUpdate: requiresMemberProfilePhotoUpdate(
-        photoState.reviewStatus,
-      ),
-    };
-  }
-
-  const supabase = getSupabaseAdminClient();
-  const memberPromise = supabase
-    .from("members")
-    .select("id,must_change_password")
-    .eq("id", session.userId)
-    .is("deleted_at", null)
-    .maybeSingle();
   const activePoliciesPromise = getActiveRequiredPolicies();
   const consentVersionsPromise = getMemberPolicyConsentVersions(session.userId);
   const photoStatePromise = getMemberProfilePhotoState(session.userId);
 
-  const [{ data: member }, activePolicies, consentVersions, photoState] = await Promise.all([
-    memberPromise,
+  const [activePolicies, consentVersions, photoState] = await Promise.all([
     activePoliciesPromise,
     consentVersionsPromise,
     photoStatePromise,
   ]);
-
-  if (!member?.id) {
-    return null;
-  }
 
   const policyStatus = evaluateRequiredPolicyStatus(
     consentVersions,
@@ -376,10 +332,10 @@ export async function getUserSession() {
 
   return {
     ...session,
-    mustChangePassword: Boolean(member.must_change_password),
+    mustChangePassword: Boolean(session.mustChangePassword),
     requiresConsent: consentSnapshotIsFresh ? false : policyStatus.requiresConsent,
     requiresProfilePhotoUpdate: requiresMemberProfilePhotoUpdate(
       photoState.reviewStatus,
     ),
   };
-}
+});
