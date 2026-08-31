@@ -48,39 +48,39 @@ function createSupabaseAdminStoredNotificationRepository(): AdminStoredNotificat
       const supabase = getSupabaseAdminClient();
       let query = supabase
         .from("admin_notification_recipients")
-        .update({ read_at: now, updated_at: now })
+        .update({ read_at: now, updated_at: now }, { count: "exact" })
         .eq("admin_id", adminId)
         .is("deleted_at", null)
         .is("read_at", null);
       if (notificationIds && notificationIds.length > 0) {
         query = query.in("notification_id", notificationIds);
       }
-      const { data, error } = await query.select("id");
+      const { count, error } = await query;
 
       if (error) {
         throw createNotificationStorageError(error);
       }
 
-      return data?.length ?? 0;
+      return count ?? 0;
     },
 
     async softDelete({ adminId, notificationIds, now }) {
       const supabase = getSupabaseAdminClient();
       let query = supabase
         .from("admin_notification_recipients")
-        .update({ deleted_at: now, updated_at: now })
+        .update({ deleted_at: now, updated_at: now }, { count: "exact" })
         .eq("admin_id", adminId)
         .is("deleted_at", null);
       if (notificationIds && notificationIds.length > 0) {
         query = query.in("notification_id", notificationIds);
       }
-      const { data, error } = await query.select("id");
+      const { count, error } = await query;
 
       if (error) {
         throw createNotificationStorageError(error);
       }
 
-      return data?.length ?? 0;
+      return count ?? 0;
     },
   };
 }

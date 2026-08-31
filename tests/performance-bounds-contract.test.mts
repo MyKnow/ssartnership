@@ -67,3 +67,22 @@ test("이미지 정규화와 수동 회원 사진 준비는 공용 제한 동시
     /Promise\.all\(rowsResult\.acceptedRows\.map/,
   );
 });
+
+test("관리자와 파트너 알림 일괄 변경은 행 본문 대신 영향 행 수만 반환한다", () => {
+  const sources = [
+    read("../src/lib/admin-notification-store.ts"),
+    read("../src/lib/partner-notification-store.ts"),
+  ];
+
+  for (const source of sources) {
+    assert.match(
+      source,
+      /\.update\(\{ read_at: now, updated_at: now \}, \{ count: "exact" \}\)/,
+    );
+    assert.match(
+      source,
+      /\.update\(\{ deleted_at: now, updated_at: now \}, \{ count: "exact" \}\)/,
+    );
+    assert.doesNotMatch(source, /query\.select\("id"\)/);
+  }
+});
