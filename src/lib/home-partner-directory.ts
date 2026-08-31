@@ -73,6 +73,10 @@ export type HomePartnerDirectoryDependencies = {
     authenticated: boolean;
     viewerAudience?: PartnerAudienceKey | null;
   }): Promise<Partner[]>;
+  getPublicDirectoryPartners(context: {
+    authenticated: boolean;
+    viewerAudience?: PartnerAudienceKey | null;
+  }): Promise<Partner[]>;
   getPopularityByPartnerId(
     partnerIds: string[],
   ): Promise<Record<string, PartnerPopularityMetrics>>;
@@ -85,6 +89,7 @@ export type HomePartnerDirectoryDependencies = {
 const homePartnerDirectoryDependencies: HomePartnerDirectoryDependencies = {
   getCategories: () => partnerRepository.getCategories(),
   getPartners: (context) => partnerRepository.getPartners(context),
+  getPublicDirectoryPartners: (context) => partnerRepository.getPublicDirectoryPartners(context),
   getPopularityByPartnerId: getHomePartnerPopularityById,
   getMemberState: getHomePartnerMemberState,
 };
@@ -233,10 +238,15 @@ dependencies: HomePartnerDirectoryDependencies = homePartnerDirectoryDependencie
 ): Promise<LoadedHomePartnerDirectory> {
   const [categories, partners] = await Promise.all([
     dependencies.getCategories(),
-    dependencies.getPartners({
-      authenticated: viewerAuthenticated,
-      viewerAudience,
-    }),
+    viewerAuthenticated
+      ? dependencies.getPartners({
+          authenticated: viewerAuthenticated,
+          viewerAudience,
+        })
+      : dependencies.getPublicDirectoryPartners({
+          authenticated: viewerAuthenticated,
+          viewerAudience,
+        }),
   ]);
   const viewPartners = maskExpiredPartnerActions(partners);
   const resolvedQuery = normalizeHomePartnerDirectoryQuery(query);

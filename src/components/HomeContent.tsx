@@ -45,7 +45,7 @@ export default async function HomeContent({
         currentUserId={currentUserId}
         partnerPopularityById={directory.partnerState.partnerPopularityById}
         partnerFavoriteStateById={directory.partnerState.partnerFavoriteStateById}
-        loadedPartnerStateIds={directory.partnerState.loadedPartnerIds}
+        loadedFavoritePartnerIds={directory.partnerState.loadedFavoritePartnerIds}
       />
     </div>
   );

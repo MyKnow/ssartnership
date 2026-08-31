@@ -8,15 +8,27 @@ import { partnerFavoriteRepository } from "@/lib/repositories";
 export const HOME_PARTNER_STATE_BATCH_LIMIT = 24;
 
 export type HomePartnerState = {
-  loadedPartnerIds: string[];
+  loadedFavoritePartnerIds: string[];
   partnerFavoriteStateById: Record<string, boolean>;
   partnerPopularityById: Record<string, PartnerPopularityMetrics>;
 };
 
 export type HomePartnerMemberState = Pick<
   HomePartnerState,
-  "loadedPartnerIds" | "partnerFavoriteStateById"
+  "loadedFavoritePartnerIds" | "partnerFavoriteStateById"
 >;
+
+export type HomePartnerStateRequest = {
+  partnerIds: string[];
+  currentUserId?: string | null;
+  includeFavorites?: boolean;
+  includePopularity?: boolean;
+};
+
+export type HomePartnerStateDependencies = {
+  popularityDependencies?: HomePartnerPopularityDependencies;
+  getMemberState?: typeof getHomePartnerMemberState;
+};
 
 const hasSupabaseEnv =
   Boolean(process.env.SUPABASE_URL) &&
@@ -142,7 +154,7 @@ export async function getHomePartnerMemberState(input: {
   const partnerIds = normalizeHomePartnerStateIds(input.partnerIds);
   const partnerFavoriteStateById: Record<string, boolean> = {};
   if (partnerIds.length === 0) {
-    return { loadedPartnerIds: [], partnerFavoriteStateById };
+    return { loadedFavoritePartnerIds: [], partnerFavoriteStateById };
   }
   const favoritePartnerIds = input.currentUserId
     ? await partnerFavoriteRepository
@@ -158,26 +170,41 @@ export async function getHomePartnerMemberState(input: {
   }
 
   return {
-    loadedPartnerIds: partnerIds,
+    loadedFavoritePartnerIds: partnerIds,
     partnerFavoriteStateById,
   };
 }
 
-export async function getHomePartnerState(input: {
-  partnerIds: string[];
-  currentUserId?: string | null;
-}): Promise<HomePartnerState> {
-  const partnerIds = normalizeHomePartnerStateIds(input.partnerIds);
-  const popularityPromise = loadHomePartnerPopularity(
-    partnerIds,
-    homePartnerPopularityDependencies,
-  );
-  const memberStatePromise = getHomePartnerMemberState({
-    partnerIds,
-    currentUserId: input.currentUserId,
-  });
-  const [partnerPopularityById, memberState] =
-    await Promise.all([popularityPromise, memberStatePromise]);
+export async function getHomePartnerState(
+  input: HomePartnerStateRequest,
+  dependencies: HomePartnerStateDependencies = {},
+): Promise<HomePartnerState> {
+  const includeFavorites = input.includeFavorites !== false;
+  const includePopularity = input.includePopularity !== false;
+  const popularityIds = includePopularity
+    ? normalizeHomePartnerStateIds(input.partnerIds, input.partnerIds.length)
+    : [];
+  const memberStateLoader =
+    dependencies.getMemberState ?? getHomePartnerMemberState;
+  const popularityPromise = includePopularity
+    ? loadHomePartnerPopularity(
+        popularityIds,
+        dependencies.popularityDependencies ?? homePartnerPopularityDependencies,
+      )
+    : Promise.resolve({});
+  const memberStatePromise = includeFavorites
+    ? memberStateLoader({
+        partnerIds: input.partnerIds,
+        currentUserId: input.currentUserId,
+      })
+    : Promise.resolve({
+        loadedFavoritePartnerIds: [],
+        partnerFavoriteStateById: {},
+      });
+  const [partnerPopularityById, memberState] = await Promise.all([
+    popularityPromise,
+    memberStatePromise,
+  ]);
 
   return {
     ...memberState,

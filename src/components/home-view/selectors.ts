@@ -66,18 +66,20 @@ export function normalizeHomePartners(
       _isActive: visibilityState !== "expired",
       _isExpired: visibilityState === "expired",
       _popularityScore: popularityScore,
-      _search: [
-        partner.name,
-        partner.location,
-        partner.reservationLink ?? "",
-        partner.inquiryLink ?? "",
-        partner.conditions.join(" "),
-        partner.benefits.join(" "),
-        partner.appliesTo.map((item) => getPartnerAudienceLabel(item)).join(" "),
-        (partner.tags ?? []).join(" "),
-      ]
-        .join(" ")
-        .toLowerCase(),
+      _search:
+        partner.directorySearchText ??
+        [
+          partner.name,
+          partner.location,
+          partner.reservationLink ?? "",
+          partner.inquiryLink ?? "",
+          partner.conditions.join(" "),
+          partner.benefits.join(" "),
+          partner.appliesTo.map((item) => getPartnerAudienceLabel(item)).join(" "),
+          (partner.tags ?? []).join(" "),
+        ]
+          .join(" ")
+          .toLowerCase(),
     };
   });
 }

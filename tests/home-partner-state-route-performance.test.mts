@@ -16,6 +16,12 @@ test("home-state authorizes the bounded request without materializing the catalo
   assert.doesNotMatch(routeSource, /partnerRepository\.getPartners\(/);
 });
 
+test("home-state route exposes favorite-only hydration flags", () => {
+  assert.match(routeSource, /function parseRequestedState/);
+  assert.match(routeSource, /includeFavorites/);
+  assert.match(routeSource, /includePopularity/);
+});
+
 test("Supabase home-state authorization selects only requested ids", () => {
   assert.match(
     supabaseRepositorySource,

@@ -17,7 +17,7 @@ function formatPeriod(start?: string | null, end?: string | null) {
 export async function buildPartnerRssFeedItems(): Promise<RssFeedItem[]> {
   const [categories, partners] = await Promise.all([
     partnerRepository.getCategories(),
-    partnerRepository.getPartners({ authenticated: false }),
+    partnerRepository.getPublicDirectoryPartners({ authenticated: false }),
   ]);
   const categoryMap = new Map(
     categories.map((category) => [category.key, category.label]),

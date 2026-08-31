@@ -181,3 +181,18 @@ test("mock home-state authorization keeps requested directory entries, including
 
   assert.deepEqual(ids, ["restaurant-001", "cafe-001", "health-001"]);
 });
+
+test("mock public directory keeps benefit search text without serializing rich arrays", async () => {
+  const { MockPartnerRepository } = await mockPartnerRepositoryPromise;
+  const repository = new MockPartnerRepository();
+
+  const partners = await repository.getPublicDirectoryPartners({
+    authenticated: false,
+  });
+  const partner = partners.find((item) => item.id === "space-001");
+
+  assert.deepEqual(partner?.benefits, []);
+  assert.deepEqual(partner?.conditions, []);
+  assert.match(partner?.directorySearchText ?? "", /2시간 무료 이용/);
+  assert.match(partner?.directorySearchText ?? "", /평일 2시간 무료/);
+});

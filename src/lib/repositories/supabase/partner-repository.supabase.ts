@@ -2,6 +2,7 @@ import type { Category, Partner } from "@/lib/types";
 import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
 import { cache } from "react";
 import {
+  getPartnerAudienceLabel,
   normalizePartnerAudience,
 } from "@/lib/partner-audience";
 import { normalizeCampusSlugs } from "@/lib/campuses";
@@ -80,6 +81,8 @@ type PublicCacheVersionRow = {
 
 const PARTNER_SELECT_COLUMNS =
   "id,name,category_id,created_at,updated_at,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,partner_benefits(id,title,max_apply_count,display_order),applies_to,images,tags,visibility,benefit_visibility,branch_scope_type,branch_scope_note,categories(key)";
+const PUBLIC_DIRECTORY_SELECT_COLUMNS =
+  "id,name,category_id,created_at,location,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,tags,visibility,benefit_visibility,branch_scope_type,categories(key)";
 
 function normalizeDate(value: string | null | undefined) {
   return value ?? "미정";
@@ -171,6 +174,28 @@ const getCachedPartnerRows = unstable_cache(
     return (data ?? []) as PartnerRow[];
   },
   ["partner-repository", "partners", "versioned"],
+  {
+    revalidate: false,
+    tags: ["partners"],
+  },
+);
+
+const getCachedPublicDirectoryPartnerRows = unstable_cache(
+  async (versionKey: string): Promise<PartnerRow[]> => {
+    void versionKey;
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("partners")
+      .select(PUBLIC_DIRECTORY_SELECT_COLUMNS)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return (data ?? []) as PartnerRow[];
+  },
+  ["partner-repository", "partners", "public-directory", "versioned"],
   {
     revalidate: false,
     tags: ["partners"],
@@ -280,6 +305,52 @@ function toLockedPartner(row: PartnerRow, categoryKey: string): Partner {
   };
 }
 
+function toVisiblePublicDirectoryPartner(row: PartnerRow, categoryKey: string): Partner {
+  const appliesTo = normalizePartnerAudience(row.applies_to);
+  return {
+    id: row.id,
+    name: row.name,
+    category: categoryKey,
+    visibility: normalizePartnerVisibility(row.visibility),
+    benefitVisibility: normalizePartnerBenefitVisibility(row.benefit_visibility),
+    createdAt: row.created_at,
+    location: row.location,
+    campusSlugs: normalizeCampusSlugs(row.campus_slugs ?? []),
+    thumbnail: row.thumbnail ?? null,
+    mapUrl: row.map_url ?? undefined,
+    benefitActionType: normalizePartnerBenefitActionType(
+      row.benefit_action_type,
+      row.benefit_action_link || row.reservation_link ? "external_link" : "none",
+    ),
+    benefitActionLink: row.benefit_action_link ?? undefined,
+    reservationLink: row.reservation_link ?? undefined,
+    inquiryLink: row.inquiry_link ?? undefined,
+    period: {
+      start: normalizeDate(row.period_start),
+      end: normalizeDate(row.period_end),
+    },
+    conditions: [],
+    benefits: [],
+    benefitItems: [],
+    appliesTo,
+    images: [],
+    tags: row.tags ?? [],
+    directorySearchText: [
+      row.name,
+      row.location,
+      row.reservation_link ?? "",
+      row.inquiry_link ?? "",
+      (row.conditions ?? []).join(" "),
+      (row.benefits ?? []).join(" "),
+      appliesTo.map((item) => getPartnerAudienceLabel(item)).join(" "),
+      (row.tags ?? []).join(" "),
+    ]
+      .join(" ")
+      .toLowerCase(),
+    branchScopeType: row.branch_scope_type ?? "single_location",
+  };
+}
+
 function mapPartnerForList(
   row: PartnerRow,
   context: PartnerViewContext,
@@ -288,6 +359,21 @@ function mapPartnerForList(
   const visibility = normalizePartnerVisibility(row.visibility);
   if (canViewPartnerDetails(visibility, context.authenticated)) {
     return maskPartnerBenefitsForAccess(toVisiblePartner(row, categoryKey), context);
+  }
+  return toLockedPartner(row, categoryKey);
+}
+
+function mapPartnerForPublicDirectory(
+  row: PartnerRow,
+  context: PartnerViewContext,
+): Partner {
+  const categoryKey = extractCategoryKey(row.categories) ?? "health";
+  const visibility = normalizePartnerVisibility(row.visibility);
+  if (canViewPartnerDetails(visibility, context.authenticated)) {
+    return maskPartnerBenefitsForAccess(
+      toVisiblePublicDirectoryPartner(row, categoryKey),
+      context,
+    );
   }
   return toLockedPartner(row, categoryKey);
 }
@@ -353,6 +439,14 @@ export class SupabasePartnerRepository implements PartnerRepository {
     const versionKey = await getPublicCacheVersionKey(["partners", "categories"]);
     const rows = await getCachedPartnerRows(versionKey);
     return rows.map((item) => mapPartnerForList(item, context));
+  }
+
+  async getPublicDirectoryPartners(
+    context: PartnerViewContext = { authenticated: false },
+  ): Promise<Partner[]> {
+    const versionKey = await getPublicCacheVersionKey(["partners", "categories"]);
+    const rows = await getCachedPublicDirectoryPartnerRows(versionKey);
+    return rows.map((item) => mapPartnerForPublicDirectory(item, context));
   }
 
   async getHomeStateAuthorizedPartnerIds(

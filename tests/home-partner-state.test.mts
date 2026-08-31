@@ -59,7 +59,7 @@ test("global popularity can cover the full directory while member state stays ba
       throw new Error("admin metrics must stay disabled");
     },
     getFavoriteCounts: async (requestedIds: string[]) =>
-      new Map(requestedIds.map((partnerId) => [partnerId, 0])),
+      new Map(requestedIds.map((partnerId: string) => [partnerId, 0])),
   });
   const state = await getHomePartnerMemberState({
     partnerIds,
@@ -67,8 +67,11 @@ test("global popularity can cover the full directory while member state stays ba
   });
 
   assert.equal(Object.keys(popularityByPartnerId).length, partnerIds.length);
-  assert.equal(state.loadedPartnerIds.length, HOME_PARTNER_STATE_BATCH_LIMIT);
-  assert.deepEqual(state.loadedPartnerIds, partnerIds.slice(0, HOME_PARTNER_STATE_BATCH_LIMIT));
+  assert.equal(state.loadedFavoritePartnerIds.length, HOME_PARTNER_STATE_BATCH_LIMIT);
+  assert.deepEqual(
+    state.loadedFavoritePartnerIds,
+    partnerIds.slice(0, HOME_PARTNER_STATE_BATCH_LIMIT),
+  );
 });
 
 test("successful admin metrics reuse their favorite counts without a duplicate fallback query", async () => {
@@ -177,5 +180,49 @@ test("home partner state starts independent data sources in parallel", () => {
     "utf8",
   );
 
-  assert.match(source, /await Promise\.all\(\[popularityPromise, memberStatePromise\]\)/);
+  assert.match(
+    source,
+    /const \[partnerPopularityById, memberState\] = await Promise\.all\(\[\s*popularityPromise,\s*memberStatePromise,\s*\]\)/,
+  );
+});
+
+test("favorite-only home-state hydration skips popularity reloads", async () => {
+  const { getHomePartnerState } = await homePartnerStateModulePromise;
+  let adminMetricsCalls = 0;
+
+  const state = await getHomePartnerState(
+    {
+      partnerIds: ["partner-1", "partner-2"],
+      currentUserId: "member-1",
+      includeFavorites: true,
+      includePopularity: false,
+    },
+    {
+      popularityDependencies: {
+        canUsePopularityMetrics: () => true,
+        getAdminPartnerMetrics: async () => {
+          adminMetricsCalls += 1;
+          return {
+            metricsByPartnerId: new Map(),
+            warningMessage: null,
+          };
+        },
+        getFavoriteCounts: async () => new Map(),
+      },
+      getMemberState: async ({ partnerIds }: { partnerIds: string[] }) => ({
+        loadedFavoritePartnerIds: partnerIds,
+        partnerFavoriteStateById: Object.fromEntries(
+          partnerIds.map((partnerId: string) => [partnerId, partnerId === "partner-2"]),
+        ),
+      }),
+    },
+  );
+
+  assert.equal(adminMetricsCalls, 0);
+  assert.deepEqual(state.loadedFavoritePartnerIds, ["partner-1", "partner-2"]);
+  assert.deepEqual(state.partnerFavoriteStateById, {
+    "partner-1": false,
+    "partner-2": true,
+  });
+  assert.deepEqual(state.partnerPopularityById, {});
 });

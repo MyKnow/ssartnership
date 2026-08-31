@@ -20,6 +20,17 @@ function parseRequestedPartnerIds(request: Request) {
   ]);
 }
 
+function parseRequestedState(request: Request) {
+  const url = new URL(request.url);
+  const includeFavorites = url.searchParams.get("includeFavorites");
+  const includePopularity = url.searchParams.get("includePopularity");
+
+  return {
+    includeFavorites: includeFavorites !== "0" && includeFavorites !== "false",
+    includePopularity: includePopularity !== "0" && includePopularity !== "false",
+  };
+}
+
 export async function GET(request: Request) {
   if (!isTrustedSameOriginRequest(request)) {
     return NextResponse.json(
@@ -29,9 +40,10 @@ export async function GET(request: Request) {
   }
 
   const requestedIds = parseRequestedPartnerIds(request);
+  const requestedState = parseRequestedState(request);
   if (requestedIds.length === 0) {
     return NextResponse.json({
-      loadedPartnerIds: [],
+      loadedFavoritePartnerIds: [],
       partnerFavoriteStateById: {},
       partnerPopularityById: {},
     });
@@ -50,6 +62,8 @@ export async function GET(request: Request) {
   const state = await getHomePartnerState({
     partnerIds,
     currentUserId: session?.userId ?? null,
+    includeFavorites: requestedState.includeFavorites,
+    includePopularity: requestedState.includePopularity,
   });
 
   return NextResponse.json(state);

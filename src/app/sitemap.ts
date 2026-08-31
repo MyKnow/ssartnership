@@ -15,7 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   try {
-    const partners = await partnerRepository.getPartners({
+    const partners = await partnerRepository.getPublicDirectoryPartners({
       authenticated: false,
     });
     const publicPartners = partners.filter((partner) =>

@@ -1,6 +1,10 @@
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { ensureCronApiAccess, getCronErrorResponse } from "@/lib/cron-route";
+import {
+  PROMOTION_EVENTS_CACHE_TAG,
+  PROMOTION_SLIDES_CACHE_TAG,
+} from "@/lib/promotions/events";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -64,6 +68,8 @@ export async function GET(request: NextRequest) {
     return getCronErrorResponse("archive-expired-promotions");
   }
 
+  revalidateTag(PROMOTION_EVENTS_CACHE_TAG, "max");
+  revalidateTag(PROMOTION_SLIDES_CACHE_TAG, "max");
   revalidatePath("/");
   revalidatePath("/admin");
   revalidatePath("/admin/advertisement");

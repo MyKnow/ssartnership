@@ -47,7 +47,7 @@ function HomeDirectoryStory({ partners }: { partners: Partner[] }) {
         partners={partners}
         viewerAuthenticated
         currentUserId={null}
-        loadedPartnerStateIds={partners.map((partner) => partner.id)}
+        loadedFavoritePartnerIds={partners.map((partner) => partner.id)}
       />
     </ToastProvider>
   );

@@ -3,6 +3,7 @@ import type {
   PartnerRepository,
   PartnerViewContext,
 } from "@/lib/repositories/partner-repository";
+import { getPartnerAudienceLabel } from "@/lib/partner-audience";
 import { canViewPartnerDetails } from "@/lib/partner-visibility";
 import { maskPartnerBenefitsForAccess } from "@/lib/partner-benefit-visibility";
 
@@ -174,6 +175,68 @@ const partners: Partner[] = [
 export class MockPartnerRepository implements PartnerRepository {
   async getCategories(): Promise<Category[]> {
     return categories;
+  }
+
+  async getPublicDirectoryPartners(
+    context: PartnerViewContext = { authenticated: false },
+  ): Promise<Partner[]> {
+    return partners.map((partner) => {
+      if (canViewPartnerDetails(partner.visibility, context.authenticated)) {
+        return maskPartnerBenefitsForAccess({
+          id: partner.id,
+          name: partner.name,
+          category: partner.category,
+          visibility: partner.visibility,
+          benefitVisibility: partner.benefitVisibility,
+          createdAt: partner.createdAt,
+          location: partner.location,
+          campusSlugs: partner.campusSlugs,
+          thumbnail: partner.thumbnail ?? null,
+          mapUrl: partner.mapUrl,
+          benefitActionType: partner.benefitActionType,
+          benefitActionLink: partner.benefitActionLink,
+          reservationLink: partner.reservationLink,
+          inquiryLink: partner.inquiryLink,
+          period: partner.period,
+          conditions: [],
+          benefits: [],
+          benefitItems: [],
+          appliesTo: partner.appliesTo,
+          images: [],
+          tags: partner.tags ?? [],
+          directorySearchText: [
+            partner.name,
+            partner.location,
+            partner.reservationLink ?? "",
+            partner.inquiryLink ?? "",
+            partner.conditions.join(" "),
+            partner.benefits.join(" "),
+            partner.appliesTo.map((item) => getPartnerAudienceLabel(item)).join(" "),
+            (partner.tags ?? []).join(" "),
+          ]
+            .join(" ")
+            .toLowerCase(),
+          branchScopeType: partner.branchScopeType,
+        }, context);
+      }
+      return {
+        id: partner.id,
+        name: "",
+        category: partner.category,
+        visibility: partner.visibility,
+        benefitVisibility: partner.benefitVisibility,
+        createdAt: partner.createdAt,
+        location: "",
+        campusSlugs: partner.campusSlugs,
+        period: { start: "", end: "" },
+        conditions: [],
+        benefits: [],
+        appliesTo: partner.appliesTo,
+        thumbnail: null,
+        images: [],
+        tags: [],
+      };
+    });
   }
 
   async getPartners(

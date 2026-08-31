@@ -142,6 +142,7 @@ test("loadHomePartnerDirectory keeps global popularity ordering while preloading
     {
       getCategories: async () => [],
       getPartners: async () => partners,
+      getPublicDirectoryPartners: async () => partners,
       getPopularityByPartnerId: async (partnerIds) => {
         popularityRequests.push(partnerIds);
         return Object.fromEntries(
@@ -154,7 +155,7 @@ test("loadHomePartnerDirectory keeps global popularity ordering while preloading
       },
       getMemberState: async ({ partnerIds }) => {
         memberStateRequests.push(partnerIds);
-        return { loadedPartnerIds: partnerIds, partnerFavoriteStateById: {} };
+        return { loadedFavoritePartnerIds: partnerIds, partnerFavoriteStateById: {} };
       },
     },
   );
@@ -167,7 +168,39 @@ test("loadHomePartnerDirectory keeps global popularity ordering while preloading
   assert.deepEqual(memberStateRequests[0], directory.displayPartnerIds.slice(0, 24));
   assert.equal(memberStateRequests[0][0], "partner-30");
   assert.equal(memberStateRequests[0].includes("partner-24"), false);
-  assert.deepEqual(directory.partnerState.loadedPartnerIds, memberStateRequests[0]);
+  assert.deepEqual(directory.partnerState.loadedFavoritePartnerIds, memberStateRequests[0]);
+});
+
+test("loadHomePartnerDirectory uses the lean public directory loader for logged out viewers", async () => {
+  const { loadHomePartnerDirectory } = await homePartnerDirectoryModulePromise;
+  let getPartnersCalls = 0;
+  let getPublicDirectoryPartnersCalls = 0;
+
+  await loadHomePartnerDirectory(
+    {
+      viewerAuthenticated: false,
+      currentUserId: null,
+    },
+    {
+      getCategories: async () => [],
+      getPartners: async () => {
+        getPartnersCalls += 1;
+        return [];
+      },
+      getPublicDirectoryPartners: async () => {
+        getPublicDirectoryPartnersCalls += 1;
+        return [];
+      },
+      getPopularityByPartnerId: async () => ({}),
+      getMemberState: async () => ({
+        loadedFavoritePartnerIds: [],
+        partnerFavoriteStateById: {},
+      }),
+    },
+  );
+
+  assert.equal(getPartnersCalls, 0);
+  assert.equal(getPublicDirectoryPartnersCalls, 1);
 });
 
 test("loadHomePartnerDirectoryState converts an unavailable repository into a recoverable state", async () => {
@@ -249,7 +282,7 @@ test("loadHomePartnerDirectoryState preserves a successful directory result", as
     totalDisplayCount: 0,
     hasMore: false,
     partnerState: {
-      loadedPartnerIds: [],
+      loadedFavoritePartnerIds: [],
       partnerFavoriteStateById: {},
       partnerPopularityById: {},
     },

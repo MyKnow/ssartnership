@@ -28,6 +28,9 @@ const getCampusPartnersCached = cache(
   (authenticated: boolean, viewerAudience?: PartnerAudienceKey | null) =>
     partnerRepository.getPartners({ authenticated, viewerAudience }),
 );
+const getCampusPublicDirectoryPartnersCached = cache(() =>
+  partnerRepository.getPublicDirectoryPartners({ authenticated: false }),
+);
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
@@ -54,7 +57,7 @@ export async function generateMetadata({
 
   const [categories, partners] = await Promise.all([
     getCampusCategoriesCached(),
-    getCampusPartnersCached(false),
+    getCampusPublicDirectoryPartnersCached(),
   ]);
 
   const campusPartners = getCampusPartners(partners, campus.slug).filter((partner) =>
@@ -120,10 +123,12 @@ export default async function CampusLandingPage({
 
   const [categories, partners] = await Promise.all([
     getCampusCategoriesCached(),
-    getCampusPartnersCached(
-      viewerContext.authenticated,
-      viewerContext.viewerAudience,
-    ),
+    viewerContext.authenticated
+      ? getCampusPartnersCached(
+          viewerContext.authenticated,
+          viewerContext.viewerAudience,
+        )
+      : getCampusPublicDirectoryPartnersCached(),
   ]);
 
   const campusPartners = getCampusPartners(partners, campus.slug).map((partner) => {
@@ -191,7 +196,7 @@ export default async function CampusLandingPage({
         currentUserId={headerSession?.userId ?? null}
         partnerPopularityById={campusPartnerState.partnerPopularityById}
         partnerFavoriteStateById={campusPartnerState.partnerFavoriteStateById}
-        loadedPartnerStateIds={campusPartnerState.loadedPartnerIds}
+        loadedFavoritePartnerIds={campusPartnerState.loadedFavoritePartnerIds}
         structuredData={campusJsonLd}
       />
     </div>

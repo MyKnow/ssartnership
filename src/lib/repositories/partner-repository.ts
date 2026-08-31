@@ -10,6 +10,7 @@ export type PartnerViewContext = {
 export interface PartnerRepository {
   getCategories(): Promise<Category[]>;
   getPartners(context?: PartnerViewContext): Promise<Partner[]>;
+  getPublicDirectoryPartners(context?: PartnerViewContext): Promise<Partner[]>;
   /**
    * Keeps the same directory membership as getPartners while selecting only the
    * requested ids. Locked placeholders remain valid; this does not grant detail access.
