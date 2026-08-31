@@ -15,7 +15,7 @@ import { validateAuthPasswordChangeDraft } from "@/lib/auth-form-validation";
 import { PASSWORD_POLICY_MESSAGE } from "@/lib/validation";
 import {
   copyPasswordToClipboard,
-  generateBrowserPassword,
+  tryGenerateBrowserPassword,
 } from "@/lib/browser-password";
 import { getPartnerPortalPasswordChangeErrorMessage } from "@/lib/partner-password-errors";
 
@@ -50,12 +50,21 @@ export default function PartnerPasswordChangeForm({
     if (pending) {
       return;
     }
-    const generatedPassword = generateBrowserPassword(12);
-    setNextPassword(generatedPassword);
+    const passwordResult = tryGenerateBrowserPassword(12);
+    if (!passwordResult.ok) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        nextPassword: passwordResult.error.message,
+      }));
+      setFormError(null);
+      focusField(nextPasswordRef);
+      return;
+    }
+    setNextPassword(passwordResult.password);
     setFieldErrors((prev) => ({ ...prev, nextPassword: undefined }));
     setFormError(null);
     try {
-      await copyPasswordToClipboard(generatedPassword);
+      await copyPasswordToClipboard(passwordResult.password);
       if (!mountedRef.current) {
         return;
       }
