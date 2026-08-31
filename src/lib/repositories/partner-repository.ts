@@ -15,10 +15,7 @@ export interface PartnerRepository {
    * Keeps the same directory membership as getPartners while selecting only the
    * requested ids. Locked placeholders remain valid; this does not grant detail access.
    */
-  getHomeStateAuthorizedPartnerIds(
-    ids: string[],
-    context?: PartnerViewContext,
-  ): Promise<string[]>;
+  getHomeStateAuthorizedPartnerIds(ids: string[]): Promise<string[]>;
   getPartnerById(
     id: string,
     context?: PartnerViewContext,

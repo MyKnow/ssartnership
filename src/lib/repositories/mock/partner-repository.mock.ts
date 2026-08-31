@@ -256,11 +256,7 @@ export class MockPartnerRepository implements PartnerRepository {
     });
   }
 
-  async getHomeStateAuthorizedPartnerIds(
-    ids: string[],
-    context: PartnerViewContext = { authenticated: false },
-  ): Promise<string[]> {
-    void context;
+  async getHomeStateAuthorizedPartnerIds(ids: string[]): Promise<string[]> {
     const existingIds = new Set(partners.map((partner) => partner.id));
     return [...new Set(ids.map((id) => id.trim()).filter(Boolean))].filter((id) =>
       existingIds.has(id),

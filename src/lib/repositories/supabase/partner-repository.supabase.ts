@@ -463,11 +463,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
     return rows.map((item) => mapPartnerForPublicDirectory(item, context));
   }
 
-  async getHomeStateAuthorizedPartnerIds(
-    ids: string[],
-    context: PartnerViewContext = { authenticated: false },
-  ): Promise<string[]> {
-    void context;
+  async getHomeStateAuthorizedPartnerIds(ids: string[]): Promise<string[]> {
     const normalizedIds = normalizeUuidList(ids);
     if (normalizedIds.length === 0) {
       return [];

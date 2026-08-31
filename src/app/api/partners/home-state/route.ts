@@ -3,7 +3,6 @@ import {
   getHomePartnerState,
   normalizeHomePartnerStateIds,
 } from "@/lib/home-partner-state";
-import { getPartnerViewerContext } from "@/lib/partner-view-context";
 import { partnerRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSignedUserSession } from "@/lib/user-auth";
@@ -50,14 +49,8 @@ export async function GET(request: Request) {
   }
 
   const session = await getSignedUserSession().catch(() => null);
-  const viewerContext = await getPartnerViewerContext(session?.userId);
-  const partnerIds = await partnerRepository.getHomeStateAuthorizedPartnerIds(
-    requestedIds,
-    {
-      authenticated: viewerContext.authenticated,
-      viewerAudience: viewerContext.viewerAudience,
-    },
-  );
+  const partnerIds =
+    await partnerRepository.getHomeStateAuthorizedPartnerIds(requestedIds);
 
   const state = await getHomePartnerState({
     partnerIds,

@@ -174,10 +174,12 @@ test("mock home-state authorization keeps requested directory entries, including
   const { MockPartnerRepository } = await mockPartnerRepositoryPromise;
   const repository = new MockPartnerRepository();
 
-  const ids = await repository.getHomeStateAuthorizedPartnerIds(
-    ["restaurant-001", "cafe-001", "missing", "health-001"],
-    { authenticated: false },
-  );
+  const ids = await repository.getHomeStateAuthorizedPartnerIds([
+    "restaurant-001",
+    "cafe-001",
+    "missing",
+    "health-001",
+  ]);
 
   assert.deepEqual(ids, ["restaurant-001", "cafe-001", "health-001"]);
 });
