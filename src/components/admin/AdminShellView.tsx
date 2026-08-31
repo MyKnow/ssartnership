@@ -28,7 +28,7 @@ import {
   ADMIN_PREFETCH_HOVER_DELAY_MS,
   markAdminPrefetchIntent,
 } from "@/lib/admin-prefetch";
-import { useAutoHideHeader } from "@/hooks/useAutoHideHeader";
+import { useHeaderHeight } from "@/hooks/useAutoHideHeader";
 import {
   ADMIN_NAV_ICON_BY_KEY,
   type AdminNavGroup,
@@ -64,7 +64,7 @@ export default function AdminShellView({
   const prefetchedHrefsRef = useRef(new Set<string>());
   const hoverPrefetchTimersRef = useRef(new Map<string, number>());
   const [isTabletNavExpanded, setIsTabletNavExpanded] = useState(false);
-  const { hidden, headerHeight, headerRef } = useAutoHideHeader();
+  const { headerHeight, headerRef } = useHeaderHeight();
   const activeNavItem =
     navGroups
       .flatMap((group) => group.items)
@@ -219,10 +219,7 @@ export default function AdminShellView({
         <header className="fixed inset-x-0 top-0 z-40">
           <div
             ref={headerRef}
-            className={cn(
-              "border-b border-border/70 bg-surface-overlay/95 pt-safe-top shadow-flat backdrop-blur-xl transition-transform duration-300 ease-out will-change-transform",
-              hidden ? "-translate-y-full" : "translate-y-0",
-            )}
+            className="border-b border-border/70 bg-surface-overlay/95 pt-safe-top shadow-flat backdrop-blur-xl"
           >
             <Container className="flex items-center justify-between gap-3 py-3" size="dashboard">
               <div className="min-w-0">
