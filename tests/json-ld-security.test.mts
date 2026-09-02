@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { extname, relative } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { serializeJsonLd } from "@/lib/seo";
 
 const sourceRoot = new URL("../src/", import.meta.url);
+const repositoryRoot = fileURLToPath(new URL("..", sourceRoot));
 
 async function findJsonLdSinkFiles(directory: URL): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -18,7 +20,7 @@ async function findJsonLdSinkFiles(directory: URL): Promise<string[]> {
         return [];
       }
       const source = await readFile(entryUrl, "utf8");
-      return source.includes("application/ld+json") ? [entryUrl.pathname] : [];
+      return source.includes("application/ld+json") ? [fileURLToPath(entryUrl)] : [];
     }),
   );
   return matches.flat();
@@ -43,7 +45,7 @@ test("모든 application/ld+json sink는 공용 HTML-safe 직렬화를 사용한
   assert.ok(sinkFiles.length > 0);
   for (const absolutePath of sinkFiles) {
     const source = await readFile(absolutePath, "utf8");
-    const displayPath = relative(new URL("..", sourceRoot).pathname, absolutePath);
+    const displayPath = relative(repositoryRoot, absolutePath);
     assert.match(source, /serializeJsonLd/u, `${displayPath} must use serializeJsonLd`);
     assert.doesNotMatch(
       source,
