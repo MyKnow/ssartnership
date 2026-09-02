@@ -49,7 +49,7 @@ const partners: Partner[] = [
     benefitActionType: "certification",
     reservationLink: "https://booking.naver.com/",
     inquiryLink: "02-123-4567",
-    period: { start: "2026-03-01", end: "2026-08-31" },
+    period: { start: "2026-03-01", end: "2099-12-31" },
     conditions: ["전 직원 SSAFY 구성원 인증"],
     benefits: ["월 이용권 20% 할인", "PT 5회 패키지 10% 할인"],
     benefitItems: [
