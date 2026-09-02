@@ -170,6 +170,19 @@ test("mock partner repository applies benefit masking at list boundary", async (
   assert.equal(studentHealth?.reservationLink, "https://booking.naver.com/");
 });
 
+test("canonical E2E partner fixture remains active independently of the wall clock", async () => {
+  const { MockPartnerRepository } = await mockPartnerRepositoryPromise;
+  const repository = new MockPartnerRepository();
+
+  const rawPartner = await repository.getPartnerByIdRaw("health-001");
+  const publicPartner = await repository.getPartnerById("health-001", {
+    authenticated: false,
+  });
+
+  assert.equal(rawPartner?.period.end, "2099-12-31");
+  assert.notEqual(publicPartner, null);
+});
+
 test("mock home-state authorization keeps requested directory entries, including locked placeholders", async () => {
   const { MockPartnerRepository } = await mockPartnerRepositoryPromise;
   const repository = new MockPartnerRepository();
