@@ -196,7 +196,7 @@ test.describe("auth and partner portal operation flows", () => {
     await expect(memberTab).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("textbox", { name: "Mattermost ID" })).toHaveAttribute(
       "placeholder",
-      "예: myknow",
+      "예시: myknow",
     );
     await expect(
       page.getByText("기수의 Mattermost Sender가 6자리 인증 코드를 DM으로 보냅니다."),
