@@ -18,7 +18,7 @@ test("기존 회원 복구는 신규 수료생 가입과 별도 request kind로 
 });
 
 test("복구 승인에는 운영자가 선택한 기존 회원만 연결되고 새 members 행을 만들지 않는다", () => {
-  const migration = read("supabase/migrations/20260717020528_add_member_email_recovery_and_existing_member_recovery.sql");
+  const migration = read("supabase/migrations/20260902150504_fix_graduate_approval_member_schema.sql");
   const service = read("src/lib/graduate-verification-service.ts");
   const queue = read("src/components/admin/AdminGraduateVerificationQueue.tsx");
   const actions = read("src/app/admin/(protected)/graduate-verifications/actions.ts");
