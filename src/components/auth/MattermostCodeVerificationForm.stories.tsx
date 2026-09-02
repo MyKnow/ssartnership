@@ -66,7 +66,7 @@ export const CodeIssued: Story = {
 
     await userEvent.type(canvas.getByRole("textbox", { name: "Mattermost ID" }), "myknow");
     await userEvent.selectOptions(canvas.getByRole("combobox", { name: "기수" }), "15");
-    await userEvent.click(canvas.getByRole("button", { name: "Mattermost DM으로 코드 받기" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Mattermost로 인증 코드 받기" }));
 
     await expect(
       canvas.getByText("입력한 Mattermost 계정으로 인증 코드를 보냈습니다."),

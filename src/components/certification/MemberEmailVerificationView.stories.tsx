@@ -1,24 +1,23 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
+import MemberEmailVerificationPageHeader from "@/components/certification/MemberEmailVerificationPageHeader";
 import MemberEmailVerificationView from "@/components/certification/MemberEmailVerificationView";
-import PageHeader from "@/components/ui/PageHeader";
 import { ToastProvider } from "@/components/ui/Toast";
 
 function StoryFrame({
   emailVerified = false,
   initialEmail,
+  required = false,
 }: {
   emailVerified?: boolean;
   initialEmail?: string | null;
+  required?: boolean;
 }) {
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6 p-4 sm:p-6">
-      <PageHeader
-        title="로그인·복구 이메일"
-        description="로그인과 비밀번호 재설정에 사용할 이메일을 인증합니다."
-        backHref="/certification"
-        backLabel="내 인증으로 돌아가기"
-        className="border-b-0"
+      <MemberEmailVerificationPageHeader
+        emailRegistrationRequired={required}
+        completionHref="/certification"
       />
       <ToastProvider>
         <MemberEmailVerificationView
@@ -43,6 +42,19 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Unverified: Story = {};
+
+export const RequiredAfterMattermostDisabled: Story = {
+  args: { required: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole("heading", { name: "이메일 등록이 필요해요" }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("link", { name: "이전 화면으로 돌아가기" }),
+    ).toBeNull();
+  },
+};
 
 export const Verified: Story = {
   args: { emailVerified: true },

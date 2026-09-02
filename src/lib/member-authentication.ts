@@ -12,6 +12,8 @@ export type LoginMember = {
   password_hash: string | null;
   password_salt: string | null;
   must_change_password: boolean | null;
+  email_verified_at: string | null;
+  mattermost_login_disabled_at: string | null;
 };
 
 export type MemberEmailRecoveryMember = LoginMember & {
@@ -25,7 +27,8 @@ export type LoginMemberResolution = {
   authenticationMethod: LoginMemberAuthenticationMethod;
 };
 
-const MEMBER_LOGIN_SELECT = "id,password_hash,password_salt,must_change_password";
+const MEMBER_LOGIN_SELECT =
+  "id,password_hash,password_salt,must_change_password,email_verified_at,mattermost_login_disabled_at";
 const MEMBER_EMAIL_RECOVERY_SELECT = `${MEMBER_LOGIN_SELECT},auth_session_version`;
 
 async function findActiveMemberByMattermostDirectoryId(directoryId: string) {
@@ -135,12 +138,25 @@ export async function resolveActiveMemberForLoginWithSource(
       return { member: manualMember, authenticationMethod: "manual" };
     }
     const mattermostMember = await resolveMemberByMattermostUsername(identifier.value);
-    return mattermostMember
-      ? { member: mattermostMember, authenticationMethod: "mattermost" }
+    if (mattermostMember) {
+      return { member: mattermostMember, authenticationMethod: "mattermost" };
+    }
+    const disabledMattermostMember =
+      await resolveRecoverableMemberByMattermostUsername(identifier.value);
+    return disabledMattermostMember?.mattermost_login_disabled_at
+      ? { member: disabledMattermostMember, authenticationMethod: "manual" }
       : null;
   }
   const member = await resolveMemberByMattermostUsername(identifier.value);
-  return member ? { member, authenticationMethod: "mattermost" } : null;
+  if (member) {
+    return { member, authenticationMethod: "mattermost" };
+  }
+  const disabledMember = await resolveRecoverableMemberByMattermostUsername(
+    identifier.value,
+  );
+  return disabledMember?.mattermost_login_disabled_at
+    ? { member: disabledMember, authenticationMethod: "manual" }
+    : null;
 }
 
 export async function resolveActiveMemberForLoginInput(value: unknown) {
@@ -155,10 +171,10 @@ export async function resolveActiveMemberForLoginInput(value: unknown) {
 }
 
 /**
- * This resolver deliberately ignores the Mattermost-login-disabled flag. A
- * member who can still prove the pre-existing local password may create an
- * email credential during a Mattermost outage, but cannot use this path to
- * obtain a normal user session before email verification succeeds.
+ * This resolver deliberately ignores the Mattermost-login-disabled flag for
+ * the legacy limited recovery session. Normal login can now use the same local
+ * credential proof, but the resulting session is subject to the required
+ * email-registration gate until verification succeeds.
  */
 export async function resolveMemberForEmailRecovery(value: unknown) {
   const identifier = classifyMemberLoginIdentifier(value);

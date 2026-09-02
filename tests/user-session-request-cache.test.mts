@@ -15,7 +15,11 @@ test("signed member session revalidation is memoized once per server request", (
   );
   assert.match(
     source,
-    /\.select\("id,auth_session_version,must_change_password"\)/,
+    /\.select\(\s*"id,auth_session_version,must_change_password,email_verified_at,mattermost_login_disabled_at",?\s*\)/,
+  );
+  assert.match(
+    source,
+    /requiresEmailRegistration: requiresMemberEmailRegistration\(\{[\s\S]*?mattermostLoginDisabledAt: data\.mattermost_login_disabled_at,[\s\S]*?emailVerifiedAt: data\.email_verified_at,[\s\S]*?\}\)/,
   );
   assert.match(
     source,

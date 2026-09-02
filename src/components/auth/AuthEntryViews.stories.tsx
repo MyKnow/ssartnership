@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, within } from "storybook/test";
+import { expect, userEvent, within } from "storybook/test";
 import {
   LoginPageView,
   ResetPasswordPageView,
@@ -20,7 +20,9 @@ type Story = StoryObj<typeof meta>;
 export const Login: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const username = canvas.getByLabelText("아이디 또는 이메일");
+    const usernameTab = canvas.getByRole("tab", { name: "아이디" });
+    const emailTab = canvas.getByRole("tab", { name: "이메일" });
+    const username = canvas.getByLabelText("Mattermost 아이디");
     const password = canvas.getByLabelText("비밀번호");
     const autoLogin = canvas.getByRole("checkbox", { name: "자동 로그인" });
     const loginButton = canvas.getByRole("button", { name: "로그인" });
@@ -28,6 +30,8 @@ export const Login: Story = {
     const divider = canvas.getByRole("separator");
     const signupButton = canvas.getByRole("link", { name: "회원가입" });
     const orderedElements = [
+      usernameTab,
+      emailTab,
       username,
       password,
       autoLogin,
@@ -35,6 +39,9 @@ export const Login: Story = {
       divider,
       signupButton,
     ];
+
+    await expect(usernameTab).toHaveAttribute("aria-selected", "true");
+    await expect(emailTab).toHaveAttribute("aria-selected", "false");
 
     await expect(
       canvas.queryByText("아이디와 사이트 비밀번호로 싸트너십에 로그인합니다."),
@@ -55,6 +62,25 @@ export const Login: Story = {
 
 export const ResetPassword: Story = {
   render: () => <ResetPasswordPageView activeSenderGenerations={[15]} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const memberTab = canvas.getByRole("tab", { name: "Mattermost" });
+    const graduateTab = canvas.getByRole("tab", { name: "이메일" });
+
+    await expect(canvas.getAllByRole("tab")).toHaveLength(2);
+    await expect(canvas.queryByRole("tab", { name: "이메일 초대" })).not.toBeInTheDocument();
+    await expect(memberTab).toHaveAttribute("aria-selected", "true");
+    await expect(
+      canvas.getByRole("link", { name: "수료해서 MM 로그인이 불가능해요" }),
+    ).toHaveAttribute("href", "/auth/signup/graduate?kind=recovery");
+
+    memberTab.focus();
+    await userEvent.keyboard("{ArrowRight}");
+
+    await expect(graduateTab).toHaveFocus();
+    await expect(graduateTab).toHaveAttribute("aria-selected", "true");
+    await expect(canvas.getByRole("textbox", { name: "이메일" })).toBeVisible();
+  },
 };
 
 export const Signup: Story = {

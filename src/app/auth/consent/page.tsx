@@ -44,6 +44,7 @@ export default async function ConsentPage({ searchParams }: PageProps) {
     returnTo,
     mustChangePassword: session.mustChangePassword,
     requiresConsent: session.requiresConsent,
+    requiresEmailRegistration: session.requiresEmailRegistration,
     requiresProfilePhotoUpdate: session.requiresProfilePhotoUpdate,
   });
   if (requiredGateRedirect) {

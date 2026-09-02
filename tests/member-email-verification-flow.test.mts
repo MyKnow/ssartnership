@@ -354,6 +354,9 @@ test("설정 화면은 이메일 폼 대신 별도 흐름으로 이동하는 요
     "src/components/certification/CertificationFooterActions.tsx",
   );
   const emailPage = read("src/app/(site)/certification/email/page.tsx");
+  const emailHeader = read(
+    "src/components/certification/MemberEmailVerificationPageHeader.tsx",
+  );
   const summary = read(
     "src/components/certification/CertificationEmailSummary.tsx",
   );
@@ -376,12 +379,15 @@ test("설정 화면은 이메일 폼 대신 별도 흐름으로 이동하는 요
   );
   assert.match(footerActions, /현재 계정의 비밀번호를 변경합니다\./);
   assert.match(emailPage, /MemberEmailVerificationView/);
-  assert.match(emailPage, /sanitizeReturnTo/);
-  assert.match(emailPage, /로그인·복구 이메일/);
+  assert.match(emailPage, /getMemberGateCompletionReturnTo/);
+  assert.match(emailHeader, /로그인·복구 이메일/);
 });
 
 test("로그인·복구 이메일 화면은 간결한 헤더와 전용 로딩 골격을 제공한다", () => {
   const emailPage = read("src/app/(site)/certification/email/page.tsx");
+  const emailHeader = read(
+    "src/components/certification/MemberEmailVerificationPageHeader.tsx",
+  );
   const emailView = read(
     "src/components/certification/MemberEmailVerificationView.tsx",
   );
@@ -391,13 +397,14 @@ test("로그인·복구 이메일 화면은 간결한 헤더와 전용 로딩 �
     "src/components/certification/MemberEmailVerificationView.stories.tsx",
   );
 
-  assert.doesNotMatch(emailPage, /eyebrow="Member"/);
+  assert.doesNotMatch(emailHeader, /eyebrow="Member"/);
   assert.match(
-    emailPage,
+    emailHeader,
     /로그인과 비밀번호 재설정에 사용할 이메일을 인증합니다\./,
   );
-  assert.doesNotMatch(emailPage, /MM 사용 여부와 별개로/);
-  assert.match(emailPage, /className="border-b-0"/);
+  assert.doesNotMatch(emailHeader, /MM 사용 여부와 별개로/);
+  assert.match(emailHeader, /className="border-b-0"/);
+  assert.match(emailPage, /MemberEmailVerificationPageHeader/);
   assert.doesNotMatch(emailView, /title="별도 로그인 수단"/);
   assert.doesNotMatch(emailView, /MM 인증과 이메일 인증은 서로를 대체하는/);
   assert.doesNotMatch(
@@ -411,10 +418,7 @@ test("로그인·복구 이메일 화면은 간결한 헤더와 전용 로딩 �
     /export function MemberEmailVerificationPageSkeleton\(\)/,
   );
   assert.doesNotMatch(story, /eyebrow="Member"/);
-  assert.match(
-    story,
-    /로그인과 비밀번호 재설정에 사용할 이메일을 인증합니다\./,
-  );
+  assert.match(story, /MemberEmailVerificationPageHeader/);
 });
 
 test("별도 이메일 인증 화면은 전송 후 이메일 고정·만료 타이머·입력행 재전송을 제공한다", () => {

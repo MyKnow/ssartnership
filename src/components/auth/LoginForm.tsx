@@ -1,7 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
@@ -10,15 +16,32 @@ import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
 import { getMemberRequiredGateRedirect } from "@/lib/member-required-gates";
+import {
+  persistLastMemberLoginMethod,
+  readLastMemberLoginMethod,
+  type MemberLoginMethod,
+} from "@/lib/member-login-method-preference.client";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { isValidEmail, normalizeMmUsername, validateMmUsername } from "@/lib/validation";
+
+const loginMethods: MemberLoginMethod[] = ["username", "email"];
+
+function loginMethodTabClassName(active: boolean) {
+  return active
+    ? "min-h-11 rounded-[0.95rem] bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-raised"
+    : "min-h-11 rounded-[0.95rem] px-3 text-sm font-semibold text-foreground transition hover:bg-surface-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20";
+}
 
 export default function LoginForm({
   returnTo,
 }: {
   returnTo?: string;
 }) {
-  const [identifier, setIdentifier] = useState("");
+  const [loginMethod, setLoginMethod] = useState<MemberLoginMethod>("username");
+  const [identifiers, setIdentifiers] = useState<Record<MemberLoginMethod, string>>({
+    username: "",
+    email: "",
+  });
   const [password, setPassword] = useState("");
   const [autoLogin, setAutoLogin] = useState(true);
   const [fieldErrors, setFieldErrors] = useState<{
@@ -29,8 +52,16 @@ export default function LoginForm({
   const [pending, setPending] = useState(false);
   const { notify } = useToast();
   const router = useRouter();
-  const identifierRef = useRef<HTMLInputElement>(null);
+  const id = useId();
+  const usernameTabId = `${id}-username-tab`;
+  const emailTabId = `${id}-email-tab`;
+  const usernamePanelId = `${id}-username-panel`;
+  const emailPanelId = `${id}-email-panel`;
+  const usernameIdentifierRef = useRef<HTMLInputElement>(null);
+  const emailIdentifierRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+  const identifier = identifiers[loginMethod];
+  const identifierLabel = loginMethod === "email" ? "이메일" : "Mattermost 아이디";
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -55,6 +86,51 @@ export default function LoginForm({
     }
   }, [notify]);
 
+  useEffect(() => {
+    setLoginMethod(readLastMemberLoginMethod());
+  }, []);
+
+  function getIdentifierRef(method: MemberLoginMethod) {
+    return method === "email" ? emailIdentifierRef : usernameIdentifierRef;
+  }
+
+  function selectLoginMethod(method: MemberLoginMethod) {
+    if (pending || method === loginMethod) {
+      return;
+    }
+    setLoginMethod(method);
+    setFieldErrors((previous) => ({ ...previous, identifier: undefined }));
+    setFormError(null);
+  }
+
+  function handleTabKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+    currentMethod: MemberLoginMethod,
+  ) {
+    const currentIndex = loginMethods.indexOf(currentMethod);
+    const nextIndex =
+      event.key === "ArrowRight"
+        ? (currentIndex + 1) % loginMethods.length
+        : event.key === "ArrowLeft"
+          ? (currentIndex - 1 + loginMethods.length) % loginMethods.length
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? loginMethods.length - 1
+              : null;
+
+    if (nextIndex === null) {
+      return;
+    }
+
+    event.preventDefault();
+    const nextMethod = loginMethods[nextIndex];
+    selectLoginMethod(nextMethod);
+    document
+      .getElementById(nextMethod === "email" ? emailTabId : usernameTabId)
+      ?.focus();
+  }
+
   function clearFieldError(field: "identifier" | "password") {
     setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
     setFormError(null);
@@ -67,24 +143,24 @@ export default function LoginForm({
 
     if (!identifier.trim() || !password) {
       setFieldErrors({
-        identifier: identifier.trim() ? undefined : "아이디 또는 이메일을 입력해 주세요.",
+        identifier: identifier.trim() ? undefined : `${identifierLabel}를 입력해 주세요.`,
         password: password ? undefined : "비밀번호를 입력해 주세요.",
       });
       setFormError(null);
-      focusField(identifier.trim() ? passwordRef : identifierRef);
+      focusField(identifier.trim() ? passwordRef : getIdentifierRef(loginMethod));
       return;
     }
 
     const identifierValue = identifier.trim();
-    const identifierError = identifierValue.includes("@")
+    const identifierError = loginMethod === "email"
       ? isValidEmail(identifierValue)
         ? null
         : "이메일 주소를 확인해 주세요."
-      : validateMmUsername(identifierValue, "아이디");
+      : validateMmUsername(identifierValue, "Mattermost 아이디");
     if (identifierError) {
       setFieldErrors({ identifier: identifierError });
       setFormError(null);
-      focusField(identifierRef);
+      focusField(getIdentifierRef(loginMethod));
       return;
     }
 
@@ -93,7 +169,7 @@ export default function LoginForm({
     setPending(true);
 
     try {
-      const normalizedLoginIdentifier = identifierValue.includes("@")
+      const normalizedLoginIdentifier = loginMethod === "email"
         ? identifierValue.toLowerCase()
         : normalizeMmUsername(identifierValue);
       const response = await fetch("/api/auth/login", {
@@ -112,12 +188,13 @@ export default function LoginForm({
           setFormError("로그인이 너무 자주 시도되었습니다. 잠시 후 다시 시도해 주세요.");
           return;
         }
-        setFormError("아이디 또는 비밀번호가 올바르지 않습니다.");
+        setFormError(`${identifierLabel} 또는 비밀번호가 올바르지 않습니다.`);
         return;
       }
 
       setFieldErrors({});
       setFormError(null);
+      persistLastMemberLoginMethod(loginMethod);
       notify("로그인되었습니다.");
       const safeReturnTo = sanitizeReturnTo(returnTo, "/");
       const nextHref =
@@ -126,6 +203,7 @@ export default function LoginForm({
           returnTo: safeReturnTo,
           mustChangePassword: Boolean(data.mustChangePassword),
           requiresConsent: Boolean(data.requiresConsent),
+          requiresEmailRegistration: Boolean(data.requiresEmailRegistration),
           requiresProfilePhotoUpdate: Boolean(data.requiresProfilePhotoUpdate),
         }) ?? safeReturnTo;
       router.replace(nextHref);
@@ -143,24 +221,78 @@ export default function LoginForm({
         void handleLogin();
       }}
     >
-      <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-        아이디 또는 이메일
-        <Input
-          ref={identifierRef}
-          autoComplete="username"
-          placeholder="예시: myknow@example.com"
-          value={identifier}
-          onChange={(event) => {
-            setIdentifier(event.target.value);
-            clearFieldError("identifier");
-          }}
-          aria-invalid={Boolean(fieldErrors.identifier) || undefined}
-          className={getFieldErrorClass(Boolean(fieldErrors.identifier))}
-        />
-        {fieldErrors.identifier ? (
-          <FormMessage variant="error">{fieldErrors.identifier}</FormMessage>
-        ) : null}
-      </label>
+      <div
+        role="tablist"
+        aria-label="로그인 방식"
+        className="grid grid-cols-2 gap-2 rounded-[1.35rem] border border-border bg-surface-inset p-2"
+      >
+        <button
+          id={usernameTabId}
+          type="button"
+          role="tab"
+          aria-selected={loginMethod === "username"}
+          aria-controls={usernamePanelId}
+          tabIndex={loginMethod === "username" ? 0 : -1}
+          disabled={pending}
+          onClick={() => selectLoginMethod("username")}
+          onKeyDown={(event) => handleTabKeyDown(event, "username")}
+          className={loginMethodTabClassName(loginMethod === "username")}
+        >
+          아이디
+        </button>
+        <button
+          id={emailTabId}
+          type="button"
+          role="tab"
+          aria-selected={loginMethod === "email"}
+          aria-controls={emailPanelId}
+          tabIndex={loginMethod === "email" ? 0 : -1}
+          disabled={pending}
+          onClick={() => selectLoginMethod("email")}
+          onKeyDown={(event) => handleTabKeyDown(event, "email")}
+          className={loginMethodTabClassName(loginMethod === "email")}
+        >
+          이메일
+        </button>
+      </div>
+
+      {loginMethods.map((method) => {
+        const isEmail = method === "email";
+        const active = loginMethod === method;
+        return (
+          <section
+            key={method}
+            id={isEmail ? emailPanelId : usernamePanelId}
+            role="tabpanel"
+            aria-labelledby={isEmail ? emailTabId : usernameTabId}
+            hidden={!active}
+          >
+            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+              {isEmail ? "이메일" : "Mattermost 아이디"}
+              <Input
+                ref={isEmail ? emailIdentifierRef : usernameIdentifierRef}
+                type={isEmail ? "email" : "text"}
+                inputMode={isEmail ? "email" : "text"}
+                autoComplete="username"
+                placeholder={isEmail ? "예시: myknow@example.com" : "예시: myknow"}
+                value={identifiers[method]}
+                onChange={(event) => {
+                  setIdentifiers((previous) => ({
+                    ...previous,
+                    [method]: event.target.value,
+                  }));
+                  clearFieldError("identifier");
+                }}
+                aria-invalid={(active && Boolean(fieldErrors.identifier)) || undefined}
+                className={getFieldErrorClass(active && Boolean(fieldErrors.identifier))}
+              />
+              {active && fieldErrors.identifier ? (
+                <FormMessage variant="error">{fieldErrors.identifier}</FormMessage>
+              ) : null}
+            </label>
+          </section>
+        );
+      })}
 
       <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
         비밀번호

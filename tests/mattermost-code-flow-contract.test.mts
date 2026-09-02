@@ -37,3 +37,18 @@ test("기존 회원 인증은 로그인으로 한 번만 이동하고 토스트 
   assert.doesNotMatch(form, /router\.replace\(nextPath\);\s*router\.refresh\(\)/);
   assert.match(login, /notify\("이미 가입된 회원입니다\."\)/);
 });
+
+test("Mattermost 인증 입력은 기수를 먼저 받고 첫 오류 focus도 같은 순서를 따른다", async () => {
+  const form = await read("src/components/auth/MattermostCodeVerificationForm.tsx");
+  const generationField = form.indexOf("기수\n        <Select");
+  const usernameField = form.indexOf("Mattermost ID\n        <Input");
+  const generationFocus = form.indexOf("if (nextErrors.generation)");
+  const usernameFocus = form.indexOf("if (nextErrors.username)");
+
+  assert.ok(generationField >= 0);
+  assert.ok(usernameField > generationField);
+  assert.ok(generationFocus >= 0);
+  assert.ok(usernameFocus > generationFocus);
+  assert.match(form, /placeholder="예시: myknow"/);
+  assert.match(form, /className="mt-2 w-full"[^>]*>\s*Mattermost로 인증 코드 받기/);
+});

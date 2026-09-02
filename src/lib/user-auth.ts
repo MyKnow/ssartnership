@@ -10,6 +10,7 @@ import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "./hmac.js";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { requiresMemberProfilePhotoUpdate } from "@/lib/member-profile-photo";
+import { requiresMemberEmailRegistration } from "@/lib/member-required-gates";
 import {
   getMockMemberById,
   isMockMemberAuthEnabled,
@@ -31,6 +32,7 @@ type SignedUserSession = {
   issuedAt: number;
   expiresAt: number;
   mustChangePassword?: boolean;
+  requiresEmailRegistration?: boolean;
   persistent?: boolean;
   policyConsentSnapshot?: PolicyConsentSnapshot | null;
 };
@@ -158,7 +160,11 @@ export const getSignedUserSession = cache(async () => {
   if (isMockMemberAuthEnabled()) {
     const member = getMockMemberById(session.userId);
     return member?.authSessionVersion === session.authSessionVersion
-      ? { ...session, mustChangePassword: member.mustChangePassword }
+      ? {
+          ...session,
+          mustChangePassword: member.mustChangePassword,
+          requiresEmailRegistration: false,
+        }
       : null;
   }
 
@@ -166,12 +172,21 @@ export const getSignedUserSession = cache(async () => {
     const supabase = getSupabaseAdminClient();
     const { data } = await supabase
       .from("members")
-      .select("id,auth_session_version,must_change_password")
+      .select(
+        "id,auth_session_version,must_change_password,email_verified_at,mattermost_login_disabled_at",
+      )
       .eq("id", session.userId)
       .is("deleted_at", null)
       .maybeSingle();
     return data?.id && data.auth_session_version === session.authSessionVersion
-      ? { ...session, mustChangePassword: Boolean(data.must_change_password) }
+      ? {
+          ...session,
+          mustChangePassword: Boolean(data.must_change_password),
+          requiresEmailRegistration: requiresMemberEmailRegistration({
+            mattermostLoginDisabledAt: data.mattermost_login_disabled_at,
+            emailVerifiedAt: data.email_verified_at,
+          }),
+        }
       : null;
   } catch {
     return null;
@@ -334,6 +349,7 @@ export const getUserSession = cache(async () => {
     ...session,
     mustChangePassword: Boolean(session.mustChangePassword),
     requiresConsent: consentSnapshotIsFresh ? false : policyStatus.requiresConsent,
+    requiresEmailRegistration: Boolean(session.requiresEmailRegistration),
     requiresProfilePhotoUpdate: requiresMemberProfilePhotoUpdate(
       photoState.reviewStatus,
     ),
