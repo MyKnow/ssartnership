@@ -1,5 +1,6 @@
 import type { ReviewMediaManifestEntry } from "@/lib/review-media";
 import type { ClientImageUploadRequest } from "@/lib/image-upload/client";
+import { createClientUuid } from "@/lib/client-uuid";
 
 export type ReviewImageItem =
   | {
@@ -45,7 +46,7 @@ export function createWebpFile(blob: Blob, fileName: string) {
 
 export function createReviewImageItemFromFile(file: File): ReviewImageItem {
   return {
-    id: crypto.randomUUID(),
+    id: createClientUuid(),
     kind: "file",
     url: makeObjectUrl(file),
     file,
@@ -54,7 +55,7 @@ export function createReviewImageItemFromFile(file: File): ReviewImageItem {
 
 export function createReviewImageItemFromExisting(url: string): ReviewImageItem {
   return {
-    id: crypto.randomUUID(),
+    id: createClientUuid(),
     kind: "existing",
     url,
   };

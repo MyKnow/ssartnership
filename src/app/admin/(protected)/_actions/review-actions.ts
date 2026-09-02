@@ -3,13 +3,18 @@
 import { redirect } from "next/navigation";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { partnerReviewRepository } from "@/lib/repositories";
+import { sanitizeReturnTo } from "@/lib/return-to";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { logAdminAction, revalidateReviewPaths } from "./shared-helpers";
 import { redirectAdminActionError } from "./shared-helpers";
 
+const ADMIN_REVIEWS_PATH = "/admin/reviews";
+
 function getSafeReturnTo(value: FormDataEntryValue | null) {
-  const candidate = typeof value === "string" ? value : "";
-  return candidate.startsWith("/") ? candidate : "/admin/reviews";
+  return sanitizeReturnTo(
+    typeof value === "string" ? value : "",
+    ADMIN_REVIEWS_PATH,
+  );
 }
 
 export async function hidePartnerReviewAction(formData: FormData) {

@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import {
   getPartnerCompanyPlanDefinition,
+  isPartnerPlanWindowOrderValid,
   normalizePartnerCompanyPlanTier,
   resolvePartnerBrandPlanWindow,
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
 import {
   calculatePartnerPlanUpgradeCharge,
-  getOverdueDowngradeCandidate,
   getPaymentDueAt,
   type PartnerBillingInvoiceStatus,
   type PartnerTaxDocumentStatus,
@@ -16,6 +16,8 @@ import { resolvePartnerBillingProfileForPlanRequest } from "@/lib/partner-billin
 import { listMockPartnerPortalCompanySetups } from "@/lib/mock/partner-portal/store";
 import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
 import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { normalizePartnerVisibility } from "@/lib/partner-visibility";
+import type { PartnerVisibility } from "@/lib/types";
 import {
   assertPartnerPlanUpgradeTransition,
   normalizePartnerPlanUpgradeRequestStatus,
@@ -37,7 +39,7 @@ export type PartnerBrandPlanRecord = {
   companyName: string;
   companySlug: string;
   location: string;
-  visibility: string;
+  visibility: PartnerVisibility;
   periodStart: string | null;
   periodEnd: string | null;
   planTier: PartnerCompanyPlanTier;
@@ -191,6 +193,129 @@ type PlanEventRow = {
   brand?: { id: string; name: string } | { id: string; name: string }[] | null;
 };
 
+type SupabaseMutationError = {
+  code?: string | null;
+  message?: string | null;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function getAtomicRpcRow<T>(
+  payload: unknown,
+  key: string,
+  fallbackMessage: string,
+) {
+  if (!isRecord(payload) || !isRecord(payload[key])) {
+    throw new Error(fallbackMessage);
+  }
+  return payload[key] as T;
+}
+
+function getCreateUpgradeBillingErrorMessage(error: SupabaseMutationError) {
+  const message = error.message ?? "";
+  if (
+    error.code === "23505" &&
+    message.includes("partner_plan_upgrade_requests_pending_partner_idx")
+  ) {
+    return "이미 처리 대기 중인 업그레이드 요청이 있습니다.";
+  }
+  if (message.includes("partner_plan_billing_access_denied")) {
+    return "파트너사 접근 권한이 없습니다.";
+  }
+  if (message.includes("partner_plan_billing_partner_not_found")) {
+    return "제휴처를 찾을 수 없습니다.";
+  }
+  if (message.includes("partner_plan_billing_profile_not_found")) {
+    return "프로필 탭에서 입금자와 세금계산서 정보를 먼저 저장해 주세요.";
+  }
+  if (
+    message.includes("partner_plan_billing_state_changed") ||
+    message.includes("partner_plan_billing_profile_changed")
+  ) {
+    return "플랜 또는 청구 정보가 변경되었습니다. 새로고침 후 다시 시도해 주세요.";
+  }
+  if (message.includes("partner_plan_billing_invalid_request")) {
+    return "플랜 청구 정보를 확인해 주세요.";
+  }
+  return "플랜 업그레이드 요청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+}
+
+function getConfirmBankTransferErrorMessage(error: SupabaseMutationError) {
+  const message = error.message ?? "";
+  if (message.includes("partner_plan_payment_request_state_conflict")) {
+    return "처리 대기 중인 업그레이드 요청만 입금 확인할 수 있습니다.";
+  }
+  if (message.includes("partner_plan_payment_invoice_not_found")) {
+    return "청구서를 찾을 수 없습니다.";
+  }
+  if (message.includes("partner_plan_payment_invoice_cancelled")) {
+    return "취소된 청구서는 입금 확인할 수 없습니다.";
+  }
+  return "입금 확인 정보를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+}
+
+function getCancelUpgradeBillingErrorMessage(
+  error: SupabaseMutationError,
+  action: "취소" | "반려",
+) {
+  const message = error.message ?? "";
+  if (message.includes("partner_plan_cancel_request_state_conflict")) {
+    return action === "반려"
+      ? "partner_company_plan_processed"
+      : "이미 처리된 업그레이드 요청입니다.";
+  }
+  if (message.includes("partner_plan_cancel_paid_invoice_conflict")) {
+    return action === "반려"
+      ? "partner_company_plan_rejection_paid"
+      : "입금 확인이 완료된 청구는 취소할 수 없습니다.";
+  }
+  return action === "반려"
+    ? "partner_company_plan_invalid_request"
+    : "업그레이드 요청을 취소하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+}
+
+function getApproveUpgradeBillingErrorMessage(error: SupabaseMutationError) {
+  const message = error.message ?? "";
+  if (message.includes("partner_plan_approval_request_state_conflict")) {
+    return "partner_company_plan_processed";
+  }
+  if (message.includes("partner_plan_approval_invoice_not_found")) {
+    return "partner_company_plan_invoice_missing";
+  }
+  if (message.includes("partner_plan_approval_invoice_unpaid_conflict")) {
+    return "partner_company_plan_payment_unconfirmed";
+  }
+  if (message.includes("partner_plan_approval_partner_not_found")) {
+    return "partner_company_plan_partner_missing";
+  }
+  if (message.includes("partner_plan_approval_partner_state_conflict")) {
+    return "partner_company_plan_state_changed";
+  }
+  return "플랜 업그레이드 승인을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+}
+
+function getAdminPlanUpdateErrorMessage(error: SupabaseMutationError) {
+  const message = error.message ?? "";
+  if (
+    message.includes("partner_plan_admin_update_partner_not_found") ||
+    message.includes("partner_plan_admin_update_company_required")
+  ) {
+    return "파트너사가 연결된 제휴처만 플랜을 변경할 수 있습니다.";
+  }
+  if (message.includes("partner_plan_admin_update_state_changed")) {
+    return "partner_company_plan_state_changed";
+  }
+  if (message.includes("partner_plan_admin_update_pending_request")) {
+    return "partner_company_plan_pending_exists";
+  }
+  if (message.includes("partner_plan_admin_update_invalid_window")) {
+    return "partner_company_plan_invalid_request";
+  }
+  return "플랜 변경을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+}
+
 function getSingleRelation<T>(value: T | T[] | null | undefined): T | null {
   if (!value) {
     return null;
@@ -247,7 +372,7 @@ function mapBrand(row: BrandRow): PartnerBrandPlanRecord {
     companyName: company?.name ?? "미지정",
     companySlug: company?.slug ?? "",
     location: row.location ?? "",
-    visibility: row.visibility ?? "public",
+    visibility: normalizePartnerVisibility(row.visibility),
     periodStart: row.period_start ?? null,
     periodEnd: row.period_end ?? null,
     planTier,
@@ -562,7 +687,6 @@ export async function createPartnerPlanUpgradeRequest(input: {
   const payerName = normalizePlanUpgradePayerName(
     resolvedBillingProfile.payerName,
   );
-  const billingProfile = resolvedBillingProfile.billingProfile;
   const nowIso = new Date().toISOString();
   const charge = calculatePartnerPlanUpgradeCharge({
     currentPlanTier: brand.planTier,
@@ -579,137 +703,71 @@ export async function createPartnerPlanUpgradeRequest(input: {
   });
   const dueAt = getPaymentDueAt(nowIso);
   const supabase = getSupabaseAdminClient();
-  let insertedRequestId: string | null = null;
-
-  const { data, error } = await supabase
-    .from("partner_plan_upgrade_requests")
-    .insert({
-      partner_id: brand.id,
-      company_id: brand.companyId,
-      requested_by_account_id: input.accountId,
-      current_plan_tier: brand.planTier,
-      requested_plan_tier: requestedPlanTier,
-      payment_amount_krw: charge.totalAmountKrw,
-      payer_name: payerName,
-      memo,
-    })
-    .select(
-      "id,partner_id,company_id,requested_by_account_id,current_plan_tier,requested_plan_tier,status,payment_amount_krw,payer_name,memo,admin_note,reviewed_by_admin_id,reviewed_at,created_at,updated_at,brand:partners!partner_plan_upgrade_requests_partner_id_fkey(id,name),company:partner_companies(id,name),requested_by:partner_accounts!partner_plan_upgrade_requests_requested_by_account_id_fkey(id,display_name)",
-    )
-    .single();
-
+  const { data, error } = await supabase.rpc(
+    "create_partner_plan_upgrade_billing",
+    {
+      p_partner_id: brand.id,
+      p_company_id: brand.companyId,
+      p_account_id: input.accountId,
+      p_billing_profile_id: resolvedBillingProfile.profileId,
+      p_expected_current_plan_tier: brand.planTier,
+      p_expected_plan_updated_at: brand.planUpdatedAt,
+      p_requested_plan_tier: requestedPlanTier,
+      p_invoice_number: createPartnerBillingInvoiceNumber(nowIso),
+      p_billing_policy: charge.policy,
+      p_remaining_days: charge.remainingDays,
+      p_service_period_start: servicePeriod.servicePeriodStart,
+      p_service_period_end: servicePeriod.servicePeriodEnd,
+      p_supply_amount_krw: charge.supplyAmountKrw,
+      p_vat_amount_krw: charge.vatAmountKrw,
+      p_total_amount_krw: charge.totalAmountKrw,
+      p_due_at: dueAt,
+      p_payer_name: payerName,
+      p_memo: memo,
+    },
+  );
   if (error) {
-    if (error.code === "23505") {
-      throw new Error("이미 처리 대기 중인 업그레이드 요청이 있습니다.");
-    }
-    throw new Error(error.message);
+    throw new Error(getCreateUpgradeBillingErrorMessage(error));
   }
 
-  const request = mapUpgradeRequest(data as UpgradeRequestRow);
-  insertedRequestId = request.id;
-  let billingInvoice: PartnerBillingInvoiceRecord | null = null;
-  try {
-    const { data: invoiceData, error: invoiceError } = await supabase
-      .from("partner_billing_invoices")
-      .insert({
-        invoice_number: createPartnerBillingInvoiceNumber(nowIso),
-        company_id: brand.companyId,
-        partner_id: brand.id,
-        upgrade_request_id: request.id,
-        requested_by_account_id: input.accountId,
-        billing_reason: "plan_upgrade",
-        billing_policy: charge.policy,
-        payment_method: "manual_bank_transfer",
-        status: "pending_payment",
-        current_plan_tier: brand.planTier,
-        requested_plan_tier: requestedPlanTier,
-        remaining_days: charge.remainingDays,
-        service_period_start: servicePeriod.servicePeriodStart,
-        service_period_end: servicePeriod.servicePeriodEnd,
-        supply_amount_krw: charge.supplyAmountKrw,
-        vat_amount_krw: charge.vatAmountKrw,
-        total_amount_krw: charge.totalAmountKrw,
-        due_at: dueAt,
-        metadata: {
-          vatIncluded: true,
-          taxDocumentType: "tax_invoice",
-        },
-      })
-      .select(
-        "id,invoice_number,upgrade_request_id,status,billing_policy,remaining_days,service_period_start,service_period_end,supply_amount_krw,vat_amount_krw,total_amount_krw,due_at,paid_at",
-      )
-      .single();
-    if (invoiceError || !invoiceData) {
-      throw new Error(invoiceError?.message ?? "청구서를 생성하지 못했습니다.");
-    }
-
-    const invoice = invoiceData as BillingInvoiceRow;
-    const [paymentResult, taxDocumentResult, requestUpdateResult] = await Promise.all([
-      supabase.from("partner_billing_payments").insert({
-        invoice_id: invoice.id,
-        method: "manual_bank_transfer",
-        status: "awaiting_transfer",
-        amount_krw: charge.totalAmountKrw,
-        payer_name: payerName,
-        memo,
-      }),
-      supabase.from("partner_tax_documents").insert({
-        invoice_id: invoice.id,
-        type: "tax_invoice",
-        status: "requested",
-        business_registration_number: billingProfile.businessRegistrationNumber,
-        business_name: billingProfile.businessName,
-        representative_name: billingProfile.representativeName,
-        business_address: billingProfile.businessAddress,
-        business_type: billingProfile.businessType,
-        business_item: billingProfile.businessItem,
-        tax_invoice_email: billingProfile.taxInvoiceEmail,
-        provider: "manual_hometax",
-      }),
-      supabase
-        .from("partner_plan_upgrade_requests")
-        .update({ billing_invoice_id: invoice.id })
-        .eq("id", request.id),
-    ]);
-    if (paymentResult.error) {
-      throw new Error(paymentResult.error.message);
-    }
-    if (taxDocumentResult.error) {
-      throw new Error(taxDocumentResult.error.message);
-    }
-    if (requestUpdateResult.error) {
-      throw new Error(requestUpdateResult.error.message);
-    }
-
-    billingInvoice = mapBillingInvoice(
-      invoice,
-      {
-        invoice_id: invoice.id,
-        status: "awaiting_transfer",
-        confirmed_at: null,
-      },
-      {
-        invoice_id: invoice.id,
-        status: "requested",
-        issued_at: null,
-      },
-    );
-  } catch (billingError) {
-    if (insertedRequestId) {
-      try {
-        const { error: cleanupError } = await supabase
-          .from("partner_plan_upgrade_requests")
-          .delete()
-          .eq("id", insertedRequestId);
-        if (cleanupError) {
-          console.error("[partner-plan-service] cleanup failed", cleanupError);
-        }
-      } catch (cleanupError) {
-        console.error("[partner-plan-service] cleanup failed", cleanupError);
-      }
-    }
-    throw billingError;
-  }
+  const requestRow = getAtomicRpcRow<UpgradeRequestRow>(
+    data,
+    "request",
+    "생성된 업그레이드 요청을 확인하지 못했습니다.",
+  );
+  const invoiceRow = getAtomicRpcRow<BillingInvoiceRow>(
+    data,
+    "invoice",
+    "생성된 청구서를 확인하지 못했습니다.",
+  );
+  const paymentRow = getAtomicRpcRow<BillingPaymentRow>(
+    data,
+    "payment",
+    "생성된 결제 정보를 확인하지 못했습니다.",
+  );
+  const taxDocumentRow = getAtomicRpcRow<TaxDocumentRow>(
+    data,
+    "taxDocument",
+    "생성된 세금계산서 정보를 확인하지 못했습니다.",
+  );
+  const requestedByDisplayName =
+    isRecord(data) && typeof data.requestedByDisplayName === "string"
+      ? data.requestedByDisplayName
+      : null;
+  const request = mapUpgradeRequest({
+    ...requestRow,
+    brand: { id: brand.id, name: brand.name },
+    company: { id: brand.companyId, name: brand.companyName },
+    requested_by: {
+      id: input.accountId,
+      display_name: requestedByDisplayName,
+    },
+  });
+  const billingInvoice = mapBillingInvoice(
+    invoiceRow,
+    paymentRow,
+    taxDocumentRow,
+  );
 
   await Promise.all([
     createAdminOperationalNotification({
@@ -756,115 +814,43 @@ export async function createPartnerPlanUpgradeRequest(input: {
   return { ...request, billingInvoice };
 }
 
-async function cancelBillingForUpgradeRequest(
-  requestId: string,
-  cancelledAt = new Date().toISOString(),
-) {
-  const supabase = getSupabaseAdminClient();
-  const billingByRequestId =
-    await getPartnerBillingInvoiceSummariesForUpgradeRequests([requestId]);
-  const invoice = billingByRequestId.get(requestId);
-  if (!invoice) {
-    return;
-  }
-
-  const [invoiceResult, paymentResult, taxDocumentResult] = await Promise.all([
-    supabase
-      .from("partner_billing_invoices")
-      .update({
-        status: "cancelled",
-        cancelled_at: cancelledAt,
-      })
-      .eq("id", invoice.id)
-      .neq("status", "paid"),
-    supabase
-      .from("partner_billing_payments")
-      .update({ status: "cancelled" })
-      .eq("invoice_id", invoice.id)
-      .neq("status", "confirmed"),
-    supabase
-      .from("partner_tax_documents")
-      .update({ status: "cancelled", cancelled_at: cancelledAt })
-      .eq("invoice_id", invoice.id)
-      .in("status", ["requested", "pending_issue"]),
-  ]);
-  if (invoiceResult.error) {
-    throw new Error(invoiceResult.error.message);
-  }
-  if (paymentResult.error) {
-    throw new Error(paymentResult.error.message);
-  }
-  if (taxDocumentResult.error) {
-    throw new Error(taxDocumentResult.error.message);
-  }
-}
-
 export async function confirmPartnerPlanBankTransferPayment(input: {
   requestId: string;
   adminId: string;
   taxDocumentStatus: Extract<PartnerTaxDocumentStatus, "pending_issue" | "issued">;
 }) {
-  const billingByRequestId =
-    await getPartnerBillingInvoiceSummariesForUpgradeRequests([input.requestId]);
-  const invoice = billingByRequestId.get(input.requestId);
-  if (!invoice) {
-    throw new Error("청구서를 찾을 수 없습니다.");
-  }
-  if (invoice.invoiceStatus === "cancelled") {
-    throw new Error("취소된 청구서는 입금 확인할 수 없습니다.");
-  }
-  if (invoice.invoiceStatus === "paid") {
-    return invoice;
-  }
-
   const now = new Date().toISOString();
   const supabase = getSupabaseAdminClient();
-  const [invoiceResult, paymentResult, taxDocumentResult] = await Promise.all([
-    supabase
-      .from("partner_billing_invoices")
-      .update({
-        status: "paid",
-        paid_at: now,
-      })
-      .eq("id", invoice.id),
-    supabase
-      .from("partner_billing_payments")
-      .update({
-        status: "confirmed",
-        confirmed_by_admin_id: input.adminId,
-        confirmed_at: now,
-      })
-      .eq("invoice_id", invoice.id),
-    supabase
-      .from("partner_tax_documents")
-      .update({
-        status: input.taxDocumentStatus,
-        issued_by_admin_id:
-          input.taxDocumentStatus === "issued" ? input.adminId : null,
-        issued_at: input.taxDocumentStatus === "issued" ? now : null,
-        sent_at: input.taxDocumentStatus === "issued" ? now : null,
-      })
-      .eq("invoice_id", invoice.id),
-  ]);
-  if (invoiceResult.error) {
-    throw new Error(invoiceResult.error.message);
-  }
-  if (paymentResult.error) {
-    throw new Error(paymentResult.error.message);
-  }
-  if (taxDocumentResult.error) {
-    throw new Error(taxDocumentResult.error.message);
+  const { data, error } = await supabase.rpc(
+    "confirm_partner_plan_bank_transfer_payment",
+    {
+      p_request_id: input.requestId,
+      p_admin_id: input.adminId,
+      p_tax_document_status: input.taxDocumentStatus,
+      p_confirmed_at: now,
+    },
+  );
+  if (error) {
+    throw new Error(getConfirmBankTransferErrorMessage(error));
   }
 
-  return {
-    ...invoice,
-    invoiceStatus: "paid" as const,
-    paymentStatus: "confirmed" as const,
-    taxDocumentStatus: input.taxDocumentStatus,
-    paidAt: now,
-    paymentConfirmedAt: now,
-    taxDocumentIssuedAt: input.taxDocumentStatus === "issued" ? now : null,
-  };
+  return mapBillingInvoice(
+    getAtomicRpcRow<BillingInvoiceRow>(
+      data,
+      "invoice",
+      "확정된 청구서를 확인하지 못했습니다.",
+    ),
+    getAtomicRpcRow<BillingPaymentRow>(
+      data,
+      "payment",
+      "확정된 결제 정보를 확인하지 못했습니다.",
+    ),
+    getAtomicRpcRow<TaxDocumentRow>(
+      data,
+      "taxDocument",
+      "확정된 세금계산서 정보를 확인하지 못했습니다.",
+    ),
+  );
 }
 
 export async function cancelPartnerPlanUpgradeRequest(input: {
@@ -889,19 +875,25 @@ export async function cancelPartnerPlanUpgradeRequest(input: {
     normalizePartnerPlanUpgradeRequestStatus(data.status),
     "cancelled",
   );
-
-  const { error: updateError } = await supabase
-    .from("partner_plan_upgrade_requests")
-    .update({ status: "cancelled", updated_at: new Date().toISOString() })
-    .eq("id", input.requestId);
-  if (updateError) {
-    throw new Error(updateError.message);
+  const { error: cancelError } = await supabase.rpc(
+    "cancel_partner_plan_upgrade_billing",
+    {
+      p_request_id: input.requestId,
+      p_next_request_status: "cancelled",
+      p_cancelled_at: new Date().toISOString(),
+      p_admin_id: null,
+      p_admin_note: null,
+    },
+  );
+  if (cancelError) {
+    throw new Error(getCancelUpgradeBillingErrorMessage(cancelError, "취소"));
   }
-  await cancelBillingForUpgradeRequest(input.requestId);
 }
 
 export async function updatePartnerBrandPlanByAdmin(input: {
   partnerId: string;
+  expectedPlanTier: PartnerCompanyPlanTier;
+  expectedPlanUpdatedAt: string | null;
   nextPlanTier: PartnerCompanyPlanTier;
   planStartedAt: string | null;
   planExpiresAt: string | null;
@@ -920,34 +912,23 @@ export async function updatePartnerBrandPlanByAdmin(input: {
     planStartedAt: input.planStartedAt,
     planExpiresAt: input.planExpiresAt,
   });
-  const supabase = getSupabaseAdminClient();
-  const { error } = await supabase
-    .from("partners")
-    .update({
-      plan_tier: input.nextPlanTier,
-      plan_started_at: planWindow.planStartedAt,
-      plan_expires_at: planWindow.planExpiresAt,
-      plan_updated_at: now,
-      updated_at: now,
-    })
-    .eq("id", input.partnerId);
-  if (error) {
-    throw new Error(error.message);
+  if (!isPartnerPlanWindowOrderValid(planWindow)) {
+    throw new Error("partner_company_plan_invalid_request");
   }
-
-  const { error: eventError } = await supabase.from("partner_brand_plan_events").insert({
-    partner_id: input.partnerId,
-    company_id: brand.companyId,
-    previous_plan_tier: brand.planTier,
-    next_plan_tier: input.nextPlanTier,
-    source: "admin",
-    actor_admin_id: input.adminId,
-    plan_started_at: planWindow.planStartedAt,
-    plan_expires_at: planWindow.planExpiresAt,
-    note: input.note,
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase.rpc("update_partner_brand_plan_by_admin", {
+    p_partner_id: input.partnerId,
+    p_expected_plan_tier: input.expectedPlanTier,
+    p_expected_plan_updated_at: input.expectedPlanUpdatedAt,
+    p_next_plan_tier: input.nextPlanTier,
+    p_plan_started_at: planWindow.planStartedAt,
+    p_plan_expires_at: planWindow.planExpiresAt,
+    p_actor_admin_id: input.adminId,
+    p_note: input.note,
+    p_updated_at: now,
   });
-  if (eventError) {
-    throw new Error(eventError.message);
+  if (error) {
+    throw new Error(getAdminPlanUpdateErrorMessage(error));
   }
 
   await createPartnerOperationalNotification({
@@ -987,75 +968,59 @@ export async function reviewPartnerPlanUpgradeRequest(input: {
     .eq("id", input.requestId)
     .maybeSingle();
   if (error || !data) {
-    throw new Error("업그레이드 요청을 찾을 수 없습니다.");
+    throw new Error("partner_company_plan_missing_request");
   }
 
   const request = mapUpgradeRequest(data as UpgradeRequestRow);
   if (!request.partnerId) {
-    throw new Error("제휴처를 찾을 수 없습니다.");
+    throw new Error("partner_company_plan_partner_missing");
   }
-  assertPartnerPlanUpgradeTransition(request.status, input.nextStatus);
+  try {
+    assertPartnerPlanUpgradeTransition(request.status, input.nextStatus);
+  } catch {
+    throw new Error("partner_company_plan_processed");
+  }
   const reviewedAt = new Date().toISOString();
   const adminNote = normalizePlanUpgradeMemo(input.adminNote);
   const billingByRequestId =
     await getPartnerBillingInvoiceSummariesForUpgradeRequests([request.id]);
   const billingInvoice = billingByRequestId.get(request.id) ?? null;
-
-  if (input.nextStatus === "approved" && billingInvoice?.invoiceStatus !== "paid") {
-    throw new Error("입금 확인 후 플랜을 승인할 수 있습니다.");
-  }
-
-  const { error: requestUpdateError } = await supabase
-    .from("partner_plan_upgrade_requests")
-    .update({
-      status: input.nextStatus,
-      admin_note: adminNote,
-      reviewed_by_admin_id: input.adminId,
-      reviewed_at: reviewedAt,
-      updated_at: reviewedAt,
-    })
-    .eq("id", request.id);
-  if (requestUpdateError) {
-    throw new Error(requestUpdateError.message);
-  }
+  let approvedBillingInvoice = billingInvoice;
 
   if (input.nextStatus === "approved") {
-    const planStartedAt = billingInvoice?.paidAt ?? reviewedAt;
-    const planExpiresAt =
-      billingInvoice?.servicePeriodEnd ??
-      addDaysIso(planStartedAt, billingInvoice?.remainingDays ?? 30);
-    const { error: brandUpdateError } = await supabase
-      .from("partners")
-      .update({
-        plan_tier: request.requestedPlanTier,
-        plan_started_at: planStartedAt,
-        plan_expires_at: planExpiresAt,
-        plan_updated_at: reviewedAt,
-        updated_at: reviewedAt,
-      })
-      .eq("id", request.partnerId);
-    if (brandUpdateError) {
-      throw new Error(brandUpdateError.message);
+    const { data, error: approvalError } = await supabase.rpc(
+      "approve_partner_plan_upgrade_request",
+      {
+        p_request_id: request.id,
+        p_admin_id: input.adminId,
+        p_admin_note: adminNote,
+        p_reviewed_at: reviewedAt,
+      },
+    );
+    if (approvalError) {
+      throw new Error(getApproveUpgradeBillingErrorMessage(approvalError));
     }
-
-    const { error: eventError } = await supabase.from("partner_brand_plan_events").insert({
-      partner_id: request.partnerId,
-      company_id: request.companyId,
-      upgrade_request_id: request.id,
-      previous_plan_tier: request.currentPlanTier,
-      next_plan_tier: request.requestedPlanTier,
-      source: "partner_upgrade",
-      actor_admin_id: input.adminId,
-      actor_partner_account_id: request.requestedByAccountId,
-      plan_started_at: planStartedAt,
-      plan_expires_at: planExpiresAt,
-      note: adminNote,
-    });
-    if (eventError) {
-      throw new Error(eventError.message);
-    }
+    approvedBillingInvoice = mapBillingInvoice(
+      getAtomicRpcRow<BillingInvoiceRow>(
+        data,
+        "invoice",
+        "승인된 청구서를 확인하지 못했습니다.",
+      ),
+    );
   } else {
-    await cancelBillingForUpgradeRequest(request.id, reviewedAt);
+    const { error: cancelError } = await supabase.rpc(
+      "cancel_partner_plan_upgrade_billing",
+      {
+        p_request_id: request.id,
+        p_next_request_status: input.nextStatus,
+        p_cancelled_at: reviewedAt,
+        p_admin_id: input.adminId,
+        p_admin_note: adminNote,
+      },
+    );
+    if (cancelError) {
+      throw new Error(getCancelUpgradeBillingErrorMessage(cancelError, "반려"));
+    }
   }
 
   const approved = input.nextStatus === "approved";
@@ -1074,8 +1039,8 @@ export async function reviewPartnerPlanUpgradeRequest(input: {
           kind: "partner_plan_upgrade_approved",
           partnerName: request.brandName,
           requestedPlanName: getPartnerCompanyPlanDefinition(request.requestedPlanTier).label,
-          effectiveAt: billingInvoice?.paidAt ?? reviewedAt,
-          expiresAt: billingInvoice?.servicePeriodEnd ?? "",
+          effectiveAt: approvedBillingInvoice?.paidAt ?? reviewedAt,
+          expiresAt: approvedBillingInvoice?.servicePeriodEnd ?? "",
           planUrl: getCompanyScopedPortalHref(request.companyId, "plans"),
         }
       : {
@@ -1093,109 +1058,50 @@ export async function reviewPartnerPlanUpgradeRequest(input: {
 export async function runPartnerBillingOverdueDowngrades(now = new Date()) {
   const nowIso = now.toISOString();
   const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("partner_billing_invoices")
-    .select(
-      "id,invoice_number,company_id,partner_id,upgrade_request_id,status,requested_plan_tier,due_at",
-    )
-    .eq("status", "pending_payment")
-    .lte("due_at", nowIso)
-    .limit(100);
+  const { data, error } = await supabase.rpc(
+    "process_partner_billing_overdue_downgrades",
+    {
+      p_now: nowIso,
+      p_limit: 100,
+    },
+  );
   if (error) {
-    throw new Error(error.message);
-  }
-
-  const candidates = ((data ?? []) as BillingInvoiceRow[])
-    .map((invoice) => {
-      if (!invoice.company_id || !invoice.partner_id || !invoice.requested_plan_tier) {
-        return null;
-      }
-      return {
-        invoice,
-        candidate: getOverdueDowngradeCandidate({
-          invoiceId: invoice.id,
-          partnerId: invoice.partner_id,
-          requestedPlanTier: normalizePartnerCompanyPlanTier(invoice.requested_plan_tier),
-          dueAt: invoice.due_at,
-          status: invoice.status,
-          now: nowIso,
-        }),
-      };
-    })
-    .filter(
-      (item): item is { invoice: BillingInvoiceRow; candidate: NonNullable<ReturnType<typeof getOverdueDowngradeCandidate>> } =>
-        Boolean(item?.candidate),
+    console.error(
+      "[partner-plan-service] overdue downgrade transaction failed",
+      error,
     );
-
-  const results = [];
-  for (const { invoice, candidate } of candidates) {
-    const [brandResult, invoiceResult, requestResult, eventResult] =
-      await Promise.all([
-        supabase
-          .from("partners")
-          .update({
-            plan_tier: candidate.downgradeTo,
-            plan_started_at: null,
-            plan_expires_at: null,
-            plan_updated_at: nowIso,
-            updated_at: nowIso,
-          })
-          .eq("id", candidate.partnerId),
-        supabase
-          .from("partner_billing_invoices")
-          .update({
-            status: "overdue",
-            overdue_marked_at: nowIso,
-            downgraded_at: nowIso,
-          })
-          .eq("id", candidate.invoiceId),
-        invoice.upgrade_request_id
-          ? supabase
-              .from("partner_plan_upgrade_requests")
-              .update({
-                status: "cancelled",
-                admin_note: "미납 7일 경과로 자동 취소되었습니다.",
-                updated_at: nowIso,
-              })
-              .eq("id", invoice.upgrade_request_id)
-          : Promise.resolve({ error: null }),
-        supabase.from("partner_brand_plan_events").insert({
-          partner_id: candidate.partnerId,
-          company_id: invoice.company_id,
-          upgrade_request_id: invoice.upgrade_request_id,
-          previous_plan_tier: invoice.requested_plan_tier,
-          next_plan_tier: candidate.downgradeTo,
-          source: "system",
-          plan_started_at: null,
-          plan_expires_at: null,
-          note: "계좌이체 청구 미납 7일 경과로 Basic 플랜으로 자동 조정",
-          metadata: {
-            invoiceId: candidate.invoiceId,
-            invoiceNumber: invoice.invoice_number,
-            reason: candidate.reason,
-          },
-        }),
-      ]);
-
-    const firstError =
-      brandResult.error ??
-      invoiceResult.error ??
-      requestResult.error ??
-      eventResult.error;
-    if (firstError) {
-      throw new Error(firstError.message);
-    }
-
-    results.push({
-      invoiceId: candidate.invoiceId,
-      partnerId: candidate.partnerId,
-      downgradedTo: candidate.downgradeTo,
-    });
+    throw new Error("미납 플랜 자동 조정을 완료하지 못했습니다.");
+  }
+  if (!isRecord(data) || !Array.isArray(data.results)) {
+    throw new Error("미납 플랜 자동 조정 결과를 확인하지 못했습니다.");
   }
 
-  return {
-    checked: (data ?? []).length,
-    downgraded: results.length,
-    results,
-  };
+  const checked = Number(data.checked);
+  const downgraded = Number(data.downgraded);
+  const results = data.results.map((item) => {
+    if (
+      !isRecord(item) ||
+      typeof item.invoiceId !== "string" ||
+      typeof item.partnerId !== "string" ||
+      item.downgradedTo !== "basic"
+    ) {
+      throw new Error("미납 플랜 자동 조정 결과를 확인하지 못했습니다.");
+    }
+    return {
+      invoiceId: item.invoiceId,
+      partnerId: item.partnerId,
+      downgradedTo: "basic" as const,
+    };
+  });
+  if (
+    !Number.isInteger(checked) ||
+    checked < 0 ||
+    !Number.isInteger(downgraded) ||
+    downgraded < 0 ||
+    downgraded !== results.length
+  ) {
+    throw new Error("미납 플랜 자동 조정 결과를 확인하지 못했습니다.");
+  }
+
+  return { checked, downgraded, results };
 }

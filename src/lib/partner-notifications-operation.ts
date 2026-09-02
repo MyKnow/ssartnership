@@ -1,7 +1,7 @@
 import type {
   PartnerNotificationCenterSummary,
   PartnerNotificationEntry,
-} from "@/lib/partner-notifications";
+} from "@/lib/partner-notification-contract";
 import {
   getCompanyScopedPartnerServiceHref,
   getCompanyScopedPortalHref,

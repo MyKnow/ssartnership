@@ -14,6 +14,48 @@ import {
 } from "./shared";
 import { buildPartnerCompanySlug } from "./slug";
 
+type CleanupQueryResult = {
+  error: { code?: string; message: string } | null;
+};
+
+async function runPartnerCompanyCleanup(
+  stage: string,
+  operation: () => PromiseLike<CleanupQueryResult>,
+) {
+  const { error } = await operation();
+  if (!error) {
+    return true;
+  }
+
+  console.error("[partner-company-provision] cleanup failed", {
+    stage,
+    code: error.code ?? null,
+    message: error.message,
+  });
+  return false;
+}
+
+async function runProvisionCleanupTasks(
+  cleanupTasks: Array<() => Promise<void>>,
+  originalError: unknown,
+) {
+  let cleanupFailed = false;
+
+  for (const cleanup of cleanupTasks.reverse()) {
+    try {
+      await cleanup();
+    } catch {
+      cleanupFailed = true;
+    }
+  }
+
+  if (cleanupFailed) {
+    throw new Error("partner_company_cleanup_failed", {
+      cause: originalError,
+    });
+  }
+}
+
 export async function ensurePartnerCompanyRow(
   supabase: AdminSupabaseClient,
   companyInput: PartnerCompanyInput,
@@ -39,6 +81,7 @@ export async function ensurePartnerCompanyRow(
       createdCompany: false,
       createdAccount: false,
       createdLink: false,
+      updatedAccountPreviousValues: null,
     };
   }
 
@@ -48,6 +91,7 @@ export async function ensurePartnerCompanyRow(
   let createdCompany = false;
   let createdAccount = false;
   let createdLink = false;
+  let updatedAccountPreviousValues: PartnerCompanyProvision["updatedAccountPreviousValues"] = null;
 
   try {
     if (hasCompanySelection) {
@@ -74,6 +118,7 @@ export async function ensurePartnerCompanyRow(
         createdCompany: false,
         createdAccount: false,
         createdLink: false,
+        updatedAccountPreviousValues: null,
       };
     }
 
@@ -103,7 +148,17 @@ export async function ensurePartnerCompanyRow(
     company = normalizePartnerCompanyRow(created as PartnerCompanyRow);
     createdCompany = true;
     cleanupTasks.push(async () => {
-      await supabase.from("partner_companies").delete().eq("id", company?.id ?? "");
+      const cleaned = await runPartnerCompanyCleanup(
+        "partner_company",
+        () =>
+          supabase
+            .from("partner_companies")
+            .delete()
+            .eq("id", company?.id ?? ""),
+      );
+      if (!cleaned) {
+        throw new Error("partner_company_cleanup_failed");
+      }
     });
 
     if (!company) {
@@ -127,6 +182,11 @@ export async function ensurePartnerCompanyRow(
     }
 
     if (existingAccount) {
+      updatedAccountPreviousValues = {
+        display_name: existingAccount.display_name,
+        email: existingAccount.email ?? null,
+        is_active: existingAccount.is_active ?? null,
+      };
       const { data: updatedAccount, error: updateError } = await supabase
         .from("partner_accounts")
         .update({
@@ -142,6 +202,19 @@ export async function ensurePartnerCompanyRow(
         throw new Error(updateError.message);
       }
       account = normalizePartnerAccountRow(updatedAccount as PartnerAccountRow);
+      cleanupTasks.push(async () => {
+        const cleaned = await runPartnerCompanyCleanup(
+          "partner_account_restore",
+          () =>
+            supabase
+              .from("partner_accounts")
+              .update(updatedAccountPreviousValues!)
+              .eq("id", existingAccount.id),
+        );
+        if (!cleaned) {
+          throw new Error("partner_company_cleanup_failed");
+        }
+      });
     } else {
       const passwordRecord = hashPassword(generateTempPassword(12));
       const { data: createdAccountRow, error: createAccountError } = await supabase
@@ -167,7 +240,17 @@ export async function ensurePartnerCompanyRow(
       account = normalizePartnerAccountRow(createdAccountRow as PartnerAccountRow);
       createdAccount = true;
       cleanupTasks.push(async () => {
-        await supabase.from("partner_accounts").delete().eq("id", account?.id ?? "");
+        const cleaned = await runPartnerCompanyCleanup(
+          "partner_account",
+          () =>
+            supabase
+              .from("partner_accounts")
+              .delete()
+              .eq("id", account?.id ?? ""),
+        );
+        if (!cleaned) {
+          throw new Error("partner_company_cleanup_failed");
+        }
       });
     }
 
@@ -191,11 +274,18 @@ export async function ensurePartnerCompanyRow(
 
     createdLink = true;
     cleanupTasks.push(async () => {
-      await supabase
-        .from("partner_account_companies")
-        .delete()
-        .eq("account_id", accountId)
-        .eq("company_id", companyId);
+      const cleaned = await runPartnerCompanyCleanup(
+        "partner_account_company",
+        () =>
+          supabase
+            .from("partner_account_companies")
+            .delete()
+            .eq("account_id", accountId)
+            .eq("company_id", companyId),
+      );
+      if (!cleaned) {
+        throw new Error("partner_company_cleanup_failed");
+      }
     });
 
     return {
@@ -204,11 +294,10 @@ export async function ensurePartnerCompanyRow(
       createdCompany,
       createdAccount,
       createdLink,
+      updatedAccountPreviousValues,
     };
   } catch (error) {
-    for (const cleanup of cleanupTasks.reverse()) {
-      await cleanup().catch(() => undefined);
-    }
+    await runProvisionCleanupTasks(cleanupTasks, error);
     throw error;
   }
 }
@@ -221,19 +310,60 @@ export async function cleanupPartnerCompanyProvision(
     return;
   }
 
+  const cleanupResults: boolean[] = [];
+
   if (provision.createdLink && provision.account) {
-    await supabase
-      .from("partner_account_companies")
-      .delete()
-      .eq("account_id", provision.account.id)
-      .eq("company_id", provision.company.id);
+    cleanupResults.push(
+      await runPartnerCompanyCleanup(
+        "partner_account_company",
+        () =>
+          supabase
+            .from("partner_account_companies")
+            .delete()
+            .eq("account_id", provision.account!.id)
+            .eq("company_id", provision.company!.id),
+      ),
+    );
   }
 
   if (provision.createdAccount && provision.account) {
-    await supabase.from("partner_accounts").delete().eq("id", provision.account.id);
+    cleanupResults.push(
+      await runPartnerCompanyCleanup(
+        "partner_account",
+        () =>
+          supabase
+            .from("partner_accounts")
+            .delete()
+            .eq("id", provision.account!.id),
+      ),
+    );
+  } else if (provision.updatedAccountPreviousValues && provision.account) {
+    cleanupResults.push(
+      await runPartnerCompanyCleanup(
+        "partner_account_restore",
+        () =>
+          supabase
+            .from("partner_accounts")
+            .update(provision.updatedAccountPreviousValues!)
+            .eq("id", provision.account!.id),
+      ),
+    );
   }
 
   if (provision.createdCompany) {
-    await supabase.from("partner_companies").delete().eq("id", provision.company.id);
+    cleanupResults.push(
+      await runPartnerCompanyCleanup(
+        "partner_company",
+        () =>
+          supabase
+            .from("partner_companies")
+            .delete()
+            .eq("id", provision.company!.id),
+      ),
+    );
+  }
+
+  if (cleanupResults.includes(false)) {
+    throw new Error("partner_company_cleanup_failed");
   }
 }

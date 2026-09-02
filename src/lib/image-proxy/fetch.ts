@@ -4,9 +4,15 @@ import https from "node:https";
 import net from "node:net";
 import type { IncomingHttpHeaders, RequestOptions } from "node:http";
 import { isPublicIpAddress } from "./ip";
-import { IMAGE_FETCH_TIMEOUT_MS, ImageProxyError, MAX_IMAGE_BYTES } from "./shared";
+import {
+  IMAGE_FETCH_TIMEOUT_MS,
+  ImageProxyError,
+  MAX_IMAGE_BYTES,
+  resolveAllowedImageContentType,
+} from "./shared";
 
 export type FetchPublicImageOptions = {
+  allowedContentTypes?: readonly string[];
   maxBytes?: number;
 };
 
@@ -50,13 +56,18 @@ async function resolvePublicImageAddress(hostname: string) {
   return publicAddresses[0];
 }
 
-function parseTargetPort(target: URL) {
+export function resolvePublicImageTargetPort(target: URL) {
+  if (target.protocol !== "http:" && target.protocol !== "https:") {
+    throw new ImageProxyError("Unsupported protocol", 400);
+  }
+
   if (!target.port) {
     return undefined;
   }
 
   const port = Number.parseInt(target.port, 10);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  const expectedPort = target.protocol === "https:" ? 443 : 80;
+  if (!Number.isInteger(port) || port !== expectedPort) {
     throw new ImageProxyError("Unsupported port", 400);
   }
 
@@ -90,7 +101,7 @@ export async function fetchPublicImage(
   const requestOptions: RequestOptions = {
     protocol: target.protocol,
     hostname: resolvedAddress,
-    port: parseTargetPort(target),
+    port: resolvePublicImageTargetPort(target),
     method: "GET",
     path: `${target.pathname}${target.search}`,
     headers: {
@@ -127,8 +138,11 @@ export async function fetchPublicImage(
     throw new ImageProxyError("Failed to fetch image", 502);
   }
 
-  const contentType = getContentType(response.headers);
-  if (!contentType.startsWith("image/")) {
+  const contentType = resolveAllowedImageContentType(
+    getContentType(response.headers),
+    options.allowedContentTypes,
+  );
+  if (!contentType) {
     response.resume();
     throw new ImageProxyError("Unsupported media type", 415);
   }

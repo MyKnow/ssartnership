@@ -2,6 +2,7 @@ import HeroSection from "@/components/HeroSection";
 import HomeView from "@/components/HomeView";
 import Container from "@/components/ui/Container";
 import type { PartnerPopularityMetrics } from "@/lib/partner-popularity";
+import { serializeJsonLd } from "@/lib/seo";
 import type { Category, Partner } from "@/lib/types";
 
 export type CampusLandingViewProps = {
@@ -17,7 +18,7 @@ export type CampusLandingViewProps = {
   currentUserId: string | null;
   partnerPopularityById?: Record<string, PartnerPopularityMetrics | undefined>;
   partnerFavoriteStateById?: Record<string, boolean | undefined>;
-  loadedPartnerStateIds?: string[];
+  loadedFavoritePartnerIds?: string[];
   structuredData?: Record<string, unknown> | null;
 };
 
@@ -30,7 +31,7 @@ export default function CampusLandingView({
   currentUserId,
   partnerPopularityById,
   partnerFavoriteStateById,
-  loadedPartnerStateIds,
+  loadedFavoritePartnerIds,
   structuredData,
 }: CampusLandingViewProps) {
   return (
@@ -39,7 +40,7 @@ export default function CampusLandingView({
         {structuredData ? (
           <script
             type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+            dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
           />
         ) : null}
         <HeroSection
@@ -54,7 +55,7 @@ export default function CampusLandingView({
           currentUserId={currentUserId}
           partnerPopularityById={partnerPopularityById}
           partnerFavoriteStateById={partnerFavoriteStateById}
-          loadedPartnerStateIds={loadedPartnerStateIds}
+          loadedFavoritePartnerIds={loadedFavoritePartnerIds}
         />
       </Container>
     </main>

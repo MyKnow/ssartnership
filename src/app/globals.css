@@ -191,7 +191,7 @@ body {
 }
 
 @media (max-width: 767px) {
-  [data-site-footer-navigation-reserve] {
+  body:has([data-site-mobile-navigation]) [data-site-footer] {
     padding-bottom: calc(env(safe-area-inset-bottom) + 7.75rem);
   }
 
@@ -226,6 +226,12 @@ body {
 :where(code, pre, kbd, samp) {
   word-break: normal;
   overflow-wrap: normal;
+}
+
+@media (display-mode: standalone) {
+  [data-site-header-pwa-install] {
+    display: none;
+  }
 }
 
 ::selection {

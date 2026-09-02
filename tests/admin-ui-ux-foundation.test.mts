@@ -110,6 +110,24 @@ test("관리 셸은 문서 제목을 만들지 않고 페이지 헤더가 단일
   assert.match(pageHeaderSource, /<h1 className=/);
 });
 
+test("관리자 모바일 헤더는 스크롤과 무관하게 계속 노출된다", async () => {
+  const [shellSource, headerHeightSource] = await Promise.all([
+    readFile(
+      new URL("../src/components/admin/AdminShellView.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/hooks/useHeaderHeight.ts", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(shellSource, /useHeaderHeight/);
+  assert.doesNotMatch(shellSource, /useAutoHideHeader|hidden \? "-translate-y-full"/);
+  assert.doesNotMatch(headerHeightSource, /addEventListener\("scroll"|requestAnimationFrame/);
+  assert.match(headerHeightSource, /ResizeObserver/);
+});
+
 test("핵심 관리자 화면은 데이터 본문보다 페이지 헤더를 먼저 스트리밍한다", async () => {
   const pageSources = await Promise.all(
     [

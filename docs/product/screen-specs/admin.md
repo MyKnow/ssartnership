@@ -1,3 +1,10 @@
+---
+title: 관리자 화면 계약
+type: product-contract
+status: current
+authority: normative
+---
+
 # 관리자 화면 계약
 
 작성 기준일: 2026-07-10

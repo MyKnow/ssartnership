@@ -6,7 +6,6 @@ import EmptyState from "@/components/ui/EmptyState";
 import SectionHeading from "@/components/ui/SectionHeading";
 import {
   PARTNER_COMPANY_PLAN_DEFINITIONS,
-  getPartnerCompanyPlanDefinition,
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
 import type { PartnerBillingProfileRecord } from "@/lib/partner-billing-profiles";
@@ -14,11 +13,14 @@ import type { PartnerBankTransferAccount } from "@/lib/partner-billing-config";
 import type { PartnerPlanPortalData } from "@/lib/partner-plan-service";
 import {
   formatPartnerPlanCurrency,
+  formatPartnerPlanDateTime,
   formatPartnerPlanMonthlyPrice,
+  getPartnerPlanBadgeLabel,
+  getPartnerPlanBadgeVariant,
   getPartnerPlanChannelLabel,
+  getPartnerPlanDaysUntil,
   getPartnerPlanProgressLabel,
 } from "@/lib/partner-plan-ui";
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 
 export type PartnerPlanFormAction = (
   formData: FormData,
@@ -37,28 +39,10 @@ export type PartnerPlanManagementViewProps = {
   actions: PartnerPlanActions;
 };
 
-function formatDateTime(value?: string | null) {
-  return value ? formatKoreanDateTimeToMinute(value) : "없음";
-}
-
-function getDaysUntil(value?: string | null) {
-  if (!value) {
-    return null;
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-  return Math.ceil((date.getTime() - Date.now()) / 86_400_000);
-}
-
 function PlanBadge({ tier }: { tier: PartnerCompanyPlanTier }) {
-  const definition = getPartnerCompanyPlanDefinition(tier);
   return (
-    <Badge
-      variant={tier === "boost" ? "primary" : tier === "partner" ? "success" : "neutral"}
-    >
-      {definition.label}
+    <Badge variant={getPartnerPlanBadgeVariant(tier)}>
+      {getPartnerPlanBadgeLabel(tier)}
     </Badge>
   );
 }
@@ -114,7 +98,7 @@ export default function PartnerPlanManagementView({
     (request) => request.status === "pending",
   ).length;
   const expiringBrandCount = data.brands.filter((brand) => {
-    const daysUntil = getDaysUntil(brand.planExpiresAt);
+    const daysUntil = getPartnerPlanDaysUntil(brand.planExpiresAt);
     return daysUntil !== null && daysUntil >= 0 && daysUntil <= 30;
   }).length;
   const brandCountByTier = Object.fromEntries(
@@ -235,7 +219,7 @@ export default function PartnerPlanManagementView({
                 </div>
                 <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Clock3 className="h-3.5 w-3.5" />
-                  {formatDateTime(request.createdAt)}
+                  {formatPartnerPlanDateTime(request.createdAt)}
                 </span>
               </Card>
             ))}

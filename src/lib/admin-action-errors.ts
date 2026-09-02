@@ -59,6 +59,8 @@ export const adminActionErrorMessages: Record<string, string> = {
   partner_account_invalid_email: "담당자 이메일 형식이 올바르지 않습니다.",
   partner_account_invalid_request: "파트너사 계정 입력값을 확인해 주세요.",
   partner_account_exists: "이미 존재하는 로그인 아이디입니다.",
+  partner_account_create_uncertain:
+    "파트너사 계정 생성 중 정리가 끝나지 않았을 수 있습니다. 계정 목록을 확인한 뒤 다시 시도해 주세요.",
   partner_account_company_missing: "연결할 계정과 회사를 찾을 수 없습니다.",
   partner_account_company_invalid_request: "연결 상태 입력값을 확인해 주세요.",
   regional_admin_scope_denied: "배정된 지역의 제휴처 또는 파트너사만 관리할 수 있습니다.",
@@ -68,6 +70,12 @@ export const adminActionErrorMessages: Record<string, string> = {
   partner_company_plan_pending_exists: "이미 처리 대기 중인 업그레이드 요청이 있습니다.",
   partner_company_plan_processed: "이미 처리된 업그레이드 요청입니다.",
   partner_company_plan_payment_unconfirmed: "입금 확인 후 플랜을 승인할 수 있습니다.",
+  partner_company_plan_invoice_missing: "청구서를 찾을 수 없습니다.",
+  partner_company_plan_partner_missing: "제휴처를 찾을 수 없습니다.",
+  partner_company_plan_rejection_paid:
+    "입금 확인이 완료된 청구는 반려할 수 없습니다.",
+  partner_company_plan_state_changed:
+    "제휴처 플랜이 변경되었습니다. 현재 상태를 확인한 뒤 다시 시도해 주세요.",
   review_invalid_request: "리뷰 입력값을 확인해 주세요.",
   review_not_found: "대상을 찾을 수 없습니다.",
   admin_usage_invalid_request: "혜택 적용 이력 입력값을 확인해 주세요.",

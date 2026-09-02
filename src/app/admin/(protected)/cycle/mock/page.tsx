@@ -3,7 +3,7 @@ import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminShell from "@/components/admin/AdminShell";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { getAdminAccountByLoginId } from "@/lib/admin-accounts";
-import { listCohortCardThemes } from "@/lib/cohort-card-themes";
+import { listCohortCardThemes } from "@/lib/cohort-card-themes.server";
 import { getMemberCanonicalProfile } from "@/lib/member-profile-view";
 
 export const dynamic = "force-dynamic";

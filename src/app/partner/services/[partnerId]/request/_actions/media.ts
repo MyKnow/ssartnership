@@ -4,14 +4,14 @@ import {
   assertNoDirectImageFileSubmission,
   resolveImageTransformPolicy,
 } from "@/lib/image-upload/policy";
-import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import {
   assertPartnerMediaExistingUrls,
   parsePartnerMediaManifest,
 } from "@/lib/partner-media";
 import {
   buildPartnerMediaStoragePath,
-  deletePartnerMediaUrls,
+  rethrowAfterPartnerMediaCleanup,
 } from "@/lib/partner-media-storage";
 import { PARTNER_MEDIA_BUCKET } from "@/lib/partner-media";
 
@@ -80,6 +80,7 @@ export async function resolvePartnerMediaPayload(
           "제휴처 이미지 URL을 만들지 못했습니다.",
         );
       }
+      uploadedUrls.push(attached.url);
       return attached.url;
     };
 
@@ -114,7 +115,10 @@ export async function resolvePartnerMediaPayload(
 
     return { thumbnail, images, uploadedUrls };
   } catch (error) {
-    await deletePartnerMediaUrls(uploadedUrls).catch(() => undefined);
-    throw error;
+    return rethrowAfterPartnerMediaCleanup({
+      urls: uploadedUrls,
+      originalError: error,
+      logContext: "partner-change-request",
+    });
   }
 }

@@ -5,7 +5,12 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import CertificationView from "@/components/certification/CertificationView";
 import AnalyticsEventOnMount from "@/components/analytics/AnalyticsEventOnMount";
+import {
+  ClientSafeRequestError,
+  getClientSafeRequestError,
+} from "@/lib/client-safe-request-error";
 import { getProductSessionId } from "@/lib/product-events";
+import { createClientUuid } from "@/lib/client-uuid";
 import type { CohortCardTheme } from "@/lib/cohort-card-themes";
 
 type VerificationMember = {
@@ -21,13 +26,6 @@ type BenefitUseResponse = {
   ok?: boolean;
   message?: string;
 };
-
-function createIdempotencyKey() {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
 
 export default function PartnerBenefitVerificationView({
   partnerId,
@@ -69,7 +67,7 @@ export default function PartnerBenefitVerificationView({
     }
 
     if (!idempotencyKeyRef.current) {
-      idempotencyKeyRef.current = createIdempotencyKey();
+      idempotencyKeyRef.current = createClientUuid();
     }
 
     setIsSubmitting(true);
@@ -93,7 +91,10 @@ export default function PartnerBenefitVerificationView({
       );
       const payload = (await response.json().catch(() => null)) as BenefitUseResponse | null;
       if (!response.ok || !payload?.ok) {
-        throw new Error(payload?.message || "혜택 이용 확인에 실패했습니다.");
+        throw new ClientSafeRequestError(
+          "request_failed",
+          payload?.message || "혜택 이용 확인에 실패했습니다.",
+        );
       }
       setIsCompleted(true);
       setMessage({
@@ -103,7 +104,11 @@ export default function PartnerBenefitVerificationView({
     } catch (error) {
       setMessage({
         tone: "error",
-        text: error instanceof Error ? error.message : "혜택 이용 확인에 실패했습니다.",
+        text: getClientSafeRequestError(error, {
+          requestFailed: "혜택 이용 확인에 실패했습니다.",
+          networkUnavailable:
+            "혜택 이용 확인에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
+        }).message,
       });
     } finally {
       setIsSubmitting(false);

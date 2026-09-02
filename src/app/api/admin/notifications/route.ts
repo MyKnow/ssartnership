@@ -4,11 +4,17 @@ import {
   getCachedAdminNotificationInboxReadModel,
   invalidateAdminNotificationReadCache,
 } from "@/lib/admin-notifications.server";
+import {
+  deleteAdminStoredNotifications,
+  markAdminStoredNotificationsRead,
+} from "@/lib/admin-notification-store";
 import { conditionalJsonResponse } from "@/lib/conditional-json-response";
-import { getAdminSession } from "@/lib/auth";
-import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
+import { getAdminPersonalNotificationApiSession } from "@/lib/admin-access";
+import {
+  getSafeNotificationRouteError,
+  shouldLogNotificationRouteError,
+} from "@/lib/notifications/safe-error";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { withServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
@@ -26,33 +32,12 @@ async function requireAdminNotificationSession(request: NextRequest) {
     return { response: getInvalidRequestResponse() };
   }
 
-  const session = await getAdminSession();
-  if (!session) {
-    return {
-      response: NextResponse.json(
-        { message: "관리자 인증이 필요합니다." },
-        { status: 401 },
-      ),
-    };
+  const auth = await getAdminPersonalNotificationApiSession(request);
+  if ("response" in auth) {
+    return auth;
   }
 
-  return { adminId: session.adminId };
-}
-
-async function getUnreadCount(adminId: string) {
-  const supabase = getSupabaseAdminClient();
-  const { count, error } = await supabase
-    .from("admin_notification_recipients")
-    .select("id", { count: "exact", head: true })
-    .eq("admin_id", adminId)
-    .is("deleted_at", null)
-    .is("read_at", null);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return count ?? 0;
+  return { adminId: auth.session.adminId };
 }
 
 export async function GET(request: NextRequest) {
@@ -75,7 +60,8 @@ export async function GET(request: NextRequest) {
       offset: request.nextUrl.searchParams.get("offset"),
       limit: request.nextUrl.searchParams.get("limit"),
     });
-    const includeSummary = request.nextUrl.searchParams.get("includeSummary") !== "0";
+    const includeSummary =
+      request.nextUrl.searchParams.get("includeSummary") !== "0";
     const readModel = await timing.measure("query", () =>
       getCachedAdminNotificationInboxReadModel({
         adminId,
@@ -97,7 +83,9 @@ export async function GET(request: NextRequest) {
       items: result.items,
       nextOffset: result.nextOffset,
       hasMore: result.hasMore,
-      ...(includeSummary ? { summary: { unreadCount: result.unreadCount } } : {}),
+      ...(includeSummary
+        ? { summary: { unreadCount: result.unreadCount } }
+        : {}),
     };
     return conditionalJsonResponse(request, response);
   });
@@ -110,23 +98,26 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
-    const now = new Date().toISOString();
-    const supabase = getSupabaseAdminClient();
-    const { error } = await supabase
-      .from("admin_notification_recipients")
-      .update({ read_at: now, updated_at: now })
-      .eq("admin_id", auth.adminId)
-      .is("deleted_at", null)
-      .is("read_at", null);
-    if (error) {
-      throw new Error(error.message);
-    }
+    const result = await markAdminStoredNotificationsRead({
+      adminId: auth.adminId,
+    });
     invalidateAdminNotificationReadCache(auth.adminId);
-    const unreadCount = await getUnreadCount(auth.adminId);
-    return NextResponse.json({ ok: true, summary: { unreadCount } });
+    return NextResponse.json({
+      ok: true,
+      summary: { unreadCount: result.unreadCount },
+    });
   } catch (error) {
-    const message = getSafeAdminMessage(error, "알림을 처리하지 못했습니다.");
-    return NextResponse.json({ message }, { status: 400 });
+    if (shouldLogNotificationRouteError(error)) {
+      console.error("[admin-notifications] mark read failed", error);
+    }
+    const safeError = getSafeNotificationRouteError(
+      error,
+      "알림을 처리하지 못했습니다.",
+    );
+    return NextResponse.json(
+      { message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }
 
@@ -137,21 +128,25 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    const now = new Date().toISOString();
-    const supabase = getSupabaseAdminClient();
-    const { error } = await supabase
-      .from("admin_notification_recipients")
-      .update({ deleted_at: now, updated_at: now })
-      .eq("admin_id", auth.adminId)
-      .is("deleted_at", null);
-    if (error) {
-      throw new Error(error.message);
-    }
+    const result = await deleteAdminStoredNotifications({
+      adminId: auth.adminId,
+    });
     invalidateAdminNotificationReadCache(auth.adminId);
-    const unreadCount = await getUnreadCount(auth.adminId);
-    return NextResponse.json({ ok: true, summary: { unreadCount } });
+    return NextResponse.json({
+      ok: true,
+      summary: { unreadCount: result.unreadCount },
+    });
   } catch (error) {
-    const message = getSafeAdminMessage(error, "알림을 삭제하지 못했습니다.");
-    return NextResponse.json({ message }, { status: 400 });
+    if (shouldLogNotificationRouteError(error)) {
+      console.error("[admin-notifications] delete failed", error);
+    }
+    const safeError = getSafeNotificationRouteError(
+      error,
+      "알림을 삭제하지 못했습니다.",
+    );
+    return NextResponse.json(
+      { message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }

@@ -15,7 +15,7 @@ Resolve a conflict in this order: server-side authorization, privacy, and access
 
 Read these before changing a visual surface:
 
-- `docs/design-system/README.md` and the linked foundation, component, and layout rules
+- `docs/design-system/index.md` and the linked foundation, component, and layout rules
 - `src/app/globals.css` for tokens and typography
 - `src/components/ui/` for reusable primitives and Storybook contracts
 - `docs/product/screen-specs/` for route-level information hierarchy and states

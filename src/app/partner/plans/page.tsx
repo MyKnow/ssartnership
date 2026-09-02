@@ -7,6 +7,7 @@ import {
 import { getPartnerPortalCompanySummaries } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
+import { readFirstSearchParam } from "@/lib/search-params";
 
 export const metadata: Metadata = {
   title: `플랜 관리 | ${SITE_NAME}`,
@@ -14,10 +15,6 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = "force-dynamic";
-
-function readSearchParam(value?: string | string[]) {
-  return Array.isArray(value) ? value[0] : value;
-}
 
 export default async function PartnerPlansCompatibilityPage({
   searchParams,
@@ -38,7 +35,7 @@ export default async function PartnerPlansCompatibilityPage({
 
   const companies = await getPartnerPortalCompanySummaries(session.companyIds);
   const legacyParams = (await searchParams) ?? {};
-  const requestedCompanyId = readSearchParam(legacyParams.companyId)?.trim();
+  const requestedCompanyId = readFirstSearchParam(legacyParams.companyId)?.trim();
   const company =
     companies.find((candidate) => candidate.id === requestedCompanyId) ??
     (companies.length === 1 ? companies[0] : null);
@@ -47,8 +44,8 @@ export default async function PartnerPlansCompatibilityPage({
   }
 
   const nextParams = new URLSearchParams();
-  const status = readSearchParam(legacyParams.status);
-  const error = readSearchParam(legacyParams.error);
+  const status = readFirstSearchParam(legacyParams.status);
+  const error = readFirstSearchParam(legacyParams.error);
   if (status) {
     nextParams.set("status", status);
   }

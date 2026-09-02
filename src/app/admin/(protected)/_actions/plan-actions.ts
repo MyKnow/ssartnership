@@ -3,6 +3,7 @@ import { getSafeAdminActionErrorCode } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { assertAdminCanUseGlobalFeature } from "@/lib/admin-scope";
 import {
+  isPartnerPlanWindowOrderValid,
   isPartnerCompanyPlanTier,
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
@@ -48,6 +49,16 @@ function parseNote(value: string) {
   return value;
 }
 
+function parseNullableIsoTimestamp(value: string) {
+  if (!value) {
+    return null;
+  }
+  if (value.length > 64 || Number.isNaN(Date.parse(value))) {
+    throw new Error("partner_company_plan_invalid_request");
+  }
+  return value;
+}
+
 export async function updatePartnerBrandPlanAction(formData: FormData) {
   const adminSession = await requireAdminPermission("brands", "update", {
     path: "/admin/partners",
@@ -64,6 +75,8 @@ export async function updatePartnerBrandPlanAction(formData: FormData) {
   }
   let payload: {
     partnerId: string;
+    expectedPlanTier: PartnerCompanyPlanTier;
+    expectedPlanUpdatedAt: string | null;
     nextPlanTier: PartnerCompanyPlanTier;
     planStartedAt: string | null;
     planExpiresAt: string | null;
@@ -74,11 +87,27 @@ export async function updatePartnerBrandPlanAction(formData: FormData) {
     if (!partnerId) {
       throw new Error("partner_company_plan_invalid_request");
     }
+    const nextPlanTier = parsePlanTier(getString(formData, "planTier"));
+    const planStartedAtInput = getString(formData, "planStartedAt");
+    const planExpiresAtInput = getString(formData, "planExpiresAt");
+    if (
+      nextPlanTier !== "basic" &&
+      !isPartnerPlanWindowOrderValid({
+        planStartedAt: planStartedAtInput,
+        planExpiresAt: planExpiresAtInput,
+      })
+    ) {
+      throw new Error("partner_company_plan_invalid_request");
+    }
     payload = {
       partnerId,
-      nextPlanTier: parsePlanTier(getString(formData, "planTier")),
-      planStartedAt: parseNullableKstDate(getString(formData, "planStartedAt")),
-      planExpiresAt: parseNullableKstDate(getString(formData, "planExpiresAt"), true),
+      expectedPlanTier: parsePlanTier(getString(formData, "expectedPlanTier")),
+      expectedPlanUpdatedAt: parseNullableIsoTimestamp(
+        getString(formData, "expectedPlanUpdatedAt"),
+      ),
+      nextPlanTier,
+      planStartedAt: parseNullableKstDate(planStartedAtInput),
+      planExpiresAt: parseNullableKstDate(planExpiresAtInput, true),
       note: parseNote(getString(formData, "note")),
     };
   } catch (error) {
@@ -239,12 +268,10 @@ async function reviewPartnerPlanRequestAction(
       adminNote: getString(formData, "adminNote"),
     });
   } catch (error) {
-    const message =
-      error instanceof Error && error.message.includes("이미 처리된")
-        ? "partner_company_plan_processed"
-        : error instanceof Error && error.message.includes("입금 확인")
-          ? "partner_company_plan_payment_unconfirmed"
-          : getSafeAdminActionErrorCode(error, "partner_company_plan_invalid_request");
+    const message = getSafeAdminActionErrorCode(
+      error,
+      "partner_company_plan_invalid_request",
+    );
     redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, message, {
       action: `partner_plan_upgrade_${nextStatus}`,
       targetType: "partner_plan_upgrade_request",

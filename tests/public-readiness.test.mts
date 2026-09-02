@@ -8,6 +8,7 @@ function readRepoFile(pathname: string) {
 
 const WORKFLOW_FILES = [
   "admin-performance.yml",
+  "cross-platform-development.yml",
   "preview-migrations.yml",
   "preview-sync.yml",
   "production-migrations.yml",
@@ -16,16 +17,26 @@ const WORKFLOW_FILES = [
 ] as const;
 
 const VERIFIED_SUPABASE_CLI_VERSION = "2.114.0";
+const CHECKOUT_ACTION_SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1";
+const CHECKOUT_ACTION_VERSION = "v7.0.1";
+const SETUP_NODE_ACTION_SHA = "820762786026740c76f36085b0efc47a31fe5020";
+const SETUP_NODE_ACTION_VERSION = "v7.0.0";
+const SUPABASE_SETUP_CLI_ACTION_SHA = "3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf";
+const SUPABASE_SETUP_CLI_ACTION_VERSION = "v2.1.1";
 
 test("GitHub Actions use the Node 24 action runtime and project runtime with read-only repository access", () => {
   for (const filename of WORKFLOW_FILES) {
     const workflow = readRepoFile(`.github/workflows/${filename}`);
     const checkoutVersions = [
-      ...workflow.matchAll(/actions\/checkout@(v\d+(?:\.\d+)*)/g),
-    ].map((match) => match[1]);
+      ...workflow.matchAll(
+        new RegExp(`actions/checkout@(${CHECKOUT_ACTION_SHA})\\s+#\\s+(${CHECKOUT_ACTION_VERSION})`, "g"),
+      ),
+    ].map((match) => `${match[1]}#${match[2]}`);
     const setupNodeVersions = [
-      ...workflow.matchAll(/actions\/setup-node@(v\d+(?:\.\d+)*)/g),
-    ].map((match) => match[1]);
+      ...workflow.matchAll(
+        new RegExp(`actions/setup-node@(${SETUP_NODE_ACTION_SHA})\\s+#\\s+(${SETUP_NODE_ACTION_VERSION})`, "g"),
+      ),
+    ].map((match) => `${match[1]}#${match[2]}`);
     const projectNodeVersions = [
       ...workflow.matchAll(/node-version:\s*["']?([^\s"'#]+)["']?/g),
     ].map((match) => match[1]);
@@ -33,14 +44,14 @@ test("GitHub Actions use the Node 24 action runtime and project runtime with rea
     assert.ok(checkoutVersions.length > 0, `${filename}: checkout action missing`);
     assert.deepEqual(
       new Set(checkoutVersions),
-      new Set(["v7"]),
-      `${filename}: checkout must use the Node 24 runtime release`,
+      new Set([`${CHECKOUT_ACTION_SHA}#${CHECKOUT_ACTION_VERSION}`]),
+      `${filename}: checkout must use the reviewed upstream SHA with a readable release comment`,
     );
     assert.ok(setupNodeVersions.length > 0, `${filename}: setup-node action missing`);
     assert.deepEqual(
       new Set(setupNodeVersions),
-      new Set(["v7"]),
-      `${filename}: setup-node must use the Node 24 runtime release`,
+      new Set([`${SETUP_NODE_ACTION_SHA}#${SETUP_NODE_ACTION_VERSION}`]),
+      `${filename}: setup-node must use the reviewed upstream SHA with a readable release comment`,
     );
     assert.equal(
       projectNodeVersions.length,
@@ -135,6 +146,8 @@ test("local prepush shares the change classifier while explicit promotion gates 
     packageJson.scripts["verify:change"],
     "node scripts/verify-change.mjs",
   );
+  assert.equal(packageJson.scripts["check:docs"], "node scripts/check-docs.mjs");
+  assert.match(readRepoFile("scripts/verify-change.mjs"), /runRequired\("check:docs"\)/);
   assert.doesNotMatch(quick, /\bbuild\b|test:e2e:ci/);
   assert.match(
     packageJson.scripts["verify:release"],
@@ -152,6 +165,13 @@ test("local prepush shares the change classifier while explicit promotion gates 
 
   const release = readRepoFile("scripts/release.mjs");
   assert.match(release, /runRequiredScript\("prepush"\)/);
+  assert.match(release, /ensureVersionFilesDoNotHaveUnstagedChanges/);
+  assert.match(release, /stageReleaseVersionFiles/);
+  assert.doesNotMatch(release, /runGit\(\["add", "-A"\]\)/);
+  assert.match(
+    release,
+    /runGit\(\["add", "--", "package\.json", "package-lock\.json"\]\)/,
+  );
   assert.doesNotMatch(release, /runRequiredScript\("build-storybook"\)/);
   assert.doesNotMatch(release, /runRequiredScript\("test-storybook"\)/);
   assert.doesNotMatch(release, /runRequiredScript\("test:visual"\)/);
@@ -180,16 +200,18 @@ test("active workflows use the current Node 24 GitHub action majors", () => {
   for (const workflowName of workflowNames) {
     const workflow = readFileSync(new URL(workflowName, workflowsDirectory), "utf8");
     const actions = workflow.matchAll(
-      /uses:\s*actions\/(checkout|setup-node)@([^\s#]+)/g,
+      /uses:\s*actions\/(checkout|setup-node)@([0-9a-f]{40})\s+#\s+(v\d+(?:\.\d+)*)/g,
     );
 
     for (const action of actions) {
       actionCount += 1;
-      assert.equal(
-        action[2],
-        "v7",
-        `${workflowName} must use actions/${action[1]}@v7`,
-      );
+      if (action[1] === "checkout") {
+        assert.equal(action[2], CHECKOUT_ACTION_SHA, `${workflowName} must pin checkout to the reviewed SHA`);
+        assert.equal(action[3], CHECKOUT_ACTION_VERSION, `${workflowName} must document the checkout release`);
+      } else {
+        assert.equal(action[2], SETUP_NODE_ACTION_SHA, `${workflowName} must pin setup-node to the reviewed SHA`);
+        assert.equal(action[3], SETUP_NODE_ACTION_VERSION, `${workflowName} must document the setup-node release`);
+      }
     }
   }
 
@@ -215,7 +237,9 @@ test("active Supabase workflows pin the Production-validated CLI version", () =>
 
     for (let index = 0; index < lines.length; index += 1) {
       const setupCliUse = lines[index].match(
-        /^(\s*)uses:\s*supabase\/setup-cli@v2\s*$/,
+        new RegExp(
+          `^(\\s*)uses:\\s*supabase/setup-cli@${SUPABASE_SETUP_CLI_ACTION_SHA}\\s+#\\s+${SUPABASE_SETUP_CLI_ACTION_VERSION}\\s*$`,
+        ),
       );
       if (!setupCliUse) {
         continue;
@@ -246,7 +270,7 @@ test("active Supabase workflows pin the Production-validated CLI version", () =>
       assert.equal(
         configuredVersion,
         VERIFIED_SUPABASE_CLI_VERSION,
-        `${workflowName}: supabase/setup-cli must use the Production-validated version`,
+        `${workflowName}: supabase/setup-cli must keep the Production-validated CLI version`,
       );
     }
   }
@@ -255,6 +279,15 @@ test("active Supabase workflows pin the Production-validated CLI version", () =>
     setupCliStepCount > 0,
     "expected at least one active Supabase setup-cli step",
   );
+});
+
+test("Dependabot tracks pinned GitHub Actions workflow refs", () => {
+  const config = readRepoFile(".github/dependabot.yml");
+
+  assert.match(config, /^version:\s*2$/m);
+  assert.match(config, /package-ecosystem:\s*github-actions/);
+  assert.match(config, /directory:\s*["']\/["']/);
+  assert.match(config, /schedule:\s*\n\s+interval:\s*weekly/);
 });
 
 test("Storybook interaction and visual baselines are explicit manual tools", () => {
@@ -389,8 +422,28 @@ test("Preview Supabase migrations apply dev schema changes without syncing data"
   );
   assert.doesNotMatch(workflow, /ref: dev/);
   assert.doesNotMatch(workflow, /workflow_run:/);
+  assert.doesNotMatch(workflow, /gh run rerun/);
+  assert.doesNotMatch(workflow, /"\.github\/workflows\/preview-migrations\.yml"/);
+  assert.match(workflow, /permissions:\s*\n\s+contents: read\s*\n\s+checks: read/);
   assert.match(workflow, /git ls-remote "\$REPOSITORY_URL" refs\/heads\/dev/);
   assert.match(workflow, /echo "is_current=false" >> "\$GITHUB_OUTPUT"/);
+  assert.match(
+    workflow,
+    /name: Wait for the exact Supabase Preview check[\s\S]+?github\.event_name == 'push'[\s\S]+?SUPABASE_GITHUB_APP_ID: "330661"[\s\S]+?for _ in \{1\.\.60\}[\s\S]+?commits\/\$EXPECTED_DEV_SHA\/check-runs\?filter=latest&per_page=100&app_id=\$SUPABASE_GITHUB_APP_ID[\s\S]+?select\(\.name == "Supabase Preview" and \.app\.id == 330661\)[\s\S]+?sleep 5/,
+  );
+  assert.match(
+    workflow,
+    /"present\|\\\(\$checks\[0\]\.status\)\|\\\(\$checks\[0\]\.conclusion \/\/ ""\)"/,
+  );
+  assert.match(
+    workflow,
+    /"\$match_state" == "present" && "\$check_status" == "completed"[\s\S]+?"\$check_conclusion" != "success"/,
+  );
+  assert.ok(
+    workflow.indexOf("name: Wait for the exact Supabase Preview check") <
+      workflow.indexOf("name: List Preview migrations before apply"),
+    "the provider check must settle before inspecting or mutating Preview migrations",
+  );
   assert.match(
     workflow,
     /name: Apply pending Preview migrations[\s\S]+?test "\$\(git rev-parse HEAD\)" = "\$EXPECTED_DEV_SHA"[\s\S]+?git ls-remote origin refs\/heads\/dev[\s\S]+?supabase db push/,
@@ -433,7 +486,7 @@ test("playwright config can use the CI-hosted Chrome channel", () => {
 });
 
 test("public repository exposes a responsible disclosure security policy", () => {
-  const securityPolicy = readRepoFile("SECURITY.md");
+  const securityPolicy = readRepoFile("docs/SECURITY.md");
 
   assert.match(securityPolicy, /SSARTNERSHIP Security Policy/);
   assert.match(securityPolicy, /myknow@ssafy\.com/);
@@ -442,7 +495,7 @@ test("public repository exposes a responsible disclosure security policy", () =>
 });
 
 test("public readiness TODO keeps the launch blocker remediation tracked", () => {
-  const todo = readRepoFile("docs/product/todo.md");
+  const todo = readRepoFile("docs/history/product/todo-2026-08-13.md");
 
   assert.match(todo, /공개 readiness 보완/);
   assert.match(todo, /Issue #55/);

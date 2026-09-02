@@ -16,7 +16,10 @@ const responseModulePromise = import(
 ) as Promise<ResponseModule>;
 
 test("MM route parsers preserve request payload shapes", async () => {
-  const { parseResetPasswordCompleteBody } = await parserModulePromise;
+  const {
+    MemberAuthRouteBodyError,
+    parseResetPasswordCompleteBody,
+  } = await parserModulePromise;
 
   const resetPassword = await parseResetPasswordCompleteBody(
     new Request("http://localhost/api/mm/reset-password/complete", {
@@ -33,6 +36,41 @@ test("MM route parsers preserve request payload shapes", async () => {
     nextPassword: "Password123!",
     nextPasswordConfirm: "Password123!",
   });
+
+  await assert.rejects(
+    parseResetPasswordCompleteBody(
+      new Request("http://localhost/api/mm/reset-password/complete", {
+        method: "POST",
+        body: JSON.stringify({ nextPassword: "x".repeat(5_000) }),
+        headers: { "Content-Type": "application/json" },
+      }),
+    ),
+    (error: unknown) =>
+      error instanceof MemberAuthRouteBodyError &&
+      error.code === "body_too_large",
+  );
+});
+
+test("public suggestion and member auth routes share bounded JSON parsing", async () => {
+  const root = new URL("..", import.meta.url);
+  const read = async (path: string) =>
+    (await import("node:fs/promises")).readFile(new URL(path, root), "utf8");
+  const [suggest, login, changePassword, consent, resetComplete] =
+    await Promise.all([
+      read("src/app/api/suggest/route.ts"),
+      read("src/app/api/mm/login/route.ts"),
+      read("src/app/api/mm/change-password/route.ts"),
+      read("src/app/api/mm/consent/route.ts"),
+      read("src/app/api/mm/_shared/reset-password-complete.ts"),
+    ]);
+
+  assert.match(suggest, /readJsonRequestBodyWithinLimit/);
+  assert.match(suggest, /MAX_SUGGEST_JSON_BODY_BYTES = 16 \* 1024/);
+  for (const source of [login, changePassword, consent]) {
+    assert.match(source, /parseMemberAuthJsonBody/);
+    assert.match(source, /error instanceof MemberAuthRouteBodyError/);
+  }
+  assert.match(resetComplete, /error instanceof MemberAuthRouteBodyError/);
 });
 
 test("MM route helpers expose deterministic throttle context and response mapping", async () => {

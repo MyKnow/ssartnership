@@ -2,19 +2,13 @@ import {
   getPartnerPortalLoginErrorMessage,
   type PartnerPortalLoginErrorCode,
 } from "@/lib/partner-auth";
+export { readFirstSearchParamOrEmpty as readSearchParam } from "@/lib/search-params";
 
 export type PartnerLoginSearchParams = {
   error?: string | string[];
   loginId?: string | string[];
   setup?: string | string[];
 };
-
-export function readSearchParam(value?: string | string[]) {
-  if (Array.isArray(value)) {
-    return value[0] ?? "";
-  }
-  return value ?? "";
-}
 
 export function getLoginErrorMessage(errorCode: string | undefined) {
   switch (errorCode) {

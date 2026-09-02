@@ -8,15 +8,13 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
+import CarouselSlideIndicators from "@/components/ui/CarouselSlideIndicators";
+import { getCachedImageUrl } from "@/lib/image-cache";
 import { trackProductEvent } from "@/lib/product-events";
 import type { PromotionSlide } from "@/lib/promotions/catalog";
 
 function isInlineImageSrc(src: string) {
   return src.startsWith("blob:") || src.startsWith("data:");
-}
-
-function isRemoteImageSrc(src: string) {
-  return /^https?:\/\//.test(src);
 }
 
 export default function PromotionCarousel({
@@ -156,7 +154,7 @@ export default function PromotionCarousel({
                   />
                 ) : (
                   <Image
-                    src={slide.imageSrc}
+                    src={getCachedImageUrl(slide.imageSrc)}
                     alt={slide.imageAlt}
                     fill
                     sizes={
@@ -165,7 +163,6 @@ export default function PromotionCarousel({
                         : "(min-width: 1024px) 50vw, calc(100vw - 64px)"
                     }
                     priority={index === 0}
-                    unoptimized={isRemoteImageSrc(slide.imageSrc)}
                     className="object-cover"
                   />
                 )}
@@ -192,23 +189,11 @@ export default function PromotionCarousel({
               )}
             </button>
 
-            <div className="flex items-center gap-2">
-              {slides.map((slide, index) => (
-                <button
-                  key={slide.id}
-                  type="button"
-                  className={cn(
-                    "h-2.5 rounded-full transition-all",
-                    activeIndex === index
-                      ? "w-7 bg-white"
-                      : "w-2.5 bg-white/45 hover:bg-white/70",
-                  )}
-                  aria-label={indicatorLabels[index]}
-                  aria-pressed={activeIndex === index}
-                  onClick={() => scrollToIndex(index)}
-                />
-              ))}
-            </div>
+            <CarouselSlideIndicators
+              labels={indicatorLabels}
+              activeIndex={activeIndex}
+              onSelect={scrollToIndex}
+            />
 
             <p className="hidden min-w-10 text-center text-xs font-semibold text-white md:block">
               {activeIndex + 1} / {slideCount}

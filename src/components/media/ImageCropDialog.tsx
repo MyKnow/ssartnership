@@ -1,8 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import Cropper, { type Area } from "react-easy-crop";
+import type { Area } from "react-easy-crop";
 import {
   PhotoIcon,
   XMarkIcon,
@@ -12,6 +13,8 @@ import FormMessage from "@/components/ui/FormMessage";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import { type ImageTransformPolicy } from "@/lib/image-upload/policy";
+
+const Cropper = dynamic(() => import("react-easy-crop"), { ssr: false });
 
 function createImage(sourceUrl: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
@@ -120,6 +123,7 @@ export default function ImageCropDialog({
   const effectiveOutputHeight = policy?.height ?? outputHeight;
   const effectiveAspectRatio = policy?.aspectRatio ?? aspectRatio;
   const effectiveQuality = policy ? policy.quality / 100 : quality;
+  const canApply = requiresServerFallback ? Boolean(sourceFile) : croppedAreaPixels !== null;
 
   useEffect(() => {
     if (!open || !portalRoot) {
@@ -218,10 +222,16 @@ export default function ImageCropDialog({
                   image={sourceUrl}
                   crop={crop}
                   zoom={1}
+                  rotation={0}
                   aspect={effectiveAspectRatio}
+                  minZoom={1}
+                  maxZoom={3}
+                  cropShape="rect"
                   restrictPosition
                   showGrid
+                  zoomSpeed={1}
                   zoomWithScroll={false}
+                  keyboardStep={1}
                   onCropChange={setCrop}
                   onCropComplete={(_, croppedPixels) => setCroppedAreaPixels(croppedPixels)}
                   onMediaLoaded={() => {
@@ -235,6 +245,7 @@ export default function ImageCropDialog({
                         "0 0 0 9999em rgba(2,6,23,0.58), 0 0 0 1px rgba(15,23,42,0.75)",
                     },
                   }}
+                  classes={{}}
                   mediaProps={{
                     onError: () => {
                       setCroppedAreaPixels(null);
@@ -246,6 +257,7 @@ export default function ImageCropDialog({
                       setError("이미지를 불러올 수 없습니다. 팝업을 닫고 다른 파일을 선택해 주세요.");
                     },
                   }}
+                  cropperProps={{}}
                 />
               )}
             </div>
@@ -263,7 +275,7 @@ export default function ImageCropDialog({
               onClick={exportFile}
               loading={isExporting}
               loadingText={requiresServerFallback ? "서버 변환 준비 중" : "적용 중"}
-              disabled={requiresServerFallback && !sourceFile}
+              disabled={!canApply || isExporting}
               className={cn("min-w-0 sm:w-auto", isExporting ? "pointer-events-none" : null)}
             >
               {requiresServerFallback ? "서버 변환으로 계속" : "적용"}

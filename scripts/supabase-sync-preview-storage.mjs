@@ -13,8 +13,56 @@ const RETRYABLE_ERROR_PATTERNS = [
 ];
 const PREVIEW_REQUIRED_STORAGE_BUCKETS = new Set(["member-profile-images"]);
 
+function readBucketIdentifier(bucket, field) {
+  if (!bucket || typeof bucket !== "object") {
+    return null;
+  }
+
+  const value = bucket[field];
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+export function getPreviewStorageBucketName(bucket) {
+  const id = readBucketIdentifier(bucket, "id");
+  const name = readBucketIdentifier(bucket, "name");
+
+  if (id && name && id !== name) {
+    return null;
+  }
+
+  return id ?? name;
+}
+
 export function isPreviewRequiredStorageBucket(bucketName) {
   return PREVIEW_REQUIRED_STORAGE_BUCKETS.has(bucketName);
+}
+
+export function shouldSyncPreviewStorageBucket(bucket) {
+  const bucketName = getPreviewStorageBucketName(bucket);
+  if (!bucketName || typeof bucket.public !== "boolean") {
+    return false;
+  }
+
+  if (isPreviewRequiredStorageBucket(bucketName)) {
+    return bucket.public === false;
+  }
+
+  return bucket.public === true;
+}
+
+export function isInvalidPreviewRequiredStorageBucket(bucket) {
+  const identifiers = [
+    readBucketIdentifier(bucket, "id"),
+    readBucketIdentifier(bucket, "name"),
+  ];
+
+  return (
+    identifiers.some((identifier) =>
+      isPreviewRequiredStorageBucket(identifier),
+    ) && !shouldSyncPreviewStorageBucket(bucket)
+  );
 }
 
 export function shouldAbortPreviewStorageObjectSync(bucketName) {
@@ -101,6 +149,7 @@ export function toStorageError(error) {
 export function createSafeStorageOperationError(context, error) {
   const { status, code } = extractStorageErrorDetails(error);
   const storageError = new Error(`${context}: ${formatStorageError(error)}`);
+  storageError.stack = `${storageError.name}: ${storageError.message}`;
 
   if (typeof status === "number") {
     storageError.status = status;

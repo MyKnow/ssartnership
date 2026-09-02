@@ -122,10 +122,6 @@ export async function getMemberAuthBlockingState(
   context: MemberAuthAttemptContext,
 ) {
   const keys = getMemberAuthAttemptKeys(route, context);
-  if (keys.length === 0) {
-    return null;
-  }
-
   return getBlockingState(keys, MEMBER_AUTH_RATE_LIMIT);
 }
 
@@ -135,11 +131,7 @@ export async function recordMemberAuthAttempt(
   success: boolean,
 ) {
   const keys = getMemberAuthAttemptKeys(route, context);
-  if (keys.length === 0) {
-    return;
-  }
-
-  await recordAttemptBatch(keys, success, MEMBER_AUTH_RATE_LIMIT);
+  return recordAttemptBatch(keys, success, MEMBER_AUTH_RATE_LIMIT);
 }
 
 export async function delayMemberAuthAttempt(

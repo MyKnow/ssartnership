@@ -1,4 +1,8 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import {
+  getAdminSearchLikePattern,
+  normalizeAdminSearchQuery,
+} from "@/lib/admin-search-query";
 import { fetchAdminReviewCounts } from "@/lib/partner-counts";
 import {
   createEmptyPartnerReviewReactionState,
@@ -235,7 +239,7 @@ export function parseAdminReviewFilters(input: Record<string, string | string[] 
     partnerId: parseQueryParam(input.partnerId),
     rating: normalizeAdminReviewRatingFilter(parseQueryParam(input.rating)),
     imagesOnly: parseBooleanParam(input.imagesOnly),
-    memberQuery: parseQueryParam(input.memberQuery),
+    memberQuery: normalizeAdminSearchQuery(parseQueryParam(input.memberQuery)),
   };
 }
 
@@ -361,18 +365,14 @@ function toAdminReviewSummary(review: AdminReviewRecord): AdminReviewSummary {
   return summary;
 }
 
-function escapeLikePattern(value: string) {
-  return value.replace(/[\\%_]/g, "\\$&");
-}
-
 async function findAdminReviewMemberIds(value: string) {
-  const normalizedValue = value.trim();
+  const normalizedValue = normalizeAdminSearchQuery(value);
   if (!normalizedValue) {
     return [];
   }
 
   const supabase = getSupabaseAdminClient();
-  const pattern = `%${escapeLikePattern(normalizedValue)}%`;
+  const pattern = getAdminSearchLikePattern(normalizedValue);
   const [nameResult, directoryResult] = await Promise.all([
     supabase
       .from("members")

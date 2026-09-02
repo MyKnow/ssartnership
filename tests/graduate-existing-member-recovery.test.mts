@@ -18,7 +18,7 @@ test("기존 회원 복구는 신규 수료생 가입과 별도 request kind로 
 });
 
 test("복구 승인에는 운영자가 선택한 기존 회원만 연결되고 새 members 행을 만들지 않는다", () => {
-  const migration = read("supabase/migrations/20260717020528_add_member_email_recovery_and_existing_member_recovery.sql");
+  const migration = read("supabase/migrations/20260902150504_fix_graduate_approval_member_schema.sql");
   const service = read("src/lib/graduate-verification-service.ts");
   const queue = read("src/components/admin/AdminGraduateVerificationQueue.tsx");
   const actions = read("src/app/admin/(protected)/graduate-verifications/actions.ts");
@@ -31,4 +31,12 @@ test("복구 승인에는 운영자가 선택한 기존 회원만 연결되고 �
   assert.match(service, /기존 회원을 명시적으로 선택해 주세요/);
   assert.match(queue, /name="existingMemberId"/);
   assert.match(actions, /getOptionalId\(formData, "existingMemberId", returnTo\)/);
+});
+
+test("수료생 인증 관리자 액션은 엔터티 ID를 공용 UUID 계약으로 검증한다", () => {
+  const actions = read("src/app/admin/(protected)/graduate-verifications/actions.ts");
+
+  assert.match(actions, /import \{ isUuid \} from "@\/lib\/uuid";/);
+  assert.equal(actions.match(/!isUuid\(value\)/g)?.length, 2);
+  assert.equal(actions.includes("/^[0-9a-f-]{36}$/i"), false);
 });

@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getImageProps } from "next/image";
 import {
   getCachedImageUrl,
-  warmCachedImageUrls,
+  warmCachedImageUrl,
 } from "@/lib/image-cache";
 import {
   clampCarouselZoom,
@@ -83,8 +84,22 @@ export function useCarouselController({
       return;
     }
 
-    warmCachedImageUrls(cachedImages.slice(1));
-  }, [cachedImages, hasImages]);
+    const nextImage = cachedImages[activeIndex + 1];
+    if (!nextImage) {
+      return;
+    }
+    const { props } = getImageProps({
+      src: nextImage,
+      alt: "",
+      width: 1600,
+      height: 1200,
+      sizes: "(max-width: 767px) 100vw, 65vw",
+    });
+    warmCachedImageUrl(props.src, {
+      srcSet: props.srcSet,
+      sizes: props.sizes,
+    });
+  }, [activeIndex, cachedImages, hasImages]);
 
   useEffect(() => {
     const thumb = activeThumbRef.current;

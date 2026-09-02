@@ -6,6 +6,7 @@ import { getPartnerGlobalPortalHref } from "@/lib/partner-portal-paths";
 import { getPartnerPortalCompanySummaries } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { BUG_REPORT_EMAIL, SITE_NAME } from "@/lib/site";
+import { readFirstSearchParam } from "@/lib/search-params";
 
 export const metadata: Metadata = {
   title: `기술 지원 | ${SITE_NAME}`,
@@ -13,10 +14,6 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = "force-dynamic";
-
-function readSearchParam(value?: string | string[]) {
-  return Array.isArray(value) ? value[0] : value;
-}
 
 export default async function PartnerSupportPage({
   searchParams,
@@ -35,7 +32,7 @@ export default async function PartnerSupportPage({
     getPartnerPortalCompanySummaries(session.companyIds),
     getPartnerPortalDashboard(session.companyIds),
   ]);
-  const requestedCompanyId = readSearchParam(
+  const requestedCompanyId = readFirstSearchParam(
     (await searchParams)?.companyId,
   )?.trim();
   const contextCompany =

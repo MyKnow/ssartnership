@@ -1,4 +1,5 @@
 import { getSupabaseAdminClient } from "../supabase/server.ts";
+import { collectRowsByFilterChunks } from "../supabase/paging.ts";
 
 export type MmUserDirectoryIdentity = {
   id: string;
@@ -21,18 +22,28 @@ export async function getMmUserDirectoryEntriesByAccountIds(
     return new Map<string, MmUserDirectoryIdentity>();
   }
 
-  const { data, error } = await getSupabaseAdminClient()
-    .from("mm_user_directory")
-    .select(
-      "id,mm_user_id,mm_username,display_name,campus,is_staff,source_years,is_active",
-    )
-    .in("id", uniqueAccountIds);
-  if (error) {
-    throw new Error("MM 유저 디렉터리를 불러오지 못했습니다.");
-  }
+  const supabase = getSupabaseAdminClient();
+  const result = await collectRowsByFilterChunks<
+    string,
+    MmUserDirectoryIdentity
+  >(uniqueAccountIds, async (accountIdChunk) => {
+    const { data, error } = await supabase
+      .from("mm_user_directory")
+      .select(
+        "id,mm_user_id,mm_username,display_name,campus,is_staff,source_years,is_active",
+      )
+      .in("id", [...accountIdChunk]);
+    if (error) {
+      throw new Error("MM 유저 디렉터리를 불러오지 못했습니다.");
+    }
+    return {
+      rows: (data ?? []) as MmUserDirectoryIdentity[],
+      error: false,
+    };
+  });
 
   return new Map(
-    ((data ?? []) as MmUserDirectoryIdentity[]).map((entry) => [
+    result.rows.map((entry) => [
       entry.id,
       entry,
     ]),

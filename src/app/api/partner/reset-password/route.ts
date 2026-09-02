@@ -14,14 +14,10 @@ import {
 import {
   requestPartnerPortalPasswordReset,
 } from "@/lib/partner-auth";
+import { PartnerPortalRouteBodyError, readPartnerPortalJsonBody } from "@/lib/partner-auth/route-body";
 import { normalizePartnerLoginId } from "@/lib/partner-utils";
 import { isValidEmail } from "@/lib/validation";
 import { isPartnerPortalMock } from "@/lib/partner-portal";
-import { sendPartnerPortalTemporaryPasswordEmail } from "@/lib/partner-email";
-import {
-  commitSupabasePartnerPortalPasswordReset,
-  prepareSupabasePartnerPortalPasswordReset,
-} from "@/lib/partner-auth/supabase";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
@@ -45,7 +41,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const payload = (await request.json()) as { email?: string };
+    const payload = await readPartnerPortalJsonBody<{ email?: string }>(request);
     const rawEmail = String(payload.email ?? "").trim();
     normalizedEmail = normalizePartnerLoginId(rawEmail);
     const throttleContext = {
@@ -57,7 +53,25 @@ export async function POST(request: Request) {
       "reset-password",
       throttleContext,
     );
-    if (blockedState) {
+    if (!blockedState.ok) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "partner_password_reset",
+        status: "failure",
+        actorType: "guest",
+        identifier: normalizedEmail || null,
+        properties: { reason: blockedState.code },
+      });
+      await delayPartnerAuthAttempt("reset-password", true);
+      return NextResponse.json(
+        {
+          error: "send_failed",
+          message: "임시 비밀번호 전송에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+        },
+        { status: 503 },
+      );
+    }
+    if (blockedState.blocked) {
       await logAuthSecurity({
         ...context,
         eventName: "partner_password_reset",
@@ -101,19 +115,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_email" }, { status: 400 });
     }
 
-    const result = isPartnerPortalMock
-      ? await requestPartnerPortalPasswordReset(normalizedEmail)
-      : await (async () => {
-          const preparedReset =
-            await prepareSupabasePartnerPortalPasswordReset(normalizedEmail);
-          await sendPartnerPortalTemporaryPasswordEmail({
-            to: preparedReset.emailSentTo,
-            displayName: preparedReset.account.displayName,
-            loginId: preparedReset.account.loginId,
-            temporaryPassword: preparedReset.temporaryPassword,
-          });
-          return commitSupabasePartnerPortalPasswordReset(preparedReset);
-        })();
+    const result = await requestPartnerPortalPasswordReset(normalizedEmail);
 
     await recordPartnerAuthAttempt("reset-password", throttleContext, true);
     await logAuthSecurity({
@@ -135,6 +137,29 @@ export async function POST(request: Request) {
         : {}),
     });
   } catch (error) {
+    if (error instanceof PartnerPortalRouteBodyError) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "partner_password_reset",
+        status: "failure",
+        actorType: "guest",
+        properties: { reason: "invalid_body" },
+      });
+      await recordPartnerAuthAttempt(
+        "reset-password",
+        {
+          ipAddress: context.ipAddress ?? null,
+          accountIdentifier: normalizedEmail || null,
+        },
+        false,
+      ).catch(() => undefined);
+      await delayPartnerAuthAttempt("reset-password");
+      return NextResponse.json(
+        { error: "invalid_body", message: error.message },
+        { status: 400 },
+      );
+    }
+
     if (error instanceof PartnerPortalPasswordResetError) {
       const isAccountStateError =
         error.code === "not_found" ||

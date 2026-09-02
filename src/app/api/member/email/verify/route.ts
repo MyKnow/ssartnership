@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
+import { getRequestLogContext } from "@/lib/activity-logs";
 import {
   hashMemberEmailIdentifier,
   hashMemberEmailVerificationCode,
@@ -16,8 +16,14 @@ import {
   isMemberEmailVerificationCodeFailure,
 } from "@/lib/member-email-verification-service";
 import { normalizeMemberEmail } from "@/lib/member-domain";
+import { logMemberEmailSecurity } from "@/lib/member-email-security-log";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSignedUserSession } from "@/lib/user-auth";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 
 export const runtime = "nodejs";
 
@@ -42,10 +48,27 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = (await request.json().catch(() => null)) as {
+  let body: {
     email?: unknown;
     code?: unknown;
-  } | null;
+  } | null = null;
+  try {
+    body = await readRouteJsonBodyWithinLimit<{
+      email?: unknown;
+      code?: unknown;
+    }>(request, {
+      maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+      invalidMessage: "이메일과 6자리 인증 코드를 확인해 주세요.",
+      tooLargeMessage: "요청 본문이 너무 큽니다.",
+    });
+  } catch (error) {
+    if (error instanceof RouteJsonBodyError && error.code === "body_too_large") {
+      return NextResponse.json(
+        { ok: false, message: "요청 본문이 너무 큽니다." },
+        { status: 413 },
+      );
+    }
+  }
   const email = normalizeMemberEmail(body?.email);
   const code = typeof body?.code === "string" ? body.code.trim() : "";
   if (!email || !/^\d{6}$/.test(code)) {
@@ -59,14 +82,32 @@ export async function POST(request: Request) {
     ipAddress: context.ipAddress ?? null,
     accountIdentifier: hashMemberEmailIdentifier(email),
   };
-  if (await getMemberEmailVerificationBlockingState("verify", rateLimitContext)) {
-    await logAuthSecurity({
-      ...context,
-      eventName: "member_email_verification",
-      status: "blocked",
-      actorType: "member",
+  const blockingState = await getMemberEmailVerificationBlockingState("verify", rateLimitContext);
+  if (!blockingState.ok) {
+    await logMemberEmailSecurity({
+      context,
+      flow: "verification",
+      stage: "verify",
+      status: "failure",
       actorId: session.userId,
-      properties: { stage: "verify", reason: "rate_limit" },
+      reason: blockingState.code,
+    });
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "인증 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
+  }
+  if (blockingState.blocked) {
+    await logMemberEmailSecurity({
+      context,
+      flow: "verification",
+      stage: "verify",
+      status: "blocked",
+      actorId: session.userId,
+      reason: "rate_limit",
     });
     return NextResponse.json(
       { ok: false, message: "인증 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요." },
@@ -99,13 +140,13 @@ export async function POST(request: Request) {
           false,
         );
       }
-      await logAuthSecurity({
-        ...context,
-        eventName: "member_email_verification",
+      await logMemberEmailSecurity({
+        context,
+        flow: "verification",
+        stage: "verify",
         status: "failure",
-        actorType: "member",
         actorId: session.userId,
-        properties: { stage: "verify", reason: completion.reason },
+        reason: completion.reason,
       });
       const failure = getMemberEmailVerificationHttpFailure(completion.reason);
       return NextResponse.json(
@@ -114,13 +155,13 @@ export async function POST(request: Request) {
       );
     }
   } catch {
-    await logAuthSecurity({
-      ...context,
-      eventName: "member_email_verification",
+    await logMemberEmailSecurity({
+      context,
+      flow: "verification",
+      stage: "verify",
       status: "failure",
-      actorType: "member",
       actorId: session.userId,
-      properties: { stage: "verify", reason: "state_update_failed" },
+      reason: "state_update_failed",
     });
     return NextResponse.json(
       {
@@ -132,13 +173,12 @@ export async function POST(request: Request) {
   }
 
   await recordMemberEmailVerificationAttempt("verify", rateLimitContext, true);
-  await logAuthSecurity({
-    ...context,
-    eventName: "member_email_verification",
+  await logMemberEmailSecurity({
+    context,
+    flow: "verification",
+    stage: "verify",
     status: "success",
-    actorType: "member",
     actorId: session.userId,
-    properties: { stage: "verify" },
   });
   revalidatePath("/certification");
   revalidatePath("/certification/email");

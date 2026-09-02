@@ -145,3 +145,51 @@ test("raw partner events can be rebuilt into rollup rows", async () => {
   assert.equal(totalUv?.metric_count, 1);
   assert.equal(totalCardClick?.metric_count, 1);
 });
+
+test("raw metric fallback is bounded and refuses a truncated total", async () => {
+  const {
+    fetchPartnerMetricEventLogRows,
+    PARTNER_METRIC_EVENT_FALLBACK_LIMIT,
+  } = await partnerMetricRollupsModulePromise;
+  let requestedLimit = 0;
+  const event = {
+    target_id: "partner-a",
+    event_name: "partner_detail_view",
+    actor_type: "guest",
+    actor_id: null,
+    session_id: "session-a",
+    created_at: "2026-04-19T03:20:00.000Z",
+  };
+  const query = {
+    select() {
+      return this;
+    },
+    eq() {
+      return this;
+    },
+    in() {
+      return this;
+    },
+    limit(limit: number) {
+      requestedLimit = limit;
+      return Promise.resolve({
+        data: Array.from(
+          { length: PARTNER_METRIC_EVENT_FALLBACK_LIMIT + 1 },
+          () => event,
+        ),
+        error: null,
+      });
+    },
+  };
+
+  const result = await fetchPartnerMetricEventLogRows(
+    { from: () => query } as never,
+    ["partner-a"],
+  );
+
+  assert.equal(requestedLimit, PARTNER_METRIC_EVENT_FALLBACK_LIMIT + 1);
+  assert.deepEqual(result, {
+    rows: [],
+    errorMessage: "partner_metric_event_fallback_limit_exceeded",
+  });
+});

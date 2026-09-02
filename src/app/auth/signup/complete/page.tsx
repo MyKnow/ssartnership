@@ -8,7 +8,7 @@ import { getHeaderSession } from "@/lib/header-session";
 import {
   getActiveRequiredPolicies,
   getPolicyDocumentByKind,
-} from "@/lib/policy-documents";
+} from "@/lib/policy-documents.server";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import { SITE_NAME } from "@/lib/site";
 import { getMattermostCodeSession } from "@/lib/mattermost-code-session";

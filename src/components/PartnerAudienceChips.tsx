@@ -14,7 +14,7 @@ export default function PartnerAudienceChips({
   className,
   itemClassName,
   badgeClassName = "bg-surface-muted text-foreground dark:bg-slate-800 dark:text-slate-100",
-  inactiveBadgeClassName = "border-dashed border-border bg-transparent text-foreground",
+  inactiveBadgeClassName = "border-border/45 bg-surface-muted/35 text-muted-foreground shadow-none",
   showAllOptions = false,
 }: {
   appliesTo: Array<string | null | undefined>;
@@ -50,6 +50,7 @@ export default function PartnerAudienceChips({
         <span
           key={item.key}
           role="listitem"
+          data-audience-active={item.active ? "true" : "false"}
           className={itemClassName}
           aria-label={
             showAllOptions
@@ -65,7 +66,7 @@ export default function PartnerAudienceChips({
                 data-audience-status-dot
                 className={cn(
                   "mr-1.5 size-1.5 rounded-full",
-                  item.active ? "bg-current" : "bg-muted-foreground",
+                  item.active ? "bg-current" : "bg-muted-foreground/40",
                 )}
                 aria-hidden="true"
               />

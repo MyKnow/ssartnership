@@ -6,6 +6,10 @@ import { StarIcon as StarOutlineIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
+import {
+  ClientSafeRequestError,
+  getClientSafeRequestError,
+} from "@/lib/client-safe-request-error";
 import { cn } from "@/lib/cn";
 
 export default function PartnerFavoriteButton({
@@ -75,7 +79,10 @@ export default function PartnerFavoriteButton({
         | null;
 
       if (!response.ok) {
-        throw new Error(payload?.message ?? "즐겨찾기를 처리하지 못했습니다.");
+        throw new ClientSafeRequestError(
+          "request_failed",
+          payload?.message ?? "즐겨찾기를 처리하지 못했습니다.",
+        );
       }
 
       setIsFavorited(Boolean(payload?.favorite ?? nextFavorited));
@@ -88,7 +95,13 @@ export default function PartnerFavoriteButton({
       setIsFavorited(!nextFavorited);
       setCount((current) => Math.max(0, current + (nextFavorited ? -1 : 1)));
       onToggle?.(!nextFavorited);
-      notify(error instanceof Error ? error.message : "즐겨찾기를 처리하지 못했습니다.");
+      notify(
+        getClientSafeRequestError(error, {
+          requestFailed: "즐겨찾기를 처리하지 못했습니다.",
+          networkUnavailable:
+            "즐겨찾기를 처리하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
+        }).message,
+      );
     } finally {
       setIsPending(false);
     }

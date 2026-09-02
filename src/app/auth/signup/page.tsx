@@ -31,7 +31,10 @@ export default async function SignupPage({
 
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader initialSession={headerSession} />
+      <SiteHeader
+        initialSession={headerSession}
+        guestAuthReturnTo={rawReturnTo === undefined ? undefined : returnTo}
+      />
       <SignupPageView
         returnTo={returnTo}
         activeSenderGenerations={senderAvailability.activeSenderGenerations}

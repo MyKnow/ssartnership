@@ -98,6 +98,7 @@ async function getAdminNotificationInboxReadModelUncached({
         .eq("admin_id", adminId)
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
         .range(offset, offset + limit),
     ]);
 

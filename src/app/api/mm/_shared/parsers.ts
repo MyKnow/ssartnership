@@ -1,9 +1,35 @@
 import type { ResetPasswordCompleteBody } from "./types";
+import {
+  JsonRequestBodyError,
+  readJsonRequestBodyWithinLimit,
+} from "@/lib/request-body-limit";
 
-async function parseJsonBody<T>(request: Request) {
-  return (await request.json()) as T;
+export const MAX_MEMBER_AUTH_JSON_BODY_BYTES = 4 * 1024;
+
+export class MemberAuthRouteBodyError extends Error {
+  readonly code: JsonRequestBodyError["code"];
+
+  constructor(error: JsonRequestBodyError) {
+    super(error.message);
+    this.name = "MemberAuthRouteBodyError";
+    this.code = error.code;
+  }
+}
+
+export async function parseMemberAuthJsonBody<T>(request: Request) {
+  try {
+    return await readJsonRequestBodyWithinLimit<T>(
+      request,
+      MAX_MEMBER_AUTH_JSON_BODY_BYTES,
+    );
+  } catch (error) {
+    if (error instanceof JsonRequestBodyError) {
+      throw new MemberAuthRouteBodyError(error);
+    }
+    throw error;
+  }
 }
 
 export async function parseResetPasswordCompleteBody(request: Request) {
-  return parseJsonBody<ResetPasswordCompleteBody>(request);
+  return parseMemberAuthJsonBody<ResetPasswordCompleteBody>(request);
 }

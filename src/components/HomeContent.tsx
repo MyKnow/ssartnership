@@ -1,22 +1,30 @@
 import HomeView from "@/components/HomeView";
 import HomeDirectoryError from "@/components/home-view/HomeDirectoryError";
-import { loadHomePartnerDirectoryState } from "@/lib/home-partner-directory";
+import {
+  loadHomePartnerDirectoryState,
+  type HomePartnerDirectoryLoadState,
+} from "@/lib/home-partner-directory";
 import type { PartnerAudienceKey } from "@/lib/partner-audience";
 
 export default async function HomeContent({
   viewerAuthenticated,
   currentUserId,
   viewerAudience,
+  directoryPromise,
 }: {
   viewerAuthenticated: boolean;
   currentUserId: string | null;
   viewerAudience?: PartnerAudienceKey | null;
+  directoryPromise?: Promise<HomePartnerDirectoryLoadState>;
 }) {
-  const directoryState = await loadHomePartnerDirectoryState({
-    viewerAuthenticated,
-    currentUserId,
-    viewerAudience,
-  });
+  const directoryState = await (
+    directoryPromise ??
+    loadHomePartnerDirectoryState({
+      viewerAuthenticated,
+      currentUserId,
+      viewerAudience,
+    })
+  );
 
   if (directoryState.status === "unavailable") {
     return (
@@ -37,7 +45,7 @@ export default async function HomeContent({
         currentUserId={currentUserId}
         partnerPopularityById={directory.partnerState.partnerPopularityById}
         partnerFavoriteStateById={directory.partnerState.partnerFavoriteStateById}
-        loadedPartnerStateIds={directory.partnerState.loadedPartnerIds}
+        loadedFavoritePartnerIds={directory.partnerState.loadedFavoritePartnerIds}
       />
     </div>
   );

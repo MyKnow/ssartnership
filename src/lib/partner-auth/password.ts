@@ -3,7 +3,12 @@ import { PartnerPortalPasswordChangeError } from "../partner-password-errors.ts"
 import { hashPassword, isValidPassword, verifyPassword } from "../password.ts";
 import { toPartnerPortalAccountSummary } from "./mappers.ts";
 import { getSupabasePartnerPortalCompanyIds } from "./company.ts";
-import { getSupabasePartnerPortalAccountById } from "./accounts.ts";
+import type { PartnerPortalAccountRow } from "./types.ts";
+import {
+  getSupabasePartnerPortalAccountById,
+  isMissingPartnerAuthSessionVersionColumnError,
+  omitPartnerAuthSessionVersion,
+} from "./accounts.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 
 export async function changeSupabasePartnerPortalPassword(input: {
@@ -49,27 +54,60 @@ export async function changeSupabasePartnerPortalPassword(input: {
 
   const nextPasswordRecord = hashPassword(input.nextPassword);
   const now = new Date().toISOString();
-  const { error: updateError } = await getSupabaseAdminClient()
-    .from("partner_accounts")
-    .update({
-      password_hash: nextPasswordRecord.hash,
-      password_salt: nextPasswordRecord.salt,
-      must_change_password: false,
-      updated_at: now,
-    })
-    .eq("id", account.id);
+  const payloadWithVersion = {
+    password_hash: nextPasswordRecord.hash,
+    password_salt: nextPasswordRecord.salt,
+    auth_session_version: Math.max(1, Number(account.auth_session_version ?? 1)) + 1,
+    must_change_password: false,
+    updated_at: now,
+  };
+  const selectWithoutVersion =
+    "id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at,updated_at";
+  const selectWithVersion = `${selectWithoutVersion},auth_session_version`;
+  const attemptUpdate = async (payload: Record<string, unknown>, select: string) => {
+    const updateQuery = getSupabaseAdminClient()
+      .from("partner_accounts")
+      .update(payload)
+      .eq("id", account.id);
 
-  if (updateError) {
-    throw updateError;
+    const response = await (account.updated_at
+      ? updateQuery.eq("updated_at", account.updated_at)
+      : updateQuery.is("updated_at", null))
+      .select(select)
+      .maybeSingle();
+
+    return response as {
+      data: PartnerPortalAccountRow | null;
+      error: { message: string } | null;
+    };
+  };
+
+  let { data: updatedAccount, error: updateError } = await attemptUpdate(
+    payloadWithVersion,
+    selectWithVersion,
+  );
+
+  if (
+    updateError &&
+    isMissingPartnerAuthSessionVersionColumnError(updateError.message)
+  ) {
+    ({ data: updatedAccount, error: updateError } = await attemptUpdate(
+      omitPartnerAuthSessionVersion(payloadWithVersion),
+      selectWithoutVersion,
+    ));
+  }
+
+  if (updateError || !updatedAccount?.id) {
+    throw new PartnerPortalPasswordChangeError(
+      "unauthorized",
+      "로그인 후 다시 시도해 주세요.",
+    );
   }
 
   const companyIds = await getSupabasePartnerPortalCompanyIds(account.id);
 
   return {
-    account: toPartnerPortalAccountSummary({
-      ...account,
-      must_change_password: false,
-    }),
+    account: toPartnerPortalAccountSummary(updatedAccount),
     companyIds,
   };
 }

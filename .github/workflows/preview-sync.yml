@@ -47,7 +47,7 @@ jobs:
           echo "sha=$EXPECTED_DEV_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Checkout selected dev revision
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.select-dev.outputs.sha }}
           persist-credentials: false
@@ -61,7 +61,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_DEV_SHA"
 
       - name: Setup Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         env:
           NPM_CONFIG_CACHE: ${{ github.workspace }}/.tmp/npm-cache
         with:
@@ -80,7 +80,7 @@ jobs:
         run: npm run validate:migrations
 
       - name: Set up Supabase CLI
-        uses: supabase/setup-cli@v2
+        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1
         with:
           version: 2.114.0
           github-token: ${{ github.token }}

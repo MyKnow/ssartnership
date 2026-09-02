@@ -5,6 +5,7 @@ export type PartnerPortalAccountRow = {
   email?: string | null;
   password_hash?: string | null;
   password_salt?: string | null;
+  auth_session_version?: number | null;
   must_change_password?: boolean | null;
   is_active?: boolean | null;
   email_verified_at?: string | null;

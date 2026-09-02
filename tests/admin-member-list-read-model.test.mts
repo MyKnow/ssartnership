@@ -23,11 +23,15 @@ test("관리자 회원 목록은 페이지에서 DB 조회를 분리하고 서�
 
   assert.match(pageSource, /getAdminMemberListReadModel/);
   assert.doesNotMatch(pageSource, /getSupabaseAdminClient/);
-  assert.match(readModelSource, /\{ count: "exact" \},/);
-  assert.match(readModelSource, /memberQuery = memberQuery\.range\(/);
-  assert.match(readModelSource, /from \+ pageSize - 1/);
+  assert.match(readModelSource, /rpc\("get_admin_member_list_page"/);
+  assert.match(readModelSource, /input_offset: from/);
+  assert.match(readModelSource, /input_page_size: pageSize/);
+  assert.match(readModelSource, /input_trend_limit: ADMIN_MEMBER_TREND_SAMPLE_LIMIT/);
+  assert.match(readModelSource, /\.in\("id", memberIds\)/);
+  assert.match(readModelSource, /orderAdminMemberRowsByPage/);
+  assert.doesNotMatch(readModelSource, /memberQuery\.range\(/);
   assert.match(readModelSource, /shouldRedirectToLastPage: page > totalPages/);
-  assert.match(readModelSource, /escapeLikePattern\(searchValue\)/);
+  assert.match(readModelSource, /getAdminSearchLikePattern\(filters\.searchValue\)/);
   assert.match(readModelSource, /is\("deleted_at", null\)/);
   assert.match(pageSource, /redirect\(`\/admin\/members\?/);
 });
@@ -76,8 +80,9 @@ test("회원 목록은 추이 query를 핵심 목록과 분리해 먼저 렌더�
 
   assert.match(pageSource, /<Suspense/);
   assert.match(pageSource, /<AdminMemberTrendSection/);
-  assert.match(readModelSource, /memberTrendQuery\s*\.then/);
-  assert.doesNotMatch(readModelSource, /\[memberResult, memberTrendResult\]/);
+  assert.match(readModelSource, /indexRow\.trend_created_ats/);
+  assert.match(readModelSource, /Promise\.resolve<AdminMemberTrendReadModel>/);
+  assert.match(readModelSource, /isSampled: totalCount > trendCreatedAts\.length/);
   assert.match(trendSectionSource, /await trend/);
 });
 
@@ -120,22 +125,45 @@ test("회원 목록 read-model은 오류를 안전한 상태로 돌려준다", a
   assert.match(source, /unstable_cache/);
   assert.match(source, /ADMIN_MEMBER_OPTIONS_CACHE_REVALIDATE_SECONDS = 60/);
   assert.match(source, /getCachedAdminMemberOptions\(\)/);
+  assert.match(source, /rpc\(\s*"get_admin_member_filter_options"/);
   assert.match(source, /ADMIN_MEMBER_POLICY_CACHE_REVALIDATE_SECONDS = 3/);
   assert.match(source, /getCachedAdminMemberPolicyContext\(\)/);
   assert.match(source, /select\("id,kind,version"\)/);
   assert.doesNotMatch(source, /select\(POLICY_SELECT\)/);
+  assert.doesNotMatch(source, /select\("generation,campus"\)/);
+  assert.doesNotMatch(source, /limit\(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT\)/);
   assert.doesNotMatch(source, /getMemberProfilePhotoStates\(memberIds\)/);
-  assert.match(source, /mm_user_directory!inner\(id\)/);
-  assert.match(source, /ilike\("mm_user_directory\.mm_username"/);
-  assert.match(source, /ilike\("mm_user_directory\.mm_user_id"/);
-  assert.match(source, /email_normalized\.ilike\.\$\{pattern\}/);
-  assert.match(source, /ilike\("email_normalized", pattern\)/);
-  assert.match(source, /canUseMemberSearchOrFilter/);
-  assert.match(source, /referencedTable: "mm_user_directory"/);
-  assert.match(source, /searchResults\.some\(\(result\) => Boolean\(result\.error\)\)/);
+  assert.match(source, /input_search_pattern:/);
+  assert.match(source, /getAdminSearchLikePattern\(filters\.searchValue\)/);
+  assert.match(source, /input_service_policy_id:/);
+  assert.match(source, /input_marketing_enabled:/);
+  assert.doesNotMatch(source, /getMemberSearchIds/);
+  assert.doesNotMatch(source, /getPreferenceFilteredMemberIds/);
+  assert.doesNotMatch(source, /getPolicyConsentFilteredMemberIds/);
   assert.doesNotMatch(source, /getSsafyCycleSettings/);
   assert.doesNotMatch(source, /cycleSettings/);
   assert.doesNotMatch(source, /Error\.message/);
+});
+
+test("회원 필터 옵션은 전체 활성 회원 기준 distinct RPC를 사용한다", async () => {
+  const [source, migrationSource] = await Promise.all([
+    readFile(memberReadModelPath, "utf8"),
+    readFile(
+      new URL(
+        "../supabase/migrations/20260831120053_add_admin_member_filter_options.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(source, /optionsResult\.data\?\.campuses/);
+  assert.match(source, /optionsResult\.data\?\.generations/);
+  assert.match(migrationSource, /create or replace function public\.get_admin_member_filter_options\(\)/);
+  assert.match(migrationSource, /select distinct members\.generation/);
+  assert.match(migrationSource, /select distinct btrim\(members\.campus\)/);
+  assert.match(migrationSource, /where members\.deleted_at is null/);
+  assert.match(migrationSource, /grant execute on function public\.get_admin_member_filter_options\(\) to service_role;/);
 });
 
 test("기수 전체 MM 중단은 실제 변경 대상 수를 별도로 계산해 UI에 전달한다", async () => {
@@ -168,14 +196,28 @@ test("회원 수동 추가의 기수 설정은 핵심 목록과 분리해 스트
   assert.match(pageSource, /getSsafyCycleSettings\(\)\.catch/);
 });
 
-test("회원 고급 필터는 독립적인 설정·동의 조회를 병렬화한다", async () => {
+test("회원 고급 필터는 전체 ID 집합 대신 DB 페이지 RPC에 전달한다", async () => {
   const source = await readFile(memberReadModelPath, "utf8");
 
-  assert.equal(
-    (source.match(/Promise\.all\(\s*activeFilters\.map/g) ?? []).length,
-    2,
+  assert.match(source, /rpc\("get_admin_member_list_page"/);
+  assert.match(source, /input_service_consent: filters\.serviceConsentFilter/);
+  assert.match(source, /input_privacy_consent: filters\.privacyConsentFilter/);
+  assert.match(source, /input_marketing_consent: filters\.marketingConsentFilter/);
+  assert.match(source, /input_announcement_enabled: filters\.announcementEnabledFilter/);
+  assert.match(source, /input_mm_enabled: filters\.mmEnabledFilter/);
+  assert.doesNotMatch(source, /\.select\("member_id"\)/);
+  assert.doesNotMatch(source, /toInList|mergeMemberIdFilters/);
+});
+
+test("활성 마케팅 정책이 없으면 마케팅 동의 필터는 RPC 이전에 fail-closed 한다", async () => {
+  const source = await readFile(memberReadModelPath, "utf8");
+
+  assert.match(source, /const requiresMarketingConsentFilter =/);
+  assert.match(source, /filters\.marketingConsentFilter !== "all"/);
+  assert.match(
+    source,
+    /\(requiresMarketingConsentFilter && !activeMarketingPolicy\)/,
   );
-  assert.match(source, /filterResults\.some\(\(result\) => result === undefined\)/);
 });
 
 test("회원 목록 URL 필터는 알려진 값만 수용하고 검색 입력을 제한한다", () => {
@@ -191,7 +233,7 @@ test("회원 목록 URL 필터는 알려진 값만 수용하고 검색 입력을
     marketingEnabled: "enabled",
   });
 
-  assert.equal(filters.searchValue, "가".repeat(100));
+  assert.equal(filters.searchValue, "가".repeat(80));
   assert.equal(filters.sortValue, "name");
   assert.equal(filters.filterValue, "mustChangePassword");
   assert.equal(filters.mattermostLifecycleFilter, "graduated");

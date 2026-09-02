@@ -31,7 +31,10 @@ import {
   serializeAdminReviewPageQuery,
 } from "@/lib/admin-reviews";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
-import { buildPartnerPreviewUrl } from "@/lib/partner-preview";
+import {
+  buildPartnerPreviewUrl,
+  isPartnerPreviewLinkActive,
+} from "@/lib/partner-preview";
 import { decryptPartnerPreviewToken } from "@/lib/partner-preview-token-crypto";
 import { sanitizeAdminReturnTo } from "@/lib/admin-session-bridge";
 import {
@@ -231,8 +234,14 @@ async function AdminPartnerDetailContent({
     ? `${detailPath}?${reviewQueryString}`
     : detailPath;
   const previewTokenRow = previewToken;
+  const hasActivePreviewLink = isPartnerPreviewLinkActive(
+    previewTokenRow?.expires_at,
+    new Date(),
+    previewTokenRow?.created_at,
+  );
   let initialPreviewUrl: string | null = null;
   if (
+    hasActivePreviewLink &&
     canUpdatePartner &&
     previewTokenRow?.token_ciphertext &&
     previewTokenRow.token_nonce &&
@@ -288,7 +297,7 @@ async function AdminPartnerDetailContent({
 
         <AdminPartnerPreviewLinkPanel
           partnerId={partner.id}
-          hasActiveLink={Boolean(previewTokenRow?.created_at)}
+          hasActiveLink={hasActivePreviewLink}
           initialPreviewUrl={initialPreviewUrl}
           canUpdate={canUpdatePartner}
           generateAction={generatePartnerPreviewLink}

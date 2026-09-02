@@ -15,36 +15,72 @@ import { resolveNotificationTemplate } from "@/lib/notification-templates/reposi
 import { renderNotificationTemplate } from "@/lib/notification-templates/template";
 import { isBlocked, recordAttempt, SUGGEST_RATE_LIMIT } from "@/lib/rate-limit";
 import { validateSuggestPayload } from "@/lib/suggest-validation";
+import {
+  JsonRequestBodyError,
+  readJsonRequestBodyWithinLimit,
+} from "@/lib/request-body-limit";
+import { getClientIp } from "@/lib/client-ip";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+const MAX_SUGGEST_JSON_BODY_BYTES = 16 * 1024;
 
 function errorResponse(message: string, status: number, code: string) {
   return NextResponse.json({ ok: false, code, message }, { status });
 }
 
 function getClientIdentifier(request: Request) {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0]?.trim() ?? "unknown";
-  }
-  return request.headers.get("x-real-ip") ?? "unknown";
+  return getClientIp(request.headers) ?? "unknown";
 }
 
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
+  if (
+    !isTrustedSameOriginRequest(request, {
+      allowedContentTypes: ["application/json"],
+    })
+  ) {
+    return errorResponse(
+      "올바르지 않은 요청입니다.",
+      403,
+      "suggest_request_not_allowed",
+    );
+  }
+
   try {
     const identifier = getClientIdentifier(request);
-    if (await isBlocked(identifier, SUGGEST_RATE_LIMIT)) {
+    const blockingState = await isBlocked(identifier, SUGGEST_RATE_LIMIT);
+    if (!blockingState.ok) {
+      return errorResponse(
+        "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        503,
+        "suggest_unavailable",
+      );
+    }
+    if (blockingState.blocked) {
       return NextResponse.json(
         { message: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." },
         { status: 429 },
       );
     }
 
-    const rawPayload = (await request.json()) as Parameters<
-      typeof validateSuggestPayload
-    >[0];
+    let rawPayload: Parameters<typeof validateSuggestPayload>[0];
+    try {
+      rawPayload = await readJsonRequestBodyWithinLimit<
+        Parameters<typeof validateSuggestPayload>[0]
+      >(request, MAX_SUGGEST_JSON_BODY_BYTES);
+    } catch (error) {
+      if (!(error instanceof JsonRequestBodyError)) {
+        throw error;
+      }
+      await recordAttempt(identifier, false, SUGGEST_RATE_LIMIT);
+      return errorResponse(
+        error.message,
+        error.code === "body_too_large" ? 413 : 400,
+        "suggest_invalid_body",
+      );
+    }
     const validation = validateSuggestPayload(rawPayload);
     if (!validation.ok) {
       return errorResponse(validation.message, 400, validation.code);
@@ -52,9 +88,7 @@ export async function POST(request: Request) {
     const payload = validation.values;
     const safeCompanyUrlValue = validation.safeCompanyUrl;
 
-    await recordAttempt(identifier, false, SUGGEST_RATE_LIMIT);
-
-    const recipient = process.env.SUGGEST_NOTIFY_EMAIL ?? BUG_REPORT_EMAIL;
+    const recipient = process.env.SUGGEST_NOTIFY_EMAIL?.trim() || BUG_REPORT_EMAIL;
     try {
       getEmailDeliveryConfig();
     } catch (error) {
@@ -92,13 +126,13 @@ export async function POST(request: Request) {
     });
 
     await sendTransactionalEmail({
-      to: payload.contactEmail,
-      bcc: recipient,
+      to: recipient,
       replyTo: payload.contactEmail,
       subject,
       text: renderedBody.text,
       html: renderedBody.html,
     });
+    await recordAttempt(identifier, true, SUGGEST_RATE_LIMIT);
 
     const actor = await resolveCurrentActor();
     scheduleProductEventLog({

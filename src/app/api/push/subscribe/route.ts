@@ -7,6 +7,14 @@ import {
 import { getSignedUserSession } from "@/lib/user-auth";
 import { isPushConfigured, upsertPushSubscription } from "@/lib/push";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import {
+  getSafeNotificationRouteError,
+  shouldLogNotificationRouteError,
+} from "@/lib/notifications/safe-error";
+import { MAX_PUSH_SUBSCRIPTION_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 
 export const runtime = "nodejs";
 
@@ -51,13 +59,17 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = (await request.json()) as {
+    const body = await readRouteJsonBodyWithinLimit<{
       subscription?: PushSubscriptionJSON & {
         endpoint?: string;
         expirationTime?: number | null;
         keys?: { p256dh?: string; auth?: string };
       };
-    };
+    }>(request, {
+      maximumBytes: MAX_PUSH_SUBSCRIPTION_JSON_BODY_BYTES,
+      invalidMessage: "요청 본문 형식을 확인해 주세요.",
+      tooLargeMessage: "Push 구독 요청이 너무 큽니다.",
+    });
     if (!body?.subscription) {
       return NextResponse.json(
         { message: "Push 구독 정보가 필요합니다." },
@@ -96,8 +108,16 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true, preferences });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "알림 구독에 실패했습니다.";
-    return NextResponse.json({ message }, { status: 400 });
+    if (shouldLogNotificationRouteError(error)) {
+      console.error("[member-push-subscribe] request failed", error);
+    }
+    const safeError = getSafeNotificationRouteError(
+      error,
+      "알림 구독에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    return NextResponse.json(
+      { message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }

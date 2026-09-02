@@ -5,6 +5,16 @@ import test from "node:test";
 const root = new URL("..", import.meta.url);
 const read = (path: string) => readFile(new URL(path, root), "utf8");
 
+function getFunctionSql(source: string, functionName: string) {
+  const start = source.lastIndexOf(
+    `create or replace function public.${functionName}(`,
+  );
+  assert.notEqual(start, -1, `${functionName} must exist`);
+  const end = source.indexOf("\n$$;", start);
+  assert.notEqual(end, -1, `${functionName} must terminate`);
+  return source.slice(start, end + 4);
+}
+
 test("관리자 회원 비밀번호 재발급은 권한·동일 출처·무캐시 응답을 강제한다", async () => {
   const [route, service, panel, catalog, logLabels] = await Promise.all([
     read("src/app/api/admin/members/[id]/password-reset/route.ts"),
@@ -66,20 +76,40 @@ test("관리자 재발급은 한 개의 활성 링크만 유지하고 실제 이
   const legacyMigration = await read(
     "supabase/migrations/20260821001338_add_admin_member_password_reset.sql",
   );
+  const schemaCompleteAction = getFunctionSql(schema, "complete_member_password_action");
+  const schemaCompleteWithDelivery = getFunctionSql(
+    schema,
+    "complete_member_password_action_with_delivery",
+  );
+  const schemaFunction = getFunctionSql(schema, "issue_admin_member_password_action");
 
-  for (const source of [legacyMigration, schema]) {
-    assert.match(source, /'admin_password_reset'/);
-    assert.match(source, /delivery_channel in \('mattermost', 'email', 'admin'\)/);
-    assert.match(source, /members_admin_email_normalized_trgm_idx/);
-    assert.match(source, /email_normalized extensions\.gin_trgm_ops/);
-    assert.match(source, /'authenticationMethod', authentication_method/);
-    assert.match(
-      source,
-      /case token_row\.delivery_channel[\s\S]*when 'mattermost' then 'mattermost'[\s\S]*when 'email' then 'email'[\s\S]*else 'manual'/,
-    );
-    assert.match(source, /when token_row\.delivery_channel = 'email' then coalesce\(email_verified_at, now\(\)\)/);
-  }
-  for (const source of [migration, schema]) {
+  assert.match(legacyMigration, /'admin_password_reset'/);
+  assert.match(legacyMigration, /delivery_channel in \('mattermost', 'email', 'admin'\)/);
+  assert.match(legacyMigration, /members_admin_email_normalized_trgm_idx/);
+  assert.match(legacyMigration, /email_normalized extensions\.gin_trgm_ops/);
+  assert.match(
+    legacyMigration,
+    /case token_row\.delivery_channel[\s\S]*when 'mattermost' then 'mattermost'[\s\S]*when 'email' then 'email'[\s\S]*else 'manual'/,
+  );
+  assert.match(
+    legacyMigration,
+    /when token_row\.delivery_channel = 'email' then coalesce\(email_verified_at, now\(\)\)/,
+  );
+
+  assert.match(schema, /'admin_password_reset'/);
+  assert.match(schema, /delivery_channel in \('mattermost', 'email', 'admin'\)/);
+  assert.match(schema, /members_admin_email_normalized_trgm_idx/);
+  assert.match(schema, /email_normalized extensions\.gin_trgm_ops/);
+  assert.match(schemaCompleteWithDelivery, /'authenticationMethod', authentication_method/);
+  assert.match(
+    schemaCompleteWithDelivery,
+    /case token_row\.delivery_channel[\s\S]*when 'mattermost' then 'mattermost'[\s\S]*when 'email' then 'email'[\s\S]*else 'manual'/,
+  );
+  assert.match(
+    schemaCompleteAction,
+    /when token_row\.delivery_channel = 'email' then coalesce\(email_verified_at, now\(\)\)/,
+  );
+  for (const source of [migration, schemaFunction]) {
     assert.match(source, /issue_admin_member_password_action/);
     assert.match(source, /p_purpose in \('manual_initial_setup', 'admin_password_reset'\)/);
     assert.match(source, /p_delivery_channel in \('email', 'admin'\)/);
@@ -101,18 +131,32 @@ test("관리자 재발급은 한 개의 활성 링크만 유지하고 실제 이
 });
 
 test("회원 목록과 상세는 이메일 식별과 검색을 함께 제공한다", async () => {
-  const [readModel, selectors, listItem, detailView, detailPage, manager] = await Promise.all([
+  const [
+    readModel,
+    selectors,
+    listItem,
+    detailView,
+    detailPage,
+    manager,
+    memberListFilterMigration,
+  ] = await Promise.all([
     read("src/lib/admin-member-list.server.ts"),
     read("src/components/admin/member-manager/selectors.ts"),
     read("src/components/admin/AdminMemberListItem.tsx"),
     read("src/components/admin/AdminMemberDetailView.tsx"),
     read("src/app/admin/(protected)/members/[memberId]/page.tsx"),
     read("src/components/admin/AdminMemberManager.tsx"),
+    read(
+      "supabase/migrations/20260831111653_filter_admin_member_list_in_database.sql",
+    ),
   ]);
 
   assert.match(readModel, /email,email_normalized/);
-  assert.match(readModel, /email_normalized\.ilike\.\$\{pattern\}/);
-  assert.match(readModel, /\.ilike\("email_normalized", pattern\)/);
+  assert.match(readModel, /getAdminSearchLikePattern\(filters\.searchValue\)/);
+  assert.match(
+    memberListFilterMigration,
+    /members\.email_normalized ilike input_search_pattern/,
+  );
   assert.match(readModel, /email: member\.email \?\? member\.email_normalized/);
   assert.match(selectors, /member\.email \?\? ""/);
   assert.match(listItem, /member\.mmUsername[\s\S]*?member\.email/);

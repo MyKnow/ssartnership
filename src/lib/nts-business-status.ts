@@ -2,6 +2,7 @@ import { normalizeBusinessRegistrationNumber } from "@/lib/partner-billing";
 
 const NTS_BUSINESS_STATUS_ENDPOINT =
   "https://api.odcloud.kr/api/nts-businessman/v1/status";
+export const NTS_BUSINESS_STATUS_TIMEOUT_MS = 10_000;
 
 const NTS_BUSINESS_STATUS_LABEL_BY_CODE: Record<string, string> = {
   "01": "계속사업자",
@@ -50,8 +51,37 @@ export function isNtsBusinessStatusLookupConfigured() {
   return Boolean(getNtsBusinessStatusServiceKey());
 }
 
+async function fetchNtsBusinessStatus(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+) {
+  const abortController = new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      fetch(url, {
+        ...init,
+        signal: abortController.signal,
+      }),
+      new Promise<never>((_resolve, reject) => {
+        timeoutId = setTimeout(() => {
+          abortController.abort();
+          reject(new Error("nts_business_status_timeout"));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
 export async function lookupNtsBusinessStatus(
   businessRegistrationNumber: string,
+  options: { timeoutMs?: number } = {},
 ): Promise<NtsBusinessStatusLookupResult> {
   const normalizedBusinessRegistrationNumber = normalizeBusinessRegistrationNumber(
     businessRegistrationNumber,
@@ -66,7 +96,11 @@ export async function lookupNtsBusinessStatus(
   }
 
   try {
-    const response = await fetch(
+    const timeoutMs =
+      Number.isFinite(options.timeoutMs) && Number(options.timeoutMs) > 0
+        ? Math.floor(Number(options.timeoutMs))
+        : NTS_BUSINESS_STATUS_TIMEOUT_MS;
+    const response = await fetchNtsBusinessStatus(
       `${NTS_BUSINESS_STATUS_ENDPOINT}?serviceKey=${getServiceKeyQueryValue(serviceKey)}&returnType=JSON`,
       {
         method: "POST",
@@ -77,6 +111,7 @@ export async function lookupNtsBusinessStatus(
         body: JSON.stringify({ b_no: [normalizedBusinessRegistrationNumber] }),
         cache: "no-store",
       },
+      timeoutMs,
     );
     if (!response.ok) {
       return {

@@ -208,9 +208,7 @@ export async function AdminPartnerDetailOperationalSections({
         partnerId={partnerId}
         partnerName={core.partner.name ?? "제휴처"}
         partnerPeriodEnd={partnerPeriodEnd}
-        campaigns={detail.adCampaigns.filter(
-          (campaign) => campaign.partnerId === partnerId,
-        )}
+        campaigns={detail.adCampaigns}
         coupons={detail.adCoupons}
         createCouponAction={createAdCouponAction}
         updateCouponAction={updateAdCouponAction}

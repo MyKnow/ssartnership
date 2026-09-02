@@ -25,15 +25,17 @@ import {
 import {
   buildPartnerRegistrationMediaStoragePath,
   deletePartnerMediaUrls,
+  rethrowAfterPartnerMediaCleanup,
 } from "@/lib/partner-media-storage";
 import { resolveImageUploadActorForServerAction } from "@/lib/image-upload/auth.server";
 import {
   assertNoDirectImageFileSubmission,
   resolveImageTransformPolicy,
 } from "@/lib/image-upload/policy";
-import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { PARTNER_MEDIA_BUCKET } from "@/lib/partner-media";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { loadXlsxWorkbookWithinResourceLimits } from "@/lib/xlsx-resource-limits.server";
 
 export type PartnerRegistrationMediaPayload = {
   thumbnailUrl: string | null;
@@ -104,6 +106,38 @@ export async function loadPartnerRegistrationCategories() {
   return (result.data ?? []) as AdminPartnerFileCategory[];
 }
 
+async function rollbackCreatedPartnerRegistrationRequest(input: {
+  supabase: ReturnType<typeof getSupabaseAdminClient>;
+  requestId: string;
+  uploadedUrls: string[];
+  originalError: unknown;
+}) {
+  const cleanupResults = await Promise.allSettled([
+    deletePartnerMediaUrls(input.uploadedUrls),
+    (async () => {
+      const { error } = await input.supabase
+        .from("partner_registration_requests")
+        .delete()
+        .eq("id", input.requestId);
+      if (error) {
+        throw new Error(error.message);
+      }
+    })(),
+  ]);
+  const cleanupErrors = cleanupResults.flatMap((result) =>
+    result.status === "rejected" ? [result.reason] : [],
+  );
+  if (cleanupErrors.length > 0) {
+    console.error(
+      "[partner-registration] created request rollback failed",
+      cleanupErrors,
+    );
+    throw new Error("partner_registration_cleanup_failed", {
+      cause: { originalError: input.originalError, cleanupErrors },
+    });
+  }
+}
+
 export async function resolvePartnerRegistrationMediaPayload(
   formData: FormData,
   requestId: string,
@@ -156,22 +190,31 @@ export async function resolvePartnerRegistrationMediaPayload(
     if (!attached.url) {
       throw new Error("제휴처 이미지 URL을 만들지 못했습니다.");
     }
+    uploadedUrls.push(attached.url);
     return attached.url;
   };
 
-  let thumbnailUrl: string | null = null;
-  if (thumbnailManifest?.thumbnail) {
-    assertUploadOnlyEntry(thumbnailManifest.thumbnail);
-    thumbnailUrl = await attachUpload(thumbnailManifest.thumbnail.uploadId, "thumbnail", 0);
-  }
+  try {
+    let thumbnailUrl: string | null = null;
+    if (thumbnailManifest?.thumbnail) {
+      assertUploadOnlyEntry(thumbnailManifest.thumbnail);
+      thumbnailUrl = await attachUpload(thumbnailManifest.thumbnail.uploadId, "thumbnail", 0);
+    }
 
-  const imageUrls: string[] = [];
-  for (const [index, entry] of galleryEntries.entries()) {
-    assertUploadOnlyEntry(entry);
-    imageUrls.push(await attachUpload(entry.uploadId, "gallery", index));
-  }
+    const imageUrls: string[] = [];
+    for (const [index, entry] of galleryEntries.entries()) {
+      assertUploadOnlyEntry(entry);
+      imageUrls.push(await attachUpload(entry.uploadId, "gallery", index));
+    }
 
-  return { thumbnailUrl, imageUrls, uploadedUrls };
+    return { thumbnailUrl, imageUrls, uploadedUrls };
+  } catch (originalError) {
+    return rethrowAfterPartnerMediaCleanup({
+      urls: uploadedUrls,
+      originalError,
+      logContext: "partner-registration",
+    });
+  }
 }
 
 function getCellText(cell: ExcelJS.Cell) {
@@ -211,11 +254,8 @@ async function parsePartnerRegistrationBranchXlsxFile(
     throw new Error("지점 목록은 .xlsx 파일만 업로드할 수 있습니다.");
   }
 
-  const workbook = new ExcelJS.Workbook();
   const fileBuffer = Buffer.from(await file.arrayBuffer());
-  await workbook.xlsx.load(
-    fileBuffer as unknown as Parameters<typeof workbook.xlsx.load>[0],
-  );
+  const workbook = await loadXlsxWorkbookWithinResourceLimits(fileBuffer);
   const worksheet = workbook.worksheets[0];
   if (!worksheet) {
     throw new Error("지점 목록 시트를 찾지 못했습니다.");
@@ -393,12 +433,15 @@ export async function insertPartnerRegistrationRequest({
     }
     persistedRequestId = existing?.id ?? "";
   } else if (insertResult.error) {
-    await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
     console.error(
       "[partner-registration] request insert failed",
       insertResult.error.message,
     );
-    throw new Error("신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    return rethrowAfterPartnerMediaCleanup({
+      urls: media.uploadedUrls,
+      originalError: new Error("신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요."),
+      logContext: "partner-registration",
+    });
   } else {
     created = true;
     persistedRequestId = insertResult.data.id as string;
@@ -413,11 +456,12 @@ export async function insertPartnerRegistrationRequest({
 
   if (benefitGroupResult.error) {
     if (created) {
-      await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
-      await supabase
-        .from("partner_registration_requests")
-        .delete()
-        .eq("id", persistedRequestId);
+      await rollbackCreatedPartnerRegistrationRequest({
+        supabase,
+        requestId: persistedRequestId,
+        uploadedUrls: media.uploadedUrls,
+        originalError: benefitGroupResult.error,
+      });
     }
     console.error(
       "[partner-registration] benefit group insert failed",
@@ -448,11 +492,12 @@ export async function insertPartnerRegistrationRequest({
 
     if (branchResult.error) {
       if (created) {
-        await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
-        await supabase
-          .from("partner_registration_requests")
-          .delete()
-          .eq("id", persistedRequestId);
+        await rollbackCreatedPartnerRegistrationRequest({
+          supabase,
+          requestId: persistedRequestId,
+          uploadedUrls: media.uploadedUrls,
+          originalError: branchResult.error,
+        });
       }
       console.error(
         "[partner-registration] branch insert failed",

@@ -6,7 +6,7 @@ import Card from "@/components/ui/Card";
 import PolicyConsentForm from "@/components/auth/PolicyConsentForm";
 import { getHeaderSession } from "@/lib/header-session";
 import { getUserSession } from "@/lib/user-auth";
-import { getMemberPolicyReviewBundle } from "@/lib/policy-documents";
+import { getMemberPolicyReviewBundle } from "@/lib/policy-documents.server";
 import {
   getMemberGateCompletionReturnTo,
   getMemberRequiredGateRedirect,

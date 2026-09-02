@@ -1,4 +1,5 @@
 import type { ClientImageUploadRequest } from "@/lib/image-upload/client";
+import { createClientUuid } from "@/lib/client-uuid";
 import type { PartnerMediaManifestEntry } from "../../../lib/partner-media";
 import type { MediaItem, MediaRole } from "./types";
 
@@ -32,7 +33,7 @@ export function isImageFile(file: File) {
 
 export function createPreviewEntryFromFile(file: File): MediaItem {
   return {
-    id: crypto.randomUUID(),
+    id: createClientUuid(),
     kind: "file",
     url: makeObjectUrl(file),
     file,
@@ -41,7 +42,7 @@ export function createPreviewEntryFromFile(file: File): MediaItem {
 
 export function createPreviewEntryFromExisting(url: string): MediaItem {
   return {
-    id: crypto.randomUUID(),
+    id: createClientUuid(),
     kind: "existing",
     url,
   };

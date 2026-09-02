@@ -50,6 +50,7 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
     "node_modules",
     ".next",
     ".next-e2e",
+    ".next-perf-review",
     "next-env.d.ts",
   ]);
 
@@ -96,6 +97,22 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
     new URL("./e2e/partner-registration.spec.ts", import.meta.url),
     "utf8",
   );
+  const graduateVerification = await readFile(
+    new URL("./e2e/graduate-verification.spec.ts", import.meta.url),
+    "utf8",
+  );
+  const partnerImageCarousel = await readFile(
+    new URL("./e2e/partner-image-carousel.spec.ts", import.meta.url),
+    "utf8",
+  );
+  const partnerDetailIntroduction = await readFile(
+    new URL("./e2e/partner-detail-introduction.spec.ts", import.meta.url),
+    "utf8",
+  );
+  const pageReadyHelpers = await readFile(
+    new URL("./e2e/page-ready.ts", import.meta.url),
+    "utf8",
+  );
   for (const criticalPath of [
     "/",
     "/auth/login",
@@ -116,6 +133,13 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
     "utf8",
   );
   assert.match(releaseScript, /runRequiredScript\("prepush"\)/);
+  assert.match(releaseScript, /ensureVersionFilesDoNotHaveUnstagedChanges/);
+  assert.match(releaseScript, /stageReleaseVersionFiles/);
+  assert.doesNotMatch(releaseScript, /runGit\(\["add", "-A"\]\)/);
+  assert.match(
+    releaseScript,
+    /runGit\(\["add", "--", "package\.json", "package-lock\.json"\]\)/,
+  );
   assert.doesNotMatch(releaseScript, /runRequiredScript\("build-storybook"\)/);
   assert.doesNotMatch(releaseScript, /runRequiredScript\("test-storybook"\)/);
   assert.doesNotMatch(releaseScript, /runRequiredScript\("test:visual"\)/);
@@ -142,6 +166,7 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
     "utf8",
   );
   assert.match(eslintConfig, /"\.next-e2e\/\*\*"/);
+  assert.match(eslintConfig, /"\.next-perf-review\/\*\*"/);
 
   const adminConsoleSpec = await readFile(
     new URL("./e2e/admin-console.spec.ts", import.meta.url),
@@ -234,7 +259,7 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
   assert.ok(publicPartnerNavigationTest);
   assert.match(
     publicPartnerNavigationTest,
-    /await waitForDirectoryControls\(page\)/,
+    /await (?:gotoDirectory\(page, "\/"\)|waitForDirectoryControls\(page\))/,
   );
   assert.match(publicPartnerNavigationTest, /await Promise\.all\(\[/);
   assert.match(
@@ -245,14 +270,35 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
     publicPartnerNavigationTest.indexOf("page.waitForURL") <
       publicPartnerNavigationTest.indexOf("publicPartnerLink.click"),
   );
-  assert.ok(
-    publicPartnerNavigationTest.lastIndexOf('page.waitForLoadState("networkidle")') >
-      publicPartnerNavigationTest.lastIndexOf('getByRole("heading"'),
+  assert.doesNotMatch(
+    publicPartnerNavigationTest,
+    /page\.waitForLoadState\("networkidle"\)/,
   );
   assert.doesNotMatch(
     publicPartnerNavigationTest,
     /force:\s*true|waitForTimeout|retry/,
   );
+  for (const source of [
+    authOperations,
+    partnerRegistration,
+    graduateVerification,
+    partnerImageCarousel,
+    partnerDetailIntroduction,
+  ]) {
+    assert.doesNotMatch(source, /waitForLoadState\("networkidle"\)/);
+  }
+  assert.match(pageReadyHelpers, /export async function waitForPageReady/);
+  assert.match(pageReadyHelpers, /document\.fonts\.ready/);
+  assert.match(pageReadyHelpers, /Execution context was destroyed/);
+  assert.match(pageReadyHelpers, /export async function waitForScrollStability/);
+  const introductionTest = partnerDetailIntroduction.match(
+    /test\("puts the period in the header and keeps introduction and tags plain",[\s\S]*?\n  \}\);/,
+  )?.[0];
+  assert.ok(introductionTest);
+  assert.match(partnerDetailIntroduction, /await page\.goto\("\/partners\/health-001"\)/);
+  assert.match(partnerImageCarousel, /await page\.goto\(partnerPath\)/);
+  assert.match(partnerRegistration, /await page\.goto\("\/partner-registration"\)/);
+  assert.match(graduateVerification, /await expect\(applyCropButton\)\.toBeEnabled\(\)/);
 });
 
 test("Mattermost signup E2E waits for its finite form readiness instead of global network idle", async () => {

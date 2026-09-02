@@ -7,7 +7,12 @@ import { PartnerPortalSetupError } from "../partner-portal-errors.ts";
 import { hashPassword, isValidPassword } from "../password.ts";
 import { toPartnerPortalAccountSummary } from "./mappers.ts";
 import { getSupabasePartnerPortalCompanyIds, getSupabasePartnerPortalSetupCompany } from "./company.ts";
-import { findSupabasePartnerPortalSetupAccount } from "./accounts.ts";
+import {
+  findSupabasePartnerPortalSetupAccount,
+  getSupabasePartnerPortalAccountById,
+  isMissingPartnerAuthSessionVersionColumnError,
+  omitPartnerAuthSessionVersion,
+} from "./accounts.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 import {
   buildPartnerSetupCompletionPayload,
@@ -15,12 +20,14 @@ import {
   resolvePartnerSetupSchemaCapabilitiesFromAccount,
   resolvePartnerSetupSchemaCapabilitiesFromError,
 } from "./setup-schema.ts";
+import { getPartnerSetupLinkState } from "./setup-link.ts";
 
 const INITIAL_SETUP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 type PartnerSetupCompletionCommonPayload = {
   password_hash: string;
   password_salt: string;
+  auth_session_version: number;
   must_change_password: boolean;
   is_active: boolean;
   email_verified_at: string;
@@ -49,6 +56,7 @@ function buildPartnerSetupCompletionPayloadCandidates(
     initial_setup_token?: string | null;
     initial_setup_token_hash?: string | null;
     initial_setup_expires_at?: string | null;
+    auth_session_version?: number | null;
   },
 ) : PartnerSetupCompletionPayloadCandidate[] {
   const detectedCapabilities = resolvePartnerSetupSchemaCapabilitiesFromAccount(account);
@@ -117,19 +125,47 @@ function hasSetupToken(account: {
   return Boolean(account.initial_setup_token_hash || account.initial_setup_token);
 }
 
+function applyPartnerSetupCompletionMatchFilters<TBuilder extends {
+  eq(column: string, value: string): TBuilder;
+  is(column: string, value: null): TBuilder;
+}>(
+  builder: TBuilder,
+  account: {
+    initial_setup_token?: string | null;
+    initial_setup_token_hash?: string | null;
+    initial_setup_expires_at?: string | null;
+  },
+) {
+  const withCompletionGuard = builder.is("initial_setup_completed_at", null);
+
+  if (account.initial_setup_token_hash) {
+    return withCompletionGuard.eq(
+      "initial_setup_token_hash",
+      account.initial_setup_token_hash,
+    );
+  }
+
+  if (account.initial_setup_token) {
+    return withCompletionGuard.eq("initial_setup_token", account.initial_setup_token);
+  }
+
+  return withCompletionGuard;
+}
+
 export async function getSupabasePartnerPortalSetupContext(
   token: string,
 ): Promise<PartnerPortalSetupContext | null> {
   const account = await findSupabasePartnerPortalSetupAccount(token);
   const expiresAt = account ? resolveSetupExpiry(account) : null;
-  if (
-    !account ||
-    !account.is_active ||
-    !hasSetupToken(account) ||
-    !expiresAt ||
-    new Date(expiresAt).getTime() <= Date.now() ||
-    account.initial_setup_completed_at
-  ) {
+  const linkState = account
+    ? getPartnerSetupLinkState({
+        isActive: account.is_active === true,
+        hasToken: hasSetupToken(account),
+        expiresAt,
+        completedAt: account.initial_setup_completed_at ?? null,
+      })
+    : null;
+  if (!account || linkState !== "usable") {
     return null;
   }
 
@@ -152,20 +188,27 @@ export async function completeSupabasePartnerPortalInitialSetup(
 ): Promise<PartnerPortalSetupResult> {
   const account = await findSupabasePartnerPortalSetupAccount(input.token);
   const expiresAt = account ? resolveSetupExpiry(account) : null;
+  const linkState = account
+    ? getPartnerSetupLinkState({
+        isActive: account.is_active === true,
+        hasToken: hasSetupToken(account),
+        expiresAt,
+        completedAt: account.initial_setup_completed_at ?? null,
+      })
+    : null;
 
-  if (!account || !hasSetupToken(account)) {
+  if (
+    !account ||
+    linkState === "inactive" ||
+    linkState === "missing_token" ||
+    linkState === "expired"
+  ) {
     throw new PartnerPortalSetupError(
       "not_found",
       "초기 설정 링크를 찾을 수 없습니다.",
     );
   }
-  if (!expiresAt || new Date(expiresAt).getTime() <= Date.now()) {
-    throw new PartnerPortalSetupError(
-      "not_found",
-      "초기 설정 링크를 찾을 수 없습니다.",
-    );
-  }
-  if (account.initial_setup_completed_at) {
+  if (linkState === "completed") {
     throw new PartnerPortalSetupError(
       "already_completed",
       "이미 초기 설정이 완료되었습니다.",
@@ -199,6 +242,7 @@ export async function completeSupabasePartnerPortalInitialSetup(
   const basePayload = {
     password_hash: passwordRecord.hash,
     password_salt: passwordRecord.salt,
+    auth_session_version: Math.max(1, Number(account.auth_session_version ?? 1)) + 1,
     must_change_password: false,
     is_active: true,
     email_verified_at: completedAt,
@@ -209,14 +253,46 @@ export async function completeSupabasePartnerPortalInitialSetup(
   let lastSchemaError: Error | null = null;
 
   for (const candidate of payloadCandidates) {
-    const attempt = await supabase
-      .from("partner_accounts")
-      .update(candidate.payload)
-      .eq("id", account.id);
+    const attemptUpdate = async (payload: Record<string, unknown>) =>
+      applyPartnerSetupCompletionMatchFilters(
+        supabase
+          .from("partner_accounts")
+          .update(payload)
+          .eq("id", account.id),
+        account,
+      )
+        .select("id")
+        .maybeSingle();
 
-    if (!attempt.error) {
+    let attempt = await attemptUpdate(candidate.payload);
+
+    if (
+      attempt.error &&
+      isMissingPartnerAuthSessionVersionColumnError(attempt.error.message)
+    ) {
+      attempt = await attemptUpdate(
+        omitPartnerAuthSessionVersion(candidate.payload),
+      );
+    }
+
+    if (!attempt.error && attempt.data?.id) {
       lastSchemaError = null;
       break;
+    }
+
+    if (!attempt.error) {
+      const latestAccount = await getSupabasePartnerPortalAccountById(account.id);
+      if (latestAccount?.initial_setup_completed_at) {
+        throw new PartnerPortalSetupError(
+          "already_completed",
+          "이미 초기 설정이 완료되었습니다.",
+        );
+      }
+
+      throw new PartnerPortalSetupError(
+        "not_found",
+        "초기 설정 링크를 찾을 수 없습니다.",
+      );
     }
 
     console.error("[partner-setup] completion update failed", {

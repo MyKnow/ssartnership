@@ -7,10 +7,13 @@ function getFirstForwardedIp(value: string | null) {
   return ipAddress ? ipAddress.slice(0, 128) : null;
 }
 
+export function getTrustedPlatformClientIp(headerStore: HeaderSource) {
+  if (process.env.VERCEL !== '1') {
+    return null;
+  }
+  return getFirstForwardedIp(headerStore.get('x-vercel-forwarded-for'));
+}
+
 export function getClientIp(headerStore: HeaderSource) {
-  return (
-    getFirstForwardedIp(headerStore.get('x-vercel-forwarded-for')) ??
-    getFirstForwardedIp(headerStore.get('x-forwarded-for')) ??
-    getFirstForwardedIp(headerStore.get('x-real-ip'))
-  );
+  return getTrustedPlatformClientIp(headerStore);
 }

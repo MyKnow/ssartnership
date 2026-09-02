@@ -26,7 +26,10 @@ export default async function LoginPage({
   );
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader initialSession={headerSession} />
+      <SiteHeader
+        initialSession={headerSession}
+        guestAuthReturnTo={rawReturnTo === undefined ? undefined : returnTo}
+      />
       <LoginPageView returnTo={returnTo} />
     </div>
   );

@@ -5,8 +5,10 @@ import { requireAdminPermission } from "@/lib/admin-access";
 import { assertAdminCanAccessManagedCampuses } from "@/lib/admin-scope";
 import {
   buildPartnerPreviewUrl,
+  createPartnerPreviewExpiresAt,
   createPartnerPreviewToken,
   hashPartnerPreviewToken,
+  isMissingPartnerPreviewExpiryColumnError,
 } from "@/lib/partner-preview";
 import { encryptPartnerPreviewToken } from "@/lib/partner-preview-token-crypto";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -48,21 +50,37 @@ export async function generatePartnerPreviewLink(partnerId: string) {
   const { adminSession, supabase } = await requireManagedPartner(normalizedPartnerId);
   const token = createPartnerPreviewToken();
   const encryptedToken = encryptPartnerPreviewToken(normalizedPartnerId, token);
-  const now = new Date().toISOString();
-  const { error } = await supabase
+  const now = new Date();
+  const createdAt = now.toISOString();
+  const expiresAt = createPartnerPreviewExpiresAt(now);
+  const previewTokenPayload = {
+    partner_id: normalizedPartnerId,
+    token_hash: hashPartnerPreviewToken(token),
+    token_ciphertext: encryptedToken.ciphertext,
+    token_nonce: encryptedToken.nonce,
+    token_auth_tag: encryptedToken.authTag,
+    token_key_version: encryptedToken.keyVersion,
+    created_at: createdAt,
+    expires_at: expiresAt,
+  };
+  const previewTokenPayloadLegacy = {
+    partner_id: normalizedPartnerId,
+    token_hash: hashPartnerPreviewToken(token),
+    token_ciphertext: encryptedToken.ciphertext,
+    token_nonce: encryptedToken.nonce,
+    token_auth_tag: encryptedToken.authTag,
+    token_key_version: encryptedToken.keyVersion,
+    created_at: createdAt,
+  };
+  let { error } = await supabase
     .from("partner_preview_tokens")
-    .upsert(
-      {
-        partner_id: normalizedPartnerId,
-        token_hash: hashPartnerPreviewToken(token),
-        token_ciphertext: encryptedToken.ciphertext,
-        token_nonce: encryptedToken.nonce,
-        token_auth_tag: encryptedToken.authTag,
-        token_key_version: encryptedToken.keyVersion,
-        created_at: now,
-      },
-      { onConflict: "partner_id" },
-    );
+    .upsert(previewTokenPayload, { onConflict: "partner_id" });
+
+  if (error && isMissingPartnerPreviewExpiryColumnError(error.message)) {
+    ({ error } = await supabase
+      .from("partner_preview_tokens")
+      .upsert(previewTokenPayloadLegacy, { onConflict: "partner_id" }));
+  }
 
   if (error) {
     throw new Error(error.message);
@@ -73,7 +91,8 @@ export async function generatePartnerPreviewLink(partnerId: string) {
     targetId: normalizedPartnerId,
     properties: {
       adminId: adminSession.adminId,
-      createdAt: now,
+      createdAt,
+      expiresAt,
     },
   });
   revalidatePath(`/admin/partners/${normalizedPartnerId}`);

@@ -14,6 +14,11 @@ test("isUuid rejects public mock slugs before Supabase queries", () => {
   assert.equal(isUuid(""), false);
 });
 
+test("isUuid rejects loose 36-character identifier shapes", () => {
+  assert.equal(isUuid("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), false);
+  assert.equal(isUuid("------------------------------------"), false);
+});
+
 test("normalizeUuidList trims, dedupes, and drops non-UUID values", () => {
   assert.deepEqual(
     normalizeUuidList([

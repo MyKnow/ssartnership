@@ -10,6 +10,7 @@ import {
 } from "../../partner-visibility.ts";
 import { getSupabaseAdminClient } from "../../supabase/server.ts";
 import { collectRemovedPartnerMediaUrls } from "../media-cleanup.ts";
+import { requirePartnerChangeRequestAuditContext } from "../contracts.ts";
 import { fetchRequestSummary, toSummary } from "../summary.ts";
 import {
   collectPartnerChangeRequestRequestedMediaUrls,
@@ -23,12 +24,10 @@ import {
 } from "../shared.ts";
 
 export async function approveSupabaseRequest(input: PartnerChangeRequestReviewInput) {
-  if (!input.auditContext) {
-    throw new PartnerChangeRequestError(
-      "invalid_request",
-      "감사 요청 문맥이 없어 변경 요청을 승인할 수 없습니다.",
-    );
-  }
+  const auditContext = requirePartnerChangeRequestAuditContext(
+    input.auditContext,
+    "감사 요청 문맥이 없어 변경 요청을 승인할 수 없습니다.",
+  );
   const supabase = getSupabaseAdminClient();
   const { data: request, error: requestError } = await supabase
     .from("partner_change_requests")
@@ -93,7 +92,7 @@ export async function approveSupabaseRequest(input: PartnerChangeRequestReviewIn
       p_change_request_id: input.requestId,
       p_admin_id: input.adminId,
       p_decision: "approved",
-      ...buildAtomicAuditRpcContext(input.auditContext, buildApprovalAuditProperties(summary)),
+      ...buildAtomicAuditRpcContext(auditContext, buildApprovalAuditProperties(summary)),
     },
   );
 
@@ -112,7 +111,12 @@ export async function approveSupabaseRequest(input: PartnerChangeRequestReviewIn
     currentMediaUrls,
     collectPartnerChangeRequestRequestedMediaUrls(summary),
   );
-  await deletePartnerMediaUrls(removedMediaUrls).catch(() => undefined);
+  await deletePartnerMediaUrls(removedMediaUrls).catch((cleanupError) => {
+    console.error(
+      "[partner-change-request] approved media cleanup failed",
+      cleanupError,
+    );
+  });
 
   const approved = await fetchRequestSummary(supabase, input.requestId);
   if (!approved) {
@@ -148,12 +152,10 @@ export async function approveSupabaseRequest(input: PartnerChangeRequestReviewIn
 }
 
 export async function rejectSupabaseRequest(input: PartnerChangeRequestReviewInput) {
-  if (!input.auditContext) {
-    throw new PartnerChangeRequestError(
-      "invalid_request",
-      "감사 요청 문맥이 없어 변경 요청을 거절할 수 없습니다.",
-    );
-  }
+  const auditContext = requirePartnerChangeRequestAuditContext(
+    input.auditContext,
+    "감사 요청 문맥이 없어 변경 요청을 거절할 수 없습니다.",
+  );
   const supabase = getSupabaseAdminClient();
   const { data: request, error: requestError } = await supabase
     .from("partner_change_requests")
@@ -198,7 +200,7 @@ export async function rejectSupabaseRequest(input: PartnerChangeRequestReviewInp
       p_change_request_id: input.requestId,
       p_admin_id: input.adminId,
       p_decision: "rejected",
-      ...buildAtomicAuditRpcContext(input.auditContext, buildRejectionAuditProperties(summary)),
+      ...buildAtomicAuditRpcContext(auditContext, buildRejectionAuditProperties(summary)),
     },
   );
 
@@ -225,7 +227,12 @@ export async function rejectSupabaseRequest(input: PartnerChangeRequestReviewInp
     collectPartnerChangeRequestRequestedMediaUrls(rejected);
   await deletePartnerMediaUrls(
     requestedMediaUrls.filter((url) => !currentMediaUrls.includes(url)),
-  ).catch(() => undefined);
+  ).catch((cleanupError) => {
+    console.error(
+      "[partner-change-request] rejected media cleanup failed",
+      cleanupError,
+    );
+  });
 
   return rejected;
 }

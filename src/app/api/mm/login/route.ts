@@ -7,7 +7,7 @@ import { verifyPassword } from "@/lib/password";
 import { normalizeMmUsername, validateMmUsername } from "@/lib/validation";
 import {
   getMemberRequiredPolicyStatus,
-} from "@/lib/policy-documents";
+} from "@/lib/policy-documents.server";
 import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { requiresMemberProfilePhotoUpdate } from "@/lib/member-profile-photo";
 import { resolveActiveMemberForLoginWithSource } from "@/lib/member-authentication";
@@ -19,6 +19,10 @@ import {
   recordMemberAuthAttempt,
 } from "@/lib/member-auth-security";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import {
+  MemberAuthRouteBodyError,
+  parseMemberAuthJsonBody,
+} from "@/app/api/mm/_shared/parsers";
 
 export const runtime = "nodejs";
 
@@ -40,11 +44,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const payload = (await request.json()) as {
+    const payload = await parseMemberAuthJsonBody<{
       username?: string;
       password?: string;
       autoLogin?: boolean;
-    };
+    }>(request);
 
     const username = normalizeMmUsername(String(payload.username ?? ""));
     const password = String(payload.password ?? "").trim();
@@ -57,7 +61,25 @@ export async function POST(request: Request) {
       "login",
       throttleContext,
     );
-    if (blockedState) {
+    if (!blockedState.ok) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_login",
+        status: "failure",
+        actorType: "guest",
+        identifier: username || null,
+        properties: { reason: blockedState.code },
+      });
+      await delayMemberAuthAttempt("login", true);
+      return NextResponse.json(
+        {
+          error: "login_failed",
+          message: "로그인에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+        },
+        { status: 503 },
+      );
+    }
+    if (blockedState.blocked) {
       await logAuthSecurity({
         ...context,
         eventName: "member_login",
@@ -184,6 +206,18 @@ export async function POST(request: Request) {
       requiresProfilePhotoUpdate,
     });
   } catch (error) {
+    if (error instanceof MemberAuthRouteBodyError) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "member_login",
+        status: "failure",
+        actorType: "guest",
+        properties: { reason: "invalid_body" },
+      });
+      await delayMemberAuthAttempt("login");
+      return NextResponse.json({ error: "login_failed" }, { status: 400 });
+    }
+
     await logAuthSecurity({
       ...context,
       eventName: "member_login",

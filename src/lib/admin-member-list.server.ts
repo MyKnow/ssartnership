@@ -8,22 +8,18 @@ import type {
 } from "@/components/admin/member-manager/selectors";
 import type { AdminMemberPageSize } from "@/lib/admin-ia";
 import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
+import {
+  getAdminSearchLikePattern,
+  normalizeAdminSearchQuery,
+} from "@/lib/admin-search-query";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { unstable_cache } from "next/cache";
 
-export const ADMIN_MEMBER_OPTION_SAMPLE_LIMIT = 5_000;
 export const ADMIN_MEMBER_TREND_SAMPLE_LIMIT = 5_000;
 export const ADMIN_MEMBER_READ_MODEL_TIMEOUT_MS = 5_000;
 export const ADMIN_MEMBER_OPTIONAL_READ_MODEL_TIMEOUT_MS = 750;
 export const ADMIN_MEMBER_OPTIONS_CACHE_REVALIDATE_SECONDS = 60;
 export const ADMIN_MEMBER_POLICY_CACHE_REVALIDATE_SECONDS = 3;
-
-const EMPTY_MEMBER_ID = "00000000-0000-0000-0000-000000000000";
-
-type MemberIdFilter = {
-  included: string[] | null;
-  excluded: string[];
-};
 
 type MemberPolicyConsentRow = {
   member_id: string | null;
@@ -74,13 +70,15 @@ type AdminMemberEnrichment = {
   marketingPreferences: MemberMarketingPreferenceRow[];
 };
 
-type AdminMemberTrendDatabaseRow = {
-  created_at: string | null;
+type AdminMemberListPageIndexRow = {
+  member_ids: string[] | null;
+  total_count: number | string | null;
+  trend_created_ats: Array<string | null> | null;
 };
 
-type AdminMemberOptionDatabaseRow = {
-  generation: number | null;
-  campus: string | null;
+type AdminMemberOptionRow = {
+  generations: Array<number | null> | null;
+  campuses: Array<string | null> | null;
 };
 
 type AdminMemberPolicyDatabaseRow = {
@@ -102,7 +100,6 @@ const ADMIN_MEMBER_LIST_SELECT: string =
   "id,mattermost_account_id,manual_login_id,display_name,email,email_normalized,generation,staff_source_generation,campus,must_change_password,created_at,updated_at,mattermost_login_disabled_at,mattermost_login_disabled_reason,profile_images:member_profile_images!member_profile_images_member_id_fkey(status),directory:mm_user_directory!members_mattermost_account_id_fkey(id,mm_user_id,mm_username)";
 const ADMIN_MEMBER_LIST_FALLBACK_SELECT: string =
   "id,mattermost_account_id,manual_login_id,display_name,email,email_normalized,generation,staff_source_generation,campus,must_change_password,created_at,updated_at,mattermost_login_disabled_at,mattermost_login_disabled_reason,profile_images:member_profile_images!member_profile_images_member_id_fkey(status)";
-const ADMIN_MEMBER_TREND_SELECT: string = "created_at";
 
 const getCachedAdminMemberPolicyContext = unstable_cache(
   async (): Promise<AdminMemberPolicyContext> => {
@@ -154,15 +151,14 @@ const getCachedAdminMemberPolicyContext = unstable_cache(
 
 const getCachedAdminMemberOptions = unstable_cache(
   async () => {
-    const { data, error } = await getSupabaseAdminClient()
-      .from("members")
-      .select("generation,campus")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT);
+    const { data, error } = await getSupabaseAdminClient().rpc(
+      "get_admin_member_filter_options",
+    );
+
+    const row = ((data ?? []) as AdminMemberOptionRow[])[0] ?? null;
 
     return {
-      data: (data ?? []) as AdminMemberOptionDatabaseRow[],
+      data: row,
       hasError: Boolean(error),
     };
   },
@@ -284,7 +280,7 @@ export function parseAdminMemberListFilters(
   params: AdminMemberSearchParams,
 ): AdminMemberListFilters {
   return {
-    searchValue: getAdminMemberSearchParam(params, "q")?.trim().slice(0, 100) ?? "",
+    searchValue: normalizeAdminSearchQuery(getAdminMemberSearchParam(params, "q")),
     sortValue: parseSort(getAdminMemberSearchParam(params, "sort")),
     filterValue: parseMemberStatus(getAdminMemberSearchParam(params, "status")),
     mattermostLifecycleFilter: parseMemberLifecycleFilter(
@@ -325,14 +321,6 @@ export function parseAdminMemberListFilters(
   };
 }
 
-function toInList(ids: string[]) {
-  return `(${ids.join(",")})`;
-}
-
-function getMemberIdSet(rows: Array<{ member_id: string | null }>) {
-  return new Set(rows.flatMap((row) => (row.member_id ? [row.member_id] : [])));
-}
-
 function getEffectiveMarketingConsentMemberIds(
   policyConsentMemberIds: ReadonlySet<string>,
   preferences: readonly MemberMarketingPreferenceRow[],
@@ -351,186 +339,23 @@ function getEffectiveMarketingConsentMemberIds(
   );
 }
 
-function intersectMemberIdSets(current: Set<string> | null, next: Set<string>) {
-  if (!current) {
-    return next;
-  }
-  return new Set(Array.from(current).filter((id) => next.has(id)));
+function toAdminMemberCount(value: number | string | null | undefined) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
 }
 
-function mergeMemberIdFilters(filters: Array<MemberIdFilter | null>): MemberIdFilter {
-  let included: Set<string> | null = null;
-  const excluded = new Set<string>();
-
-  for (const filter of filters) {
-    if (!filter) {
-      continue;
-    }
-    if (filter.included) {
-      included = intersectMemberIdSets(included, new Set(filter.included));
-    }
-    filter.excluded.forEach((id) => excluded.add(id));
-  }
-
-  return {
-    included: included ? [...included] : null,
-    excluded: [...excluded],
-  };
-}
-
-function escapeLikePattern(value: string) {
-  return value
-    .replaceAll("\\", "\\\\")
-    .replaceAll("%", "\\%")
-    .replaceAll("_", "\\_");
-}
-
-function canUseMemberSearchOrFilter(value: string) {
-  return /^[\p{L}\p{N}\s@._+-]+$/u.test(value);
-}
-
-async function getPreferenceFilteredMemberIds(
-  supabase: ReturnType<typeof getSupabaseAdminClient>,
-  filters: Array<{
-    column: string;
-    value: NotificationPreferenceFilterOption;
-    defaultEnabled: boolean;
-  }>,
-): Promise<MemberIdFilter | null | undefined> {
-  const activeFilters = filters.filter((filter) => filter.value !== "all");
-  if (!activeFilters.length) {
-    return null;
-  }
-
-  const filterResults = await Promise.all(
-    activeFilters.map(async (filter) => {
-      const shouldInclude =
-        (filter.value === "enabled" && !filter.defaultEnabled) ||
-        (filter.value === "disabled" && filter.defaultEnabled);
-      const expectedValue = shouldInclude
-        ? filter.value === "enabled"
-        : filter.value === "disabled";
-      const { data, error } = await supabase
-        .from("push_preferences")
-        .select("member_id")
-        .eq(filter.column, expectedValue);
-
-      if (error) {
-        return undefined;
-      }
-
-      return {
-        filter,
-        shouldInclude,
-        ids: getMemberIdSet(
-          (data ?? []) as Array<{ member_id: string | null }>,
-        ),
-      };
-    }),
+function orderAdminMemberRowsByPage(
+  rows: AdminMemberDatabaseRow[],
+  memberIds: readonly string[],
+) {
+  const memberOrder = new Map(
+    memberIds.map((memberId, index) => [memberId, index]),
   );
-  if (filterResults.some((result) => result === undefined)) {
-    return undefined;
-  }
-
-  const excludedIds = new Set<string>();
-  let includedIds: Set<string> | null = null;
-
-  for (const result of filterResults) {
-    if (!result) {
-      continue;
-    }
-    if (result.shouldInclude) {
-      includedIds = intersectMemberIdSets(includedIds, result.ids);
-      continue;
-    }
-    result.ids.forEach((id) => excludedIds.add(id));
-  }
-
-  return {
-    included: includedIds ? [...includedIds] : null,
-    excluded: [...excludedIds],
-  };
-}
-
-async function getPolicyConsentFilteredMemberIds(
-  supabase: ReturnType<typeof getSupabaseAdminClient>,
-  filters: Array<{
-    kind: "service" | "privacy" | "marketing";
-    policyDocumentId: string | null | undefined;
-    value: ConsentFilterOption;
-  }>,
-): Promise<MemberIdFilter | null | undefined> {
-  const activeFilters = filters.filter(
-    (
-      filter,
-    ): filter is {
-      kind: "service" | "privacy" | "marketing";
-      policyDocumentId: string;
-      value: ConsentFilterOption;
-    } => Boolean(filter.policyDocumentId) && filter.value !== "all",
+  return [...rows].sort(
+    (left, right) =>
+      (memberOrder.get(left.id) ?? Number.MAX_SAFE_INTEGER)
+      - (memberOrder.get(right.id) ?? Number.MAX_SAFE_INTEGER),
   );
-  if (activeFilters.length === 0) {
-    return null;
-  }
-
-  const filterResults = await Promise.all(
-    activeFilters.map(async (filter) => {
-      const consentPromise = supabase
-        .from("member_policy_consents")
-        .select("member_id")
-        .eq("policy_document_id", filter.policyDocumentId);
-      const marketingPreferencesPromise =
-        filter.kind === "marketing"
-          ? supabase
-              .from("push_preferences")
-              .select("member_id,marketing_enabled")
-              .eq("marketing_enabled", true)
-          : Promise.resolve(null);
-      const [consentResult, marketingPreferencesResult] = await Promise.all([
-        consentPromise,
-        marketingPreferencesPromise,
-      ]);
-
-      if (consentResult.error || marketingPreferencesResult?.error) {
-        return undefined;
-      }
-
-      let effectiveIds = getMemberIdSet(
-        (consentResult.data ?? []) as Array<{ member_id: string | null }>,
-      );
-      if (filter.kind === "marketing") {
-        effectiveIds = getEffectiveMarketingConsentMemberIds(
-          effectiveIds,
-          (marketingPreferencesResult?.data ?? []) as MemberMarketingPreferenceRow[],
-        );
-      }
-
-      return { filter, effectiveIds };
-    }),
-  );
-  if (filterResults.some((result) => result === undefined)) {
-    return undefined;
-  }
-
-  const excludedIds = new Set<string>();
-  let includedIds: Set<string> | null = null;
-
-  for (const result of filterResults) {
-    if (!result) {
-      continue;
-    }
-
-    if (result.filter.value === "agreed") {
-      includedIds = intersectMemberIdSets(includedIds, result.effectiveIds);
-    } else {
-      result.effectiveIds.forEach((id) => excludedIds.add(id));
-    }
-  }
-
-  return {
-    included: includedIds ? [...includedIds] : null,
-    excluded: [...excludedIds],
-  } satisfies MemberIdFilter;
 }
 
 async function getMemberMarketingPreferences(
@@ -551,89 +376,6 @@ async function getMemberMarketingPreferences(
   return (data ?? []) as MemberMarketingPreferenceRow[];
 }
 
-async function getMemberSearchIds(
-  supabase: ReturnType<typeof getSupabaseAdminClient>,
-  searchValue: string,
-): Promise<string[] | null | undefined> {
-  if (!searchValue) {
-    return null;
-  }
-
-  const pattern = `%${escapeLikePattern(searchValue)}%`;
-  const useOrFilter = canUseMemberSearchOrFilter(searchValue);
-  const directSearchQueries = useOrFilter
-    ? [
-        supabase
-          .from("members")
-          .select("id")
-          .is("deleted_at", null)
-          .or(`display_name.ilike.${pattern},manual_login_id.ilike.${pattern},email_normalized.ilike.${pattern}`)
-          .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
-      ]
-    : [
-        supabase
-          .from("members")
-          .select("id")
-          .is("deleted_at", null)
-          .ilike("display_name", pattern)
-          .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
-        supabase
-          .from("members")
-          .select("id")
-          .is("deleted_at", null)
-          .ilike("manual_login_id", pattern)
-          .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
-        supabase
-          .from("members")
-          .select("id")
-          .is("deleted_at", null)
-          .ilike("email_normalized", pattern)
-          .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
-      ];
-  const directorySearchQueries = useOrFilter
-    ? [
-        supabase
-          .from("members")
-          .select("id,mm_user_directory!inner(id)")
-          .is("deleted_at", null)
-          .or(
-            `mm_username.ilike.${pattern},mm_user_id.ilike.${pattern}`,
-            { referencedTable: "mm_user_directory" },
-          )
-          .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
-      ]
-    : [
-        supabase
-          .from("members")
-          .select("id,mm_user_directory!inner(id)")
-          .is("deleted_at", null)
-          .ilike("mm_user_directory.mm_username", pattern)
-          .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
-        supabase
-          .from("members")
-          .select("id,mm_user_directory!inner(id)")
-          .is("deleted_at", null)
-          .ilike("mm_user_directory.mm_user_id", pattern)
-          .limit(ADMIN_MEMBER_OPTION_SAMPLE_LIMIT),
-      ];
-  const searchResults = await Promise.all([
-    ...directSearchQueries,
-    ...directorySearchQueries,
-  ]);
-  if (searchResults.some((result) => Boolean(result.error))) {
-    return undefined;
-  }
-
-  return Array.from(
-    new Set(
-      searchResults
-        .flatMap((result) => result.data ?? [])
-        .map((row) => row.id)
-        .filter((id): id is string => Boolean(id)),
-    ),
-  );
-}
-
 async function getCurrentMemberPolicyConsents(
   supabase: ReturnType<typeof getSupabaseAdminClient>,
   memberIds: string[],
@@ -652,54 +394,6 @@ async function getCurrentMemberPolicyConsents(
     return undefined;
   }
   return (data ?? []) as MemberPolicyConsentRow[];
-}
-
-type MemberFilterQuery = {
-  eq(column: string, value: unknown): MemberFilterQuery;
-  not(column: string, operator: string, value: unknown): MemberFilterQuery;
-  in(column: string, values: ReadonlyArray<unknown>): MemberFilterQuery;
-};
-
-function applyMemberFilters(
-  query: MemberFilterQuery,
-  filters: AdminMemberListFilters,
-  memberIdFilter: MemberIdFilter,
-) {
-  if (filters.yearFilter !== "all") {
-    query.eq("generation", Number(filters.yearFilter));
-  }
-  if (filters.campusFilter !== "all") {
-    query.eq("campus", filters.campusFilter);
-  }
-  if (filters.filterValue === "mustChangePassword") {
-    query.eq("must_change_password", true);
-  } else if (filters.filterValue === "normal") {
-    query.eq("must_change_password", false);
-  }
-  if (filters.mattermostLifecycleFilter === "disabled") {
-    query.not("mattermost_login_disabled_at", "is", null);
-  } else if (filters.mattermostLifecycleFilter === "graduated") {
-    query.eq(
-      "mattermost_login_disabled_reason",
-      "generation_completed",
-    );
-  } else if (filters.mattermostLifecycleFilter === "departed") {
-    query.eq(
-      "mattermost_login_disabled_reason",
-      "member_departed",
-    );
-  }
-  if (memberIdFilter.included) {
-    query.in(
-      "id",
-      memberIdFilter.included.length > 0
-        ? memberIdFilter.included
-        : [EMPTY_MEMBER_ID],
-    );
-  }
-  if (memberIdFilter.excluded.length > 0) {
-    query.not("id", "in", toInList(memberIdFilter.excluded));
-  }
 }
 
 function createEmptyReadModel(filters: AdminMemberListFilters) {
@@ -831,200 +525,142 @@ async function getAdminMemberListReadModelUnbounded({
 }) {
   try {
     const supabase = getSupabaseAdminClient();
-    const [
-      policyContext,
-      optionsResult,
-      preferenceFilter,
-      searchMemberIds,
-      generationMattermostLoginTargetResult,
-    ] = await Promise.all([
-      withAdminReadModelTimeout(
-        getCachedAdminMemberPolicyContext(),
-        {
-          requiredPolicies: null,
-          marketingPolicy: null,
-          hasError: true,
-        },
-        ADMIN_MEMBER_OPTIONAL_READ_MODEL_TIMEOUT_MS,
-      ),
-      withAdminReadModelTimeout(
-        getCachedAdminMemberOptions(),
-        {
-          data: [] as AdminMemberOptionDatabaseRow[],
-          hasError: true,
-        },
-        ADMIN_MEMBER_OPTIONAL_READ_MODEL_TIMEOUT_MS,
-      ),
-      getPreferenceFilteredMemberIds(supabase, [
-        { column: "enabled", value: filters.pushEnabledFilter, defaultEnabled: false },
-        {
-          column: "announcement_enabled",
-          value: filters.announcementEnabledFilter,
-          defaultEnabled: true,
-        },
-        {
-          column: "new_partner_enabled",
-          value: filters.newPartnerEnabledFilter,
-          defaultEnabled: true,
-        },
-        {
-          column: "expiring_partner_enabled",
-          value: filters.expiringPartnerEnabledFilter,
-          defaultEnabled: true,
-        },
-        { column: "review_enabled", value: filters.reviewEnabledFilter, defaultEnabled: true },
-        { column: "mm_enabled", value: filters.mmEnabledFilter, defaultEnabled: true },
-        {
-          column: "marketing_enabled",
-          value: filters.marketingEnabledFilter,
-          defaultEnabled: false,
-        },
-      ]),
-      getMemberSearchIds(supabase, filters.searchValue),
-      filters.yearFilter === "all"
-        ? Promise.resolve(null)
-        : withAdminReadModelTimeout(
-            Promise.resolve(
-              supabase
-                .from("members")
-                .select("id", { count: "exact", head: true })
-                .is("deleted_at", null)
-                .eq("generation", Number(filters.yearFilter))
-                .not("mattermost_account_id", "is", null)
-                .is("mattermost_login_disabled_at", null)
-                .then(({ count, error }) => ({
-                  count: count ?? null,
-                  error: Boolean(error),
-                })),
+    const [policyContext, optionsResult, generationMattermostLoginTargetResult] =
+      await Promise.all([
+        withAdminReadModelTimeout(
+          getCachedAdminMemberPolicyContext(),
+          {
+            requiredPolicies: null,
+            marketingPolicy: null,
+            hasError: true,
+          },
+          ADMIN_MEMBER_OPTIONAL_READ_MODEL_TIMEOUT_MS,
+        ),
+        withAdminReadModelTimeout(
+          getCachedAdminMemberOptions(),
+          {
+            data: null as AdminMemberOptionRow | null,
+            hasError: true,
+          },
+          ADMIN_MEMBER_OPTIONAL_READ_MODEL_TIMEOUT_MS,
+        ),
+        filters.yearFilter === "all"
+          ? Promise.resolve(null)
+          : withAdminReadModelTimeout(
+              Promise.resolve(
+                supabase
+                  .from("members")
+                  .select("id", { count: "exact", head: true })
+                  .is("deleted_at", null)
+                  .eq("generation", Number(filters.yearFilter))
+                  .not("mattermost_account_id", "is", null)
+                  .is("mattermost_login_disabled_at", null)
+                  .then(({ count, error }) => ({
+                    count: count ?? null,
+                    error: Boolean(error),
+                  })),
+              ),
+              { count: null, error: true },
+              ADMIN_MEMBER_OPTIONAL_READ_MODEL_TIMEOUT_MS,
             ),
-            { count: null, error: true },
-            ADMIN_MEMBER_OPTIONAL_READ_MODEL_TIMEOUT_MS,
-          ),
-    ]);
-    if (preferenceFilter === undefined || searchMemberIds === undefined) {
-      return createEmptyReadModel(filters);
-    }
+      ]);
     const activePolicies = policyContext.requiredPolicies;
     const activeMarketingPolicy = policyContext.marketingPolicy;
-    const hasPolicyConsentFilter =
+    const hasRequiredPolicyConsentFilter =
       filters.serviceConsentFilter !== "all" ||
-      filters.privacyConsentFilter !== "all" ||
+      filters.privacyConsentFilter !== "all";
+    const requiresMarketingConsentFilter =
       filters.marketingConsentFilter !== "all";
-    const policyConsentFilter = activePolicies
-      ? await getPolicyConsentFilteredMemberIds(supabase, [
-          {
-            kind: "service",
-            policyDocumentId: activePolicies.service.id,
-            value: filters.serviceConsentFilter,
-          },
-          {
-            kind: "privacy",
-            policyDocumentId: activePolicies.privacy.id,
-            value: filters.privacyConsentFilter,
-          },
-          {
-            kind: "marketing",
-            policyDocumentId: activeMarketingPolicy?.id,
-            value: filters.marketingConsentFilter,
-          },
-        ])
-      : hasPolicyConsentFilter
-        ? undefined
-        : null;
-    if (policyConsentFilter === undefined) {
+    const hasPolicyConsentFilter =
+      hasRequiredPolicyConsentFilter || requiresMarketingConsentFilter;
+    if (
+      (hasRequiredPolicyConsentFilter && !activePolicies) ||
+      (requiresMarketingConsentFilter && !activeMarketingPolicy)
+    ) {
       return createEmptyReadModel(filters);
     }
-    const memberIdFilter = mergeMemberIdFilters([
-      searchMemberIds === null
-        ? null
-        : { included: searchMemberIds, excluded: [] },
-      preferenceFilter,
-      policyConsentFilter,
-    ]);
-
-    const memberBaseQuery = supabase
-      .from("members")
-      .select(
-        ADMIN_MEMBER_LIST_SELECT,
-        { count: "exact" },
-      )
-      .is("deleted_at", null);
-    let memberQuery = memberBaseQuery;
-    applyMemberFilters(
-      memberQuery as unknown as MemberFilterQuery,
-      filters,
-      memberIdFilter,
-    );
-    if (filters.sortValue === "name") {
-      memberQuery = memberQuery.order("display_name", { ascending: true });
-    } else if (filters.sortValue === "updated") {
-      memberQuery = memberQuery.order("updated_at", { ascending: false });
-    } else {
-      memberQuery = memberQuery.order("created_at", { ascending: false });
-    }
-
-    const memberTrendBaseQuery = supabase
-      .from("members")
-      .select(ADMIN_MEMBER_TREND_SELECT)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(ADMIN_MEMBER_TREND_SAMPLE_LIMIT);
-    const memberTrendQuery = memberTrendBaseQuery;
-    applyMemberFilters(
-      memberTrendQuery as unknown as MemberFilterQuery,
-      filters,
-      memberIdFilter,
-    );
     const from = (page - 1) * pageSize;
-    memberQuery = memberQuery.range(from, from + pageSize - 1);
-    const memberTrendResultPromise = Promise.resolve(
-      memberTrendQuery.then((result) => ({
-        createdAts: ((result.data ?? []) as unknown as AdminMemberTrendDatabaseRow[])
-          .map((row) => row.created_at)
-          .filter((value): value is string => Boolean(value)),
-        hasError: Boolean(result.error),
-      })),
-    )
-      .catch(() => ({ createdAts: [], hasError: true }));
-    let memberResult = (await memberQuery) as unknown as {
+    const pageIndexResult = await supabase.rpc("get_admin_member_list_page", {
+      input_search_pattern: filters.searchValue
+        ? getAdminSearchLikePattern(filters.searchValue)
+        : null,
+      input_generation:
+        filters.yearFilter === "all" ? null : Number(filters.yearFilter),
+      input_campus:
+        filters.campusFilter === "all" ? null : filters.campusFilter,
+      input_password_status: filters.filterValue,
+      input_mattermost_lifecycle: filters.mattermostLifecycleFilter,
+      input_service_policy_id: activePolicies?.service.id ?? null,
+      input_privacy_policy_id: activePolicies?.privacy.id ?? null,
+      input_marketing_policy_id: activeMarketingPolicy?.id ?? null,
+      input_service_consent: filters.serviceConsentFilter,
+      input_privacy_consent: filters.privacyConsentFilter,
+      input_marketing_consent: filters.marketingConsentFilter,
+      input_push_enabled: filters.pushEnabledFilter,
+      input_announcement_enabled: filters.announcementEnabledFilter,
+      input_new_partner_enabled: filters.newPartnerEnabledFilter,
+      input_expiring_partner_enabled: filters.expiringPartnerEnabledFilter,
+      input_review_enabled: filters.reviewEnabledFilter,
+      input_mm_enabled: filters.mmEnabledFilter,
+      input_marketing_enabled: filters.marketingEnabledFilter,
+      input_sort: filters.sortValue,
+      input_offset: from,
+      input_page_size: pageSize,
+      input_trend_limit: ADMIN_MEMBER_TREND_SAMPLE_LIMIT,
+    });
+    if (pageIndexResult.error) {
+      return createEmptyReadModel(filters);
+    }
+    const indexRow = (
+      (pageIndexResult.data ?? []) as unknown as AdminMemberListPageIndexRow[]
+    )[0];
+    if (!indexRow) {
+      return createEmptyReadModel(filters);
+    }
+    const memberIds = Array.from(
+      new Set(
+        (indexRow.member_ids ?? []).filter(
+          (memberId): memberId is string =>
+            typeof memberId === "string" && memberId.length > 0,
+        ),
+      ),
+    );
+    const totalCount = toAdminMemberCount(indexRow.total_count);
+    const trendCreatedAts = (indexRow.trend_created_ats ?? []).filter(
+      (createdAt): createdAt is string =>
+        typeof createdAt === "string" && createdAt.length > 0,
+    );
+    const memberTrend = Promise.resolve<AdminMemberTrendReadModel>({
+      createdAts: trendCreatedAts,
+      isSampled: totalCount > trendCreatedAts.length,
+      hasError: false,
+    });
+    let memberResult: {
       data: AdminMemberDatabaseRow[] | null;
-      count: number | null;
       error: unknown | null;
-    };
+    } = { data: [], error: null };
+    if (memberIds.length > 0) {
+      memberResult = (await supabase
+        .from("members")
+        .select(ADMIN_MEMBER_LIST_SELECT)
+        .in("id", memberIds)
+        .is("deleted_at", null)) as unknown as {
+        data: AdminMemberDatabaseRow[] | null;
+        error: unknown | null;
+      };
+    }
 
     let hasMemberMetadataError =
       policyContext.hasError ||
       !policyContext.requiredPolicies ||
       optionsResult.hasError;
     if (memberResult.error) {
-      let fallbackMemberQuery = supabase
+      memberResult = (await supabase
         .from("members")
-        .select(ADMIN_MEMBER_LIST_FALLBACK_SELECT, { count: "exact" })
-        .is("deleted_at", null);
-      applyMemberFilters(
-        fallbackMemberQuery as unknown as MemberFilterQuery,
-        filters,
-        memberIdFilter,
-      );
-      if (filters.sortValue === "name") {
-        fallbackMemberQuery = fallbackMemberQuery.order("display_name", {
-          ascending: true,
-        });
-      } else if (filters.sortValue === "updated") {
-        fallbackMemberQuery = fallbackMemberQuery.order("updated_at", {
-          ascending: false,
-        });
-      } else {
-        fallbackMemberQuery = fallbackMemberQuery.order("created_at", {
-          ascending: false,
-        });
-      }
-      memberResult = (await fallbackMemberQuery.range(
-        from,
-        from + pageSize - 1,
-      )) as unknown as {
+        .select(ADMIN_MEMBER_LIST_FALLBACK_SELECT)
+        .in("id", memberIds)
+        .is("deleted_at", null)) as unknown as {
         data: AdminMemberDatabaseRow[] | null;
-        count: number | null;
         error: unknown | null;
       };
       hasMemberMetadataError = true;
@@ -1033,8 +669,10 @@ async function getAdminMemberListReadModelUnbounded({
       return createEmptyReadModel(filters);
     }
 
-    const safeMembers = memberResult.data ?? [];
-    const memberIds = safeMembers.map((member) => member.id);
+    const safeMembers = orderAdminMemberRowsByPage(
+      memberResult.data ?? [],
+      memberIds,
+    );
     const policyDocumentIds = [
       activePolicies?.service.id,
       activePolicies?.privacy.id,
@@ -1067,26 +705,20 @@ async function getAdminMemberListReadModelUnbounded({
       activeMarketingPolicy,
       enrichment: resolvedMemberEnrichment,
     });
-    const totalCount = memberResult.count ?? safeMembers.length;
     const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-    const memberTrend = memberTrendResultPromise.then((result) => ({
-      ...result,
-      isSampled: totalCount > result.createdAts.length,
-    }));
     const latestUpdatedAt = getLatestMemberUpdatedAt(safeMembers);
-    const optionRows = optionsResult.data;
     const options = {
       campuses: Array.from(
         new Set(
-          optionRows
-            .map((row) => (typeof row.campus === "string" ? row.campus.trim() : ""))
+          (optionsResult.data?.campuses ?? [])
+            .map((campus) => (typeof campus === "string" ? campus.trim() : ""))
             .filter(Boolean),
         ),
       ).sort((a, b) => a.localeCompare(b, "ko")),
       years: Array.from(
         new Set(
-          optionRows
-            .map((row) => row.generation)
+          (optionsResult.data?.generations ?? [])
+            .map((generation) => generation)
             .filter((generation): generation is number => typeof generation === "number"),
         ),
       ).sort((a, b) => b - a),

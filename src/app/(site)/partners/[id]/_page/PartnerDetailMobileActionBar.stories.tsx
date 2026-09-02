@@ -146,3 +146,27 @@ export const ExternalBenefit: Story = {
     await expect(benefit).toHaveClass("h-12", "w-full", "bg-primary");
   },
 };
+
+export const GuestExternalBenefit: Story = {
+  args: {
+    benefitUseAction: {
+      label: "로그인 후 혜택 이용하기",
+      href: "/auth/login?returnTo=%2Fpartners%2F00000000-0000-4000-8000-000000000001",
+      type: "external_link" as const,
+      requiresLogin: true,
+    },
+    certificationBenefitAction: null,
+    inquiryAction: null,
+  },
+  play: async ({ canvasElement }) => {
+    const benefit = within(canvasElement).getByRole("link", {
+      name: "로그인 후 혜택 이용하기",
+    });
+
+    await expect(benefit).toHaveAttribute(
+      "href",
+      "/auth/login?returnTo=%2Fpartners%2F00000000-0000-4000-8000-000000000001",
+    );
+    await expect(benefit).not.toHaveAttribute("target");
+  },
+};

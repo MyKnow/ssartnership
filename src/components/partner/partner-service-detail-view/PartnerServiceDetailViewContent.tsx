@@ -14,7 +14,10 @@ import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
 } from "@/lib/partner-visibility";
-import { getPartnerCompanyPlanDefinition } from "@/lib/partner-company-plans";
+import {
+  getPartnerPlanBadgeLabel,
+  getPartnerPlanBadgeVariant,
+} from "@/lib/partner-plan-ui";
 import PartnerServiceMetricsPanel from "@/components/partner/partner-service-detail-view/PartnerServiceMetricsPanel";
 import PartnerPendingRequestSection from "@/components/partner/partner-service-detail-view/PartnerPendingRequestSection";
 import PartnerServiceContacts from "@/components/partner/partner-service-detail-view/PartnerServiceContacts";
@@ -140,8 +143,8 @@ export default function PartnerServiceDetailViewContent({
                       <Badge className={getPartnerVisibilityBadgeClass(context.visibility)}>
                         {getPartnerVisibilityLabel(context.visibility)}
                       </Badge>
-                      <Badge variant={brandPlanTier === "boost" ? "primary" : brandPlanTier === "partner" ? "success" : "neutral"}>
-                        {getPartnerCompanyPlanDefinition(brandPlanTier).label}
+                      <Badge variant={getPartnerPlanBadgeVariant(brandPlanTier)}>
+                        {getPartnerPlanBadgeLabel(brandPlanTier)}
                       </Badge>
                       {pendingRequest ? (
                         <Badge className="bg-amber-500/10 text-amber-700">

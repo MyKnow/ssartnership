@@ -14,6 +14,8 @@ import {
 import { CAMPUS_DIRECTORY } from "@/lib/campuses";
 import { getSsafyMemberLifecycle, SSAFY_STAFF_YEAR } from "@/lib/ssafy-year";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
+import { cache } from "react";
 
 type PromotionEventRow = {
   id: string;
@@ -76,6 +78,9 @@ export type ManagedPromotionSlide = PromotionSlide & {
   createdAt: string | null;
   updatedAt: string | null;
 };
+
+export const PROMOTION_EVENTS_CACHE_TAG = "promotion-events";
+export const PROMOTION_SLIDES_CACHE_TAG = "promotion-slides";
 
 const conditionKeys = new Set<EventConditionKey>([
   "signup",
@@ -268,7 +273,7 @@ function staticSlides() {
   return HOME_PROMOTIONS.map((slide, index) => mapStaticSlide(slide, index));
 }
 
-export async function listManagedPromotionSlides(options?: {
+async function loadManagedPromotionSlides(options?: {
   includeInactive?: boolean;
 }): Promise<ManagedPromotionSlide[]> {
   if (!canUseSupabase()) {
@@ -323,6 +328,22 @@ export async function listManagedPromotionSlides(options?: {
     console.error("[promotions] promotion_slides fallback", error);
     return staticSlides();
   }
+}
+
+const getCachedManagedPromotionSlides = unstable_cache(
+  async (includeInactive: boolean): Promise<ManagedPromotionSlide[]> =>
+    loadManagedPromotionSlides({ includeInactive }),
+  ["promotions", "slides", "raw"],
+  {
+    revalidate: false,
+    tags: [PROMOTION_SLIDES_CACHE_TAG],
+  },
+);
+
+export async function listManagedPromotionSlides(options?: {
+  includeInactive?: boolean;
+}): Promise<ManagedPromotionSlide[]> {
+  return getCachedManagedPromotionSlides(Boolean(options?.includeInactive));
 }
 
 export type PromotionSlideViewer = {
@@ -441,7 +462,7 @@ export function canDisplayHomePromotionSlide(
   return isPromotionCampaignVisible(campaignsBySlug.get(slide.eventSlug) ?? null, now);
 }
 
-export async function listManagedEventCampaigns(options?: {
+async function loadManagedEventCampaigns(options?: {
   includeInactive?: boolean;
 }): Promise<ManagedEventCampaign[]> {
   if (!canUseSupabase()) {
@@ -473,10 +494,26 @@ export async function listManagedEventCampaigns(options?: {
   }
 }
 
-export async function getManagedEventCampaign(slug: string) {
+const getCachedManagedEventCampaigns = unstable_cache(
+  async (includeInactive: boolean): Promise<ManagedEventCampaign[]> =>
+    loadManagedEventCampaigns({ includeInactive }),
+  ["promotions", "events", "raw"],
+  {
+    revalidate: false,
+    tags: [PROMOTION_EVENTS_CACHE_TAG],
+  },
+);
+
+export async function listManagedEventCampaigns(options?: {
+  includeInactive?: boolean;
+}): Promise<ManagedEventCampaign[]> {
+  return getCachedManagedEventCampaigns(Boolean(options?.includeInactive));
+}
+
+export const getManagedEventCampaign = cache(async (slug: string) => {
   const campaigns = await listManagedEventCampaigns({ includeInactive: true });
   return campaigns.find((campaign) => campaign.slug === slug) ?? null;
-}
+});
 
 export async function getHomePromotionSlides(
   viewer: PromotionSlideViewer = { authenticated: false, year: null, campus: null },

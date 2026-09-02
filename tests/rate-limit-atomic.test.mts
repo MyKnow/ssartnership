@@ -224,6 +224,149 @@ test("rate-limit persistence returns safe typed failures without provider detail
   );
 });
 
+test("rate-limit lookup distinguishes available, blocked, and storage failure states", async () => {
+  const { readRateLimitBlockingState } = await rateLimitModulePromise;
+  const future = new Date(Date.now() + 60_000).toISOString();
+
+  assert.deepEqual(
+    await readRateLimitBlockingState(["login:account:member"], async () => ({
+      data: [],
+      error: null,
+    })),
+    { ok: true, blocked: false },
+  );
+  assert.deepEqual(
+    await readRateLimitBlockingState(["login:account:member"], async () => ({
+      data: [
+        {
+          identifier: "login:account:member",
+          blocked_until: future,
+        },
+      ],
+      error: null,
+    })),
+    {
+      ok: true,
+      blocked: true,
+      identifier: "login:account:member",
+      blockedUntil: future,
+    },
+  );
+
+  for (const readRows of [
+    async () => ({
+      data: null,
+      error: { message: "sensitive database response" },
+    }),
+    async () => {
+      throw new TypeError("fetch failed with internal connection details");
+    },
+    async () => ({
+      data: [
+        {
+          identifier: "login:account:member",
+          blocked_until: "invalid-provider-timestamp",
+        },
+      ],
+      error: null,
+    }),
+    async () => ({
+      data: [{ blocked_until: null }],
+      error: null,
+    }),
+    async () => ({
+      data: [
+        {
+          identifier: "login:account:unexpected-member",
+          blocked_until: null,
+        },
+      ],
+      error: null,
+    }),
+  ]) {
+    const result = await readRateLimitBlockingState(
+      ["login:account:member"],
+      readRows,
+    );
+    assert.deepEqual(result, {
+      ok: false,
+      code: "rate_limit_storage_failed",
+    });
+    assert.doesNotMatch(
+      JSON.stringify(result),
+      /sensitive database response|fetch failed|connection details|provider-timestamp/,
+    );
+  }
+});
+
+test("rate-limit lookup with no identifiers remains available without touching storage", async () => {
+  const { readRateLimitBlockingState } = await rateLimitModulePromise;
+  let called = false;
+  const result = await readRateLimitBlockingState([], async () => {
+    called = true;
+    throw new Error("must not be called");
+  });
+
+  assert.deepEqual(result, { ok: true, blocked: false });
+  assert.equal(called, false);
+});
+
+test("abuse-sensitive callers distinguish storage failure before normal block handling", async () => {
+  const callers = [
+    ["src/app/(site)/partner-registration/actions.ts", "blockingState", 2],
+    ["src/app/admin/(protected)/_actions/cycle-actions.ts", "blocked", 1],
+    ["src/app/api/admin/members/[id]/profile-photo/route.ts", "blockingState", 1],
+    ["src/app/api/auth/login/route.ts", "blockedState", 1],
+    ["src/app/api/certification/photo/route.ts", "blockingState", 1],
+    ["src/app/api/graduate-verification/account/setup/route.ts", "blockingState", 1],
+    ["src/app/api/graduate-verification/email/send/route.ts", "blockingState", 1],
+    ["src/app/api/graduate-verification/email/verify/route.ts", "blockingState", 1],
+    ["src/app/api/graduate-verification/password-reset/send/route.ts", "blockingState", 1],
+    ["src/app/api/graduate-verification/password-reset/verify/route.ts", "blockingState", 1],
+    ["src/app/api/graduate-verification/submit/route.ts", "blockingState", 1],
+    ["src/app/api/graduate-verification/uploads/sign/route.ts", "blockingState", 1],
+    ["src/app/api/member-password-action/complete/route.ts", "blockingState", 1],
+    ["src/app/api/member-password-action/reset/route.ts", "blockingState", 1],
+    ["src/app/api/member/email/send/route.ts", "blockingState", 1],
+    ["src/app/api/member/email/verify/route.ts", "blockingState", 1],
+    ["src/app/api/member/recovery/email/send/route.ts", "blockingState", 1],
+    ["src/app/api/member/recovery/email/verify/route.ts", "blockingState", 1],
+    ["src/app/api/member/recovery/start/route.ts", "blockingState", 1],
+    ["src/app/api/mm/_shared/reset-password-complete.ts", "blockedState", 1],
+    ["src/app/api/mm/change-password/route.ts", "blockedState", 1],
+    ["src/app/api/mm/code/issue/route.ts", "blocked", 1],
+    ["src/app/api/mm/code/verify/route.ts", "blocked", 1],
+    ["src/app/api/mm/login/route.ts", "blockedState", 1],
+    ["src/app/api/partner/change-password/route.ts", "blockedState", 1],
+    ["src/app/api/partner/reset-password/route.ts", "blockedState", 1],
+    ["src/app/api/suggest/route.ts", "blockingState", 1],
+    ["src/app/api/uploads/images/complete/route.ts", "blockingState", 1],
+    ["src/app/api/uploads/images/sign/route.ts", "blockingState", 1],
+    ["src/app/partner/login/_actions/login.ts", "blockedState", 1],
+  ] as const;
+
+  for (const [path, decision, expectedOccurrences] of callers) {
+    const source = await readFile(new URL(`../${path}`, import.meta.url), "utf8");
+    let searchFrom = 0;
+    for (let occurrence = 0; occurrence < expectedOccurrences; occurrence += 1) {
+      const unavailableIndex = source.indexOf(
+        `if (!${decision}.ok)`,
+        searchFrom,
+      );
+      const blockedIndex = source.indexOf(
+        `if (${decision}.blocked)`,
+        unavailableIndex,
+      );
+      assert.ok(unavailableIndex >= 0, `${path}: storage failure branch missing`);
+      assert.ok(
+        blockedIndex > unavailableIndex,
+        `${path}: storage failure must be handled before blocked state`,
+      );
+      searchFrom = blockedIndex + 1;
+    }
+  }
+});
+
 test("storage failures do not divert post-side-effect callers into catch paths", async () => {
   const { persistRateLimitAttempt } = await rateLimitModulePromise;
   const events = ["business_side_effect_completed"];
@@ -250,6 +393,26 @@ test("storage failures do not divert post-side-effect callers into catch paths",
     "business_side_effect_completed",
     "caller_continued",
   ]);
+});
+
+test("required rate-limit records fail closed before email delivery", async () => {
+  for (const path of [
+    "src/app/api/member/email/send/route.ts",
+    "src/app/api/member/recovery/email/send/route.ts",
+  ]) {
+    const source = await readFile(new URL(`../${path}`, import.meta.url), "utf8");
+    const recordIndex = source.indexOf(
+      "const attemptRecord = await recordMemberEmailVerificationAttempt(",
+    );
+    const failureIndex = source.indexOf("if (!attemptRecord.ok)", recordIndex);
+    const deliveryIndex = source.indexOf("deliver: async", recordIndex);
+
+    assert.ok(recordIndex >= 0, `${path}: required attempt record missing`);
+    assert.ok(
+      failureIndex > recordIndex && failureIndex < deliveryIndex,
+      `${path}: storage failure must abort before delivery`,
+    );
+  }
 });
 
 test("recordAttempt normalizes synchronous Supabase client setup failures", async () => {
