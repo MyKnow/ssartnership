@@ -422,8 +422,28 @@ test("Preview Supabase migrations apply dev schema changes without syncing data"
   );
   assert.doesNotMatch(workflow, /ref: dev/);
   assert.doesNotMatch(workflow, /workflow_run:/);
+  assert.doesNotMatch(workflow, /gh run rerun/);
+  assert.doesNotMatch(workflow, /"\.github\/workflows\/preview-migrations\.yml"/);
+  assert.match(workflow, /permissions:\s*\n\s+contents: read\s*\n\s+checks: read/);
   assert.match(workflow, /git ls-remote "\$REPOSITORY_URL" refs\/heads\/dev/);
   assert.match(workflow, /echo "is_current=false" >> "\$GITHUB_OUTPUT"/);
+  assert.match(
+    workflow,
+    /name: Wait for the exact Supabase Preview check[\s\S]+?github\.event_name == 'push'[\s\S]+?SUPABASE_GITHUB_APP_ID: "330661"[\s\S]+?for _ in \{1\.\.60\}[\s\S]+?commits\/\$EXPECTED_DEV_SHA\/check-runs\?filter=latest&per_page=100&app_id=\$SUPABASE_GITHUB_APP_ID[\s\S]+?select\(\.name == "Supabase Preview" and \.app\.id == 330661\)[\s\S]+?sleep 5/,
+  );
+  assert.match(
+    workflow,
+    /"present\|\\\(\$checks\[0\]\.status\)\|\\\(\$checks\[0\]\.conclusion \/\/ ""\)"/,
+  );
+  assert.match(
+    workflow,
+    /"\$match_state" == "present" && "\$check_status" == "completed"[\s\S]+?"\$check_conclusion" != "success"/,
+  );
+  assert.ok(
+    workflow.indexOf("name: Wait for the exact Supabase Preview check") <
+      workflow.indexOf("name: List Preview migrations before apply"),
+    "the provider check must settle before inspecting or mutating Preview migrations",
+  );
   assert.match(
     workflow,
     /name: Apply pending Preview migrations[\s\S]+?test "\$\(git rev-parse HEAD\)" = "\$EXPECTED_DEV_SHA"[\s\S]+?git ls-remote origin refs\/heads\/dev[\s\S]+?supabase db push/,

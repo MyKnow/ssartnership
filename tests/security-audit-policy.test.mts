@@ -66,7 +66,7 @@ test("production advisories always fail even when their URL is tracked for devel
   assert.equal(result.allowedDevelopment.length, 0);
 });
 
-test("only exact unpatchable development advisories are allowed", () => {
+test("only exact reviewed development advisories with an active exception are allowed", () => {
   const [tracked] = ALLOWED_DEVELOPMENT_ADVISORIES.values();
   const allowedReport = createAuditReport([
     {
@@ -90,12 +90,20 @@ test("only exact unpatchable development advisories are allowed", () => {
   const patchable = evaluateAuditPolicy({
     fullReport: patchableReport,
     productionReport: createAuditReport([]),
+    now: Date.parse("2026-09-03T00:00:00.000Z"),
+  });
+  const expired = evaluateAuditPolicy({
+    fullReport: patchableReport,
+    productionReport: createAuditReport([]),
+    now: Date.parse("2026-09-16T00:00:00.000Z"),
   });
 
   assert.equal(allowed.allowedDevelopment.length, 1);
   assert.equal(allowed.developmentFailures.length, 0);
-  assert.equal(patchable.allowedDevelopment.length, 0);
-  assert.equal(patchable.developmentFailures.length, 1);
+  assert.equal(patchable.allowedDevelopment.length, 1);
+  assert.equal(patchable.developmentFailures.length, 0);
+  assert.equal(expired.allowedDevelopment.length, 0);
+  assert.equal(expired.developmentFailures.length, 1);
 });
 
 test("unknown development advisories fail and duplicate URLs are reported once", () => {
