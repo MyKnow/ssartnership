@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useId, useState, type KeyboardEvent } from "react";
 import GraduatePasswordResetForm from "@/components/auth/GraduatePasswordResetForm";
 import MattermostCodeVerificationForm from "@/components/auth/MattermostCodeVerificationForm";
@@ -66,7 +67,7 @@ export default function PasswordResetMethodTabs({
     <div className="mt-6">
       <div
         role="tablist"
-        aria-label="비밀번호 재설정 유형"
+        aria-label="비밀번호 재설정 인증 수단"
         className="grid grid-cols-2 gap-2 rounded-[1.35rem] border border-border bg-surface-inset p-2"
       >
         <button
@@ -80,7 +81,7 @@ export default function PasswordResetMethodTabs({
           onKeyDown={(event) => handleTabKeyDown(event, "mattermost")}
           className={resetMethodTabClassName(method === "mattermost")}
         >
-          운영진·재학생
+          Mattermost
         </button>
         <button
           id={graduateTabId}
@@ -93,7 +94,7 @@ export default function PasswordResetMethodTabs({
           onKeyDown={(event) => handleTabKeyDown(event, "graduate_email")}
           className={resetMethodTabClassName(method === "graduate_email")}
         >
-          수료생
+          이메일
         </button>
       </div>
       {method === "mattermost" ? (
@@ -109,6 +110,14 @@ export default function PasswordResetMethodTabs({
           <GraduatePasswordResetForm />
         </section>
       )}
+      <div className="mt-5 border-t border-border pt-3 text-center">
+        <Link
+          href="/auth/signup/graduate?kind=recovery"
+          className="inline-flex min-h-11 items-center justify-center text-ko text-center text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          수료해서 MM 로그인이 불가능해요
+        </Link>
+      </div>
     </div>
   );
 }

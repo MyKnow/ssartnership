@@ -11,16 +11,23 @@ const graduateFormSource = await readFile(
   "utf8",
 );
 
-test("비밀번호 재설정은 운영진·재학생과 수료생 경로만 노출한다", () => {
+test("비밀번호 재설정은 Mattermost와 이메일 인증 수단만 노출한다", () => {
   assert.match(source, /grid-cols-2/);
-  assert.match(source, />\s*운영진·재학생\s*</);
-  assert.match(source, />\s*수료생\s*</);
+  assert.match(source, /aria-label="비밀번호 재설정 인증 수단"/);
+  assert.match(source, />\s*Mattermost\s*</);
+  assert.match(source, />\s*이메일\s*</);
+  assert.doesNotMatch(source, />\s*운영진·재학생\s*</);
+  assert.doesNotMatch(source, />\s*수료생\s*</);
+  assert.doesNotMatch(source, />\s*Mattermost 아이디\s*</);
   assert.doesNotMatch(source, /이메일 초대|manual_email|ManualMemberEmailResetForm/);
 });
 
-test("비밀번호 재설정 탭은 각 유형의 재설정 입력에만 집중한다", () => {
+test("비밀번호 재설정 탭은 각 유형의 재설정 입력에 집중하고 수료생 복구를 별도 안내한다", () => {
   assert.doesNotMatch(source, /로그인 후 이메일 등록|\/auth\/login\?returnTo=%2Fcertification%2Femail/);
-  assert.doesNotMatch(source, /기존 회원 복구 신청|\/auth\/signup\/graduate\?kind=recovery/);
+  assert.doesNotMatch(source, /기존 회원 복구 신청/);
+  assert.match(source, /href="\/auth\/signup\/graduate\?kind=recovery"/);
+  assert.match(source, />\s*수료해서 MM 로그인이 불가능해요\s*</);
+  assert.equal(source.match(/\/auth\/signup\/graduate\?kind=recovery/g)?.length, 1);
   assert.doesNotMatch(
     source,
     /가입 때 연결한 Mattermost 계정으로 인증 코드를 받으면 새 비밀번호를 설정할 수 있습니다/,

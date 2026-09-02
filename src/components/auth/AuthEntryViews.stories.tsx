@@ -64,12 +64,15 @@ export const ResetPassword: Story = {
   render: () => <ResetPasswordPageView activeSenderGenerations={[15]} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const memberTab = canvas.getByRole("tab", { name: "운영진·재학생" });
-    const graduateTab = canvas.getByRole("tab", { name: "수료생" });
+    const memberTab = canvas.getByRole("tab", { name: "Mattermost" });
+    const graduateTab = canvas.getByRole("tab", { name: "이메일" });
 
     await expect(canvas.getAllByRole("tab")).toHaveLength(2);
     await expect(canvas.queryByRole("tab", { name: "이메일 초대" })).not.toBeInTheDocument();
     await expect(memberTab).toHaveAttribute("aria-selected", "true");
+    await expect(
+      canvas.getByRole("link", { name: "수료해서 MM 로그인이 불가능해요" }),
+    ).toHaveAttribute("href", "/auth/signup/graduate?kind=recovery");
 
     memberTab.focus();
     await userEvent.keyboard("{ArrowRight}");

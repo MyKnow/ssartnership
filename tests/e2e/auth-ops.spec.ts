@@ -155,12 +155,11 @@ test.describe("auth and partner portal operation flows", () => {
     }, MEMBER_LOGIN_METHOD_STORAGE_KEY);
   });
 
-  test("@critical password reset exposes only member and graduate paths", async ({ page }) => {
+  test("@critical password reset exposes only Mattermost ID and email methods", async ({ page }) => {
     await page.goto("/auth/reset");
-    await page.waitForLoadState("networkidle");
-
-    const memberTab = page.getByRole("tab", { name: "운영진·재학생", exact: true });
-    const graduateTab = page.getByRole("tab", { name: "수료생", exact: true });
+    const memberTab = page.getByRole("tab", { name: "Mattermost", exact: true });
+    const graduateTab = page.getByRole("tab", { name: "이메일", exact: true });
+    await waitForPageReady(page, memberTab);
 
     await expect(page.getByRole("tab")).toHaveCount(2);
     await expect(page.getByRole("tab", { name: "이메일 초대", exact: true })).toHaveCount(0);
@@ -171,7 +170,13 @@ test.describe("auth and partner portal operation flows", () => {
     await expect(page.getByRole("combobox", { name: "기수" })).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Mattermost ID" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Mattermost로 인증 코드 받기" })).toHaveClass(/mt-2/);
-    await expect(page.getByRole("link", { name: "기존 회원 복구 신청" })).toHaveCount(0);
+    const graduateRecovery = page.getByRole("link", {
+      name: "수료해서 MM 로그인이 불가능해요",
+    });
+    await expect(graduateRecovery).toHaveAttribute(
+      "href",
+      "/auth/signup/graduate?kind=recovery",
+    );
 
     await memberTab.focus();
     await page.keyboard.press("ArrowRight");
@@ -180,7 +185,7 @@ test.describe("auth and partner portal operation flows", () => {
     await expect(graduateTab).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("textbox", { name: "이메일" })).toBeVisible();
     await expect(page.getByRole("button", { name: "이메일로 인증 코드 받기" })).toHaveClass(/w-full/);
-    await expect(page.getByRole("link", { name: "기존 회원 복구 신청" })).toHaveCount(0);
+    await expect(graduateRecovery).toBeVisible();
   });
 
   test("signup switches its child panel before opening the graduate certificate application", async ({ page }) => {
@@ -280,12 +285,19 @@ test.describe("auth and partner portal operation flows", () => {
     await expect(page.getByText("이미 가입된 회원입니다.")).toBeVisible();
   });
 
-  test("keeps existing-member recovery links out of password reset tabs", async ({ page }) => {
+  test("keeps graduated-member recovery available outside both password reset panels", async ({ page }) => {
     await page.goto("/auth/reset");
 
-    await expect(page.getByRole("link", { name: "기존 회원 복구 신청" })).toHaveCount(0);
-    await page.getByRole("tab", { name: "수료생", exact: true }).click();
-    await expect(page.getByRole("link", { name: "기존 회원 복구 신청" })).toHaveCount(0);
+    const recoveryLink = page.getByRole("link", {
+      name: "수료해서 MM 로그인이 불가능해요",
+    });
+    await expect(recoveryLink).toHaveCount(1);
+    await expect(recoveryLink).toHaveAttribute(
+      "href",
+      "/auth/signup/graduate?kind=recovery",
+    );
+    await page.getByRole("tab", { name: "이메일", exact: true }).click();
+    await expect(recoveryLink).toBeVisible();
   });
 
   test("partner login maps safe server validation errors to fields", async ({ page }) => {
