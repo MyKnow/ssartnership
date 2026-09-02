@@ -13,15 +13,15 @@ export const ALLOWED_DEVELOPMENT_ADVISORIES = new Map(
       packageName: "image-size",
       url: "https://github.com/advisories/GHSA-w3rx-r6r6-pgpr",
       reason:
-        "Storybook-only image-size dependency; upstream 2.0.2 has no patched release, and the npm-proposed Storybook replacement is not coherently installable yet.",
-      fixAvailableOverrideExpiresAt: "2026-09-16T00:00:00.000Z",
+        "Storybook-only dependency; npm's replacement line requires an unpublished stable Storybook peer. Temporary grace expires 2026-09-09.",
+      allowPatchableUntil: "2026-09-09T00:00:00.000Z",
     },
     {
       packageName: "image-size",
       url: "https://github.com/advisories/GHSA-5p2g-fcmc-qvqq",
       reason:
-        "Storybook-only image-size dependency; upstream 2.0.2 has no patched release, and the npm-proposed Storybook replacement is not coherently installable yet.",
-      fixAvailableOverrideExpiresAt: "2026-09-16T00:00:00.000Z",
+        "Storybook-only dependency; npm's replacement line requires an unpublished stable Storybook peer. Temporary grace expires 2026-09-09.",
+      allowPatchableUntil: "2026-09-09T00:00:00.000Z",
     },
   ].map((advisory) => [advisoryKey(advisory), advisory]),
 );
@@ -101,7 +101,7 @@ export function evaluateAuditPolicy({
   fullReport,
   productionReport,
   allowedDevelopmentAdvisories = ALLOWED_DEVELOPMENT_ADVISORIES,
-  now = Date.now(),
+  now = new Date(),
 }) {
   const productionFailures = collectAdvisories(productionReport);
   const productionKeys = new Set(productionFailures.map(advisoryKey));
@@ -113,17 +113,17 @@ export function evaluateAuditPolicy({
 
   for (const advisory of developmentAdvisories) {
     const policy = allowedDevelopmentAdvisories.get(advisoryKey(advisory));
-    const overrideExpiresAt = policy?.fixAvailableOverrideExpiresAt
-      ? Date.parse(policy.fixAvailableOverrideExpiresAt)
+    const patchableGraceDeadline = policy?.allowPatchableUntil
+      ? Date.parse(policy.allowPatchableUntil)
       : Number.NaN;
-    const hasActiveFixAvailableOverride =
+    const patchableGraceActive =
       advisory.fixAvailable === true &&
-      Number.isFinite(overrideExpiresAt) &&
-      now < overrideExpiresAt;
+      Number.isFinite(patchableGraceDeadline) &&
+      now.getTime() < patchableGraceDeadline;
 
     if (
       policy &&
-      (advisory.fixAvailable === false || hasActiveFixAvailableOverride)
+      (advisory.fixAvailable === false || patchableGraceActive)
     ) {
       allowedDevelopment.push({ ...advisory, reason: policy.reason });
       continue;
@@ -168,7 +168,7 @@ export function main() {
   }
 
   if (result.allowedDevelopment.length > 0) {
-    console.warn("Tracked development-only advisories without a patch:");
+    console.warn("Tracked development-only advisories under explicit policy:");
     for (const advisory of result.allowedDevelopment) {
       console.warn(
         `- [${advisory.severity}] ${advisory.packageName}: ${advisory.title} ${advisory.url}`,
@@ -187,7 +187,7 @@ export function main() {
 
   console.log("Production dependency audit passed with no advisories.");
   console.log(
-    "Full dependency policy audit passed with tracked development-only advisories.",
+    "Full dependency policy audit passed with explicitly tracked development-only advisories.",
   );
 }
 
