@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Check } from "lucide-react";
 import Button from "@/components/ui/Button";
@@ -16,11 +16,10 @@ import {
   GRADUATE_EMAIL_CODE_TTL_SECONDS,
 } from "@/lib/graduate-verification-email-code";
 import {
-  clampGraduateEducationEnd,
-  getGraduateCurrentYearMonth,
-  getSsafyGenerationFromEducationStart,
+  getGraduateGenerationOptions,
   GRADUATE_CAMPUS_OPTIONS,
   MAX_GRADUATE_CERTIFICATE_BYTES,
+  validateGraduateEducationDetails,
   type GraduateVerificationRequestKind,
 } from "@/lib/graduate-verification";
 import {
@@ -48,14 +47,10 @@ const GRADUATE_PROFILE_IMAGE_POLICY = resolveImageTransformPolicy(
 );
 
 const RESUBMISSION_TARGET_LABELS: Record<ResubmissionTarget, string> = {
-  education_period: "교육 기간",
+  education_period: "교육 정보",
   certificate: "교육이수증",
   profile_image: "본인 사진",
 };
-
-function getCurrentYear() {
-  return new Date().getFullYear();
-}
 
 function getCertificateFileError(file: File) {
   if (file.type !== "application/pdf" || !file.name.toLowerCase().endsWith(".pdf")) {
@@ -101,11 +96,8 @@ async function uploadSignedGraduateFile(input: {
 
 export default function GraduateVerificationApplicationView({
   requestKind = "graduate_signup",
-  cohortSelectionPreview = false,
 }: {
   requestKind?: GraduateVerificationRequestKind;
-  /** Storybook-only application preview; it never derives or submits education dates. */
-  cohortSelectionPreview?: boolean;
 }) {
   const certificateInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -126,10 +118,6 @@ export default function GraduateVerificationApplicationView({
     generation?: string;
     campus?: string;
   }>({});
-  const [startYear, setStartYear] = useState(String(getCurrentYear()));
-  const [startMonth, setStartMonth] = useState("1");
-  const [endYear, setEndYear] = useState(String(getCurrentYear()));
-  const [endMonth, setEndMonth] = useState("6");
   const [campus, setCampus] = useState("");
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -151,7 +139,7 @@ export default function GraduateVerificationApplicationView({
   const legalNameRef = useRef<HTMLInputElement>(null);
   const generationRef = useRef<HTMLSelectElement>(null);
   const campusRef = useRef<HTMLSelectElement>(null);
-  const currentYearMonth = useMemo(() => getGraduateCurrentYearMonth(), []);
+  const generationOptions = getGraduateGenerationOptions();
   const isExistingMemberRecovery = requestKind === "existing_member_recovery";
   const activeStepIndex = step === "email" ? 0 : step === "details" ? 1 : 2;
   const { persist: persistProfileDraft, clear: clearProfileDraft } = useSingleImageUploadDraft({
@@ -186,22 +174,8 @@ export default function GraduateVerificationApplicationView({
     return () => window.clearInterval(intervalId);
   }, [codeExpiresAt]);
 
-  const inferredGeneration = useMemo(
-    () => getSsafyGenerationFromEducationStart(Number(startYear), Number(startMonth)),
-    [startMonth, startYear],
-  );
-  const generationOptions = useMemo(
-    () => {
-      const latestGeneration = getSsafyGenerationFromEducationStart(
-        currentYearMonth.year,
-        currentYearMonth.month,
-      ) ?? 0;
-      return Array.from({ length: latestGeneration }, (_, index) => String(latestGeneration - index));
-    },
-    [currentYearMonth],
-  );
   const isResubmission = resubmissionTargets.length > 0;
-  const canEditEducationPeriod =
+  const canEditEducation =
     !isResubmission || resubmissionTargets.includes("education_period");
   const requiresCertificate = !isResubmission || resubmissionTargets.includes("certificate");
   const requiresProfileImage = !isResubmission || resubmissionTargets.includes("profile_image");
@@ -215,41 +189,6 @@ export default function GraduateVerificationApplicationView({
     (!requiresProfileImage || photoFile !== null) &&
     !photoSelecting &&
     !pending;
-
-  const normalizeEducationYear = (value: string) => {
-    const digits = value.replace(/\D/g, "");
-    if (!digits) return "";
-    return String(Math.min(Number(digits), currentYearMonth.year));
-  };
-
-  useEffect(() => {
-    const startYearNumber = Number(startYear);
-    const startMonthNumber = Number(startMonth);
-    const endYearNumber = Number(endYear);
-    const endMonthNumber = Number(endMonth);
-    if (!Number.isInteger(startYearNumber) || !Number.isInteger(startMonthNumber)) return;
-
-    const normalizedStartMonth =
-      startYearNumber === currentYearMonth.year
-        ? Math.min(startMonthNumber, currentYearMonth.month)
-        : startMonthNumber;
-    if (normalizedStartMonth !== startMonthNumber) {
-      setStartMonth(String(normalizedStartMonth));
-      return;
-    }
-    if (!Number.isInteger(endYearNumber) || !Number.isInteger(endMonthNumber)) return;
-
-    const normalizedEnd = clampGraduateEducationEnd({
-      startYear: startYearNumber,
-      startMonth: normalizedStartMonth,
-      endYear: endYearNumber,
-      endMonth: endMonthNumber,
-      currentYear: currentYearMonth.year,
-      currentMonth: currentYearMonth.month,
-    });
-    if (normalizedEnd.year !== endYearNumber) setEndYear(String(normalizedEnd.year));
-    if (normalizedEnd.month !== endMonthNumber) setEndMonth(String(normalizedEnd.month));
-  }, [currentYearMonth, endMonth, endYear, startMonth, startYear]);
 
   const chooseCertificate = () => certificateInputRef.current?.click();
   const choosePhoto = () => photoInputRef.current?.click();
@@ -299,10 +238,8 @@ export default function GraduateVerificationApplicationView({
         resubmission_targets?: unknown;
         review_note?: unknown;
         legal_name?: unknown;
-        education_start_year?: unknown;
-        education_start_month?: unknown;
-        education_end_year?: unknown;
-        education_end_month?: unknown;
+        inferred_generation?: unknown;
+        inferred_cohort?: unknown;
         campus?: unknown;
       } | null = null;
       try {
@@ -331,26 +268,10 @@ export default function GraduateVerificationApplicationView({
           typeof request.review_note === "string" ? request.review_note : null,
         );
         setLegalName(typeof request.legal_name === "string" ? request.legal_name : "");
-        setStartYear(
-          typeof request.education_start_year === "number"
-            ? String(request.education_start_year)
-            : String(getCurrentYear()),
-        );
-        setStartMonth(
-          typeof request.education_start_month === "number"
-            ? String(request.education_start_month)
-            : "1",
-        );
-        setEndYear(
-          typeof request.education_end_year === "number"
-            ? String(request.education_end_year)
-            : String(getCurrentYear()),
-        );
-        setEndMonth(
-          typeof request.education_end_month === "number"
-            ? String(request.education_end_month)
-            : "6",
-        );
+        const storedGeneration = typeof request.inferred_generation === "number"
+          ? request.inferred_generation
+          : typeof request.inferred_cohort === "number" ? request.inferred_cohort : null;
+        setSelectedGeneration(storedGeneration ? String(storedGeneration) : "");
         setCampus(typeof request.campus === "string" ? request.campus : "");
         setMessage({
           tone: "info",
@@ -382,39 +303,13 @@ export default function GraduateVerificationApplicationView({
   }
 
   function continueToFiles() {
-    if (cohortSelectionPreview) {
-      const errors = {
-        legalName: legalName.trim() ? undefined : "이름을 입력해 주세요.",
-        generation: generationOptions.includes(selectedGeneration)
-          ? undefined
-          : "기수를 선택해 주세요.",
-        campus: campus ? undefined : "캠퍼스를 선택해 주세요.",
-      };
-      if (errors.legalName || errors.generation || errors.campus) {
-        setDetailsErrors(errors);
-        const firstInvalidField = errors.legalName
-          ? legalNameRef
-          : errors.generation
-            ? generationRef
-            : campusRef;
-        firstInvalidField.current?.focus();
-        return;
-      }
-      setDetailsErrors({});
-      setMessage(null);
-      setStep("files");
+    const validation = validateGraduateEducationDetails({ legalName, generation: Number(selectedGeneration), campus });
+    if (!validation.ok) {
+      setDetailsErrors(validation.fieldErrors);
+      (validation.fieldErrors.legalName ? legalNameRef : validation.fieldErrors.generation ? generationRef : campusRef).current?.focus();
       return;
     }
-    if (!legalName.trim() || !inferredGeneration || !campus) {
-      setMessage({ tone: "danger", text: "이름, 캠퍼스, 교육 시작 연·월을 확인해 주세요." });
-      return;
-    }
-    const start = Number(startYear) * 12 + Number(startMonth);
-    const end = Number(endYear) * 12 + Number(endMonth);
-    if (!Number.isInteger(end) || end < start) {
-      setMessage({ tone: "danger", text: "교육 종료 연·월은 시작 연·월보다 빠를 수 없습니다." });
-      return;
-    }
+    setDetailsErrors({});
     setMessage(null);
     setStep("files");
   }
@@ -479,10 +374,6 @@ export default function GraduateVerificationApplicationView({
   }
 
   async function submit() {
-    if (cohortSelectionPreview) {
-      setMessage({ tone: "info", text: "미리보기에서는 신청이 접수되지 않습니다." });
-      return;
-    }
     if (
       (requiresCertificate && !certificateFile) ||
       (requiresProfileImage && !photoFile) ||
@@ -526,10 +417,7 @@ export default function GraduateVerificationApplicationView({
           profileImageUploadSource: stagedProfileImageUploadId ? "common" : undefined,
           email,
           legalName,
-          educationStartYear: Number(startYear),
-          educationStartMonth: Number(startMonth),
-          educationEndYear: Number(endYear),
-          educationEndMonth: Number(endMonth),
+          generation: Number(selectedGeneration),
           campus,
           consented,
         }),
@@ -634,25 +522,18 @@ export default function GraduateVerificationApplicationView({
         {step === "details" ? (
           <section className="mt-6 space-y-4" aria-labelledby="graduate-details-heading">
             <h2 id="graduate-details-heading" className="text-ko-title text-lg font-semibold">교육 정보를 입력해 주세요</h2>
-            <label className="grid gap-2 text-sm font-medium">이름<Input ref={legalNameRef} value={legalName} onChange={(event) => { setLegalName(event.target.value); setDetailsErrors((errors) => ({ ...errors, legalName: undefined })); }} maxLength={100} disabled={isResubmission} aria-invalid={cohortSelectionPreview && Boolean(detailsErrors.legalName)} aria-describedby={detailsErrors.legalName ? "graduate-legal-name-error" : undefined} /></label>
+            <label className="grid gap-2 text-sm font-medium">이름<Input ref={legalNameRef} value={legalName} onChange={(event) => { setLegalName(event.target.value); setDetailsErrors((errors) => ({ ...errors, legalName: undefined })); }} maxLength={100} disabled={isResubmission} aria-invalid={Boolean(detailsErrors.legalName)} aria-describedby={detailsErrors.legalName ? "graduate-legal-name-error" : undefined} /></label>
             {detailsErrors.legalName ? <p id="graduate-legal-name-error" className="text-sm text-danger">{detailsErrors.legalName}</p> : null}
-            {cohortSelectionPreview ? (
-              <label className="grid gap-2 text-sm font-medium">기수
-                <Select ref={generationRef} aria-label="기수" value={selectedGeneration} onChange={(event) => { setSelectedGeneration(event.target.value); setDetailsErrors((errors) => ({ ...errors, generation: undefined })); }} aria-invalid={Boolean(detailsErrors.generation)} aria-describedby={detailsErrors.generation ? "graduate-generation-error" : undefined}>
-                  <option value="" disabled>기수를 선택해 주세요</option>
-                  {generationOptions.map((generation) => <option key={generation} value={generation}>{generation}기</option>)}
-                </Select>
-              </label>
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <fieldset className="grid gap-2"><legend className="text-sm font-medium">교육 시작 연·월</legend><div className="grid grid-cols-2 gap-2"><Input inputMode="numeric" aria-label="교육 시작 연도" max={currentYearMonth.year} value={startYear} onChange={(event) => setStartYear(normalizeEducationYear(event.target.value))} disabled={!canEditEducationPeriod} /><Select aria-label="교육 시작 월" value={startMonth} onChange={(event) => setStartMonth(event.target.value)} disabled={!canEditEducationPeriod}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1} disabled={Number(startYear) === currentYearMonth.year && index + 1 > currentYearMonth.month}>{index + 1}월</option>)}</Select></div></fieldset>
-                <fieldset className="grid gap-2"><legend className="text-sm font-medium">교육 종료 연·월</legend><div className="grid grid-cols-2 gap-2"><Input inputMode="numeric" aria-label="교육 종료 연도" max={currentYearMonth.year} value={endYear} onChange={(event) => setEndYear(normalizeEducationYear(event.target.value))} disabled={!canEditEducationPeriod} /><Select aria-label="교육 종료 월" value={endMonth} onChange={(event) => setEndMonth(event.target.value)} disabled={!canEditEducationPeriod}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1} disabled={Number(endYear) === currentYearMonth.year && index + 1 > currentYearMonth.month}>{index + 1}월</option>)}</Select></div></fieldset>
-              </div>
-            )}
+            <label className="grid gap-2 text-sm font-medium">기수
+              <Select ref={generationRef} aria-label="기수" value={selectedGeneration} onChange={(event) => { setSelectedGeneration(event.target.value); setDetailsErrors((errors) => ({ ...errors, generation: undefined })); }} disabled={!canEditEducation} aria-invalid={Boolean(detailsErrors.generation)} aria-describedby={detailsErrors.generation ? "graduate-generation-error" : undefined}>
+                <option value="" disabled>기수를 선택해 주세요</option>
+                {generationOptions.map((generation) => <option key={generation} value={generation}>{generation}기</option>)}
+              </Select>
+            </label>
             {detailsErrors.generation ? <p id="graduate-generation-error" className="text-sm text-danger">{detailsErrors.generation}</p> : null}
-            <label className="grid gap-2 text-sm font-medium">캠퍼스<Select ref={campusRef} aria-label="캠퍼스" value={campus} onChange={(event) => { setCampus(event.target.value); setDetailsErrors((errors) => ({ ...errors, campus: undefined })); }} disabled={isResubmission} aria-invalid={cohortSelectionPreview && Boolean(detailsErrors.campus)} aria-describedby={detailsErrors.campus ? "graduate-campus-error" : undefined}><option value="" disabled>캠퍼스를 선택해 주세요</option>{GRADUATE_CAMPUS_OPTIONS.map((option) => <option key={option} value={option}>{option} 캠퍼스</option>)}</Select></label>
+            <label className="grid gap-2 text-sm font-medium">캠퍼스<Select ref={campusRef} aria-label="캠퍼스" value={campus} onChange={(event) => { setCampus(event.target.value); setDetailsErrors((errors) => ({ ...errors, campus: undefined })); }} disabled={isResubmission} aria-invalid={Boolean(detailsErrors.campus)} aria-describedby={detailsErrors.campus ? "graduate-campus-error" : undefined}><option value="" disabled>캠퍼스를 선택해 주세요</option>{GRADUATE_CAMPUS_OPTIONS.map((option) => <option key={option} value={option}>{option} 캠퍼스</option>)}</Select></label>
             {detailsErrors.campus ? <p id="graduate-campus-error" className="text-sm text-danger">{detailsErrors.campus}</p> : null}
-            {isResubmission && !canEditEducationPeriod ? <p className="text-sm text-muted-foreground">기존 교육 정보는 유지됩니다. 교육 기간 보완 요청이 있을 때만 수정할 수 있습니다.</p> : null}
+            {isResubmission && !canEditEducation ? <p className="text-sm text-muted-foreground">기존 교육 정보는 유지됩니다. 교육 정보 보완 요청이 있을 때만 기수를 수정할 수 있습니다.</p> : null}
             <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 pt-2"><Button variant="ghost" onClick={() => setStep("email")}>이전</Button><Button onClick={continueToFiles}>다음</Button></div>
           </section>
         ) : null}

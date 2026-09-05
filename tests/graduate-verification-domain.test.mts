@@ -4,97 +4,31 @@ import {
   GRADUATE_COHORT_RULE_VERSION,
   canTransitionGraduateVerification,
   createGraduateVerificationSubmission,
-  getSsafyGenerationFromEducationStart,
-  getSsafyCohortFromEducationStart,
+  getGraduateGenerationOptions,
   getGraduateResubmissionTargets,
   getGraduateSubmissionFileRequirements,
   normalizeGraduateEmail,
   normalizeGraduateDocumentNumber,
   validateGraduateDocumentNumber,
-  validateGraduateEducationPeriod,
-  clampGraduateEducationEnd,
+  validateGraduateEducationDetails,
   validateGraduatePhotoUpload,
   validateGraduateCertificateUpload,
 } from "@/lib/graduate-verification";
 
-test("교육 시작 연·월로 SSAFY 기수를 계산한다", () => {
+test("현재 SSAFY 기수를 기준으로 선택지를 만든다", () => {
   assert.equal(GRADUATE_COHORT_RULE_VERSION, "ssafy-half-year-v1");
-  assert.equal(getSsafyCohortFromEducationStart(2018, 12), 1);
-  assert.equal(getSsafyCohortFromEducationStart(2019, 1), 1);
-  assert.equal(getSsafyCohortFromEducationStart(2019, 6), 1);
-  assert.equal(getSsafyCohortFromEducationStart(2019, 7), 2);
-  assert.equal(getSsafyCohortFromEducationStart(2026, 1), 15);
-  assert.equal(getSsafyCohortFromEducationStart(2026, 7), 16);
-  assert.equal(getSsafyCohortFromEducationStart(2018, 11), null);
-  assert.equal(getSsafyCohortFromEducationStart(2026, 13), null);
-  assert.equal(getSsafyGenerationFromEducationStart(2026, 1), 15);
+  assert.deepEqual(getGraduateGenerationOptions(new Date(2018, 10, 1)), []);
+  assert.deepEqual(getGraduateGenerationOptions(new Date(2018, 11, 1)), [1]);
+  assert.deepEqual(getGraduateGenerationOptions(new Date(2019, 0, 1)), [1]);
+  assert.deepEqual(getGraduateGenerationOptions(new Date("2026-01-01")), Array.from({ length: 15 }, (_, index) => 15 - index));
+  assert.deepEqual(getGraduateGenerationOptions(new Date("2026-07-01")), Array.from({ length: 16 }, (_, index) => 16 - index));
 });
 
-test("교육 종료 연월은 시작 연월보다 빠를 수 없다", () => {
-  assert.equal(
-    validateGraduateEducationPeriod({
-      startYear: 2026,
-      startMonth: 1,
-      endYear: 2026,
-      endMonth: 6,
-    }),
-    null,
-  );
-  assert.match(
-    validateGraduateEducationPeriod({
-      startYear: 2026,
-      startMonth: 7,
-      endYear: 2026,
-      endMonth: 6,
-    }) ?? "",
-    /종료/,
-  );
-});
-
-test("교육 종료 연월은 시작일보다 이르거나 현재보다 늦을 수 없다", () => {
-  assert.deepEqual(
-    clampGraduateEducationEnd({
-      startYear: 2025,
-      startMonth: 1,
-      endYear: 2024,
-      endMonth: 3,
-      currentYear: 2026,
-      currentMonth: 7,
-    }),
-    { year: 2025, month: 1 },
-  );
-  assert.deepEqual(
-    clampGraduateEducationEnd({
-      startYear: 2026,
-      startMonth: 1,
-      endYear: 2027,
-      endMonth: 1,
-      currentYear: 2026,
-      currentMonth: 7,
-    }),
-    { year: 2026, month: 7 },
-  );
-  assert.match(
-    validateGraduateEducationPeriod({
-      startYear: 2026,
-      startMonth: 1,
-      endYear: 2026,
-      endMonth: 8,
-      currentYear: 2026,
-      currentMonth: 7,
-    }) ?? "",
-    /현재 연·월/,
-  );
-});
-
-test("서버는 교육 시작 연월로 수료생 기수를 계산한다", () => {
+test("서버는 선택한 유효 기수를 저장한다", () => {
   const result = createGraduateVerificationSubmission({
     email: " Graduate@Example.com ",
     legalName: "홍길동",
-    educationStartYear: 2026,
-    educationStartMonth: 1,
-    educationEndYear: 2026,
-    educationEndMonth: 6,
+    generation: 15,
     campus: "서울",
   });
 
@@ -111,10 +45,7 @@ test("수료생 인증은 지정된 캠퍼스를 반드시 선택해야 한다",
   const baseInput = {
     email: "graduate@example.com",
     legalName: "홍길동",
-    educationStartYear: 2026,
-    educationStartMonth: 1,
-    educationEndYear: 2026,
-    educationEndMonth: 6,
+    generation: 15,
   } as const;
 
   const missingCampus = createGraduateVerificationSubmission(baseInput);
@@ -131,6 +62,15 @@ test("수료생 인증은 지정된 캠퍼스를 반드시 선택해야 한다",
   if (!invalidCampus.ok) {
     assert.match(invalidCampus.error, /캠퍼스/);
   }
+});
+
+test("교육 정보 검증은 미래·비정수 기수와 잘못된 필드를 구분한다", () => {
+  const now = new Date("2026-01-01");
+  const valid = validateGraduateEducationDetails({ legalName: "홍길동", generation: 15, campus: "서울" }, now);
+  assert.equal(valid.ok, true);
+  const invalid = validateGraduateEducationDetails({ legalName: "", generation: 16.5, campus: "없음" }, now);
+  assert.equal(invalid.ok, false);
+  if (!invalid.ok) assert.deepEqual(Object.keys(invalid.fieldErrors).sort(), ["campus", "generation", "legalName"]);
 });
 
 test("수료증 문서 번호는 원문을 저장하지 않을 정규화 값으로 제한한다", () => {

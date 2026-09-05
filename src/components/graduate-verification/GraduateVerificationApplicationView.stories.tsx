@@ -20,6 +20,12 @@ const meta = {
         return Response.json({ expiresInSeconds: parameters.codeExpired ? 0.001 : 300 });
       }
       if (url.includes("/api/graduate-verification/current")) {
+        if (parameters.educationResubmission) {
+          return Response.json({ request: { status: "needs_resubmission", resubmission_targets: ["education_period"], legal_name: "테스트 수료생", inferred_generation: 15, campus: "서울", review_note: "기수를 확인해 주세요." } });
+        }
+        if (parameters.fileOnlyResubmission) {
+          return Response.json({ request: { status: "needs_resubmission", resubmission_targets: ["certificate"], legal_name: "테스트 수료생", inferred_generation: 15, campus: "서울" } });
+        }
         return parameters.reviewPending
           ? Response.json({ request: { status: "submitted" } })
           : new Response("{}", { status: 404 });
@@ -122,47 +128,24 @@ async function expectCohortSelectionDetails(canvasElement: HTMLElement) {
 }
 
 export const EducationDetails: Story = {
-  args: { cohortSelectionPreview: true },
   play: async ({ canvasElement }) => {
     await expectCohortSelectionDetails(canvasElement);
   },
 };
 
-export const EducationPeriodDetails: Story = {
-  args: { cohortSelectionPreview: false },
-  play: async ({ canvasElement }) => {
-    const canvas = await moveToDetails(canvasElement);
-    await expect(
-      canvas.queryByText("이메일 인증이 완료되었습니다. 교육 정보를 입력해 주세요."),
-    ).not.toBeInTheDocument();
-    await expect(canvas.queryByText("자동 계산된 15기")).not.toBeInTheDocument();
-    await expect(canvas.getByRole("textbox", { name: "교육 시작 연도" })).toBeVisible();
-    await expect(canvas.getByRole("combobox", { name: "교육 시작 월" })).toBeVisible();
-    await expect(canvas.getByRole("textbox", { name: "교육 종료 연도" })).toBeVisible();
-    await expect(canvas.getByRole("combobox", { name: "교육 종료 월" })).toBeVisible();
-    await expect(canvas.getByRole("button", { name: "다음" })).toBeInTheDocument();
-  },
-};
-
 export const RecoveryEducationDetails: Story = {
   ...EducationDetails,
-  args: { requestKind: "existing_member_recovery", cohortSelectionPreview: true },
+  args: { requestKind: "existing_member_recovery" },
   play: async ({ canvasElement }) => {
     await expectCohortSelectionDetails(canvasElement);
   },
 };
 
 export const FileSubmission: Story = {
-  args: { cohortSelectionPreview: true },
   play: async ({ canvasElement, args }) => {
     const canvas = await moveToDetails(canvasElement);
     await userEvent.type(canvas.getByRole("textbox", { name: "이름" }), "테스트 수료생");
-    if (args.cohortSelectionPreview) {
-      await userEvent.selectOptions(canvas.getByRole("combobox", { name: "기수" }), "15");
-    } else {
-      await userEvent.selectOptions(canvas.getByRole("combobox", { name: "교육 시작 월" }), "1");
-      await userEvent.selectOptions(canvas.getByRole("combobox", { name: "교육 종료 월" }), "6");
-    }
+    await userEvent.selectOptions(canvas.getByRole("combobox", { name: "기수" }), "15");
     await userEvent.selectOptions(canvas.getByRole("combobox", { name: "캠퍼스" }), "서울");
     await userEvent.click(canvas.getByRole("button", { name: "다음" }));
     await expect(canvas.getByRole("heading", { name: "교육이수증과 본인 사진" })).toBeInTheDocument();
@@ -176,11 +159,11 @@ export const FileSubmission: Story = {
 
 export const RecoveryFileSubmission: Story = {
   ...FileSubmission,
-  args: { requestKind: "existing_member_recovery", cohortSelectionPreview: true },
+  args: { requestKind: "existing_member_recovery" },
 };
 
 export const RecoveryCohortRequired: Story = {
-  args: { requestKind: "existing_member_recovery", cohortSelectionPreview: true },
+  args: { requestKind: "existing_member_recovery" },
   play: async ({ canvasElement }) => {
     const canvas = await moveToDetails(canvasElement);
     await userEvent.type(canvas.getByRole("textbox", { name: "이름" }), "테스트 수료생");
@@ -201,7 +184,25 @@ export const RecoveryCohortRequired: Story = {
 
 export const CohortRequired: Story = {
   ...RecoveryCohortRequired,
-  args: { cohortSelectionPreview: true },
+};
+
+export const EducationInfoResubmission: Story = {
+  parameters: { educationResubmission: true },
+  play: async ({ canvasElement }) => {
+    const canvas = await moveToDetails(canvasElement);
+    await expect(canvas.getByRole("combobox", { name: "기수" })).toHaveValue("15");
+    await expect(canvas.getByRole("combobox", { name: "기수" })).toBeEnabled();
+  },
+};
+
+export const FileOnlyResubmissionLocksEducation: Story = {
+  parameters: { fileOnlyResubmission: true },
+  play: async ({ canvasElement }) => {
+    const canvas = await moveToDetails(canvasElement);
+    await expect(canvas.getByRole("combobox", { name: "기수" })).toBeDisabled();
+    await expect(canvas.getByRole("textbox", { name: "이름" })).toBeDisabled();
+    await expect(canvas.getByRole("combobox", { name: "캠퍼스" })).toBeDisabled();
+  },
 };
 
 export const RecoveryReviewPending: Story = {

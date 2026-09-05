@@ -54,6 +54,11 @@ type GraduateRequestRow = {
   profile_image_id: string | null;
   resubmission_targets: string[] | null;
   request_kind: GraduateVerificationRequestKind;
+  legal_name: string;
+  campus: string;
+  inferred_generation: number | null;
+  inferred_cohort: number | null;
+  cohort_rule_version: string | null;
 };
 
 type GraduateImageRow = {
@@ -248,7 +253,7 @@ async function findOpenGraduateRequest(
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("graduate_verification_requests")
-    .select("id,status,certificate_storage_path,certificate_sha256,profile_image_id,resubmission_targets,request_kind")
+    .select("id,status,certificate_storage_path,certificate_sha256,profile_image_id,resubmission_targets,request_kind,legal_name,campus,inferred_generation,inferred_cohort,cohort_rule_version")
     .eq("email_normalized", emailNormalized)
     .eq("request_kind", requestKind)
     .in("status", ["draft", "submitted", "in_review", "needs_resubmission"])
@@ -354,10 +359,7 @@ export async function submitGraduateVerificationRequest(input: {
   profileImageUploadId?: string | null;
   email: string;
   legalName: string;
-  educationStartYear: number;
-  educationStartMonth: number;
-  educationEndYear: number;
-  educationEndMonth: number;
+  generation: unknown;
   campus?: string | null;
   consented: boolean;
 }) {
@@ -439,6 +441,16 @@ export async function submitGraduateVerificationRequest(input: {
     ? getGraduateResubmissionTargets(existingRequest.resubmission_targets ?? [])
     : null;
   const requirements = getGraduateSubmissionFileRequirements(resubmissionTargets);
+  const canCorrectEducation = Boolean(resubmissionTargets?.includes("education_period"));
+  const lockedGeneration = existingRequest
+    ? existingRequest.inferred_generation ?? existingRequest.inferred_cohort
+    : null;
+  if (existingRequest && (!lockedGeneration || !existingRequest.legal_name || !existingRequest.campus)) {
+    throw new GraduateVerificationServiceError("submission_invalid", "저장된 교육 정보를 확인할 수 없습니다. 관리자에게 문의해 주세요.");
+  }
+  const effectiveGeneration = existingRequest && !canCorrectEducation
+    ? lockedGeneration!
+    : submission.value.inferredGeneration;
   const requiresCertificate = requirements.certificate;
   const requiresProfileImage = requirements.profileImage;
   if (!requiresCertificate && input.certificateUploadId) {
@@ -527,10 +539,6 @@ export async function submitGraduateVerificationRequest(input: {
         email: submission.value.email,
         email_normalized: submission.value.emailNormalized,
         legal_name: submission.value.legalName,
-        education_start_year: submission.value.educationStartYear,
-        education_start_month: submission.value.educationStartMonth,
-        education_end_year: submission.value.educationEndYear,
-        education_end_month: submission.value.educationEndMonth,
         inferred_generation: submission.value.inferredGeneration,
         inferred_cohort: submission.value.inferredGeneration,
         cohort_rule_version: submission.value.cohortRuleVersion,
@@ -580,17 +588,16 @@ export async function submitGraduateVerificationRequest(input: {
       const { error } = await supabase
         .from("graduate_verification_requests")
         .update({
-          email: submission.value.email,
-          email_normalized: submission.value.emailNormalized,
-          legal_name: submission.value.legalName,
-          education_start_year: submission.value.educationStartYear,
-          education_start_month: submission.value.educationStartMonth,
-          education_end_year: submission.value.educationEndYear,
-          education_end_month: submission.value.educationEndMonth,
-          inferred_generation: submission.value.inferredGeneration,
-          inferred_cohort: submission.value.inferredGeneration,
-          cohort_rule_version: submission.value.cohortRuleVersion,
-          campus: submission.value.campus,
+          // Name and campus are permanently locked after the first submission.
+          // Only an explicit education-info correction may replace generation.
+          ...(canCorrectEducation ? {
+            inferred_generation: submission.value.inferredGeneration,
+            inferred_cohort: submission.value.inferredGeneration,
+            cohort_rule_version: submission.value.cohortRuleVersion,
+          } : {
+            inferred_generation: lockedGeneration,
+            inferred_cohort: lockedGeneration,
+          }),
           privacy_photo_consented_at: new Date().toISOString(),
           ...(promotedCertificatePath
             ? {
@@ -629,7 +636,7 @@ export async function submitGraduateVerificationRequest(input: {
     return {
       requestId,
       status: "submitted" as const,
-      inferredGeneration: submission.value.inferredGeneration,
+      inferredGeneration: effectiveGeneration,
     };
   } catch (error) {
     if (!persistedRequest && createdRequest) {
@@ -699,7 +706,7 @@ export async function requestGraduateVerificationResubmission(input: {
     throw new Error("보완 요청을 처리하지 못했습니다.");
   }
   const targetLabels: Record<GraduateResubmissionTarget, string> = {
-    education_period: "교육 기간",
+    education_period: "교육 정보",
     certificate: "교육이수증",
     profile_image: "본인 사진",
   };

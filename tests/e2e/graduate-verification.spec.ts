@@ -19,7 +19,7 @@ const CROPPABLE_PROFILE_IMAGE_PATH = path.join(
 for (const kind of ["graduate_signup", "existing_member_recovery"] as const) {
   const recovery = kind === "existing_member_recovery";
   test.describe(`graduate verification application (${kind})`, () => {
-    test("submits the verified email, inferred cohort, certificate, and cropped profile photo", async ({
+    test("submits the verified email, selected generation, certificate, and cropped profile photo", async ({
       page,
     }) => {
       await page.route("**/api/graduate-verification/email/send", (route) => {
@@ -108,15 +108,8 @@ for (const kind of ["graduate_signup", "existing_member_recovery"] as const) {
         page.getByText("이메일 인증이 완료되었습니다. 교육 정보를 입력해 주세요."),
       ).toHaveCount(0);
       await page.getByRole("textbox", { name: "이름" }).fill("테스트 수료생");
-      await page.getByRole("textbox", { name: "교육 시작 연도" }).fill("2026");
-      await page.getByRole("combobox", { name: "교육 시작 월" }).selectOption("1");
-      await page.getByRole("textbox", { name: "교육 종료 연도" }).fill("2026");
-      await page.getByRole("combobox", { name: "교육 종료 월" }).selectOption("6");
+      await page.getByRole("combobox", { name: "기수" }).selectOption("15");
       await page.getByRole("combobox", { name: "캠퍼스" }).selectOption("서울");
-      await expect(page.getByText("자동 계산된 15기")).toHaveCount(0);
-      await expect(
-        page.getByText("교육 시작 연·월로 계산되며 직접 수정할 수 없습니다."),
-      ).toHaveCount(0);
       await page.getByRole("button", { name: "다음" }).click();
       const submitButton = page.getByRole("button", { name: recovery ? "복구 신청 제출" : "수료생 인증 제출", exact: true });
       await expect(submitButton).toBeDisabled();
@@ -169,12 +162,12 @@ for (const kind of ["graduate_signup", "existing_member_recovery"] as const) {
       const submitted = await submitRequest;
       expect(submitted.postDataJSON()).toMatchObject({
         email: "graduate@example.com",
-        educationStartYear: 2026,
-        educationStartMonth: 1,
+        generation: 15,
         certificateUploadId: "certificate-upload",
         profileImageUploadId: PROFILE_IMAGE_UPLOAD_ID,
         profileImageUploadSource: "common",
       });
+      expect(submitted.postDataJSON()).not.toHaveProperty("educationStartYear");
       await expect(page.getByText(recovery ? "기존 회원 복구 신청을 제출했습니다." : "수료생 인증 신청을 제출했습니다.")).toBeVisible();
       await expect(
         page.getByText("수료증과 본인 사진을 검토합니다. 보완이 필요하면 같은 이메일로 다시 안내합니다."),

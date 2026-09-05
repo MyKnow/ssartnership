@@ -17,11 +17,8 @@ export type AdminGraduateVerificationRequest = {
   id: string;
   email: string;
   legal_name: string;
-  education_start_year: number;
-  education_start_month: number;
-  education_end_year: number;
-  education_end_month: number;
-  inferred_generation: number;
+  inferred_generation: number | null;
+  inferred_cohort?: number | null;
   campus: string | null;
   request_kind: "graduate_signup" | "existing_member_recovery";
   recovery_member_id: string | null;
@@ -200,7 +197,7 @@ function GraduateVerificationDecisionCard({
             <Badge variant={statusBadgeVariant(request.status)}>
               {statusLabel(request.status)}
             </Badge>
-            <Badge variant="neutral">{request.inferred_generation}기</Badge>
+            <Badge variant="neutral">{request.inferred_generation ?? request.inferred_cohort ?? "-"}기</Badge>
             {isExistingMemberRecovery ? (
               <Badge variant="danger">기존 회원 복구</Badge>
             ) : (
@@ -213,13 +210,7 @@ function GraduateVerificationDecisionCard({
           >
             {request.email}
           </p>
-          <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            {request.education_start_year}.
-            {String(request.education_start_month).padStart(2, "0")} ~{" "}
-            {request.education_end_year}.
-            {String(request.education_end_month).padStart(2, "0")} ·{" "}
-            {request.campus || "캠퍼스 미입력"}
-          </p>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">{request.campus || "캠퍼스 미입력"}</p>
         </div>
         <AdminGraduateVerificationMediaViewer
           requestId={request.id}
@@ -373,7 +364,7 @@ function GraduateVerificationDecisionCard({
                     aria-label="보완이 필요한 항목"
                   >
                     {[
-                      { value: "education_period", label: "교육 기간" },
+                      { value: "education_period", label: "교육 정보" },
                       { value: "certificate", label: "수료증" },
                       { value: "profile_image", label: "본인 사진" },
                     ].map((target) => (
@@ -403,7 +394,7 @@ function GraduateVerificationDecisionCard({
                       name="note"
                       maxLength={500}
                       aria-describedby={resubmissionNoteHelpId}
-                      placeholder="예: 수료증의 교육 기간이 신청 내용과 다릅니다."
+                      placeholder="예: 수료증의 기수가 신청 내용과 다릅니다."
                     />
                     <p
                       id={resubmissionNoteHelpId}

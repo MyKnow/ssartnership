@@ -16,7 +16,7 @@ export async function GET() {
   }
   const { data } = await getSupabaseAdminClient()
     .from("graduate_verification_requests")
-    .select("id,status,resubmission_targets,review_note,rejection_reason,legal_name,education_start_year,education_start_month,education_end_year,education_end_month,campus,inferred_generation")
+    .select("id,status,resubmission_targets,review_note,rejection_reason,legal_name,campus,inferred_generation,inferred_cohort,cohort_rule_version")
     .eq("email_normalized", challenge.email_normalized)
     .eq("request_kind", requestKind)
     .order("created_at", { ascending: false })
