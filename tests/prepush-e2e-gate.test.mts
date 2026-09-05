@@ -291,10 +291,10 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
   assert.match(pageReadyHelpers, /document\.fonts\.ready/);
   assert.match(pageReadyHelpers, /Execution context was destroyed/);
   assert.match(pageReadyHelpers, /export async function waitForScrollStability/);
-  const introductionTest = partnerDetailIntroduction.match(
-    /test\("puts the period in the header and keeps introduction and tags plain",[\s\S]*?\n  \}\);/,
-  )?.[0];
-  assert.ok(introductionTest);
+  assert.match(
+    partnerDetailIntroduction,
+    /viewports\.forEach\(\(viewport\) => \{\s*test\(/,
+  );
   assert.match(partnerDetailIntroduction, /await page\.goto\("\/partners\/health-001"\)/);
   assert.match(partnerImageCarousel, /await page\.goto\(partnerPath\)/);
   assert.match(partnerRegistration, /await page\.goto\("\/partner-registration"\)/);

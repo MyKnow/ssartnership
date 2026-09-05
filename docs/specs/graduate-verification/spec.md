@@ -7,9 +7,10 @@ authority: normative
 
 # 수료생 증명서·프로필 사진 인증 v1
 
-작성 기준일: 2026-07-12
-관련 이슈: #102
+작성 기준일: 2026-09-05
+관련 이슈: #102, #432
 화면 계약: [수료생 증명서·본인 사진 인증](../../product/screen-specs/graduate-verification.md)
+실행 계획: [Issue 432 기수 전환 롤아웃](plan-432.md)
 
 ## 목적과 비범위
 
@@ -25,32 +26,22 @@ authority: normative
 ```mermaid
 flowchart LR
     A["가입 유형 선택"] --> B["이메일 인증"]
-    B --> C["교육기간 입력"]
-    C --> D["기수 자동 계산"]
-    D --> E["수료증 PDF·본인 사진 제출"]
+    B --> C["이름·기수·캠퍼스 입력"]
+    C --> E["수료증 PDF·본인 사진 제출"]
     E --> F["관리자 통합 검토"]
     F -->|"보완 요청"| G["정보·파일 재제출"]
-    G --> D
+    G --> C
     F -->|"승인"| H["비밀번호 설정"]
     H --> I["사진 포함 수료생 인증 활성화"]
 ```
 
 ## 기수 규칙
 
-규칙 식별자는 `ssafy-half-year-v1`이며, 서버의 `getSsafyCohortFromEducationStart()`가 유일한 계산 주체다. 클라이언트 값은 표시용이고 제출 시 무시한다.
-
-```ts
-if (year === 2018 && month === 12) return 1;
-if (year < 2019) return null;
-return (year - 2019) * 2 + (month >= 7 ? 2 : 1);
-```
+규칙 식별자는 `ssafy-half-year-v1`이다. 사용자는 현재 SSAFY 반기 기준으로 계산한 1기부터 현재 기수까지의 정수 중 하나를 직접 선택하며, FE/BE가 같은 `validateGraduateEducationDetails()` 규칙으로 검증한다.
 
 신청에는 다음을 저장한다.
 
-- `education_start_year`, `education_start_month`
-- `education_end_year`, `education_end_month`
-- `inferred_cohort`, `cohort_rule_version`
-- `completion_stage` (`semester_1` 또는 `semester_2`)
+- `inferred_generation`과 호환 필드 `inferred_cohort`, `cohort_rule_version`
 - 자가 입력 `campus` — 혜택 권한 판단에는 사용하지 않음
 
 ## 데이터 모델
@@ -58,7 +49,7 @@ return (year - 2019) * 2 + (month >= 7 ? 2 : 1);
 | 모델 | 책임 |
 | --- | --- |
 | `member_auth_identities` | 기존 `mattermost`와 수료생 `graduate_email` 로그인 식별자를 회원에 연결한다. |
-| `graduate_verification_requests` | 이메일, 교육기간, 기수, 수료증 hash/path, 상태·검토·삭제 일정을 보관한다. |
+| `graduate_verification_requests` | 이메일, 이름·기수·캠퍼스, 수료증 hash/path, 상태·검토·삭제 일정을 보관한다. |
 | `member_profile_images` | 본인 사진의 private Storage 메타데이터와 `pending/approved/rejected/superseded` 상태를 보관한다. |
 | `graduate_email_challenges` | 이메일 인증/재설정의 코드 hash, 시도 횟수, 만료를 보관한다. |
 | `graduate_verification_uploads` | short-lived signed upload의 격리 객체와 요청 또는 회원 소유자를 보관한다. |
@@ -76,7 +67,7 @@ in_review → rejected
 draft/submitted/needs_resubmission → withdrawn
 ```
 
-보완 요청은 `education_period`, `certificate`, `profile_image`을 독립적으로 기록한다. 기존 요청의 보완에서는 요청된 파일만 새로 받으며, 이전 사진/수료증은 새 검토 파일이 연결될 때까지 private 상태로 유지한다.
+보완 요청은 내부 키 `education_period`, `certificate`, `profile_image`을 독립적으로 기록한다. UI에는 `교육 정보`로만 표시한다. 파일만 보완할 때는 서버가 이름·캠퍼스·기수를 잠그며, 교육 정보 보완일 때만 기수를 바꿀 수 있다.
 
 ## 파일 처리와 보관
 

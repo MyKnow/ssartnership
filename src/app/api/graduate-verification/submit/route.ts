@@ -28,17 +28,10 @@ type GraduateSubmissionBody = {
   profileImageUploadSource?: unknown;
   email?: unknown;
   legalName?: unknown;
-  educationStartYear?: unknown;
-  educationStartMonth?: unknown;
-  educationEndYear?: unknown;
-  educationEndMonth?: unknown;
+  generation?: unknown;
   campus?: unknown;
   consented?: unknown;
 };
-
-function toInteger(value: unknown) {
-  return typeof value === "number" && Number.isInteger(value) ? value : Number.NaN;
-}
 
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
@@ -89,6 +82,8 @@ export async function POST(request: Request) {
   }
   if (
     !body ||
+    typeof body !== "object" || Array.isArray(body) ||
+    typeof body.email !== "string" || typeof body.legalName !== "string" ||
     (body.certificateUploadId !== undefined && typeof body.certificateUploadId !== "string") ||
     (body.profileImageUploadId !== undefined && typeof body.profileImageUploadId !== "string") ||
     (
@@ -102,17 +97,17 @@ export async function POST(request: Request) {
   ) {
     return NextResponse.json({ ok: false, message: "업로드 파일을 확인해 주세요." }, { status: 400 });
   }
+  if (["educationStartYear", "educationStartMonth", "educationEndYear", "educationEndMonth", "education_start_year", "education_start_month", "education_end_year", "education_end_month"].some((key) => key in body)) {
+    return NextResponse.json({ ok: false, message: "교육 정보 형식이 변경되었습니다. 페이지를 새로고침한 뒤 다시 제출해 주세요." }, { status: 400 });
+  }
   try {
     const result = await submitGraduateVerificationRequest({
       challengeId: session.challengeId,
       certificateUploadId: typeof body.certificateUploadId === "string" ? body.certificateUploadId : null,
       profileImageUploadId: typeof body.profileImageUploadId === "string" ? body.profileImageUploadId : null,
-      email: String(body.email ?? ""),
-      legalName: String(body.legalName ?? ""),
-      educationStartYear: toInteger(body.educationStartYear),
-      educationStartMonth: toInteger(body.educationStartMonth),
-      educationEndYear: toInteger(body.educationEndYear),
-      educationEndMonth: toInteger(body.educationEndMonth),
+      email: body.email,
+      legalName: body.legalName,
+      generation: body.generation,
       campus: typeof body.campus === "string" ? body.campus : null,
       consented: body.consented === true,
     });

@@ -224,10 +224,7 @@ test("수료생 신청의 최대 정상 payload는 일반 4KiB cap 안에 들어
     profileImageUploadSource: "common",
     email: `${"a".repeat(64)}@example.com`,
     legalName: "가".repeat(100),
-    educationStartYear: 2024,
-    educationStartMonth: 1,
-    educationEndYear: 2024,
-    educationEndMonth: 12,
+    generation: 15,
     campus: "서울",
     consented: true,
   });
