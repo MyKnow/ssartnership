@@ -1,0 +1,25 @@
+# Run on an independently managed backup host. Local Docker is a transport
+# fixture only, never proof of off-site disaster recovery.
+name: ssartnership-backup-receiver
+services:
+  receiver:
+    image: restic/rest-server:0.14.0@sha256:d2aff06f47eb38637dff580c3e6bce4af98f386c396a25d32eb6727ec96214a5
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports: ["127.0.0.1:${BACKUP_RECEIVER_PORT:-58443}:8000"]
+    environment:
+      OPTIONS: --append-only --private-repos --tls --tls-min-ver 1.3 --tls-cert /run/receiver/certificate.pem --tls-key /run/receiver/private-key.pem --htpasswd-file /run/receiver/htpasswd --max-size ${BACKUP_RECEIVER_MAX_BYTES:-10737418240}
+    volumes:
+      - receiver-data:/data
+      - ${BACKUP_RECEIVER_SECRETS_DIR:?set a private receiver secrets directory}/certificate.pem:/run/receiver/certificate.pem:ro
+      - ${BACKUP_RECEIVER_SECRETS_DIR:?set a private receiver secrets directory}/private-key.pem:/run/receiver/private-key.pem:ro
+      - ${BACKUP_RECEIVER_SECRETS_DIR:?set a private receiver secrets directory}/htpasswd:/run/receiver/htpasswd:ro
+    logging:
+      driver: local
+      options: { max-size: 10m, max-file: "3" }
+    mem_limit: 256m
+    pids_limit: 128
+volumes:
+  receiver-data:

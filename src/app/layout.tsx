@@ -13,6 +13,7 @@ import { createCanonicalAlternates, getMetadataBase } from "@/lib/seo";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import PwaProvider from "@/components/PwaProvider";
+import SelfHostedWebVitals from "@/components/SelfHostedWebVitals";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -107,7 +108,7 @@ export default function RootLayout({
             <Analytics />
             <SpeedInsights />
           </>
-        ) : null}
+        ) : <SelfHostedWebVitals />}
       </body>
     </html>
   );

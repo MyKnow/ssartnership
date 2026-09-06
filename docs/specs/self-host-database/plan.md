@@ -44,6 +44,17 @@ Preview는 운영 데이터가 없는 독립 환경부터 제공한다. 데이�
 
 ## 검증·전환
 
+### 2026-09-07 실행 추가 범위
+
+사용자가 기반 커밋 이후 위 여섯 운영 항목의 Docker 구현·시험과 서버 배포를 승인했다. [Issue #435 추가 계획](https://github.com/MyKnow/ssartnership/issues/435#issuecomment-5561917265)을 따른다. 기존 클라우드의 중단·Production 데이터 전환은 도메인과 전환 선택이 확정되기 전 실행하지 않는다.
+
+- 외부 사본은 pgBackRest와 Storage Restic의 **암호화된 저장소 및 짝지은 manifest**를 별도 암호화 Restic 저장소로 운반한다. 같은 operations 잠금 아래 보존/삭제와 경쟁하지 않게 한다. 사본의 보장 시점은 선택 manifest의 DB 복구 지점과 Storage snapshot이며, 실시간 외부 WAL 복제로 표현하지 않는다. 복구 키는 사본 안에 넣지 않는다. 원격 REST HTTPS 수신과 인증·append-only, 새 대상 복원·오류 탐지를 시험한다. 외부 목적지 미정 시 Docker 모의 수신과 서버 밖 장치의 사본을 구분한다.
+- 관측 구성은 별도 Compose overlay와 관리망으로 나눈다. Prometheus 7일/2GB 보존, Grafana 익명/회원가입 차단과 provisioned dashboard, PostgreSQL의 pg_monitor 전용 계정, node_exporter textfile 지표를 사용한다. DB superuser와 Docker socket을 exporter에 제공하지 않는다. Alertmanager 수신 adapter는 고정 수신처와 제한된 메시지만 전달하고 인증/전송 실패를 숨기지 않는다.
+- Web Vitals는 앱 경계에서 LCP/INP/CLS의 유효한 수치와 유한한 route 분류만 수용한다. 원본 URL·회원/IP 식별자·metric ID·브라우저 entries를 저장하지 않는다. origin·크기·빈도 제한 후 내부 collector가 histogram으로 집계하고 Prometheus가 보관한다. 기존 제품 이벤트와 분리한다.
+- CI는 기존 ci-builder rootless Docker 및 1 job/30분/자원 제한을 유지한다. 검토된 SHA의 고정 source bundle을 실행하고 결과 image/archive manifest를 운영 비밀과 분리한다. 운영 배포는 별도 신뢰 주체가 exact SHA·digest·platform·health를 검증한다. 잘못된 repo/ref·실패 job·불완전 artifact·동시 실행을 거절하고 이전 앱 digest rollback을 시험한다.
+- 단일 호스트의 초기 artifact 전달은 checksum과 이미지 digest가 검증된 Docker image archive로 구현한다. 앞의 registry는 후보였으며 이번 기본 구성에는 설치하지 않는다. 별도 registry의 인증·GC·백업 운영을 추가하지 않아도 빌더/배포 권한 분리는 가능하다. 여러 배포 호스트로 확장할 때 동일 manifest 검증 뒤 registry transport를 추가한다. 압축 파일이나 mutable tag만으로 배포를 승인하지 않는다.
+- 서비스 장애·백업/점검 실패·노후 지표·만료 전 접근 상태를 관찰하며 실제 실행 증거를 작업 목록과 runbook에 갱신한다. 전체 release gate와 서버 AMD64 검증은 로컬 ARM64 증거와 별개다.
+
 Node 집중 테스트는 파싱·권한·명령 조합·drift·복구 대상 방어를 검사한다. 실제 Docker 검증은 초기화·API·파일·지속성·백업·PITR을 검사한다. `check:docs`, 타입 검사, lint 및 저장소 Release gate는 실제 worktree에서 실행한다. 원격 provider CI, 홈 서버 부하, 외부 백업과 재설치 복구는 로컬 테스트로 대체하지 않는다.
 
 업그레이드는 image digest 변경→격리 환경 초기화/복원→회귀 검증→백업→단일 운영 적용 순서다. 앱 rollback은 이전 이미지로 가능하지만 PostgreSQL major downgrade와 적용된 schema의 자동 역변환은 금지한다. 호환되지 않는 변경의 되돌리기는 검증한 백업을 새 환경에 복원하여 전환한다.

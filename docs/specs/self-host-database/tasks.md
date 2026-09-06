@@ -25,7 +25,21 @@ authority: normative
 
 첫 시간 복구의 ISO `T...Z` 설정 오류를 PostgreSQL 설정용 UTC 형식으로 고쳤고 실패 기록도 보존했다. 현재 실제 `status`는 archive 설정·최근 백업·검사·복구 모두 정상으로 보고했다. 이는 실행 당시의 로컬 상태이며 운영 서비스 보장이 아니다.
 
-## 서버 접근 후 전환 게이트
+## 2026-09-07 추가 구현과 관측 증거
+
+- [x] 기반 56개 파일을 `b95c894b`에 커밋. 원본 worktree의 별도 인증 작업은 보존했다.
+- [x] operations 잠금을 async 작업 종료까지 유지하도록 수정하고 경쟁 실행 거절 회귀 테스트 추가.
+- [x] TLS·인증·append-only REST 백업 수신 fixture, 별도 암호화 외부 사본, 전체 읽기 검사와 새 볼륨 복구 구현. 인증 거절·신뢰되지 않은 CA·삭제 거절·용량 초과를 실제 Docker로 시험했다.
+- [x] 외부 사본 `f6ba89b6075798b69e10614508a7d570cb0c7eba4772e4523ef34919bcd21dc7`에서 DB/Storage 저장소를 새 볼륨으로 되살리고 격리 PITR/파일 hash 재검증. 같은 Docker 장치의 fixture이며 독립 장애 영역의 백업 증거는 아니다.
+- [x] Prometheus·Alertmanager·Grafana와 5개 scrape target, pg_monitor 최소 권한 계정, 운영 textfile 지표·12개 알림 규칙 구현. Grafana 익명 API 401, provisioned dashboard 10개 panel 확인. TLS 알림 fixture에서 firing/resolved 수신 확인; 실제 외부 운영자 수신은 미완료.
+- [x] 자체 Web Vitals의 origin·크기·빈도·유한 route 분류·DNT·샘플링 및 식별자 없는 histogram 구현. 실제 Docker 앱의 360/820/1366px 로그인 화면에서 LCP/INP/CLS 수신, 콘솔 오류 0, 가로 넘침 없음 확인. Next prefetch 취소 4/4/3건과 수신 입증 후 종료 beacon 취소 각 2건은 별도 계수했다.
+- [x] standalone의 내부 origin 때문에 기존 제품 이벤트가 403이 된 문제를 고정 공개 origin 검증으로 수정. 전달된 Host/forwarded header를 신뢰하지 않는 회귀 테스트 포함.
+- [x] 추가 코드의 로컬 Release 실행 종료 코드 0, E2E 103/103·retry 0. 출력 일부가 도구에서 잘려 전체 로그 감사 증거로 사용하지 않는다. 기존 between-test Fast Refresh 외 시작 시 1회 추가 신호를 보존하고 다음 CI 검증에서 재관찰한다.
+- [x] 서버 접근 창과 rootless CI 제약을 읽기 확인하고 프로젝트 전용 Node 24.18.1 바이너리만 설치. 아직 서버 앱 배포 증거는 없다.
+
+추가 집중 검증은 `tests/self-host-*.test.mts` 53/53 및 Web Vitals route 단위 4/4다. 기존 provider transport의 별도 테스트는 이 glob 개수에 포함하지 않는다. 빈 DB 초기 seed가 가리키는 기존 banner SVG 2개가 현재 저장소에 없어 홈페이지의 해당 이미지는 별도 해결/데이터 전환 게이트다. 적용된 migration을 수정하거나 운영 데이터를 반입하여 숨기지 않았다.
+
+## 남은 전환 게이트
 
 - [ ] 운영 DB 크기·확장·권한·Storage 객체 수와 hash 목록 조사, 운영 데이터 반입 범위 확정.
 - [ ] 독립 장애 영역의 암호화 백업 저장소 연결, 보관·삭제 정책·잔여 용량 및 쓰기 실패 검증.
@@ -33,8 +47,8 @@ authority: normative
 - [ ] scheduler 설치, 백업 실패/나이/WAL 지연·디스크/서비스 장애 알림의 외부 수신 확인.
 - [ ] Vercel Analytics·SpeedInsights 대체: 자체 RUM/Web Vitals·요청 지연·오류·가용성 수집과 대시보드/외부 알림 검증. 기존 내부 제품 이벤트/SQL 지표와 backup-status만으로 완료하지 않는다.
 - [ ] 8GB 서버의 runtime·빌드·백업·복원 자원 측정과 동시 실행 제한; RPO/RTO 확정.
-- [ ] 별도 CI runner, image registry, digest 승격/rollback, Preview lifecycle와 배포 권한 연결.
+- [ ] 별도 rootless CI, 검증된 image archive/digest 승격·rollback, Preview lifecycle와 배포 권한 연결. 상시 registry는 현재 기본 구성에서 제외한다.
 - [ ] 운영 데이터와 파일을 새 환경에 복원하고 회원/관리자/파트너 인증·업로드·실제 연동 검증.
 - [ ] DNS/HTTPS·신뢰 proxy·Cron 단일 소유권을 전환하고 되돌리기 기준 확인.
 
-실제 홈 서버·운영 provider·외부 알림은 현재 접근하지 않았다. 전환 게이트가 남아 있는 동안 자체 운영 마이그레이션 완료로 표시하지 않는다.
+홈 서버 접근과 프로젝트 Node 설치는 확인했지만 운영 provider·도메인·데이터 전환 및 외부 운영자 알림은 실행하지 않았다. 전환 게이트가 남아 있는 동안 자체 운영 마이그레이션 완료로 표시하지 않는다.

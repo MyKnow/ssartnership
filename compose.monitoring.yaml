@@ -1,0 +1,107 @@
+x-monitor-defaults: &monitor-defaults
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 128
+  logging:
+    driver: local
+    options: { max-size: 10m, max-file: "3" }
+
+services:
+  app:
+    networks: [default, edge, monitoring]
+    environment:
+      SELF_HOST_VITALS_ENABLED: "1"
+      SELF_HOST_VITALS_TOKEN: ${SELF_HOST_VITALS_TOKEN:?initialize monitoring secrets}
+      SELF_HOST_VITALS_SAMPLE_RATE: ${SELF_HOST_VITALS_SAMPLE_RATE:-0.1}
+  prometheus:
+    <<: *monitor-defaults
+    image: prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
+    networks: [monitoring, edge]
+    ports: ["127.0.0.1:${PROMETHEUS_PORT:-59090}:9090"]
+    mem_limit: 512m
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus, --storage.tsdb.retention.time=7d, --storage.tsdb.retention.size=2GB]
+    volumes:
+      - ./deploy/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/observability/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+  alertmanager:
+    <<: *monitor-defaults
+    image: prom/alertmanager:v0.34.0@sha256:690c7b525f4367aa91f73e2f91c632206d32e97c6384bdbf2fb7a861b420340d
+    networks: [monitoring, edge]
+    ports: ["127.0.0.1:${ALERTMANAGER_PORT:-59093}:9093"]
+    mem_limit: 128m
+    command: [--config.file=/etc/alertmanager/alertmanager.yml, --storage.path=/alertmanager, --cluster.listen-address=]
+    volumes:
+      - ./deploy/observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ${MONITORING_SECRETS_DIR:?initialize monitoring secrets}/alert-relay-token:/run/alert-relay-token:ro
+      - alertmanager-data:/alertmanager
+  grafana:
+    <<: *monitor-defaults
+    image: grafana/grafana:13.2.1@sha256:f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283
+    networks: [monitoring, edge]
+    ports: ["127.0.0.1:${GRAFANA_PORT:-53000}:3000"]
+    mem_limit: 384m
+    tmpfs: [/tmp:mode=1777]
+    environment:
+      GF_SECURITY_ADMIN_USER: operator
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/grafana-password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_LOG_MODE: console
+      GF_LOG_LEVEL: warn
+    volumes:
+      - ${MONITORING_SECRETS_DIR:?initialize monitoring secrets}/grafana-password:/run/grafana-password:ro
+      - ./deploy/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/observability/grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+  node-exporter:
+    <<: *monitor-defaults
+    image: prom/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
+    networks: [monitoring]
+    mem_limit: 64m
+    command: [--collector.textfile.directory=/textfile, --no-collector.netstat, --no-collector.softnet]
+    volumes:
+      - ${MONITORING_TEXTFILE_DIR:?initialize monitoring textfile directory}:/textfile:ro
+  postgres-exporter:
+    <<: *monitor-defaults
+    image: prometheuscommunity/postgres-exporter:v0.20.1@sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e
+    networks: [default, monitoring]
+    mem_limit: 96m
+    environment:
+      DATA_SOURCE_URI: db:5432/postgres?sslmode=disable
+      DATA_SOURCE_USER: ssartnership_monitor
+      DATA_SOURCE_PASS_FILE: /run/postgres-monitor-password
+    volumes:
+      - ${MONITORING_SECRETS_DIR:?initialize monitoring secrets}/postgres-monitor-password:/run/postgres-monitor-password:ro
+  telemetry:
+    <<: *monitor-defaults
+    build:
+      context: .
+      dockerfile: deploy/observability/Dockerfile
+    image: ${SELF_HOST_TELEMETRY_IMAGE:-ssartnership/telemetry:self-host}
+    networks: [monitoring, edge]
+    mem_limit: 128m
+    environment:
+      SELF_HOST_VITALS_TOKEN: ${SELF_HOST_VITALS_TOKEN:?initialize monitoring secrets}
+      OPS_ALERT_RELAY_TOKEN: ${OPS_ALERT_RELAY_TOKEN:?initialize monitoring secrets}
+      OPS_ALERT_WEBHOOK_URL: ${OPS_ALERT_WEBHOOK_URL:-}
+      OPS_APP_PROBE_ENABLED: "1"
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:9464/health').then(r=>process.exit(r.status===204?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  monitoring:
+    internal: true
+volumes:
+  prometheus-data:
+  alertmanager-data:
+  grafana-data:

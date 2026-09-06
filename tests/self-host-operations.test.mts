@@ -28,6 +28,31 @@ import {
 } from "../scripts/self-host-operations/lib.mjs";
 import { createProcessRunner, executeCli, parseCliArguments, quiesceWrites } from "../scripts/self-host-operations/cli.mjs";
 
+test("CLI retains the operations lock until asynchronous backup/check failure finishes", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "ssartnership-lock-"));
+  const data = path.join(directory, "data.env");
+  const operations = path.join(directory, "operations.env");
+  await writeFile(data, "COMPOSE_PROJECT_NAME=ssartnership-lock\n", { mode: 0o600 });
+  await executeCli(["init", "--env-file", data, "--operations-env-file", operations]);
+  let unblock!: () => void;
+  const blocked = new Promise<void>((resolve) => { unblock = resolve; });
+  let entered!: () => void;
+  const started = new Promise<void>((resolve) => { entered = resolve; });
+  const running = executeCli(["check", "--env-file", data, "--operations-env-file", operations], {
+    run: async () => { entered(); await blocked; throw new OperationsError("SYNTHETIC_FAILURE"); },
+  });
+  const expectedFailure = assert.rejects(running, /SYNTHETIC_FAILURE/);
+  await started;
+  try {
+    await assert.rejects(() => acquireOperationsLock(path.join(directory, "operations-state")), /OPERATIONS_LOCKED/);
+  } finally {
+    unblock();
+    await expectedFailure;
+  }
+  const release = await acquireOperationsLock(path.join(directory, "operations-state"));
+  await release();
+});
+
 const project = "ssartnership-local";
 const context = {
   projectName: project,

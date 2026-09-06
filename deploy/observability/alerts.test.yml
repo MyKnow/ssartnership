@@ -1,0 +1,39 @@
+rule_files: [alerts.yml]
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'up{job="synthetic"}'
+        values: '0 0 0 0 1 1 1'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: ServiceDown
+        exp_alerts:
+          - exp_labels: { job: synthetic, severity: critical }
+      - eval_time: 6m
+        alertname: ServiceDown
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: 'ssartnership_operations_last_success_seconds{operation="offhost-capture"}'
+        values: '-100000+0x8'
+      - series: ssartnership_operations_archive_healthy
+        values: '0+0x8'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: OffhostBackupStale
+        exp_alerts:
+          - exp_labels: { operation: offhost-capture, severity: critical }
+      - eval_time: 3m
+        alertname: ArchiveUnhealthy
+        exp_alerts:
+          - exp_labels: { severity: critical }
+  - interval: 1m
+    input_series:
+      - series: ssartnership_operations_collected_seconds
+        values: '0 60 120 stale _ _ _ _'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: OperationsExporterStale
+        exp_alerts:
+          - exp_labels: { severity: critical }

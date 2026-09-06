@@ -17,6 +17,7 @@ last_verified: 2026-08-29
 - [자체 호스팅 앱 빌드·실행·Cron 전환](./runbooks/self-hosting.md)
 - [자체 호스팅 DB·Storage·Preview](./runbooks/self-host-database.md)
 - [자체 호스팅 백업·PITR·운영 관리](./runbooks/self-host-operations.md)
+- [자체 호스팅 외부 사본·관측·Web Vitals](./runbooks/self-host-observability.md)
 - [교차 플랫폼 개발환경](./runbooks/cross-platform-development.md)
 - [Storybook·Visual Baselines](./runbooks/storybook-visual-workflow.md)
 - [Vercel 계정 라우팅](./runbooks/vercel-account-routing.md)

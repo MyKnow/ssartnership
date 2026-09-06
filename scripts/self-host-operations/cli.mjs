@@ -462,9 +462,9 @@ export async function executeCli(argv, { run = createProcessRunner() } = {}) {
   if (options.command === "status") return performStatus(context, run);
   const release = await acquireOperationsLock(context.stateDirectory);
   try {
-    if (options.command === "backup") return performBackup(context, run, options.type);
-    if (options.command === "check") return performCheck(context, run);
-    return performRestoreDrill(context, run, { manifestPath: options.manifest, targetTime: options.target_time });
+    if (options.command === "backup") return await performBackup(context, run, options.type);
+    if (options.command === "check") return await performCheck(context, run);
+    return await performRestoreDrill(context, run, { manifestPath: options.manifest, targetTime: options.target_time });
   } finally {
     await release();
   }

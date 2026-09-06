@@ -44,12 +44,26 @@ function originsMatch(actualOrigin: string, expectedOrigin: string) {
   }
 }
 
+export function getTrustedRequestOrigin(fallback: string | null) {
+  if (process.env.SELF_HOST_MODE !== "real") return fallback;
+  try {
+    const configured = new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "");
+    if (configured.username || configured.password || configured.search || configured.hash || configured.pathname !== "/") return null;
+    if (configured.protocol !== "https:" && !(configured.protocol === "http:" && isLoopbackHostname(configured.hostname))) return null;
+    return configured.origin;
+  } catch { return null; }
+}
+
 export function isTrustedSameOriginRequest(
   request: SameOriginRequest,
   options: SameOriginOptions = {},
 ) {
-  const expectedOrigin =
-    options.expectedOrigin ?? getOriginFromUrl(request.url);
+  // Next standalone can expose its internal bind origin in nextUrl. The
+  // self-hosted public origin is operator configuration, never a forwarded
+  // header chosen by a caller. Invalid/missing real-mode config fails closed.
+  const expectedOrigin = getTrustedRequestOrigin(
+    options.expectedOrigin ?? getOriginFromUrl(request.url),
+  );
   if (!expectedOrigin) {
     return false;
   }
