@@ -8,7 +8,7 @@ issue: https://github.com/MyKnow/ssartnership/issues/435
 
 # 자체 호스팅 작업과 검증 증거
 
-기준은 Issue #435의 `dev` → `feat/self-host-compose-foundation-20260906` → `dev` 흐름이다. 서버 접근이 불가능하여 로컬에서 수행 가능한 앱·데이터 선행 작업과 실제 서버 전환을 구분한다.
+기준은 Issue #435의 `dev` → `feat/self-host-compose-foundation-20260906` → `dev` 흐름이다. 최초 2026-09-06에는 서버 접근 없이 로컬 선행 작업을 수행했다. 2026-09-07 한시적 서버 접근 이후의 진행은 [데이터 작업 목록](../self-host-database/tasks.md)에 기록하며 아래 초기 증거와 구분한다.
 
 ## 앱 선행 작업
 
@@ -39,4 +39,4 @@ Docker Desktop Linux arm64에서 mock/real production standalone 이미지 빌�
 
 작업 체크는 해당 증거가 생길 때 갱신한다. 로컬 mock smoke는 데이터 이전 또는 운영 인증 검증을 대체하지 않는다.
 
-데이터·복구의 상세 증거와 운영 서비스 구현 순서는 [데이터 작업 목록](../self-host-database/tasks.md), [기술 계획](../self-host-database/plan.md)이 정본이다. Git 커밋·push·PR·merge·배포는 이번 로컬 검증과 별개이며 수행하지 않았다.
+데이터·복구의 상세 증거와 운영 서비스 구현 순서는 [데이터 작업 목록](../self-host-database/tasks.md), [기술 계획](../self-host-database/plan.md)이 정본이다. 최초 로컬 검증 이후 기반 `b95c894b`와 관측·백업 `fd77cc07` 커밋을 만들었다. push·PR·merge·실제 배포는 각 증거가 생길 때 별도로 기록한다.

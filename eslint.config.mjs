@@ -10,6 +10,9 @@ const eslintConfig = defineConfig([
   ...nextTs,
   // Override default ignores of eslint-config-next.
   globalIgnores([
+    // Repository-approved location for private QA logs and retained builds.
+    // These are artifacts, never application or controller source.
+    ".tmp/**",
     // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",

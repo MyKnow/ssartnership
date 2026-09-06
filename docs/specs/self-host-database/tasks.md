@@ -41,6 +41,20 @@ authority: normative
 
 ## 남은 전환 게이트
 
+추가 격리 CI 준비(2026-09-07): 관측·백업을 `fd77cc07`에 커밋하고 root 소유 승인 archive를 서버 CI 입력으로 설치했다. 원격 `dev`는 다시 조회한 `2074e22d`이며 Production 전환은 하지 않았다. 새 CI 제어 코드는 이 source commit과 별도로 검증 중이다.
+
+- 로컬 자체 호스팅·lint 격리 집중 테스트 70/70, 타입 검사 통과. 실제 Docker의 실패 health 503을 거절하고 이전 immutable app 이미지로 rollback 후 200 복구를 확인했다.
+- 실제 Docker archive를 제한된 단일 이미지 tar로 재포장·적재하고 config/layer/revision 일치를 확인했다. 원본 containerd index ID와 적재 후 ID가 달라지는 경우도 구분한다.
+- 서버 CI 첫 준비 실행은 빌더 HOME 오설정으로 실패했다. 실제 `/srv/ci`로 교정했다. 이후 영상 인코딩 포함 실행은 1.5 CPU 제약 아래 E2E 시간 초과로 실패했고, 다음 실행은 별도 Playwright 설정의 상대 경로 문제로 테스트 시작 전 실패했다. 모두 로그·작업 디렉터리를 보존하고 성공 artifact를 게시하지 않았다.
+- 제어 코드 v4는 영상만 끄고 두 초기 module을 별도 GET으로 준비하며 테스트 제한·자원·retry 0은 유지했다. 최초 사례 집중 진단 1/1은 통과했지만 전체 실행 `202609070704`는 1 통과·1 실패·101 미실행으로 끝났다. partner 경로 cold compile 21.794초와 미완료 문서 요청을 확인했으며 성공 artifact는 없다. 후속 제어 코드는 검토된 유한한 읽기 전용 경로와 mock 관리자 화면을 별도 컴파일하며, 준비 시간·same-origin redirect 경계를 기록한다. 전체 서버 통과는 아직 미확인이다.
+- 로컬 전체 Release 로그를 `.tmp/self-host/verify-release-20260907-ci.log`에 온전히 보존했다. 종료 0, E2E 103/103·retry 0이며 전체 로그 감사는 별도다. 시작 시 Fast Refresh는 독립 fresh-server 진단에서 화면 이동 중 HMR manifest `ERR_ABORTED` → `client-full-reload`로 재현했다. WebSocket payload의 `hadRuntimeError=false`, 브라우저 오류 0, 새 cache에서도 같은 원인임을 확인했다. generic 경고 문구만 보고 제품 컴포넌트를 재작성하지 않는다.
+- 운영 유지보수 timer·DB 읽기 점검·서버 밖 키 암호화/SSH 반출·격리 복구 도구를 추가했다. 단위 검증은 실제 timer 설치·서버 사본 반출·다른 장치 복구 완료를 의미하지 않는다.
+- 백업 반출 도구 포함 첫 로컬 Release는 개인 홈 절대 경로에 대한 cross-platform 정책으로 중단됐다. runtime 홈 경로 계산으로 고치고 원본 실패 로그를 보존했다. Docker 반출/복구 준비에서는 numeric UID/GID를 보존해야 PostgreSQL이 0600 저장소 파일을 읽을 수 있음을 확인하고, 새 볼륨에 복원한 synthetic 파일을 UID 105:106으로 읽는 실제 시험을 통과했다.
+- 로컬 후속 Release의 generated QA lint 충돌은 `.tmp/**`만 lint에서 제외하고 실제 ESLint API로 소스 검사를 유지함을 검증했다. 기본 3100 포트 충돌은 기존 Compose 앱을 유지하고 별도 3150 테스트 포트로 해결했다. 최종 로그 `verify-release-20260907-ci-v6-final.log`는 종료 0, Node 1769 통과/8 기존 skip, unit 133 통과, E2E 103 통과/retry 0이다. 204,352바이트 전체 로그의 시그니처 검사 결과는 이미 진단한 Fast Refresh 안내뿐이다.
+- 서버 v5 빈 캐시 진단은 19개 경로를 준비한 뒤 parent cgroup의 3GiB MemoryHigh 부근에서 메모리 회수·swap 때문에 정체되었다. Next 개발 CLI의 호스트 RAM 기반 기본 heap 크기를 확인했다. 진단은 9m52.255s timeout으로 끝나며 보존했고, 후속 CI 설정은 개발 서버 heap만 1536MiB로 명시한다. 서버/컨테이너 제한이나 테스트 시간을 늘리지 않았다.
+
+절차와 잔여 권한 경계는 [격리 CI·유지보수 runbook](../../operations/runbooks/self-host-ci-maintenance.md)을 따른다.
+
 - [ ] 운영 DB 크기·확장·권한·Storage 객체 수와 hash 목록 조사, 운영 데이터 반입 범위 확정.
 - [ ] 독립 장애 영역의 암호화 백업 저장소 연결, 보관·삭제 정책·잔여 용량 및 쓰기 실패 검증.
 - [ ] 서버 밖의 복구 키 보관과 새 장치에서 키를 가져오는 복구 실습.

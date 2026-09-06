@@ -116,8 +116,9 @@ export async function executeOffhost(argv, { run = createProcessRunner() } = {})
   }
 }
 
-export async function rehearseRecoveredBundle(context, run, bundleVolume) {
+export async function rehearseRecoveredBundle(context, run, bundleVolume, { databaseImage } = {}) {
   if (!/^ssartnership-[a-z0-9-]+-offhost-[a-f0-9]{32}$/u.test(bundleVolume)) fail("OFFHOST_BUNDLE_INVALID");
+  if (databaseImage !== undefined && !/^sha256:[a-f0-9]{64}$/u.test(databaseImage)) fail("OFFHOST_IMAGE_INVALID");
   const recoveryProject = `ssartnership-recovery-${randomUUID().replaceAll("-", "").slice(0, 12)}`;
   const directory = path.join(context.stateDirectory, recoveryProject);
   await mkdir(directory, { mode: 0o700 });
@@ -137,6 +138,7 @@ export async function rehearseRecoveredBundle(context, run, bundleVolume) {
     PGBACKREST_REPO1_CIPHER_PASS: context.operations.PGBACKREST_REPO1_CIPHER_PASS,
     RESTIC_PASSWORD: context.operations.RESTIC_PASSWORD,
     PGBACKREST_REPOSITORY_VOLUME: pgVolume, RESTIC_REPOSITORY_VOLUME: storageVolume,
+    ...(databaseImage ? { SELF_HOST_PGBACKREST_IMAGE: databaseImage } : {}),
   }), { mode: 0o600, flag: "wx" });
   const recovered = await loadOperationsContext({ dataEnvFile: dataFile, operationsEnvFile: opsFile });
   await appendManifest(defaultManifestPath(opsFile), paired);

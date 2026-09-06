@@ -1,0 +1,31 @@
+# Linux host resource/log bounds. Add only after the data/operations and
+# monitoring overlays. These are ceilings, not proof of simultaneous capacity.
+x-logs: &bounded-logs
+  driver: local
+  options: { max-size: 10m, max-file: "3" }
+services:
+  app:
+    mem_limit: 768m
+    cpus: 1.5
+    pids_limit: 256
+    logging: *bounded-logs
+  db:
+    mem_limit: 1536m
+    cpus: 1.5
+    pids_limit: 256
+    logging: *bounded-logs
+  rest:
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 128
+    logging: *bounded-logs
+  storage:
+    mem_limit: 512m
+    cpus: 1
+    pids_limit: 128
+    logging: *bounded-logs
+  gateway:
+    mem_limit: 384m
+    cpus: 1
+    pids_limit: 128
+    logging: *bounded-logs
