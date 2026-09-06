@@ -1,0 +1,10 @@
+[Unit]
+Description=SSAFY Partnership full database and Storage backup
+Wants=network-online.target
+After=network-online.target
+OnFailure=ssartnership-operations-failure@%n.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/services/ssartnership
+ExecStart=/usr/bin/node -- scripts/self-host-operations/cli.mjs backup --type full --env-file /etc/myknow/secrets/ssartnership/data.env --operations-env-file /etc/myknow/secrets/ssartnership/operations.env

@@ -1,0 +1,3 @@
+# Runtime-only deployment configuration. Keep the tracked example above as
+# the editable contract; never add a populated copy to source control.
+runtime.env

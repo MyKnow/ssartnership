@@ -47,6 +47,7 @@ function buildSupabaseRemotePattern(): RemotePattern | null {
 }
 
 const supabaseRemotePattern = buildSupabaseRemotePattern();
+const selfHostBuild = process.env.SELF_HOST_BUILD === "1";
 
 if (process.env.NODE_ENV === "production") {
   securityHeaders.push({
@@ -56,6 +57,9 @@ if (process.env.NODE_ENV === "production") {
 }
 
 const nextConfig: NextConfig = {
+  // Self-hosted images use Next's portable standalone server. The flag keeps
+  // Vercel's existing build and tracing behavior unchanged.
+  output: selfHostBuild ? "standalone" : undefined,
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
   // The mobile search island occupies the framework indicator's default
   // bottom-left position. Keep local QA aligned with the shipped navigation.

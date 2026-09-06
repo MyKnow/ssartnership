@@ -45,6 +45,8 @@
     "verify:release": "node scripts/run-package-scripts.mjs verify:quick verify:release:post-quick",
     "prepush": "npm run verify:change",
     "sync:preview": "node scripts/supabase-sync-preview.mjs",
+    "self-host:database": "node -- scripts/self-host-database/cli.mjs",
+    "self-host:operations": "node -- scripts/self-host-operations/cli.mjs",
     "measure:admin:preview": "node scripts/admin-preview-performance.mjs",
     "migrate:legacy-member-avatars": "node --import ./tests/alias-register.mjs --env-file-if-exists=.env scripts/migrate-legacy-member-avatars.mjs",
     "migrate:image-assets": "node --import ./tests/alias-register.mjs --env-file-if-exists=.env scripts/migrate-image-assets.mts",

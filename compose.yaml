@@ -1,0 +1,27 @@
+services:
+  app:
+    # A release should set SELF_HOST_IMAGE to a registry tag or immutable
+    # digest. The base file intentionally has no build context.
+    image: ${SELF_HOST_IMAGE:-ssartnership:self-host}
+    init: true
+    restart: unless-stopped
+    networks: [default, edge]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    ports:
+      - "127.0.0.1:${SELF_HOST_APP_PORT:-3100}:3000"
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      SELF_HOST_MODE: real
+    # Missing configuration is deliberately accepted by Compose so an image
+    # can be inspected or used by the local mock overlay. The entrypoint
+    # rejects a real-mode container before Next starts when it is absent.
+    env_file:
+      - path: ${SELF_HOST_RUNTIME_ENV_FILE:-./deploy/self-host/runtime.env}
+        required: false
+networks:
+  edge:

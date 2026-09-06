@@ -1,0 +1,4 @@
+# The operations image has an intentionally tiny, self-contained build context.
+*
+!Dockerfile
+!pgbackrest.conf
