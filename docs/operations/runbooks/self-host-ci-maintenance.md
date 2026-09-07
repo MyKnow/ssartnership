@@ -114,6 +114,8 @@ Mac engine은 사용자 소유 Docker Desktop Unix socket에 고정하고 환경
 
 ### 원래 Cloud Preview의 암호화 이전 준비
 
+원격 Storage 수집은 최대 4개 요청을 병렬 처리하되 다운로드와 재검증 pass 사이의 DB 목록 대조를 유지한다. 실패 시 다른 진행 요청도 중단하고 종료를 기다린 뒤 전체 실패로 반환하며, 재시도·파일 생략·부분 성공은 없다. 각 pass의 100개 단위 및 마지막 처리 건수만 공개 로그에 남긴다. 20분 상한은 늘리지 않으며 최종 목록 조회 도중 만료돼도 성공 ledger를 발급하지 않는다.
+
 이전용 파일에는 기존 Production→Preview 정제를 적용하지 않는다. 원래 Preview의 완전 export·Storage byte 검증·새 DB 복원·쓰기를 정지한 최종 동등성 확인은 [데이터 기술 계획](../../specs/self-host-database/plan.md)을 따른다. `self-host-migration/database.mjs`와 `storage.mjs`는 읽기 전용 수집 모듈이고 `transfer.mjs`는 암호화 전송 경계다. Cloud export workflow 실행과 서버 복원·공개 전환의 완료를 뜻하지 않는다.
 
 DB 수집은 고정 Preview direct/session-pooler identity·5432·PostgreSQL 17·TLS `verify-full`을 요구한다. 기본 transaction을 읽기 전용으로 설정하며, 같은 `REPEATABLE READ READ ONLY` transaction의 exported snapshot으로 전체 custom-format `pg_dump`와 최초 Storage 목록을 연결한다. 원래 Preview 회원 비밀번호를 정제하지 않는다. DB 로그인 비밀번호는 별도 교체 대상이며 role 속성·membership만 별도 private JSON에 보존한다. 자격증명은 명령 인수가 아닌 명시적 PG 환경 이름으로만 client container에 전달하고 원본 stderr/SQL/객체 경로는 로그에 내보내지 않는다.

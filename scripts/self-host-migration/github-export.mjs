@@ -87,7 +87,8 @@ async function capture(context) {
   const database = await captureDatabase(path.join(payload, "database"), planFor);
   console.log('{"stage":"storage-capture"}');
   let reads = 0;
-  const storage = await exportStorage({ directory: path.join(payload, "storage"), serviceKey: process.env.SUPABASE_PREVIEW_SERVICE_ROLE_KEY,
+  const storage = await exportStorage({ directory: path.join(payload, "storage"), serviceKey: process.env.SUPABASE_PREVIEW_SERVICE_ROLE_KEY, concurrency: 4,
+    onProgress: progress => console.log(JSON.stringify({ stage: "storage-progress", ...progress })),
     readInventory: () => ++reads === 1 ? Promise.resolve(database.storageInventory) : currentStorageInventory(planFor) });
   console.log('{"stage":"encrypt-complete-snapshot"}');
   const archive = path.join(directory, "snapshot.tar");

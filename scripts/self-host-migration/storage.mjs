@@ -111,14 +111,20 @@ async function download(object, key, output, request, signal) {
 // Two reads detect observed races, not an atomic DB+Storage snapshot: final
 // source write-quiesce/reconciliation remains mandatory before traffic cutover.
 /**
- * @param {{directory: string, serviceKey: string, readInventory: () => Promise<unknown>}} options
+ * @param {{directory: string, serviceKey: string, readInventory: () => Promise<unknown>, concurrency?: number, timeoutMs?: number, onProgress?: (value: {phase: string, completed: number, total: number}) => void}} options
  * @param {(url: string, options: RequestInit) => Promise<Response>} request
  */
 export async function exportStorage(options, request = fetch) {
-  const { directory, serviceKey, readInventory } = options;
-  const signal = AbortSignal.timeout(20 * 60_000);
+  const { directory, serviceKey, readInventory, concurrency = 1, timeoutMs = 20 * 60_000, onProgress = () => {} } = options;
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 4
+    || !Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 20 * 60_000) fail("LIMITS_INVALID");
+  const deadline = AbortSignal.timeout(timeoutMs), cancellation = new AbortController();
+  const signal = AbortSignal.any([deadline, cancellation.signal]);
   const read = async () => {
-    try { signal.throwIfAborted(); return validateStorageInventory(await readInventory()); }
+    try {
+      signal.throwIfAborted(); const value = await readInventory(); signal.throwIfAborted();
+      return validateStorageInventory(value);
+    }
     catch { fail("INVENTORY_FAILED"); }
   };
   try {
@@ -126,25 +132,46 @@ export async function exportStorage(options, request = fetch) {
     const inventory = await read(), fingerprint = inventoryFingerprint(inventory);
     await privateDirectory(directory);
     const startedAt = new Date().toISOString(), files = [];
-    for (const [index, object] of inventory.objects.entries()) {
+    // Keep the two verification passes separated by a fresh inventory read.
+    // Workers share a bounded cursor, but each file and ledger slot is unique.
+    const pass = async (phase, processObject) => {
+      let next = 0, completed = 0, failure;
+      await Promise.all(Array.from({ length: Math.min(concurrency, inventory.objects.length) }, async () => {
+        while (!failure && next < inventory.objects.length) {
+          const index = next++;
+          try {
+            signal.throwIfAborted();
+            await processObject(inventory.objects[index], index);
+            completed++;
+            if (completed % 100 === 0 || completed === inventory.objects.length) onProgress({ phase, completed, total: inventory.objects.length });
+          } catch (error) { failure ??= error; cancellation.abort(); }
+        }
+      }));
+      // Settle every in-flight request before returning a failure. No retry,
+      // next pass, inventory read or success ledger may race failed workers.
+      if (failure) throw failure;
+      signal.throwIfAborted();
+    };
+    await pass("download", async (object, index) => {
       signal.throwIfAborted();
       const name = `${String(index).padStart(6, "0")}.bin`;
       const partial = path.join(directory, `${name}.partial`);
       const result = await download(object, serviceKey, partial, request, signal);
       await link(partial, path.join(directory, name)); await unlink(partial);
-      files.push({ id: object.id, file: name, ...result });
-    }
+      files[index] = { id: object.id, file: name, ...result };
+    });
     if (inventoryFingerprint(await read()) !== fingerprint) fail("INVENTORY_CHANGED");
-    for (const [index, object] of inventory.objects.entries()) {
+    await pass("verify", async (object, index) => {
       signal.throwIfAborted();
       const result = await download(object, serviceKey, null, request, signal);
       if (result.sha256 !== files[index].sha256 || await sha256File(path.join(directory, files[index].file)) !== result.sha256) fail("CONTENT_CHANGED");
-    }
+    });
     if (inventoryFingerprint(await read()) !== fingerprint) fail("INVENTORY_CHANGED");
     const summary = { buckets: inventory.buckets.length, objects: files.length, bytes: files.reduce((total, item) => total + item.bytes, 0), verifiedPasses: 2, inventoryReads: 3 };
     await writeFile(path.join(directory, "ledger.json"), JSON.stringify({ version: 1, sourceProject: PREVIEW_PROJECT, startedAt, completedAt: new Date().toISOString(), inventory, files, summary }), { mode: 0o600, flag: "wx" });
     return summary; // Only aggregate counts are safe for public diagnostics.
   } catch (error) {
+    if (deadline.aborted) fail("TIMEOUT");
     const code = String(error.message);
     if (/^MIGRATION_STORAGE_[A-Z_]+$/u.test(code)) throw new Error(code);
     fail("EXPORT_FAILED");

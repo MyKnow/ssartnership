@@ -105,3 +105,59 @@ test("private canonical output parent is mandatory and inventory errors never le
   await assert.rejects(exportStorage({ ...options, readInventory: async () => { throw new Error("private DB row"); } }, fetcher), /^Error: MIGRATION_STORAGE_INVENTORY_FAILED$/);
   assert.equal(calls, 0);
 });
+
+const manyObjects = () => ({ buckets: inventory().buckets, objects: Array.from({ length: 12 }, (_, index) => ({
+  id: `00000000-0000-0000-0000-${String(index + 1).padStart(12, "0")}`,
+  bucket_id: "private", name: `${index}.bin`, version: "v1", metadata: { size: 1 },
+})) });
+test("bounded parallel Storage export retains ordered complete ledgers and two full passes", async t => {
+  const f = await fixture(t); let active = 0, peak = 0, calls = 0, reads = 0;
+  const progress: unknown[] = [];
+  const result = await exportStorage({ directory: f.directory, serviceKey: "synthetic-only-key", concurrency: 4,
+    onProgress: value => { progress.push(value); }, readInventory: async () => { reads++; return manyObjects(); } }, async url => {
+    calls++; active++; peak = Math.max(peak, active);
+    const index = Number(new URL(url).pathname.split("/").at(-1)?.split(".")[0]);
+    await new Promise(resolve => setTimeout(resolve, 12 - index % 4)); active--;
+    return new Response(Buffer.from([index]));
+  });
+  assert.equal(peak, 4); assert.equal(active, 0); assert.equal(calls, 24); assert.equal(reads, 3);
+  assert.equal(result.objects, 12); assert.equal(result.verifiedPasses, 2);
+  const ledger = JSON.parse(await readFile(path.join(f.directory, "ledger.json"), "utf8"));
+  for (const [index, file] of ledger.files.entries()) {
+    assert.equal(file.file, `${String(index).padStart(6, "0")}.bin`);
+    assert.equal(file.id, manyObjects().objects[index].id);
+    assert.deepEqual(await readFile(path.join(f.directory, file.file)), Buffer.from([index]));
+  }
+  assert.deepEqual(progress, [{ phase: "download", completed: 12, total: 12 }, { phase: "verify", completed: 12, total: 12 }]);
+});
+test("one parallel failure aborts and settles in-flight requests without retry or success ledger", async t => {
+  const f = await fixture(t); let calls = 0, aborted = 0;
+  await assert.rejects(exportStorage({ directory: f.directory, serviceKey: "synthetic-only-key", concurrency: 4,
+    readInventory: async () => manyObjects() }, async (url, options) => {
+    calls++;
+    if (url.endsWith("/0.bin")) { await new Promise(resolve => setTimeout(resolve, 15)); throw new Error("synthetic private provider message"); }
+    return new Promise<Response>((_resolve, reject) => options.signal?.addEventListener("abort", () => { aborted++; reject(new Error("aborted")); }, { once: true }));
+  }), /^Error: MIGRATION_STORAGE_DOWNLOAD_FAILED$/);
+  assert.equal(calls, 4); assert.equal(aborted, 3);
+  assert.deepEqual(await readdir(f.directory), []);
+});
+test("Storage deadline is explicit, bounded, and never publishes partial success", async t => {
+  const f = await fixture(t);
+  await assert.rejects(exportStorage({ directory: f.directory, serviceKey: "synthetic-only-key", concurrency: 4, timeoutMs: 30,
+    readInventory: async () => manyObjects() }, async (_url, options) => new Promise<Response>((_resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("synthetic fallback")), 200);
+    options.signal?.addEventListener("abort", () => { clearTimeout(timer); reject(new Error("deadline")); }, { once: true });
+  })), /^Error: MIGRATION_STORAGE_TIMEOUT$/);
+  assert.ok(!(await readdir(f.directory)).includes("ledger.json"));
+  for (const limits of [{ concurrency: 0 }, { concurrency: 5 }, { timeoutMs: 0 }, { timeoutMs: 1200001 }]) {
+    await assert.rejects(exportStorage({ directory: `${f.root}/invalid`, serviceKey: "synthetic-only-key", readInventory: async () => manyObjects(), ...limits }, request), /^Error: MIGRATION_STORAGE_LIMITS_INVALID$/);
+  }
+});
+test("deadline expiry during the final inventory read still prevents success publication", async t => {
+  const f = await fixture(t); let reads = 0; const deadline = new AbortController();
+  t.mock.method(AbortSignal, "timeout", () => deadline.signal);
+  await assert.rejects(exportStorage({ directory: f.directory, serviceKey: "synthetic-only-key",
+    readInventory: async () => { if (++reads === 3) deadline.abort(); return inventory(); } }, request), /^Error: MIGRATION_STORAGE_TIMEOUT$/);
+  assert.equal(reads, 3);
+  assert.ok(!(await readdir(f.directory)).includes("ledger.json"));
+});
