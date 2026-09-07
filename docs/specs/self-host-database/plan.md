@@ -90,3 +90,11 @@ Node 집중 테스트는 파싱·권한·명령 조합·drift·복구 대상 방
 ### 유지보수 진입점의 링크 경로 검증
 
 서버의 versioned controller를 `current` 링크로 실행하는 실제 경로도 검증한다. Node의 물리 module URL과 argv 링크를 비교하여 명령이 생략되는 문제는 maintenance/export 두 진입점에서 argv를 realpath로 해석하여 고친다. root/승인/잠금/비밀 처리 경계는 그대로 유지한다. 직접·링크 subprocess를 모두 실행하되 테스트에서는 UID를 비특권으로 고정하여 실제 운영 상태에 접근하지 않는다. 로컬 전체 gate와 Linux 회귀 뒤 controller만 새 version으로 교체하며, 이미 검증된 앱·DB·telemetry 이미지와 데이터 release는 `5b807483`에 유지한다. 실행 receipt·metric 파일·실제 백업과 복구를 확인한 뒤 중지한 여섯 타이머를 재개한다. 타이머 active/프로세스 exit 0만으로 수용하지 않는다.
+
+### 초기화 로그 보호와 합성 자격증명 교체 제안 — 승인 대기
+
+현재 서버 적용안이 아닌 후속 제안이다. [PostgreSQL 17 로그 설정](https://www.postgresql.org/docs/17/runtime-config-logging.html)에 따라 `log_statement=none`만으로 실패한 SQL 본문은 차단되지 않는다. 후보는 `log_statement=none`, `log_min_error_statement=panic`, `log_error_verbosity=terse`, `log_parameter_max_length_on_error=0`을 실제 entrypoint가 시작하는 임시 초기화 서버부터 전달하는 것이다. 오류 심각도와 명령 실패는 유지한다. 이 설정도 오류 메시지 자체나 다른 출력 경로의 모든 민감 값을 지운다는 보장은 아니다.
+
+승인 후 기본 data Compose와 operations overlay의 DB command 재정의, 새 초기화와 복구 실행 경계를 함께 검사한다. 먼저 합성 canary로 성공한 초기화 DDL과 실패 SQL의 값 미노출, ERROR 유지·비정상 종료, 정상 bootstrap·인증·Storage·백업을 회귀 검증한다. 이후 운영 잠금과 쓰기 중지 아래 실제 역할/소비자 목록을 대조하여 기존 합성 Preview DB 비밀번호와 대응 비밀 파일을 교체하고 재연결·RPC/RLS·Storage·health를 확인한다. 기존 데이터 볼륨과 별도 암호화 키는 보존한다. 기존 로그의 접근 통제와 잔존 범위를 확인하되 원본 증거를 임의 삭제하지 않는다.
+
+교체 후 신규 DB/Storage 짝지은 백업과 로그 재감사를 완료해야 복구 자료 반출을 재개한다. controller 링크 수정의 실제 receipt/metric 및 복구 검증과 구분해 타이머 재개를 판단한다. Production 데이터 반입·DNS/공개 ingress·클라우드 변경·접근 계정 수명 변경은 이 제안의 범위 밖이다.
