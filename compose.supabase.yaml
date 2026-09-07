@@ -2,6 +2,20 @@ services:
   db:
     image: supabase/postgres:17.6.1.136@sha256:f371b5f3f2ac0a05703f33d6e6134515fb2498cab708fb948a0aeb7481467c00
     restart: unless-stopped
+    # Apply before the upstream entrypoint starts its temporary init server.
+    # DDL and failed SQL can contain passwords; keep ERROR severity intact.
+    command:
+      - postgres
+      - -D
+      - /etc/postgresql
+      - -c
+      - log_statement=none
+      - -c
+      - log_min_error_statement=panic
+      - -c
+      - log_error_verbosity=terse
+      - -c
+      - log_parameter_max_length_on_error=0
     environment:
       POSTGRES_DB: postgres
       POSTGRES_USER: supabase_admin
