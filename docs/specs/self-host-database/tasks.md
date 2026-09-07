@@ -162,3 +162,25 @@ Mac 후속 검증: 세 차례 AMD64 gate의 실패를 모두 보존했다. 준�
 - [ ] DNS/HTTPS·신뢰 proxy·Cron 단일 소유권을 전환하고 되돌리기 기준 확인.
 
 홈 서버 접근과 프로젝트 Node 설치는 확인했지만 운영 provider·도메인·데이터 전환 및 외부 운영자 알림은 실행하지 않았다. 전환 게이트가 남아 있는 동안 자체 운영 마이그레이션 완료로 표시하지 않는다.
+
+## 2026-09-07 Production/Preview 동시 운영과 명령형 사본 준비
+
+Issue #435에 두 환경 격리와 단방향 사본 준비 계획을 먼저 기록했다. origin/dev를 fetch해 작업 브랜치가 최신 dev를 포함하는지 확인했고, 원래 루트의 사용자 변경은 보존했다. [두 환경 runbook](../../operations/runbooks/self-host-environments.md)에 실행 명령과 아직 수행하지 않는 전환 경계를 기록한다.
+
+- [x] 새 private directory에서 환경별 프로젝트·DB/JWT/세션 키·볼륨·포트·자원 제한 생성, 공유/변조/중복 초기화 거부.
+- [x] 로컬 Docker에서 별도 public-origin 앱 이미지 빌드와 Production/Preview 역할 앱·DB·API·Storage 동시 실행.
+- [x] 두 앱의 home/login/health 200, Preview 앱의 단일 internal network와 DB 포트 미공개, 자체 DB 접속 성공·Production DB IP/외부 IP 접속 거절 확인.
+- [x] 기존 짝 백업을 격리 복원해 비밀번호/발송 토큰 제거·이메일 마스킹·source migration prefix 검증 후 새 후보에 로드하는 `prepare-copy` 구현.
+- [x] 공개 Storage 객체의 파일 metadata 보존과 실제 API SHA256 검증, 후보 DB 행/파일 삭제 후 원본 유지, 상대 환경 service key 거절을 합성 데이터로 확인.
+- [x] 비공개 프로필 이미지/ledger 복사·공개 접근 거절·Preview 전용 비밀번호 seed의 실제 해시 검증과 원본 회원 불변 확인.
+- [x] 최종 로컬 Release 통과와 전체 로그 진단 기록.
+- [ ] 후보 앱 인증/권한 QA, 고정 Preview ingress의 교체·실패 복귀·원본 URL 제거 검증.
+- [ ] 홈 서버에 두 환경 상시 적용, TLS/서브도메인, 실제 운영 데이터 반입, GHCR/GitHub Actions 배포 연결 및 전체 자원 부하 검증.
+
+집중 테스트 7개, 타입 검사와 문서 94개 검증을 통과했다. 공개 파일 복사 실습은 22:11 KST에 성공했으며 migration 199개와 6객체/162바이트의 파일 및 API hash를 확인했다. 합성 규모이며 실데이터의 복원 시간/저장 공간 보장이 아니다. 로컬 Docker 이미지는 ARM64이므로 홈 서버 AMD64 배포 검증과 구분한다. UI 소스 변경은 없고 이 단계의 격리 실측은 HTTP/TCP 검사이며 실제 사용자 로그인/쿠키의 브라우저 검증으로 대체하지 않는다.
+
+22:16 KST 최종 합성 복사 시험은 migration 199개, 공개/비공개 8객체·245바이트의 파일 및 API hash를 통과했다. private `member-profile-images` 객체와 public ledger가 유지되고 공개 경로 접근은 거절됐다. 운영 비밀번호 제거 후 후보의 특정 회원 한 명만 새 Preview 비밀번호로 seed하고 실제 PBKDF2 결과를 확인했다. 후보 DB 행/공개 파일 삭제와 회원 비밀번호 변경 뒤 원본은 유지됐으며 후보 키로 원본 API 접근도 거절됐다. source backup은 22:12 KST의 성공한 짝 백업이므로 명령 실행 시점의 live snapshot이라고 부르지 않는다. 모든 receipt의 `activated:false`를 유지하며 기존 Preview 교체는 수행하지 않았다.
+
+개발 중 실패 증거는 Git 제외 작업 폴더에 보존했다. sanitizer의 CHECK 제약(분리 UPDATE)과 정수 배열 cast 오류를 수정하고 회귀 테스트를 추가했다. 고정 helper 이미지가 BuildKit 캐시에만 있던 문제는 실행 전 engine image 검사로 차단한다. internal network 직접 publish 대신 비밀 없는 고정 upstream ingress를 분리했다. 파일 바이트만 복사하면 Storage API가 ENODATA로 실패한 문제는 확장 속성 보존과 모든 객체의 API hash 검증으로 수정했다. 실패 후보 컨테이너는 정확한 이름으로 중지하고 볼륨/실패 receipt를 보존했으며 사용자 서비스와 기존 Preview를 삭제하지 않았다.
+
+첫 Release는 신규 테스트의 JS 추론 타입 오류, 다음 실행은 기존 앱이 사용하는 3100 포트 충돌로 실패했다. 두 로그를 보존하고 타입 수정 및 별도 3199 포트로 재검증해 종료 0을 확인했다: Node 1,814 통과/기존 skip 8, unit 133, build, E2E 103 통과/재시도 없음(6.6분). 전체 208,931바이트·2,368줄에는 기존 실패 경로 단위 테스트의 합성 rollback 진단 4건과 관리자 테스트 사이 Fast Refresh 2회가 있었으며 테스트 실패는 없다. 마지막 CLI 입력 경계 및 비공개 파일 fixture 변경 후 집중 lint·7개 테스트·타입 검사를 다시 통과했고 최종 문서 94개도 확인했다. 이 로컬 단계에서 commit/push/원격 CI trigger/서버 변경/실제 Production 전환은 수행하지 않았다.

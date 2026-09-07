@@ -9,6 +9,14 @@ authority: normative
 
 ## 구성과 책임
 
+### 상시 두 환경과 후보 기반 데이터 복사
+
+`scripts/self-host-environments/`는 기존 Compose·마이그레이션·짝 백업 복원 도구를 조합한다. 환경 설정은 새 private directory에만 생성하며 중복 초기화, symlink, 파일/descriptor drift, 공유 백업 볼륨, DB system identifier 불일치를 거부한다. 환경별 immutable 앱 이미지의 public build 설정을 각각 맞춘다. 로컬 브라우저 검증도 Production 역할은 `127.0.0.1`, Preview 역할은 `localhost`로 분리한다. 실제 서비스의 두 HTTPS 도메인·ingress는 별도 전환 단계다.
+
+복사는 기존 paired backup을 읽기 전용으로 복원한다. source migration checksum-prefix와 재생한 스키마 catalog를 대조하고, 검토한 public table/민감 column 정책을 적용한다. 회원 비밀번호는 NULL, 필수 파트너 비밀번호는 공개하지 않는 난수 sentinel, 이메일은 동일 복사 안에서 일관된 `preview.invalid` 주소가 된다. 새 DB는 원본 migration prefix → 데이터 → dev suffix 순서로 복원하고 FK 무결성을 확인한다. Storage는 공개 bucket과 private `member-profile-images`의 ledger 참조 파일만 read-only snapshot에서 새 볼륨으로 복사하고 SHA256을 검증한다. 공개 Storage URL은 후보 환경 주소로 치환한다.
+
+초기 명령은 `prepare-copy`까지 제공하며 후보 DB/API/Storage 검증과 기존 Preview 보존을 우선한다. 후보 앱의 동일 public-origin 빌드, 고정 ingress의 교체/실패 복귀, 두 환경의 실제 홈 서버 상시 배포, 부하·쿠키·권한의 운영 검증이 끝나기 전에는 전체 데이터 동기화 기능을 완료로 표시하지 않는다. GitHub Actions/GHCR 자동 연결과 실제 운영 데이터 이전은 이 로컬 단계에 포함된 완료 사실이 아니다.
+
 데이터 구성은 `compose.supabase.yaml`의 `db`, `rest`, `storage`, `gateway`다. 환경마다 Compose 프로젝트·포트·비밀·볼륨을 분리한다. gateway만 loopback으로 공개하며 DB와 관리 도구는 내부망에 둔다. 기존 앱은 서버 SDK의 공개 origin/내부 transport 분리를 통해 연결한다.
 
 Supabase `self-hosted/v0.8.0`의 고정 commit `241bb11c0627f2981746d37033f57dbfa81d29b0`을 구성 호환성 기준으로 삼는다. PostgreSQL 17, PostgREST, 파일 backend의 Storage와 gateway를 사용한다. 현재 앱이 직접 구현한 인증을 GoTrue로 교체하지 않으며 사용 근거가 없는 Realtime·Studio·상시 analytics 서비스를 추가하지 않는다. 이미지 tag와 digest는 Compose가 실행 원본이다.

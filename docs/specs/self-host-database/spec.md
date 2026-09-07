@@ -10,6 +10,12 @@ issue: https://github.com/MyKnow/ssartnership/issues/435
 
 ## 결과
 
+### 상시 Production/Preview 격리 계약
+
+2026-09-07 사용자 승인: Production과 Preview는 앱(Next.js FE/BE)·PostgreSQL·Storage를 각각 상시 실행한다. Compose 프로젝트, DB 계정, JWT/세션/암호화 키, 네트워크, 데이터/파일/백업 볼륨을 공유하지 않는다. 브라우저 쿠키는 포트가 아닌 hostname 경계이므로 최종 ingress도 서로 다른 hostname과 host-only 쿠키를 사용한다. Preview의 변경·삭제·마이그레이션·복구는 Production에 쓰지 않는다. 동일 물리 호스트의 장애·자원 경쟁은 별도 위험이며 자원 제한과 실측이 필요하다.
+
+Production → Preview 복사는 명령으로 요청하는 단방향 유지보수다. 일반 dev 배포는 데이터를 복사하지 않는다. 검증된 DB/Storage 짝 백업을 네트워크 없는 격리 환경에 복원하고, 운영 비밀번호·재사용 가능한 토큰·발송 자격증명을 제거한 뒤 새 Preview 후보에 전달한다. 기존 Preview는 후보 검증과 명시적 교체가 끝날 때까지 유지한다. 운영 데이터 그대로의 무차별 복제가 아니라, 기존 회원 비밀번호 제외 및 Storage 허용 정책을 보존한 테스트 사본이다. 세부 범위와 현재 한계는 [두 환경 운영과 복사](../../operations/runbooks/self-host-environments.md)를 따른다.
+
 [홈 서버 마이그레이션](../self-hosting/spec.md)의 데이터·운영 범위다. PostgreSQL, REST/RPC와 Storage를 자체 운영하고, 현재 사용하거나 장기 유지보수에 필요한 관리형 기능을 대체한다. Next.js와 기존 Repository·SDK 계약을 유지한다. 로컬 선행 작업은 실제 운영 데이터 없이 Docker Desktop에서 재현한다.
 
 Supabase 자체 호스팅은 관리형 백업/PITR, branching, 고급 metrics, 플랫폼 Management API를 포함하지 않는다. 따라서 데이터 컨테이너가 실행되는 것과 운영 서비스가 준비되는 것은 서로 다른 수용 조건이다. [공식 차이점](https://supabase.com/docs/guides/self-hosting#how-self-hosted-supabase-differs)을 기준으로 다음을 범위에 포함한다.
