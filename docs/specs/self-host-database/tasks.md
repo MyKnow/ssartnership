@@ -135,8 +135,21 @@ Mac 후속 검증: 세 차례 AMD64 gate의 실패를 모두 보존했다. 준�
 
 검색 수정의 일반 Release도 종료 0으로 통과했다: Node 1,807/기존 skip 8, unit 133, 실제 build, E2E 103/retry 0(5.2분). 전체 208,259바이트·2,362줄의 특이 신호는 기존 관리자 전환 Fast Refresh 2회뿐이다. lint·타입·문서 93개·diff 검증도 통과했다. 이는 새 SHA의 AMD64 gate 또는 서버 적용을 대신하지 않는다.
 
-- [ ] 초기화 SQL/비밀번호 로그 경계 수정, 기존 합성 Preview DB 자격증명 교체, 신규 백업과 로그 재감사.
-- [ ] 검증한 maintenance/export 진입점 controller 적용과 실제 receipt/metric 확인 후 여섯 타이머 재개.
+2026-09-07 18:36 이후 최신 적용: `2f60c1855755a4b362b51962db3a75e3b048c6e0`의 AMD64 전체 gate가 종료 0/OOM false로 통과했다(Node 1,807/기존 skip 8, unit 133, E2E 103/retry 0, 1.4분). 전체 235,324바이트·2,941줄에서 의도된 Storage 미지원 503 단위 테스트 진단과 정상 registry metadata/서버 준비 메시지를 구분했으며 실패 신호는 없었다. 동일 커밋의 세 image archive를 빌더 권한으로 전송하고 root importer가 archive/config/layer/revision/AMD64를 검사했다. Mac 실행 출처와 `nativeServerCi=false`를 함께 보존한다. 서버 source SHA256은 `4fc8c1ee049f62ce6da881a63919ede79d5ea968e25e1d7f84ec5f72ff9260f6`이다.
+
+서버의 기존 합성 DB 볼륨과 백업/JWT/세션 키를 보존한 채 네 공유 DB 역할을 새 SCRAM 자격증명으로 교체했다. 실제 private-network 접속에서 새 비밀번호 4/4 성공·이전 비밀번호 4/4 거절을 확인했다. 초기화/운영/복구 command의 로그 보호와 새 DB의 실제 설정, 현재 자격증명 로그 일치 0건을 확인했다. 이전 설정·노출 로그는 서버 root 0700 journal 안에 0600 파일로 보존했고 Mac으로 평문 반출하지 않았다. 교체 절차의 prepared→completed 기록은 56.663초이며 실사용 트래픽의 무중단/SLA 측정은 아니다. 독립 점검은 새 revision의 11개 서비스, home/login/health 200, reset 404, test header 부재, migration 199개, RPC/RLS/Storage smoke, Prometheus 5 target UP/12 rule, Grafana 익명 401/10 panel 및 자체 Vitals 활성화를 확인했다.
+
+새 전체 paired backup은 18:40:44–18:41:33 KST에 19개 명령 모두 성공했다(48.826초). 저장소 검사 2개 명령과 최신 backup의 새 볼륨 PITR/Storage 복구 6개 명령도 모두 성공했다(복구 20.2초). before/after marker와 파일 hash 검증이 포함되며 합성 데이터 규모의 측정이므로 운영 RPO/RTO로 확정하지 않는다. `current` 링크 진입점이 실제 JSON receipt·manifest·DB/운영 metric을 갱신하는 것을 확인했다.
+
+서버의 암호화 pgBackRest/Restic 사본 12,727,808바이트를 기존 pinned VPN SSH로 Mac에 반출했다. 수신 SHA256은 `d2450e2bdf8aa1fd00c5fbfd7035fe3348ae8690fb82fa756f1b605ad4ae7f6a`이며 수신자 개인키는 Mac login Keychain에만 보관했다. 새 Docker volume과 동일 AMD64 DB 이미지에서 서버 접근 없이 PITR marker/Storage hash 복구가 18:44:35 KST에 성공했다. 실행 시 백업 암호 두 개만 전달하고 종료 후 키를 가진 drill container는 제거했으며 복구 volume과 암호화 사본/receipt는 보존했다. 별도 장치 복구 증거이고 같은 집의 재해·Mac 분실 시 키 escrow·정기 외부 백업 증거는 아니다.
+
+암호화 tar·전송/복구 receipt·공개 수신자 참조의 독립 사본을 Mac의 `Library/Application Support/ssartnership-recovery/bundles/20260907-2f60c185`에 보관했다. 디렉터리 0700/파일 0600과 복사본 hash를 검증했고 개인키 파일은 만들지 않았다. 원래 QA 사본도 보존했다. 현재 복구 CLI는 canonical `.tmp` 입력만 허용하므로 보관본 재검증은 새 private 작업 폴더로 복사하고 전송 receipt 이름을 `receipt.json`으로 두어 hash를 다시 검사하는 경로다. `fdesetup status`는 FileVault Off를 반환했다. 지금 복원한 것은 합성 데이터뿐이며, 실제 개인정보의 Mac 복구에는 호스트 디스크 암호화와 독립 키 보관 검증이 선행되어야 한다. 시스템 전체 FileVault 설정/복구 키 정책은 이 앱 배포에서 임의로 변경하지 않았다.
+
+18:45 KST에 여섯 timer를 enabled/active로 재개하고 systemd collect/db-check의 실제 JSON receipt·종료 0을 확인했다. 18:46의 다음 1분 주기 자동 수집도 성공해 metric mtime이 갱신됐다. 다음 증분 백업은 9월 8일 03:00, 전체/저장소 검사는 9월 13일 03:00/05:00, 정기 복구는 10월 3일 06:00 KST다. 이 예정 시각의 미래 실행 성공은 아직 검증되지 않았다. 실제 외부 알림 채널은 미설정이고 Alertmanager 전달 오류 및 일부 관측 초기화 진단은 남아 있다. native 서버 CI와 지속 trigger, 공개 ingress, 운영 데이터/외부 연동 및 Production 전환도 완료하지 않았다.
+
+- [x] 초기화 SQL/비밀번호 로그 경계 수정, 기존 합성 Preview DB 자격증명 교체, 신규 백업과 로그 재감사.
+- [x] 검증한 maintenance/export 진입점 controller 적용과 실제 receipt/metric 확인 후 여섯 타이머 재개.
+- [x] 합성 Preview의 서버→Mac 암호화 반출, Keychain 수신자와 네트워크 없는 새 볼륨 PITR/Storage 복구.
 - [ ] 운영 DB 크기·확장·권한·Storage 객체 수와 hash 목록 조사, 운영 데이터 반입 범위 확정.
 - [ ] 운영 전 DB 이미지 최소화: Alpine pgBackRest의 부가 PostgreSQL 18 패키지 제거 방안과 SBOM/취약점 검증. 현재 실행 서버·pg_dump는 원래 Nix PostgreSQL 17.6이며 패키징 경고를 별도 기록했다.
 - [ ] 독립 장애 영역의 암호화 백업 저장소 연결, 보관·삭제 정책·잔여 용량 및 쓰기 실패 검증.
