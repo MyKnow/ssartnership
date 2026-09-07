@@ -114,7 +114,22 @@ Mac engine은 사용자 소유 Docker Desktop Unix socket에 고정하고 환경
 
 ### 원래 Cloud Preview의 암호화 이전 준비
 
-이전용 파일에는 기존 Production→Preview 정제를 적용하지 않는다. 원래 Preview의 완전 export·Storage byte 검증·새 DB 복원·쓰기를 정지한 최종 동등성 확인은 [데이터 기술 계획](../../specs/self-host-database/plan.md)을 따른다. 현재 `self-host-migration/transfer.mjs`는 전송 경계만 제공하며 Cloud export 또는 데이터 복원 도구의 완료를 뜻하지 않는다.
+이전용 파일에는 기존 Production→Preview 정제를 적용하지 않는다. 원래 Preview의 완전 export·Storage byte 검증·새 DB 복원·쓰기를 정지한 최종 동등성 확인은 [데이터 기술 계획](../../specs/self-host-database/plan.md)을 따른다. `self-host-migration/database.mjs`와 `storage.mjs`는 읽기 전용 수집 모듈이고 `transfer.mjs`는 암호화 전송 경계다. Cloud export workflow 실행과 서버 복원·공개 전환의 완료를 뜻하지 않는다.
+
+DB 수집은 고정 Preview direct/session-pooler identity·5432·PostgreSQL 17·TLS `verify-full`을 요구한다. 기본 transaction을 읽기 전용으로 설정하며, 같은 `REPEATABLE READ READ ONLY` transaction의 exported snapshot으로 전체 custom-format `pg_dump`와 최초 Storage 목록을 연결한다. 원래 Preview 회원 비밀번호를 정제하지 않는다. DB 로그인 비밀번호는 별도 교체 대상이며 role 속성·membership만 별도 private JSON에 보존한다. 자격증명은 명령 인수가 아닌 명시적 PG 환경 이름으로만 client container에 전달하고 원본 stderr/SQL/객체 경로는 로그에 내보내지 않는다.
+
+전체 원본 archive는 검토·복구용 증거다. [Supabase의 자체 호스팅 복원 안내](https://supabase.com/docs/guides/self-hosting/restore-from-platform)가 설명하듯 managed 내부 schema/role과 대상 Storage/Auth 버전은 다를 수 있다. 따라서 이를 기존 대상에 무조건 `pg_restore`하지 않으며, receipt의 `restoreApproved:false`를 유지한다. 관리 schema와 custom role 매핑, 확장·함수·자동 RLS/event trigger·마이그레이션 이력·전체 데이터 검증이 새 격리 대상에서 먼저 필요하다.
+
+Storage는 snapshot에 있는 **모든** bucket/객체 metadata를 보존하고, 공개·비공개·빈 bucket·0바이트 파일을 제외하지 않는다. 원래 객체 경로 대신 일련번호 파일명을 사용하는 새 0700 directory에 0600 파일을 쓴다. 고정 Cloud Preview 인증 GET만 허용하고 redirect·부분 응답·누락·크기 초과·전송 실패를 재시도 없이 거부한다. 모든 파일을 다시 읽어 SHA256을 비교하고 두 번의 최신 DB 목록도 대조한다. GET이 갱신할 수 있는 `last_accessed_at`만 비교에서 제외하되 원래 값은 보존한다. 최대 파일 50MiB·합계 1GiB·20,000객체를 넘으면 전체 수집을 거부하며 일부만 성공으로 기록하지 않는다. 최종 private ledger는 전체 검증 이후에만 생성한다. 이 ledger에도 식별자/경로/metadata가 있으므로 공개 artifact로 올리지 않는다.
+
+이 검사는 관측 구간의 경합을 검출할 뿐 DB와 Storage의 원자적 시점을 보장하지 않는다. 실제 전환 직전 쓰기 정지와 최종 대조가 필수다. 실패한 private 부분 작업은 성공 ledger가 없으며 기존 directory를 재사용하지 않는다. 현재 합성 Docker 시험 명령은 아래와 같다. 실데이터를 Mac에 평문 수집하는 용도로 사용하지 않는다.
+
+```sh
+node tests/fixtures/self-host-migration-database.mjs .tmp/migration-database-fixture-new
+node tests/fixtures/self-host-migration-storage.mjs .tmp/migration-storage-fixture-new
+```
+
+첫 시험은 독립 internal network/tmpfs PG17에서 덤프 도중 원본을 바꾸고 새 DB 복원을 비교한다. 두 번째는 새 Supabase data Compose(58920 포트)의 실제 Storage API와 DB 수집, 전체 archive의 age 암호화/복호화를 함께 검사한다. 두 시험은 고정 image를 미리 준비해야 하고 두 번째는 `age`/`age-keygen`도 필요하다. 성공한 합성 컨테이너만 정리하며 실패 증거와 Compose 데이터 볼륨은 보존한다.
 
 전송에는 [표준 age](https://github.com/FiloSottile/age)의 native recipient를 사용한다. `install-age.mjs`는 Linux AMD64/ARM64의 1.3.2 공식 archive SHA256을 고정해 새 도구 directory에만 설치하고 기존 시스템 도구를 교체하지 않는다. Docker 시험에서는 실행 가능한 `/tools`와 실행 불가능한 데이터 tmpfs를 분리한다. 서버의 이전용 private identity는 새 root 0700 directory/0600 file에만 생성하고 GitHub에는 공개 recipient만 전달한다. SSH private key·DB 암호를 recipient로 재사용하지 않는다.
 

@@ -217,3 +217,21 @@ Issue #435에 두 환경 격리와 단방향 사본 준비 계획을 먼저 기�
 개발 중 실패 증거는 Git 제외 작업 폴더에 보존했다. sanitizer의 CHECK 제약(분리 UPDATE)과 정수 배열 cast 오류를 수정하고 회귀 테스트를 추가했다. 고정 helper 이미지가 BuildKit 캐시에만 있던 문제는 실행 전 engine image 검사로 차단한다. internal network 직접 publish 대신 비밀 없는 고정 upstream ingress를 분리했다. 파일 바이트만 복사하면 Storage API가 ENODATA로 실패한 문제는 확장 속성 보존과 모든 객체의 API hash 검증으로 수정했다. 실패 후보 컨테이너는 정확한 이름으로 중지하고 볼륨/실패 receipt를 보존했으며 사용자 서비스와 기존 Preview를 삭제하지 않았다.
 
 첫 Release는 신규 테스트의 JS 추론 타입 오류, 다음 실행은 기존 앱이 사용하는 3100 포트 충돌로 실패했다. 두 로그를 보존하고 타입 수정 및 별도 3199 포트로 재검증해 종료 0을 확인했다: Node 1,814 통과/기존 skip 8, unit 133, build, E2E 103 통과/재시도 없음(6.6분). 전체 208,931바이트·2,368줄에는 기존 실패 경로 단위 테스트의 합성 rollback 진단 4건과 관리자 테스트 사이 Fast Refresh 2회가 있었으며 테스트 실패는 없다. 마지막 CLI 입력 경계 및 비공개 파일 fixture 변경 후 집중 lint·7개 테스트·타입 검사를 다시 통과했고 최종 문서 94개도 확인했다. 이 로컬 단계에서 commit/push/원격 CI trigger/서버 변경/실제 Production 전환은 수행하지 않았다.
+
+## 2026-09-07 원래 Cloud Preview 전체 수집 모듈
+
+- [x] Preview 전용 PostgreSQL direct/session 연결 검증, 읽기 전용 exported snapshot과 전체 custom archive·Storage 목록 연결.
+- [x] 원래 DB 데이터·함수·RLS·ACL 보존 및 로그인 암호 없는 별도 role/membership inventory 수집.
+- [x] bucket/객체 전체 수집, 비공개·빈 bucket·0바이트 파일 포함, 두 번의 실제 다운로드 SHA256과 세 번의 DB 목록 대조, 최종 private ledger 경계 구현.
+- [x] 독립 Docker PG17에서 덤프 도중 원본 변경 후 이전 snapshot 복원, password material·함수·RLS·ACL 대조.
+- [x] 새 Supabase Compose의 실제 공개/비공개/0바이트 파일 다운로드·전체 archive age 암호화/복호화 검증.
+- [ ] 기존 GitHub Preview Secrets를 단계 한정으로 사용하는 암호화 export workflow의 정확한 SHA 실행 및 원격 artifact 검증.
+- [ ] 서버 private staging 복호화·호환성 검토·전체 DB/Storage 복원과 사용자 흐름 검증, 최종 write-quiesce·DNS/TLS 전환.
+
+Cloud 조회는 집계만 실행했다: bucket 7개, 객체 823개, 39,851,100바이트, 최대 파일 2,845,002바이트이며 size/version 누락과 위험한 dot/빈 경로 구간은 없었다. `auth.users`와 Vault secret은 각각 0개였다. 이 시점 조회를 실제 export 또는 전체 데이터 동등성 증거로 사용하지 않는다. source data와 원래 Cloud Preview는 변경하지 않았다.
+
+집중 테스트는 DB 연결/스냅샷 3개와 Storage 6개를 추가했다. Docker DB fixture는 source mutation 이후에도 원래 snapshot의 데이터를 복원했다. 실제 Storage fixture의 첫 실행은 다운로드/목록/hash 검증 뒤 시험 기대 용량(43바이트)을 잘못 적어 실제 합계(45바이트)와 달라 실패했다. source Buffer 길이 합으로 기대값을 계산하도록 고쳤으며 실패 private export/합성 볼륨은 보존했다. 재사용 대신 새 작업 directory로 전체 검증한다. 원격 실행 전 전체 릴리스 gate와 Actions 사전 점검은 별도로 필요하다.
+
+수정 후 새 Docker 환경의 전체 시험은 bucket 3개·파일 3개·45바이트, 실제 API 다운로드 2회와 DB 목록 3회 대조, 전체 archive age round-trip을 통과했다. 증거는 Git 제외 `.tmp/migration-database-fixture-20260907/proof.json`과 `.tmp/migration-storage-fixture-20260907-verified/proof.json`에 있다. 이전 실패 환경과 성공 환경의 Compose 컨테이너/네트워크만 정확한 프로젝트 단위로 제거했고 데이터 볼륨·private export는 남겼다. 독립 PG17 시험의 새 tmpfs 데이터는 시험 종료 시 제거되며 코드로 다시 생성할 수 있는 합성 데이터였다. 홈 서버의 기존 Preview 컨테이너와 실제 Cloud 데이터는 변경하지 않았다.
+
+2026-09-08 00:02 KST `verify:change`는 high/Quick profile로 종료 0이었다: docs 94개, migrations 199개, Node 1,834 통과/기존 skip 8, unit 133 통과, lint·semantic typecheck·lockfile 및 Production dependency audit 통과. 전체 185,678바이트/2,034줄의 진단 검사에서 기존 합성 rollback 실패 경로 4건만 확인했고 새 실행 오류는 없었다. 마지막 관측 시작 시각 기록 위치 조정 후 migration 집중 테스트 15개를 다시 통과했다. Release/build/E2E와 GitHub 원격 first-attempt 실행은 이번 수집 모듈 검증과 별도다.
