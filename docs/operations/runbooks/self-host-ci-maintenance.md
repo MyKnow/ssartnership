@@ -35,7 +35,13 @@ flock --nonblock --conflict-exit-code 75 /var/lib/ssartnership-ci/heavy.lock
 
 Production standalone 산출물은 한 번 빌드하고 `App.Dockerfile`로 그대로 포장한다. E2E의 `.next-e2e`와 Production `.next`는 분리된다. 수용한 공개 origin manifest는 runtime 검증에 그대로 전달하고, 이미지에는 운영 비밀을 넣지 않는다. app·telemetry·pgBackRest DB 이미지가 모두 완성되어야 `result.json`을 게시한다. 실패·만료·부분 artifact는 배포할 수 없다. 로그와 실패 work directory는 유지하며 전체 prune을 하지 않는다.
 
-전용 E2E 개발 서버에만 `NODE_OPTIONS=--max-old-space-size=1536`을 적용한다. 고정 Next 16.2.11 개발 CLI는 명시적 값이 없으면 `os.totalmem()` 절반을 V8 heap 상한으로 사용해 부모 사용자 slice의 더 낮은 MemoryHigh를 넘을 수 있었다. 실제 진단에서 Next RSS 약 2.97GiB·반복적인 memory.high 회수·swap을 확인했다. 이 값은 JavaScript heap 상한이며 전체 프로세스/container 메모리 보장이 아니다. 원래 서버 slice·container 제한·Production build 설정·제품 테스트 제한은 변경하지 않는다. [Next 메모리 운영 안내](https://nextjs.org/docs/app/guides/memory-usage)와 실제 cgroup 압력을 함께 확인한다.
+전용 E2E 개발 서버에만 `NODE_OPTIONS=--max-old-space-size=2048`을 적용한다. 고정 Next 16.2.11 개발 CLI는 명시적 값이 없으면 `os.totalmem()` 절반을 V8 heap 상한으로 사용해 부모 사용자 slice의 더 낮은 MemoryHigh를 넘을 수 있었다. 실제 진단에서 Next RSS 약 2.97GiB·반복적인 memory.high 회수·swap을 확인했다. 이 값은 JavaScript heap 상한이며 전체 프로세스/container 메모리 보장이 아니다. 원래 서버 slice·container 제한·Production build 설정·제품 테스트 제한은 변경하지 않는다. [Next 메모리 운영 안내](https://nextjs.org/docs/app/guides/memory-usage)와 실제 cgroup 압력을 함께 확인한다.
+
+개발 서버 준비 완료는 `/api/health`로 확인하며 홈페이지는 해당 테스트 묶음에서만 준비한다. 서버 stdout/stderr를 묶음별로 보존하고 자동 재시작·manifest 손상·heap 고갈이 있으면 테스트가 나중에 통과해도 실패한다. [Playwright trace 옵션](https://playwright.dev/docs/api/class-testoptions#test-options-trace)의 연속 화면 촬영만 끄며 실패 screenshot과 DOM snapshot·network·action·source trace는 유지한다. 이 설정은 저사양 서버 검증용이고 GitHub/일반 로컬 설정은 바꾸지 않는다. 네이티브 전체 검증 시간과 성공은 아직 검증 중이며, 30분 job 상한 안에서 완료하지 못하면 현재 pipeline은 배포 산출물을 발행하지 않는다.
+
+개발 페이지 보관 시간을 늘리는 `onDemandEntries` 실험으로도 같은 오류가 발생해 이 설정은 제거했다. 프레임워크 설정을 확정된 해결책으로 남기지 않는다. 실패 기록과 원인 진단은 [작업 증거](../../specs/self-host-database/tasks.md)와 CI 실패 원장에 보존한다.
+
+모든 페이지를 하나의 개발 서버에 누적시키는 초기 준비는 heap 부족으로 실패했다. 전용 CI는 Node 개발 스택 소스맵 캐시를 끄고, 전체 E2E를 16개 Playwright shard로 순차 실행한다. 묶음마다 개발 서버 프로세스는 새로 시작하며 선택된 테스트에 필요한 경로만 준비한다. 첫 진입 화면은 마지막에 준비한다. mock 환경에서는 자체 Web Vitals를 삽입하지 않고 설정 GET도 준비하지 않는다. 실제 비-Vercel Supabase 앱은 기존 runtime 활성화·샘플링 계약으로 수집한다. 디스크의 개발 캐시는 재사용할 수 있지만 이전 프로세스의 mock 세션·heap은 재사용하지 않는다. 전체 목록과 각 shard 목록의 테스트 ID 합집합을 먼저 비교하고, 결과마다 단 한 번의 passed/retry 0을 요구한다. 실행 후 ID 합집합도 다시 비교하므로 누락·중복·skip·재시도·부분 결과는 통과하지 못한다. 새 테스트 파일이나 인증 시나리오는 경로 준비 계획에 등록해야 한다. 각 묶음의 JSON/JUnit/HTML/실패 trace는 별도 디렉터리에 보존하며 전체 통과 전에는 complete receipt를 만들지 않는다.
 
 배포 운영자의 `import.mjs <request> <artifact directory> <새 release-stage directory>`는 다음을 검사한다.
 
@@ -58,7 +64,7 @@ Production standalone 산출물은 한 번 빌드하고 `App.Dockerfile`로 그�
 
 ## 유지보수
 
-`maintenance.mjs`의 고정 명령은 전체/증분 백업, 저장소 검사, 새 볼륨 격리 복구, 운영 metric 수집, 읽기 전용 DB 점검, 상태 및 외부 사본 capture/check다. DB 점검은 5초 SQL 제한 아래 DB 크기·최장 transaction·live/dead tuples·deadlock·autovacuum 활성만 집계한다. table/회원/SQL 본문을 metric label에 기록하지 않으며, dead tuple 수를 실제 bloat 측정으로 부르지 않는다. VACUUM FULL·REINDEX·retention 삭제·키 교체는 자동 실행하지 않는다.
+`maintenance.mjs`의 고정 명령은 전체/증분 백업, 저장소 검사, 새 볼륨 격리 복구, 운영 metric 수집, 읽기 전용 DB 점검, 상태 및 외부 사본 capture/check다. DB 점검은 5초 SQL 제한 아래 DB 크기·최장 transaction·live/dead tuples·deadlock·autovacuum 활성만 집계한다. table/회원/SQL 본문을 metric label에 기록하지 않으며, dead tuple 수를 실제 bloat 측정으로 부르지 않는다. 기존 백업 작업은 pgBackRest 전체 백업 2개 보존 정책과 만료된 DB 체인에만 연결된 Storage snapshot 정리를 수행한다. 그 밖의 임의 retention 삭제·VACUUM FULL·REINDEX·키 교체는 자동 실행하지 않는다.
 
 `install-maintenance.mjs`는 새 Preview에만 여섯 timer를 설치한다: 매분 metric, 15분 DB 점검, KST 일요일 03시 전체/나머지 요일 03시 증분, 일요일 05시 저장소 검사, 매월 첫 토요일 06시 격리 복구. 무거운 명령은 CI와 같은 heavy lock을 사용하고 충돌은 75로 실패한다. 지표 수집은 가벼운 읽기이므로 빌드 중에도 동작한다. 외부 수신처가 없는 offhost timer와 제품 Cron은 활성화하지 않는다. 생성된 timer가 active인 것과 예정 시각의 실제 성공은 별도 증거다.
 

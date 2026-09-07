@@ -15,13 +15,12 @@ const steps = [
   ["npm", ["run", "build"], publicBuild],
   // Same config, projects, full suite and zero retries as test:e2e:ci. Use the
   // image-pinned bundled Chromium, not the host-only Chrome installation.
-  ["node", ["node_modules/@playwright/test/cli.js", "test", "--config=/opt/ssartnership/playwright.config.mjs"]],
+  ["node", ["/opt/ssartnership/e2e.mjs"]],
 ];
 for (const [command, args, extra = {}] of steps) {
   const result = spawnSync(command, args, { stdio: "inherit", env: { ...process.env, PLAYWRIGHT_CHROMIUM_CHANNEL: "chromium", ...extra } });
   if (result.error || result.status !== 0) process.exit(result.status || 1);
 }
-const suite = readFileSync("/work/playwright-results.xml", "utf8").match(/<testsuites\b([^>]*)>/u)?.[1] ?? "";
-const totals = Object.fromEntries([...suite.matchAll(/(tests|failures|errors|skipped)="(\d+)"/gu)].map((item) => [item[1], Number(item[2])]));
+const totals = JSON.parse(readFileSync("/work/.self-host-build/e2e/complete.json", "utf8"));
 if (!(totals.tests > 0) || totals.failures !== 0 || totals.errors !== 0 || totals.skipped !== 0) process.exit(1);
 writeFileSync("/work/.self-host-build/gate.json", `${JSON.stringify({ ...totals, retries: 0, video: "off", compiledSource: "single-build" })}\n`, { flag: "wx", mode: 0o600 });

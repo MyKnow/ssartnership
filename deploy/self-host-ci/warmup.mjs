@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { parseBatch } from "./batch-plan.mjs";
+
 export const READ_ONLY_ROUTES = Object.freeze([
   "/auth/login", "/auth/member/setup", "/api/e2e/mock/reset", "/partners/health-001",
   "/auth/signup", "/auth/signup/graduate", "/auth/graduate/setup", "/auth/reset", "/auth/reset/complete",
@@ -6,13 +9,18 @@ export const READ_ONLY_ROUTES = Object.freeze([
   "/certification", "/certification/photo", "/coupons", "/notifications",
   "/partner/companies/mock-partner-company-cafe-ssafy", "/partner/services/mock-partner-service-cafe-ssafy-yeoksam",
   "/partner/services/mock-partner-service-cafe-ssafy-yeoksam/request",
+  "/partner/companies/mock-partner-company-urban-gym",
+  "/partner/companies/mock-partner-company-urban-gym/services/mock-partner-service-urban-gym-pt",
+  "/", "/legal/privacy", "/legal/marketing", "/auth/change-password", "/auth/consent", "/partner/change-password",
+  "/partner", "/partner/account", "/partner/notifications", "/partner/plans", "/partner/support",
 ]);
-export async function prepareReadOnlyModules(fetcher = fetch, report = console.log) {
+export async function prepareReadOnlyModules(fetcher = fetch, report = console.log, routes = READ_ONLY_ROUTES) {
+  if (!Array.isArray(routes) || !routes.length || routes.length > READ_ONLY_ROUTES.length || new Set(routes).size !== routes.length || routes.some((route) => !READ_ONLY_ROUTES.includes(route))) throw new Error("CI_WARMUP_ROUTES_INVALID");
   const deadline = Date.now() + 8 * 60_000;
   // Dev compiler preparation is separate from the unchanged behavior budget.
   // This finite reviewed list never follows redirects, posts a reset, creates
   // a domain entity or calls a cron/integration endpoint. No retry is present.
-  for (const [index, route] of READ_ONLY_ROUTES.entries()) {
+  for (const [index, route] of routes.entries()) {
     const started = Date.now();
     const remaining = deadline - started;
     if (remaining <= 0) throw new Error("CI_WARMUP_DEADLINE");
@@ -42,7 +50,11 @@ export async function prepareAdminModule(context, route) {
   throw new Error("CI_ADMIN_REDIRECT_LIMIT");
 }
 export default async function warmup(config) {
-  await prepareReadOnlyModules();
+  const batch = parseBatch(process.env.SELF_HOST_CI_E2E_BATCH);
+  const plan = JSON.parse(await readFile(`/work/.self-host-build/e2e/batch-${batch}/plan.json`, "utf8"));
+  if (plan.version !== 1 || typeof plan.administrator !== "boolean") throw new Error("CI_E2E_PLAN_INVALID");
+  await prepareReadOnlyModules(fetch, console.log, plan.routes);
+  if (!plan.administrator) return;
   // Only the standard local mock administrator fixture creates a disposable
   // session here. No real login, DB, secret or domain mutation is performed.
   const { request } = await import("/work/node_modules/playwright/index.mjs");

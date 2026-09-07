@@ -17,9 +17,12 @@ test("container gate preserves full fail-closed suites and packages the single v
   assert.match(gate, /totals\.skipped !== 0/u);
   assert.match(config, /retries: 0/u); assert.match(config, /maxFailures: 1/u);
   assert.match(config, /video: "off"/u); assert.doesNotMatch(config, /timeout:|grep:|testMatch:/u);
-  assert.match(config, /cwd: "\/work"/u); assert.match(config, /outputFile: "\/work\/playwright-results\.xml"/u);
-  assert.match(config, /outputDir: "\/work\/test-results"/u);
-  assert.match(config, /NODE_OPTIONS: "--max-old-space-size=1536"/u);
+  assert.match(config, /mode: "retain-on-failure", screenshots: false, snapshots: true, sources: true/u);
+  assert.match(config, /cwd: "\/work"/u); assert.match(config, /reportDirectory.*results\.xml/u);
+  assert.match(config, /reportDirectory.*test-results/u);
+  assert.match(config, /NODE_OPTIONS: "--max-old-space-size=2048"/u);
+  assert.match(config, /base\.webServer\.command.*--disable-source-maps/u);
+  assert.match(config, /url: "http:\/\/127\.0\.0\.1:3100\/api\/health"/u);
   assert.match(dockerfile, /COPY --chown=nextjs:nextjs \.next\/standalone/u);
   assert.doesNotMatch(dockerfile, /npm|RUN .*build/u);
 });

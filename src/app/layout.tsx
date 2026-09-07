@@ -14,6 +14,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import PwaProvider from "@/components/PwaProvider";
 import SelfHostedWebVitals from "@/components/SelfHostedWebVitals";
+import { shouldLoadSelfHostedTelemetry } from "@/lib/telemetry-mode";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -81,6 +82,10 @@ export const viewport: Viewport = {
 };
 
 const shouldLoadVercelTelemetry = process.env.VERCEL === "1";
+const loadSelfHostedTelemetry = shouldLoadSelfHostedTelemetry({
+  VERCEL: process.env.VERCEL,
+  NEXT_PUBLIC_DATA_SOURCE: process.env.NEXT_PUBLIC_DATA_SOURCE,
+});
 
 export default function RootLayout({
   children,
@@ -108,7 +113,7 @@ export default function RootLayout({
             <Analytics />
             <SpeedInsights />
           </>
-        ) : <SelfHostedWebVitals />}
+        ) : loadSelfHostedTelemetry ? <SelfHostedWebVitals /> : null}
       </body>
     </html>
   );
