@@ -3,6 +3,7 @@ import type { RemotePattern } from "next/dist/shared/lib/image-config";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AtomicDevelopmentManifestsPlugin, shouldUseAtomicManifests } from "./scripts/webpack-atomic-manifests.mjs";
+import { fixtureBuildProfile, assertNoFixtureDotenv, configureFixtureCompiler, FIXTURE_HEADER, FIXTURE_BUILD_MARKER } from "./scripts/webpack-fixture-boundary.mjs";
 
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 
@@ -49,6 +50,11 @@ function buildSupabaseRemotePattern(): RemotePattern | null {
 
 const supabaseRemotePattern = buildSupabaseRemotePattern();
 const selfHostBuild = process.env.SELF_HOST_BUILD === "1";
+const fixtureBuild = fixtureBuildProfile(process.env);
+if (fixtureBuild) {
+  assertNoFixtureDotenv(projectRoot);
+  securityHeaders.push({ key: FIXTURE_HEADER, value: FIXTURE_BUILD_MARKER });
+}
 
 if (process.env.NODE_ENV === "production") {
   securityHeaders.push({
@@ -89,6 +95,7 @@ const nextConfig: NextConfig = {
     root: projectRoot,
   },
   webpack(config, { dev }) {
+    configureFixtureCompiler(config, { dev, root: projectRoot, enabled: fixtureBuild });
     if (shouldUseAtomicManifests(dev)) {
       config.plugins.push(new AtomicDevelopmentManifestsPlugin(
         resolve(projectRoot, process.env.NEXT_DIST_DIR ?? ".next", "dev"),

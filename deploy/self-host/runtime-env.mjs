@@ -278,6 +278,9 @@ export function validateSelfHostRuntimeEnvironment(environment, manifest) {
   if (valueOf(environment, "MOCK_MEMBER_AUTH") === "1") {
     diagnostics.push(diagnostic("mock_member_auth_forbidden", "MOCK_MEMBER_AUTH"));
   }
+  for (const name of ["SELF_HOST_E2E_BUILD", "E2E_MOCK_MUTATIONS", "E2E_ADMIN_AUTH"]) {
+    if (valueOf(environment, name) === "1") diagnostics.push(diagnostic("e2e_fixture_flag_forbidden", name));
+  }
 
   if (mode === "local-mock") {
     if (

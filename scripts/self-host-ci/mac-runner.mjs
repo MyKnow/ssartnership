@@ -5,6 +5,7 @@ import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { COMPONENTS, imageTag, sha256File, validateRequest, validateGitTree } from "./lib.mjs";
+import { fingerprintDeployableArtifact } from "./production-e2e-profile.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export function assertMacDesktop(platform, info, request) {
@@ -75,6 +76,8 @@ export async function executeMac(requestFile, sourceFile, output) {
     validateRequest(request);
     const gateEvidence = JSON.parse(await readFile(path.join(work, ".self-host-build/gate.json"), "utf8"));
     if (!(gateEvidence.tests > 0) || ["failures", "errors", "skipped", "retries"].some((key) => gateEvidence[key] !== 0)) throw new Error("CI_MAC_GATE_INVALID");
+    if (gateEvidence.e2eRuntime !== "production-test-only" || gateEvidence.fixtureBuildDeployable !== false) throw new Error("CI_MAC_FIXTURE_EVIDENCE_INVALID");
+    if (fingerprintDeployableArtifact(work) !== gateEvidence.deployableFingerprint) throw new Error("CI_MAC_DEPLOYABLE_BUILD_CHANGED");
     const images = [];
     for (const component of COMPONENTS) {
       const tag = imageTag(request, component);

@@ -105,7 +105,7 @@ test("actual Next config installs the helper only for explicitly enabled develop
       cwd: new URL("..", import.meta.url), encoding: "utf8",
       env: { ...process.env, NODE_ENV: "development", SELF_HOST_ATOMIC_MANIFESTS: enabled },
     }));
-    assert.deepEqual(result, [enabled === "1" ? ["AtomicDevelopmentManifestsPlugin"] : [], []]);
+    assert.deepEqual(result, [enabled === "1" ? ["FixtureModuleBoundaryPlugin", "AtomicDevelopmentManifestsPlugin"] : ["FixtureModuleBoundaryPlugin"], ["FixtureModuleBoundaryPlugin"]]);
   }
 });
 

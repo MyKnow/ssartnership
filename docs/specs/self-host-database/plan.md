@@ -44,6 +44,24 @@ Preview는 운영 데이터가 없는 독립 환경부터 제공한다. 데이�
 
 ## 검증·전환
 
+### 운영 런타임의 격리 E2E 빌드
+
+2026-09-07 사용자가 별도 운영 빌드용 E2E 환경 설계를 승인했다. Issue #435의 기존 범위 안에서 AMD64 Mac 대체 gate를 다음 순서로 변경한다. 실패한 개발 서버 gate의 결과는 그대로 보존하며 native 서버 CI의 자원 제한이나 실행 방식을 변경하지 않는다.
+
+1. 기본 fixture 정책은 기존 `NODE_ENV !== production` 조건을 유지한다. 회원·관리자 mock 인증, E2E 변경/초기화, 제품 이벤트의 테스트 no-op만 이 정책을 공유한다. 인증 토큰·권한·Secure 쿠키·필수 회원 gate는 변경하지 않는다.
+2. 명시적인 CI 전용 빌드에서만 webpack이 이 작은 정책 모듈을 합성 fixture 모듈로 교체한다. `NODE_ENV=production`, 두 데이터 소스 `mock`, 별도 출력 `.next-e2e`, standalone 비활성화를 모두 요구한다. 배포 빌드와 동시 flag 설정, 개발 compiler, 실제 연결 비밀 및 dotenv 파일은 거절한다. 일반 compiler는 테스트 전용 모듈이 module graph에 들어오면 실패한다. 런타임 환경 변수만으로 일반 배포 이미지의 정책을 교체할 수 없다.
+3. 실제 Supabase standalone 결과는 `.next`에 한 번 만들고 별도 fixture 결과는 `.next-e2e`에 만든다. 테스트 시작 시 전용 marker와 loopback origin을 검증한다. 배포 패키지는 `.next/standalone`·`.next/static`만 포함하고, 실제 빌드 설정/공개 manifest/테스트 marker 부재를 다시 검사한다. 테스트 결과를 배포 이미지라고 부르거나 fixture 빌드를 배포 archive에 넣지 않는다.
+4. 같은 103개 프로젝트별 테스트 ID·fixture·assertion·초기화·deadline·retry 0을 유지하여 `next start`로 전체 suite를 실행한다. 기존 전체 로그 오류 방어도 유지한다. 실제 Supabase/RLS/RPC/Storage 및 최종 immutable 이미지 검증은 별도 필수 계층으로 남는다. Secure 쿠키의 loopback Chromium 동작은 실제 인증 흐름에서 검증하고 문제가 있으면 TLS 테스트 환경을 설계하며 쿠키 보안을 낮추지 않는다.
+5. 먼저 정책·잘못된 빌드 조합·실제 webpack 교체/격리·패키지 경계의 회귀 테스트를 작성한다. 호스트 전체 Release와 별도 운영 fixture suite 이후 새 SHA의 전체 AMD64 gate를 실행한다. 하나라도 실패하면 성공 receipt·배포를 차단하고 원본 증거와 원인을 기록한다.
+
+이는 개발 HMR의 모든 이전 실패 원인을 확정한 수정이 아니라, 요청 시 compiler가 실행되지 않는 [Next production 실행 방식](https://nextjs.org/docs/app/api-reference/cli/next)을 사용하는 검증 체계 변경이다. [webpack 확장](https://nextjs.org/docs/app/api-reference/config/next-config-js/webpack)과 [Playwright webServer](https://playwright.dev/docs/test-webserver)의 고정 버전 동작을 실제 빌드와 브라우저로 검증한다.
+
+운영 CSS 검증에서 발견한 좁은 회귀도 같은 작업에 포함한다. 사용자와 단일 행동은 제휴 링크 복사 후 완료 확인이며, 표면은 기존 Toast와 같은 glass 선언을 쓰는 모바일 탐색이다. 디자인·토큰·레이아웃은 그대로 두고 vendor 선언을 표준 선언보다 먼저 배치해 실제 Tailwind 운영 optimizer에서 표준 backdrop-filter가 사라지지 않게 한다. 새로운 glass 표현을 추가하지 않는다. 설치된 optimizer의 축소 재현, 원래 103개 assertion, 360/820/1366px 라이트·다크 화면과 닫기·넘침 검증을 요구한다.
+
+추가 브라우저 검증에서 기본 배너 제거 커밋 뒤 남은 정적 catalog의 삭제 SVG 참조 2개를 확인했다. 기존 삭제 의도를 유지해 해당 정적 항목만 제거하고 파일 존재 검사를 추가한다. 현재 DB의 운영 배너나 기존 migration은 변경하지 않는다.
+
+삭제 후 전체 suite는 캐러셀 배치 시나리오의 합성 데이터 부재로 실패했다. 만료된 이벤트나 폐기된 기본 배너를 재활성화하지 않고, 명시적인 mock E2E에만 기존 배포 이미지 자산을 쓰는 합성 slide를 제공한다. 기본 Production 정책·실제 provider·E2E 비활성 환경에서는 빈 배열을 반환한다. 기존 103개 ID와 캐러셀의 세 viewport assertion은 유지한다.
+
 ### 개발 manifest 경합의 제한된 수정 검증
 
 2026-09-07 재개 시 서버의 실제 접근 창은 22:00 KST까지로 확인했다. Issue #435 범위에서 먼저 기존 103개 개발 E2E와 Production 인증 경계를 그대로 유지하는 수정안을 검증한다. [webpack의 outputFileSystem 확장점](https://webpack.js.org/api/node/#custom-file-systems)을 사용해 명시적으로 활성화한 자체 호스팅 CI의 개발 빌드 manifest만 같은 디렉터리의 임시 파일에 완성한 뒤 rename한다. 읽기/JSON.parse·manifest 내용·node_modules는 변경하지 않고, 쓰기/rename 실패는 원래 compiler callback에 전달한다. 비-manifest 출력과 Production 빌드는 그대로 둔다. 동일 경로의 쓰기는 순서대로 처리하며 부분 실패가 다음 작업의 큐를 영구 차단하지 않게 한다.

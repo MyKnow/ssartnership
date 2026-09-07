@@ -9,6 +9,9 @@ if (process.env.CI_NATIVE_BROWSER === "1") process.env.PW_TEST_CONNECT_WS_ENDPOI
 const listed = spawnSync(process.execPath, [...args, "--list", "--reporter=json"], { encoding: "utf8", maxBuffer: 8 * 1024 ** 2, timeout: 60_000 });
 if (listed.status !== 0 || listed.error) throw new Error("CI_E2E_LIST_FAILED");
 const expected = testInventory(JSON.parse(listed.stdout));
+const baseline = spawnSync(process.execPath, ["/work/node_modules/@playwright/test/cli.js", "test", "--config=/work/playwright.config.ts", "--list", "--reporter=json"], { encoding: "utf8", maxBuffer: 8 * 1024 ** 2, timeout: 60_000 });
+if (baseline.status !== 0 || baseline.error) throw new Error("CI_E2E_BASELINE_LIST_FAILED");
+requireExactInventory(testInventory(JSON.parse(baseline.stdout)), expected);
 const logFile = `${directory}/execution.log`;
 const log = openSync(logFile, "wx", 0o600);
 let result;

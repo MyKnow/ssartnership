@@ -95,6 +95,16 @@ Mac 후속 검증: 세 차례 AMD64 gate의 실패를 모두 보존했다. 준�
 
 서버에는 `fbd7ccca`의 root 소유 승인 입력·controller·release 소스만 설치했다(source SHA256 `06cecd07a97dfd8c847b31779ce06c29c58b10b6621a1356b879c0c812bda6c8`). 실패한 gate는 성공 receipt·3개 image archive를 만들지 않았고 앱/DB/관측/유지보수의 실행 배포는 계속 차단했다. 원본·진단 로그는 보존했고 작업 전용 진단 container만 제거했다. 추가 대기나 반복 실행으로 통과를 만들지 않는다. 운영 빌드용 별도 E2E 환경은 앞서 명시한 fixture·인증·초기화·이미지 격리 동등성 검토가 필요한 미채택 대안이며, Production 보안 guard는 그대로다. 실제 서버 백업과 Keychain 수신자 반출·Mac 복구도 아직 미완료다.
 
+### 격리 운영 런타임 E2E 구현
+
+2026-09-07 16시대 KST: 사용자가 별도 운영 런타임 E2E 설계를 승인하여 [계획](./plan.md#운영-런타임의-격리-e2e-빌드)을 구현했다. 일반 Production guard는 그대로 두고 명시적 mock CI compiler에서만 작은 fixture 정책을 교체한다. 배포 standalone과 테스트 빌드는 출력·marker·모듈 경계로 분리하고 배포 파일 fingerprint를 테스트 전후/포장 전에 비교한다. 실제 NODE_ENV=production의 Secure/HttpOnly 쿠키를 확인했다. 기존 네이티브 CI·103개 테스트 ID·assertion·retry 0은 유지한다.
+
+초기 nested config cwd, Next의 resolved module 교체, 보고서 경로, env 타입 추론 실패를 각각 회귀 테스트와 함께 수정했다. 운영 CSS optimizer가 표준 backdrop-filter를 제거하는 문제는 실제 optimizer의 실패 재현 후 두 glass 규칙의 선언 순서만 고쳤다. 기존에 삭제된 SVG 두 개를 참조하던 정적 banner도 제거했다. 이 제거 후 캐러셀 시나리오가 사라져 전체 E2E는 14 통과/1 실패/88 미실행으로 중단됐다. 실제 운영 배너/만료 이벤트를 복원하지 않고 명시적인 mock E2E에만 합성 slide를 제공했으며, Production·실제 provider에서는 비활성임을 추가 테스트로 확인했다.
+
+최종 합성 slide 소스의 운영 fixture suite는 103/103·retry 0(1.2분), 기본 suite와 exact ID 일치, 전체 16,882바이트 로그의 오류/경고 신호 0이다. 별도의 최종 화면 검증은 360/820/1366px×라이트/다크 12장과 키보드 닫기·24px blur·가로 넘침·Secure/HttpOnly 쿠키를 확인했다. 화면별 console/page/HTTP/일반 요청 실패는 없었으나, 성공 HTTP 200 RSC의 speculative prefetch 취소는 각각 4/6/6/4/6/6회 관찰되어 별도로 보존했다. 취소 대상의 실제 document GET과 전체 body는 정상이고 정확한 취소 원인/성능 영향은 미확정이다. 이것을 모든 네트워크 이벤트 0으로 표현하지 않는다.
+
+운영자 순서 오류도 보존했다. 진단 Release 실행 중 출력 디렉터리를 이동하여 manifest 오류를 유발한 실행은 중단했고, 전체 E2E 종료 전 시작한 화면 검증도 EADDRINUSE/연결 거부로 실패했다. 두 실행은 수용 증거에서 제외했다. 이후 프로세스 종료와 포트 선점 확인을 거친 독립 화면 검증은 통과했다. 최종 기본 Release도 모든 fixture/화면 프로세스 종료 뒤 순차 실행하여 Node 1,797 통과/기존 skip 8, unit 133, Production build, E2E 103/retry 0(3.4분)으로 완료했다. 전체 207,156바이트·2,352줄 감사에는 기존 관리자 테스트 전환의 Fast Refresh 2회만 있고 다른 오류 신호는 없다. 자체 호스팅 집중 96/96, 문서 93개, canonical lockfile 검사도 통과했다. 앞선 103개 성공이나 운영 fixture 빌드만으로 AMD64 image·서버 배포를 승인하지 않는다. 새 commit의 전체 AMD64 gate·실제 Preview 배포·서버 백업 반출/복구는 아직 남아 있다.
+
 - [ ] 운영 DB 크기·확장·권한·Storage 객체 수와 hash 목록 조사, 운영 데이터 반입 범위 확정.
 - [ ] 독립 장애 영역의 암호화 백업 저장소 연결, 보관·삭제 정책·잔여 용량 및 쓰기 실패 검증.
 - [ ] 서버 밖의 복구 키 보관과 새 장치에서 키를 가져오는 복구 실습.

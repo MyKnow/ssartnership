@@ -1,4 +1,4 @@
-import base from "/work/playwright.config.ts";
+import base from "/work/deploy/self-host-ci/playwright.production.config.ts";
 
 // The Mac's larger, explicitly approved container uses the ordinary complete
 // suite lifecycle. No preparatory page requests or native-server sharding.
@@ -8,7 +8,7 @@ const config = {
   outputDir: "/work/.self-host-build/e2e/desktop/test-results",
   reporter: [["json", { outputFile: "/work/.self-host-build/e2e/desktop/results.json" }], ["list"]],
   webServer: { ...base.webServer, cwd: "/work", stdout: "pipe",
-    env: { ...base.webServer.env, SELF_HOST_ATOMIC_MANIFESTS: "1", NODE_OPTIONS: "--max-old-space-size=3072" } },
+    env: { ...base.webServer.env } },
   retries: 0,
   maxFailures: 1,
   forbidOnly: true,

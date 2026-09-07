@@ -16,6 +16,7 @@ import { getSsafyMemberLifecycle, SSAFY_STAFF_YEAR } from "@/lib/ssafy-year";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
+import { localPromotionFixtures } from "@/lib/mock/promotions";
 
 type PromotionEventRow = {
   id: string;
@@ -270,7 +271,7 @@ function staticCampaigns() {
 }
 
 function staticSlides() {
-  return HOME_PROMOTIONS.map((slide, index) => mapStaticSlide(slide, index));
+  return [...HOME_PROMOTIONS, ...localPromotionFixtures()].map((slide, index) => mapStaticSlide(slide, index));
 }
 
 async function loadManagedPromotionSlides(options?: {
