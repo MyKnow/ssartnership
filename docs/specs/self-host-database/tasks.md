@@ -87,6 +87,10 @@ Mac 후속 검증: 세 차례 AMD64 gate의 실패를 모두 보존했다. 준�
 
 기존 E2E/Production 보안 계약을 유지하기 위해 먼저 [개발 manifest 쓰기 수정 계획](./plan.md#개발-manifest-경합의-제한된-수정-검증)을 구현했다. 대상은 명시적으로 활성화한 dev webpack의 manifest 출력뿐이다. 최초 테스트는 helper 부재로 실패했고, 수정 후 파일시스템/Next config/실제 webpack 집중 검증 8개가 통과했다. 초기 타입 진단의 Next ProcessEnv 추론 충돌은 helper 입력을 두 개의 선택적 환경 필드로 명시해 고쳤다. 그 전 6개 버전의 전체 자체 호스팅 집중 검증은 84/84와 타입 검사·lint를 통과했고 추가 2개 큐/충돌 테스트도 통과했다. 실제 Mac fresh-server에서 실패 순서와 같은 첫 인증 2개를 연속 실행해 2/2, retry 0(21.6초)을 확인했다. 직접 실행의 NO_COLOR/FORCE_COLOR 안내는 기록했으며 기능 오류와 구분한다. 이는 새 AMD64 전체 gate나 서버 배포 완료 증거가 아니다. 새로운 전체 검증 결과를 기다린다.
 
+`ecc04568`의 macOS 전체 Release는 Node 1,787/기존 skip 8, unit 133, E2E 103/retry 0(7.0분)으로 통과했다. 전체 206,173바이트·2,342줄 감사는 기존 between-test Fast Refresh 2회 외 manifest/연결/uncaught 오류를 발견하지 않았다. 반면 같은 SHA의 AMD64 gate는 Quick와 standalone 빌드 후 회원가입 이동에서 실패했다(1 통과·1 실패·101 미실행). RSC 응답과 page chunk가 약 1.4초 안에 끝났지만 HMR 갱신이 겹친 뒤 로그인 URL에 머물렀다. manifest 오류는 이번 실행에 없었으며 성공 receipt·image archive도 만들지 않았다.
+
+사전 컴파일을 적용한 별도 진단에서도 뒤로가기 실패가 남아 이 방식만으로 해결되지 않음을 확인했다. 실제 source와 브라우저 이력 관측에서는 첫 구형 제휴 URL의 streamed 정규화 이동이 별도 document 교체를 만들었다. 원래 테스트의 링크 표시/fonts만으로는 그 이동 완료를 보장하지 않았다. 제품 코드는 바꾸지 않고 정규 URL의 문서 load를 5초 안에 기다리는 새 검증을 기존 readiness 앞에 추가했다. 관련 순서 회귀는 수정 전 실패·수정 후 통과했다. 사전 컴파일이나 관측 코드를 쓰지 않은 두 독립 Docker fresh-server 집중 실행에서 원래 인증 2개가 각각 2/2·retry 0으로 통과했다(41.8초, 41.9초; canonical 흐름 15.0초, 14.8초). 원래 실패 기록은 보존한다. 이것은 집중 검증이며 새 commit 전체 gate와 실제 서버 배포는 아직 필요하다.
+
 - [ ] 운영 DB 크기·확장·권한·Storage 객체 수와 hash 목록 조사, 운영 데이터 반입 범위 확정.
 - [ ] 독립 장애 영역의 암호화 백업 저장소 연결, 보관·삭제 정책·잔여 용량 및 쓰기 실패 검증.
 - [ ] 서버 밖의 복구 키 보관과 새 장치에서 키를 가져오는 복구 실습.

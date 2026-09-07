@@ -18,6 +18,9 @@ test("Mac AMD64 alternative cannot impersonate native server CI or use a non-Des
 test("canonical authentication journey proves interactivity without weakening browser history assertions", async () => {
   const source = await readFile(new URL("./e2e/auth-ops.spec.ts", import.meta.url), "utf8");
   const flow = source.slice(source.indexOf('test("uses the canonical partner'), source.indexOf('test("@critical member login'));
+  const canonicalReady = flow.indexOf('await page.waitForURL(/\\/partners\\/health-001$/, { timeout: 5_000 })');
+  assert.ok(canonicalReady > flow.indexOf("await page.goto("));
+  assert.ok(canonicalReady < flow.indexOf("await waitForPageReady("));
   assert.ok(flow.indexOf('expect(usernameTab).toHaveAttribute("aria-selected", "true")') < flow.indexOf("await signupAction.click()"));
   assert.ok(flow.indexOf('expect(graduateTab).toHaveAttribute("aria-selected", "true")') < flow.indexOf("await page.goBack()"));
   assert.ok(flow.includes("await page.goBack()"));

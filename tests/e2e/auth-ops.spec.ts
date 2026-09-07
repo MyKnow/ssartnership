@@ -32,6 +32,9 @@ test.describe("auth and partner portal operation flows", () => {
     expect(loginWarmup.ok()).toBe(true);
 
     await page.goto("/partners/health-001?returnTo=%2F%3Fcategory%3Dhealth%23benefits");
+    // The legacy URL can stream a redirect after its first document loads.
+    // Finish that canonical navigation before observing or clicking its UI.
+    await page.waitForURL(/\/partners\/health-001$/, { timeout: 5_000 });
     await waitForPageReady(
       page,
       page.getByRole("banner").getByRole("link", { name: "로그인", exact: true }),
