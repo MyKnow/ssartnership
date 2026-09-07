@@ -66,6 +66,8 @@ Mac engine은 사용자 소유 Docker Desktop Unix socket에 고정하고 환경
 
 ## Preview 설치와 rollback
 
+자체 호스팅 개발 E2E는 `SELF_HOST_ATOMIC_MANIFESTS=1`을 명시한다. Next 설정은 dev compiler와 이 flag가 모두 참이고 NODE_ENV가 Production이 아닐 때만 webpack manifest 출력 adapter를 설치한다. 같은 디렉터리의 새 임시 파일에 내용을 완성한 뒤 rename하며, 같은 대상의 compiler 쓰기는 순서대로 처리한다. 쓰기/rename 실패는 compiler에 전달되고 독자·JSON 파싱·일반 JS/CSS 출력은 바뀌지 않는다. Production 이미지에 테스트 초기화 예외를 만들지 않는다. 이 경로는 개발 bundler asset의 빈 읽기 방지용이며 Next가 직접 갱신하는 prerender manifest 또는 Windows 파일시스템에서의 동등한 원자성 보장은 별도다. 실패 gate 재시도·오류 숨김·시간 제한 완화 대신 새 SHA의 전체 검증으로 확인한다.
+
 `install-release.mjs`는 승인된 source archive의 hash를 확인하고 새 root 소유 release 디렉터리에만 설치한다. `bootstrap-preview.mjs`는 해당 승인·AMD64·고정 loopback origins를 확인하고 새 `ssartnership-home-preview`의 비밀·볼륨·199개 이상 migration·Storage/RPC smoke·관측 서비스를 준비한다. 기존 env가 있으면 재초기화하지 않는다. 실패한 bootstrap을 무작정 다시 실행하지 말고 생성된 키·볼륨·성공 단계를 보존한 채 미완료 단계만 조사한다.
 
 원본 운영 데이터는 반입하지 않는다. 새 DB에 남은 두 폐기된 기본 banner seed만 비활성화한다. 운영/복원 DB에는 이 seed 조정을 실행하지 않는다. 외부 Mattermost/메일 등 실제 연동은 비활성/미설정이며, synthetic DB를 실서비스 데이터로 오해하지 않는다. 서비스 포트는 loopback에만 공개하고 `compose.server.yaml`로 자원/로그 상한을 적용한다.

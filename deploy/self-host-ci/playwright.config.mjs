@@ -19,7 +19,7 @@ const config = {
     command: `${base.webServer.command} --disable-source-maps`,
     // The builder's existing 3 GiB MemoryHigh also contains Docker and browser
     // processes. Bound only the dev compiler heap below that shared boundary.
-    env: { ...base.webServer.env, NODE_OPTIONS: "--max-old-space-size=2048" } },
+    env: { ...base.webServer.env, SELF_HOST_ATOMIC_MANIFESTS: "1", NODE_OPTIONS: "--max-old-space-size=2048" } },
   retries: 0,
   maxFailures: 1,
   forbidOnly: true,

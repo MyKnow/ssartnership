@@ -44,6 +44,12 @@ Preview는 운영 데이터가 없는 독립 환경부터 제공한다. 데이�
 
 ## 검증·전환
 
+### 개발 manifest 경합의 제한된 수정 검증
+
+2026-09-07 재개 시 서버의 실제 접근 창은 22:00 KST까지로 확인했다. Issue #435 범위에서 먼저 기존 103개 개발 E2E와 Production 인증 경계를 그대로 유지하는 수정안을 검증한다. [webpack의 outputFileSystem 확장점](https://webpack.js.org/api/node/#custom-file-systems)을 사용해 명시적으로 활성화한 자체 호스팅 CI의 개발 빌드 manifest만 같은 디렉터리의 임시 파일에 완성한 뒤 rename한다. 읽기/JSON.parse·manifest 내용·node_modules는 변경하지 않고, 쓰기/rename 실패는 원래 compiler callback에 전달한다. 비-manifest 출력과 Production 빌드는 그대로 둔다. 동일 경로의 쓰기는 순서대로 처리하며 부분 실패가 다음 작업의 큐를 영구 차단하지 않게 한다.
+
+변경 범위는 개발 전용 webpack helper, next.config의 dev+명시 flag 조건, 자체 호스팅 E2E 환경 flag와 집중 회귀 테스트다. 출력 경로 경계·동시 쓰기 중 이전 완성본 유지·쓰기/rename 실패·임시 파일 정리·일반 파일 전달·Production 비활성화를 먼저 검증한다. 이후 AMD64 실제 전체 gate에서 manifest/HTTP/브라우저 오류가 없고 103개가 retry 0으로 통과해야 이미지를 승인한다. 이 수정은 [upstream #97594](https://github.com/vercel/next.js/issues/97594)의 bundler asset 쓰기 경합을 대상으로 한 검증안이며 Next가 직접 갱신하는 prerender manifest의 read-modify-write를 해결한다고 주장하지 않는다. 효과를 입증하지 못하면 실패 결과를 보존하고 런타임 E2E 재설계 후보와 별도로 판단한다. 테스트 우회·제한 연장·부분 결과 승인은 하지 않는다.
+
 ### 2026-09-07 실행 추가 범위
 
 사용자가 기반 커밋 이후 위 여섯 운영 항목의 Docker 구현·시험과 서버 배포를 승인했다. [Issue #435 추가 계획](https://github.com/MyKnow/ssartnership/issues/435#issuecomment-5561917265)을 따른다. 기존 클라우드의 중단·Production 데이터 전환은 도메인과 전환 선택이 확정되기 전 실행하지 않는다.

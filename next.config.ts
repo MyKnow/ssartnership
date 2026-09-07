@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 import type { RemotePattern } from "next/dist/shared/lib/image-config";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { AtomicDevelopmentManifestsPlugin, shouldUseAtomicManifests } from "./scripts/webpack-atomic-manifests.mjs";
 
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 
@@ -87,7 +88,12 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: projectRoot,
   },
-  webpack(config) {
+  webpack(config, { dev }) {
+    if (shouldUseAtomicManifests(dev)) {
+      config.plugins.push(new AtomicDevelopmentManifestsPlugin(
+        resolve(projectRoot, process.env.NEXT_DIST_DIR ?? ".next", "dev"),
+      ));
+    }
     // @discourse/heic's Emscripten loader fetches this file itself. Treating it
     // as a native WebAssembly module makes Webpack try to resolve its internal
     // Emscripten import names (for example, "a") as npm packages.
