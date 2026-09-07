@@ -73,6 +73,12 @@ Mac 후속 검증: 세 차례 AMD64 gate의 실패를 모두 보존했다. 준�
 
 복원 중 백업 암호 파일 잔존도 보강했다. 기존 로컬 TLS receiver에서 받은 암호화 bundle로 실제 Docker 복원을 수행해 PITR marker·Storage 검증을 통과했다. 설정/증거 파일 3개에 실제 백업 암호가 없음을 메모리 비교로 확인했으며 해당 새 drill container는 0개, 복원 volume은 보존했다. 이것은 로컬 fixture의 보관 최소화 검증이며 아직 홈서버에서 Mac으로 반출한 사본의 검증은 아니다. 새 도구 포함 직전 macOS 전체 Release는 E2E 103/retry 0(4.9분)이었으며 마지막 인증 readiness 변경 이후에는 새 전체 검증이 필요하다.
 
+2026-09-07 13:55 KST 판정: Mac operator·Keychain·암호 잔존 방지·인증 readiness를 `76b6d963`에 로컬 커밋했다. 같은 SHA의 macOS 전체 Release는 Node 1,779 통과/기존 skip 8, unit 133, E2E 103/retry 0(8.7분)으로 통과했다. 전체 205,796바이트·2,334줄 로그 감사는 기존 Fast Refresh 2회만 검출했다. 자체 호스팅 집중 테스트 78/78과 문서 93개 검사도 통과했다.
+
+그러나 새 AMD64 전체 gate는 Quick와 standalone 빌드까지 통과한 뒤, 두 번째 테스트의 첫 로그인 준비 GET에서 JSON 파싱 오류와 HTTP 500으로 중단됐다. 1 통과·1 실패·101 미실행·테스트 밖 오류 1건이며 readiness assertion 전에 실패했다. 이 실행만으로 오류 입력이 앞서 진단한 빈 manifest와 같다고 확정하지 않는다. `CI_E2E_SERVER_UNSTABLE` 방어가 작동했으며 성공 receipt·3개 배포 image archive는 생성하지 않았다. 원본 `.tmp/self-host/76b6-mac-amd64-release`의 로그·trace·소스는 보존했다. Mac 기본 전체 통과나 AMD64 빌드 성공만으로 배포를 승인하지 않았다.
+
+서버의 13:51 KST 읽기 점검에서는 root 소유 승인 입력·controller·release 소스만 준비된 상태였다. 승인 source SHA256은 `326acb107fd221970f7b36dadd76655a4cd7558693b5b1446bad529a4c2c62e6`이며 public 기반 이미지 10개를 내려받았다. rootful 실행 container는 없고 Preview 비밀 디렉터리·maintenance current 링크·heavy lock은 아직 없다. 기존 CI 1.5 CPU/MemoryHigh 3GiB/MemoryMax 4GiB/swap 1GiB/Tasks 2048은 유지했다. 앱·DB·관측 stack·timer 설치, 서버 백업의 Keychain 수신자 반출과 Mac 복구는 미완료다. 승인된 접근 창은 14:00 KST까지이며 만료 정책을 바꾸지 않았다. 이후 서버 작업에는 유효한 새 접근 창이 필요하고, 네이티브/AMD64 전체 검증 해결 또는 검토된 검증 체계 변경 없이는 배포하지 않는다. 원본 worktree의 별도 인증 변경, 원격 branch, Vercel/Supabase/DNS는 그대로다.
+
 - [ ] 운영 DB 크기·확장·권한·Storage 객체 수와 hash 목록 조사, 운영 데이터 반입 범위 확정.
 - [ ] 독립 장애 영역의 암호화 백업 저장소 연결, 보관·삭제 정책·잔여 용량 및 쓰기 실패 검증.
 - [ ] 서버 밖의 복구 키 보관과 새 장치에서 키를 가져오는 복구 실습.
