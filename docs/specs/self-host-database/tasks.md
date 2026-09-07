@@ -19,6 +19,10 @@ authority: normative
 
 첫 Docker 시험은 다운로드/해제 후 바이너리 실행 단계에서 실패했다. 진단에서 도구까지 넣은 임시 mount의 `noexec`를 확인했고, 수정한 시험은 `/tools`만 실행 가능하게 하고 데이터 영역의 `noexec`·read-only root·capability 제거·512MiB/1CPU 제한을 유지했다. 이전 실패를 삭제하거나 합성 시험을 원본 데이터 이전 성공으로 표시하지 않는다. 아직 Cloud DB/Storage export 및 서버 데이터 restore는 실행하지 않았다.
 
+전송 도구를 `8e1e5bcd`에 커밋한 뒤 해당 commit의 installer로 서버 전용 `/opt/ssartnership/age-v1.3.2`를 새로 설치했다. Linux AMD64 공식 archive SHA256과 실행 버전을 확인했고 시스템 기본 도구는 교체하지 않았다. 새 `/etc/myknow/secrets/ssartnership-cloud-preview-migration`은 root:root 0700, native age identity는 root:root 0600이다. 공개 recipient만 `deploy/self-host-migration/preview-recipient.json`에 기록했다. private key는 출력하거나 Mac/GitHub로 반출하지 않았다.
+
+Mac에서 이 공개 recipient로 암호화한 새로운 2MiB 합성 데이터를 pinned SSH로 서버에 전달하고, 서버의 native age 복호화→hash pipeline이 원본과 일치함을 확인했다. 끝 byte 변조는 비정상 종료했고 pipefail로 hash 명령의 성공이 복호화 실패를 숨기지 않았다. 실제 Cloud DB/Storage나 앱 비밀은 이 시험에 사용하지 않았다. 이후 앱 health 200과 기존 11개 container 유지도 확인했다. 이전용 key의 독립 escrow와 원본 export/restore는 후속 게이트다.
+
 두 환경 격리와 사본 준비를 `a6fecd5a`에 커밋했다. Issue #435에 GHCR 이미지 게시와 원래 Cloud Preview 전체 이전의 분리 계획을 기록했다. Production 데이터를 정제하는 `prepare-copy`는 원래 Cloud Preview의 완전 이전 도구가 아니므로 혼용하지 않는다.
 
 Cloud Preview의 13:42 UTC 읽기 전용 집계는 PostgreSQL 17.6, DB 104,418,451바이트, public table 101개, migration 199개, Storage bucket 7개/객체 823개/metadata 기준 39,851,100바이트, auth.users 0개였다. 파일 hash와 전체 schema/data 동등성은 아직 미검증이다. 개인정보를 Mac으로 평문 내려받지 않았다.
