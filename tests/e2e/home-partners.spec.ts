@@ -429,6 +429,13 @@ test.describe("public partner discovery", () => {
 
   test("applies a partner search only after an explicit submit", async ({ page }) => {
     await gotoDirectory(page, "/#benefits");
+    const searchNavigations: string[] = [];
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (request.headers().rsc === "1" && url.pathname === "/" && url.searchParams.has("q")) {
+        searchNavigations.push(request.url());
+      }
+    });
 
     const cards = page.getByTestId("partner-card");
     const initialCount = await cards.count();
@@ -451,12 +458,24 @@ test.describe("public partner discovery", () => {
     await searchInput.press("Enter");
     await expect(page).toHaveURL(/q=/);
     await expect(cards).toHaveCount(1);
+    expect(searchNavigations).toEqual([]);
+    expect(new URL(page.url()).hash).toBe("#benefits");
 
     await searchInput.fill("");
     await expect(page).toHaveURL(/q=/);
     await page.getByRole("button", { name: "검색", exact: true }).click();
     await expect(page).not.toHaveURL(/q=/);
     await expect(cards).toHaveCount(initialCount);
+    expect(new URL(page.url()).hash).toBe("#benefits");
+    await page.goBack();
+    await expect(page).toHaveURL(/q=/);
+    await expect(searchInput).toHaveValue(firstPartnerName);
+    await expect(cards).toHaveCount(1);
+    await page.goForward();
+    await expect(page).not.toHaveURL(/q=/);
+    await expect(searchInput).toHaveValue("");
+    await expect(cards).toHaveCount(initialCount);
+    expect(searchNavigations).toEqual([]);
   });
 
   test("uses a clean detail URL and restores a submitted search with browser back", async ({

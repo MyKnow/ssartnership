@@ -129,6 +129,12 @@ Mac 후속 검증: 세 차례 AMD64 gate의 실패를 모두 보존했다. 준�
 
 첫 Release의 테스트용 YAML 타입 선언 오류와 다음 실행의 점유 포트 3100 오류, 별도 집중 실행의 alias loader 누락을 원장에 보존했다. 수정 후 비점유 3189 포트에서 전체 Release가 종료 0으로 끝났다: Node 1,807 통과/기존 skip 8, unit 133, build, E2E 103/retry 0(3.6분). 전체 로그의 특이 신호는 기존 관리자 테스트 전환 Fast Refresh 2회뿐이다. 새 SHA의 AMD64 전체 gate와 실제 서버 교체/백업/복구는 별도 수용 단계다.
 
+2026-09-07 18시대 KST: `30184759` AMD64 gate는 Quick·실제 standalone·추가 fixture build를 통과했으나 검색 초기화에서 종료 1로 멈췄다(25 pass/1 fail/77 unrun/retry 0/OOM false). 전체 220,552바이트·2,777줄과 trace를 보존했다. 검색과 초기화 RSC는 모두 200이었지만 이전 query와 중복 fragment가 남았다. 성공 이미지/result는 생성하지 않았고 서버에는 hash 검증된 source/controller만 설치했다. 실행 Preview·자격증명·타이머는 아직 이전 상태다.
+
+후속 UI micro brief: 공개 사용자의 검색 제출·초기화가 대상이며 기존 홈 필터와 URL을 단일 기준으로 유지한다. 디자인·컴포넌트·문구를 바꾸지 않고 동일 목록의 검색을 [Next가 지원하는 native history push](https://nextjs.org/docs/app/getting-started/linking-and-navigating#native-history-api)로 처리한다. 다른 필터의 replace 및 상세 페이지 이동은 그대로다. 기존 화면에 새 패턴을 추가하지 않는다. 새 no-search-RSC 회귀는 기존 router.push 구현에서 실패했고 최소 수정 뒤 통과했다. 추가 assertion을 포함한 production-fixture 전체 103개도 retry 0으로 통과했다(40.5초). 360/820/1366px에서 정확한 fragment·키보드 제출·뒤로가기/앞으로가기·overflow 부재를 확인하고 전후 screenshot 6개를 Git 제외 QA 폴더에 남겼다. 첫 QA의 미분류 fetch 취소는 보존했고, 새 QA에서는 기존의 엄격한 HTTP 200 RSC prefetch 취소 분류에 해당하는 3/5/4건만 별도 기록했다. 해당 목적지의 실제 문서 본문 200을 확인했고 다른 요청 실패·콘솔 오류·검색 RSC는 0이었다. 일반 Release와 새 SHA AMD64 gate는 별도 필수다.
+
+검색 수정의 일반 Release도 종료 0으로 통과했다: Node 1,807/기존 skip 8, unit 133, 실제 build, E2E 103/retry 0(5.2분). 전체 208,259바이트·2,362줄의 특이 신호는 기존 관리자 전환 Fast Refresh 2회뿐이다. lint·타입·문서 93개·diff 검증도 통과했다. 이는 새 SHA의 AMD64 gate 또는 서버 적용을 대신하지 않는다.
+
 - [ ] 초기화 SQL/비밀번호 로그 경계 수정, 기존 합성 Preview DB 자격증명 교체, 신규 백업과 로그 재감사.
 - [ ] 검증한 maintenance/export 진입점 controller 적용과 실제 receipt/metric 확인 후 여섯 타이머 재개.
 - [ ] 운영 DB 크기·확장·권한·Storage 객체 수와 hash 목록 조사, 운영 데이터 반입 범위 확정.
