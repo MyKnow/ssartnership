@@ -1,0 +1,23 @@
+services:
+  offhost:
+    image: restic/restic:0.19.1@sha256:136600b6ff6843d61d355f7f71f460a166429f35de6fd11b568fece3c9a4d510
+    profiles: [operations]
+    restart: "no"
+    networks: [edge]
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [DAC_READ_SEARCH]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp:mode=1777]
+    environment:
+      RESTIC_REPOSITORY: ${OFFHOST_REPOSITORY:?set an explicit HTTPS repository}
+      RESTIC_PASSWORD: ${OFFHOST_PASSWORD:?set a separate outer encryption key}
+      RESTIC_REST_USERNAME: ${OFFHOST_USERNAME:?set receiver identity}
+      RESTIC_REST_PASSWORD: ${OFFHOST_CREDENTIAL:?set receiver credential}
+      RESTIC_CACHE_DIR: /tmp/restic-cache
+      RESTIC_CACERT: /run/receiver-ca.pem
+    volumes:
+      - pgbackrest-repo:/bundle/pgbackrest:ro
+      - restic-repo:/bundle/storage-repository:ro
+      - ${OFFHOST_MANIFEST_FILE:?set a frozen paired manifest}:/bundle/manifest.jsonl:ro
+      - ${OFFHOST_CA_FILE:?set trusted receiver CA bundle}:/run/receiver-ca.pem:ro

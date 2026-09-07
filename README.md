@@ -69,6 +69,8 @@ SSARTNERSHIP는 SSAFY 구성원을 위한 제휴 혜택 플랫폼입니다.
 
 ## 기술 스택
 
+자체 호스팅 마이그레이션의 로컬 Docker Desktop 실행과 운영 전환 절차는 [자체 호스팅 runbook](docs/operations/runbooks/self-hosting.md), 범위와 진행 상태는 [마이그레이션 명세](docs/specs/self-hosting/spec.md)를 참고합니다.
+
 - Next.js 16 App Router
 - React 19
 - TypeScript

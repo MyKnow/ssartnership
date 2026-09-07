@@ -1,0 +1,14 @@
+# Linux server only. Docker Desktop base metrics describe its Linux VM,
+# not macOS. No Docker socket, privileged mode or writeable host mount.
+services:
+  node-exporter:
+    command:
+      - --path.rootfs=/host
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --collector.textfile.directory=/textfile
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker|run/docker)($|/)
+    volumes:
+      - /:/host:ro,rslave
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro

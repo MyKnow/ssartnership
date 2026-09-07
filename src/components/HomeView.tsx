@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   useCallback,
   startTransition,
@@ -58,7 +58,6 @@ export default function HomeView({
   loadedFavoritePartnerIds?: string[];
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const categoryKeys = useMemo(
     () => categories.map((category) => category.key),
@@ -115,12 +114,12 @@ export default function HomeView({
         : `${pathname}#benefits`;
 
       if (historyMode === "push") {
-        router.push(nextUrl);
+        window.history.pushState(null, "", nextUrl);
       } else {
         window.history.replaceState(null, "", nextUrl);
       }
     },
-    [categoryKeys, pathname, router],
+    [categoryKeys, pathname],
   );
 
   const commitSearchValue = useCallback(

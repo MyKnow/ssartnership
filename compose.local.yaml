@@ -1,0 +1,31 @@
+services:
+  app:
+    image: ssartnership:self-host-local
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_DATA_SOURCE: mock
+        NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE: mock
+        NEXT_PUBLIC_SUPABASE_URL: ""
+        NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3100
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ""
+    restart: "no"
+    # Compose v2.24.4+ is required for !reset. This prevents the real-mode
+    # runtime.env inherited from compose.yaml from reaching local mock smoke.
+    env_file: !reset []
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      SELF_HOST_MODE: local-mock
+      NEXT_PUBLIC_DATA_SOURCE: mock
+      NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE: mock
+      NEXT_PUBLIC_SUPABASE_URL: ""
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3100
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: ""
+      # Local mock data is allowed for a loopback-only smoke surface. Member
+      # mock authentication remains disabled in every self-hosted container.
+      MOCK_MEMBER_AUTH: "0"
+    ports:
+      - "127.0.0.1:3100:3000"

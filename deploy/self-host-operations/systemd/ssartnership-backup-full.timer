@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly SSAFY Partnership full backup
+
+[Timer]
+OnCalendar=Sun *-*-* 03:00:00
+Persistent=true
+Unit=ssartnership-backup-full.service
+
+[Install]
+WantedBy=timers.target

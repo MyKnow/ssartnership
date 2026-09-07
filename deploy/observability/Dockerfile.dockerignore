@@ -1,0 +1,8 @@
+**
+!deploy/
+!deploy/observability/
+!deploy/observability/Dockerfile
+!deploy/observability/telemetry.mjs
+!src/
+!src/lib/
+!src/lib/web-vitals-contract.ts

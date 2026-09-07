@@ -1,0 +1,8 @@
+# Local test only. TLS is still verified against the generated fixture CA.
+services:
+  telemetry:
+    environment:
+      OPS_ALERT_WEBHOOK_URL: https://host.docker.internal:58445/webhook
+      NODE_EXTRA_CA_CERTS: /run/fixture-ca.pem
+    volumes:
+      - ${ALERT_FIXTURE_CA_FILE:?set the local fixture CA}:/run/fixture-ca.pem:ro

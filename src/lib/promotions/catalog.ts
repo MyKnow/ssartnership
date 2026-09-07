@@ -79,33 +79,12 @@ export const EVENT_CAMPAIGNS: EventCampaign[] = listEventPageDefinitions();
 
 export const HOME_PROMOTIONS: PromotionSlide[] = [
   {
-    id: "partnership-overview",
-    title: "싸트너십 | SSAFY 제휴 혜택 플랫폼",
-    description:
-      "SSAFY 구성원을 위한 캠퍼스 주변 제휴 혜택을 카테고리별로 빠르게 찾습니다.",
-    imageSrc: "/ads/home-partnership-overview.svg",
-    imageAlt: "SSAFY 제휴 혜택을 한곳에서 확인하는 광고",
-    href: "/#partner-explore",
-    audiences: [...DEFAULT_PROMOTION_AUDIENCES],
-    allowedCampuses: [],
-  },
-  {
     id: "signup-reward",
     title: "싸트너십 추첨권 이벤트",
     description: "회원가입, 알림 설정, 리뷰 작성으로 추첨권을 받을 수 있습니다.",
     imageSrc: "/ads/reward-event.svg",
     imageAlt: "회원가입, 알림, 마케팅 동의, 리뷰 작성 추첨권 이벤트 광고",
     href: "/events/signup-reward",
-    audiences: [...DEFAULT_PROMOTION_AUDIENCES],
-    allowedCampuses: [],
-  },
-  {
-    id: "campus-partners",
-    title: "캠퍼스별 제휴 탐색",
-    description: "서울 캠퍼스부터 캠퍼스별 제휴 혜택을 따로 확인합니다.",
-    imageSrc: "/ads/campus-partners.svg",
-    imageAlt: "캠퍼스별 제휴 혜택 탐색 광고",
-    href: "/campuses/seoul",
     audiences: [...DEFAULT_PROMOTION_AUDIENCES],
     allowedCampuses: [],
   },

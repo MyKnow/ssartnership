@@ -1,3 +1,5 @@
+import { allowsLocalFixtures } from "@/lib/local-fixture-policy.mjs";
+
 type ActivityLogRuntimeEnvironment = {
   NODE_ENV?: string;
   E2E_MOCK_MUTATIONS?: string;
@@ -13,7 +15,7 @@ export function shouldBypassActivityLogPersistence(
   environment: ActivityLogRuntimeEnvironment = process.env,
 ) {
   return (
-    environment.NODE_ENV !== "production" &&
+    allowsLocalFixtures(environment) &&
     environment.E2E_MOCK_MUTATIONS === "1" &&
     environment.NEXT_PUBLIC_DATA_SOURCE === "mock"
   );
@@ -23,7 +25,7 @@ export function shouldBypassProductEventTransport(
   environment: ProductEventTransportEnvironment,
 ) {
   return (
-    environment.NODE_ENV !== "production" &&
+    allowsLocalFixtures(environment) &&
     environment.NEXT_PUBLIC_DATA_SOURCE === "mock"
   );
 }

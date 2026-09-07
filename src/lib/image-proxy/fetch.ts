@@ -3,13 +3,14 @@ import http from "node:http";
 import https from "node:https";
 import net from "node:net";
 import type { IncomingHttpHeaders, RequestOptions } from "node:http";
-import { isPublicIpAddress } from "./ip";
+import { resolveInternalPublicSupabaseImageTarget } from "../supabase/public-image.ts";
+import { isPublicIpAddress } from "./ip.ts";
 import {
   IMAGE_FETCH_TIMEOUT_MS,
   ImageProxyError,
   MAX_IMAGE_BYTES,
   resolveAllowedImageContentType,
-} from "./shared";
+} from "./shared.ts";
 
 export type FetchPublicImageOptions = {
   allowedContentTypes?: readonly string[];
@@ -95,25 +96,31 @@ export async function fetchPublicImage(
   options: FetchPublicImageOptions = {},
 ) {
   const maxBytes = resolveMaxBytes(options.maxBytes);
-  const resolvedAddress = await resolvePublicImageAddress(target.hostname);
-  const isHttps = target.protocol === "https:";
+  const internalTarget = resolveInternalPublicSupabaseImageTarget(target);
+  const requestTarget = internalTarget ?? target;
+  const resolvedAddress = internalTarget
+    ? requestTarget.hostname
+    : await resolvePublicImageAddress(requestTarget.hostname);
+  const isHttps = requestTarget.protocol === "https:";
   const client = isHttps ? https : http;
   const requestOptions: RequestOptions = {
-    protocol: target.protocol,
+    protocol: requestTarget.protocol,
     hostname: resolvedAddress,
-    port: resolvePublicImageTargetPort(target),
+    port: internalTarget
+      ? requestTarget.port || undefined
+      : resolvePublicImageTargetPort(requestTarget),
     method: "GET",
-    path: `${target.pathname}${target.search}`,
+    path: `${requestTarget.pathname}${requestTarget.search}`,
     headers: {
       Accept: "image/*",
       "Accept-Encoding": "identity",
-      Host: target.host,
+      Host: requestTarget.host,
     },
     signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS),
     timeout: IMAGE_FETCH_TIMEOUT_MS,
     ...(isHttps
       ? {
-          servername: target.hostname,
+          servername: requestTarget.hostname,
         }
       : {}),
   };

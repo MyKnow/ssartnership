@@ -1,3 +1,5 @@
+import { allowsLocalFixtures } from "@/lib/local-fixture-policy.mjs";
+
 export const MOCK_MEMBER_ID = "mock-member-jung-minho";
 
 export type MockMemberPolicyState = {
@@ -78,7 +80,7 @@ export function isMockMemberAuthEnabled(
   environment: MockMemberEnvironment = process.env,
 ) {
   return (
-    environment.NODE_ENV !== "production" &&
+    allowsLocalFixtures(environment) &&
     isMockDataSource(environment) &&
     environment.MOCK_MEMBER_AUTH === "1"
   );
