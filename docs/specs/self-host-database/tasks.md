@@ -65,6 +65,14 @@ v17은 mock Web Vitals 요청을 제거한 상태에서도 첫 묶음의 제휴 
 
 후속 로컬 Release `verify-release-20260907-ci-guards-final.log`는 종료 0, Node 1773 통과/8 기존 skip, unit 133, E2E 103/retry 0(3.1분)이다. 204,595바이트·2,328줄 전체 로그 시그니처 검사는 통과한 테스트 사이의 기존 Fast Refresh 2회만 검출했다. 마지막 CI 준비 경로 정합성 수정은 별도 집중 테스트 5/5와 lint로 추가 검증했다. 문서 93개와 canonical lockfile 검사도 통과했다. 이 증거는 로컬 수정 검증이며 실패한 네이티브 CI의 성공, 서버 배포, 외부 키 보관 또는 Production 전환을 의미하지 않는다.
 
+2026-09-07 후속 승인: 네이티브 CI 안정화는 미완료로 유지하고 Mac Docker AMD64 전체 검증 후 별도 synthetic Preview 배포를 진행한다. 복구 개인키 보관은 macOS login Keychain으로 승인받았다. Mac 대체 runner는 기존 server rootless 검사를 수정하지 않으며, 별도 출처 증거를 남긴다. 앱 소스는 로컬 commit `ed93c05ab271c59a055665ca5cd7cc5c3cc3fcc6`의 승인 archive이며 배포 gate 실행 중이다. 새로운 operator 도구는 별도 변경으로 검증한다.
+
+Keychain 실제 시험: private PEM 파일 없이 임시 시험용 item의 저장/읽기·중복 거부·정확한 시험 item 삭제를 확인했다. 별도 RSA 4096 개인키로 Keychain readback과 봉인 묶음 복호화까지 통과했다. 시험용 item은 삭제했고 실제 복구 item/서버 백업 반출은 아직 실행하지 않았다. Mac operator/복구 집중 테스트 6/6 통과. Keychain 보관 성공은 Mac 분실에 대한 오프라인 키 escrow 또는 지리적으로 분리된 DR 증거가 아니다.
+
+Mac 후속 검증: 세 차례 AMD64 gate의 실패를 모두 보존했다. 준비 GET을 사용하는 첫 실행은 manifest 오류, 단일 서버의 두 번째 실행은 signup 이동 제한과 React 경고, ARM64 브라우저를 분리한 세 번째 실행은 즉시 뒤로가기의 잘못된 history 결과로 실패했다. 부분 이미지나 성공 receipt는 발행하지 않았다. 마지막 trace에서 signup URL 확인 직후 약 4ms 만에 뒤로가기를 호출함을 확인했다. 로그인/회원가입 탭의 실제 상태 변경을 확인하도록 같은 테스트를 강화한 별도 fresh-server 집중 진단은 1/1 통과(16.4초)했다. 기존 제한·뒤로가기·returnTo·데모 로그인 assertion을 유지하며, 새 소스 전체 검증은 별도로 필요하다.
+
+복원 중 백업 암호 파일 잔존도 보강했다. 기존 로컬 TLS receiver에서 받은 암호화 bundle로 실제 Docker 복원을 수행해 PITR marker·Storage 검증을 통과했다. 설정/증거 파일 3개에 실제 백업 암호가 없음을 메모리 비교로 확인했으며 해당 새 drill container는 0개, 복원 volume은 보존했다. 이것은 로컬 fixture의 보관 최소화 검증이며 아직 홈서버에서 Mac으로 반출한 사본의 검증은 아니다. 새 도구 포함 직전 macOS 전체 Release는 E2E 103/retry 0(4.9분)이었으며 마지막 인증 readiness 변경 이후에는 새 전체 검증이 필요하다.
+
 - [ ] 운영 DB 크기·확장·권한·Storage 객체 수와 hash 목록 조사, 운영 데이터 반입 범위 확정.
 - [ ] 독립 장애 영역의 암호화 백업 저장소 연결, 보관·삭제 정책·잔여 용량 및 쓰기 실패 검증.
 - [ ] 서버 밖의 복구 키 보관과 새 장치에서 키를 가져오는 복구 실습.

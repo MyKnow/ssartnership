@@ -116,7 +116,15 @@ export async function executeOffhost(argv, { run = createProcessRunner() } = {})
   }
 }
 
-export async function rehearseRecoveredBundle(context, run, bundleVolume, { databaseImage } = {}) {
+export function recoveryKeyMode(operations, runtimeKeysOnly) {
+  if (typeof runtimeKeysOnly !== "boolean") fail("OFFHOST_KEY_MODE_INVALID");
+  const keys = Object.fromEntries(["PGBACKREST_REPO1_CIPHER_PASS", "RESTIC_PASSWORD"].map((key) => [key, operations[key]]));
+  if (runtimeKeysOnly && Object.values(keys).some((value) => !/^[a-f0-9]{64}$/u.test(value ?? ""))) fail("OFFHOST_RUNTIME_KEYS_INVALID");
+  return { fileKeys: runtimeKeysOnly ? Object.fromEntries(Object.keys(keys).map((key) => [key, "injected-only-during-restore"])) : keys,
+    runtimeKeys: runtimeKeysOnly ? keys : {} };
+}
+
+export async function rehearseRecoveredBundle(context, run, bundleVolume, { databaseImage, runtimeKeysOnly = false } = {}) {
   if (!/^ssartnership-[a-z0-9-]+-offhost-[a-f0-9]{32}$/u.test(bundleVolume)) fail("OFFHOST_BUNDLE_INVALID");
   if (databaseImage !== undefined && !/^sha256:[a-f0-9]{64}$/u.test(databaseImage)) fail("OFFHOST_IMAGE_INVALID");
   const recoveryProject = `ssartnership-recovery-${randomUUID().replaceAll("-", "").slice(0, 12)}`;
@@ -133,17 +141,20 @@ export async function rehearseRecoveredBundle(context, run, bundleVolume, { data
   await run("docker", ["run", "--rm", "--network", "none", "--read-only", "--volume", `${bundleVolume}:/recovered:ro`, "--volume", `${pgVolume}:/pg`, "--volume", `${storageVolume}:/storage`, "--entrypoint", "/bin/sh", OFFHOST_IMAGE, "-ec", "cp -a /recovered/bundle/pgbackrest/. /pg/; cp -a /recovered/bundle/storage-repository/. /storage/"]);
   const dataFile = path.join(directory, "data.env");
   const opsFile = path.join(directory, "operations.env");
+  const keyMode = recoveryKeyMode(context.operations, runtimeKeysOnly);
   await writeFile(dataFile, serializeEnvironment(createDatabaseEnvironment({ project: recoveryProject })), { mode: 0o600, flag: "wx" });
   await writeFile(opsFile, serializeEnvironment({
-    PGBACKREST_REPO1_CIPHER_PASS: context.operations.PGBACKREST_REPO1_CIPHER_PASS,
-    RESTIC_PASSWORD: context.operations.RESTIC_PASSWORD,
+    ...keyMode.fileKeys,
     PGBACKREST_REPOSITORY_VOLUME: pgVolume, RESTIC_REPOSITORY_VOLUME: storageVolume,
     ...(databaseImage ? { SELF_HOST_PGBACKREST_IMAGE: databaseImage } : {}),
   }), { mode: 0o600, flag: "wx" });
   const recovered = await loadOperationsContext({ dataEnvFile: dataFile, operationsEnvFile: opsFile });
   await appendManifest(defaultManifestPath(opsFile), paired);
-  const result = await performRestoreDrill(recovered, run);
-  return { result: result.result, projectName: result.isolatedProject, targetVolumes: result.targetVolumes, recoveredFromOffhost: true };
+  // The Mac recipient keeps real backup keys out of durable env files. Only
+  // exact restore subprocesses receive them; no command argument/log does.
+  const restoreRun = runtimeKeysOnly ? (file, args, options = {}) => run(file, args, { ...options, env: { ...(options.env ?? {}), ...keyMode.runtimeKeys } }) : run;
+  const result = await performRestoreDrill(recovered, restoreRun, { removeContainer: runtimeKeysOnly });
+  return { result: result.result, projectName: result.isolatedProject, targetVolumes: result.targetVolumes, recoveredFromOffhost: true, runtimeKeysOnly };
 }
 
 if (process.argv[1] && import.meta.url === new URL(process.argv[1], "file:").href) {

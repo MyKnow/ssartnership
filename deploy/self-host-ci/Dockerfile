@@ -12,6 +12,8 @@ RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && test "$(id -u pwuser)" = 1001
 COPY --chmod=0555 gate.mjs /opt/ssartnership/gate.mjs
 COPY playwright.config.mjs warmup.mjs batch-plan.mjs e2e.mjs /opt/ssartnership/
+COPY playwright.desktop.config.mjs e2e-desktop.mjs /opt/ssartnership/
+COPY browser-server.mjs /opt/ssartnership/
 ENV CI=1 NEXT_TELEMETRY_DISABLED=1 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright HOME=/tmp/ci-home
 USER 1001:1001
 WORKDIR /work

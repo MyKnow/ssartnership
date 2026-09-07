@@ -71,6 +71,15 @@ test.describe("auth and partner portal operation flows", () => {
     const decodedReturnTo = decodeURIComponent(benefitUseReturnTo);
     expect(decodedReturnTo).toBe("/partners/health-001");
 
+    // Prove the destination is interactive before another client navigation.
+    // URL/SSR link visibility alone can precede the router's hydrated state.
+    const emailTab = page.getByRole("tab", { name: "이메일", exact: true });
+    await emailTab.click();
+    await expect(emailTab).toHaveAttribute("aria-selected", "true");
+    const usernameTab = page.getByRole("tab", { name: "아이디", exact: true });
+    await usernameTab.click();
+    await expect(usernameTab).toHaveAttribute("aria-selected", "true");
+
     const signupAction = page.getByRole("main").getByRole("link", {
       name: "회원가입",
       exact: true,
@@ -91,6 +100,10 @@ test.describe("auth and partner portal operation flows", () => {
     await expect(page).toHaveURL(
       /\/auth\/signup\?returnTo=%2Fpartners%2Fhealth-001$/,
     );
+
+    const graduateTab = page.getByRole("tab", { name: "수료생", exact: true });
+    await graduateTab.click();
+    await expect(graduateTab).toHaveAttribute("aria-selected", "true");
 
     await page.goBack();
     await expect(page).toHaveURL(

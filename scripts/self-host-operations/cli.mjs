@@ -381,7 +381,7 @@ async function assertRestoredMarkers(context, run, projectName, markers) {
   if (parsed.before !== true || parsed.after !== false) throw new OperationsError("RESTORE_DRILL_MARKER_ASSERTION_FAILED");
 }
 
-export async function performRestoreDrill(context, run, { manifestPath = defaultManifestPath(context.operationsEnvFile), targetTime } = {}) {
+export async function performRestoreDrill(context, run, { manifestPath = defaultManifestPath(context.operationsEnvFile), targetTime, removeContainer = false } = {}) {
   const records = await readManifest(manifestPath);
   const backup = selectBackupManifest(records);
   const target = selectPitrTarget(backup, targetTime);
@@ -430,7 +430,11 @@ export async function performRestoreDrill(context, run, { manifestPath = default
     await recordFailure(manifestPath, "restore-drill", startedAt, commands, error);
     throw error;
   } finally {
-    if (databaseStarted) {
+    if (removeContainer) {
+      // Exact new drill project only. Keep recovered volumes/evidence, but
+      // don't retain a stopped container's runtime backup-key environment.
+      await composeRun(context, run, ["rm", "--force", "--stop", "restore-drill-db"], { projectName: drillProject });
+    } else if (databaseStarted) {
       await composeRun(context, run, ["stop", "restore-drill-db"], { projectName: drillProject, allowFailure: true });
     }
   }

@@ -54,6 +54,16 @@ Production standalone 산출물은 한 번 빌드하고 `App.Dockerfile`로 그�
 
 파일 hash는 전송 무결성과 승인된 입력의 연결 증거다. 손상된 빌드 호스트 자체를 신뢰할 수 없게 만드는 독립 서명/재현 빌드 증명은 아니다. 빌더 업데이트와 저장소 검토는 별도 공급망 신뢰 경계다.
 
+### 승인된 Mac Docker 대체 빌드
+
+서버 네이티브 CI 안정화와 분리하여 운영자가 승인한 경우에만 `scripts/self-host-ci/mac-runner.mjs <request.json> <source.tar> <새 출력 디렉터리>`를 사용한다. 입력/출력은 이 작업 저장소의 canonical `.tmp` 아래에 두며, 입력 hash를 실제 Git commit의 archive와 다시 비교한다. macOS·Docker Desktop·Linux engine·AMD64 대상·최소 7GiB Docker 메모리와 30GiB 디스크 여유를 요구한다. 기존 서버 rootless UID·승인 파일 소유권·자원 제한 검사를 완화하지 않는다.
+
+Mac 검증 container는 AMD64, 6 CPU·5GiB memory/swap 상한, 읽기 전용 root·capability 제거·소스 bind만 사용한다. 실제 운영 비밀·host socket·SSH 경로를 전달하지 않는다. 같은 전체 Quick/build/E2E 범위를 실행하되 Mac 전용 config는 일반 로컬과 같은 단일 개발 서버 전체 suite를 사용한다. 사전 페이지 GET과 16 shard는 사용하지 않으며 개발 heap만 3072MiB로 제한한다. 모든 테스트/project·assertion 제한·retry 0·실패 trace와 결과 ID/내부 오류 검사는 유지한다. app standalone은 다시 빌드하지 않는다. 성공 증거의 `execution=mac-docker-desktop-amd64`, `nativeServerCi=false`를 보존한다. Mac 도구/게이트 제어 코드의 검토 상태와 앱 source SHA를 별도로 기록한다. 이 경로의 성공은 서버의 1.5 CPU/3GiB slice 안에서 native CI가 통과했다는 뜻이 아니다.
+
+운영자는 성공한 세 image archive와 result/게이트 증거만 기존 고정 SSH로 전달하고 원격 hash를 확인한다. 원격 입력은 root 소유, 전달 artifact는 importer가 요구하는 전용 builder 소유의 새 job 디렉터리에 둔다. 전달 receipt에는 실제 Mac 실행 출처를 기록하며 소유권만으로 서버에서 빌드되었다고 주장하지 않는다. 기존 privileged importer의 archive/config/layer/플랫폼/revision 검사는 그대로 거친다. 이 경로는 별도 synthetic Preview 배포용이며 Production 승격이나 공개 ingress를 승인하지 않는다.
+
+Mac engine은 사용자 소유 Docker Desktop Unix socket에 고정하고 환경 변수의 다른 Docker host/context를 받지 않는다. 브라우저는 동일 버전 Playwright의 ARM64 sidecar로 분리한다. AMD64 gate와 정확히 같은 비공개 network namespace를 사용하고 host port는 공개하지 않는다. trusted install 완료 신호 뒤에만 같은 의존성의 브라우저 server를 실행하며 런타임 추가 설치는 없다. 앱·테스트 runner·배포 이미지는 AMD64이고 실제 브라우저만 ARM64다. [Playwright의 원격 브라우저 연결](https://playwright.dev/docs/docker#remote-connection)과 동일 버전 계약을 따르며 브라우저 image ID/플랫폼을 증거에 따로 남긴다. Docker 로그 전달 명령의 종료 0과 gate container의 실제 종료 상태는 별도로 검증한다.
+
 ## Preview 설치와 rollback
 
 `install-release.mjs`는 승인된 source archive의 hash를 확인하고 새 root 소유 release 디렉터리에만 설치한다. `bootstrap-preview.mjs`는 해당 승인·AMD64·고정 loopback origins를 확인하고 새 `ssartnership-home-preview`의 비밀·볼륨·199개 이상 migration·Storage/RPC smoke·관측 서비스를 준비한다. 기존 env가 있으면 재초기화하지 않는다. 실패한 bootstrap을 무작정 다시 실행하지 말고 생성된 키·볼륨·성공 단계를 보존한 채 미완료 단계만 조사한다.
@@ -84,8 +94,12 @@ Production standalone 산출물은 한 번 빌드하고 `App.Dockerfile`로 그�
 
 독립 REST 백업 목적지가 결정되기 전의 장치 고장 대비 경로는 `pull-recovery.mjs <새 .tmp bundle 디렉터리> <별도 새 .tmp 키 디렉터리>`다. 기존 pinned VPN SSH wrapper로 읽기 반출하며 새 listener·포트 전달·SSH 개인키 복사를 하지 않는다. 운영 heavy/operations 잠금 안에서 최신 paired manifest와 암호화된 pgBackRest/Restic 저장소를 고정한다. 키 묶음은 Mac에서 생성한 RSA 4096 공개키에 RSA-OAEP-SHA256/AES-256-GCM으로 봉인한다. 서버에는 수신 공개키만 전달한다.
 
-수신 `.partial`은 SSH 성공·크기 확인 뒤에만 완성 tar로 바뀌고 SHA256 receipt를 남긴다. 실패 사본과 키는 조사용으로 보존한다. Mac 개인키는 0600의 별도 디렉터리에만 저장하지만 동일 디스크의 디렉터리 분리는 독립 키 보관이 아니다. FileVault/오프라인 키 보관·별도 장애 영역 백업은 따로 확인해야 한다. 이 사본과 `.tmp`를 비밀 없는 QA artifact처럼 공개하거나 Git에 추가하지 않는다.
+수신 `.partial`은 SSH 성공·크기 확인 뒤에만 완성 tar로 바뀌고 SHA256 receipt를 남긴다. 실패 사본과 키는 조사용으로 보존한다. Mac 개인키는 [Apple Keychain Services](https://developer.apple.com/documentation/security/adding-a-password-to-the-keychain)의 login Keychain에 저장한다. Swift Security helper에 stdin으로만 전달하고 읽기도 메모리 pipe로만 받는다. 인수·환경 변수·평문 PEM·로그에 개인키를 넣지 않으며 저장 후 공개키 fingerprint readback을 확인한다. 같은 item 덮어쓰기와 실제 복구 item 삭제는 helper가 허용하지 않는다. 자동 keychain unlock·공유 ACL·iCloud 동기화 설정을 추가하지 않으며, macOS 접근 승인이 필요하면 운영자가 직접 승인해야 한다.
 
-`rehearse-pulled-recovery.mjs <bundle 디렉터리> <Mac private PEM 경로> <승인 DB image의 sha256 ID>`는 전송 receipt/hash, 키 봉인, paired ID, image revision/AMD64를 확인한다. tar는 host 경로가 아닌 새 Docker volume에만 펼치고, 백업 암호 두 개만 새로운 격리 Compose 환경에 전달한다. 원본 앱 비밀·볼륨·경로·외부 연동을 재사용하지 않는다. Mac ARM64에서는 서버와 같은 AMD64 이미지를 사용해 물리 PostgreSQL 복구를 시험하며 이를 native ARM64 물리 복구 지원으로 해석하지 않는다. 네트워크 없는 PITR의 before/after marker와 복원 Storage hash가 모두 맞아야 `restored: true`를 기록한다.
+별도 키 디렉터리에는 `recipient-public.pem`과 공개 메타데이터 `recipient-keychain.json`만 보존한다. helper 실행 파일은 사용자 Library의 Application Support 아래 private 프로젝트 디렉터리에 source hash별로 보존한다. helper 변경 후에는 OS 접근 승인이 다시 필요할 수 있다. Keychain은 Mac 전체 분실/손상에 대한 독립 키 escrow가 아니다. FileVault·오프라인 키 escrow·별도 장애 영역 백업은 별도 게이트다. 이 사본과 `.tmp`를 비밀 없는 QA artifact처럼 공개하거나 Git에 추가하지 않으며 키 식별 메타데이터도 임의 정리하지 않는다.
+
+`rehearse-pulled-recovery.mjs <bundle 디렉터리> <recipient-keychain.json 경로> <승인 DB image의 sha256 ID>`는 전송 receipt/hash, Keychain recipient fingerprint, 키 봉인, paired ID, image revision/AMD64를 확인한다. private PEM 경로는 더 이상 받지 않는다. tar는 host 경로가 아닌 새 Docker volume에만 펼치고, 백업 암호 두 개만 새로운 격리 Compose 환경에 전달한다. 원본 앱 비밀·볼륨·경로·외부 연동을 재사용하지 않는다. Mac ARM64에서는 서버와 같은 AMD64 이미지를 사용해 물리 PostgreSQL 복구를 시험하며 이를 native ARM64 물리 복구 지원으로 해석하지 않는다. 네트워크 없는 PITR의 before/after marker와 복원 Storage hash가 모두 맞아야 `restored: true`를 기록한다.
 
 같은 집의 Mac 사본은 서버 디스크 고장에 대한 별도 장치 복구 증거일 뿐, 화재·도난·지역 회선/전원 장애에 대한 geographic DR 또는 정기 외부 백업 성공 증거가 아니다. 실제 외부 목적지와 운영자 알림 채널이 결정되기 전에는 그 전환 게이트를 닫지 않는다.
+
+Mac 반출 복원에서는 복호화한 pgBackRest/Restic 암호도 `runtimeKeysOnly`로 전달한다. 복원 설정 파일에는 비밀이 아닌 표시값만 남기며 실제 두 암호는 해당 복원 subprocess 환경에만 제공한다. 종료 시 새 drill의 DB container를 제거해 정지된 container 설정에 암호를 장기 보존하지 않는다. 복구된 volume과 검증 기록은 유지한다. 이는 정상 수명주기의 보관 최소화이며 실행 중 메모리·Docker 저장장치의 포렌식 삭제 또는 전체 디스크 암호화 보장은 아니다. 실제 회원 데이터 반입에는 별도 장치/데이터 보관 정책과 암호화 검증이 필요하다.

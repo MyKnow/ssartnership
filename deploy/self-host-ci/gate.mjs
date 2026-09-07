@@ -15,11 +15,15 @@ const steps = [
   ["npm", ["run", "build"], publicBuild],
   // Same config, projects, full suite and zero retries as test:e2e:ci. Use the
   // image-pinned bundled Chromium, not the host-only Chrome installation.
-  ["node", ["/opt/ssartnership/e2e.mjs"]],
+  ["node", [process.env.CI_EXECUTION_PROFILE === "mac-amd64" ? "/opt/ssartnership/e2e-desktop.mjs" : "/opt/ssartnership/e2e.mjs"]],
 ];
 for (const [command, args, extra = {}] of steps) {
   const result = spawnSync(command, args, { stdio: "inherit", env: { ...process.env, PLAYWRIGHT_CHROMIUM_CHANNEL: "chromium", ...extra } });
   if (result.error || result.status !== 0) process.exit(result.status || 1);
+  if (args.join(" ") === "run install:trusted" && process.env.CI_NATIVE_BROWSER === "1") {
+    mkdirSync("/work/.self-host-build", { recursive: true, mode: 0o700 });
+    writeFileSync("/work/.self-host-build/dependencies-ready", "ready\n", { flag: "wx", mode: 0o600 });
+  }
 }
 const totals = JSON.parse(readFileSync("/work/.self-host-build/e2e/complete.json", "utf8"));
 if (!(totals.tests > 0) || totals.failures !== 0 || totals.errors !== 0 || totals.skipped !== 0) process.exit(1);

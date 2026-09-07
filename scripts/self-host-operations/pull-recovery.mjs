@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { generateKeyPairSync, createHash } from "node:crypto";
+import { createHash } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { mkdir, realpath, writeFile, rename, statfs } from "node:fs/promises";
 import { spawn } from "node:child_process";
@@ -7,6 +7,7 @@ import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import path from "node:path";
 import os from "node:os";
+import { createKeychainRecipient } from "./keychain.mjs";
 
 const wrapper = path.join(os.homedir(), "coding", "myknow-server", "scripts", "ssh-codex-bootstrap.sh");
 // Exact existing pinned VPN SSH transport. No port forwarding, new server
@@ -22,8 +23,8 @@ export async function pullRecovery(destination, keyDirectory) {
   const disk = await statfs(temporary);
   if (disk.bavail * disk.bsize < 12 * 1024 ** 3) throw new Error("RECOVERY_DISK_HEADROOM_REQUIRED");
   await mkdir(target, { mode: 0o700 }); await mkdir(keys, { mode: 0o700 });
-  const pair = generateKeyPairSync("rsa", { modulusLength: 4096, publicKeyEncoding: { type: "spki", format: "pem" }, privateKeyEncoding: { type: "pkcs8", format: "pem" } });
-  await writeFile(path.join(keys, "recipient-private.pem"), pair.privateKey, { flag: "wx", mode: 0o600 });
+  const pair = await createKeychainRecipient();
+  await writeFile(path.join(keys, "recipient-keychain.json"), `${JSON.stringify(pair.reference)}\n`, { flag: "wx", mode: 0o600 });
   await writeFile(path.join(keys, "recipient-public.pem"), pair.publicKey, { flag: "wx", mode: 0o600 });
   const child = spawn("bash", [wrapper, remote], { stdio: ["pipe", "pipe", "pipe"] });
   child.stdin.end(pair.publicKey);

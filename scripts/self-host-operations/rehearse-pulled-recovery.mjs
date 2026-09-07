@@ -8,6 +8,7 @@ import { runOperatorCommand } from "../self-host-ci/deployment.mjs";
 import { createProcessRunner } from "./cli.mjs";
 import { OFFHOST_IMAGE, rehearseRecoveredBundle } from "./offhost.mjs";
 import { assertAbsentVolume, parseEnvText, parseManifestLines, selectBackupManifest } from "./lib.mjs";
+import { readKeychainRecipient } from "./keychain.mjs";
 
 export function validateRecoveryReceipt(receipt, size, hash) {
   if (receipt?.version !== 1 || receipt.transport !== "pinned-vpn-ssh-pull" || !Number.isSafeInteger(size)
@@ -32,13 +33,13 @@ export function recoveryExtractArguments(archive, volume) {
     "--mount", `type=bind,src=${archive},dst=/input.tar,readonly`, "--volume", `${volume}:/recovered`, "--entrypoint", "/bin/tar", OFFHOST_IMAGE,
     "--numeric-owner", "-xf", "/input.tar", "-C", "/recovered"];
 }
-export async function rehearsePulledRecovery(bundleDirectory, privateKeyFile, databaseImage) {
+export async function rehearsePulledRecovery(bundleDirectory, keyReferenceFile, databaseImage) {
   if (process.platform !== "darwin" || !/^sha256:[a-f0-9]{64}$/u.test(databaseImage ?? "")) throw new Error("RECOVERY_MAC_IMAGE_REQUIRED");
   const directory = path.resolve(bundleDirectory);
   const temporary = path.resolve(".tmp");
   if (!directory.startsWith(`${temporary}/`) || await realpath(directory) !== directory) throw new Error("RECOVERY_PATH_INVALID");
   const archive = path.join(directory, "recovery.tar");
-  const metadata = await lstat(archive); const keyMetadata = await lstat(privateKeyFile);
+  const metadata = await lstat(archive); const keyMetadata = await lstat(keyReferenceFile);
   if (!metadata.isFile() || metadata.isSymbolicLink() || !keyMetadata.isFile() || keyMetadata.isSymbolicLink()
     || (keyMetadata.mode & 0o077) !== 0 || keyMetadata.size > 16 * 1024) throw new Error("RECOVERY_FILES_INVALID");
   validateRecoveryReceipt(JSON.parse(await readFile(path.join(directory, "receipt.json"), "utf8")), metadata.size, await sha256File(archive));
@@ -55,14 +56,17 @@ export async function rehearsePulledRecovery(bundleDirectory, privateKeyFile, da
   await runOperatorCommand("docker", recoveryExtractArguments(archive, volume), { timeout: 1_800_000 });
   const readBundle = async (file) => (await runOperatorCommand("docker", ["run", "--rm", "--network", "none", "--read-only", "--cap-drop", "ALL", "--volume", `${volume}:/recovered:ro`, "--entrypoint", "/bin/cat", OFFHOST_IMAGE, `/recovered/bundle/${file}`])).stdout;
   const paired = selectBackupManifest(parseManifestLines(await readBundle("manifest.jsonl")));
-  const plaintext = openRecoveryPayload(await readFile(privateKeyFile, "utf8"), JSON.parse(await readBundle("keys.envelope.json")));
+  const privateKey = await readKeychainRecipient(JSON.parse(await readFile(keyReferenceFile, "utf8")));
+  let plaintext;
+  try { plaintext = openRecoveryPayload(privateKey, JSON.parse(await readBundle("keys.envelope.json"))); }
+  finally { privateKey.fill(0); }
   let material;
   try { material = JSON.parse(plaintext.toString("utf8")); } finally { plaintext.fill(0); }
   const image = JSON.parse((await runOperatorCommand("docker", ["image", "inspect", databaseImage])).stdout)[0];
   const operations = recoveryBackupKeys(material, image, paired.id);
   const stateDirectory = path.join(directory, `rehearsal-${randomUUID()}`);
   await mkdir(stateDirectory, { mode: 0o700 });
-  const result = await rehearseRecoveredBundle({ stateDirectory, operations }, run, volume, { databaseImage });
+  const result = await rehearseRecoveredBundle({ stateDirectory, operations }, run, volume, { databaseImage, runtimeKeysOnly: true });
   const receipt = { version: 1, completedAt: new Date().toISOString(), sourceSha: material.sha, sourcePlatform: material.platform,
     databaseImage, sourceBundleVolume: volume, separateDevice: true, geographicDisasterProof: false, restored: true, drill: result };
   await writeFile(path.join(stateDirectory, "receipt.json"), `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600, flag: "wx" });
