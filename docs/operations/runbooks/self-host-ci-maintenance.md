@@ -112,6 +112,14 @@ Mac engine은 사용자 소유 Docker Desktop Unix socket에 고정하고 환경
 
 ## 별도 장치 반출·복구
 
+### 원래 Cloud Preview의 암호화 이전 준비
+
+이전용 파일에는 기존 Production→Preview 정제를 적용하지 않는다. 원래 Preview의 완전 export·Storage byte 검증·새 DB 복원·쓰기를 정지한 최종 동등성 확인은 [데이터 기술 계획](../../specs/self-host-database/plan.md)을 따른다. 현재 `self-host-migration/transfer.mjs`는 전송 경계만 제공하며 Cloud export 또는 데이터 복원 도구의 완료를 뜻하지 않는다.
+
+전송에는 [표준 age](https://github.com/FiloSottile/age)의 native recipient를 사용한다. `install-age.mjs`는 Linux AMD64/ARM64의 1.3.2 공식 archive SHA256을 고정해 새 도구 directory에만 설치하고 기존 시스템 도구를 교체하지 않는다. Docker 시험에서는 실행 가능한 `/tools`와 실행 불가능한 데이터 tmpfs를 분리한다. 서버의 이전용 private identity는 새 root 0700 directory/0600 file에만 생성하고 GitHub에는 공개 recipient만 전달한다. SSH private key·DB 암호를 recipient로 재사용하지 않는다.
+
+받은 ciphertext와 receipt는 독립적으로 승인한 GitHub run/SHA/artifact에 연결하고 서버 private staging에서만 복호화한다. ciphertext hash·age 종료·평문 크기를 모두 확인한 뒤 새 최종 파일을 공개한다. 실패 시 해당 새 대상의 부분 평문만 제거하고 원본·암호화 사본·identity는 보존한다. `.partial` 제거는 포렌식 삭제나 디스크 암호화의 보장이 아니다. 실제 개인정보를 디스크 암호화가 미검증된 Mac에 복호화하지 않는다. 서버 key custody와 원본 재export 가능성을 확보하기 전에는 기존 Cloud Preview를 폐기하지 않는다.
+
 독립 REST 백업 목적지가 결정되기 전의 장치 고장 대비 경로는 `pull-recovery.mjs <새 .tmp bundle 디렉터리> <별도 새 .tmp 키 디렉터리>`다. 기존 pinned VPN SSH wrapper로 읽기 반출하며 새 listener·포트 전달·SSH 개인키 복사를 하지 않는다. 운영 heavy/operations 잠금 안에서 최신 paired manifest와 암호화된 pgBackRest/Restic 저장소를 고정한다. 키 묶음은 Mac에서 생성한 RSA 4096 공개키에 RSA-OAEP-SHA256/AES-256-GCM으로 봉인한다. 서버에는 수신 공개키만 전달한다.
 
 수신 `.partial`은 SSH 성공·크기 확인 뒤에만 완성 tar로 바뀌고 SHA256 receipt를 남긴다. 실패 사본과 키는 조사용으로 보존한다. Mac 개인키는 [Apple Keychain Services](https://developer.apple.com/documentation/security/adding-a-password-to-the-keychain)의 login Keychain에 저장한다. Swift Security helper에 stdin으로만 전달하고 읽기도 메모리 pipe로만 받는다. 인수·환경 변수·평문 PEM·로그에 개인키를 넣지 않으며 저장 후 공개키 fingerprint readback을 확인한다. 같은 item 덮어쓰기와 실제 복구 item 삭제는 helper가 허용하지 않는다. 자동 keychain unlock·공유 ACL·iCloud 동기화 설정을 추가하지 않으며, macOS 접근 승인이 필요하면 운영자가 직접 승인해야 한다.

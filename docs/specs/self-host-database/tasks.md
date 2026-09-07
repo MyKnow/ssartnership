@@ -11,6 +11,14 @@ authority: normative
 
 ## 2026-09-07 23시 전후 GitHub 이미지 게시 준비
 
+### Cloud Preview 암호화 전송 선행 검증
+
+`scripts/self-host-migration/transfer.mjs`는 원래 Preview project·source SHA·run ID에 묶인 암호화 전송 receipt를 검증한다. private regular file, 단일 link, 새 전용 directory, 2GiB 상한, 기존 대상 덮어쓰기 금지, ciphertext hash와 복호화 완료 후 크기 확인을 적용한다. 실제 암호화는 표준 age가 수행하며 자체 암호 알고리즘은 추가하지 않는다. age 성공 전에 부분 평문을 restore 입력으로 공개하지 않고 실패한 부분 평문만 제거한다. 공개 recipient를 아는 사람은 새 ciphertext를 만들 수 있으므로 암호화나 hash만으로 sender를 인증하지 않는다. 별도 GitHub run/SHA/artifact 검증이 필수다.
+
+로컬 age 1.3.1과 Docker Linux AMD64의 hash 고정 age 1.3.2에서 2MiB 합성 파일 왕복을 확인했다. 잘못된 키와 마지막 암호화 byte 변조를 모두 거부했다. 변조 시험은 outer hash를 의도적으로 재계산하므로 실제 age 인증 실패를 검사하며, 실패 대상에는 부분 평문이 없었다. Node 집중 테스트 5개와 semantic typecheck/lint, 변경 기반 Quick의 Node 1,824 통과/기존 skip 8 및 unit 133이 통과했다. 기본 런타임 Release는 직전 이미지 게시 커밋의 증거와 구분한다.
+
+첫 Docker 시험은 다운로드/해제 후 바이너리 실행 단계에서 실패했다. 진단에서 도구까지 넣은 임시 mount의 `noexec`를 확인했고, 수정한 시험은 `/tools`만 실행 가능하게 하고 데이터 영역의 `noexec`·read-only root·capability 제거·512MiB/1CPU 제한을 유지했다. 이전 실패를 삭제하거나 합성 시험을 원본 데이터 이전 성공으로 표시하지 않는다. 아직 Cloud DB/Storage export 및 서버 데이터 restore는 실행하지 않았다.
+
 두 환경 격리와 사본 준비를 `a6fecd5a`에 커밋했다. Issue #435에 GHCR 이미지 게시와 원래 Cloud Preview 전체 이전의 분리 계획을 기록했다. Production 데이터를 정제하는 `prepare-copy`는 원래 Cloud Preview의 완전 이전 도구가 아니므로 혼용하지 않는다.
 
 Cloud Preview의 13:42 UTC 읽기 전용 집계는 PostgreSQL 17.6, DB 104,418,451바이트, public table 101개, migration 199개, Storage bucket 7개/객체 823개/metadata 기준 39,851,100바이트, auth.users 0개였다. 파일 hash와 전체 schema/data 동등성은 아직 미검증이다. 개인정보를 Mac으로 평문 내려받지 않았다.

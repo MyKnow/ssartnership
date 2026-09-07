@@ -9,6 +9,12 @@ authority: normative
 
 ## 구성과 책임
 
+### 원래 Cloud Preview의 전체 이전
+
+Production→Preview 정제 복사와 별도로 원래 Cloud Preview 자체를 읽기 전용 export한다. 기존 GitHub Secrets의 Preview 연결 정보는 export 작업에서만 사용하고 운영자 채팅·명령 인수·Mac 평문 파일로 반출하지 않는다. 서버가 소유하는 별도 age 수신 키의 공개 recipient만 export 환경에 제공한다. 표준 age 도구로 전체 export를 암호화하고 hash/정확한 source SHA/실행 ID를 검증한 뒤 서버의 새 private staging에서만 복호화한다. 자체 암호 알고리즘을 만들지 않으며, age의 성공 종료와 전체 파일 hash 확인 전에는 부분 복호화 결과를 복원 입력으로 공개하지 않는다.
+
+원본 DB dump와 migration/schema/권한/자동 RLS 기능, 모든 Storage bucket·object의 metadata 및 실제 바이트 hash를 보존한다. 일부 bucket만 복사하거나 비밀번호를 정제하는 기존 sync 도구를 이 경로에 재사용하지 않는다. 새 대상에 복원하고 원본/대상 내용을 대조한 뒤에만 전환을 허용한다. DB snapshot과 Storage의 관측 구간을 기록하고 원본 쓰기 경합을 검사하며, 최종 쓰기 정지·증분 확인·DNS/TLS·실제 인증/업로드/읽기 및 실패 복귀 검증 전에는 원래 Preview의 대체 완료로 표시하지 않는다. 원본 cloud 프로젝트·실행 Preview·기존 백업과 복구 키는 이 export에서 변경하지 않는다.
+
 ### 상시 두 환경과 후보 기반 데이터 복사
 
 `scripts/self-host-environments/`는 기존 Compose·마이그레이션·짝 백업 복원 도구를 조합한다. 환경 설정은 새 private directory에만 생성하며 중복 초기화, symlink, 파일/descriptor drift, 공유 백업 볼륨, DB system identifier 불일치를 거부한다. 환경별 immutable 앱 이미지의 public build 설정을 각각 맞춘다. 로컬 브라우저 검증도 Production 역할은 `127.0.0.1`, Preview 역할은 `localhost`로 분리한다. 실제 서비스의 두 HTTPS 도메인·ingress는 별도 전환 단계다.
