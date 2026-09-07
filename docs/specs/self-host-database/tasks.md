@@ -79,6 +79,10 @@ Mac 후속 검증: 세 차례 AMD64 gate의 실패를 모두 보존했다. 준�
 
 서버의 13:51 KST 읽기 점검에서는 root 소유 승인 입력·controller·release 소스만 준비된 상태였다. 승인 source SHA256은 `326acb107fd221970f7b36dadd76655a4cd7558693b5b1446bad529a4c2c62e6`이며 public 기반 이미지 10개를 내려받았다. rootful 실행 container는 없고 Preview 비밀 디렉터리·maintenance current 링크·heavy lock은 아직 없다. 기존 CI 1.5 CPU/MemoryHigh 3GiB/MemoryMax 4GiB/swap 1GiB/Tasks 2048은 유지했다. 앱·DB·관측 stack·timer 설치, 서버 백업의 Keychain 수신자 반출과 Mac 복구는 미완료다. 승인된 접근 창은 14:00 KST까지이며 만료 정책을 바꾸지 않았다. 이후 서버 작업에는 유효한 새 접근 창이 필요하고, 네이티브/AMD64 전체 검증 해결 또는 검토된 검증 체계 변경 없이는 배포하지 않는다. 원본 worktree의 별도 인증 변경, 원격 branch, Vercel/Supabase/DNS는 그대로다.
 
+2026-09-07 14:00 KST 후속 읽기 진단: 실패 work의 `build-manifest.json`(617바이트), `prerender-manifest.json`(354바이트), `server/next-font-manifest.json`(77바이트)은 종료 후 모두 정상 JSON이었다. 이는 영구 손상을 입증하지 못하며 요청 시점의 빈 읽기와도 양립한다. 설치된 Next 16.2.11의 `load-manifest.external.js`는 디스크 읽기 직후 JSON.parse를 호출하고, webpack build manifest plugin은 manifest를 bundler asset으로 방출한다. 공식 [Issue #97594](https://github.com/vercel/next.js/issues/97594)는 같은 build/font manifest의 개발 중 빈 읽기와 두 오류 형식을 보고한다. 이 보고는 이전 자체 진단과 부합하는 upstream 근거지만 이번 실패 시점의 입력을 새로 계측한 증거는 아니다. 연결된 [PR #97593](https://github.com/vercel/next.js/pull/97593)은 조회 시 open이며 선택적인 client-reference manifest만 다루고 JSON 오류는 범위 밖이라고 명시한다. 따라서 이 부분 패치를 배포 가능한 해결책으로 간주하지 않는다. `prerender-manifest`의 read-modify-write 경합을 다루는 [Issue #96664](https://github.com/vercel/next.js/issues/96664)는 쓰기 경로가 다른 문제로 구분한다.
+
+런타임 E2E 재설계 후보는 아직 채택하지 않았다. 현재 `src/lib/e2e-mutation-mode.ts`는 Production에서 초기화/변경 flag를 무조건 무시하므로 단순히 `next dev`를 `next start`로 바꾸거나 `NODE_ENV`를 위장할 수 없다. 검토 시 전체 103개 테스트의 동등한 fixture·인증·초기화 경로, 배포 이미지에서 테스트 우회 기능의 부재, 실제 Supabase/Storage를 사용하는 immutable 배포 이미지 검증, 원래 assertion/deadline/retry 0·오류 거절 유지가 먼저 필요하다. 원본 실패 gate의 성공 판정을 바꾸지 않는다. 14:00 이후 승인된 서버 작업 창은 종료됐으며 후속 서버 명령은 실행하지 않았다. 실제 자동 계정 회수 성공은 별도 운영 검증 항목이다.
+
 - [ ] 운영 DB 크기·확장·권한·Storage 객체 수와 hash 목록 조사, 운영 데이터 반입 범위 확정.
 - [ ] 독립 장애 영역의 암호화 백업 저장소 연결, 보관·삭제 정책·잔여 용량 및 쓰기 실패 검증.
 - [ ] 서버 밖의 복구 키 보관과 새 장치에서 키를 가져오는 복구 실습.
