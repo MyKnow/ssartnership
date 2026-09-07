@@ -15,6 +15,8 @@ Production→Preview 정제 복사와 별도로 원래 Cloud Preview 자체를 �
 
 원본 DB dump와 migration/schema/권한/자동 RLS 기능, 모든 Storage bucket·object의 metadata 및 실제 바이트 hash를 보존한다. 일부 bucket만 복사하거나 비밀번호를 정제하는 기존 sync 도구를 이 경로에 재사용하지 않는다. 새 대상에 복원하고 원본/대상 내용을 대조한 뒤에만 전환을 허용한다. DB snapshot과 Storage의 관측 구간을 기록하고 원본 쓰기 경합을 검사하며, 최종 쓰기 정지·증분 확인·DNS/TLS·실제 인증/업로드/읽기 및 실패 복귀 검증 전에는 원래 Preview의 대체 완료로 표시하지 않는다. 원본 cloud 프로젝트·실행 Preview·기존 백업과 복구 키는 이 export에서 변경하지 않는다.
 
+Storage runtime은 원본 내부 migration 이력과 함께 검증한다. 초기 `v1.60.4`는 60번까지만 포함해 원본의 67번까지 적용된 schema와 맞지 않았다. [공식 v1.73.1](https://github.com/supabase/storage/releases/tag/v1.73.1)의 68개 migration 이름·hash가 원본과 전부 일치하여 이 이미지의 multi-platform digest를 Compose에 고정한다. `DB_ALLOW_MIGRATION_REFRESH=false`로 시작 시 이력 hash를 자동 수정하는 동작을 차단한다. 원본 데이터 생략·schema downgrade·가짜 migration 이력으로 호환성 검사를 통과시키지 않는다. 이후 버전 변경도 새 격리 DB/API/전체 파일 검증이 선행돼야 한다.
+
 ### 상시 두 환경과 후보 기반 데이터 복사
 
 `scripts/self-host-environments/`는 기존 Compose·마이그레이션·짝 백업 복원 도구를 조합한다. 환경 설정은 새 private directory에만 생성하며 중복 초기화, symlink, 파일/descriptor drift, 공유 백업 볼륨, DB system identifier 불일치를 거부한다. 환경별 immutable 앱 이미지의 public build 설정을 각각 맞춘다. 로컬 브라우저 검증도 Production 역할은 `127.0.0.1`, Preview 역할은 `localhost`로 분리한다. 실제 서비스의 두 HTTPS 도메인·ingress는 별도 전환 단계다.

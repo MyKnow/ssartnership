@@ -9,6 +9,36 @@ authority: normative
 
 상위 작업은 [Issue #435](https://github.com/MyKnow/ssartnership/issues/435)와 [마이그레이션 작업 목록](../self-hosting/tasks.md)이다. 코드 준비와 실제 실행 완료를 구분한다.
 
+## 2026-09-08 원본 Preview 수신과 격리 전체 복원
+
+- [x] `08c762d1` 원격 수집의 Storage 20분 만료 실패를 보존하고, 최대 4개 병렬 처리·취소·최종 만료 검사를 `e92ebcdb`에 커밋·푸시했다. 로컬 high/Quick은 Node 1,842 통과/기존 skip 8, unit 133 통과였다.
+- [x] 수정 SHA의 [원본 수집 첫 실행 34141078185](https://github.com/MyKnow/ssartnership/actions/runs/34141078185/attempts/1)이 성공했다. 전체 414줄 로그·모든 job/step·annotation 감사에서 오류·재시도 시그니처가 없고, 다운로드/재검증 모두 823/823이었다. 같은 SHA의 Vercel 배포도 READY, 실제 npm 11.17.0·trusted install·271개 build event의 오류/경고 시그니처 0을 확인했다. Vercel 성공은 홈 서버 전환 증거가 아니다.
+- [x] 암호화 artifact 1개의 GitHub SHA256, 정확한 repo/workflow/branch/SHA/run/첫 attempt와 내부 receipt·ciphertext hash를 독립 대조했다. Mac에는 암호문만 저장하고 pinned SSH로 홈 서버의 새 root 전용 staging에 전달했다. 서버 private age identity는 반출하지 않았다.
+- [x] 서버 복호화 후 DB dump 9,181,782바이트, Storage 7개 bucket·823개 object·39,851,100바이트를 전량 검증했다. 모든 archive entry를 허용된 경로·종류로 제한하고 각각의 hash/크기를 다시 대조했다. 원본 Cloud와 기존 합성 Preview는 변경하지 않았다.
+- [x] 원본 archive의 1,902개 TOC 항목과 role/membership을 조사하고, 별도의 PostgreSQL 17 컨테이너에 전체 DB를 복원했다. 원본과 같은 ICU locale/provider/version을 확인했고 컨테이너는 network none·비특권 UID·capability 제거·1GiB/1CPU 한도다.
+- [x] 복원 DB의 136개 전체 COPY 테이블, 124,998개 행을 열 목록과 정렬된 행 hash로 원본 dump와 대조했다. 두 sequence 상태도 일치했다. public table/RLS 101개, 함수 146개, 앱 trigger 53개, migration 199개, event trigger 7개, auth.users 0개를 확인했다. 회원 비밀번호를 포함한 원래 Preview 데이터를 정제하지 않았다.
+- [x] 새 Storage 디렉터리에 823개 파일을 전량 배치하고 고정 `storage-api:v1.60.4`의 실제 FileBackend로 다시 읽었다. 모든 byte hash·MIME·cache-control·ETag·수정 시각이 원본과 일치했고, Range 206과 If-None-Match 304도 확인했다. Linux 파일 확장 속성을 실제 기록·대조했으며 HTTP 서버나 인증/RLS 경로를 통과한 시험은 아니다.
+- [x] 별도 서비스 후보의 실제 PostgREST·Storage HTTP API, 원본 전체 파일·권한·업로드 검증.
+- [ ] 원본 데이터 서비스에 공개 origin 앱 연결, 회원·관리자·파트너 브라우저 인증과 실제 연동 검증.
+- [ ] 최종 원본 쓰기 정지와 변경분 대조, 공개 HTTPS/DNS 전환, 기존 Preview 교체 및 실패 복귀 검증.
+- [ ] `dev` 통합 검증, GitHub 이미지 게시와 서버 자동 수신·활성화의 실제 연결.
+
+첫 격리 복원은 일반 PostgreSQL이 비슈퍼유저 `postgres`로 event trigger 소유권을 바꾸는 것을 거부해 전체 transaction이 롤백됐다. 해당 빈 후보와 오류 증거는 보존했다. 새 후보에서는 network none/NOLOGIN 상태에서 복원 중에만 `postgres`를 임시 SUPERUSER로 두고, 성공·실패와 관계없이 즉시 NOSUPERUSER로 회수했다. 성공 후 NOLOGIN·NOSUPERUSER를 다시 확인했고 원본 trigger 소유권은 유지했다. 이 임시 권한을 서비스 설정이나 상시 관리자 권한으로 사용하지 않는다.
+
+격리 후보는 TCP를 닫고 `/tmp` Unix socket으로만 실행했으므로 이미지에서 상속한 localhost TCP healthcheck는 실패했다. 명시적인 socket `pg_isready`와 위의 실제 SQL/전량 대조는 성공했다. 서비스용 컨테이너에는 실제 연결 경로에 맞는 healthcheck가 필요하다. 검증을 끝낸 참조 후보와 실패한 빈 후보는 정상 중지하고 데이터·컨테이너·증거를 보존했다. 검증된 참조 사본을 그대로 공개 서비스로 간주하지 않는다.
+
+현재 원본 DB는 별도 서비스 후보에 있고, 기존 합성 Preview의 3100 HTTP 서비스와 공개 Vercel 경로는 유지된다. 전체 행 대조는 **해당 수집 snapshot과 복원 후보 사이**의 증거이며 이후 Cloud 변경분이나 실제 앱·공개 전환까지 입증하지 않는다. Git 제외 개인 작업 스크립트는 해당 run·SHA·새 서버 경로에 고정된 일회성 실행이며 범용 자동 복원 CLI의 완료로 표시하지 않는다.
+
+### 서비스 후보와 Storage 런타임 호환성
+
+원본 Cloud Storage migration은 0–67의 68개이고 기존 v1.60.4는 0–60만 포함한다. v1.73.1의 전체 68개 이름·SHA1이 원본과 정확히 일치하는 것을 실제 이미지에서 확인했다. Compose는 해당 multi-platform digest에 고정하고 `DB_ALLOW_MIGRATION_REFRESH=false`로 migration hash 자동 덮어쓰기를 거부한다. 참조 DB와 다른 system identifier의 새 DB를 전체 복원·전량 대조한 뒤 서비스용으로 실행했다. `authenticator`와 `supabase_storage_admin`만 별도의 새 로그인 암호를 사용하며, 원래 회원 암호·ACL·RLS·trigger·migration 이력은 보존했다.
+
+새 DB·PostgREST·Storage·Kong 네 서비스는 healthy이며 gateway만 서버 loopback 58180에 노출한다. DB는 외부 포트가 없고 두 서비스 role의 전용 internal subnet SCRAM 접속만 허용한다. HTTP API로 원본 823개 파일/39,851,100바이트의 SHA256·MIME·ETag를 전량 대조했다. service-role 회원 수 HEAD와 관리자 dashboard RPC, API key 누락 거절, 원본 ACL에 따른 anon 회원 조회 401/42501을 확인했다. 합성 public/private bucket·0바이트 업로드·공개/비공개 접근·signed download를 검사한 뒤 시험 객체와 bucket을 API로 정리했다. 이후 원본 7개 bucket과 전체 136개 테이블/124,998행·두 sequence의 dump 대조가 일치했다.
+
+기본 INFO 로그에 정상 객체 경로가 남는 것을 확인해 `LOG_LEVEL=warn`으로 새 Storage 컨테이너만 교체했다. 데이터와 이전 검증 기록은 보존했다. 교체 후 실제 전체 파일/API 시험은 다시 통과했고 로그의 INFO·ERROR·signed token·Authorization 노출은 0이었다. 두 번의 시험에서 누적된 WARN 4건의 URL은 전부 합성 비공개 파일 접근 거절 경로였으며 원본 객체 경로는 없었다. 처음 로그 검사에서 모든 URL 필드를 0으로 기대해 마지막 감사 단계만 실패한 기록을 보존하고, 정확한 합성 거절 경로만 분류했다. 서비스 경고 전체를 끄거나 원본 경로를 허용하지 않았다. WARN 이상에서 실제 오류 경로가 기록될 가능성까지 제거한 일반 개인정보 무로그 보장은 아니다.
+
+Mac ARM64의 새 실제 Docker 시험도 bucket 3개·파일 3개·45바이트, 두 번의 전체 파일 hash/세 번의 목록 대조·전체 age round-trip을 통과했다. 첫 로컬 Release는 기존 DB 테스트의 이전 이미지 기대값 한 건으로 실패했으며 보존했다. 정확한 새 digest로 수정 후 집중 테스트 18개와 전체 Release가 종료 0이었다: Node 1,843 통과/기존 skip 8, unit 133 통과, build, E2E 103 통과/retry 0(3.1분). 전체 2,398줄의 로그는 기존 합성 rollback 진단 4건·관리자 테스트 사이 Fast Refresh 2회·명시된 개발 전용 advisory 외 새 오류가 없었다. 이 증거는 GitHub 이미지 게시·실제 앱 인증·TLS/DNS 전환과 별도다.
+
 ## 2026-09-07 23시 전후 GitHub 이미지 게시 준비
 
 ### Cloud Preview 암호화 전송 선행 검증

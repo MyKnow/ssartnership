@@ -59,7 +59,7 @@ services:
       retries: 12
       start_period: 15s
   storage:
-    image: supabase/storage-api:v1.60.4@sha256:c8eb9858eafec891a97c27125470aaad54703c3f4eb4d55ca7f1bf6c6411febf
+    image: supabase/storage-api:v1.73.1@sha256:c24fb33cc2fa38d0f9582a30312907fc56da333fb9ba0646833186197e4982f3
     restart: unless-stopped
     depends_on:
       db: { condition: service_healthy }
@@ -79,6 +79,12 @@ services:
       TENANT_ID: stub
       REGION: local
       ENABLE_IMAGE_TRANSFORMATION: "false"
+      # Preserve the reviewed Cloud migration history; never silently rewrite
+      # a hash mismatch while starting an imported database.
+      DB_ALLOW_MIGRATION_REFRESH: "false"
+      # Routine request URLs contain private object names. Keep warnings and
+      # errors without retaining every successful Storage access path.
+      LOG_LEVEL: warn
     volumes:
       - storage-data:/var/lib/storage
     healthcheck:

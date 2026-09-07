@@ -120,7 +120,7 @@ test("compose pins data services and exposes only a loopback gateway", async () 
   assert.doesNotMatch(compose, /5432:/u);
   assert.match(compose, /supabase\/postgres:17\.6\.1\.136@sha256:f371b5/u);
   assert.match(compose, /postgrest\/postgrest:v14\.12@sha256:54000f/u);
-  assert.match(compose, /supabase\/storage-api:v1\.60\.4@sha256:c8eb985/u);
+  assert.match(compose, /supabase\/storage-api:v1\.73\.1@sha256:c24fb33cc2fa38d0f9582a30312907fc56da333fb9ba0646833186197e4982f3/u);
   assert.match(compose, /kong\/kong:3\.9\.3@sha256:9a2ae669/u);
   assert.match(compose, /db-data:\/var\/lib\/postgresql\/data/u);
   assert.match(compose, /storage-data:\/var\/lib\/storage/u);
