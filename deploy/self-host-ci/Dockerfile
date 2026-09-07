@@ -11,9 +11,11 @@ RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && git --version \
     && test "$(id -u pwuser)" = 1001
 COPY --chmod=0555 gate.mjs /opt/ssartnership/gate.mjs
-COPY playwright.config.mjs warmup.mjs batch-plan.mjs e2e.mjs /opt/ssartnership/
-COPY playwright.desktop.config.mjs e2e-desktop.mjs /opt/ssartnership/
-COPY browser-server.mjs /opt/ssartnership/
+# Source is extracted under umask 077. COPY must not inherit owner-only read
+# permissions for these public modules: the gate runs as the caller's nonroot UID.
+COPY --chmod=0444 playwright.config.mjs warmup.mjs batch-plan.mjs e2e.mjs /opt/ssartnership/
+COPY --chmod=0444 playwright.desktop.config.mjs e2e-desktop.mjs /opt/ssartnership/
+COPY --chmod=0444 browser-server.mjs /opt/ssartnership/
 ENV CI=1 NEXT_TELEMETRY_DISABLED=1 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright HOME=/tmp/ci-home
 USER 1001:1001
 WORKDIR /work

@@ -7,6 +7,25 @@ const sha = "a".repeat(40), hash = "b".repeat(64);
 const environment = { GITHUB_ACTIONS: "true", GITHUB_REPOSITORY: "MyKnow/ssartnership", GITHUB_EVENT_NAME: "push", GITHUB_REF: "refs/heads/dev", GITHUB_SHA: sha, GITHUB_RUN_ID: "123", GITHUB_RUN_ATTEMPT: "1", GITHUB_WORKFLOW_REF: "MyKnow/ssartnership/.github/workflows/self-host-preview.yml@refs/heads/dev" };
 const context = githubContext(environment);
 const bundle = () => ({ version: 1, ...context, platform: "linux/amd64", sourceHash: hash, gate: { tests: 103, failures: 0, errors: 0, skipped: 0, retries: 0, e2eRuntime: "production-test-only", fixtureBuildDeployable: false }, images: ["app", "telemetry", "database"].map(component => ({ component, tag: imageReference(component, sha), id: `sha256:${hash}`, archive: `${component}.tar`, hash })) });
+test("gate modules remain readable by arbitrary nonroot users after private source extraction", () => {
+  const dockerfile = readFileSync(new URL("../deploy/self-host-ci/Dockerfile", import.meta.url), "utf8");
+  const copies = dockerfile.split("\n").filter(line => line.startsWith("COPY ") && line.includes("/opt/ssartnership/"));
+  assert.equal(copies.length, 4);
+  for (const line of copies) assert.match(line, /^COPY --chmod=0(?:444|555) /);
+  assert.match(dockerfile, /USER 1001:1001/);
+  const release = readFileSync(new URL("../scripts/self-host-ci/github-release.mjs", import.meta.url), "utf8");
+  assert.match(release, /process\.umask\(0o077\)/);
+  assert.match(release, /"--read-only", "--cap-drop", "ALL"/);
+  assert.match(release, /"--user", `\$\{process\.getuid\(\)\}:\$\{process\.getgid\(\)\}`/);
+});
+test("telemetry image also normalizes public source read permissions for its nonroot runtime", () => {
+  const dockerfile = readFileSync(new URL("../deploy/observability/Dockerfile", import.meta.url), "utf8");
+  const copies = dockerfile.split("\n").filter(line => line.startsWith("COPY "));
+  assert.equal(copies.length, 2);
+  // COPY also creates nested destination directories with this mode.
+  for (const line of copies) assert.match(line, /^COPY --chmod=0555 /);
+  assert.match(dockerfile, /USER 1001:1001/);
+});
 test("GitHub release accepts only the exact dev push first attempt", () => {
   for (const [key, value] of Object.entries({ GITHUB_ACTIONS: "false", GITHUB_REPOSITORY: "attacker/ssartnership", GITHUB_EVENT_NAME: "pull_request_target", GITHUB_REF: "refs/heads/main", GITHUB_RUN_ID: "9999999999999999", GITHUB_RUN_ATTEMPT: "2", GITHUB_SHA: "dev", GITHUB_WORKFLOW_REF: "other" })) {
     assert.throws(() => githubContext({ ...environment, [key]: value }), /GITHUB_CONTEXT_INVALID/);
