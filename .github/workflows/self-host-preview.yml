@@ -1,0 +1,77 @@
+name: Self-host Preview Images
+
+on:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: self-host-preview-images
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Isolated AMD64 Release Gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.1
+      - name: Build without publishing credentials
+        run: node scripts/self-host-ci/github-release.mjs build .tmp/github-build
+      - name: Upload only validated image archives
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-images-${{ github.sha }}
+          path: .tmp/github-build/payload/*
+          if-no-files-found: error
+          retention-days: 2
+          compression-level: 0
+
+  publish:
+    name: Publish Verified Preview Images
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: preview-images-${{ github.sha }}
+          path: .tmp/preview-bundle
+          digest-mismatch: error
+      - name: Authenticate registry for publication only
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_USER: ${{ github.actor }}
+        run: printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io -u "$REGISTRY_USER" --password-stdin
+      - name: Verify archives and current dev before publication
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/self-host-ci/github-release.mjs publish .tmp/preview-bundle .tmp/published
+      - name: Publish immutable deployment manifest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ssartnership-preview-release
+          path: .tmp/published/release.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Remove registry session
+        if: ${{ always() }}
+        run: docker logout ghcr.io

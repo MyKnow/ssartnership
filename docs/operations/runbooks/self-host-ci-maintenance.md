@@ -27,7 +27,17 @@ flock --nonblock --conflict-exit-code 75 /var/lib/ssartnership-ci/heavy.lock
   /srv/ci/artifacts/ssartnership/<40자리 SHA>-<12자리 job ID>
 ```
 
-자동 GitHub runner 등록이나 공개 webhook을 설치하지 않는다. 초기 버전은 **승인된 입력을 받아 실행하는 수동 trigger pipeline**이며 변경 감지/polling이 활성화된 Continuous Delivery는 아니다. 향후 protected dev 이벤트 연결도 같은 승인·stale-ref·공유 잠금 경계를 통과해야 한다. Production 승격은 별도 수동 승인이다.
+자동 GitHub runner 등록이나 공개 webhook을 설치하지 않는다. 기존 서버 경로는 **승인된 입력을 받아 실행하는 수동 trigger pipeline**이며 변경 감지/polling이 활성화된 Continuous Delivery는 아니다. 아래 이미지 게시 경로도 서버 배포 연결 검증 전까지 자동 배포 완료로 해석하지 않는다. Production 승격은 별도 수동 승인이다.
+
+### GitHub 빌드와 GHCR 게시
+
+`.github/workflows/self-host-preview.yml`은 `dev` push의 첫 실행만 대상으로 한다. GitHub-hosted Linux AMD64 build job은 exact commit의 검증된 Git archive만 container에 전달한다. 읽기 전용 root·capability 제거·5GiB/2CPU 제한을 적용하고 운영 비밀, SSH, registry 로그인, Docker socket과 원본 checkout 인증 설정을 전달하지 않는다. 전체 Quick·실제 standalone build·별도 운영 모드 합성 E2E 103개 이상을 retry/skip/error 없이 통과하고 배포 산출물 fingerprint가 유지되어야 app·telemetry·DB 세 이미지를 포장한다. 기존 서버 rootless CI의 설정이나 제한은 바꾸지 않는다.
+
+게시 권한은 새 runner의 별도 job에만 있다. `github-release.mjs publish`는 archive의 크기·hash·경로·config/layer closure·플랫폼·revision을 검사해 승인 내용만 적재하고, 매 게시 직전과 최종 manifest 생성 전에 live `dev` SHA를 다시 확인한다. 의존성 설치나 이미지 실행은 하지 않는다. registry 자격증명은 게시 단계에서만 사용하고 마지막에 로그아웃한다. 이미지 묶음 artifact는 2일, digest manifest artifact는 30일 보존한다. fixture 이미지는 게시하지 않고 artifact digest 불일치는 오류로 처리한다. 부분 게시에는 최종 manifest가 없어 배포 승인으로 사용할 수 없다.
+
+공개 빌드 origin은 앱 `https://ssartnership-dev.myknow.xyz`, API `https://ssartnership-api-dev.myknow.xyz`로 고정한다. 이 설정은 DNS/TLS 전환 또는 데이터 이전 증거가 아니다. 실패 시 complete bundle을 만들지 않고 container 종료 상태와 가능한 gate 로그를 남긴다.
+
+서버 수용 계약 `github-contract.mjs`는 독립 조회한 GitHub run/jobs의 저장소·workflow 경로·현재 dev SHA·첫 실행·성공과 두 job의 필수 단계 및 전체 단계 성공을 요구한다. manifest 자체의 주장은 충분하지 않다. 실제 서버의 artifact 수신, registry 접근, source hash·migration 호환성 검증, 공유 lock, Preview 활성화와 rollback 연결은 미완료다. 연결 검증 전에는 polling timer를 활성화하지 않는다.
 
 ## 검증과 이미지 전달
 

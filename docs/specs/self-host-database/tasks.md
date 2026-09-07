@@ -9,6 +9,27 @@ authority: normative
 
 상위 작업은 [Issue #435](https://github.com/MyKnow/ssartnership/issues/435)와 [마이그레이션 작업 목록](../self-hosting/tasks.md)이다. 코드 준비와 실제 실행 완료를 구분한다.
 
+## 2026-09-07 23시 전후 GitHub 이미지 게시 준비
+
+두 환경 격리와 사본 준비를 `a6fecd5a`에 커밋했다. Issue #435에 GHCR 이미지 게시와 원래 Cloud Preview 전체 이전의 분리 계획을 기록했다. Production 데이터를 정제하는 `prepare-copy`는 원래 Cloud Preview의 완전 이전 도구가 아니므로 혼용하지 않는다.
+
+Cloud Preview의 13:42 UTC 읽기 전용 집계는 PostgreSQL 17.6, DB 104,418,451바이트, public table 101개, migration 199개, Storage bucket 7개/객체 823개/metadata 기준 39,851,100바이트, auth.users 0개였다. 파일 hash와 전체 schema/data 동등성은 아직 미검증이다. 개인정보를 Mac으로 평문 내려받지 않았다.
+
+22:56 KST에 pinned SSH와 비대화형 root 권한을 다시 확인했다. 접근 창은 다음 날 22:55 KST까지 활성이고 계정 수명주기는 직접 바꾸지 않았다. 합성 Preview/관측 11개 container는 실행 중, root filesystem은 약 78GiB 여유였다. 공개 Preview DNS는 여전히 Vercel이고 별도 API 레코드는 조회되지 않았다. 이 확인에서 서버 구성·데이터는 변경하지 않았다.
+
+- [x] 격리 GitHub AMD64 build와 별도 GHCR publication job, exact dev/첫 실행/세 이미지 archive 및 digest 검증 코드 작성.
+- [x] run-level success 외 필수 job/step 성공을 요구하는 서버 수용 계약과 집중 회귀 테스트 5개 통과.
+- [x] 새 코드의 로컬 전체 Release 검증.
+- [ ] exact GitHub SHA 첫 실행과 이미지 게시 검증.
+- [ ] 서버 manifest 수신·공유 잠금·이미지 교체·실패 복귀·polling 연결.
+- [ ] 원래 Cloud Preview 전체 DB/Storage 이전과 공개 HTTPS 전환·실제 브라우저/데이터 동등성 확인.
+
+단계별 경계는 [CI runbook](../../operations/runbooks/self-host-ci-maintenance.md)에 유지한다. 코드·집중 테스트는 GHCR 게시 또는 서버 자동 배포 증거가 아니다.
+
+로컬 전체 Release는 종료 0, Node 1,819 통과/기존 skip 8, unit 133, build, E2E 103/retry 0(2.6분)이었다. 전체 209,248바이트·2,373줄의 진단은 기존 합성 rollback 4건과 관리자 테스트 사이 Fast Refresh 2회다. 자체 호스팅 집중 테스트 118개와 workflow YAML 해석도 통과했다. 원래 worktree의 사용자 인증 변경은 보존했다.
+
+읽기 대조에서 양쪽 public table 101개·policy 0개·sequence 0개가 일치했다. Cloud Preview의 public 함수 146개 중 서버의 145개 함수 서명은 모두 일치하며, 차이는 `rls_auto_enable()` 하나다. Cloud의 활성 `ensure_rls` event trigger는 CREATE TABLE/CREATE TABLE AS/SELECT INTO 때 public RLS를 자동 활성화한다. 함수 본문/테이블/trigger/권한 전체 동등성은 이 개수·서명 비교만으로 입증되지 않으며, 해당 자동 RLS 운영 기능도 이전 검증에 포함한다.
+
 ## 로컬 선행 작업
 
 - [x] 최신 `dev` 기준 DB·Storage·Cloud 운영 기능 사용처 확인과 [계약](./spec.md) 작성.
