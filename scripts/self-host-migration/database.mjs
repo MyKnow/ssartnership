@@ -1,10 +1,11 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
-import { createWriteStream } from "node:fs";
+import { createWriteStream, readFileSync } from "node:fs";
 import { mkdir, lstat, realpath, writeFile, link, unlink } from "node:fs/promises";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash, X509Certificate } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { PREVIEW_PROJECT, STORAGE_INVENTORY_SQL, validateStorageInventory } from "./storage.mjs";
 import { SUPABASE_POSTGRES_DUMP_IMAGE } from "../supabase-sync-preview-dump-lib.mjs";
@@ -12,6 +13,12 @@ import { sha256File } from "../self-host-ci/lib.mjs";
 
 /** @returns {never} */
 const fail = code => { throw new Error(`MIGRATION_DATABASE_${code}`); };
+const CA_FILE = fileURLToPath(new URL("../../deploy/self-host-migration/supabase-root-2021.crt", import.meta.url));
+export function validateDatabaseCa(bytes, now = Date.now()) {
+  if (!Buffer.isBuffer(bytes) || createHash("sha256").update(bytes).digest("hex") !== "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7") fail("CA_INVALID");
+  const cert = new X509Certificate(bytes);
+  if (!cert.ca || now < Date.parse(cert.validFrom) || now >= Date.parse(cert.validTo)) fail("CA_INVALID");
+}
 const SNAPSHOT = /^[0-9A-F]{8}-[0-9A-F]{8}-[1-9][0-9]*$/u;
 const SNAPSHOT_SQL = `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
 SELECT jsonb_build_object('snapshot',pg_export_snapshot(),'readOnly',current_setting('transaction_read_only'),
@@ -30,13 +37,15 @@ export function previewConnection(databaseUrl) {
     const user = decodeURIComponent(url.username), password = decodeURIComponent(url.password);
     const direct = url.hostname === `db.${PREVIEW_PROJECT}.supabase.co` && user === "postgres";
     const pooler = /^aws-[0-9]+-[a-z]+(?:-[a-z]+)+-[0-9]+\.pooler\.supabase\.com$/u.test(url.hostname) && user === `postgres.${PREVIEW_PROJECT}`;
-    if (!["postgres:", "postgresql:"].includes(url.protocol) || !(direct || pooler) || (url.port && url.port !== "5432")
+    // A stored transaction-pooler URL can identify the same reviewed project;
+    // always select its session port for the exported-snapshot owner session.
+    if (!["postgres:", "postgresql:"].includes(url.protocol) || !(direct || pooler) || (url.port && url.port !== "5432" && !(pooler && url.port === "6543"))
       || url.pathname !== "/postgres" || url.hash || !password || /[\u0000-\u001f\u007f]/u.test(password)
       || [...url.searchParams.keys()].some(key => key !== "sslmode") || url.searchParams.getAll("sslmode").length > 1
       || (url.searchParams.has("sslmode") && !["require", "verify-ca", "verify-full"].includes(url.searchParams.get("sslmode")))) fail("CONNECTION_INVALID");
     return {
       PGHOST: url.hostname, PGPORT: "5432", PGUSER: user, PGPASSWORD: password, PGDATABASE: "postgres",
-      PGSSLMODE: "verify-full", PGSSLROOTCERT: "/etc/ssl/certs/ca-certificates.crt", PGCONNECT_TIMEOUT: "15",
+      PGSSLMODE: "verify-full", PGSSLROOTCERT: "/etc/ssartnership-migration-ca.crt", PGCONNECT_TIMEOUT: "15",
       PGAPPNAME: "ssartnership-preview-export",
       PGOPTIONS: "-c default_transaction_read_only=on -c statement_timeout=600000 -c idle_in_transaction_session_timeout=900000",
     };
@@ -50,7 +59,8 @@ export function databaseClientPlan(connection, tool, args, name) {
   const env = { PATH: process.env.PATH, ...Object.fromEntries(keys.map(key => [key, connection[key]])) };
   return { command: "docker", args: ["run", "--rm", "--init", "--name", name, "--interactive", "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
     "--user", "65534:65534", "--pids-limit", "64", "--memory", "512m", "--cpus", "1", "--network", "bridge",
-    "--tmpfs", "/tmp:mode=1777,size=64m", ...keys.flatMap(key => ["--env", key]), "--entrypoint", tool, SUPABASE_POSTGRES_DUMP_IMAGE, ...args],
+    "--tmpfs", "/tmp:mode=1777,size=64m", "--mount", `type=bind,src=${CA_FILE},dst=/etc/ssartnership-migration-ca.crt,readonly`,
+    ...keys.flatMap(key => ["--env", key]), "--entrypoint", tool, SUPABASE_POSTGRES_DUMP_IMAGE, ...args],
   env };
 }
 export function validateSnapshot(value) {
@@ -119,6 +129,7 @@ async function dump(plan, file) {
 }
 export function cloudDatabaseClient(databaseUrl) {
   if (process.platform !== "linux") fail("LINUX_EXPORT_HOST_REQUIRED");
+  validateDatabaseCa(readFileSync(CA_FILE));
   const connection = previewConnection(databaseUrl);
   return (tool, args) => databaseClientPlan(connection, tool, args, `ssartnership-migration-${randomUUID()}`);
 }
