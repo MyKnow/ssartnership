@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile, writeFile, rename } from "node:fs/promises";
+import { readFile, writeFile, rename, realpath } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
@@ -48,7 +48,7 @@ export async function maintain(command) {
   const result = JSON.parse(response.stdout.trim());
   return { command, completed: true, healthy: result.healthy ?? null };
 }
-if (process.argv[1] && import.meta.url === new URL(process.argv[1], "file:").href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(await realpath(process.argv[1])).href) {
   try { console.log(JSON.stringify(await maintain(process.argv[2]))); }
   catch { console.error('{"error":"MAINTENANCE_FAILED"}'); process.exitCode = 1; }
 }

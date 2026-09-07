@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, realpath } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { pathToFileURL } from "node:url";
@@ -49,7 +49,7 @@ async function exportRecovery() {
     await lib.appendManifest(lib.defaultManifestPath(context.operationsEnvFile), { version: 1, kind: "offhost-export", id, result: "success", startedAt, finishedAt: new Date().toISOString(), pairedId: paired.id, recipient: sealed.recipient });
   } finally { await release(); }
 }
-if (process.argv[1] && import.meta.url === new URL(process.argv[1], "file:").href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(await realpath(process.argv[1])).href) {
   try { await exportRecovery(); }
   catch { process.stderr.write('{"error":"RECOVERY_EXPORT_FAILED"}\n'); process.exitCode = 1; }
 }

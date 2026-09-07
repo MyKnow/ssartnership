@@ -109,7 +109,20 @@ Mac 후속 검증: 세 차례 AMD64 gate의 실패를 모두 보존했다. 준�
 
 후속 수정은 추가 fixture의 static worker만 2개로 제한하고 runner가 terminal 정리 전에 exit/OOM 상태를 보존하도록 한다. 두 회귀 테스트는 수정 전 실패했다. 실제/native 빌드 설정·컨테이너/heap 한도·테스트 제한은 그대로다. 새 호스트 fixture 빌드에서 실제 worker 2개를 확인했고, 운영 E2E 103/retry 0(41.8초)·exact ID·전체 로그 16,885바이트의 오류 신호 0을 확인했다. 이어 순차 실행한 기본 Release도 Node 1,799/기존 skip 8·unit 133·build·E2E 103/retry 0(4.4분)으로 통과했다. 207,315바이트·2,354줄에는 기존 관리자 전환 Fast Refresh 2회만 남았다. 집중 자체 호스팅 98/98, 문서 93개, 타입·lint·canonical lockfile도 통과했다. 새 SHA AMD64 gate는 여전히 별도 필수다. 원격 `dev`는 다시 조회한 `2074e22d`, 서버 SSH/sudo·22:00 KST 만료 창은 정상이고 rootful 실행 서비스와 Preview 초기화는 아직 없다.
 
+### 첫 서버 Preview와 보안 중단 지점
+
+2026-09-07 17시대 KST: `5b807483`의 새 Mac Docker AMD64 gate가 정상 종료했다(exit 0, OOM false). Node 1,799/기존 skip 8, unit 133, 실제 standalone 및 별도 fixture 빌드, E2E 103/retry 0(1.1분), 배포 fingerprint 불변과 3개 archive hash를 확인했다. 전체 247,032바이트·3,089줄을 감사했고 패키징 경고와 의도된 negative unit 진단은 실패 이력에 별도 기록했다. source hash는 `66a7b605917a384b177915097c21b1ddbdb0e3d051e218893c1e8887d327efb5`다. 이는 Mac에서 검증한 AMD64 산출물이며 native 서버 CI 성공은 아니다.
+
+서버의 root 소유 source/controller/release 설치와 importer의 세 archive 검증을 통과한 뒤 새 synthetic Preview를 배포했다. 실제 PostgreSQL 17.6/마이그레이션 199개, RPC/RLS/Storage smoke, 서비스 11개, home/login/health 200, 테스트 reset 404와 test header 부재를 확인했다. 공개된 포트는 모두 서버 loopback이다. Prometheus target 5개 UP, alert rule 12개, Grafana 익명 접근 401/인증 dashboard 10개 panel, Web Vitals enable도 확인했다. 외부 알림 발송 성공은 아니며 Alertmanager 전달 오류 등 관측 초기화 진단은 후속 점검 대상이다.
+
+설치한 여섯 유지보수 타이머는 `current` 링크를 통한 Node 진입점 비교 문제로 실제 명령 없이 exit 0을 반환했다. 모두 중지·비활성화했다. 직접 physical controller 경로에서 실행한 첫 전체 DB/Storage 백업은 실제 성공했다. 유지보수/export 두 진입점 수정의 회귀는 수정 전 2개 실패, 이후 Mac/Linux AMD64에서 각각 2/2를 통과했다. 최종 로컬 Release도 Node 1,801/기존 skip 8, unit 133, build, E2E 103/retry 0(3.5분)으로 통과했다. 전체 207,583바이트·2,356줄에는 기존 between-admin Fast Refresh 2회만 있다. 이 controller 수정은 아직 서버에 적용하지 않았다.
+
+추가 보안 감사에서 초기 DDL 로깅이 새 DB 비밀번호를 3회 기록한 것을 값 출력 없이 확인했다. 현재 세션의 log_statement=none만으로 초기화 안전성을 증명할 수 없다. 앱은 계속 내부 합성 Preview이며 운영 데이터·공개 ingress·클라우드·접근 계정 수명은 변경하지 않았다. 로그 내용 보호와 관련 자격증명 교체의 검토/승인 전에는 타이머 재개와 복구 키 반출을 보류한다. 백업의 실제 PITR/Storage 복원, Keychain 반출과 Mac 복구는 아직 미실행이다.
+
+- [ ] 초기화 SQL/비밀번호 로그 경계 수정, 기존 합성 Preview DB 자격증명 교체, 신규 백업과 로그 재감사.
+- [ ] 검증한 maintenance/export 진입점 controller 적용과 실제 receipt/metric 확인 후 여섯 타이머 재개.
 - [ ] 운영 DB 크기·확장·권한·Storage 객체 수와 hash 목록 조사, 운영 데이터 반입 범위 확정.
+- [ ] 운영 전 DB 이미지 최소화: Alpine pgBackRest의 부가 PostgreSQL 18 패키지 제거 방안과 SBOM/취약점 검증. 현재 실행 서버·pg_dump는 원래 Nix PostgreSQL 17.6이며 패키징 경고를 별도 기록했다.
 - [ ] 독립 장애 영역의 암호화 백업 저장소 연결, 보관·삭제 정책·잔여 용량 및 쓰기 실패 검증.
 - [ ] 서버 밖의 복구 키 보관과 새 장치에서 키를 가져오는 복구 실습.
 - [ ] scheduler 설치, 백업 실패/나이/WAL 지연·디스크/서비스 장애 알림의 외부 수신 확인.

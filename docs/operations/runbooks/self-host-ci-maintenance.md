@@ -82,6 +82,8 @@ Mac engine은 사용자 소유 Docker Desktop Unix socket에 고정하고 환경
 
 ## 유지보수
 
+`current`는 versioned controller의 링크이므로 maintenance/export 진입점은 argv를 realpath로 해석한다. controller-only 수정은 앱/DB 이미지 release와 구분하여 새 root 소유 version에 설치하고 이전 링크 대상을 보존한 뒤 원자적으로 교체한다. timer active/exit 0뿐 아니라 JSON receipt, metric 갱신, manifest의 실제 성공 기록을 확인한다. 아무 출력 없이 성공하면 무실행 결함으로 판단하여 해당 타이머를 중지하고 직접/링크 실행 경로부터 검사한다. 데이터·키·이미지는 재초기화하지 않는다.
+
 `maintenance.mjs`의 고정 명령은 전체/증분 백업, 저장소 검사, 새 볼륨 격리 복구, 운영 metric 수집, 읽기 전용 DB 점검, 상태 및 외부 사본 capture/check다. DB 점검은 5초 SQL 제한 아래 DB 크기·최장 transaction·live/dead tuples·deadlock·autovacuum 활성만 집계한다. table/회원/SQL 본문을 metric label에 기록하지 않으며, dead tuple 수를 실제 bloat 측정으로 부르지 않는다. 기존 백업 작업은 pgBackRest 전체 백업 2개 보존 정책과 만료된 DB 체인에만 연결된 Storage snapshot 정리를 수행한다. 그 밖의 임의 retention 삭제·VACUUM FULL·REINDEX·키 교체는 자동 실행하지 않는다.
 
 `install-maintenance.mjs`는 새 Preview에만 여섯 timer를 설치한다: 매분 metric, 15분 DB 점검, KST 일요일 03시 전체/나머지 요일 03시 증분, 일요일 05시 저장소 검사, 매월 첫 토요일 06시 격리 복구. 무거운 명령은 CI와 같은 heavy lock을 사용하고 충돌은 75로 실패한다. 지표 수집은 가벼운 읽기이므로 빌드 중에도 동작한다. 외부 수신처가 없는 offhost timer와 제품 Cron은 활성화하지 않는다. 생성된 timer가 active인 것과 예정 시각의 실제 성공은 별도 증거다.

@@ -86,3 +86,7 @@ Node 집중 테스트는 파싱·권한·명령 조합·drift·복구 대상 방
 업그레이드는 image digest 변경→격리 환경 초기화/복원→회귀 검증→백업→단일 운영 적용 순서다. 앱 rollback은 이전 이미지로 가능하지만 PostgreSQL major downgrade와 적용된 schema의 자동 역변환은 금지한다. 호환되지 않는 변경의 되돌리기는 검증한 백업을 새 환경에 복원하여 전환한다.
 
 [명세](./spec.md)와 [작업 목록](./tasks.md)에 완료 증거와 미완료 게이트를 기록한다.
+
+### 유지보수 진입점의 링크 경로 검증
+
+서버의 versioned controller를 `current` 링크로 실행하는 실제 경로도 검증한다. Node의 물리 module URL과 argv 링크를 비교하여 명령이 생략되는 문제는 maintenance/export 두 진입점에서 argv를 realpath로 해석하여 고친다. root/승인/잠금/비밀 처리 경계는 그대로 유지한다. 직접·링크 subprocess를 모두 실행하되 테스트에서는 UID를 비특권으로 고정하여 실제 운영 상태에 접근하지 않는다. 로컬 전체 gate와 Linux 회귀 뒤 controller만 새 version으로 교체하며, 이미 검증된 앱·DB·telemetry 이미지와 데이터 release는 `5b807483`에 유지한다. 실행 receipt·metric 파일·실제 백업과 복구를 확인한 뒤 중지한 여섯 타이머를 재개한다. 타이머 active/프로세스 exit 0만으로 수용하지 않는다.
