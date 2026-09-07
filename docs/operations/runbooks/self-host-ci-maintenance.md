@@ -64,6 +64,8 @@ Mac 검증 container는 AMD64, 6 CPU·5GiB memory/swap 상한, 읽기 전용 roo
 
 성공 증거의 `execution=mac-docker-desktop-amd64`, `nativeServerCi=false`, `e2eRuntime=production-test-only`, `fixtureBuildDeployable=false`와 deployable fingerprint를 보존한다. Mac 도구/게이트 제어 코드의 검토 상태와 앱 source SHA를 별도로 기록한다. 이 경로의 성공은 서버의 1.5 CPU/3GiB slice 안에서 native CI가 통과했다는 뜻이 아니다. 로컬 기본 Release와 fixture QA는 `.next-e2e` 부모를 공유하므로 순차 실행하며, 사용 중인 출력 디렉터리를 이동/정리하지 않는다.
 
+추가 fixture 빌드의 static worker는 고정 버전 Next의 `experimental.cpus=2`로 제한한다. Docker VM의 14-worker 기본값과 빌드 heap이 합쳐져 기존 5GiB cgroup에서 OOM이 발생했기 때문이다. 실제 standalone/native 빌드 설정·메모리 한도는 바꾸지 않는다. runner의 `gate-termination.json`은 컨테이너 제거 전에 running/exitCode/oomKilled만 기록한다. 이 파일은 진단 자료이고 전체 성공 receipt를 대신하지 않는다.
+
 운영자는 성공한 세 image archive와 result/게이트 증거만 기존 고정 SSH로 전달하고 원격 hash를 확인한다. 원격 입력은 root 소유, 전달 artifact는 importer가 요구하는 전용 builder 소유의 새 job 디렉터리에 둔다. 전달 receipt에는 실제 Mac 실행 출처를 기록하며 소유권만으로 서버에서 빌드되었다고 주장하지 않는다. 기존 privileged importer의 archive/config/layer/플랫폼/revision 검사는 그대로 거친다. 이 경로는 별도 synthetic Preview 배포용이며 Production 승격이나 공개 ingress를 승인하지 않는다.
 
 Mac engine은 사용자 소유 Docker Desktop Unix socket에 고정하고 환경 변수의 다른 Docker host/context를 받지 않는다. 브라우저는 동일 버전 Playwright의 ARM64 sidecar로 분리한다. AMD64 gate와 정확히 같은 비공개 network namespace를 사용하고 host port는 공개하지 않는다. trusted install 완료 신호 뒤에만 같은 의존성의 브라우저 server를 실행하며 런타임 추가 설치는 없다. 앱·테스트 runner·배포 이미지는 AMD64이고 실제 브라우저만 ARM64다. [Playwright의 원격 브라우저 연결](https://playwright.dev/docs/docker#remote-connection)과 동일 버전 계약을 따르며 브라우저 image ID/플랫폼을 증거에 따로 남긴다. Docker 로그 전달 명령의 종료 0과 gate container의 실제 종료 상태는 별도로 검증한다.

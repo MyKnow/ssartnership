@@ -62,6 +62,8 @@ Preview는 운영 데이터가 없는 독립 환경부터 제공한다. 데이�
 
 삭제 후 전체 suite는 캐러셀 배치 시나리오의 합성 데이터 부재로 실패했다. 만료된 이벤트나 폐기된 기본 배너를 재활성화하지 않고, 명시적인 mock E2E에만 기존 배포 이미지 자산을 쓰는 합성 slide를 제공한다. 기본 Production 정책·실제 provider·E2E 비활성 환경에서는 빈 배열을 반환한다. 기존 103개 ID와 캐러셀의 세 viewport assertion은 유지한다.
 
+첫 새 AMD64 gate는 별도 fixture 빌드의 페이지 수집 단계에서 14개 worker와 함께 5GiB cgroup OOM으로 종료됐다. 설치된 Next 16.2.11의 `getNumberOfWorkers`에서 명시적 `experimental.cpus`가 worker 수를 결정하는 것을 확인했다. 추가 fixture 빌드에만 2개를 명시하고 실제/native 빌드·heap·컨테이너·테스트 한도는 유지한다. 이는 [Next 빌드 메모리 운영](https://nextjs.org/docs/app/guides/memory-usage)의 병렬 실행/메모리 경계를 반영하는 제한이며 전체 빌드 성공은 새 SHA로 다시 검증한다. Mac runner는 terminal container 정리 전에 구조화된 exit/OOM 상태를 남긴다.
+
 ### 개발 manifest 경합의 제한된 수정 검증
 
 2026-09-07 재개 시 서버의 실제 접근 창은 22:00 KST까지로 확인했다. Issue #435 범위에서 먼저 기존 103개 개발 E2E와 Production 인증 경계를 그대로 유지하는 수정안을 검증한다. [webpack의 outputFileSystem 확장점](https://webpack.js.org/api/node/#custom-file-systems)을 사용해 명시적으로 활성화한 자체 호스팅 CI의 개발 빌드 manifest만 같은 디렉터리의 임시 파일에 완성한 뒤 rename한다. 읽기/JSON.parse·manifest 내용·node_modules는 변경하지 않고, 쓰기/rename 실패는 원래 compiler callback에 전달한다. 비-manifest 출력과 Production 빌드는 그대로 둔다. 동일 경로의 쓰기는 순서대로 처리하며 부분 실패가 다음 작업의 큐를 영구 차단하지 않게 한다.

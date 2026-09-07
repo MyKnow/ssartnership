@@ -82,6 +82,8 @@ const nextConfig: NextConfig = {
   },
   reactCompiler: true,
   experimental: {
+    // Bound the additional test build inside the unchanged 5 GiB Mac gate.
+    ...(fixtureBuild ? { cpus: 2 } : {}),
     optimizePackageImports: [
       "@heroicons/react",
       "lucide-react",

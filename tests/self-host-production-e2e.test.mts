@@ -34,6 +34,15 @@ test("normal production policy cannot enable fixture bypasses with runtime flags
   assert.equal(allowsLocalFixtures({ NODE_ENV: "test" }), true);
 });
 
+test("only the explicit fixture build bounds static worker concurrency", () => {
+  for (const enabled of [false, true]) {
+    const code = "const {default:config}=await import('./next.config.ts'); console.log(JSON.stringify({workers:config.experimental.cpus??null}));";
+    const env = { ...process.env, SELF_HOST_E2E_BUILD: "0", ...(enabled ? fixtureEnvironment : {}), NODE_ENV: "production" as const };
+    const result = JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", code], { cwd: new URL("..", import.meta.url), env, encoding: "utf8" }));
+    assert.equal(result.workers, enabled ? 2 : null);
+  }
+});
+
 test("production fixture build requires explicit CI, isolated output and only mock providers", () => {
   assert.equal(fixtureBuildProfile({}), false);
   assert.equal(fixtureBuildProfile(fixtureEnvironment), true);

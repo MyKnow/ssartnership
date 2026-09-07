@@ -105,6 +105,10 @@ Mac 후속 검증: 세 차례 AMD64 gate의 실패를 모두 보존했다. 준�
 
 운영자 순서 오류도 보존했다. 진단 Release 실행 중 출력 디렉터리를 이동하여 manifest 오류를 유발한 실행은 중단했고, 전체 E2E 종료 전 시작한 화면 검증도 EADDRINUSE/연결 거부로 실패했다. 두 실행은 수용 증거에서 제외했다. 이후 프로세스 종료와 포트 선점 확인을 거친 독립 화면 검증은 통과했다. 최종 기본 Release도 모든 fixture/화면 프로세스 종료 뒤 순차 실행하여 Node 1,797 통과/기존 skip 8, unit 133, Production build, E2E 103/retry 0(3.4분)으로 완료했다. 전체 207,156바이트·2,352줄 감사에는 기존 관리자 테스트 전환의 Fast Refresh 2회만 있고 다른 오류 신호는 없다. 자체 호스팅 집중 96/96, 문서 93개, canonical lockfile 검사도 통과했다. 앞선 103개 성공이나 운영 fixture 빌드만으로 AMD64 image·서버 배포를 승인하지 않는다. 새 commit의 전체 AMD64 gate·실제 Preview 배포·서버 백업 반출/복구는 아직 남아 있다.
 
+구현은 `4e61ce3f`로 로컬 커밋했다. 해당 SHA의 새 AMD64 gate도 trusted install, Node 1,797/기존 skip 8·unit 133의 Quick, 실제 standalone 빌드까지 통과했으나 추가 fixture 빌드의 페이지 수집에서 종료됐다. Docker Desktop 커널의 16:41 KST 로그는 정확한 gate cgroup의 5GiB 메모리 초과와 빌드 프로세스 OOM 종료를 명시한다. 당시 worker 14개와 종료된 프로세스 약 3.21GiB anonymous RSS를 확인했다. E2E·성공 receipt·세 image archive는 없으며 서버 배포를 하지 않았다. 원래 runner가 terminal container 상태를 별도 저장하지 않았으므로 과거 exit code는 추정하지 않는다. 실패 archive·로그·최소 커널 진단을 보존했다.
+
+후속 수정은 추가 fixture의 static worker만 2개로 제한하고 runner가 terminal 정리 전에 exit/OOM 상태를 보존하도록 한다. 두 회귀 테스트는 수정 전 실패했다. 실제/native 빌드 설정·컨테이너/heap 한도·테스트 제한은 그대로다. 새 호스트 fixture 빌드에서 실제 worker 2개를 확인했고, 운영 E2E 103/retry 0(41.8초)·exact ID·전체 로그 16,885바이트의 오류 신호 0을 확인했다. 이어 순차 실행한 기본 Release도 Node 1,799/기존 skip 8·unit 133·build·E2E 103/retry 0(4.4분)으로 통과했다. 207,315바이트·2,354줄에는 기존 관리자 전환 Fast Refresh 2회만 남았다. 집중 자체 호스팅 98/98, 문서 93개, 타입·lint·canonical lockfile도 통과했다. 새 SHA AMD64 gate는 여전히 별도 필수다. 원격 `dev`는 다시 조회한 `2074e22d`, 서버 SSH/sudo·22:00 KST 만료 창은 정상이고 rootful 실행 서비스와 Preview 초기화는 아직 없다.
+
 - [ ] 운영 DB 크기·확장·권한·Storage 객체 수와 hash 목록 조사, 운영 데이터 반입 범위 확정.
 - [ ] 독립 장애 영역의 암호화 백업 저장소 연결, 보관·삭제 정책·잔여 용량 및 쓰기 실패 검증.
 - [ ] 서버 밖의 복구 키 보관과 새 장치에서 키를 가져오는 복구 실습.

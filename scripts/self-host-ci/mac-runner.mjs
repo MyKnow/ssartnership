@@ -12,6 +12,10 @@ export function assertMacDesktop(platform, info, request) {
   if (platform !== "darwin" || info.OperatingSystem !== "Docker Desktop" || info.OSType !== "linux"
     || request.platform !== "linux/amd64" || info.MemTotal < 7 * 1024 ** 3) throw new Error("CI_MAC_DESKTOP_REQUIRED");
 }
+export function gateTerminationEvidence(state) {
+  if (typeof state?.Running !== "boolean" || typeof state.OOMKilled !== "boolean" || !Number.isInteger(state.ExitCode) || state.ExitCode < 0) throw new Error("CI_MAC_GATE_STATE_INVALID");
+  return { version: 1, running: state.Running, exitCode: state.ExitCode, oomKilled: state.OOMKilled };
+}
 // Explicit operator alternative, not the server's rootless/native CI identity.
 // Containers receive only public archived source, never a Docker socket,
 // credentials, SSH material, host environment, or production volume.
@@ -72,6 +76,7 @@ export async function executeMac(requestFile, sourceFile, output) {
     await run(["run", "-d", "--platform", "linux/arm64", "--name", browserContainer, "--init", "--user", "0:0", "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--pids-limit", "512", "--memory", "768m", "--memory-swap", "768m", "--cpus", "2", "--tmpfs", "/tmp:mode=1777,size=256m", "--shm-size", "256m", "--network", `container:${container}`, "--mount", `type=bind,src=${work},dst=/work,readonly`, "--entrypoint", "node", browserImage.Id, "/opt/ssartnership/browser-server.mjs"]);
     await run(["logs", "--follow", container]);
     const gateState = JSON.parse(inspect(["inspect", "--format", "{{json .State}}", container]));
+    await writeFile(path.join(output, "gate-termination.json"), `${JSON.stringify(gateTerminationEvidence(gateState))}\n`, { flag: "wx", mode: 0o600 });
     if (gateState.Running || gateState.ExitCode !== 0 || gateState.OOMKilled) throw new Error("CI_MAC_GATE_FAILED");
     validateRequest(request);
     const gateEvidence = JSON.parse(await readFile(path.join(work, ".self-host-build/gate.json"), "utf8"));

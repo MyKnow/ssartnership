@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { assertMacDesktop } from "../scripts/self-host-ci/mac-runner.mjs";
+import { assertMacDesktop, gateTerminationEvidence } from "../scripts/self-host-ci/mac-runner.mjs";
+
+test("Mac gate termination evidence retains failure and OOM without arbitrary Docker fields", () => {
+  assert.deepEqual(gateTerminationEvidence({ Running: false, ExitCode: 137, OOMKilled: true, Error: "do-not-copy" }), {
+    version: 1, running: false, exitCode: 137, oomKilled: true,
+  });
+  for (const state of [{}, { Running: false, ExitCode: null, OOMKilled: false }]) assert.throws(() => gateTerminationEvidence(state));
+});
 import { keychainOperation, validateKeyReference } from "../scripts/self-host-operations/keychain.mjs";
 import { recoveryKeyMode } from "../scripts/self-host-operations/offhost.mjs";
 
