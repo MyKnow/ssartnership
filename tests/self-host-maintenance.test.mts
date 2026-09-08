@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { maintenancePlan, renderDatabaseMetrics } from "../scripts/self-host-operations/maintenance.mjs";
 import { previewComposeArguments } from "../scripts/self-host-ci/bootstrap-preview.mjs";
 import { TIMERS, timerUnit } from "../deploy/self-host-ci/install-maintenance.mjs";
@@ -12,6 +12,7 @@ test("maintenance supports fixed operations without accepting shell commands or 
   const wrapper = readFileSync(new URL("../deploy/self-host-ci/maintenance-run.sh", import.meta.url), "utf8");
   assert.match(wrapper, /flock --nonblock --conflict-exit-code 75/u);
   assert.doesNotMatch(wrapper, /eval|docker\.sock|down -v|prune/u);
+  assert.notEqual(statSync(new URL("../deploy/self-host-ci/maintenance-run.sh", import.meta.url)).mode & 0o111, 0, "systemd maintenance wrapper must be executable");
 });
 test("database maintenance metrics contain only finite global aggregates", () => {
   const values = { database_bytes: 1200, oldest_transaction_seconds: 10, dead_tuples: 2, live_tuples: 20, deadlocks: 0, autovacuum_enabled: 1, table: "private-table", member: "private-member" };
