@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import JSZip from "jszip";
 import { createHash, randomBytes } from "node:crypto";
-import { mkdtemp, readFile, writeFile, chmod } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, chmod, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { parseReleaseArtifact, selectFirstAttemptRun, validatePulledImage, receiveRelease } from "../scripts/self-host-ci/receive-release.mjs";
+import { fileURLToPath } from "node:url";
+import { isMainModule, parseReleaseArtifact, selectFirstAttemptRun, validatePulledImage, receiveRelease } from "../scripts/self-host-ci/receive-release.mjs";
 import { imageReference } from "../scripts/self-host-ci/github-contract.mjs";
 
 const sha = randomBytes(20).toString("hex");
@@ -40,6 +41,20 @@ test("receiver runtime keeps ZIP parsing self-contained", async () => {
   const source = await readFile(new URL("../scripts/self-host-ci/receive-release.mjs", import.meta.url), "utf8");
   assert.doesNotMatch(source, /from ["']jszip["']/u);
   assert.match(source, /inflateRawSync/u);
+});
+
+test("receiver main detection follows the control/current symlink", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "ssartnership-receiver-main-"));
+  const linked = path.join(directory, "receive-release.mjs");
+  const source = fileURLToPath(new URL("../scripts/self-host-ci/receive-release.mjs", import.meta.url));
+  try {
+    await symlink(source, linked);
+    const moduleUrl = new URL("../scripts/self-host-ci/receive-release.mjs", import.meta.url).href;
+    assert.equal(isMainModule(linked, moduleUrl), true);
+    assert.equal(isMainModule(path.join(directory, "missing.mjs"), moduleUrl), false);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("receiver rejects duplicate, retried and non-success runs", () => {

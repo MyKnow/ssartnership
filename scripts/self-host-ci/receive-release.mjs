@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
+import { realpathSync } from "node:fs";
 import { mkdir, readFile, writeFile, lstat, realpath, rename, rm } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { inflateRawSync } from "node:zlib";
 import { verifyRemoteJobs, verifyRemoteRelease } from "./github-contract.mjs";
 import { switchApplication } from "./deployment.mjs";
@@ -298,6 +300,11 @@ async function loadState(file) {
   }
 }
 
+export function isMainModule(argvPath = process.argv[1], moduleUrl = import.meta.url) {
+  if (typeof argvPath !== "string") return false;
+  try { return realpathSync(argvPath) === realpathSync(fileURLToPath(moduleUrl)); } catch { return false; }
+}
+
 async function saveManifest(root, sha, manifest) {
   assertAbsolutePath(root);
   if (!SHA.test(sha)) fail("RECEIVER_SHA_INVALID");
@@ -374,6 +381,6 @@ export async function receiveRelease({ config = RECEIVER_CONFIG, fetcher = fetch
   return { status: "deployed", sha: liveSha, image: appImage };
 }
 
-if (process.argv[1] && import.meta.url === new URL(process.argv[1], "file:").href) {
+if (isMainModule()) {
   receiveRelease().then((result) => process.stdout.write(`${JSON.stringify(result)}\n`)).catch(() => { process.stderr.write('{"error":"RECEIVER_FAILED"}\n'); process.exitCode = 1; });
 }
