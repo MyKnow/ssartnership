@@ -18,6 +18,13 @@ test("original Preview overlay keeps restored data isolated and bounded", () => 
   assert.match(compose, /networks: \[original_default, original_edge, monitoring\]/u);
   assert.match(compose, /original_edge:\s*\n\s+external: true\s*\n\s+name: ssartnership-original-preview-34141078185_edge/u);
   assert.match(compose, /127\.0\.0\.1:3108:3000/u);
+  for (const serviceName of ["telemetry", "prometheus", "alertmanager", "grafana"]) {
+    const block = compose.match(new RegExp(`\\n  ${serviceName}:([\\s\\S]*?)(?=\\n  [a-z-]+:|\\nvolumes:)`, "u"))?.[1] ?? "";
+    const expectedNetworks = serviceName === "telemetry"
+      ? /networks: \[original_default, original_edge, monitoring\]/u
+      : /networks: \[original_edge, monitoring\]/u;
+    assert.match(block, expectedNetworks, `${serviceName} host probe network`);
+  }
   assert.match(compose, /env_file: \["\$\{MONITORING_ENV_FILE:\?monitoring env file required\}"\]/u);
   assert.match(compose, /--collector\.textfile\.directory=\/textfile/u);
   assert.match(compose, /\$\{MONITORING_TEXTFILE_DIR:\?monitoring textfile directory required\}:\/textfile:ro/u);
