@@ -42,10 +42,11 @@ services:
     pids_limit: 128
     logging: *bounded-logs
     networks: [original_default, monitoring]
+    # Keep telemetry credentials out of the app env_file. The receiver passes
+    # this file only to the telemetry container while Compose uses the app
+    # env-file for the remaining interpolation values.
+    env_file: ["${MONITORING_ENV_FILE:?monitoring env file required}"]
     environment:
-      SELF_HOST_VITALS_TOKEN: ${SELF_HOST_VITALS_TOKEN:?monitoring secret required}
-      OPS_ALERT_RELAY_TOKEN: ${OPS_ALERT_RELAY_TOKEN:?monitoring secret required}
-      OPS_ALERT_WEBHOOK_URL: ${OPS_ALERT_WEBHOOK_URL:-}
       OPS_APP_PROBE_ENABLED: "1"
     healthcheck:
       test: [CMD, node, -e, "fetch('http://127.0.0.1:9464/health').then(r=>process.exit(r.status===204?0:1)).catch(()=>process.exit(1))"]
@@ -144,8 +145,9 @@ services:
     pids_limit: 128
     logging: *bounded-logs
     networks: [monitoring]
-    command: [--path.rootfs=/host, --path.procfs=/host/proc, --path.sysfs=/host/sys, --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker|run/docker)($|/)]
+    command: [--path.rootfs=/host, --path.procfs=/host/proc, --path.sysfs=/host/sys, --collector.textfile.directory=/textfile, --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker|run/docker)($|/)]
     volumes:
+      - ${MONITORING_TEXTFILE_DIR:?monitoring textfile directory required}:/textfile:ro
       - /:/host:ro,rslave
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
