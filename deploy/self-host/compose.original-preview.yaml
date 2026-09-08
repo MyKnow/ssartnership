@@ -10,7 +10,10 @@ services:
     image: ${SELF_HOST_IMAGE:?receiver supplies an immutable app image}
     init: true
     restart: unless-stopped
-    networks: [original_default, monitoring]
+    # original_default is an internal-only restored Supabase network. Keep the
+    # app attached to the existing edge network as well so Docker can publish
+    # the loopback host port for the reverse proxy and receiver health probe.
+    networks: [original_default, original_edge, monitoring]
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
     mem_limit: 768m
@@ -159,5 +162,8 @@ networks:
   original_default:
     external: true
     name: ssartnership-original-preview-34141078185_default
+  original_edge:
+    external: true
+    name: ssartnership-original-preview-34141078185_edge
   monitoring:
     internal: true
