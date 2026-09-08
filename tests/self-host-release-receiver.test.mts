@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import JSZip from "jszip";
 import { createHash, randomBytes } from "node:crypto";
-import { mkdtemp, writeFile, chmod } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { parseReleaseArtifact, selectFirstAttemptRun, validatePulledImage, receiveRelease } from "../scripts/self-host-ci/receive-release.mjs";
@@ -21,17 +21,25 @@ const jobs = [
   { name: "Publish Verified Preview Images", run_id: 17, run_attempt: 1, head_sha: sha, status: "completed", conclusion: "success", steps: [{ name: "Authenticate registry for publication only", status: "completed", conclusion: "success" }, { name: "Verify archives and current dev before publication", status: "completed", conclusion: "success" }, { name: "Publish immutable deployment manifest", status: "completed", conclusion: "success" }, { name: "Remove registry session", status: "completed", conclusion: "success" }] },
 ];
 
-async function artifactBytes(value = manifest) {
+async function artifactBytes(value = manifest, compression: "STORE" | "DEFLATE" = "STORE") {
   const zip = new JSZip(); zip.file("release.json", JSON.stringify(value));
-  return zip.generateAsync({ type: "nodebuffer", compression: "STORE" });
+  return zip.generateAsync({ type: "nodebuffer", compression });
 }
 
 test("receiver accepts only one regular release.json artifact", async () => {
   const bytes = await artifactBytes();
   assert.deepEqual(await parseReleaseArtifact(bytes, { size_in_bytes: bytes.length, digest: `sha256:${createHash("sha256").update(bytes).digest("hex")}` }), manifest);
+  const compressed = await artifactBytes(manifest, "DEFLATE");
+  assert.deepEqual(await parseReleaseArtifact(compressed, { size_in_bytes: compressed.length, digest: `sha256:${createHash("sha256").update(compressed).digest("hex")}` }), manifest);
   const bad = new JSZip(); bad.file("../release.json", "{}");
   const badBytes = await bad.generateAsync({ type: "nodebuffer" });
   await assert.rejects(() => parseReleaseArtifact(badBytes, { size_in_bytes: badBytes.length }), /RECEIVER_ARTIFACT_CONTENT_INVALID/);
+});
+
+test("receiver runtime keeps ZIP parsing self-contained", async () => {
+  const source = await readFile(new URL("../scripts/self-host-ci/receive-release.mjs", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /from ["']jszip["']/u);
+  assert.match(source, /inflateRawSync/u);
 });
 
 test("receiver rejects duplicate, retried and non-success runs", () => {

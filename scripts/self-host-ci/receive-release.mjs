@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { mkdir, readFile, writeFile, lstat, realpath, rename, rm } from "node:fs/promises";
 import path from "node:path";
-import JSZip from "jszip";
+import { inflateRawSync } from "node:zlib";
 import { verifyRemoteJobs, verifyRemoteRelease } from "./github-contract.mjs";
 import { switchApplication } from "./deployment.mjs";
 
@@ -122,23 +122,109 @@ async function fetchArtifact(urlValue, token, fetcher = fetch) {
 
 function validateArtifactDigest(bytes, artifact) {
   if (artifact?.digest !== undefined && (!HASH.test(artifact.digest) || artifact.digest !== `sha256:${createHash("sha256").update(bytes).digest("hex")}`)) fail("RECEIVER_ARTIFACT_DIGEST_INVALID");
-  if (!Number.isSafeInteger(artifact?.size_in_bytes) || artifact.size_in_bytes < 1 || artifact.size_in_bytes > MAX_ARTIFACT_BYTES) fail("RECEIVER_ARTIFACT_SIZE_INVALID");
+  if (!Number.isSafeInteger(artifact?.size_in_bytes) || artifact.size_in_bytes !== bytes.length || artifact.size_in_bytes < 1 || artifact.size_in_bytes > MAX_ARTIFACT_BYTES) fail("RECEIVER_ARTIFACT_SIZE_INVALID");
+}
+
+const ZIP_END_OF_CENTRAL_DIRECTORY = 0x06054b50;
+const ZIP_CENTRAL_FILE_HEADER = 0x02014b50;
+const ZIP_LOCAL_FILE_HEADER = 0x04034b50;
+const ZIP_MAX_COMMENT_BYTES = 0xffff;
+const ZIP_RELEASE_NAME = Buffer.from("release.json", "ascii");
+
+function zipUint16(bytes, offset) {
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset + 2 > bytes.length) fail("RECEIVER_ARTIFACT_ZIP_INVALID");
+  return bytes.readUInt16LE(offset);
+}
+
+function zipUint32(bytes, offset) {
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset + 4 > bytes.length) fail("RECEIVER_ARTIFACT_ZIP_INVALID");
+  return bytes.readUInt32LE(offset);
+}
+
+function zipCrc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc = ZIP_CRC32_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+const ZIP_CRC32_TABLE = Uint32Array.from({ length: 256 }, (_, index) => {
+  let value = index;
+  for (let bit = 0; bit < 8; bit += 1) value = (value & 1) === 1 ? (value >>> 1) ^ 0xedb88320 : value >>> 1;
+  return value >>> 0;
+});
+
+function findZipEndOfCentralDirectory(bytes) {
+  const earliest = Math.max(0, bytes.length - (22 + ZIP_MAX_COMMENT_BYTES));
+  for (let offset = bytes.length - 22; offset >= earliest; offset -= 1) {
+    if (zipUint32(bytes, offset) !== ZIP_END_OF_CENTRAL_DIRECTORY) continue;
+    const commentLength = zipUint16(bytes, offset + 20);
+    if (offset + 22 + commentLength === bytes.length) return offset;
+  }
+  fail("RECEIVER_ARTIFACT_ZIP_INVALID");
+}
+
+function parseSingleReleaseZip(bytes) {
+  const endOffset = findZipEndOfCentralDirectory(bytes);
+  const disk = zipUint16(bytes, endOffset + 4);
+  const centralDisk = zipUint16(bytes, endOffset + 6);
+  const entriesOnDisk = zipUint16(bytes, endOffset + 8);
+  const totalEntries = zipUint16(bytes, endOffset + 10);
+  const centralSize = zipUint32(bytes, endOffset + 12);
+  const centralOffset = zipUint32(bytes, endOffset + 16);
+  if (disk !== 0 || centralDisk !== 0 || centralSize === 0xffffffff || centralOffset === 0xffffffff
+    || centralOffset + centralSize !== endOffset) fail("RECEIVER_ARTIFACT_ZIP_INVALID");
+  if (entriesOnDisk !== 1 || totalEntries !== 1) fail("RECEIVER_ARTIFACT_CONTENT_INVALID");
+
+  const central = centralOffset;
+  if (zipUint32(bytes, central) !== ZIP_CENTRAL_FILE_HEADER) fail("RECEIVER_ARTIFACT_ZIP_INVALID");
+  const madeBy = zipUint16(bytes, central + 4);
+  const flags = zipUint16(bytes, central + 8);
+  const method = zipUint16(bytes, central + 10);
+  const crc = zipUint32(bytes, central + 16);
+  const compressedSize = zipUint32(bytes, central + 20);
+  const uncompressedSize = zipUint32(bytes, central + 24);
+  const nameLength = zipUint16(bytes, central + 28);
+  const extraLength = zipUint16(bytes, central + 30);
+  const commentLength = zipUint16(bytes, central + 32);
+  const externalAttributes = zipUint32(bytes, central + 38);
+  const localOffset = zipUint32(bytes, central + 42);
+  const centralEnd = central + 46 + nameLength + extraLength + commentLength;
+  if (centralEnd !== endOffset || compressedSize === 0xffffffff || uncompressedSize === 0xffffffff || localOffset === 0xffffffff
+    || (flags & 0x1) !== 0 || ![0, 8].includes(method)) fail("RECEIVER_ARTIFACT_ZIP_INVALID");
+  if (nameLength !== ZIP_RELEASE_NAME.length || !bytes.subarray(central + 46, central + 46 + nameLength).equals(ZIP_RELEASE_NAME)) fail("RECEIVER_ARTIFACT_CONTENT_INVALID");
+
+  const unixMode = (madeBy >>> 8) === 3 ? (externalAttributes >>> 16) & 0xffff : 0;
+  if ((unixMode & 0o170000) === 0o120000 || (unixMode & 0o170000) === 0o040000 || ((madeBy >>> 8) !== 3 && (externalAttributes & 0x10) !== 0)) fail("RECEIVER_ARTIFACT_CONTENT_INVALID");
+  if (uncompressedSize > MAX_MANIFEST_BYTES || compressedSize > MAX_ARTIFACT_BYTES) fail("RECEIVER_MANIFEST_TOO_LARGE");
+
+  if (zipUint32(bytes, localOffset) !== ZIP_LOCAL_FILE_HEADER) fail("RECEIVER_ARTIFACT_ZIP_INVALID");
+  const localFlags = zipUint16(bytes, localOffset + 6);
+  const localMethod = zipUint16(bytes, localOffset + 8);
+  const localNameLength = zipUint16(bytes, localOffset + 26);
+  const localExtraLength = zipUint16(bytes, localOffset + 28);
+  const localNameEnd = localOffset + 30 + localNameLength;
+  const dataStart = localNameEnd + localExtraLength;
+  const dataEnd = dataStart + compressedSize;
+  if (localFlags !== flags || localMethod !== method || localNameLength !== nameLength
+    || !bytes.subarray(localOffset + 30, localNameEnd).equals(ZIP_RELEASE_NAME)
+    || dataStart < 0 || dataEnd > centralOffset || dataEnd < dataStart) fail("RECEIVER_ARTIFACT_ZIP_INVALID");
+
+  let content;
+  try {
+    content = method === 0 ? bytes.subarray(dataStart, dataEnd) : inflateRawSync(bytes.subarray(dataStart, dataEnd), { maxOutputLength: MAX_MANIFEST_BYTES });
+  } catch {
+    fail("RECEIVER_ARTIFACT_ZIP_INVALID");
+  }
+  if (content.length !== uncompressedSize || zipCrc32(content) !== crc) fail("RECEIVER_ARTIFACT_ZIP_INVALID");
+  return content;
 }
 
 export async function parseReleaseArtifact(bytes, artifact) {
   if (!Buffer.isBuffer(bytes) || bytes.length < 22 || bytes.length > MAX_ARTIFACT_BYTES) fail("RECEIVER_ARTIFACT_SIZE_INVALID");
   validateArtifactDigest(bytes, artifact);
-  let zip;
-  try { zip = await JSZip.loadAsync(bytes, { checkCRC32: true, createFolders: false }); } catch { fail("RECEIVER_ARTIFACT_ZIP_INVALID"); }
-  const names = Object.keys(zip.files);
-  if (names.length !== 1 || names[0] !== "release.json") fail("RECEIVER_ARTIFACT_CONTENT_INVALID");
-  const entry = zip.files["release.json"];
-  if (!entry || entry.dir || entry.unsafeOriginalName !== "release.json" || (entry.unixPermissions && (entry.unixPermissions & 0o170000) === 0o120000)) fail("RECEIVER_ARTIFACT_CONTENT_INVALID");
-  const metadataSize = Number(entry._data?.uncompressedSize ?? 0);
-  if (metadataSize > MAX_MANIFEST_BYTES) fail("RECEIVER_MANIFEST_TOO_LARGE");
-  let content;
-  try { content = await entry.async("nodebuffer"); } catch { fail("RECEIVER_ARTIFACT_CONTENT_INVALID"); }
-  if (content.length > MAX_MANIFEST_BYTES) fail("RECEIVER_MANIFEST_TOO_LARGE");
+  const content = parseSingleReleaseZip(bytes);
   try { return JSON.parse(content.toString("utf8")); } catch { fail("RECEIVER_MANIFEST_INVALID"); }
 }
 
