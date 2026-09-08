@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { clearPartnerSession, getPartnerSession } from "@/lib/partner-session";
-import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import { buildTrustedRedirectUrl, isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
@@ -35,5 +35,5 @@ export async function POST(request: Request) {
     });
   }
 
-  return NextResponse.redirect(new URL("/partner/login", request.url), 303);
+  return NextResponse.redirect(buildTrustedRedirectUrl("/partner/login", request.url), 303);
 }

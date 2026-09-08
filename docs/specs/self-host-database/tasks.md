@@ -285,3 +285,12 @@ Cloud 조회는 집계만 실행했다: bucket 7개, 객체 823개, 39,851,100�
 19:10 KST 읽기 전용 재확인에서 현재 Cloud Preview와 home Preview의 137개 테이블·124,998행 전체 정렬 JSON SHA256이 일치했다. 이미 승인한 Storage origin 치환만 정규화했으며 회원 데이터는 출력하지 않았다. 이는 해당 시점의 DB 동등성이고 전환 창의 쓰기 차단이나 Storage byte 재검증을 대신하지 않는다. 사용자가 호스팅케이알 DNS 화면 로그인을 완료했고 기존 Preview CNAME/TTL 60을 확인했으나 아직 DNS를 변경하지 않았다.
 
 수신기 동일 릴리스 판정과 테스트 초기화 수정의 최종 로컬 Release는 Node 1,861 통과/기존 skip 8, unit 133 통과, build, E2E 103/retry 0으로 완료했다. 전체 2,416줄/215,085바이트 감사에서 기존 between-admin Fast Refresh 2회 외 오류·재시도 시그니처는 없었다. 수정 후 unit 133개를 별도 새 실행 세 번으로도 검증했으며 remote 첫 실행과 새 receiver 적용은 별도 단계다.
+
+## 2026-09-08 공개 인증 redirect 교정
+
+공개 DNS/TLS와 원본 데이터 전환 이후 실제 `/admin/session` 요청에서 컨테이너 내부 주소가 Location에 들어가는 결함을 확인했다. [별도 PR 계획](https://github.com/MyKnow/ssartnership/issues/435#issuecomment-5584174724)에 따라 real-mode의 고정 public origin과 안전한 목적지 경로를 조합하는 helper를 추가한다. proxy·관리자 bridge·파트너 logout의 절대 redirect를 대상으로 하며 기존 인증/권한/회원 gate 정책과 데이터는 변경하지 않는다.
+
+- [x] 실패 우선 회귀 후 origin 오염/누락·악성 목적지·Vercel/loopback 유지·실제 Next proxy·필수 단계 모든 조합/query 보존을 포함한 집중 테스트 44개 통과.
+- [x] 변경 전체 Release: Node 1,868 통과/기존 skip 8, unit 133, build, E2E 103/retry 0. 기존 CSRF source assertion 1건의 첫 실패와 수정 후 전체 2,423줄 감사는 실패 원장에 보존했다.
+- [ ] 새 source SHA 첫 원격 CI·서버 이미지 적용.
+- [ ] 실제 공개 회원/관리자/파트너 인증 및 공개 도메인 redirect 확인. 이 완료 전 receiver timer를 활성화하지 않는다.

@@ -9,6 +9,7 @@ import {
   shouldChallengeAdminBasicAuth,
 } from "@/lib/admin-security";
 import { getMemberRequiredGateRedirect } from "@/lib/member-required-gates";
+import { buildTrustedRedirectUrl } from "@/lib/request-guards";
 import {
   buildForwardedRequestPath,
   REQUEST_PATH_HEADER,
@@ -292,7 +293,7 @@ export async function proxy(request: NextRequest) {
       return nextWithRequestUrl(request);
     }
 
-    const url = request.nextUrl.clone();
+    const url = buildTrustedRedirectUrl(currentPath, request.url);
     url.pathname = userPayload ? "/admin/session" : "/auth/login";
     url.search = "";
     url.searchParams.set("returnTo", currentPath);
@@ -319,7 +320,7 @@ export async function proxy(request: NextRequest) {
       mustChangePassword: payload?.mustChangePassword,
     });
     if (requiredGateRedirect) {
-      return NextResponse.redirect(new URL(requiredGateRedirect, request.url));
+      return NextResponse.redirect(buildTrustedRedirectUrl(requiredGateRedirect, request.url));
     }
   }
 
@@ -344,14 +345,14 @@ export async function proxy(request: NextRequest) {
       pathname !== "/partner/change-password" &&
       pathname !== "/partner/logout"
     ) {
-      const url = request.nextUrl.clone();
+      const url = buildTrustedRedirectUrl(currentPath, request.url);
       url.pathname = "/partner/change-password";
       return NextResponse.redirect(url);
     }
 
     if (isPartnerLoginPath) {
       if (partnerPayload) {
-        const url = request.nextUrl.clone();
+        const url = buildTrustedRedirectUrl(currentPath, request.url);
         url.pathname =
           partnerPayload.mustChangePassword ? "/partner/change-password" : "/partner";
         return NextResponse.redirect(url);
@@ -361,7 +362,7 @@ export async function proxy(request: NextRequest) {
 
     if (pathname === "/partner/reset") {
       if (partnerPayload) {
-        const url = request.nextUrl.clone();
+        const url = buildTrustedRedirectUrl(currentPath, request.url);
         url.pathname = "/partner";
         return NextResponse.redirect(url);
       }
@@ -370,14 +371,14 @@ export async function proxy(request: NextRequest) {
 
     if (isPartnerSetupPath) {
       if (partnerPayload) {
-        const url = request.nextUrl.clone();
+        const url = buildTrustedRedirectUrl(currentPath, request.url);
         url.pathname = "/partner";
         return NextResponse.redirect(url);
       }
       return nextWithRequestUrl(request);
     }
     if (!partnerPayload && !isPartnerLogoutPath) {
-      const url = request.nextUrl.clone();
+      const url = buildTrustedRedirectUrl(currentPath, request.url);
       url.pathname = "/partner/login";
       return NextResponse.redirect(url);
     }
