@@ -12,6 +12,11 @@ test("original Preview overlay keeps restored data isolated and bounded", () => 
   assert.match(compose, /original_default:\s*\n\s+external: true/u);
   assert.match(compose, /name: ssartnership-original-preview-34141078185_default/u);
   assert.match(compose, /127\.0\.0\.1:3108:3000/u);
+  assert.match(compose, /env_file: \["\$\{MONITORING_ENV_FILE:\?monitoring env file required\}"\]/u);
+  assert.match(compose, /--collector\.textfile\.directory=\/textfile/u);
+  assert.match(compose, /\$\{MONITORING_TEXTFILE_DIR:\?monitoring textfile directory required\}:\/textfile:ro/u);
+  assert.doesNotMatch(compose, /SELF_HOST_VITALS_TOKEN: \$\{/u);
+  assert.doesNotMatch(compose, /OPS_ALERT_RELAY_TOKEN: \$\{/u);
   for (const serviceName of ["app", "telemetry", "prometheus", "alertmanager", "grafana", "postgres-exporter", "node-exporter"]) {
     const block = compose.match(new RegExp(`\\n  ${serviceName}:([\\s\\S]*?)(?=\\n  [a-z-]+:|\\nvolumes:)`, "u"))?.[1] ?? "";
     assert.match(block, /mem_limit:/u, `${serviceName} memory bound`);
