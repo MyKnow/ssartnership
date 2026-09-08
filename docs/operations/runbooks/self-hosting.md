@@ -68,10 +68,10 @@ Storage SDK의 signed/public URL과 공개 이미지 프록시는 [데이터 실
 
 ```bash
 docker compose -p ssartnership-edge -f deploy/self-host/compose.edge.yaml config --quiet
-docker compose -p ssartnership-edge -f deploy/self-host/compose.edge.yaml run --rm caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+docker compose -p ssartnership-edge -f deploy/self-host/compose.edge.yaml run --rm --entrypoint caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 ```
 
-`config --quiet`와 Caddy validate는 공개 변경 없이 설정만 검사한다. DNS/TLS·외부 probe·외부 암호화 백업/복구 드릴이 모두 통과하기 전에는 `up -d`를 실행하지 않는다. 전환 후에는 두 origin의 HTTPS redirect, 정상 Host/protocol 전달, `/api/health`, 로그인, Storage 업로드·다운로드, 인증서 자동 갱신을 외부 네트워크에서 확인하고 실패 시 Caddy를 중지해 기존 Preview를 유지한다.
+`config --quiet`와 Caddy validate는 공개 변경 없이 설정만 검사한다. 공개 전환 전 원본 Preview의 외부 암호화 백업/복구 드릴, 원본 쓰기 중지와 최종 동등성, DNS 수정 권한, 방화벽 전달 경로 및 기존 DNS 복구값을 확보한다. 합성 환경의 백업은 원본 Preview 복구 증거를 대신하지 않는다. 승인된 전환 창에서 edge를 시작하고 두 DNS 레코드를 홈 서버로 연결한 뒤 실제 TLS 발급과 외부 probe를 검증한다. 발급 전에 TLS 성공을 선행 조건으로 요구하지 않는다. 두 origin의 HTTPS redirect, 정상 Host/protocol 전달, `/api/health`, 로그인, Storage 업로드·다운로드를 확인하고 인증서 갱신 상태도 운영 점검에 포함한다. 실패하면 기존 DNS를 복원하고 Caddy를 중지한다. 전환 중 홈 서버에 새 쓰기가 있었다면 원본을 재개하기 전에 데이터 차이를 확인한다.
 
 ## Cron 이식
 

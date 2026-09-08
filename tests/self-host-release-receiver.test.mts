@@ -6,7 +6,7 @@ import { mkdtemp, readFile, writeFile, chmod, rm, symlink } from "node:fs/promis
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { isMainModule, parseReleaseArtifact, selectFirstAttemptRun, validatePulledImage, receiveRelease } from "../scripts/self-host-ci/receive-release.mjs";
+import { isMainModule, isSameApprovedRelease, parseReleaseArtifact, selectFirstAttemptRun, validatePulledImage, receiveRelease } from "../scripts/self-host-ci/receive-release.mjs";
 import { imageReference } from "../scripts/self-host-ci/github-contract.mjs";
 
 const sha = randomBytes(20).toString("hex");
@@ -69,6 +69,29 @@ test("pulled images must match immutable digest, platform, revision and reposito
   assert.notEqual(pulledId, item.id);
   assert.doesNotThrow(() => validatePulledImage({ Id: pulledId, Os: "linux", Architecture: "amd64", Config: { Labels: { "org.opencontainers.image.revision": sha } }, RepoDigests: [item.reference] }, item, sha));
   for (const patch of [{ Architecture: "arm64" }, { RepoDigests: [] }, { Id: "not-a-content-address" }]) assert.throws(() => validatePulledImage({ Id: pulledId, Os: "linux", Architecture: "amd64", Config: { Labels: { "org.opencontainers.image.revision": sha } }, RepoDigests: [item.reference], ...patch }, item, sha));
+});
+
+test("receiver recognizes the same approved release across build and pulled image identities", () => {
+  const images = manifest.images.map((item) => ({ ...item, id: `sha256:${randomBytes(32).toString("hex")}` }));
+  const state = {
+    version: 1, repository: manifest.repository, workflow: ".github/workflows/self-host-preview.yml",
+    sha, runId: manifest.runId, attempt: 1, platform: manifest.platform, sourceHash: manifest.sourceHash,
+    manifestHash: createHash("sha256").update(JSON.stringify(manifest)).digest("hex"),
+    appImage: images[0].id, images,
+  };
+  assert.notEqual(state.appImage, manifest.images[0].id);
+  assert.equal(isSameApprovedRelease(state, manifest), true);
+  assert.equal(isSameApprovedRelease(null, manifest), false);
+  for (const patch of [
+    { version: 2 }, { repository: "different/repository" }, { workflow: "different.yml" },
+    { sha: "0".repeat(40) }, { runId: 18 }, { attempt: 2 }, { platform: "linux/arm64" },
+    { sourceHash: "0".repeat(64) }, { manifestHash: "0".repeat(64) }, { appImage: digest },
+    { images: undefined }, { images: [...images, images[0]] }, { images: images.slice(1) },
+    { images: images.map((item) => ({ ...item, id: "invalid" })) },
+    { images: images.map((item) => ({ ...item, reference: "other@" + item.digest })) },
+    { images: images.map((item) => ({ ...item, digest: "sha256:" + "0".repeat(64) })) },
+    { images: [images[0], images[0], images[2]] },
+  ]) assert.equal(isSameApprovedRelease({ ...state, ...patch }, manifest), false);
 });
 
 test("receiver independently verifies GitHub API, manifest, jobs and deploy callback", async () => {
