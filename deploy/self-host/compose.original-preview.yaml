@@ -44,7 +44,7 @@ services:
     cpus: 0.5
     pids_limit: 128
     logging: *bounded-logs
-    networks: [original_default, monitoring]
+    networks: [original_default, original_edge, monitoring]
     # Keep telemetry credentials out of the app env_file. The receiver passes
     # this file only to the telemetry container while Compose uses the app
     # env-file for the remaining interpolation values.
@@ -67,7 +67,7 @@ services:
     cpus: 1
     pids_limit: 128
     logging: *bounded-logs
-    networks: [monitoring]
+    networks: [original_edge, monitoring]
     ports: ["127.0.0.1:59190:9090"]
     command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus, --storage.tsdb.retention.time=7d, --storage.tsdb.retention.size=2GB]
     volumes:
@@ -84,7 +84,7 @@ services:
     cpus: 0.5
     pids_limit: 128
     logging: *bounded-logs
-    networks: [monitoring]
+    networks: [original_edge, monitoring]
     ports: ["127.0.0.1:59193:9093"]
     command: [--config.file=/etc/alertmanager/alertmanager.yml, --storage.path=/alertmanager, --cluster.listen-address=]
     volumes:
@@ -101,7 +101,7 @@ services:
     cpus: 1
     pids_limit: 128
     logging: *bounded-logs
-    networks: [monitoring]
+    networks: [original_edge, monitoring]
     ports: ["127.0.0.1:53100:3000"]
     tmpfs: [/tmp:mode=1777]
     environment:
