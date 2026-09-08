@@ -41,7 +41,7 @@ test("sanitizer keeps only one approved tag/config/layer closure and rejects dig
     const configName = `blobs/sha256/${hash(config)}`; const layerName = `blobs/sha256/${hash(layer)}`;
     const tag = `ssartnership-ci/app:${sha}-amd64`;
     const manifest = Buffer.from(JSON.stringify([{ Config: configName, RepoTags: [tag], Layers: [layerName] }]));
-    const entries: [string, Buffer][] = [[configName, config], [layerName, layer], ["manifest.json", manifest], ["index.json", Buffer.from('{"unapprovedTag":"discarded"}')]];
+    const entries: [string, Buffer][] = [[configName, config], [layerName, layer], ["manifest.json", manifest], ["index.json", Buffer.from('{"unapprovedTag":"discarded"}')], ["repositories", Buffer.from('{"ssartnership-ci/app":{"latest":"discarded"}}')]];
     const archive = Buffer.concat([...entries.flatMap(([name, value]) => [header(name, value.length), value, Buffer.alloc((512 - value.length % 512) % 512)]), Buffer.alloc(1024)]);
     const source = path.join(directory, "source.tar"); await writeFile(source, archive);
     const expected = { tag, id: `sha256:${hash(config)}` };

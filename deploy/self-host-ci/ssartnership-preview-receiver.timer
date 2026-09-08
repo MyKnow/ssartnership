@@ -1,0 +1,12 @@
+[Unit]
+Description=Poll the approved GitHub Preview image release
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+RandomizedDelaySec=60s
+Persistent=true
+Unit=ssartnership-preview-receiver.service
+
+[Install]
+WantedBy=timers.target

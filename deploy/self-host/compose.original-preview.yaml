@@ -1,0 +1,161 @@
+# App and monitoring overlay for the restored original Cloud Preview.
+# The database, PostgREST, Storage and Kong services remain in the separately
+# managed ssartnership-original-preview-34141078185 project and their volumes
+# are never recreated by this file.
+x-logs: &bounded-logs
+  driver: local
+  options: { max-size: 10m, max-file: "3" }
+services:
+  app:
+    image: ${SELF_HOST_IMAGE:?receiver supplies an immutable app image}
+    init: true
+    restart: unless-stopped
+    networks: [original_default, monitoring]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    mem_limit: 768m
+    cpus: 1.5
+    pids_limit: 256
+    logging: *bounded-logs
+    ports: ["127.0.0.1:3108:3000"]
+    env_file: ["${SELF_HOST_RUNTIME_ENV_FILE:-/etc/myknow/secrets/ssartnership-original-preview/app.env}"]
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      SELF_HOST_MODE: real
+      SELF_HOST_VITALS_ENABLED: "1"
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+  telemetry:
+    image: ${SELF_HOST_TELEMETRY_IMAGE:?receiver supplies an immutable telemetry image}
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 128
+    logging: *bounded-logs
+    networks: [original_default, monitoring]
+    environment:
+      SELF_HOST_VITALS_TOKEN: ${SELF_HOST_VITALS_TOKEN:?monitoring secret required}
+      OPS_ALERT_RELAY_TOKEN: ${OPS_ALERT_RELAY_TOKEN:?monitoring secret required}
+      OPS_ALERT_WEBHOOK_URL: ${OPS_ALERT_WEBHOOK_URL:-}
+      OPS_APP_PROBE_ENABLED: "1"
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:9464/health').then(r=>process.exit(r.status===204?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    ports: ["127.0.0.1:59464:9464"]
+  prometheus:
+    image: prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    cpus: 1
+    pids_limit: 128
+    logging: *bounded-logs
+    networks: [monitoring]
+    ports: ["127.0.0.1:59190:9090"]
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus, --storage.tsdb.retention.time=7d, --storage.tsdb.retention.size=2GB]
+    volumes:
+      - ./deploy/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/observability/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - original-prometheus-data:/prometheus
+  alertmanager:
+    image: prom/alertmanager:v0.34.0@sha256:690c7b525f4367aa91f73e2f91c632206d32e97c6384bdbf2fb7a861b420340d
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 128
+    logging: *bounded-logs
+    networks: [monitoring]
+    ports: ["127.0.0.1:59193:9093"]
+    command: [--config.file=/etc/alertmanager/alertmanager.yml, --storage.path=/alertmanager, --cluster.listen-address=]
+    volumes:
+      - ./deploy/observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ${MONITORING_SECRETS_DIR:?monitoring secrets required}/alert-relay-token:/run/alert-relay-token:ro
+      - original-alertmanager-data:/alertmanager
+  grafana:
+    image: grafana/grafana:13.2.1@sha256:f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+    cpus: 1
+    pids_limit: 128
+    logging: *bounded-logs
+    networks: [monitoring]
+    ports: ["127.0.0.1:53100:3000"]
+    tmpfs: [/tmp:mode=1777]
+    environment:
+      GF_SECURITY_ADMIN_USER: operator
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/grafana-password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_LOG_MODE: console
+      GF_LOG_LEVEL: warn
+    volumes:
+      - ${MONITORING_SECRETS_DIR:?monitoring secrets required}/grafana-password:/run/grafana-password:ro
+      - ./deploy/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/observability/grafana/dashboards:/etc/grafana/dashboards:ro
+      - original-grafana-data:/var/lib/grafana
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.20.1@sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 96m
+    cpus: 0.25
+    pids_limit: 128
+    logging: *bounded-logs
+    networks: [original_default, monitoring]
+    environment:
+      DATA_SOURCE_URI: db:5432/postgres?sslmode=disable
+      DATA_SOURCE_USER: ssartnership_monitor
+      DATA_SOURCE_PASS_FILE: /run/postgres-monitor-password
+    volumes:
+      - ${MONITORING_SECRETS_DIR:?monitoring secrets required}/postgres-monitor-password:/run/postgres-monitor-password:ro
+  node-exporter:
+    image: prom/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 64m
+    cpus: 0.25
+    pids_limit: 128
+    logging: *bounded-logs
+    networks: [monitoring]
+    command: [--path.rootfs=/host, --path.procfs=/host/proc, --path.sysfs=/host/sys, --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker|run/docker)($|/)]
+    volumes:
+      - /:/host:ro,rslave
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+volumes:
+  original-prometheus-data:
+  original-alertmanager-data:
+  original-grafana-data:
+networks:
+  original_default:
+    external: true
+    name: ssartnership-original-preview-34141078185_default
+  monitoring:
+    internal: true

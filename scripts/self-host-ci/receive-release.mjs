@@ -1,0 +1,293 @@
+#!/usr/bin/env node
+import { createHash, randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
+import { mkdir, readFile, writeFile, lstat, realpath, rename, rm } from "node:fs/promises";
+import path from "node:path";
+import JSZip from "jszip";
+import { verifyRemoteJobs, verifyRemoteRelease } from "./github-contract.mjs";
+import { switchApplication } from "./deployment.mjs";
+
+const API_ORIGIN = "https://api.github.com";
+const REPOSITORY = "MyKnow/ssartnership";
+const WORKFLOW_PATH = ".github/workflows/self-host-preview.yml";
+const ARTIFACT_NAME = "ssartnership-preview-release";
+const SHA = /^[a-f0-9]{40}$/u;
+const HASH = /^sha256:[a-f0-9]{64}$/u;
+const MAX_API_BYTES = 4 * 1024 * 1024;
+const MAX_ARTIFACT_BYTES = 64 * 1024 * 1024;
+const MAX_MANIFEST_BYTES = 128 * 1024;
+const requiresRootOwnership = process.getuid?.() === 0;
+
+export const RECEIVER_CONFIG = {
+  tokenFile: "/etc/myknow/secrets/ssartnership-original-preview/github-token",
+  stateFile: "/var/lib/ssartnership-ci/original-preview/receiver-state.json",
+  releaseRoot: "/var/lib/ssartnership-ci/original-preview/releases",
+  composeFile: "/opt/ssartnership/control/current/deploy/self-host/compose.original-preview.yaml",
+  composeCwd: "/opt/ssartnership/control/current",
+  runtimeEnvFile: "/etc/myknow/secrets/ssartnership-original-preview/app.env",
+  composeProject: "ssartnership-original-preview",
+  healthOrigin: "http://127.0.0.1:3108",
+};
+
+function fail(code) {
+  throw new Error(code);
+}
+
+function assertAbsolutePath(file) {
+  if (typeof file !== "string" || !path.isAbsolute(file) || file.includes("\0")) fail("RECEIVER_PATH_INVALID");
+  return file;
+}
+
+async function readRootToken(file) {
+  assertAbsolutePath(file);
+  const metadata = await lstat(file);
+  if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.uid !== 0 || (metadata.mode & 0o077) !== 0 || metadata.size < 20 || metadata.size > 512) fail("RECEIVER_TOKEN_INVALID");
+  if (await realpath(file) !== file) fail("RECEIVER_TOKEN_INVALID");
+  const token = (await readFile(file, "utf8")).trim();
+  if (token.length < 20 || token.length > 256 || /[\s\u0000-\u001f\u007f]/u.test(token)) fail("RECEIVER_TOKEN_INVALID");
+  return token;
+}
+
+async function readBody(response, limit) {
+  const declared = Number(response.headers.get("content-length") ?? 0);
+  if (Number.isFinite(declared) && declared > limit) fail("RECEIVER_RESPONSE_TOO_LARGE");
+  const chunks = [];
+  let bytes = 0;
+  for await (const chunk of response.body ?? []) {
+    bytes += chunk.length;
+    if (bytes > limit) fail("RECEIVER_RESPONSE_TOO_LARGE");
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
+function apiUrl(relative) {
+  if (typeof relative !== "string" || !relative.startsWith("/repos/MyKnow/ssartnership/")) fail("RECEIVER_API_PATH_INVALID");
+  const url = new URL(relative, API_ORIGIN);
+  if (url.origin !== API_ORIGIN) fail("RECEIVER_API_PATH_INVALID");
+  return url;
+}
+
+async function fetchApi(relative, token, fetcher = fetch) {
+  const response = await fetcher(apiUrl(relative), {
+    redirect: "error",
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
+      "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "ssartnership-self-host-receiver/1",
+    },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) {
+    await response.body?.cancel();
+    fail("RECEIVER_GITHUB_API_FAILED");
+  }
+  try {
+    return JSON.parse((await readBody(response, MAX_API_BYTES)).toString("utf8"));
+  } catch {
+    fail("RECEIVER_GITHUB_JSON_INVALID");
+  }
+}
+
+function allowedArtifactRedirect(url) {
+  return url.protocol === "https:"
+    && (url.hostname === "pipelines.actions.githubusercontent.com" || url.hostname.endsWith(".blob.core.windows.net"));
+}
+
+async function fetchArtifact(urlValue, token, fetcher = fetch) {
+  let url;
+  try { url = new URL(urlValue); } catch { fail("RECEIVER_ARTIFACT_URL_INVALID"); }
+  if (url.origin !== API_ORIGIN || url.username || url.password) fail("RECEIVER_ARTIFACT_URL_INVALID");
+  let response = await fetcher(url, {
+    redirect: "manual",
+    headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`, "User-Agent": "ssartnership-self-host-receiver/1" },
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (response.status >= 300 && response.status < 400) {
+    const location = response.headers.get("location");
+    await response.body?.cancel();
+    if (!location) fail("RECEIVER_ARTIFACT_REDIRECT_INVALID");
+    try { url = new URL(location, url); } catch { fail("RECEIVER_ARTIFACT_REDIRECT_INVALID"); }
+    if (!allowedArtifactRedirect(url)) fail("RECEIVER_ARTIFACT_REDIRECT_INVALID");
+    // Do not forward the GitHub token to the object-storage redirect target.
+    response = await fetcher(url, { redirect: "error", signal: AbortSignal.timeout(30_000) });
+  }
+  if (!response.ok) {
+    await response.body?.cancel();
+    fail("RECEIVER_ARTIFACT_DOWNLOAD_FAILED");
+  }
+  return readBody(response, MAX_ARTIFACT_BYTES);
+}
+
+function validateArtifactDigest(bytes, artifact) {
+  if (artifact?.digest !== undefined && (!HASH.test(artifact.digest) || artifact.digest !== `sha256:${createHash("sha256").update(bytes).digest("hex")}`)) fail("RECEIVER_ARTIFACT_DIGEST_INVALID");
+  if (!Number.isSafeInteger(artifact?.size_in_bytes) || artifact.size_in_bytes < 1 || artifact.size_in_bytes > MAX_ARTIFACT_BYTES) fail("RECEIVER_ARTIFACT_SIZE_INVALID");
+}
+
+export async function parseReleaseArtifact(bytes, artifact) {
+  if (!Buffer.isBuffer(bytes) || bytes.length < 22 || bytes.length > MAX_ARTIFACT_BYTES) fail("RECEIVER_ARTIFACT_SIZE_INVALID");
+  validateArtifactDigest(bytes, artifact);
+  let zip;
+  try { zip = await JSZip.loadAsync(bytes, { checkCRC32: true, createFolders: false }); } catch { fail("RECEIVER_ARTIFACT_ZIP_INVALID"); }
+  const names = Object.keys(zip.files);
+  if (names.length !== 1 || names[0] !== "release.json") fail("RECEIVER_ARTIFACT_CONTENT_INVALID");
+  const entry = zip.files["release.json"];
+  if (!entry || entry.dir || entry.unsafeOriginalName !== "release.json" || (entry.unixPermissions && (entry.unixPermissions & 0o170000) === 0o120000)) fail("RECEIVER_ARTIFACT_CONTENT_INVALID");
+  const metadataSize = Number(entry._data?.uncompressedSize ?? 0);
+  if (metadataSize > MAX_MANIFEST_BYTES) fail("RECEIVER_MANIFEST_TOO_LARGE");
+  let content;
+  try { content = await entry.async("nodebuffer"); } catch { fail("RECEIVER_ARTIFACT_CONTENT_INVALID"); }
+  if (content.length > MAX_MANIFEST_BYTES) fail("RECEIVER_MANIFEST_TOO_LARGE");
+  try { return JSON.parse(content.toString("utf8")); } catch { fail("RECEIVER_MANIFEST_INVALID"); }
+}
+
+export function selectFirstAttemptRun(payload, sha) {
+  if (!SHA.test(sha) || !payload || !Array.isArray(payload.workflow_runs)) fail("RECEIVER_RUN_LIST_INVALID");
+  const matching = payload.workflow_runs.filter((run) => run?.head_sha === sha);
+  const approved = matching.filter((run) => run?.status === "completed" && run?.conclusion === "success" && run?.run_attempt === 1);
+  if (approved.length > 1) fail("RECEIVER_RUN_AMBIGUOUS");
+  return approved[0] ?? null;
+}
+
+function validateArtifactMetadata(artifacts, runId) {
+  if (!Array.isArray(artifacts?.artifacts)) fail("RECEIVER_ARTIFACT_LIST_INVALID");
+  const matching = artifacts.artifacts.filter((artifact) => artifact?.name === ARTIFACT_NAME);
+  if (matching.length !== 1) fail("RECEIVER_ARTIFACT_AMBIGUOUS");
+  const artifact = matching[0];
+  if (artifact.expired || artifact.workflow_run?.id !== runId || typeof artifact.archive_download_url !== "string") fail("RECEIVER_ARTIFACT_NOT_APPROVED");
+  return artifact;
+}
+
+async function dockerProcess(args, { input, allowFailure = false, env = {} } = {}) {
+  return new Promise((resolve, reject) => {
+    const extra = Object.fromEntries(Object.entries(env).filter(([key, value]) => /^SELF_HOST_(?:IMAGE|TELEMETRY_IMAGE)$/u.test(key) && /^sha256:[a-f0-9]{64}$/u.test(String(value))));
+    const child = spawn("docker", args, {
+      env: { PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", HOME: "/root", LANG: "C", ...extra },
+      stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => child.kill("SIGTERM"), 120_000);
+    child.stdout.on("data", (chunk) => { stdout = `${stdout}${chunk}`.slice(-2 * 1024 * 1024); });
+    child.stderr.on("data", (chunk) => { stderr = `${stderr}${chunk}`.slice(-64 * 1024); });
+    child.once("error", () => { clearTimeout(timer); reject(new Error("RECEIVER_DOCKER_UNAVAILABLE")); });
+    child.once("close", (code) => {
+      clearTimeout(timer);
+      if (code === 0 || allowFailure) resolve({ code: code ?? 1, stdout, stderr });
+      else reject(new Error("RECEIVER_DOCKER_FAILED"));
+    });
+    if (input !== undefined) child.stdin.end(input);
+  });
+}
+
+export function validatePulledImage(inspected, expected, sha) {
+  if (!inspected || expected?.component === undefined || !SHA.test(sha) || !HASH.test(expected.digest) || !/^sha256:[a-f0-9]{64}$/u.test(expected.id)
+    || inspected.Id !== expected.id || inspected.Os !== "linux" || inspected.Architecture !== "amd64"
+    || inspected.Config?.Labels?.["org.opencontainers.image.revision"] !== sha
+    || !Array.isArray(inspected.RepoDigests) || inspected.RepoDigests.length !== 1 || inspected.RepoDigests[0] !== expected.reference) fail("RECEIVER_IMAGE_NOT_APPROVED");
+  return true;
+}
+
+async function writeAtomic(file, value) {
+  assertAbsolutePath(file);
+  const parent = path.dirname(file);
+  await mkdir(parent, { recursive: true, mode: 0o700 });
+  const temporary = path.join(parent, `.${path.basename(file)}.${randomUUID()}.tmp`);
+  try {
+    await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600, flag: "wx" });
+    await rename(temporary, file);
+  } finally { await rm(temporary, { force: true }); }
+}
+
+async function loadState(file) {
+  try {
+    const metadata = await lstat(file);
+    if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.uid !== 0 || (metadata.mode & 0o077) !== 0 || await realpath(file) !== file) fail("RECEIVER_STATE_INVALID");
+    return JSON.parse(await readFile(file, "utf8"));
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    if (error?.message?.startsWith("RECEIVER_STATE")) throw error;
+    fail("RECEIVER_STATE_INVALID");
+  }
+}
+
+async function saveManifest(root, sha, manifest) {
+  assertAbsolutePath(root);
+  if (!SHA.test(sha)) fail("RECEIVER_SHA_INVALID");
+  await mkdir(root, { recursive: true, mode: 0o700 });
+  const rootMetadata = await lstat(root);
+  if (!rootMetadata.isDirectory() || rootMetadata.isSymbolicLink() || (requiresRootOwnership && rootMetadata.uid !== 0) || (rootMetadata.mode & 0o077) !== 0) fail("RECEIVER_RELEASE_ROOT_INVALID");
+  const canonicalRoot = await realpath(root);
+  const directory = path.join(canonicalRoot, sha);
+  await mkdir(directory, { mode: 0o700 }).catch((error) => { if (error?.code !== "EEXIST") throw error; });
+  const directoryMetadata = await lstat(directory);
+  if (!directoryMetadata.isDirectory() || directoryMetadata.isSymbolicLink() || (requiresRootOwnership && directoryMetadata.uid !== 0) || (directoryMetadata.mode & 0o077) !== 0) fail("RECEIVER_RELEASE_DIRECTORY_INVALID");
+  const file = path.join(directory, "release.json");
+  try { await writeFile(file, `${JSON.stringify(manifest)}\n`, { mode: 0o600, flag: "wx" }); }
+  catch (error) {
+    if (error?.code !== "EEXIST") throw error;
+    const fileMetadata = await lstat(file);
+    if (!fileMetadata.isFile() || fileMetadata.isSymbolicLink() || (requiresRootOwnership && fileMetadata.uid !== 0) || (fileMetadata.mode & 0o077) !== 0) fail("RECEIVER_MANIFEST_CONFLICT");
+    let existing;
+    try { existing = JSON.parse(await readFile(file, "utf8")); } catch { fail("RECEIVER_MANIFEST_CONFLICT"); }
+    if (JSON.stringify(existing) !== JSON.stringify(manifest)) fail("RECEIVER_MANIFEST_CONFLICT");
+  }
+  return file;
+}
+
+async function pullImages(manifest, token, docker = dockerProcess) {
+  let loggedIn = false;
+  try {
+    await docker(["login", "ghcr.io", "--username", "github-receiver", "--password-stdin"], { input: `${token}\n` });
+    loggedIn = true;
+    const pulled = [];
+    for (const expected of manifest.images) {
+      await docker(["pull", "--platform", "linux/amd64", expected.reference]);
+      const inspected = JSON.parse((await docker(["image", "inspect", "--format", "{{json .}}", expected.reference])).stdout);
+      validatePulledImage(inspected, expected, manifest.sha);
+      pulled.push({ component: expected.component, id: inspected.Id, digest: expected.digest, reference: expected.reference });
+    }
+    return pulled;
+  } finally {
+    if (loggedIn) await docker(["logout", "ghcr.io"], { allowFailure: true });
+  }
+}
+
+async function deployApp(image, previousImage, config, docker = dockerProcess, images = []) {
+  const composeArgs = ["compose", "--project-name", config.composeProject, "--env-file", config.runtimeEnvFile, "--file", config.composeFile];
+  const run = (command, args, options) => command === "docker" ? docker([...args], options) : fail("RECEIVER_COMMAND_INVALID");
+  const telemetry = images.find((item) => item.component === "telemetry");
+  return switchApplication({ composeArgs, cwd: config.composeCwd, nextImage: image, previousImage, origin: config.healthOrigin, environment: telemetry ? { SELF_HOST_TELEMETRY_IMAGE: telemetry.id } : {} }, run);
+}
+
+export async function receiveRelease({ config = RECEIVER_CONFIG, fetcher = fetch, docker = dockerProcess, readToken = readRootToken, deploy = deployApp, now = () => new Date().toISOString(), operator = process.getuid?.() === 0 } = {}) {
+  if (!operator) fail("RECEIVER_OPERATOR_REQUIRED");
+  const token = await readToken(config.tokenFile);
+  const ref = await fetchApi("/repos/MyKnow/ssartnership/git/ref/heads/dev", token, fetcher);
+  const liveSha = ref?.object?.sha;
+  if (!SHA.test(liveSha)) fail("RECEIVER_DEV_REF_INVALID");
+  const runs = await fetchApi(`/repos/MyKnow/ssartnership/actions/workflows/self-host-preview.yml/runs?branch=dev&event=push&head_sha=${liveSha}&per_page=10`, token, fetcher);
+  const run = selectFirstAttemptRun(runs, liveSha);
+  if (!run) return { status: "pending", sha: liveSha };
+  const jobs = await fetchApi(`/repos/MyKnow/ssartnership/actions/runs/${run.id}/jobs?per_page=100`, token, fetcher);
+  verifyRemoteJobs(jobs.jobs, { runId: run.id, sha: liveSha });
+  const artifact = validateArtifactMetadata(await fetchApi(`/repos/MyKnow/ssartnership/actions/runs/${run.id}/artifacts?per_page=100`, token, fetcher), run.id);
+  const manifest = verifyRemoteRelease(await parseReleaseArtifact(await fetchArtifact(artifact.archive_download_url, token, fetcher), artifact), run, liveSha);
+  await saveManifest(config.releaseRoot, liveSha, manifest);
+  const previous = await loadState(config.stateFile);
+  const app = manifest.images.find((item) => item.component === "app");
+  if (!app) fail("RECEIVER_APP_IMAGE_MISSING");
+  if (previous?.sha === manifest.sha && previous?.appImage === app.id && previous?.manifestHash === createHash("sha256").update(JSON.stringify(manifest)).digest("hex")) return { status: "unchanged", sha: liveSha, image: app.id };
+  const images = await pullImages(manifest, token, docker);
+  const appImage = images.find((item) => item.component === "app")?.id;
+  if (!appImage) fail("RECEIVER_APP_IMAGE_MISSING");
+  await deploy(appImage, previous?.appImage ?? null, config, docker, images);
+  const state = { version: 1, repository: REPOSITORY, workflow: WORKFLOW_PATH, sha: manifest.sha, runId: run.id, attempt: 1, platform: manifest.platform, sourceHash: manifest.sourceHash, manifestHash: createHash("sha256").update(JSON.stringify(manifest)).digest("hex"), appImage, images, appliedAt: now() };
+  await writeAtomic(config.stateFile, state);
+  return { status: "deployed", sha: liveSha, image: appImage };
+}
+
+if (process.argv[1] && import.meta.url === new URL(process.argv[1], "file:").href) {
+  receiveRelease().then((result) => process.stdout.write(`${JSON.stringify(result)}\n`)).catch(() => { process.stderr.write('{"error":"RECEIVER_FAILED"}\n'); process.exitCode = 1; });
+}
