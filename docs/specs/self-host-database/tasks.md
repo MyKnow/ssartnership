@@ -9,6 +9,34 @@ authority: normative
 
 상위 작업은 [Issue #435](https://github.com/MyKnow/ssartnership/issues/435)와 [마이그레이션 작업 목록](../self-hosting/tasks.md)이다. 코드 준비와 실제 실행 완료를 구분한다.
 
+## 공개 Preview 인수인계 — 2026-09-08
+
+현재 전달 범위는 **원래 Cloud Preview를 홈 서버의 공개 Preview로 이전**하는 것이다. Production은 기존 Vercel/Supabase를 유지한다. 아래 시간별 기록과 체크박스는 그 당시의 증거이며 이 절의 최신 상태와 구분한다.
+
+| 경계 | 확인된 상태 |
+| --- | --- |
+| 공개 주소 | 앱 `https://ssartnership-dev.myknow.xyz`, API `https://ssartnership-api-dev.myknow.xyz`; 두 A/TTL 60만 변경하고 Production DNS 보존 |
+| 데이터 | 최종 Cloud 서비스 쓰기 차단 후 137개 테이블·124,998행·두 sequence의 전체 정렬 hash 일치; 7개 bucket·823개 파일·39,851,100바이트의 hash/MIME/ETag 전량 일치 |
+| 외부 사본 | Mac의 암호화 원본 cold backup 90,062,488바이트 및 Keychain 복구 키; Mac에서 재전송해 새 격리 DB/파일의 전체 복구 검증 완료. 독립 지역·상시 PITR와는 별개 |
+| 관측 | 원본 Preview의 Prometheus/Alertmanager/Grafana/telemetry 운영 중; 20:40 KST 수집 대상 5개 모두 up. 외부 운영자 알림 수신은 미완료 |
+| 스키마 승인 | [PR #449](https://github.com/MyKnow/ssartnership/pull/449)의 exact migration tree/root-only 승인 설치. 실제 GitHub 5회 조회 뒤 불일치 거절, artifact/Docker/deploy 호출 0·state/컨테이너 불변 검증 |
+| 인증 수정 | [PR #450](https://github.com/MyKnow/ssartnership/pull/450) 통합 SHA `29a3ca0c9af9c7ac64e59b91ddbd44ed28f774ae`, 이미지 `sha256:f4c4abb5e614aed47d554f9fc157cee74c7bebe738cdeef0bade390c30013147`를 21:00 KST 실제 적용. 21:10 공개 HTTP 회원/관리자/파트너 인증·권한·logout 완료 |
+| 자동 수신 | 실제 인증/스키마 차단 확인 후 21:11 KST timer enabled/active. 첫 예약 실행이 21:11:19 `unchanged`/exit 0으로 끝났고 21:14 컨테이너 ID·시작 시각·이미지·적용 상태 불변을 대조했다. 5분 간격+최대 60초 분산이며 새 커밋의 자동 적용은 별도 검증한다 |
+
+인증 수정의 로컬 전체 Release는 Node 1,868 통과/기존 skip 8, unit 133, build, E2E 103/retry 0이었다. 첫 Release의 기존 CSRF source assertion 실패는 보존했고 303/POST/CSRF 계약을 바꾸지 않고 새 helper 표기를 반영했다. 새 gate 2,423줄과 canonical release 2,098줄의 전체 로그를 감사했다. PR Public Readiness [34221171966 첫 실행](https://github.com/MyKnow/ssartnership/actions/runs/34221171966/attempts/1)은 3,364줄·전체 job/step/annotation 검토를 통과했고 기존 between-admin Fast Refresh 두 줄만 관측했다. 해당 PR의 Cross-Platform workflow는 변경 경로 조건에 해당하지 않아 생성되지 않았고, Supabase check는 SQL 미변경에 따른 예상 skip이다. Vercel도 해당 source로 trusted install/build 완료했지만 홈 서버 runtime 증거와 구분한다.
+
+호스팅케이알 관리 화면, 네 authoritative 주소의 TCP 응답과 Google/Cloudflare/Quad9는 모두 홈 서버 A를 반환했다. 이 Mac의 ns1 UDP만 이전 CNAME을 반환하고 같은 대상 TCP는 새 A여서 전송 경로/캐시 차이의 원인을 확정하지 않았다. Let’s Encrypt의 외부 HTTP-01/TLS-ALPN-01 검증과 로컬 회선 hairpin 브라우저 검증은 서로 다른 근거다.
+
+원본 Cloud Preview는 CONNECT 차단 상태로 데이터와 자격증명을 보존한다. 홈 서버에 새 쓰기가 생긴 후에는 Cloud ACL/DNS만 되돌리지 않는다. 새 쓰기 조정과 복구 대상 검증이 선행돼야 한다. 기존 Cloud Preview migration/sync workflow와 Supabase 연동도 아직 폐기하지 않았으므로, 다음 SQL 변경 전에 home migration 승인과 legacy writer 정리를 별도 수행한다.
+
+원본 DB의 `archive_mode=off`를 상시 PITR 완료로 표현하지 않는다. 정기 외부 반출/독립 지역·키 escrow, 실제 외부 장애 알림, 제품 Cron 단일 실행 주체, Production 이전, 두 실환경의 상시 복사 전환과 이전 이미지 자동 보존/정리는 남은 운영 단계다. 무차별 Docker prune이나 Cloud 삭제는 수행하지 않았다.
+
+통합 dev의 Public Readiness [34222190882](https://github.com/MyKnow/ssartnership/actions/runs/34222190882/attempts/1)와 이미지 발행 [34222190776](https://github.com/MyKnow/ssartnership/actions/runs/34222190776/attempts/1)은 첫 실행으로 통과했다. 이미지 전체 3,984줄 감사는 unit 133/E2E 103 성공과 필수 job/step 성공·annotation 0을 확인했고, registry auth 4회와 기존 artifact 도구의 Buffer DEP0005 2줄만 별도 분류했다. controller archive SHA256 `a30877843d97c40ea29827a3eee27f2662749761ff62f6500468e05f3ca6d2e6`, root 소유 2,590파일과 migration 199개·Git tree `87d611d793563b4723dc668e626cb1319a783123`를 검증해 설치했으며 이전 controller/image는 보존했다.
+
+공개 HTTP 인증 완료 proof는 `5174d1d5-91b9-4f04-a868-ab37ef6ac12b`다. 실제 비밀번호로 임시 회원/조회 전용 관리자를 로그인시켜 Secure/HttpOnly/SameSite cookie, 비관리자 bridge 거절, 관리자 bridge와 화면, 조회 전용 변경 API의 권한별 403을 확인했다. 별도 임시 회사의 파트너는 실제 server-action 비밀번호 로그인→회사 대시보드→POST logout을 통과했고 회원/관리자 logout도 확인했다. 모든 Location은 공개 도메인이며 임시 UUID 계정·회사·연결은 삭제 후 재조회 0, 원래 회원/파트너 hash·salt·세션 버전 digest는 불변이었다. 비밀번호/쿠키는 서버 메모리에서만 사용했다. 생성 fixture의 캠퍼스 누락, fetch의 탐색 header 강제 변환, 잘못된 관리자 UI marker/조회 메뉴 가정으로 중단된 앞선 시험과 진단은 실패 원장과 별도 proof에 보존한다. 제품 권한이나 CSRF를 완화하지 않았다.
+
+브라우저에서는 수정 후 `/admin/session`이 공개 로그인 화면으로 이동하고 원래 `/admin` returnTo가 유지되는 것을 확인했다. 위의 실제 인증은 서버 HTTP rehearsal이며 로그인된 브라우저의 클릭·업무 전체 흐름이나 이메일/Mattermost 등 외부 연동 완료 증거는 아니다.
+
 ## 2026-09-08 19시대 공개 Preview 전환
 
 이 절이 해당 시점의 최신 실행 요약이며, 아래 시간별 기록의 미완료 표시는 그 기록 당시의 상태다.

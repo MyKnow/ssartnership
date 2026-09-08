@@ -168,3 +168,21 @@ Mac 반출 복원에서는 복호화한 pgBackRest/Restic 암호도 `runtimeKeys
 Next standalone의 route-handler `request.url`은 외부 HTTPS 요청에서도 컨테이너의 `0.0.0.0:3000`을 가리킬 수 있다. 실제 원본 Preview의 `/admin/session`에서 이를 확인했다. `buildTrustedRedirectUrl`은 real-mode에서 검증된 `NEXT_PUBLIC_SITE_URL`만 절대 redirect의 origin으로 사용한다. proxy의 관리자/파트너 분기와 회원 필수 단계, 관리자 세션 bridge, 파트너 로그아웃은 같은 helper를 사용한다. 일반 Vercel/로컬 실행은 기존 request origin을 유지한다.
 
 목적지는 안전한 절대 경로만 허용하며 query와 sanitized returnTo는 유지한다. 외부 URL·프로토콜 상대 URL·역슬래시·제어 문자는 거절한다. Host/forwarded header를 운영 설정의 대용으로 사용하지 않으며 real-mode 설정 누락/오염 시 내부 주소로 되돌아가지 않는다. 필수 회원 단계 순서와 같은 출처 검사, Secure/HttpOnly/SameSite 쿠키는 변경하지 않는다. 기본 합성 E2E 외에 실제 공개 origin의 로그인·관리자 bridge·로그아웃 Location을 별도로 검증해야 한다.
+
+## 공개 Preview의 일상 확인
+
+현재 공개 Preview의 최신 SHA·실검증·잔여 단계는 [작업 인수인계](../../specs/self-host-database/tasks.md#공개-preview-인수인계--2026-09-08)가 기준이다. 아래 명령은 홈 서버의 신뢰된 운영자 셸에서 실행한다. 만료된 bootstrap 계정을 자동 재활성화하거나 SSH 키를 복사하는 절차가 아니다.
+
+```bash
+sudo systemctl status ssartnership-preview-receiver.timer --no-pager
+sudo systemctl list-timers --all ssartnership-preview-receiver.timer --no-pager
+sudo systemctl show ssartnership-preview-receiver.service -p Result -p ExecMainStatus -p ExecMainStartTimestamp
+sudo journalctl -u ssartnership-preview-receiver.service -n 12 --no-pager
+curl --fail --silent --show-error https://ssartnership-dev.myknow.xyz/api/health
+```
+
+timer는 `OnUnitActiveSec=5min`과 최대 60초 분산 지연으로 동작한다. `pending`은 현재 dev의 첫 승인 이미지 발행이 아직 없는 상태, `unchanged`는 저장된 승인 릴리스와 같은 상태, `deployed`는 새 이미지의 실제 적용·health 검사 후 상태 기록까지 완료한 결과다. timer active만으로 배포 성공을 주장하지 않는다. 수동 즉시 확인이 필요하면 `sudo systemctl start ssartnership-preview-receiver.service`를 사용하며 같은 heavy lock과 schema/first-attempt/digest 검사를 그대로 거친다. 반복 `docker compose up`으로 승인 검사나 실패 복귀를 우회하지 않는다.
+
+스키마 tree가 달라지면 앱 수신은 차단된다. 다음 SQL 변경은 legacy Cloud Preview migration/sync 및 Supabase 자동 연동의 남은 writer를 먼저 조사하고, 백업·새 후보 복구·실제 migration 검증을 거쳐 home 승인 baseline을 갱신해야 한다. 승인 JSON의 hash만 바꾸거나 기존 migration 파일을 수정하는 방식은 허용하지 않는다. Production은 이 수신기의 대상이 아니다.
+
+원본 Cloud는 삭제하지 않은 frozen 복구 기준선이다. 홈 서버 쓰기 이후의 복귀에는 변경분 조정이 필요하며 CONNECT grant와 DNS만 되돌리는 절차를 정상 rollback으로 사용하지 않는다. 원본의 수동 외부 cold backup/복원 성공은 상시 WAL/PITR·정기 외부 사본·독립 지역 복구의 완료 근거가 아니다. 운영 이미지 정리도 별도 보존 정책이 필요한 단계이며 `docker system prune` 또는 volume 삭제를 자동 수신기에 추가하지 않는다.
