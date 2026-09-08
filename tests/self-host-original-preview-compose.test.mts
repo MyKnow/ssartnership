@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const compose = readFileSync(new URL("../deploy/self-host/compose.original-preview.yaml", import.meta.url), "utf8");
+const composePath = fileURLToPath(new URL("../deploy/self-host/compose.original-preview.yaml", import.meta.url));
+const composeDirectory = path.dirname(composePath);
+const compose = readFileSync(composePath, "utf8");
 const receiver = readFileSync(new URL("../scripts/self-host-ci/receive-release.mjs", import.meta.url), "utf8");
 const service = readFileSync(new URL("../deploy/self-host-ci/ssartnership-preview-receiver.service", import.meta.url), "utf8");
 const timer = readFileSync(new URL("../deploy/self-host-ci/ssartnership-preview-receiver.timer", import.meta.url), "utf8");
@@ -17,6 +21,13 @@ test("original Preview overlay keeps restored data isolated and bounded", () => 
   assert.match(compose, /env_file: \["\$\{MONITORING_ENV_FILE:\?monitoring env file required\}"\]/u);
   assert.match(compose, /--collector\.textfile\.directory=\/textfile/u);
   assert.match(compose, /\$\{MONITORING_TEXTFILE_DIR:\?monitoring textfile directory required\}:\/textfile:ro/u);
+  for (const path of ["prometheus.yml", "alerts.yml", "alertmanager.yml"]) assert.match(compose, new RegExp(`\\.\\./observability/${path}:`, "u"));
+  assert.match(compose, /\.\.\/observability\/grafana\/provisioning:/u);
+  assert.match(compose, /\.\.\/observability\/grafana\/dashboards:/u);
+  assert.doesNotMatch(compose, /\.\/deploy\/observability\//u);
+  for (const relative of ["../observability/prometheus.yml", "../observability/alerts.yml", "../observability/alertmanager.yml", "../observability/grafana/provisioning", "../observability/grafana/dashboards"]) {
+    assert.equal(existsSync(path.resolve(composeDirectory, relative)), true, `Compose source path exists: ${relative}`);
+  }
   assert.doesNotMatch(compose, /SELF_HOST_VITALS_TOKEN: \$\{/u);
   assert.doesNotMatch(compose, /OPS_ALERT_RELAY_TOKEN: \$\{/u);
   for (const serviceName of ["app", "telemetry", "prometheus", "alertmanager", "grafana", "postgres-exporter", "node-exporter"]) {

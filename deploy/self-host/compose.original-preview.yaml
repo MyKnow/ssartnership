@@ -71,8 +71,8 @@ services:
     ports: ["127.0.0.1:59190:9090"]
     command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus, --storage.tsdb.retention.time=7d, --storage.tsdb.retention.size=2GB]
     volumes:
-      - ./deploy/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./deploy/observability/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ../observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../observability/alerts.yml:/etc/prometheus/alerts.yml:ro
       - original-prometheus-data:/prometheus
   alertmanager:
     image: prom/alertmanager:v0.34.0@sha256:690c7b525f4367aa91f73e2f91c632206d32e97c6384bdbf2fb7a861b420340d
@@ -88,7 +88,7 @@ services:
     ports: ["127.0.0.1:59193:9093"]
     command: [--config.file=/etc/alertmanager/alertmanager.yml, --storage.path=/alertmanager, --cluster.listen-address=]
     volumes:
-      - ./deploy/observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ../observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - ${MONITORING_SECRETS_DIR:?monitoring secrets required}/alert-relay-token:/run/alert-relay-token:ro
       - original-alertmanager-data:/alertmanager
   grafana:
@@ -117,8 +117,8 @@ services:
       GF_LOG_LEVEL: warn
     volumes:
       - ${MONITORING_SECRETS_DIR:?monitoring secrets required}/grafana-password:/run/grafana-password:ro
-      - ./deploy/observability/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./deploy/observability/grafana/dashboards:/etc/grafana/dashboards:ro
+      - ../observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../observability/grafana/dashboards:/etc/grafana/dashboards:ro
       - original-grafana-data:/var/lib/grafana
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:v0.20.1@sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e
