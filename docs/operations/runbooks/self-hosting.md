@@ -62,6 +62,17 @@ SELF_HOST_IMAGE=registry.example.com/ssartnership@sha256:REVIEWED_DIGEST docker 
 
 Storage SDK의 signed/public URL과 공개 이미지 프록시는 [데이터 실행 절차](./self-host-database.md)에 따라 검증한다. 공개 origin과 내부 전송 주소를 설정한 것만으로 실제 업로드·다운로드 검증을 완료 처리하지 않는다.
 
+## 공개 edge와 TLS
+
+공개 edge는 별도 Caddy Compose overlay로 고정한다. Caddy는 기존 Preview edge network에서만 `app:3000`과 `gateway:8000`을 향해 프록시하고, Docker socket·관리 API·데이터 network에는 접근하지 않는다. Caddyfile의 `ssartnership-dev.myknow.xyz`와 `ssartnership-api-dev.myknow.xyz`는 실제 DNS가 홈 서버를 가리키고 방화벽 포워딩을 검증한 뒤에만 인증서를 발급한다.
+
+```bash
+docker compose -p ssartnership-edge -f deploy/self-host/compose.edge.yaml config --quiet
+docker compose -p ssartnership-edge -f deploy/self-host/compose.edge.yaml run --rm caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+```
+
+`config --quiet`와 Caddy validate는 공개 변경 없이 설정만 검사한다. DNS/TLS·외부 probe·외부 암호화 백업/복구 드릴이 모두 통과하기 전에는 `up -d`를 실행하지 않는다. 전환 후에는 두 origin의 HTTPS redirect, 정상 Host/protocol 전달, `/api/health`, 로그인, Storage 업로드·다운로드, 인증서 자동 갱신을 외부 네트워크에서 확인하고 실패 시 Caddy를 중지해 기존 Preview를 유지한다.
+
 ## Cron 이식
 
 일정과 endpoint는 `vercel.json`이 정본이며 모두 UTC다. 목록 조회는 HTTP 요청을 보내지 않는다.
