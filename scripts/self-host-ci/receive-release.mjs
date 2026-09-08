@@ -357,6 +357,23 @@ async function deployApp(image, previousImage, config, docker = dockerProcess, i
   return switchApplication({ composeArgs, cwd: config.composeCwd, nextImage: image, previousImage, origin: config.healthOrigin, environment: telemetry ? { SELF_HOST_TELEMETRY_IMAGE: telemetry.id } : {} }, run);
 }
 
+export function isSameApprovedRelease(previous, manifest) {
+  if (previous?.version !== 1 || previous.repository !== REPOSITORY || previous.workflow !== WORKFLOW_PATH
+    || previous.sha !== manifest.sha || previous.runId !== manifest.runId || previous.attempt !== 1
+    || previous.platform !== manifest.platform || previous.sourceHash !== manifest.sourceHash
+    || previous.manifestHash !== createHash("sha256").update(JSON.stringify(manifest)).digest("hex")
+    || !Array.isArray(previous.images) || previous.images.length !== manifest.images.length) return false;
+  // Stored IDs describe the verified registry pull, not the build daemon's
+  // local image IDs. Match every immutable publication, then use its stored
+  // pulled app ID to avoid replacing an already deployed release each poll.
+  for (const expected of manifest.images) {
+    const matches = previous.images.filter((item) => item?.component === expected.component);
+    if (matches.length !== 1 || !HASH.test(matches[0].id ?? "")
+      || matches[0].digest !== expected.digest || matches[0].reference !== expected.reference) return false;
+  }
+  return previous.appImage === previous.images.find((item) => item.component === "app")?.id;
+}
+
 export async function receiveRelease({ config = RECEIVER_CONFIG, fetcher = fetch, docker = dockerProcess, readToken = readRootToken, deploy = deployApp, now = () => new Date().toISOString(), operator = process.getuid?.() === 0 } = {}) {
   if (!operator) fail("RECEIVER_OPERATOR_REQUIRED");
   const token = await readToken(config.tokenFile);
@@ -374,7 +391,7 @@ export async function receiveRelease({ config = RECEIVER_CONFIG, fetcher = fetch
   const previous = await loadState(config.stateFile);
   const app = manifest.images.find((item) => item.component === "app");
   if (!app) fail("RECEIVER_APP_IMAGE_MISSING");
-  if (previous?.sha === manifest.sha && previous?.appImage === app.id && previous?.manifestHash === createHash("sha256").update(JSON.stringify(manifest)).digest("hex")) return { status: "unchanged", sha: liveSha, image: app.id };
+  if (isSameApprovedRelease(previous, manifest)) return { status: "unchanged", sha: liveSha, image: previous.appImage };
   const images = await pullImages(manifest, token, docker);
   const appImage = images.find((item) => item.component === "app")?.id;
   if (!appImage) fail("RECEIVER_APP_IMAGE_MISSING");

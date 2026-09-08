@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 const getSupabaseAdminClient = vi.fn();
 
@@ -23,6 +23,13 @@ async function loadModule() {
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
   return import("../../src/lib/notification-preferences");
 }
+
+let preferences: Awaited<ReturnType<typeof loadModule>>;
+beforeEach(async () => {
+  // Initialize the environment-specific module before a test mutates its RPC
+  // mock. A failed import must not resume inside a later case's mock state.
+  preferences = await loadModule();
+});
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -53,7 +60,7 @@ describe("notification preferences", () => {
     });
     getSupabaseAdminClient.mockReturnValue({ rpc });
 
-    const { updateMemberNotificationPreferences } = await loadModule();
+    const { updateMemberNotificationPreferences } = preferences;
     await expect(
       updateMemberNotificationPreferences(
         "member-1",
@@ -103,7 +110,7 @@ describe("notification preferences", () => {
       }),
     });
 
-    const { updateMemberNotificationPreferences } = await loadModule();
+    const { updateMemberNotificationPreferences } = preferences;
     await expect(
       updateMemberNotificationPreferences("member-1", {}),
     ).rejects.toMatchObject({

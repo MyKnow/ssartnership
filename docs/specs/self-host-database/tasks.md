@@ -265,3 +265,23 @@ Cloud 조회는 집계만 실행했다: bucket 7개, 객체 823개, 39,851,100�
 수정 후 새 Docker 환경의 전체 시험은 bucket 3개·파일 3개·45바이트, 실제 API 다운로드 2회와 DB 목록 3회 대조, 전체 archive age round-trip을 통과했다. 증거는 Git 제외 `.tmp/migration-database-fixture-20260907/proof.json`과 `.tmp/migration-storage-fixture-20260907-verified/proof.json`에 있다. 이전 실패 환경과 성공 환경의 Compose 컨테이너/네트워크만 정확한 프로젝트 단위로 제거했고 데이터 볼륨·private export는 남겼다. 독립 PG17 시험의 새 tmpfs 데이터는 시험 종료 시 제거되며 코드로 다시 생성할 수 있는 합성 데이터였다. 홈 서버의 기존 Preview 컨테이너와 실제 Cloud 데이터는 변경하지 않았다.
 
 2026-09-08 00:02 KST `verify:change`는 high/Quick profile로 종료 0이었다: docs 94개, migrations 199개, Node 1,834 통과/기존 skip 8, unit 133 통과, lint·semantic typecheck·lockfile 및 Production dependency audit 통과. 전체 185,678바이트/2,034줄의 진단 검사에서 기존 합성 rollback 실패 경로 4건만 확인했고 새 실행 오류는 없었다. 마지막 관측 시작 시각 기록 위치 조정 후 migration 집중 테스트 15개를 다시 통과했다. Release/build/E2E와 GitHub 원격 first-attempt 실행은 이번 수집 모듈 검증과 별도다.
+
+## 2026-09-08 원본 home Preview 외부 cold backup 복구 증거
+
+18:35:47 KST에 실제 원본 Preview 앱/API/Storage의 쓰기를 잠시 중지하고 PostgreSQL 정상 종료 상태에서 물리 DB 사본과 Storage 전체 사본을 만들었다. 즉시 기존 서비스만 재기동했고 앱 health/login HTTP 200과 데이터 서비스 healthy를 확인했다. 이 작업은 원래 Cloud Preview와 Production을 변경하지 않았다.
+
+18:41:26 KST에 Mac으로 age 암호문 90,062,488바이트를 반출했다. SHA256은 `4ea6a985d722e2979bd423612f959a9edd63723dbf06086b4fd915ee2e0fcc02`다. age identity는 별도 RSA 수신자 envelope로 봉인하고 RSA 개인키는 Mac login Keychain에만 보관한다. Mac 파일시스템에 원본 DB/객체 평문을 저장하지 않았다. 첫 전송은 120초 제한으로 실패했고 부분 암호문을 보존했다. 재전송은 이미 생성된 같은 서버 스냅샷만 읽었으며 원본 서비스를 다시 중지하지 않았다.
+
+18:49:58 KST에는 **Mac의 암호화 사본을 되가져온 경로**에서 새 DB를 복원했다. 원본 데이터 mount 없이 `network=none`, 비root PostgreSQL, 별도 복구 경로만 사용했고 비교 후 복구 container만 제거했다. 복구 데이터와 증거는 보존한다. 전용 Mac 백업 디렉터리에 암호문·봉인 identity·Keychain 참조·검증 receipt를 별도 보관한다.
+
+- [x] 현재 원본 home Preview의 137개 테이블·124,998행 전체 정렬 JSON SHA256 일치.
+- [x] Storage 823개 파일·39,851,100바이트 전체 SHA256 일치, tar 확장 속성/ACL/metadata 비교 통과.
+- [x] 서버 밖 암호문 보관과 그 사본으로의 별도 격리 복구. 합성 Preview 복구와 구별한다.
+- [ ] 원본 home Preview의 상시 pgBackRest/WAL 보관과 정기 백업·복구 timer 연결. 현재 원본 `archive_mode=off`이며 이 cold backup을 연속 PITR 증거로 부르지 않는다.
+- [ ] 독립 장애 지역 보관·키 escrow 및 원본 Cloud의 최종 쓰기 중지/동등성, DNS/TLS 공개 전환.
+
+공개 DNS는 여전히 Vercel을 가리키며 권한 DNS는 호스팅케이알이다. Caddy 설정 검증과 홈 서버 loopback 응답은 공개 사이트 전환의 증거가 아니다. 기존 receiver 배포 SHA `b8f918b2`의 앱은 healthy지만 periodic receiver timer는 아직 비활성이고, 모니터링/DB 이미지 자동 승격은 app-only 배포와 별개다.
+
+19:10 KST 읽기 전용 재확인에서 현재 Cloud Preview와 home Preview의 137개 테이블·124,998행 전체 정렬 JSON SHA256이 일치했다. 이미 승인한 Storage origin 치환만 정규화했으며 회원 데이터는 출력하지 않았다. 이는 해당 시점의 DB 동등성이고 전환 창의 쓰기 차단이나 Storage byte 재검증을 대신하지 않는다. 사용자가 호스팅케이알 DNS 화면 로그인을 완료했고 기존 Preview CNAME/TTL 60을 확인했으나 아직 DNS를 변경하지 않았다.
+
+수신기 동일 릴리스 판정과 테스트 초기화 수정의 최종 로컬 Release는 Node 1,861 통과/기존 skip 8, unit 133 통과, build, E2E 103/retry 0으로 완료했다. 전체 2,416줄/215,085바이트 감사에서 기존 between-admin Fast Refresh 2회 외 오류·재시도 시그니처는 없었다. 수정 후 unit 133개를 별도 새 실행 세 번으로도 검증했으며 remote 첫 실행과 새 receiver 적용은 별도 단계다.

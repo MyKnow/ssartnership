@@ -34,3 +34,8 @@ test("Caddy routes the fixed public origins to internal app and Supabase gateway
   assert.match(caddyfile, /admin off/u);
   assert.doesNotMatch(caddyfile, /tls internal|127\.0\.0\.1|localhost|http:\/\//u);
 });
+
+test("Caddy validation runbook supplies the executable for the entrypoint-free image", () => {
+  const runbook = readFileSync(new URL("../docs/operations/runbooks/self-hosting.md", import.meta.url), "utf8");
+  assert.match(runbook, /run --rm --entrypoint caddy caddy validate --config \/etc\/caddy\/Caddyfile --adapter caddyfile/u);
+});
