@@ -159,7 +159,7 @@ test("partner logout is a same-origin POST exposed only through live POST forms"
   );
   assert.match(
     route,
-    /NextResponse\.redirect\(new URL\("\/partner\/login", request\.url\), 303\)/,
+    /NextResponse\.redirect\(buildTrustedRedirectUrl\("\/partner\/login", request\.url\), 303\)/,
     "successful POST logout must redirect with See Other",
   );
 

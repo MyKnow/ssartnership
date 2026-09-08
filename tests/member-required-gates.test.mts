@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { buildTrustedRedirectUrl } from "@/lib/request-guards";
 import {
   buildMemberGateHref,
   getMemberGateCompletionReturnTo,
@@ -53,6 +54,28 @@ const mattermostProfileSyncRoutePath = new URL(
   "../src/app/api/mm/profile-sync/route.ts",
   import.meta.url,
 );
+
+test("자체 호스팅 절대 redirect도 필수 단계 우선순위와 원래 query를 보존한다", () => {
+  const beforeMode = process.env.SELF_HOST_MODE;
+  const beforeOrigin = process.env.NEXT_PUBLIC_SITE_URL;
+  try {
+    process.env.SELF_HOST_MODE = "real";
+    process.env.NEXT_PUBLIC_SITE_URL = "https://ssartnership-dev.myknow.xyz";
+    const destination = "/partners?q=coffee&page=2";
+    for (let mask = 1; mask < 16; mask += 1) {
+      const state = { mustChangePassword: Boolean(mask & 8), requiresConsent: Boolean(mask & 4), requiresEmailRegistration: Boolean(mask & 2), requiresProfilePhotoUpdate: Boolean(mask & 1) };
+      const target = getMemberRequiredGateRedirect({ ...state, currentPath: destination, returnTo: destination });
+      assert.ok(target);
+      const url = buildTrustedRedirectUrl(target, "https://0.0.0.0:3000/partners?q=coffee&page=2");
+      assert.equal(url.origin, "https://ssartnership-dev.myknow.xyz");
+      assert.equal(url.pathname, state.mustChangePassword ? "/auth/change-password" : state.requiresConsent ? "/auth/consent" : state.requiresEmailRegistration ? "/certification/email" : "/certification/photo");
+      assert.equal(url.searchParams.get("returnTo"), destination);
+    }
+  } finally {
+    if (beforeMode === undefined) delete process.env.SELF_HOST_MODE; else process.env.SELF_HOST_MODE = beforeMode;
+    if (beforeOrigin === undefined) delete process.env.NEXT_PUBLIC_SITE_URL; else process.env.NEXT_PUBLIC_SITE_URL = beforeOrigin;
+  }
+});
 const certificationMattermostSyncActionPath = new URL(
   "../src/components/certification/CertificationMattermostSyncAction.tsx",
   import.meta.url,

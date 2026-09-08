@@ -54,6 +54,19 @@ export function getTrustedRequestOrigin(fallback: string | null) {
   } catch { return null; }
 }
 
+/** Keep real-mode redirects on the configured public origin, not standalone's bind URL. */
+export function buildTrustedRedirectUrl(destination: string, requestUrl: string) {
+  const origin = getTrustedRequestOrigin(getOriginFromUrl(requestUrl));
+  if (!origin || !/^https?:\/\//u.test(origin)) throw new Error("REDIRECT_ORIGIN_INVALID");
+  if (!destination.startsWith("/") || destination.startsWith("//")
+    || /[\\\u0000-\u0020\u007f]/u.test(destination)) {
+    throw new Error("REDIRECT_DESTINATION_INVALID");
+  }
+  const target = new URL(destination, origin);
+  if (target.origin !== origin) throw new Error("REDIRECT_DESTINATION_INVALID");
+  return target;
+}
+
 export function isTrustedSameOriginRequest(
   request: SameOriginRequest,
   options: SameOriginOptions = {},

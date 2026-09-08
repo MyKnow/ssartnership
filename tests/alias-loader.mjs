@@ -76,6 +76,10 @@ export function resolve(specifier, context, nextResolve) {
     return nextResolve("next/navigation.js", context);
   }
 
+  if (specifier === "next/server") {
+    return nextResolve("next/server.js", context);
+  }
+
   const aliasPath = resolveAliasPath(specifier);
   if (aliasPath) {
     return {

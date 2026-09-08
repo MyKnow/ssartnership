@@ -162,3 +162,9 @@ node tests/fixtures/self-host-migration-storage.mjs .tmp/migration-storage-fixtu
 같은 집의 Mac 사본은 서버 디스크 고장에 대한 별도 장치 복구 증거일 뿐, 화재·도난·지역 회선/전원 장애에 대한 geographic DR 또는 정기 외부 백업 성공 증거가 아니다. 실제 외부 목적지와 운영자 알림 채널이 결정되기 전에는 그 전환 게이트를 닫지 않는다.
 
 Mac 반출 복원에서는 복호화한 pgBackRest/Restic 암호도 `runtimeKeysOnly`로 전달한다. 복원 설정 파일에는 비밀이 아닌 표시값만 남기며 실제 두 암호는 해당 복원 subprocess 환경에만 제공한다. 종료 시 새 drill의 DB container를 제거해 정지된 container 설정에 암호를 장기 보존하지 않는다. 복구된 volume과 검증 기록은 유지한다. 이는 정상 수명주기의 보관 최소화이며 실행 중 메모리·Docker 저장장치의 포렌식 삭제 또는 전체 디스크 암호화 보장은 아니다. 실제 회원 데이터 반입에는 별도 장치/데이터 보관 정책과 암호화 검증이 필요하다.
+
+## 공개 인증 리디렉션
+
+Next standalone의 route-handler `request.url`은 외부 HTTPS 요청에서도 컨테이너의 `0.0.0.0:3000`을 가리킬 수 있다. 실제 원본 Preview의 `/admin/session`에서 이를 확인했다. `buildTrustedRedirectUrl`은 real-mode에서 검증된 `NEXT_PUBLIC_SITE_URL`만 절대 redirect의 origin으로 사용한다. proxy의 관리자/파트너 분기와 회원 필수 단계, 관리자 세션 bridge, 파트너 로그아웃은 같은 helper를 사용한다. 일반 Vercel/로컬 실행은 기존 request origin을 유지한다.
+
+목적지는 안전한 절대 경로만 허용하며 query와 sanitized returnTo는 유지한다. 외부 URL·프로토콜 상대 URL·역슬래시·제어 문자는 거절한다. Host/forwarded header를 운영 설정의 대용으로 사용하지 않으며 real-mode 설정 누락/오염 시 내부 주소로 되돌아가지 않는다. 필수 회원 단계 순서와 같은 출처 검사, Secure/HttpOnly/SameSite 쿠키는 변경하지 않는다. 기본 합성 E2E 외에 실제 공개 origin의 로그인·관리자 bridge·로그아웃 Location을 별도로 검증해야 한다.
