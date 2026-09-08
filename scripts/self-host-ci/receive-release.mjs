@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { inflateRawSync } from "node:zlib";
 import { verifyRemoteJobs, verifyRemoteRelease } from "./github-contract.mjs";
 import { switchApplication } from "./deployment.mjs";
+import { readRootSchemaApproval, validateSchemaApproval, selectSchemaTree } from "./schema-approval.mjs";
 
 const API_ORIGIN = "https://api.github.com";
 const REPOSITORY = "MyKnow/ssartnership";
@@ -22,6 +23,7 @@ const requiresRootOwnership = process.getuid?.() === 0;
 
 export const RECEIVER_CONFIG = {
   tokenFile: "/etc/myknow/secrets/ssartnership-original-preview/github-token",
+  schemaApprovalFile: "/etc/myknow/secrets/ssartnership-original-preview/schema-approval.json",
   stateFile: "/var/lib/ssartnership-ci/original-preview/receiver-state.json",
   releaseRoot: "/var/lib/ssartnership-ci/original-preview/releases",
   composeFile: "/opt/ssartnership/control/current/deploy/self-host/compose.original-preview.yaml",
@@ -374,7 +376,7 @@ export function isSameApprovedRelease(previous, manifest) {
   return previous.appImage === previous.images.find((item) => item.component === "app")?.id;
 }
 
-export async function receiveRelease({ config = RECEIVER_CONFIG, fetcher = fetch, docker = dockerProcess, readToken = readRootToken, deploy = deployApp, now = () => new Date().toISOString(), operator = process.getuid?.() === 0 } = {}) {
+export async function receiveRelease({ config = RECEIVER_CONFIG, fetcher = fetch, docker = dockerProcess, readToken = readRootToken, readSchema = readRootSchemaApproval, deploy = deployApp, now = () => new Date().toISOString(), operator = process.getuid?.() === 0 } = {}) {
   if (!operator) fail("RECEIVER_OPERATOR_REQUIRED");
   const token = await readToken(config.tokenFile);
   const ref = await fetchApi("/repos/MyKnow/ssartnership/git/ref/heads/dev", token, fetcher);
@@ -385,6 +387,13 @@ export async function receiveRelease({ config = RECEIVER_CONFIG, fetcher = fetch
   if (!run) return { status: "pending", sha: liveSha };
   const jobs = await fetchApi(`/repos/MyKnow/ssartnership/actions/runs/${run.id}/jobs?per_page=100`, token, fetcher);
   verifyRemoteJobs(jobs.jobs, { runId: run.id, sha: liveSha });
+  // App-only deployment never applies database DDL. A trusted operator must
+  // verify the deployed migration history before approving its exact Git tree.
+  // Check even an unchanged release; persisted app state is not schema proof.
+  const schema = validateSchemaApproval(await readSchema(config.schemaApprovalFile));
+  const supabaseTree = selectSchemaTree(await fetchApi(`/repos/MyKnow/ssartnership/git/trees/${liveSha}`, token, fetcher), liveSha, "supabase");
+  const migrationTree = selectSchemaTree(await fetchApi(`/repos/MyKnow/ssartnership/git/trees/${supabaseTree}`, token, fetcher), supabaseTree, "migrations");
+  if (migrationTree !== schema.migrationTree) fail("RECEIVER_SCHEMA_NOT_APPROVED");
   const artifact = validateArtifactMetadata(await fetchApi(`/repos/MyKnow/ssartnership/actions/runs/${run.id}/artifacts?per_page=100`, token, fetcher), run.id);
   const manifest = verifyRemoteRelease(await parseReleaseArtifact(await fetchArtifact(artifact.archive_download_url, token, fetcher), artifact), run, liveSha);
   await saveManifest(config.releaseRoot, liveSha, manifest);

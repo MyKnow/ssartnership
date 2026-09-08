@@ -11,6 +11,8 @@ import { imageReference } from "../scripts/self-host-ci/github-contract.mjs";
 
 const sha = randomBytes(20).toString("hex");
 const digest = `sha256:${randomBytes(32).toString("hex")}`;
+const supabaseTree = "a".repeat(40);
+const migrationTree = "b".repeat(40);
 const manifest = {
   version: 1, repository: "MyKnow/ssartnership", sha, runId: 17, attempt: 1, platform: "linux/amd64", sourceHash: randomBytes(32).toString("hex"),
   gate: { tests: 103, failures: 0, errors: 0, skipped: 0, retries: 0, e2eRuntime: "production-test-only", fixtureBuildDeployable: false },
@@ -103,6 +105,8 @@ test("receiver independently verifies GitHub API, manifest, jobs and deploy call
     calls.push(String(url));
     const value = String(url);
     if (value.endsWith("/git/ref/heads/dev")) return new Response(JSON.stringify({ object: { sha } }), { status: 200 });
+    if (value.endsWith(`/git/trees/${sha}`)) return new Response(JSON.stringify({ sha, truncated: false, tree: [{ path: "supabase", mode: "040000", type: "tree", sha: supabaseTree }] }), { status: 200 });
+    if (value.endsWith(`/git/trees/${supabaseTree}`)) return new Response(JSON.stringify({ sha: supabaseTree, truncated: false, tree: [{ path: "migrations", mode: "040000", type: "tree", sha: migrationTree }] }), { status: 200 });
     if (value.includes("/runs?") && value.includes("head_sha=")) return new Response(JSON.stringify({ workflow_runs: [run] }), { status: 200 });
     if (value.endsWith("/jobs?per_page=100")) return new Response(JSON.stringify({ jobs }), { status: 200 });
     if (value.endsWith("/artifacts?per_page=100")) return new Response(JSON.stringify({ artifacts: [{ name: "ssartnership-preview-release", expired: false, workflow_run: { id: 17 }, size_in_bytes: bytes.length, digest: `sha256:${createHash("sha256").update(bytes).digest("hex")}`, archive_download_url: "https://api.github.com/repos/MyKnow/ssartnership/actions/artifacts/1/zip" }] }), { status: 200 });
@@ -116,7 +120,19 @@ test("receiver independently verifies GitHub API, manifest, jobs and deploy call
     if (args[0] === "image") return { stdout: JSON.stringify({ Id: pulledId, Os: "linux", Architecture: "amd64", Config: { Labels: { "org.opencontainers.image.revision": sha } }, RepoDigests: [manifest.images.find((item) => item.reference === args.at(-1))?.reference] }) };
     return { stdout: "" };
   };
-  const config = { tokenFile, stateFile: path.join(root, "state.json"), releaseRoot: path.join(root, "releases"), composeFile: path.join(root, "compose.yaml"), composeCwd: root, runtimeEnvFile: path.join(root, "app.env"), composeProject: "test", healthOrigin: "http://127.0.0.1:3108" };
-  const result = await receiveRelease({ config, fetcher, docker, readToken: async () => "t".repeat(40), deploy: async () => ({ deployed: true, image: digest, previousImage: null }), operator: true, now: () => "2026-09-08T00:00:00.000Z" });
-  assert.equal(result.status, "deployed"); assert.equal(calls.filter((url) => url.includes("api.github.com")).length, 5); assert.ok(dockerCalls.some((args) => args[0] === "login"));
+  const config = { tokenFile, schemaApprovalFile: path.join(root, "schema.json"), stateFile: path.join(root, "state.json"), releaseRoot: path.join(root, "releases"), composeFile: path.join(root, "compose.yaml"), composeCwd: root, runtimeEnvFile: path.join(root, "app.env"), composeProject: "test", healthOrigin: "http://127.0.0.1:3108" };
+  let approval = { version: 1, repository: "MyKnow/ssartnership", environment: "original-preview", project: "ssartnership-original-preview-34141078185", migrationTree, verifiedSourceSha: sha, migrationCount: 199, verifiedAt: "2026-09-08T00:00:00.000Z" };
+  const options = { config, fetcher, docker, readToken: async () => "t".repeat(40), readSchema: async () => approval, deploy: async () => ({ deployed: true, image: digest, previousImage: null }), operator: true, now: () => "2026-09-08T00:00:00.000Z" };
+  try {
+    const result = await receiveRelease(options);
+    assert.equal(result.status, "deployed"); assert.equal(calls.filter((url) => url.includes("api.github.com")).length, 7); assert.ok(dockerCalls.some((args) => args[0] === "login"));
+    const before = await readFile(config.stateFile, "utf8");
+    const dockerCount = dockerCalls.length;
+    approval = { ...approval, migrationTree: "0".repeat(40) };
+    await assert.rejects(() => receiveRelease(options), /RECEIVER_SCHEMA_NOT_APPROVED/);
+    assert.equal(dockerCalls.length, dockerCount, "schema drift must stop before any image pull or deployment");
+    assert.equal(await readFile(config.stateFile, "utf8"), before, "an existing release must not bypass schema approval");
+    await assert.rejects(() => receiveRelease({ ...options, readSchema: async () => { throw new Error("RECEIVER_SCHEMA_APPROVAL_FILE_INVALID"); } }), /RECEIVER_SCHEMA_APPROVAL_FILE_INVALID/);
+    assert.equal(dockerCalls.length, dockerCount);
+  } finally { await rm(root, { recursive: true, force: true }); }
 });

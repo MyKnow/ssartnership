@@ -9,6 +9,26 @@ authority: normative
 
 상위 작업은 [Issue #435](https://github.com/MyKnow/ssartnership/issues/435)와 [마이그레이션 작업 목록](../self-hosting/tasks.md)이다. 코드 준비와 실제 실행 완료를 구분한다.
 
+## 2026-09-08 19시대 공개 Preview 전환
+
+이 절이 해당 시점의 최신 실행 요약이며, 아래 시간별 기록의 미완료 표시는 그 기록 당시의 상태다.
+
+- [x] HostingKR에서 Preview 앱/API 두 이름만 `121.168.23.74` A/TTL 60으로 연결했다. Production과 다른 DNS 레코드는 유지했다.
+- [x] Caddy의 TCP 80/443·UDP 443 웹 바인딩과 범위 제한 Docker 방화벽 예외를 검증·설치했다. 정적 probe 제거/규칙 복귀/새 SSH 확인 후 실제 앱/API를 연결했으며 Docker/서버 재시작은 하지 않았다.
+- [x] Cloud Preview 서비스의 CONNECT만 차단하고 기존 세션 5개 종료, 새 서비스 세션 0·관리 연결 유지 후 137개 테이블/124,998행 전체 hash와 두 sequence를 대조했다. Cloud 프로젝트/데이터를 삭제하지 않았다.
+- [x] Cloud 원본 823파일/39,851,100바이트의 최신 GET hash/MIME/ETag와 home 원본 ledger가 일치했다. 공개 HTTPS API에서도 전량 대조와 임시 public/private 업로드·서명 다운로드·권한 거절·정리 검증을 통과했다.
+- [x] Let’s Encrypt의 독립 외부 HTTP-01/TLS-ALPN-01 검증과 두 인증서 발급을 확인했다. 실제 공개 앱 health 200, 27개 제휴처·광고·검색·상세, 회원 returnTo·관리자 redirect·파트너 로그인 화면을 브라우저에서 확인했다. Mac/서버 HTTP 호출은 동일 회선 hairpin이며 독립 외부 브라우저의 전체 사용자 흐름은 아니다.
+- [x] PR #448 source `403732cf`의 첫 Public/Cross-Platform 성공 후 dev `4bba2b78`로 병합했다. dev Public `34215789435`와 이미지 `34215789448`의 첫 실행·전체 job/step·로그/annotation을 확인했다. 이미지 gate E2E 103, retry/skip/error 0이며 registry auth 네 줄과 기존 artifact Buffer DEP0005 두 줄을 별도 분류했다.
+- [x] root controller 교체 후 GHCR app digest `71a8f55a6bd61883dd0bba567c5874f438b00a62016888dd246c494c4ceda119`를 실제 적용했다. 두 번째 receiver 호출은 `unchanged`였고 container ID/StartedAt/appliedAt가 유지됐다. DB·Storage·관측 이미지는 app 교체와 별개다.
+- [ ] schema 승인 guard의 새 exact-SHA 검증·서버 적용 후 receiver timer를 켜고 실제 예약 실행을 확인한다.
+- [ ] 실제 회원·관리자·파트너의 로그인 완료 및 외부 연동 검증, 원본 DB 상시 PITR/정기 외부 반출과 운영자 알림 수신.
+
+20:04 KST `/admin/session`의 실제 GET이 컨테이너 내부 주소로 307 응답하는 것을 확인했다. 데이터/TLS 성공과 별개의 standalone 절대 redirect 결함이며 [별도 수정 계획](https://github.com/MyKnow/ssartnership/issues/435#issuecomment-5584174724)에 따라 교정한다. 이 문제가 해결되기 전에는 인증 전환 수용과 상시 receiver를 완료로 표시하지 않는다.
+
+공개 API 시험의 두 초기 최종 감사 실패는 누적 Storage 로그의 이전 cold backup DB 연결 종료 1건(`09:35:17.898Z`) 때문이었다. 기능·정리 assertion 이후 `log-level-audit`까지 완료된 증거를 유지했다. 전환 이후 별도 로그 감사는 ERROR 0, Authorization/서명 token/미분류 URL 0이며 경고 4건은 해당 합성 private object의 접근 거절이다. 실패 로그와 과거 연결 종료는 삭제하지 않았다.
+
+홈 서버에 새 쓰기가 생긴 이후 Cloud 연결 ACL/DNS를 단순히 되돌리면 데이터가 갈라진다. 복귀 전 새 쓰기 차이를 조정해야 하며, 현재 Cloud Preview는 원본을 보존한 채 frozen 상태다. 원본 cold backup의 외부 보관·격리 복구와 실제 연속 PITR를 구분한다.
+
 ## 2026-09-08 원본 Preview 수신과 격리 전체 복원
 
 - [x] `08c762d1` 원격 수집의 Storage 20분 만료 실패를 보존하고, 최대 4개 병렬 처리·취소·최종 만료 검사를 `e92ebcdb`에 커밋·푸시했다. 로컬 high/Quick은 Node 1,842 통과/기존 skip 8, unit 133 통과였다.

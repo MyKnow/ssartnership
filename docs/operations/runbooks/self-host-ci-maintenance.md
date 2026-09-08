@@ -7,7 +7,7 @@ authority: normative
 
 # 격리 CI·배포·유지보수
 
-[데이터 계획](../../specs/self-host-database/plan.md), [관측 운영](./self-host-observability.md), [진행 증거](../../specs/self-host-database/tasks.md)를 함께 따른다. 아래 구현은 기존 GitHub/Vercel/Supabase Production을 중단하지 않는 원래 Cloud Preview 전용 경로다. GitHub release 수신기와 app/관측 Compose overlay는 구현했지만 아직 서버 설치·활성화 및 공개 ingress 전환을 완료한 것으로 해석하지 않는다. 실제 데이터 전환·외부 알림/재해 백업도 별도 게이트다.
+[데이터 계획](../../specs/self-host-database/plan.md), [관측 운영](./self-host-observability.md), [진행 증거](../../specs/self-host-database/tasks.md)를 함께 따른다. 아래 구현은 기존 GitHub/Vercel/Supabase Production을 중단하지 않는 원래 Cloud Preview 전용 경로다. 원본 데이터·공개 DNS/TLS 전환 및 GitHub 이미지의 서버 app 적용은 확인했고, 현재의 정확한 SHA와 timer·인증·외부 알림·상시 PITR 미완료 경계는 진행 증거에서 확인한다. 합성 환경의 복구 성공을 원본 환경의 연속 PITR로 해석하지 않는다.
 
 ## 권한과 소스 승인
 
@@ -38,6 +38,16 @@ flock --nonblock --conflict-exit-code 75 /var/lib/ssartnership-ci/heavy.lock
 공개 빌드 origin은 앱 `https://ssartnership-dev.myknow.xyz`, API `https://ssartnership-api-dev.myknow.xyz`로 고정한다. 이 설정은 DNS/TLS 전환 또는 데이터 이전 증거가 아니다. 실패 시 complete bundle을 만들지 않고 container 종료 상태와 가능한 gate 로그를 남긴다.
 
 서버 수용 계약 `github-contract.mjs`와 `receive-release.mjs`는 독립 조회한 GitHub run/jobs의 저장소·workflow 경로·현재 dev SHA·첫 실행·성공과 두 job의 필수 단계 및 전체 단계 성공을 요구한다. manifest 자체의 주장은 충분하지 않다. 수신기는 root 전용 token 파일과 root-owned release/state directory를 사용하고, GHCR에서 세 이미지를 모두 immutable reference로 pull한 뒤 image ID·AMD64·revision·단일 RepoDigest를 확인한다. 이후 `compose.original-preview.yaml`의 app만 `--pull never`로 교체하고 `/api/health`·`/auth/login`을 확인하며 실패 시 이전 app image로 rollback한다. 실제 서버 artifact 수신·registry 접근·후보 env/health·공개 ingress·백업 연결 증거가 쌓이기 전에는 polling timer를 활성화하지 않는다.
+
+### 앱 자동 배포의 DB schema 승인
+
+수신기는 DB DDL을 적용하지 않는다. `/etc/myknow/secrets/ssartnership-original-preview/schema-approval.json`은 root-owned·0600·단일 regular file이어야 하며 symlink와 4KiB 초과를 거절한다. 버전 1의 정확한 필드는 `repository=MyKnow/ssartnership`, `environment=original-preview`, `project=ssartnership-original-preview-34141078185`, `migrationTree`, `verifiedSourceSha`, `migrationCount`, `verifiedAt`이다.
+
+운영자는 실제 원본 Preview의 적용 migration 목록/내용과 source 동등성, 현재 백업 및 필요한 새 DDL 적용·회귀 검증을 확인한 뒤에만 승인 파일을 작성한다. `migrationTree`는 해당 source의 `supabase/migrations` Git tree SHA다. git ref 자체나 app SHA를 대신 넣지 않는다. 승인 파일은 비밀을 포함하지 않지만 배포 권한이므로 CI·앱·builder가 쓰지 못해야 한다.
+
+receiver는 [GitHub Trees API](https://docs.github.com/en/rest/git/trees#get-a-tree)의 비재귀 응답을 두 단계 읽어 exact dev SHA → supabase → migrations tree를 찾는다. 요청 SHA·완전한 응답·경로/종류/모드·단일 항목을 검증하고 운영 승인 tree와 다르면 manifest 저장·이미지 pull·앱 교체 전에 중단한다. 같은 앱 릴리스가 이미 적용됐어도 schema 검사를 생략하지 않는다. 새 migration의 추가·삭제·수정은 모두 tree를 바꾸므로 운영자 검증 없이 자동 통과하지 않는다.
+
+이는 승인 시점 이후 운영자가 수행한 임의 DDL까지 지속 감지하는 schema drift scanner가 아니다. DB 변경은 별도 운영 절차와 백업/동등성 증거를 남겨야 한다. 승인 파일을 latest dev 값으로 자동 갱신하거나 단순 count 일치만으로 새 migration을 적용한 것으로 간주하지 않는다.
 
 ## 검증과 이미지 전달
 
