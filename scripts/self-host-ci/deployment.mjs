@@ -40,10 +40,15 @@ export async function waitApplication(origin, { timeout = 90_000, fetcher = fetc
   }
   throw new Error("DEPLOY_HEALTH_FAILED");
 }
-export async function switchApplication({ composeArgs, cwd, nextImage, previousImage = null, origin, timeout }, run = runOperatorCommand) {
+export async function switchApplication({ composeArgs, cwd, nextImage, previousImage = null, origin, timeout, environment = {} }, run = runOperatorCommand) {
   if (![nextImage, ...(previousImage ? [previousImage] : [])].every((id) => /^sha256:[a-f0-9]{64}$/u.test(id))) throw new Error("DEPLOY_IMMUTABLE_IMAGE_REQUIRED");
+  if (!environment || typeof environment !== "object" || Array.isArray(environment)
+    || Object.keys(environment).some((key) => key !== "SELF_HOST_TELEMETRY_IMAGE")
+    || (environment.SELF_HOST_TELEMETRY_IMAGE !== undefined && !/^sha256:[a-f0-9]{64}$/u.test(environment.SELF_HOST_TELEMETRY_IMAGE))) {
+    throw new Error("DEPLOY_ENVIRONMENT_INVALID");
+  }
   const activate = async (image) => {
-    const options = { cwd, env: { SELF_HOST_IMAGE: image } };
+    const options = { cwd, env: { SELF_HOST_IMAGE: image, ...environment } };
     await run("docker", [...composeArgs, "up", "-d", "--no-deps", "--no-build", "--pull", "never", "app"], options);
     const response = await run("docker", [...composeArgs, "ps", "--quiet", "app"], options);
     const container = response.stdout.trim();
@@ -58,7 +63,7 @@ export async function switchApplication({ composeArgs, cwd, nextImage, previousI
   } catch (error) {
     try {
       if (previousImage) await activate(previousImage);
-      else await run("docker", [...composeArgs, "stop", "app"], { cwd, env: { SELF_HOST_IMAGE: nextImage } });
+    else await run("docker", [...composeArgs, "stop", "app"], { cwd, env: { SELF_HOST_IMAGE: nextImage, ...environment } });
     } catch { throw new Error("DEPLOY_ROLLBACK_FAILED"); }
     throw Object.assign(new Error(previousImage ? "DEPLOY_FAILED_ROLLED_BACK" : "DEPLOY_FAILED_STOPPED"), { cause: error });
   }

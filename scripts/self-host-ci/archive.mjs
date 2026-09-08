@@ -29,7 +29,11 @@ export function parseHeader(header) {
   const name = text(header.subarray(0, 100));
   const type = String.fromCharCode(header[156]);
   if (prefix || !["0", "\0", "5"].includes(type)) reject("CI_TAR_TYPE_INVALID");
-  const allowedFile = /^(?:manifest\.json|index\.json|oci-layout|blobs\/sha256\/[a-f0-9]{64}|[a-f0-9]{64}\.json|[a-f0-9]{64}\/(?:layer\.tar|json|VERSION))$/u;
+  // Docker's `save` output may include this legacy tag index even when the
+  // archive is OCI-backed. It is intentionally validated only as an allowed
+  // ignored entry; the selected manifest/config/layer closure below remains
+  // the sole content written to the sanitized archive.
+  const allowedFile = /^(?:manifest\.json|index\.json|oci-layout|repositories|blobs\/sha256\/[a-f0-9]{64}|[a-f0-9]{64}\.json|[a-f0-9]{64}\/(?:layer\.tar|json|VERSION))$/u;
   const allowedDirectory = /^(?:blobs\/|blobs\/sha256\/|[a-f0-9]{64}\/)$/u;
   if (!(type === "5" ? allowedDirectory : allowedFile).test(name)) reject("CI_TAR_PATH_INVALID");
   const size = octal(header.subarray(124, 136));

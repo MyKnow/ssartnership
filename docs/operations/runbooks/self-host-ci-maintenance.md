@@ -7,7 +7,7 @@ authority: normative
 
 # 격리 CI·배포·유지보수
 
-[데이터 계획](../../specs/self-host-database/plan.md), [관측 운영](./self-host-observability.md), [진행 증거](../../specs/self-host-database/tasks.md)를 함께 따른다. 아래 구현은 기존 GitHub/Vercel/Supabase Production을 중단하지 않는 별도 synthetic Preview용이다. 공개 ingress·실제 데이터 전환·외부 알림/재해 백업을 완료한 것으로 해석하지 않는다.
+[데이터 계획](../../specs/self-host-database/plan.md), [관측 운영](./self-host-observability.md), [진행 증거](../../specs/self-host-database/tasks.md)를 함께 따른다. 아래 구현은 기존 GitHub/Vercel/Supabase Production을 중단하지 않는 원래 Cloud Preview 전용 경로다. GitHub release 수신기와 app/관측 Compose overlay는 구현했지만 아직 서버 설치·활성화 및 공개 ingress 전환을 완료한 것으로 해석하지 않는다. 실제 데이터 전환·외부 알림/재해 백업도 별도 게이트다.
 
 ## 권한과 소스 승인
 
@@ -27,7 +27,7 @@ flock --nonblock --conflict-exit-code 75 /var/lib/ssartnership-ci/heavy.lock
   /srv/ci/artifacts/ssartnership/<40자리 SHA>-<12자리 job ID>
 ```
 
-자동 GitHub runner 등록이나 공개 webhook을 설치하지 않는다. 기존 서버 경로는 **승인된 입력을 받아 실행하는 수동 trigger pipeline**이며 변경 감지/polling이 활성화된 Continuous Delivery는 아니다. 아래 이미지 게시 경로도 서버 배포 연결 검증 전까지 자동 배포 완료로 해석하지 않는다. Production 승격은 별도 수동 승인이다.
+자동 GitHub runner 등록이나 공개 webhook을 설치하지 않는다. 서버는 GitHub API의 현재 `dev` ref와 첫 성공 attempt만 독립 조회하는 `ssartnership-preview-receiver.service`/`.timer`를 사용한다. 수신기는 artifact digest·`release.json`·전체 job/step·GHCR immutable digest를 검증한 뒤 app만 교체하고, 공유 heavy lock·health·rollback 결과를 기록한다. 이 timer는 서버의 token/config·후보 앱 health·Caddy/DNS·실제 백업을 검증한 뒤에만 enable한다. Production 승격은 별도 수동 승인이다.
 
 ### GitHub 빌드와 GHCR 게시
 
@@ -37,7 +37,7 @@ flock --nonblock --conflict-exit-code 75 /var/lib/ssartnership-ci/heavy.lock
 
 공개 빌드 origin은 앱 `https://ssartnership-dev.myknow.xyz`, API `https://ssartnership-api-dev.myknow.xyz`로 고정한다. 이 설정은 DNS/TLS 전환 또는 데이터 이전 증거가 아니다. 실패 시 complete bundle을 만들지 않고 container 종료 상태와 가능한 gate 로그를 남긴다.
 
-서버 수용 계약 `github-contract.mjs`는 독립 조회한 GitHub run/jobs의 저장소·workflow 경로·현재 dev SHA·첫 실행·성공과 두 job의 필수 단계 및 전체 단계 성공을 요구한다. manifest 자체의 주장은 충분하지 않다. 실제 서버의 artifact 수신, registry 접근, source hash·migration 호환성 검증, 공유 lock, Preview 활성화와 rollback 연결은 미완료다. 연결 검증 전에는 polling timer를 활성화하지 않는다.
+서버 수용 계약 `github-contract.mjs`와 `receive-release.mjs`는 독립 조회한 GitHub run/jobs의 저장소·workflow 경로·현재 dev SHA·첫 실행·성공과 두 job의 필수 단계 및 전체 단계 성공을 요구한다. manifest 자체의 주장은 충분하지 않다. 수신기는 root 전용 token 파일과 root-owned release/state directory를 사용하고, GHCR에서 세 이미지를 모두 immutable reference로 pull한 뒤 image ID·AMD64·revision·단일 RepoDigest를 확인한다. 이후 `compose.original-preview.yaml`의 app만 `--pull never`로 교체하고 `/api/health`·`/auth/login`을 확인하며 실패 시 이전 app image로 rollback한다. 실제 서버 artifact 수신·registry 접근·후보 env/health·공개 ingress·백업 연결 증거가 쌓이기 전에는 polling timer를 활성화하지 않는다.
 
 ## 검증과 이미지 전달
 
@@ -88,7 +88,7 @@ Mac engine은 사용자 소유 Docker Desktop Unix socket에 고정하고 환경
 
 원본 운영 데이터는 반입하지 않는다. 새 DB에 남은 두 폐기된 기본 banner seed만 비활성화한다. 운영/복원 DB에는 이 seed 조정을 실행하지 않는다. 외부 Mattermost/메일 등 실제 연동은 비활성/미설정이며, synthetic DB를 실서비스 데이터로 오해하지 않는다. 서비스 포트는 loopback에만 공개하고 `compose.server.yaml`로 자원/로그 상한을 적용한다.
 
-앱 교체는 `switchApplication`이 immutable image로 app 서비스만 갱신하고 실제 container 이미지와 health·로그인 GET 200을 검사한다. 실패하면 이전 이미지로 돌아가 다시 검사하며 rollback 실패를 별도 오류로 보고한다. 초기 배포에 이전 이미지가 없으면 앱만 중단한다. 데이터 볼륨·schema는 이 경로에서 삭제/역변환하지 않는다. DB major 또는 비호환 migration rollback은 새 환경의 복구/전환 절차다.
+앱 교체는 `switchApplication`이 immutable image로 app 서비스만 갱신하고 실제 container 이미지와 health·로그인 GET 200을 검사한다. 원래 Cloud Preview의 DB/REST/Storage/Kong Compose와 volume은 이 overlay에서 재생성하거나 삭제하지 않는다. 실패하면 이전 이미지로 돌아가 다시 검사하며 rollback 실패를 별도 오류로 보고한다. 초기 배포에 이전 이미지가 없으면 앱만 중단한다. 데이터 볼륨·schema는 이 경로에서 삭제/역변환하지 않는다. DB major 또는 비호환 migration rollback은 새 환경의 복구/전환 절차다. overlay의 telemetry·Prometheus·Alertmanager·Grafana·exporter는 app health와 후보 monitoring secret을 확인한 뒤 별도로 기동하며, 모든 서비스에 bounded log·memory·CPU·PID 상한을 적용한다.
 
 ## 유지보수
 

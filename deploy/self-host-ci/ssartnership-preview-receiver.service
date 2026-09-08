@@ -1,0 +1,15 @@
+[Unit]
+Description=SSARTNERSHIP original Preview GitHub release receiver
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+Nice=10
+TimeoutStartSec=15min
+Environment=PATH=/opt/ssartnership/node24:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/usr/bin/flock --nonblock --conflict-exit-code 75 /var/lib/ssartnership-ci/heavy.lock /opt/ssartnership/node24/node /opt/ssartnership/control/current/scripts/self-host-ci/receive-release.mjs
