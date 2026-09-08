@@ -270,8 +270,11 @@ async function dockerProcess(args, { input, allowFailure = false, env = {} } = {
 }
 
 export function validatePulledImage(inspected, expected, sha) {
+  // The build-time image ID can be a local/containerd identifier and is not
+  // stable after publication and a registry pull. The immutable RepoDigest,
+  // platform and revision label are the pulled-image identity checks.
   if (!inspected || expected?.component === undefined || !SHA.test(sha) || !HASH.test(expected.digest) || !/^sha256:[a-f0-9]{64}$/u.test(expected.id)
-    || inspected.Id !== expected.id || inspected.Os !== "linux" || inspected.Architecture !== "amd64"
+    || !/^sha256:[a-f0-9]{64}$/u.test(inspected.Id) || inspected.Os !== "linux" || inspected.Architecture !== "amd64"
     || inspected.Config?.Labels?.["org.opencontainers.image.revision"] !== sha
     || !Array.isArray(inspected.RepoDigests) || inspected.RepoDigests.length !== 1 || inspected.RepoDigests[0] !== expected.reference) fail("RECEIVER_IMAGE_NOT_APPROVED");
   return true;

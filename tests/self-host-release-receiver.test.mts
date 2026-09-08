@@ -65,8 +65,10 @@ test("receiver rejects duplicate, retried and non-success runs", () => {
 
 test("pulled images must match immutable digest, platform, revision and repository digest", () => {
   const item = manifest.images[0];
-  assert.doesNotThrow(() => validatePulledImage({ Id: item.id, Os: "linux", Architecture: "amd64", Config: { Labels: { "org.opencontainers.image.revision": sha } }, RepoDigests: [item.reference] }, item, sha));
-  for (const patch of [{ Architecture: "arm64" }, { RepoDigests: [] }, { Id: `sha256:${randomBytes(32).toString("hex")}` }]) assert.throws(() => validatePulledImage({ Id: item.id, Os: "linux", Architecture: "amd64", Config: { Labels: { "org.opencontainers.image.revision": sha } }, RepoDigests: [item.reference], ...patch }, item, sha));
+  const pulledId = `sha256:${randomBytes(32).toString("hex")}`;
+  assert.notEqual(pulledId, item.id);
+  assert.doesNotThrow(() => validatePulledImage({ Id: pulledId, Os: "linux", Architecture: "amd64", Config: { Labels: { "org.opencontainers.image.revision": sha } }, RepoDigests: [item.reference] }, item, sha));
+  for (const patch of [{ Architecture: "arm64" }, { RepoDigests: [] }, { Id: "not-a-content-address" }]) assert.throws(() => validatePulledImage({ Id: pulledId, Os: "linux", Architecture: "amd64", Config: { Labels: { "org.opencontainers.image.revision": sha } }, RepoDigests: [item.reference], ...patch }, item, sha));
 });
 
 test("receiver independently verifies GitHub API, manifest, jobs and deploy callback", async () => {
@@ -85,9 +87,10 @@ test("receiver independently verifies GitHub API, manifest, jobs and deploy call
     throw new Error("unexpected fetch");
   };
   const dockerCalls: string[][] = [];
+  const pulledId = `sha256:${randomBytes(32).toString("hex")}`;
   const docker = async (args: string[]): Promise<{ stdout: string }> => {
     dockerCalls.push(args);
-    if (args[0] === "image") return { stdout: JSON.stringify({ Id: digest, Os: "linux", Architecture: "amd64", Config: { Labels: { "org.opencontainers.image.revision": sha } }, RepoDigests: [manifest.images.find((item) => item.reference === args.at(-1))?.reference] }) };
+    if (args[0] === "image") return { stdout: JSON.stringify({ Id: pulledId, Os: "linux", Architecture: "amd64", Config: { Labels: { "org.opencontainers.image.revision": sha } }, RepoDigests: [manifest.images.find((item) => item.reference === args.at(-1))?.reference] }) };
     return { stdout: "" };
   };
   const config = { tokenFile, stateFile: path.join(root, "state.json"), releaseRoot: path.join(root, "releases"), composeFile: path.join(root, "compose.yaml"), composeCwd: root, runtimeEnvFile: path.join(root, "app.env"), composeProject: "test", healthOrigin: "http://127.0.0.1:3108" };
