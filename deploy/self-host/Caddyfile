@@ -1,0 +1,28 @@
+{
+	# Caddy obtains and renews the public certificates after DNS points at this
+	# host. Do not replace these names with a temporary local certificate.
+	admin off
+	servers {
+		timeouts {
+			read_body 70s
+			write 70s
+			idle 5m
+		}
+	}
+}
+
+ssartnership-dev.myknow.xyz {
+	encode zstd gzip
+	request_body {
+		max_size 64MB
+	}
+	reverse_proxy app:3000
+}
+
+ssartnership-api-dev.myknow.xyz {
+	encode zstd gzip
+	request_body {
+		max_size 64MB
+	}
+	reverse_proxy gateway:8000
+}
