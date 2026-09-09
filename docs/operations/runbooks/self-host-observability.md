@@ -62,7 +62,7 @@ Mac의 `dev.myknow.ssartnership-production-backup` LaunchAgent는 로그인 시�
 
 서버의 metrics timer는 매분 마지막 스냅샷과 Mac에 실제 복사된 스냅샷 시각을 갱신한다. Production 전용 경보는 수집 중단 5분, 서버/Mac 사본 26시간 노후 또는 지표 누락을 감지한다. 오래된 파일을 다시 확인해도 사본의 생성 시각은 갱신하지 않는다. 외부 알림 수신처 설정과 전달 성공은 별도로 검증한다.
 
-복구 시험은 Mac 암호문과 Keychain 키로 복원한 새 서버 비공개 경로를 `restore-production-backup.mjs`에 제공한다. network-none DB에서 테이블별 전체 행 hash와 Storage 전체 파일 hash·메타데이터를 비교하고 원본 mount가 없음을 확인한다. 실제 설치·예약 실행·Mac 수신·복구 시험의 결과는 각각 Issue #453 receipt로 구분하며, 최종 데이터 전환 후 새 스냅샷으로 다시 확인한다.
+복구 시험은 Mac 암호문과 Keychain 키로 복원한 새 서버 비공개 경로와 검증한 receipt의 `databaseSystemId`를 `restore-production-backup.mjs <경로> <databaseSystemId>`에 제공한다. 식별자는 초기 후보 상수가 아니라 해당 백업의 receipt·암호화 manifest·실제 격리 복원 DB에서 모두 일치해야 한다. network-none DB에서 테이블별 전체 행 hash와 Storage 전체 파일 hash·메타데이터를 비교하고 원본 mount가 없음을 확인한다. 새 백업의 암호화 manifest는 캡처 당시 실행 중인 앱의 Git SHA와 이미지 식별자도 보존하므로 데이터 시점에 맞는 앱을 복구할 때 사용한다. 실제 설치·예약 실행·Mac 수신·복구 시험의 결과는 각각 Issue #453 receipt로 구분하며, 최종 데이터 전환 후 새 스냅샷으로 다시 확인한다.
 
 ### Production 외부 관측 경로
 

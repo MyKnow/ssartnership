@@ -6,7 +6,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { pipeline } from 'node:stream/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { validateBackupReceipt, selectBackupRetention } from './production-backup-contract.mjs';
+import { validateBackupReceipt, selectBackupRetention, backupApplicationIdentity } from './production-backup-contract.mjs';
 
 const ROOT = '/srv/backups/ssartnership-production';
 const CONFIG = '/etc/myknow/secrets/ssartnership-production/backup.json';
@@ -81,6 +81,8 @@ async function capture() {
   const sql = query => run('docker', ['exec', DB, 'psql', '-X', '-qAt', '-v', 'ON_ERROR_STOP=1', '-h', '/tmp', '-U', 'supabase_admin', '-d', 'postgres', '-c', query]).trim();
   ensure(sql('SELECT system_identifier::text FROM pg_control_system()') === config.databaseSystemId);
   ensure(sql("SELECT count(*) FROM pg_tablespace WHERE spcname NOT IN ('pg_default','pg_global')") === '0');
+  const app = JSON.parse(run('docker', ['inspect', 'ssartnership-production-app-1']))[0];
+  const application = backupApplicationIdentity(app, JSON.parse(run('docker', ['image', 'inspect', app.Image]))[0]);
   const id = randomUUID(), temporary = `${ROOT}/${id}.partial`, outgoing = '/srv/ssartnership-backup-export';
   await mkdir(temporary, { mode: 0o700 });
   const selected = JSON.parse(run('docker', ['inspect', ...WRITERS])).filter(c => c.State.Running).map(c => c.Name.slice(1));
@@ -99,7 +101,7 @@ async function capture() {
     ensure(JSON.stringify(await inventory(`${config.source}/storage`)) === JSON.stringify(storage));
     for (const name of ['data.env', 'compose.json']) { await privateFile(`${config.source}/${name}`); await copyFile(`${config.source}/${name}`, `${temporary}/${name}`); }
     const appFile = '/etc/myknow/secrets/ssartnership-production/app.env'; await privateFile(appFile); await copyFile(appFile, `${temporary}/app.env`);
-    await writeFile(`${temporary}/manifest.json`, JSON.stringify({ version: 1, kind: 'production-cold-snapshot', id, capturedAt: new Date().toISOString(), databaseImage: current.Image, databaseSystemId: config.databaseSystemId, tables, storage, applicationWritesQuiesced: true, databaseCleanlyStopped: true, continuousPitr: false }), { mode: 0o600, flag: 'wx' });
+    await writeFile(`${temporary}/manifest.json`, JSON.stringify({ version: 1, kind: 'production-cold-snapshot', id, capturedAt: new Date().toISOString(), databaseImage: current.Image, databaseSystemId: config.databaseSystemId, application, tables, storage, applicationWritesQuiesced: true, databaseCleanlyStopped: true, continuousPitr: false }), { mode: 0o600, flag: 'wx' });
   } finally { await resumeProductionBackup(); }
   await encryptBundle(temporary, config.recipient, `${temporary}/snapshot.tar.age`);
   const info = await lstat(`${temporary}/snapshot.tar.age`);

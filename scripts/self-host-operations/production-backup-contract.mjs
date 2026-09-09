@@ -1,6 +1,12 @@
 const UUID = "[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}";
 const HASH = "[a-f0-9]{64}";
 const fail = () => { throw new Error("PRODUCTION_BACKUP_CONTRACT_INVALID"); };
+export function backupApplicationIdentity(container, image) {
+  const sourceSha = image?.Config?.Labels?.["org.opencontainers.image.revision"];
+  if (container?.State?.Running !== true || !/^sha256:[a-f0-9]{64}$/u.test(image?.Id ?? "")
+    || container.Image !== image.Id || typeof sourceSha !== "string" || !/^[a-f0-9]{40}$/u.test(sourceSha)) fail();
+  return { sourceSha, image: image.Id };
+}
 export function parseBackupCommand(value) {
   if (value === "list") return { command: "list" };
   if (typeof value !== "string" || /[\r\n\0]/u.test(value)) fail();
