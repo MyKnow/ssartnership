@@ -4,6 +4,13 @@ import { createRequire } from 'node:module';
 import { test } from 'node:test';
 const require=createRequire(import.meta.url);
 const {load}=require('js-yaml');
+test('home Production promotion preserves Preview deployment and the shared cron schedule',()=>{
+ const config=JSON.parse(readFileSync(new URL('../vercel.json',import.meta.url),'utf8'));
+ assert.deepEqual(config.git.deploymentEnabled,{main:false});
+ assert.equal(config.installCommand,'npm run install:trusted');
+ assert.equal(config.crons.length,11);
+ assert.equal(new Set(config.crons.map((entry:{path:string})=>entry.path)).size,11);
+});
 test('Production application and monitoring use separate data networks, secrets and volumes',()=>{
  const source=readFileSync(new URL('../deploy/self-host/compose.production.yaml',import.meta.url),'utf8');
  const config=load(source);

@@ -75,6 +75,8 @@ docker compose -p ssartnership-edge -f deploy/self-host/compose.edge.yaml run --
 
 ## Cron 이식
 
+Production 홈 서버 전환에서는 `vercel.json`의 `git.deploymentEnabled.main=false`로 main 커밋의 Vercel 자동 배포를 중지한다. 지정하지 않은 dev와 작업 브랜치는 Preview 배포를 유지한다. 이는 새 앱이 이전 Cloud 스키마에 먼저 배포되는 것을 막는 전환 계약이다. 기존 Vercel 배포는 복구용으로 보존하며 이 설정만으로 기존 요청이나 Cron이 중지되지는 않는다. 최종 데이터 복사 직전에 Vercel 설정에서 Cron을 비활성화하고 기존 Production 요청을 정지한 뒤 진행 중인 쓰기 종료와 원본 쓰기 차단을 확인한다. 신규 Production 검증은 승인된 main SHA의 홈 서버 이미지·DB·실제 공개 흐름을 기준으로 수행한다. 새 서버가 쓰기를 받은 뒤에는 데이터 차이 확인 없이 기존 서비스와 DNS를 재개하지 않는다.
+
 일정과 endpoint는 `vercel.json`이 정본이며 모두 UTC다. 목록 조회는 HTTP 요청을 보내지 않는다.
 
 ```bash
@@ -90,6 +92,8 @@ node scripts/self-host-cron.mjs --run /api/cron/rss
 외부 scheduler는 목록의 각 UTC 일정에 대응하는 단발 명령을 실행한다. 같은 job이 겹치지 않게 실행 잠금을 설정하고 종료 코드와 실패 알림을 수집한다. 도구가 timeout으로 끝났다고 서버 작업까지 취소됐다고 가정하지 않는다. 재실행 전에 실행 로그와 실제 데이터 결과를 확인한다.
 
 운영 전환에서는 기존 Vercel Cron을 중지한 다음 새 scheduler 하나만 활성화한다. 전환 직후 job별 마지막 실행 시각, 결과, 중복 여부를 확인한다. 이 앱 Compose는 반복 scheduler를 자동으로 시작하지 않는다.
+
+홈 Production의 `production-cron.mjs`는 이 목록에서 일일 UTC systemd timer를 생성하고, 그 밖의 일정 문법은 설치 전에 거절한다. `ssartnership-production-cron@.service`는 고정 loopback 앱으로만 요청하며 비밀은 root 전용 파일에서 읽는다. 먼저 검증된 버전의 스크립트·공용 Cron 모듈·vercel.json을 `/opt/ssartnership/production-cron/` 아래에 설치하고 `current` 링크와 11개 timer를 준비하되 활성화하지 않는다. 기존 Cron 비활성화·최종 동기화·공개 전환 검증 뒤에만 root 전용 `cron-owner` 파일에 `home-production`을 기록하고 timer를 활성화한다. 파일이 없거나 값이 다르면 실행하지 않는다. timer는 `Persistent=false`라서 중지 중의 과거 작업을 한꺼번에 실행하지 않는다. 단발 호출은 전용 잠금으로 직렬화하고 HTTP timeout 뒤 자동 재시도하지 않는다. 누락/실패는 systemd 결과와 앱의 작업 이력을 확인한 뒤 판단한다.
 
 ## 운영·복구 검증
 
