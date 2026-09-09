@@ -2,7 +2,7 @@ import http from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import { parseVitalSample, VITAL_NAMES, VITAL_ROUTES, createVitalIngressQuota } from "../../src/lib/web-vitals-contract.ts";
 
-export const ALERT_NAMES = new Set(["ServiceDown", "DatabaseUnavailable", "HostDiskLow", "HostMemoryLow", "BackupMissingOrStale", "BackupFailed", "ArchiveUnhealthy", "OperationsExporterStale", "RestoreDrillStale", "OffhostBackupStale", "OffhostBackupFailed", "AlertDeliveryUnavailable", "SyntheticAlert"]);
+export const ALERT_NAMES = new Set(["ServiceDown", "DatabaseUnavailable", "HostDiskLow", "HostMemoryLow", "BackupMissingOrStale", "BackupFailed", "ArchiveUnhealthy", "OperationsExporterStale", "RestoreDrillStale", "OffhostBackupStale", "OffhostBackupFailed", "AlertDeliveryUnavailable", "ProductionBackupCollectorStale", "ProductionBackupStale", "ProductionMacBackupStale", "SyntheticAlert"]);
 const BUCKETS = { CLS: [0.05, 0.1, 0.25, 0.5, 1, 5, 100], LCP: [500, 1000, 2500, 4000, 10000, 30000, 300000], INP: [50, 100, 200, 500, 1000, 5000, 300000] };
 
 export function summarizeAlerts(payload) {

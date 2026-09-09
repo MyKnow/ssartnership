@@ -1,0 +1,9 @@
+[Unit]
+Description=SSARTNERSHIP Production daily backup schedule
+[Timer]
+OnCalendar=*-*-* 03:00:00 Asia/Seoul
+Persistent=true
+RandomizedDelaySec=60
+Unit=ssartnership-production-backup.service
+[Install]
+WantedBy=timers.target

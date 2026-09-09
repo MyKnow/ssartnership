@@ -42,6 +42,36 @@ node -- scripts/self-host-operations/offhost.mjs init \
 
 홈 서버와 같은 집의 디스크/컨테이너는 독립 재해 사본이 아니다. 노트북 사본은 장치 분리 증거일 뿐 상시 가용성·지리적 분리를 보장하지 않는다. 외부 목적지·백업 주기·독립 키 보관·실복구가 확인되지 않으면 전환 게이트는 미완료다.
 
+### Production의 Mac 백업 목적지 수용
+
+[Issue #453](https://github.com/MyKnow/ssartnership/issues/453)의 2026-09-09 운영자 결정에 따라 현재 작업 Mac을 Production 백업 목적지로 사용한다. 별도 외부 저장소가 없다는 상황을 확인한 명시적 선택이며, 이 이전에서는 지리적 분리 저장소 확보를 전환의 선행 조건으로 요구하지 않는다. 같은 장소의 화재·도난·전원 장애와 Mac 분실에 대한 한계는 남는다. 이 결정은 정기 백업, 복구 키 보관, 실제 복원 검증을 생략하는 승인이 아니다.
+
+장기 보관 사본은 작업용 `.tmp`와 분리한 사용자 Library의 전용 Application Support 디렉터리에 둔다. Mac의 FileVault가 꺼져 있으면 DB와 Storage의 평문 파일을 남기지 않는다. 암호문 전체의 hash와 인증 복호화 검증은 가능하며, 실제 DB 복원은 운영자가 승인한 서버의 새 비공개 격리 대상으로 수행한다. Mac 사본에서 다시 전송한 입력과 Mac Keychain에서 복구한 키만 사용하고 원본 백업·운영 DB·Storage를 복원 입력으로 대체하지 않는다. 같은 서버에서 수행한 시험은 별도 장치의 저장 사본 복구 증거이며, 독립 컴퓨팅 장치나 지리적 재해 복구 증거로 표현하지 않는다.
+
+정기 작업에는 임시 `codex-bootstrap` 계정의 만료를 연장하거나 그 관리자 키를 재사용하지 않는다. 백업 전용 전송 경계와 실행 주기, 보존 기간, Mac 절전·오프라인 후 재개, 마지막 성공 시각의 노후 감지를 검증한 뒤에만 정기 백업 완료로 기록한다. 초기 이전 스냅샷을 Mac에 한 번 복사한 것만으로 운영 데이터의 지속 백업이나 RPO를 보장하지 않는다. 실제 적용 상태와 복원 receipt는 Issue에 기록한다.
+
+### Production 일일 암호화 스냅샷
+
+서버의 `ssartnership-production-backup.timer`는 매일 03:00 Asia/Seoul에 실행하고 성공 사본 7개를 보존한다. CI의 heavy 잠금이 사용 중이면 해당 실행은 실패하며 다음 성공으로 숨기지 않는다. 앱·API·Storage를 정지하고 DB를 정상 종료한 뒤 물리 DB와 Storage, 복구용 env를 함께 암호화한다. 잠시 서비스가 중단되는 cold backup이며 연속 WAL/PITR을 제공하지 않는다. 정상·실패 종료 모두 저장된 재개 의도에 따라 원래 실행 중이던 컨테이너만 다시 시작한다. 호스트 재부팅 후에도 백업 서비스의 `resume`으로 남은 의도를 먼저 처리한다.
+
+실행 파일은 `scripts/self-host-operations/production-*.mjs`, 전송 파일은 `serve-production-backup.mjs`와 `pull-production-backups.mjs`다. 서버 systemd 템플릿은 `deploy/self-host-operations/production-backup/`에 둔다. 설치 시 템플릿의 버전 경로와 실제 root 소유 실행 파일을 일치시키고, private `backup.json`의 source·DB system identifier·공개 age recipient·전송 그룹을 확인한다. 비밀 설정 자체는 저장소에 넣지 않는다.
+
+Mac의 `dev.myknow.ssartnership-production-backup` LaunchAgent는 로그인 시와 매시간 실행한다. 저장 위치는 `~/Library/Application Support/ssartnership-backups/production`이고 성공 사본 30개를 보존한다. Mac이 잠들거나 꺼져 있으면 복사는 재개 후 실행되므로 실제 복구 가능 시점은 마지막으로 검증된 Mac 사본이다. 온라인 상태의 일일 백업 목표는 약 24시간이며 보장 SLA가 아니다. 26시간 이상 된 사본은 실패 상태로 표시한다. 암호문 파일의 크기와 SHA-256이 맞아야 receipt 및 서버 확인 응답을 남긴다. 실패한 부분 파일은 성공 사본으로 승격하거나 복구 입력으로 쓰지 않는다.
+
+전용 SSH 계정은 고정 Mac 주소·고정 호스트 키·전용 키로만 연결하며 `list`, `get <UUID>`, `ack <UUID> <SHA256>`만 허용한다. sudo, Docker 권한, 셸, 포트 전달은 제공하지 않는다. 서버의 공개 recipient로 암호화하고 private 복구 키는 Mac Keychain 기반 envelope로 보관한다. 호스트 키 변경 오류는 관리자 확인 후 핀을 교체하며 검증을 끄지 않는다.
+
+서버의 metrics timer는 매분 마지막 스냅샷과 Mac에 실제 복사된 스냅샷 시각을 갱신한다. Production 전용 경보는 수집 중단 5분, 서버/Mac 사본 26시간 노후 또는 지표 누락을 감지한다. 오래된 파일을 다시 확인해도 사본의 생성 시각은 갱신하지 않는다. 외부 알림 수신처 설정과 전달 성공은 별도로 검증한다.
+
+복구 시험은 Mac 암호문과 Keychain 키로 복원한 새 서버 비공개 경로를 `restore-production-backup.mjs`에 제공한다. network-none DB에서 테이블별 전체 행 hash와 Storage 전체 파일 hash·메타데이터를 비교하고 원본 mount가 없음을 확인한다. 실제 설치·예약 실행·Mac 수신·복구 시험의 결과는 각각 Issue #453 receipt로 구분하며, 최종 데이터 전환 후 새 스냅샷으로 다시 확인한다.
+
+### Production 외부 관측 경로
+
+`deploy/self-host/Caddyfile.production`는 API 및 인프라 도메인 전용 조각이다. 활성화 시 기존 edge 설정을 보존한 새 버전 설정에 이 조각을 결합하고 Caddy 검증을 통과시킨다. Caddy를 Production edge·monitoring 네트워크에 연결하고, Dev와 Prod의 upstream은 서비스 별칭 대신 환경별 전체 컨테이너 이름으로 구분한다. 전체 네트워크를 연결한 뒤 `app` 같은 중복 별칭을 남기면 다른 환경으로 연결될 수 있다. 기존 Dev upstream도 전체 이름으로 고정하고 두 환경 응답을 함께 검증한다.
+
+`/run/production-infra-auth/users`는 별도 Production 인프라 계정의 bcrypt hash 파일만 읽기 전용으로 mount한다. 원본 부모는 0700이며 사용자 비밀번호와 앱 계정을 설정 조각에 넣지 않는다. Prometheus·Alertmanager 경로는 GET/HEAD만 허용하고 인증 헤더와 쿠키를 upstream에 전달하지 않는다. Grafana는 동일한 전용 operator 계정을 자체 검증한다. 외부 Origin과 cross-site API 요청을 차단한다. DNS의 권한 서버 및 독립 resolver 응답이 일치한 뒤 TLS 발급을 시작한다. 원시 서비스 포트는 loopback으로 유지한다.
+
+이 조각에는 실제 앱 도메인을 넣지 않는다. 앱 주소 전환은 최종 데이터 동기화, 인증 검증, 실행 SHA 및 Cron 단일 소유 확인을 완료한 뒤 별도 수행한다.
+
 ## 관측 구성
 
 기존 세 Compose 파일에 `compose.monitoring.yaml`을 추가한다. Linux 서버에서는 `compose.monitoring.host.yaml`도 추가한다. Docker Desktop 기본 exporter는 Linux VM을 관측하며 Mac 하드웨어 감시로 표현하지 않는다.
