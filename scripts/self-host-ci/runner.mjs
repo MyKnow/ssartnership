@@ -39,7 +39,7 @@ export async function execute(requestFile, sourceFile, output) {
     const gateId = execFileSync("docker", ["image", "inspect", "--format", "{{.Id}}", gateTag], { env: cleanEnvironment(), encoding: "utf8" }).trim();
     // Root inside the rootless user namespace maps to ci-builder (1001) on
     // the host, allowing its private source bind; it is never host root.
-    await run("docker", ["run", "--name", container, "--label", "io.ssartnership.ci=true", "--rm", "--init", "--user", "0:0", "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--pids-limit", "768", "--memory", "3500m", "--memory-swap", "4g", "--cpus", "1.5", "--tmpfs", "/tmp:mode=1777,size=512m", "--shm-size", "256m", "--env", `CI_BUILD_SITE_ORIGIN=${request.siteOrigin}`, "--env", `CI_BUILD_SUPABASE_ORIGIN=${request.supabaseOrigin}`, "--mount", `type=bind,src=${work},dst=/work`, gateId], log);
+    await run("docker", ["run", "--name", container, "--label", "io.ssartnership.ci=true", "--rm", "--init", "--user", "0:0", "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--pids-limit", "768", "--memory", "3500m", "--memory-swap", "4g", "--cpus", "1.5", "--tmpfs", "/tmp:mode=1777,size=512m", "--shm-size", "256m", "--env", `CI_BUILD_SITE_ORIGIN=${request.siteOrigin}`, "--env", `CI_BUILD_SUPABASE_ORIGIN=${request.supabaseOrigin}`, "--env", `CI_BUILD_VAPID_PUBLIC_KEY=${request.vapidPublicKey ?? ""}`, "--mount", `type=bind,src=${work},dst=/work`, gateId], log);
     validateRequest(request); // Expired approval cannot publish an artifact.
     const images = [];
     for (const component of COMPONENTS) {

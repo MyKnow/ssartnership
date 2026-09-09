@@ -130,26 +130,20 @@ test.describe("public partner discovery", () => {
       await expect(resultsPane).toBeVisible();
       await expect(partnerGrid).toBeVisible();
 
-      const filterBox = await filterPanel.boundingBox();
-      const resultsBox = await resultsPane.boundingBox();
-      expect(filterBox).not.toBeNull();
-      expect(resultsBox).not.toBeNull();
-
-      if (!filterBox || !resultsBox) {
-        continue;
-      }
-
-      if (scenario.sidebar) {
-        expect(filterBox.x + filterBox.width).toBeLessThan(resultsBox.x);
-      } else {
-        expect(filterBox.y + filterBox.height).toBeLessThan(resultsBox.y);
-      }
-
-      const gridColumnCount = await partnerGrid.evaluate((element) =>
-        window.getComputedStyle(element).gridTemplateColumns.split(" ").filter(Boolean)
-          .length,
-      );
-      expect(gridColumnCount).toBe(scenario.columns);
+      // Read geometry in one browser frame: anchor scrolling or a late image
+      // layout must not mix coordinates from two different viewport states.
+      await expect.poll(() => page.evaluate((sidebar) => {
+        const filter = document.querySelector('[data-testid="partner-filter-panel"]');
+        const results = document.querySelector('[data-testid="partner-results-pane"]');
+        const grid = document.querySelector('[data-testid="partner-grid"]');
+        if (!filter || !results || !grid) return null;
+        const filterBox = filter.getBoundingClientRect();
+        const resultsBox = results.getBoundingClientRect();
+        return {
+          separated: sidebar ? filterBox.right < resultsBox.left : filterBox.bottom < resultsBox.top,
+          columns: getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length,
+        };
+      }, scenario.sidebar)).toEqual({ separated: true, columns: scenario.columns });
     }
   });
 
