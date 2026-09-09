@@ -6,7 +6,7 @@ import { REPOSITORY, SHA, validateGitTree, validateRequest, sha256File } from ".
 
 // Operator-only preparation. This creates public, reviewed input, never
 // installs a runner, triggers Actions, fetches credentials or changes a ref.
-export async function prepare(directory, sha, ref, platform, siteOrigin, supabaseOrigin) {
+export async function prepare(directory, sha, ref, platform, siteOrigin, supabaseOrigin, vapidPublicKey) {
   if (!SHA.test(sha ?? "")) throw new Error("CI_SHA_REQUIRED");
   const git = (args) => execFileSync("git", ["-c", "core.hooksPath=/dev/null", ...args], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 });
   if (git(["rev-parse", `${ref}^{commit}`]).trim() !== sha) throw new Error("CI_REF_SHA_MISMATCH");
@@ -15,7 +15,7 @@ export async function prepare(directory, sha, ref, platform, siteOrigin, supabas
   await mkdir(target, { mode: 0o700 });
   const source = path.join(target, "source.tar");
   execFileSync("git", ["-c", "core.hooksPath=/dev/null", "archive", "--format=tar", `--output=${source}`, sha]);
-  const request = validateRequest({ version: 1, repository: REPOSITORY, ref, sha, sourceHash: await sha256File(source), platform, siteOrigin, supabaseOrigin, expiresAt: new Date(Date.now() + 23 * 60 * 60_000).toISOString() });
+  const request = validateRequest({ version: 1, repository: REPOSITORY, ref, sha, sourceHash: await sha256File(source), platform, siteOrigin, supabaseOrigin, ...(vapidPublicKey ? { vapidPublicKey } : {}), expiresAt: new Date(Date.now() + 23 * 60 * 60_000).toISOString() });
   await writeFile(path.join(target, "request.json"), `${JSON.stringify(request, null, 2)}\n`, { mode: 0o444, flag: "wx" });
   return { prepared: true, sha, sourceHash: request.sourceHash };
 }

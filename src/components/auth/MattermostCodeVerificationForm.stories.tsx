@@ -26,7 +26,7 @@ export const Signup: Story = {
     const generation = canvas.getByRole("combobox", { name: "기수" });
     const options = within(generation).getAllByRole("option");
 
-    await expect(canvas.getByPlaceholderText("예: myknow")).toBeVisible();
+    await expect(canvas.getByPlaceholderText("예시: myknow")).toBeVisible();
     await expect(
       canvas.queryByText("기수의 Mattermost Sender가 6자리 인증 코드를 DM으로 보냅니다."),
     ).not.toBeInTheDocument();

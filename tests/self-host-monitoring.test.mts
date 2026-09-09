@@ -78,3 +78,23 @@ test("real HTTP collector requires separate tokens and reports delivery failure 
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
+
+test("monitoring secret mounts remain readable under a private operator umask", { skip: process.platform === "win32" }, async () => {
+  const { mkdtemp, lstat, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { spawnSync } = await import("node:child_process");
+  const root = await mkdtemp(join(tmpdir(), "monitoring-permissions-"));
+  const target = join(root, "monitoring");
+  try {
+    const moduleUrl = new URL("../scripts/self-host-operations/monitoring.mjs", import.meta.url).href;
+    const result = spawnSync(process.execPath, ["--input-type=module", "-e", `process.umask(0o077); const { initializeMonitoring } = await import(${JSON.stringify(moduleUrl)}); await initializeMonitoring(process.argv[1]);`, target], { encoding: "utf8" });
+    assert.equal(result.status, 0);
+    for (const directory of [target, join(target, "secrets")]) assert.equal((await lstat(directory)).mode & 0o777, 0o700);
+    assert.equal((await lstat(join(target, "monitoring.env"))).mode & 0o777, 0o600);
+    assert.equal((await lstat(join(target, "textfile"))).mode & 0o777, 0o755);
+    for (const name of ["grafana-password", "postgres-monitor-password", "alert-relay-token"]) {
+      assert.equal((await lstat(join(target, "secrets", name))).mode & 0o777, 0o444);
+    }
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

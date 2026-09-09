@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, ECDH } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
@@ -12,7 +12,15 @@ function exactKeys(object, keys) {
   if (!object || typeof object !== "object" || Array.isArray(object) || Object.keys(object).sort().join() !== [...keys].sort().join()) reject("CI_FIELDS_INVALID");
 }
 export function validateRequest(value, now = Date.now()) {
-  exactKeys(value, ["version", "repository", "ref", "sha", "sourceHash", "platform", "siteOrigin", "supabaseOrigin", "expiresAt"]);
+  const fields = ["version", "repository", "ref", "sha", "sourceHash", "platform", "siteOrigin", "supabaseOrigin", "expiresAt"];
+  if (value && Object.hasOwn(value, "vapidPublicKey")) fields.push("vapidPublicKey");
+  exactKeys(value, fields);
+  if (Object.hasOwn(value, "vapidPublicKey")) {
+    if (typeof value.vapidPublicKey !== "string" || !/^[A-Za-z0-9_-]{87}$/u.test(value.vapidPublicKey)) reject("CI_VAPID_PUBLIC_KEY_INVALID");
+    const point = Buffer.from(value.vapidPublicKey, "base64url");
+    if (point.length !== 65 || point[0] !== 4 || point.toString("base64url") !== value.vapidPublicKey) reject("CI_VAPID_PUBLIC_KEY_INVALID");
+    try { ECDH.convertKey(point, "prime256v1"); } catch { reject("CI_VAPID_PUBLIC_KEY_INVALID"); }
+  }
   if (value.version !== 1 || value.repository !== REPOSITORY || !SHA.test(value.sha) || !HASH.test(value.sourceHash)) reject("CI_SOURCE_INVALID");
   // Only a reviewed integration branch or explicitly approved typed task
   // branch. PR refs, main, arbitrary repositories and floating SHAs are absent.

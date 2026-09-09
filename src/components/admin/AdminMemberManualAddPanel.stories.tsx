@@ -82,7 +82,9 @@ export const AddsAndRemovesRow: Story = {
     await expect(body.queryByTestId("image-crop-tools")).not.toBeInTheDocument();
     await expect(body.queryByRole("button", { name: "초기화" })).not.toBeInTheDocument();
     await expect(body.queryByRole("button", { name: "이미지 변경" })).not.toBeInTheDocument();
-    await userEvent.click(body.getByRole("button", { name: /^적용$/ }));
+    const applyButton = body.getByRole("button", { name: /^적용$/ });
+    await waitFor(() => expect(applyButton).toBeEnabled());
+    await userEvent.click(applyButton);
     await expect(await canvas.findByText("선택됨 · profile.png")).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: "사진 해제" }));
     await expect(

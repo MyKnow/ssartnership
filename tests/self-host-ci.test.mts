@@ -41,3 +41,20 @@ test("artifact result requires every exact component, immutable image ID, hash a
   assert.equal(validateResult(value, approved), value);
   for (const patch of [{ gate: "failed" }, { sha: request().sha }, { images: value.images.slice(0, 2) }, { images: [...value.images].reverse() }]) assert.throws(() => validateResult({ ...value, ...patch }, approved));
 });
+
+test("Production CI binds only a valid optional public VAPID point and preserves keyless Preview", async () => {
+  const { createECDH } = await import("node:crypto");
+  const ec = createECDH("prime256v1");
+  const publicKey = ec.generateKeys().toString("base64url");
+  assert.equal(validateRequest({ ...request(), vapidPublicKey: publicKey }).vapidPublicKey, publicKey);
+  assert.equal(validateRequest(request()).vapidPublicKey, undefined);
+  for (const value of ["", "private-key", "A".repeat(87), publicKey + "=", null, 123]) {
+    assert.throws(() => validateRequest({ ...request(), vapidPublicKey: value }));
+  }
+  const gate = readFileSync(new URL("../deploy/self-host-ci/gate.mjs", import.meta.url), "utf8");
+  assert.match(gate, /NEXT_PUBLIC_VAPID_PUBLIC_KEY: process\.env\.CI_BUILD_VAPID_PUBLIC_KEY \?\? ""/u);
+  for (const file of ["runner.mjs", "mac-runner.mjs"]) {
+    const source = readFileSync(new URL(`../scripts/self-host-ci/${file}`, import.meta.url), "utf8");
+    assert.match(source, /CI_BUILD_VAPID_PUBLIC_KEY=\$\{request\.vapidPublicKey \?\? ""\}/u);
+  }
+});

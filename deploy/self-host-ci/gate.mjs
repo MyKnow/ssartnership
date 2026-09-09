@@ -4,7 +4,7 @@ import { fingerprintDeployableArtifact } from "/work/scripts/self-host-ci/produc
 
 mkdirSync(process.env.HOME, { recursive: true, mode: 0o700 });
 const productionFixture = ["mac-amd64", "github-amd64"].includes(process.env.CI_EXECUTION_PROFILE);
-const publicBuild = { SELF_HOST_BUILD: "1", NEXT_PUBLIC_DATA_SOURCE: "supabase", NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE: "supabase", NEXT_PUBLIC_SITE_URL: process.env.CI_BUILD_SITE_ORIGIN, NEXT_PUBLIC_SUPABASE_URL: process.env.CI_BUILD_SUPABASE_ORIGIN, NEXT_PUBLIC_VAPID_PUBLIC_KEY: "" };
+const publicBuild = { SELF_HOST_BUILD: "1", NEXT_PUBLIC_DATA_SOURCE: "supabase", NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE: "supabase", NEXT_PUBLIC_SITE_URL: process.env.CI_BUILD_SITE_ORIGIN, NEXT_PUBLIC_SUPABASE_URL: process.env.CI_BUILD_SUPABASE_ORIGIN, NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.CI_BUILD_VAPID_PUBLIC_KEY ?? "" };
 // The source archive has no Git config, hooks or credentials. A fresh index
 // enables the repository's tracked-file checks; it is not a fake source SHA.
 const steps = [

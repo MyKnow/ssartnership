@@ -1,0 +1,173 @@
+# App and monitoring overlay for the restored Cloud Production.
+# The database, PostgREST, Storage and Kong services remain in the separately
+# managed ssartnership-production-data project and their volumes
+# are never recreated by this file.
+x-logs: &bounded-logs
+  driver: local
+  options: { max-size: 10m, max-file: "3" }
+services:
+  app:
+    image: ${SELF_HOST_IMAGE:?receiver supplies an immutable app image}
+    init: true
+    restart: unless-stopped
+    # production_default is an internal-only restored Supabase network. Keep the
+    # app attached to the existing edge network as well so Docker can publish
+    # the loopback host port for the reverse proxy and receiver health probe.
+    networks: [production_default, production_edge, monitoring]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    mem_limit: 768m
+    cpus: 1.5
+    pids_limit: 256
+    logging: *bounded-logs
+    ports: ["127.0.0.1:3110:3000"]
+    env_file: ["${SELF_HOST_RUNTIME_ENV_FILE:-/etc/myknow/secrets/ssartnership-production/app.env}"]
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      SELF_HOST_MODE: real
+      SELF_HOST_VITALS_ENABLED: "1"
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+  telemetry:
+    image: ${SELF_HOST_TELEMETRY_IMAGE:?receiver supplies an immutable telemetry image}
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 128
+    logging: *bounded-logs
+    networks: [production_default, production_edge, monitoring]
+    # Keep telemetry credentials out of the app env_file. The receiver passes
+    # this file only to the telemetry container while Compose uses the app
+    # env-file for the remaining interpolation values.
+    env_file: ["${MONITORING_ENV_FILE:?monitoring env file required}"]
+    environment:
+      OPS_APP_PROBE_ENABLED: "1"
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:9464/health').then(r=>process.exit(r.status===204?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    ports: ["127.0.0.1:59465:9464"]
+  prometheus:
+    image: prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    cpus: 1
+    pids_limit: 128
+    logging: *bounded-logs
+    networks: [production_edge, monitoring]
+    ports: ["127.0.0.1:59191:9090"]
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus, --storage.tsdb.retention.time=7d, --storage.tsdb.retention.size=2GB, --web.external-url=https://ssartnership-infra.myknow.xyz/infra/prometheus/, --web.route-prefix=/]
+    volumes:
+      - ../observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../observability/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ../observability/production-backup-alerts.yml:/etc/prometheus/production-backup-alerts.yml:ro
+      - production-prometheus-data:/prometheus
+  alertmanager:
+    image: prom/alertmanager:v0.34.0@sha256:690c7b525f4367aa91f73e2f91c632206d32e97c6384bdbf2fb7a861b420340d
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 128
+    logging: *bounded-logs
+    networks: [production_edge, monitoring]
+    ports: ["127.0.0.1:59194:9093"]
+    command: [--config.file=/etc/alertmanager/alertmanager.yml, --storage.path=/alertmanager, --cluster.listen-address=, --web.external-url=https://ssartnership-infra.myknow.xyz/infra/alertmanager/, --web.route-prefix=/]
+    volumes:
+      - ../observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ${MONITORING_SECRETS_DIR:?monitoring secrets required}/alert-relay-token:/run/alert-relay-token:ro
+      - production-alertmanager-data:/alertmanager
+  grafana:
+    image: grafana/grafana:13.2.1@sha256:f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+    cpus: 1
+    pids_limit: 128
+    logging: *bounded-logs
+    networks: [production_edge, monitoring]
+    ports: ["127.0.0.1:53110:3000"]
+    tmpfs: [/tmp:mode=1777]
+    environment:
+      GF_SERVER_ROOT_URL: https://ssartnership-infra.myknow.xyz/infra/grafana/
+      GF_AUTH_BASIC_ENABLED: "true"
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_ADMIN_USER: operator
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/grafana-password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_LOG_MODE: console
+      GF_LOG_LEVEL: warn
+    volumes:
+      - ${MONITORING_SECRETS_DIR:?monitoring secrets required}/grafana-password:/run/grafana-password:ro
+      - ../observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../observability/grafana/dashboards:/etc/grafana/dashboards:ro
+      - production-grafana-data:/var/lib/grafana
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.20.1@sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 96m
+    cpus: 0.25
+    pids_limit: 128
+    logging: *bounded-logs
+    networks: [production_default, monitoring]
+    environment:
+      DATA_SOURCE_URI: db:5432/postgres?sslmode=disable
+      DATA_SOURCE_USER: ssartnership_monitor
+      DATA_SOURCE_PASS_FILE: /run/postgres-monitor-password
+    volumes:
+      - ${MONITORING_SECRETS_DIR:?monitoring secrets required}/postgres-monitor-password:/run/postgres-monitor-password:ro
+  node-exporter:
+    image: prom/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 64m
+    cpus: 0.25
+    pids_limit: 128
+    logging: *bounded-logs
+    networks: [monitoring]
+    command: [--path.rootfs=/host, --path.procfs=/host/proc, --path.sysfs=/host/sys, --collector.textfile.directory=/textfile, --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker|run/docker)($|/)]
+    volumes:
+      - ${MONITORING_TEXTFILE_DIR:?monitoring textfile directory required}:/textfile:ro
+      - /:/host:ro,rslave
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+volumes:
+  production-prometheus-data:
+  production-alertmanager-data:
+  production-grafana-data:
+networks:
+  production_default:
+    external: true
+    name: ssartnership-production-data_default
+  production_edge:
+    external: true
+    name: ssartnership-production-data_edge
+  monitoring:
+    internal: true

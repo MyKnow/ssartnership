@@ -1,0 +1,49 @@
+name: Export Original Cloud Production
+
+on:
+  push:
+    branches: [feat/self-host-production-20260909]
+    paths: [deploy/self-host-migration/production-export-request.json]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: original-cloud-production-export
+  cancel-in-progress: false
+
+jobs:
+  export:
+    name: Read and encrypt original Production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.1
+      - name: Verify request and prepare pinned tools without Cloud secrets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/self-host-migration/github-production-export.mjs prepare
+      - name: Capture original Production and encrypt for the home server
+        id: capture
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SUPABASE_PRODUCTION_DB_URL: ${{ secrets.SUPABASE_PRODUCTION_DB_URL }}
+          SUPABASE_PRODUCTION_URL: ${{ secrets.SUPABASE_PRODUCTION_URL }}
+          SUPABASE_PRODUCTION_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_PRODUCTION_SERVICE_ROLE_KEY }}
+        run: node scripts/self-host-migration/github-production-export.mjs capture
+      - name: Upload ciphertext only
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: original-production-${{ github.sha }}-${{ github.run_id }}
+          path: |
+            .tmp/production-cloud-export/encrypted/snapshot.tar.age
+            .tmp/production-cloud-export/encrypted/receipt.json
+          if-no-files-found: error
+          retention-days: 2
+          compression-level: 0

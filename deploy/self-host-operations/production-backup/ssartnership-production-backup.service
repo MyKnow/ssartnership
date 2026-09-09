@@ -1,0 +1,18 @@
+[Unit]
+Description=SSARTNERSHIP Production encrypted daily backup
+After=docker.service
+Requires=docker.service
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+ExecStart=/usr/bin/flock --nonblock --conflict-exit-code 75 /var/lib/ssartnership-ci/heavy.lock /opt/ssartnership/node24/node /opt/ssartnership/production-backup-20260909/production-cold-backup.mjs capture
+ExecStopPost=/opt/ssartnership/node24/node /opt/ssartnership/production-backup-20260909/production-cold-backup.mjs resume
+TimeoutStartSec=15min
+TimeoutStopSec=3min
+KillMode=control-group
+Nice=10
+CPUQuota=100%
+MemoryMax=512M
+StandardOutput=journal
+StandardError=journal

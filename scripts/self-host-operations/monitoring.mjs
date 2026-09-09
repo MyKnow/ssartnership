@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { randomBytes, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdir, writeFile, readFile, rename, lstat } from "node:fs/promises";
+import { mkdir, writeFile, readFile, rename, lstat, chmod } from "node:fs/promises";
 import path from "node:path";
 import { composeArguments, defaultManifestPath, loadOperationsContext, readManifest, serializeEnvironment } from "./lib.mjs";
 import { createProcessRunner, performStatus } from "./cli.mjs";
@@ -33,12 +33,15 @@ export async function initializeMonitoring(directory) {
   const textfiles = path.join(target, "textfile");
   const secrets = path.join(target, "secrets");
   await mkdir(textfiles, { mode: 0o755 });
+  await chmod(textfiles, 0o755);
   await mkdir(secrets, { mode: 0o700 });
   const relay = randomBytes(32).toString("hex");
   // Parent 0700 protects host access; individual bind mounts are readable by
   // different non-root container UIDs, with no directory traversal exposure.
   for (const [name, value] of [["alert-relay-token", relay], ["grafana-password", randomBytes(32).toString("hex")], ["postgres-monitor-password", randomBytes(32).toString("hex")]]) {
     await writeFile(path.join(secrets, name), `${value}\n`, { mode: 0o444, flag: "wx" });
+    // Explicitly restore mount permissions after the operator umask applies.
+    await chmod(path.join(secrets, name), 0o444);
   }
   await writeFile(path.join(target, "monitoring.env"), serializeEnvironment({
     MONITORING_SECRETS_DIR: secrets, MONITORING_TEXTFILE_DIR: textfiles,

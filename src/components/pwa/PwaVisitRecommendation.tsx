@@ -87,10 +87,12 @@ export default function PwaVisitRecommendation() {
 
   useEffect(() => {
     const previousPathname = previousPathnameRef.current;
-    previousPathnameRef.current = pathname;
 
     if (!canOfferPwaRecommendation(suppressed)) {
-      const frame = window.requestAnimationFrame(() => setVisible(false));
+      const frame = window.requestAnimationFrame(() => {
+        previousPathnameRef.current = pathname;
+        setVisible(false);
+      });
       return () => window.cancelAnimationFrame(frame);
     }
 
@@ -99,6 +101,8 @@ export default function PwaVisitRecommendation() {
     }
 
     const frame = window.requestAnimationFrame(() => {
+      // A cancelled effect must not mark an unseen recommendation as handled.
+      previousPathnameRef.current = pathname;
       setVisible(true);
     });
 

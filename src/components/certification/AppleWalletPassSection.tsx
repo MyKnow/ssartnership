@@ -90,6 +90,8 @@ export default function AppleWalletPassSection({
     setPendingAction("download");
     setErrorMessage(null);
     setSuccessMessage(null);
+    // This endpoint returns a .pkpass download, not a Next.js page.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.assign("/api/wallet/apple/pass");
   };
 

@@ -1,0 +1,15 @@
+groups:
+  - name: production-backup
+    rules:
+      - alert: ProductionBackupCollectorStale
+        expr: (time() - ssartnership_production_backup_collected_seconds > 300) or absent(ssartnership_production_backup_collected_seconds)
+        for: 2m
+        labels: { severity: critical }
+      - alert: ProductionBackupStale
+        expr: (time() - ssartnership_production_backup_created_seconds > 93600) or absent(ssartnership_production_backup_created_seconds)
+        for: 5m
+        labels: { severity: critical }
+      - alert: ProductionMacBackupStale
+        expr: (time() - ssartnership_production_backup_mac_created_seconds > 93600) or absent(ssartnership_production_backup_mac_created_seconds)
+        for: 5m
+        labels: { severity: critical }

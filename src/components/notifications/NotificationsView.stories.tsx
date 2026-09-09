@@ -3,7 +3,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import NotificationsView from "@/components/notifications/NotificationsView";
 import { ToastProvider } from "@/components/ui/Toast";
-import { DEFAULT_PUSH_PREFERENCES } from "@/lib/push";
+import { DEFAULT_PUSH_PREFERENCES } from "@/lib/push/types";
 
 const meta = {
   title: "Screens/Member/NotificationsView",

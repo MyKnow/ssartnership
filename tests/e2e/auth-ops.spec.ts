@@ -7,10 +7,10 @@ let hasWarmedAuthRoute = false;
 test.describe("auth and partner portal operation flows", () => {
   test.beforeEach(async ({ page }) => {
     if (!hasWarmedAuthRoute) {
-      await page.goto("/auth/login");
-      await expect(
-        page.getByRole("textbox", { name: "Mattermost 아이디" }),
-      ).toBeVisible();
+      // Compile the login route without creating a disposable HMR client.
+      // The scenario itself establishes its rendered readiness after navigation.
+      const warmupResponse = await page.request.get("/auth/login");
+      expect(warmupResponse.ok()).toBe(true);
       hasWarmedAuthRoute = true;
     }
 
