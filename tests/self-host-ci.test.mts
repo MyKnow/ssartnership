@@ -9,6 +9,17 @@ test("CI approval pins source, ref, platform, public origins and expiry without 
   assert.equal(validateRequest(request()).repository, REPOSITORY);
   for (const patch of [{ repository: "https://example.invalid/repo.git" }, { ref: "refs/pull/1/head" }, { ref: "refs/heads/main" }, { sha: "dev" }, { platform: "linux/riscv64" }, { siteOrigin: "https://user:password@example.invalid" }, { siteOrigin: "https://example.invalid/path" }, { expiresAt: "2000-01-01" }, { secret: "unexpected" }]) assert.throws(() => validateRequest({ ...request(), ...patch }));
 });
+test("main image approval requires the Production origin pair, AMD64 and a public VAPID key", async () => {
+  const { createECDH } = await import("node:crypto");
+  const approved = { ...request(), ref: "refs/heads/main", siteOrigin: "https://ssartnership.myknow.xyz", supabaseOrigin: "https://ssartnership-api.myknow.xyz", vapidPublicKey: createECDH("prime256v1").generateKeys().toString("base64url") };
+  assert.equal(validateRequest(approved).ref, "refs/heads/main");
+  for (const patch of [{ siteOrigin: "https://ssartnership-dev.myknow.xyz" }, { supabaseOrigin: "https://ssartnership-api-dev.myknow.xyz" }, { siteOrigin: "https://example.invalid" }, { vapidPublicKey: undefined }, { vapidPublicKey: "" }, { platform: "linux/arm64" }, { ref: "refs/pull/1/merge" }]) {
+    assert.throws(() => validateRequest({ ...approved, ...patch }));
+  }
+  const { vapidPublicKey: omitted, ...withoutKey } = approved;
+  assert.ok(omitted);
+  assert.throws(() => validateRequest(withoutKey));
+});
 test("container gate preserves full fail-closed suites and packages the single verified standalone build", () => {
   const gate = readFileSync(new URL("../deploy/self-host-ci/gate.mjs", import.meta.url), "utf8");
   const config = readFileSync(new URL("../deploy/self-host-ci/playwright.config.mjs", import.meta.url), "utf8");

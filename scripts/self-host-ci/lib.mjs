@@ -22,9 +22,14 @@ export function validateRequest(value, now = Date.now()) {
     try { ECDH.convertKey(point, "prime256v1"); } catch { reject("CI_VAPID_PUBLIC_KEY_INVALID"); }
   }
   if (value.version !== 1 || value.repository !== REPOSITORY || !SHA.test(value.sha) || !HASH.test(value.sourceHash)) reject("CI_SOURCE_INVALID");
-  // Only a reviewed integration branch or explicitly approved typed task
-  // branch. PR refs, main, arbitrary repositories and floating SHAs are absent.
-  if (!/^refs\/heads\/(?:dev|(?:feat|fix|refactor|chore|ci)\/[a-z0-9][a-z0-9-]{0,100})$/u.test(value.ref)) reject("CI_REF_INVALID");
+  // main is operator-only Production input, with the deployed origin pair and
+  // public push key required. GitHub Preview publication remains dev-only.
+  const productionMain = value.ref === "refs/heads/main"
+    && value.platform === "linux/amd64"
+    && value.siteOrigin === "https://ssartnership.myknow.xyz"
+    && value.supabaseOrigin === "https://ssartnership-api.myknow.xyz"
+    && typeof value.vapidPublicKey === "string";
+  if (!productionMain && !/^refs\/heads\/(?:dev|(?:feat|fix|refactor|chore|ci)\/[a-z0-9][a-z0-9-]{0,100})$/u.test(value.ref)) reject("CI_REF_INVALID");
   if (!["linux/amd64", "linux/arm64"].includes(value.platform)) reject("CI_PLATFORM_INVALID");
   for (const key of ["siteOrigin", "supabaseOrigin"]) {
     let url; try { url = new URL(value[key]); } catch { reject("CI_ORIGIN_INVALID"); }
