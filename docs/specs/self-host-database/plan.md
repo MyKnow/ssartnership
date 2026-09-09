@@ -114,3 +114,14 @@ Node 집중 테스트는 파싱·권한·명령 조합·drift·복구 대상 방
 기본 data Compose와 operations overlay의 DB command 재정의, 새 초기화와 복구 실행 경계를 함께 검사한다. 먼저 합성 canary로 성공한 초기화 DDL과 실패 SQL의 값 미노출, ERROR 유지·비정상 종료, 정상 bootstrap·인증·Storage·백업을 회귀 검증한다. 이후 운영 잠금과 쓰기 중지 아래 실제 역할/소비자 목록을 대조하여 기존 합성 Preview DB 비밀번호와 대응 비밀 파일을 교체하고 재연결·RPC/RLS·Storage·health를 확인한다. 실제로 같은 비밀번호를 쓰는 네 역할만 허용하며 변경 SQL은 평문 대신 salt가 다른 SCRAM verifier를 stdin으로 전달한다. 로컬 loopback의 trust 인증은 교체 증거가 아니므로 별도 private network client에서 네 역할의 신규 인증 성공과 이전 비밀번호 거절을 모두 확인한다. 기존 데이터 볼륨과 별도 암호화 키는 보존한다. 기존 로그의 접근 통제와 잔존 범위를 확인하되 원본 증거를 임의 삭제하지 않는다.
 
 교체 후 신규 DB/Storage 짝지은 백업과 로그 재감사를 완료해야 복구 자료 반출을 재개한다. controller 링크 수정의 실제 receipt/metric 및 복구 검증과 구분해 타이머 재개를 판단한다. Production 데이터 반입·DNS/공개 ingress·클라우드 변경·접근 계정 수명 변경은 이 제안의 범위 밖이다.
+
+
+### Production 이전 — Issue #453
+
+2026-09-09 사용자가 별도 Prod 전체 구성 후 운영 전환을 승인했다. 현재 원본은 `jlcrhzmiuygqnkwmzfyr`이며 기존 Preview 사본을 운영 원본으로 사용하지 않는다. 운영 회원 비밀번호와 전체 Storage를 보존하는 Production→Production 이전으로, 테스트용 sanitizer를 적용하지 않는다. 원본 클러스터 로그인 비밀번호는 export하지 않고 새 운영 계정을 생성한다.
+
+먼저 보안 의존성 패치와 전체 Release를 검증한다. 별도의 Production export 진입점은 고정된 프로젝트·task branch·workflow·SHA·첫 시도·24시간 이하 요청 만료를 검증하고 Cloud 비밀을 capture 단계에만 제공한다. 서버 root 전용 age 키의 공개 recipient로 전체 DB/Storage export를 암호화하며 GitHub artifact에는 암호문과 무결성 receipt만 포함한다. 요청 marker는 실행 직전 생성하며, 유효한 marker 없이 export하지 않는다. 원본/대상 비교는 프로젝트·SHA·run·해시를 모두 확인한다. Preview exporter의 기본값과 거절 조건은 유지한다.
+
+새 Prod 볼륨에서 원본 스키마/역할/Storage migration을 먼저 복원하고 전체 행·파일을 비교한 다음 후속 앱 migration을 검증한다. 현재 조사된 원본은 migration 173개, DB 약 145MB, Storage 7개 bucket/859개 파일/약 41MB다. 이 수치는 시점 조사이며 최종 이전 입력은 새 snapshot이다. 기존 Preview 네트워크·키·볼륨은 공유하지 않는다. 기존 운영 hostname은 검증 완료까지 현재 Vercel을 유지한다.
+
+독립 장애 영역의 자동 암호화 백업 저장소와 키 복구, 복원 드릴, 실제 인증·업로드, 지표/외부 장애 알림 및 Cron 단일 실행 주체를 검증한 뒤 최종 쓰기 정지·데이터 동등성·DNS/TLS 전환을 실행한다. 원본 서비스/자료는 실패 복귀를 위해 보존하며 새 Prod에 쓰기가 발생한 뒤의 복귀는 데이터 차이를 먼저 확인한다. 외부 백업 위치는 사용자에게 확인 중이다.

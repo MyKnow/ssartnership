@@ -4,7 +4,11 @@ import { mkdir, realpath, lstat, open, link, unlink, writeFile } from "node:fs/p
 import { sha256File } from "../self-host-ci/lib.mjs";
 
 export const PREVIEW_PROJECT = "uuxzzanpxzvhauzxufuk";
-const ORIGIN = `https://${PREVIEW_PROJECT}.supabase.co`;
+export const PRODUCTION_PROJECT = "jlcrhzmiuygqnkwmzfyr";
+export function migrationSource(project = PREVIEW_PROJECT) {
+  if (![PREVIEW_PROJECT, PRODUCTION_PROJECT].includes(project)) throw new Error("MIGRATION_SOURCE_INVALID");
+  return project;
+}
 const MAX_OBJECT_BYTES = 50 * 1024 ** 2;
 const MAX_TOTAL_BYTES = 1024 ** 3;
 const UUID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u;
@@ -27,11 +31,12 @@ function safeSegment(value) {
 function safeObjectPath(value) {
   return typeof value === "string" && Buffer.byteLength(value) <= 4096 && value.split("/").every(safeSegment);
 }
-export function storageDownloadUrl(object) {
+export function storageDownloadUrl(object, sourceProject = PREVIEW_PROJECT) {
+  const origin = `https://${migrationSource(sourceProject)}.supabase.co`;
   if (!safeSegment(object.bucket_id) || !safeObjectPath(object.name)) fail("PATH_INVALID");
   // Encode each segment exactly once; never interpret a source name as a URL
   // or as a filesystem path. Dot segments are rejected before URL parsing.
-  return `${ORIGIN}/storage/v1/object/authenticated/${encodeURIComponent(object.bucket_id)}/${object.name.split("/").map(encodeURIComponent).join("/")}`;
+  return `${origin}/storage/v1/object/authenticated/${encodeURIComponent(object.bucket_id)}/${object.name.split("/").map(encodeURIComponent).join("/")}`;
 }
 export function validateStorageInventory(input) {
   if (!record(input) || Object.keys(input).sort().join() !== "buckets,objects"
@@ -77,10 +82,10 @@ async function privateDirectory(directory) {
   if (!parent.isDirectory() || parent.uid !== process.getuid() || (parent.mode & 0o077) !== 0) fail("DIRECTORY_INVALID");
   await mkdir(directory, { mode: 0o700 }); // exclusive: never reuse a partial job
 }
-async function download(object, key, output, request, signal) {
+async function download(object, key, output, request, signal, sourceProject) {
   let file, created = false;
   try {
-    const response = await request(storageDownloadUrl(object), {
+    const response = await request(storageDownloadUrl(object, sourceProject), {
       method: "GET", headers: { apikey: key, authorization: `Bearer ${key}`, "accept-encoding": "identity", "cache-control": "no-cache" },
       redirect: "error", signal: AbortSignal.any([signal, AbortSignal.timeout(60_000)]),
     });
@@ -105,19 +110,20 @@ async function download(object, key, output, request, signal) {
 }
 
 // This module does not read cloud credentials from local dotenv or accept a
-// target URL. The only network effect is GET on the pinned Cloud Preview.
+// target URL. GET requests use only the explicitly selected, pinned Cloud project.
 // Plaintext is allowed only in an approved private export workspace (ephemeral
 // Actions runner/server); on an unencrypted Mac use synthetic fixtures only.
 // Two reads detect observed races, not an atomic DB+Storage snapshot: final
 // source write-quiesce/reconciliation remains mandatory before traffic cutover.
 /**
- * @param {{directory: string, serviceKey: string, readInventory: () => Promise<unknown>, concurrency?: number, timeoutMs?: number, onProgress?: (value: {phase: string, completed: number, total: number}) => void}} options
+ * @param {{directory: string, serviceKey: string, sourceProject?: string, readInventory: () => Promise<unknown>, concurrency?: number, timeoutMs?: number, onProgress?: (value: {phase: string, completed: number, total: number}) => void}} options
  * @param {(url: string, options: RequestInit) => Promise<Response>} request
  */
 export async function exportStorage(options, request = fetch) {
-  const { directory, serviceKey, readInventory, concurrency = 1, timeoutMs = 20 * 60_000, onProgress = () => {} } = options;
+  const { directory, serviceKey, readInventory, sourceProject = PREVIEW_PROJECT, concurrency = 1, timeoutMs = 20 * 60_000, onProgress = () => {} } = options;
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 4
     || !Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 20 * 60_000) fail("LIMITS_INVALID");
+  migrationSource(sourceProject);
   const deadline = AbortSignal.timeout(timeoutMs), cancellation = new AbortController();
   const signal = AbortSignal.any([deadline, cancellation.signal]);
   const read = async () => {
@@ -156,19 +162,19 @@ export async function exportStorage(options, request = fetch) {
       signal.throwIfAborted();
       const name = `${String(index).padStart(6, "0")}.bin`;
       const partial = path.join(directory, `${name}.partial`);
-      const result = await download(object, serviceKey, partial, request, signal);
+      const result = await download(object, serviceKey, partial, request, signal, sourceProject);
       await link(partial, path.join(directory, name)); await unlink(partial);
       files[index] = { id: object.id, file: name, ...result };
     });
     if (inventoryFingerprint(await read()) !== fingerprint) fail("INVENTORY_CHANGED");
     await pass("verify", async (object, index) => {
       signal.throwIfAborted();
-      const result = await download(object, serviceKey, null, request, signal);
+      const result = await download(object, serviceKey, null, request, signal, sourceProject);
       if (result.sha256 !== files[index].sha256 || await sha256File(path.join(directory, files[index].file)) !== result.sha256) fail("CONTENT_CHANGED");
     });
     if (inventoryFingerprint(await read()) !== fingerprint) fail("INVENTORY_CHANGED");
     const summary = { buckets: inventory.buckets.length, objects: files.length, bytes: files.reduce((total, item) => total + item.bytes, 0), verifiedPasses: 2, inventoryReads: 3 };
-    await writeFile(path.join(directory, "ledger.json"), JSON.stringify({ version: 1, sourceProject: PREVIEW_PROJECT, startedAt, completedAt: new Date().toISOString(), inventory, files, summary }), { mode: 0o600, flag: "wx" });
+    await writeFile(path.join(directory, "ledger.json"), JSON.stringify({ version: 1, sourceProject, startedAt, completedAt: new Date().toISOString(), inventory, files, summary }), { mode: 0o600, flag: "wx" });
     return summary; // Only aggregate counts are safe for public diagnostics.
   } catch (error) {
     if (deadline.aborted) fail("TIMEOUT");

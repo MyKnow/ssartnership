@@ -275,7 +275,7 @@ export const Default: Story = {
     await expect(gallery).not.toBeNull();
     await expect(
       within(gallery!).getByRole("button", {
-        name: "바디라인 역삼점 추가 이미지 이미지 크게 보기",
+        name: "이미지 1 크게 보기",
       }),
     ).toBeVisible();
     await expect(

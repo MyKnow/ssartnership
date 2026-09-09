@@ -177,17 +177,17 @@ test("local prepush shares the change classifier while explicit promotion gates 
   assert.doesNotMatch(release, /runRequiredScript\("test:visual"\)/);
 });
 
-test("auth E2E mock reset waits for a semantic application readiness boundary", () => {
+test("auth E2E mock reset follows successful login preparation without disposable browser navigation", () => {
   const authOperations = readRepoFile("tests/e2e/auth-ops.spec.ts");
-  const readinessIndex = authOperations.indexOf('await page.goto("/auth/login");');
-  const resetIndex = authOperations.indexOf('page.request.post("/api/e2e/mock/reset")');
+  const preparation = authOperations.slice(authOperations.indexOf("test.beforeEach"), authOperations.indexOf('test("manual member setup'));
+  const readinessIndex = preparation.indexOf('await page.request.get("/auth/login")');
+  const successIndex = preparation.indexOf("expect(warmupResponse.ok()).toBe(true)");
+  const resetIndex = preparation.indexOf('page.request.post("/api/e2e/mock/reset")');
 
-  assert.ok(readinessIndex >= 0, "auth operations must warm the login route first");
-  assert.ok(resetIndex > readinessIndex, "mock reset must follow route readiness");
-  assert.match(
-    authOperations,
-    /getByRole\("textbox", \{ name: "Mattermost 아이디" \}\)[\s\S]*?\.toBeVisible\(\);[\s\S]*?page\.request\.post\("\/api\/e2e\/mock\/reset"\)/,
-  );
+  assert.ok(readinessIndex >= 0, "auth operations must prepare the login route first");
+  assert.ok(successIndex > readinessIndex, "the preparation response must succeed");
+  assert.ok(resetIndex > successIndex, "mock reset must follow successful preparation");
+  assert.doesNotMatch(preparation, /page\.goto|networkidle|waitForTimeout/);
 });
 
 test("active workflows use the current Node 24 GitHub action majors", () => {

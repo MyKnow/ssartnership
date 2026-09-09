@@ -6,13 +6,14 @@ import { Transform } from "node:stream";
 import path from "node:path";
 import { sha256File } from "../self-host-ci/lib.mjs";
 
+import { PREVIEW_PROJECT, PRODUCTION_PROJECT } from "./storage.mjs";
+
 const MAX_BYTES = 2 * 1024 ** 3;
-const PREVIEW_PROJECT = "uuxzzanpxzvhauzxufuk";
 const RECIPIENT = /^age1[023456789acdefghjklmnpqrstuvwxyz]{58}$/u;
 /** @returns {never} */
 const fail = code => { throw new Error(code); };
 function validateContext(value) {
-  if (!value || Object.keys(value).sort().join() !== "runId,sha,sourceProject" || value.sourceProject !== PREVIEW_PROJECT
+  if (!value || Object.keys(value).sort().join() !== "runId,sha,sourceProject" || ![PREVIEW_PROJECT, PRODUCTION_PROJECT].includes(value.sourceProject)
     || !/^[a-f0-9]{40}$/u.test(value.sha) || !Number.isSafeInteger(value.runId) || value.runId < 1) fail("MIGRATION_CONTEXT_INVALID");
 }
 export function validateTransferReceipt(value, context) {

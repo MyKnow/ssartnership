@@ -7,7 +7,7 @@ import { pipeline } from "node:stream/promises";
 import { randomUUID, createHash, X509Certificate } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { PREVIEW_PROJECT, STORAGE_INVENTORY_SQL, validateStorageInventory } from "./storage.mjs";
+import { PREVIEW_PROJECT, migrationSource, STORAGE_INVENTORY_SQL, validateStorageInventory } from "./storage.mjs";
 import { SUPABASE_POSTGRES_DUMP_IMAGE } from "../supabase-sync-preview-dump-lib.mjs";
 import { sha256File } from "../self-host-ci/lib.mjs";
 
@@ -31,12 +31,13 @@ const ROLES_SQL = `SELECT jsonb_build_object(
  FROM pg_auth_members a JOIN pg_roles r ON r.oid=a.roleid JOIN pg_roles m ON m.oid=a.member JOIN pg_roles g ON g.oid=a.grantor)
 );`;
 
-export function previewConnection(databaseUrl) {
+export function cloudConnection(databaseUrl, sourceProject) {
+  migrationSource(sourceProject);
   try {
     const url = new URL(databaseUrl);
     const user = decodeURIComponent(url.username), password = decodeURIComponent(url.password);
-    const direct = url.hostname === `db.${PREVIEW_PROJECT}.supabase.co` && user === "postgres";
-    const pooler = /^aws-[0-9]+-[a-z]+(?:-[a-z]+)+-[0-9]+\.pooler\.supabase\.com$/u.test(url.hostname) && user === `postgres.${PREVIEW_PROJECT}`;
+    const direct = url.hostname === `db.${sourceProject}.supabase.co` && user === "postgres";
+    const pooler = /^aws-[0-9]+-[a-z]+(?:-[a-z]+)+-[0-9]+\.pooler\.supabase\.com$/u.test(url.hostname) && user === `postgres.${sourceProject}`;
     // A stored transaction-pooler URL can identify the same reviewed project;
     // always select its session port for the exported-snapshot owner session.
     if (!["postgres:", "postgresql:"].includes(url.protocol) || !(direct || pooler) || (url.port && url.port !== "5432" && !(pooler && url.port === "6543"))
@@ -46,10 +47,13 @@ export function previewConnection(databaseUrl) {
     return {
       PGHOST: url.hostname, PGPORT: "5432", PGUSER: user, PGPASSWORD: password, PGDATABASE: "postgres",
       PGSSLMODE: "verify-full", PGSSLROOTCERT: "/etc/ssartnership-migration-ca.crt", PGCONNECT_TIMEOUT: "15",
-      PGAPPNAME: "ssartnership-preview-export",
+      PGAPPNAME: sourceProject === PREVIEW_PROJECT ? "ssartnership-preview-export" : "ssartnership-production-export",
       PGOPTIONS: "-c default_transaction_read_only=on -c statement_timeout=600000 -c idle_in_transaction_session_timeout=900000",
     };
   } catch { fail("CONNECTION_INVALID"); }
+}
+export function previewConnection(databaseUrl) {
+  return cloudConnection(databaseUrl, PREVIEW_PROJECT);
 }
 export function databaseClientPlan(connection, tool, args, name) {
   if (!["psql", "pg_dump"].includes(tool) || !/^ssartnership-migration-[a-z0-9-]{1,80}$/u.test(name)) fail("CLIENT_INVALID");
@@ -95,7 +99,7 @@ function processClient(plan) {
   return { child, done, stop };
 }
 // planFor is an internal dependency boundary for synthetic Docker fixtures.
-// The Cloud CLI must always construct it from previewConnection() above.
+// The Cloud CLI must always construct it from the pinned cloudConnection() above.
 export function openDatabaseReader(planFor) {
   const client = processClient(planFor("psql", PSQL));
   let bytes = 0;
@@ -127,13 +131,14 @@ async function dump(plan, file) {
   if (bytes < 5) fail("DUMP_EMPTY");
   return bytes;
 }
-export function cloudDatabaseClient(databaseUrl) {
+export function cloudDatabaseClient(databaseUrl, sourceProject = PREVIEW_PROJECT) {
   if (process.platform !== "linux") fail("LINUX_EXPORT_HOST_REQUIRED");
   validateDatabaseCa(readFileSync(CA_FILE));
-  const connection = previewConnection(databaseUrl);
+  const connection = cloudConnection(databaseUrl, sourceProject);
   return (tool, args) => databaseClientPlan(connection, tool, args, `ssartnership-migration-${randomUUID()}`);
 }
-export async function captureDatabase(directory, planFor) {
+export async function captureDatabase(directory, planFor, sourceProject = PREVIEW_PROJECT) {
+  migrationSource(sourceProject);
   let reader;
   try {
     if (!path.isAbsolute(directory) || path.resolve(directory) !== directory || await realpath(path.dirname(directory)) !== path.dirname(directory)) fail("DIRECTORY_INVALID");
@@ -156,7 +161,7 @@ export async function captureDatabase(directory, planFor) {
     // attributes/membership without database login password material. Their
     // reviewed mapping and new login credentials are a restore prerequisite.
     await writeFile(path.join(directory, "roles.json"), JSON.stringify(roles), { flag: "wx", mode: 0o600 });
-    const receipt = { version: 1, sourceProject: PREVIEW_PROJECT, startedAt, completedAt: new Date().toISOString(), snapshot, bytes, sha256: await sha256File(path.join(directory, "database.dump")), restoreApproved: false };
+    const receipt = { version: 1, sourceProject, startedAt, completedAt: new Date().toISOString(), snapshot, bytes, sha256: await sha256File(path.join(directory, "database.dump")), restoreApproved: false };
     await writeFile(path.join(directory, "receipt.json"), JSON.stringify(receipt), { flag: "wx", mode: 0o600 });
     return { storageInventory, receipt };
   } catch { fail("CAPTURE_FAILED"); }
