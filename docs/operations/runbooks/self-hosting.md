@@ -77,6 +77,8 @@ docker compose -p ssartnership-edge -f deploy/self-host/compose.edge.yaml run --
 
 Production 홈 서버 전환에서는 `vercel.json`의 `git.deploymentEnabled.main=false`로 main 커밋의 Vercel 자동 배포를 중지한다. 지정하지 않은 dev와 작업 브랜치는 Preview 배포를 유지한다. 이는 새 앱이 이전 Cloud 스키마에 먼저 배포되는 것을 막는 전환 계약이다. 기존 Vercel 배포는 복구용으로 보존하며 이 설정만으로 기존 요청이나 Cron이 중지되지는 않는다. 최종 데이터 복사 직전에 Vercel 설정에서 Cron을 비활성화하고 기존 Production 요청을 정지한 뒤 진행 중인 쓰기 종료와 원본 쓰기 차단을 확인한다. 신규 Production 검증은 승인된 main SHA의 홈 서버 이미지·DB·실제 공개 흐름을 기준으로 수행한다. 새 서버가 쓰기를 받은 뒤에는 데이터 차이 확인 없이 기존 서비스와 DNS를 재개하지 않는다.
 
+운영 이미지 준비 입력의 `refs/heads/main`은 앱 origin `https://ssartnership.myknow.xyz`, API origin `https://ssartnership-api.myknow.xyz`, `linux/amd64`, 유효한 공개 VAPID 키를 모두 요구한다. 기존 SHA·소스 archive hash·만료·root 소유 파일·전체 Release 검증을 유지하며, 실제 운영 키와 빌드/실행 값의 일치도 별도로 확인한다. 일반 main 입력이나 Preview 주소를 섞은 main 입력은 거절한다. GitHub Preview 이미지 발행 문맥은 계속 dev 전용이며 이 입력 허용만으로 자동 운영 배포를 만들지 않는다.
+
 일정과 endpoint는 `vercel.json`이 정본이며 모두 UTC다. 목록 조회는 HTTP 요청을 보내지 않는다.
 
 ```bash
