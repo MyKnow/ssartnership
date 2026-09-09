@@ -50,7 +50,7 @@ const NextImageMock = React.forwardRef<HTMLImageElement, NextImageMockProps>(
   function NextImageMock(props, ref) {
     // Storybook deliberately uses the same unoptimized URL for rendering and preloading.
     // eslint-disable-next-line @next/next/no-img-element
-    return <img ref={ref} {...getImageProps(props).props} />;
+    return <img ref={ref} {...getImageProps(props).props} alt={props.alt ?? ""} />;
   },
 );
 
