@@ -4,6 +4,7 @@ import {
 } from "@/lib/admin-permissions";
 import type { AdminAccount } from "@/lib/admin-accounts";
 import { MOCK_MEMBER_ID } from "@/lib/mock/member";
+import { allowsLocalFixtures } from "@/lib/local-fixture-policy.mjs";
 
 type MockAdminAuthEnvironment = {
   NODE_ENV?: string;
@@ -20,7 +21,7 @@ export function isMockAdminAuthEnabled(
   environment: MockAdminAuthEnvironment = process.env,
 ) {
   return (
-    environment.NODE_ENV !== "production" &&
+    allowsLocalFixtures(environment) &&
     environment.NEXT_PUBLIC_DATA_SOURCE === "mock" &&
     environment.E2E_ADMIN_AUTH === "1" &&
     environment.E2E_MOCK_MUTATIONS === "1"

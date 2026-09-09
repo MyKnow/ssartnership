@@ -1,14 +1,16 @@
 import { expect, test } from "@playwright/test";
+import { MEMBER_LOGIN_METHOD_STORAGE_KEY } from "../../src/lib/member-login-method-preference.client";
+import { waitForPageReady } from "./page-ready";
 
 let hasWarmedAuthRoute = false;
 
 test.describe("auth and partner portal operation flows", () => {
   test.beforeEach(async ({ page }) => {
     if (!hasWarmedAuthRoute) {
-      await page.goto("/auth/login");
-      await expect(
-        page.getByRole("textbox", { name: "아이디 또는 이메일" }),
-      ).toBeVisible();
+      // Compile the login route without creating a disposable HMR client.
+      // The scenario itself establishes its rendered readiness after navigation.
+      const warmupResponse = await page.request.get("/auth/login");
+      expect(warmupResponse.ok()).toBe(true);
       hasWarmedAuthRoute = true;
     }
 
@@ -30,10 +32,35 @@ test.describe("auth and partner portal operation flows", () => {
     expect(loginWarmup.ok()).toBe(true);
 
     await page.goto("/partners/health-001?returnTo=%2F%3Fcategory%3Dhealth%23benefits");
-    await page.waitForLoadState("networkidle");
+    // The legacy URL can stream a redirect after its first document loads.
+    // Finish that canonical navigation before observing or clicking its UI.
+    await page.waitForURL(/\/partners\/health-001$/, { timeout: 5_000 });
+    await waitForPageReady(
+      page,
+      page.getByRole("banner").getByRole("link", { name: "로그인", exact: true }),
+    );
 
-    const benefitAction = page.getByRole("link", { name: "혜택 이용하기" }).first();
+    await expect(
+      page.getByRole("banner").getByRole("link", { name: "로그인", exact: true }),
+    ).toHaveAttribute("href", "/auth/login?returnTo=%2Fpartners%2Fhealth-001");
+    await expect(
+      page.getByRole("banner").getByRole("link", {
+        name: "회원가입",
+        exact: true,
+      }),
+    ).toHaveAttribute("href", "/auth/signup?returnTo=%2Fpartners%2Fhealth-001");
+
+    const benefitAction = page.getByRole("link", {
+      name: "로그인 후 혜택 이용하기",
+    }).first();
+    const reviewWriteAction = page.getByRole("link", {
+      name: "로그인 후 리뷰 작성",
+    });
     await expect(benefitAction).toHaveAttribute(
+      "href",
+      "/auth/login?returnTo=%2Fpartners%2Fhealth-001",
+    );
+    await expect(reviewWriteAction).toHaveAttribute(
       "href",
       "/auth/login?returnTo=%2Fpartners%2Fhealth-001",
     );
@@ -46,34 +73,146 @@ test.describe("auth and partner portal operation flows", () => {
     const benefitUseReturnTo = loginUrl.searchParams.get("returnTo") ?? "";
     const decodedReturnTo = decodeURIComponent(benefitUseReturnTo);
     expect(decodedReturnTo).toBe("/partners/health-001");
+
+    // Prove the destination is interactive before another client navigation.
+    // URL/SSR link visibility alone can precede the router's hydrated state.
+    const emailTab = page.getByRole("tab", { name: "이메일", exact: true });
+    await emailTab.click();
+    await expect(emailTab).toHaveAttribute("aria-selected", "true");
+    const usernameTab = page.getByRole("tab", { name: "아이디", exact: true });
+    await usernameTab.click();
+    await expect(usernameTab).toHaveAttribute("aria-selected", "true");
+
+    const signupAction = page.getByRole("main").getByRole("link", {
+      name: "회원가입",
+      exact: true,
+    });
+    const headerSignupAction = page.getByRole("banner").getByRole("link", {
+      name: "회원가입",
+      exact: true,
+    });
+    await expect(headerSignupAction).toHaveAttribute(
+      "href",
+      "/auth/signup?returnTo=%2Fpartners%2Fhealth-001",
+    );
+    await expect(signupAction).toHaveAttribute(
+      "href",
+      "/auth/signup?returnTo=%2Fpartners%2Fhealth-001",
+    );
+    await signupAction.click();
+    await expect(page).toHaveURL(
+      /\/auth\/signup\?returnTo=%2Fpartners%2Fhealth-001$/,
+    );
+
+    const graduateTab = page.getByRole("tab", { name: "수료생", exact: true });
+    await graduateTab.click();
+    await expect(graduateTab).toHaveAttribute("aria-selected", "true");
+
+    await page.goBack();
+    await expect(page).toHaveURL(
+      /\/auth\/login\?returnTo=%2Fpartners%2Fhealth-001$/,
+    );
+    const demoLoginAction = page.getByRole("main").getByRole("link", {
+      name: "촬영용 데모 시작",
+    });
+    await expect(demoLoginAction).toHaveAttribute(
+      "href",
+      "/auth/mock?returnTo=%2Fpartners%2Fhealth-001",
+    );
+    await demoLoginAction.click();
+    await expect(page).toHaveURL(/\/partners\/health-001$/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "바디라인 피트니스" }),
+    ).toBeVisible();
   });
 
   test("@critical member login shows field-level validation before submitting", async ({ page }) => {
     await page.goto("/auth/login");
-    await page.waitForLoadState("networkidle");
+    await waitForPageReady(
+      page,
+      page.getByRole("textbox", { name: "Mattermost 아이디" }),
+    );
 
-    await expect(page.getByRole("textbox", { name: "아이디 또는 이메일" })).toHaveAttribute(
+    const usernameTab = page.getByRole("tab", { name: "아이디" });
+    const emailTab = page.getByRole("tab", { name: "이메일" });
+
+    await expect(usernameTab).toHaveAttribute("aria-selected", "true");
+    await expect(emailTab).toHaveAttribute("aria-selected", "false");
+    await expect(page.getByRole("textbox", { name: "Mattermost 아이디" })).toHaveAttribute(
       "placeholder",
-      "예시: myknow@example.com",
+      "예시: myknow",
     );
     await expect(page.getByRole("checkbox", { name: "자동 로그인" })).toBeChecked();
 
     await page.getByRole("button", { name: "로그인" }).click();
 
-    await expect(page.getByText("아이디 또는 이메일을 입력해 주세요.")).toBeVisible();
+    await expect(page.getByText("Mattermost 아이디를 입력해 주세요.")).toBeVisible();
     await expect(page.getByText("비밀번호를 입력해 주세요.")).toBeVisible();
+
+    await emailTab.click();
+    await expect(emailTab).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("textbox", { name: "이메일" })).toHaveAttribute(
+      "placeholder",
+      "예시: myknow@example.com",
+    );
+
+    await page.reload();
+    await expect(usernameTab).toHaveAttribute("aria-selected", "true");
+
+    await page.evaluate((storageKey) => {
+      window.localStorage.setItem(storageKey, "email");
+    }, MEMBER_LOGIN_METHOD_STORAGE_KEY);
+    await page.reload();
+    await expect(emailTab).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("textbox", { name: "이메일" })).toBeVisible();
+
+    await page.evaluate((storageKey) => {
+      window.localStorage.removeItem(storageKey);
+    }, MEMBER_LOGIN_METHOD_STORAGE_KEY);
+  });
+
+  test("@critical password reset exposes only Mattermost ID and email methods", async ({ page }) => {
+    await page.goto("/auth/reset");
+    const memberTab = page.getByRole("tab", { name: "Mattermost", exact: true });
+    const graduateTab = page.getByRole("tab", { name: "이메일", exact: true });
+    await waitForPageReady(page, memberTab);
+
+    await expect(page.getByRole("tab")).toHaveCount(2);
+    await expect(page.getByRole("tab", { name: "이메일 초대", exact: true })).toHaveCount(0);
+    await expect(memberTab).toHaveAttribute("aria-selected", "true");
+    await expect(
+      page.getByText("가입 때 연결한 Mattermost 계정으로 인증 코드를 받으면 새 비밀번호를 설정할 수 있습니다."),
+    ).toHaveCount(0);
+    await expect(page.getByRole("combobox", { name: "기수" })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Mattermost ID" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Mattermost로 인증 코드 받기" })).toHaveClass(/mt-2/);
+    const graduateRecovery = page.getByRole("link", {
+      name: "수료해서 MM 로그인이 불가능해요",
+    });
+    await expect(graduateRecovery).toHaveAttribute(
+      "href",
+      "/auth/signup/graduate?kind=recovery",
+    );
+
+    await memberTab.focus();
+    await page.keyboard.press("ArrowRight");
+
+    await expect(graduateTab).toBeFocused();
+    await expect(graduateTab).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("textbox", { name: "이메일" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "이메일로 인증 코드 받기" })).toHaveClass(/w-full/);
+    await expect(graduateRecovery).toBeVisible();
   });
 
   test("signup switches its child panel before opening the graduate certificate application", async ({ page }) => {
     await page.goto("/auth/signup");
-    await page.waitForLoadState("networkidle");
-    await page.evaluate(() => document.fonts?.ready);
 
     const memberTab = page.getByRole("tab", { name: "운영진·재학생", exact: true });
+    await waitForPageReady(page, memberTab);
     await expect(memberTab).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("textbox", { name: "Mattermost ID" })).toHaveAttribute(
       "placeholder",
-      "예: myknow",
+      "예시: myknow",
     );
     await expect(
       page.getByText("기수의 Mattermost Sender가 6자리 인증 코드를 DM으로 보냅니다."),
@@ -143,7 +282,7 @@ test.describe("auth and partner portal operation flows", () => {
     await generationOption.evaluate((option) => option.removeAttribute("disabled"));
     await page.getByRole("textbox", { name: "Mattermost ID" }).fill("myknow");
     await generation.selectOption(generationValue!);
-    await page.getByRole("button", { name: "Mattermost DM으로 코드 받기" }).click();
+    await page.getByRole("button", { name: "Mattermost로 인증 코드 받기" }).click();
 
     await expect(
       page.getByText("입력한 Mattermost 계정으로 인증 코드를 보냈습니다.", { exact: true }),
@@ -162,38 +301,19 @@ test.describe("auth and partner portal operation flows", () => {
     await expect(page.getByText("이미 가입된 회원입니다.")).toBeVisible();
   });
 
-  test("offers email recovery and an existing-member recovery application when Mattermost is unavailable", async ({ page }) => {
-    const recoveryWarmup = await page.request.get("/auth/recover-email");
-    expect(recoveryWarmup.ok()).toBe(true);
-
+  test("keeps graduated-member recovery available outside both password reset panels", async ({ page }) => {
     await page.goto("/auth/reset");
 
-    const emailRecovery = page.getByRole("link", { name: /이메일 로그인 복구/ });
-    await expect(emailRecovery).toHaveAttribute("href", "/auth/recover-email");
-    const existingMemberRecovery = page.getByRole("link", { name: "기존 회원 복구 신청" });
-    await expect(existingMemberRecovery).toHaveAttribute(
+    const recoveryLink = page.getByRole("link", {
+      name: "수료해서 MM 로그인이 불가능해요",
+    });
+    await expect(recoveryLink).toHaveCount(1);
+    await expect(recoveryLink).toHaveAttribute(
       "href",
       "/auth/signup/graduate?kind=recovery",
     );
-
-    await Promise.all([
-      page.waitForURL(/\/auth\/recover-email$/),
-      emailRecovery.click(),
-    ]);
-    await page.waitForLoadState("networkidle");
-    await expect(page.getByRole("heading", { name: "이메일 로그인 복구" })).toBeVisible();
-    await expect(page.getByRole("textbox", { name: "기존 아이디 또는 이메일" })).toBeVisible();
-    const passwordSubmit = page.getByRole("button", { name: "기존 비밀번호 확인" });
-    await expect(passwordSubmit).toBeEnabled();
-    await passwordSubmit.click();
-    await expect(page.getByText("아이디 또는 이메일을 입력해 주세요.")).toBeVisible();
-    await expect(page.getByText("기존 사이트 비밀번호를 입력해 주세요.")).toBeVisible();
-
-    await page.goto("/auth/signup/graduate?kind=recovery");
-    await expect(page.getByRole("heading", { name: "기존 회원 복구" })).toBeVisible();
-    await expect(
-      page.getByText(/관리자가 기존 회원을 명시적으로 선택한 경우에만 이메일 로그인과 초기 비밀번호를 연결합니다/),
-    ).toBeVisible();
+    await page.getByRole("tab", { name: "이메일", exact: true }).click();
+    await expect(recoveryLink).toBeVisible();
   });
 
   test("partner login maps safe server validation errors to fields", async ({ page }) => {
@@ -237,7 +357,12 @@ test.describe("auth and partner portal operation flows", () => {
     await page.getByPlaceholder("초기 설정 후 받은 비밀번호").fill("Partner!123");
     await page.getByRole("button", { name: "로그인" }).click();
 
-    await expect(page).toHaveURL(/\/partner/, { timeout: 15_000 });
+    // Login redirects through /partner to the sole company. Do not match
+    // /partner/login or race that in-flight redirect with a second navigation.
+    await expect(page).toHaveURL(
+      (url) => url.pathname === "/partner/companies/mock-partner-company-urban-gym",
+      { timeout: 15_000 },
+    );
     await expect
       .poll(
         async () =>
@@ -247,7 +372,6 @@ test.describe("auth and partner portal operation flows", () => {
         { timeout: 20_000 },
       )
       .toBe(true);
-    await page.goto("/partner/companies/mock-partner-company-urban-gym");
     await expect(page.getByRole("heading", { name: "운영 홈" })).toBeVisible({
       timeout: 20_000,
     });

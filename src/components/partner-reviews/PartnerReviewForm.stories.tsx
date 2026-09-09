@@ -120,7 +120,7 @@ export const CreateNetworkError: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     globalThis.fetch = fn(async () => {
-      throw new Error("네트워크 오류");
+      throw new TypeError("Failed to fetch");
     }) as unknown as typeof fetch;
 
     await userEvent.type(canvas.getByPlaceholderText("리뷰 제목"), "네트워크 오류 테스트");
@@ -130,7 +130,7 @@ export const CreateNetworkError: Story = {
     );
     await userEvent.click(canvas.getByRole("button", { name: "등록" }));
 
-    await expect(canvas.getByText("네트워크 오류")).toBeInTheDocument();
+    await expect(canvas.getByText("리뷰 등록에 실패했습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.")).toBeInTheDocument();
   },
 };
 

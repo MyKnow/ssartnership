@@ -26,6 +26,10 @@ export {
 };
 
 export const mockPartnerPortalRepository: PartnerPortalRepository = {
+  authenticateLogin: authenticateMockPartnerPortalLogin,
+  requestPasswordReset: requestMockPartnerPortalPasswordReset,
+  changePassword: changeMockPartnerPortalPassword,
+
   async listDemoSetups() {
     return listMockPartnerPortalSetups();
   },

@@ -1,3 +1,10 @@
+---
+title: 싸트너십 화면 계약
+type: index
+status: current
+authority: normative
+---
+
 # 싸트너십 화면 계약
 
 작성 기준일: 2026-07-10
@@ -11,9 +18,9 @@
 - [수료생 증명서·본인 사진 인증](./graduate-verification.md)
 - [파트너 포털](./partner.md)
 - [관리자 화면](./admin.md)
-- [관리자 기능·UI/UX 구현 명세](../admin-ui-ux-spec.md)
-- [용어 기준](./terminology.md)
-- [기능 유지·통합·제거 점수표](./feature-scoring.md)
+- [관리자 기능·UI/UX 구현 명세](../../specs/205-admin-console/spec.md)
+- [용어 기준](../glossary.md)
+- [기능 유지·통합·제거 점수표](../feature-scoring.md)
 
 ## 화면 계약 필드
 

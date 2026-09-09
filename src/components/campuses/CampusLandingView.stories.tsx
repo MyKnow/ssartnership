@@ -67,7 +67,7 @@ const meta = {
     viewerAuthenticated: true,
     currentUserId: "story-member-campus",
     partnerFavoriteStateById: { "story-campus-cafe": true },
-    loadedPartnerStateIds: partners.map((partner) => partner.id),
+    loadedFavoritePartnerIds: partners.map((partner) => partner.id),
   },
 } satisfies Meta<typeof CampusLandingView>;
 

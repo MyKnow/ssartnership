@@ -1,0 +1,66 @@
+ssartnership-api.myknow.xyz {
+ encode zstd gzip
+ request_body {
+  max_size 64MB
+ }
+ reverse_proxy ssartnership-production-data-gateway-1:8000
+}
+
+ssartnership-infra.myknow.xyz {
+	encode zstd gzip
+	@infra path /infra /infra/*
+	handle @infra {
+		route {
+			basic_auth bcrypt infra {
+				import /run/production-infra-auth/users
+			}
+			header Cache-Control "no-store"
+			header Referrer-Policy "no-referrer"
+			header X-Frame-Options "DENY"
+			# Browser-cached Basic credentials require cross-origin protection.
+			@cross_site {
+				header Sec-Fetch-Site cross-site
+				not header Sec-Fetch-Mode navigate
+			}
+			respond @cross_site 403
+			@foreign_origin {
+				header Origin *
+				not header Origin https://ssartnership-infra.myknow.xyz
+			}
+			respond @foreign_origin 403
+			@unsafe_readonly {
+				path /infra/prometheus/* /infra/alertmanager/*
+				not method GET HEAD
+			}
+			respond @unsafe_readonly 405
+			redir /infra/prometheus /infra/prometheus/ 308
+			redir /infra/alertmanager /infra/alertmanager/ 308
+			redir /infra/grafana /infra/grafana/ 308
+			handle_path /infra/prometheus/* {
+				reverse_proxy ssartnership-production-prometheus-1:9090 {
+					header_up -Authorization
+					header_up -Cookie
+					header_down -Access-Control-Allow-Origin
+				}
+			}
+			handle_path /infra/alertmanager/* {
+				reverse_proxy ssartnership-production-alertmanager-1:9093 {
+					header_up -Authorization
+					header_up -Cookie
+					header_down -Access-Control-Allow-Origin
+				}
+			}
+			handle_path /infra/grafana/* {
+				# Native Grafana Basic auth independently validates operator.
+				reverse_proxy ssartnership-production-grafana-1:3000 {
+					header_up -X-WEBAUTH-USER
+					header_up -X-WEBAUTH-ROLE
+				}
+			}
+			respond "Infrastructure: /infra/prometheus/ /infra/alertmanager/ /infra/grafana/" 200
+		}
+	}
+	handle {
+		redir /infra/prometheus/ 302
+	}
+}

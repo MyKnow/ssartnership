@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { anonymizeDeletedMember } from "../../src/lib/member-lifecycle";
 
-const getSupabaseAdminClient = vi.fn();
+const { getSupabaseAdminClient } = vi.hoisted(() => ({ getSupabaseAdminClient: vi.fn() }));
 
 vi.mock("../../src/lib/supabase/server", () => ({
   getSupabaseAdminClient,
@@ -100,13 +101,11 @@ function createSupabaseMock({
 describe("member anonymization private Storage orchestration", () => {
   beforeEach(() => {
     getSupabaseAdminClient.mockReset();
-    vi.resetModules();
   });
 
   test("does not mutate Storage or member rows before the database retention gate", async () => {
     const supabase = createSupabaseMock({ plan: null });
     getSupabaseAdminClient.mockReturnValue(supabase);
-    const { anonymizeDeletedMember } = await import("../../src/lib/member-lifecycle");
 
     await expect(anonymizeDeletedMember("member-id")).resolves.toBe(false);
     expect(supabase.calls).toEqual([
@@ -119,7 +118,6 @@ describe("member anonymization private Storage orchestration", () => {
       profileStorageError: { message: "provider detail" },
     });
     getSupabaseAdminClient.mockReturnValue(supabase);
-    const { anonymizeDeletedMember } = await import("../../src/lib/member-lifecycle");
 
     await expect(anonymizeDeletedMember("member-id")).rejects.toThrow(
       "익명화할 프로필 사진을 삭제하지 못했습니다.",
@@ -139,7 +137,6 @@ describe("member anonymization private Storage orchestration", () => {
       certificateStorageError: { message: "provider detail" },
     });
     getSupabaseAdminClient.mockReturnValue(supabase);
-    const { anonymizeDeletedMember } = await import("../../src/lib/member-lifecycle");
 
     await expect(anonymizeDeletedMember("member-id")).rejects.toThrow(
       "익명화할 교육이수증을 삭제하지 못했습니다.",
@@ -156,15 +153,22 @@ describe("member anonymization private Storage orchestration", () => {
   });
 
   test("purges relational data only after every private object deletion succeeds", async () => {
-    const supabase = createSupabaseMock();
+    const supabase = createSupabaseMock({
+      plan: {
+        profile_image_paths: ["profiles/member.webp"],
+        certificate_paths: [
+          "certificates/member.pdf",
+          "certificates/member-old.pdf",
+        ],
+      },
+    });
     getSupabaseAdminClient.mockReturnValue(supabase);
-    const { anonymizeDeletedMember } = await import("../../src/lib/member-lifecycle");
 
     await expect(anonymizeDeletedMember("member-id")).resolves.toBe(true);
     expect(supabase.calls).toEqual([
       "rpc:get_deleted_member_anonymization_storage_plan",
       "storage:member-profile-images:profiles/member.webp",
-      "storage:graduate-certificates:certificates/member.pdf",
+      "storage:graduate-certificates:certificates/member.pdf,certificates/member-old.pdf",
       "rpc:anonymize_deleted_member",
     ]);
   });
@@ -174,7 +178,6 @@ describe("member anonymization private Storage orchestration", () => {
       certificateStorageErrors: [{ message: "transient provider detail" }, null],
     });
     getSupabaseAdminClient.mockReturnValue(supabase);
-    const { anonymizeDeletedMember } = await import("../../src/lib/member-lifecycle");
 
     await expect(anonymizeDeletedMember("member-id")).rejects.toThrow(
       "익명화할 교육이수증을 삭제하지 못했습니다.",
@@ -197,7 +200,6 @@ describe("member anonymization private Storage orchestration", () => {
       currentAnonymizedAt: "2026-08-13T00:00:00.000Z",
     });
     getSupabaseAdminClient.mockReturnValue(supabase);
-    const { anonymizeDeletedMember } = await import("../../src/lib/member-lifecycle");
 
     await expect(anonymizeDeletedMember("member-id")).resolves.toBe(false);
     expect(supabase.calls.at(-1)).toBe("query:member-state");
@@ -206,7 +208,6 @@ describe("member anonymization private Storage orchestration", () => {
   test("does not hide a changed recovery gate after private files were removed", async () => {
     const supabase = createSupabaseMock({ anonymizeResult: false });
     getSupabaseAdminClient.mockReturnValue(supabase);
-    const { anonymizeDeletedMember } = await import("../../src/lib/member-lifecycle");
 
     await expect(anonymizeDeletedMember("member-id")).rejects.toThrow(
       "회원 익명화 상태가 변경되었습니다.",

@@ -4,17 +4,17 @@ const states = [
   {
     key: "email",
     storyId: "screens-auth-graduateverificationapplication--email-verification",
-    heading: "1. 이메일 인증",
+    heading: "이메일을 인증해 주세요",
   },
   {
     key: "details",
     storyId: "screens-auth-graduateverificationapplication--education-details",
-    heading: "2. 교육 정보",
+    heading: "교육 정보를 입력해 주세요",
   },
   {
     key: "files",
     storyId: "screens-auth-graduateverificationapplication--file-submission",
-    heading: "3. 교육이수증과 본인 사진",
+    heading: "교육이수증과 본인 사진",
   },
 ] as const;
 

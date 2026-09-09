@@ -527,12 +527,12 @@ const emailTemplates: NotificationTemplateDefinition[] = [
   }),
   defineTemplate({
     eventKey: "email.partner_suggestion_received",
-    label: "제휴 제안 접수 안내",
-    description: "제휴 제안을 접수한 제안자와 운영 수신처에 전송하는 안내 메일입니다.",
+    label: "제휴 제안 운영 알림",
+    description: "공개 제휴 제안이 접수되면 내부 운영 수신처에 전송하는 알림 메일입니다.",
     group: "제휴 이메일",
     channel: "email",
-    titleTemplate: "[{siteName}] 제휴 제안 접수 안내",
-    bodyTemplate: "안녕하세요 {contactName} {contactRole}님,\n\n{siteName} 파트너십 제안을 접수했습니다. 보내주신 내용을 아래와 같이 정리해 전달드립니다.\n\n파트너사명: {companyName}\n사업 분야 소개: {businessArea}\n제안 제휴 조건: {partnershipConditions}\n담당자 이메일: {contactEmail}\n회사 사이트: {companyUrl}\n\n담당자가 확인 후 안내드리겠습니다. 추가로 전달하실 내용이 있으면 답장해 주세요.",
+    titleTemplate: "[{siteName}] 새 제휴 제안이 접수되었습니다",
+    bodyTemplate: "운영 검토가 필요한 새 제휴 제안이 접수되었습니다.\n제안자에게 회신하려면 이 메일에 답장해 주세요.\n\n담당자: {contactName} {contactRole}\n파트너사명: {companyName}\n사업 분야 소개: {businessArea}\n제안 제휴 조건: {partnershipConditions}\n담당자 이메일: {contactEmail}\n회사 사이트: {companyUrl}",
     variables: [
       siteName,
       { name: "contactName", label: "담당자 이름" },

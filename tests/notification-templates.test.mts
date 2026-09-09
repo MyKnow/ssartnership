@@ -382,7 +382,7 @@ test("템플릿 관리자는 서버에서 수신 회원을 재검증하고 모�
   assert.match(delivery, /withActiveMattermostSenderForSubject/);
   assert.match(delivery, /sendPushTemplateTest/);
   assert.match(delivery, /createNotification/);
-  assert.match(recipientsRoute, /ensureAdminApiPermission/);
+  assert.match(recipientsRoute, /getNotificationTemplateAdminApiSession/);
   assert.match(recipientsRoute, /listNotificationTemplateTestRecipients/);
 
   const memberSelect = delivery.match(/const MEMBER_SELECT =\s*"([^"]+)"/)?.[1];

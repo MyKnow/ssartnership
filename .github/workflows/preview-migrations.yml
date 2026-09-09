@@ -19,6 +19,7 @@ on:
 
 permissions:
   contents: read
+  checks: read
 
 concurrency:
   group: preview-supabase-migrations
@@ -79,7 +80,7 @@ jobs:
 
       - name: Checkout selected dev revision
         if: steps.select-dev.outputs.is_current == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.select-dev.outputs.sha }}
           persist-credentials: false
@@ -95,7 +96,7 @@ jobs:
 
       - name: Setup Node
         if: steps.select-dev.outputs.is_current == 'true'
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         env:
           NPM_CONFIG_CACHE: ${{ github.workspace }}/.tmp/npm-cache
         with:
@@ -112,10 +113,60 @@ jobs:
 
       - name: Set up Supabase CLI
         if: steps.select-dev.outputs.is_current == 'true'
-        uses: supabase/setup-cli@v2
+        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1
         with:
           version: 2.114.0
           github-token: ${{ github.token }}
+
+      - name: Wait for the exact Supabase Preview check
+        if: ${{ steps.select-dev.outputs.is_current == 'true' && github.event_name == 'push' }}
+        shell: bash
+        env:
+          EXPECTED_DEV_SHA: ${{ steps.select-dev.outputs.sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          SUPABASE_GITHUB_APP_ID: "330661"
+        run: |
+          set -euo pipefail
+
+          for _ in {1..60}; do
+            check_probe="$(
+              gh api \
+                --method GET \
+                -H "Accept: application/vnd.github+json" \
+                "/repos/$REPOSITORY/commits/$EXPECTED_DEV_SHA/check-runs?filter=latest&per_page=100&app_id=$SUPABASE_GITHUB_APP_ID" \
+                --jq '
+                  [.check_runs[] | select(.name == "Supabase Preview" and .app.id == 330661)] as $checks
+                  | if ($checks | length) == 0 then
+                      "absent||"
+                    elif ($checks | length) == 1 then
+                      "present|\($checks[0].status)|\($checks[0].conclusion // "")"
+                    else
+                      "ambiguous||"
+                    end
+                '
+            )"
+
+            IFS='|' read -r match_state check_status check_conclusion <<< "$check_probe"
+            if [[ "$match_state" == "ambiguous" ]]; then
+              echo "::error::Multiple latest Supabase Preview checks exist for the exact dev commit."
+              exit 1
+            fi
+
+            if [[ "$match_state" == "present" && "$check_status" == "completed" ]]; then
+              if [[ "$check_conclusion" != "success" ]]; then
+                echo "::error::The exact dev commit's Supabase Preview check did not succeed."
+                exit 1
+              fi
+
+              exit 0
+            fi
+
+            sleep 5
+          done
+
+          echo "::error::The exact dev commit's Supabase Preview check did not complete within five minutes."
+          exit 1
 
       - name: List Preview migrations before apply
         if: steps.select-dev.outputs.is_current == 'true'

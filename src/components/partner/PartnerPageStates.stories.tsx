@@ -11,7 +11,7 @@ import StatsRow from "@/components/ui/StatsRow";
 import { ToastProvider } from "@/components/ui/Toast";
 import PartnerNotificationCenter from "@/components/partner/partner-notifications/PartnerNotificationCenter";
 import PartnerSupportRequestPanel from "@/components/partner/PartnerSupportRequestPanel";
-import type { PartnerNotificationCenterData } from "@/lib/partner-notifications";
+import type { PartnerNotificationCenterData } from "@/lib/partner-notification-contract";
 
 const companyId = "mock-partner-company-cafe-ssafy";
 const companyName = "카페 싸피";

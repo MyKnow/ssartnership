@@ -5,7 +5,9 @@ import type {
   PartnerBenefitUsageVerificationContext,
   RecordPartnerBenefitUsageInput,
 } from "@/lib/repositories/partner-benefit-usage-repository";
+import { assertPartnerBenefitUsageMemberAndCount } from "@/lib/repositories/partner-benefit-usage-repository-guards";
 import type { PartnerBenefit } from "@/lib/partner-benefit-items";
+import { MOCK_MEMBER_ID } from "@/lib/mock/member";
 
 const CAFE_SSAFY_PIN_HASH =
   "QhpQoVp+QUjkiLHzWV447DLxUcOIgxFS6+Y4yC1boAA=";
@@ -29,11 +31,16 @@ export const MOCK_PARTNER_BENEFIT_USAGE_CONTEXTS: PartnerBenefitUsageVerificatio
 export class MockPartnerBenefitUsageRepository implements PartnerBenefitUsageRepository {
   private readonly contexts = new Map<string, PartnerBenefitUsageVerificationContext>();
   private readonly usages = new Map<string, PartnerBenefitUsageRecord>();
+  private readonly memberIds: ReadonlySet<string>;
 
-  constructor(contexts: PartnerBenefitUsageVerificationContext[] = []) {
+  constructor(
+    contexts: PartnerBenefitUsageVerificationContext[] = [],
+    memberIds: readonly string[] = [MOCK_MEMBER_ID],
+  ) {
     for (const context of contexts) {
       this.contexts.set(context.partnerId, context);
     }
+    this.memberIds = new Set(memberIds);
   }
 
   async getVerificationContext(partnerId: string) {
@@ -110,6 +117,11 @@ export class MockPartnerBenefitUsageRepository implements PartnerBenefitUsageRep
     const benefit = context?.benefitItems.find((item) => item.id === input.benefitId);
     if (!context) throw new Error("partner_benefit_usage_partner_not_found");
     if (!benefit) throw new Error("partner_benefit_usage_benefit_not_found");
+    assertPartnerBenefitUsageMemberAndCount({
+      memberExists: this.memberIds.has(input.memberId),
+      maxApplyCount: benefit.maxApplyCount,
+      useCount: input.useCount,
+    });
     const usageId = `mock-admin-usage-${this.usages.size + 1}`;
     const record: PartnerBenefitUsageRecord = {
       usageId,
@@ -151,6 +163,11 @@ export class MockPartnerBenefitUsageRepository implements PartnerBenefitUsageRep
     const existing = existingEntry?.[1];
     if (!context) throw new Error("partner_benefit_usage_partner_not_found");
     if (!benefit) throw new Error("partner_benefit_usage_benefit_not_found");
+    assertPartnerBenefitUsageMemberAndCount({
+      memberExists: this.memberIds.has(input.memberId),
+      maxApplyCount: benefit.maxApplyCount,
+      useCount: input.useCount,
+    });
     if (!existing) throw new Error("partner_benefit_usage_not_found");
     const updated = {
       ...existing,

@@ -4,17 +4,12 @@ import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
 import PageHeader from "@/components/ui/PageHeader";
 import { getHeaderSession } from "@/lib/header-session";
-import {
-  getMemberCanonicalProfile,
-  getMemberProfileImageUrl,
-} from "@/lib/member-profile-view";
+import { getCertificationMemberView } from "@/lib/certification-member-view.server";
 import { getSignedUserSession } from "@/lib/user-auth";
 import CertificationView from "@/components/certification/CertificationView";
 import { SITE_NAME } from "@/lib/site";
 import { sanitizeReturnTo } from "@/lib/return-to";
-import { listCohortCardThemes } from "@/lib/cohort-card-themes";
-import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
-import { getMemberProfilePhotoAccessState } from "@/lib/member-profile-photo";
+import { listCohortCardThemes } from "@/lib/cohort-card-themes.server";
 import Button from "@/components/ui/Button";
 import { buildMemberGateHref } from "@/lib/member-required-gates";
 
@@ -27,15 +22,6 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = "force-dynamic";
-
-type CertificationMember = {
-  mattermostUsername?: string | null;
-  displayName?: string | null;
-  generation?: number | null;
-  campus?: string | null;
-  graduateVerifiedAt?: string | null;
-  profileImageUrl?: string | null;
-};
 
 function buildCertificationReturnTo(rawReturnTo?: string | string[]) {
   const nestedReturnTo = sanitizeReturnTo(
@@ -67,17 +53,16 @@ export default async function CertificationPage({
     redirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
 
-  const [headerSession, cohortCardThemes, photoState, member] = await Promise.all([
+  const [headerSession, cohortCardThemes, memberView] = await Promise.all([
     getHeaderSession(session.userId),
     listCohortCardThemes(),
-    getMemberProfilePhotoState(session.userId),
-    getMemberCanonicalProfile(session.userId),
+    getCertificationMemberView(session.userId),
   ]);
-  const photoAccess = getMemberProfilePhotoAccessState(photoState.reviewStatus);
 
-  if (!member) {
+  if (!memberView) {
     redirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
+  const { member, photoAccess } = memberView;
 
   return (
     <div className="min-h-screen bg-background">
@@ -104,18 +89,7 @@ export default async function CertificationPage({
                 </Button>
               </div>
             ) : <CertificationView
-              member={{
-                mattermostUsername: member.mattermostUsername,
-                displayName: member.displayName,
-                generation: member.generation,
-                campus: member.campus,
-                graduateVerifiedAt: member.graduateVerifiedAt,
-                profileImageUrl: member.activeProfileImageId
-                  && member.profilePhotoReviewStatus === "approved"
-                  && !member.mustChangePassword
-                  ? getMemberProfileImageUrl(member.id)
-                  : null,
-              } satisfies CertificationMember}
+              member={member}
               initialTimestamp={initialTimestamp}
               cohortCardThemes={cohortCardThemes}
             />}

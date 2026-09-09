@@ -10,28 +10,7 @@ import type {
 import { ADMIN_LOGS_CSV_HEADER, uniqueLogGroups } from './shared';
 import { resolveActorMeta } from './data';
 import { maskUnifiedCsvRow } from './privacy';
-
-function normalizeCsvText(value: string) {
-  const normalized = value.replace(/\u0000/g, '').replace(/[\r\n]+/g, ' ');
-  return /^[\s\t]*[=+\-@]/.test(normalized) ? `'${normalized}` : normalized;
-}
-
-function escapeCsvValue(value: string) {
-  return `"${normalizeCsvText(value).replace(/"/g, '""')}"`;
-}
-
-function toCsvCell(value: unknown) {
-  if (value === null || value === undefined) {
-    return '';
-  }
-  if (typeof value === 'string') {
-    return escapeCsvValue(value);
-  }
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-  return escapeCsvValue(JSON.stringify(value));
-}
+import { toCsvCell } from '@/lib/csv';
 
 export function serializeAdminLogsCsvRow(row: UnifiedCsvRow) {
   return [
@@ -51,7 +30,7 @@ export function serializeAdminLogsCsvRow(row: UnifiedCsvRow) {
     row.createdAt,
     row.properties,
   ]
-    .map(toCsvCell)
+    .map((value) => toCsvCell(value, { quoteStrings: 'always' }))
     .join(',');
 }
 

@@ -1,17 +1,11 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { scheduleProductEventLog } from "@/lib/activity-logs";
+import { ensureCronApiAccess, getCronErrorResponse } from "@/lib/cron-route";
 import { reconcileInstalledAppleWalletPasses } from "@/lib/wallet/wallet-pass-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function isAuthorizedByCronSecret(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  return Boolean(
-    secret && request.headers.get("authorization") === `Bearer ${secret}`,
-  );
-}
 
 function logWalletReconcileEvent(properties: Record<string, unknown>) {
   try {
@@ -32,12 +26,10 @@ function logWalletReconcileEvent(properties: Record<string, unknown>) {
 
 export async function GET(request: NextRequest) {
   noStore();
-  if (!isAuthorizedByCronSecret(request)) {
-    return NextResponse.json(
-      { message: "Unauthorized" },
-      { status: 401, headers: { "cache-control": "no-store" } },
-    );
-  }
+  const denied = ensureCronApiAccess(request, {
+    headers: { "cache-control": "no-store" },
+  });
+  if (denied) return denied;
 
   try {
     const result = await reconcileInstalledAppleWalletPasses();
@@ -60,12 +52,8 @@ export async function GET(request: NextRequest) {
       outcome: "reconcile_failed",
       reasonCode: "unexpected_error",
     });
-    return NextResponse.json(
-      {
-        ok: false,
-        message: "Apple Wallet 패스 상태 조정을 완료하지 못했습니다.",
-      },
-      { status: 500, headers: { "cache-control": "no-store" } },
-    );
+    return getCronErrorResponse("reconcile-apple-wallet-passes", {
+      headers: { "cache-control": "no-store" },
+    });
   }
 }

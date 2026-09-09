@@ -3,6 +3,7 @@ import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
 import type { EventCampaign } from "@/lib/promotions/catalog";
 import type { EventRewardSummary } from "@/lib/promotions/event-rewards";
+import { serializeJsonLd } from "@/lib/seo";
 
 export type EventPageViewProps = {
   campaign: EventCampaign;
@@ -25,7 +26,7 @@ export default function EventPageView({
         {structuredData ? (
           <script
             type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+            dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
           />
         ) : null}
         <EventLanding

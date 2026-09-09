@@ -77,16 +77,16 @@ export default function GraduatePasswordResetForm() {
   return (
     <div className="mt-5 grid gap-4">
       <p className="text-sm text-muted-foreground">
-        수료생 이메일로 6자리 인증 코드를 확인한 뒤 새 비밀번호 설정 링크를 보냅니다.
+        이메일로 6자리 인증 코드를 확인한 뒤 새 비밀번호 설정 링크를 보냅니다.
       </p>
       <label className="grid gap-2 text-sm font-medium text-foreground">
-        수료생 이메일
+        이메일
         <Input
           type="email"
           autoComplete="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          placeholder="name@example.com"
+          placeholder="예시: myknow@example.com"
         />
       </label>
       {codeSent ? (
@@ -102,19 +102,21 @@ export default function GraduatePasswordResetForm() {
           />
         </label>
       ) : null}
-      <div className="flex flex-wrap gap-2">
+      <div className="mt-2 grid gap-3">
         <Button
           type="button"
           variant={codeSent ? "secondary" : "primary"}
+          className="w-full"
           loading={pending}
           loadingText="전송 중"
           onClick={sendCode}
         >
-          {codeSent ? "인증 코드 다시 보내기" : "인증 코드 보내기"}
+          {codeSent ? "인증 코드 다시 보내기" : "이메일로 인증 코드 받기"}
         </Button>
         {codeSent ? (
           <Button
             type="button"
+            className="w-full"
             loading={pending}
             loadingText="확인 중"
             onClick={verifyCode}

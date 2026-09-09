@@ -10,6 +10,11 @@ import {
   type ManualMemberImportPhotoManifestEntry,
   type ManualMemberImportRawRow,
 } from "@/lib/member-manual-import/shared";
+import { MAX_BULK_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 import { withServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
@@ -77,7 +82,13 @@ export async function POST(request: NextRequest) {
     try {
       const contentType = request.headers.get("content-type") ?? "";
       const payload = contentType.includes("application/json")
-        ? await request.json().catch(() => null)
+        ? await readRouteJsonBodyWithinLimit<Record<string, unknown> | null>(
+          request,
+          {
+            maximumBytes: MAX_BULK_JSON_BODY_BYTES,
+            invalidMessage: "회원 행과 사진 목록을 확인해 주세요.",
+          },
+        )
         : null;
       const rows = parseRows(payload && typeof payload === "object" ? payload.rows : null);
       const photos = parsePhotoManifest(payload && typeof payload === "object" ? payload.photos : null);
@@ -90,7 +101,13 @@ export async function POST(request: NextRequest) {
         photos,
       }));
       return NextResponse.json(result, { status: result.ok ? 200 : 400 });
-    } catch {
+    } catch (error) {
+      if (error instanceof RouteJsonBodyError) {
+        return NextResponse.json(
+          { ok: false, errors: [error.message] },
+          { status: error.status },
+        );
+      }
       return NextResponse.json({ ok: false, errors: ["가져오기 준비에 실패했습니다."] }, { status: 400 });
     }
   });

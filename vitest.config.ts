@@ -15,6 +15,15 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.join(dirname, "src"),
+      "server-only": path.join(
+        dirname,
+        "node_modules",
+        "next",
+        "dist",
+        "compiled",
+        "server-only",
+        "empty.js",
+      ),
     },
   },
   optimizeDeps: {
@@ -57,6 +66,11 @@ export default defineConfig({
         test: {
           name: "unit",
           environment: "node",
+          // Match the isolated release gate's CPU budget. Unbounded transform
+          // workers can exhaust import deadlines and leave timed-out work alive.
+          maxWorkers: 2,
+          testTimeout: 5_000,
+          retry: 0,
           include: ["tests/unit/**/*.test.ts"],
         },
       },

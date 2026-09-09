@@ -10,6 +10,25 @@ const MAX_HEIF_BOXES = 2_048;
 const MAX_HEIF_BOX_DEPTH = 8;
 const INVALID_HEIF_ERROR = "HEIC/HEIF 이미지의 해상도를 확인하지 못했습니다.";
 
+export function getImagePixelError(
+  width: number,
+  height: number,
+  maxPixels: number,
+) {
+  if (
+    !Number.isSafeInteger(width)
+    || !Number.isSafeInteger(height)
+    || width <= 0
+    || height <= 0
+    || !Number.isSafeInteger(maxPixels)
+    || maxPixels <= 0
+    || width * height > maxPixels
+  ) {
+    return "이미지 해상도가 너무 큽니다.";
+  }
+  return null;
+}
+
 function getHeifBox(view: DataView, offset: number, parentEnd: number): HeifBox | null {
   if (offset + 8 > parentEnd) return null;
   const size32 = view.getUint32(offset);
@@ -63,15 +82,8 @@ export function getHeifSpatialExtentError(source: ArrayBuffer, maxPixels: number
         foundSpatialExtent = true;
         const width = view.getUint32(box.payloadStart + 4);
         const height = view.getUint32(box.payloadStart + 8);
-        if (
-          !Number.isSafeInteger(width)
-          || !Number.isSafeInteger(height)
-          || width <= 0
-          || height <= 0
-          || width * height > maxPixels
-        ) {
-          return "이미지 해상도가 너무 큽니다.";
-        }
+        const pixelError = getImagePixelError(width, height, maxPixels);
+        if (pixelError) return pixelError;
       } else if (scope === "root" && box.type === "meta") {
         if (box.payloadStart + 4 > box.end) return INVALID_HEIF_ERROR;
         const error = inspectBoxes(box.payloadStart + 4, box.end, depth + 1, "meta");

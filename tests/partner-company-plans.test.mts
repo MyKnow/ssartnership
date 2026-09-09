@@ -8,6 +8,7 @@ import {
   canAccessPartnerMetric,
   getPartnerCompanyPlanDefinition,
   getPlanAllowedAdChannels,
+  isPartnerPlanWindowOrderValid,
   normalizePartnerCompanyPlanTier,
   resolvePartnerBrandPlanWindow,
   type PartnerMetricKey,
@@ -50,6 +51,30 @@ describe("partner company plans", () => {
         planStartedAt: "2026-08-01T00:00:00+09:00",
         planExpiresAt: "2026-08-31T23:59:59+09:00",
       },
+    );
+  });
+
+  it("accepts inclusive date ranges and rejects reversed plan windows", () => {
+    assert.equal(
+      isPartnerPlanWindowOrderValid({
+        planStartedAt: "2026-08-31",
+        planExpiresAt: "2026-08-31",
+      }),
+      true,
+    );
+    assert.equal(
+      isPartnerPlanWindowOrderValid({
+        planStartedAt: "2026-09-01",
+        planExpiresAt: "2026-08-31",
+      }),
+      false,
+    );
+    assert.equal(
+      isPartnerPlanWindowOrderValid({
+        planStartedAt: "2026-08-31T00:00:00+09:00",
+        planExpiresAt: "2026-08-31T23:59:59+09:00",
+      }),
+      true,
     );
   });
 

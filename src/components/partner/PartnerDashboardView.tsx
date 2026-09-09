@@ -16,9 +16,12 @@ import type {
 } from "@/lib/partner-dashboard";
 import {
   canAccessPartnerMetric,
-  getPartnerCompanyPlanDefinition,
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
+import {
+  getPartnerPlanBadgeLabel,
+  getPartnerPlanBadgeVariant,
+} from "@/lib/partner-plan-ui";
 import {
   getPartnerVisibilityBadgeClass,
   getPartnerVisibilityLabel,
@@ -57,14 +60,9 @@ function ServiceMetric({
 }
 
 function BrandPlanBadge({ planTier }: { planTier: PartnerCompanyPlanTier }) {
-  const definition = getPartnerCompanyPlanDefinition(planTier);
   return (
-    <Badge
-      variant={
-        planTier === "boost" ? "primary" : planTier === "partner" ? "success" : "neutral"
-      }
-    >
-      {definition.label}
+    <Badge variant={getPartnerPlanBadgeVariant(planTier)}>
+      {getPartnerPlanBadgeLabel(planTier)}
     </Badge>
   );
 }
@@ -297,7 +295,7 @@ function CompanyOperationsSummary({
       value: `${attentionCount.toLocaleString("ko-KR")}건`,
       description:
         attentionCount > 0
-            ? "승인 대기, 반려, 검토용 공개 상태를 확인하세요."
+            ? "승인 대기, 반려, 대외비 공개 상태를 확인하세요."
           : "승인/공개 상태가 안정적으로 유지되고 있습니다.",
       tone: attentionCount > 0 ? "warning" : "success",
     },

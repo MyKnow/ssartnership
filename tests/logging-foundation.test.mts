@@ -351,6 +351,48 @@ test("product ingestion stops reading and cancels a streaming body above its byt
   assert.equal(cancelled, true);
 });
 
+test("shared JSON body parsing rejects malformed and oversized requests safely", async () => {
+  const { JsonRequestBodyError, readJsonRequestBodyWithinLimit } =
+    await requestBodyLimitModulePromise;
+
+  await assert.rejects(
+    readJsonRequestBodyWithinLimit(
+      new Request("https://ssartnership.example/api/test", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{not-json",
+      }),
+      32,
+    ),
+    (error: unknown) => {
+      if (!(error instanceof JsonRequestBodyError)) {
+        return false;
+      }
+      return (error as { code?: string }).code === "invalid_json";
+    },
+  );
+
+  await assert.rejects(
+    readJsonRequestBodyWithinLimit(
+      new Request("https://ssartnership.example/api/test", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "content-length": "4097",
+        },
+        body: "{}",
+      }),
+      4 * 1024,
+    ),
+    (error: unknown) => {
+      if (!(error instanceof JsonRequestBodyError)) {
+        return false;
+      }
+      return (error as { code?: string }).code === "body_too_large";
+    },
+  );
+});
+
 test("product endpoint uses the bounded stream reader instead of buffering request text", () => {
   assert.match(productEventRouteSource, /readRequestBodyWithinLimit\(\s*request\.body/);
   assert.doesNotMatch(productEventRouteSource, /request\.text\(\)/);

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import NotificationsView from "@/components/notifications/NotificationsView";
-import { getPolicyDocumentByKind } from "@/lib/policy-documents";
+import { getPolicyDocumentByKind } from "@/lib/policy-documents.server";
 import { getMemberNotificationPreferences } from "@/lib/notification-preferences";
 import { notificationRepository } from "@/lib/repositories";
 import { isPushConfigured } from "@/lib/push";

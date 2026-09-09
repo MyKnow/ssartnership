@@ -38,6 +38,22 @@ export type CouponIssueWindow = {
   endsAt: string;
 };
 
+export const AD_COUPON_CODE_BATCH_LIMIT = 20_000;
+export const AD_COUPON_CODE_MAX_LENGTH = 120;
+
+export function assertValidAdCouponCodeBatch(codes: readonly string[]) {
+  if (codes.length > AD_COUPON_CODE_BATCH_LIMIT) {
+    throw new Error(
+      `쿠폰 코드는 한 번에 ${AD_COUPON_CODE_BATCH_LIMIT.toLocaleString("ko-KR")}개까지 등록할 수 있습니다.`,
+    );
+  }
+  if (codes.some((code) => code.length > AD_COUPON_CODE_MAX_LENGTH)) {
+    throw new Error(
+      `쿠폰 코드는 ${AD_COUPON_CODE_MAX_LENGTH}자 이하로 입력해 주세요.`,
+    );
+  }
+}
+
 function getTime(value: string | null | undefined) {
   if (!value) {
     return null;

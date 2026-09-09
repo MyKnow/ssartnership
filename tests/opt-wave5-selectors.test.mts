@@ -106,6 +106,48 @@ test("home selectors apply search before splitting visible and locked cards", as
   assert.deepStrictEqual(emptyResult.display.map((partner) => partner.id), []);
 });
 
+test("home selectors preserve benefit search through a folded directorySearchText", async () => {
+  const { normalizeHomePartners, filterHomePartners } = await homeSelectorsPromise;
+
+  const normalized = normalizeHomePartners(
+    [
+      {
+        id: "partner-lean-public",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        name: "역삼 테스트",
+        location: "역삼",
+        category: "food",
+        visibility: "public",
+        period: { start: "2026-01-01", end: "2099-12-31" },
+        thumbnail: null,
+        images: [],
+        conditions: [],
+        benefits: [],
+        appliesTo: ["student"],
+        mapUrl: undefined,
+        reservationLink: undefined,
+        inquiryLink: undefined,
+        tags: [],
+        directorySearchText: "역삼 테스트 평일 점심 10% 할인",
+      },
+    ],
+    false,
+  );
+
+  const result = filterHomePartners({
+    partners: normalized,
+    activeCategory: "all",
+    campusFilter: "all",
+    appliesToFilter: "all",
+    searchValue: "10% 할인",
+    sortValue: "recent",
+  });
+
+  assert.deepStrictEqual(result.display.map((partner) => partner.id), [
+    "partner-lean-public",
+  ]);
+});
+
 test("member selectors derive campus and filter must-change users first", async () => {
   const {
     normalizeAdminMembers,

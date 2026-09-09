@@ -6,12 +6,13 @@ import {
   createPartnerBillingProfileAction,
   setDefaultPartnerBillingProfileAction,
 } from "@/app/partner/account/actions";
-import { getPartnerBillingProfiles } from "@/lib/partner-billing-profiles";
+import { getPartnerBillingProfilesForCompanies } from "@/lib/partner-billing-profiles";
 import { getPartnerBillingActionErrorMessage } from "@/lib/partner-billing-action-errors";
 import { getPartnerPasswordChangeHref } from "@/lib/partner-portal-paths";
 import { getPartnerPortalCompanySummaries } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
+import { readFirstSearchParam } from "@/lib/search-params";
 
 export const metadata: Metadata = {
   title: `계정 | ${SITE_NAME}`,
@@ -19,10 +20,6 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = "force-dynamic";
-
-function readSearchParam(value?: string | string[]) {
-  return Array.isArray(value) ? value[0] : value;
-}
 
 export default async function PartnerAccountPage({
   searchParams,
@@ -47,27 +44,18 @@ export default async function PartnerAccountPage({
   }
 
   const params = (await searchParams) ?? {};
-  const requestedCompanyId = readSearchParam(params.companyId)?.trim();
+  const requestedCompanyId = readFirstSearchParam(params.companyId)?.trim();
   const contextCompany =
     companies.find((company) => company.id === requestedCompanyId) ?? companies[0];
   if (!contextCompany) {
     redirect("/partner");
   }
 
-  const profileGroups = await Promise.all(
-    companies.map((company) =>
-      getPartnerBillingProfiles({
-        accountId: session.accountId,
-        companyId: company.id,
-      }),
-    ),
-  );
-  const profiles = [
-    ...new Map(
-      profileGroups.flat().map((profile) => [profile.id, profile] as const),
-    ).values(),
-  ];
-  const status = readSearchParam(params.status);
+  const profiles = await getPartnerBillingProfilesForCompanies({
+    accountId: session.accountId,
+    companyIds: companies.map((company) => company.id),
+  });
+  const status = readFirstSearchParam(params.status);
   const statusMessage =
     status === "created"
       ? "프로필이 저장되었습니다."
@@ -77,7 +65,7 @@ export default async function PartnerAccountPage({
           ? "증빙 프로필이 삭제되었습니다."
           : null;
   const errorMessage = getPartnerBillingActionErrorMessage(
-    readSearchParam(params.error),
+    readFirstSearchParam(params.error),
   );
 
   return (

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ensureAdminApiPermission } from "@/lib/admin-access";
+import { getNotificationTemplateAdminApiSession } from "@/lib/admin-access";
 import {
   getNotificationTemplateDefinition,
   type NotificationTemplateChannel,
@@ -20,15 +20,11 @@ function getChannel(value: string | null): NotificationTemplateChannel | null {
 
 export async function GET(request: NextRequest) {
   return withServerTiming(async (timing) => {
-    const denied = await timing.measure("auth", () =>
-      ensureAdminApiPermission(
-        request,
-        "notification_templates",
-        "read",
-      ),
+    const access = await timing.measure("auth", () =>
+      getNotificationTemplateAdminApiSession(request, "read"),
     );
-    if (denied) {
-      return denied;
+    if ("response" in access) {
+      return access.response;
     }
 
     const eventKey = request.nextUrl.searchParams.get("eventKey")?.trim() ?? "";

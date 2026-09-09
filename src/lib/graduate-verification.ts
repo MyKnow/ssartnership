@@ -93,63 +93,42 @@ const TRANSITIONS: Record<GraduateVerificationStatus, readonly GraduateVerificat
 const RESUBMISSION_TARGET_SET = new Set<string>(GRADUATE_RESUBMISSION_TARGETS);
 const GRADUATE_CAMPUS_SET = new Set<string>(GRADUATE_CAMPUS_OPTIONS);
 
-function isValidMonth(value: number) {
-  return Number.isInteger(value) && value >= 1 && value <= 12;
+/** Returns selectable SSAFY generations, newest first. */
+export function getGraduateGenerationOptions(now = new Date()) {
+  if (now.getFullYear() === 2018 && now.getMonth() === 11) return [1];
+  const currentGeneration = Math.min(
+    99,
+    Math.max(
+      0,
+      (now.getFullYear() - 2019) * 2 + (now.getMonth() + 1 >= 7 ? 2 : 1),
+    ),
+  );
+  return Array.from({ length: currentGeneration }, (_, index) => currentGeneration - index);
 }
 
-function isValidEducationStart(year: number, month: number) {
-  if (!Number.isInteger(year) || !isValidMonth(month)) {
-    return false;
-  }
-  return year > 2018 || (year === 2018 && month === 12);
-}
+export type GraduateEducationDetails = {
+  legalName: string;
+  generation: unknown;
+  campus?: unknown;
+};
 
-function toYearMonthIndex(year: number, month: number) {
-  return year * 12 + month;
-}
+export type GraduateEducationFieldErrors = Partial<Record<"legalName" | "generation" | "campus", string>>;
 
-function fromYearMonthIndex(index: number) {
-  return {
-    year: Math.floor((index - 1) / 12),
-    month: ((index - 1) % 12) + 1,
-  };
-}
-
-export function getGraduateCurrentYearMonth(now = new Date()) {
-  return {
-    year: now.getFullYear(),
-    month: now.getMonth() + 1,
-  };
-}
-
-export function clampGraduateEducationEnd(input: {
-  startYear: number;
-  startMonth: number;
-  endYear: number;
-  endMonth: number;
-  currentYear: number;
-  currentMonth: number;
-}) {
-  const start = toYearMonthIndex(input.startYear, input.startMonth);
-  const end = toYearMonthIndex(input.endYear, input.endMonth);
-  const current = toYearMonthIndex(input.currentYear, input.currentMonth);
-  return fromYearMonthIndex(Math.min(Math.max(end, start), current));
-}
-
-export function getSsafyCohortFromEducationStart(year: number, month: number) {
-  if (!isValidEducationStart(year, month)) {
-    return null;
-  }
-  if (year === 2018 && month === 12) {
-    return 1;
-  }
-  return (year - 2019) * 2 + (month >= 7 ? 2 : 1);
-}
-
-// `cohort` was the former internal term. New member-domain code uses
-// generation consistently; keep the old export only for existing callers.
-export function getSsafyGenerationFromEducationStart(year: number, month: number) {
-  return getSsafyCohortFromEducationStart(year, month);
+export function validateGraduateEducationDetails(
+  input: GraduateEducationDetails,
+  now = new Date(),
+): { ok: true; value: { legalName: string; generation: number; campus: GraduateCampus } } | { ok: false; fieldErrors: GraduateEducationFieldErrors; message: string } {
+  const legalName = input.legalName.trim();
+  const generation = input.generation;
+  const campus = typeof input.campus === "string" ? input.campus.trim() : "";
+  const validGenerations = new Set(getGraduateGenerationOptions(now));
+  const fieldErrors: GraduateEducationFieldErrors = {};
+  if (legalName.length < 1 || legalName.length > 100) fieldErrors.legalName = "이름은 1~100자로 입력해 주세요.";
+  if (typeof generation !== "number" || !Number.isInteger(generation) || !validGenerations.has(generation)) fieldErrors.generation = "기수를 선택해 주세요.";
+  if (!GRADUATE_CAMPUS_SET.has(campus)) fieldErrors.campus = "캠퍼스를 선택해 주세요.";
+  const message = fieldErrors.legalName ?? fieldErrors.generation ?? fieldErrors.campus;
+  if (message) return { ok: false, fieldErrors, message };
+  return { ok: true, value: { legalName, generation: generation as number, campus: campus as GraduateCampus } };
 }
 
 export function normalizeGraduateEmail(value: string) {
@@ -176,10 +155,6 @@ export type GraduateVerificationSubmission = {
   email: string;
   emailNormalized: string;
   legalName: string;
-  educationStartYear: number;
-  educationStartMonth: number;
-  educationEndYear: number;
-  educationEndMonth: number;
   inferredGeneration: number;
   cohortRuleVersion: typeof GRADUATE_COHORT_RULE_VERSION;
   campus: GraduateCampus;
@@ -188,10 +163,7 @@ export type GraduateVerificationSubmission = {
 type GraduateSubmissionInput = {
   email: string;
   legalName: string;
-  educationStartYear: number;
-  educationStartMonth: number;
-  educationEndYear: number;
-  educationEndMonth: number;
+  generation: unknown;
   campus?: unknown;
 };
 
@@ -205,77 +177,21 @@ export function createGraduateVerificationSubmission(
     return { ok: false, error: "이메일 주소를 확인해 주세요." };
   }
 
-  const legalName = input.legalName.trim();
-  if (legalName.length < 1 || legalName.length > 100) {
-    return { ok: false, error: "이름은 1~100자로 입력해 주세요." };
-  }
-
-  const periodError = validateGraduateEducationPeriod({
-    startYear: input.educationStartYear,
-    startMonth: input.educationStartMonth,
-    endYear: input.educationEndYear,
-    endMonth: input.educationEndMonth,
-  });
-  if (periodError) {
-    return { ok: false, error: periodError };
-  }
-
-  const inferredGeneration = getSsafyGenerationFromEducationStart(
-    input.educationStartYear,
-    input.educationStartMonth,
-  );
-  if (inferredGeneration === null) {
-    return { ok: false, error: "기수를 계산할 수 없는 교육 시작 연·월입니다." };
-  }
-
-  const campus = typeof input.campus === "string" ? input.campus.trim() : "";
-  if (!GRADUATE_CAMPUS_SET.has(campus)) {
-    return { ok: false, error: "캠퍼스를 선택해 주세요." };
-  }
+  const details = validateGraduateEducationDetails(input);
+  if (!details.ok) return { ok: false, error: details.message };
   return {
     ok: true,
     value: {
       email: input.email.trim(),
       emailNormalized,
-      legalName,
-      educationStartYear: input.educationStartYear,
-      educationStartMonth: input.educationStartMonth,
-      educationEndYear: input.educationEndYear,
-      educationEndMonth: input.educationEndMonth,
-      inferredGeneration,
+      legalName: details.value.legalName,
+      inferredGeneration: details.value.generation,
       cohortRuleVersion: GRADUATE_COHORT_RULE_VERSION,
-      campus: campus as GraduateCampus,
+      campus: details.value.campus,
     },
   };
 }
 
-export function validateGraduateEducationPeriod(input: {
-  startYear: number;
-  startMonth: number;
-  endYear: number;
-  endMonth: number;
-  currentYear?: number;
-  currentMonth?: number;
-}) {
-  if (!isValidEducationStart(input.startYear, input.startMonth)) {
-    return "교육 시작 연·월을 확인해 주세요.";
-  }
-  if (!Number.isInteger(input.endYear) || !isValidMonth(input.endMonth)) {
-    return "교육 종료 연·월을 확인해 주세요.";
-  }
-  const start = toYearMonthIndex(input.startYear, input.startMonth);
-  const end = toYearMonthIndex(input.endYear, input.endMonth);
-  if (end < start) {
-    return "교육 종료 연·월은 시작 연·월보다 빠를 수 없습니다.";
-  }
-  const current = getGraduateCurrentYearMonth();
-  const currentYear = input.currentYear ?? current.year;
-  const currentMonth = input.currentMonth ?? current.month;
-  if (!isValidMonth(currentMonth) || end > toYearMonthIndex(currentYear, currentMonth)) {
-    return "교육 종료 연·월은 현재 연·월보다 늦을 수 없습니다.";
-  }
-  return null;
-}
 
 export function canTransitionGraduateVerification(
   from: GraduateVerificationStatus,

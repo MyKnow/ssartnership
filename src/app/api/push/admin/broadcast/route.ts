@@ -7,6 +7,10 @@ import { parsePushAudience } from "@/lib/push";
 import { isUuid } from "@/lib/uuid";
 import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
 import { withServerTiming } from "@/lib/server-timing";
+import {
+  AdminNotificationRouteBodyError,
+  readAdminNotificationJsonBody,
+} from "@/lib/admin-notification-route-body";
 
 export const runtime = "nodejs";
 
@@ -25,7 +29,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const body = (await request.json()) as {
+      const body = await readAdminNotificationJsonBody<{
         notificationType?: AdminNotificationType;
         title?: string;
         body?: string;
@@ -34,7 +38,7 @@ export async function POST(request: NextRequest) {
         audience?: unknown;
         confirmationText?: string | null;
         idempotencyKey?: string | null;
-      };
+      }>(request);
       const idempotencyKey = body.idempotencyKey?.trim() ?? "";
       if (!isUuid(idempotencyKey)) {
         return NextResponse.json(
@@ -54,8 +58,8 @@ export async function POST(request: NextRequest) {
             push: Boolean(body.channels?.push),
             mm: Boolean(body.channels?.mm),
           },
-        confirmationText: body.confirmationText ?? null,
-        idempotencyKey,
+          confirmationText: body.confirmationText ?? null,
+          idempotencyKey,
         }),
       );
 
@@ -80,6 +84,12 @@ export async function POST(request: NextRequest) {
         result,
       });
     } catch (error) {
+      if (error instanceof AdminNotificationRouteBodyError) {
+        return NextResponse.json(
+          { message: error.message },
+          { status: error.status },
+        );
+      }
       console.error("[push-admin-broadcast] send failed", error);
       const message = getSafeAdminMessage(
         error,

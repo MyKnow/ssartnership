@@ -44,6 +44,7 @@ export type Partner = {
   thumbnail?: string | null;
   images?: string[];
   tags?: string[];
+  directorySearchText?: string;
   branchScopeType?: string;
   branchScopeNote?: string | null;
 };

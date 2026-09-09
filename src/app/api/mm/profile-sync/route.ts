@@ -35,6 +35,7 @@ export async function POST(request: Request) {
       await logAdminAudit({
         ...context,
         action: "member_email_login_transition",
+        actorType: "member",
         actorId: session.userId,
         targetType: "member",
         targetId: session.userId,
@@ -64,6 +65,7 @@ export async function POST(request: Request) {
       await logAdminAudit({
         ...context,
         action: "member_sync",
+        actorType: "member",
         actorId: session.userId,
         targetType: "member",
         targetId: session.userId,

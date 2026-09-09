@@ -347,7 +347,7 @@ test("member lifecycle deletes private files before calling the anonymization RP
     ".from(MEMBER_PROFILE_IMAGES_BUCKET)\n      .remove(paths)",
   );
   const certificateDelete = anonymizeSource.indexOf(
-    ".from(GRADUATE_CERTIFICATES_BUCKET)\n      .remove([certificatePath])",
+    ".from(GRADUATE_CERTIFICATES_BUCKET)\n      .remove(storagePlan.certificatePaths)",
   );
   const rpc = anonymizeSource.indexOf(
     'supabase.rpc("anonymize_deleted_member"',
@@ -371,5 +371,17 @@ test("member lifecycle deletes private files before calling the anonymization RP
   assert.match(
     lifecycleSource,
     /Date\.now\(\) - 30 \* 24 \* 60 \* 60 \* 1000/,
+  );
+});
+
+test("member anonymization cron uses bounded concurrency", () => {
+  const cronSource = readRepoFile(
+    "src/app/api/cron/anonymize-deleted-members/route.ts",
+  );
+
+  assert.match(cronSource, /MEMBER_ANONYMIZATION_CONCURRENCY = 4/);
+  assert.match(
+    cronSource,
+    /await forEachWithConcurrency\(\s*members,\s*MEMBER_ANONYMIZATION_CONCURRENCY,/,
   );
 });

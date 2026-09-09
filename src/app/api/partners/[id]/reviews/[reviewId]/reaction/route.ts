@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { getRequestLogContext, scheduleProductEventLog } from "@/lib/activity-logs";
+import { getSafePublicRouteError } from "@/lib/public-route-safe-errors";
 import { partnerReviewRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 import { ensureVisibleReviewPartner, getReviewMemberSession } from "../../_shared";
 
 export const runtime = "nodejs";
@@ -46,7 +52,24 @@ export async function PATCH(
     return NextResponse.json({ ok: false, message: "비공개 처리된 리뷰에는 반응할 수 없습니다." }, { status: 409 });
   }
 
-  const body = await request.json().catch(() => null);
+  let body: { reaction?: unknown } | null = null;
+  try {
+    body = await readRouteJsonBodyWithinLimit<{ reaction?: unknown } | null>(
+      request,
+      {
+        maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+        invalidMessage: "반응 종류를 확인해 주세요.",
+        tooLargeMessage: "요청이 너무 큽니다.",
+      },
+    );
+  } catch (error) {
+    if (error instanceof RouteJsonBodyError && error.code === "body_too_large") {
+      return NextResponse.json(
+        { ok: false, message: error.message },
+        { status: error.status },
+      );
+    }
+  }
   const reaction =
     body?.reaction === "recommend" || body?.reaction === "disrecommend"
       ? body.reaction
@@ -87,11 +110,14 @@ export async function PATCH(
     }
     return NextResponse.json({ ok: true, review });
   } catch (error) {
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : "리뷰 반응에 실패했습니다. 잠시 후 다시 시도해 주세요.";
-    const status = message.includes("찾을 수 없습니다.") ? 404 : 503;
-    return NextResponse.json({ ok: false, message }, { status });
+    console.error("[partner-review-reaction] update failed", error);
+    const safeError = getSafePublicRouteError(
+      error,
+      "리뷰 반응에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    return NextResponse.json(
+      { ok: false, message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }

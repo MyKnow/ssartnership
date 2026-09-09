@@ -3,6 +3,11 @@ import { getRequestLogContext, scheduleProductEventLog } from "@/lib/activity-lo
 import { consumeProductEventQuota } from "@/lib/product-event-throttle";
 import { adPackageRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 import { getSignedUserSession } from "@/lib/user-auth";
 
 export const runtime = "nodejs";
@@ -74,9 +79,20 @@ export async function POST(
 
   let body: RedeemRequestBody | null;
   try {
-    body = (await request.json()) as RedeemRequestBody;
-  } catch {
-    return NextResponse.json({ ok: false, message: "잘못된 요청입니다." }, { status: 400 });
+    body = await readRouteJsonBodyWithinLimit<RedeemRequestBody | null>(
+      request,
+      {
+        maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+        invalidMessage: "잘못된 요청입니다.",
+        tooLargeMessage: "요청이 너무 큽니다.",
+      },
+    );
+  } catch (error) {
+    const message = error instanceof RouteJsonBodyError
+      ? error.message
+      : "잘못된 요청입니다.";
+    const status = error instanceof RouteJsonBodyError ? error.status : 400;
+    return NextResponse.json({ ok: false, message }, { status });
   }
 
   const context = getRequestLogContext(request);
@@ -85,7 +101,8 @@ export async function POST(
     !consumeProductEventQuota({
       eventName: "coupon_redeem",
       ipAddress: context.ipAddress,
-      sessionId,
+      actorKey: `member:${session.userId}`,
+      scopeKey: `coupon:${couponId}`,
     })
   ) {
     return NextResponse.json(

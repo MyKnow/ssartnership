@@ -1,104 +1,83 @@
 ---
 name: docs-governance
-description: Repository markdown placement and documentation taxonomy for ssartnership. Use when creating, moving, renaming, or reviewing markdown files so that README, AGENTS, and skill docs stay in place and every other project markdown file is stored under docs/ with a clear category.
+description: Repository Knowledge placement, metadata, lifecycle, link, and source-of-truth governance for ssartnership. Use when creating, moving, renaming, completing, superseding, or reviewing project documentation.
 ---
 
 # Docs Governance
 
-Use this skill whenever the task creates or reorganizes Markdown documentation in this repository.
+Use this skill whenever the task creates, reorganizes, completes, supersedes, or reviews Markdown documentation in this repository.
 
-## Core Rule
+## Start Here
 
-Keep project Markdown files under `docs/`.
+Read [docs/index.md](../../../docs/index.md) before choosing a destination. It is the Repository Knowledge map. The detailed metadata, status transition, spec lifecycle, and validation contract is [docs/operations/documentation-lifecycle.md](../../../docs/operations/documentation-lifecycle.md).
 
-Allowed non-`docs/` exceptions:
+`AGENTS.md` is a concise map and working-rule file, not the project knowledge store. Do not grow it into a duplicate manual.
+
+## Root Exceptions
+
+Keep project Markdown under `docs/` except for:
 
 - `README.md`
 - `AGENTS.md`
-- `.agents/skills/**/SKILL.md`
-- skill metadata or assets that are part of a skill package
+- `.agents/skills/**/SKILL.md` and assets that are part of a skill package
 
-Everything else that is a project document should live under `docs/`.
+The public vulnerability disclosure policy is `docs/SECURITY.md`. Do not introduce a second root copy.
 
-## Placement Rules
+## Source of Truth
 
-Choose the narrowest matching category first.
+- Product intent and user contracts: `docs/product/`, `docs/requirements/`, `docs/specs/`
+- Current technical boundaries: `docs/architecture/`; decision rationale: `docs/decisions/`
+- Current implementation: code, schema, migrations, tests, and package scripts
+- Work state: `docs/plans/active/`, GitHub Issue/PR, Git, CI
+- Repeatable operations: `docs/operations/runbooks/`
+- Point-in-time evidence: completed plans, audits, measurements, and history
 
-- `docs/security/`
-  - security reviews
-  - hardening guides
-  - auth, secrets, abuse prevention, incident notes
-- `docs/performance/`
-  - profiling notes
-  - performance audits
-  - before/after measurements
-  - optimization plans
-- `docs/design-system/`
-  - foundations
-  - component conventions
-  - layout/motion rules
-- `docs/architecture/`
-  - system structure
-  - repository/service boundaries
-  - data flow and technical decisions
-- `docs/operations/`
-  - release workflow
-  - deployment runbooks
-  - maintenance guides
-  - operational audits
-- `docs/product/`
-  - roadmap
-  - TODO/FIX lists
-  - feature rollout notes
-  - domain policies that are product-facing
-- `docs/testing/`
-  - Storybook
-  - Playwright
-  - test strategy
-  - QA guides
+Link to the canonical document instead of copying the same current fact into several files.
 
-If no category exists yet, create the smallest obvious directory under `docs/` instead of leaving the file at repo root.
+## Placement
 
-## File Naming
+Choose the narrowest existing category.
 
-- Prefer lowercase kebab-case for general docs: `release-workflow.md`
-- Keep established security report naming when already standardized:
-  - `security_YYYY-MM-DD_NN.md`
-- Avoid vague names at root level like `FIX.md`, `TODO.md`, `notes.md`
-- Prefer names that make the category obvious without opening the file
+- `docs/product/`: service overview, information architecture, user flows, screen contracts, terminology, operator-facing product guides
+- `docs/requirements/`: cross-cutting functional and non-functional contracts
+- `docs/specs/<feature>/`: planned multi-surface, data-model, security-sensitive, or architectural features
+  - `spec.md`: WHAT/WHY, scope, invariants, acceptance
+  - `plan.md`: technical boundaries, changed surfaces, rollout, verification
+  - `tasks.md`: resumable order, status, and completion evidence
+- `docs/architecture/`: current system, data, API, repository/service, logging boundaries
+- `docs/decisions/`: ADRs with Context, Decision, Alternatives, Consequences, Status
+- `docs/plans/active/`: approved work that needs repository-local resume context
+- `docs/plans/completed/`: finished plans and their evidence
+- `docs/plans/tech-debt.md`: unapproved follow-up candidates
+- `docs/operations/runbooks/`: repeatable release, deployment, maintenance, recovery procedures
+- `docs/operations/audits/`: dated operational findings
+- `docs/security/`, `docs/performance/`, `docs/testing/`, `docs/design-system/`: domain contracts and their explicit audit/baseline subtypes
+- `docs/history/`: expired or superseded originals that remain useful as evidence
 
-## Required Behavior
+Do not create `generated/` without a reproducible source and command. Do not copy an external reference into the repository unless durable offline preservation, provenance, and usage rights justify it.
 
-When asked to create a new Markdown doc:
+## Metadata And Lifecycle
 
-1. Decide whether it is a skill file or repository doc
-2. If it is a repository doc, place it under `docs/`
-3. If the file already exists outside `docs/` and is not an allowed exception, move it
-4. Update internal links if a move changes paths
+Every `docs/**/*.md` needs scalar frontmatter with `title`, `type`, `status`, and `authority`. Add `last_verified` only after real revalidation. A superseded document also needs `superseded_by`.
 
-When asked to review doc layout:
+- Move finished active plans to `plans/completed/` and record evidence and residual risk.
+- Move expired source documents to `history/`; use `superseded` when a replacement exists and `archived` when it simply expired.
+- Never use an audit or historical checklist as the current runbook.
+- When a path moves, update Markdown links, README/AGENTS/skill references, workflow path filters, and contract tests in the same change.
+- Preserve old evidence as code text when a referenced implementation file no longer exists; do not leave a misleading broken link.
 
-1. List root-level `.md` files
-2. Separate allowed exceptions from misplaced docs
-3. Propose the target `docs/` subdirectory for each misplaced file
+## Spec Decision
 
-## Current Repository Taxonomy
+Use spec/plan/tasks for new planned work that changes several surfaces, data contracts, auth/security, or architecture. Do not retroactively convert the whole brownfield system. A small, reversible fix can stay in an Issue/PR with a focused regression test.
 
-Use these directories first because they already exist:
+## Verification
 
-- `docs/security/`
-- `docs/performance/`
-- `docs/design-system/`
+Run:
 
-Preferred next directories when needed:
+```bash
+npm run check:docs
+```
 
-- `docs/architecture/`
-- `docs/operations/`
-- `docs/product/`
-- `docs/testing/`
+The validator fails on invalid metadata, path/status mismatches, broken or repository-external local links, personal-machine absolute paths, missing replacement targets, and current/active normative documents that cannot be reached from `docs/index.md`.
 
-## Notes
-
-- Do not move `AGENTS.md`; tooling expects it at repo root.
-- Do not create extra top-level Markdown files unless the user explicitly wants a root-level exception.
-- `STORYBOOK.md` should live under `docs/testing/` if it is kept as repository documentation.
+`npm run verify:change` always runs `check:docs`, including the docs-only tier. When documentation is moved, also search the full repository for stale paths and review the final rename detection and diff.

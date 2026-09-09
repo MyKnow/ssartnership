@@ -21,5 +21,6 @@ test("제휴처 수정 실패는 내부 오류를 노출하지 않고 상세 경
   assert.match(actionSource, /partner_update_failed/);
   assert.match(actionSource, /stage: "mutation"/);
   assert.match(actionSource, /stage: "media"/);
+  assert.doesNotMatch(actionSource, /rollbackPartnerUpdateMutation/);
   assert.match(errorSource, /partner_update_failed:/);
 });

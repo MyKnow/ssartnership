@@ -8,6 +8,7 @@ const session = {
   loginId: "partner@cafessafy.example",
   displayName: "김싸피 담당자",
   companyIds: [companyId],
+  authSessionVersion: 1,
   mustChangePassword: false,
   issuedAt: Date.now(),
   expiresAt: Date.now() + 60_000,

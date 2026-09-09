@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
     returnTo,
     mustChangePassword: session.mustChangePassword,
     requiresConsent: session.requiresConsent,
+    requiresEmailRegistration: session.requiresEmailRegistration,
     requiresProfilePhotoUpdate: session.requiresProfilePhotoUpdate,
   });
 

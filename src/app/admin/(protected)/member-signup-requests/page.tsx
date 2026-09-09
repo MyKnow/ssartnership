@@ -12,6 +12,7 @@ import {
 } from "@/lib/mm-signup-approval/repository";
 import type { MattermostSignupApprovalRequestSummary } from "@/lib/mm-signup-approval";
 import { getAdminReviewQueueFeedback } from "@/lib/admin-review-queue";
+import { readFirstSearchParam } from "@/lib/search-params";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -23,10 +24,6 @@ type MemberSignupRequestsSearchParams = {
   page?: string | string[];
   pageSize?: string | string[];
 };
-
-function getOneSearchParam(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] : value;
-}
 
 function buildMemberSignupQueueHref(page: number, pageSize: number) {
   const params = new URLSearchParams();
@@ -44,8 +41,8 @@ async function AdminMemberSignupRequestsContent({
   params: MemberSignupRequestsSearchParams;
 }) {
   const pagination = parseAdminReviewQueuePagination({
-    page: getOneSearchParam(params.page),
-    pageSize: getOneSearchParam(params.pageSize),
+    page: readFirstSearchParam(params.page),
+    pageSize: readFirstSearchParam(params.pageSize),
   });
   let requestPage: {
     requests: MattermostSignupApprovalRequestSummary[];
@@ -88,11 +85,11 @@ async function AdminMemberSignupRequestsContent({
   return (
     <AdminMemberSignupApprovalQueue
         requests={requestPage.requests}
-        statusMessage={getSignupApprovalStatusMessage(getOneSearchParam(params.status))}
+        statusMessage={getSignupApprovalStatusMessage(readFirstSearchParam(params.status))}
         returnTo={returnTo}
         feedback={getAdminReviewQueueFeedback({
-          error: getOneSearchParam(params.error),
-          success: getOneSearchParam(params.success) ?? getOneSearchParam(params.status),
+          error: readFirstSearchParam(params.error),
+          success: readFirstSearchParam(params.success) ?? readFirstSearchParam(params.status),
         })}
         pagination={requestPage}
         loadError={queueLoadError}

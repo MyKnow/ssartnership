@@ -19,41 +19,61 @@ import type { PartnerFavoriteRepository } from "@/lib/repositories/partner-favor
 import type { PartnerReviewRepository } from "@/lib/repositories/partner-review-repository";
 import type { AdPackageRepository } from "@/lib/repositories/ad-package-repository";
 import type { PartnerBenefitUsageRepository } from "@/lib/repositories/partner-benefit-usage-repository";
+import {
+  createUnavailableDataAccessProxy,
+  selectRuntimeDataAccess,
+} from "@/lib/runtime-data-access";
 
-const dataSource = process.env.NEXT_PUBLIC_DATA_SOURCE;
-const hasSupabaseEnv =
-  !!process.env.SUPABASE_URL &&
-  (!!process.env.SUPABASE_ANON_KEY || !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+export const repositoryDataAccess = selectRuntimeDataAccess({
+  capability: "admin",
+});
 
-const repository: PartnerRepository =
-  dataSource === "mock" || !hasSupabaseEnv
-    ? new MockPartnerRepository()
-    : new SupabasePartnerRepository();
+function createActiveRepository<T extends object>(
+  createMockRepository: () => T,
+  createSupabaseRepository: () => T,
+) {
+  if (repositoryDataAccess.source === "mock") {
+    return createMockRepository();
+  }
+  if (repositoryDataAccess.source === "supabase") {
+    return createSupabaseRepository();
+  }
+  return createUnavailableDataAccessProxy<T>(repositoryDataAccess);
+}
 
-const reviewRepository: PartnerReviewRepository =
-  dataSource === "mock" || !hasSupabaseEnv
-    ? new MockPartnerReviewRepository()
-    : new SupabasePartnerReviewRepository();
+const repository = createActiveRepository<PartnerRepository>(
+  () => new MockPartnerRepository(),
+  () => new SupabasePartnerRepository(),
+);
 
-const activeNotificationRepository: NotificationRepository =
-  dataSource === "mock" || !hasSupabaseEnv
-    ? new MockNotificationRepository()
-    : new SupabaseNotificationRepository();
+const reviewRepository = createActiveRepository<PartnerReviewRepository>(
+  () => new MockPartnerReviewRepository(),
+  () => new SupabasePartnerReviewRepository(),
+);
 
-const favoriteRepository: PartnerFavoriteRepository =
-  dataSource === "mock" || !hasSupabaseEnv
-    ? new MockPartnerFavoriteRepository()
-    : new SupabasePartnerFavoriteRepository();
+const activeNotificationRepository = createActiveRepository<NotificationRepository>(
+  () => new MockNotificationRepository(),
+  () => new SupabaseNotificationRepository(),
+);
 
-const activeAdPackageRepository: AdPackageRepository =
-  dataSource === "mock" || !hasSupabaseEnv
-    ? new MockAdPackageRepository()
-    : new SupabaseAdPackageRepository();
+const favoriteRepository = createActiveRepository<PartnerFavoriteRepository>(
+  () => new MockPartnerFavoriteRepository(),
+  () => new SupabasePartnerFavoriteRepository(),
+);
 
-const activePartnerBenefitUsageRepository: PartnerBenefitUsageRepository =
-  dataSource === "mock" || !hasSupabaseEnv
-    ? new MockPartnerBenefitUsageRepository(MOCK_PARTNER_BENEFIT_USAGE_CONTEXTS)
-    : new SupabasePartnerBenefitUsageRepository();
+const activeAdPackageRepository = createActiveRepository<AdPackageRepository>(
+  () => new MockAdPackageRepository(),
+  () => new SupabaseAdPackageRepository(),
+);
+
+const activePartnerBenefitUsageRepository =
+  createActiveRepository<PartnerBenefitUsageRepository>(
+    () =>
+      new MockPartnerBenefitUsageRepository(
+        MOCK_PARTNER_BENEFIT_USAGE_CONTEXTS,
+      ),
+    () => new SupabasePartnerBenefitUsageRepository(),
+  );
 
 export const partnerRepository = repository;
 export const partnerReviewRepository = reviewRepository;

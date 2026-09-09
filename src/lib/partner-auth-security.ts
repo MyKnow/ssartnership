@@ -53,12 +53,7 @@ export async function getPartnerAuthBlockingState(
   context: PartnerAuthRateLimitContext,
 ) {
   const keys = getPartnerAuthAttemptKeys(route, context);
-  if (keys.length === 0) {
-    return null;
-  }
-
-  const blockedState = await getBlockingState(keys, PARTNER_AUTH_RATE_LIMIT);
-  return blockedState;
+  return getBlockingState(keys, PARTNER_AUTH_RATE_LIMIT);
 }
 
 export async function recordPartnerAuthAttempt(
@@ -67,11 +62,7 @@ export async function recordPartnerAuthAttempt(
   success: boolean,
 ) {
   const keys = getPartnerAuthAttemptKeys(route, context);
-  if (keys.length === 0) {
-    return;
-  }
-
-  await recordAttemptBatch(keys, success, PARTNER_AUTH_RATE_LIMIT);
+  return recordAttemptBatch(keys, success, PARTNER_AUTH_RATE_LIMIT);
 }
 
 export async function delayPartnerAuthAttempt(

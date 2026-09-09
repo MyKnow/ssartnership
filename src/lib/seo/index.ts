@@ -1,6 +1,16 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "../site.ts";
 
+export function serializeJsonLd(value: unknown) {
+  const serialized = JSON.stringify(value) ?? "null";
+  return serialized
+    .replace(/</gu, "\\u003c")
+    .replace(/>/gu, "\\u003e")
+    .replace(/&/gu, "\\u0026")
+    .replace(/\u2028/gu, "\\u2028")
+    .replace(/\u2029/gu, "\\u2029");
+}
+
 export function normalizeSeoPath(pathname: string) {
   const trimmed = pathname.trim();
   if (!trimmed || trimmed === "/") {

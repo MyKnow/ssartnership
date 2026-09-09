@@ -4,6 +4,7 @@ import {
   MANUAL_MEMBER_IMPORT_LIMITS,
   type ManualMemberImportRawRow,
 } from "./shared";
+import { loadXlsxWorkbookWithinResourceLimits } from "@/lib/xlsx-resource-limits.server";
 
 const SHEET_NAME = "회원 가져오기";
 
@@ -76,8 +77,7 @@ export async function parseManualMemberImportWorkbook(buffer: Buffer) {
   if (buffer.length === 0 || buffer.length > MANUAL_MEMBER_IMPORT_LIMITS.xlsxBytes) {
     throw new Error("XLSX 파일은 1MB 이하만 업로드할 수 있습니다.");
   }
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer as unknown as ExcelJS.Buffer);
+  const workbook = await loadXlsxWorkbookWithinResourceLimits(buffer);
   const sheet = workbook.getWorksheet(SHEET_NAME) ?? workbook.worksheets[0];
   if (!sheet) throw new Error("회원 가져오기 시트를 찾지 못했습니다.");
 

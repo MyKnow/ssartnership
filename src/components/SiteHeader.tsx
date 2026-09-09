@@ -11,12 +11,12 @@ import {
 import { usePathname } from "next/navigation";
 import { BellAlertIcon } from "@heroicons/react/24/solid";
 import ThemeToggle from "@/components/ThemeToggle";
+import PwaInstallButton from "@/components/PwaInstallButton";
 import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
 import { SITE_NAME } from "@/lib/site";
 import type { HeaderSession } from "@/lib/header-session";
 import { cn } from "@/lib/cn";
-import { useAutoHideHeader } from "@/hooks/useAutoHideHeader";
 import BrandWordmark from "@/components/BrandWordmark";
 import {
   NOTIFICATION_BELL_ACTIVE_ICON_CLASS,
@@ -37,11 +37,12 @@ const TabletMenu = dynamic(() => import("@/components/TabletMenu"));
 export default function SiteHeader({
   suggestHref = "/suggest",
   initialSession,
+  guestAuthReturnTo,
 }: {
   suggestHref?: string;
   initialSession?: HeaderSession | null;
+  guestAuthReturnTo?: string;
 }) {
-  const { hidden, headerHeight, headerRef } = useAutoHideHeader();
   const pathname = usePathname();
   const [notificationUnreadCount] = useNotificationUnreadCount(
     initialSession?.notificationUnreadCount ?? 0,
@@ -52,16 +53,9 @@ export default function SiteHeader({
       <div
         aria-hidden="true"
         className="safe-site-header-spacer"
-        style={headerHeight ? { height: headerHeight } : undefined}
       />
       <header className="fixed inset-x-0 top-0 z-40">
-        <div
-          ref={headerRef}
-          className={cn(
-            "border-b border-border/70 bg-surface-overlay/95 pt-safe-top shadow-flat backdrop-blur-xl transition-transform duration-300 ease-out will-change-transform",
-            hidden ? "-translate-y-full" : "translate-y-0",
-          )}
-        >
+        <div className="border-b border-border/70 bg-surface-overlay/95 pt-safe-top shadow-flat backdrop-blur-xl">
           <Container className="flex min-w-0 items-center justify-between gap-3 py-3" size="wide">
             <Link
               href="/"
@@ -77,7 +71,11 @@ export default function SiteHeader({
                 </Button>
               </div>
               <div className="hidden items-center gap-2 xl:flex">
-                <UserMenu initialSession={initialSession} logoutIconOnly />
+                <UserMenu
+                  initialSession={initialSession}
+                  guestAuthReturnTo={guestAuthReturnTo}
+                  logoutIconOnly
+                />
               </div>
               {initialSession ? (
                 <div className="relative hidden items-center xl:flex">
@@ -120,6 +118,16 @@ export default function SiteHeader({
               ) : null}
               <div data-site-header-theme-toggle className="hidden md:flex">
                 <ThemeToggle />
+              </div>
+              <div
+                data-site-header-pwa-install
+                className="min-h-11 min-w-11"
+              >
+                <PwaInstallButton
+                  iconOnly
+                  hideWhenInstalled
+                  variant="secondary"
+                />
               </div>
               {initialSession ? (
                 <div className="hidden md:block xl:hidden">
@@ -175,7 +183,10 @@ export default function SiteHeader({
                   </Button>
                 </div>
               ) : null}
-              <TabletMenu initialSession={initialSession} />
+              <TabletMenu
+                initialSession={initialSession}
+                guestAuthReturnTo={guestAuthReturnTo}
+              />
             </div>
           </Container>
         </div>

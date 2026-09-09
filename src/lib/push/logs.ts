@@ -8,6 +8,15 @@ import type {
   StoredSubscription,
 } from "./types.ts";
 
+function assertPushMutationSucceeded(
+  error: { message?: string | null } | null | undefined,
+  message: string,
+) {
+  if (error) {
+    throw wrapPushDbError(error, message);
+  }
+}
+
 export async function logPushDelivery(params: {
   messageLogId?: string | null;
   memberId: string;
@@ -17,7 +26,7 @@ export async function logPushDelivery(params: {
   errorMessage?: string | null;
 }) {
   const supabase = getSupabaseAdminClient();
-  await supabase.from("push_delivery_logs").insert({
+  const { error } = await supabase.from("push_delivery_logs").insert({
     message_log_id: params.messageLogId ?? null,
     member_id: params.memberId,
     subscription_id: params.subscriptionId,
@@ -28,6 +37,7 @@ export async function logPushDelivery(params: {
     status: params.status,
     error_message: params.errorMessage ?? null,
   });
+  assertPushMutationSucceeded(error, "Push 전송 로그를 저장하지 못했습니다.");
 }
 
 export async function createPushMessageLog(params: {
@@ -79,7 +89,7 @@ export async function finalizePushMessageLog(params: {
           : "sent";
 
   const supabase = getSupabaseAdminClient();
-  await supabase
+  const { error } = await supabase
     .from("push_message_logs")
     .update({
       status,
@@ -89,6 +99,7 @@ export async function finalizePushMessageLog(params: {
       completed_at: new Date().toISOString(),
     })
     .eq("id", params.id);
+  assertPushMutationSucceeded(error, "Push 메시지 로그를 갱신하지 못했습니다.");
 }
 
 export async function getRecentPushMessageLogs(limit = 200) {
@@ -127,7 +138,7 @@ export async function deletePushMessageLog(logId: string) {
 
 export async function markPushSuccess(subscriptionId: string) {
   const supabase = getSupabaseAdminClient();
-  await supabase
+  const { error } = await supabase
     .from("push_subscriptions")
     .update({
       last_success_at: new Date().toISOString(),
@@ -135,6 +146,7 @@ export async function markPushSuccess(subscriptionId: string) {
       failure_reason: null,
     })
     .eq("id", subscriptionId);
+  assertPushMutationSucceeded(error, "Push 구독 상태를 갱신하지 못했습니다.");
 }
 
 export async function markPushFailure(
@@ -143,7 +155,7 @@ export async function markPushFailure(
   deactivate: boolean,
 ) {
   const supabase = getSupabaseAdminClient();
-  await supabase
+  const { error } = await supabase
     .from("push_subscriptions")
     .update({
       is_active: deactivate ? false : true,
@@ -152,4 +164,5 @@ export async function markPushFailure(
       failure_reason: errorMessage,
     })
     .eq("id", subscription.id);
+  assertPushMutationSucceeded(error, "Push 구독 실패 상태를 저장하지 못했습니다.");
 }

@@ -56,7 +56,8 @@ describe("wallet apple member route contract", () => {
 
   it("rate limits signing and mutation work per authenticated member", () => {
     assert.match(source, /consumeProductEventQuota\(\{/);
-    assert.match(source, /sessionId: userId/);
+    assert.match(source, /actorKey: `member:\$\{userId\}`/);
+    assert.match(source, /scopeKey: "wallet-pass"/);
     assert.match(source, /"wallet_pass_download"/);
     assert.match(source, /"wallet_pass_issue"/);
     assert.match(source, /"wallet_pass_revoke"/);

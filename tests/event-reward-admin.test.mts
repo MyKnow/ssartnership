@@ -180,6 +180,63 @@ test("event reward comparison csv marks unrecoverable before states as unknown",
   assert.match(csv, /김싸피,kim,15,서울,Y,N,1,6,5,완료,확인불가,확인불가,확인불가,완료,완료,완료,완료,1/);
 });
 
+test("event reward csv export neutralizes spreadsheet formulas and preserves normal quoting", async () => {
+  const {
+    buildEventRewardAdminOverview,
+    buildEventRewardComparisonOverview,
+    createEventRewardComparisonCsv,
+    createEventRewardCsv,
+  } = await eventRewardsModulePromise;
+
+  const dangerousMembers = [
+    {
+      id: "member-equals",
+      displayName: "=1+1",
+      mmUsername: "+SUM(A1:A2)",
+      year: 15,
+      campus: "@서울",
+      createdAt: "2026-04-01T00:00:00+09:00",
+      preferences: {
+        enabled: true,
+        mmEnabled: true,
+        marketingEnabled: true,
+      },
+      reviewCount: 1,
+    },
+    {
+      id: "member-minus",
+      displayName: "\t-1+2",
+      mmUsername: "김,싸피",
+      year: 15,
+      campus: " \t=IMPORTXML(\"x\")",
+      createdAt: "2026-05-01T00:00:00+09:00",
+      preferences: {
+        enabled: false,
+        mmEnabled: false,
+        marketingEnabled: false,
+      },
+      reviewCount: 0,
+    },
+  ];
+
+  const adminOverview = buildEventRewardAdminOverview(campaign, dangerousMembers);
+  const comparisonOverview = buildEventRewardComparisonOverview(campaign, dangerousMembers);
+
+  const adminCsv = createEventRewardCsv(adminOverview);
+  const comparisonCsv = createEventRewardComparisonCsv(comparisonOverview);
+
+  for (const csv of [adminCsv, comparisonCsv]) {
+    assert.match(csv, /'=1\+1/);
+    assert.match(csv, /'\+SUM\(A1:A2\)/);
+    assert.match(csv, /'\t-1\+2/);
+    assert.match(csv, /"' \t=IMPORTXML\(\"\"x\"\"\)"/);
+    assert.match(csv, /"김,싸피"/);
+  }
+
+  assert.match(adminCsv, /'=1\+1,'\+SUM\(A1:A2\),15,'@서울,/);
+  assert.doesNotMatch(adminCsv, /"kim"/);
+});
+
 test("event reward weighted draw is deterministic and excludes zero-ticket members", async () => {
   const {
     buildEventRewardAdminOverview,

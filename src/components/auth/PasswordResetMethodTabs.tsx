@@ -1,12 +1,21 @@
 "use client";
 
-import { useId, useState } from "react";
 import Link from "next/link";
+import { useId, useState, type KeyboardEvent } from "react";
 import GraduatePasswordResetForm from "@/components/auth/GraduatePasswordResetForm";
-import ManualMemberEmailResetForm from "@/components/member-manual-import/ManualMemberEmailResetForm";
 import MattermostCodeVerificationForm from "@/components/auth/MattermostCodeVerificationForm";
 
-type ResetMethod = "mattermost" | "manual_email" | "graduate_email";
+type ResetMethod = "mattermost" | "graduate_email";
+
+const resetMethods: ResetMethod[] = ["mattermost", "graduate_email"];
+
+function resetMethodTabClassName(active: boolean) {
+  const base =
+    "min-h-11 rounded-[0.95rem] px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20";
+  return active
+    ? `${base} bg-primary text-primary-foreground shadow-raised`
+    : `${base} text-foreground hover:bg-surface-control`;
+}
 
 export default function PasswordResetMethodTabs({
   activeSenderGenerations = [],
@@ -21,15 +30,45 @@ export default function PasswordResetMethodTabs({
   const graduateTabId = `${id}-graduate-tab`;
   const memberPanelId = `${id}-member-panel`;
   const graduatePanelId = `${id}-graduate-panel`;
-  const manualTabId = `${id}-manual-tab`;
-  const manualPanelId = `${id}-manual-panel`;
+
+  function selectMethod(nextMethod: ResetMethod) {
+    setMethod(nextMethod);
+  }
+
+  function handleTabKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+    currentMethod: ResetMethod,
+  ) {
+    const currentIndex = resetMethods.indexOf(currentMethod);
+    const nextIndex =
+      event.key === "ArrowRight"
+        ? (currentIndex + 1) % resetMethods.length
+        : event.key === "ArrowLeft"
+          ? (currentIndex - 1 + resetMethods.length) % resetMethods.length
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? resetMethods.length - 1
+              : null;
+
+    if (nextIndex === null) {
+      return;
+    }
+
+    event.preventDefault();
+    const nextMethod = resetMethods[nextIndex];
+    selectMethod(nextMethod);
+    document
+      .getElementById(nextMethod === "mattermost" ? memberTabId : graduateTabId)
+      ?.focus();
+  }
 
   return (
     <div className="mt-6">
       <div
         role="tablist"
-        aria-label="비밀번호 재설정 유형"
-        className="grid grid-cols-3 gap-2 rounded-[1.35rem] border border-border bg-surface-inset p-2"
+        aria-label="비밀번호 재설정 인증 수단"
+        className="grid grid-cols-2 gap-2 rounded-[1.35rem] border border-border bg-surface-inset p-2"
       >
         <button
           id={memberTabId}
@@ -37,52 +76,46 @@ export default function PasswordResetMethodTabs({
           role="tab"
           aria-selected={method === "mattermost"}
           aria-controls={memberPanelId}
-          onClick={() => setMethod("mattermost")}
-          className={method === "mattermost"
-            ? "min-h-11 rounded-[0.95rem] bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-raised"
-            : "min-h-11 rounded-[0.95rem] px-3 text-sm font-semibold text-foreground hover:bg-surface-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"}
+          tabIndex={method === "mattermost" ? 0 : -1}
+          onClick={() => selectMethod("mattermost")}
+          onKeyDown={(event) => handleTabKeyDown(event, "mattermost")}
+          className={resetMethodTabClassName(method === "mattermost")}
         >
-          운영진·재학생
+          Mattermost
         </button>
-        <button id={manualTabId} type="button" role="tab" aria-selected={method === "manual_email"} aria-controls={manualPanelId} onClick={() => setMethod("manual_email")} className={method === "manual_email" ? "min-h-11 rounded-[0.95rem] bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-raised" : "min-h-11 rounded-[0.95rem] px-3 text-sm font-semibold text-foreground hover:bg-surface-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"}>이메일 초대</button>
         <button
           id={graduateTabId}
           type="button"
           role="tab"
           aria-selected={method === "graduate_email"}
           aria-controls={graduatePanelId}
-          onClick={() => setMethod("graduate_email")}
-          className={method === "graduate_email"
-            ? "min-h-11 rounded-[0.95rem] bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-raised"
-            : "min-h-11 rounded-[0.95rem] px-3 text-sm font-semibold text-foreground hover:bg-surface-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"}
+          tabIndex={method === "graduate_email" ? 0 : -1}
+          onClick={() => selectMethod("graduate_email")}
+          onKeyDown={(event) => handleTabKeyDown(event, "graduate_email")}
+          className={resetMethodTabClassName(method === "graduate_email")}
         >
-          수료생
+          이메일
         </button>
       </div>
       {method === "mattermost" ? (
         <section id={memberPanelId} role="tabpanel" aria-labelledby={memberTabId}>
-          <p className="mt-5 text-sm text-muted-foreground">
-            가입 때 연결한 Mattermost 계정으로 인증 코드를 받으면 새 비밀번호를 설정할 수 있습니다.
-          </p>
           <MattermostCodeVerificationForm
             purpose="reset_password"
             activeSenderGenerations={activeSenderGenerations}
             configuredSenderGenerations={configuredSenderGenerations}
           />
         </section>
-      ) : method === "manual_email" ? (
-        <section id={manualPanelId} role="tabpanel" aria-labelledby={manualTabId}><ManualMemberEmailResetForm /></section>
       ) : (
         <section id={graduatePanelId} role="tabpanel" aria-labelledby={graduateTabId}>
           <GraduatePasswordResetForm />
         </section>
       )}
-      <div className="mt-5 grid gap-2 border-t border-border pt-4 text-sm text-muted-foreground">
-        <Link href="/auth/recover-email" className="font-medium underline underline-offset-4 hover:text-foreground">
-          Mattermost를 사용할 수 없지만 기존 사이트 비밀번호는 알고 있나요? 이메일 로그인 복구
-        </Link>
-        <Link href="/auth/signup/graduate?kind=recovery" className="font-medium underline underline-offset-4 hover:text-foreground">
-          기존 사이트 비밀번호도 모르면 기존 회원 복구 신청
+      <div className="mt-5 border-t border-border pt-3 text-center">
+        <Link
+          href="/auth/signup/graduate?kind=recovery"
+          className="inline-flex min-h-11 items-center justify-center text-ko text-center text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          수료해서 MM 로그인이 불가능해요
         </Link>
       </div>
     </div>

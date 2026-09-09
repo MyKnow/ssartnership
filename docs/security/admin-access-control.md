@@ -1,3 +1,10 @@
+---
+title: Admin Access Control
+type: security-policy
+status: current
+authority: normative
+---
+
 # Admin Access Control
 
 ## 개요

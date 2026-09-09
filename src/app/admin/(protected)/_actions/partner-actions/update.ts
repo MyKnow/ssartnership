@@ -2,7 +2,10 @@ import { redirect } from "next/navigation";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { assertAdminCanAccessManagedCampuses } from "@/lib/admin-scope";
 import { buildAuditChangeSummary } from "@/lib/audit-change-summary";
-import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
+import {
+  cleanupPartnerMediaOrThrow,
+  deletePartnerMediaUrls,
+} from "@/lib/partner-media-storage";
 import {
   clearNewPartnerNotificationSent,
   sendAndRecordCampusScopedNewPartnerNotification,
@@ -70,7 +73,7 @@ export async function updatePartnerAction(formData: FormData) {
   const { data: previousPartner, error: previousPartnerError } = await supabase
     .from("partners")
     .select(
-      "company_id,category_id,name,location,detail_description,campus_slugs,managed_campus_slugs,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,benefit_visibility,benefit_verification_pin_hash,benefit_verification_pin_salt,company:partner_companies(id,name,slug,managed_campus_slugs),categories(id,label)",
+      "company_id,category_id,name,location,detail_description,campus_slugs,managed_campus_slugs,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,thumbnail,images,tags,visibility,benefit_visibility,benefit_verification_pin_hash,benefit_verification_pin_salt,updated_at,company:partner_companies(id,name,slug,managed_campus_slugs),categories(id,label)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -233,66 +236,71 @@ export async function updatePartnerAction(formData: FormData) {
   }
 
   try {
-    const { data: updatedPartner, error } = await supabase
-      .from("partners")
-      .update({
-        company_id: nextCompanyId,
-        name: payload.name,
-        category_id: payload.categoryId,
-        location: payload.location,
-        detail_description: payload.detailDescription,
-        campus_slugs: payload.campusSlugs,
-        map_url: payload.mapUrl,
-        benefit_action_type: payload.benefitActionType,
-        benefit_action_link: payload.benefitActionLink,
-        benefit_verification_pin_hash: nextBenefitVerificationPin?.hash ?? null,
-        benefit_verification_pin_salt: nextBenefitVerificationPin?.salt ?? null,
-        reservation_link: payload.reservationLink,
-        inquiry_link: payload.inquiryLink,
-        period_start: payload.periodStart,
-        period_end: payload.periodEnd,
-        conditions: payload.conditions,
-        benefits: payload.benefits,
-        applies_to: payload.appliesTo,
-        thumbnail: media.thumbnail,
-        images: media.images,
-        tags: payload.tags,
-        visibility: payload.visibility,
-        benefit_visibility: payload.benefitVisibility,
-      })
-      .eq("id", id)
-      .select("id")
-      .single();
-
-    if (error) {
-      throw new Error(error.message);
-    }
-    if (!updatedPartner?.id) {
-      throw new Error("제휴처 저장 결과를 확인할 수 없습니다.");
-    }
-    const { error: deleteBenefitsError } = await supabase
-      .from("partner_benefits")
-      .delete()
-      .eq("partner_id", id);
-    if (deleteBenefitsError) {
-      throw new Error(deleteBenefitsError.message);
-    }
-    if (payload.benefitItems.length > 0) {
-      const { error: benefitError } = await supabase.from("partner_benefits").insert(
-        payload.benefitItems.map((benefit, displayOrder) => ({
-          partner_id: id,
+    const { data: updatedPartnerId, error } = await supabase.rpc(
+      "update_partner_with_benefits_atomic",
+      {
+        p_partner_id: id,
+        p_expected_updated_at: previousPartner.updated_at,
+        p_partner: {
+          company_id: nextCompanyId,
+          name: payload.name,
+          category_id: payload.categoryId,
+          location: payload.location,
+          detail_description: payload.detailDescription,
+          campus_slugs: payload.campusSlugs,
+          map_url: payload.mapUrl,
+          benefit_action_type: payload.benefitActionType,
+          benefit_action_link: payload.benefitActionLink,
+          benefit_verification_pin_hash: nextBenefitVerificationPin?.hash ?? null,
+          benefit_verification_pin_salt: nextBenefitVerificationPin?.salt ?? null,
+          reservation_link: payload.reservationLink,
+          inquiry_link: payload.inquiryLink,
+          period_start: payload.periodStart,
+          period_end: payload.periodEnd,
+          conditions: payload.conditions,
+          benefits: payload.benefits,
+          applies_to: payload.appliesTo,
+          thumbnail: media.thumbnail,
+          images: media.images,
+          tags: payload.tags,
+          visibility: payload.visibility,
+          benefit_visibility: payload.benefitVisibility,
+        },
+        p_benefits: payload.benefitItems.map((benefit, displayOrder) => ({
           title: benefit.title,
           max_apply_count: benefit.maxApplyCount ?? null,
           display_order: displayOrder,
         })),
-      );
-      if (benefitError) {
-        throw new Error(benefitError.message);
-      }
+      },
+    );
+
+    if (error) {
+      throw new Error("partner_update_atomic_mutation_failed", { cause: error });
+    }
+    if (updatedPartnerId !== id) {
+      throw new Error("제휴처 저장 결과를 확인할 수 없습니다.");
     }
   } catch (error) {
-    await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
-    await cleanupPartnerCompanyProvision(supabase, companyProvision);
+    let mediaCleanupError: unknown = null;
+    try {
+      await cleanupPartnerMediaOrThrow({
+        urls: media.uploadedUrls,
+        originalError: error,
+        logContext: "admin-partner-update",
+      });
+    } catch (cleanupError) {
+      mediaCleanupError = cleanupError;
+    }
+    try {
+      await cleanupPartnerCompanyProvision(supabase, companyProvision);
+    } catch (cleanupError) {
+      throw new Error("partner_company_cleanup_failed", {
+        cause: { originalError: error, cleanupError, mediaCleanupError },
+      });
+    }
+    if (mediaCleanupError) {
+      throw mediaCleanupError;
+    }
     redirectAdminActionError(
       redirectPath,
       getSafeAdminActionErrorCode(error, "partner_update_failed"),
@@ -311,7 +319,9 @@ export async function updatePartnerAction(formData: FormData) {
     images: media.images,
   });
   const removedUrls = previousUrls.filter((url) => !nextUrls.includes(url));
-  await deletePartnerMediaUrls(removedUrls).catch(() => undefined);
+  await deletePartnerMediaUrls(removedUrls).catch((cleanupError) => {
+    console.error("[admin-partner-update] stale media cleanup failed", cleanupError);
+  });
 
   const nextCompany = companyProvision?.company ?? previousCompany;
   const nextCategoryLabel =

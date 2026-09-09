@@ -4,6 +4,7 @@ import {
   getPartnerCompanyPlanDefinition,
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
+import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 
 export const PARTNER_PLAN_RANK: Record<PartnerCompanyPlanTier, number> = {
   basic: 10,
@@ -66,6 +67,14 @@ export function getPartnerPlanUpgradeOptions(currentTier: PartnerCompanyPlanTier
 
 export function getPartnerPlanProgressLabel(tier: PartnerCompanyPlanTier) {
   return PLAN_PROGRESS[tier];
+}
+
+export function getPartnerPlanBadgeVariant(tier: PartnerCompanyPlanTier) {
+  return tier === "boost" ? "primary" : tier === "partner" ? "success" : "neutral";
+}
+
+export function getPartnerPlanBadgeLabel(tier: PartnerCompanyPlanTier) {
+  return getPartnerCompanyPlanDefinition(tier).label;
 }
 
 export function getPartnerPlanChannelLabel(channel: AdChannel) {
@@ -220,6 +229,30 @@ function buildPlanRequestSteps(
 
 export function formatPartnerPlanCurrency(value: number) {
   return `${value.toLocaleString("ko-KR")}원`;
+}
+
+export function formatPartnerPlanDateTime(value?: string | null) {
+  return value ? formatKoreanDateTimeToMinute(value) : "없음";
+}
+
+export function getPartnerPlanDaysUntil(
+  value?: string | null,
+  referenceTime: string | number | Date = Date.now(),
+) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  const referenceDate = new Date(referenceTime);
+  if (
+    Number.isNaN(date.getTime()) ||
+    Number.isNaN(referenceDate.getTime())
+  ) {
+    return null;
+  }
+
+  return Math.ceil((date.getTime() - referenceDate.getTime()) / 86_400_000);
 }
 
 export function formatPartnerPlanMonthlyPrice(tier: PartnerCompanyPlanTier) {

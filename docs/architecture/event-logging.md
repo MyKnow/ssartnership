@@ -1,3 +1,10 @@
+---
+title: 이벤트 로깅 기준
+type: architecture
+status: current
+authority: normative
+---
+
 # 이벤트 로깅 기준
 
 ## 목적

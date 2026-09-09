@@ -29,3 +29,101 @@ test("public ip checks allow routable public addresses", async () => {
   assert.equal(isPublicIpAddress("1.1.1.1"), true);
   assert.equal(isPublicIpAddress("2001:4860:4860::8888"), true);
 });
+
+test("public image proxy allowlist accepts raster MIME types and normalizes parameters", async () => {
+  const {
+    PUBLIC_RASTER_IMAGE_CONTENT_TYPES,
+    resolveAllowedImageContentType,
+  } = await imageProxyModulePromise;
+
+  assert.equal(
+    resolveAllowedImageContentType(
+      "image/png; charset=binary",
+      PUBLIC_RASTER_IMAGE_CONTENT_TYPES,
+    ),
+    "image/png",
+  );
+  assert.equal(
+    resolveAllowedImageContentType(
+      "IMAGE/WEBP",
+      PUBLIC_RASTER_IMAGE_CONTENT_TYPES,
+    ),
+    "image/webp",
+  );
+  assert.equal(
+    resolveAllowedImageContentType(
+      "image/svg+xml",
+      PUBLIC_RASTER_IMAGE_CONTENT_TYPES,
+    ),
+    null,
+  );
+  assert.equal(
+    resolveAllowedImageContentType(
+      "image/svg+xml; charset=utf-8",
+      PUBLIC_RASTER_IMAGE_CONTENT_TYPES,
+    ),
+    null,
+  );
+  assert.equal(
+    resolveAllowedImageContentType(
+      "application/xml",
+      PUBLIC_RASTER_IMAGE_CONTENT_TYPES,
+    ),
+    null,
+  );
+  assert.equal(
+    resolveAllowedImageContentType(
+      "image/png, image/svg+xml",
+      PUBLIC_RASTER_IMAGE_CONTENT_TYPES,
+    ),
+    null,
+  );
+});
+
+test("server-side image fetch keeps SVG input available when no public raster policy is requested", async () => {
+  const { resolveAllowedImageContentType } = await imageProxyModulePromise;
+
+  assert.equal(
+    resolveAllowedImageContentType("image/svg+xml; charset=utf-8"),
+    "image/svg+xml",
+  );
+});
+
+test("public image proxy only allows the protocol default ports", async () => {
+  const { resolvePublicImageTargetPort } = await imageProxyModulePromise;
+
+  assert.equal(resolvePublicImageTargetPort(new URL("https://example.com/image.png")), undefined);
+  assert.equal(resolvePublicImageTargetPort(new URL("https://example.com:443/image.png")), undefined);
+  assert.equal(resolvePublicImageTargetPort(new URL("http://example.com:80/image.png")), undefined);
+  assert.throws(
+    () => resolvePublicImageTargetPort(new URL("https://example.com:8443/image.png")),
+    /Unsupported port/u,
+  );
+  assert.throws(
+    () => resolvePublicImageTargetPort(new URL("http://example.com:8080/image.png")),
+    /Unsupported port/u,
+  );
+  assert.throws(
+    () => resolvePublicImageTargetPort(new URL("ftp://example.com/image.png")),
+    /Unsupported protocol/u,
+  );
+});
+
+test("public image route applies the raster policy and disables MIME sniffing", async () => {
+  const routeSource = await import("node:fs/promises").then(({ readFile }) =>
+    readFile(
+      new URL("../src/app/api/image/route.ts", import.meta.url),
+      "utf8",
+    ),
+  );
+
+  assert.match(
+    routeSource,
+    /fetchPublicImage\(parsed,\s*\{[\s\S]*allowedContentTypes:\s*PUBLIC_RASTER_IMAGE_CONTENT_TYPES[\s\S]*\}\)/u,
+  );
+  assert.match(routeSource, /consumeImageProxyRequestQuota/u);
+  assert.match(routeSource, /status:\s*429/u);
+  assert.match(routeSource, /"Retry-After":\s*String\(quota\.retryAfterSeconds\)/u);
+  assert.match(routeSource, /status:\s*503/u);
+  assert.match(routeSource, /"x-content-type-options":\s*"nosniff"/u);
+});

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
+import { createClientUuid } from "@/lib/client-uuid";
 import type { PushAudienceScope } from "@/lib/push";
 import type {
   AdminNotificationPreview,
@@ -383,7 +384,7 @@ export function useAdminPushManager({
     }
 
     setPending(true);
-    const idempotencyKey = sendIdempotencyKeyRef.current ?? crypto.randomUUID();
+    const idempotencyKey = sendIdempotencyKeyRef.current ?? createClientUuid();
     sendIdempotencyKeyRef.current = idempotencyKey;
     try {
       const response = await fetch("/api/push/admin/broadcast", {

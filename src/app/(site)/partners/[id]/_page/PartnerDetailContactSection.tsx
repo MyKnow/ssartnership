@@ -6,6 +6,7 @@ import PartnerBenefitUseAction, {
 } from "@/components/partner/PartnerBenefitUseAction";
 import PartnerDetailBenefitActionLink from "./PartnerDetailBenefitActionLink";
 import PartnerDetailInfoRow from "./PartnerDetailInfoRow";
+import type { PartnerDetailBenefitUseAction } from "@/lib/partner-detail-benefit-action";
 
 function PhoneIcon({ className }: { className?: string }) {
   return (
@@ -29,10 +30,6 @@ function PhoneIcon({ className }: { className?: string }) {
 type ContactDisplay = NonNullable<
   ReturnType<typeof import("@/lib/partner-links").getContactDisplay>
 >;
-type BenefitUseAction = NonNullable<
-  ReturnType<typeof import("@/lib/partner-links").getBenefitUseAction>
->;
-
 export default function PartnerDetailContactSection({
   isActive,
   contactCount,
@@ -46,7 +43,7 @@ export default function PartnerDetailContactSection({
 }: {
   isActive: boolean;
   contactCount: number;
-  benefitUseAction: BenefitUseAction | null;
+  benefitUseAction: PartnerDetailBenefitUseAction | null;
   inquiryDisplay: ContactDisplay | null;
   normalizedLinks: {
     benefitActionLink: string;
@@ -90,7 +87,15 @@ export default function PartnerDetailContactSection({
         aria-label="혜택 이용"
       >
         <div data-primary-benefit-action className="w-full">
-          {benefitUseAction.disabled ? (
+          {benefitUseAction.requiresLogin ? (
+            <Button
+              className="!h-14 w-full justify-center rounded-[1rem] text-base"
+              href={benefitUseAction.href}
+              variant="primary"
+            >
+              {benefitUseAction.label}
+            </Button>
+          ) : benefitUseAction.disabled ? (
             <Button
               className="!h-14 w-full justify-center rounded-[1rem] text-base"
               disabled

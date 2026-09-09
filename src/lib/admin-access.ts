@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation";
 import { NextRequest, NextResponse } from "next/server";
-import { logAuthSecurity, getRequestLogContext, getServerActionLogContext } from "@/lib/activity-logs";
+import {
+  logAuthSecurity,
+  getRequestLogContext,
+  getServerActionLogContext,
+} from "@/lib/activity-logs";
 import { getAdminSession, type AdminSession } from "@/lib/auth";
 import { sanitizeAdminReturnTo } from "@/lib/admin-session-bridge";
 import {
@@ -110,7 +114,9 @@ export async function requireMattermostSenderAdmin(
     return session;
   }
 
-  const context = await getServerActionLogContext(options?.path ?? "/admin/cycle");
+  const context = await getServerActionLogContext(
+    options?.path ?? "/admin/cycle",
+  );
   await logAuthSecurity({
     ...context,
     eventName: "admin_access",
@@ -144,8 +150,8 @@ export async function requireMemberSignupRequestAdmin(
     options,
   );
   if (
-    session.account.permissionId === "super_admin"
-    && canAdmin(session.account.permissions, "member_signup_requests", action)
+    session.account.permissionId === "super_admin" &&
+    canAdmin(session.account.permissions, "member_signup_requests", action)
   ) {
     return session;
   }
@@ -169,6 +175,16 @@ export async function requireMemberSignupRequestAdmin(
   redirect(options?.redirectTo ?? "/admin?error=permission_denied");
 }
 
+function canAccessNotificationTemplates(
+  session: AdminSession,
+  action: AdminPermissionAction,
+) {
+  return (
+    session.account.permissionId === "super_admin" &&
+    canAdmin(session.account.permissions, "notification_templates", action)
+  );
+}
+
 /**
  * Notification content can contain operational policy and recovery guidance.
  * Keep template access non-delegable to the Super Admin account.
@@ -185,10 +201,7 @@ export async function requireNotificationTemplateAdmin(
     action,
     options,
   );
-  if (
-    session.account.permissionId === "super_admin"
-    && canAdmin(session.account.permissions, "notification_templates", action)
-  ) {
+  if (canAccessNotificationTemplates(session, action)) {
     return session;
   }
 
@@ -233,8 +246,7 @@ export async function ensureAdminApiAccess(request: NextRequest) {
 }
 
 type AdminApiPermissionResult =
-  | { session: AdminSession }
-  | { response: NextResponse };
+  { session: AdminSession } | { response: NextResponse };
 
 export async function getAdminApiPermissionSession(
   request: NextRequest,
@@ -287,6 +299,55 @@ export async function getAdminApiPermissionSession(
   }
 
   return { session } satisfies AdminApiPermissionResult;
+}
+
+/**
+ * Personal inbox reads, read-state/delete-state changes, preferences, and push
+ * subscriptions all belong to the same notification-reading capability. This
+ * intentionally lets read-only/support admins manage their own delivery state
+ * without granting broadcast create/update/delete permissions.
+ */
+export function getAdminPersonalNotificationApiSession(request: NextRequest) {
+  return getAdminApiPermissionSession(request, "notifications", "read");
+}
+
+export async function getNotificationTemplateAdminApiSession(
+  request: NextRequest,
+  action: AdminPermissionAction,
+): Promise<AdminApiPermissionResult> {
+  const result = await getAdminApiPermissionSession(
+    request,
+    "notification_templates",
+    action,
+  );
+  if (
+    "response" in result ||
+    canAccessNotificationTemplates(result.session, action)
+  ) {
+    return result;
+  }
+
+  const { session } = result;
+  await logAuthSecurity({
+    ...getRequestLogContext(request),
+    eventName: "admin_access",
+    status: "blocked",
+    actorType: "admin",
+    actorId: session.adminId,
+    identifier: session.loginId,
+    properties: {
+      reason: "super_admin_required",
+      resource: "notification_templates",
+      action,
+    },
+  });
+
+  return {
+    response: NextResponse.json(
+      { message: "관리자 권한이 필요합니다." },
+      { status: 403 },
+    ),
+  } satisfies AdminApiPermissionResult;
 }
 
 export async function ensureAdminApiPermission(

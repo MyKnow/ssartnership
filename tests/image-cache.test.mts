@@ -36,3 +36,148 @@ test("local and data urls pass through unchanged", async () => {
   assert.equal(getCachedImageUrl("blob:abc"), "blob:abc");
   assert.equal(isProxiedCachedImageUrl("/icon-512.png"), false);
 });
+
+test("concurrent preloads for the same image share one in-flight request", async () => {
+  const { preloadCachedImageUrl } = await imageCacheModulePromise;
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const images: DeferredImage[] = [];
+
+  class DeferredImage {
+    decoding = "";
+    onerror: (() => void) | null = null;
+    onload: (() => void) | null = null;
+
+    constructor() {
+      images.push(this);
+    }
+
+    decode() {
+      return new Promise<void>(() => undefined);
+    }
+
+    set src(_value: string) {}
+  }
+
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: { Image: DeferredImage },
+  });
+
+  try {
+    const first = preloadCachedImageUrl("https://images.example.com/shared.jpg");
+    const second = preloadCachedImageUrl("https://images.example.com/shared.jpg");
+
+    assert.equal(first, second);
+    assert.equal(images.length, 1);
+
+    images[0]?.onload?.();
+    await Promise.all([first, second]);
+  } finally {
+    if (originalWindow) {
+      Object.defineProperty(globalThis, "window", originalWindow);
+    } else {
+      Reflect.deleteProperty(globalThis, "window");
+    }
+  }
+});
+
+test("responsive preloads let the browser choose the optimized candidate", async () => {
+  const { preloadCachedImageUrl } = await imageCacheModulePromise;
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const responsiveImage = { sizes: "", srcset: "" };
+
+  class ResponsiveImage {
+    decoding = "";
+    onerror: (() => void) | null = null;
+    onload: (() => void) | null = null;
+    get sizes() {
+      return responsiveImage.sizes;
+    }
+
+    set sizes(value: string) {
+      responsiveImage.sizes = value;
+    }
+
+    get srcset() {
+      return responsiveImage.srcset;
+    }
+
+    set srcset(value: string) {
+      responsiveImage.srcset = value;
+    }
+
+    decode() {
+      return Promise.resolve();
+    }
+
+    set src(_value: string) {
+      queueMicrotask(() => this.onload?.());
+    }
+  }
+
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: { Image: ResponsiveImage },
+  });
+
+  try {
+    await preloadCachedImageUrl("/_next/image?url=next-responsive&w=3840&q=75", {
+      srcSet: "/_next/image?url=next-responsive&w=640&q=75 640w",
+      sizes: "100vw",
+    });
+    assert.equal(
+      responsiveImage.srcset,
+      "/_next/image?url=next-responsive&w=640&q=75 640w",
+    );
+    assert.equal(responsiveImage.sizes, "100vw");
+  } finally {
+    if (originalWindow) {
+      Object.defineProperty(globalThis, "window", originalWindow);
+    } else {
+      Reflect.deleteProperty(globalThis, "window");
+    }
+  }
+});
+
+test("the warmed image registry evicts its oldest entry after 256 urls", async () => {
+  const { isCachedImageUrlPreloaded, preloadCachedImageUrl } =
+    await imageCacheModulePromise;
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+
+  class ImmediateImage {
+    decoding = "";
+    onerror: (() => void) | null = null;
+    onload: (() => void) | null = null;
+
+    decode() {
+      return Promise.resolve();
+    }
+
+    set src(_value: string) {}
+  }
+
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: { Image: ImmediateImage },
+  });
+
+  const firstUrl = "https://images.example.com/cache-limit-0.jpg";
+  const latestUrl = "https://images.example.com/cache-limit-256.jpg";
+
+  try {
+    for (let index = 0; index <= 256; index += 1) {
+      await preloadCachedImageUrl(
+        `https://images.example.com/cache-limit-${index}.jpg`,
+      );
+    }
+
+    assert.equal(isCachedImageUrlPreloaded(firstUrl), false);
+    assert.equal(isCachedImageUrlPreloaded(latestUrl), true);
+  } finally {
+    if (originalWindow) {
+      Object.defineProperty(globalThis, "window", originalWindow);
+    } else {
+      Reflect.deleteProperty(globalThis, "window");
+    }
+  }
+});

@@ -142,7 +142,10 @@ test("wallet pass push removes invalid APNs registrations without poisoning heal
     issued.pass.publicId,
   );
   const registrations = await walletPassRepository
-    .listAppleWalletDeviceRegistrationsForPass(issued.pass.id);
+    .listAppleWalletDeviceRegistrationsForPass({
+      passId: issued.pass.id,
+      limit: 10,
+    });
 
   assert.equal(result.failed, 1);
   assert.equal(pass?.syncStatus, "synced");

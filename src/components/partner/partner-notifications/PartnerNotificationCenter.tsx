@@ -18,7 +18,7 @@ import {
   type PartnerNotificationCenterData,
   type PartnerNotificationEntry,
   type PartnerNotificationStatus,
-} from "@/lib/partner-notifications";
+} from "@/lib/partner-notification-contract";
 import {
   derivePartnerNotificationUiModel,
   filterPartnerNotificationUiModels,
@@ -33,6 +33,10 @@ import {
   type PartnerNotificationUiType,
   summarizePartnerNotificationUiModels,
 } from "@/lib/partner-notification-ui";
+import {
+  getNotificationClientError,
+  requestNotificationJson,
+} from "@/lib/notifications/client-request";
 
 type NotificationFilter = PartnerNotificationCategory | "all";
 type PartnerNotificationMutationResponse = {
@@ -129,16 +133,6 @@ function SelectField({
       </Select>
     </label>
   );
-}
-
-async function parsePartnerNotificationMutationResponse(response: Response) {
-  const data = (await response.json().catch(() => ({}))) as PartnerNotificationMutationResponse;
-
-  if (!response.ok) {
-    throw new Error(data.message ?? "알림을 처리하지 못했습니다.");
-  }
-
-  return data;
 }
 
 function updateNotificationReadState(
@@ -466,15 +460,17 @@ export default function PartnerNotificationCenter({
     setItems((current) => updateNotificationReadState(current, [notificationId], now));
 
     try {
-      await parsePartnerNotificationMutationResponse(
-        await fetch(`/api/partner/notifications/${notificationId}`, {
+      await requestNotificationJson<PartnerNotificationMutationResponse>(
+        `/api/partner/notifications/${notificationId}`,
+        {
           method: "PATCH",
-        }),
+        },
+        { requestFailureMessage: "읽음 처리에 실패했습니다." },
       );
       notify("알림을 읽음 처리했습니다.");
     } catch (error) {
       setItems(snapshot);
-      notify(error instanceof Error ? error.message : "읽음 처리에 실패했습니다.");
+      notify(getNotificationClientError(error, "읽음 처리에 실패했습니다.").message);
     } finally {
       setPendingNotificationId(null);
     }
@@ -491,15 +487,17 @@ export default function PartnerNotificationCenter({
     setItems((current) => removeNotifications(current, [notificationId]));
 
     try {
-      await parsePartnerNotificationMutationResponse(
-        await fetch(`/api/partner/notifications/${notificationId}`, {
+      await requestNotificationJson<PartnerNotificationMutationResponse>(
+        `/api/partner/notifications/${notificationId}`,
+        {
           method: "DELETE",
-        }),
+        },
+        { requestFailureMessage: "알림 삭제에 실패했습니다." },
       );
       notify("처리 필요 알림을 삭제했습니다.");
     } catch (error) {
       setItems(snapshot);
-      notify(error instanceof Error ? error.message : "알림 삭제에 실패했습니다.");
+      notify(getNotificationClientError(error, "알림 삭제에 실패했습니다.").message);
     } finally {
       setPendingNotificationId(null);
     }
@@ -520,17 +518,19 @@ export default function PartnerNotificationCenter({
     setItems((current) => updateNotificationReadState(current, visibleUnreadNotificationIds, now));
 
     try {
-      await parsePartnerNotificationMutationResponse(
-        await fetch("/api/partner/notifications", {
+      await requestNotificationJson<PartnerNotificationMutationResponse>(
+        "/api/partner/notifications",
+        {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ notificationIds: visibleUnreadNotificationIds }),
-        }),
+        },
+        { requestFailureMessage: "전체 읽음 처리에 실패했습니다." },
       );
       notify("표시된 미확인 알림을 읽음 처리했습니다.");
     } catch (error) {
       setItems(snapshot);
-      notify(error instanceof Error ? error.message : "전체 읽음 처리에 실패했습니다.");
+      notify(getNotificationClientError(error, "전체 읽음 처리에 실패했습니다.").message);
     } finally {
       setPendingBulkAction(null);
     }
@@ -554,17 +554,21 @@ export default function PartnerNotificationCenter({
     setItems((current) => removeNotifications(current, visibleActionNotificationIds));
 
     try {
-      await parsePartnerNotificationMutationResponse(
-        await fetch("/api/partner/notifications", {
+      await requestNotificationJson<PartnerNotificationMutationResponse>(
+        "/api/partner/notifications",
+        {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ notificationIds: visibleActionNotificationIds }),
-        }),
+        },
+        { requestFailureMessage: "처리 필요 알림 삭제에 실패했습니다." },
       );
       notify("표시된 처리 필요 알림을 삭제했습니다.");
     } catch (error) {
       setItems(snapshot);
-      notify(error instanceof Error ? error.message : "처리 필요 알림 삭제에 실패했습니다.");
+      notify(
+        getNotificationClientError(error, "처리 필요 알림 삭제에 실패했습니다.").message,
+      );
     } finally {
       setPendingBulkAction(null);
     }

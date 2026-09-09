@@ -38,6 +38,7 @@ test("홈 프로모션은 좁은 화면에서는 전체 폭, 데스크톱에서�
   );
   assert.doesNotMatch(source, /className="mb-4 grid/);
   assert.doesNotMatch(source, /rounded-overlay/);
+  assert.match(source, /CarouselSlideIndicators/);
   assert.match(
     homePageSource,
     /<main>\s*<PromotionCarousel[\s\S]*headingLevel="h1"[\s\S]*?\/>\s*<Container className="pb-16 pt-0"/,
@@ -56,7 +57,9 @@ test("홈 프로모션은 좁은 화면에서는 전체 폭, 데스크톱에서�
     /<main>\s*<div className="lg:mx-auto lg:max-w-\[min\(var\(--grid-wide\),calc\(100vw-1\.5rem\)\)\] lg:px-8">\s*<HeroSkeleton \/>\s*<\/div>\s*<Container className="pb-16 pt-0"/,
   );
   assert.match(siteHeaderSource, /className="safe-site-header-spacer"/);
-  assert.match(siteHeaderSource, /style=\{headerHeight \? \{ height: headerHeight \}/);
+  assert.doesNotMatch(siteHeaderSource, /useAutoHideHeader/);
+  assert.doesNotMatch(siteHeaderSource, /-translate-y-full/);
+  assert.doesNotMatch(siteHeaderSource, /transition-transform/);
   assert.match(
     globalsSource,
     /\.safe-site-header-spacer \{\s*height: calc\(4\.3125rem \+ env\(safe-area-inset-top\)\)/,

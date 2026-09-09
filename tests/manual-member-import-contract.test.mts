@@ -22,6 +22,23 @@ test("관리자 대량 초대는 공통 이미지 staging 완료 뒤 행별 생�
   assert.match(service, /source: "manual_admin"/);
 });
 
+test("회원 가져오기 준비 단계는 행 저장·상태 전환·보상 삭제 오류를 삼키지 않는다", async () => {
+  const service = await read("src/lib/member-manual-import/service.server.ts");
+
+  assert.match(
+    service,
+    /const \{ error: rowsError \} = await supabase[\s\S]*?\.from\("manual_member_import_rows"\)[\s\S]*?\.insert\(insertRows\)/,
+  );
+  assert.match(
+    service,
+    /if \(rowsError\) \{[\s\S]*?const \{ error: cleanupBatchError \} = await supabase[\s\S]*?\.from\("manual_member_import_batches"\)[\s\S]*?\.delete\(\)[\s\S]*?if \(cleanupBatchError\) \{[\s\S]*?throw new Error\("회원 가져오기 배치를 정리하지 못했습니다\."\)/,
+  );
+  assert.match(
+    service,
+    /const \{ error: readyError \} = await supabase[\s\S]*?\.from\("manual_member_import_batches"\)[\s\S]*?\.update\(\{ status: "ready" \}\)[\s\S]*?if \(readyError\) \{[\s\S]*?throw new Error\("회원 가져오기 배치 상태를 준비로 전환하지 못했습니다\."\)/,
+  );
+});
+
 test("회원 생성은 준비 완료 배치만 원자적으로 선점한다", async () => {
   const [service, checkpointMigration, retryCheckpointMigration] = await Promise.all([
     read("src/lib/member-manual-import/service.server.ts"),
@@ -105,6 +122,13 @@ test("수동 초기 설정과 이메일 재설정은 토큰 해시만 서버에 
   assert.doesNotMatch(complete, /properties:\s*\{[^}]*token/i);
   assert.match(reset, /hashMemberEmailIdentifier/);
   assert.match(reset, /issueManualMemberPasswordReset/);
+  assert.match(reset, /recordMemberAuthAttempt\("reset-password", throttle, resetResult\.ok\)/);
+  assert.match(reset, /if \(!resetResult\.ok\) \{\s*await delayMemberAuthAttempt\("reset-password"\);/);
+  assert.match(reset, /recordMemberAuthAttempt\("reset-password", throttle, false\)\.catch\(\(\) => undefined\)/);
+  assert.match(service, /if \(error\) \{\s*throw error;\s*\}/);
+  assert.match(service, /return \{ ok: false, reason: "not_found" \};/);
+  assert.match(service, /return \{ ok: false, reason: "already_pending" \};/);
+  assert.match(service, /return \{ ok: true, reason: "issued" \};/);
   assert.match(service, /deliveryChannel: "email"/);
   assert.match(service, /deliveryChannel: "mattermost"/);
 });

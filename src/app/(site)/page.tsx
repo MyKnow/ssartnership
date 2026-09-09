@@ -15,11 +15,16 @@ import {
   SITE_RSS_URL,
   SITE_TITLE,
 } from "@/lib/site";
-import { buildSiteUrl, createCanonicalAlternates } from "@/lib/seo";
+import {
+  buildSiteUrl,
+  createCanonicalAlternates,
+  serializeJsonLd,
+} from "@/lib/seo";
 import { getHeaderSession } from "@/lib/header-session";
 import { getMemberCanonicalProfile } from "@/lib/member-profile-view";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { resolvePartnerAudienceFromMemberYear } from "@/lib/partner-audience";
+import { loadHomePartnerDirectoryState } from "@/lib/home-partner-directory";
 
 export const revalidate = 300;
 
@@ -69,6 +74,17 @@ export default async function Home() {
       ? getMemberCanonicalProfile(session.userId)
       : Promise.resolve(null),
   ]);
+  const viewerAudience = resolvePartnerAudienceFromMemberYear(
+    member?.generation ?? null,
+    new Date(),
+    undefined,
+    { graduateVerifiedAt: member?.graduateVerifiedAt ?? null },
+  );
+  const directoryPromise = loadHomePartnerDirectoryState({
+    viewerAuthenticated: Boolean(session?.userId),
+    currentUserId: session?.userId ?? null,
+    viewerAudience,
+  });
   const resolvedPromotionSlides = await getHomePromotionSlides({
     authenticated: Boolean(session?.userId),
     year: member?.generation ?? null,
@@ -117,18 +133,14 @@ export default async function Home() {
         <Container className="pb-16 pt-0" size="wide">
           <script
             type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+            dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
           />
           <Suspense fallback={<HomePartnerExploreSkeleton />}>
             <HomeContent
               viewerAuthenticated={Boolean(session?.userId)}
               currentUserId={session?.userId ?? null}
-              viewerAudience={resolvePartnerAudienceFromMemberYear(
-                member?.generation ?? null,
-                new Date(),
-                undefined,
-                { graduateVerifiedAt: member?.graduateVerifiedAt ?? null },
-              )}
+              viewerAudience={viewerAudience}
+              directoryPromise={directoryPromise}
             />
           </Suspense>
         </Container>

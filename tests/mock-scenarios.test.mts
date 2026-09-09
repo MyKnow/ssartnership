@@ -5,10 +5,18 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 type ScenarioModule = typeof import("../src/lib/mock/scenarios");
+type StorybookPartnerPortalScenarioModule =
+  typeof import("../src/lib/mock/scenarios/storybook-partner-portal");
 
 const scenarioModulePromise = import(
   new URL("../src/lib/mock/scenarios/index.ts", import.meta.url).href
 ) as Promise<ScenarioModule>;
+const storybookPartnerPortalScenarioModulePromise = import(
+  new URL(
+    "../src/lib/mock/scenarios/storybook-partner-portal.ts",
+    import.meta.url,
+  ).href
+) as Promise<StorybookPartnerPortalScenarioModule>;
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const appDir = path.join(repoRoot, "src/app");
@@ -242,6 +250,50 @@ test("partner portal scenario adapters build fresh view props", async () => {
     "partner.company.dashboard.empty",
   );
   assert.equal(freshEmptyDashboard.dashboard.companies[0]?.services.length, 0);
+});
+
+test("partner dashboard Storybook adapters preserve the canonical runtime scenario contract", async () => {
+  const { getPartnerDashboardMockScenario } = await scenarioModulePromise;
+  const { getPartnerDashboardStoryScenario } =
+    await storybookPartnerPortalScenarioModulePromise;
+  const scenarioIds = [
+    "partner.company.dashboard.cafe-ssafy-mixed-plans",
+    "partner.company.dashboard.empty",
+    "partner.company.dashboard.pending-review",
+  ] as const;
+
+  for (const scenarioId of scenarioIds) {
+    const runtimeScenario = getPartnerDashboardMockScenario(scenarioId);
+    const storybookScenario = getPartnerDashboardStoryScenario(scenarioId);
+
+    assert.deepStrictEqual(storybookScenario, runtimeScenario);
+    assert.deepStrictEqual(
+      storybookScenario.dashboard.companies.map((company) => ({
+        id: company.id,
+        serviceIds: company.services.map((service) => service.id),
+        serviceBenefitUsageCounts: company.services.map(
+          (service) => service.metrics.benefitUsageCount,
+        ),
+        totals: company.totals,
+      })),
+      runtimeScenario.dashboard.companies.map((company) => ({
+        id: company.id,
+        serviceIds: company.services.map((service) => service.id),
+        serviceBenefitUsageCounts: company.services.map(
+          (service) => service.metrics.benefitUsageCount,
+        ),
+        totals: company.totals,
+      })),
+    );
+    assert.equal(
+      storybookScenario.dashboard.totals.serviceCount,
+      runtimeScenario.dashboard.totals.serviceCount,
+    );
+    assert.equal(
+      storybookScenario.dashboard.totals.benefitUsageCount,
+      runtimeScenario.dashboard.totals.benefitUsageCount,
+    );
+  }
 });
 
 test("coverage matrix exposes route, scenario, storybook, and viewport traceability", async () => {

@@ -104,6 +104,29 @@ describe("NTS business status lookup", () => {
     });
   });
 
+  it("aborts a stalled request within the configured timeout and returns a safe network error", async () => {
+    process.env.NTS_BUSINESS_STATUS_SERVICE_KEY = "service-key";
+    delete process.env.DATA_GO_KR_SERVICE_KEY;
+    const requestSignals: AbortSignal[] = [];
+    globalThis.fetch = ((_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.signal) {
+        requestSignals.push(init.signal);
+      }
+      return new Promise<Response>(() => undefined);
+    }) as typeof fetch;
+
+    const result = await lookupNtsBusinessStatus("220-81-62517", {
+      timeoutMs: 5,
+    });
+
+    assert.deepEqual(result, {
+      ok: false,
+      code: "network_error",
+      message: "사업자 상태조회 API 호출 중 오류가 발생했습니다.",
+    });
+    assert.equal(requestSignals[0]?.aborted, true);
+  });
+
   it("prefers the official status code over a mismatched status label", async () => {
     process.env.NTS_BUSINESS_STATUS_SERVICE_KEY = "service-key";
     delete process.env.DATA_GO_KR_SERVICE_KEY;

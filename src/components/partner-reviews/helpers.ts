@@ -10,6 +10,7 @@ import {
   type ReviewImageItem,
 } from "@/components/review-media/shared";
 import { formatKoreanDate } from "@/lib/datetime";
+import { buildReviewSubmissionRequest } from "@/lib/review-validation";
 
 export function formatPartnerReviewDate(value: string) {
   try {
@@ -19,25 +20,20 @@ export function formatPartnerReviewDate(value: string) {
   }
 }
 
-export function buildReviewFormData(input: {
+export function buildReviewRequestBody(input: {
   reviewId: string;
   rating: number;
   title: string;
   body: string;
   items: ReviewImageItem[];
 }) {
-  const formData = new FormData();
-  formData.set("reviewId", input.reviewId);
-  formData.set("rating", String(input.rating));
-  formData.set("title", input.title);
-  formData.set("body", input.body);
-  formData.set(
-    "imagesManifest",
-    JSON.stringify({
-      images: buildReviewMediaManifestEntries(input.items),
-    }),
-  );
-  return formData;
+  return buildReviewSubmissionRequest({
+    reviewId: input.reviewId,
+    rating: input.rating,
+    title: input.title,
+    body: input.body,
+    images: buildReviewMediaManifestEntries(input.items),
+  });
 }
 
 export function appendPartnerReviewList(

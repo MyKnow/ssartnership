@@ -9,6 +9,7 @@ import {
   type ImageUploadDraftManifest,
   type ImageUploadDraftValue,
 } from "@/lib/image-upload/draft";
+import { createClientUuid } from "@/lib/client-uuid";
 
 const SESSION_PREFIX = "ssartnership:image-upload-draft:";
 const SUBMISSION_KEY_SUFFIX = ":submission-key";
@@ -126,10 +127,7 @@ export function saveImageUploadDraft(input: {
  * inputs and sensitive values.
  */
 export function getOrCreateImageUploadSubmissionId(formKey: string) {
-  if (
-    typeof window === "undefined"
-    || typeof window.crypto?.randomUUID !== "function"
-  ) {
+  if (typeof window === "undefined") {
     return null;
   }
   try {
@@ -142,7 +140,7 @@ export function getOrCreateImageUploadSubmissionId(formKey: string) {
     }
     const next = createImageUploadSubmissionKey({
       formKey,
-      id: window.crypto.randomUUID(),
+      id: createClientUuid(),
     });
     window.sessionStorage.setItem(sessionKey, JSON.stringify(next));
     return next.id;

@@ -5,6 +5,7 @@ import {
   cancelPartnerPlanUpgradeRequest,
   createPartnerPlanUpgradeRequest,
 } from "@/lib/partner-plan-service";
+import { getSafePartnerPlanActionMessage } from "@/lib/partner-plan-safe-messages";
 import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
 import { isPartnerPortalCompanyAllowed } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
@@ -29,8 +30,7 @@ function redirectPartnerPlans(
 }
 
 function redirectPartnerPlanError(companyId: string, error: unknown): never {
-  const message =
-    error instanceof Error ? error.message : "요청을 처리하지 못했습니다.";
+  const message = getSafePartnerPlanActionMessage(error);
   redirect(
     `${getPartnerPlansPath(companyId)}?error=${encodeURIComponent(message)}`,
   );

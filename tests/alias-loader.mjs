@@ -51,12 +51,33 @@ function resolveRelativePath(specifier, parentURL) {
 }
 
 export function resolve(specifier, context, nextResolve) {
+  if (specifier === "server-only") {
+    return {
+      shortCircuit: true,
+      url: pathToFileURL(
+        path.join(
+          rootDir,
+          "node_modules",
+          "next",
+          "dist",
+          "compiled",
+          "server-only",
+          "empty.js",
+        ),
+      ).href,
+    };
+  }
+
   if (specifier === "next/cache") {
     return nextResolve("next/cache.js", context);
   }
 
   if (specifier === "next/navigation") {
     return nextResolve("next/navigation.js", context);
+  }
+
+  if (specifier === "next/server") {
+    return nextResolve("next/server.js", context);
   }
 
   const aliasPath = resolveAliasPath(specifier);

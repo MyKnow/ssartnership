@@ -3,7 +3,7 @@ import type {
   PartnerNotificationCategory,
   PartnerNotificationEntry,
   PartnerNotificationStatus,
-} from "@/lib/partner-notifications";
+} from "@/lib/partner-notification-contract";
 
 export type PartnerNotificationPurpose = "action" | "information";
 

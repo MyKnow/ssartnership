@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  formatPartnerPlanDateTime,
   getPartnerPlanExpiryStatus,
+  getPartnerPlanBadgeLabel,
+  getPartnerPlanBadgeVariant,
+  getPartnerPlanDaysUntil,
   getPartnerPlanFilterLabel,
   getPartnerPlanChannelLabel,
   getPartnerPlanProgressLabel,
@@ -29,6 +33,23 @@ describe("partner plan UI helpers", () => {
     assert.equal(getPartnerPlanProgressLabel("boost"), "3/3 단계");
     assert.equal(getPartnerPlanChannelLabel("home_banner"), "홈 배너");
     assert.equal(getPartnerPlanChannelLabel("ad_banner"), "일반 애드배너");
+  });
+
+  it("shares badge, date, and day-delta helpers across partner plan surfaces", () => {
+    assert.equal(getPartnerPlanBadgeVariant("basic"), "neutral");
+    assert.equal(getPartnerPlanBadgeVariant("partner"), "success");
+    assert.equal(getPartnerPlanBadgeVariant("boost"), "primary");
+    assert.equal(getPartnerPlanBadgeLabel("partner"), "Partner");
+    assert.equal(formatPartnerPlanDateTime(null), "없음");
+    assert.equal(
+      formatPartnerPlanDateTime("2026-08-10T03:45:00.000Z"),
+      "2026. 8. 10. 12:45",
+    );
+    assert.equal(
+      getPartnerPlanDaysUntil("2026-08-31T00:00:00.000Z", "2026-08-30T00:00:00.000Z"),
+      1,
+    );
+    assert.equal(getPartnerPlanDaysUntil("invalid-date"), null);
   });
 
   it("separates Basic partnership expiry copy from paid plan expiry copy", () => {

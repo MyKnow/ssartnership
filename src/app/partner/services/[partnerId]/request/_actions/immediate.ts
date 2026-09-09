@@ -2,7 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { createServerActionAuditContext } from "@/lib/audit-context";
-import { deletePartnerMediaUrls } from "@/lib/partner-media-storage";
+import {
+  cleanupPartnerMediaOrThrow,
+  deletePartnerMediaUrls,
+} from "@/lib/partner-media-storage";
 import { getPartnerSession } from "@/lib/partner-session";
 import { PartnerChangeRequestError } from "@/lib/partner-change-request-errors";
 import {
@@ -135,7 +138,12 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
       result.previousMediaUrls.filter(
         (url) => !result.currentMediaUrls.includes(url),
       ),
-    ).catch(() => undefined);
+    ).catch((cleanupError) => {
+      console.error(
+        "[partner-immediate-update] stale media cleanup failed",
+        cleanupError,
+      );
+    });
 
     await createAdminOperationalNotification({
       type: "partner_immediate_update",
@@ -167,7 +175,11 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
     });
   } catch (error) {
     if (media) {
-      await deletePartnerMediaUrls(media.uploadedUrls).catch(() => undefined);
+      await cleanupPartnerMediaOrThrow({
+        urls: media.uploadedUrls,
+        originalError: error,
+        logContext: "partner-immediate-update",
+      });
     }
     if (error instanceof PartnerChangeRequestError) {
       redirect(`${getReturnUrl(partnerId, companyId)}?mode=edit&error=${error.code}`);

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { mapWithConcurrency } from "@/lib/async-concurrency";
 import { SITE_NAME } from "@/lib/site";
 import { createHmacDigest } from "@/lib/hmac.js";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -14,7 +15,7 @@ import {
   storeMemberProfileImage,
 } from "@/lib/graduate-verification-storage";
 import { resolveImageTransformPolicy } from "@/lib/image-upload/policy";
-import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import {
   findMmUserDirectoryEntryByUserId,
   upsertMmUserDirectorySnapshot,
@@ -49,6 +50,7 @@ export const MANUAL_MEMBER_IMPORT_STAGING_BUCKET = "manual-member-import-staging
 const IMPORT_TTL_MS = 24 * 60 * 60 * 1000;
 const PASSWORD_ACTION_TTL_MS = 24 * 60 * 60 * 1000;
 const PROCESSING_LEASE_MS = 15 * 60 * 1000;
+const MANUAL_IMPORT_IMAGE_PREPARE_CONCURRENCY = 4;
 const MANUAL_MEMBER_IMPORT_REISSUE_KEY_PREFIX = "manual-member-import-reissue:";
 const MANUAL_MEMBER_IMPORT_REISSUE_INTERRUPTED_MESSAGE = "새 초기 설정 링크 발급이 중단되었습니다. 수신 여부를 확인한 뒤 새 링크 발급을 다시 진행해 주세요.";
 
@@ -620,29 +622,53 @@ export async function prepareManualMemberImport(input: {
       input.photos.map((photo) => [photo.filename.toLowerCase(), photo]),
     );
     const imageUploadRepository = getImageUploadRepository();
-    const insertRows = await Promise.all(rowsResult.acceptedRows.map(async (row) => {
-      const photo = row.photoFilename
-        ? photoByFilename.get(row.photoFilename.toLowerCase()) ?? null
-        : null;
-      const rowId = randomUUID();
-      if (photo) {
-        if (!photo.uploadId) {
-          throw new Error("사진 업로드 정보를 확인해 주세요.");
+    const insertRows = await mapWithConcurrency(
+      rowsResult.acceptedRows,
+      MANUAL_IMPORT_IMAGE_PREPARE_CONCURRENCY,
+      async (row) => {
+        const photo = row.photoFilename
+          ? photoByFilename.get(row.photoFilename.toLowerCase()) ?? null
+          : null;
+        const rowId = randomUUID();
+        if (photo) {
+          if (!photo.uploadId) {
+            throw new Error("사진 업로드 정보를 확인해 주세요.");
+          }
+          const attached = await imageUploadRepository.attach({
+            actor: { kind: "admin", id: input.adminId },
+            purpose: "manual-member-import",
+            uploadId: photo.uploadId,
+            role: "profile",
+            policy: resolveImageTransformPolicy("manual-member-import", "profile"),
+            destination: {
+              bucket: MEMBER_PROFILE_IMAGES_BUCKET,
+              path: `manual-import/uploads/${photo.uploadId}.webp`,
+              isPublic: false,
+              cacheControl: "private, no-store",
+            },
+            resource: { type: "manual_member_import_row", id: rowId },
+          });
+          return {
+            id: rowId,
+            batch_id: batch.id,
+            row_number: row.rowNumber,
+            generation: row.generation,
+            display_name: row.name,
+            campus: row.campus,
+            mm_username: row.mmId,
+            email: row.email,
+            email_normalized: row.email,
+            photo_filename: row.photoFilename,
+            staging_bucket: MEMBER_PROFILE_IMAGES_BUCKET,
+            staging_path: attached.path,
+            photo_content_type: "image/webp",
+            photo_size_bytes: null,
+            image_upload_id: photo.uploadId,
+            photo_sha256: attached.sha256,
+            photo_width: attached.width,
+            photo_height: attached.height,
+          };
         }
-        const attached = await imageUploadRepository.attach({
-          actor: { kind: "admin", id: input.adminId },
-          purpose: "manual-member-import",
-          uploadId: photo.uploadId,
-          role: "profile",
-          policy: resolveImageTransformPolicy("manual-member-import", "profile"),
-          destination: {
-            bucket: MEMBER_PROFILE_IMAGES_BUCKET,
-            path: `manual-import/uploads/${photo.uploadId}.webp`,
-            isPublic: false,
-            cacheControl: "private, no-store",
-          },
-          resource: { type: "manual_member_import_row", id: rowId },
-        });
         return {
           id: rowId,
           batch_id: batch.id,
@@ -654,41 +680,33 @@ export async function prepareManualMemberImport(input: {
           email: row.email,
           email_normalized: row.email,
           photo_filename: row.photoFilename,
-          staging_bucket: MEMBER_PROFILE_IMAGES_BUCKET,
-          staging_path: attached.path,
-          photo_content_type: "image/webp",
+          staging_bucket: null,
+          staging_path: null,
+          photo_content_type: null,
           photo_size_bytes: null,
-          image_upload_id: photo.uploadId,
-          photo_sha256: attached.sha256,
-          photo_width: attached.width,
-          photo_height: attached.height,
         };
-      }
-      return {
-        id: rowId,
-        batch_id: batch.id,
-        row_number: row.rowNumber,
-        generation: row.generation,
-        display_name: row.name,
-        campus: row.campus,
-        mm_username: row.mmId,
-        email: row.email,
-        email_normalized: row.email,
-        photo_filename: row.photoFilename,
-        staging_bucket: null,
-        staging_path: null,
-        photo_content_type: null,
-        photo_size_bytes: null,
-      };
-    }));
+      },
+    );
     const { error: rowsError } = await supabase
       .from("manual_member_import_rows")
       .insert(insertRows);
     if (rowsError) {
-      await supabase.from("manual_member_import_batches").delete().eq("id", batch.id);
-      throw new Error("가져오기 행을 저장하지 못했습니다.");
+      const { error: cleanupBatchError } = await supabase
+        .from("manual_member_import_batches")
+        .delete()
+        .eq("id", batch.id);
+      if (cleanupBatchError) {
+        throw new Error("회원 가져오기 배치를 정리하지 못했습니다.");
+      }
+      throw new Error("회원 가져오기 행을 저장하지 못했습니다.");
     }
-    await supabase.from("manual_member_import_batches").update({ status: "ready" }).eq("id", batch.id);
+    const { error: readyError } = await supabase
+      .from("manual_member_import_batches")
+      .update({ status: "ready" })
+      .eq("id", batch.id);
+    if (readyError) {
+      throw new Error("회원 가져오기 배치 상태를 준비로 전환하지 못했습니다.");
+    }
     return { ok: true, batchId: batch.id as string, expiresAt };
   } catch (error) {
     return { ok: false, errors: [getSafeFailureMessage(error)] };
@@ -1788,7 +1806,19 @@ export async function completeManualMemberPasswordAction(input: {
   };
 }
 
-export async function issueManualMemberPasswordReset(email: string) {
+export type ManualMemberPasswordResetIssueResult =
+  | {
+      ok: true;
+      reason: "issued";
+    }
+  | {
+      ok: false;
+      reason: "not_found" | "already_pending";
+    };
+
+export async function issueManualMemberPasswordReset(
+  email: string,
+): Promise<ManualMemberPasswordResetIssueResult> {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("members")
@@ -1797,8 +1827,14 @@ export async function issueManualMemberPasswordReset(email: string) {
     .not("email_verified_at", "is", null)
     .is("deleted_at", null)
     .maybeSingle();
-  if (error || !data?.id || data.must_change_password || !data.email_normalized) {
-    return false;
+  if (error) {
+    throw error;
+  }
+  if (!data?.id || !data.email_normalized) {
+    return { ok: false, reason: "not_found" };
+  }
+  if (data.must_change_password) {
+    return { ok: false, reason: "already_pending" };
   }
   const token = await createManualPasswordAction({
     memberId: data.id as string,
@@ -1810,5 +1846,5 @@ export async function issueManualMemberPasswordReset(email: string) {
     displayName: String(data.display_name ?? "회원"),
     token,
   });
-  return true;
+  return { ok: true, reason: "issued" };
 }

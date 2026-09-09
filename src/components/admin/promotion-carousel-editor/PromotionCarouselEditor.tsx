@@ -18,6 +18,7 @@ import Textarea from "@/components/ui/Textarea";
 import PromotionCarousel from "@/components/promotions/PromotionCarousel";
 import MediaCropModal from "@/components/admin/partner-media-editor/MediaCropModal";
 import { AD_PACKAGE_FORM_LIMITS } from "@/lib/ad-package-validation";
+import { createClientUuid } from "@/lib/client-uuid";
 import { CAMPUS_DIRECTORY, type CampusSlug } from "@/lib/campuses";
 import { uploadImagesToStaging } from "@/lib/image-upload/client";
 import {
@@ -418,7 +419,7 @@ export default function PromotionCarouselEditor({
     if (!canUpdate) {
       return;
     }
-    const id = crypto.randomUUID();
+    const id = createClientUuid();
     const fallback = createPlaceholderImage("새 광고 카드");
     setSlides((current) => [
       ...current,

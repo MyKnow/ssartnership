@@ -112,6 +112,7 @@ export async function requestMockPartnerPortalPasswordReset(
 
   setup.account.passwordHash = passwordRecord.hash;
   setup.account.passwordSalt = passwordRecord.salt;
+  setup.account.authSessionVersion += 1;
   setup.account.mustChangePassword = true;
   setup.account.emailVerifiedAt = emailVerifiedAt;
 
@@ -162,6 +163,7 @@ export async function changeMockPartnerPortalPassword(input: {
   const passwordRecord = hashPassword(input.nextPassword);
   setup.account.passwordHash = passwordRecord.hash;
   setup.account.passwordSalt = passwordRecord.salt;
+  setup.account.authSessionVersion += 1;
   setup.account.mustChangePassword = false;
 
   return {

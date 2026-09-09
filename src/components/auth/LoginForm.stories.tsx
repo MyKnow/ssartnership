@@ -1,13 +1,27 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 import { ToastProvider } from "@/components/ui/Toast";
+import { MEMBER_LOGIN_METHOD_STORAGE_KEY } from "@/lib/member-login-method-preference.client";
 import LoginForm from "./LoginForm";
+
+const STORYBOOK_FETCH = globalThis.fetch;
 
 const meta = {
   title: "Domains/Auth/LoginForm",
   component: LoginForm,
   args: {
     returnTo: "/partners/partner-1",
+  },
+  beforeEach: async () => {
+    window.fetch = STORYBOOK_FETCH;
+    window.localStorage.removeItem(MEMBER_LOGIN_METHOD_STORAGE_KEY);
+    return () => {
+      window.fetch = STORYBOOK_FETCH;
+      window.localStorage.removeItem(MEMBER_LOGIN_METHOD_STORAGE_KEY);
+    };
+  },
+  parameters: {
+    chromatic: { viewports: [360, 820, 1366] },
   },
   decorators: [
     (Story) => (
@@ -28,6 +42,25 @@ const legacyLoginButtonName = "로그인";
 
 export const Default: Story = {};
 
+export const LoginMethodTabs: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const usernameTab = canvas.getByRole("tab", { name: "아이디" });
+    const emailTab = canvas.getByRole("tab", { name: "이메일" });
+
+    await expect(usernameTab).toHaveAttribute("aria-selected", "true");
+    await expect(emailTab).toHaveAttribute("aria-selected", "false");
+    await expect(canvas.getByRole("textbox", { name: "Mattermost 아이디" })).toBeVisible();
+
+    usernameTab.focus();
+    await userEvent.keyboard("{ArrowRight}");
+
+    await expect(emailTab).toHaveFocus();
+    await expect(emailTab).toHaveAttribute("aria-selected", "true");
+    await expect(canvas.getByRole("textbox", { name: "이메일" })).toBeVisible();
+  },
+};
+
 export const WithReturnToAdmin: Story = {
   args: {
     returnTo: "/admin",
@@ -41,18 +74,36 @@ export const ValidationErrors: Story = {
     await userEvent.click(
       canvas.getByRole("button", { name: legacyLoginButtonName }),
     );
-    await expect(canvas.getByText("아이디 또는 이메일을 입력해 주세요.")).toBeInTheDocument();
+    await expect(canvas.getByText("Mattermost 아이디를 입력해 주세요.")).toBeInTheDocument();
     await expect(canvas.getByText("비밀번호를 입력해 주세요.")).toBeInTheDocument();
 
     await userEvent.type(
-      canvas.getByPlaceholderText("예시: myknow@example.com"),
+      canvas.getByPlaceholderText("예시: myknow"),
       "bad id!",
     );
     await userEvent.type(canvas.getByPlaceholderText("사이트 비밀번호"), "password123");
     await userEvent.click(
       canvas.getByRole("button", { name: legacyLoginButtonName }),
     );
-    await expect(canvas.getByText("아이디에 공백을 넣을 수 없습니다.")).toBeInTheDocument();
+    await expect(canvas.getByText("Mattermost 아이디에 공백을 넣을 수 없습니다.")).toBeInTheDocument();
+  },
+};
+
+export const EmailValidationError: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("tab", { name: "이메일" }));
+    await userEvent.type(
+      canvas.getByPlaceholderText("예시: myknow@example.com"),
+      "not-an-email",
+    );
+    await userEvent.type(canvas.getByPlaceholderText("사이트 비밀번호"), "password123");
+    await userEvent.click(
+      canvas.getByRole("button", { name: legacyLoginButtonName }),
+    );
+
+    await expect(canvas.getByText("이메일 주소를 확인해 주세요.")).toBeInTheDocument();
   },
 };
 
@@ -66,7 +117,7 @@ export const KeyboardSubmit: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.type(
-      canvas.getByPlaceholderText("예시: myknow@example.com"),
+      canvas.getByPlaceholderText("예시: myknow"),
       "ssafy15",
     );
     await userEvent.type(
@@ -85,7 +136,7 @@ export const BlockedLogin: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.type(
-      canvas.getByPlaceholderText("예시: myknow@example.com"),
+      canvas.getByPlaceholderText("예시: myknow"),
       "ssafy15",
     );
     await userEvent.type(canvas.getByPlaceholderText("사이트 비밀번호"), "password123");
@@ -106,7 +157,7 @@ export const InvalidCredentials: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.type(
-      canvas.getByPlaceholderText("예시: myknow@example.com"),
+      canvas.getByPlaceholderText("예시: myknow"),
       "ssafy15",
     );
     await userEvent.type(canvas.getByPlaceholderText("사이트 비밀번호"), "wrong-password");
@@ -115,7 +166,7 @@ export const InvalidCredentials: Story = {
     );
 
     await expect(
-      await canvas.findByText("아이디 또는 비밀번호가 올바르지 않습니다."),
+      await canvas.findByText("Mattermost 아이디 또는 비밀번호가 올바르지 않습니다."),
     ).toBeInTheDocument();
   },
 };
@@ -126,7 +177,7 @@ export const SuccessfulLogin: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.type(
-      canvas.getByPlaceholderText("예시: myknow@example.com"),
+      canvas.getByPlaceholderText("예시: myknow"),
       "ssafy15",
     );
     await userEvent.type(canvas.getByPlaceholderText("사이트 비밀번호"), "Valid!123");
@@ -135,6 +186,27 @@ export const SuccessfulLogin: Story = {
     );
 
     await expect(await canvas.findByText("로그인되었습니다.")).toBeInTheDocument();
+    await expect(window.localStorage.getItem(MEMBER_LOGIN_METHOD_STORAGE_KEY)).toBe("username");
+  },
+};
+
+export const SuccessfulEmailLogin: Story = {
+  play: async ({ canvasElement }) => {
+    window.fetch = async () => Response.json({ requiresConsent: false }, { status: 200 });
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("tab", { name: "이메일" }));
+    await userEvent.type(
+      canvas.getByPlaceholderText("예시: myknow@example.com"),
+      "member@example.com",
+    );
+    await userEvent.type(canvas.getByPlaceholderText("사이트 비밀번호"), "Valid!123");
+    await userEvent.click(
+      canvas.getByRole("button", { name: legacyLoginButtonName }),
+    );
+
+    await expect(await canvas.findByText("로그인되었습니다.")).toBeInTheDocument();
+    await expect(window.localStorage.getItem(MEMBER_LOGIN_METHOD_STORAGE_KEY)).toBe("email");
   },
 };
 
@@ -144,7 +216,7 @@ export const SuccessfulLoginRequiringConsent: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.type(
-      canvas.getByPlaceholderText("예시: myknow@example.com"),
+      canvas.getByPlaceholderText("예시: myknow"),
       "ssafy15",
     );
     await userEvent.type(canvas.getByPlaceholderText("사이트 비밀번호"), "Valid!123");

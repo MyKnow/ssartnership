@@ -9,6 +9,10 @@ import {
 } from "@/lib/admin-notification-ops";
 import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
 import { withServerTiming } from "@/lib/server-timing";
+import {
+  AdminNotificationRouteBodyError,
+  readAdminNotificationJsonBody,
+} from "@/lib/admin-notification-route-body";
 
 export const runtime = "nodejs";
 
@@ -26,14 +30,14 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const body = (await request.json()) as {
+      const body = await readAdminNotificationJsonBody<{
         notificationType?: AdminNotificationType;
         title?: string;
         body?: string;
         url?: string | null;
         channels?: Partial<AdminNotificationChannelSelection>;
         audience?: unknown;
-      };
+      }>(request);
 
       const preview = await timing.measure("query", () =>
         previewAdminNotificationCampaign({
@@ -50,8 +54,14 @@ export async function POST(request: NextRequest) {
         }),
       );
 
-    return NextResponse.json({ ok: true, preview });
+      return NextResponse.json({ ok: true, preview });
     } catch (error) {
+      if (error instanceof AdminNotificationRouteBodyError) {
+        return NextResponse.json(
+          { message: error.message },
+          { status: error.status },
+        );
+      }
       console.error("[push-admin-preview] preview failed", error);
       const message = getSafeAdminMessage(
         error,

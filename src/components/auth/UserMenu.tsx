@@ -7,22 +7,36 @@ import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import type { HeaderSession } from "@/lib/header-session";
 import { cn } from "@/lib/cn";
+import { sanitizeReturnTo } from "@/lib/return-to";
 
 export default function UserMenu({
   initialSession = null,
   className,
   buttonClassName,
   logoutIconOnly = false,
+  guestAuthReturnTo,
+  showMemberNavigation = true,
 }: {
   initialSession?: HeaderSession | null;
   className?: string;
   buttonClassName?: string;
   logoutIconOnly?: boolean;
+  guestAuthReturnTo?: string;
+  showMemberNavigation?: boolean;
 }) {
   const [session, setSession] = useState<HeaderSession | null>(initialSession);
   const [loggingOut, setLoggingOut] = useState(false);
   const { notify } = useToast();
   const router = useRouter();
+  const safeGuestAuthReturnTo = guestAuthReturnTo
+    ? sanitizeReturnTo(guestAuthReturnTo, "/")
+    : null;
+  const loginHref = safeGuestAuthReturnTo
+    ? `/auth/login?returnTo=${encodeURIComponent(safeGuestAuthReturnTo)}`
+    : "/auth/login";
+  const signupHref = safeGuestAuthReturnTo
+    ? `/auth/signup?returnTo=${encodeURIComponent(safeGuestAuthReturnTo)}`
+    : "/auth/signup";
 
   const handleLogout = async () => {
     if (loggingOut) {
@@ -50,7 +64,7 @@ export default function UserMenu({
       <div className={cn("flex items-center gap-2", className)}>
         <Button
           variant="ghost"
-          href="/auth/login"
+          href={loginHref}
           prefetch={false}
           className={buttonClassName}
         >
@@ -58,7 +72,7 @@ export default function UserMenu({
         </Button>
         <Button
           variant="ghost"
-          href="/auth/signup"
+          href={signupHref}
           prefetch={false}
           className={buttonClassName}
         >
@@ -70,22 +84,26 @@ export default function UserMenu({
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <Button
-        variant="ghost"
-        href="/coupons"
-        prefetch={false}
-        className={buttonClassName}
-      >
-        쿠폰함
-      </Button>
-      <Button
-        variant="ghost"
-        href="/certification"
-        prefetch={false}
-        className={buttonClassName}
-      >
-        내 인증
-      </Button>
+      {showMemberNavigation ? (
+        <>
+          <Button
+            variant="ghost"
+            href="/coupons"
+            prefetch={false}
+            className={buttonClassName}
+          >
+            쿠폰함
+          </Button>
+          <Button
+            variant="ghost"
+            href="/certification"
+            prefetch={false}
+            className={buttonClassName}
+          >
+            내 인증
+          </Button>
+        </>
+      ) : null}
       {logoutIconOnly ? (
         <Button
           variant="danger"

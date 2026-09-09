@@ -1,7 +1,54 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getPartnerDetailBenefitMode } from "../src/lib/partner-detail-benefit-action.ts";
+import {
+  getPartnerDetailBenefitMode,
+  resolvePartnerDetailBenefitUseAction,
+} from "../src/lib/partner-detail-benefit-action.ts";
+
+const externalBenefitAction = {
+  label: "혜택 이용",
+  href: "tel:050713822343",
+  type: "external_link" as const,
+};
+
+test("logged-out benefit actions lead to login without exposing the original action", () => {
+  assert.deepEqual(
+    resolvePartnerDetailBenefitUseAction({
+      action: externalBenefitAction,
+      authenticated: false,
+      returnTo: "/partners/partner-1",
+    }),
+    {
+      label: "로그인 후 혜택 이용하기",
+      href: "/auth/login?returnTo=%2Fpartners%2Fpartner-1",
+      type: "external_link",
+      requiresLogin: true,
+    },
+  );
+});
+
+test("logged-in benefit actions keep their original destination", () => {
+  assert.equal(
+    resolvePartnerDetailBenefitUseAction({
+      action: externalBenefitAction,
+      authenticated: true,
+      returnTo: "/partners/partner-1",
+    }),
+    externalBenefitAction,
+  );
+});
+
+test("logged-out benefit actions sanitize unsafe return destinations", () => {
+  assert.equal(
+    resolvePartnerDetailBenefitUseAction({
+      action: externalBenefitAction,
+      authenticated: false,
+      returnTo: "https://attacker.example/next",
+    })?.href,
+    "/auth/login?returnTo=%2F",
+  );
+});
 
 test("external links expose the partner detail benefit action", () => {
   assert.equal(

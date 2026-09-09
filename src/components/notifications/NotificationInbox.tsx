@@ -18,6 +18,10 @@ import {
 } from "@/lib/notifications/shared";
 import { cn } from "@/lib/cn";
 import { formatKoreanDateTime } from "@/lib/datetime";
+import {
+  getNotificationClientError,
+  requestNotificationJson,
+} from "@/lib/notifications/client-request";
 
 type NotificationInboxState = NotificationListResult;
 
@@ -35,22 +39,14 @@ function formatNotificationDate(value: string) {
   });
 }
 
-async function parseNotificationResponse(response: Response) {
-  const data = (await response.json().catch(() => ({}))) as {
-    ok?: boolean;
-    message?: string;
-    summary?: { unreadCount?: number };
-    items?: MemberNotificationRecord[];
-    nextOffset?: number;
-    hasMore?: boolean;
-  };
-
-  if (!response.ok) {
-    throw new Error(data.message ?? "알림을 처리하지 못했습니다.");
-  }
-
-  return data;
-}
+type MemberNotificationApiResponse = {
+  ok?: boolean;
+  message?: string;
+  summary?: { unreadCount?: number };
+  items?: MemberNotificationRecord[];
+  nextOffset?: number;
+  hasMore?: boolean;
+};
 
 export default function NotificationInbox({
   initialState,
@@ -91,13 +87,16 @@ export default function NotificationInbox({
     }));
 
     try {
-      const response = await fetch(`/api/notifications/${item.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
+      const data = await requestNotificationJson<MemberNotificationApiResponse>(
+        `/api/notifications/${item.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
         },
-      });
-      const data = await parseNotificationResponse(response);
+        { requestFailureMessage: "읽음 처리에 실패했습니다." },
+      );
       if (typeof data.summary?.unreadCount === "number") {
         emitNotificationUnreadCount(data.summary.unreadCount);
         setState((current) => ({
@@ -120,7 +119,7 @@ export default function NotificationInbox({
             : row,
         ),
       }));
-      notify(error instanceof Error ? error.message : "읽음 처리에 실패했습니다.");
+      notify(getNotificationClientError(error, "읽음 처리에 실패했습니다.").message);
     } finally {
       setPendingId(null);
     }
@@ -133,13 +132,16 @@ export default function NotificationInbox({
 
     setPendingId(item.id);
     try {
-      const response = await fetch(`/api/notifications/${item.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
+      const data = await requestNotificationJson<MemberNotificationApiResponse>(
+        `/api/notifications/${item.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
         },
-      });
-      const data = await parseNotificationResponse(response);
+        { requestFailureMessage: "알림을 열지 못했습니다." },
+      );
       if (typeof data.summary?.unreadCount === "number") {
         setState((current) => ({
           ...current,
@@ -159,7 +161,7 @@ export default function NotificationInbox({
       }
       router.push(item.targetUrl);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "알림을 열지 못했습니다.");
+      notify(getNotificationClientError(error, "알림을 열지 못했습니다.").message);
     } finally {
       setPendingId(null);
     }
@@ -181,10 +183,11 @@ export default function NotificationInbox({
     }));
 
     try {
-      const response = await fetch(`/api/notifications/${item.id}`, {
-        method: "DELETE",
-      });
-      const data = await parseNotificationResponse(response);
+      const data = await requestNotificationJson<MemberNotificationApiResponse>(
+        `/api/notifications/${item.id}`,
+        { method: "DELETE" },
+        { requestFailureMessage: "알림을 삭제하지 못했습니다." },
+      );
       if (typeof data.summary?.unreadCount === "number") {
         emitNotificationUnreadCount(data.summary.unreadCount);
         setState((current) => ({
@@ -198,7 +201,7 @@ export default function NotificationInbox({
         unreadCount: wasUnread ? current.unreadCount + 1 : current.unreadCount,
         items: [item, ...current.items],
       }));
-      notify(error instanceof Error ? error.message : "알림을 삭제하지 못했습니다.");
+      notify(getNotificationClientError(error, "알림을 삭제하지 못했습니다.").message);
     } finally {
       setPendingId(null);
     }
@@ -228,10 +231,11 @@ export default function NotificationInbox({
     }));
 
     try {
-      const response = await fetch("/api/notifications", {
-        method: "PATCH",
-      });
-      const data = await parseNotificationResponse(response);
+      const data = await requestNotificationJson<MemberNotificationApiResponse>(
+        "/api/notifications",
+        { method: "PATCH" },
+        { requestFailureMessage: "전체 읽음 처리에 실패했습니다." },
+      );
       if (typeof data.summary?.unreadCount === "number") {
         emitNotificationUnreadCount(data.summary.unreadCount);
         setState((current) => ({
@@ -242,7 +246,7 @@ export default function NotificationInbox({
       notify("모든 알림을 읽음 처리했습니다.");
     } catch (error) {
       setState(snapshot);
-      notify(error instanceof Error ? error.message : "전체 읽음 처리에 실패했습니다.");
+      notify(getNotificationClientError(error, "전체 읽음 처리에 실패했습니다.").message);
     } finally {
       setPendingAction(null);
     }
@@ -268,10 +272,11 @@ export default function NotificationInbox({
     }));
 
     try {
-      const response = await fetch("/api/notifications", {
-        method: "DELETE",
-      });
-      const data = await parseNotificationResponse(response);
+      const data = await requestNotificationJson<MemberNotificationApiResponse>(
+        "/api/notifications",
+        { method: "DELETE" },
+        { requestFailureMessage: "전체 삭제에 실패했습니다." },
+      );
       if (typeof data.summary?.unreadCount === "number") {
         emitNotificationUnreadCount(data.summary.unreadCount);
         setState((current) => ({
@@ -282,7 +287,7 @@ export default function NotificationInbox({
       notify("모든 알림을 삭제했습니다.");
     } catch (error) {
       setState(snapshot);
-      notify(error instanceof Error ? error.message : "전체 삭제에 실패했습니다.");
+      notify(getNotificationClientError(error, "전체 삭제에 실패했습니다.").message);
     } finally {
       setPendingAction(null);
     }
@@ -295,10 +300,11 @@ export default function NotificationInbox({
 
     setLoadingMore(true);
     try {
-      const response = await fetch(
+      const data = await requestNotificationJson<MemberNotificationApiResponse>(
         `/api/notifications?offset=${state.nextOffset}&limit=10`,
+        undefined,
+        { requestFailureMessage: "알림을 더 불러오지 못했습니다." },
       );
-      const data = await parseNotificationResponse(response);
       setState((current) => ({
         unreadCount: data.summary?.unreadCount ?? current.unreadCount,
         items: [...current.items, ...(data.items ?? [])],
@@ -306,7 +312,7 @@ export default function NotificationInbox({
         hasMore: Boolean(data.hasMore),
       }));
     } catch (error) {
-      notify(error instanceof Error ? error.message : "알림을 더 불러오지 못했습니다.");
+      notify(getNotificationClientError(error, "알림을 더 불러오지 못했습니다.").message);
     } finally {
       setLoadingMore(false);
     }

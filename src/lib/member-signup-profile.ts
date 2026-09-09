@@ -1,6 +1,6 @@
 import { isUuid } from "@/lib/uuid";
 import { resolveImageTransformPolicy } from "@/lib/image-upload/policy";
-import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { ImageUploadError } from "@/lib/image-upload/repository";
 import type { ImageUploadActor } from "@/lib/image-upload/repository";
 import { MEMBER_PROFILE_IMAGES_BUCKET } from "@/lib/graduate-verification-storage";

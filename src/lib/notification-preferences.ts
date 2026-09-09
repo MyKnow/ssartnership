@@ -1,21 +1,32 @@
 import {
   getMemberPolicyConsentVersions,
   getPolicyDocumentByKind,
-  recordMarketingPolicyConsent,
-} from "@/lib/policy-documents";
+} from "@/lib/policy-documents.server";
 import {
   countActivePushSubscriptions,
   DEFAULT_PUSH_PREFERENCES,
   getMemberPushPreferences,
-  upsertMemberPushPreferences,
 } from "@/lib/push";
+import { wrapPushDbError } from "@/lib/push/config";
+import { getPushDeviceLabel } from "@/lib/push/device-label";
 import type { PushPreferenceState, PushSubscriptionDevice } from "@/lib/push";
+import {
+  assertRuntimeDataAccessAvailable,
+  selectRuntimeDataAccess,
+} from "@/lib/runtime-data-access";
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
-const dataSource = process.env.NEXT_PUBLIC_DATA_SOURCE;
-const hasSupabaseEnv =
-  !!process.env.SUPABASE_URL &&
-  (!!process.env.SUPABASE_ANON_KEY || !!process.env.SUPABASE_SERVICE_ROLE_KEY);
-const useMockPreferences = dataSource === "mock" || !hasSupabaseEnv;
+export const notificationPreferenceDataAccess = selectRuntimeDataAccess({
+  capability: "admin",
+});
+const useMockPreferences = notificationPreferenceDataAccess.source === "mock";
+
+function assertNotificationPreferenceDataAccessAvailable() {
+  assertRuntimeDataAccessAvailable(
+    notificationPreferenceDataAccess,
+    "알림 설정 저장소를 사용할 수 없습니다.",
+  );
+}
 
 const mockPreferenceStore = new Map<string, PushPreferenceState>();
 const mockPushDeviceStore = new Map<string, PushSubscriptionDevice[]>();
@@ -28,28 +39,6 @@ function getMockPreferences(memberId: string) {
   const initial = { ...DEFAULT_PUSH_PREFERENCES };
   mockPreferenceStore.set(memberId, initial);
   return initial;
-}
-
-function getMockDeviceLabel(userAgent: string | null) {
-  const source = userAgent ?? "";
-  const browser = source.includes("Chrome")
-    ? "Chrome"
-    : source.includes("Safari")
-      ? "Safari"
-      : source.includes("Firefox")
-        ? "Firefox"
-        : "브라우저";
-  const os = source.includes("Mac")
-    ? "macOS"
-    : source.includes("Windows")
-      ? "Windows"
-      : source.includes("Android")
-        ? "Android"
-        : source.includes("iPhone") || source.includes("iPad")
-          ? "iOS"
-          : "기기";
-
-  return `${browser} · ${os}`;
 }
 
 export function isMockNotificationPreferenceMode() {
@@ -75,7 +64,7 @@ export function upsertMockPushDevice(params: {
   const devices = mockPushDeviceStore.get(params.memberId) ?? [];
   const nextDevice: PushSubscriptionDevice = {
     id: params.endpoint,
-    label: getMockDeviceLabel(params.userAgent ?? null),
+    label: getPushDeviceLabel(params.userAgent ?? null),
     userAgent: params.userAgent ?? null,
     isCurrent: true,
     createdAt:
@@ -116,6 +105,7 @@ export function deactivateAllMockPushDevices(memberId: string) {
 }
 
 export async function getMemberNotificationPreferences(memberId: string) {
+  assertNotificationPreferenceDataAccessAvailable();
   if (useMockPreferences) {
     const preferences = getMockPreferences(memberId);
     return {
@@ -155,6 +145,7 @@ export async function updateMemberNotificationPreferences(
     userAgent?: string | null;
   },
 ) {
+  assertNotificationPreferenceDataAccessAvailable();
   if (useMockPreferences) {
     const current = getMockPreferences(memberId);
     const hasPushDevice = (mockPushDeviceStore.get(memberId) ?? []).length > 0;
@@ -167,23 +158,38 @@ export async function updateMemberNotificationPreferences(
     return next;
   }
 
-  const activePushSubscriptionCount = await countActivePushSubscriptions(memberId);
-  const currentPreferences = await getMemberPushPreferences(memberId);
-  const preferences = await upsertMemberPushPreferences(memberId, {
-    ...value,
-    enabled:
-      (value.enabled ?? currentPreferences.enabled) &&
-      activePushSubscriptionCount > 0,
-  });
-  const activeMarketingPolicy = await getPolicyDocumentByKind("marketing");
+  const { data, error } = await getSupabaseAdminClient().rpc(
+    "update_member_push_preferences_atomic",
+    {
+      input_member_id: memberId,
+      input_enabled: value.enabled ?? null,
+      input_announcement_enabled: value.announcementEnabled ?? null,
+      input_new_partner_enabled: value.newPartnerEnabled ?? null,
+      input_expiring_partner_enabled: value.expiringPartnerEnabled ?? null,
+      input_review_enabled: value.reviewEnabled ?? null,
+      input_mm_enabled: value.mmEnabled ?? null,
+      input_marketing_enabled: value.marketingEnabled ?? null,
+      input_ip_address: context?.ipAddress ?? null,
+      input_user_agent: context?.userAgent ?? null,
+    },
+  );
 
-  await recordMarketingPolicyConsent({
-    memberId,
-    activePolicy: activeMarketingPolicy,
-    agreed: preferences.marketingEnabled,
-    ipAddress: context?.ipAddress ?? null,
-    userAgent: context?.userAgent ?? null,
-  });
+  if (error) {
+    throw wrapPushDbError(error, "알림 설정을 저장하지 못했습니다.");
+  }
 
-  return preferences;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) {
+    throw wrapPushDbError(null, "알림 설정을 저장하지 못했습니다.");
+  }
+
+  return {
+    enabled: Boolean(row.enabled),
+    announcementEnabled: Boolean(row.announcement_enabled),
+    newPartnerEnabled: Boolean(row.new_partner_enabled),
+    expiringPartnerEnabled: Boolean(row.expiring_partner_enabled),
+    reviewEnabled: Boolean(row.review_enabled),
+    mmEnabled: Boolean(row.mm_enabled),
+    marketingEnabled: Boolean(row.marketing_enabled),
+  };
 }

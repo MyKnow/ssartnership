@@ -1,4 +1,8 @@
-import { PartnerPortalSetupError } from "./partner-portal-errors.ts";
+import {
+  createUnavailableDataAccessProxy,
+  selectRuntimeDataAccess,
+} from "./runtime-data-access.ts";
+
 export {
   PartnerPortalSetupError,
   type PartnerPortalSetupErrorCode,
@@ -82,6 +86,16 @@ export type PartnerPortalDemoSetupSummary = {
 };
 
 export interface PartnerPortalRepository {
+  authenticateLogin(
+    loginId: string,
+    password: string,
+  ): Promise<PartnerPortalLoginResult>;
+  requestPasswordReset(email: string): Promise<PartnerPortalPasswordResetResult>;
+  changePassword(input: {
+    accountId: string;
+    currentPassword: string;
+    nextPassword: string;
+  }): Promise<PartnerPortalPasswordChangeResult>;
   listDemoSetups(): Promise<PartnerPortalDemoSetupSummary[]>;
   getSetupContext(token: string): Promise<PartnerPortalSetupContext | null>;
   completeInitialSetup(
@@ -89,29 +103,16 @@ export interface PartnerPortalRepository {
   ): Promise<PartnerPortalSetupResult>;
 }
 
-class UnconfiguredPartnerPortalRepository implements PartnerPortalRepository {
-  async listDemoSetups(): Promise<PartnerPortalDemoSetupSummary[]> {
-    return [];
-  }
+export const partnerPortalDataAccess = selectRuntimeDataAccess({
+  capability: "admin",
+  sourcePreference: "partner-portal",
+});
 
-  async getSetupContext(): Promise<PartnerPortalSetupContext | null> {
-    return null;
-  }
+export const isPartnerPortalMock = partnerPortalDataAccess.source === "mock";
 
-  async completeInitialSetup(): Promise<PartnerPortalSetupResult> {
-    throw new PartnerPortalSetupError(
-      "not_found",
-      "제휴 포털 초기 설정 경로가 아직 연결되지 않았습니다.",
-    );
-  }
+export function createUnavailablePartnerPortalRepository() {
+  return createUnavailableDataAccessProxy<PartnerPortalRepository>(
+    partnerPortalDataAccess,
+    "파트너 포털 저장소를 사용할 수 없습니다.",
+  );
 }
-
-const dataSource =
-  process.env.NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE ??
-  process.env.NEXT_PUBLIC_DATA_SOURCE ??
-  "supabase";
-
-export const isPartnerPortalMock = dataSource !== "supabase";
-
-export const partnerPortalRepository: PartnerPortalRepository =
-  new UnconfiguredPartnerPortalRepository();

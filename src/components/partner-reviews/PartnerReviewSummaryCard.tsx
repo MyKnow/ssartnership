@@ -3,11 +3,16 @@ import type { PartnerReviewSummary } from "@/lib/partner-reviews";
 
 export default function PartnerReviewSummaryCard({
   summary,
+  embedded = false,
 }: {
   summary: PartnerReviewSummary;
+  embedded?: boolean;
 }) {
-  return (
-    <Card padding="md" className="grid gap-4 sm:grid-cols-[9rem_minmax(0,1fr)] sm:items-center">
+  const content = (
+    <div
+      data-partner-review-summary-content
+      className="grid gap-4 sm:grid-cols-[9rem_minmax(0,1fr)] sm:items-center"
+    >
       <div className="grid gap-1 text-center sm:text-left">
         <p className="ui-caption">평균</p>
         <p className="text-3xl font-semibold tracking-[-0.03em] text-foreground">
@@ -36,8 +41,13 @@ export default function PartnerReviewSummaryCard({
             </div>
           );
         })}
-        <p className="text-xs text-muted-foreground">비공개 리뷰 제외</p>
       </div>
-    </Card>
+    </div>
   );
+
+  if (embedded) {
+    return content;
+  }
+
+  return <Card padding="md">{content}</Card>;
 }

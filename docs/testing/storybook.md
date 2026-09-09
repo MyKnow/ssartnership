@@ -1,6 +1,13 @@
+---
+title: Storybook
+type: test-guide
+status: current
+authority: normative
+---
+
 # Storybook
 
-이 문서는 `/Users/myknow/coding/ssartnership` 프로젝트의 Storybook 구성 현황과 운영 기준을 정리합니다.
+이 문서는 이 저장소의 Storybook 구성 현황과 운영 기준을 정리합니다.
 
 ## 목적
 
@@ -25,9 +32,9 @@
 
 ### 설정 파일
 
-- [.storybook/main.ts](/Users/myknow/coding/ssartnership/.storybook/main.ts)
-- [.storybook/preview.tsx](/Users/myknow/coding/ssartnership/.storybook/preview.tsx)
-- [vitest.config.ts](/Users/myknow/coding/ssartnership/vitest.config.ts)
+- [.storybook/main.ts](../../.storybook/main.ts)
+- [.storybook/preview.tsx](../../.storybook/preview.tsx)
+- [vitest.config.ts](../../vitest.config.ts)
 
 ### package.json scripts
 
@@ -46,81 +53,81 @@ Storybook 자체 검증은 로컬 릴리즈 게이트로 유지합니다.
 - `npm run release`는 커밋/푸시 전에 `npm run test-storybook`을 반드시 실행합니다.
 - 두 명령 중 하나라도 실패하면 버전 업데이트, 커밋, 푸시를 진행하지 않습니다.
 - GitHub Actions의 `Storybook and Visual Baselines`는 Chromatic 없이 정적 빌드, browser-mode test, Playwright 이미지 비교를 실행합니다.
-- GitHub에서 수동 비활성화한 워크플로의 재활성화·검증·롤백 절차는 [Storybook·Visual Baselines 워크플로 운영](../operations/storybook-visual-workflow.md)을 따릅니다.
+- GitHub에서 수동 비활성화한 워크플로의 재활성화·검증·롤백 절차는 [Storybook·Visual Baselines 워크플로 운영](../operations/runbooks/storybook-visual-workflow.md)을 따릅니다.
 - 긴급 상황에서 `git push --no-verify`로 로컬 hook을 우회하더라도 release 스크립트와 Public Readiness CI 게이트는 우회하지 않는 것을 원칙으로 합니다.
 
 ## 현재 포함된 스토리
 
 ### Foundations
 
-- [.storybook/overview.stories.tsx](/Users/myknow/coding/ssartnership/.storybook/overview.stories.tsx)
+- [.storybook/overview.stories.tsx](../../.storybook/overview.stories.tsx)
 
 ### UI
 
-- [src/components/ui/Button.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/Button.stories.tsx)
-- [src/components/ui/Badge.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/Badge.stories.tsx)
-- [src/components/ui/Card.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/Card.stories.tsx)
-- [src/components/ui/Modal.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/Modal.stories.tsx)
-- [src/components/ui/Input.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/Input.stories.tsx)
-- [src/components/ui/Textarea.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/Textarea.stories.tsx)
-- [src/components/ui/PasswordInput.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/PasswordInput.stories.tsx)
-- [src/components/ui/Select.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/Select.stories.tsx)
-- [src/components/ui/Tabs.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/Tabs.stories.tsx)
-- [src/components/ui/EmptyState.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/EmptyState.stories.tsx)
-- [src/components/ui/SubmitButton.stories.tsx](/Users/myknow/coding/ssartnership/src/components/ui/SubmitButton.stories.tsx)
+- [src/components/ui/Button.stories.tsx](../../src/components/ui/Button.stories.tsx)
+- [src/components/ui/Badge.stories.tsx](../../src/components/ui/Badge.stories.tsx)
+- [src/components/ui/Card.stories.tsx](../../src/components/ui/Card.stories.tsx)
+- [src/components/ui/Modal.stories.tsx](../../src/components/ui/Modal.stories.tsx)
+- [src/components/ui/Input.stories.tsx](../../src/components/ui/Input.stories.tsx)
+- [src/components/ui/Textarea.stories.tsx](../../src/components/ui/Textarea.stories.tsx)
+- [src/components/ui/PasswordInput.stories.tsx](../../src/components/ui/PasswordInput.stories.tsx)
+- [src/components/ui/Select.stories.tsx](../../src/components/ui/Select.stories.tsx)
+- [src/components/ui/Tabs.stories.tsx](../../src/components/ui/Tabs.stories.tsx)
+- [src/components/ui/EmptyState.stories.tsx](../../src/components/ui/EmptyState.stories.tsx)
+- [src/components/ui/SubmitButton.stories.tsx](../../src/components/ui/SubmitButton.stories.tsx)
 
 ### Public / Domain
 
-- [src/components/HeroSection.stories.tsx](/Users/myknow/coding/ssartnership/src/components/HeroSection.stories.tsx)
-- [src/components/SiteHeader.stories.tsx](/Users/myknow/coding/ssartnership/src/components/SiteHeader.stories.tsx)
-- [src/components/PartnerCardView.stories.tsx](/Users/myknow/coding/ssartnership/src/components/PartnerCardView.stories.tsx)
-- [src/components/PartnerImageCarousel.stories.tsx](/Users/myknow/coding/ssartnership/src/components/PartnerImageCarousel.stories.tsx)
-- [src/components/partner-reviews/PartnerReviewCard.stories.tsx](/Users/myknow/coding/ssartnership/src/components/partner-reviews/PartnerReviewCard.stories.tsx)
-- [src/components/partner-reviews/PartnerReviewSummaryCard.stories.tsx](/Users/myknow/coding/ssartnership/src/components/partner-reviews/PartnerReviewSummaryCard.stories.tsx)
-- [src/components/partner-reviews/PartnerReviewForm.stories.tsx](/Users/myknow/coding/ssartnership/src/components/partner-reviews/PartnerReviewForm.stories.tsx)
-- [src/components/partner-favorites/PartnerFavoriteButton.stories.tsx](/Users/myknow/coding/ssartnership/src/components/partner-favorites/PartnerFavoriteButton.stories.tsx)
+- [src/components/HeroSection.stories.tsx](../../src/components/HeroSection.stories.tsx)
+- [src/components/SiteHeader.stories.tsx](../../src/components/SiteHeader.stories.tsx)
+- [src/components/PartnerCardView.stories.tsx](../../src/components/PartnerCardView.stories.tsx)
+- [src/components/PartnerImageCarousel.stories.tsx](../../src/components/PartnerImageCarousel.stories.tsx)
+- [src/components/partner-reviews/PartnerReviewCard.stories.tsx](../../src/components/partner-reviews/PartnerReviewCard.stories.tsx)
+- [src/components/partner-reviews/PartnerReviewSummaryCard.stories.tsx](../../src/components/partner-reviews/PartnerReviewSummaryCard.stories.tsx)
+- [src/components/partner-reviews/PartnerReviewForm.stories.tsx](../../src/components/partner-reviews/PartnerReviewForm.stories.tsx)
+- [src/components/partner-favorites/PartnerFavoriteButton.stories.tsx](../../src/components/partner-favorites/PartnerFavoriteButton.stories.tsx)
 
 ### Auth
 
-- [src/components/auth/LoginForm.stories.tsx](/Users/myknow/coding/ssartnership/src/components/auth/LoginForm.stories.tsx)
-- [src/components/auth/ResetPasswordForm.stories.tsx](/Users/myknow/coding/ssartnership/src/components/auth/ResetPasswordForm.stories.tsx)
+- [src/components/auth/LoginForm.stories.tsx](../../src/components/auth/LoginForm.stories.tsx)
+- 당시 `src/components/auth/ResetPasswordForm.stories.tsx` (현재 제거됨)
 
 ### Admin
 
-- [src/components/admin/AdminLogoutButton.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminLogoutButton.stories.tsx)
-- [src/components/admin/AdminMobileNav.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminMobileNav.stories.tsx)
-- [src/components/admin/AdminShell.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminShell.stories.tsx)
-- [src/components/admin/AdminPageStates.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminPageStates.stories.tsx)
-- [src/components/admin/AdminPartnerManager.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminPartnerManager.stories.tsx)
-- [src/components/admin/partner-manager/AdminPartnerManagerFilters.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/partner-manager/AdminPartnerManagerFilters.stories.tsx)
-- [src/components/admin/partner-manager/AdminPartnerManagerList.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/partner-manager/AdminPartnerManagerList.stories.tsx)
-- [src/components/admin/AdminReviewManager.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminReviewManager.stories.tsx)
-- [src/components/admin/review-manager/AdminReviewFilters.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/review-manager/AdminReviewFilters.stories.tsx)
-- [src/components/admin/review-manager/AdminReviewCardView.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/review-manager/AdminReviewCardView.stories.tsx)
-- [src/components/admin/review-manager/AdminReviewImageGallery.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/review-manager/AdminReviewImageGallery.stories.tsx)
-- [src/components/admin/partner-manager/AdminPartnerListItem.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/partner-manager/AdminPartnerListItem.stories.tsx)
-- [src/components/admin/logs/AdminLogsExplorer.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/logs/AdminLogsExplorer.stories.tsx)
-- [src/components/admin/AdminPushManager.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminPushManager.stories.tsx)
-- [src/components/admin/AdminLogsManager.stories.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminLogsManager.stories.tsx)
+- [src/components/admin/AdminLogoutButton.stories.tsx](../../src/components/admin/AdminLogoutButton.stories.tsx)
+- [src/components/admin/AdminMobileNav.stories.tsx](../../src/components/admin/AdminMobileNav.stories.tsx)
+- [src/components/admin/AdminShell.stories.tsx](../../src/components/admin/AdminShell.stories.tsx)
+- [src/components/admin/AdminPageStates.stories.tsx](../../src/components/admin/AdminPageStates.stories.tsx)
+- [src/components/admin/AdminPartnerManager.stories.tsx](../../src/components/admin/AdminPartnerManager.stories.tsx)
+- 당시 `src/components/admin/partner-manager/AdminPartnerManagerFilters.stories.tsx` (현재 제거됨)
+- [src/components/admin/partner-manager/AdminPartnerManagerList.stories.tsx](../../src/components/admin/partner-manager/AdminPartnerManagerList.stories.tsx)
+- [src/components/admin/AdminReviewManager.stories.tsx](../../src/components/admin/AdminReviewManager.stories.tsx)
+- [src/components/admin/review-manager/AdminReviewFilters.stories.tsx](../../src/components/admin/review-manager/AdminReviewFilters.stories.tsx)
+- [src/components/admin/review-manager/AdminReviewCardView.stories.tsx](../../src/components/admin/review-manager/AdminReviewCardView.stories.tsx)
+- [src/components/admin/review-manager/AdminReviewImageGallery.stories.tsx](../../src/components/admin/review-manager/AdminReviewImageGallery.stories.tsx)
+- [src/components/admin/partner-manager/AdminPartnerListItem.stories.tsx](../../src/components/admin/partner-manager/AdminPartnerListItem.stories.tsx)
+- [src/components/admin/logs/AdminLogsExplorer.stories.tsx](../../src/components/admin/logs/AdminLogsExplorer.stories.tsx)
+- [src/components/admin/AdminPushManager.stories.tsx](../../src/components/admin/AdminPushManager.stories.tsx)
+- [src/components/admin/AdminLogsManager.stories.tsx](../../src/components/admin/AdminLogsManager.stories.tsx)
 
 ### Partner Page States
 
-- [src/components/partner/PartnerCompanySelectionView.stories.tsx](/Users/myknow/coding/ssartnership/src/components/partner/PartnerCompanySelectionView.stories.tsx)
-- [src/components/partner/PartnerDashboardView.stories.tsx](/Users/myknow/coding/ssartnership/src/components/partner/PartnerDashboardView.stories.tsx)
+- [src/components/partner/PartnerCompanySelectionView.stories.tsx](../../src/components/partner/PartnerCompanySelectionView.stories.tsx)
+- [src/components/partner/PartnerDashboardView.stories.tsx](../../src/components/partner/PartnerDashboardView.stories.tsx)
 
 ## Mock Scenario Registry
 
 Mock 전략은 Repository/service mock을 폐기하지 않고, 그 위에 시나리오 레지스트리를 얹는 방식으로 운영합니다.
 
-- 시나리오 정의: [src/lib/mock/scenarios/registry.ts](/Users/myknow/coding/ssartnership/src/lib/mock/scenarios/registry.ts)
-- Route/View inventory: [src/lib/mock/scenarios/route-inventory.ts](/Users/myknow/coding/ssartnership/src/lib/mock/scenarios/route-inventory.ts)
-- Required state policy: [src/lib/mock/scenarios/required-states.ts](/Users/myknow/coding/ssartnership/src/lib/mock/scenarios/required-states.ts)
-- Coverage matrix: [src/lib/mock/scenarios/coverage.ts](/Users/myknow/coding/ssartnership/src/lib/mock/scenarios/coverage.ts)
-- Storybook scenario traceability: [src/lib/mock/scenarios/storybook-coverage.ts](/Users/myknow/coding/ssartnership/src/lib/mock/scenarios/storybook-coverage.ts)
-- Adoption policy: [src/lib/mock/scenarios/adoption-policy.ts](/Users/myknow/coding/ssartnership/src/lib/mock/scenarios/adoption-policy.ts)
-- Partner portal story adapter: [src/lib/mock/scenarios/partner-portal.ts](/Users/myknow/coding/ssartnership/src/lib/mock/scenarios/partner-portal.ts)
-- Browser-safe Storybook fixture: [src/lib/mock/scenarios/storybook-partner-portal.ts](/Users/myknow/coding/ssartnership/src/lib/mock/scenarios/storybook-partner-portal.ts)
-- 검증 테스트: [tests/mock-scenarios.test.mts](/Users/myknow/coding/ssartnership/tests/mock-scenarios.test.mts)
+- 시나리오 정의: [src/lib/mock/scenarios/registry.ts](../../src/lib/mock/scenarios/registry.ts)
+- Route/View inventory: [src/lib/mock/scenarios/route-inventory.ts](../../src/lib/mock/scenarios/route-inventory.ts)
+- Required state policy: [src/lib/mock/scenarios/required-states.ts](../../src/lib/mock/scenarios/required-states.ts)
+- Coverage matrix: [src/lib/mock/scenarios/coverage.ts](../../src/lib/mock/scenarios/coverage.ts)
+- Storybook scenario traceability: [src/lib/mock/scenarios/storybook-coverage.ts](../../src/lib/mock/scenarios/storybook-coverage.ts)
+- Adoption policy: [src/lib/mock/scenarios/adoption-policy.ts](../../src/lib/mock/scenarios/adoption-policy.ts)
+- Partner portal story adapter: [src/lib/mock/scenarios/partner-portal.ts](../../src/lib/mock/scenarios/partner-portal.ts)
+- Browser-safe Storybook fixture: [src/lib/mock/scenarios/storybook-partner-portal.ts](../../src/lib/mock/scenarios/storybook-partner-portal.ts)
+- 검증 테스트: [tests/mock-scenarios.test.mts](../../tests/mock-scenarios.test.mts)
 
 ### 현재 Coverage Matrix
 
@@ -134,7 +141,7 @@ Mock 전략은 Repository/service mock을 폐기하지 않고, 그 위에 시나
 - Storybook missing route: 17개
 - Route inventory only route: 33개
 
-이 숫자는 [tests/mock-scenarios.test.mts](/Users/myknow/coding/ssartnership/tests/mock-scenarios.test.mts)에서 고정합니다. 새 route나 story가 추가되면 coverage matrix 수치를 함께 갱신해야 합니다.
+이 숫자는 [tests/mock-scenarios.test.mts](../../tests/mock-scenarios.test.mts)에서 고정합니다. 새 route나 story가 추가되면 coverage matrix 수치를 함께 갱신해야 합니다.
 
 운영 규칙:
 
@@ -156,7 +163,7 @@ MSW는 다음 조건을 모두 만족할 때만 추가합니다.
 - `PATCH`, `DELETE`, `더보기`, `미리보기`, `저장`처럼 응답에 따라 UI가 변한다.
 - props fixture만으로는 성공/실패/rollback/pending 상태를 재현하기 어렵다.
 
-단순히 route inventory의 `dataSources`에 `api-route`가 있다는 이유만으로 MSW를 넣지 않습니다. 네트워크 상호작용을 실행하지 않는 알림 수신함, 초기 목록, 읽기 전용 상태는 초기 state fixture를 우선합니다. 이 판단은 [src/lib/mock/scenarios/adoption-policy.ts](/Users/myknow/coding/ssartnership/src/lib/mock/scenarios/adoption-policy.ts)의 `getMockScenarioNetworkMockingDecision`으로 고정합니다.
+단순히 route inventory의 `dataSources`에 `api-route`가 있다는 이유만으로 MSW를 넣지 않습니다. 네트워크 상호작용을 실행하지 않는 알림 수신함, 초기 목록, 읽기 전용 상태는 초기 state fixture를 우선합니다. 이 판단은 [src/lib/mock/scenarios/adoption-policy.ts](../../src/lib/mock/scenarios/adoption-policy.ts)의 `getMockScenarioNetworkMockingDecision`으로 고정합니다.
 
 ### 관리자 Page States
 
@@ -216,7 +223,7 @@ MSW는 다음 조건을 모두 만족할 때만 추가합니다.
 
 현재 대응:
 
-- [.storybook/vitest.setup.tsx](/Users/myknow/coding/ssartnership/.storybook/vitest.setup.tsx)에서 `next/image`를 Storybook Vitest용 `img` mock으로 대체
+- [.storybook/vitest.setup.tsx](../../.storybook/vitest.setup.tsx)에서 `next/image`를 Storybook Vitest용 `img` mock으로 대체
 - 이미지 포함 스토리도 `npm run test-storybook`에 포함
 - `manual-image`, `manual-server` 태그는 더 이상 사용하지 않음
 
@@ -227,8 +234,8 @@ MSW는 다음 조건을 모두 만족할 때만 추가합니다.
 
 서버 액션 결합 문제는 해결했습니다.
 
-- [src/components/admin/AdminShell.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminShell.tsx)는 [AdminShellView.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminShellView.tsx) wrapper 구조로 분리
-- [src/components/admin/AdminReviewManager.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminReviewManager.tsx)는 [AdminReviewManagerView.tsx](/Users/myknow/coding/ssartnership/src/components/admin/AdminReviewManagerView.tsx), [AdminReviewCardView.tsx](/Users/myknow/coding/ssartnership/src/components/admin/review-manager/AdminReviewCardView.tsx) 구조로 분리
+- [src/components/admin/AdminShell.tsx](../../src/components/admin/AdminShell.tsx)는 [AdminShellView.tsx](../../src/components/admin/AdminShellView.tsx) wrapper 구조로 분리
+- [src/components/admin/AdminReviewManager.tsx](../../src/components/admin/AdminReviewManager.tsx)는 [AdminReviewManagerView.tsx](../../src/components/admin/AdminReviewManagerView.tsx), [AdminReviewCardView.tsx](../../src/components/admin/review-manager/AdminReviewCardView.tsx) 구조로 분리
 - 따라서 `manual-server` 태그는 더 이상 사용하지 않음
 
 ## 운영 기준

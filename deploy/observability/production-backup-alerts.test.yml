@@ -1,0 +1,55 @@
+rule_files: [production-backup-alerts.yml]
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: ssartnership_production_backup_collected_seconds
+        values: '0+60x10'
+      - series: ssartnership_production_backup_created_seconds
+        values: '0+0x10'
+      - series: ssartnership_production_backup_mac_created_seconds
+        values: '0+0x10'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: ProductionBackupCollectorStale
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: ProductionBackupStale
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: ProductionMacBackupStale
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: ssartnership_production_backup_collected_seconds
+        values: '0+0x10'
+      - series: ssartnership_production_backup_created_seconds
+        values: '0+0x10'
+      - series: ssartnership_production_backup_mac_created_seconds
+        values: '-100000+0x10'
+      - series: ssartnership_production_backup_mac_ack_seconds
+        values: '0+60x10'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: ProductionBackupCollectorStale
+        exp_alerts:
+          - exp_labels: { severity: critical }
+      - eval_time: 8m
+        alertname: ProductionMacBackupStale
+        exp_alerts:
+          - exp_labels: { severity: critical }
+  - interval: 1m
+    input_series: []
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: ProductionBackupCollectorStale
+        exp_alerts:
+          - exp_labels: { severity: critical }
+      - eval_time: 8m
+        alertname: ProductionBackupStale
+        exp_alerts:
+          - exp_labels: { severity: critical }
+      - eval_time: 8m
+        alertname: ProductionMacBackupStale
+        exp_alerts:
+          - exp_labels: { severity: critical }

@@ -1,0 +1,170 @@
+services:
+  db:
+    labels:
+      io.ssartnership.backup-managed: "true"
+    build:
+      context: ./deploy/self-host-operations
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: supabase/postgres:17.6.1.136@sha256:f371b5f3f2ac0a05703f33d6e6134515fb2498cab708fb948a0aeb7481467c00
+    image: ${SELF_HOST_PGBACKREST_IMAGE:-ssartnership/postgres-pgbackrest:17.6.1.136-pgbackrest-2.57.0}
+    environment:
+      PGBACKREST_STANZA: ssartnership
+      PGBACKREST_PG1_PATH: /var/lib/postgresql/data
+      PGBACKREST_PG1_USER: supabase_admin
+      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest/repo
+      PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
+      PGBACKREST_REPO1_CIPHER_PASS: ${PGBACKREST_REPO1_CIPHER_PASS:?set this only in the operations env file}
+      PGBACKREST_REPO1_RETENTION_FULL: "2"
+      PGBACKREST_REPO1_RETENTION_DIFF: "7"
+      PGBACKREST_ARCHIVE_ASYNC: "n"
+      PGBACKREST_ARCHIVE_TIMEOUT: "60"
+      PGBACKREST_START_FAST: "y"
+      PGBACKREST_LOG_LEVEL_CONSOLE: warn
+      PGBACKREST_LOG_LEVEL_FILE: "off"
+    volumes:
+      - pgbackrest-repo:/var/lib/pgbackrest/repo
+    # Compose replaces command arrays: retain the data overlay's SQL privacy
+    # flags along with WAL settings. The upstream entrypoint remains intact.
+    command:
+      - postgres
+      - -D
+      - /etc/postgresql
+      - -c
+      - log_statement=none
+      - -c
+      - log_min_error_statement=panic
+      - -c
+      - log_error_verbosity=terse
+      - -c
+      - log_parameter_max_length_on_error=0
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=pgbackrest --stanza=ssartnership archive-push %p
+      - -c
+      - archive_timeout=60s
+
+  # This service exists only for an isolated drill. The drill project gives it
+  # a new db-data volume while the source repository remains read-only.
+  restore-db:
+    image: ${SELF_HOST_PGBACKREST_IMAGE:-ssartnership/postgres-pgbackrest:17.6.1.136-pgbackrest-2.57.0}
+    profiles: [operations]
+    user: postgres
+    network_mode: none
+    entrypoint: [pgbackrest]
+    environment:
+      PGBACKREST_STANZA: ssartnership
+      PGBACKREST_PG1_PATH: /var/lib/postgresql/data
+      PGBACKREST_PG1_USER: supabase_admin
+      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest/repo
+      PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
+      PGBACKREST_REPO1_CIPHER_PASS: ${PGBACKREST_REPO1_CIPHER_PASS:?set this only in the operations env file}
+      PGBACKREST_LOG_LEVEL_CONSOLE: warn
+      PGBACKREST_LOG_LEVEL_FILE: "off"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - pgbackrest-repo:/var/lib/pgbackrest/repo:ro
+
+  # After the restore, this isolated PostgreSQL process has no network and
+  # explicitly disables WAL archiving. App, Cron, mail, push, and callbacks are
+  # separate services and are intentionally never started for a drill.
+  restore-drill-db:
+    image: ${SELF_HOST_PGBACKREST_IMAGE:-ssartnership/postgres-pgbackrest:17.6.1.136-pgbackrest-2.57.0}
+    profiles: [operations]
+    network_mode: none
+    environment:
+      PGBACKREST_STANZA: ssartnership
+      PGBACKREST_PG1_PATH: /var/lib/postgresql/data
+      PGBACKREST_PG1_USER: supabase_admin
+      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest/repo
+      PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
+      PGBACKREST_REPO1_CIPHER_PASS: ${PGBACKREST_REPO1_CIPHER_PASS:?set this only in the operations env file}
+      PGBACKREST_LOG_LEVEL_CONSOLE: warn
+      PGBACKREST_LOG_LEVEL_FILE: "off"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - pgbackrest-repo:/var/lib/pgbackrest/repo:ro
+    command:
+      - postgres
+      - -D
+      - /etc/postgresql
+      - -c
+      - log_statement=none
+      - -c
+      - log_min_error_statement=panic
+      - -c
+      - log_error_verbosity=terse
+      - -c
+      - log_parameter_max_length_on_error=0
+      - -c
+      - archive_mode=off
+      - -c
+      - archive_command=
+      # Do not launch restored pg_cron/pg_net or other preload workers during
+      # a drill. The source database's extensions and config are unchanged.
+      - -c
+      - shared_preload_libraries=
+
+  restic:
+    image: restic/restic:0.19.1@sha256:136600b6ff6843d61d355f7f71f460a166429f35de6fd11b568fece3c9a4d510
+    profiles: [operations]
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    environment:
+      RESTIC_REPOSITORY: /repository
+      RESTIC_PASSWORD: ${RESTIC_PASSWORD:?set this only in the operations env file}
+      RESTIC_CACHE_DIR: /tmp/restic-cache
+    volumes:
+      # A backup sees Storage read-only. Restore drills attach only their fresh
+      # target volume at a second path via `docker compose run --volume`.
+      - storage-data:/var/lib/storage:ro
+      - restic-repo:/repository
+
+  # A single-use, non-networked helper writes and verifies only synthetic
+  # restore-drill markers below the hidden operations directory. It never
+  # exposes a management endpoint or touches application objects by name.
+  storage-marker:
+    image: restic/restic:0.19.1@sha256:136600b6ff6843d61d355f7f71f460a166429f35de6fd11b568fece3c9a4d510
+    profiles: [operations]
+    restart: "no"
+    network_mode: none
+    entrypoint: ["/bin/sh", "-ec"]
+    volumes:
+      - storage-data:/var/lib/storage
+
+  # Restore reads only the source restic repository and receives the fresh
+  # drill Storage volume explicitly at /restore/var/lib/storage.
+  restore-restic:
+    image: restic/restic:0.19.1@sha256:136600b6ff6843d61d355f7f71f460a166429f35de6fd11b568fece3c9a4d510
+    profiles: [operations]
+    restart: "no"
+    network_mode: none
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+      - /restore:mode=755
+    environment:
+      RESTIC_REPOSITORY: /repository
+      RESTIC_PASSWORD: ${RESTIC_PASSWORD:?set this only in the operations env file}
+      RESTIC_CACHE_DIR: /tmp/restic-cache
+    volumes:
+      - restic-repo:/repository:ro
+
+volumes:
+  # Explicit source-volume names keep the backup repositories stable when a
+  # restore drill uses a different Compose project for its destination data.
+  pgbackrest-repo:
+    name: ${PGBACKREST_REPOSITORY_VOLUME:?run operations init first}
+  restic-repo:
+    name: ${RESTIC_REPOSITORY_VOLUME:?run operations init first}

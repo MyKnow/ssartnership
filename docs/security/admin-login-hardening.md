@@ -1,3 +1,10 @@
+---
+title: 관리자 로그인 보안 강화
+type: security-policy
+status: current
+authority: normative
+---
+
 # 관리자 로그인 보안 강화
 
 Updated: 2026-07-05

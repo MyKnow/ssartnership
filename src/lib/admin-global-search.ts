@@ -1,5 +1,11 @@
+import {
+  ADMIN_SEARCH_QUERY_MAX_LENGTH,
+  getAdminSearchLikePattern,
+  normalizeAdminSearchQuery,
+} from "@/lib/admin-search-query";
+
 export const ADMIN_GLOBAL_SEARCH_MIN_QUERY_LENGTH = 2;
-export const ADMIN_GLOBAL_SEARCH_MAX_QUERY_LENGTH = 80;
+export const ADMIN_GLOBAL_SEARCH_MAX_QUERY_LENGTH = ADMIN_SEARCH_QUERY_MAX_LENGTH;
 
 export type AdminGlobalSearchMember = {
   id: string;
@@ -17,14 +23,7 @@ export type AdminGlobalSearchPartner = {
 };
 
 export function normalizeAdminGlobalSearchQuery(value: unknown) {
-  if (typeof value !== "string") {
-    return "";
-  }
-
-  return value
-    .replace(/\s+/gu, " ")
-    .trim()
-    .slice(0, ADMIN_GLOBAL_SEARCH_MAX_QUERY_LENGTH);
+  return normalizeAdminSearchQuery(value, ADMIN_GLOBAL_SEARCH_MAX_QUERY_LENGTH);
 }
 
 export function buildAdminGlobalSearchHref(value: unknown) {
@@ -43,5 +42,5 @@ export function isAdminGlobalSearchQueryReady(value: unknown) {
 
 export function getAdminGlobalSearchLikePattern(value: unknown) {
   const query = normalizeAdminGlobalSearchQuery(value);
-  return `%${query.replace(/[\\%_]/g, "\\$&")}%`;
+  return getAdminSearchLikePattern(query);
 }

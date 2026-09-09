@@ -1,5 +1,6 @@
 import type { MouseEvent } from "react";
 import Link from "next/link";
+import PartnerCategoryBadge from "@/components/PartnerCategoryBadge";
 import Badge from "@/components/ui/Badge";
 import PartnerValueBadge from "@/components/PartnerValueBadge";
 import { cn } from "@/lib/cn";
@@ -41,8 +42,6 @@ export default function PartnerCardMeta({
         onCategoryClick(partner.category);
       }
     : null;
-  const categoryBadgeClass =
-    "h-9 whitespace-nowrap px-2 py-0.5 text-[12px] font-medium tracking-[0.02em]";
   const categoryBadge = handleCategoryClick ? (
     <button
       type="button"
@@ -50,28 +49,10 @@ export default function PartnerCardMeta({
       className="inline-flex h-11 min-w-11 items-center"
       aria-label={`${categoryLabel ?? "카테고리"} 필터 적용`}
     >
-      <Badge
-        className={
-          badgeStyle
-            ? categoryBadgeClass
-            : `${categoryBadgeClass} bg-surface-muted text-foreground`
-        }
-        style={badgeStyle}
-      >
-        {categoryLabel}
-      </Badge>
+      <PartnerCategoryBadge label={categoryLabel} style={badgeStyle} />
     </button>
   ) : (
-    <Badge
-      className={
-        badgeStyle
-          ? categoryBadgeClass
-          : `${categoryBadgeClass} bg-surface-muted text-foreground`
-      }
-      style={badgeStyle}
-    >
-      {categoryLabel}
-    </Badge>
+    <PartnerCategoryBadge label={categoryLabel} style={badgeStyle} />
   );
   const serviceMode = getPartnerServiceMode(partner.location);
   const isOnlineService = serviceMode === "online";

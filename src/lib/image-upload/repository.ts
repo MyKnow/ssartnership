@@ -88,6 +88,7 @@ export type SignImageUploadInput = {
   actor: ImageUploadActor;
   purpose: ImageUploadPurpose;
   uploads: ImageUploadSignRequest[];
+  quotaIdentifiers: string[];
   now?: Date;
 };
 

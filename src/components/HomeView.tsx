@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   useCallback,
   startTransition,
@@ -47,7 +47,7 @@ export default function HomeView({
   currentUserId,
   partnerPopularityById,
   partnerFavoriteStateById,
-  loadedPartnerStateIds,
+  loadedFavoritePartnerIds,
 }: {
   categories: Category[];
   partners: Partner[];
@@ -55,10 +55,9 @@ export default function HomeView({
   currentUserId: string | null;
   partnerPopularityById?: Record<string, PartnerPopularityMetrics | undefined>;
   partnerFavoriteStateById?: Record<string, boolean | undefined>;
-  loadedPartnerStateIds?: string[];
+  loadedFavoritePartnerIds?: string[];
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const categoryKeys = useMemo(
     () => categories.map((category) => category.key),
@@ -86,8 +85,8 @@ export default function HomeView({
   const [localFavoriteStateById, setLocalFavoriteStateById] = useState<
     Record<string, boolean | undefined>
   >(partnerFavoriteStateById ?? {});
-  const [loadedPartnerStateIdSet, setLoadedPartnerStateIdSet] = useState(
-    () => new Set(loadedPartnerStateIds ?? []),
+  const [loadedFavoritePartnerIdSet, setLoadedFavoritePartnerIdSet] = useState(
+    () => new Set(loadedFavoritePartnerIds ?? []),
   );
   const deferredSearchValue = useDeferredValue(searchValue);
   const searchTimeoutRef = useRef<number | null>(null);
@@ -115,12 +114,12 @@ export default function HomeView({
         : `${pathname}#benefits`;
 
       if (historyMode === "push") {
-        router.push(nextUrl);
+        window.history.pushState(null, "", nextUrl);
       } else {
         window.history.replaceState(null, "", nextUrl);
       }
     },
-    [categoryKeys, pathname, router],
+    [categoryKeys, pathname],
   );
 
   const commitSearchValue = useCallback(
@@ -254,8 +253,12 @@ export default function HomeView({
   }, []);
 
   useEffect(() => {
+    if (!currentUserId) {
+      return;
+    }
+
     const missingPartnerIds = displayPartnerIds.filter(
-      (partnerId) => !loadedPartnerStateIdSet.has(partnerId),
+      (partnerId) => !loadedFavoritePartnerIdSet.has(partnerId),
     );
     if (missingPartnerIds.length === 0) {
       return;
@@ -266,6 +269,8 @@ export default function HomeView({
     for (const partnerId of missingPartnerIds) {
       params.append("id", partnerId);
     }
+    params.set("includeFavorites", "1");
+    params.set("includePopularity", "0");
 
     fetch(`/api/partners/home-state?${params.toString()}`, {
       credentials: "same-origin",
@@ -276,26 +281,18 @@ export default function HomeView({
           throw new Error("home_state_failed");
         }
         return (await response.json()) as {
-          loadedPartnerIds?: string[];
+          loadedFavoritePartnerIds?: string[];
           partnerFavoriteStateById?: Record<string, boolean | undefined>;
-          partnerPopularityById?: Record<
-            string,
-            PartnerPopularityMetrics | undefined
-          >;
         };
       })
       .then((state) => {
-        setLocalPopularityById((current) => ({
-          ...current,
-          ...(state.partnerPopularityById ?? {}),
-        }));
         setLocalFavoriteStateById((current) => ({
           ...current,
           ...(state.partnerFavoriteStateById ?? {}),
         }));
-        setLoadedPartnerStateIdSet((current) => {
+        setLoadedFavoritePartnerIdSet((current) => {
           const next = new Set(current);
-          for (const partnerId of state.loadedPartnerIds ?? []) {
+          for (const partnerId of state.loadedFavoritePartnerIds ?? []) {
             next.add(partnerId);
           }
           return next;
@@ -309,7 +306,7 @@ export default function HomeView({
       });
 
     return () => abortController.abort();
-  }, [displayPartnerIds, loadedPartnerStateIdSet]);
+  }, [currentUserId, displayPartnerIds, loadedFavoritePartnerIdSet]);
 
   useEffect(() => {
     if (searchTimeoutRef.current) {

@@ -10,7 +10,12 @@ import {
   isGraduateVerificationBlocked,
   recordGraduateVerificationAttempt,
 } from "@/lib/graduate-verification-rate-limit";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 import { withServerTiming } from "@/lib/server-timing";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -38,15 +43,42 @@ export async function POST(
       route: "admin-member-profile-photo-submit" as const,
       accountIdentifier: session.adminId,
     };
-    if (await timing.measure("query", () => isGraduateVerificationBlocked(rateLimitContext))) {
+    const blockingState = await timing.measure("query", () =>
+      isGraduateVerificationBlocked(rateLimitContext),
+    );
+    if (!blockingState.ok) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "사진 변경 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        },
+        { status: 503 },
+      );
+    }
+    if (blockingState.blocked) {
       return NextResponse.json({ ok: false, message: "사진 변경 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
     }
 
     const { id: memberId } = await context.params;
-    const body = await request.json().catch(() => null) as {
-      uploadId?: unknown;
-      uploadSource?: unknown;
-    } | null;
+    let body: { uploadId?: unknown; uploadSource?: unknown } | null;
+    try {
+      body = await readRouteJsonBodyWithinLimit<{
+        uploadId?: unknown;
+        uploadSource?: unknown;
+      } | null>(request, {
+        maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+        invalidMessage: "사진 업로드를 확인해 주세요.",
+      });
+    } catch (error) {
+      if (error instanceof RouteJsonBodyError) {
+        await recordGraduateVerificationAttempt({ ...rateLimitContext, success: false });
+        return NextResponse.json(
+          { ok: false, message: error.message },
+          { status: error.status },
+        );
+      }
+      throw error;
+    }
     const uploadId = typeof body?.uploadId === "string" ? body.uploadId.trim() : "";
     if (
       !UUID_PATTERN.test(memberId)

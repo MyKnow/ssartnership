@@ -1,0 +1,10 @@
+[Unit]
+Description=SSAFY Partnership backup repository integrity check
+Wants=network-online.target
+After=network-online.target
+OnFailure=ssartnership-operations-failure@%n.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/services/ssartnership
+ExecStart=/usr/bin/node -- scripts/self-host-operations/cli.mjs check --env-file /etc/myknow/secrets/ssartnership/data.env --operations-env-file /etc/myknow/secrets/ssartnership/operations.env

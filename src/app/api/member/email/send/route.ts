@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
+import { getRequestLogContext } from "@/lib/activity-logs";
 import { isE2eMockMutationEnabled } from "@/lib/e2e-mutation-mode";
 import { sendMemberEmailVerificationCode } from "@/lib/member-email";
 import {
-  deleteMemberEmailVerificationChallenge,
-  markMemberEmailVerificationChallengeSent,
-  reserveMemberEmailVerificationChallenge,
+  issueMemberEmailChallenge,
+  MemberEmailChallengeIssueError,
 } from "@/lib/member-email-verification-challenge";
 import {
   generateMemberEmailVerificationCode,
@@ -20,9 +19,15 @@ import {
 } from "@/lib/member-email-rate-limit";
 import { hasReservedMemberIdentifier } from "@/lib/member-identifier-reservations";
 import { normalizeMemberEmail } from "@/lib/member-domain";
+import { logMemberEmailSecurity } from "@/lib/member-email-security-log";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { getSignedUserSession } from "@/lib/user-auth";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 
 export const runtime = "nodejs";
 
@@ -47,9 +52,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = (await request.json().catch(() => null)) as {
+  let body: {
     email?: unknown;
-  } | null;
+  } | null = null;
+  try {
+    body = await readRouteJsonBodyWithinLimit<{ email?: unknown }>(request, {
+      maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+      invalidMessage: "이메일 주소를 확인해 주세요.",
+      tooLargeMessage: "요청 본문이 너무 큽니다.",
+    });
+  } catch (error) {
+    if (error instanceof RouteJsonBodyError && error.code === "body_too_large") {
+      return NextResponse.json(
+        { ok: false, message: error.message },
+        { status: error.status },
+      );
+    }
+  }
   const email = normalizeMemberEmail(body?.email);
   if (!email) {
     return NextResponse.json(
@@ -62,14 +81,32 @@ export async function POST(request: Request) {
     ipAddress: context.ipAddress ?? null,
     accountIdentifier: hashMemberEmailIdentifier(email),
   };
-  if (await getMemberEmailVerificationBlockingState("send", rateLimitContext)) {
-    await logAuthSecurity({
-      ...context,
-      eventName: "member_email_verification",
-      status: "blocked",
-      actorType: "member",
+  const blockingState = await getMemberEmailVerificationBlockingState("send", rateLimitContext);
+  if (!blockingState.ok) {
+    await logMemberEmailSecurity({
+      context,
+      flow: "verification",
+      stage: "send",
+      status: "failure",
       actorId: session.userId,
-      properties: { stage: "send", reason: "rate_limit" },
+      reason: blockingState.code,
+    });
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "인증 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
+  }
+  if (blockingState.blocked) {
+    await logMemberEmailSecurity({
+      context,
+      flow: "verification",
+      stage: "send",
+      status: "blocked",
+      actorId: session.userId,
+      reason: "rate_limit",
     });
     return NextResponse.json(
       { ok: false, message: "인증 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." },
@@ -131,23 +168,43 @@ export async function POST(request: Request) {
   const resendAvailableAt = new Date(
     issuedAt + MEMBER_EMAIL_RESEND_COOLDOWN_SECONDS * 1_000,
   ).toISOString();
-  let challengeId: string;
+  let reservation;
   try {
-    const reservation = await reserveMemberEmailVerificationChallenge({
-      memberId: session.userId,
-      emailNormalized: email,
-      codeHash: hashMemberEmailVerificationCode(email, code),
-      expiresAt,
-      resendAvailableAt,
-    });
+    reservation = await issueMemberEmailChallenge(
+      {
+        memberId: session.userId,
+        emailNormalized: email,
+        codeHash: hashMemberEmailVerificationCode(email, code),
+        expiresAt,
+        resendAvailableAt,
+      },
+      {
+        beforeDelivery: async () => {
+          // A successful send intentionally counts toward the resend cap.
+          const attemptRecord = await recordMemberEmailVerificationAttempt(
+            "send",
+            rateLimitContext,
+            false,
+          );
+          if (!attemptRecord.ok) {
+            throw new Error(attemptRecord.code);
+          }
+        },
+        deliver: async () => {
+          if (!isE2eMockMutationEnabled()) {
+            await sendMemberEmailVerificationCode({ to: email, code });
+          }
+        },
+      },
+    );
     if (!reservation.accepted) {
-      await logAuthSecurity({
-        ...context,
-        eventName: "member_email_verification",
+      await logMemberEmailSecurity({
+        context,
+        flow: "verification",
+        stage: "send",
         status: "blocked",
-        actorType: "member",
         actorId: session.userId,
-        properties: { stage: "send", reason: "resend_cooldown" },
+        reason: "resend_cooldown",
       });
       return NextResponse.json(
         {
@@ -164,56 +221,40 @@ export async function POST(request: Request) {
         },
       );
     }
-    challengeId = reservation.challengeId;
-  } catch {
+  } catch (error) {
+    const deliveryFailed = error instanceof MemberEmailChallengeIssueError;
+    await logMemberEmailSecurity({
+      context,
+      flow: "verification",
+      stage: "send",
+      status: "failure",
+      actorId: session.userId,
+      reason: deliveryFailed ? "delivery_failed" : "reservation_failed",
+    });
     return NextResponse.json(
       {
         ok: false,
-        message: "인증 요청을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        message: deliveryFailed
+          ? "인증 코드를 보내지 못했습니다. 잠시 후 다시 시도해 주세요."
+          : "인증 요청을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.",
       },
       { status: 503 },
     );
   }
 
-  // A successful send intentionally counts toward the resend cap.
-  await recordMemberEmailVerificationAttempt("send", rateLimitContext, false);
-  try {
-    if (!isE2eMockMutationEnabled()) {
-      await sendMemberEmailVerificationCode({ to: email, code });
-    }
-    await markMemberEmailVerificationChallengeSent(challengeId);
-    await logAuthSecurity({
-      ...context,
-      eventName: "member_email_verification",
-      status: "success",
-      actorType: "member",
-      actorId: session.userId,
-      properties: { stage: "send" },
-    });
-    return NextResponse.json({
-      ok: true,
-      expiresAt,
-      expiresInSeconds: MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS,
-      resendAvailableAt,
-      resendAvailableInSeconds: MEMBER_EMAIL_RESEND_COOLDOWN_SECONDS,
-      ...(isE2eMockMutationEnabled() ? { testCode: code } : {}),
-    });
-  } catch {
-    await deleteMemberEmailVerificationChallenge(challengeId).catch(() => {});
-    await logAuthSecurity({
-      ...context,
-      eventName: "member_email_verification",
-      status: "failure",
-      actorType: "member",
-      actorId: session.userId,
-      properties: { stage: "send", reason: "delivery_failed" },
-    });
-    return NextResponse.json(
-      {
-        ok: false,
-        message: "인증 코드를 보내지 못했습니다. 잠시 후 다시 시도해 주세요.",
-      },
-      { status: 503 },
-    );
-  }
+  await logMemberEmailSecurity({
+    context,
+    flow: "verification",
+    stage: "send",
+    status: "success",
+    actorId: session.userId,
+  });
+  return NextResponse.json({
+    ok: true,
+    expiresAt,
+    expiresInSeconds: MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS,
+    resendAvailableAt,
+    resendAvailableInSeconds: MEMBER_EMAIL_RESEND_COOLDOWN_SECONDS,
+    ...(isE2eMockMutationEnabled() ? { testCode: code } : {}),
+  });
 }

@@ -1,7 +1,4 @@
-import {
-  authenticateMockPartnerPortalLogin,
-  requestMockPartnerPortalPasswordReset,
-} from "./mock/partner-portal.ts";
+import { cache } from "react";
 import type {
   PartnerPortalLoginResult,
   PartnerPortalPasswordChangeResult,
@@ -14,28 +11,14 @@ import {
   PartnerPortalSetupError,
   type PartnerPortalSetupErrorCode,
 } from "./partner-portal-errors.ts";
-import { isPartnerPortalMock } from "./partner-portal.ts";
-import {
-  changeMockPartnerPortalPassword as changeMockPassword,
-} from "./mock/partner-portal.ts";
 import { activePartnerPortalRepository } from "./partner-auth/repository.ts";
-import {
-  authenticateSupabasePartnerPortalLogin,
-  changeSupabasePartnerPortalPassword,
-  completeSupabasePartnerPortalInitialSetup,
-  getSupabasePartnerPortalSetupContext,
-  requestSupabasePartnerPortalPasswordReset,
-} from "./partner-auth/supabase.ts";
 
 export { listPartnerPortalDemoSetups } from "./partner-auth/repository.ts";
 
 export async function requestPartnerPortalPasswordReset(
   email: string,
 ): Promise<PartnerPortalPasswordResetResult> {
-  if (isPartnerPortalMock) {
-    return requestMockPartnerPortalPasswordReset(email);
-  }
-  return requestSupabasePartnerPortalPasswordReset(email);
+  return activePartnerPortalRepository.requestPasswordReset(email);
 }
 
 export async function changePartnerPortalPassword(input: {
@@ -43,20 +26,14 @@ export async function changePartnerPortalPassword(input: {
   currentPassword: string;
   nextPassword: string;
 }): Promise<PartnerPortalPasswordChangeResult> {
-  if (isPartnerPortalMock) {
-    return changeMockPassword(input);
-  }
-  return changeSupabasePartnerPortalPassword(input);
+  return activePartnerPortalRepository.changePassword(input);
 }
 
 export async function authenticatePartnerPortalLogin(
   loginId: string,
   password: string,
 ): Promise<PartnerPortalLoginResult> {
-  if (isPartnerPortalMock) {
-    return authenticateMockPartnerPortalLogin(loginId, password);
-  }
-  return authenticateSupabasePartnerPortalLogin(loginId, password);
+  return activePartnerPortalRepository.authenticateLogin(loginId, password);
 }
 
 export function isPartnerPortalSetupError(
@@ -65,22 +42,20 @@ export function isPartnerPortalSetupError(
   return error instanceof PartnerPortalSetupError;
 }
 
+const getCachedPartnerPortalSetupContext = cache(async (token: string) =>
+  activePartnerPortalRepository.getSetupContext(token),
+);
+
 export async function getPartnerPortalSetupContext(
   token: string,
 ): Promise<PartnerPortalSetupContext | null> {
-  if (isPartnerPortalMock) {
-    return activePartnerPortalRepository.getSetupContext(token);
-  }
-  return getSupabasePartnerPortalSetupContext(token);
+  return getCachedPartnerPortalSetupContext(token);
 }
 
 export async function completePartnerPortalInitialSetup(
   input: PartnerPortalSetupInput,
 ): Promise<PartnerPortalSetupResult> {
-  if (isPartnerPortalMock) {
-    return activePartnerPortalRepository.completeInitialSetup(input);
-  }
-  return completeSupabasePartnerPortalInitialSetup(input);
+  return activePartnerPortalRepository.completeInitialSetup(input);
 }
 
 export function getPartnerPortalSetupErrorStatus(

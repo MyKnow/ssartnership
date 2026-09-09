@@ -19,68 +19,15 @@ import {
   createReviewEntry,
   sortEntries,
 } from "@/lib/partner-notifications-operation";
+import {
+  listPartnerStoredNotifications,
+  type StoredPartnerNotificationRow,
+} from "@/lib/partner-notification-store";
+import type {
+  PartnerNotificationCenterData,
+  PartnerNotificationEntry,
+} from "@/lib/partner-notification-contract";
 import { getPartnerScopedHrefFromLegacyTarget } from "@/lib/partner-portal-paths";
-
-export type PartnerNotificationCategory = "request" | "review" | "operation" | "plan";
-
-export const PARTNER_NOTIFICATION_CENTER_SCOPE_LABEL =
-  "요약과 필터 결과는 현재 화면에 불러온 최근 알림 기준입니다. 운영 데이터는 저장 알림 최근 30건, 변경 요청/리뷰/운영 로그 최근 20건(계정 로그 10건)을 합산합니다.";
-
-export type PartnerNotificationTone =
-  | "neutral"
-  | "primary"
-  | "success"
-  | "warning"
-  | "danger";
-
-export type PartnerNotificationStatus =
-  | "pending"
-  | "approved"
-  | "rejected"
-  | "cancelled"
-  | "created"
-  | "updated"
-  | "deleted"
-  | "hidden"
-  | "restored"
-  | "granted"
-  | "notified";
-
-export type PartnerNotificationEntry = {
-  id: string;
-  notificationId?: string | null;
-  readAt?: string | null;
-  isUnread?: boolean;
-  category: PartnerNotificationCategory;
-  status: PartnerNotificationStatus;
-  tone: PartnerNotificationTone;
-  badgeLabel: string;
-  title: string;
-  body: string;
-  companyId: string | null;
-  companyName: string;
-  partnerId: string | null;
-  partnerName: string | null;
-  href: string | null;
-  createdAt: string;
-};
-
-export type PartnerNotificationCenterSummary = {
-  totalCount: number;
-  requestCount: number;
-  pendingRequestCount: number;
-  resolvedRequestCount: number;
-  reviewCount: number;
-  operationCount: number;
-  companyCount: number;
-  serviceCount: number;
-};
-
-export type PartnerNotificationCenterData = {
-  summary: PartnerNotificationCenterSummary;
-  items: PartnerNotificationEntry[];
-  warningMessage: string | null;
-};
 
 type PartnerCompanyRow = {
   id: string;
@@ -160,32 +107,6 @@ type PartnerAuditLogRow = {
   created_at: string;
 };
 
-type StoredPartnerNotificationRow = {
-  id: string;
-  read_at: string | null;
-  created_at: string;
-  notification?:
-    | {
-        id: string;
-        type: string;
-        title: string;
-        body: string;
-        target_url: string;
-        company_id: string | null;
-        created_at: string;
-      }
-    | {
-        id: string;
-        type: string;
-        title: string;
-        body: string;
-        target_url: string;
-        company_id: string | null;
-        created_at: string;
-      }[]
-    | null;
-};
-
 function normalizeIds(ids: string[]) {
   return [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
 }
@@ -232,36 +153,101 @@ function createStoredNotificationEntry(
   };
 }
 
+async function loadStoredNotificationEntries(
+  accountId: string | null | undefined,
+  companyMap: Map<string, PartnerCompanyRow>,
+) {
+  if (!accountId) {
+    return { items: [] as PartnerNotificationEntry[], error: null as unknown };
+  }
+
+  const result = await listPartnerStoredNotifications({ accountId, limit: 30 }).then(
+    (value) => ({ rows: value.items, error: null as unknown }),
+    (error: unknown) => ({ rows: [] as StoredPartnerNotificationRow[], error }),
+  );
+  return {
+    items: result.rows
+      .map((row) => createStoredNotificationEntry(row, companyMap))
+      .filter((item): item is PartnerNotificationEntry => Boolean(item)),
+    error: result.error,
+  };
+}
+
 
 async function queryAuditLogs(params: {
   supabase: ReturnType<typeof getSupabaseAdminClient>;
   targetType: string;
   actions: string[];
   targetIds?: string[];
+  propertiesContains?: Record<string, string>;
   limit?: number;
 }) {
-  const query = params.targetIds && params.targetIds.length > 0
-    ? params.supabase
-        .from("admin_audit_logs")
-        .select("id,action,target_type,target_id,properties,created_at")
-        .eq("target_type", params.targetType)
-        .in("action", params.actions)
-        .in("target_id", params.targetIds)
-        .order("created_at", { ascending: false })
-        .limit(params.limit ?? 20)
-    : params.supabase
-        .from("admin_audit_logs")
-        .select("id,action,target_type,target_id,properties,created_at")
-        .eq("target_type", params.targetType)
-        .in("action", params.actions)
-        .order("created_at", { ascending: false })
-        .limit(params.limit ?? 20);
+  let query = params.supabase
+    .from("admin_audit_logs")
+    .select("id,action,target_type,target_id,properties,created_at")
+    .eq("target_type", params.targetType)
+    .in("action", params.actions);
+
+  if (params.targetIds && params.targetIds.length > 0) {
+    query = query.in("target_id", params.targetIds);
+  }
+
+  if (params.propertiesContains) {
+    query = query.contains("properties", params.propertiesContains);
+  }
+
+  query = query.order("created_at", { ascending: false }).limit(params.limit ?? 20);
 
   const { data, error } = await query;
   return {
     rows: (data ?? []) as PartnerAuditLogRow[],
     error: error ? error.message : null,
   };
+}
+
+async function queryPartnerAccountCompanyAuditLogs(params: {
+  supabase: ReturnType<typeof getSupabaseAdminClient>;
+  companyIds: string[];
+  accountId?: string | null;
+  limit?: number;
+}) {
+  const scopedCompanyIds = normalizeIds(params.companyIds);
+  if (scopedCompanyIds.length === 0) {
+    return { rows: [] as PartnerAuditLogRow[], error: null as string | null };
+  }
+
+  const results = await Promise.all(
+    scopedCompanyIds.map((companyId) =>
+      queryAuditLogs({
+        supabase: params.supabase,
+        targetType: "partner_account_company",
+        actions: ["partner_account_company_update"],
+        propertiesContains: params.accountId
+          ? { accountId: params.accountId, companyId }
+          : { companyId },
+        limit: params.limit ?? 20,
+      }),
+    ),
+  );
+
+  const error = results.find((result) => result.error)?.error ?? null;
+  const dedupedRows = new Map<string, PartnerAuditLogRow>();
+  for (const result of results) {
+    for (const row of result.rows) {
+      dedupedRows.set(row.id, row);
+    }
+  }
+
+  const rows = [...dedupedRows.values()]
+    .sort((left, right) => {
+      if (left.created_at === right.created_at) {
+        return right.id.localeCompare(left.id);
+      }
+      return right.created_at.localeCompare(left.created_at);
+    })
+    .slice(0, params.limit ?? 20);
+
+  return { rows, error };
 }
 
 async function loadSupabasePartnerNotificationCenter(
@@ -418,10 +404,10 @@ async function loadSupabasePartnerNotificationCenter(
             limit: 10,
           })
         : Promise.resolve({ rows: [] as PartnerAuditLogRow[], error: null as string | null }),
-      queryAuditLogs({
+      queryPartnerAccountCompanyAuditLogs({
         supabase,
-        targetType: "partner_account_company",
-        actions: ["partner_account_company_update"],
+        companyIds,
+        accountId,
         limit: 20,
       }),
     ]);
@@ -537,31 +523,25 @@ async function loadSupabasePartnerNotificationCenter(
       }),
   ].filter((item): item is PartnerNotificationEntry => Boolean(item));
 
-  const storedNotificationResult = accountId
-    ? await supabase
-        .from("partner_notification_recipients")
-        .select(
-          "id,read_at,created_at,notification:partner_notifications(id,type,title,body,target_url,company_id,created_at)",
-        )
-        .eq("account_id", accountId)
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
-        .limit(30)
-    : { data: [], error: null as null | { message: string } };
+  const storedNotificationResult = await loadStoredNotificationEntries(
+    accountId,
+    companyMap,
+  );
 
   if (storedNotificationResult.error) {
     markPartialFailure();
     console.error(
       "[partner-notifications] stored notification query failed",
-      storedNotificationResult.error.message,
+      storedNotificationResult.error,
     );
   }
 
-  const storedItems = ((storedNotificationResult.data ?? []) as StoredPartnerNotificationRow[])
-    .map((row) => createStoredNotificationEntry(row, companyMap))
-    .filter((item): item is PartnerNotificationEntry => Boolean(item));
-
-  const items = sortEntries([...storedItems, ...requestItems, ...reviewItems, ...operationItems]);
+  const items = sortEntries([
+    ...storedNotificationResult.items,
+    ...requestItems,
+    ...reviewItems,
+    ...operationItems,
+  ]);
   return {
     summary: buildSummary(items, companies.length, services.length),
     items,
@@ -623,30 +603,22 @@ async function loadMockPartnerNotificationCenter(
     )
   ).flat();
 
-  const operationItems: PartnerNotificationEntry[] = [];
-  if (accountId) {
-    operationItems.push({
-      id: `mock-account:${accountId}`,
-      category: "operation",
-      status: "updated",
-      tone: "primary",
-      badgeLabel: "계정",
-      title: "파트너사 계정 정보가 수정되었습니다",
-      body: "Mock 환경에서는 계정 관련 운영 알림이 제한적으로 표시됩니다.",
-      companyId: null,
-      companyName: "파트너사 계정",
-      partnerId: null,
-      partnerName: null,
-      href: "/partner",
-      createdAt: new Date().toISOString(),
-    });
-  }
+  const storedNotificationResult = await loadStoredNotificationEntries(
+    accountId,
+    companyMap,
+  );
 
-  const items = sortEntries([...requestItems, ...reviewItems, ...operationItems]);
+  const items = sortEntries([
+    ...storedNotificationResult.items,
+    ...requestItems,
+    ...reviewItems,
+  ]);
   return {
     summary: buildSummary(items, companyMap.size, serviceMap.size),
     items,
-    warningMessage: null,
+    warningMessage: storedNotificationResult.error
+      ? "일부 알림을 불러오지 못했습니다. 새로고침하면 최신 상태로 다시 시도합니다."
+      : null,
   };
 }
 

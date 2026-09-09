@@ -4,7 +4,12 @@ import { canAdmin } from "@/lib/admin-permissions";
 import { getAdminSession } from "@/lib/auth";
 import { MANUAL_MEMBER_IMPORT_LIMITS } from "@/lib/member-manual-import/shared";
 import { reissueManualMemberImportSetup } from "@/lib/member-manual-import/service.server";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 import { withServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
@@ -30,7 +35,21 @@ export async function POST(
       return NextResponse.json({ message: "회원 수정 권한이 필요합니다." }, { status: 403 });
     }
 
-    const body = await request.json().catch(() => null) as { confirmed?: unknown } | null;
+    let body: { confirmed?: unknown } | null;
+    try {
+      body = await readRouteJsonBodyWithinLimit<{ confirmed?: unknown } | null>(
+        request,
+        {
+          maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          invalidMessage: "새 초기 설정 링크 발급 확인이 필요합니다.",
+        },
+      );
+    } catch (error) {
+      if (error instanceof RouteJsonBodyError) {
+        return NextResponse.json({ message: error.message }, { status: error.status });
+      }
+      throw error;
+    }
     if (body?.confirmed !== true) {
       return NextResponse.json({ message: "새 초기 설정 링크 발급 확인이 필요합니다." }, { status: 400 });
     }

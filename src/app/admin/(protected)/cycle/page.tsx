@@ -21,7 +21,7 @@ import { adminActionErrorMessages } from "@/lib/admin-action-errors";
 import { canManageMattermostSenders } from "@/lib/mattermost-senders/access";
 import { canAdmin } from "@/lib/admin-permissions";
 import { mattermostSenderRepository } from "@/lib/mattermost-senders/repository";
-import { listCohortCardThemes } from "@/lib/cohort-card-themes";
+import { listCohortCardThemes } from "@/lib/cohort-card-themes.server";
 import {
   getSsafyCycleOverview,
   getSsafyCycleSettings,

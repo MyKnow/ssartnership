@@ -3,6 +3,10 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import PartnerSetupForm from "@/components/partner/PartnerSetupForm";
 import type { AwaitedPartnerSetupContext } from "@/app/partner/setup/[token]/_page/types";
+import {
+  getPartnerVisibilityBadgeClass,
+  getPartnerVisibilityLabel,
+} from "@/lib/partner-visibility";
 
 export default function PartnerSetupCompanySection({
   context,
@@ -40,8 +44,9 @@ export function PartnerSetupFormPanel({
                 이미 초기 설정이 완료되었습니다
               </h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                이 링크에서는 더 설정할 내용이 없습니다.<br />파트너사 포털 로그인으로
-                이동해 바로 사용하면 됩니다.
+                이 링크에서는 더 설정할 내용이 없습니다.
+                <br />
+                파트너사 포털 로그인으로 이동해 바로 사용하면 됩니다.
               </p>
             </div>
           </div>
@@ -129,22 +134,10 @@ export function PartnerSetupCompanyCard({
                 <p className="min-w-0 truncate font-semibold text-foreground">
                   {service.name}
                 </p>
-                <Badge
-                  className={
-                    service.visibility === "public"
-                      ? "bg-primary/10 text-primary"
-                      : service.visibility === "confidential"
-                        ? "bg-amber-500/10 text-amber-600"
-                        : "bg-slate-500/10 text-slate-600"
-                  }
-                >
-                  {service.visibility === "public"
-                    ? "공개"
-                    : service.visibility === "confidential"
-                      ? "검토용"
-                  : "비공개"}
-              </Badge>
-            </div>
+                <Badge className={getPartnerVisibilityBadgeClass(service.visibility)}>
+                  {getPartnerVisibilityLabel(service.visibility)}
+                </Badge>
+              </div>
               <dl className="mt-3 space-y-2 text-sm">
                 <div>
                   <dt className="text-xs font-medium text-muted-foreground">

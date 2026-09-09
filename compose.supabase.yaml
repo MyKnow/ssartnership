@@ -1,0 +1,137 @@
+services:
+  db:
+    image: supabase/postgres:17.6.1.136@sha256:f371b5f3f2ac0a05703f33d6e6134515fb2498cab708fb948a0aeb7481467c00
+    restart: unless-stopped
+    # Apply before the upstream entrypoint starts its temporary init server.
+    # DDL and failed SQL can contain passwords; keep ERROR severity intact.
+    command:
+      - postgres
+      - -D
+      - /etc/postgresql
+      - -c
+      - log_statement=none
+      - -c
+      - log_min_error_statement=panic
+      - -c
+      - log_error_verbosity=terse
+      - -c
+      - log_parameter_max_length_on_error=0
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: supabase_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?self-host database environment is required}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?self-host database environment is required}
+      PGDATABASE: postgres
+      PGPORT: "5432"
+      POSTGRES_PORT: "5432"
+      POSTGRES_HOST: /var/run/postgresql
+      JWT_SECRET: ${JWT_SECRET:?self-host database environment is required}
+      JWT_EXP: "3600"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./deploy/supabase/init/99-local-credentials.sql:/docker-entrypoint-initdb.d/init-scripts/99-local-credentials.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "supabase_admin", "-d", "postgres", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+  rest:
+    image: postgrest/postgrest:v14.12@sha256:54000f24847d01a2c2302e0041cf0618b875c57fb48507d743cfa9aaa50bf43c
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      PGRST_DB_URI: postgresql://authenticator:${POSTGRES_PASSWORD:?self-host database environment is required}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_EXTRA_SEARCH_PATH: public,extensions
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET:?self-host database environment is required}
+      PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET:?self-host database environment is required}
+      PGRST_APP_SETTINGS_JWT_EXP: "3600"
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_ADMIN_SERVER_HOST: localhost
+      PGRST_ADMIN_SERVER_PORT: "3001"
+    healthcheck:
+      test: ["CMD", "postgrest", "--ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+  storage:
+    image: supabase/storage-api:v1.73.1@sha256:c24fb33cc2fa38d0f9582a30312907fc56da333fb9ba0646833186197e4982f3
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+      rest: { condition: service_healthy }
+    environment:
+      ANON_KEY: ${SUPABASE_ANON_KEY:?self-host database environment is required}
+      SERVICE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?self-host database environment is required}
+      AUTH_JWT_SECRET: ${JWT_SECRET:?self-host database environment is required}
+      POSTGREST_URL: http://rest:3000
+      DATABASE_URL: postgresql://supabase_storage_admin:${POSTGRES_PASSWORD:?self-host database environment is required}@db:5432/postgres
+      STORAGE_PUBLIC_URL: ${SUPABASE_URL:?self-host database environment is required}
+      REQUEST_ALLOW_X_FORWARDED_PATH: "true"
+      FILE_SIZE_LIMIT: "52428800"
+      STORAGE_BACKEND: file
+      GLOBAL_S3_BUCKET: stub
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: local
+      ENABLE_IMAGE_TRANSFORMATION: "false"
+      # Preserve the reviewed Cloud migration history; never silently rewrite
+      # a hash mismatch while starting an imported database.
+      DB_ALLOW_MIGRATION_REFRESH: "false"
+      # Routine request URLs contain private object names. Keep warnings and
+      # errors without retaining every successful Storage access path.
+      LOG_LEVEL: warn
+    volumes:
+      - storage-data:/var/lib/storage
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://storage:5000/status"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+  gateway:
+    image: kong/kong:3.9.3@sha256:9a2ae6699a2ce0d60592eb176555d3594a22782c20cc6557a61ff3a7e8b559a3
+    restart: unless-stopped
+    networks: [default, edge]
+    depends_on:
+      rest: { condition: service_healthy }
+      storage: { condition: service_healthy }
+    ports:
+      - "127.0.0.1:${SUPABASE_GATEWAY_PORT:-58000}:8000"
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/kong.yml
+      KONG_ROUTER_FLAVOR: expressions
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_DNS_NOT_FOUND_TTL: "1"
+      KONG_DNS_VALID_TTL: "5"
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,post-function
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      # Signed Storage query tokens must not appear in access logs.
+      KONG_PROXY_ACCESS_LOG: "off"
+      KONG_NGINX_WORKER_PROCESSES: "2"
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:?self-host database environment is required}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?self-host database environment is required}
+    volumes:
+      - ./deploy/supabase/kong/kong.template.yml:/home/kong/kong.template.yml:ro
+      - ./deploy/supabase/kong/entrypoint.sh:/home/kong/entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/home/kong/entrypoint.sh"]
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+volumes:
+  db-data:
+  storage-data:
+networks:
+  edge:
+  default:
+    name: ${COMPOSE_PROJECT_NAME:?self-host database environment is required}_private
+    internal: true

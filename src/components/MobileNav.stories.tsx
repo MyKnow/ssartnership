@@ -1,11 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, waitFor, within } from "storybook/test";
-import MobileNav from "./MobileNav";
+import { MobileNavSurface } from "./MobileNav";
 import MobileNavGuestGate from "./MobileNavGuestGate";
 
 const meta = {
   title: "Domains/MobileNav",
-  component: MobileNav,
+  component: MobileNavSurface,
   parameters: {
     viewport: {
       defaultViewport: "mobile1",
@@ -22,7 +22,7 @@ const meta = {
       </div>
     ),
   ],
-} satisfies Meta<typeof MobileNav>;
+} satisfies Meta<typeof MobileNavSurface>;
 
 export default meta;
 

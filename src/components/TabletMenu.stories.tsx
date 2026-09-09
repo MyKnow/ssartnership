@@ -42,10 +42,17 @@ export const SignedInEscapeClose: Story = {
 
     const body = within(document.body);
     await expect(body.getByRole("dialog", { name: "메뉴" })).toBeVisible();
-    await expect(body.getByRole("link", { name: "내 인증" })).toHaveAttribute(
+    await expect(body.getByRole("link", { name: "내 정보" })).toHaveAttribute(
       "href",
       "/certification",
     );
+    await expect(body.getByRole("link", { name: "알림 설정" })).toHaveAttribute(
+      "href",
+      "/notifications",
+    );
+    await expect(body.queryByText("싸트너십")).not.toBeInTheDocument();
+    await expect(body.queryByText("로그인, 회원가입, 프로필, 알림 관련 메뉴입니다.")).not.toBeInTheDocument();
+    await expect(body.queryByText("앱", { exact: true })).not.toBeInTheDocument();
     await userEvent.keyboard("{Escape}");
     await expect(body.queryByRole("dialog", { name: "메뉴" })).not.toBeInTheDocument();
   },

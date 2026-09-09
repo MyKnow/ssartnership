@@ -3,6 +3,14 @@ import { getRequestLogContext, scheduleProductEventLog } from "@/lib/activity-lo
 import { getSignedUserSession } from "@/lib/user-auth";
 import { updateMemberNotificationPreferences } from "@/lib/notification-preferences";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import {
+  getSafeNotificationRouteError,
+  shouldLogNotificationRouteError,
+} from "@/lib/notifications/safe-error";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 
 export const runtime = "nodejs";
 
@@ -28,7 +36,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const appliedAt = new Date().toISOString();
-    const body = (await request.json()) as Record<string, unknown>;
+    const body = await readRouteJsonBodyWithinLimit<Record<string, unknown>>(
+      request,
+      {
+        maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+        invalidMessage: "요청 본문 형식을 확인해 주세요.",
+        tooLargeMessage: "알림 설정 요청이 너무 큽니다.",
+      },
+    );
     const preferences = await updateMemberNotificationPreferences(
       session.userId,
       {
@@ -66,8 +81,16 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true, preferences, appliedAt });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "알림 설정을 저장하지 못했습니다.";
-    return NextResponse.json({ message }, { status: 400 });
+    if (shouldLogNotificationRouteError(error)) {
+      console.error("[member-notification-preferences] update failed", error);
+    }
+    const safeError = getSafeNotificationRouteError(
+      error,
+      "알림 설정을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    return NextResponse.json(
+      { message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }

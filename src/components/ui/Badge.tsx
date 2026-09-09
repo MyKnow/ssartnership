@@ -1,5 +1,5 @@
 import { cn } from "@/lib/cn";
-import type { CSSProperties } from "react";
+import type { ComponentPropsWithoutRef } from "react";
 
 const variants = {
   neutral: "border-border bg-surface-muted/85 text-foreground",
@@ -12,22 +12,19 @@ const variants = {
 export default function Badge({
   children,
   className,
-  style,
   variant = "neutral",
-}: {
-  children: React.ReactNode;
-  className?: string;
-  style?: CSSProperties;
+  ...props
+}: ComponentPropsWithoutRef<"span"> & {
   variant?: keyof typeof variants;
 }) {
   return (
     <span
+      {...props}
       className={cn(
         "inline-flex items-center justify-center rounded-full border px-2.5 py-1 text-[11px] font-semibold leading-none tracking-[0.08em] whitespace-nowrap",
         variants[variant],
         className,
       )}
-      style={style}
     >
       {children}
     </span>

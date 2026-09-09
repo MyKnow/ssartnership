@@ -1,0 +1,8 @@
+[Unit]
+Description=SSAFY Partnership operations failure hook for %i
+
+[Service]
+Type=oneshot
+# This template deliberately logs only. Copy and replace it with a reviewed
+# alert delivery integration after custody of the alert credential is defined.
+ExecStart=/usr/bin/logger -t ssartnership-operations "operation failed: %i"

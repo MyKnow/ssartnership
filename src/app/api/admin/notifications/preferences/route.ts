@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/auth";
+import { getAdminPersonalNotificationApiSession } from "@/lib/admin-access";
 import { invalidateAdminNotificationSettingsCache } from "@/lib/admin-notifications.server";
 import {
   getAdminOperationalNotificationPreferences,
   upsertAdminOperationalNotificationPreferences,
 } from "@/lib/operational-notifications";
+import {
+  getSafeNotificationRouteError,
+  shouldLogNotificationRouteError,
+} from "@/lib/notifications/safe-error";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import { readRouteJsonBodyWithinLimit } from "@/lib/route-json-body";
 import { withServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
@@ -21,13 +27,19 @@ export async function GET(request: NextRequest) {
         expectedOrigin: request.nextUrl.origin,
       })
     ) {
-      return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
+      return NextResponse.json(
+        { message: "잘못된 요청입니다." },
+        { status: 403 },
+      );
     }
 
-    const session = await timing.measure("auth", () => getAdminSession());
-    if (!session) {
-      return NextResponse.json({ message: "관리자 인증이 필요합니다." }, { status: 401 });
+    const auth = await timing.measure("auth", () =>
+      getAdminPersonalNotificationApiSession(request),
+    );
+    if ("response" in auth) {
+      return auth.response;
     }
+    const { session } = auth;
 
     try {
       const preferences = await timing.measure("query", () =>
@@ -52,15 +64,28 @@ export async function POST(request: NextRequest) {
         allowedContentTypes: ["application/json"],
       })
     ) {
-      return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
+      return NextResponse.json(
+        { message: "잘못된 요청입니다." },
+        { status: 403 },
+      );
     }
-    const session = await timing.measure("auth", () => getAdminSession());
-    if (!session) {
-      return NextResponse.json({ message: "관리자 인증이 필요합니다." }, { status: 401 });
+    const auth = await timing.measure("auth", () =>
+      getAdminPersonalNotificationApiSession(request),
+    );
+    if ("response" in auth) {
+      return auth.response;
     }
+    const { session } = auth;
 
     try {
-      const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+      const body = await readRouteJsonBodyWithinLimit<Record<string, unknown>>(
+        request,
+        {
+          maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          invalidMessage: "요청 본문 형식을 확인해 주세요.",
+          tooLargeMessage: "알림 설정 요청이 너무 큽니다.",
+        },
+      );
       const preferences = await timing.measure("query", () =>
         upsertAdminOperationalNotificationPreferences(session.adminId, {
           enabled: toOptionalBoolean(body.enabled),
@@ -68,16 +93,24 @@ export async function POST(request: NextRequest) {
           pushEnabled: toOptionalBoolean(body.pushEnabled),
           securityEnabled: toOptionalBoolean(body.securityEnabled),
           partnerRequestEnabled: toOptionalBoolean(body.partnerRequestEnabled),
-          expiringPartnerEnabled: toOptionalBoolean(body.expiringPartnerEnabled),
+          expiringPartnerEnabled: toOptionalBoolean(
+            body.expiringPartnerEnabled,
+          ),
         }),
       );
       invalidateAdminNotificationSettingsCache(session.adminId);
       return NextResponse.json({ ok: true, preferences });
     } catch (error) {
-      console.error("[admin-notification-preferences] write failed", error);
+      if (shouldLogNotificationRouteError(error)) {
+        console.error("[admin-notification-preferences] write failed", error);
+      }
+      const safeError = getSafeNotificationRouteError(
+        error,
+        "알림 설정을 저장하지 못했습니다.",
+      );
       return NextResponse.json(
-        { message: "알림 설정을 저장하지 못했습니다." },
-        { status: 503 },
+        { message: safeError.message },
+        { status: safeError.status },
       );
     }
   });

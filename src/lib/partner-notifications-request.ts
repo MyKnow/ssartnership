@@ -6,7 +6,7 @@ import type {
 import type {
   PartnerNotificationEntry,
   PartnerNotificationTone,
-} from "@/lib/partner-notifications";
+} from "@/lib/partner-notification-contract";
 import { getCompanyScopedPartnerServiceHref } from "@/lib/partner-portal-paths";
 
 function formatPeriod(

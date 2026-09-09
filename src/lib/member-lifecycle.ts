@@ -163,10 +163,10 @@ export async function anonymizeDeletedMember(memberId: string) {
     }
   }
 
-  for (const certificatePath of storagePlan.certificatePaths) {
+  if (storagePlan.certificatePaths.length > 0) {
     const { error } = await supabase.storage
       .from(GRADUATE_CERTIFICATES_BUCKET)
-      .remove([certificatePath]);
+      .remove(storagePlan.certificatePaths);
     if (error) {
       throw new Error("익명화할 교육이수증을 삭제하지 못했습니다.");
     }

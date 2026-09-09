@@ -21,6 +21,7 @@ import {
   scheduleAdminActionFailureLog,
 } from "@/app/admin/(protected)/_actions/shared-helpers";
 import { sanitizeReturnTo } from "@/lib/return-to";
+import { isUuid } from "@/lib/uuid";
 
 const ADMIN_GRADUATE_VERIFICATIONS_PATH = "/admin/graduate-verifications";
 
@@ -33,7 +34,7 @@ function getReturnTo(formData: FormData) {
 
 function getRequiredId(formData: FormData, name: string, returnTo: string) {
   const value = String(formData.get(name) ?? "").trim();
-  if (!/^[0-9a-f-]{36}$/i.test(value)) {
+  if (!isUuid(value)) {
     redirectAdminActionError(returnTo, "invalid_fields");
   }
   return value;
@@ -42,7 +43,7 @@ function getRequiredId(formData: FormData, name: string, returnTo: string) {
 function getOptionalId(formData: FormData, name: string, returnTo: string) {
   const value = String(formData.get(name) ?? "").trim();
   if (!value) return null;
-  if (!/^[0-9a-f-]{36}$/i.test(value)) {
+  if (!isUuid(value)) {
     redirectAdminActionError(returnTo, "invalid_fields");
   }
   return value;

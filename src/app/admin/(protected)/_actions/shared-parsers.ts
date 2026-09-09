@@ -11,6 +11,7 @@ import {
 import {
   isPartnerBenefitActionType,
   normalizePartnerBenefitActionType,
+  resolveSubmittedBenefitActionLink,
 } from "../../../../lib/partner-benefit-action.ts";
 import { normalizePartnerDetailDescription } from "../../../../lib/partner-detail-description.ts";
 import {
@@ -277,6 +278,11 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
     formData.get("benefitVerificationPin") || "",
   ).trim();
   const rawReservationLink = String(formData.get("reservationLink") || "").trim();
+  const submittedBenefitActionLink = resolveSubmittedBenefitActionLink({
+    hasBenefitActionLinkField: formData.has("benefitActionLink"),
+    benefitActionLink: rawBenefitActionLink,
+    reservationLink: rawReservationLink,
+  });
   const rawInquiryLink = String(formData.get("inquiryLink") || "").trim();
   const rawVisibility = String(formData.get("visibility") || "").trim();
   const rawBenefitVisibility = String(formData.get("benefitVisibility") || "").trim();
@@ -316,11 +322,9 @@ export function parsePartnerPayload(formData: FormData): PartnerCoreInput {
   }
   const benefitActionType = normalizePartnerBenefitActionType(
     rawBenefitActionType,
-    rawBenefitActionLink || rawReservationLink ? "external_link" : "none",
+    submittedBenefitActionLink ? "external_link" : "none",
   );
-  const parsedBenefitActionLink = parsePartnerLink(
-    rawBenefitActionLink || rawReservationLink,
-  );
+  const parsedBenefitActionLink = parsePartnerLink(submittedBenefitActionLink);
   if (benefitActionType === "external_link" && !parsedBenefitActionLink) {
     throw new Error("partner_form_invalid_benefit_action_link");
   }

@@ -1,5 +1,10 @@
 export type PwaInstallPlatform = "android" | "ios" | "other";
 
+export type PwaDisplayModeSnapshot = {
+  displayModeStandalone?: boolean;
+  navigatorStandalone?: boolean;
+};
+
 export type PwaNavigatorSnapshot = {
   userAgent?: string;
   platform?: string;
@@ -9,6 +14,25 @@ export type PwaNavigatorSnapshot = {
 
 function normalize(value: string | undefined) {
   return value?.trim().toLowerCase() ?? "";
+}
+
+export function detectStandalonePwa(snapshot: PwaDisplayModeSnapshot) {
+  return Boolean(
+    snapshot.displayModeStandalone || snapshot.navigatorStandalone,
+  );
+}
+
+export function getBrowserStandalonePwa() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return detectStandalonePwa({
+    displayModeStandalone: window.matchMedia("(display-mode: standalone)").matches,
+    navigatorStandalone: (
+      window.navigator as Navigator & { standalone?: boolean }
+    ).standalone,
+  });
 }
 
 export function detectPwaInstallPlatform(

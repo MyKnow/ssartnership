@@ -84,7 +84,7 @@ export const MainGalleryWithTabletPreviewCarousel: Story = {
 
     await expect(carousel).not.toBeNull();
     await expect(tabletCarousel).not.toBeNull();
-    await expect(tabletCarousel).toHaveClass("hidden", "md:block");
+    await expect(tabletCarousel).toHaveClass("min-w-0");
     await expect(
       canvas.queryByRole("button", { name: "이전 이미지" }),
     ).not.toBeInTheDocument();

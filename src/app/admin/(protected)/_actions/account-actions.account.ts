@@ -147,7 +147,13 @@ export async function createPartnerAccountAction(formData: FormData) {
   }
 
   const cleanup = async () => {
-    await supabase.from("partner_accounts").delete().eq("id", createdAccount.id);
+    const { error } = await supabase
+      .from("partner_accounts")
+      .delete()
+      .eq("id", createdAccount.id);
+    if (error) {
+      throw new Error(error.message);
+    }
   };
 
   let setupLink = null as Awaited<
@@ -174,9 +180,42 @@ export async function createPartnerAccountAction(formData: FormData) {
       throw new Error(linkError.message);
     }
   } catch (error) {
-    await cleanup();
+    try {
+      await cleanup();
+    } catch (cleanupError) {
+      console.error("[admin] partner account cleanup failed", cleanupError);
+      redirectAdminActionError(
+        "/admin/companies?tab=accounts",
+        "partner_account_create_uncertain",
+        {
+          action: "partner_account_create",
+          targetType: "partner_account",
+          targetId: createdAccount.id,
+          properties: {
+            loginId: payload.loginId,
+            displayName: payload.displayName,
+            companyId: company.id,
+            isActive: payload.isActive,
+          },
+        },
+      );
+    }
     console.error("[admin] partner account create failed", error);
-    redirectAdminActionError("/admin/companies?tab=accounts", "partner_account_invalid_request");
+    redirectAdminActionError(
+      "/admin/companies?tab=accounts",
+      "partner_account_invalid_request",
+      {
+        action: "partner_account_create",
+        targetType: "partner_account",
+        targetId: createdAccount.id,
+        properties: {
+          loginId: payload.loginId,
+          displayName: payload.displayName,
+          companyId: company.id,
+          isActive: payload.isActive,
+        },
+      },
+    );
   }
 
   await logAdminAction("partner_account_create", {

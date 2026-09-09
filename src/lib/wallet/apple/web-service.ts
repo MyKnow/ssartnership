@@ -6,6 +6,12 @@ import type {
   UpdatedAppleWalletPass,
 } from "@/lib/repositories/wallet-pass-repository";
 import {
+  JsonRequestBodyError,
+  MAX_BULK_JSON_BODY_BYTES,
+  MAX_STANDARD_JSON_BODY_BYTES,
+  readJsonRequestBodyWithinLimit,
+} from "@/lib/request-body-limit";
+import {
   deriveAppleWalletAuthenticationToken,
 } from "@/lib/wallet/wallet-pass-token";
 import { hashAppleDeviceLibraryIdentifier } from "./apple-wallet-device-token";
@@ -16,6 +22,7 @@ const APPLE_PASS_AUTHORIZATION_PREFIX = "ApplePass ";
 const CACHE_CONTROL_VALUE = "private, no-store";
 const UPDATED_SINCE_QUERY_PARAM = "passesUpdatedSince";
 const MAX_UPDATED_PASS_COUNT = 100;
+const APPLE_WALLET_BODY_TOO_LARGE_MESSAGE = "요청이 너무 큽니다.";
 
 const registrationRequestSchema = z
   .object({
@@ -168,14 +175,76 @@ export function hashAppleWalletDeviceIdentifier(
   );
 }
 
+async function parseAppleWalletBodyWithSchema<T>(
+  request: Request,
+  schema: z.ZodType<T>,
+  options: {
+    maximumBytes: number;
+    invalidMessage: string;
+  },
+): Promise<
+  | { success: true; data: T }
+  | {
+      success: false;
+      status: 400 | 413;
+      message: string;
+      code: "invalid_json" | "body_too_large" | "schema_invalid";
+    }
+> {
+  let body: unknown;
+  try {
+    body = await readJsonRequestBodyWithinLimit<unknown>(
+      request,
+      options.maximumBytes,
+    );
+  } catch (error) {
+    if (
+      error instanceof JsonRequestBodyError &&
+      error.code === "body_too_large"
+    ) {
+      return {
+        success: false,
+        status: 413,
+        message: APPLE_WALLET_BODY_TOO_LARGE_MESSAGE,
+        code: "body_too_large",
+      };
+    }
+    return {
+      success: false,
+      status: 400,
+      message: options.invalidMessage,
+      code: "invalid_json",
+    };
+  }
+
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    return {
+      success: false,
+      status: 400,
+      message: options.invalidMessage,
+      code: "schema_invalid",
+    };
+  }
+
+  return {
+    success: true,
+    data: parsed.data,
+  };
+}
+
 export async function parseAppleWalletRegistrationBody(request: Request) {
-  const body = await request.json().catch(() => null);
-  return registrationRequestSchema.safeParse(body);
+  return parseAppleWalletBodyWithSchema(request, registrationRequestSchema, {
+    maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    invalidMessage: "pushToken 형식이 올바르지 않습니다.",
+  });
 }
 
 export async function parseAppleWalletLogBody(request: Request) {
-  const body = await request.json().catch(() => null);
-  return logRequestSchema.safeParse(body);
+  return parseAppleWalletBodyWithSchema(request, logRequestSchema, {
+    maximumBytes: MAX_BULK_JSON_BODY_BYTES,
+    invalidMessage: "로그 본문 형식이 올바르지 않습니다.",
+  });
 }
 
 export function parseAppleWalletUpdatedSince(request: Request) {

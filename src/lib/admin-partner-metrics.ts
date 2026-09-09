@@ -1,12 +1,12 @@
-import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
-import { createEmptyPartnerServiceMetrics } from "@/lib/partner-service-metrics";
+import {
+  createEmptyPartnerPortalMetrics,
+  type PartnerPortalServiceMetrics,
+} from "@/lib/partner-dashboard";
 import {
   applyPartnerMetricRollupRows,
-  buildPartnerMetricRollupRowsFromEventLogs,
-  fetchPartnerMetricRollupRows,
-  fetchPartnerMetricEventLogRows,
   PARTNER_METRIC_EVENT_NAMES,
 } from "@/lib/partner-metric-rollups";
+import { loadPartnerMetricAggregateRows } from "@/lib/partner-metric-loader";
 import { listMockPartnerPortalSetupsInternal } from "@/lib/mock/partner-portal/store";
 import { isPartnerPortalMock } from "@/lib/partner-portal";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -22,25 +22,8 @@ export type AdminPartnerMetricsResult = {
 
 function createMetricsMap(partnerIds: string[]) {
   return new Map(
-    partnerIds.map((partnerId) => [partnerId, createEmptyPartnerServiceMetrics()]),
+    partnerIds.map((partnerId) => [partnerId, createEmptyPartnerPortalMetrics()]),
   );
-}
-
-function indexMetricEventRowsByTargetId<T extends { target_id: string | null }>(rows: T[]) {
-  const rowsByTargetId = new Map<string, typeof rows>();
-  for (const row of rows) {
-    const targetId = row.target_id ?? "";
-    if (!targetId) {
-      continue;
-    }
-    const bucket = rowsByTargetId.get(targetId);
-    if (bucket) {
-      bucket.push(row);
-      continue;
-    }
-    rowsByTargetId.set(targetId, [row]);
-  }
-  return rowsByTargetId;
 }
 
 function getMockMetrics(partnerId: string) {
@@ -50,7 +33,7 @@ function getMockMetrics(partnerId: string) {
   const service = setup?.company.services.find((candidate) => candidate.id === partnerId);
   return service?.metrics
     ? { ...service.metrics }
-    : createEmptyPartnerServiceMetrics();
+    : createEmptyPartnerPortalMetrics();
 }
 
 export async function getAdminPartnerMetrics(
@@ -77,8 +60,8 @@ export async function getAdminPartnerMetrics(
   const metricsByPartnerId = createMetricsMap(uniquePartnerIds);
   let hasPartialFailure = false;
 
-  const [eventResult, engagementCounts] = await Promise.all([
-    fetchPartnerMetricRollupRows(supabase, {
+  const [metricRowsResult, engagementCounts] = await Promise.all([
+    loadPartnerMetricAggregateRows(supabase, {
       partnerIds: uniquePartnerIds,
       metricNames: PARTNER_METRIC_EVENT_NAMES,
       metricKinds: ["pv", "uv"],
@@ -90,33 +73,18 @@ export async function getAdminPartnerMetrics(
     ),
   ]);
 
-  if (eventResult.errorMessage) {
+  if (metricRowsResult.failure) {
     hasPartialFailure = true;
-    console.error("[admin-partner-metrics] event query failed", eventResult.errorMessage);
+    const queryLabel =
+      metricRowsResult.failure.stage === "rollup"
+        ? "event query failed"
+        : "fallback event query failed";
+    console.error(
+      `[admin-partner-metrics] ${queryLabel}`,
+      metricRowsResult.failure.errorMessage,
+    );
   } else {
-    if (eventResult.rows.length > 0) {
-      applyPartnerMetricRollupRows(metricsByPartnerId, eventResult.rows);
-    } else {
-      const fallbackResult = await fetchPartnerMetricEventLogRows(supabase, uniquePartnerIds);
-      if (fallbackResult.errorMessage) {
-        hasPartialFailure = true;
-        console.error(
-          "[admin-partner-metrics] fallback event query failed",
-          fallbackResult.errorMessage,
-        );
-      } else {
-        const rowsByTargetId = indexMetricEventRowsByTargetId(fallbackResult.rows);
-        for (const partnerId of uniquePartnerIds) {
-          applyPartnerMetricRollupRows(
-            metricsByPartnerId,
-            buildPartnerMetricRollupRowsFromEventLogs(
-              rowsByTargetId.get(partnerId) ?? [],
-              partnerId,
-            ),
-          );
-        }
-      }
-    }
+    applyPartnerMetricRollupRows(metricsByPartnerId, metricRowsResult.rows);
   }
 
   if (engagementCounts.engagementErrorMessage) {

@@ -7,6 +7,10 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import SectionHeading from "@/components/ui/SectionHeading";
 import { useToast } from "@/components/ui/Toast";
+import {
+  ClientSafeRequestError,
+  getClientSafeRequestError,
+} from "@/lib/client-safe-request-error";
 import { getProductSessionId, trackProductEvent } from "@/lib/product-events";
 import type { AdCoupon, AvailableAdCoupon } from "@/lib/repositories/ad-package-repository";
 import { indexIssuedCouponsByCouponId } from "./issued-coupon-map";
@@ -126,12 +130,19 @@ export default function PartnerDetailCoupons({
       });
       const payload = (await response.json().catch(() => null)) as IssueResponse | null;
       if (!response.ok || !payload?.ok || !payload.issue) {
-        throw new Error(payload?.message || "쿠폰 다운로드에 실패했습니다.");
+        throw new ClientSafeRequestError(
+          "request_failed",
+          payload?.message || "쿠폰 다운로드에 실패했습니다.",
+        );
       }
       setIssuedCoupons((current) => ({ ...current, [coupon.id]: payload.issue! }));
       notify("쿠폰함에 쿠폰을 담았습니다.");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "쿠폰 다운로드에 실패했습니다.";
+      const message = getClientSafeRequestError(error, {
+        requestFailed: "쿠폰 다운로드에 실패했습니다.",
+        networkUnavailable:
+          "쿠폰 다운로드에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
+      }).message;
       notify(message);
       setMessages((current) => ({ ...current, [coupon.id]: { tone: "error", text: message } }));
     } finally {
@@ -164,7 +175,10 @@ export default function PartnerDetailCoupons({
       });
       const payload = (await response.json().catch(() => null)) as RedeemResponse | null;
       if (!response.ok || !payload?.ok) {
-        throw new Error(payload?.message || "쿠폰 사용 확인에 실패했습니다.");
+        throw new ClientSafeRequestError(
+          "request_failed",
+          payload?.message || "쿠폰 사용 확인에 실패했습니다.",
+        );
       }
 
       setMessages((current) => ({
@@ -176,10 +190,11 @@ export default function PartnerDetailCoupons({
       }));
       notify("쿠폰 사용 확인이 기록되었습니다.");
     } catch (error) {
-      const message =
-        error instanceof Error && error.message
-          ? error.message
-          : "쿠폰 사용 확인에 실패했습니다.";
+      const message = getClientSafeRequestError(error, {
+        requestFailed: "쿠폰 사용 확인에 실패했습니다.",
+        networkUnavailable:
+          "쿠폰 사용 확인에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
+      }).message;
       setMessages((current) => ({
         ...current,
         [coupon.id]: {

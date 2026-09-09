@@ -1,0 +1,18 @@
+global:
+  resolve_timeout: 5m
+route:
+  receiver: operator
+  group_by: [alertname]
+  group_wait: 15s
+  group_interval: 1m
+  repeat_interval: 4h
+receivers:
+  - name: operator
+    webhook_configs:
+      - url: http://telemetry:9464/alerts
+        send_resolved: true
+        max_alerts: 20
+        http_config:
+          follow_redirects: false
+          authorization:
+            credentials_file: /run/alert-relay-token

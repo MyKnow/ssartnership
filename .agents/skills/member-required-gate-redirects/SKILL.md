@@ -13,10 +13,11 @@ Resolve required member gates in this exact order:
 
 1. Forced password change (`mustChangePassword`)
 2. Required policy consent (`requiresConsent`)
-3. Required profile-photo submission (`requiresProfilePhotoUpdate`)
-4. The validated original destination
+3. Required email registration for a Mattermost-disabled member (`requiresEmailRegistration`)
+4. Required profile-photo submission (`requiresProfilePhotoUpdate`)
+5. The validated original destination
 
-Treat a forced password change as a security control. Never render consent or photo submission ahead of it when both conditions are true.
+Treat a forced password change as a security control. Never render consent, email registration, or photo submission ahead of it when conditions overlap. Require email registration only when Mattermost login is disabled and the member has no verified email; do not block every member who has not registered an email.
 
 ## Route implementation
 
@@ -24,14 +25,14 @@ Treat a forced password change as a security control. Never render consent or ph
 - Pass the actual current request path as `currentPath` and the original destination as `returnTo`.
 - Preserve the original destination when redirecting from an edge/proxy layer; do not replace a route with a gate URL and discard its path or query.
 - Let a route that already owns the highest-priority gate render instead of redirecting to itself.
-- Keep gate paths explicit: `/auth/change-password`, `/auth/consent`, and `/certification/photo`.
+- Keep gate paths explicit: `/auth/change-password`, `/auth/consent`, `/certification/email`, and `/certification/photo`.
 
 ## `returnTo` boundary
 
 - Accept `returnTo` only through `sanitizeReturnTo` or the member-gate helper.
 - Reject external origins, protocol-relative URLs, malformed values, and non-path values by falling back to `/`.
 - Do not use framework-internal headers such as `next-url` as a source of the original request path. Use the trusted `x-ssartnership-request-path` set in `src/proxy.ts`.
-- Never use the active gate URL as a completion destination. Call `getMemberGateCompletionReturnTo` after a password, consent, or photo mutation.
+- Never use the active gate URL as a completion destination. Call `getMemberGateCompletionReturnTo` after a password, consent, email, or photo mutation.
 
 ## Completion behavior
 
@@ -41,4 +42,4 @@ Treat a forced password change as a security control. Never render consent or ph
 
 ## Required regression coverage
 
-Add or update focused Node tests in `tests/member-required-gates.test.mts` whenever this flow changes. Cover every combination of password, consent, and photo requirements; priority; self-redirect prevention; unsafe `returnTo`; and valid path/query preservation.
+Add or update focused Node tests in `tests/member-required-gates.test.mts` whenever this flow changes. Cover every combination of password, consent, email, and photo requirements; priority; self-redirect prevention; unsafe `returnTo`; and valid path/query preservation.

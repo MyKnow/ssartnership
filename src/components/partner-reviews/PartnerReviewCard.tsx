@@ -10,6 +10,7 @@ import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import { cn } from "@/lib/cn";
+import { getCachedImageUrl } from "@/lib/image-cache";
 import type { PartnerReview, PartnerReviewReaction } from "@/lib/partner-reviews";
 import { formatPartnerReviewDate } from "./helpers";
 import PartnerReviewLightbox from "./PartnerReviewLightbox";
@@ -29,6 +30,7 @@ export default function PartnerReviewCard({
   showHiddenContent = false,
   showModerationActions = false,
   showReactionActions = true,
+  embedded = false,
 }: {
   review: PartnerReview;
   onEdit: () => void;
@@ -43,6 +45,7 @@ export default function PartnerReviewCard({
   showHiddenContent?: boolean;
   showModerationActions?: boolean;
   showReactionActions?: boolean;
+  embedded?: boolean;
 }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
@@ -81,18 +84,36 @@ export default function PartnerReviewCard({
   }
 
   if (review.isHidden && !showHiddenContent) {
-    return (
-      <Card padding="md" className="flex items-center gap-2 border-dashed bg-surface-muted/40">
+    const hiddenContent = (
+      <>
         <Badge variant="warning" className="w-fit">
           비공개
         </Badge>
         <p className="text-sm text-muted-foreground">비공개 처리된 리뷰입니다.</p>
+      </>
+    );
+
+    if (embedded) {
+      return (
+        <article data-partner-review-item className="flex items-center gap-2">
+          {hiddenContent}
+        </article>
+      );
+    }
+
+    return (
+      <Card
+        data-partner-review-item
+        padding="md"
+        className="flex items-center gap-2 border-dashed bg-surface-muted/40"
+      >
+        {hiddenContent}
       </Card>
     );
   }
 
-  return (
-    <Card padding="md" className="grid gap-4">
+  const content = (
+    <>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="grid gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
@@ -160,12 +181,11 @@ export default function PartnerReviewCard({
               aria-label={`리뷰 사진 ${index + 1} 크게 보기`}
             >
               <Image
-                src={image}
+                src={getCachedImageUrl(image)}
                 alt=""
                 fill
                 sizes="(max-width: 640px) 30vw, 120px"
                 className="object-cover"
-                unoptimized
               />
             </button>
           ))}
@@ -198,6 +218,20 @@ export default function PartnerReviewCard({
           onClose={() => setLightboxIndex(null)}
         />
       ) : null}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <article data-partner-review-item className="grid gap-4">
+        {content}
+      </article>
+    );
+  }
+
+  return (
+    <Card data-partner-review-item padding="md" className="grid gap-4">
+      {content}
     </Card>
   );
 }

@@ -1,22 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminSession } from "@/lib/auth";
+import { ensureCronApiAccess, getCronErrorResponse } from "@/lib/cron-route";
 import { buildPartnerRssFeedItems } from "@/lib/rss/feed";
 
 export const runtime = "nodejs";
 
-function isAuthorizedByCronSecret(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    return false;
-  }
-  return request.headers.get("authorization") === `Bearer ${secret}`;
-}
-
 export async function GET(request: NextRequest) {
-  const adminAuthorized = await isAdminSession();
-  if (!adminAuthorized && !isAuthorizedByCronSecret(request)) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
+  const denied = ensureCronApiAccess(request);
+  if (denied) return denied;
 
   try {
     const items = await buildPartnerRssFeedItems();
@@ -25,13 +15,7 @@ export async function GET(request: NextRequest) {
       items: items.length,
       refreshedAt: new Date().toISOString(),
     });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        ok: false,
-        message: (error as Error).message,
-      },
-      { status: 500 },
-    );
+  } catch {
+    return getCronErrorResponse("rss");
   }
 }

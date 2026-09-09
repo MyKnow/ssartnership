@@ -4,7 +4,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 import { ThemeProvider } from "next-themes";
 import Footer from "./Footer";
-import MobileNav from "./MobileNav";
+import { MobileNavSurface } from "./MobileNav";
 import SiteHeader from "./SiteHeader";
 import { ToastProvider } from "@/components/ui/Toast";
 import type { HeaderSession } from "@/lib/header-session";
@@ -36,14 +36,14 @@ function SiteNavigationStory(props: React.ComponentProps<typeof SiteHeader>) {
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <ToastProvider>
         <div className="min-h-screen bg-background">
-          <MobileNav signedInUserId={props.initialSession?.userId ?? null} />
+          <MobileNavSurface signedInUserId={props.initialSession?.userId ?? null} />
           <SiteHeader {...props} />
           <main className="ui-page-shell-wide min-h-[32rem] py-8">
             <div className="rounded-panel border border-border bg-surface-muted/60 p-6 text-sm text-muted-foreground">
               상단 헤더와 하단 탐색이 함께 보이는 반응형 셸입니다.
             </div>
           </main>
-          <Footer reserveMobileNavigationSpace />
+          <Footer />
         </div>
       </ToastProvider>
     </ThemeProvider>
@@ -71,6 +71,7 @@ export const SignedIn: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await expect(await canvas.findByRole("link", { name: "앱 설치" })).toBeVisible();
     await expect(canvas.getByRole("link", { name: "설정" })).toHaveAttribute(
       "href",
       "/settings?returnTo=%2F",

@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 import {
   buildPwaInstallGuideHref,
+  detectStandalonePwa,
   detectPwaInstallPlatform,
   parsePwaInstallPlatform,
 } from "@/lib/pwa-install";
@@ -109,6 +110,30 @@ test("설치 안내 주소와 외부 쿼리 값을 허용된 플랫폼으로 정
   assert.equal(parsePwaInstallPlatform(["ios", "android"]), "ios");
   assert.equal(parsePwaInstallPlatform("javascript:alert(1)"), "other");
   assert.equal(parsePwaInstallPlatform(undefined), "other");
+});
+
+test("standalone PWA는 CSS display mode와 iOS navigator 상태를 모두 판별한다", () => {
+  assert.equal(
+    detectStandalonePwa({
+      displayModeStandalone: true,
+      navigatorStandalone: false,
+    }),
+    true,
+  );
+  assert.equal(
+    detectStandalonePwa({
+      displayModeStandalone: false,
+      navigatorStandalone: true,
+    }),
+    true,
+  );
+  assert.equal(
+    detectStandalonePwa({
+      displayModeStandalone: false,
+      navigatorStandalone: false,
+    }),
+    false,
+  );
 });
 
 test("모바일 설치 안내는 현재 화면에서 바로 누를 조작과 실제 시뮬레이터 화면을 제공한다", () => {

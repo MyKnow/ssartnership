@@ -93,6 +93,11 @@ export type PartnerCompanyProvision = {
   createdCompany: boolean;
   createdAccount: boolean;
   createdLink: boolean;
+  updatedAccountPreviousValues: {
+    display_name: string;
+    email: string | null;
+    is_active: boolean | null;
+  } | null;
 };
 
 export type CreatedPartnerRecord = {

@@ -17,6 +17,10 @@ import {
   type EncryptedApplePushToken,
 } from "@/lib/wallet/apple/apple-wallet-device-token";
 import {
+  APPLE_WALLET_DEVICE_CLEANUP_CONCURRENCY,
+  MAX_APPLE_WALLET_PUSH_TOKENS_PER_BATCH,
+} from "@/lib/wallet/apple/limits";
+import {
   buildWalletPassDisplaySnapshot,
   getMemberWalletPassEligibility,
   getWalletPassEligibilityMessage,
@@ -30,6 +34,7 @@ import {
   verifyWalletPassVerificationToken,
 } from "@/lib/wallet/wallet-pass-token";
 import { APPLE_WALLET_CONSENT_VERSION } from "@/lib/wallet/wallet-pass-request";
+import { forEachWithConcurrency } from "@/lib/async-concurrency";
 
 const displaySnapshotSchema = z
   .object({
@@ -386,7 +391,10 @@ export async function notifyAppleWalletPassChange(
 ) {
   const config = requireAppleWalletConfig();
   const registrations = await walletPassRepository
-    .listAppleWalletDeviceRegistrationsForPass(pass.id);
+    .listAppleWalletDeviceRegistrationsForPass({
+      passId: pass.id,
+      limit: MAX_APPLE_WALLET_PUSH_TOKENS_PER_BATCH,
+    });
   let tokenReadFailures = 0;
   const tokens = registrations.flatMap((registration) => {
     if (registration.pushTokenKeyVersion !== 1) {
@@ -428,8 +436,10 @@ export async function notifyAppleWalletPassChange(
   const result = await (options.sendUpdate ?? sendAppleWalletPassUpdate)(tokens);
   if (result.invalidTokens.length > 0) {
     const invalidTokenSet = new Set(result.invalidTokens);
-    await Promise.all(
-      registrations.map(async (registration) => {
+    await forEachWithConcurrency(
+      registrations,
+      APPLE_WALLET_DEVICE_CLEANUP_CONCURRENCY,
+      async (registration) => {
         try {
           const token = decryptApplePushToken(
             {
@@ -450,7 +460,7 @@ export async function notifyAppleWalletPassChange(
         } catch {
           return;
         }
-      }),
+      },
     );
   }
   const combinedResult = {
@@ -479,6 +489,7 @@ export async function reconcileInstalledAppleWalletPasses(
   options: {
     batchSize?: number;
     maxPasses?: number;
+    concurrency?: number;
     notifyPassChange?: typeof notifyAppleWalletPassChange;
     configStatus?: AppleWalletConfigStatus;
   } = {},
@@ -500,6 +511,7 @@ export async function reconcileInstalledAppleWalletPasses(
 
   const batchSize = Math.max(1, Math.min(options.batchSize ?? 50, 100));
   const maxPasses = Math.max(1, Math.min(options.maxPasses ?? 500, 1_000));
+  const concurrency = Math.max(1, Math.min(options.concurrency ?? 4, 16));
   const notifyPassChange = options.notifyPassChange ?? notifyAppleWalletPassChange;
   let afterPassId: string | null = null;
   let scanned = 0;
@@ -516,47 +528,48 @@ export async function reconcileInstalledAppleWalletPasses(
     lastBatchWasFull = passes.length === pageLimit;
     if (passes.length === 0) break;
 
-    for (const pass of passes) {
-      scanned += 1;
-      afterPassId = pass.id;
-      try {
-        if (pass.credentialStatus === "revoked") {
-          await notifyPassChange(pass);
-          continue;
-        }
-        const eligibility = await getMemberWalletPassEligibility(pass.memberId);
-        const consentCurrent =
-          pass.consentVersion === APPLE_WALLET_CONSENT_VERSION;
-        const contentCurrent =
-          consentCurrent && isWalletPassSnapshotCurrent(pass, eligibility);
-        if (contentCurrent) {
-          if (pass.syncStatus !== "synced") {
+    scanned += passes.length;
+    afterPassId = passes.at(-1)?.id ?? afterPassId;
+    await forEachWithConcurrency(passes, concurrency, async (pass) => {
+        try {
+          if (pass.credentialStatus === "revoked") {
             await notifyPassChange(pass);
+            return;
           }
-          continue;
-        }
+          const eligibility = await getMemberWalletPassEligibility(pass.memberId);
+          const consentCurrent =
+            pass.consentVersion === APPLE_WALLET_CONSENT_VERSION;
+          const contentCurrent =
+            consentCurrent && isWalletPassSnapshotCurrent(pass, eligibility);
+          if (contentCurrent) {
+            if (pass.syncStatus !== "synced") {
+              await notifyPassChange(pass);
+            }
+            return;
+          }
 
-        let pendingPass: MemberWalletPass;
-        if (eligibility.eligible && consentCurrent) {
-          const snapshot = buildWalletPassDisplaySnapshot(eligibility.member);
-          pendingPass = await walletPassRepository.reconcileWalletPassContent({
-            passId: pass.id,
-            action: "refresh",
-            snapshot,
-            snapshotHash: hashWalletPassDisplaySnapshot(snapshot),
-          });
-        } else {
-          pendingPass = await walletPassRepository.reconcileWalletPassContent({
-            passId: pass.id,
-            action: "invalidate",
-          });
+          let pendingPass: MemberWalletPass;
+          if (eligibility.eligible && consentCurrent) {
+            const snapshot = buildWalletPassDisplaySnapshot(eligibility.member);
+            pendingPass = await walletPassRepository.reconcileWalletPassContent({
+              passId: pass.id,
+              action: "refresh",
+              snapshot,
+              snapshotHash: hashWalletPassDisplaySnapshot(snapshot),
+            });
+          } else {
+            pendingPass = await walletPassRepository.reconcileWalletPassContent({
+              passId: pass.id,
+              action: "invalidate",
+            });
+          }
+          await notifyPassChange(pendingPass);
+          invalidated += 1;
+        } catch {
+          failed += 1;
         }
-        await notifyPassChange(pendingPass);
-        invalidated += 1;
-      } catch {
-        failed += 1;
-      }
-    }
+      },
+    );
 
     if (passes.length < pageLimit) break;
   }

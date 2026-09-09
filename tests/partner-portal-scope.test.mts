@@ -20,6 +20,7 @@ function createSession(companyIds: string[]): PartnerSession {
     loginId: "partner@example.com",
     displayName: "파트너 담당자",
     companyIds,
+    authSessionVersion: 1,
     mustChangePassword: false,
     issuedAt: 1,
     expiresAt: Date.now() + 1000,

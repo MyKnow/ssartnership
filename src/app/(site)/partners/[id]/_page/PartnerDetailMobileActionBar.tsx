@@ -2,7 +2,7 @@
 
 import Button from "@/components/ui/Button";
 import { trackProductEvent } from "@/lib/product-events";
-import type { BenefitUseAction } from "@/lib/partner-links";
+import type { PartnerDetailBenefitUseAction } from "@/lib/partner-detail-benefit-action";
 import PartnerBenefitUseAction, {
   type OfflinePartnerBenefitAction,
 } from "@/components/partner/PartnerBenefitUseAction";
@@ -21,7 +21,7 @@ export default function PartnerDetailMobileActionBar({
   inquiryAction,
 }: {
   partnerId: string;
-  benefitUseAction: BenefitUseAction | null;
+  benefitUseAction: PartnerDetailBenefitUseAction | null;
   certificationBenefitAction?: OfflinePartnerBenefitAction | null;
   inquiryAction: MobileInquiryAction | null;
 }) {
@@ -70,7 +70,9 @@ export default function PartnerDetailMobileActionBar({
           })
         }
       >
-        {benefitUseAction.type === "external_link"
+        {benefitUseAction.requiresLogin
+          ? benefitUseAction.label
+          : benefitUseAction.type === "external_link"
           ? "혜택 이용하기"
           : benefitUseAction.label}
       </Button>

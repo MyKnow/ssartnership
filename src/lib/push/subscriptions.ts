@@ -1,8 +1,8 @@
 import { getSupabaseAdminClient } from "../supabase/server.ts";
-import { sanitizeHttpUrl } from "../validation.ts";
 import { wrapPushDbError } from "./config.ts";
-import { PushError } from "./types.ts";
+import { getPushDeviceLabel } from "./device-label.ts";
 import type { SubscriptionInput } from "./types.ts";
+import { validateTrustedPushSubscription } from "./subscription-trust.ts";
 import {
   getMemberPushPreferences,
   upsertMemberPushPreferences,
@@ -18,35 +18,13 @@ export type PushSubscriptionDevice = {
   lastSuccessAt: string | null;
 };
 
-function validateSubscription(input: SubscriptionInput) {
-  const endpoint = sanitizeHttpUrl(input.endpoint);
-  if (!endpoint?.startsWith("https://")) {
-    throw new PushError("invalid_request", "유효한 Push 구독 정보를 찾을 수 없습니다.");
-  }
-  const p256dh = input.keys?.p256dh?.trim();
-  const auth = input.keys?.auth?.trim();
-  if (!p256dh || !auth) {
-    throw new PushError("invalid_request", "Push 구독 키가 누락되었습니다.");
-  }
-
-  return {
-    endpoint,
-    p256dh,
-    auth,
-    expirationTime:
-      typeof input.expirationTime === "number" && Number.isFinite(input.expirationTime)
-        ? new Date(input.expirationTime).toISOString()
-        : null,
-  };
-}
-
 export async function upsertPushSubscription(params: {
   memberId: string;
   subscription: SubscriptionInput;
   userAgent?: string | null;
 }) {
   const { memberId, subscription, userAgent } = params;
-  const validated = validateSubscription(subscription);
+  const validated = await validateTrustedPushSubscription(subscription);
   const supabase = getSupabaseAdminClient();
 
   const { error } = await supabase.from("push_subscriptions").upsert(
@@ -112,42 +90,6 @@ export async function deactivatePushSubscription(params: {
   return getMemberPushPreferences(memberId);
 }
 
-function getDeviceLabel(userAgent: string | null) {
-  const source = userAgent ?? "";
-  const clientHints = source.includes("client-hints=")
-    ? source.slice(source.indexOf("client-hints="))
-    : "";
-  const browser =
-    clientHints.includes("Microsoft Edge") || source.includes("Edg/")
-      ? "Edge"
-      : clientHints.includes("Google Chrome") ||
-          clientHints.includes("Chromium") ||
-          source.includes("Chrome/")
-        ? "Chrome"
-      : source.includes("Firefox/")
-        ? "Firefox"
-        : source.includes("Safari/") && !clientHints
-          ? "Safari"
-          : "브라우저";
-  const os =
-    clientHints.includes("macOS") ||
-    source.includes("Mac OS X") ||
-    source.includes("macOS") ||
-    source.includes("Macintosh")
-      ? "macOS"
-      : clientHints.includes("Windows") || source.includes("Windows")
-        ? "Windows"
-        : clientHints.includes("Android") || source.includes("Android")
-          ? "Android"
-          : source.includes("iPhone") || source.includes("iPad") || source.includes("iOS")
-            ? "iOS"
-            : source.includes("Linux")
-              ? "Linux"
-              : "기기";
-
-  return `${browser} · ${os}`;
-}
-
 export async function listPushSubscriptionDevices(params: {
   memberId: string;
   currentEndpoint?: string | null;
@@ -166,7 +108,7 @@ export async function listPushSubscriptionDevices(params: {
 
   return (data ?? []).map((row) => ({
     id: String(row.id),
-    label: getDeviceLabel(row.user_agent),
+    label: getPushDeviceLabel(row.user_agent),
     userAgent: row.user_agent ?? null,
     isCurrent: Boolean(params.currentEndpoint && row.endpoint === params.currentEndpoint),
     createdAt: row.created_at ?? null,

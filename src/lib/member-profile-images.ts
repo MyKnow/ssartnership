@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import net from "node:net";
+import { cache } from "react";
 import { fetchPublicImage, isPublicIpAddress } from "@/lib/image-proxy";
 import { MAX_GRADUATE_PROFILE_IMAGE_BYTES } from "@/lib/graduate-verification";
 import { normalizeMattermostProfileImage } from "@/lib/graduate-verification-files";
@@ -383,10 +384,10 @@ export async function getCurrentMemberProfileImageMemberIds(
   );
 }
 
-export async function getMemberProfilePhotoState(memberId: string) {
+export const getMemberProfilePhotoState = cache(async (memberId: string) => {
   const states = await getMemberProfilePhotoStates([memberId]);
   return states.get(memberId) ?? { ...DEFAULT_MEMBER_PROFILE_PHOTO_STATE };
-}
+});
 
 export async function getActiveMemberProfileImage(
   memberId: string,

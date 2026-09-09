@@ -34,12 +34,32 @@ type RateLimitAttemptRecorder = (
   config: RateLimitConfig,
 ) => PromiseLike<RateLimitStorageResult>;
 
+type RateLimitBlockingStateReader = () => PromiseLike<{
+  data: unknown;
+  error: unknown;
+}>;
+
+export type RateLimitStorageFailure = {
+  readonly ok: false;
+  readonly code: "rate_limit_storage_failed";
+};
+
 export type RateLimitStorageResult =
   | { readonly ok: true }
+  | RateLimitStorageFailure;
+
+export type RateLimitBlockingStateResult =
   | {
-      readonly ok: false;
-      readonly code: "rate_limit_storage_failed";
-    };
+      readonly ok: true;
+      readonly blocked: false;
+    }
+  | {
+      readonly ok: true;
+      readonly blocked: true;
+      readonly identifier: string;
+      readonly blockedUntil: string;
+    }
+  | RateLimitStorageFailure;
 
 export type RateLimitBatchStorageResult =
   | {
@@ -54,7 +74,7 @@ export type RateLimitBatchStorageResult =
       readonly failedCount: number;
     };
 
-function rateLimitStorageFailure(): RateLimitStorageResult {
+function rateLimitStorageFailure(): RateLimitStorageFailure {
   return { ok: false, code: "rate_limit_storage_failed" };
 }
 
@@ -134,19 +154,8 @@ export const ADMIN_ACCOUNT_RATE_LIMIT: RateLimitConfig = {
 export async function isBlocked(
   identifier: string,
   config: RateLimitConfig = ADMIN_RATE_LIMIT,
-) {
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from(config.table)
-    .select("blocked_until")
-    .eq("identifier", identifier)
-    .maybeSingle();
-
-  if (error || !data?.blocked_until) {
-    return false;
-  }
-
-  return new Date(data.blocked_until).getTime() > Date.now();
+): Promise<RateLimitBlockingStateResult> {
+  return getBlockingState([identifier], config);
 }
 
 export async function persistRateLimitAttempt(
@@ -191,40 +200,75 @@ export async function recordAttempt(
   );
 }
 
+export async function readRateLimitBlockingState(
+  identifiers: string[],
+  readRows: RateLimitBlockingStateReader,
+): Promise<RateLimitBlockingStateResult> {
+  const uniqueIdentifiers = [...new Set(identifiers.filter(Boolean))];
+  if (uniqueIdentifiers.length === 0) {
+    return { ok: true, blocked: false };
+  }
+
+  let data: unknown;
+  let error: unknown;
+
+  try {
+    ({ data, error } = await readRows());
+  } catch {
+    return rateLimitStorageFailure();
+  }
+
+  if ((error !== null && error !== undefined) || !Array.isArray(data)) {
+    return rateLimitStorageFailure();
+  }
+
+  for (const row of data) {
+    if (!row || typeof row !== "object") {
+      return rateLimitStorageFailure();
+    }
+    const identifier = (row as { identifier?: unknown }).identifier;
+    const blockedUntilValue = (row as { blocked_until?: unknown }).blocked_until;
+    if (
+      typeof identifier !== "string" ||
+      !identifier ||
+      !uniqueIdentifiers.includes(identifier)
+    ) {
+      return rateLimitStorageFailure();
+    }
+    if (blockedUntilValue === null || blockedUntilValue === undefined) {
+      continue;
+    }
+    if (typeof blockedUntilValue !== "string") {
+      return rateLimitStorageFailure();
+    }
+    const blockedUntil = new Date(blockedUntilValue).getTime();
+    if (!Number.isFinite(blockedUntil)) {
+      return rateLimitStorageFailure();
+    }
+    if (blockedUntil > Date.now()) {
+      return {
+        ok: true,
+        blocked: true,
+        identifier,
+        blockedUntil: blockedUntilValue,
+      };
+    }
+  }
+
+  return { ok: true, blocked: false };
+}
+
 export async function getBlockingState(
   identifiers: string[],
   config: RateLimitConfig = ADMIN_RATE_LIMIT,
-) {
+): Promise<RateLimitBlockingStateResult> {
   const uniqueIdentifiers = [...new Set(identifiers.filter(Boolean))];
-  if (uniqueIdentifiers.length === 0) {
-    return null;
-  }
-
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from(config.table)
-    .select("identifier,blocked_until")
-    .in("identifier", uniqueIdentifiers);
-
-  if (error || !data) {
-    return null;
-  }
-
-  const activeBlock = data.find((row) => {
-    if (!row.blocked_until) {
-      return false;
-    }
-    return new Date(row.blocked_until).getTime() > Date.now();
-  });
-
-  if (!activeBlock?.identifier || !activeBlock.blocked_until) {
-    return null;
-  }
-
-  return {
-    identifier: activeBlock.identifier,
-    blockedUntil: activeBlock.blocked_until,
-  };
+  return readRateLimitBlockingState(uniqueIdentifiers, () =>
+    getSupabaseAdminClient()
+      .from(config.table)
+      .select("identifier,blocked_until")
+      .in("identifier", uniqueIdentifiers),
+  );
 }
 
 export async function recordAttemptBatch(

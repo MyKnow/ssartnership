@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { parseCouponCodeWorkbook } from "@/lib/ad-coupon-code-import.server";
 import { adPackageRepository } from "@/lib/repositories";
+import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { withServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
@@ -11,6 +12,15 @@ export async function POST(
   { params }: { params: Promise<{ couponId: string }> },
 ) {
   return withServerTiming(async (timing) => {
+    if (!isTrustedSameOriginRequest(request, {
+      expectedOrigin: request.nextUrl.origin,
+      allowedContentTypes: ["multipart/form-data"],
+    })) {
+      return NextResponse.json(
+        { ok: false, message: "요청을 확인해 주세요." },
+        { status: 403 },
+      );
+    }
     await timing.measure("auth", () => requireAdminPermission("home_ads", "update", { path: "/admin/advertisement" }));
     const couponId = decodeURIComponent((await params).couponId ?? "").trim();
     const formData = await request.formData();

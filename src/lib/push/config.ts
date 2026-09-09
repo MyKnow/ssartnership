@@ -4,7 +4,9 @@ export function wrapPushDbError(
   error: { message?: string | null } | null | undefined,
   message = "Push 데이터를 처리하지 못했습니다.",
 ) {
-  return new PushError("db_error", error?.message?.trim() || message);
+  const wrapped = new PushError("db_error", message);
+  wrapped.cause = error;
+  return wrapped;
 }
 
 export function getPushEnv() {

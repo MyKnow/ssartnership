@@ -1,3 +1,10 @@
+---
+title: Foundations
+type: design-system
+status: current
+authority: normative
+---
+
 # Foundations
 
 ## Color

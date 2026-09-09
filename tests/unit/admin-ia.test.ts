@@ -55,7 +55,7 @@ describe("admin IA helpers", () => {
         pageSize: "100",
       }),
     ).toEqual({
-      searchValue: "x".repeat(100),
+      searchValue: "x".repeat(80),
       categoryKey: "all",
       visibility: "all",
       sort: "recent",

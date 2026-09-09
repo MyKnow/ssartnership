@@ -4,11 +4,12 @@ import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import { clearAdminSession } from "@/lib/auth";
 import { setUserSession } from "@/lib/user-auth";
 import { verifyPassword } from "@/lib/password";
-import { getMemberRequiredPolicyStatus } from "@/lib/policy-documents";
+import { getMemberRequiredPolicyStatus } from "@/lib/policy-documents.server";
 import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { requiresMemberProfilePhotoUpdate } from "@/lib/member-profile-photo";
 import { classifyMemberLoginIdentifier } from "@/lib/member-domain";
 import { hashMemberEmailIdentifier } from "@/lib/member-email-verification";
+import { requiresMemberEmailRegistration } from "@/lib/member-required-gates";
 import {
   resolveActiveMemberForLoginWithSource,
   type LoginMemberResolution,
@@ -21,6 +22,10 @@ import {
 } from "@/lib/member-auth-security";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
+  JsonRequestBodyError,
+  readJsonRequestBodyWithinLimit,
+} from "@/lib/request-body-limit";
+import {
   getMockMemberById,
   isMockMemberAuthEnabled,
   MOCK_MEMBER_ID,
@@ -28,6 +33,7 @@ import {
 } from "@/lib/mock/member";
 
 export const runtime = "nodejs";
+const MAX_MEMBER_LOGIN_JSON_BODY_BYTES = 8 * 1024;
 
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
@@ -36,11 +42,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const payload = (await request.json()) as {
+    const payload = await readJsonRequestBodyWithinLimit<{
       identifier?: unknown;
       password?: unknown;
       autoLogin?: unknown;
-    };
+    }>(request, MAX_MEMBER_LOGIN_JSON_BODY_BYTES);
     const rawIdentifier = String(payload.identifier ?? "").trim();
     const password = String(payload.password ?? "").trim();
     const autoLogin = payload.autoLogin === true;
@@ -77,12 +83,28 @@ export async function POST(request: Request) {
           password_hash: null,
           password_salt: null,
           must_change_password: mockMember.mustChangePassword,
+          email_verified_at: null,
+          mattermost_login_disabled_at: null,
         },
         authenticationMethod: "manual",
       };
     } else {
       const blockedState = await getMemberAuthBlockingState("login", throttleContext);
-      if (blockedState) {
+      if (!blockedState.ok) {
+        await logAuthSecurity({
+          ...context,
+          eventName: "member_login",
+          status: "failure",
+          actorType: "guest",
+          properties: {
+            reason: blockedState.code,
+            provider: requestedProvider,
+          },
+        });
+        await delayMemberAuthAttempt("login", true);
+        return NextResponse.json({ error: "login_failed" }, { status: 503 });
+      }
+      if (blockedState.blocked) {
         await logAuthSecurity({
           ...context,
           eventName: "member_login",
@@ -145,6 +167,10 @@ export async function POST(request: Request) {
     const requiresProfilePhotoUpdate = requiresMemberProfilePhotoUpdate(
       photoState.reviewStatus,
     );
+    const requiresEmailRegistration = requiresMemberEmailRegistration({
+      mattermostLoginDisabledAt: member.mattermost_login_disabled_at,
+      emailVerifiedAt: member.email_verified_at,
+    });
     await setUserSession(member.id, Boolean(member.must_change_password), {
       persistent: autoLogin,
       authenticationMethod: resolvedLogin.authenticationMethod,
@@ -167,6 +193,7 @@ export async function POST(request: Request) {
         properties: {
           mustChangePassword: Boolean(member.must_change_password),
           requiresConsent: policyStatus.requiresConsent,
+          requiresEmailRegistration,
           requiresProfilePhotoUpdate,
           autoLogin,
           provider,
@@ -177,18 +204,24 @@ export async function POST(request: Request) {
       ok: true,
       mustChangePassword: Boolean(member.must_change_password),
       requiresConsent: policyStatus.requiresConsent,
+      requiresEmailRegistration,
       requiresProfilePhotoUpdate,
     });
-  } catch {
+  } catch (error) {
+    const bodyTooLarge =
+      error instanceof JsonRequestBodyError && error.code === "body_too_large";
     if (!isMockMemberAuthEnabled()) {
       await logAuthSecurity({
         ...context,
         eventName: "member_login",
         status: "failure",
         actorType: "guest",
-        properties: { reason: "exception" },
+        properties: { reason: bodyTooLarge ? "body_too_large" : "exception" },
       });
       await delayMemberAuthAttempt("login", true);
+    }
+    if (bodyTooLarge) {
+      return NextResponse.json({ error: "login_failed" }, { status: 413 });
     }
     return NextResponse.json({ error: "login_failed" }, { status: 503 });
   }

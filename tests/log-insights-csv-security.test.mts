@@ -36,3 +36,8 @@ test("CSV는 개행과 따옴표를 안전하게 이스케이프한다", () => {
   assert.match(csv, /""hello"" world"/);
   assert.doesNotMatch(csv, /\r|\n/);
 });
+
+test("CSV는 일반 문자열의 기존 따옴표 직렬화를 유지한다", () => {
+  const csv = serializeAdminLogsCsvRow(rowWithAction("plain-text"));
+  assert.match(csv, /"plain-text"/);
+});

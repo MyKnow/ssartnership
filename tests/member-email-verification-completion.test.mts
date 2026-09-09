@@ -354,12 +354,15 @@ test("회원 이메일 verify route는 원자 service에 위임하면서 기존 
   assert.match(route, /\^\\d\{6\}\$/);
   assert.match(route, /getMemberEmailVerificationBlockingState\("verify"/);
   assert.match(route, /status:\s*"blocked"/);
-  assert.match(route, /properties:\s*\{ stage:\s*"verify", reason:\s*"rate_limit" \}/);
+  assert.match(
+    route,
+    /logMemberEmailSecurity\(\{[\s\S]*?flow:\s*"verification"[\s\S]*?stage:\s*"verify"[\s\S]*?status:\s*"blocked"[\s\S]*?reason:\s*"rate_limit"/,
+  );
   assert.match(route, /hashMemberEmailVerificationCode/);
   assert.match(route, /buildReservedMemberIdentifierHashes/);
   assert.match(route, /completeMemberEmailVerification/);
   assert.match(route, /recordMemberEmailVerificationAttempt/);
-  assert.match(route, /eventName:\s*"member_email_verification"/);
+  assert.match(route, /logMemberEmailSecurity/);
   assert.doesNotMatch(route, /\.from\("members"\)/);
   assert.doesNotMatch(route, /\.from\("member_email_challenges"\)/);
   assert.doesNotMatch(route, /error\.message|String\(error\)|properties:\s*\{[^}]*email/);

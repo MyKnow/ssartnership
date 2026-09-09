@@ -8,8 +8,13 @@ async function waitForDirectoryControls(page: Page) {
   );
 }
 
+async function gotoDirectory(page: Page, href: string) {
+  await page.goto(href);
+  await page.evaluate(() => document.fonts.ready);
+  await waitForDirectoryControls(page);
+}
+
 async function typeSearch(page: Page, value: string) {
-  await page.waitForLoadState("networkidle");
   await waitForDirectoryControls(page);
   const searchInput = page.getByTestId("partner-search-input");
   await searchInput.fill(value);
@@ -26,9 +31,7 @@ test.describe("public partner discovery", () => {
       { width: 1366, height: 900, fullWidth: false },
     ]) {
       await page.setViewportSize(viewport);
-      await page.goto("/");
-      await page.waitForLoadState("networkidle");
-      await page.evaluate(() => document.fonts.ready);
+      await gotoDirectory(page, "/");
 
       const [carouselBox, directoryBox] = await Promise.all([
         page.locator("[data-promotion-carousel-media]").first().boundingBox(),
@@ -59,9 +62,7 @@ test.describe("public partner discovery", () => {
   test("keeps the mobile list summary compact without a separate detail action", async ({ page }) => {
     for (const width of [320, 360, 390]) {
       await page.setViewportSize({ width, height: 844 });
-      await page.goto("/?view=list#benefits");
-      await page.waitForLoadState("networkidle");
-      await page.evaluate(() => document.fonts.ready);
+      await gotoDirectory(page, "/?view=list#benefits");
 
       const card = page.getByTestId("partner-card").first();
       const detailAction = card.getByRole("link", { name: "제휴 상세 보기" });
@@ -120,8 +121,7 @@ test.describe("public partner discovery", () => {
 
     for (const scenario of scenarios) {
       await page.setViewportSize({ width: scenario.width, height: 1024 });
-      await page.goto("/?view=card#benefits");
-      await page.waitForLoadState("networkidle");
+      await gotoDirectory(page, "/?view=card#benefits");
 
       const filterPanel = page.getByTestId("partner-filter-panel");
       const resultsPane = page.getByTestId("partner-results-pane");
@@ -130,26 +130,20 @@ test.describe("public partner discovery", () => {
       await expect(resultsPane).toBeVisible();
       await expect(partnerGrid).toBeVisible();
 
-      const filterBox = await filterPanel.boundingBox();
-      const resultsBox = await resultsPane.boundingBox();
-      expect(filterBox).not.toBeNull();
-      expect(resultsBox).not.toBeNull();
-
-      if (!filterBox || !resultsBox) {
-        continue;
-      }
-
-      if (scenario.sidebar) {
-        expect(filterBox.x + filterBox.width).toBeLessThan(resultsBox.x);
-      } else {
-        expect(filterBox.y + filterBox.height).toBeLessThan(resultsBox.y);
-      }
-
-      const gridColumnCount = await partnerGrid.evaluate((element) =>
-        window.getComputedStyle(element).gridTemplateColumns.split(" ").filter(Boolean)
-          .length,
-      );
-      expect(gridColumnCount).toBe(scenario.columns);
+      // Read geometry in one browser frame: anchor scrolling or a late image
+      // layout must not mix coordinates from two different viewport states.
+      await expect.poll(() => page.evaluate((sidebar) => {
+        const filter = document.querySelector('[data-testid="partner-filter-panel"]');
+        const results = document.querySelector('[data-testid="partner-results-pane"]');
+        const grid = document.querySelector('[data-testid="partner-grid"]');
+        if (!filter || !results || !grid) return null;
+        const filterBox = filter.getBoundingClientRect();
+        const resultsBox = results.getBoundingClientRect();
+        return {
+          separated: sidebar ? filterBox.right < resultsBox.left : filterBox.bottom < resultsBox.top,
+          columns: getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length,
+        };
+      }, scenario.sidebar)).toEqual({ separated: true, columns: scenario.columns });
     }
   });
 
@@ -157,9 +151,7 @@ test.describe("public partner discovery", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 360, height: 844 });
-    await page.goto("/?view=list#benefits");
-    await page.waitForLoadState("networkidle");
-    await waitForDirectoryControls(page);
+    await gotoDirectory(page, "/?view=list#benefits");
 
     const searchBox = await page.getByTestId("partner-search-input").boundingBox();
     const disclosure = page.getByTestId("partner-mobile-filter-disclosure");
@@ -180,8 +172,7 @@ test.describe("public partner discovery", () => {
     }
 
     await page.setViewportSize({ width: 1024, height: 900 });
-    await page.goto("/?view=list#benefits");
-    await page.waitForLoadState("networkidle");
+    await gotoDirectory(page, "/?view=list#benefits");
 
     const tabletCard = page.getByTestId("partner-card").first();
     await expect(tabletCard.getByText("혜택", { exact: true })).toBeHidden();
@@ -204,8 +195,7 @@ test.describe("public partner discovery", () => {
     }
 
     await page.setViewportSize({ width: 1366, height: 900 });
-    await page.goto("/?view=list#benefits");
-    await page.waitForLoadState("networkidle");
+    await gotoDirectory(page, "/?view=list#benefits");
 
     const firstCard = page.getByTestId("partner-card").first();
     await expect(firstCard.getByText("혜택", { exact: true })).toBeVisible();
@@ -217,8 +207,7 @@ test.describe("public partner discovery", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 320, height: 844 });
-    await page.goto("/#benefits");
-    await waitForDirectoryControls(page);
+    await gotoDirectory(page, "/#benefits");
 
     await page
       .getByTestId("partner-mobile-filter-disclosure")
@@ -251,9 +240,7 @@ test.describe("public partner discovery", () => {
 
   test("keeps applied filters visible and individually removable", async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 844 });
-    await page.goto("/#benefits");
-    await page.waitForLoadState("networkidle");
-    await waitForDirectoryControls(page);
+    await gotoDirectory(page, "/#benefits");
 
     await page.getByTestId("partner-mobile-filter-disclosure").click();
     await page
@@ -271,9 +258,7 @@ test.describe("public partner discovery", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
-    await page.goto("/?campaign=summer#benefits");
-    await page.waitForLoadState("networkidle");
-    await waitForDirectoryControls(page);
+    await gotoDirectory(page, "/?campaign=summer#benefits");
     await expect(page.getByTestId("partner-grid")).toBeVisible();
 
     const filterRscRequests: string[] = [];
@@ -356,8 +341,7 @@ test.describe("public partner discovery", () => {
   });
 
   test("lists partners and opens a public partner detail page", async ({ page }) => {
-    await page.goto("/");
-    await waitForDirectoryControls(page);
+    await gotoDirectory(page, "/");
 
     const cards = page.getByTestId("partner-card");
     await expect(cards.first()).toBeVisible();
@@ -376,11 +360,10 @@ test.describe("public partner discovery", () => {
     ]);
 
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await page.waitForLoadState("networkidle");
   });
 
   test("opens a public partner detail page from the card surface", async ({ page }) => {
-    await page.goto("/#benefits");
+    await gotoDirectory(page, "/#benefits");
 
     const card = page.getByTestId("partner-card").first();
     await expect(card).toBeVisible();
@@ -396,7 +379,7 @@ test.describe("public partner discovery", () => {
 
   test("does not render a scroll-to-top FAB on mobile partner detail", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/#benefits");
+    await gotoDirectory(page, "/#benefits");
 
     const card = page.getByTestId("partner-card").first();
     await expect(card).toBeVisible();
@@ -408,7 +391,7 @@ test.describe("public partner discovery", () => {
   });
 
   test("filters partners by search keyword and shows an empty state", async ({ page }) => {
-    await page.goto("/");
+    await gotoDirectory(page, "/");
 
     const cards = page.getByTestId("partner-card");
 
@@ -439,8 +422,14 @@ test.describe("public partner discovery", () => {
   });
 
   test("applies a partner search only after an explicit submit", async ({ page }) => {
-    await page.goto("/#benefits");
-    await waitForDirectoryControls(page);
+    await gotoDirectory(page, "/#benefits");
+    const searchNavigations: string[] = [];
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (request.headers().rsc === "1" && url.pathname === "/" && url.searchParams.has("q")) {
+        searchNavigations.push(request.url());
+      }
+    });
 
     const cards = page.getByTestId("partner-card");
     const initialCount = await cards.count();
@@ -463,18 +452,30 @@ test.describe("public partner discovery", () => {
     await searchInput.press("Enter");
     await expect(page).toHaveURL(/q=/);
     await expect(cards).toHaveCount(1);
+    expect(searchNavigations).toEqual([]);
+    expect(new URL(page.url()).hash).toBe("#benefits");
 
     await searchInput.fill("");
     await expect(page).toHaveURL(/q=/);
     await page.getByRole("button", { name: "검색", exact: true }).click();
     await expect(page).not.toHaveURL(/q=/);
     await expect(cards).toHaveCount(initialCount);
+    expect(new URL(page.url()).hash).toBe("#benefits");
+    await page.goBack();
+    await expect(page).toHaveURL(/q=/);
+    await expect(searchInput).toHaveValue(firstPartnerName);
+    await expect(cards).toHaveCount(1);
+    await page.goForward();
+    await expect(page).not.toHaveURL(/q=/);
+    await expect(searchInput).toHaveValue("");
+    await expect(cards).toHaveCount(initialCount);
+    expect(searchNavigations).toEqual([]);
   });
 
   test("uses a clean detail URL and restores a submitted search with browser back", async ({
     page,
   }) => {
-    await page.goto("/");
+    await gotoDirectory(page, "/");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     const benefitsSection = page.locator("#benefits");
     await benefitsSection.scrollIntoViewIfNeeded();
@@ -511,6 +512,7 @@ test.describe("public partner discovery", () => {
     await expect(page).toHaveURL(/\/partners\/[^?#]+$/);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await page.goBack();
+    await waitForDirectoryControls(page);
 
     await expect(page).toHaveURL(directoryUrl);
     await expect(page.getByTestId("partner-search-input")).toHaveValue(firstPartnerName);
@@ -521,6 +523,7 @@ test.describe("public partner discovery", () => {
     await expect(page).toHaveURL(/\/partners\/[^?#]+$/);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await page.goBack();
+    await waitForDirectoryControls(page);
 
     await expect(page).toHaveURL(directoryUrl);
     await expect(page.getByTestId("partner-search-input")).toHaveValue(firstPartnerName);

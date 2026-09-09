@@ -3,6 +3,7 @@ import { sanitizeReturnTo } from "@/lib/return-to";
 export const MEMBER_REQUIRED_GATE_PATHS = {
   "change-password": "/auth/change-password",
   consent: "/auth/consent",
+  "email-registration": "/certification/email",
   "profile-photo": "/certification/photo",
 } as const;
 
@@ -11,8 +12,19 @@ export type MemberRequiredGate = keyof typeof MEMBER_REQUIRED_GATE_PATHS;
 type MemberRequiredGateState = {
   mustChangePassword?: boolean;
   requiresConsent?: boolean;
+  requiresEmailRegistration?: boolean;
   requiresProfilePhotoUpdate?: boolean;
 };
+
+export function requiresMemberEmailRegistration({
+  mattermostLoginDisabledAt,
+  emailVerifiedAt,
+}: {
+  mattermostLoginDisabledAt?: string | null;
+  emailVerifiedAt?: string | null;
+}) {
+  return Boolean(mattermostLoginDisabledAt && !emailVerifiedAt);
+}
 
 type MemberRequiredGateRedirectInput = MemberRequiredGateState & {
   currentPath?: string | null;
@@ -27,10 +39,12 @@ function getPathname(candidate: string | null | undefined) {
 export function resolveMemberRequiredGate({
   mustChangePassword = false,
   requiresConsent = false,
+  requiresEmailRegistration = false,
   requiresProfilePhotoUpdate = false,
 }: MemberRequiredGateState): MemberRequiredGate | null {
   if (mustChangePassword) return "change-password";
   if (requiresConsent) return "consent";
+  if (requiresEmailRegistration) return "email-registration";
   if (requiresProfilePhotoUpdate) return "profile-photo";
   return null;
 }

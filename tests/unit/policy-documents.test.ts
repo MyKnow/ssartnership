@@ -198,7 +198,7 @@ async function loadPolicyDocumentsModule({
   process.env.SUPABASE_URL = useMockData ? "" : "https://example.supabase.co";
   process.env.SUPABASE_SERVICE_ROLE_KEY = useMockData ? "" : "service-role-key";
 
-  return import("../../src/lib/policy-documents");
+  return import("../../src/lib/policy-documents.server");
 }
 
 beforeEach(() => {

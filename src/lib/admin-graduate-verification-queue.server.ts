@@ -46,7 +46,7 @@ export async function getAdminGraduateVerificationRequestQueueReadModel({
     const requestsResult = await supabase
       .from("graduate_verification_requests")
       .select(
-        "id,email,legal_name,education_start_year,education_start_month,education_end_year,education_end_month,inferred_generation,campus,request_kind,recovery_member_id,status,profile_image_id,created_at",
+        "id,email,legal_name,inferred_generation,inferred_cohort,campus,request_kind,recovery_member_id,status,profile_image_id,created_at",
         { count: "exact" },
       )
       .in("status", ["submitted", "in_review"])

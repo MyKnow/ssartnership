@@ -14,6 +14,7 @@ import {
   getPartnerPortalPasswordChangeErrorStatus,
   PartnerPortalPasswordChangeError,
 } from "@/lib/partner-password-errors";
+import { PartnerPortalRouteBodyError, readPartnerPortalJsonBody } from "@/lib/partner-auth/route-body";
 import { getPartnerSession, setPartnerSession } from "@/lib/partner-session";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
@@ -61,7 +62,26 @@ export async function POST(request: Request) {
       "change-password",
       throttleContext,
     );
-    if (blockedState) {
+    if (!blockedState.ok) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "partner_password_change",
+        status: "failure",
+        actorType: "partner",
+        actorId: sessionAccountId,
+        identifier: sessionLoginId,
+        properties: { reason: blockedState.code },
+      });
+      await delayPartnerAuthAttempt("change-password", true);
+      return NextResponse.json(
+        {
+          error: "change_failed",
+          message: "비밀번호 변경에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+        },
+        { status: 503 },
+      );
+    }
+    if (blockedState.blocked) {
       await logAuthSecurity({
         ...context,
         eventName: "partner_password_change",
@@ -79,10 +99,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "blocked" }, { status: 429 });
     }
 
-    const payload = (await request.json()) as {
+    const payload = await readPartnerPortalJsonBody<{
       currentPassword?: string;
       nextPassword?: string;
-    };
+    }>(request);
     const currentPassword = String(payload.currentPassword ?? "").trim();
     const nextPassword = String(payload.nextPassword ?? "").trim();
     if (!currentPassword || !nextPassword) {
@@ -132,6 +152,36 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof PartnerPortalRouteBodyError) {
+      await logAuthSecurity({
+        ...context,
+        eventName: "partner_password_change",
+        status: "failure",
+        actorType: sessionAccountId ? "partner" : "guest",
+        actorId: sessionAccountId || null,
+        identifier: sessionLoginId || null,
+        properties: {
+          reason: "invalid_body",
+        },
+      });
+      await recordPartnerAuthAttempt(
+        "change-password",
+        {
+          ipAddress: context.ipAddress ?? null,
+          accountIdentifier: sessionLoginId || null,
+        },
+        false,
+      ).catch(() => undefined);
+      await delayPartnerAuthAttempt("change-password");
+      return NextResponse.json(
+        {
+          error: "invalid_body",
+          message: error.message,
+        },
+        { status: 400 },
+      );
+    }
+
     if (error instanceof PartnerPortalPasswordChangeError) {
       await logAuthSecurity({
         ...context,

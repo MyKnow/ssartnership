@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getRequestLogContext, scheduleProductEventLog } from "@/lib/activity-logs";
+import { getSafePublicRouteError } from "@/lib/public-route-safe-errors";
 import { partnerReviewRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
@@ -9,10 +10,11 @@ import {
 import {
   ensurePartnerReviewModerationAccess,
   ensureVisibleReviewPartner,
+  getReviewMediaInputFieldErrors,
   getReviewMemberSession,
-  parseReviewFormFields,
+  isReviewImageUploadUnavailable,
   parseReviewListParams,
-  parseRequestedReviewId,
+  readPartnerReviewSubmission,
   resolveReviewMediaPayload,
 } from "./_shared";
 
@@ -64,7 +66,7 @@ export async function POST(
 ) {
   if (
     !isTrustedSameOriginRequest(request, {
-      allowedContentTypes: ["multipart/form-data"],
+      allowedContentTypes: ["application/json"],
     })
   ) {
     return NextResponse.json(
@@ -87,16 +89,22 @@ export async function POST(
     return NextResponse.json({ ok: false, message: "대상을 찾을 수 없습니다." }, { status: 404 });
   }
 
-  const formData = await request.formData();
-  const parsed = parseReviewFormFields(formData);
-  if (!parsed.ok) {
+  const submission = await readPartnerReviewSubmission(request);
+  if (!submission.ok) {
     return NextResponse.json(
-      { ok: false, fieldErrors: parsed.fieldErrors },
-      { status: 400 },
+      {
+        ok: false,
+        ...(submission.message ? { message: submission.message } : {}),
+        ...(submission.fieldErrors
+          ? { fieldErrors: submission.fieldErrors }
+          : {}),
+      },
+      { status: submission.status },
     );
   }
+  const payload = submission.values;
 
-  const reviewId = parseRequestedReviewId(formData) ?? randomUUID();
+  const reviewId = payload.reviewId ?? randomUUID();
   const existingReview = await partnerReviewRepository.getPartnerReviewById(
     reviewId,
     session.userId,
@@ -111,15 +119,20 @@ export async function POST(
   let uploadedUrls: string[] = [];
 
   try {
-    const media = await resolveReviewMediaPayload(formData, id, reviewId, session.userId);
+    const media = await resolveReviewMediaPayload(
+      payload.imagesManifest,
+      id,
+      reviewId,
+      session.userId,
+    );
     uploadedUrls = media.uploadedUrls;
     const review = await partnerReviewRepository.createPartnerReview({
       reviewId,
       partnerId: id,
       memberId: session.userId,
-      rating: parsed.rating,
-      title: parsed.title,
-      body: parsed.body,
+      rating: payload.rating,
+      title: payload.title,
+      body: payload.body,
       images: media.images,
     });
     const summary = await partnerReviewRepository.getPartnerReviewSummary(id);
@@ -132,12 +145,29 @@ export async function POST(
       targetId: review.id,
       properties: {
         partnerId: id,
-        rating: parsed.rating,
+        rating: payload.rating,
         imageCount: media.images.length,
       },
     });
     return NextResponse.json({ ok: true, review, summary });
   } catch (error) {
+    if (isReviewImageUploadUnavailable(error)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "image_upload_unavailable",
+          message: "현재 환경에서는 이미지 업로드를 사용할 수 없습니다.",
+        },
+        { status: 503 },
+      );
+    }
+    const mediaFieldErrors = getReviewMediaInputFieldErrors(error);
+    if (mediaFieldErrors) {
+      return NextResponse.json(
+        { ok: false, fieldErrors: mediaFieldErrors },
+        { status: 400 },
+      );
+    }
     const retriedReview = await partnerReviewRepository
       .getPartnerReviewById(reviewId, session.userId)
       .catch(() => null);
@@ -150,10 +180,14 @@ export async function POST(
       return NextResponse.json({ ok: true, review: retriedReview, summary, idempotent: true });
     }
     await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : "리뷰 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.";
-    return NextResponse.json({ ok: false, message }, { status: 503 });
+    console.error("[partner-reviews] create failed", error);
+    const safeError = getSafePublicRouteError(
+      error,
+      "리뷰 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    return NextResponse.json(
+      { ok: false, message: safeError.message },
+      { status: safeError.status },
+    );
   }
 }

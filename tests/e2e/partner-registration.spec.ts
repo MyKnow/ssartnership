@@ -1,14 +1,15 @@
 import { expect, test } from "@playwright/test";
+import { waitForPageReady } from "./page-ready";
 
 test("@critical partner registration reaches a review-ready submit through all five steps", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 360, height: 844 });
   await page.goto("/partner-registration");
-  await page.waitForLoadState("networkidle");
 
   const stepProgress = page.getByRole("navigation", { name: "파트너 등록 단계" });
   const currentStep = stepProgress.locator('button[aria-current="step"]:visible');
+  await waitForPageReady(page, currentStep);
   await expect(currentStep).toContainText("1");
   await page.getByLabel(/^제휴처명/).fill("E2E 테스트 제휴처");
   await page.getByLabel(/^카테고리/).fill("카페");

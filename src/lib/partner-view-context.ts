@@ -1,5 +1,5 @@
 import { resolvePartnerAudienceFromMemberYear } from "@/lib/partner-audience";
-import { getMemberCanonicalProfile } from "@/lib/member-profile-view";
+import { getMemberAudienceSnapshot } from "@/lib/member-audience-snapshot";
 import type { PartnerViewContext } from "@/lib/repositories/partner-repository";
 
 export async function getPartnerViewerContext(
@@ -9,7 +9,7 @@ export async function getPartnerViewerContext(
     return { authenticated: false };
   }
 
-  const member = await getMemberCanonicalProfile(userId);
+  const member = await getMemberAudienceSnapshot(userId);
 
   return {
     authenticated: true,

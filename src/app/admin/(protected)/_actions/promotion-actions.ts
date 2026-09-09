@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { getAdminSession } from "@/lib/auth";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -20,13 +20,17 @@ import {
   sendEventRewardWinnerTestNotification,
   sendEventRewardWinnerNotifications,
 } from "@/lib/promotions/event-rewards";
-import { getManagedEventCampaign } from "@/lib/promotions/events";
+import {
+  getManagedEventCampaign,
+  PROMOTION_EVENTS_CACHE_TAG,
+  PROMOTION_SLIDES_CACHE_TAG,
+} from "@/lib/promotions/events";
 import {
   deletePromotionSlideImageUrls,
 } from "@/lib/promotion-slide-storage-server";
 import { resolveImageUploadActorForServerAction } from "@/lib/image-upload/auth.server";
 import { resolveImageTransformPolicy } from "@/lib/image-upload/policy";
-import { getImageUploadRepository } from "@/lib/image-upload/repository.supabase";
+import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { PROMOTION_SLIDES_BUCKET } from "@/lib/promotion-slide-storage";
 import { logAdminAction } from "./shared-helpers";
 
@@ -135,6 +139,8 @@ function parseDateTimeLocal(value: string) {
 }
 
 function revalidatePromotionPaths(slug: string) {
+  revalidateTag(PROMOTION_EVENTS_CACHE_TAG, "max");
+  revalidateTag(PROMOTION_SLIDES_CACHE_TAG, "max");
   revalidatePath("/");
   revalidatePath("/admin");
   revalidatePath("/admin/advertisement");
@@ -304,6 +310,8 @@ function parsePromotionSlideDrafts(formData: FormData) {
 }
 
 function revalidateAdvertisementPaths() {
+  revalidateTag(PROMOTION_EVENTS_CACHE_TAG, "max");
+  revalidateTag(PROMOTION_SLIDES_CACHE_TAG, "max");
   revalidatePath("/");
   revalidatePath("/admin");
   revalidatePath("/admin/advertisement");

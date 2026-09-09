@@ -1,14 +1,15 @@
 import { createHash, randomBytes } from "node:crypto";
 import { getMemberNotificationPreferences } from "@/lib/notification-preferences";
 import { fetchMemberVisibleReviewCountInRange } from "@/lib/partner-counts";
-import { collectPagedRows } from "@/lib/log-insights/paging";
+import { collectPagedRows } from "@/lib/supabase/paging";
 import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
-import { getPolicyDocumentByKind } from "@/lib/policy-documents";
+import { getPolicyDocumentByKind } from "@/lib/policy-documents.server";
 import { getPushPreferencesOrDefault } from "@/lib/push";
 import {
   sendAdminNotificationCampaign,
   type AdminNotificationComposerInput,
 } from "@/lib/admin-notification-ops";
+import { toCsvCell } from "@/lib/csv";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type { EventCampaign, EventConditionKey } from "@/lib/promotions/catalog";
 
@@ -409,11 +410,6 @@ export function buildEventRewardAdminOverview(
   };
 }
 
-function csvCell(value: string | number | null | undefined) {
-  const text = String(value ?? "");
-  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
-}
-
 function conditionStatusLabel(
   row: EventRewardAdminMemberRow,
   key: EventConditionKey,
@@ -462,7 +458,7 @@ export function createEventRewardCsv(overview: EventRewardAdminOverview) {
   ]);
 
   return `\uFEFF${[headers, ...rows]
-    .map((row) => row.map((value) => csvCell(value)).join(","))
+    .map((row) => row.map((value) => toCsvCell(value)).join(","))
     .join("\n")}`;
 }
 
@@ -550,7 +546,7 @@ export function createEventRewardComparisonCsv(
   ]);
 
   return `\uFEFF${[headers, ...rows]
-    .map((row) => row.map((value) => csvCell(value)).join(","))
+    .map((row) => row.map((value) => toCsvCell(value)).join(","))
     .join("\n")}`;
 }
 

@@ -140,9 +140,10 @@ export interface WalletPassRepository {
     memberId: string;
     platform: WalletPassPlatform;
   }): Promise<MemberWalletPass | null>;
-  listAppleWalletDeviceRegistrationsForPass(
-    passId: string,
-  ): Promise<AppleWalletDeviceRegistration[]>;
+  listAppleWalletDeviceRegistrationsForPass(input: {
+    passId: string;
+    limit: number;
+  }): Promise<AppleWalletDeviceRegistration[]>;
   listAppleWalletPassesForReconciliation(input: {
     afterPassId?: string | null;
     limit: number;

@@ -170,13 +170,13 @@ export type PartnerChangeRequestCancelInput = {
 export type PartnerChangeRequestReviewInput = {
   requestId: string;
   adminId: string;
-  auditContext?: AtomicAuditContext;
+  auditContext: AtomicAuditContext;
 };
 
 export type PartnerImmediateUpdateInput = {
   companyIds: string[];
   partnerId: string;
-  auditContext?: AtomicAuditContext;
+  auditContext: AtomicAuditContext;
   thumbnail: string | null;
   images: string[];
   tags: string[];

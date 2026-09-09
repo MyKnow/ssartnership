@@ -5,9 +5,9 @@ import {
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import Image from "next/image";
-import { useEffect, useRef, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { cn } from "@/lib/cn";
-import { isProxiedCachedImageUrl } from "@/lib/image-cache";
+import CarouselSlideIndicators from "@/components/ui/CarouselSlideIndicators";
 
 type HorizontalSwipeHandler = (clientX: number) => void;
 type HorizontalWheelHandler = (deltaX: number, deltaY: number) => boolean;
@@ -20,6 +20,7 @@ function PreviewCard({
   name,
   position,
   depth,
+  visibleFrom,
   onSelect,
   shouldIgnoreClick,
 }: {
@@ -28,6 +29,7 @@ function PreviewCard({
   name: string;
   position: "previous" | "next";
   depth: number;
+  visibleFrom: "sm" | "md";
   onSelect: (index: number) => void;
   shouldIgnoreClick: () => boolean;
 }) {
@@ -43,22 +45,28 @@ function PreviewCard({
         aria-hidden="true"
         data-partner-image-carousel-preview={position}
         className={cn(
-          "pointer-events-none absolute top-1/2 aspect-[4/3] -translate-y-1/2 overflow-hidden rounded-card border border-border bg-surface-muted shadow-flat",
-      )}
-      style={{
-        width: `${widthPercent}%`,
-        [position === "previous" ? "left" : "right"]: `${insetPercent}%`,
-        zIndex: 10 - depth,
-        opacity: Math.max(0.42, 1 - (depth - 1) * 0.18),
-      }}
+          "pointer-events-none absolute top-1/2 hidden aspect-[4/3] -translate-y-1/2 overflow-hidden rounded-card border border-border bg-surface-muted shadow-flat",
+          visibleFrom === "sm" ? "sm:block" : "md:block",
+        )}
+        style={{
+          width: `${widthPercent}%`,
+          [position === "previous" ? "left" : "right"]: `${insetPercent}%`,
+          zIndex: 10 - depth,
+          opacity: Math.max(0.42, 1 - (depth - 1) * 0.18),
+        }}
       >
         <Image
           src={image}
           alt=""
           fill
-          sizes="(min-width: 768px) 46vw, 100vw"
+          sizes={
+            visibleFrom === "sm"
+              ? "(min-width: 640px) 46vw, 100vw"
+              : "(min-width: 768px) 46vw, 100vw"
+          }
           className="scale-[1.04] object-cover blur-[1.5px] saturate-75"
-          unoptimized={isProxiedCachedImageUrl(image)}
+          loading={depth === 1 ? "eager" : "lazy"}
+          fetchPriority={depth === 1 ? "auto" : "low"}
         />
         <span
           aria-hidden="true"
@@ -67,7 +75,10 @@ function PreviewCard({
       </div>
       <button
         type="button"
-        className="absolute top-1/2 z-20 -translate-y-1/2 rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+        className={cn(
+          "absolute top-1/2 z-20 hidden -translate-y-1/2 rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+          visibleFrom === "sm" ? "sm:block" : "md:block",
+        )}
         style={{
           width: `${exposedWidthPercent}%`,
           height: `${(widthPercent / ACTIVE_WIDTH_PERCENT) * 100}%`,
@@ -100,6 +111,10 @@ export default function TabletImageCarousel({
   onSwipeCancel,
   shouldIgnoreSwipeClick,
   onHorizontalWheel,
+  visibleFrom = "md",
+  imageFit = "cover",
+  mobileFullBleed = false,
+  priority = false,
 }: {
   images: string[];
   name: string;
@@ -116,8 +131,13 @@ export default function TabletImageCarousel({
   onSwipeCancel: () => void;
   shouldIgnoreSwipeClick: () => boolean;
   onHorizontalWheel: HorizontalWheelHandler;
+  visibleFrom?: "sm" | "md";
+  imageFit?: "cover" | "contain";
+  mobileFullBleed?: boolean;
+  priority?: boolean;
 }) {
   const carouselSurfaceRef = useRef<HTMLDivElement | null>(null);
+  const [isExpandedCarousel, setIsExpandedCarousel] = useState(false);
   const activeImage = images[activeIndex];
   const firstPreviousIndex = Math.max(0, activeIndex - 3);
   const previousPreviews = images
@@ -140,6 +160,21 @@ export default function TabletImageCarousel({
   const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
     onSwipeEnd(event.clientX);
   };
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(
+      visibleFrom === "sm" ? "(min-width: 640px)" : "(min-width: 768px)",
+    );
+    const updateExpandedCarousel = () => {
+      setIsExpandedCarousel(mediaQuery.matches);
+    };
+
+    updateExpandedCarousel();
+    mediaQuery.addEventListener("change", updateExpandedCarousel);
+    return () => {
+      mediaQuery.removeEventListener("change", updateExpandedCarousel);
+    };
+  }, [visibleFrom]);
 
   useEffect(() => {
     const surface = carouselSurfaceRef.current;
@@ -167,33 +202,47 @@ export default function TabletImageCarousel({
     <section
       aria-label={`${name} 이미지`}
       data-partner-image-tablet-carousel
-      className="hidden min-w-0 md:block"
+      data-partner-image-carousel-expanded={isExpandedCarousel}
+      className="min-w-0"
     >
       <div
         ref={carouselSurfaceRef}
-        className="relative isolate flex min-w-0 items-center justify-center overflow-hidden py-4 touch-pan-y overscroll-x-none"
+        className={cn(
+          "relative isolate flex min-w-0 items-center justify-center overflow-hidden p-0 touch-pan-y overscroll-x-none",
+          visibleFrom === "sm" ? "sm:py-4" : "md:py-4",
+        )}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerCancel={onSwipeCancel}
       >
-        {previousPreviews.map(({ image, index, depth }) => (
-          <PreviewCard
-            image={image}
-            index={index}
-            name={name}
-            position="previous"
-            depth={depth}
-            onSelect={onSelect}
-            shouldIgnoreClick={shouldIgnoreSwipeClick}
-            key={`previous-${image}-${index}`}
-          />
-        ))}
+        {isExpandedCarousel
+          ? previousPreviews.map(({ image, index, depth }) => (
+              <PreviewCard
+                image={image}
+                index={index}
+                name={name}
+                position="previous"
+                depth={depth}
+                visibleFrom={visibleFrom}
+                onSelect={onSelect}
+                shouldIgnoreClick={shouldIgnoreSwipeClick}
+                key={`previous-${image}-${index}`}
+              />
+            ))
+          : null}
 
         <button
           key={activeIndex}
           type="button"
+          data-partner-image-main-frame
           data-partner-image-carousel-active
-          className="relative z-10 aspect-[4/3] w-[65%] overflow-hidden rounded-card border border-primary bg-surface-muted shadow-flat focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          className={cn(
+            "relative z-10 aspect-[4/3] w-full overflow-hidden border border-border bg-surface-muted shadow-flat focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+            mobileFullBleed ? "rounded-none" : "rounded-3xl",
+            visibleFrom === "sm"
+              ? "sm:w-[65%] sm:rounded-card sm:border-primary"
+              : "md:w-[65%] md:rounded-card md:border-primary",
+          )}
           onClick={() => {
             if (!shouldIgnoreSwipeClick()) {
               onOpen();
@@ -213,43 +262,76 @@ export default function TabletImageCarousel({
               src={activeImage}
               alt={name}
               fill
-              sizes="(min-width: 768px) 65vw, 100vw"
-              className="object-cover"
-              unoptimized={isProxiedCachedImageUrl(activeImage)}
-              priority={activeIndex < 2}
+              sizes={
+                visibleFrom === "sm"
+                  ? "(max-width: 639px) 100vw, 65vw"
+                  : "(max-width: 767px) 100vw, 65vw"
+              }
+              className={imageFit === "contain" ? "object-contain" : "object-cover"}
+              loading="eager"
+              fetchPriority={priority ? "high" : undefined}
+              priority={priority}
             />
           </span>
         </button>
 
-        {nextPreviews.map(({ image, index, depth }) => (
-          <PreviewCard
-            image={image}
-            index={index}
-            name={name}
-            position="next"
-            depth={depth}
-            onSelect={onSelect}
-            shouldIgnoreClick={shouldIgnoreSwipeClick}
-            key={`next-${image}-${index}`}
-          />
-        ))}
+        {!isExpandedCarousel && mobileFullBleed && images.length > 1 ? (
+          <div
+            className={cn(
+              "absolute inset-x-0 bottom-3 z-20 flex justify-center px-4",
+              visibleFrom === "sm" ? "sm:hidden" : "md:hidden",
+            )}
+          >
+            <div className="rounded-full border border-white/25 bg-black/35 px-3 py-1 shadow-flat backdrop-blur-md">
+              <CarouselSlideIndicators
+                labels={images.map(
+                  (_, index) => `${name} 이미지 ${index + 1} 선택`,
+                )}
+                activeIndex={activeIndex}
+                onSelect={onSelect}
+              />
+            </div>
+          </div>
+        ) : null}
 
-        {canGoPrev ? (
+        {isExpandedCarousel
+          ? nextPreviews.map(({ image, index, depth }) => (
+              <PreviewCard
+                image={image}
+                index={index}
+                name={name}
+                position="next"
+                depth={depth}
+                visibleFrom={visibleFrom}
+                onSelect={onSelect}
+                shouldIgnoreClick={shouldIgnoreSwipeClick}
+                key={`next-${image}-${index}`}
+              />
+            ))
+          : null}
+
+        {isExpandedCarousel && canGoPrev ? (
           <button
             type="button"
             onClick={onPrev}
             aria-label="이전 이미지"
-            className="absolute inset-y-0 left-0 z-20 my-auto hidden h-11 w-11 items-center justify-center rounded-full border border-border bg-surface/90 text-foreground shadow-flat backdrop-blur transition-interactive hover:border-strong hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:inline-flex"
+            className={cn(
+              "absolute inset-y-0 left-0 z-20 my-auto hidden h-11 w-11 items-center justify-center rounded-full border border-border bg-surface/90 text-foreground shadow-flat backdrop-blur transition-interactive hover:border-strong hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+              visibleFrom === "sm" ? "sm:inline-flex" : "md:inline-flex",
+            )}
           >
             <ChevronLeftIcon className="h-5 w-5" aria-hidden="true" />
           </button>
         ) : null}
-        {canGoNext ? (
+        {isExpandedCarousel && canGoNext ? (
           <button
             type="button"
             onClick={onNext}
             aria-label="다음 이미지"
-            className="absolute inset-y-0 right-0 z-20 my-auto hidden h-11 w-11 items-center justify-center rounded-full border border-border bg-surface/90 text-foreground shadow-flat backdrop-blur transition-interactive hover:border-strong hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:inline-flex"
+            className={cn(
+              "absolute inset-y-0 right-0 z-20 my-auto hidden h-11 w-11 items-center justify-center rounded-full border border-border bg-surface/90 text-foreground shadow-flat backdrop-blur transition-interactive hover:border-strong hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+              visibleFrom === "sm" ? "sm:inline-flex" : "md:inline-flex",
+            )}
           >
             <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
           </button>

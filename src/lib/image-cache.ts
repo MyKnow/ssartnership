@@ -1,6 +1,23 @@
 const PROXY_PREFIX = "/api/image?url=";
+const MAX_WARMED_IMAGE_URLS = 256;
 const warmedImageUrls = new Set<string>();
 const pendingImagePreloads = new Map<string, Promise<void>>();
+
+function rememberWarmedImageUrl(url: string) {
+  if (warmedImageUrls.has(url)) {
+    return;
+  }
+
+  warmedImageUrls.add(url);
+  if (warmedImageUrls.size <= MAX_WARMED_IMAGE_URLS) {
+    return;
+  }
+
+  const oldestUrl = warmedImageUrls.values().next().value;
+  if (oldestUrl) {
+    warmedImageUrls.delete(oldestUrl);
+  }
+}
 
 function shouldBypassProxy(src: string) {
   if (
@@ -27,7 +44,10 @@ export function isProxiedCachedImageUrl(src?: string | null) {
   return Boolean(src?.startsWith(PROXY_PREFIX));
 }
 
-export function preloadCachedImageUrl(src?: string | null) {
+export function preloadCachedImageUrl(
+  src?: string | null,
+  responsive?: { srcSet?: string; sizes?: string },
+) {
   if (typeof window === "undefined") {
     return Promise.resolve();
   }
@@ -51,7 +71,7 @@ export function preloadCachedImageUrl(src?: string | null) {
         return;
       }
       settled = true;
-      warmedImageUrls.add(url);
+      rememberWarmedImageUrl(url);
       resolve();
     };
 
@@ -66,6 +86,12 @@ export function preloadCachedImageUrl(src?: string | null) {
     image.decoding = "async";
     image.onload = finish;
     image.onerror = fail;
+    if (responsive?.srcSet) {
+      image.srcset = responsive.srcSet;
+    }
+    if (responsive?.sizes) {
+      image.sizes = responsive.sizes;
+    }
     image.src = url;
 
     if (typeof image.decode === "function") {
@@ -85,8 +111,11 @@ export function preloadCachedImageUrls(
   return Promise.allSettled(urls.map((url) => preloadCachedImageUrl(url)));
 }
 
-export function warmCachedImageUrl(src?: string | null) {
-  void preloadCachedImageUrl(src).catch(() => undefined);
+export function warmCachedImageUrl(
+  src?: string | null,
+  responsive?: { srcSet?: string; sizes?: string },
+) {
+  void preloadCachedImageUrl(src, responsive).catch(() => undefined);
 }
 
 export function warmCachedImageUrls(urls: Array<string | null | undefined>) {

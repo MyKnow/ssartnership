@@ -1,0 +1,51 @@
+groups:
+  - name: ssartnership
+    rules:
+      - alert: ServiceDown
+        expr: (up == 0) or (ssartnership_app_probe_success == 0) or (time() - ssartnership_app_probe_completed_seconds > 90)
+        for: 2m
+        labels: { severity: critical }
+      - alert: DatabaseUnavailable
+        expr: pg_up == 0
+        for: 1m
+        labels: { severity: critical }
+      - alert: HostDiskLow
+        expr: node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes < 0.15
+        for: 5m
+        labels: { severity: critical }
+      - alert: HostMemoryLow
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.1
+        for: 5m
+        labels: { severity: warning }
+      - alert: BackupMissingOrStale
+        expr: time() - ssartnership_operations_last_success_seconds{operation="backup"} > 93600
+        for: 5m
+        labels: { severity: critical }
+      - alert: BackupFailed
+        expr: ssartnership_operations_last_result{operation=~"backup|check|restore-drill"} == 0
+        for: 1m
+        labels: { severity: critical }
+      - alert: ArchiveUnhealthy
+        expr: ssartnership_operations_archive_healthy == 0
+        for: 2m
+        labels: { severity: critical }
+      - alert: OperationsExporterStale
+        expr: (time() - ssartnership_operations_collected_seconds > 300) or absent(ssartnership_operations_collected_seconds)
+        for: 2m
+        labels: { severity: critical }
+      - alert: RestoreDrillStale
+        expr: time() - ssartnership_operations_last_success_seconds{operation="restore-drill"} > 2678400
+        for: 5m
+        labels: { severity: warning }
+      - alert: OffhostBackupStale
+        expr: time() - ssartnership_operations_last_success_seconds{operation="offhost-capture"} > 93600
+        for: 5m
+        labels: { severity: critical }
+      - alert: OffhostBackupFailed
+        expr: ssartnership_operations_last_result{operation=~"offhost-capture|offhost-check|offhost-rehearse"} == 0
+        for: 1m
+        labels: { severity: critical }
+      - alert: AlertDeliveryUnavailable
+        expr: (ssartnership_alert_receiver_configured == 0) or (increase(ssartnership_alert_deliveries_total{result="failure"}[10m]) > 0)
+        for: 2m
+        labels: { severity: critical }

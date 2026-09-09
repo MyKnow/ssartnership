@@ -1,42 +1,50 @@
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminSession } from "@/lib/auth";
+import { ensureCronApiAccess, getCronErrorResponse } from "@/lib/cron-route";
+import {
+  PROMOTION_EVENTS_CACHE_TAG,
+  PROMOTION_SLIDES_CACHE_TAG,
+} from "@/lib/promotions/events";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
-function isAuthorizedByCronSecret(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    return false;
-  }
-  return request.headers.get("authorization") === `Bearer ${secret}`;
-}
+const ARCHIVE_EVENT_BATCH_SIZE = 100;
 
 export async function GET(request: NextRequest) {
-  const adminAuthorized = await isAdminSession();
-  if (!adminAuthorized && !isAuthorizedByCronSecret(request)) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
+  const denied = ensureCronApiAccess(request);
+  if (denied) return denied;
 
   const supabase = getSupabaseAdminClient();
   const nowIso = new Date().toISOString();
-  const { data: expiredEvents, error: eventQueryError } = await supabase
-    .from("promotion_events")
-    .select("slug")
-    .eq("is_active", true)
-    .lt("ends_at", nowIso);
+  const { data, error } = await supabase.rpc("archive_expired_promotions_batch", {
+    input_now: nowIso,
+    input_limit: ARCHIVE_EVENT_BATCH_SIZE,
+  });
 
-  if (eventQueryError) {
-    return NextResponse.json(
-      { ok: false, message: eventQueryError.message },
-      { status: 500 },
-    );
+  if (error) {
+    console.error("[archive-expired-promotions] archive rpc failed", {
+      code: error.code,
+    });
+    return getCronErrorResponse("archive-expired-promotions");
   }
 
-  const slugs = (expiredEvents ?? [])
-    .map((event) => String(event.slug ?? "").trim())
-    .filter(Boolean);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) {
+    console.error("[archive-expired-promotions] archive rpc returned no row");
+    return getCronErrorResponse("archive-expired-promotions");
+  }
+
+  const slugs = Array.isArray(row.archived_event_slugs)
+    ? row.archived_event_slugs
+        .map((slug: unknown) => (typeof slug === "string" ? slug.trim() : ""))
+        .filter(Boolean)
+    : [];
+  const archivedSlides = Number(row.archived_slide_count ?? 0);
+  if (!Number.isFinite(archivedSlides) || archivedSlides < 0) {
+    console.error("[archive-expired-promotions] archive rpc returned invalid slide count");
+    return getCronErrorResponse("archive-expired-promotions");
+  }
 
   if (slugs.length === 0) {
     return NextResponse.json({
@@ -47,30 +55,8 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const { error: eventUpdateError } = await supabase
-    .from("promotion_events")
-    .update({ is_active: false })
-    .in("slug", slugs);
-  if (eventUpdateError) {
-    return NextResponse.json(
-      { ok: false, message: eventUpdateError.message },
-      { status: 500 },
-    );
-  }
-
-  const { data: updatedSlides, error: slideUpdateError } = await supabase
-    .from("promotion_slides")
-    .update({ is_active: false })
-    .in("event_slug", slugs)
-    .eq("is_active", true)
-    .select("id");
-  if (slideUpdateError) {
-    return NextResponse.json(
-      { ok: false, message: slideUpdateError.message },
-      { status: 500 },
-    );
-  }
-
+  revalidateTag(PROMOTION_EVENTS_CACHE_TAG, "max");
+  revalidateTag(PROMOTION_SLIDES_CACHE_TAG, "max");
   revalidatePath("/");
   revalidatePath("/admin");
   revalidatePath("/admin/advertisement");
@@ -83,7 +69,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     archivedEvents: slugs.length,
-    archivedSlides: updatedSlides?.length ?? 0,
+    archivedSlides,
     slugs,
     archivedAt: nowIso,
   });

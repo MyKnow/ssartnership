@@ -2,11 +2,35 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
+import {
+  BellIcon,
+  HomeIcon,
+  MagnifyingGlassIcon,
+  TicketIcon,
+  UserCircleIcon,
+} from "@heroicons/react/24/outline";
 import UserMenu from "@/components/auth/UserMenu";
-import PwaInstallButton from "@/components/PwaInstallButton";
+import Button from "@/components/ui/Button";
 import type { HeaderSession } from "@/lib/header-session";
-import { SITE_NAME } from "@/lib/site";
 import { cn } from "@/lib/cn";
+import { usePwaStandaloneMode } from "@/hooks/usePwaStandaloneMode";
+
+const BROWSER_NAVIGATION_ITEMS = [
+  { label: "홈", href: "/", Icon: HomeIcon, memberOnly: false },
+  {
+    label: "혜택 검색",
+    href: "/#benefit-search",
+    Icon: MagnifyingGlassIcon,
+    memberOnly: false,
+  },
+  { label: "쿠폰함", href: "/coupons", Icon: TicketIcon, memberOnly: true },
+  {
+    label: "내 정보",
+    href: "/certification",
+    Icon: UserCircleIcon,
+    memberOnly: true,
+  },
+] as const;
 
 function DrawerSection({
   title,
@@ -32,10 +56,14 @@ function DrawerSection({
 
 export default function TabletMenu({
   initialSession,
+  guestAuthReturnTo,
 }: {
   initialSession?: HeaderSession | null;
+  guestAuthReturnTo?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const standalone = usePwaStandaloneMode();
+  const signedIn = Boolean(initialSession);
 
   useEffect(() => {
     if (!open) {
@@ -60,7 +88,11 @@ export default function TabletMenu({
     <>
       <button
         type="button"
-        className="hidden h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-control text-foreground md:inline-flex xl:hidden"
+        data-site-browser-menu-trigger
+        className={cn(
+          "h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-control text-foreground xl:hidden",
+          standalone ? "hidden md:inline-flex" : "inline-flex",
+        )}
         aria-label="메뉴 열기"
         onClick={() => setOpen(true)}
       >
@@ -85,7 +117,8 @@ export default function TabletMenu({
         ? createPortal(
             <div
               className={cn(
-                "fixed inset-0 isolate z-[70] hidden md:block xl:hidden",
+                "fixed inset-0 isolate z-[70] xl:hidden",
+                standalone ? "hidden md:block" : "block",
                 open ? "pointer-events-auto" : "pointer-events-none",
               )}
               aria-hidden={!open}
@@ -116,9 +149,6 @@ export default function TabletMenu({
                         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
                           Menu
                         </p>
-                        <p className="mt-2 text-lg font-semibold text-foreground">
-                          {SITE_NAME}
-                        </p>
                       </div>
 
                       <button
@@ -147,23 +177,54 @@ export default function TabletMenu({
 
                   <div className="flex-1 overflow-y-auto px-6 py-5">
                     <div className="flex flex-col gap-4">
-                      <DrawerSection
-                        title="계정"
-                        description="로그인, 회원가입, 프로필, 알림 관련 메뉴입니다."
-                      >
+                      <DrawerSection title="탐색">
+                        <div className="grid gap-2">
+                          {BROWSER_NAVIGATION_ITEMS.map((item) => {
+                            const href =
+                              item.memberOnly && !signedIn
+                                ? `/auth/login?returnTo=${encodeURIComponent(item.href)}`
+                                : item.href;
+                            const Icon = item.Icon;
+
+                            return (
+                              <Button
+                                key={item.label}
+                                variant="ghost"
+                                href={href}
+                                prefetch={false}
+                                onClick={() => setOpen(false)}
+                                className="w-full justify-between rounded-2xl px-4"
+                              >
+                                <Icon className="h-5 w-5" aria-hidden="true" />
+                                {item.label}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      </DrawerSection>
+
+                      <DrawerSection title="계정">
+                        {signedIn ? (
+                          <Button
+                            variant="ghost"
+                            href="/notifications"
+                            prefetch={false}
+                            onClick={() => setOpen(false)}
+                            className="mb-2 w-full justify-between rounded-2xl px-4"
+                          >
+                            <BellIcon className="h-5 w-5" aria-hidden="true" />
+                            알림 설정
+                          </Button>
+                        ) : null}
                         <UserMenu
                           initialSession={initialSession}
+                          guestAuthReturnTo={guestAuthReturnTo}
                           className="flex-col items-stretch"
                           buttonClassName="w-full justify-between rounded-2xl px-4"
+                          showMemberNavigation={false}
                         />
                       </DrawerSection>
 
-                      <DrawerSection
-                        title="앱"
-                        description="홈 화면에 추가해 앱처럼 실행할 수 있습니다."
-                      >
-                        <PwaInstallButton className="w-full justify-between rounded-2xl px-4" />
-                      </DrawerSection>
                     </div>
                   </div>
 

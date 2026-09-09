@@ -135,7 +135,7 @@ export function buildAdminNotificationListResult({
   return {
     unreadCount: Math.max(0, unreadCount),
     items,
-    nextOffset: offset + items.length,
+    nextOffset: offset + visibleRows.length,
     hasMore: hasMore ?? rows.length > limit,
   };
 }

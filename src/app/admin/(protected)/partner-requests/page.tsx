@@ -17,6 +17,7 @@ import { getManagedCampusFilterValues } from "@/lib/admin-scope";
 import { parseAdminReviewQueuePagination } from "@/lib/admin-ia";
 import { getAdminPartnerChangeRequestQueueReadModel } from "@/lib/admin-partner-change-request-queue.server";
 import { AdminPartnerRequestsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
+import { readFirstSearchParam } from "@/lib/search-params";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +27,6 @@ type PartnerRequestsSearchParams = {
   page?: string | string[];
   pageSize?: string | string[];
 };
-
-function getOneSearchParam(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] : value;
-}
 
 function buildPartnerRequestQueueHref(page: number, pageSize: number) {
   const params = new URLSearchParams();
@@ -47,8 +44,8 @@ async function AdminPartnerRequestsContent({
   params: PartnerRequestsSearchParams;
 }) {
   const pagination = parseAdminReviewQueuePagination({
-    page: getOneSearchParam(params.page),
-    pageSize: getOneSearchParam(params.pageSize),
+    page: readFirstSearchParam(params.page),
+    pageSize: readFirstSearchParam(params.pageSize),
   });
   const { requestPage, queueLoadError } =
     await getAdminPartnerChangeRequestQueueReadModel({
@@ -73,8 +70,8 @@ async function AdminPartnerRequestsContent({
     null,
   );
   const feedback = getAdminReviewQueueFeedback({
-    error: getOneSearchParam(params.error),
-    success: getOneSearchParam(params.success),
+    error: readFirstSearchParam(params.error),
+    success: readFirstSearchParam(params.success),
   });
   const returnTo = buildPartnerRequestQueueHref(pagination.page, pagination.pageSize);
 

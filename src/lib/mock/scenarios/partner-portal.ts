@@ -85,6 +85,7 @@ function toSession({
     loginId: setup?.account.loginId ?? "partner-empty@example",
     displayName: setup?.account.displayName ?? "테스트 파트너",
     companyIds: [...companyIds],
+    authSessionVersion: setup?.account.authSessionVersion ?? 1,
     mustChangePassword: false,
     issuedAt: STORY_NOW,
     expiresAt: STORY_NOW + 7 * 24 * 60 * 60 * 1000,

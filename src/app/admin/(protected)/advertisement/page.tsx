@@ -71,14 +71,25 @@ async function AdminAdvertisementContent({
   const actionErrorMessage = errorMessage(params.error);
   let slides: Awaited<ReturnType<typeof listManagedPromotionSlides>>;
   let eventCampaigns: Awaited<ReturnType<typeof listManagedEventCampaigns>>;
-  let adCampaignOptions: Awaited<
-    ReturnType<typeof adPackageRepository.listAdminCampaignOptions>
+  let preparedCampaigns: Awaited<
+    ReturnType<typeof adPackageRepository.prepareAdminCampaigns>
   >;
+  const campaignPreparationPromise = adPackageRepository.prepareAdminCampaigns();
+  const campaignManagerPromise = Promise.all([
+    campaignPreparationPromise.then(({ campaigns }) => campaigns),
+    partnerRepository.listAdminPartnerOptions(),
+  ])
+    .then(([campaignItems, partners]) => ({
+      status: "ready" as const,
+      campaigns: campaignItems,
+      partners,
+    }))
+    .catch(() => ({ status: "error" as const }));
   try {
-    [slides, eventCampaigns, adCampaignOptions] = await Promise.all([
+    [slides, eventCampaigns, preparedCampaigns] = await Promise.all([
       listManagedPromotionSlides({ includeInactive: true }),
       listManagedEventCampaigns({ includeInactive: false }),
-      adPackageRepository.listAdminCampaignOptions(),
+      campaignPreparationPromise,
     ]);
   } catch {
     return (
@@ -99,26 +110,14 @@ async function AdminAdvertisementContent({
       slug: campaign.slug,
       label: `${campaign.title} (${campaign.pagePath})`,
     }));
-  const campaignsPromise = Promise.all([
-    adPackageRepository.listAdminCampaigns(),
-    partnerRepository.getPartners({ authenticated: true }),
-  ])
-    .then(([campaigns, partners]) => ({
-      status: "ready" as const,
-      campaigns,
-      partners: partners
-        .filter((partner) => partner.name)
-        .map((partner) => ({ id: partner.id, name: partner.name })),
-    }))
-    .catch(() => ({ status: "error" as const }));
   return (
     <AdminAdvertisementView
-        campaignsPromise={campaignsPromise}
+        campaignsPromise={campaignManagerPromise}
         createCampaignAction={createAdCampaignAction}
         updateCampaignStatusAction={updateAdCampaignStatusAction}
         initialSlides={slides}
         eventPageOptions={eventPageOptions}
-        adCampaignOptions={adCampaignOptions}
+        adCampaignOptions={preparedCampaigns.options}
         saveAction={savePromotionSlidesAction}
         canCreate={canAdmin(session.account.permissions, "home_ads", "create")}
         canUpdate={canAdmin(session.account.permissions, "home_ads", "update")}

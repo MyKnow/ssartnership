@@ -21,14 +21,17 @@ import {
   getPartnerCompanyPlanDefinition,
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import { getPartnerPortalMetricAccessItems } from "@/lib/partner-portal-metric-access";
 import type { PartnerPlanPortalData } from "@/lib/partner-plan-service";
 import {
   PARTNER_PLAN_FILTERS,
+  formatPartnerPlanDateTime,
   formatPartnerPlanCurrency,
   formatPartnerPlanMonthlyPrice,
+  getPartnerPlanBadgeLabel,
+  getPartnerPlanBadgeVariant,
   getPartnerPlanChannelLabel,
+  getPartnerPlanDaysUntil,
   getPartnerPlanExpiryStatus,
   getPartnerPlanFilterLabel,
   getPartnerPlanRequestProgress,
@@ -39,10 +42,10 @@ import {
 } from "@/lib/partner-plan-ui";
 import { cn } from "@/lib/cn";
 import type { PartnerPlanActions } from "@/components/partner/PartnerPlanManagementView";
-
-function formatDateTime(value?: string | null) {
-  return value ? formatKoreanDateTimeToMinute(value) : "없음";
-}
+import {
+  getPartnerVisibilityBadgeClass,
+  getPartnerVisibilityLabel,
+} from "@/lib/partner-visibility";
 
 function getPeriodLines({
   startedAt,
@@ -57,45 +60,15 @@ function getPeriodLines({
     return [emptyLabel];
   }
   return [
-    `시작일 ${startedAt ? formatDateTime(startedAt) : "없음"}`,
-    `만료일 ${expiresAt ? formatDateTime(expiresAt) : "없음"}`,
+    `시작일 ${startedAt ? formatPartnerPlanDateTime(startedAt) : "없음"}`,
+    `만료일 ${expiresAt ? formatPartnerPlanDateTime(expiresAt) : "없음"}`,
   ];
 }
 
-function getDaysUntil(value: string | null | undefined, nowIso: string) {
-  if (!value) {
-    return null;
-  }
-  const date = new Date(value);
-  const now = new Date(nowIso);
-  if (Number.isNaN(date.getTime()) || Number.isNaN(now.getTime())) {
-    return null;
-  }
-  return Math.ceil((date.getTime() - now.getTime()) / 86_400_000);
-}
-
-function getVisibilityLabel(value: string) {
-  switch (value) {
-    case "public":
-    case "visible":
-      return "공개";
-    case "confidential":
-      return "검토용";
-    case "private":
-    case "hidden":
-      return "비공개";
-    default:
-      return value;
-  }
-}
-
 function PlanBadge({ tier }: { tier: PartnerCompanyPlanTier }) {
-  const definition = getPartnerCompanyPlanDefinition(tier);
   return (
-    <Badge
-      variant={tier === "boost" ? "primary" : tier === "partner" ? "success" : "neutral"}
-    >
-      {definition.label}
+    <Badge variant={getPartnerPlanBadgeVariant(tier)}>
+      {getPartnerPlanBadgeLabel(tier)}
     </Badge>
   );
 }
@@ -195,7 +168,7 @@ export default function PartnerPlanBrandList({
         const accessibleMetricCount = metricAccessItems.filter(
           (item) => !item.locked,
         ).length;
-        const daysUntil = getDaysUntil(brand.planExpiresAt, nowIso);
+        const daysUntil = getPartnerPlanDaysUntil(brand.planExpiresAt, nowIso);
 
         return {
           brand,
@@ -332,7 +305,9 @@ export default function PartnerPlanBrandList({
                       <div className="flex flex-wrap items-center gap-2">
                         <PlanBadge tier={brand.planTier} />
                         <Badge variant="neutral">{brand.companyName}</Badge>
-                        <Badge variant="neutral">{getVisibilityLabel(brand.visibility)}</Badge>
+                        <Badge className={getPartnerVisibilityBadgeClass(brand.visibility)}>
+                          {getPartnerVisibilityLabel(brand.visibility)}
+                        </Badge>
                         <Badge variant={expiryStatus.tone}>{expiryStatus.label}</Badge>
                       </div>
                       <div className="min-w-0">
@@ -340,7 +315,7 @@ export default function PartnerPlanBrandList({
                           {brand.name}
                         </h3>
                         <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                          플랜 변경 {formatDateTime(brand.planUpdatedAt)}
+                          플랜 변경 {formatPartnerPlanDateTime(brand.planUpdatedAt)}
                         </p>
                       </div>
                     </div>
@@ -470,7 +445,9 @@ export default function PartnerPlanBrandList({
                           label="납부기한"
                           value={
                             pendingRequest.billingInvoice
-                              ? formatDateTime(pendingRequest.billingInvoice.dueAt)
+                              ? formatPartnerPlanDateTime(
+                                  pendingRequest.billingInvoice.dueAt,
+                                )
                               : "확인 중"
                           }
                         />

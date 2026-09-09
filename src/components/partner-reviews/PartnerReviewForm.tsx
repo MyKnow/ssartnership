@@ -13,7 +13,7 @@ import {
   validateReviewDraftInput,
   type ReviewFieldErrors,
 } from "@/lib/review-validation";
-import { buildReviewFormData } from "./helpers";
+import { buildReviewRequestBody } from "./helpers";
 import ReviewStarsInput from "./ReviewStarsInput";
 import ReviewImageUploader from "@/components/review-media/ReviewImageUploader";
 import {
@@ -30,6 +30,8 @@ import {
   saveImageUploadDraft,
   saveImageUploadDraftFiles,
 } from "@/lib/image-upload/draft.client";
+import { getClientSafeRequestError } from "@/lib/client-safe-request-error";
+import { createClientUuid } from "@/lib/client-uuid";
 
 export default function PartnerReviewForm({
   partnerId,
@@ -55,7 +57,9 @@ export default function PartnerReviewForm({
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [mediaProcessing, setMediaProcessing] = useState(false);
-  const [submissionId, setSubmissionId] = useState(() => review?.id ?? crypto.randomUUID());
+  const [submissionId, setSubmissionId] = useState(
+    () => review?.id ?? createClientUuid(),
+  );
   const [draftHydrated, setDraftHydrated] = useState(false);
   const draftRestoringRef = useRef(false);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -197,13 +201,17 @@ export default function PartnerReviewForm({
           : `/api/partners/${encodeURIComponent(partnerId)}/reviews`,
         {
           method: isEditMode ? "PATCH" : "POST",
-          body: buildReviewFormData({
-            rating: normalized.rating,
-            title: normalized.title,
-            body: normalized.body,
-            items: submittedItems,
-            reviewId,
-          }),
+          headers: { "content-type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify(
+            buildReviewRequestBody({
+              rating: normalized.rating,
+              title: normalized.title,
+              body: normalized.body,
+              items: submittedItems,
+              reviewId,
+            }),
+          ),
         },
       );
 
@@ -234,13 +242,16 @@ export default function PartnerReviewForm({
       });
       await clearImageUploadDraft(draftKey);
     } catch (error) {
-      const message =
-        error instanceof Error && error.message
-          ? error.message
-          : isEditMode
+      setFormError(
+        getClientSafeRequestError(error, {
+          requestFailed: isEditMode
+            ? "리뷰 수정에 실패했습니다. 잠시 후 다시 시도해 주세요."
+            : "리뷰 등록에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+          networkUnavailable: isEditMode
             ? "리뷰 수정에 실패했습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요."
-            : "리뷰 등록에 실패했습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.";
-      setFormError(message);
+            : "리뷰 등록에 실패했습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.",
+        }).message,
+      );
     } finally {
       setPending(false);
     }

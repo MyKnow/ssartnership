@@ -1,0 +1,11 @@
+services:
+  app:
+    image: ${SELF_HOST_IMAGE:?immutable fixture image required}
+    ports: ["127.0.0.1:3131:3000"]
+    init: true
+    restart: "no"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    pids_limit: 64

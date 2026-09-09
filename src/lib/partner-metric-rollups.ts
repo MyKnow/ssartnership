@@ -9,6 +9,7 @@ export const PARTNER_METRIC_EVENT_NAMES = [
   "inquiry_click",
   "partner_benefit_use",
 ] as const;
+export const PARTNER_METRIC_EVENT_FALLBACK_LIMIT = 10_000;
 
 export type PartnerMetricEventName =
   (typeof PARTNER_METRIC_EVENT_NAMES)[number];
@@ -279,10 +280,10 @@ export function buildPartnerMetricRollupRowsFromEventLogs(
 
     for (const target of pvTargets) {
       bump({
-      partner_id: partnerId,
-      metric_name: event.event_name,
-      metric_kind: "pv",
-      granularity: target.granularity,
+        partner_id: partnerId,
+        metric_name: event.event_name,
+        metric_kind: "pv",
+        granularity: target.granularity,
         bucket_timezone: KST_TIMEZONE,
         bucket_local_start: target.bucket_local_start,
         bucket_local_date: target.bucket_local_date,
@@ -313,10 +314,10 @@ export function buildPartnerMetricRollupRowsFromEventLogs(
     if (!uvSeenByBucket.total.has(visitorKey)) {
       uvSeenByBucket.total.add(visitorKey);
       bump({
-      partner_id: partnerId,
-      metric_name: event.event_name,
-      metric_kind: "uv",
-      granularity: "total",
+        partner_id: partnerId,
+        metric_name: event.event_name,
+        metric_kind: "uv",
+        granularity: "total",
         bucket_timezone: KST_TIMEZONE,
         bucket_local_start: null,
         bucket_local_date: null,
@@ -367,10 +368,18 @@ export async function fetchPartnerMetricEventLogRows(
     .select("target_id,event_name,actor_type,actor_id,session_id,created_at")
     .eq("target_type", "partner")
     .in("target_id", normalizedPartnerIds)
-    .in("event_name", [...PARTNER_METRIC_EVENT_NAMES]);
+    .in("event_name", [...PARTNER_METRIC_EVENT_NAMES])
+    .limit(PARTNER_METRIC_EVENT_FALLBACK_LIMIT + 1);
 
   if (error) {
     return { rows: [], errorMessage: error.message };
+  }
+
+  if ((data?.length ?? 0) > PARTNER_METRIC_EVENT_FALLBACK_LIMIT) {
+    return {
+      rows: [],
+      errorMessage: "partner_metric_event_fallback_limit_exceeded",
+    };
   }
 
   const rows = (data ?? []).filter(

@@ -21,7 +21,7 @@ import {
 import CertificationCardFrame from "@/components/certification/CertificationCardFrame";
 import { cn } from "@/lib/cn";
 import { formatKoreanDateTimeToSecond } from "@/lib/datetime";
-import { listCohortCardThemes } from "@/lib/cohort-card-themes";
+import { listCohortCardThemes } from "@/lib/cohort-card-themes.server";
 
 export const dynamic = "force-dynamic";
 

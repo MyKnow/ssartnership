@@ -9,6 +9,7 @@ import InlineMessage from "@/components/ui/InlineMessage";
 import Modal from "@/components/ui/Modal";
 import { resolveAppleWalletCardStatusAfterRevoke } from "@/lib/wallet/wallet-pass-card-state";
 import { APPLE_WALLET_CONSENT_VERSION } from "@/lib/wallet/wallet-pass-request";
+import { createClientUuid } from "@/lib/client-uuid";
 
 type PendingAction = "issue" | "download" | "revoke" | null;
 
@@ -21,7 +22,7 @@ type AppleWalletPassSectionProps = {
 };
 
 function createIdempotencyKey() {
-  return crypto.randomUUID().replaceAll("-", "");
+  return createClientUuid().replaceAll("-", "");
 }
 
 async function readApiResponse(response: Response) {
@@ -89,6 +90,8 @@ export default function AppleWalletPassSection({
     setPendingAction("download");
     setErrorMessage(null);
     setSuccessMessage(null);
+    // This endpoint returns a .pkpass download, not a Next.js page.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.assign("/api/wallet/apple/pass");
   };
 

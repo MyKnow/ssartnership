@@ -53,18 +53,37 @@ export interface PartnerPortalDashboardRepository {
   getDashboard(companyIds: string[]): Promise<PartnerPortalDashboard>;
 }
 
-const zeroMetrics = (): PartnerPortalServiceMetrics => ({
-  favoriteCount: 0,
-  detailViews: 0,
-  detailUv: 0,
-  cardClicks: 0,
-  mapClicks: 0,
-  reservationClicks: 0,
-  inquiryClicks: 0,
-  benefitUsageCount: 0,
-  reviewCount: 0,
-  totalClicks: 0,
-});
+export function createEmptyPartnerPortalMetrics(): PartnerPortalServiceMetrics {
+  return {
+    favoriteCount: 0,
+    detailViews: 0,
+    detailUv: 0,
+    cardClicks: 0,
+    mapClicks: 0,
+    reservationClicks: 0,
+    inquiryClicks: 0,
+    benefitUsageCount: 0,
+    reviewCount: 0,
+    totalClicks: 0,
+  };
+}
+
+export function normalizePartnerPortalMetrics(
+  metrics?: Partial<PartnerPortalServiceMetrics> | null,
+): PartnerPortalServiceMetrics {
+  return {
+    favoriteCount: metrics?.favoriteCount ?? 0,
+    detailViews: metrics?.detailViews ?? 0,
+    detailUv: metrics?.detailUv ?? 0,
+    cardClicks: metrics?.cardClicks ?? 0,
+    mapClicks: metrics?.mapClicks ?? 0,
+    reservationClicks: metrics?.reservationClicks ?? 0,
+    inquiryClicks: metrics?.inquiryClicks ?? 0,
+    benefitUsageCount: metrics?.benefitUsageCount ?? 0,
+    reviewCount: metrics?.reviewCount ?? 0,
+    totalClicks: metrics?.totalClicks ?? 0,
+  };
+}
 
 function normalizeCompanyIds(companyIds: string[]) {
   return [...new Set(companyIds.map((id) => id.trim()).filter(Boolean))];
@@ -88,7 +107,7 @@ export function sumPartnerPortalMetrics(
       reviewCount: accumulator.reviewCount + metrics.reviewCount,
       totalClicks: accumulator.totalClicks + metrics.totalClicks,
     }),
-    zeroMetrics(),
+    createEmptyPartnerPortalMetrics(),
   );
 }
 
@@ -134,7 +153,7 @@ function createEmptyDashboard(): PartnerPortalDashboard {
   return {
     companies: [],
     totals: {
-      ...zeroMetrics(),
+      ...createEmptyPartnerPortalMetrics(),
       companyCount: 0,
       serviceCount: 0,
     },

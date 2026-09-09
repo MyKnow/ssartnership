@@ -14,6 +14,11 @@ import {
   submitGraduateVerificationRequest,
 } from "@/lib/graduate-verification-service";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 
 export const runtime = "nodejs";
 
@@ -23,17 +28,10 @@ type GraduateSubmissionBody = {
   profileImageUploadSource?: unknown;
   email?: unknown;
   legalName?: unknown;
-  educationStartYear?: unknown;
-  educationStartMonth?: unknown;
-  educationEndYear?: unknown;
-  educationEndMonth?: unknown;
+  generation?: unknown;
   campus?: unknown;
   consented?: unknown;
 };
-
-function toInteger(value: unknown) {
-  return typeof value === "number" && Number.isInteger(value) ? value : Number.NaN;
-}
 
 export async function POST(request: Request) {
   const context = getRequestLogContext(request);
@@ -53,13 +51,39 @@ export async function POST(request: Request) {
     ipAddress: context.ipAddress,
     accountIdentifier: hashGraduateEmailIdentifier(challenge.email_normalized),
   };
-  if (await isGraduateVerificationBlocked(rateLimitContext)) {
+  const blockingState = await isGraduateVerificationBlocked(rateLimitContext);
+  if (!blockingState.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "제출 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
+  }
+  if (blockingState.blocked) {
     return NextResponse.json({ ok: false, message: "제출 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
   }
 
-  const body = (await request.json().catch(() => null)) as GraduateSubmissionBody | null;
+  let body: GraduateSubmissionBody | null = null;
+  try {
+    body = await readRouteJsonBodyWithinLimit<GraduateSubmissionBody>(request, {
+      maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+      invalidMessage: "업로드 파일을 확인해 주세요.",
+      tooLargeMessage: "요청 본문이 너무 큽니다.",
+    });
+  } catch (error) {
+    if (error instanceof RouteJsonBodyError && error.code === "body_too_large") {
+      return NextResponse.json(
+        { ok: false, message: error.message },
+        { status: error.status },
+      );
+    }
+  }
   if (
     !body ||
+    typeof body !== "object" || Array.isArray(body) ||
+    typeof body.email !== "string" || typeof body.legalName !== "string" ||
     (body.certificateUploadId !== undefined && typeof body.certificateUploadId !== "string") ||
     (body.profileImageUploadId !== undefined && typeof body.profileImageUploadId !== "string") ||
     (
@@ -73,17 +97,17 @@ export async function POST(request: Request) {
   ) {
     return NextResponse.json({ ok: false, message: "업로드 파일을 확인해 주세요." }, { status: 400 });
   }
+  if (["educationStartYear", "educationStartMonth", "educationEndYear", "educationEndMonth", "education_start_year", "education_start_month", "education_end_year", "education_end_month"].some((key) => key in body)) {
+    return NextResponse.json({ ok: false, message: "교육 정보 형식이 변경되었습니다. 페이지를 새로고침한 뒤 다시 제출해 주세요." }, { status: 400 });
+  }
   try {
     const result = await submitGraduateVerificationRequest({
       challengeId: session.challengeId,
       certificateUploadId: typeof body.certificateUploadId === "string" ? body.certificateUploadId : null,
       profileImageUploadId: typeof body.profileImageUploadId === "string" ? body.profileImageUploadId : null,
-      email: String(body.email ?? ""),
-      legalName: String(body.legalName ?? ""),
-      educationStartYear: toInteger(body.educationStartYear),
-      educationStartMonth: toInteger(body.educationStartMonth),
-      educationEndYear: toInteger(body.educationEndYear),
-      educationEndMonth: toInteger(body.educationEndMonth),
+      email: body.email,
+      legalName: body.legalName,
+      generation: body.generation,
       campus: typeof body.campus === "string" ? body.campus : null,
       consented: body.consented === true,
     });

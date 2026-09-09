@@ -5,7 +5,13 @@ import {
 } from "@/components/home-view/selectors";
 import { unstable_rethrow } from "next/navigation";
 import type { PartnerAudienceFilter, PartnerAudienceKey } from "@/lib/partner-audience";
-import { getHomePartnerState, type HomePartnerState } from "@/lib/home-partner-state";
+import {
+  getHomePartnerMemberState,
+  getHomePartnerPopularityById,
+  normalizeHomePartnerStateIds,
+  type HomePartnerMemberState,
+  type HomePartnerState,
+} from "@/lib/home-partner-state";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import { partnerRepository } from "@/lib/repositories";
 import type { Category, CategoryKey, Partner } from "@/lib/types";
@@ -60,6 +66,33 @@ export type HomePartnerDirectoryLoadState =
 type HomePartnerDirectoryLoader = (
   input: LoadHomePartnerDirectoryInput,
 ) => Promise<LoadedHomePartnerDirectory>;
+
+export type HomePartnerDirectoryDependencies = {
+  getCategories(): Promise<Category[]>;
+  getPartners(context: {
+    authenticated: boolean;
+    viewerAudience?: PartnerAudienceKey | null;
+  }): Promise<Partner[]>;
+  getPublicDirectoryPartners(context: {
+    authenticated: boolean;
+    viewerAudience?: PartnerAudienceKey | null;
+  }): Promise<Partner[]>;
+  getPopularityByPartnerId(
+    partnerIds: string[],
+  ): Promise<Record<string, PartnerPopularityMetrics>>;
+  getMemberState(input: {
+    partnerIds: string[];
+    currentUserId?: string | null;
+  }): Promise<HomePartnerMemberState>;
+};
+
+const homePartnerDirectoryDependencies: HomePartnerDirectoryDependencies = {
+  getCategories: () => partnerRepository.getCategories(),
+  getPartners: (context) => partnerRepository.getPartners(context),
+  getPublicDirectoryPartners: (context) => partnerRepository.getPublicDirectoryPartners(context),
+  getPopularityByPartnerId: getHomePartnerPopularityById,
+  getMemberState: getHomePartnerMemberState,
+};
 
 type ErrorLike = {
   cause?: unknown;
@@ -200,28 +233,48 @@ export async function loadHomePartnerDirectory({
   currentUserId,
   viewerAudience,
   query,
-}: LoadHomePartnerDirectoryInput): Promise<LoadedHomePartnerDirectory> {
+}: LoadHomePartnerDirectoryInput,
+dependencies: HomePartnerDirectoryDependencies = homePartnerDirectoryDependencies,
+): Promise<LoadedHomePartnerDirectory> {
   const [categories, partners] = await Promise.all([
-    partnerRepository.getCategories(),
-    partnerRepository.getPartners({
-      authenticated: viewerAuthenticated,
-      viewerAudience,
-    }),
+    dependencies.getCategories(),
+    viewerAuthenticated
+      ? dependencies.getPartners({
+          authenticated: viewerAuthenticated,
+          viewerAudience,
+        })
+      : dependencies.getPublicDirectoryPartners({
+          authenticated: viewerAuthenticated,
+          viewerAudience,
+        }),
   ]);
   const viewPartners = maskExpiredPartnerActions(partners);
-  const partnerIds = viewPartners.map((partner) => partner.id);
-  const partnerState = await getHomePartnerState({
-    partnerIds,
-    partnerIdLimit: partnerIds.length,
-    currentUserId,
-  });
   const resolvedQuery = normalizeHomePartnerDirectoryQuery(query);
+  const popularityCandidates = buildHomePartnerDirectory({
+    partners: viewPartners,
+    viewerAuthenticated,
+    popularityByPartnerId: {},
+  });
+  const partnerPopularityById = await dependencies.getPopularityByPartnerId(
+    popularityCandidates.displayPartnerIds,
+  );
   const directory = buildHomePartnerDirectory({
     partners: viewPartners,
     viewerAuthenticated,
-    popularityByPartnerId: partnerState.partnerPopularityById,
+    popularityByPartnerId: partnerPopularityById,
     query: resolvedQuery,
   });
+  const preloadPartnerIds = normalizeHomePartnerStateIds(
+    directory.displayPartnerIds,
+  );
+  const memberState = await dependencies.getMemberState({
+    partnerIds: preloadPartnerIds,
+    currentUserId,
+  });
+  const partnerState: HomePartnerState = {
+    ...memberState,
+    partnerPopularityById,
+  };
 
   return {
     ...directory,

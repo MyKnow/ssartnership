@@ -8,7 +8,10 @@ import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
 import { validateAuthPasswordPairDraft } from "@/lib/auth-form-validation";
-import { copyPasswordToClipboard, generateBrowserPassword } from "@/lib/browser-password";
+import {
+  copyPasswordToClipboard,
+  tryGenerateBrowserPassword,
+} from "@/lib/browser-password";
 import { PASSWORD_POLICY_MESSAGE } from "@/lib/validation";
 
 export default function ResetPasswordCompleteForm({
@@ -32,13 +35,22 @@ export default function ResetPasswordCompleteForm({
     if (pending) {
       return;
     }
-    const nextPassword = generateBrowserPassword(12);
-    setPassword(nextPassword);
-    setConfirmPassword(nextPassword);
+    const passwordResult = tryGenerateBrowserPassword(12);
+    if (!passwordResult.ok) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        password: passwordResult.error.message,
+      }));
+      setFormError(null);
+      focusField(passwordRef);
+      return;
+    }
+    setPassword(passwordResult.password);
+    setConfirmPassword(passwordResult.password);
     setFieldErrors({});
     setFormError(null);
     try {
-      await copyPasswordToClipboard(nextPassword);
+      await copyPasswordToClipboard(passwordResult.password);
       notify("랜덤 비밀번호를 복사했습니다.");
     } catch {
       notify("랜덤 비밀번호를 생성했습니다.");

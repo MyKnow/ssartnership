@@ -9,6 +9,11 @@ import {
 import { completeManualMemberPasswordAction } from "@/lib/member-manual-import/service.server";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { setUserSession } from "@/lib/user-auth";
+import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
+import {
+  RouteJsonBodyError,
+  readRouteJsonBodyWithinLimit,
+} from "@/lib/route-json-body";
 
 export const runtime = "nodejs";
 
@@ -17,17 +22,46 @@ export async function POST(request: Request) {
   if (!isTrustedSameOriginRequest(request, { allowedContentTypes: ["application/json"] })) {
     return NextResponse.json({ ok: false, message: "요청을 확인해 주세요." }, { status: 403 });
   }
-  const body = (await request.json().catch(() => null)) as {
+  let body: {
     token?: unknown;
     password?: unknown;
     confirmPassword?: unknown;
-  } | null;
+  } | null = null;
+  try {
+    body = await readRouteJsonBodyWithinLimit<{
+      token?: unknown;
+      password?: unknown;
+      confirmPassword?: unknown;
+    }>(request, {
+      maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
+      invalidMessage: "비밀번호는 8~64자이며 영문, 숫자, 특수문자를 모두 포함해야 합니다.",
+      tooLargeMessage: "요청 본문이 너무 큽니다.",
+    });
+  } catch (error) {
+    if (error instanceof RouteJsonBodyError && error.code === "body_too_large") {
+      return NextResponse.json(
+        { ok: false, message: error.message },
+        { status: error.status },
+      );
+    }
+  }
   const token = String(body?.token ?? "").trim();
   const password = String(body?.password ?? "");
   const confirmPassword = String(body?.confirmPassword ?? "");
   const tokenHash = token ? hashOpaqueToken(token) : "missing";
   const throttle = { ipAddress: context.ipAddress, accountIdentifier: tokenHash };
-  if (await getMemberAuthBlockingState("manual-password-action", throttle)) {
+  const blockingState = await getMemberAuthBlockingState("manual-password-action", throttle);
+  if (!blockingState.ok) {
+    await delayMemberAuthAttempt("manual-password-action", true);
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "비밀번호를 설정하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      },
+      { status: 503 },
+    );
+  }
+  if (blockingState.blocked) {
     await delayMemberAuthAttempt("manual-password-action", true);
     return NextResponse.json({ ok: false, message: "시도가 너무 많습니다. 잠시 후 다시 시도해 주세요." }, { status: 429 });
   }

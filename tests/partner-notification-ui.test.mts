@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import type { PartnerNotificationEntry } from "../src/lib/partner-notifications.ts";
+import type { PartnerNotificationEntry } from "../src/lib/partner-notification-contract.ts";
 import {
   derivePartnerNotificationUiModel,
   filterPartnerNotificationUiModels,

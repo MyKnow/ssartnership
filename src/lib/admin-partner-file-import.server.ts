@@ -18,6 +18,11 @@ import {
   type AdminPartnerFileParseResult,
   type AdminPartnerFileTemplateOptions,
 } from "@/lib/admin-partner-file-import";
+import {
+  SAFE_XLSX_ERROR_MESSAGE,
+  XlsxResourceError,
+  loadXlsxWorkbookWithinResourceLimits,
+} from "@/lib/xlsx-resource-limits.server";
 
 const INPUT_SHEET_NAME = "입력";
 const GUIDE_SHEET_NAME = "작성 가이드";
@@ -584,13 +589,20 @@ export async function parseAdminPartnerXlsxDraft({
     return { ok: false, errors: ["XLSX 파일은 1MB 이하만 업로드할 수 있습니다."] };
   }
 
-  const workbook = new ExcelJS.Workbook();
+  let workbook: ExcelJS.Workbook;
   try {
-    await workbook.xlsx.load(
-      fileBuffer as unknown as Parameters<typeof workbook.xlsx.load>[0],
-    );
-  } catch {
-    return { ok: false, errors: ["XLSX 파일을 읽지 못했습니다."] };
+    workbook = await loadXlsxWorkbookWithinResourceLimits(fileBuffer);
+  } catch (error) {
+    if (
+      error instanceof XlsxResourceError &&
+      error.code === "workbook_resource_limit_exceeded"
+    ) {
+      return {
+        ok: false,
+        errors: ["입력 시트에는 템플릿 항목 범위 밖의 값을 넣을 수 없습니다."],
+      };
+    }
+    return { ok: false, errors: [SAFE_XLSX_ERROR_MESSAGE] };
   }
 
   const options = readMetaOptions(workbook);

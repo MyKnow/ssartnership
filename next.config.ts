@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 import type { RemotePattern } from "next/dist/shared/lib/image-config";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { AtomicDevelopmentManifestsPlugin, shouldUseAtomicManifests } from "./scripts/webpack-atomic-manifests.mjs";
+import { fixtureBuildProfile, assertNoFixtureDotenv, configureFixtureCompiler, FIXTURE_HEADER, FIXTURE_BUILD_MARKER } from "./scripts/webpack-fixture-boundary.mjs";
 
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 
@@ -47,6 +49,12 @@ function buildSupabaseRemotePattern(): RemotePattern | null {
 }
 
 const supabaseRemotePattern = buildSupabaseRemotePattern();
+const selfHostBuild = process.env.SELF_HOST_BUILD === "1";
+const fixtureBuild = fixtureBuildProfile(process.env);
+if (fixtureBuild) {
+  assertNoFixtureDotenv(projectRoot);
+  securityHeaders.push({ key: FIXTURE_HEADER, value: FIXTURE_BUILD_MARKER });
+}
 
 if (process.env.NODE_ENV === "production") {
   securityHeaders.push({
@@ -56,6 +64,9 @@ if (process.env.NODE_ENV === "production") {
 }
 
 const nextConfig: NextConfig = {
+  // Self-hosted images use Next's portable standalone server. The flag keeps
+  // Vercel's existing build and tracing behavior unchanged.
+  output: selfHostBuild ? "standalone" : undefined,
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
   // The mobile search island occupies the framework indicator's default
   // bottom-left position. Keep local QA aligned with the shipped navigation.
@@ -71,6 +82,8 @@ const nextConfig: NextConfig = {
   },
   reactCompiler: true,
   experimental: {
+    // Bound the additional test build inside the unchanged 5 GiB Mac gate.
+    ...(fixtureBuild ? { cpus: 2 } : {}),
     optimizePackageImports: [
       "@heroicons/react",
       "lucide-react",
@@ -83,7 +96,13 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: projectRoot,
   },
-  webpack(config) {
+  webpack(config, { dev }) {
+    configureFixtureCompiler(config, { dev, root: projectRoot, enabled: fixtureBuild });
+    if (shouldUseAtomicManifests(dev)) {
+      config.plugins.push(new AtomicDevelopmentManifestsPlugin(
+        resolve(projectRoot, process.env.NEXT_DIST_DIR ?? ".next", "dev"),
+      ));
+    }
     // @discourse/heic's Emscripten loader fetches this file itself. Treating it
     // as a native WebAssembly module makes Webpack try to resolve its internal
     // Emscripten import names (for example, "a") as npm packages.

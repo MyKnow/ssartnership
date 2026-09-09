@@ -156,23 +156,27 @@ export async function getGraduateEmailSendBlockingState(
       GRADUATE_EMAIL_PROVIDER_FAILURE_RATE_LIMIT,
     ),
   ]);
+  if (!sendQuota.ok || !providerFailure.ok) {
+    return { ok: false, code: "rate_limit_storage_failed" } as const;
+  }
   const activeStates = [
-    sendQuota ? { ...sendQuota, reason: "send_quota" as const } : null,
-    providerFailure
+    sendQuota.blocked ? { ...sendQuota, reason: "send_quota" as const } : null,
+    providerFailure.blocked
       ? { ...providerFailure, reason: "provider_failure_backoff" as const }
       : null,
   ].filter((state): state is NonNullable<typeof state> => Boolean(state));
 
-  return activeStates.sort(
+  const activeState = activeStates.sort(
     (left, right) =>
       Date.parse(right.blockedUntil) - Date.parse(left.blockedUntil),
-  )[0] ?? null;
+  )[0];
+  return activeState ?? ({ ok: true, blocked: false } as const);
 }
 
 export async function recordGraduateEmailSendSuccess(
   input: GraduateEmailSendRateLimitContext,
 ) {
-  await recordAttemptBatch(
+  return recordAttemptBatch(
     getGraduateEmailSendSuccessKeys(input),
     false,
     GRADUATE_EMAIL_SEND_SUCCESS_RATE_LIMIT,
@@ -182,7 +186,7 @@ export async function recordGraduateEmailSendSuccess(
 export async function recordGraduateEmailProviderFailure(
   input: GraduateEmailSendRateLimitContext,
 ) {
-  await recordAttemptBatch(
+  return recordAttemptBatch(
     getGraduateEmailProviderFailureKeys(input),
     false,
     GRADUATE_EMAIL_PROVIDER_FAILURE_RATE_LIMIT,
@@ -192,7 +196,7 @@ export async function recordGraduateEmailProviderFailure(
 export async function clearGraduateEmailProviderFailures(
   input: GraduateEmailSendRateLimitContext,
 ) {
-  await recordAttemptBatch(
+  return recordAttemptBatch(
     getGraduateEmailProviderFailureKeys(input),
     true,
     GRADUATE_EMAIL_PROVIDER_FAILURE_RATE_LIMIT,
@@ -217,7 +221,6 @@ export async function isGraduateVerificationBlocked(input: {
   accountIdentifier?: string | null;
 }) {
   const keys = getGraduateVerificationAttemptKeys(input);
-  if (keys.length === 0) return null;
   return getBlockingState(keys, GRADUATE_VERIFICATION_RATE_LIMIT[input.route]);
 }
 
@@ -228,8 +231,7 @@ export async function recordGraduateVerificationAttempt(input: {
   success: boolean;
 }) {
   const keys = getGraduateVerificationAttemptKeys(input);
-  if (keys.length === 0) return;
-  await recordAttemptBatch(
+  return recordAttemptBatch(
     keys,
     input.success,
     GRADUATE_VERIFICATION_RATE_LIMIT[input.route],

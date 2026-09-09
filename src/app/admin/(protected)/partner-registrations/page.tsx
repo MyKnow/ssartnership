@@ -24,6 +24,7 @@ import { isPartnerVisibility } from "@/lib/partner-visibility";
 import type { PartnerVisibility } from "@/lib/types";
 import { getAdminReviewQueueFeedback } from "@/lib/admin-review-queue";
 import { redirect } from "next/navigation";
+import { readFirstSearchParam } from "@/lib/search-params";
 
 export const dynamic = "force-dynamic";
 
@@ -38,10 +39,6 @@ type PartnerRegistrationSearchParams = {
   visibility?: string | string[];
   sort?: string | string[];
 };
-
-function getOneSearchParam(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] : value;
-}
 
 function buildPartnerRegistrationHref({
   status,
@@ -95,28 +92,28 @@ async function AdminPartnerRegistrationsContent({
     "create",
   );
   const pagination = parseAdminReviewQueuePagination({
-    page: getOneSearchParam(params.page),
-    pageSize: getOneSearchParam(params.pageSize),
+    page: readFirstSearchParam(params.page),
+    pageSize: readFirstSearchParam(params.pageSize),
   });
-  const statusValue = getOneSearchParam(params.status);
+  const statusValue = readFirstSearchParam(params.status);
   const status =
     statusValue && isPartnerRegistrationRequestStatus(statusValue)
       ? statusValue
       : null;
-  const search = (getOneSearchParam(params.q) ?? "").trim().slice(0, 100);
-  const sourceValue = getOneSearchParam(params.source);
+  const search = (readFirstSearchParam(params.q) ?? "").trim().slice(0, 100);
+  const sourceValue = readFirstSearchParam(params.source);
   const source = PARTNER_REGISTRATION_SOURCE_OPTIONS.includes(
     sourceValue as PartnerRegistrationSource,
   )
     ? (sourceValue as PartnerRegistrationSource)
     : null;
-  const visibilityValue = getOneSearchParam(params.visibility);
+  const visibilityValue = readFirstSearchParam(params.visibility);
   const visibility: PartnerVisibility | null = isPartnerVisibility(
     visibilityValue ?? "",
   )
     ? (visibilityValue as PartnerVisibility)
     : null;
-  const sortValue = getOneSearchParam(params.sort);
+  const sortValue = readFirstSearchParam(params.sort);
   const sort = PARTNER_REGISTRATION_QUEUE_SORT_OPTIONS.some(
     (option) => option.value === sortValue,
   )
@@ -154,8 +151,8 @@ async function AdminPartnerRegistrationsContent({
     );
   }
   const feedback = getAdminReviewQueueFeedback({
-    error: getOneSearchParam(params.error),
-    success: getOneSearchParam(params.success),
+    error: readFirstSearchParam(params.error),
+    success: readFirstSearchParam(params.success),
   });
   const returnTo = buildPartnerRegistrationHref({
     status,

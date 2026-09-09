@@ -2,16 +2,15 @@ import { getSupabaseAdminClient } from "./supabase/server.ts";
 import { fetchPartnerEngagementCounts } from "./partner-counts.ts";
 import {
   applyPartnerMetricRollupRows,
-  buildPartnerMetricRollupRowsFromEventLogs,
-  fetchPartnerMetricRollupRows,
-  fetchPartnerMetricEventLogRows,
   PARTNER_METRIC_EVENT_NAMES,
 } from "./partner-metric-rollups.ts";
+import { loadPartnerMetricAggregateRows } from "./partner-metric-loader.ts";
 import {
   type PartnerPortalCompanyDashboard,
   type PartnerPortalDashboard,
   type PartnerPortalServiceDashboard,
   type PartnerPortalServiceMetrics,
+  createEmptyPartnerPortalMetrics,
   filterPartnerPortalMetricsForPlan,
   normalizePartnerPortalServiceStatus,
   sumPartnerPortalMetrics,
@@ -69,38 +68,6 @@ function extractCategoryLabel(
   return categories.label ?? "제휴";
 }
 
-function createEmptyMetrics(): PartnerPortalServiceMetrics {
-  return {
-    favoriteCount: 0,
-    detailViews: 0,
-    detailUv: 0,
-    cardClicks: 0,
-    mapClicks: 0,
-    reservationClicks: 0,
-    inquiryClicks: 0,
-    benefitUsageCount: 0,
-    reviewCount: 0,
-    totalClicks: 0,
-  };
-}
-
-function indexMetricEventRowsByTargetId<T extends { target_id: string | null }>(rows: T[]) {
-  const rowsByTargetId = new Map<string, typeof rows>();
-  for (const row of rows) {
-    const targetId = row.target_id ?? "";
-    if (!targetId) {
-      continue;
-    }
-    const bucket = rowsByTargetId.get(targetId);
-    if (bucket) {
-      bucket.push(row);
-      continue;
-    }
-    rowsByTargetId.set(targetId, [row]);
-  }
-  return rowsByTargetId;
-}
-
 function normalizeSupabaseCompanyIds(companyIds: string[]) {
   return [
     ...new Set(
@@ -152,7 +119,7 @@ export async function getSupabasePartnerPortalDashboard(
     return {
       companies: [],
       totals: {
-        ...createEmptyMetrics(),
+        ...createEmptyPartnerPortalMetrics(),
         companyCount: 0,
         serviceCount: 0,
       },
@@ -223,7 +190,7 @@ export async function getSupabasePartnerPortalDashboard(
 
   const serviceMetricsEntries = serviceRows.map((row) => [
     row.id,
-    createEmptyMetrics(),
+    createEmptyPartnerPortalMetrics(),
   ] as const);
   const metricsByServiceId = new Map(serviceMetricsEntries);
   const engagementCounts = await fetchPartnerEngagementCounts(
@@ -236,7 +203,7 @@ export async function getSupabasePartnerPortalDashboard(
     console.error("[partner-dashboard] engagement metric query failed", engagementCounts.engagementErrorMessage);
   }
 
-  const rollupResult = await fetchPartnerMetricRollupRows(supabase, {
+  const metricRowsResult = await loadPartnerMetricAggregateRows(supabase, {
     partnerIds: serviceRows.map((serviceRow) => serviceRow.id),
     metricNames: PARTNER_METRIC_EVENT_NAMES,
     metricKinds: ["pv", "uv"],
@@ -253,39 +220,18 @@ export async function getSupabasePartnerPortalDashboard(
     }
   }
 
-  if (rollupResult.errorMessage) {
+  if (metricRowsResult.failure) {
     markPartialFailure();
+    const queryLabel =
+      metricRowsResult.failure.stage === "rollup"
+        ? "event metric query failed"
+        : "fallback event metric query failed";
     console.error(
-      "[partner-dashboard] event metric query failed",
-      rollupResult.errorMessage,
+      `[partner-dashboard] ${queryLabel}`,
+      metricRowsResult.failure.errorMessage,
     );
   } else {
-    if (rollupResult.rows.length > 0) {
-      applyPartnerMetricRollupRows(metricsByServiceId, rollupResult.rows);
-    } else {
-      const fallbackResult = await fetchPartnerMetricEventLogRows(
-        supabase,
-        serviceRows.map((serviceRow) => serviceRow.id),
-      );
-      if (fallbackResult.errorMessage) {
-        markPartialFailure();
-        console.error(
-          "[partner-dashboard] fallback event metric query failed",
-          fallbackResult.errorMessage,
-        );
-      } else {
-        const rowsByTargetId = indexMetricEventRowsByTargetId(fallbackResult.rows);
-        for (const serviceRow of serviceRows) {
-          applyPartnerMetricRollupRows(
-            metricsByServiceId,
-            buildPartnerMetricRollupRowsFromEventLogs(
-              rowsByTargetId.get(serviceRow.id) ?? [],
-              serviceRow.id,
-            ),
-          );
-        }
-      }
-    }
+    applyPartnerMetricRollupRows(metricsByServiceId, metricRowsResult.rows);
   }
 
   for (const serviceRow of serviceRows) {
@@ -313,7 +259,7 @@ export async function getSupabasePartnerPortalDashboard(
         toServiceDashboard(
           serviceRow,
           filterPartnerPortalMetricsForPlan(
-            metricsByServiceId.get(serviceRow.id) ?? createEmptyMetrics(),
+            metricsByServiceId.get(serviceRow.id) ?? createEmptyPartnerPortalMetrics(),
             normalizePartnerCompanyPlanTier(serviceRow.plan_tier),
           ),
           statusByPartnerId.get(serviceRow.id),

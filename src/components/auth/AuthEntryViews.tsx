@@ -35,6 +35,7 @@ export function LoginPageView({ returnTo }: { returnTo: string }) {
               <Button
                 variant="ghost"
                 href={`/auth/mock?returnTo=${encodeURIComponent(returnTo)}`}
+                reloadDocument
               >
                 촬영용 데모 시작
               </Button>

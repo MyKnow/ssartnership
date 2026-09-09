@@ -5,6 +5,7 @@ import {
   sanitizeAdminReturnTo,
 } from "@/lib/admin-session-bridge";
 import { setAdminSession } from "@/lib/auth";
+import { buildTrustedRedirectUrl, isTrustedAdminSessionNavigation } from "@/lib/request-guards";
 import { getSignedUserSession } from "@/lib/user-auth";
 
 export async function GET(request: NextRequest) {
@@ -13,6 +14,21 @@ export async function GET(request: NextRequest) {
     "/admin",
   );
   const context = getRequestLogContext(request);
+
+  if (!isTrustedAdminSessionNavigation(request)) {
+    await logAuthSecurity({
+      ...context,
+      eventName: "admin_access",
+      status: "blocked",
+      actorType: "guest",
+      properties: {
+        reason: "same_origin_failed",
+        stage: "session_bridge",
+      },
+    });
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
   const memberSession = await getSignedUserSession();
 
   if (!memberSession?.userId) {
@@ -26,7 +42,7 @@ export async function GET(request: NextRequest) {
         stage: "session_bridge",
       },
     });
-    const loginUrl = new URL("/auth/login", request.url);
+    const loginUrl = buildTrustedRedirectUrl("/auth/login", request.url);
     loginUrl.searchParams.set("returnTo", returnTo);
     return NextResponse.redirect(loginUrl);
   }
@@ -44,7 +60,7 @@ export async function GET(request: NextRequest) {
         stage: "session_bridge",
       },
     });
-    const deniedUrl = new URL("/admin/denied", request.url);
+    const deniedUrl = buildTrustedRedirectUrl("/admin/denied", request.url);
     deniedUrl.searchParams.set("returnTo", returnTo);
     return NextResponse.redirect(deniedUrl);
   }
@@ -64,5 +80,5 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  return NextResponse.redirect(new URL(returnTo, request.url));
+  return NextResponse.redirect(buildTrustedRedirectUrl(returnTo, request.url));
 }
