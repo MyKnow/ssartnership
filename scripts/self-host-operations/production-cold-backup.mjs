@@ -52,7 +52,7 @@ async function inventory(root, prefix = '') {
   }
   return result;
 }
-async function encryptBundle(directory, recipient, output) {
+export async function encryptBundle(directory, recipient, output) {
   const tar = spawn('tar', ['--create', '--format=ustar', '--file=-', '--directory', directory, 'database.tar.gz', 'storage.tar', 'data.env', 'compose.json', 'app.env', 'manifest.json'], { stdio: ['ignore', 'pipe', 'pipe'] });
   const age = spawn('/opt/ssartnership/age-v1.3.2/age', ['--encrypt', '--recipient', recipient], { stdio: ['pipe', 'pipe', 'pipe'] });
   const done = child => new Promise(resolve => { child.once('error', () => resolve(-1)); child.once('close', resolve); });
@@ -83,7 +83,7 @@ async function capture() {
   ensure(sql("SELECT count(*) FROM pg_tablespace WHERE spcname NOT IN ('pg_default','pg_global')") === '0');
   const app = JSON.parse(run('docker', ['inspect', 'ssartnership-production-app-1']))[0];
   const application = backupApplicationIdentity(app, JSON.parse(run('docker', ['image', 'inspect', app.Image]))[0]);
-  const id = randomUUID(), temporary = `${ROOT}/${id}.partial`, outgoing = '/srv/ssartnership-backup-export';
+  const id = randomUUID(), temporary = `${ROOT}/${id}.partial`;
   await mkdir(temporary, { mode: 0o700 });
   const selected = JSON.parse(run('docker', ['inspect', ...WRITERS])).filter(c => c.State.Running).map(c => c.Name.slice(1));
   await saveIntent({ database: false, writers: selected });
@@ -103,9 +103,15 @@ async function capture() {
     const appFile = '/etc/myknow/secrets/ssartnership-production/app.env'; await privateFile(appFile); await copyFile(appFile, `${temporary}/app.env`);
     await writeFile(`${temporary}/manifest.json`, JSON.stringify({ version: 1, kind: 'production-cold-snapshot', id, capturedAt: new Date().toISOString(), databaseImage: current.Image, databaseSystemId: config.databaseSystemId, application, tables, storage, applicationWritesQuiesced: true, databaseCleanlyStopped: true, continuousPitr: false }), { mode: 0o600, flag: 'wx' });
   } finally { await resumeProductionBackup(); }
+  await publishProductionBackup(temporary, config, id);
+}
+export async function publishProductionBackup(temporary, config, id) {
+  const outgoing = '/srv/ssartnership-backup-export';
+  ensure(temporary === `${ROOT}/${id}.partial` && /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(id));
   await encryptBundle(temporary, config.recipient, `${temporary}/snapshot.tar.age`);
   const info = await lstat(`${temporary}/snapshot.tar.age`);
-  const receipt = validateBackupReceipt({ version: 1, id, createdAt: new Date().toISOString(), bytes: info.size, sha256: await hashFile(`${temporary}/snapshot.tar.age`), recipient: config.recipient, databaseSystemId: config.databaseSystemId, continuousPitr: false });
+  const capturedAt = JSON.parse(await readFile(`${temporary}/manifest.json`, 'utf8')).capturedAt;
+  const receipt = validateBackupReceipt({ version: 1, id, createdAt: capturedAt, bytes: info.size, sha256: await hashFile(`${temporary}/snapshot.tar.age`), recipient: config.recipient, databaseSystemId: config.databaseSystemId, continuousPitr: false });
   await mkdir(outgoing, { recursive: true, mode: 0o750 }); await chown(outgoing, 0, config.exportGroupId); await chmod(outgoing, 0o750);
   // Only finished ciphertext and receipts cross into the unprivileged export directory.
   const final = `${ROOT}/${id}.publish`; await mkdir(final, { mode: 0o750 }); await chown(final, 0, config.exportGroupId); await chmod(final, 0o750);

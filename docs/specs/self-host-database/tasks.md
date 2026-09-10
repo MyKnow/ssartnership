@@ -9,6 +9,24 @@ authority: normative
 
 상위 작업은 [Issue #435](https://github.com/MyKnow/ssartnership/issues/435)와 [마이그레이션 작업 목록](../self-hosting/tasks.md)이다. 코드 준비와 실제 실행 완료를 구분한다.
 
+## Production 일일 온라인 백업·이메일 — 2026-09-10
+
+[Issue #453 작업 계획](https://github.com/MyKnow/ssartnership/issues/453#issuecomment-5612304008)에 따라 운영자가 지정한 이메일 수신과 기존 일일 백업의 중단 제거를 구현한다. 아래 이전 날짜의 Preview 전용 상태는 역사적 기록이다. 현재 Production 앱·데이터 서비스의 전환 상태와 이번 백업 전환을 혼동하지 않는다.
+
+- [x] 이메일 relay 코드와 Production 전용 이미지 적용. 앱·DB container 불변, 수신처 설정 지표 1 확인. 장애·복구 시험 메일 두 건의 실제 수신을 운영자가 확인했다.
+- [x] 일일 백업 실패의 별도 systemd `OnFailure` 이메일 연결. 기존 capture/resume 명령·예약은 보존했다.
+- [x] 온라인 base backup, WAL/manifest 검증, Storage 버전 대응, 격리 복원 후 archive 정규화 구현. 합성 DB의 동시 쓰기 20건·후속 쓰기 제외·삭제된 이전 객체 보존 시험 통과.
+- [x] Production 원본 앱·DB를 재시작하지 않고 실제 온라인 사본 생성. UUID `191787e8-5ba2-4acc-8905-80eb1e026b77`, 암호문 75,425,960바이트, SHA256 `5ce1dc2209c59d43af95a7b4d0633ca06c277348e925351815ad9f87257921d9`. Mac의 전용 백업 디렉터리 수신·동일 hash 확인, 평문 저장 없음.
+- [x] Mac Keychain 기반 실제 암호화 왕복 복원. SSH 세션의 macOS -25308은 운영자가 허용한 Mac GUI Terminal에서 기존 helper를 실행하여 해소했다. 12:08 KST에 137개 테이블·168,336행과 Storage 859개 파일·41,475,231바이트 전량 hash 및 metadata가 일치했다. 키 ACL 변경·평문 Mac 저장·원본 데이터 mount 없이 network-none 복원했다.
+- [x] `online-backup.conf` 설치 후 systemd 실제 실행이 12:09:35~12:10:33 KST, exit 0으로 완료됐다. 앱·DB 시작 시각 불변 및 healthy 확인. 새 사본 `d2f7a4b1-84dd-43e4-b4ac-111b72304ca2`는 Mac 수신까지 완료했고 SHA256은 `9c1c5a901205650f2b24482ed8ad2ef31c8d870b8dbf1e16ad616f6222ebf38d`다. 현재 예약은 매일 03:00 KST의 온라인 방식이며 서버 7개·Mac 30개 보관과 Mac 매시간 pull을 유지한다.
+- [ ] 변경 commit/push·PR 통합. telemetry의 현재 운영자 이미지가 이후 정규 배포에도 유지되도록 소스 통합 후 릴리스해야 한다.
+
+홈 서버 이전 후 남아 있던 Vercel Git 자동 배포는 모든 브랜치에서 비활성화한다. 기존 프로젝트와 공유 Cron 11개 정의는 보존하며, 배포 검증은 홈 Preview·Production 실행 증거를 기준으로 한다. 이전 feature SHA의 정지 프로젝트 BLOCKED 응답과 후속 교정은 실패 원장에 기록한다.
+
+집중 테스트와 Linux 전체 검사 단계별 결과·초기 실패는 [실패 원장](../../../.agents/skills/github-actions-operations/references/failure-ledger.md)에 기록한다. 홈 서버 전체 전원·회선 장애용 독립 외부 감시는 이번 relay와 별개다. 기존 Vercel/Supabase 폐기와 제품 Cron 활성화는 이번 작업에 포함하지 않는다.
+
+최종 집중 lint·타입·문서 94개와 Linux Node 1,896개/기존 skip 8, unit 133개, 보안 정책·Production 빌드 및 실제 Docker 동시 쓰기 백업 시험을 통과했다. 에뮬레이션의 초기 실패와 포트 충돌은 원장에 보존했다. 이후 격리 native macOS의 전체 Release가 exit 0으로 완료됐다: Node 1,895개/플랫폼 skip 9, unit 133개, 빌드와 E2E 103개·재시도 0. 2,487줄 전체 로그에서 기존 between-admin Fast Refresh 두 건 외 차단 시그니처는 없었다. 테스트 조건과 시간 제한은 변경하지 않았다. 원격 CI·홈 Preview 통합과 정규 Production 운영 릴리스는 별도 확인한다.
+
 ## 공개 Preview 인수인계 — 2026-09-08
 
 현재 전달 범위는 **원래 Cloud Preview를 홈 서버의 공개 Preview로 이전**하는 것이다. Production은 기존 Vercel/Supabase를 유지한다. 아래 시간별 기록과 체크박스는 그 당시의 증거이며 이 절의 최신 상태와 구분한다.

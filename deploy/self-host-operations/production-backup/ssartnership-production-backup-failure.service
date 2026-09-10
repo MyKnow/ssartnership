@@ -1,0 +1,15 @@
+[Unit]
+Description=SSARTNERSHIP daily backup failure email
+After=network-online.target
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+ExecStart=/opt/ssartnership/node24/node /opt/ssartnership/operator-online-20260910/scripts/self-host-operations/notify-backup-failure.mjs
+TimeoutStartSec=15s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+StandardOutput=journal
+StandardError=journal
