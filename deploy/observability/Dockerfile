@@ -3,6 +3,7 @@ WORKDIR /service
 # COPY applies the mode to newly created parent directories too. Preserve
 # traversal for the nonroot runtime without making public code writable.
 COPY --chmod=0555 deploy/observability/telemetry.mjs ./deploy/observability/telemetry.mjs
+COPY --chmod=0555 deploy/observability/alert-delivery.mjs ./deploy/observability/alert-delivery.mjs
 COPY --chmod=0555 src/lib/web-vitals-contract.ts ./src/lib/web-vitals-contract.ts
 USER 1001:1001
 EXPOSE 9464
