@@ -2,8 +2,16 @@ import { readFile, writeFile, readdir, lstat } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
+import { verifyReferencedStorage } from './production-online-backup.mjs';
 export function assertRestoreDatabaseIdentity(expected, actual) {
   if (typeof expected !== 'string' || !/^[1-9][0-9]{0,19}$/u.test(expected) || expected !== actual) throw Error('PRODUCTION_RESTORE_IDENTITY_MISMATCH');
+}
+export function assertRestoreSnapshotKind(manifest) {
+  const cold = manifest?.kind === 'production-cold-snapshot' && manifest.applicationWritesQuiesced === true;
+  const online = manifest?.kind === 'production-online-snapshot' && manifest.applicationWritesQuiesced === false
+    && manifest.sourceRemainedRunning === true && manifest.onlineBaseBackupVerified === true
+    && Number.isSafeInteger(manifest.storageReferencesVerified) && manifest.storageReferencesVerified >= 0;
+  if (manifest?.version !== 1 || manifest.databaseCleanlyStopped !== true || !(cold || online)) throw Error('PRODUCTION_RESTORE_SNAPSHOT_INVALID');
 }
 
 export async function restoreProductionBackup(backup, expectedDatabaseSystemId) {
@@ -26,7 +34,7 @@ try{
  process.umask(0o077);check(process.platform==='linux'&&process.getuid()===0&&/^\/srv\/backups\/ssartnership-production\/from-mac-[a-f0-9-]{36}$/.test(backup));
  const stat=await lstat(backup);check(stat.isDirectory()&&!stat.isSymbolicLink()&&stat.uid===0&&(stat.mode&0o077)===0);
  const manifest=JSON.parse(await readFile(`${backup}/manifest.json`,'utf8'));
- check(manifest.version===1&&manifest.kind==='production-cold-snapshot'&&manifest.databaseCleanlyStopped===true&&manifest.applicationWritesQuiesced===true);
+ assertRestoreSnapshotKind(manifest);
  assertRestoreDatabaseIdentity(expectedDatabaseSystemId,manifest.databaseSystemId);
  check(/^sha256:[a-f0-9]{64}$/.test(manifest.databaseImage));
  check(!(await readdir(backup)).some(n=>n==='data'||n==='storage'));
@@ -49,6 +57,10 @@ try{
  const current=JSON.parse(run('docker',['inspect',name]))[0];
  check(current.HostConfig.NetworkMode==='none'&&current.Mounts.filter(m=>m.Type==='bind').length===1&&current.Mounts.find(m=>m.Destination==='/data')?.Source===`${backup}/data`);
  assertRestoreDatabaseIdentity(expectedDatabaseSystemId,sql('SELECT system_identifier::text FROM pg_control_system();'));
+ if(manifest.kind==='production-online-snapshot'){
+   const objects=JSON.parse(sql("SELECT coalesce(json_agg(json_build_object('bucket_id',bucket_id,'name',name,'version',version,'metadata',metadata)),'[]') FROM storage.objects"));
+   check(await verifyReferencedStorage(`${backup}/storage`,objects)===manifest.storageReferencesVerified);
+ }
  stage='all-table-comparison';let rows=0;
  for(const table of manifest.tables){
    const actual=JSON.parse(sql(`SELECT json_build_object('rows',count(*),'sha256',encode(sha256(convert_to(coalesce(string_agg(j,E'\\n' ORDER BY j COLLATE "C"),''),'UTF8')),'hex')) FROM (SELECT to_jsonb(t)::text j FROM ${id(table.schema)}.${id(table.name)} t) q`));

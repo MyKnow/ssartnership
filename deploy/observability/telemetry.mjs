@@ -1,12 +1,13 @@
 import http from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import { parseVitalSample, VITAL_NAMES, VITAL_ROUTES, createVitalIngressQuota } from "../../src/lib/web-vitals-contract.ts";
+import { alertDeliveryConfiguration, deliverOperationalAlert } from "./alert-delivery.mjs";
 
 export const ALERT_NAMES = new Set(["ServiceDown", "DatabaseUnavailable", "HostDiskLow", "HostMemoryLow", "BackupMissingOrStale", "BackupFailed", "ArchiveUnhealthy", "OperationsExporterStale", "RestoreDrillStale", "OffhostBackupStale", "OffhostBackupFailed", "AlertDeliveryUnavailable", "ProductionBackupCollectorStale", "ProductionBackupStale", "ProductionMacBackupStale", "SyntheticAlert"]);
 const BUCKETS = { CLS: [0.05, 0.1, 0.25, 0.5, 1, 5, 100], LCP: [500, 1000, 2500, 4000, 10000, 30000, 300000], INP: [50, 100, 200, 500, 1000, 5000, 300000] };
 
 export function summarizeAlerts(payload) {
-  if (!payload || !Array.isArray(payload.alerts) || payload.alerts.length > 50) return null;
+  if (!payload || !Array.isArray(payload.alerts) || payload.alerts.length === 0 || payload.alerts.length > 50) return null;
   const alerts = payload.alerts.map((item) => ({
     name: item?.labels?.alertname,
     status: item?.status,
@@ -69,7 +70,8 @@ export function createTelemetryServer({ env = process.env, deliver = fetch } = {
   const probe = { success: 0, duration: 0, completed: 0 };
   let probeTimer;
   let closing = false;
-  const configured = Boolean(env.OPS_ALERT_WEBHOOK_URL?.startsWith("https://"));
+  const deliveryConfiguration = alertDeliveryConfiguration(env);
+  const configured = Boolean(deliveryConfiguration);
   const server = http.createServer(async (request, response) => {
     const end = (status) => { if (!response.writableEnded) { response.writeHead(status, { "Cache-Control": "no-store" }); response.end(); } };
     try {
@@ -91,12 +93,7 @@ export function createTelemetryServer({ env = process.env, deliver = fetch } = {
       if (!text) return end(400);
       if (!configured) { outcomes.failure += 1; return end(503); }
       try {
-        const result = await deliver(env.OPS_ALERT_WEBHOOK_URL, {
-          method: "POST", redirect: "error", signal: AbortSignal.timeout(5000),
-          headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }),
-        });
-        await result.body?.cancel();
-        if (!result.ok) throw new Error("DELIVERY_FAILED");
+        await deliverOperationalAlert(deliveryConfiguration, text, payload, deliver);
         outcomes.success += 1;
         lastDelivery = Math.floor(Date.now() / 1000);
         return end(204);

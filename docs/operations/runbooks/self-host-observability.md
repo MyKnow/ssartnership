@@ -52,7 +52,7 @@ node -- scripts/self-host-operations/offhost.mjs init \
 
 ### Production 일일 암호화 스냅샷
 
-서버의 `ssartnership-production-backup.timer`는 매일 03:00 Asia/Seoul에 실행하고 성공 사본 7개를 보존한다. CI의 heavy 잠금이 사용 중이면 해당 실행은 실패하며 다음 성공으로 숨기지 않는다. 앱·API·Storage를 정지하고 DB를 정상 종료한 뒤 물리 DB와 Storage, 복구용 env를 함께 암호화한다. 잠시 서비스가 중단되는 cold backup이며 연속 WAL/PITR을 제공하지 않는다. 정상·실패 종료 모두 저장된 재개 의도에 따라 원래 실행 중이던 컨테이너만 다시 시작한다. 호스트 재부팅 후에도 백업 서비스의 `resume`으로 남은 의도를 먼저 처리한다.
+서버의 `ssartnership-production-backup.timer`는 매일 03:00 Asia/Seoul에 실행하고 성공 사본 7개를 보존한다. CI의 heavy 잠금이 사용 중이면 해당 실행은 실패하며 다음 성공으로 숨기지 않는다. 2026-09-10부터 아래 온라인 drop-in을 적용하여 운영 앱·DB를 중단하지 않는다. 연속 WAL/PITR은 제공하지 않는다. 기존 cold 실행 파일은 복귀용으로 보존한다. cold 방식으로 명시적으로 복귀하면 앱·API·Storage·DB가 잠시 중단되며, 정상·실패 종료 모두 저장된 재개 의도에 따라 원래 실행 중이던 컨테이너만 다시 시작한다.
 
 실행 파일은 `scripts/self-host-operations/production-*.mjs`, 전송 파일은 `serve-production-backup.mjs`와 `pull-production-backups.mjs`다. 서버 systemd 템플릿은 `deploy/self-host-operations/production-backup/`에 둔다. 설치 시 템플릿의 버전 경로와 실제 root 소유 실행 파일을 일치시키고, private `backup.json`의 source·DB system identifier·공개 age recipient·전송 그룹을 확인한다. 비밀 설정 자체는 저장소에 넣지 않는다.
 
@@ -63,6 +63,26 @@ Mac의 `dev.myknow.ssartnership-production-backup` LaunchAgent는 로그인 시�
 서버의 metrics timer는 매분 마지막 스냅샷과 Mac에 실제 복사된 스냅샷 시각을 갱신한다. Production 전용 경보는 수집 중단 5분, 서버/Mac 사본 26시간 노후 또는 지표 누락을 감지한다. 오래된 파일을 다시 확인해도 사본의 생성 시각은 갱신하지 않는다. 외부 알림 수신처 설정과 전달 성공은 별도로 검증한다.
 
 복구 시험은 Mac 암호문과 Keychain 키로 복원한 새 서버 비공개 경로와 검증한 receipt의 `databaseSystemId`를 `restore-production-backup.mjs <경로> <databaseSystemId>`에 제공한다. 식별자는 초기 후보 상수가 아니라 해당 백업의 receipt·암호화 manifest·실제 격리 복원 DB에서 모두 일치해야 한다. network-none DB에서 테이블별 전체 행 hash와 Storage 전체 파일 hash·메타데이터를 비교하고 원본 mount가 없음을 확인한다. 새 백업의 암호화 manifest는 캡처 당시 실행 중인 앱의 Git SHA와 이미지 식별자도 보존하므로 데이터 시점에 맞는 앱을 복구할 때 사용한다. 실제 설치·예약 실행·Mac 수신·복구 시험의 결과는 각각 Issue #453 receipt로 구분하며, 최종 데이터 전환 후 새 스냅샷으로 다시 확인한다.
+
+SSH 세션에서 Keychain 접근이 macOS -25308로 거절되면 운영자가 로그인한 Mac의 GUI Terminal에서 동일한 복구 helper를 실행하고 접근 요청을 직접 허용한다. 키 자체나 비밀번호를 출력·전송하지 않으며 키 ACL을 넓히지 않는다. Keychain 앱 실행 허용과 실제 복구 키 읽기 성공은 별도 단계다.
+
+### 일일 온라인 백업 전환과 이메일 수신
+
+2026-09-10 운영 요구는 매일 03:00 KST 백업, 서버 7개·Mac 30개 보관 유지와 서비스 중단 제거다. `scripts/self-host-operations/production-online-backup.mjs capture`는 실행 중인 PostgreSQL 17의 `pg_basebackup`을 사용한다. WAL을 포함한 단일 archive가 완성되지 않으면 실패한다. 별도 tablespace 또는 unlogged 사용자 테이블이 있으면 실행 전에 거절한다. WAL 보존이 부족하여 backup 중 필요한 WAL이 제거돼도 성공으로 처리하지 않는다. 이 방식은 일일 복구 지점이며 연속 PITR 서비스가 아니다.
+
+Storage는 원본과 독립된 버전 파일 사본을 DB 백업 전후에 만든다. 원본 파일을 hard link하지 않는다. 같은 버전의 바이트 변경, 사본 누락, 크기 불일치 또는 경로 탈출은 실패다. `pg_verifybackup` 검증 후 network-none 복원 DB에서 실제 참조하는 모든 버전을 대조한다. 이 복원 DB만 정상 종료하여 기존 복원 도구와 호환되는 DB archive를 만든다. 운영 앱·DB의 컨테이너 ID와 시작 시각 불변을 확인한다. 동시 삭제로 필요한 버전을 확보하지 못한 경우에는 기존 성공 사본을 보존하고 실패를 알린다. 실패한 `.partial` 경로는 자동 공개·보존 삭제 대상으로 취급하지 않는다.
+
+수동 실제 capture → 암호화 Mac 수신 → 격리 복원의 전체 행·파일 대조를 통과한 뒤 `deploy/self-host-operations/production-backup/online-backup.conf`를 기존 백업 service의 drop-in으로 설치한다. 설치된 코드 경로를 먼저 확인하고 기존 service와 timer 파일을 보존한다. timer 일정과 Mac LaunchAgent는 변경하지 않는다. `ExecStopPost`의 기존 cold resume을 제거하기 전에 남은 resume 의도가 없음을 확인한다. 실패 시 drop-in을 제거하고 `daemon-reload`하여 이전 실행 파일로 돌아갈 수 있다. 온라인 archive도 기존 receipt·암호화·SSH list/get/ack 계약을 유지한다.
+
+초기 준비는 `prepare-online-backup.mjs`로 현재 DB의 system identifier와 HBA 경로를 확인한 뒤 Unix socket의 `supabase_admin` replication 규칙만 추가하고 reload한다. TCP 접속 규칙은 추가하지 않는다. 원래 HBA 사본은 PGDATA 밖에 보관한다. PGDATA 안에 root 전용 파일을 두면 비root base backup이 실패한다.
+
+`backup-alerts.conf`는 백업 service의 별도 `alerts.conf` drop-in으로 설치하며, `OnFailure`를 `ssartnership-production-backup-failure.service`로 연결한다. 온라인 전환 전에도 기존 일일 백업의 실패를 알릴 수 있다. 이 서비스는 root 전용 monitoring env에서 발송 설정만 읽고 고정 `BackupFailed` 메시지를 보내므로 telemetry가 내려가 있어도 발송을 시도한다. 호스트 전원·네트워크·메일 공급자 장애 시 전달을 보장하지는 않는다. 잠금 충돌도 실패로 남기며 기존 성공 사본을 갱신하지 않는다.
+
+Production의 비공개 `MONITORING_ENV_FILE`에 `OPS_ALERT_EMAIL_TO`, `OPS_ALERT_EMAIL_FROM`, `OPS_ALERT_RESEND_API_KEY`를 설정한다. 수신자는 운영자가 지정한 주소 한 개이고, 발신자는 Resend 검증 도메인의 메일 주소다. 도메인 한정 발송 전용 키를 사용하며 앱 env 전체를 telemetry에 전달하지 않는다. 기존 `OPS_ALERT_WEBHOOK_URL`은 비워 두며 두 방식을 동시에 설정하거나 일부 값만 넣으면 구성 오류로 처리한다. 수신 주소와 키를 저장소·로그에 넣지 않는다.
+
+relay는 인증된 Alertmanager 요청에서 알려진 경보명·심각도·발생/복구 상태만 이메일로 보낸다. 원문 annotations·labels·회원 정보는 보내지 않는다. 같은 사건의 중복 통지는 Resend의 24시간 idempotency로 제한하고 복구 및 새 사건은 별도 키를 사용한다. 발송 실패는 HTTP 502와 실패 지표로 남겨 Alertmanager가 실패를 관측할 수 있게 한다. API 접수 성공과 실제 메일함 수신은 구분하여 확인한다. 이 relay는 홈 서버에 있으므로 서버 전체 전원·회선 장애를 독립적으로 탐지하는 외부 감시는 별도 구성이다.
+
+참고: [PostgreSQL 온라인 base backup](https://www.postgresql.org/docs/17/app-pgbasebackup.html), [Resend idempotency](https://resend.com/docs/dashboard/emails/idempotency-keys).
 
 ### Production 외부 관측 경로
 

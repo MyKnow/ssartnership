@@ -21,7 +21,8 @@ test("gate modules remain readable by arbitrary nonroot users after private sour
 test("telemetry image also normalizes public source read permissions for its nonroot runtime", () => {
   const dockerfile = readFileSync(new URL("../deploy/observability/Dockerfile", import.meta.url), "utf8");
   const copies = dockerfile.split("\n").filter(line => line.startsWith("COPY "));
-  assert.equal(copies.length, 2);
+  assert.equal(copies.length, 3);
+  assert.ok(copies.some(line => line.includes('deploy/observability/alert-delivery.mjs')));
   // COPY also creates nested destination directories with this mode.
   for (const line of copies) assert.match(line, /^COPY --chmod=0555 /);
   assert.match(dockerfile, /USER 1001:1001/);
