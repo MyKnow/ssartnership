@@ -21,6 +21,8 @@ authority: normative
 - [x] `online-backup.conf` 설치 후 systemd 실제 실행이 12:09:35~12:10:33 KST, exit 0으로 완료됐다. 앱·DB 시작 시각 불변 및 healthy 확인. 새 사본 `d2f7a4b1-84dd-43e4-b4ac-111b72304ca2`는 Mac 수신까지 완료했고 SHA256은 `9c1c5a901205650f2b24482ed8ad2ef31c8d870b8dbf1e16ad616f6222ebf38d`다. 현재 예약은 매일 03:00 KST의 온라인 방식이며 서버 7개·Mac 30개 보관과 Mac 매시간 pull을 유지한다.
 - [ ] 변경 commit/push·PR 통합. telemetry의 현재 운영자 이미지가 이후 정규 배포에도 유지되도록 소스 통합 후 릴리스해야 한다.
 
+홈 서버 이전 후 남아 있던 Vercel Git 자동 배포는 모든 브랜치에서 비활성화한다. 기존 프로젝트와 공유 Cron 11개 정의는 보존하며, 배포 검증은 홈 Preview·Production 실행 증거를 기준으로 한다. 이전 feature SHA의 정지 프로젝트 BLOCKED 응답과 후속 교정은 실패 원장에 기록한다.
+
 집중 테스트와 Linux 전체 검사 단계별 결과·초기 실패는 [실패 원장](../../../.agents/skills/github-actions-operations/references/failure-ledger.md)에 기록한다. 홈 서버 전체 전원·회선 장애용 독립 외부 감시는 이번 relay와 별개다. 기존 Vercel/Supabase 폐기와 제품 Cron 활성화는 이번 작업에 포함하지 않는다.
 
 최종 집중 lint·타입·문서 94개와 Linux Node 1,896개/기존 skip 8, unit 133개, 보안 정책·Production 빌드 및 실제 Docker 동시 쓰기 백업 시험을 통과했다. 에뮬레이션의 초기 실패와 포트 충돌은 원장에 보존했다. 이후 격리 native macOS의 전체 Release가 exit 0으로 완료됐다: Node 1,895개/플랫폼 skip 9, unit 133개, 빌드와 E2E 103개·재시도 0. 2,487줄 전체 로그에서 기존 between-admin Fast Refresh 두 건 외 차단 시그니처는 없었다. 테스트 조건과 시간 제한은 변경하지 않았다. 원격 CI·홈 Preview 통합과 정규 Production 운영 릴리스는 별도 확인한다.
