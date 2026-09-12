@@ -214,7 +214,7 @@ test("mock partner repository scopes full and public directory reads by campus",
   assert.equal(publicSeoulPartners.length, seoulPartners.length);
 });
 
-test("mock public directory keeps public benefit search text without serializing rich arrays", async () => {
+test("mock public directory keeps display benefit titles without serializing rich arrays", async () => {
   const { MockPartnerRepository } = await mockPartnerRepositoryPromise;
   const repository = new MockPartnerRepository();
 
@@ -223,7 +223,8 @@ test("mock public directory keeps public benefit search text without serializing
   });
   const partner = partners.find((item) => item.id === "space-001");
 
-  assert.deepEqual(partner?.benefits, []);
+  assert.deepEqual(partner?.benefits, ["2시간 무료 이용", "시간권 30% 할인"]);
+  assert.deepEqual(partner?.benefitItems, []);
   assert.deepEqual(partner?.conditions, []);
   assert.match(partner?.directorySearchText ?? "", /2시간 무료 이용/);
   assert.match(partner?.directorySearchText ?? "", /평일 2시간 무료/);
@@ -239,7 +240,8 @@ test("mock public directory masks eligible-only search text for guests", async (
   });
   const partner = partners.find((item) => item.id === "health-001");
 
-  assert.deepEqual(partner?.benefits, []);
+  assert.deepEqual(partner?.benefits, [BENEFIT_LOGIN_REQUIRED_MESSAGE]);
+  assert.deepEqual(partner?.benefitItems, []);
   assert.deepEqual(partner?.conditions, []);
   assert.doesNotMatch(partner?.directorySearchText ?? "", /월 이용권 20% 할인/);
   assert.doesNotMatch(partner?.directorySearchText ?? "", /전 직원 SSAFY 구성원 인증/);
@@ -256,7 +258,8 @@ test("mock public directory keeps eligible-only search text for eligible viewers
   });
   const partner = partners.find((item) => item.id === "health-001");
 
-  assert.deepEqual(partner?.benefits, []);
+  assert.deepEqual(partner?.benefits, ["월 이용권 20% 할인", "PT 5회 패키지 10% 할인"]);
+  assert.deepEqual(partner?.benefitItems, []);
   assert.deepEqual(partner?.conditions, []);
   assert.match(partner?.directorySearchText ?? "", /월 이용권 20% 할인/);
   assert.match(partner?.directorySearchText ?? "", /전 직원 ssafy 구성원 인증/);
@@ -273,7 +276,8 @@ test("mock public directory masks eligible-only search text for non-eligible vie
   });
   const partner = partners.find((item) => item.id === "health-001");
 
-  assert.deepEqual(partner?.benefits, []);
+  assert.deepEqual(partner?.benefits, [BENEFIT_ELIGIBLE_ONLY_MESSAGE]);
+  assert.deepEqual(partner?.benefitItems, []);
   assert.deepEqual(partner?.conditions, []);
   assert.doesNotMatch(partner?.directorySearchText ?? "", /월 이용권 20% 할인/);
   assert.doesNotMatch(partner?.directorySearchText ?? "", /전 직원 SSAFY 구성원 인증/);

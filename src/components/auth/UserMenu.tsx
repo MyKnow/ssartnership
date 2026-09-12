@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { LogOut } from "lucide-react";
+import { LogIn, LogOut, UserPlus } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import type { HeaderSession } from "@/lib/header-session";
@@ -16,6 +16,7 @@ export default function UserMenu({
   logoutIconOnly = false,
   guestAuthReturnTo,
   showMemberNavigation = true,
+  showAuthIcons = false,
 }: {
   initialSession?: HeaderSession | null;
   className?: string;
@@ -23,6 +24,7 @@ export default function UserMenu({
   logoutIconOnly?: boolean;
   guestAuthReturnTo?: string;
   showMemberNavigation?: boolean;
+  showAuthIcons?: boolean;
 }) {
   const [session, setSession] = useState<HeaderSession | null>(initialSession);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -68,6 +70,7 @@ export default function UserMenu({
           prefetch={false}
           className={buttonClassName}
         >
+          {showAuthIcons ? <LogIn className="h-5 w-5" aria-hidden="true" /> : null}
           로그인
         </Button>
         <Button
@@ -76,6 +79,7 @@ export default function UserMenu({
           prefetch={false}
           className={buttonClassName}
         >
+          {showAuthIcons ? <UserPlus className="h-5 w-5" aria-hidden="true" /> : null}
           회원가입
         </Button>
       </div>
@@ -124,6 +128,7 @@ export default function UserMenu({
           loadingText="로그아웃 중"
           className={buttonClassName}
         >
+          {showAuthIcons ? <LogOut className="h-5 w-5" aria-hidden="true" /> : null}
           로그아웃
         </Button>
       )}

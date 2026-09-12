@@ -31,11 +31,10 @@ test.describe("mobile browser and standalone PWA shell", () => {
       page.getByRole("navigation", { name: "모바일 주요 탐색" }),
     ).toHaveCount(0);
     await expect(page.getByRole("button", { name: "메뉴 열기" })).toBeVisible();
-    await expect(
-      page
-        .locator("[data-site-header-pwa-install]")
-        .getByRole("link", { name: "앱 설치" }),
-    ).toHaveAttribute("href", "/install?platform=ios");
+    await page.getByRole("button", { name: "메뉴 열기" }).click();
+    await expect(page.getByRole("dialog", { name: "메뉴" }).getByRole("link", { name: "앱 설치" }))
+      .toHaveAttribute("href", "/install?platform=ios");
+    await page.getByRole("button", { name: "메뉴 닫기" }).click();
 
     await recommendation.getByRole("button", { name: "나중에" }).click();
     await expect(recommendation).toHaveCount(0);

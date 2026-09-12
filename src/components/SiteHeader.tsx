@@ -1,18 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import {
   BellIcon,
-  Cog6ToothIcon,
-  IdentificationIcon,
   MagnifyingGlassIcon,
-  TicketIcon,
 } from "@heroicons/react/24/outline";
 import { usePathname } from "next/navigation";
 import { BellAlertIcon } from "@heroicons/react/24/solid";
-import ThemeToggle from "@/components/ThemeToggle";
-import PwaInstallButton from "@/components/PwaInstallButton";
+import TabletMenu from "@/components/TabletMenu";
 import Button from "@/components/ui/Button";
 import Container from "@/components/ui/Container";
 import { SITE_NAME } from "@/lib/site";
@@ -21,19 +16,11 @@ import { cn } from "@/lib/cn";
 import BrandWordmark from "@/components/BrandWordmark";
 import {
   NOTIFICATION_BELL_ACTIVE_ICON_CLASS,
-  NOTIFICATION_BELL_ACTIVE_ICON_BUTTON_CLASS,
 } from "@/components/notifications/notification-bell";
 import {
   useNotificationUnreadCount,
 } from "@/hooks/useNotificationUnreadCount";
-import {
-  buildSettingsHref,
-  isFocusedSiteFlow,
-  isSettingsPath,
-} from "@/lib/site-navigation";
-
-const UserMenu = dynamic(() => import("@/components/auth/UserMenu"));
-const TabletMenu = dynamic(() => import("@/components/TabletMenu"));
+import { isFocusedSiteFlow } from "@/lib/site-navigation";
 
 export default function SiteHeader({
   suggestHref = "/suggest",
@@ -83,67 +70,25 @@ export default function SiteHeader({
             >
               <BrandWordmark className="text-lg sm:text-xl" />
             </Link>
-            <div className="flex items-center gap-1 sm:gap-2">
-              <div className="hidden items-center gap-2 xl:flex">
-                <Button variant="soft" href={suggestHref}>
-                  제휴 제안하기
-                </Button>
-              </div>
-              <div className="hidden items-center gap-2 xl:flex">
-                <UserMenu
-                  initialSession={initialSession}
-                  guestAuthReturnTo={guestAuthReturnTo}
-                  logoutIconOnly
-                />
-              </div>
+            <div data-site-header-actions className="flex shrink-0 items-center gap-1 sm:gap-2">
               {initialSession ? (
-                <div className="relative hidden items-center xl:flex">
+                <div data-site-header-certification>
                   <Button
-                    variant="secondary"
-                    size="icon"
-                    href="/notifications"
-                    prefetch={false}
-                    className={cn(
-                      notificationUnreadCount > 0
-                        ? NOTIFICATION_BELL_ACTIVE_ICON_BUTTON_CLASS
-                        : null,
-                    )}
-                    ariaLabel="알림"
-                    title="알림"
-                  >
-                    {notificationUnreadCount > 0 ? (
-                      <BellAlertIcon
-                        className={cn("h-5 w-5", NOTIFICATION_BELL_ACTIVE_ICON_CLASS)}
-                      />
-                    ) : (
-                      <BellIcon className="h-5 w-5" />
-                    )}
-                  </Button>
-                </div>
-              ) : null}
-              {initialSession ? (
-                <div className="hidden md:block xl:hidden">
-                  <Button
-                    variant="secondary"
-                    size="icon"
+                    variant="soft"
                     href="/certification"
                     prefetch={false}
-                    ariaLabel="내 인증"
-                    title="내 인증"
+                    className="px-3 !shadow-none focus-visible:!outline-2 focus-visible:!outline-primary focus-visible:!outline-offset-2 sm:px-4"
+                    ariaCurrent={pathname === "/certification" ? "page" : undefined}
                   >
-                    <IdentificationIcon className="h-5 w-5" />
+                    내 인증
                   </Button>
                 </div>
-              ) : null}
-              <div data-site-header-theme-toggle className="hidden md:flex">
-                <ThemeToggle />
-              </div>
-              {!initialSession && !isFocusedSiteFlow(pathname) ? (
-                <div data-site-header-search className="md:hidden">
+              ) : !isFocusedSiteFlow(pathname) ? (
+                <div data-site-header-search>
                   <Button
                     href="/#benefit-search"
                     prefetch={false}
-                    variant="secondary"
+                    variant="ghost"
                     size="icon"
                     ariaLabel="혜택 검색"
                     title="혜택 검색"
@@ -153,73 +98,34 @@ export default function SiteHeader({
                   </Button>
                 </div>
               ) : null}
-              <div
-                data-site-header-pwa-install
-                className="min-h-11 min-w-11"
-              >
-                <PwaInstallButton
-                  iconOnly
-                  hideWhenInstalled
-                  variant="secondary"
-                />
-              </div>
               {initialSession ? (
-                <div className="hidden md:block xl:hidden">
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    href="/coupons"
-                    prefetch={false}
-                    ariaLabel="쿠폰함"
-                    title="쿠폰함"
-                  >
-                    <TicketIcon className="h-5 w-5" />
-                  </Button>
-                </div>
-              ) : null}
-              {initialSession ? (
-                <div className="xl:hidden">
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    href="/notifications"
-                    prefetch={false}
-                    className={cn(
-                      notificationUnreadCount > 0
-                        ? NOTIFICATION_BELL_ACTIVE_ICON_BUTTON_CLASS
-                        : null,
-                    )}
-                    ariaLabel="알림"
-                    title="알림"
-                  >
-                    {notificationUnreadCount > 0 ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  href="/notifications"
+                  prefetch={false}
+                  className="relative"
+                  ariaLabel="알림"
+                  title={notificationUnreadCount > 0 ? `읽지 않은 알림 ${notificationUnreadCount}개` : "알림"}
+                >
+                  {notificationUnreadCount > 0 ? (
+                    <>
                       <BellAlertIcon
-                        className={cn("h-5 w-5", NOTIFICATION_BELL_ACTIVE_ICON_CLASS)}
+                        className={cn("h-5 w-5 text-danger", NOTIFICATION_BELL_ACTIVE_ICON_CLASS)}
+                        aria-hidden="true"
                       />
-                    ) : (
-                      <BellIcon className="h-5 w-5" />
-                    )}
-                  </Button>
-                </div>
-              ) : null}
-              {initialSession && !isFocusedSiteFlow(pathname) ? (
-                <div>
-                  <Button
-                    variant={isSettingsPath(pathname) ? "soft" : "secondary"}
-                    size="icon"
-                    href={buildSettingsHref(pathname)}
-                    prefetch={false}
-                    ariaLabel="설정"
-                    ariaCurrent={isSettingsPath(pathname) ? "page" : undefined}
-                    title="설정"
-                  >
-                    <Cog6ToothIcon className="h-5 w-5" />
-                  </Button>
-                </div>
+                      <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-danger" aria-hidden="true" />
+                      <span className="sr-only">읽지 않은 알림 {notificationUnreadCount}개</span>
+                    </>
+                  ) : (
+                    <BellIcon className="h-5 w-5" aria-hidden="true" />
+                  )}
+                </Button>
               ) : null}
               <TabletMenu
                 initialSession={initialSession}
                 guestAuthReturnTo={guestAuthReturnTo}
+                suggestHref={suggestHref}
               />
             </div>
           </Container>

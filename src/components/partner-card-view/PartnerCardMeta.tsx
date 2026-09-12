@@ -170,16 +170,20 @@ export default function PartnerCardMeta({
       >
         <div className="min-w-0 text-sm text-foreground">
           <p className="font-medium text-foreground">혜택</p>
-          <div className="mt-2 flex min-w-0 flex-wrap gap-2">
-            {benefitBudget.visible.map((benefit) => (
-              <PartnerValueBadge key={benefit}>
-                {benefit}
-              </PartnerValueBadge>
-            ))}
-            {benefitBudget.hiddenCount > 0 ? (
-              <PartnerValueBadge>+{benefitBudget.hiddenCount}</PartnerValueBadge>
-            ) : null}
-          </div>
+          {benefitBudget.visible.length > 0 ? (
+            <div className="mt-2 flex min-w-0 flex-wrap gap-2">
+              {benefitBudget.visible.map((benefit) => (
+                <PartnerValueBadge key={benefit}>
+                  {benefit}
+                </PartnerValueBadge>
+              ))}
+              {benefitBudget.hiddenCount > 0 ? (
+                <PartnerValueBadge>+{benefitBudget.hiddenCount}</PartnerValueBadge>
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-1.5 text-sm text-muted-foreground">혜택 정보 준비 중</p>
+          )}
         </div>
         <div className="min-w-0 text-sm text-foreground">
           <p className="font-medium text-foreground">적용 대상</p>

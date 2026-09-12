@@ -220,6 +220,7 @@ test("uses the full-bleed gallery lead only below the mobile breakpoint", async 
     "data-partner-image-carousel-expanded",
     "true",
   );
+  await expect(mainFrame).toHaveCSS("border-radius", "24px");
   await expect(
     expandedCarousel.locator("[data-partner-image-carousel-preview]"),
   ).not.toHaveCount(0);

@@ -206,7 +206,10 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
 }
 
 @media (max-width: 767px) {
-  body:has([data-site-mobile-navigation]) [data-site-header-search] {
+  /* 실제 하단 탐색이 보이는 앱 화면에서만 상단의 중복 액션을 숨깁니다. */
+  body:has([data-site-mobile-navigation]) [data-site-header-search],
+  body:has([data-site-mobile-navigation]) [data-site-header-certification],
+  body:has([data-site-mobile-navigation]) [data-site-browser-menu-trigger] {
     display: none;
   }
 
@@ -214,8 +217,8 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
     padding-bottom: calc(env(safe-area-inset-bottom) + 7.75rem);
   }
 
-  body:has([data-site-mobile-navigation]) [data-site-header-theme-toggle] {
-    display: flex;
+  body:has([data-site-mobile-navigation]) [data-site-app-settings-trigger] {
+    display: inline-flex;
   }
 
   body:has([data-site-mobile-navigation]) [data-site-footer-theme-mode],
@@ -245,12 +248,6 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
 :where(code, pre, kbd, samp) {
   word-break: normal;
   overflow-wrap: normal;
-}
-
-@media (display-mode: standalone) {
-  [data-site-header-pwa-install] {
-    display: none;
-  }
 }
 
 ::selection {
