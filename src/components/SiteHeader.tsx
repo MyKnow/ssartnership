@@ -6,6 +6,7 @@ import {
   BellIcon,
   Cog6ToothIcon,
   IdentificationIcon,
+  MagnifyingGlassIcon,
   TicketIcon,
 } from "@heroicons/react/24/outline";
 import { usePathname } from "next/navigation";
@@ -47,6 +48,24 @@ export default function SiteHeader({
   const [notificationUnreadCount] = useNotificationUnreadCount(
     initialSession?.notificationUnreadCount ?? 0,
   );
+
+  const handleSearchClick = (event: React.MouseEvent<HTMLElement>) => {
+    if (pathname !== "/" || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const input = document.querySelector<HTMLInputElement>("#benefit-search");
+    if (!input) return;
+    event.preventDefault();
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.pathname}${window.location.search}#benefit-search`,
+    );
+    // 터치 이벤트 안에서 바로 포커스해야 iOS에서도 검색 키보드가 열립니다.
+    input.focus({ preventScroll: true });
+    input.scrollIntoView({
+      block: "center",
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
+  };
 
   return (
     <>
@@ -119,6 +138,21 @@ export default function SiteHeader({
               <div data-site-header-theme-toggle className="hidden md:flex">
                 <ThemeToggle />
               </div>
+              {!initialSession && !isFocusedSiteFlow(pathname) ? (
+                <div data-site-header-search className="md:hidden">
+                  <Button
+                    href="/#benefit-search"
+                    prefetch={false}
+                    variant="secondary"
+                    size="icon"
+                    ariaLabel="혜택 검색"
+                    title="혜택 검색"
+                    onClick={handleSearchClick}
+                  >
+                    <MagnifyingGlassIcon className="h-5 w-5" aria-hidden="true" />
+                  </Button>
+                </div>
+              ) : null}
               <div
                 data-site-header-pwa-install
                 className="min-h-11 min-w-11"

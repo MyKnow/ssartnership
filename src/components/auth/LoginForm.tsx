@@ -269,23 +269,31 @@ export default function LoginForm({
           >
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {isEmail ? "이메일" : "Mattermost 아이디"}
-              <Input
-                ref={isEmail ? emailIdentifierRef : usernameIdentifierRef}
-                type={isEmail ? "email" : "text"}
-                inputMode={isEmail ? "email" : "text"}
-                autoComplete="username"
-                placeholder={isEmail ? "예시: myknow@example.com" : "예시: myknow"}
-                value={identifiers[method]}
-                onChange={(event) => {
-                  setIdentifiers((previous) => ({
-                    ...previous,
-                    [method]: event.target.value,
-                  }));
-                  clearFieldError("identifier");
-                }}
-                aria-invalid={(active && Boolean(fieldErrors.identifier)) || undefined}
-                className={getFieldErrorClass(active && Boolean(fieldErrors.identifier))}
-              />
+              {/* 숨긴 탭의 입력까지 자동완성 후보로 해석하지 않도록 활성 입력만 렌더링합니다. */}
+              {active ? (
+                <Input
+                  ref={isEmail ? emailIdentifierRef : usernameIdentifierRef}
+                  id={`${id}-${method}`}
+                  name={isEmail ? "email" : "username"}
+                  type={isEmail ? "email" : "text"}
+                  inputMode={isEmail ? "email" : "text"}
+                  autoComplete={isEmail ? "email" : "username"}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder={isEmail ? "예시: myknow@example.com" : "예시: myknow"}
+                  value={identifiers[method]}
+                  onChange={(event) => {
+                    setIdentifiers((previous) => ({
+                      ...previous,
+                      [method]: event.target.value,
+                    }));
+                    clearFieldError("identifier");
+                  }}
+                  aria-invalid={(active && Boolean(fieldErrors.identifier)) || undefined}
+                  className={getFieldErrorClass(active && Boolean(fieldErrors.identifier))}
+                />
+              ) : null}
               {active && fieldErrors.identifier ? (
                 <FormMessage variant="error">{fieldErrors.identifier}</FormMessage>
               ) : null}
@@ -298,6 +306,9 @@ export default function LoginForm({
         비밀번호
         <PasswordInput
           ref={passwordRef}
+          id={`${id}-password`}
+          name="password"
+          autoComplete="current-password"
           value={password}
           onChange={(event) => {
             setPassword(event.target.value);

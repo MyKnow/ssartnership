@@ -50,7 +50,8 @@ test.describe("mobile browser and standalone PWA shell", () => {
       .locator('a[aria-label$=" 상세 보기"]')
       .first();
     await firstPartnerDetailLink.click();
-    await expect(page).toHaveURL(/\/partners\/[^?#]+$/);
+    // A cold development render of the detail route can take longer than 5s.
+    await expect(page).toHaveURL(/\/partners\/[^?#]+$/, { timeout: 15_000 });
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 
     await page.getByRole("banner").getByLabel("싸트너십").click();

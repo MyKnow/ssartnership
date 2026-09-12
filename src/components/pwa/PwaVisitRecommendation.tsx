@@ -28,17 +28,38 @@ export function PwaVisitRecommendationSurface({
 }: {
   onDismiss: () => void;
 }) {
+  const positionRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const updatePosition = () => {
+      const bottom = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
+      positionRef.current?.style.setProperty("--pwa-viewport-bottom", `${bottom}px`);
+    };
+    updatePosition();
+    viewport.addEventListener("resize", updatePosition);
+    viewport.addEventListener("scroll", updatePosition);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      viewport.removeEventListener("resize", updatePosition);
+      viewport.removeEventListener("scroll", updatePosition);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, []);
+
   return (
     <aside
+      ref={positionRef}
       data-pwa-visit-recommendation
       aria-labelledby="pwa-visit-recommendation-title"
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-3 top-[calc(env(safe-area-inset-top)+5.0625rem)] z-30"
+      className="pwa-visit-recommendation pointer-events-none fixed inset-x-3 z-30"
     >
       <Surface
         level="overlay"
         padding="sm"
-        className="pointer-events-auto mx-auto max-w-md rounded-[1.375rem] bg-surface-overlay/95"
+        className="pwa-visit-recommendation-content pointer-events-auto mx-auto max-w-md overflow-y-auto rounded-[1.375rem] bg-surface-overlay/95"
       >
         <div className="flex min-w-0 items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-primary-soft text-primary">

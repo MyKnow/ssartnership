@@ -190,7 +190,26 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* 브라우저의 보이는 영역과 홈 인디케이터 위에 설치 안내를 배치합니다. */
+.pwa-visit-recommendation {
+  bottom: calc(max(env(safe-area-inset-bottom, 0px), var(--pwa-viewport-bottom, 0px)) + 1rem);
+}
+
+.pwa-visit-recommendation-content {
+  max-height: max(0px, calc(100svh - env(safe-area-inset-top, 0px) - max(env(safe-area-inset-bottom, 0px), var(--pwa-viewport-bottom, 0px)) - 7rem));
+}
+
+/* 입력 중에는 검색과 키보드를 가리지 않고, 앱 하단 탐색과도 함께 뜨지 않습니다. */
+body:has(input:focus, textarea:focus, [contenteditable="true"]:focus) [data-pwa-visit-recommendation],
+body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
+  display: none;
+}
+
 @media (max-width: 767px) {
+  body:has([data-site-mobile-navigation]) [data-site-header-search] {
+    display: none;
+  }
+
   body:has([data-site-mobile-navigation]) [data-site-footer] {
     padding-bottom: calc(env(safe-area-inset-bottom) + 7.75rem);
   }
