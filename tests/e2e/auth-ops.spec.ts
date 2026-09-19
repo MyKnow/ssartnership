@@ -37,19 +37,21 @@ test.describe("auth and partner portal operation flows", () => {
     await page.waitForURL(/\/partners\/health-001$/, { timeout: 5_000 });
     await waitForPageReady(
       page,
-      page.getByRole("banner").getByRole("link", { name: "로그인", exact: true }),
+      page.getByRole("button", { name: "메뉴 열기" }),
     );
+    await page.getByRole("button", { name: "메뉴 열기" }).click();
 
     await expect(
-      page.getByRole("banner").getByRole("link", { name: "로그인", exact: true }),
+      page.getByRole("dialog", { name: "메뉴" }).getByRole("link", { name: "로그인", exact: true }),
     ).toHaveAttribute("href", "/auth/login?returnTo=%2Fpartners%2Fhealth-001");
     await expect(
-      page.getByRole("banner").getByRole("link", {
+      page.getByRole("dialog", { name: "메뉴" }).getByRole("link", {
         name: "회원가입",
         exact: true,
       }),
     ).toHaveAttribute("href", "/auth/signup?returnTo=%2Fpartners%2Fhealth-001");
 
+    await page.getByRole("button", { name: "메뉴 닫기" }).click();
     const benefitAction = page.getByRole("link", {
       name: "로그인 후 혜택 이용하기",
     }).first();
@@ -87,7 +89,8 @@ test.describe("auth and partner portal operation flows", () => {
       name: "회원가입",
       exact: true,
     });
-    const headerSignupAction = page.getByRole("banner").getByRole("link", {
+    await page.getByRole("button", { name: "메뉴 열기" }).click();
+    const headerSignupAction = page.getByRole("dialog", { name: "메뉴" }).getByRole("link", {
       name: "회원가입",
       exact: true,
     });
@@ -95,6 +98,7 @@ test.describe("auth and partner portal operation flows", () => {
       "href",
       "/auth/signup?returnTo=%2Fpartners%2Fhealth-001",
     );
+    await page.getByRole("button", { name: "메뉴 닫기" }).click();
     await expect(signupAction).toHaveAttribute(
       "href",
       "/auth/signup?returnTo=%2Fpartners%2Fhealth-001",

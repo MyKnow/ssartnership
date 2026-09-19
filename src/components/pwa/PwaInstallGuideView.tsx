@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRightIcon,
@@ -11,6 +10,7 @@ import {
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
 import ShellHeader from "@/components/ui/ShellHeader";
+import InstallGuideImage from "@/components/pwa/InstallGuideImage";
 import type { PwaInstallPlatform } from "@/lib/pwa-install";
 import { buildPwaInstallGuideHref } from "@/lib/pwa-install";
 
@@ -195,16 +195,7 @@ function InstallStep({ step, index }: { step: GuideStep; index: number }) {
       </div>
 
       {step.image ? (
-        <div className="relative h-44 min-w-0 overflow-hidden rounded-[1rem] border border-border bg-surface-control shadow-flat md:h-full md:min-h-44">
-          <Image
-            src={step.image.src}
-            alt={step.image.alt}
-            fill
-            sizes="(min-width: 768px) 240px, calc(100vw - 80px)"
-            className="object-cover"
-            style={{ objectPosition: step.image.objectPosition }}
-          />
-        </div>
+        <InstallGuideImage key={step.image.src} {...step.image} />
       ) : null}
     </li>
   );

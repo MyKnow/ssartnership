@@ -101,7 +101,8 @@ export default function CertificationCardFrame({
         <div className="absolute inset-x-0 bottom-0 h-[0.125cqw] bg-white/10" />
       </div>
 
-      <div className="relative grid h-full min-h-0 grid-cols-[minmax(0,1fr)_clamp(0px,28cqw,28rem)] grid-rows-[minmax(0,1fr)_minmax(clamp(0px,14cqw,11rem),auto)] gap-x-[clamp(0px,4cqw,4rem)] gap-y-[clamp(0px,2cqw,2rem)]">
+      {/* 비율로 정해진 카드에서 Safari의 백분율 높이 계산에 의존하지 않도록 안쪽 영역을 고정합니다. */}
+      <div className="absolute inset-[clamp(0px,4cqw,4rem)] grid min-h-0 grid-cols-[minmax(0,1fr)_clamp(0px,28cqw,28rem)] grid-rows-[minmax(0,1fr)_minmax(clamp(0px,14cqw,11rem),auto)] gap-x-[clamp(0px,4cqw,4rem)] gap-y-[clamp(0px,2cqw,2rem)]">
         <div
           data-certification-card-identity
           className="row-start-1 col-start-1 min-h-0 min-w-0 space-y-[clamp(0px,1cqw,1rem)] overflow-hidden"

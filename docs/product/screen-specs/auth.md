@@ -14,7 +14,7 @@ authority: normative
 
 - 목표·위계: 로그인 목적 → 아이디·이메일 방식 탭 → Mattermost 아이디 또는 이메일/비밀번호 → 로그인 → 가입·재설정 순이다.
 - 액션·흐름: 일반 로그인은 아이디 또는 검증된 이메일과 기존 사이트 비밀번호를 사용한다. Mattermost 로그인이 비활성화된 기존 회원도 사이트 비밀번호로 로그인할 수 있으며, 이메일이 미인증이면 로그인 직후 이메일 등록을 필수로 완료한다. 로그인에 성공한 방식만 브라우저에 기억하고 다음 방문의 기본 탭으로 복원한다. 필요 시 강제 비밀번호 변경·정책 동의·이메일 등록·원래 `returnTo`로 이어진다.
-- 경계·상태: 아이디·이메일은 탭별 규칙으로 FE 검증하고, 기존 BE 로그인 검증·rate limit·HMAC session 경계를 유지한다. 기본, validation error, 인증 실패, 제한, 이미 로그인 상태를 제공한다.
+- 경계·상태: 아이디·이메일은 탭별 규칙으로 FE 검증하고, 기존 BE 로그인 검증·rate limit·HMAC session 경계를 유지한다. 자동완성 혼동을 줄이기 위해 활성 탭의 입력만 렌더링하되 탭별 작성값은 유지한다. 아이디는 `name=username`, `autocomplete=username`, 이메일은 `name=email`, `type=email`, `inputmode=email`, `autocomplete=email`을 사용하며 자동 대문자·자동 교정은 끈다. 비밀번호는 `name=password`, `autocomplete=current-password`로 명시한다. 실제 키체인·연락처 추천은 브라우저가 결정한다. 기본, validation error, 인증 실패, 제한, 이미 로그인 상태를 제공한다.
 - 수용 기준: 저장값이 없거나 손상되면 아이디 탭을 사용한다. 방식 외 식별자·비밀번호는 브라우저 저장소에 보관하지 않으며, 외부 `returnTo` 거부, 첫 오류 focus, 중복 제출 차단, 자격 증명 비노출을 보장한다.
 
 <!-- screen-contract: auth.reset -->

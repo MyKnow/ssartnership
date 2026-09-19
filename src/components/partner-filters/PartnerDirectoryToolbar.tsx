@@ -28,21 +28,22 @@ export default function PartnerDirectoryToolbar({
       className="flex min-w-0 flex-col gap-3 min-[840px]:flex-row min-[840px]:items-end min-[840px]:justify-between"
       data-testid="partner-results-toolbar"
     >
-      <div className="flex min-w-0 items-end justify-between gap-3">
+      <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <p className="ui-caption">검색 결과</p>
           <p className="mt-1 text-lg font-semibold text-foreground" aria-live="polite">
             제휴처 {resultCount.toLocaleString("ko-KR")}곳
           </p>
         </div>
-        <label className="block w-32 shrink-0 min-[840px]:hidden">
+        <label className="block w-44 max-w-full shrink-0 min-[840px]:hidden">
           <span className="sr-only">정렬</span>
           <Select
+            aria-label="제휴처 정렬"
             value={sortValue}
             onChange={(event) =>
               onSortChange(event.target.value as PartnerSortOption)
             }
-            className="h-10 rounded-[0.95rem] text-xs"
+            className="rounded-[0.95rem] text-base sm:text-base"
             data-testid="partner-sort-select-mobile"
           >
             {partnerSortOptions.map((option) => (

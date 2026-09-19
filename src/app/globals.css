@@ -190,13 +190,35 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* 브라우저의 보이는 영역과 홈 인디케이터 위에 설치 안내를 배치합니다. */
+.pwa-visit-recommendation {
+  bottom: calc(max(env(safe-area-inset-bottom, 0px), var(--pwa-viewport-bottom, 0px)) + 1rem);
+}
+
+.pwa-visit-recommendation-content {
+  max-height: max(0px, calc(100svh - env(safe-area-inset-top, 0px) - max(env(safe-area-inset-bottom, 0px), var(--pwa-viewport-bottom, 0px)) - 7rem));
+}
+
+/* 입력 중에는 검색과 키보드를 가리지 않고, 앱 하단 탐색과도 함께 뜨지 않습니다. */
+body:has(input:focus, textarea:focus, [contenteditable="true"]:focus) [data-pwa-visit-recommendation],
+body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
+  display: none;
+}
+
 @media (max-width: 767px) {
+  /* 실제 하단 탐색이 보이는 앱 화면에서만 상단의 중복 액션을 숨깁니다. */
+  body:has([data-site-mobile-navigation]) [data-site-header-search],
+  body:has([data-site-mobile-navigation]) [data-site-header-certification],
+  body:has([data-site-mobile-navigation]) [data-site-browser-menu-trigger] {
+    display: none;
+  }
+
   body:has([data-site-mobile-navigation]) [data-site-footer] {
     padding-bottom: calc(env(safe-area-inset-bottom) + 7.75rem);
   }
 
-  body:has([data-site-mobile-navigation]) [data-site-header-theme-toggle] {
-    display: flex;
+  body:has([data-site-mobile-navigation]) [data-site-app-settings-trigger] {
+    display: inline-flex;
   }
 
   body:has([data-site-mobile-navigation]) [data-site-footer-theme-mode],
@@ -226,12 +248,6 @@ body {
 :where(code, pre, kbd, samp) {
   word-break: normal;
   overflow-wrap: normal;
-}
-
-@media (display-mode: standalone) {
-  [data-site-header-pwa-install] {
-    display: none;
-  }
 }
 
 ::selection {
@@ -801,4 +817,34 @@ body {
 
 .cert-glow-b {
   animation: cert-glow-drift-b 9s ease-in-out infinite;
+}
+
+/* 사이트 메뉴 전환: SSR과 브라우저에서 동일한 클래스에 적용합니다. */
+.site-menu-panel {
+  transform: translateX(0);
+  transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.site-menu-scrim {
+  opacity: 1;
+  transition: opacity 200ms ease-out;
+}
+.site-menu-dialog[data-closing="true"] .site-menu-panel {
+  transition-duration: 220ms;
+  transform: translateX(100%);
+}
+.site-menu-dialog[data-closing="true"] .site-menu-scrim {
+  opacity: 0;
+}
+@starting-style {
+  .site-menu-dialog[open] .site-menu-panel {
+    transform: translateX(100%);
+  }
+  .site-menu-dialog[open] .site-menu-scrim {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-menu-panel, .site-menu-scrim {
+    transition: none;
+  }
 }
