@@ -264,36 +264,7 @@ export default function TabletMenu({
           </div>
         </div>
       </dialog>
-      <style jsx global>{`
-        .site-menu-panel {
-          transform: translateX(0);
-          transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
-        }
-        .site-menu-scrim {
-          opacity: 1;
-          transition: opacity 200ms ease-out;
-        }
-        .site-menu-dialog[data-closing="true"] .site-menu-panel {
-          transition-duration: 220ms;
-          transform: translateX(100%);
-        }
-        .site-menu-dialog[data-closing="true"] .site-menu-scrim {
-          opacity: 0;
-        }
-        @starting-style {
-          .site-menu-dialog[open] .site-menu-panel {
-            transform: translateX(100%);
-          }
-          .site-menu-dialog[open] .site-menu-scrim {
-            opacity: 0;
-          }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .site-menu-panel, .site-menu-scrim {
-            transition: none;
-          }
-        }
-      `}</style>
+
     </>
   );
 }
