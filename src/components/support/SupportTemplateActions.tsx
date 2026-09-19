@@ -31,7 +31,7 @@ export default function SupportTemplateActions({
   };
 
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+    <div className="flex flex-col gap-2 sm:flex-row-reverse sm:items-center sm:justify-start">
       <Button
         type="button"
         onClick={handleCopy}

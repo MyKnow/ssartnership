@@ -65,6 +65,7 @@ export default function TabletMenu({
 }) {
   const pathname = usePathname();
   const [panel, setPanel] = useState<{ kind: "menu" | "settings"; pathname: string } | null>(null);
+  const [closing, setClosing] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const openerRef = useRef<HTMLButtonElement | null>(null);
   const dialogId = useId();
@@ -75,6 +76,21 @@ export default function TabletMenu({
   const open = panel !== null && panel.pathname === pathname;
   const settingsOnly = panel?.kind === "settings";
   const title = settingsOnly ? "설정" : "메뉴";
+
+  function closePanel() {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setPanel(null);
+    } else {
+      setClosing(true);
+    }
+  }
+
+  // 전환 이벤트가 생략되어도 모달과 스크롤 잠금이 남지 않도록 정리합니다.
+  useEffect(() => {
+    if (!closing) return;
+    const timer = window.setTimeout(() => setPanel(null), 220);
+    return () => window.clearTimeout(timer);
+  }, [closing]);
 
   const navigationItems = (memberOnly: boolean) => BROWSER_NAVIGATION_ITEMS
     .filter((item) => item.memberOnly === memberOnly)
@@ -124,6 +140,7 @@ export default function TabletMenu({
         aria-expanded={open && !settingsOnly}
         onClick={(event) => {
           openerRef.current = event.currentTarget;
+          setClosing(false);
           setPanel({ kind: "menu", pathname });
         }}
       >
@@ -139,6 +156,7 @@ export default function TabletMenu({
         aria-expanded={open && settingsOnly}
         onClick={(event) => {
           openerRef.current = event.currentTarget;
+          setClosing(false);
           setPanel({ kind: "settings", pathname });
         }}
       >
@@ -151,12 +169,13 @@ export default function TabletMenu({
         id={dialogId}
         aria-labelledby={titleId}
         aria-modal="true"
-        className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none border-0 bg-transparent p-0 text-foreground backdrop:bg-black/55"
-        onCancel={() => setPanel(null)}
+        data-closing={closing}
+        className="site-menu-dialog overflow-clip fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none border-0 bg-transparent p-0 text-foreground backdrop:bg-transparent"
+        onCancel={(event) => { event.preventDefault(); closePanel(); }}
         onKeyDown={(event) => {
           if (event.key === "Escape") {
             event.preventDefault();
-            setPanel(null);
+            closePanel();
             return;
           }
           if (event.key !== "Tab") return;
@@ -175,11 +194,13 @@ export default function TabletMenu({
           }
         }}
         onClick={(event) => {
-          if (event.target === event.currentTarget) setPanel(null);
+          if (event.target === event.currentTarget) closePanel();
         }}
       >
+        {/* 배경은 페이드, 패널은 오른쪽에서 진입하며 모션 감소 설정을 존중합니다. */}
+        <div aria-hidden="true" className="site-menu-scrim pointer-events-none absolute inset-0 bg-black/55" />
         <div
-          className="absolute inset-y-0 right-0 flex w-[90vw] max-w-sm flex-col overflow-hidden rounded-l-[var(--radius-panel)] border-l border-border bg-background shadow-overlay"
+          className="site-menu-panel absolute inset-y-0 right-0 flex w-[90vw] max-w-sm flex-col overflow-hidden rounded-l-[var(--radius-panel)] border-l border-border bg-background shadow-overlay"
           onClick={(event) => {
             // 로그인·회원가입·설치 안내를 포함해 같은 탭에서 링크로 이동하면 닫습니다.
             if (event.target instanceof Element && event.target.closest("a[href]") &&
@@ -194,7 +215,7 @@ export default function TabletMenu({
               <button
                 type="button"
                 className={cn(iconButtonClassName, "inline-flex")}
-                onClick={() => setPanel(null)}
+                onClick={closePanel}
                 aria-label={`${title} 닫기`}
               >
                 <XMarkIcon className="h-5 w-5" aria-hidden="true" />
@@ -243,6 +264,36 @@ export default function TabletMenu({
           </div>
         </div>
       </dialog>
+      <style jsx global>{`
+        .site-menu-panel {
+          transform: translateX(0);
+          transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .site-menu-scrim {
+          opacity: 1;
+          transition: opacity 200ms ease-out;
+        }
+        .site-menu-dialog[data-closing="true"] .site-menu-panel {
+          transition-duration: 220ms;
+          transform: translateX(100%);
+        }
+        .site-menu-dialog[data-closing="true"] .site-menu-scrim {
+          opacity: 0;
+        }
+        @starting-style {
+          .site-menu-dialog[open] .site-menu-panel {
+            transform: translateX(100%);
+          }
+          .site-menu-dialog[open] .site-menu-scrim {
+            opacity: 0;
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .site-menu-panel, .site-menu-scrim {
+            transition: none;
+          }
+        }
+      `}</style>
     </>
   );
 }
