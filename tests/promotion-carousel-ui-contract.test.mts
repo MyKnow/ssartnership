@@ -45,7 +45,7 @@ test("홈 프로모션은 좁은 화면에서는 전체 폭, 데스크톱에서�
   );
   assert.match(
     homePageSource,
-    /className="mt-0 lg:mx-auto lg:max-w-\[min\(var\(--grid-wide\),calc\(100vw-1\.5rem\)\)\] lg:px-8"/,
+    /className="!mt-0 lg:!mt-5 lg:mx-auto lg:max-w-\[min\(var\(--grid-wide\),calc\(100vw-1\.5rem\)\)\] lg:px-8"/,
   );
   assert.match(homePageSource, /<Container className="pb-16 pt-0"/);
   assert.match(
