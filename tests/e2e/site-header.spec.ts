@@ -66,6 +66,10 @@ test("menu keeps account destinations, keyboard focus and theme controls", async
   await page.keyboard.press("Tab");
   await expect(menu.getByRole("button", { name: "메뉴 닫기" })).toBeFocused();
   expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
+  // 진입 전환이 끝난 실제 배치에서 화면 경계와 터치 영역을 검사합니다.
+  await expect.poll(() => menu.locator(".site-menu-panel").evaluate((element) =>
+    element.getAnimations().filter((animation) => animation.playState === "running").length,
+  )).toBe(0);
   for (const width of [320, 360, 390, 820, 1366]) {
     await page.setViewportSize({ width, height: 740 });
     for (const action of await menu.locator("a:visible, button:visible").all()) {
