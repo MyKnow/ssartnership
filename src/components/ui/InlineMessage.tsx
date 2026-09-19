@@ -26,6 +26,7 @@ export default function InlineMessage({
   actionLabel,
   role,
   ariaLive,
+  layout = "stacked",
 }: {
   title?: string;
   description?: string;
@@ -36,6 +37,7 @@ export default function InlineMessage({
   actionLabel?: string;
   role?: "alert" | "status";
   ariaLive?: "assertive" | "polite" | "off";
+  layout?: "stacked" | "inline";
 }) {
   const resolvedAction =
     action ??
@@ -55,10 +57,31 @@ export default function InlineMessage({
         className,
       )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-2">
+      <div
+        className={cn(
+          "flex flex-wrap items-start gap-3",
+          resolvedAction ? "justify-between" : "justify-start",
+        )}
+      >
+        <div
+          className={cn(
+            "min-w-0",
+            layout === "inline"
+              ? "flex flex-1 flex-wrap items-center gap-x-2 gap-y-1"
+              : "space-y-2",
+          )}
+        >
           {title ? <Badge variant={badgeVariants[tone]}>{title}</Badge> : null}
-          {description ? <p className="ui-body max-w-3xl">{description}</p> : null}
+          {description ? (
+            <p
+              className={cn(
+                "ui-body max-w-3xl",
+                layout === "inline" ? "min-w-0 flex-1 basis-96" : undefined,
+              )}
+            >
+              {description}
+            </p>
+          ) : null}
         </div>
         {resolvedAction ? <div className="shrink-0">{resolvedAction}</div> : null}
       </div>

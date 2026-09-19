@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import InlineMessage from "@/components/ui/InlineMessage";
@@ -41,9 +42,9 @@ function SuggestField({
             *
           </span>
         ) : (
-          <span className="font-medium tracking-normal text-muted-foreground">
+          <Badge className="!border-border/70 !bg-surface-muted/60 !px-2 !py-0.5 !text-[10px] !font-medium !tracking-normal !text-muted-foreground">
             선택
-          </span>
+          </Badge>
         )}
       </span>
       {children}
@@ -155,16 +156,10 @@ export default function SuggestForm() {
         title="접수 안내"
         description="제출하면 입력한 담당자 이메일로 접수 사본이 발송됩니다."
         className="py-3.5"
+        layout="inline"
       />
 
       <section className="space-y-4">
-        <div className="space-y-1">
-          <h2 className="text-lg font-semibold text-foreground">제휴 내용</h2>
-          <p className="text-sm leading-6 text-muted-foreground">
-            SSAFY 구성원이 받을 수 있는 혜택과 이용 조건을 중심으로 작성해 주세요.
-          </p>
-        </div>
-
         <SuggestField label="제휴처명" required error={fieldErrors.companyName}>
           <Input
             ref={(element) => {
@@ -203,7 +198,7 @@ export default function SuggestForm() {
 
         <SuggestField
           label="제안 제휴 조건"
-          description="할인율, 제공 혜택, 인증 방식, 사용 가능 기간 등을 적어 주세요."
+          description="할인율, 제공 혜택, 사용 가능 기간 등을 적어 주세요."
           required
           error={fieldErrors.partnershipConditions}
         >
@@ -300,13 +295,10 @@ export default function SuggestForm() {
         </SuggestField>
       </section>
 
-      <div className="flex flex-col gap-3 rounded-card border border-border/70 bg-surface-muted/70 p-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm leading-6 text-muted-foreground">
-          제출 전 연락처와 혜택 조건을 한 번 더 확인해 주세요.
-        </p>
+      <div className="flex justify-end">
         <Button
           type="submit"
-          className="w-full justify-center sm:min-w-[140px] sm:w-auto"
+          className="min-w-[140px] justify-center"
           loading={isSubmitting}
           loadingText="제출 중"
         >

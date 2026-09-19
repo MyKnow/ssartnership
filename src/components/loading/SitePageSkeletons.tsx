@@ -284,30 +284,6 @@ function CertificationFrameSkeleton() {
   );
 }
 
-function SuggestGuideSkeleton() {
-  return (
-    <Card padding="md" tone="muted" className="space-y-4">
-      <div className="grid gap-2">
-        <StaticSkeleton className="h-4 w-20 rounded-lg" />
-        <StaticSkeleton className="h-6 w-28" />
-        <StaticSkeleton className="h-4 w-full max-w-md" />
-      </div>
-      <div className="grid gap-3">
-        {Array.from({ length: 3 }).map((_, index) => (
-          <div
-            key={index}
-            className="rounded-card border border-border/70 bg-surface-inset/80 p-4"
-          >
-            <StaticSkeleton className="h-5 w-20" />
-            <StaticSkeleton className="mt-2 h-4 w-full" />
-            <StaticSkeleton className="mt-2 h-4 w-full max-w-sm" />
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
 export function HomePageSkeleton() {
   return (
     <div className="min-h-screen bg-background">
@@ -649,32 +625,25 @@ export function SuggestPageSkeleton() {
               />
             </Card>
 
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
-              <Card padding="md">
-                <div className="grid gap-6">
-                  <StaticSkeleton className="h-16 w-full rounded-3xl" />
-                  {Array.from({ length: 2 }).map((_, sectionIndex) => (
-                    <div
-                      key={sectionIndex}
-                      className="grid gap-4 border-t border-border/70 pt-5 first:border-t-0 first:pt-0"
-                    >
-                      <StaticSkeleton className="h-6 w-28" />
-                      <StaticSkeleton className="h-4 w-full max-w-md" />
-                      <StaticSkeleton className="h-12 w-full rounded-2xl" />
-                      <StaticSkeleton className="h-28 w-full rounded-2xl" />
-                    </div>
-                  ))}
-                  <div className="rounded-3xl border border-border/70 bg-surface-inset p-3">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <StaticSkeleton className="h-4 w-full max-w-sm" />
-                      <StaticSkeleton className="h-12 w-32 rounded-full" />
-                    </div>
+            <Card padding="md">
+              <div className="grid gap-6">
+                <StaticSkeleton className="h-16 w-full rounded-3xl" />
+                {Array.from({ length: 2 }).map((_, sectionIndex) => (
+                  <div
+                    key={sectionIndex}
+                    className="grid gap-4 border-t border-border/70 pt-5 first:border-t-0 first:pt-0"
+                  >
+                    <StaticSkeleton className="h-6 w-28" />
+                    <StaticSkeleton className="h-4 w-full max-w-md" />
+                    <StaticSkeleton className="h-12 w-full rounded-2xl" />
+                    <StaticSkeleton className="h-28 w-full rounded-2xl" />
                   </div>
+                ))}
+                <div className="flex justify-end">
+                  <StaticSkeleton className="h-12 w-32 rounded-full" />
                 </div>
-              </Card>
-
-              <SuggestGuideSkeleton />
-            </div>
+              </div>
+            </Card>
           </div>
         </Container>
       </main>
