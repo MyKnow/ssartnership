@@ -23,3 +23,5 @@ last_verified: 2026-08-29
 - [Apple Wallet 회원 인증 패스](./301-apple-wallet-member-pass/spec.md) — Issue #301, active
 - [관리자 콘솔 계약](./205-admin-console/spec.md) — implemented current contract
 - [수료생 증명서·프로필 사진 인증](./graduate-verification/spec.md) — implemented current contract
+
+- [문서 책임·테스트 정비](./documentation-architecture/spec.md) — Issue #474

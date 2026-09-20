@@ -19,3 +19,8 @@ last_verified: 2026-08-29
 
 - [2026-04-24 보안 검토](./audits/security_2026-04-24_01.md)
 - [2026-05-13 보안 검토](./audits/security_2026-05-13_01.md)
+
+## 경계와 수명주기
+
+- [위협 모델](./threat-model.md)
+- [데이터 수명주기](./data-lifecycle.md)

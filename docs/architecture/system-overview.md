@@ -46,7 +46,7 @@ Browser
 전환 규칙:
 
 - `NEXT_PUBLIC_DATA_SOURCE=mock`이면 mock 구현을 사용한다.
-- Supabase env가 없으면 mock 구현으로 fallback한다.
+- 명시적 `mock`만 mock 구현을 선택한다. 잘못된 source나 필요한 자격 정보 누락은 `unavailable`로 처리하며 mock으로 조용히 fallback하지 않는다. 공개 읽기와 관리자 쓰기의 자격 조건은 다르다. [선택 구현](../../src/lib/runtime-data-access.ts)과 [회귀 테스트](../../tests/runtime-data-access.test.mts)가 근거다.
 - `NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE`는 partner portal mock 여부만 별도로 override한다.
 - repository method는 raw DB row가 아니라 domain model을 반환한다.
 - Supabase row-to-domain mapping은 Supabase repository 근처에 둔다.

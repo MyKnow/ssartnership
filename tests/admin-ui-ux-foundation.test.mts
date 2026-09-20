@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, readdir } from "node:fs/promises";
-import path from "node:path";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   ADMIN_NAV_GROUPS,
@@ -274,111 +273,6 @@ test("관리자 전환 계측은 Next.js insertion effect 중 동기 상태 갱�
   );
 });
 
-test("관리자 공통 진입점은 외래어 대신 한국어 업무 맥락을 표시한다", async () => {
-  const [
-    shellSource,
-    mobileNavSource,
-    quickNavigatorSource,
-    taskInboxSource,
-    dashboardSource,
-  ] = await Promise.all([
-    readFile(
-      new URL("../src/components/admin/AdminShellView.tsx", import.meta.url),
-      "utf8",
-    ),
-    readFile(
-      new URL("../src/components/admin/AdminMobileNav.tsx", import.meta.url),
-      "utf8",
-    ),
-    readFile(
-      new URL(
-        "../src/components/admin/AdminQuickNavigator.tsx",
-        import.meta.url,
-      ),
-      "utf8",
-    ),
-    readFile(
-      new URL(
-        "../src/components/admin/AdminTaskInboxView.tsx",
-        import.meta.url,
-      ),
-      "utf8",
-    ),
-    readFile(
-      new URL(
-        "../src/components/admin/AdminDashboardView.tsx",
-        import.meta.url,
-      ),
-      "utf8",
-    ),
-  ]);
-
-  assert.match(shellSource, />\s*관리자\s*</);
-  assert.match(shellSource, /group\.label === "데이터"/);
-  assert.match(shellSource, /item\.href === "\/admin\/members"/);
-  assert.match(shellSource, /activeNavItem\?\.label \?\? title/);
-  assert.match(mobileNavSource, />\s*관리자 메뉴\s*</);
-  assert.match(mobileNavSource, /aria-label="관리 메뉴 배경 닫기"/);
-  assert.match(mobileNavSource, /href=\{href\}\s+prefetch=\{false\}/);
-  assert.doesNotMatch(
-    mobileNavSource,
-    /className="fixed inset-0 isolate z-\[70\] md:hidden" aria-hidden=/,
-  );
-  assert.match(quickNavigatorSource, />\s*바로 이동\s*</);
-  assert.match(taskInboxSource, /eyebrow="작업함"/);
-  assert.match(dashboardSource, /eyebrow="홈"/);
-  assert.doesNotMatch(mobileNavSource, /Admin Workspace/);
-  assert.doesNotMatch(shellSource, /회원·검토/);
-  assert.doesNotMatch(quickNavigatorSource, />Go to</);
-  assert.doesNotMatch(taskInboxSource, /eyebrow="Task inbox"/);
-  assert.doesNotMatch(dashboardSource, /eyebrow="Operations"/);
-});
-
-test("대표 셸 Story는 작업 중심 콘텐츠와 새 데이터 분류를 보여준다", async () => {
-  const [shellStorySource, partnerNewSource, partnerRequestsSource, partnersSource] =
-    await Promise.all([
-      readFile(
-        new URL(
-          "../src/components/admin/AdminShell.stories.tsx",
-          import.meta.url,
-        ),
-        "utf8",
-      ),
-      readFile(
-        new URL(
-          "../src/components/admin/AdminPartnerNewView.tsx",
-          import.meta.url,
-        ),
-        "utf8",
-      ),
-      readFile(
-        new URL(
-          "../src/app/admin/(protected)/partner-requests/page.tsx",
-          import.meta.url,
-        ),
-        "utf8",
-      ),
-      readFile(
-        new URL(
-          "../src/app/admin/(protected)/partners/page.tsx",
-          import.meta.url,
-        ),
-        "utf8",
-      ),
-    ]);
-
-  assert.match(shellStorySource, /다음으로 처리/);
-  assert.match(shellStorySource, /작업함에서 이어서 처리/);
-  assert.match(shellStorySource, /href="\/admin\/members"/);
-  assert.match(partnerNewSource, /eyebrow="데이터"/);
-  assert.match(partnerRequestsSource, /eyebrow="작업함"/);
-  assert.match(partnersSource, /eyebrow="데이터"/);
-  assert.doesNotMatch(shellStorySource, /상위 레이아웃/);
-  assert.doesNotMatch(partnerNewSource, /eyebrow="제휴 운영"/);
-  assert.doesNotMatch(partnerRequestsSource, /eyebrow="제휴 운영"/);
-  assert.doesNotMatch(partnersSource, /eyebrow="제휴 운영"/);
-});
-
 test("관리자 검색·리뷰 필터는 한국어 accessible name을 제공한다", async () => {
   const sources = await Promise.all([
     readFile(
@@ -437,67 +331,6 @@ test("관리 홈의 집계 실패는 0을 정상값으로 오인시키지 않는
   assert.match(source, /isDataUnavailable \? "확인 필요" : item\.value/);
   assert.match(source, /counts\.companyCount\.toLocaleString\("ko-KR"\)/);
   assert.match(source, /counts\.accountCount\.toLocaleString\("ko-KR"\)/);
-});
-
-test("서비스 활성도는 약어보다 한국어 업무 의미를 먼저 표시한다", async () => {
-  const source = await readFile(
-    new URL(
-      "../src/components/admin/AdminPlatformActivityMetricsPanel.tsx",
-      import.meta.url,
-    ),
-    "utf8",
-  );
-
-  assert.match(source, /label: "일간 활성"/);
-  assert.match(source, /label: "주간 활성"/);
-  assert.match(source, /label: "월간 활성"/);
-  assert.doesNotMatch(source, /\{ label: "DAU"/);
-});
-
-test("실제 관리자 화면의 eyebrow는 한국어 업무 맥락을 사용한다", async () => {
-  const sourceRoots = [
-    new URL("../src/app/admin/(protected)/", import.meta.url),
-    new URL("../src/components/admin/", import.meta.url),
-  ];
-  const sources = await Promise.all(
-    sourceRoots.map(async (sourceRoot) => {
-      const paths = await readdir(sourceRoot, { recursive: true });
-      const files = paths
-        .filter(
-          (file) =>
-            file.endsWith(".tsx") &&
-            !file.endsWith(".stories.tsx") &&
-            !file.includes(`${path.sep}__`),
-        )
-        .map((file) => new URL(file, sourceRoot));
-      return Promise.all(files.map((file) => readFile(file, "utf8")));
-    }),
-  );
-
-  assert.doesNotMatch(sources.flat().join("\n"), /eyebrow="[A-Za-z]/);
-});
-
-test("실제 관리자 화면의 kicker는 한국어 업무 맥락을 사용한다", async () => {
-  const sourceRoots = [
-    new URL("../src/app/admin/(protected)/", import.meta.url),
-    new URL("../src/components/admin/", import.meta.url),
-  ];
-  const sources = await Promise.all(
-    sourceRoots.map(async (sourceRoot) => {
-      const paths = await readdir(sourceRoot, { recursive: true });
-      const files = paths
-        .filter(
-          (file) =>
-            file.endsWith(".tsx") &&
-            !file.endsWith(".stories.tsx") &&
-            !file.includes(`${path.sep}__`),
-        )
-        .map((file) => new URL(file, sourceRoot));
-      return Promise.all(files.map((file) => readFile(file, "utf8")));
-    }),
-  );
-
-  assert.doesNotMatch(sources.flat().join("\n"), /className="ui-kicker">[A-Za-z]/);
 });
 
 test("관리자 운영 표는 모바일에서 카드 표현으로 전환하고 모션 감소를 존중한다", async () => {

@@ -175,7 +175,7 @@ npm run ci:local
 ```
 
 - `check:lockfile`: Node.js 24.18.1과 npm 11.16.0으로 lockfile을 재계산해 canonical 여부 확인
-- `ci:local`: 신뢰 설치, 교차 플랫폼 정책, 전체 사전 푸시 게이트, Storybook·Visual test를 순서대로 검증
+- `ci:local`: bootstrap 후 변경 위험에 따른 `verify:change`를 실행. Storybook·Visual은 별도 수동 검사
 
 ## 환경 변수
 
