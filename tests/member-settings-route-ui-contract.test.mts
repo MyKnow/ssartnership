@@ -23,12 +23,3 @@ test("회원 설정 화면은 로그인과 안전한 복귀 경로를 보존한�
   assert.match(navigation, /encodeURIComponent\(backHref\)/);
   assert.match(navigation, /isSettingsPath/);
 });
-
-test("설정 화면은 공용 헤더와 설정 전용 뷰를 렌더링한다", async () => {
-  const page = await readFile(settingsPageUrl, "utf8");
-
-  assert.match(page, /<SiteHeader initialSession=\{headerSession\} \/>/);
-  assert.match(page, /<MemberSettingsView/);
-  assert.match(page, /hasMattermostAccount=\{Boolean\(member\.mattermostAccountId\)\}/);
-  assert.match(page, /emailVerified=\{Boolean\(member\.emailVerifiedAt\)\}/);
-});

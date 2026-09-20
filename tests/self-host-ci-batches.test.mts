@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { compilerPlan, parseBatch, requireExactInventory, requireStableDevLog, testInventory } from "../deploy/self-host-ci/batch-plan.mjs";
 
-const report = (status = "passed", retry = 0) => ({ errors: [], suites: [{ specs: [{ id: "a", file: "page-smoke.spec.ts", title: "renders /suggest", tests: [{ projectName: "chromium", expectedStatus: "passed", results: [{ status, retry }] }] }] }] });
+const report = (status = "passed", retry = 0) => ({ errors: [], suites: [{ specs: [{ id: "a", file: "access-control.spec.ts", title: "redirects /certification", tests: [{ projectName: "chromium", expectedStatus: "passed", results: [{ status, retry }] }] }] }] });
 test("CI batches require one successful zero-retry result for every unique planned ID", () => {
   const expected = testInventory(report());
   requireExactInventory(expected, testInventory(report(), { passed: true }));
@@ -16,7 +16,7 @@ test("CI batches require one successful zero-retry result for every unique plann
 });
 test("compiler preparation includes only selected batch routes and rejects unplanned files", () => {
   const plan = compilerPlan(testInventory(report()));
-  assert.ok(plan.routes.includes("/suggest"));
+  assert.ok(plan.routes.includes("/certification"));
   assert.ok(!plan.routes.includes("/api/web-vitals"));
   assert.ok(!plan.routes.includes("/partner-registration"));
   assert.equal(plan.administrator, false);

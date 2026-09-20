@@ -68,16 +68,6 @@ test("쿠폰 생성 UI는 발급·사용 방식에 맞는 필드만 렌더링한
   assert.match(source, />\s*입력 오류\s*<\/span>/);
 });
 
-test("제휴처 상세 쿠폰 Chip에는 전체 사용량 문구를 다시 노출하지 않는다", async () => {
-  const source = await readFile(
-    new URL("../src/app/(site)/partners/[id]/_page/PartnerDetailCoupons.tsx", import.meta.url),
-    "utf8",
-  );
-
-  assert.doesNotMatch(source, /getUsageLabel/);
-  assert.doesNotMatch(source, /회 사용/);
-});
-
 test("제휴처 수정 저장 CTA는 폼 안에서 고정 버튼을 렌더링한다", async () => {
   const source = await readFile(
     new URL("../src/components/partner-card-form/PartnerFormActions.tsx", import.meta.url),

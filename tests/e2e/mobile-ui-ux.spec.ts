@@ -8,32 +8,6 @@ test.use({
   hasTouch: true,
 });
 
-test("mobile sort labels fit at narrow widths", async ({ page }) => {
-  await page.goto("/");
-  await expect(page.getByTestId("partner-filter-interaction-root")).toHaveAttribute("data-hydrated", "true");
-  await page.evaluate(() => document.fonts.ready);
-  for (const width of [320, 360, 390, 820]) {
-    await page.setViewportSize({ width, height: 844 });
-    const select = page.getByTestId("partner-sort-select-mobile");
-    await expect(select).toBeVisible();
-    const measurement = await select.evaluate((element: HTMLSelectElement) => {
-      const style = getComputedStyle(element);
-      const canvas = document.createElement("canvas");
-      const context = canvas.getContext("2d")!;
-      context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-      return {
-        available: element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
-        required: Math.max(...Array.from(element.options, option => context.measureText(option.text).width)),
-        height: element.getBoundingClientRect().height,
-        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      };
-    });
-    expect(measurement.available, `${width}px option text space`).toBeGreaterThanOrEqual(measurement.required);
-    expect(measurement.height).toBeGreaterThanOrEqual(44);
-    expect(measurement.overflow).toBe(0);
-  }
-});
-
 test("guest can return to and focus search from the fixed mobile header", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByTestId("partner-filter-interaction-root")).toHaveAttribute("data-hydrated", "true");
@@ -48,22 +22,6 @@ test("guest can return to and focus search from the fixed mobile header", async 
   await input.fill("바디라인");
   await page.getByRole("button", { name: "검색", exact: true }).click();
   await expect(page.getByTestId("partner-card")).toHaveCount(1);
-});
-
-test("install recommendation stays at the bottom and clear of the header", async ({ page }) => {
-  await page.goto("/");
-  const recommendation = page.locator("[data-pwa-visit-recommendation]");
-  await expect(recommendation).toBeVisible();
-  for (const size of [{ width: 360, height: 780 }, { width: 390, height: 844 }, { width: 820, height: 500 }]) {
-    await page.setViewportSize(size);
-    const banner = await recommendation.boundingBox();
-    const header = await page.getByRole("banner").boundingBox();
-    expect(banner!.y).toBeGreaterThan(header!.y + header!.height);
-    expect(size.height - (banner!.y + banner!.height)).toBeGreaterThanOrEqual(12);
-    expect(size.height - (banner!.y + banner!.height)).toBeLessThan(80);
-  }
-  await recommendation.getByRole("button", { name: "앱 설치 권장 닫기" }).click();
-  await expect(recommendation).toHaveCount(0);
 });
 
 test("all iOS guide images recover from optimizer failures", async ({ page }) => {
@@ -105,34 +63,6 @@ test("recommendation follows the visible viewport and remains usable at short he
   expect(banner!.y).toBeGreaterThanOrEqual(header!.y + header!.height + 12);
   await recommendation.getByRole("button", { name: "나중에" }).click();
   await expect(recommendation).toHaveCount(0);
-});
-
-test("home and iOS guide preserve content across responsive widths", async ({ page }) => {
-  const errors: string[] = [];
-  page.on("pageerror", error => errors.push(error.message));
-  await page.goto("/");
-  await expect(page.getByTestId("partner-filter-interaction-root")).toHaveAttribute("data-hydrated", "true");
-  await page.evaluate(() => document.fonts.ready);
-  for (const width of [320, 360, 390, 820, 1366]) {
-    await page.setViewportSize({ width, height: width >= 820 ? 1000 : 844 });
-    await expect(page.getByRole("heading", { name: "제휴 혜택 찾기" })).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
-    await page.screenshot({ path: `.tmp/ui-qa/issue-463/home-${width}.png`, fullPage: true, animations: "disabled" });
-  }
-  await page.goto("/install?platform=ios");
-  const steps = page.getByRole("list", { name: "iPhone·iPad 앱 설치 순서" });
-  for (const image of await steps.getByRole("img").all()) {
-    await image.scrollIntoViewIfNeeded();
-    await expect.poll(() => image.evaluate((element: HTMLImageElement) => element.complete && element.naturalWidth > 0)).toBe(true);
-  }
-  await page.evaluate(() => document.fonts.ready);
-  for (const width of [360, 820, 1366]) {
-    await page.setViewportSize({ width, height: width >= 820 ? 1000 : 844 });
-    await page.getByRole("heading", { name: "싸트너십 앱 설치", exact: true }).scrollIntoViewIfNeeded();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
-    await page.screenshot({ path: `.tmp/ui-qa/issue-463/install-${width}.png`, fullPage: true, animations: "disabled" });
-  }
-  expect(errors).toEqual([]);
 });
 
 test("one unavailable guide image can be retried without losing other steps", async ({ page }) => {

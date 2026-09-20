@@ -49,13 +49,13 @@ export function compilerPlan(inventory) {
       case "auth-ops.spec.ts": for (const route of authRoutes(item.title)) routes.add(route); break;
       case "graduate-verification.spec.ts": routes.add("/auth/signup/graduate"); break;
       case "home-partners.spec.ts": routes.add("/"); routes.add("/partners/health-001"); break;
-      case "partner-detail-introduction.spec.ts": case "partner-image-carousel.spec.ts": routes.add("/partners/health-001"); break;
+      case "partner-image-carousel.spec.ts": routes.add("/partners/health-001"); break;
       case "partner-registration.spec.ts": routes.add("/partner-registration"); break;
       case "pwa-shell.spec.ts": routes.add("/"); break;
       case "admin-console.spec.ts": administrator = true; break;
-      case "page-smoke.spec.ts": {
+      case "access-control.spec.ts": {
         if (/guards \/admin/u.test(item.title)) break;
-        const route = /(?:renders|redirects) (\/[a-z0-9/-]*)$/u.exec(item.title)?.[1];
+        const route = /(?:redirects) (\/[a-z0-9/-]*)$/u.exec(item.title)?.[1];
         if (!route) throw new Error("CI_E2E_ROUTE_PLAN_REQUIRED");
         routes.add(route); routes.add("/partner/login"); break;
       }

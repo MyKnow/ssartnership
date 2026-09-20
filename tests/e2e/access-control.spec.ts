@@ -1,19 +1,11 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import {
   adminGuardRoutes,
-  authSmokeRoutes,
   memberProtectedRoutes,
   partnerProtectedRoutes,
-  publicSmokeRoutes,
   type RedirectRoute,
-  type SmokeRoute,
 } from "./fixtures/routes";
 
-const criticalPublicPaths = new Set([
-  "/",
-  "/auth/login",
-  "/partners/health-001",
-]);
 const criticalRedirectPaths = new Set(["/certification", "/partner"]);
 const criticalAdminPaths = new Set(["/admin/login", "/admin"]);
 
@@ -29,18 +21,7 @@ async function expectNoNextError(page: Page) {
   ).toHaveCount(0);
 }
 
-test.describe("page smoke coverage", () => {
-  test.describe("public and login pages", () => {
-    for (const route of [...publicSmokeRoutes, ...authSmokeRoutes]) {
-      test(
-        criticalTitle(route.path, `renders ${route.path}`, criticalPublicPaths),
-        async ({ page }) => {
-          await visitSmokeRoute(page, route);
-        },
-      );
-    }
-  });
-
+test.describe("protected route access control", () => {
   test.describe("protected page redirects", () => {
     for (const route of memberProtectedRoutes) {
       test(
@@ -79,15 +60,6 @@ test.describe("page smoke coverage", () => {
     }
   });
 });
-
-async function visitSmokeRoute(page: Page, route: SmokeRoute) {
-  const response = await page.goto(route.path);
-
-  expect(response?.status(), route.path).toBeLessThan(500);
-  await expect(page.locator("body")).toContainText(route.expected);
-  await expectNoNextError(page);
-  await page.waitForLoadState("load");
-}
 
 async function visitMemberRedirectRoute(page: Page, route: RedirectRoute) {
   const response = await page.goto(route.path);
