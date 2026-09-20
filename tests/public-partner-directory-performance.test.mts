@@ -41,7 +41,7 @@ test("partner repository contract exposes lean directory and SEO loaders", () =>
   assert.match(repositoryContractSource, /getPublicPartnerSeoEntries/);
 });
 
-test("Supabase public directory projection omits heavy detail fields", () => {
+test("Supabase public directory projection keeps canonical benefit titles and omits other heavy detail fields", () => {
   const publicProjectionMatch = supabaseRepositorySource.match(
     /const PUBLIC_DIRECTORY_SELECT_COLUMNS =\s*"([^"]+)";/,
   );
@@ -50,10 +50,14 @@ test("Supabase public directory projection omits heavy detail fields", () => {
   const publicProjection = publicProjectionMatch[1];
   assert.doesNotMatch(
     publicProjection,
-    /detail_description|partner_benefits|images/,
+    /detail_description|images/,
   );
   assert.match(publicProjection, /conditions/);
   assert.match(publicProjection, /benefits/);
+  assert.match(
+    publicProjection,
+    /partner_benefits\(id,title,max_apply_count,display_order\)/,
+  );
   assert.match(supabaseRepositorySource, /getCachedPublicDirectoryPartnerRows/);
   assert.match(supabaseRepositorySource, /async getPublicDirectoryPartners/);
   assert.match(
@@ -66,7 +70,11 @@ test("Supabase public directory projection omits heavy detail fields", () => {
   );
   assert.match(
     publicDirectorySource,
-    /function toLeanPublicDirectoryPartner\(partner: Partner\): Partner \{[\s\S]*conditions: \[],[\s\S]*benefits: \[],[\s\S]*benefitItems: \[],[\s\S]*directorySearchText: buildPartnerDirectorySearchText\(partner\)/,
+    /function toLeanPublicDirectoryPartner\(partner: Partner\): Partner \{[\s\S]*conditions: \[],[\s\S]*benefits: partner\.benefits,[\s\S]*benefitItems: \[],[\s\S]*directorySearchText: buildPartnerDirectorySearchText\(partner\)/,
+  );
+  assert.match(
+    supabaseRepositorySource,
+    /const benefitItems = getPartnerBenefitItems\(row\);[\s\S]*benefits: partnerBenefitItemsToTitles\(benefitItems\)/,
   );
 });
 

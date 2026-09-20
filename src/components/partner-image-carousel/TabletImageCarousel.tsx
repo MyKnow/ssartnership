@@ -240,8 +240,8 @@ export default function TabletImageCarousel({
             "relative z-10 aspect-[4/3] w-full overflow-hidden border border-border bg-surface-muted shadow-flat focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
             mobileFullBleed ? "rounded-none" : "rounded-3xl",
             visibleFrom === "sm"
-              ? "sm:w-[65%] sm:rounded-card sm:border-primary"
-              : "md:w-[65%] md:rounded-card md:border-primary",
+              ? "sm:w-[65%] sm:rounded-[var(--radius-card)] sm:border-primary"
+              : "md:w-[65%] md:rounded-[var(--radius-card)] md:border-primary",
           )}
           onClick={() => {
             if (!shouldIgnoreSwipeClick()) {

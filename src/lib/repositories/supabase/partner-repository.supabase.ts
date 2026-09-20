@@ -1,5 +1,8 @@
 import type { Category, Partner } from "@/lib/types";
-import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
+import {
+  normalizePartnerBenefitItems,
+  partnerBenefitItemsToTitles,
+} from "@/lib/partner-benefit-items";
 import { cache } from "react";
 import { normalizePartnerAudience } from "@/lib/partner-audience";
 import { normalizeCampusSlugs, type CampusSlug } from "@/lib/campuses";
@@ -106,7 +109,7 @@ type PublicCacheVersionSnapshot = {
 const PARTNER_SELECT_COLUMNS =
   "id,name,category_id,created_at,updated_at,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,partner_benefits(id,title,max_apply_count,display_order),applies_to,images,tags,visibility,benefit_visibility,branch_scope_type,branch_scope_note,categories(key)";
 const PUBLIC_DIRECTORY_SELECT_COLUMNS =
-  "id,name,category_id,created_at,location,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,applies_to,tags,visibility,benefit_visibility,branch_scope_type,categories(key)";
+  "id,name,category_id,created_at,location,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,partner_benefits(id,title,max_apply_count,display_order),applies_to,tags,visibility,benefit_visibility,branch_scope_type,categories(key)";
 const PUBLIC_PARTNER_SEO_SELECT_COLUMNS =
   "id,name,location,period_start,period_end,categories(label)";
 
@@ -356,9 +359,27 @@ const getCachedPartnerRowById = unstable_cache(
   },
 );
 
+function getPartnerBenefitItems(row: PartnerRow) {
+  return row.partner_benefits?.length
+    ? row.partner_benefits
+        .slice()
+        .sort((left, right) => (left.display_order ?? 0) - (right.display_order ?? 0))
+        .map((benefit) => ({
+          id: benefit.id,
+          title: benefit.title,
+          maxApplyCount: benefit.max_apply_count,
+          displayOrder: benefit.display_order ?? undefined,
+        }))
+    : normalizePartnerBenefitItems((row.benefits ?? []).map((title, index) => ({
+        id: `legacy-benefit-${row.id}-${index + 1}`,
+        title,
+      })));
+}
+
 function toVisiblePartner(row: PartnerRow, categoryKey: string): Partner {
   const galleryImages = row.images ?? [];
   const thumbnail = row.thumbnail ?? row.images?.[0] ?? null;
+  const benefitItems = getPartnerBenefitItems(row);
   return {
     id: row.id,
     name: row.name,
@@ -376,20 +397,7 @@ function toVisiblePartner(row: PartnerRow, categoryKey: string): Partner {
       row.benefit_action_link || row.reservation_link ? "external_link" : "none",
     ),
     benefitActionLink: row.benefit_action_link ?? undefined,
-    benefitItems: row.partner_benefits?.length
-      ? row.partner_benefits
-          .slice()
-          .sort((left, right) => (left.display_order ?? 0) - (right.display_order ?? 0))
-          .map((benefit) => ({
-            id: benefit.id,
-            title: benefit.title,
-            maxApplyCount: benefit.max_apply_count,
-            displayOrder: benefit.display_order ?? undefined,
-          }))
-      : normalizePartnerBenefitItems((row.benefits ?? []).map((title, index) => ({
-          id: `legacy-benefit-${row.id}-${index + 1}`,
-          title,
-        }))),
+    benefitItems,
     reservationLink: row.reservation_link ?? undefined,
     inquiryLink: row.inquiry_link ?? undefined,
     period: {
@@ -397,7 +405,7 @@ function toVisiblePartner(row: PartnerRow, categoryKey: string): Partner {
       end: normalizeDate(row.period_end),
     },
     conditions: row.conditions ?? [],
-    benefits: row.benefits ?? [],
+    benefits: partnerBenefitItemsToTitles(benefitItems),
     appliesTo: normalizePartnerAudience(row.applies_to),
     images: galleryImages,
     tags: row.tags ?? [],
@@ -431,6 +439,7 @@ function toLockedPartner(row: PartnerRow, categoryKey: string): Partner {
 
 function toVisiblePublicDirectorySummaryPartner(row: PartnerRow, categoryKey: string): Partner {
   const appliesTo = normalizePartnerAudience(row.applies_to);
+  const benefitItems = getPartnerBenefitItems(row);
   return {
     id: row.id,
     name: row.name,
@@ -454,11 +463,8 @@ function toVisiblePublicDirectorySummaryPartner(row: PartnerRow, categoryKey: st
       end: normalizeDate(row.period_end),
     },
     conditions: row.conditions ?? [],
-    benefits: row.benefits ?? [],
-    benefitItems: normalizePartnerBenefitItems((row.benefits ?? []).map((title, index) => ({
-      id: `legacy-public-directory-benefit-${row.id}-${index + 1}`,
-      title,
-    }))),
+    benefits: partnerBenefitItemsToTitles(benefitItems),
+    benefitItems,
     appliesTo,
     images: [],
     tags: row.tags ?? [],

@@ -1,7 +1,7 @@
 "use client";
 
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, within } from "storybook/test";
+import { expect, userEvent, within } from "storybook/test";
 import { ThemeProvider } from "next-themes";
 import Footer from "./Footer";
 import { MobileNavSurface } from "./MobileNav";
@@ -71,22 +71,13 @@ export const SignedIn: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(await canvas.findByRole("link", { name: "앱 설치" })).toBeVisible();
-    await expect(canvas.getByRole("link", { name: "설정" })).toHaveAttribute(
-      "href",
-      "/settings?returnTo=%2F",
-    );
-    if (window.innerWidth < 768) {
-      await expect(canvas.getByRole("link", { name: "알림" })).toBeVisible();
-      await expect(canvas.queryByRole("button", { name: "테마 변경" })).not.toBeInTheDocument();
-      return;
-    }
-    if (window.innerWidth < 1280) {
-      await expect(
-        await canvas.findByRole("link", { name: "내 인증" }),
-      ).toHaveAttribute("href", "/certification");
-    }
-    await expect(canvas.getByRole("button", { name: "테마 변경" })).toBeVisible();
+    await expect(canvas.getByRole("link", { name: "내 인증" })).toHaveAttribute("href", "/certification");
+    await expect(canvas.getByRole("link", { name: "알림" })).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "메뉴 열기" }));
+    const menu = within(canvas.getByRole("dialog", { name: "메뉴" }));
+    await expect(await menu.findByRole("link", { name: "앱 설치" })).toBeVisible();
+    await expect(menu.getByRole("link", { name: "계정 설정" })).toHaveAttribute("href", "/settings?returnTo=%2F");
+    await userEvent.keyboard("{Escape}");
   },
 };
 
@@ -99,10 +90,9 @@ export const WithMobileNavigation: Story = {
     const canvas = within(canvasElement);
     const footer = within(canvas.getByRole("contentinfo"));
 
-    await expect(
-      canvas.getByRole("button", { name: "테마 변경" }),
-    ).toBeVisible();
     if (window.innerWidth < 768) {
+      await expect(canvas.getByRole("button", { name: "설정 열기" })).toBeVisible();
+      await expect(canvas.queryByRole("button", { name: "메뉴 열기" })).not.toBeInTheDocument();
       await expect(
         footer.queryByRole("button", { name: "라이트 모드" }),
       ).not.toBeInTheDocument();
@@ -130,6 +120,9 @@ export const FocusedEmailVerification: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.queryByRole("link", { name: "설정" })).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "메뉴 열기" }));
+    const menu = within(canvas.getByRole("dialog", { name: "메뉴" }));
+    await expect(menu.queryByRole("link", { name: "계정 설정" })).not.toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
   },
 };

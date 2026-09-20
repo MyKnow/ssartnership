@@ -22,6 +22,29 @@ async function typeSearch(page: Page, value: string) {
 }
 
 test.describe("public partner discovery", () => {
+  test("renders benefit values in card view across responsive widths", async ({ page }) => {
+    for (const viewport of [
+      { width: 360, height: 900 },
+      { width: 820, height: 900 },
+      { width: 962, height: 740 },
+      { width: 1366, height: 900 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await gotoDirectory(page, "/?view=card#benefits");
+
+      const card = page.getByTestId("partner-card").first();
+      const benefitLabel = card.getByText("혜택", { exact: true });
+      const benefitBlock = benefitLabel.locator("..");
+      await expect(benefitLabel).toBeVisible();
+      await expect(benefitBlock.locator("span").first()).toBeVisible();
+      await expect(benefitBlock.getByText("혜택 정보 준비 중")).toHaveCount(0);
+      await page.screenshot({
+        path: `.tmp/ui-qa/issue-463-benefit-text/card-${viewport.width}.png`,
+        animations: "disabled",
+      });
+    }
+  });
+
   test("aligns the desktop ad carousel with the partner directory container", async ({
     page,
   }) => {

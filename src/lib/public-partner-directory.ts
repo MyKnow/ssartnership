@@ -20,7 +20,8 @@ export function toLeanPublicDirectoryPartner(partner: Partner): Partner {
   return {
     ...partner,
     conditions: [],
-    benefits: [],
+    // 홈 카드 비교에 필요한 짧은 제목은 남기고 적용 횟수 원장은 제거합니다.
+    benefits: partner.benefits,
     benefitItems: [],
     images: [],
     directorySearchText: buildPartnerDirectorySearchText(partner),

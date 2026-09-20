@@ -84,6 +84,21 @@ export const PublicCard: Story = {
   },
 };
 
+export const EmptyBenefits: Story = {
+  args: {
+    partner: {
+      ...basePartner,
+      benefits: [],
+      benefitItems: [],
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("혜택 정보 준비 중")).toBeVisible();
+    await expect(canvas.getByText("적용 대상", { exact: true })).toBeVisible();
+  },
+};
+
 export const InteractivePublicCard: Story = {
   play: async ({ canvasElement, args }) => {
     window.fetch = async () => Response.json({ ok: true });

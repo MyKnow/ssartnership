@@ -15,7 +15,7 @@ export default function BugReportView({
           <ShellHeader
             eyebrow="Bug Report"
             title="버그 제보"
-            description="문제가 발생한 화면과 재현 방법을 남겨 주세요. 템플릿을 복사해 사용하는 방식이 가장 안정적입니다."
+            description="문제가 발생한 화면과 재현 방법을 남겨 주세요."
           />
           <SupportTemplateCard
             template={template}

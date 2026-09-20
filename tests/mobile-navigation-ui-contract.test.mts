@@ -63,33 +63,16 @@ test("모바일 공용 탐색은 검색 섬과 홈·쿠폰함·내 정보 묶음
   );
 });
 
-test("일반 모바일 브라우저는 전체 메뉴의 핵심 탐색과 헤더 앱 설치를 제공한다", async () => {
-  const [source, headerSource, globalsSource] = await Promise.all([
-    readFile(tabletMenuSourceUrl, "utf8"),
-    readFile(siteHeaderSourceUrl, "utf8"),
-    readFile(globalsSourceUrl, "utf8"),
-  ]);
-
-  assert.match(source, /data-site-browser-menu-trigger/);
-  assert.match(source, /usePwaStandaloneMode\(\)/);
+test("전체 메뉴는 핵심 탐색과 설치·테마·계정 설정을 제공한다", async () => {
+  const source = await readFile(tabletMenuSourceUrl, "utf8");
   assert.match(source, /label: "홈"/);
   assert.match(source, /label: "혜택 검색"/);
   assert.match(source, /label: "쿠폰함"/);
   assert.match(source, /label: "내 정보"/);
   assert.match(source, /returnTo=\$\{encodeURIComponent\(item\.href\)\}/);
-  assert.match(source, /알림 설정/);
-  assert.doesNotMatch(source, /브라우저에서도 주요 화면을 바로 열 수 있습니다/);
-  assert.doesNotMatch(source, /홈 화면에 추가해 앱처럼 실행할 수 있습니다/);
-  assert.doesNotMatch(source, /<PwaInstallButton/);
-  assert.match(
-    headerSource,
-    /data-site-header-pwa-install[\s\S]*className="min-h-11 min-w-11"/,
-  );
-  assert.match(headerSource, /<PwaInstallButton[\s\S]*iconOnly[\s\S]*hideWhenInstalled/);
-  assert.match(
-    globalsSource,
-    /@media \(display-mode: standalone\) \{[\s\S]*\[data-site-header-pwa-install\] \{\s*display: none;/,
-  );
+  assert.match(source, /<PwaInstallButton/);
+  assert.match(source, /<ThemeModeButtons/);
+  assert.match(source, /buildSettingsHref\(pathname\)/);
 });
 
 test("설치 권장은 eligible 경로 재방문마다 노출되고 집중 화면을 피한다", async () => {
@@ -106,20 +89,13 @@ test("설치 권장은 eligible 경로 재방문마다 노출되고 집중 화�
   assert.doesNotMatch(source, /localStorage|sessionStorage/);
 });
 
-test("모바일 하단 탐색이 보이면 테마는 헤더로 옮기고 Footer 알림 중복을 숨긴다", async () => {
-  const [headerSource, footerSource, globalsSource] = await Promise.all([
-    readFile(siteHeaderSourceUrl, "utf8"),
+test("모바일 하단 탐색이 보이면 Footer 알림·테마 중복을 숨긴다", async () => {
+  const [footerSource, globalsSource] = await Promise.all([
     readFile(footerSourceUrl, "utf8"),
     readFile(globalsSourceUrl, "utf8"),
   ]);
-
-  assert.match(headerSource, /data-site-header-theme-toggle/);
   assert.match(footerSource, /data-site-footer-theme-mode/);
   assert.match(footerSource, /data-site-footer-notifications/);
-  assert.match(
-    globalsSource,
-    /body:has\(\[data-site-mobile-navigation\]\) \[data-site-header-theme-toggle\] \{\s*display: flex;/,
-  );
   assert.match(
     globalsSource,
     /body:has\(\[data-site-mobile-navigation\]\) \[data-site-footer-theme-mode\],[\s\S]*body:has\(\[data-site-mobile-navigation\]\) \[data-site-footer-notifications\] \{\s*display: none;/,
@@ -157,17 +133,15 @@ test("비로그인 회원 목적지는 로그인 후 복귀 경로를 보존한�
   assert.match(source, /isPartnerDetailPath\(pathname\)/);
 });
 
-test("설정은 공용 헤더에서 진입하고 내 정보 탐색 상태를 공유한다", async () => {
-  const [headerSource, mobileNavSource, navigationSource] = await Promise.all([
-    readFile(siteHeaderSourceUrl, "utf8"),
+test("설정은 공용 메뉴에서 진입하고 내 정보 탐색 상태를 공유한다", async () => {
+  const [menuSource, mobileNavSource, navigationSource] = await Promise.all([
+    readFile(tabletMenuSourceUrl, "utf8"),
     readFile(mobileNavSourceUrl, "utf8"),
     readFile(siteNavigationSourceUrl, "utf8"),
   ]);
 
-  assert.match(headerSource, /Cog6ToothIcon/);
-  assert.match(headerSource, /ariaLabel="설정"/);
-  assert.match(headerSource, /buildSettingsHref\(pathname\)/);
-  assert.match(headerSource, /!isFocusedSiteFlow\(pathname\)/);
+  assert.match(menuSource, /buildSettingsHref\(pathname\)/);
+  assert.match(menuSource, /!isFocusedSiteFlow\(pathname\)/);
   assert.match(mobileNavSource, /isMyInfoPath\(pathname\)/);
   assert.match(navigationSource, /pathname\.startsWith\("\/settings"\)/);
   assert.match(
@@ -190,10 +164,6 @@ test("모바일 하단 탐색은 페이지 스켈레톤 전환에도 유지되�
   assert.match(
     layoutSource,
     /<MobileNav signedInUserId=\{session\?\.userId\} \/>[\s\S]*<div className="flex-1">\{children\}<\/div>/,
-  );
-  assert.match(
-    headerSource,
-    /<div\s+data-site-header-theme-toggle\s+className="hidden md:flex"\s*>\s*<ThemeToggle \/>/,
   );
   assert.match(headerSource, /ariaLabel="알림"/);
 });

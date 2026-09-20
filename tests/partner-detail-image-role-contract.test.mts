@@ -102,6 +102,10 @@ test("모바일 갤러리는 정보 카드보다 먼저 오고 태블릿부터 �
   assert.match(tabletCarousel, /visibleFrom=\{visibleFrom\}/);
   assert.match(
     tabletCarousel,
+    /sm:rounded-\[var\(--radius-card\)\][\s\S]*md:rounded-\[var\(--radius-card\)\]/,
+  );
+  assert.match(
+    tabletCarousel,
     /visibleFrom === "sm"[\s\S]*\(min-width: 640px\) 46vw[\s\S]*\(min-width: 768px\) 46vw/,
   );
   assert.match(tabletCarousel, /const \[isExpandedCarousel, setIsExpandedCarousel\]/);
