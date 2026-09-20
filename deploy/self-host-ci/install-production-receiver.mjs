@@ -5,7 +5,7 @@ import { chmod, lstat, mkdir, open, readFile, realpath, rename, rm, writeFile } 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertOperatorInput } from "../../scripts/self-host-ci/lib.mjs";
-import { readRootToken, RECEIVER_PROFILES } from "../../scripts/self-host-ci/receive-release.mjs";
+import { isMainModule, readRootToken, RECEIVER_PROFILES } from "../../scripts/self-host-ci/receive-release.mjs";
 import { readRootSchemaApproval } from "../../scripts/self-host-ci/schema-approval.mjs";
 
 export const PRODUCTION_RECEIVER_UNITS = Object.freeze([
@@ -97,7 +97,7 @@ export async function installProductionReceiver({
   return { installed: true, timer: plan.timer, firstPoll: "scheduled", databaseMigrationsApplied: false };
 }
 
-if (process.argv[1] && import.meta.url === new URL(process.argv[1], "file:").href) {
+if (isMainModule()) {
   installProductionReceiver()
     .then((result) => process.stdout.write(`${JSON.stringify(result)}\n`))
     .catch(() => { process.stderr.write('{"error":"PRODUCTION_RECEIVER_INSTALL_FAILED"}\n'); process.exitCode = 1; });
