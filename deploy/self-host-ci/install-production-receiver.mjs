@@ -13,6 +13,10 @@ export const PRODUCTION_RECEIVER_UNITS = Object.freeze([
   "ssartnership-production-receiver.timer",
 ]);
 
+export function isInstallerMainModule(argvPath = process.argv[1], moduleUrl = import.meta.url) {
+  return isMainModule(argvPath, moduleUrl);
+}
+
 function fail(code) {
   throw new Error(code);
 }
@@ -78,10 +82,11 @@ export async function installProductionReceiver({
   if (!operator) fail("PRODUCTION_RECEIVER_OPERATOR_REQUIRED");
   const plan = productionReceiverInstallPlan(controlRoot);
   const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-  if (await realpath(sourceRoot) !== await realpath(controlRoot)) fail("PRODUCTION_RECEIVER_CONTROL_VERSION_INVALID");
-  await assertOperatorInput(await realpath(controlRoot), { directory: true });
+  const canonicalControlRoot = await realpath(controlRoot);
+  if (await realpath(sourceRoot) !== canonicalControlRoot) fail("PRODUCTION_RECEIVER_CONTROL_VERSION_INVALID");
+  await assertOperatorInput(canonicalControlRoot, { directory: true });
   await assertOperatorInput("/opt/ssartnership/node24/node");
-  await assertOperatorInput(RECEIVER_PROFILES.production.config.composeFile);
+  await assertOperatorInput(await realpath(RECEIVER_PROFILES.production.config.composeFile));
   for (const file of [RECEIVER_PROFILES.production.config.runtimeEnvFile, RECEIVER_PROFILES.production.config.tokenFile, RECEIVER_PROFILES.production.config.schemaApprovalFile]) {
     await assertRootSecret(file);
   }
@@ -90,14 +95,14 @@ export async function installProductionReceiver({
   await mkdir(plan.stateRoot, { recursive: true, mode: 0o700 });
   await mkdir(plan.releaseRoot, { recursive: true, mode: 0o700 });
   await ensureHeavyLock();
-  for (const [index, source] of plan.unitSources.entries()) await installUnit(source, plan.unitTargets[index]);
+  for (const [index, source] of plan.unitSources.entries()) await installUnit(await realpath(source), plan.unitTargets[index]);
   execute("systemd-analyze", ["verify", ...plan.unitTargets], { stdio: "pipe" });
   execute("systemctl", ["daemon-reload"], { stdio: "pipe" });
   execute("systemctl", ["enable", "--now", plan.timer], { stdio: "pipe" });
   return { installed: true, timer: plan.timer, firstPoll: "scheduled", databaseMigrationsApplied: false };
 }
 
-if (isMainModule()) {
+if (isInstallerMainModule()) {
   installProductionReceiver()
     .then((result) => process.stdout.write(`${JSON.stringify(result)}\n`))
     .catch(() => { process.stderr.write('{"error":"PRODUCTION_RECEIVER_INSTALL_FAILED"}\n'); process.exitCode = 1; });

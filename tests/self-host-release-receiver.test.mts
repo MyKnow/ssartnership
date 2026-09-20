@@ -8,7 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isMainModule, isSameApprovedRelease, parseReleaseArtifact, RECEIVER_PROFILES, selectFirstAttemptRun, validatePulledImage, receiveRelease } from "../scripts/self-host-ci/receive-release.mjs";
 import { imageReference, RELEASE_PROFILES } from "../scripts/self-host-ci/github-contract.mjs";
-import { PRODUCTION_RECEIVER_UNITS, productionReceiverInstallPlan } from "../deploy/self-host-ci/install-production-receiver.mjs";
+import { isInstallerMainModule, PRODUCTION_RECEIVER_UNITS, productionReceiverInstallPlan } from "../deploy/self-host-ci/install-production-receiver.mjs";
 
 const sha = randomBytes(20).toString("hex");
 const digest = `sha256:${randomBytes(32).toString("hex")}`;
@@ -116,6 +116,11 @@ test("Production receiver has isolated main, artifact, state, compose and health
 });
 
 test("Production receiver installer is fail-closed and enables only its timer", async () => {
+  const entryRoot = await mkdtemp(path.join(tmpdir(), "ssartnership-production-installer-entry-"));
+  const entryLink = path.join(entryRoot, "install-production-receiver.mjs");
+  await symlink(fileURLToPath(new URL("../deploy/self-host-ci/install-production-receiver.mjs", import.meta.url)), entryLink);
+  assert.equal(isInstallerMainModule(entryLink), true);
+  await rm(entryRoot, { recursive: true, force: true });
   const plan = productionReceiverInstallPlan();
   assert.deepEqual(PRODUCTION_RECEIVER_UNITS, [
     "ssartnership-production-receiver.service",
@@ -130,7 +135,10 @@ test("Production receiver installer is fail-closed and enables only its timer", 
   assert.match(installer, /readRootToken/u);
   assert.match(installer, /readRootSchemaApproval/u);
   assert.match(installer, /PRODUCTION_RECEIVER_CONTROL_VERSION_INVALID/u);
-  assert.match(installer, /if \(isMainModule\(\)\)/u);
+  assert.match(installer, /const canonicalControlRoot = await realpath\(controlRoot\)/u);
+  assert.match(installer, /assertOperatorInput\(await realpath\(RECEIVER_PROFILES\.production\.config\.composeFile\)\)/u);
+  assert.match(installer, /installUnit\(await realpath\(source\), plan\.unitTargets\[index\]\)/u);
+  assert.match(installer, /if \(isInstallerMainModule\(\)\)/u);
   assert.match(installer, /\["enable", "--now", plan\.timer\]/u);
   assert.doesNotMatch(installer, /systemctl[^\n]+start[^\n]+service/u);
 });
