@@ -37,6 +37,17 @@ Docker Desktop Linux arm64에서 mock/real production standalone 이미지 빌�
 - [ ] 실제 메일·Mattermost·Push·Wallet 연동 확인
 - [ ] 단일 writer·단일 scheduler 전환과 앱/데이터 복구 리허설
 
+## Production 앱 자동 배포 — Issue #467
+
+- [x] `main` exact SHA 전용 AMD64 Release gate와 Production origin·공개 VAPID 키 계약
+- [x] Preview와 분리된 Production artifact·GHCR tag·receiver state·schema approval·Compose·health 계약
+- [x] 첫 attempt·전체 필수 step·immutable digest 검증 및 app health 실패 시 이전 digest 복귀
+- [x] root 전용 prerequisite를 확인한 뒤 timer만 활성화하는 설치기와 운영 절차
+- [ ] 작업 브랜치 검증 후 `dev` 통합, Preview 확인, `main` 승격
+- [ ] 홈 서버 control version 설치, Production schema 승인 생성, timer 활성화와 실제 exact-SHA 공개 health 확인
+
+자동화는 app 교체에 한정한다. database image 실행, migration, 데이터·DNS·Cron·백업 변경은 별도 운영 승인과 증거가 필요하다.
+
 작업 체크는 해당 증거가 생길 때 갱신한다. 로컬 mock smoke는 데이터 이전 또는 운영 인증 검증을 대체하지 않는다.
 
 데이터·복구의 상세 증거와 운영 서비스 구현 순서는 [데이터 작업 목록](../self-host-database/tasks.md), [기술 계획](../self-host-database/plan.md)이 정본이다. 최초 로컬 검증 이후 기반 `b95c894b`와 관측·백업 `fd77cc07` 커밋을 만들었다. push·PR·merge·실제 배포는 각 증거가 생길 때 별도로 기록한다.

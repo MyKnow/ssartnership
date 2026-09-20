@@ -4,11 +4,11 @@ import { spawn } from "node:child_process";
 import { mkdir, readFile, writeFile, lstat, realpath, chmod } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { COMPONENTS, sha256File, validateGitTree } from "./lib.mjs";
+import { COMPONENTS, sha256File, validateGitTree, validateVapidPublicKey } from "./lib.mjs";
 import { sanitizeDockerArchive } from "./archive.mjs";
 import { cleanOperatorEnvironment } from "./deployment.mjs";
 import { fingerprintDeployableArtifact } from "./production-e2e-profile.mjs";
-import { githubContext, imageReference, validateBundle, validatePublishedRelease, SITE_ORIGIN, API_ORIGIN } from "./github-contract.mjs";
+import { githubContext, githubReleaseProfile, imageReference, validateBundle, validatePublishedRelease } from "./github-contract.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const fail = code => { throw new Error(code); };
@@ -43,7 +43,7 @@ async function inspectImage(tag, sha) {
     || !/^sha256:[a-f0-9]{64}$/u.test(data.Id)) fail("GITHUB_IMAGE_IDENTITY_INVALID");
   return data;
 }
-async function build(context, output) {
+async function build(context, profile, output) {
   const directory = await newDirectory(output);
   const work = path.join(directory, "work"); await mkdir(work, { mode: 0o700 });
   const payload = path.join(directory, "payload"); await mkdir(payload, { mode: 0o700 });
@@ -57,10 +57,11 @@ async function build(context, output) {
   await run("docker", ["build", "--pull", "--platform", "linux/amd64", "--tag", gateTag, path.join(work, "deploy/self-host-ci")], { visible: true });
   const gateImage = JSON.parse(await run("docker", ["image", "inspect", gateTag]))[0].Id;
   const container = `ssartnership-github-${context.runId}`;
+  const vapidPublicKey = profile.name === "production" ? validateVapidPublicKey(process.env.PRODUCTION_VAPID_PUBLIC_KEY) : "";
   try {
     // Only archived public source enters the gate. No Docker socket, registry
     // login, host environment, SSH, DB credentials or operational volume.
-    await run("docker", ["run", "--name", container, "--init", "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--user", `${process.getuid()}:${process.getgid()}`, "--pids-limit", "1024", "--memory", "5g", "--memory-swap", "5g", "--cpus", "2", "--tmpfs", "/tmp:mode=1777,size=512m", "--shm-size", "256m", "--env", "CI_EXECUTION_PROFILE=github-amd64", "--env", `CI_BUILD_SITE_ORIGIN=${SITE_ORIGIN}`, "--env", `CI_BUILD_SUPABASE_ORIGIN=${API_ORIGIN}`, "--mount", `type=bind,src=${work},dst=/work`, gateImage], { visible: true });
+    await run("docker", ["run", "--name", container, "--init", "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--user", `${process.getuid()}:${process.getgid()}`, "--pids-limit", "1024", "--memory", "5g", "--memory-swap", "5g", "--cpus", "2", "--tmpfs", "/tmp:mode=1777,size=512m", "--shm-size", "256m", "--env", "CI_EXECUTION_PROFILE=github-amd64", "--env", `CI_BUILD_SITE_ORIGIN=${profile.siteOrigin}`, "--env", `CI_BUILD_SUPABASE_ORIGIN=${profile.apiOrigin}`, "--env", `CI_BUILD_VAPID_PUBLIC_KEY=${vapidPublicKey}`, "--mount", `type=bind,src=${work},dst=/work`, gateImage], { visible: true });
     const state = JSON.parse(await run("docker", ["inspect", "--format", "{{json .State}}", container]));
     if (state.Running || state.ExitCode !== 0 || state.OOMKilled) fail("GITHUB_GATE_FAILED");
   } finally {
@@ -78,7 +79,7 @@ async function build(context, output) {
   const gate = Object.fromEntries(["tests", "failures", "errors", "skipped", "retries", "e2eRuntime", "fixtureBuildDeployable"].map(key => [key, evidence[key]]));
   const images = [];
   for (const component of COMPONENTS) {
-    const tag = imageReference(component, context.sha);
+    const tag = imageReference(component, context.sha, profile);
     const dockerfile = path.join(work, component === "app" ? "deploy/self-host-ci/App.Dockerfile" : component === "telemetry" ? "deploy/observability/Dockerfile" : "deploy/self-host-operations/Dockerfile");
     const buildContext = component === "database" ? path.join(work, "deploy/self-host-operations") : work;
     process.stdout.write(`Packaging ${component}\n`);
@@ -89,22 +90,22 @@ async function build(context, output) {
     images.push({ component, tag, id: image.Id, archive, hash: await sha256File(path.join(payload, archive)) });
   }
   if (fingerprintDeployableArtifact(work) !== evidence.deployableFingerprint) fail("GITHUB_DEPLOYABLE_CHANGED");
-  const bundle = validateBundle({ version: 1, ...context, platform: "linux/amd64", sourceHash, gate, images }, context);
+  const bundle = validateBundle({ version: 1, ...context, platform: "linux/amd64", sourceHash, gate, images }, context, profile);
   await writeFile(path.join(payload, "bundle.json"), JSON.stringify(bundle), { flag: "wx", mode: 0o600 });
   return { built: true, sha: context.sha, payload };
 }
-async function assertCurrentDev(context) {
+async function assertCurrentBranch(context, profile) {
   if (!process.env.GH_TOKEN) fail("GITHUB_READ_TOKEN_REQUIRED");
-  const sha = (await run("gh", ["api", "repos/MyKnow/ssartnership/git/ref/heads/dev", "--jq", ".object.sha"], { env: { GH_TOKEN: process.env.GH_TOKEN } })).trim();
-  if (sha !== context.sha) fail("GITHUB_STALE_DEV");
+  const sha = (await run("gh", ["api", `repos/MyKnow/ssartnership/git/ref/heads/${profile.branch}`, "--jq", ".object.sha"], { env: { GH_TOKEN: process.env.GH_TOKEN } })).trim();
+  if (sha !== context.sha) fail("GITHUB_STALE_BRANCH");
 }
-async function publish(context, input, output) {
+async function publish(context, profile, input, output) {
   if (!/^\.tmp\/[a-z][a-z0-9-]*$/u.test(input)) fail("GITHUB_DIRECTORY_INVALID");
   const source = path.join(root, input);
   if (await realpath(source) !== source) fail("GITHUB_DIRECTORY_INVALID");
-  const bundle = validateBundle(await json(path.join(source, "bundle.json")), context);
+  const bundle = validateBundle(await json(path.join(source, "bundle.json")), context, profile);
   const directory = await newDirectory(output);
-  await assertCurrentDev(context);
+  await assertCurrentBranch(context, profile);
   const images = [];
   for (const item of bundle.images) {
     const archive = path.join(source, item.archive);
@@ -116,7 +117,7 @@ async function publish(context, input, output) {
     const image = await inspectImage(item.tag, context.sha);
     // Sanitization may change a containerd index ID into the config ID. Its
     // config/layer closure was already verified by sanitizeDockerArchive.
-    await assertCurrentDev(context);
+    await assertCurrentBranch(context, profile);
     await run("docker", ["push", item.tag], { visible: true });
     const pushed = await inspectImage(item.tag, context.sha);
     const name = item.tag.split(":")[0];
@@ -124,20 +125,21 @@ async function publish(context, input, output) {
     if (refs.length !== 1) fail("GITHUB_PUBLISHED_DIGEST_AMBIGUOUS");
     images.push({ component: item.component, id: image.Id, digest: refs[0].split("@")[1], reference: refs[0] });
   }
-  await assertCurrentDev(context);
-  const published = validatePublishedRelease({ ...bundle, images }, context);
+  await assertCurrentBranch(context, profile);
+  const published = validatePublishedRelease({ ...bundle, images }, context, profile);
   const manifest = path.join(directory, "release.json");
   await writeFile(manifest, JSON.stringify(published), { flag: "wx", mode: 0o600 });
   await chmod(manifest, 0o600);
   return { published: true, sha: context.sha, manifestHash: createHash("sha256").update(JSON.stringify(published)).digest("hex") };
 }
 async function main() {
-  const context = githubContext();
+  const profile = githubReleaseProfile();
+  const context = githubContext(process.env, profile);
   if (process.platform !== "linux" || process.arch !== "x64" || process.getuid() === 0 || process.env.DOCKER_HOST || process.env.DOCKER_CONTEXT || process.env.DOCKER_TLS_VERIFY) fail("GITHUB_HOSTED_LINUX_REQUIRED");
   process.umask(0o077);
   const [command, ...args] = process.argv.slice(2);
-  if (command === "build" && args.length === 1) return build(context, args[0]);
-  if (command === "publish" && args.length === 2) return publish(context, ...args);
+  if (command === "build" && args.length === 1) return build(context, profile, args[0]);
+  if (command === "publish" && args.length === 2) return publish(context, profile, ...args);
   fail("GITHUB_ARGUMENTS_INVALID");
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
