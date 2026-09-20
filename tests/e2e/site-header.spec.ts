@@ -44,6 +44,9 @@ for (const signedIn of [false, true]) {
 
 test("menu keeps account destinations, keyboard focus and theme controls", async ({ page }) => {
   await home(page, true);
+  // 메뉴 이동 검사가 개발 서버의 최초 설정 페이지 컴파일을 기다리지 않도록 준비합니다.
+  const settingsWarmup = await page.request.get("/settings?returnTo=%2F");
+  expect(settingsWarmup.ok()).toBe(true);
   await page.setViewportSize({ width: 360, height: 740 });
   const trigger = page.getByRole("button", { name: "메뉴 열기" });
   const menu = page.getByRole("dialog", { name: "메뉴" });
