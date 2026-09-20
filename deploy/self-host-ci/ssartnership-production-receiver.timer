@@ -1,0 +1,12 @@
+[Unit]
+Description=Poll the approved GitHub Production image release
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+RandomizedDelaySec=60s
+Persistent=true
+Unit=ssartnership-production-receiver.service
+
+[Install]
+WantedBy=timers.target

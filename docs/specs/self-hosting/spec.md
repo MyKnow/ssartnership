@@ -33,6 +33,7 @@ Next.js와 기존 Repository/API 계약은 유지한다. 기존 Vercel 배포와
 4. 자체 호스팅 데이터 서비스에 스키마/RPC/RLS/Storage 호환성을 확인하고 외부 네트워크 없이 확인 가능한 증거를 별도로 기록한다.
 5. 실제 cloud 기능 사용처를 조사하여 백업/PITR 복원, Preview 분리·초기화, Management API 대체와 유지보수를 실행 가능한 명령과 검증으로 제공한다.
 6. 운영 복원·백업·성능·외부 연동과 원격 전환의 미검증 부분을 [작업 목록](./tasks.md)에 남긴다.
+7. `dev`와 `main`의 자동 앱 배포는 workflow, artifact, image tag, state, schema 승인과 health endpoint를 환경별로 분리하고 DB migration을 자동 적용하지 않는다.
 
 [기술 계획](./plan.md)과 [실행 절차](../../operations/runbooks/self-hosting.md)를 함께 따른다.
 

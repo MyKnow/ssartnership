@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdtemp, writeFile, symlink, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { readRootSchemaApproval, validateSchemaApproval, validateSchemaFileMetadata, selectSchemaTree } from "../scripts/self-host-ci/schema-approval.mjs";
+import { readRootSchemaApproval, SCHEMA_APPROVAL_PROFILES, validateSchemaApproval, validateSchemaFileMetadata, selectSchemaTree } from "../scripts/self-host-ci/schema-approval.mjs";
 
 const sha = "a".repeat(40);
 const approval = {
@@ -12,8 +12,11 @@ const approval = {
   verifiedSourceSha: "b".repeat(40), migrationCount: 199, verifiedAt: "2026-09-08T10:36:49.336Z",
 };
 
-test("schema approval is exact and limited to the restored original Preview", () => {
+test("schema approval is exact and limited to the selected deployment environment", () => {
   assert.deepEqual(validateSchemaApproval(approval), approval);
+  const production = { ...approval, environment: "production", project: "ssartnership-production-data" };
+  assert.deepEqual(validateSchemaApproval(production, SCHEMA_APPROVAL_PROFILES.production), production);
+  assert.throws(() => validateSchemaApproval(production), /RECEIVER_SCHEMA_APPROVAL_INVALID/);
   for (const patch of [
     { version: 2 }, { repository: "other/repository" }, { environment: "production" },
     { project: "ssartnership-production" }, { migrationTree: "dev" }, { verifiedSourceSha: "main" },

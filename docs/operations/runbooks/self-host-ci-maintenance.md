@@ -7,13 +7,13 @@ authority: normative
 
 # 격리 CI·배포·유지보수
 
-[데이터 계획](../../specs/self-host-database/plan.md), [관측 운영](./self-host-observability.md), [진행 증거](../../specs/self-host-database/tasks.md)를 함께 따른다. 아래 구현은 기존 GitHub/Vercel/Supabase Production을 중단하지 않는 원래 Cloud Preview 전용 경로다. 원본 데이터·공개 DNS/TLS 전환 및 GitHub 이미지의 서버 app 적용은 확인했고, 현재의 정확한 SHA와 timer·인증·외부 알림·상시 PITR 미완료 경계는 진행 증거에서 확인한다. 합성 환경의 복구 성공을 원본 환경의 연속 PITR로 해석하지 않는다.
+[데이터 계획](../../specs/self-host-database/plan.md), [관측 운영](./self-host-observability.md), [진행 증거](../../specs/self-host-database/tasks.md)를 함께 따른다. Preview는 `dev`, Production은 `main`의 첫 성공 GitHub 실행에서 발행된 exact-SHA 이미지만 각각의 서버 수신기가 적용한다. Production 자동 배포 추가 범위는 [Issue #467](https://github.com/MyKnow/ssartnership/issues/467)이며 DB migration·데이터·DNS·Cron·백업 변경은 포함하지 않는다. 합성 환경의 복구 성공을 원본 환경의 연속 PITR로 해석하지 않는다.
 
 ## 권한과 소스 승인
 
 운영 Docker는 root, 빌드 Docker는 기존 `ci-builder` UID 1001의 rootless engine이다. 프로젝트 도구는 기존 `myknow-ci-exec`의 1 job·30분·15GiB 여유 공간 및 사용자 slice 자원 제한을 바꾸지 않는다. CI container에는 작업 소스 bind만 제공하고 Docker socket·운영 env·백업 키·SSH 키를 제공하지 않는다. container의 UID 0은 rootless namespace에서 호스트의 ci-builder로 매핑되며 호스트 root가 아니다. 외부 사이트 크롤링이나 신뢰되지 않은 PR에는 이 구성을 사용하지 않는다.
 
-운영자는 `prepare.mjs <새 디렉터리> <40자리 SHA> <refs/heads/typed-branch 또는 dev> <linux/amd64 또는 linux/arm64> <site origin> <Supabase origin>`으로 Git archive와 승인 JSON을 만든다. 해당 ref의 실제 commit과 일치해야 하며 symlink/gitlink·경로 이탈을 거절한다. 저장소, ref, SHA, archive SHA256, 플랫폼, 공개 origin, 24시간 미만 승인 만료가 고정된다. 비밀·원격 URL 자격 증명은 입력하지 않는다. PR refs·다른 저장소는 거절한다. `main`은 `linux/amd64`, 운영 앱·API origin과 기존 공개 VAPID 키가 모두 일치하는 전용 Production 입력만 허용하며, 자세한 조건과 전환 순서는 [자체 호스팅 운영](./self-hosting.md)을 따른다. GitHub Preview 게시·수신은 계속 `dev`만 허용한다.
+운영자는 `prepare.mjs <새 디렉터리> <40자리 SHA> <refs/heads/typed-branch 또는 dev> <linux/amd64 또는 linux/arm64> <site origin> <Supabase origin>`으로 Git archive와 승인 JSON을 만든다. 해당 ref의 실제 commit과 일치해야 하며 symlink/gitlink·경로 이탈을 거절한다. 저장소, ref, SHA, archive SHA256, 플랫폼, 공개 origin, 24시간 미만 승인 만료가 고정된다. 비밀·원격 URL 자격 증명은 입력하지 않는다. PR refs·다른 저장소는 거절한다. `main`은 `linux/amd64`, 운영 앱·API origin과 기존 공개 VAPID 키가 모두 일치하는 전용 Production 입력만 허용하며, 자세한 조건과 전환 순서는 [자체 호스팅 운영](./self-hosting.md)을 따른다.
 
 입력은 `/var/lib/ssartnership-ci/inputs/<승인 ID>/`에 root 소유 0444 파일, 부모 root 0755로 설치한다. 빌더가 소유한 `/srv/ci` 아래에는 승인 정책을 두지 않는다. 빌더는 부모 디렉터리를 교체할 수 있기 때문이다. 제어 코드도 `/opt/ssartnership/`의 root 소유 version 디렉터리에 설치한다. 프로젝트의 고정 Node는 `deploy/self-host-operations/install-node-runtime.sh`로 설치하며 시스템 Node를 바꾸지 않는다.
 
@@ -27,25 +27,25 @@ flock --nonblock --conflict-exit-code 75 /var/lib/ssartnership-ci/heavy.lock
   /srv/ci/artifacts/ssartnership/<40자리 SHA>-<12자리 job ID>
 ```
 
-자동 GitHub runner 등록이나 공개 webhook을 설치하지 않는다. 서버는 GitHub API의 현재 `dev` ref와 첫 성공 attempt만 독립 조회하는 `ssartnership-preview-receiver.service`/`.timer`를 사용한다. 수신기는 artifact digest·`release.json`·전체 job/step·GHCR immutable digest를 검증한 뒤 app만 교체하고, 공유 heavy lock·health·rollback 결과를 기록한다. 이 timer는 서버의 token/config·후보 앱 health·Caddy/DNS·실제 백업을 검증한 뒤에만 enable한다. Production 승격은 별도 수동 승인이다.
+자동 GitHub runner 등록이나 공개 webhook을 설치하지 않는다. 서버는 GitHub API를 polling하는 환경별 timer를 사용한다. Preview 수신기는 현재 `dev`와 `.github/workflows/self-host-preview.yml`, Production 수신기는 현재 `main`과 `.github/workflows/self-host-production.yml`만 허용한다. 두 수신기는 첫 attempt의 성공, artifact digest, `release.json`, 전체 job/step, GHCR immutable digest를 독립 검증한 뒤 app만 교체하고 공유 heavy lock·health·rollback 결과를 기록한다. 서로의 artifact·state·schema 승인·Compose·health endpoint를 재사용하지 않는다.
 
 ### GitHub 빌드와 GHCR 게시
 
-`.github/workflows/self-host-preview.yml`은 `dev` push의 첫 실행만 대상으로 한다. GitHub-hosted Linux AMD64 build job은 exact commit의 검증된 Git archive만 container에 전달한다. 읽기 전용 root·capability 제거·5GiB/2CPU 제한을 적용하고 운영 비밀, SSH, registry 로그인, Docker socket과 원본 checkout 인증 설정을 전달하지 않는다. 전체 Quick·실제 standalone build·별도 운영 모드 합성 E2E 103개 이상을 retry/skip/error 없이 통과하고 배포 산출물 fingerprint가 유지되어야 app·telemetry·DB 세 이미지를 포장한다. 기존 서버 rootless CI의 설정이나 제한은 바꾸지 않는다.
+`.github/workflows/self-host-preview.yml`은 `dev`, `.github/workflows/self-host-production.yml`은 `main` push만 대상으로 한다. GitHub-hosted Linux AMD64 build job은 exact commit의 검증된 Git archive만 container에 전달한다. 읽기 전용 root·capability 제거·5GiB/2CPU 제한을 적용하고 운영 비밀, SSH, registry 로그인, Docker socket과 원본 checkout 인증 설정을 전달하지 않는다. Production은 GitHub `Production` Environment의 공개 변수 `PRODUCTION_VAPID_PUBLIC_KEY`만 build step에 전달한다. 전체 Quick·실제 standalone build·별도 운영 모드 합성 E2E 103개 이상을 retry/skip/error 없이 통과하고 배포 산출물 fingerprint가 유지되어야 app·telemetry·DB 세 이미지를 포장한다. 기존 서버 rootless CI의 설정이나 제한은 바꾸지 않는다.
 
-게시 권한은 새 runner의 별도 job에만 있다. `github-release.mjs publish`는 archive의 크기·hash·경로·config/layer closure·플랫폼·revision을 검사해 승인 내용만 적재하고, 매 게시 직전과 최종 manifest 생성 전에 live `dev` SHA를 다시 확인한다. 의존성 설치나 이미지 실행은 하지 않는다. registry 자격증명은 게시 단계에서만 사용하고 마지막에 로그아웃한다. 이미지 묶음 artifact는 2일, digest manifest artifact는 30일 보존한다. fixture 이미지는 게시하지 않고 artifact digest 불일치는 오류로 처리한다. 부분 게시에는 최종 manifest가 없어 배포 승인으로 사용할 수 없다.
+게시 권한은 새 runner의 별도 job에만 있다. `github-release.mjs publish`는 archive의 크기·hash·경로·config/layer closure·플랫폼·revision을 검사해 승인 내용만 적재하고, 매 게시 직전과 최종 manifest 생성 전에 해당 환경의 live branch SHA를 다시 확인한다. Preview tag는 `dev-<SHA>`, Production tag는 `production-<SHA>`다. 의존성 설치나 이미지 실행은 하지 않는다. registry 자격증명은 게시 단계에서만 사용하고 마지막에 로그아웃한다. 이미지 묶음 artifact는 2일, digest manifest artifact는 30일 보존한다. fixture 이미지는 게시하지 않고 artifact digest 불일치는 오류로 처리한다. 부분 게시에는 최종 manifest가 없어 배포 승인으로 사용할 수 없다.
 
-공개 빌드 origin은 앱 `https://ssartnership-dev.myknow.xyz`, API `https://ssartnership-api-dev.myknow.xyz`로 고정한다. 이 설정은 DNS/TLS 전환 또는 데이터 이전 증거가 아니다. 실패 시 complete bundle을 만들지 않고 container 종료 상태와 가능한 gate 로그를 남긴다.
+Preview 공개 빌드 origin은 앱 `https://ssartnership-dev.myknow.xyz`, API `https://ssartnership-api-dev.myknow.xyz`, Production은 앱 `https://ssartnership.myknow.xyz`, API `https://ssartnership-api.myknow.xyz`로 고정한다. 이 설정은 DNS/TLS 전환 또는 데이터 이전 증거가 아니다. 실패 시 complete bundle을 만들지 않고 container 종료 상태와 가능한 gate 로그를 남긴다.
 
-서버 수용 계약 `github-contract.mjs`와 `receive-release.mjs`는 독립 조회한 GitHub run/jobs의 저장소·workflow 경로·현재 dev SHA·첫 실행·성공과 두 job의 필수 단계 및 전체 단계 성공을 요구한다. manifest 자체의 주장은 충분하지 않다. 수신기는 root 전용 token 파일과 root-owned release/state directory를 사용하고, GHCR에서 세 이미지를 모두 immutable reference로 pull한 뒤 image ID·AMD64·revision·단일 RepoDigest를 확인한다. 이후 `compose.original-preview.yaml`의 app만 `--pull never`로 교체하고 `/api/health`·`/auth/login`을 확인하며 실패 시 이전 app image로 rollback한다. 실제 서버 artifact 수신·registry 접근·후보 env/health·공개 ingress·백업 연결 증거가 쌓이기 전에는 polling timer를 활성화하지 않는다.
+서버 수용 계약 `github-contract.mjs`와 `receive-release.mjs`는 독립 조회한 GitHub run/jobs의 저장소·workflow 경로·현재 환경 branch SHA·첫 실행·성공과 두 job의 필수 단계 및 전체 단계 성공을 요구한다. manifest 자체의 주장은 충분하지 않다. 수신기는 환경별 root 전용 token 파일과 root-owned release/state directory를 사용하고, GHCR에서 세 이미지를 모두 immutable reference로 pull한 뒤 image ID·AMD64·revision·단일 RepoDigest를 확인한다. 이후 환경별 Compose의 app만 `--pull never`로 교체하고 `/api/health`·`/auth/login`을 확인하며 실패 시 이전 app image로 rollback한다. database image는 이 자동 경로에서 실행하거나 DDL을 적용하지 않는다.
 
 ### 앱 자동 배포의 DB schema 승인
 
-수신기는 DB DDL을 적용하지 않는다. `/etc/myknow/secrets/ssartnership-original-preview/schema-approval.json`은 root-owned·0600·단일 regular file이어야 하며 symlink와 4KiB 초과를 거절한다. 버전 1의 정확한 필드는 `repository=MyKnow/ssartnership`, `environment=original-preview`, `project=ssartnership-original-preview-34141078185`, `migrationTree`, `verifiedSourceSha`, `migrationCount`, `verifiedAt`이다.
+수신기는 DB DDL을 적용하지 않는다. Preview의 `/etc/myknow/secrets/ssartnership-original-preview/schema-approval.json`과 Production의 `/etc/myknow/secrets/ssartnership-production/schema-approval.json`은 root-owned·0600·단일 regular file이어야 하며 symlink와 4KiB 초과를 거절한다. 버전 1의 정확한 필드는 `repository`, `environment`, `project`, `migrationTree`, `verifiedSourceSha`, `migrationCount`, `verifiedAt`이다. Preview는 `environment=original-preview`, `project=ssartnership-original-preview-34141078185`, Production은 `environment=production`, `project=ssartnership-production-data`만 허용한다.
 
 운영자는 실제 원본 Preview의 적용 migration 목록/내용과 source 동등성, 현재 백업 및 필요한 새 DDL 적용·회귀 검증을 확인한 뒤에만 승인 파일을 작성한다. `migrationTree`는 해당 source의 `supabase/migrations` Git tree SHA다. git ref 자체나 app SHA를 대신 넣지 않는다. 승인 파일은 비밀을 포함하지 않지만 배포 권한이므로 CI·앱·builder가 쓰지 못해야 한다.
 
-receiver는 [GitHub Trees API](https://docs.github.com/en/rest/git/trees#get-a-tree)의 비재귀 응답을 두 단계 읽어 exact dev SHA → supabase → migrations tree를 찾는다. 요청 SHA·완전한 응답·경로/종류/모드·단일 항목을 검증하고 운영 승인 tree와 다르면 manifest 저장·이미지 pull·앱 교체 전에 중단한다. 같은 앱 릴리스가 이미 적용됐어도 schema 검사를 생략하지 않는다. 새 migration의 추가·삭제·수정은 모두 tree를 바꾸므로 운영자 검증 없이 자동 통과하지 않는다.
+receiver는 [GitHub Trees API](https://docs.github.com/en/rest/git/trees#get-a-tree)의 비재귀 응답을 두 단계 읽어 환경별 exact SHA → supabase → migrations tree를 찾는다. 요청 SHA·완전한 응답·경로/종류/모드·단일 항목을 검증하고 운영 승인 tree와 다르면 manifest 저장·이미지 pull·앱 교체 전에 중단한다. 같은 앱 릴리스가 이미 적용됐어도 schema 검사를 생략하지 않는다. 새 migration의 추가·삭제·수정은 모두 tree를 바꾸므로 운영자 검증 없이 자동 통과하지 않는다.
 
 이는 승인 시점 이후 운영자가 수행한 임의 DDL까지 지속 감지하는 schema drift scanner가 아니다. DB 변경은 별도 운영 절차와 백업/동등성 증거를 남겨야 한다. 승인 파일을 latest dev 값으로 자동 갱신하거나 단순 count 일치만으로 새 migration을 적용한 것으로 간주하지 않는다.
 
@@ -169,6 +169,27 @@ Next standalone의 route-handler `request.url`은 외부 HTTPS 요청에서도 �
 
 목적지는 안전한 절대 경로만 허용하며 query와 sanitized returnTo는 유지한다. 외부 URL·프로토콜 상대 URL·역슬래시·제어 문자는 거절한다. Host/forwarded header를 운영 설정의 대용으로 사용하지 않으며 real-mode 설정 누락/오염 시 내부 주소로 되돌아가지 않는다. 필수 회원 단계 순서와 같은 출처 검사, Secure/HttpOnly/SameSite 쿠키는 변경하지 않는다. 기본 합성 E2E 외에 실제 공개 origin의 로그인·관리자 bridge·로그아웃 Location을 별도로 검증해야 한다.
 
+## Production 수신기 설치와 일상 확인
+
+코드를 검토해 root 소유 version directory에 설치하고 `/opt/ssartnership/control/current`를 그 버전으로 원자적으로 바꾼 뒤 진행한다. Production runtime env, GitHub read/package token, 현재 운영 DB와 대조한 schema approval이 먼저 있어야 한다. 설치기는 이 셋과 control version·고정 Node·Compose를 검증한 뒤 unit 두 개를 설치하고 timer만 활성화한다. 즉시 service를 실행하거나 DB migration을 적용하지 않는다.
+
+```bash
+sudo /opt/ssartnership/node24/node /opt/ssartnership/control/current/deploy/self-host-ci/install-production-receiver.mjs
+sudo systemctl status ssartnership-production-receiver.timer --no-pager
+sudo systemctl list-timers --all ssartnership-production-receiver.timer --no-pager
+```
+
+정상 운영 확인은 timer active와 실제 service 결과를 구분한다. `pending`은 현재 main의 첫 성공 릴리스가 아직 없는 상태, `unchanged`는 같은 승인 릴리스, `deployed`는 새 app 적용과 health 검사 및 state 기록까지 완료한 상태다.
+
+```bash
+sudo systemctl show ssartnership-production-receiver.service -p Result -p ExecMainStatus -p ExecMainStartTimestamp
+sudo journalctl -u ssartnership-production-receiver.service -n 20 --no-pager
+sudo cat /var/lib/ssartnership-ci/production/receiver-state.json
+curl --fail --silent --show-error https://ssartnership.myknow.xyz/api/health
+```
+
+중지할 때는 `sudo systemctl disable --now ssartnership-production-receiver.timer`로 새 자동 적용만 멈춘다. 현재 app·DB·Cron은 중지하지 않는다. 수동 확인은 `sudo systemctl start ssartnership-production-receiver.service`를 사용하며 같은 검증을 우회하지 않는다. 실패 시 새 state는 기록하지 않고 이전 app image로 복귀한다. rollback 자체도 실패하면 service는 `DEPLOY_ROLLBACK_FAILED`로 실패하며 운영자가 Compose와 공개 health를 직접 확인해야 한다.
+
 ## 공개 Preview의 일상 확인
 
 현재 공개 Preview의 최신 SHA·실검증·잔여 단계는 [작업 인수인계](../../specs/self-host-database/tasks.md#공개-preview-인수인계--2026-09-08)가 기준이다. 아래 명령은 홈 서버의 신뢰된 운영자 셸에서 실행한다. 만료된 bootstrap 계정을 자동 재활성화하거나 SSH 키를 복사하는 절차가 아니다.
@@ -183,6 +204,6 @@ curl --fail --silent --show-error https://ssartnership-dev.myknow.xyz/api/health
 
 timer는 `OnUnitActiveSec=5min`과 최대 60초 분산 지연으로 동작한다. `pending`은 현재 dev의 첫 승인 이미지 발행이 아직 없는 상태, `unchanged`는 저장된 승인 릴리스와 같은 상태, `deployed`는 새 이미지의 실제 적용·health 검사 후 상태 기록까지 완료한 결과다. timer active만으로 배포 성공을 주장하지 않는다. 수동 즉시 확인이 필요하면 `sudo systemctl start ssartnership-preview-receiver.service`를 사용하며 같은 heavy lock과 schema/first-attempt/digest 검사를 그대로 거친다. 반복 `docker compose up`으로 승인 검사나 실패 복귀를 우회하지 않는다.
 
-스키마 tree가 달라지면 앱 수신은 차단된다. 다음 SQL 변경은 legacy Cloud Preview migration/sync 및 Supabase 자동 연동의 남은 writer를 먼저 조사하고, 백업·새 후보 복구·실제 migration 검증을 거쳐 home 승인 baseline을 갱신해야 한다. 승인 JSON의 hash만 바꾸거나 기존 migration 파일을 수정하는 방식은 허용하지 않는다. Production은 이 수신기의 대상이 아니다.
+스키마 tree가 달라지면 앱 수신은 차단된다. 다음 SQL 변경은 legacy Cloud Preview migration/sync 및 Supabase 자동 연동의 남은 writer를 먼저 조사하고, 백업·새 후보 복구·실제 migration 검증을 거쳐 home 승인 baseline을 갱신해야 한다. 승인 JSON의 hash만 바꾸거나 기존 migration 파일을 수정하는 방식은 허용하지 않는다. Preview와 Production의 승인 파일은 서로 대체할 수 없다.
 
 원본 Cloud는 삭제하지 않은 frozen 복구 기준선이다. 홈 서버 쓰기 이후의 복귀에는 변경분 조정이 필요하며 CONNECT grant와 DNS만 되돌리는 절차를 정상 rollback으로 사용하지 않는다. 원본의 수동 외부 cold backup/복원 성공은 상시 WAL/PITR·정기 외부 사본·독립 지역 복구의 완료 근거가 아니다. 운영 이미지 정리도 별도 보존 정책이 필요한 단계이며 `docker system prune` 또는 volume 삭제를 자동 수신기에 추가하지 않는다.

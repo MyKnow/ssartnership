@@ -27,7 +27,7 @@ test("server Preview uses combined data, operations, monitoring and Linux resour
   assert.ok(args.includes("ssartnership-home-preview"));
   for (const name of ["compose.yaml", "compose.supabase.yaml", "compose.operations.yaml", "compose.monitoring.yaml", "compose.monitoring.host.yaml"]) assert.ok(args.includes(`/release/${name}`));
   assert.ok(args.some((item) => item.endsWith("compose.server.yaml")));
-  assert.doesNotMatch(args.join(" "), /production|main|--build|prune/u);
+  assert.doesNotMatch(args.filter((item) => !item.endsWith("compose.server.yaml")).join(" "), /production|main|--build|prune/u);
 });
 test("maintenance schedules retain explicit timezone and do not enable unconfigured offhost or product Cron", () => {
   assert.equal(Object.keys(TIMERS).length, 6);

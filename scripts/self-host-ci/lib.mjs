@@ -11,15 +11,19 @@ export function reject(code) { throw new Error(code); }
 function exactKeys(object, keys) {
   if (!object || typeof object !== "object" || Array.isArray(object) || Object.keys(object).sort().join() !== [...keys].sort().join()) reject("CI_FIELDS_INVALID");
 }
+export function validateVapidPublicKey(value) {
+  if (typeof value !== "string" || !/^[A-Za-z0-9_-]{87}$/u.test(value)) reject("CI_VAPID_PUBLIC_KEY_INVALID");
+  const point = Buffer.from(value, "base64url");
+  if (point.length !== 65 || point[0] !== 4 || point.toString("base64url") !== value) reject("CI_VAPID_PUBLIC_KEY_INVALID");
+  try { ECDH.convertKey(point, "prime256v1"); } catch { reject("CI_VAPID_PUBLIC_KEY_INVALID"); }
+  return value;
+}
 export function validateRequest(value, now = Date.now()) {
   const fields = ["version", "repository", "ref", "sha", "sourceHash", "platform", "siteOrigin", "supabaseOrigin", "expiresAt"];
   if (value && Object.hasOwn(value, "vapidPublicKey")) fields.push("vapidPublicKey");
   exactKeys(value, fields);
   if (Object.hasOwn(value, "vapidPublicKey")) {
-    if (typeof value.vapidPublicKey !== "string" || !/^[A-Za-z0-9_-]{87}$/u.test(value.vapidPublicKey)) reject("CI_VAPID_PUBLIC_KEY_INVALID");
-    const point = Buffer.from(value.vapidPublicKey, "base64url");
-    if (point.length !== 65 || point[0] !== 4 || point.toString("base64url") !== value.vapidPublicKey) reject("CI_VAPID_PUBLIC_KEY_INVALID");
-    try { ECDH.convertKey(point, "prime256v1"); } catch { reject("CI_VAPID_PUBLIC_KEY_INVALID"); }
+    validateVapidPublicKey(value.vapidPublicKey);
   }
   if (value.version !== 1 || value.repository !== REPOSITORY || !SHA.test(value.sha) || !HASH.test(value.sourceHash)) reject("CI_SOURCE_INVALID");
   // main is operator-only Production input, with the deployed origin pair and
