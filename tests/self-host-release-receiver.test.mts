@@ -135,6 +135,9 @@ test("Production receiver installer is fail-closed and enables only its timer", 
   assert.match(installer, /readRootToken/u);
   assert.match(installer, /readRootSchemaApproval/u);
   assert.match(installer, /PRODUCTION_RECEIVER_CONTROL_VERSION_INVALID/u);
+  assert.match(installer, /const canonicalControlRoot = await realpath\(controlRoot\)/u);
+  assert.match(installer, /assertOperatorInput\(await realpath\(RECEIVER_PROFILES\.production\.config\.composeFile\)\)/u);
+  assert.match(installer, /installUnit\(await realpath\(source\), plan\.unitTargets\[index\]\)/u);
   assert.match(installer, /if \(isInstallerMainModule\(\)\)/u);
   assert.match(installer, /\["enable", "--now", plan\.timer\]/u);
   assert.doesNotMatch(installer, /systemctl[^\n]+start[^\n]+service/u);
