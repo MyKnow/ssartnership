@@ -6,8 +6,9 @@ import { mkdtemp, readFile, writeFile, chmod, rm, symlink } from "node:fs/promis
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { isMainModule, isSameApprovedRelease, parseReleaseArtifact, selectFirstAttemptRun, validatePulledImage, receiveRelease } from "../scripts/self-host-ci/receive-release.mjs";
-import { imageReference } from "../scripts/self-host-ci/github-contract.mjs";
+import { isMainModule, isSameApprovedRelease, parseReleaseArtifact, RECEIVER_PROFILES, selectFirstAttemptRun, validatePulledImage, receiveRelease } from "../scripts/self-host-ci/receive-release.mjs";
+import { imageReference, RELEASE_PROFILES } from "../scripts/self-host-ci/github-contract.mjs";
+import { PRODUCTION_RECEIVER_UNITS, productionReceiverInstallPlan } from "../deploy/self-host-ci/install-production-receiver.mjs";
 
 const sha = randomBytes(20).toString("hex");
 const digest = `sha256:${randomBytes(32).toString("hex")}`;
@@ -82,8 +83,8 @@ test("receiver recognizes the same approved release across build and pulled imag
     appImage: images[0].id, images,
   };
   assert.notEqual(state.appImage, manifest.images[0].id);
-  assert.equal(isSameApprovedRelease(state, manifest), true);
-  assert.equal(isSameApprovedRelease(null, manifest), false);
+  assert.equal(isSameApprovedRelease(state, manifest, RELEASE_PROFILES.preview), true);
+  assert.equal(isSameApprovedRelease(null, manifest, RELEASE_PROFILES.preview), false);
   for (const patch of [
     { version: 2 }, { repository: "different/repository" }, { workflow: "different.yml" },
     { sha: "0".repeat(40) }, { runId: 18 }, { attempt: 2 }, { platform: "linux/arm64" },
@@ -93,7 +94,84 @@ test("receiver recognizes the same approved release across build and pulled imag
     { images: images.map((item) => ({ ...item, reference: "other@" + item.digest })) },
     { images: images.map((item) => ({ ...item, digest: "sha256:" + "0".repeat(64) })) },
     { images: [images[0], images[0], images[2]] },
-  ]) assert.equal(isSameApprovedRelease({ ...state, ...patch }, manifest), false);
+  ]) assert.equal(isSameApprovedRelease({ ...state, ...patch }, manifest, RELEASE_PROFILES.preview), false);
+});
+
+test("Production receiver has isolated main, artifact, state, compose and health contracts", async () => {
+  const profile = RECEIVER_PROFILES.production;
+  assert.equal(profile.release.branch, "main");
+  assert.equal(profile.release.workflowPath, ".github/workflows/self-host-production.yml");
+  assert.equal(profile.artifactName, "ssartnership-production-release");
+  assert.equal(profile.schema.environment, "production");
+  assert.equal(profile.schema.project, "ssartnership-production-data");
+  assert.equal(profile.config.healthOrigin, "http://127.0.0.1:3110");
+  assert.match(profile.config.stateFile, /\/production\//u);
+  assert.match(profile.config.composeFile, /compose\.production\.yaml$/u);
+  const service = await readFile(new URL("../deploy/self-host-ci/ssartnership-production-receiver.service", import.meta.url), "utf8");
+  const timer = await readFile(new URL("../deploy/self-host-ci/ssartnership-production-receiver.timer", import.meta.url), "utf8");
+  assert.match(service, /receive-release\.mjs production/u);
+  assert.match(service, /ssartnership-ci\/heavy\.lock/u);
+  assert.match(timer, /Unit=ssartnership-production-receiver\.service/u);
+  assert.match(timer, /OnUnitActiveSec=5min/u);
+});
+
+test("Production receiver installer is fail-closed and enables only its timer", async () => {
+  const plan = productionReceiverInstallPlan();
+  assert.deepEqual(PRODUCTION_RECEIVER_UNITS, [
+    "ssartnership-production-receiver.service",
+    "ssartnership-production-receiver.timer",
+  ]);
+  assert.equal(plan.root, "/opt/ssartnership/control/current");
+  assert.equal(plan.timer, "ssartnership-production-receiver.timer");
+  assert.match(plan.stateRoot, /ssartnership-ci\/production$/u);
+  assert.match(plan.releaseRoot, /ssartnership-ci\/production\/releases$/u);
+  assert.throws(() => productionReceiverInstallPlan("/tmp/unreviewed"), /PRODUCTION_RECEIVER_CONTROL_ROOT_INVALID/u);
+  const installer = await readFile(new URL("../deploy/self-host-ci/install-production-receiver.mjs", import.meta.url), "utf8");
+  assert.match(installer, /readRootToken/u);
+  assert.match(installer, /readRootSchemaApproval/u);
+  assert.match(installer, /PRODUCTION_RECEIVER_CONTROL_VERSION_INVALID/u);
+  assert.match(installer, /\["enable", "--now", plan\.timer\]/u);
+  assert.doesNotMatch(installer, /systemctl[^\n]+start[^\n]+service/u);
+});
+
+test("Production receiver admits only the exact main workflow and Production artifact", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "ssartnership-production-receiver-"));
+  const profile = RECEIVER_PROFILES.production;
+  const productionManifest = {
+    ...manifest,
+    images: manifest.images.map((item) => ({ ...item, reference: `${imageReference(item.component, sha, RELEASE_PROFILES.production).split(":")[0]}@${digest}` })),
+  };
+  const productionRun = { ...run, head_branch: "main", path: profile.release.workflowPath };
+  const productionJobs = [
+    jobs[0],
+    { ...jobs[1], name: "Publish Verified Production Images", steps: jobs[1].steps.map((step) => ({ ...step, name: step.name === "Verify archives and current dev before publication" ? "Verify archives and current main before publication" : step.name })) },
+  ];
+  const bytes = await artifactBytes(productionManifest);
+  const calls: string[] = [];
+  const fetcher = async (url: RequestInfo | URL): Promise<Response> => {
+    const value = String(url); calls.push(value);
+    if (value.endsWith("/git/ref/heads/main")) return new Response(JSON.stringify({ object: { sha } }), { status: 200 });
+    if (value.endsWith(`/git/trees/${sha}`)) return new Response(JSON.stringify({ sha, truncated: false, tree: [{ path: "supabase", mode: "040000", type: "tree", sha: supabaseTree }] }), { status: 200 });
+    if (value.endsWith(`/git/trees/${supabaseTree}`)) return new Response(JSON.stringify({ sha: supabaseTree, truncated: false, tree: [{ path: "migrations", mode: "040000", type: "tree", sha: migrationTree }] }), { status: 200 });
+    if (value.includes("/self-host-production.yml/runs?branch=main&")) return new Response(JSON.stringify({ workflow_runs: [productionRun] }), { status: 200 });
+    if (value.endsWith("/jobs?per_page=100")) return new Response(JSON.stringify({ jobs: productionJobs }), { status: 200 });
+    if (value.endsWith("/artifacts?per_page=100")) return new Response(JSON.stringify({ artifacts: [{ name: profile.artifactName, expired: false, workflow_run: { id: 17 }, size_in_bytes: bytes.length, digest: `sha256:${createHash("sha256").update(bytes).digest("hex")}`, archive_download_url: "https://api.github.com/repos/MyKnow/ssartnership/actions/artifacts/2/zip" }] }), { status: 200 });
+    if (value.endsWith("/zip")) return new Response(bytes, { status: 200 });
+    throw new Error(`unexpected fetch: ${value}`);
+  };
+  const pulledId = `sha256:${randomBytes(32).toString("hex")}`;
+  const docker = async (args: string[]): Promise<{ stdout: string }> => args[0] === "image"
+    ? { stdout: JSON.stringify({ Id: pulledId, Os: "linux", Architecture: "amd64", Config: { Labels: { "org.opencontainers.image.revision": sha } }, RepoDigests: [productionManifest.images.find((item) => item.reference === args.at(-1))?.reference] }) }
+    : { stdout: "" };
+  const config = { ...profile.config, tokenFile: path.join(root, "token"), schemaApprovalFile: path.join(root, "schema.json"), stateFile: path.join(root, "state.json"), releaseRoot: path.join(root, "releases"), composeFile: path.join(root, "compose.yaml"), composeCwd: root, runtimeEnvFile: path.join(root, "app.env") };
+  try {
+    const result = await receiveRelease({ profile, config, fetcher, docker, readToken: async () => "t".repeat(40), readSchema: async () => ({ version: 1, repository: "MyKnow/ssartnership", environment: "production", project: "ssartnership-production-data", migrationTree, verifiedSourceSha: sha, migrationCount: 199, verifiedAt: "2026-09-20T00:00:00.000Z" }), deploy: async (image: string, previousImage: string | null) => ({ deployed: true, image, previousImage }), operator: true });
+    assert.equal(result.status, "deployed");
+    assert.ok(calls.some((value) => value.includes("self-host-production.yml/runs?branch=main")));
+    assert.ok(calls.every((value) => !value.includes("heads/dev") && !value.includes("self-host-preview.yml")));
+    const state = JSON.parse(await readFile(config.stateFile, "utf8"));
+    assert.equal(state.workflow, profile.release.workflowPath);
+  } finally { await rm(root, { recursive: true, force: true }); }
 });
 
 test("receiver independently verifies GitHub API, manifest, jobs and deploy callback", async () => {
@@ -122,7 +200,7 @@ test("receiver independently verifies GitHub API, manifest, jobs and deploy call
   };
   const config = { tokenFile, schemaApprovalFile: path.join(root, "schema.json"), stateFile: path.join(root, "state.json"), releaseRoot: path.join(root, "releases"), composeFile: path.join(root, "compose.yaml"), composeCwd: root, runtimeEnvFile: path.join(root, "app.env"), composeProject: "test", healthOrigin: "http://127.0.0.1:3108" };
   let approval = { version: 1, repository: "MyKnow/ssartnership", environment: "original-preview", project: "ssartnership-original-preview-34141078185", migrationTree, verifiedSourceSha: sha, migrationCount: 199, verifiedAt: "2026-09-08T00:00:00.000Z" };
-  const options = { config, fetcher, docker, readToken: async () => "t".repeat(40), readSchema: async () => approval, deploy: async () => ({ deployed: true, image: digest, previousImage: null }), operator: true, now: () => "2026-09-08T00:00:00.000Z" };
+  const options = { profile: RECEIVER_PROFILES.preview, config, fetcher, docker, readToken: async () => "t".repeat(40), readSchema: async () => approval, deploy: async () => ({ deployed: true, image: digest, previousImage: null }), operator: true, now: () => "2026-09-08T00:00:00.000Z" };
   try {
     const result = await receiveRelease(options);
     assert.equal(result.status, "deployed"); assert.equal(calls.filter((url) => url.includes("api.github.com")).length, 7); assert.ok(dockerCalls.some((args) => args[0] === "login"));

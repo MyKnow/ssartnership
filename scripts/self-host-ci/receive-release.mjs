@@ -6,14 +6,12 @@ import { mkdir, readFile, writeFile, lstat, realpath, rename, rm } from "node:fs
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { inflateRawSync } from "node:zlib";
-import { verifyRemoteJobs, verifyRemoteRelease } from "./github-contract.mjs";
+import { RELEASE_PROFILES, verifyRemoteJobs, verifyRemoteRelease } from "./github-contract.mjs";
 import { switchApplication } from "./deployment.mjs";
-import { readRootSchemaApproval, validateSchemaApproval, selectSchemaTree } from "./schema-approval.mjs";
+import { readRootSchemaApproval, SCHEMA_APPROVAL_PROFILES, validateSchemaApproval, selectSchemaTree } from "./schema-approval.mjs";
 
 const API_ORIGIN = "https://api.github.com";
 const REPOSITORY = "MyKnow/ssartnership";
-const WORKFLOW_PATH = ".github/workflows/self-host-preview.yml";
-const ARTIFACT_NAME = "ssartnership-preview-release";
 const SHA = /^[a-f0-9]{40}$/u;
 const HASH = /^sha256:[a-f0-9]{64}$/u;
 const MAX_API_BYTES = 4 * 1024 * 1024;
@@ -21,17 +19,51 @@ const MAX_ARTIFACT_BYTES = 64 * 1024 * 1024;
 const MAX_MANIFEST_BYTES = 128 * 1024;
 const requiresRootOwnership = process.getuid?.() === 0;
 
-export const RECEIVER_CONFIG = {
-  tokenFile: "/etc/myknow/secrets/ssartnership-original-preview/github-token",
-  schemaApprovalFile: "/etc/myknow/secrets/ssartnership-original-preview/schema-approval.json",
-  stateFile: "/var/lib/ssartnership-ci/original-preview/receiver-state.json",
-  releaseRoot: "/var/lib/ssartnership-ci/original-preview/releases",
-  composeFile: "/opt/ssartnership/control/current/deploy/self-host/compose.original-preview.yaml",
-  composeCwd: "/opt/ssartnership/control/current",
-  runtimeEnvFile: "/etc/myknow/secrets/ssartnership-original-preview/app.env",
-  composeProject: "ssartnership-original-preview",
-  healthOrigin: "http://127.0.0.1:3108",
-};
+export const RECEIVER_PROFILES = Object.freeze({
+  preview: Object.freeze({
+    name: "preview",
+    release: RELEASE_PROFILES.preview,
+    artifactName: RELEASE_PROFILES.preview.artifactName,
+    schema: SCHEMA_APPROVAL_PROFILES.preview,
+    config: Object.freeze({
+      tokenFile: "/etc/myknow/secrets/ssartnership-original-preview/github-token",
+      schemaApprovalFile: "/etc/myknow/secrets/ssartnership-original-preview/schema-approval.json",
+      stateFile: "/var/lib/ssartnership-ci/original-preview/receiver-state.json",
+      releaseRoot: "/var/lib/ssartnership-ci/original-preview/releases",
+      composeFile: "/opt/ssartnership/control/current/deploy/self-host/compose.original-preview.yaml",
+      composeCwd: "/opt/ssartnership/control/current",
+      runtimeEnvFile: "/etc/myknow/secrets/ssartnership-original-preview/app.env",
+      composeProject: "ssartnership-original-preview",
+      healthOrigin: "http://127.0.0.1:3108",
+    }),
+  }),
+  production: Object.freeze({
+    name: "production",
+    release: RELEASE_PROFILES.production,
+    artifactName: RELEASE_PROFILES.production.artifactName,
+    schema: SCHEMA_APPROVAL_PROFILES.production,
+    config: Object.freeze({
+      tokenFile: "/etc/myknow/secrets/ssartnership-production/github-token",
+      schemaApprovalFile: "/etc/myknow/secrets/ssartnership-production/schema-approval.json",
+      stateFile: "/var/lib/ssartnership-ci/production/receiver-state.json",
+      releaseRoot: "/var/lib/ssartnership-ci/production/releases",
+      composeFile: "/opt/ssartnership/control/current/deploy/self-host/compose.production.yaml",
+      composeCwd: "/opt/ssartnership/control/current",
+      runtimeEnvFile: "/etc/myknow/secrets/ssartnership-production/app.env",
+      composeProject: "ssartnership-production",
+      healthOrigin: "http://127.0.0.1:3110",
+    }),
+  }),
+});
+
+/** @typedef {typeof RECEIVER_PROFILES.preview | typeof RECEIVER_PROFILES.production} ReceiverProfile */
+
+export const RECEIVER_CONFIG = RECEIVER_PROFILES.preview.config;
+
+function approvedReceiverProfile(profile) {
+  if (!Object.values(RECEIVER_PROFILES).includes(profile)) fail("RECEIVER_PROFILE_INVALID");
+  return profile;
+}
 
 function fail(code) {
   throw new Error(code);
@@ -42,7 +74,7 @@ function assertAbsolutePath(file) {
   return file;
 }
 
-async function readRootToken(file) {
+export async function readRootToken(file) {
   assertAbsolutePath(file);
   const metadata = await lstat(file);
   if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.uid !== 0 || (metadata.mode & 0o077) !== 0 || metadata.size < 20 || metadata.size > 512) fail("RECEIVER_TOKEN_INVALID");
@@ -240,9 +272,9 @@ export function selectFirstAttemptRun(payload, sha) {
   return approved[0] ?? null;
 }
 
-function validateArtifactMetadata(artifacts, runId) {
+function validateArtifactMetadata(artifacts, runId, artifactName) {
   if (!Array.isArray(artifacts?.artifacts)) fail("RECEIVER_ARTIFACT_LIST_INVALID");
-  const matching = artifacts.artifacts.filter((artifact) => artifact?.name === ARTIFACT_NAME);
+  const matching = artifacts.artifacts.filter((artifact) => artifact?.name === artifactName);
   if (matching.length !== 1) fail("RECEIVER_ARTIFACT_AMBIGUOUS");
   const artifact = matching[0];
   if (artifact.expired || artifact.workflow_run?.id !== runId || typeof artifact.archive_download_url !== "string") fail("RECEIVER_ARTIFACT_NOT_APPROVED");
@@ -359,8 +391,9 @@ async function deployApp(image, previousImage, config, docker = dockerProcess, i
   return switchApplication({ composeArgs, cwd: config.composeCwd, nextImage: image, previousImage, origin: config.healthOrigin, environment: telemetry ? { SELF_HOST_TELEMETRY_IMAGE: telemetry.id } : {} }, run);
 }
 
-export function isSameApprovedRelease(previous, manifest) {
-  if (previous?.version !== 1 || previous.repository !== REPOSITORY || previous.workflow !== WORKFLOW_PATH
+/** @param {typeof RELEASE_PROFILES.preview | typeof RELEASE_PROFILES.production} [releaseProfile] */
+export function isSameApprovedRelease(previous, manifest, releaseProfile = RELEASE_PROFILES.preview) {
+  if (previous?.version !== 1 || previous.repository !== REPOSITORY || previous.workflow !== releaseProfile.workflowPath
     || previous.sha !== manifest.sha || previous.runId !== manifest.runId || previous.attempt !== 1
     || previous.platform !== manifest.platform || previous.sourceHash !== manifest.sourceHash
     || previous.manifestHash !== createHash("sha256").update(JSON.stringify(manifest)).digest("hex")
@@ -376,40 +409,53 @@ export function isSameApprovedRelease(previous, manifest) {
   return previous.appImage === previous.images.find((item) => item.component === "app")?.id;
 }
 
-export async function receiveRelease({ config = RECEIVER_CONFIG, fetcher = fetch, docker = dockerProcess, readToken = readRootToken, readSchema = readRootSchemaApproval, deploy = deployApp, now = () => new Date().toISOString(), operator = process.getuid?.() === 0 } = {}) {
+/**
+ * @param {{profile?: ReceiverProfile, config?: any, fetcher?: any, docker?: any, readToken?: any, readSchema?: any, deploy?: any, now?: any, operator?: boolean}} [options]
+ */
+export async function receiveRelease(options = {}) {
+  const { profile = RECEIVER_PROFILES.preview, config = profile.config, fetcher = fetch, docker = dockerProcess, readToken = readRootToken, readSchema = readRootSchemaApproval, deploy = deployApp, now = () => new Date().toISOString(), operator = process.getuid?.() === 0 } = options;
+  approvedReceiverProfile(profile);
   if (!operator) fail("RECEIVER_OPERATOR_REQUIRED");
   const token = await readToken(config.tokenFile);
-  const ref = await fetchApi("/repos/MyKnow/ssartnership/git/ref/heads/dev", token, fetcher);
+  const ref = await fetchApi(`/repos/MyKnow/ssartnership/git/ref/heads/${profile.release.branch}`, token, fetcher);
   const liveSha = ref?.object?.sha;
-  if (!SHA.test(liveSha)) fail("RECEIVER_DEV_REF_INVALID");
-  const runs = await fetchApi(`/repos/MyKnow/ssartnership/actions/workflows/self-host-preview.yml/runs?branch=dev&event=push&head_sha=${liveSha}&per_page=10`, token, fetcher);
+  if (!SHA.test(liveSha)) fail("RECEIVER_REF_INVALID");
+  const workflowName = path.basename(profile.release.workflowPath);
+  const runs = await fetchApi(`/repos/MyKnow/ssartnership/actions/workflows/${workflowName}/runs?branch=${profile.release.branch}&event=push&head_sha=${liveSha}&per_page=10`, token, fetcher);
   const run = selectFirstAttemptRun(runs, liveSha);
   if (!run) return { status: "pending", sha: liveSha };
   const jobs = await fetchApi(`/repos/MyKnow/ssartnership/actions/runs/${run.id}/jobs?per_page=100`, token, fetcher);
-  verifyRemoteJobs(jobs.jobs, { runId: run.id, sha: liveSha });
+  verifyRemoteJobs(jobs.jobs, { runId: run.id, sha: liveSha }, profile.release);
   // App-only deployment never applies database DDL. A trusted operator must
   // verify the deployed migration history before approving its exact Git tree.
   // Check even an unchanged release; persisted app state is not schema proof.
-  const schema = validateSchemaApproval(await readSchema(config.schemaApprovalFile));
+  const schema = validateSchemaApproval(await readSchema(config.schemaApprovalFile, profile.schema), profile.schema);
   const supabaseTree = selectSchemaTree(await fetchApi(`/repos/MyKnow/ssartnership/git/trees/${liveSha}`, token, fetcher), liveSha, "supabase");
   const migrationTree = selectSchemaTree(await fetchApi(`/repos/MyKnow/ssartnership/git/trees/${supabaseTree}`, token, fetcher), supabaseTree, "migrations");
   if (migrationTree !== schema.migrationTree) fail("RECEIVER_SCHEMA_NOT_APPROVED");
-  const artifact = validateArtifactMetadata(await fetchApi(`/repos/MyKnow/ssartnership/actions/runs/${run.id}/artifacts?per_page=100`, token, fetcher), run.id);
-  const manifest = verifyRemoteRelease(await parseReleaseArtifact(await fetchArtifact(artifact.archive_download_url, token, fetcher), artifact), run, liveSha);
+  const artifact = validateArtifactMetadata(await fetchApi(`/repos/MyKnow/ssartnership/actions/runs/${run.id}/artifacts?per_page=100`, token, fetcher), run.id, profile.artifactName);
+  const manifest = verifyRemoteRelease(await parseReleaseArtifact(await fetchArtifact(artifact.archive_download_url, token, fetcher), artifact), run, liveSha, profile.release);
   await saveManifest(config.releaseRoot, liveSha, manifest);
   const previous = await loadState(config.stateFile);
   const app = manifest.images.find((item) => item.component === "app");
   if (!app) fail("RECEIVER_APP_IMAGE_MISSING");
-  if (isSameApprovedRelease(previous, manifest)) return { status: "unchanged", sha: liveSha, image: previous.appImage };
+  if (isSameApprovedRelease(previous, manifest, profile.release)) return { status: "unchanged", sha: liveSha, image: previous.appImage };
   const images = await pullImages(manifest, token, docker);
   const appImage = images.find((item) => item.component === "app")?.id;
   if (!appImage) fail("RECEIVER_APP_IMAGE_MISSING");
   await deploy(appImage, previous?.appImage ?? null, config, docker, images);
-  const state = { version: 1, repository: REPOSITORY, workflow: WORKFLOW_PATH, sha: manifest.sha, runId: run.id, attempt: 1, platform: manifest.platform, sourceHash: manifest.sourceHash, manifestHash: createHash("sha256").update(JSON.stringify(manifest)).digest("hex"), appImage, images, appliedAt: now() };
+  const state = { version: 1, repository: REPOSITORY, workflow: profile.release.workflowPath, sha: manifest.sha, runId: run.id, attempt: 1, platform: manifest.platform, sourceHash: manifest.sourceHash, manifestHash: createHash("sha256").update(JSON.stringify(manifest)).digest("hex"), appImage, images, appliedAt: now() };
   await writeAtomic(config.stateFile, state);
   return { status: "deployed", sha: liveSha, image: appImage };
 }
 
 if (isMainModule()) {
-  receiveRelease().then((result) => process.stdout.write(`${JSON.stringify(result)}\n`)).catch(() => { process.stderr.write('{"error":"RECEIVER_FAILED"}\n'); process.exitCode = 1; });
+  const [profileName = "preview", ...unexpected] = process.argv.slice(2);
+  const profile = RECEIVER_PROFILES[profileName];
+  if (unexpected.length || !profile) {
+    process.stderr.write('{"error":"RECEIVER_PROFILE_INVALID"}\n');
+    process.exitCode = 1;
+  } else {
+    receiveRelease({ profile }).then((result) => process.stdout.write(`${JSON.stringify(result)}\n`)).catch(() => { process.stderr.write('{"error":"RECEIVER_FAILED"}\n'); process.exitCode = 1; });
+  }
 }

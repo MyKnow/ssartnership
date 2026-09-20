@@ -30,7 +30,7 @@ cloud 기능은 사용처와 운영 목적을 조사하여 자체 운영 대체�
 
 `vercel.json`의 UTC 일정을 이식 도구가 읽는다. 도구는 등록된 endpoint에만 Bearer 인증 GET을 보내고 redirect, timeout, non-2xx 응답을 실패로 처리한다. 반복 스케줄러 자체는 로컬 smoke에서 시작하지 않는다. 운영 전환 시 Vercel Cron 비활성화와 새 scheduler 활성화를 한 절차로 수행하며 중복 실행 여부를 로그로 검증한다.
 
-CI의 산출물은 source SHA와 연결된 OCI image다. 운영 CD는 이미지를 pull하고 liveness 확인 후 결과를 기록한다. 앱 롤백은 이전 digest 재적용으로 수행한다. 새 DB에 쓰기가 생겼다면 앱 이미지/DNS만 되돌리는 방식은 데이터 롤백이 아니며 별도 복구 절차가 필요하다.
+CI의 산출물은 source SHA와 연결된 OCI image다. `dev`와 `main`은 별도 workflow에서 각각 Preview·Production origin으로 빌드하며 환경별 tag와 manifest artifact를 사용한다. 운영 CD는 현재 branch의 첫 성공 attempt, 전체 필수 step, schema migration tree 승인과 immutable digest를 다시 확인한 뒤 app만 pull·교체하고 health 결과를 기록한다. 앱 롤백은 이전 digest 재적용으로 수행한다. 새 DB에 쓰기가 생겼다면 앱 이미지/DNS만 되돌리는 방식은 데이터 롤백이 아니며 별도 복구 절차가 필요하다.
 
 ## 검증 순서
 
