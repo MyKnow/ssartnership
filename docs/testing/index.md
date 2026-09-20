@@ -12,3 +12,6 @@ last_verified: 2026-08-29
 - [Storybook·Visual Baselines 운영](../operations/runbooks/storybook-visual-workflow.md)
 
 실행 가능한 테스트, package scripts, GitHub workflow가 현재 검증 동작의 최종 근거다. 문서는 어떤 계약을 왜 보존하는지 설명한다.
+
+- [위험에 따른 테스트 전략](./strategy.md)
+- [2026-09-20 전체 테스트 분류](./audits/2026-09-20-test-rationalization.md)

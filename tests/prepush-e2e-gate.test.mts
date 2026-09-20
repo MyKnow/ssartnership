@@ -82,7 +82,7 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
   );
 
   const pageSmoke = await readFile(
-    new URL("./e2e/page-smoke.spec.ts", import.meta.url),
+    new URL("./e2e/access-control.spec.ts", import.meta.url),
     "utf8",
   );
   const authOperations = await readFile(
@@ -105,18 +105,11 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
     new URL("./e2e/partner-image-carousel.spec.ts", import.meta.url),
     "utf8",
   );
-  const partnerDetailIntroduction = await readFile(
-    new URL("./e2e/partner-detail-introduction.spec.ts", import.meta.url),
-    "utf8",
-  );
   const pageReadyHelpers = await readFile(
     new URL("./e2e/page-ready.ts", import.meta.url),
     "utf8",
   );
   for (const criticalPath of [
-    "/",
-    "/auth/login",
-    "/partners/health-001",
     "/certification",
     "/partner",
     "/admin/login",
@@ -189,21 +182,6 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
       openAdminRouteHelper.indexOf("await waitForAdminShellHydration"),
   );
 
-  const responsiveTest = adminConsoleSpec.match(
-    /test\("keeps the registration queue inside narrow and wide viewports",[\s\S]*?\n  \}\);/,
-  )?.[0];
-  assert.ok(responsiveTest);
-  assert.equal(responsiveTest.match(/openAdminRoute\(/g)?.length, 1);
-  assert.match(
-    responsiveTest,
-    /openAdminRoute\(page, "\/admin\/partner-registrations"\)/,
-  );
-  assert.doesNotMatch(responsiveTest, /page\.reload\(|\.click\(/);
-  assert.ok(
-    responsiveTest.indexOf('openAdminRoute(page, "/admin/partner-registrations")') <
-      responsiveTest.indexOf("for (const width"),
-  );
-
   const adminShellView = await readFile(
     new URL("../src/components/admin/AdminShellView.tsx", import.meta.url),
     "utf8",
@@ -212,12 +190,9 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
   assert.match(adminShellView, /data-admin-hydrated=\{hydrated\}/);
 
   const pageSmokeSpec = await readFile(
-    new URL("./e2e/page-smoke.spec.ts", import.meta.url),
+    new URL("./e2e/access-control.spec.ts", import.meta.url),
     "utf8",
   );
-  const smokeHelper = pageSmokeSpec.match(
-    /async function visitSmokeRoute[\s\S]*?\n}/,
-  )?.[0];
   const memberRedirectHelper = pageSmokeSpec.match(
     /async function visitMemberRedirectRoute[\s\S]*?\n}/,
   )?.[0];
@@ -225,13 +200,8 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
     /async function visitPartnerRedirectRoute[\s\S]*?\n}/,
   )?.[0];
 
-  assert.ok(smokeHelper);
   assert.ok(memberRedirectHelper);
   assert.ok(partnerRedirectHelper);
-  assert.ok(
-    smokeHelper.indexOf("await expectNoNextError(page)") <
-      smokeHelper.indexOf('await page.waitForLoadState("load")'),
-  );
   assert.ok(
     memberRedirectHelper.indexOf("await expectNoNextError(page)") <
       memberRedirectHelper.indexOf('await page.waitForLoadState("load")'),
@@ -261,7 +231,7 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
     "utf8",
   );
   const publicPartnerNavigationTest = homePartnersSpec.match(
-    /test\("lists partners and opens a public partner detail page",[\s\S]*?\n  \}\);/,
+    /test\("@critical lists partners and opens a public partner detail page",[\s\S]*?\n  \}\);/,
   )?.[0];
   assert.ok(publicPartnerNavigationTest);
   assert.match(
@@ -290,7 +260,6 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
     partnerRegistration,
     graduateVerification,
     partnerImageCarousel,
-    partnerDetailIntroduction,
   ]) {
     assert.doesNotMatch(source, /waitForLoadState\("networkidle"\)/);
   }
@@ -298,11 +267,6 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
   assert.match(pageReadyHelpers, /document\.fonts\.ready/);
   assert.match(pageReadyHelpers, /Execution context was destroyed/);
   assert.match(pageReadyHelpers, /export async function waitForScrollStability/);
-  assert.match(
-    partnerDetailIntroduction,
-    /viewports\.forEach\(\(viewport\) => \{\s*test\(/,
-  );
-  assert.match(partnerDetailIntroduction, /await page\.goto\("\/partners\/health-001"\)/);
   assert.match(partnerImageCarousel, /await page\.goto\(partnerPath\)/);
   assert.match(partnerRegistration, /await page\.goto\("\/partner-registration"\)/);
   assert.match(graduateVerification, /await expect\(applyCropButton\)\.toBeEnabled\(\)/);

@@ -1,5 +1,8 @@
 import { COMPONENTS, SHA, HASH } from "./lib.mjs";
 
+// Reviewed suite after Issue #474. Exact test ID coverage is enforced by the runner.
+export const MINIMUM_E2E_TESTS = 76;
+
 export const GITHUB_REPOSITORY = "MyKnow/ssartnership";
 
 export const RELEASE_PROFILES = Object.freeze({
@@ -72,7 +75,7 @@ function envelope(value, context, profile) {
     || value.runId !== context.runId || !Number.isSafeInteger(value.runId) || value.runId <= 0 || value.attempt !== 1
     || value.platform !== "linux/amd64" || !HASH.test(value.sourceHash)) die("GITHUB_RELEASE_INVALID");
   keys(value.gate, ["tests", "failures", "errors", "skipped", "retries", "e2eRuntime", "fixtureBuildDeployable"]);
-  if (!Number.isSafeInteger(value.gate.tests) || value.gate.tests < 103 || ["failures", "errors", "skipped", "retries"].some(key => value.gate[key] !== 0)
+  if (!Number.isSafeInteger(value.gate.tests) || value.gate.tests < MINIMUM_E2E_TESTS || ["failures", "errors", "skipped", "retries"].some(key => value.gate[key] !== 0)
     || value.gate.e2eRuntime !== "production-test-only" || value.gate.fixtureBuildDeployable !== false) die("GITHUB_GATE_INVALID");
   if (!Array.isArray(value.images) || value.images.length !== COMPONENTS.length) die("GITHUB_IMAGES_INVALID");
 }

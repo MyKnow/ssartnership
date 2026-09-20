@@ -31,7 +31,7 @@ flock --nonblock --conflict-exit-code 75 /var/lib/ssartnership-ci/heavy.lock
 
 ### GitHub 빌드와 GHCR 게시
 
-`.github/workflows/self-host-preview.yml`은 `dev`, `.github/workflows/self-host-production.yml`은 `main` push만 대상으로 한다. GitHub-hosted Linux AMD64 build job은 exact commit의 검증된 Git archive만 container에 전달한다. 읽기 전용 root·capability 제거·5GiB/2CPU 제한을 적용하고 운영 비밀, SSH, registry 로그인, Docker socket과 원본 checkout 인증 설정을 전달하지 않는다. Production은 GitHub `Production` Environment의 공개 변수 `PRODUCTION_VAPID_PUBLIC_KEY`만 build step에 전달한다. 전체 Quick·실제 standalone build·별도 운영 모드 합성 E2E 103개 이상을 retry/skip/error 없이 통과하고 배포 산출물 fingerprint가 유지되어야 app·telemetry·DB 세 이미지를 포장한다. 기존 서버 rootless CI의 설정이나 제한은 바꾸지 않는다.
+`.github/workflows/self-host-preview.yml`은 `dev`, `.github/workflows/self-host-production.yml`은 `main` push만 대상으로 한다. GitHub-hosted Linux AMD64 build job은 exact commit의 검증된 Git archive만 container에 전달한다. 읽기 전용 root·capability 제거·5GiB/2CPU 제한을 적용하고 운영 비밀, SSH, registry 로그인, Docker socket과 원본 checkout 인증 설정을 전달하지 않는다. Production은 GitHub `Production` Environment의 공개 변수 `PRODUCTION_VAPID_PUBLIC_KEY`만 build step에 전달한다. 전체 Quick·실제 standalone build·별도 운영 모드 합성 E2E의 검토된 최소 개수 이상을 retry/skip/error 없이 통과하고 배포 산출물 fingerprint가 유지되어야 app·telemetry·DB 세 이미지를 포장한다. 기존 서버 rootless CI의 설정이나 제한은 바꾸지 않는다.
 
 게시 권한은 새 runner의 별도 job에만 있다. `github-release.mjs publish`는 archive의 크기·hash·경로·config/layer closure·플랫폼·revision을 검사해 승인 내용만 적재하고, 매 게시 직전과 최종 manifest 생성 전에 해당 환경의 live branch SHA를 다시 확인한다. Preview tag는 `dev-<SHA>`, Production tag는 `production-<SHA>`다. 의존성 설치나 이미지 실행은 하지 않는다. registry 자격증명은 게시 단계에서만 사용하고 마지막에 로그아웃한다. 이미지 묶음 artifact는 2일, digest manifest artifact는 30일 보존한다. fixture 이미지는 게시하지 않고 artifact digest 불일치는 오류로 처리한다. 부분 게시에는 최종 manifest가 없어 배포 승인으로 사용할 수 없다.
 
@@ -207,3 +207,7 @@ timer는 `OnUnitActiveSec=5min`과 최대 60초 분산 지연으로 동작한다
 스키마 tree가 달라지면 앱 수신은 차단된다. 다음 SQL 변경은 legacy Cloud Preview migration/sync 및 Supabase 자동 연동의 남은 writer를 먼저 조사하고, 백업·새 후보 복구·실제 migration 검증을 거쳐 home 승인 baseline을 갱신해야 한다. 승인 JSON의 hash만 바꾸거나 기존 migration 파일을 수정하는 방식은 허용하지 않는다. Preview와 Production의 승인 파일은 서로 대체할 수 없다.
 
 원본 Cloud는 삭제하지 않은 frozen 복구 기준선이다. 홈 서버 쓰기 이후의 복귀에는 변경분 조정이 필요하며 CONNECT grant와 DNS만 되돌리는 절차를 정상 rollback으로 사용하지 않는다. 원본의 수동 외부 cold backup/복원 성공은 상시 WAL/PITR·정기 외부 사본·독립 지역 복구의 완료 근거가 아니다. 운영 이미지 정리도 별도 보존 정책이 필요한 단계이며 `docker system prune` 또는 volume 삭제를 자동 수신기에 추가하지 않는다.
+
+## 테스트 정리와 수신기 호환성
+
+Issue #474는 비핵심 검사를 삭제하고 `github-contract.mjs`의 최소 개수를 76개로 조정한다. 실제 발견된 테스트 ID 전체와 결과의 일치, retry/skip/error 0 조건은 그대로 유지한다. 개수만으로 전체 실행을 증명하지 않는다. 기존 103개 기준의 운영 수신기는 새 manifest를 거부하므로 dev/main 통합 전 검증한 제어 소스 버전으로 교체한다. 이전 root-owned 제어 디렉터리와 symlink 대상을 보존하며 DB·비밀·schema 승인·Compose 설정을 변경하지 않는다.

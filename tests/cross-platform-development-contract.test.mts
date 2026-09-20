@@ -184,7 +184,6 @@ test("테스트 파일 URL과 비교 경로를 운영체제 중립적으로 처�
   const fileUrlBoundaryFiles = [
     "tests/alias-loader.mjs",
     "tests/auth-session-isolation.test.mts",
-    "tests/certification-card-responsive-contract.test.mts",
     "tests/mattermost-direct-reversion.test.mts",
     "tests/mattermost-signup-campus.test.mts",
     "tests/member-normalized-auth-contract.test.mts",

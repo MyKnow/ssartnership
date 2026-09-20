@@ -60,7 +60,7 @@ last_verified: 2026-08-29 # 실제로 재검증한 경우에만 선택적으로 
 - `status`: `current`, `active`, `completed`, `superseded`, `archived`
 - `authority`: `normative`, `descriptive`, `evidence`
 - `last_verified`: 코드·외부 상태와 다시 대조한 날짜. 이동이나 frontmatter 추가만으로 갱신하지 않는다.
-- `superseded_by`: `status: superseded`일 때 필요한 대체 문서의 저장소 상대 경로
+- `superseded_by`: `status: superseded`일 때 필요한 현재 문서 디렉터리 기준 대체 문서의 상대 경로
 - `source_paths`: 생성 문서를 도입할 때 원본 목록. 현재 수동 관리 문서에는 사용하지 않는다.
 
 허용 type은 `index`, `security-policy`, `product-contract`, `guide`, `requirement`, `feature-spec`, `implementation-plan`, `task-list`, `architecture`, `decision`, `exec-plan`, `tech-debt`, `runbook`, `design-system`, `test-guide`, `baseline`, `measurement`, `audit`, `report`, `history`다.
@@ -99,3 +99,11 @@ Issue에서 문제·범위 승인
 3. 코드·스키마·테스트보다 문서가 구현 사실의 우선순위를 잘못 주장하지 않는가.
 4. active/completed/superseded 상태와 실제 Issue/PR 상태가 모순되지 않는가.
 5. 링크와 경로 필터가 이동 뒤에도 유효한가.
+
+## 승인과 부분 검증
+
+필수 frontmatter는 기존 네 필드로 유지한다. 초안은 `active/descriptive`, 승인된 계약은 `current/normative`로 관리하고 본문에 승인 Issue/PR과 담당 역할을 적는다. 기존 필드 누락을 자동 승인·폐기로 해석하지 않는다. 별도 approval 상태 기계를 추가하지 않는다.
+
+`last_verified`는 문서 전체를 대조했을 때만 갱신한다. 일부 절만 확인했다면 본문에 절·커밋·확인 범위를 기록한다. 요구/화면 문서에는 검증 방법을, tasks·감사에는 실제 실행 결과를 두고 링크한다. 새 정책·요구 ID는 여러 곳에서 참조하는 계약에만 부여한다.
+
+이관은 전체 파일 목록을 먼저 만들고 변경된 내용만 절 단위 목적지·보존·충돌을 기록한다. 대표 흐름을 먼저 검증한 뒤 반복적으로 필요한 형식만 자동 검사로 확장한다. 템플릿과 예제 자체를 현행 정책으로 집계하지 않는다.

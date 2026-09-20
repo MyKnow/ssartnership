@@ -27,21 +27,6 @@ async function assertHeaderFits(page: Page, count: number) {
   expect(header!.height).toBe(spacer!.height);
 }
 
-for (const signedIn of [false, true]) {
-  test(`${signedIn ? "member" : "guest"} header stays compact across responsive boundaries`, async ({ page }) => {
-    await home(page, signedIn);
-    for (const width of [320, 360, 390, 767, 768, 804, 820, 1279, 1280, 1366]) {
-      await page.setViewportSize({ width, height: width === 804 ? 740 : 900 });
-      await assertHeaderFits(page, signedIn ? 3 : 2);
-      await expect(page.getByRole("banner").getByRole("link", { name: signedIn ? "내 인증" : "혜택 검색" })).toBeVisible();
-      await page.getByRole("banner").screenshot({ path: `.tmp/ui-qa/issue-463-header/${signedIn ? "member" : "guest"}-header-${width}.png`, animations: "disabled" });
-      if ([360, 820, 1366].includes(width)) {
-        await page.screenshot({ path: `.tmp/ui-qa/issue-463-header/${signedIn ? "member" : "guest"}-page-${width}.png`, animations: "disabled" });
-      }
-    }
-  });
-}
-
 test("menu keeps account destinations, keyboard focus and theme controls", async ({ page }) => {
   await home(page, true);
   // 메뉴 이동 검사가 개발 서버의 최초 설정 페이지 컴파일을 기다리지 않도록 준비합니다.

@@ -71,27 +71,6 @@ test.describe("authenticated administrator console", () => {
     await expect(searchInput).toHaveValue("싸피");
   });
 
-  test("keeps the registration queue inside narrow and wide viewports", async ({ page }) => {
-    await page.setViewportSize({ width: 320, height: 900 });
-    await openAdminRoute(page, "/admin/partner-registrations");
-    await expect(
-      page.getByRole("heading", { name: "제휴 등록 신청 검토", exact: true }),
-    ).toBeVisible({ timeout: 15_000 });
-
-    for (const width of [320, 360, 390, 820, 1366]) {
-      await page.setViewportSize({ width, height: 900 });
-
-      const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth > window.innerWidth + 1,
-      );
-      expect(overflow, `horizontal overflow at ${width}px`).toBe(false);
-      await page.screenshot({
-        path: `.tmp/ui-qa/admin-partner-registrations-${width}.png`,
-        fullPage: true,
-      });
-    }
-  });
-
   test("traps mobile drawer focus and restores focus to its opener", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openAdminRoute(page, "/admin/members");

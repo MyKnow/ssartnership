@@ -7,7 +7,7 @@ const sha = "a".repeat(40), hash = "b".repeat(64);
 const environment = { GITHUB_ACTIONS: "true", GITHUB_REPOSITORY: "MyKnow/ssartnership", GITHUB_EVENT_NAME: "push", GITHUB_REF: "refs/heads/dev", GITHUB_SHA: sha, GITHUB_RUN_ID: "123", GITHUB_RUN_ATTEMPT: "1", GITHUB_WORKFLOW_REF: "MyKnow/ssartnership/.github/workflows/self-host-preview.yml@refs/heads/dev" };
 const profile = RELEASE_PROFILES.preview;
 const context = githubContext(environment, profile);
-const bundle = (selected = profile) => ({ version: 1, ...context, platform: "linux/amd64", sourceHash: hash, gate: { tests: 103, failures: 0, errors: 0, skipped: 0, retries: 0, e2eRuntime: "production-test-only", fixtureBuildDeployable: false }, images: ["app", "telemetry", "database"].map(component => ({ component, tag: imageReference(component, sha, selected), id: `sha256:${hash}`, archive: `${component}.tar`, hash })) });
+const bundle = (selected: typeof RELEASE_PROFILES[keyof typeof RELEASE_PROFILES] = profile) => ({ version: 1, ...context, platform: "linux/amd64", sourceHash: hash, gate: { tests: 103, failures: 0, errors: 0, skipped: 0, retries: 0, e2eRuntime: "production-test-only", fixtureBuildDeployable: false }, images: ["app", "telemetry", "database"].map(component => ({ component, tag: imageReference(component, sha, selected), id: `sha256:${hash}`, archive: `${component}.tar`, hash })) });
 test("gate modules remain readable by arbitrary nonroot users after private source extraction", () => {
   const dockerfile = readFileSync(new URL("../deploy/self-host-ci/Dockerfile", import.meta.url), "utf8");
   const copies = dockerfile.split("\n").filter(line => line.startsWith("COPY ") && line.includes("/opt/ssartnership/"));
@@ -96,4 +96,15 @@ test("green aggregate cannot admit missing, skipped, retried or failed publicati
   }
   const duplicate = structuredClone(jobs); duplicate[1].steps.push(duplicate[1].steps[2]);
   assert.throws(() => verifyRemoteJobs(duplicate, context, profile));
+});
+
+test("reviewed critical suite floor accepts the reduced inventory and rejects partial bundles", () => {
+  for (const selected of Object.values(RELEASE_PROFILES)) {
+    const complete = bundle(selected);
+    complete.gate.tests = 76;
+    assert.doesNotThrow(() => validateBundle(complete, context, selected));
+    for (const count of [0, 1, 75, 75.5, NaN]) {
+      assert.throws(() => validateBundle({ ...complete, gate: { ...complete.gate, tests: count } }, context, selected), /GITHUB_GATE_INVALID/);
+    }
+  }
 });
