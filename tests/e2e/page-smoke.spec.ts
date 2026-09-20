@@ -42,10 +42,7 @@ test.describe("page smoke coverage", () => {
   });
 
   test.describe("protected page redirects", () => {
-    for (const route of [
-      ...memberProtectedRoutes,
-      ...partnerProtectedRoutes,
-    ]) {
+    for (const route of memberProtectedRoutes) {
       test(
         criticalTitle(
           route.path,
@@ -53,7 +50,19 @@ test.describe("page smoke coverage", () => {
           criticalRedirectPaths,
         ),
         async ({ page }) => {
-          await visitRedirectRoute(page, route);
+          await visitMemberRedirectRoute(page, route);
+        },
+      );
+    }
+    for (const route of partnerProtectedRoutes) {
+      test(
+        criticalTitle(
+          route.path,
+          `redirects ${route.path}`,
+          criticalRedirectPaths,
+        ),
+        async ({ request }) => {
+          await visitPartnerRedirectRoute(request, route);
         },
       );
     }
@@ -80,7 +89,7 @@ async function visitSmokeRoute(page: Page, route: SmokeRoute) {
   await page.waitForLoadState("load");
 }
 
-async function visitRedirectRoute(page: Page, route: RedirectRoute) {
+async function visitMemberRedirectRoute(page: Page, route: RedirectRoute) {
   const response = await page.goto(route.path);
 
   expect(response?.status(), route.path).toBeLessThan(500);
@@ -89,6 +98,18 @@ async function visitRedirectRoute(page: Page, route: RedirectRoute) {
   );
   await expectNoNextError(page);
   await page.waitForLoadState("load");
+}
+
+async function visitPartnerRedirectRoute(
+  request: APIRequestContext,
+  route: RedirectRoute,
+) {
+  const response = await request.get(route.path, { maxRedirects: 0 });
+
+  expect([302, 303, 307, 308], route.path).toContain(response.status());
+  expect(response.headers().location ?? "", route.path).toContain(
+    route.expectedPath,
+  );
 }
 
 async function visitAdminGuardRoute(

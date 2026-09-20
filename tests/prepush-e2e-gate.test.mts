@@ -218,20 +218,27 @@ test("change-aware prepush stays tiered while promotion gates own browser covera
   const smokeHelper = pageSmokeSpec.match(
     /async function visitSmokeRoute[\s\S]*?\n}/,
   )?.[0];
-  const redirectHelper = pageSmokeSpec.match(
-    /async function visitRedirectRoute[\s\S]*?\n}/,
+  const memberRedirectHelper = pageSmokeSpec.match(
+    /async function visitMemberRedirectRoute[\s\S]*?\n}/,
+  )?.[0];
+  const partnerRedirectHelper = pageSmokeSpec.match(
+    /async function visitPartnerRedirectRoute[\s\S]*?\n}/,
   )?.[0];
 
   assert.ok(smokeHelper);
-  assert.ok(redirectHelper);
+  assert.ok(memberRedirectHelper);
+  assert.ok(partnerRedirectHelper);
   assert.ok(
     smokeHelper.indexOf("await expectNoNextError(page)") <
       smokeHelper.indexOf('await page.waitForLoadState("load")'),
   );
   assert.ok(
-    redirectHelper.indexOf("await expectNoNextError(page)") <
-      redirectHelper.indexOf('await page.waitForLoadState("load")'),
+    memberRedirectHelper.indexOf("await expectNoNextError(page)") <
+      memberRedirectHelper.indexOf('await page.waitForLoadState("load")'),
   );
+  assert.match(partnerRedirectHelper, /request\.get\(route\.path, \{ maxRedirects: 0 \}\)/u);
+  assert.match(partnerRedirectHelper, /\[302, 303, 307, 308\]/u);
+  assert.doesNotMatch(partnerRedirectHelper, /page\.goto|waitForLoadState/u);
   assert.doesNotMatch(pageSmokeSpec, /waitForLoadState\("networkidle"/);
   assert.doesNotMatch(pageSmokeSpec, /test\.afterEach/);
 
