@@ -13,6 +13,10 @@ export const PRODUCTION_RECEIVER_UNITS = Object.freeze([
   "ssartnership-production-receiver.timer",
 ]);
 
+export function isInstallerMainModule(argvPath = process.argv[1], moduleUrl = import.meta.url) {
+  return isMainModule(argvPath, moduleUrl);
+}
+
 function fail(code) {
   throw new Error(code);
 }
@@ -97,7 +101,7 @@ export async function installProductionReceiver({
   return { installed: true, timer: plan.timer, firstPoll: "scheduled", databaseMigrationsApplied: false };
 }
 
-if (isMainModule()) {
+if (isInstallerMainModule()) {
   installProductionReceiver()
     .then((result) => process.stdout.write(`${JSON.stringify(result)}\n`))
     .catch(() => { process.stderr.write('{"error":"PRODUCTION_RECEIVER_INSTALL_FAILED"}\n'); process.exitCode = 1; });
