@@ -27,6 +27,8 @@ services:
     tmpfs:
       - /tmp:mode=1777
     networks: [original_edge]
+    # Config validation does not prove the listener or certificates are live;
+    # the host systemd timer performs the local SNI/TLS handshake check.
     healthcheck:
       test: [CMD, caddy, validate, --config, /etc/caddy/Caddyfile, --adapter, caddyfile]
       interval: 30s

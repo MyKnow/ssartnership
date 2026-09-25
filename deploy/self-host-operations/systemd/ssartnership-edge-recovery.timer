@@ -1,0 +1,12 @@
+[Unit]
+Description=Check and recover the SSAFY Partnership public edge
+
+[Timer]
+OnBootSec=60s
+OnUnitActiveSec=60s
+AccuracySec=5s
+Persistent=false
+Unit=ssartnership-edge-recovery.service
+
+[Install]
+WantedBy=timers.target

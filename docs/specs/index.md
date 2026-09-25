@@ -3,7 +3,7 @@ title: 기능 명세 인덱스
 type: index
 status: current
 authority: normative
-last_verified: 2026-08-29
+last_verified: 2026-09-25
 ---
 
 # 기능 명세 인덱스
@@ -20,6 +20,7 @@ last_verified: 2026-08-29
 
 - [자체 호스팅 마이그레이션](./self-hosting/spec.md) — Issue #435, active
 - [자체 호스팅 데이터와 운영 복구](./self-host-database/spec.md) — Issue #435, active
+- [자체 호스팅 공개 edge 복구](./self-host-edge-recovery/spec.md) — Issue #478, active
 - [Apple Wallet 회원 인증 패스](./301-apple-wallet-member-pass/spec.md) — Issue #301, active
 - [관리자 콘솔 계약](./205-admin-console/spec.md) — implemented current contract
 - [수료생 증명서·프로필 사진 인증](./graduate-verification/spec.md) — implemented current contract
