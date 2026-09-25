@@ -17,6 +17,8 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { localPromotionFixtures } from "@/lib/mock/promotions";
+import { projectShowcaseRepository } from "@/lib/project-showcase";
+import { getShowcasePhase, PROJECT_SHOWCASE_SLUG, type ShowcasePhase } from "@/lib/project-showcase/types";
 
 type PromotionEventRow = {
   id: string;
@@ -448,11 +450,16 @@ export function canViewPromotionSlide(
   return true;
 }
 
+/**
+ * `externalEventVisibility` covers event pages that are not promotion campaigns
+ * (e.g. the project showcase), keyed by event slug.
+ */
 export function canDisplayHomePromotionSlide(
   slide: ManagedPromotionSlide,
   viewer: PromotionSlideViewer,
   campaignsBySlug: ReadonlyMap<string, ManagedEventCampaign>,
   now: Date = new Date(),
+  externalEventVisibility: ReadonlyMap<string, boolean> = new Map(),
 ) {
   if (!slide.isActive || !canViewPromotionSlide(slide, viewer)) {
     return false;
@@ -460,7 +467,29 @@ export function canDisplayHomePromotionSlide(
   if (!slide.eventSlug) {
     return true;
   }
+  const externalVisibility = externalEventVisibility.get(slide.eventSlug);
+  if (externalVisibility !== undefined) {
+    return externalVisibility;
+  }
   return isPromotionCampaignVisible(campaignsBySlug.get(slide.eventSlug) ?? null, now);
+}
+
+const SHOWCASE_PROMOTED_PHASES: ReadonlySet<ShowcasePhase> = new Set([
+  "upcoming",
+  "submission",
+  "reviewing",
+  "experience",
+  "verification",
+  "announcement",
+]);
+
+async function getExternalEventVisibility(now: Date) {
+  try {
+    const event = await projectShowcaseRepository.getEvent();
+    return new Map([[PROJECT_SHOWCASE_SLUG, SHOWCASE_PROMOTED_PHASES.has(getShowcasePhase(event, now))]]);
+  } catch {
+    return new Map([[PROJECT_SHOWCASE_SLUG, false]]);
+  }
 }
 
 async function loadManagedEventCampaigns(options?: {
@@ -519,13 +548,15 @@ export const getManagedEventCampaign = cache(async (slug: string) => {
 export async function getHomePromotionSlides(
   viewer: PromotionSlideViewer = { authenticated: false, year: null, campus: null },
 ): Promise<PromotionSlide[]> {
-  const [slides, campaigns] = await Promise.all([
+  const now = new Date();
+  const [slides, campaigns, externalEventVisibility] = await Promise.all([
     listManagedPromotionSlides({ includeInactive: false }),
     listManagedEventCampaigns({ includeInactive: true }),
+    getExternalEventVisibility(now),
   ]);
   const campaignsBySlug = new Map(campaigns.map((campaign) => [campaign.slug, campaign]));
   return slides
-    .filter((slide) => canDisplayHomePromotionSlide(slide, viewer, campaignsBySlug))
+    .filter((slide) => canDisplayHomePromotionSlide(slide, viewer, campaignsBySlug, now, externalEventVisibility))
     .map((slide) => ({
       id: slide.id,
       title: slide.title,

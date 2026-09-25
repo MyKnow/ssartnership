@@ -125,6 +125,12 @@ const nextConfig: NextConfig = {
       {
         pathname: "/install-guides/**",
       },
+      {
+        pathname: "/ads/project-showcase-banner.png",
+      },
+      {
+        pathname: "/ads/project-showcase.png",
+      },
     ],
   },
   async headers() {

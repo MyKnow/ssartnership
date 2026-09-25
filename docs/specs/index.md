@@ -26,3 +26,4 @@ last_verified: 2026-09-25
 - [수료생 증명서·프로필 사진 인증](./graduate-verification/spec.md) — implemented current contract
 
 - [문서 책임·테스트 정비](./documentation-architecture/spec.md) — Issue #474
+- [SSAFY 프로젝트 쇼케이스·체험 이벤트](./project-showcase-event/spec.md) — Issue #480, active

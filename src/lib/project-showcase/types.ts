@@ -1,0 +1,178 @@
+export const PROJECT_SHOWCASE_SLUG = "project-showcase";
+
+export const SHOWCASE_PROJECT_TYPES = ["web", "app", "game", "embedded"] as const;
+export type ShowcaseProjectType = (typeof SHOWCASE_PROJECT_TYPES)[number];
+
+export const SHOWCASE_PROJECT_STATUSES = [
+  "pending",
+  "approved",
+  "changes_requested",
+  "rejected",
+  "hidden",
+  "withdrawn",
+] as const;
+export type ShowcaseProjectStatus = (typeof SHOWCASE_PROJECT_STATUSES)[number];
+export type ShowcaseReviewStatus = Extract<
+  ShowcaseProjectStatus,
+  "approved" | "changes_requested" | "rejected" | "hidden"
+>;
+
+export type ShowcasePhase =
+  | "setup"
+  | "paused"
+  | "upcoming"
+  | "submission"
+  | "reviewing"
+  | "experience"
+  | "verification"
+  | "announcement"
+  | "closed";
+
+export type ShowcaseCandidateGroup = "submitter" | "experiencer";
+
+export type ShowcaseEvent = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  heroImageSrc: string;
+  submissionStartAt: string | null;
+  submissionEndAt: string | null;
+  experienceStartAt: string | null;
+  experienceEndAt: string | null;
+  announcementStartAt: string | null;
+  announcementEndAt: string | null;
+  submitterSelectionCount: number;
+  experiencerSelectionCount: number;
+  isActive: boolean;
+};
+
+export type ShowcaseProjectCounts = {
+  viewCount: number;
+  experienceCount: number;
+  validExperienceCount: number;
+  interestCount: number;
+};
+
+export type ShowcaseProject = ShowcaseProjectCounts & {
+  id: string;
+  eventId: string;
+  projectType: ShowcaseProjectType;
+  title: string;
+  teamName: string | null;
+  summary: string;
+  description: string;
+  imageUrl: string;
+  serviceUrl: string;
+  status: ShowcaseProjectStatus;
+  ownerMemberId: string;
+  createdAt: string;
+};
+
+export type ShowcaseProjectParticipant = {
+  name: string;
+  studentNumber: string;
+  isOwner: boolean;
+};
+
+export type ShowcaseOwnerProject = ShowcaseProject & {
+  participants: ShowcaseProjectParticipant[];
+  reviewNote: string | null;
+  updatedAt: string;
+};
+
+export type ShowcaseTeammateInput = {
+  name: string;
+  studentNumber: string;
+};
+
+export type ShowcaseProjectSubmission = {
+  projectType: ShowcaseProjectType;
+  title: string;
+  teamName: string | null;
+  summary: string;
+  description: string;
+  serviceUrl: string;
+  ownerStudentNumber: string;
+  teammates: ShowcaseTeammateInput[];
+  imageUploadId: string | null;
+  participantsConsent: true;
+  announcementConsent: true;
+};
+
+export function isShowcaseProjectType(value: unknown): value is ShowcaseProjectType {
+  return SHOWCASE_PROJECT_TYPES.includes(value as ShowcaseProjectType);
+}
+
+export function isShowcaseProjectStatus(value: unknown): value is ShowcaseProjectStatus {
+  return SHOWCASE_PROJECT_STATUSES.includes(value as ShowcaseProjectStatus);
+}
+
+function toTime(value: string | null) {
+  if (!value) return null;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : null;
+}
+
+export function getShowcasePhase(event: ShowcaseEvent | null, now = new Date()): ShowcasePhase {
+  const submissionStart = toTime(event?.submissionStartAt ?? null);
+  const submissionEnd = toTime(event?.submissionEndAt ?? null);
+  const experienceStart = toTime(event?.experienceStartAt ?? null);
+  const experienceEnd = toTime(event?.experienceEndAt ?? null);
+  const announcementStart = toTime(event?.announcementStartAt ?? null);
+  if (!event || submissionStart === null || submissionEnd === null || experienceStart === null
+      || experienceEnd === null || announcementStart === null) {
+    return "setup";
+  }
+  if (!event.isActive) return "paused";
+
+  const announcementEnd = toTime(event.announcementEndAt) ?? Number.POSITIVE_INFINITY;
+  const timestamp = now.getTime();
+  if (timestamp < submissionStart) return "upcoming";
+  if (timestamp < submissionEnd) return "submission";
+  if (timestamp < experienceStart) return "reviewing";
+  if (timestamp < experienceEnd) return "experience";
+  if (timestamp < announcementStart) return "verification";
+  if (timestamp < announcementEnd) return "announcement";
+  return "closed";
+}
+
+export type ShowcaseMilestone = {
+  label: string;
+  at: string;
+};
+
+/** The next scheduled boundary a visitor should know about, if any. */
+export function getShowcaseNextMilestone(
+  event: ShowcaseEvent | null,
+  phase = getShowcasePhase(event),
+): ShowcaseMilestone | null {
+  if (!event) return null;
+  const milestones: Partial<Record<ShowcasePhase, ShowcaseMilestone | null>> = {
+    upcoming: event.submissionStartAt ? { label: "출품 시작", at: event.submissionStartAt } : null,
+    submission: event.submissionEndAt ? { label: "출품 마감", at: event.submissionEndAt } : null,
+    reviewing: event.experienceStartAt ? { label: "체험 시작", at: event.experienceStartAt } : null,
+    experience: event.experienceEndAt ? { label: "체험 마감", at: event.experienceEndAt } : null,
+    verification: event.announcementStartAt ? { label: "결과 발표", at: event.announcementStartAt } : null,
+  };
+  return milestones[phase] ?? null;
+}
+
+export function maskShowcaseName(name: string) {
+  const first = Array.from(name.trim())[0];
+  return `${first ?? "참"}**`;
+}
+
+export function maskShowcaseStudentNumber(studentNumber: string) {
+  const digits = studentNumber.trim();
+  if (digits.length < 4) return "****";
+  return `${digits.slice(0, 2)}****${digits.slice(-2)}`;
+}
+
+export function canOwnerEditShowcaseProject(status: ShowcaseProjectStatus, phase: ShowcasePhase) {
+  return phase === "submission" && (status === "pending" || status === "changes_requested");
+}
+
+export function canOwnerWithdrawShowcaseProject(status: ShowcaseProjectStatus, phase: ShowcasePhase) {
+  return phase === "submission" && status !== "withdrawn";
+}

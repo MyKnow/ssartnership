@@ -25,6 +25,7 @@ last_verified: 2026-08-29
 - [공개·회원 화면](./screen-specs/public-and-member.md)
 - [인증 화면](./screen-specs/auth.md)
 - [수료생 인증 화면](./screen-specs/graduate-verification.md)
+- [프로젝트 쇼케이스 이벤트 화면](./screen-specs/project-showcase.md)
 - [파트너 포털](./screen-specs/partner.md)
 - [관리자 화면](./screen-specs/admin.md)
 

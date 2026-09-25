@@ -16,6 +16,7 @@ authority: normative
 - [공개·회원 화면](./public-and-member.md)
 - [인증 화면](./auth.md)
 - [수료생 증명서·본인 사진 인증](./graduate-verification.md)
+- [프로젝트 쇼케이스 이벤트](./project-showcase.md)
 - [파트너 포털](./partner.md)
 - [관리자 화면](./admin.md)
 - [관리자 기능·UI/UX 구현 명세](../../specs/205-admin-console/spec.md)
