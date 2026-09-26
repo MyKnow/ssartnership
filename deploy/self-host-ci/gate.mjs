@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fingerprintDeployableArtifact } from "/work/scripts/self-host-ci/production-e2e-profile.mjs";
+import { labBuildKey } from "/work/scripts/build-lab/cache-keys.mjs";
 
 mkdirSync(process.env.HOME, { recursive: true, mode: 0o700 });
 const productionFixture = ["mac-amd64", "github-amd64"].includes(process.env.CI_EXECUTION_PROFILE);
@@ -14,7 +15,7 @@ const steps = [
   ["npm", ["run", "check:docs"]],
   ["npm", ["run", "verify:quick"]],
   ["node", ["deploy/self-host/write-build-env-manifest.mjs", "/work/.self-host-build/build-env.json"], publicBuild],
-  ["npm", ["run", "build"], publicBuild],
+  ["npm", ["run", "build"], { ...publicBuild, ...labBuildKey("/work", "real") }],
   ...(productionFixture
     ? [["node", ["scripts/self-host-ci/build-production-e2e.mjs"]]] : []),
   // Same config, projects, full suite and zero retries as test:e2e:ci. Use the

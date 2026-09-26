@@ -46,6 +46,7 @@ def main():
     p.add_argument('--memory-mib', type=int, choices=[4096, 5120, 6144], required=True)
     p.add_argument('--run-id', required=True)
     p.add_argument('--warm-from')
+    p.add_argument('--stable-lab-cache', action='store_true')
     args = p.parse_args()
     if not re.fullmatch(r'[a-z0-9][a-z0-9-]{1,60}', args.run_id):
         p.error('invalid run id')
@@ -61,15 +62,30 @@ def main():
     cache_started = time.monotonic()
     if args.warm_from:
         previous = cache_sources(root, args.warm_from)
+        previous_result = json.loads((previous.parent / 'result.json').read_text())
+        if bool(previous_result.get('stableLabCache', False)) != args.stable_lab_cache:
+            raise ValueError('Warm cache optimization mode mismatch')
         for relative in ('.tmp/install-state/cache', '.next/cache', '.next-e2e/cache'):
             source = previous / relative
             if source.is_dir():
                 shutil.copytree(source, work / relative)
+        if args.stable_lab_cache:
+            keys = previous / '.tmp/build-lab-keys'
+            if keys.is_symlink() or not keys.is_dir():
+                raise ValueError('Lab cache keys unavailable')
+            for name in ('real.key', 'fixture.key'):
+                key = keys / name
+                if key.is_symlink() or not key.is_file() or key.stat().st_size != 44:
+                    raise ValueError('Invalid lab cache key file')
+            shutil.copytree(keys, work / '.tmp/build-lab-keys')
     cache_prepare_seconds = round(time.monotonic() - cache_started, 3)
     name = 'ssartnership-lab-' + args.run_id
     command = ['sudo', '-n', 'docker', 'run', '--name', name, '--init', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--user', f'{os.getuid()}:{os.getgid()}', '--pids-limit', '1024', '--memory', f'{args.memory_mib}m', '--memory-swap', f'{args.memory_mib}m', '--cpus', str(args.cpus), '--tmpfs', '/tmp:mode=1777,size=512m', '--shm-size', '256m', '--env', 'CI_EXECUTION_PROFILE=github-amd64', '--env', 'CI_BUILD_SITE_ORIGIN=' + SITE_ORIGIN, '--env', 'CI_BUILD_SUPABASE_ORIGIN=' + API_ORIGIN, '--env', 'CI_BUILD_VAPID_PUBLIC_KEY=', '--mount', f'type=bind,src={work},dst=/work', GATE_IMAGE]
     evidence = {'sha': BASE_SHA, 'archiveSha256': BASE_ARCHIVE_HASH, 'runId': args.run_id, 'cpus': args.cpus, 'memoryMiB': args.memory_mib, 'cache': 'fresh-workspace-no-npm-or-next-cache; gate-image-prebuilt; host-page-cache-uncontrolled', 'startedAt': time.time(), 'peakContainerMemoryBytes': 0, 'peakGuestUsedMemoryBytes': 0}
     evidence.update(cacheMode='warm' if args.warm_from else 'cold', warmFrom=args.warm_from, cachePrepareSeconds=cache_prepare_seconds, protocolVersion=2)
+    evidence['stableLabCache'] = args.stable_lab_cache
+    if args.stable_lab_cache:
+        command[-1:-1] = ['--env', 'SSARTNERSHIP_BUILD_LAB_CACHE=1']
     if args.warm_from:
         evidence['cache'] = 'same-SHA npm and both Next caches copied; new node_modules and outputs; gate-image-prebuilt; host-page-cache-uncontrolled'
     stop = threading.Event()

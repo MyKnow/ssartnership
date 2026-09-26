@@ -27,11 +27,13 @@ authority: normative
 - archive SHA-256: `27846014a638fc7305200918867ded81f3421601c14eefcdc0981ca546e65af9`.
 - 사전 준비 gate image: `sha256:7b7ecbe44b645fcf39fe23833c238616322b7e7292ecec8fc42913b88b7ed0da`.
 - 기존 production/preview·dev/main 배포·도메인·공유기·운영 DB·운영 비밀값은 변경하지 않는다.
-- 원본 checkout의 미추적 사용자 파일은 보존한다. 첫 기반 코드 publication을 준비 중이며 PR과 자동 제어기 활성화는 아직 없다.
+- 원본 checkout의 미추적 사용자 파일은 보존한다. 기반 코드 `81dc3a368adcf2fa74d88aa3f2deeabbd175667e`를 실험 브랜치에 push했고 원격 SHA 일치를 확인했다. 해당 SHA의 Actions/check runs/status contexts는 모두 0개이며 PR과 자동 제어기 활성화는 아직 없다.
 
 ## 2026-09-27 현재 측정
 
 PVE host의 `build-lab-497-resource-matrix.service`가 실제 VM 할당량을 비교한다. 최초 확인 MainPID는 15715다. 재개 시 동일 unit·PID·결과를 먼저 확인하고 중복 실행하지 않는다. VM 4970을 정상 종료한 뒤 2/4/8 vCPU 및 6144 MiB로 바꾸며, 각 조건에서 cold/warm 3회씩 실행한다. gate 컨테이너는 5120 MiB 제한이다. CPU 비교 뒤 RAM 비교와 코드 최적화 비교가 남아 있다.
+
+로컬 측정기는 다음 RAM 비교를 지원하도록 준비했다. CPU 결과에서 선택한 동일 코어 수를 고정하고 VM/container를 각각 6144/5120 MiB와 8192/6144 MiB로 비교한다. 따라서 이는 VM 메모리만의 효과가 아니라 실제 사용 가능한 메모리 구성 비교다. 각 조건 cold/warm 3회이며 `ram-` 실행 이름으로 CPU 비교 결과와 분리한다. 현재 실행 중인 host/guest 스크립트는 교체하지 않았다.
 
 - 실제 VM 2 vCPU/6144 MiB cold-1: 474.723초, warm-1: 450.771초. 두 실행 모두 유효 gate이며 cold-2도 475.833초로 완료했다. 다음 warm-2는 live unit에서 확인한다.
 - 이전 탐색은 VM 8 vCPU/8192 MiB에서 컨테이너 2 CPU/5120 MiB만 제한했다. cold-1 452.415초, warm-1 426.275초, cold-2 456.580초다. 세 실행 모두 83 E2E 통과, 실패/오류/skip/retry 0이다. 실제 VM 조건별 통계와 섞지 않는다.
@@ -68,6 +70,12 @@ Docker Compose 2.39.4 checksum을 확인했고, Node 24.18.1/npm 11.16.0은 dige
 - `verify:release`: loopback port 32497에서 exit 0. Quick·프로덕션 build·E2E 83개 통과, 재시도 0. 전체 2489줄에서 기존 rollback mock 4개 및 admin 테스트 사이 Fast Refresh 2개 외 새 오류/재시도 없음. 실행 중 서버나 산출물 디렉터리를 다른 검증과 공유하지 않았다.
 
 [요구사항](./spec.md) · [구현 계획](./plan.md)
+
+## 캐시 최적화 후보
+
+설치된 Next.js 16.3.4는 Docker 환경에서 생성 키 저장 디렉터리를 사용하지 않으며, 매 빌드 생성하는 Server Actions 키를 webpack cache version의 serverReferenceHashSalt에 포함한다. 따라서 캐시 디렉터리 복사만으로 컴파일 캐시가 유효하지 않을 수 있다. 이는 소스 기반 원인 후보이며 성능 개선을 아직 입증한 것은 아니다.
+
+실험 플래그 `SSARTNERSHIP_BUILD_LAB_CACHE=1`에서만 생성한 32바이트 키를 warm cache와 함께 재사용하는 후보를 준비했다. 실제 결과물과 E2E fixture의 키는 분리하며, 운영 키를 상속하지 않는다. cold에서는 새 키를 만들고 파일 권한 0600과 symlink 경계를 검사한다. 플래그가 없는 기존 흐름의 환경은 변경하지 않는다. [Next.js self-hosting 문서](https://nextjs.org/docs/app/guides/self-hosting#server-functions-encryption-key)의 지원 설정을 사용하며 같은 후보 SHA에서 플래그 off/on 각각 cold/warm 3회를 비교해야 한다. 집중 Node 테스트 2개, Python 테스트 33개, 전체 로컬 release(83 E2E, 실패/skip/오류/재시도 0)는 통과했다. 로컬 release는 Docker gate의 두 번 빌드 경로를 직접 실행하지 않으므로 해당 경로의 VM 검증과 성능 실측은 남아 있다. 전체 로그 2491줄에는 기존 mock rollback 진단 4개와 admin 테스트 사이 Fast Refresh 2개 외 새 오류가 없었다.
 
 ## 내부 네트워크의 호스트 접속 보완
 

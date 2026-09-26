@@ -32,6 +32,16 @@ class CleanupContract(unittest.TestCase):
             cleanup('vm2c6g-cold-1', self.base)
         self.assertTrue((self.base / 'vm2c6g-cold-1/work').exists())
 
+    def test_ram_pair_preserves_evidence(self):
+        for mode in ('cold', 'warm'):
+            name = f'ram-vm4c8g-{mode}-1'
+            root = self.base / name
+            (self.base / f'vm2c6g-{mode}-1').rename(root)
+            (root / 'result.json').write_text(json.dumps({'valid': True, 'runId': name}))
+        cleanup('ram-vm4c8g-cold-1', self.base)
+        self.assertTrue((self.base / 'ram-vm4c8g-cold-1/validated-gate.json').exists())
+        self.assertTrue((self.base / 'ram-vm4c8g-warm-1/work').exists())
+
     def test_rejects_unrelated_path(self):
         for name in ('../other', 'request-' + 'a'*40, 'vm2c6g-cold-9'):
             with self.subTest(name=name), self.assertRaises(ValueError):
