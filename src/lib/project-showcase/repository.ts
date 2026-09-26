@@ -1,5 +1,13 @@
+import type { ShowcaseRandomInt } from "./draw";
 import type {
   ShowcaseAdminFeedback,
+  ShowcaseAdminWinner,
+  ShowcaseDrawReceipt,
+  ShowcaseDrawState,
+  ShowcaseExperiencerCandidate,
+  ShowcasePublicWinner,
+  ShowcaseSubmitterCandidate,
+  ShowcaseVoidReason,
   ShowcaseCandidateGroup,
   ShowcaseEvent,
   ShowcaseMemberParticipation,
@@ -141,6 +149,33 @@ export interface ProjectShowcaseRepository {
   listOwnerFeedback(memberId: string, projectId: string): Promise<ShowcaseOwnerFeedback[]>;
   listAdminFeedback(input?: { hidden?: boolean }): Promise<ShowcaseAdminFeedback[]>;
   setFeedbackHidden(input: { feedbackId: string; adminId: string; hidden: boolean }): Promise<void>;
+
+  /** Verification, draws and settlement — allowed after the experience ends and before settlement. */
+  getDrawState(): Promise<ShowcaseDrawState>;
+  listSubmitterCandidates(): Promise<ShowcaseSubmitterCandidate[]>;
+  listExperiencerCandidates(): Promise<ShowcaseExperiencerCandidate[]>;
+  excludeCandidate(input: {
+    group: ShowcaseCandidateGroup;
+    projectId?: string;
+    memberId?: string;
+    reason: string;
+    adminId: string;
+  }): Promise<void>;
+  restoreCandidate(input: { exclusionId: string; adminId: string }): Promise<void>;
+  /** Initial draw: submitters uniformly by project, experiencers weighted by tickets. */
+  runDraw(input: { group: ShowcaseCandidateGroup; adminId: string; random?: ShowcaseRandomInt }): Promise<ShowcaseDrawReceipt>;
+  voidWinner(input: { winnerId: string; adminId: string; reason: ShowcaseVoidReason }): Promise<void>;
+  /** Draws one replacement for a voided winner from the same group's remaining pool. */
+  redrawWinner(input: { winnerId: string; adminId: string; random?: ShowcaseRandomInt }): Promise<ShowcaseDrawReceipt>;
+  setWinnerDelivered(input: { winnerId: string; adminId: string; delivered: boolean }): Promise<void>;
+  listAdminWinners(): Promise<ShowcaseAdminWinner[]>;
+  /** Active winners, only from the announcement start. */
+  listPublicWinners(): Promise<ShowcasePublicWinner[]>;
+  /** The member's active prizes, only from the announcement start. */
+  getMemberWinnings(memberId: string): Promise<Array<Pick<ShowcasePublicWinner, "candidateGroup" | "projectTitle"> & { deliveredAt: string | null }>>;
+  settleEvent(adminId: string): Promise<void>;
+  /** Runs the 30-day post-settlement purge when due; returns whether it purged. */
+  purgePersonalDataIfDue(): Promise<boolean>;
 
   getAdminMetrics(): Promise<ShowcaseAdminMetrics | null>;
   listAdminActivity(input: {

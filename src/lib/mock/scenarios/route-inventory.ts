@@ -446,6 +446,14 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["admin.showcase.default"],
   },
   {
+    routePath: "/admin/events/project-showcase/draw",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "AdminShowcaseDrawPage",
+    dataSources: ["repository", "service"],
+    requiredScenarioIds: ["admin.showcase.default"],
+  },
+  {
     routePath: "/admin/events/project-showcase/feedback",
     surface: "admin",
     authScope: "admin",
@@ -1045,6 +1053,11 @@ const routeContracts: Record<string, RouteContractDefinition> = {
     routeKind: "canonical",
     screenContractId: "admin.showcase",
     primaryTask: "쇼케이스 일정과 경품 수량을 정하고 출품작을 검수한다.",
+  },
+  "/admin/events/project-showcase/draw": {
+    routeKind: "canonical",
+    screenContractId: "admin.showcase-draw",
+    primaryTask: "추첨 후보를 검증하고 출품·체험 경품을 추첨·재추첨하며 발송과 정산을 기록한다.",
   },
   "/admin/events/project-showcase/feedback": {
     routeKind: "canonical",

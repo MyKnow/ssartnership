@@ -234,3 +234,54 @@ export function canSubmitShowcaseFeedback(startedAt: string | null, now = new Da
 export function countShowcaseTickets(experiences: Array<{ feedbackSubmitted: boolean }>) {
   return experiences.filter((experience) => experience.feedbackSubmitted).length;
 }
+
+export const SHOWCASE_VOID_REASONS = ["duplicate", "unreachable", "verification_failed"] as const;
+export type ShowcaseVoidReason = (typeof SHOWCASE_VOID_REASONS)[number];
+
+/** Masked winner snapshot that may be shown publicly from the announcement start. */
+export type ShowcasePublicWinner = {
+  candidateGroup: ShowcaseCandidateGroup;
+  position: number;
+  maskedName: string;
+  maskedStudentNumber: string;
+  projectTitle: string | null;
+};
+
+export type ShowcaseAdminWinner = ShowcasePublicWinner & {
+  id: string;
+  status: "active" | "voided";
+  voidReason: ShowcaseVoidReason | null;
+  deliveredAt: string | null;
+  replaced: boolean;
+};
+
+export type ShowcaseSubmitterCandidate = {
+  projectId: string;
+  projectTitle: string;
+  ownerDisplayName: string;
+  exclusion: { id: string; reason: string } | null;
+  alreadyWon: boolean;
+};
+
+export type ShowcaseExperiencerCandidate = {
+  memberId: string;
+  displayName: string;
+  studentNumber: string;
+  tickets: number;
+  exclusion: { id: string; reason: string } | null;
+  alreadyWon: boolean;
+};
+
+export type ShowcaseDrawState = {
+  submitterDrawn: boolean;
+  experiencerDrawn: boolean;
+  settledAt: string | null;
+  purgedAt: string | null;
+};
+
+export type ShowcaseDrawReceipt = {
+  candidateGroup: ShowcaseCandidateGroup;
+  candidateCount: number;
+  ticketCount: number;
+  selectedCount: number;
+};
