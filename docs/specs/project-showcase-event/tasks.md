@@ -11,7 +11,8 @@ authority: descriptive
 
 - 2026-09-26: 기획안 v4 기준으로 명세를 다시 썼다. 체험 인정은 체험 시작 60초 후 피드백 제출, 추첨권은 유효 체험 프로젝트 수, 유형에 GAME 추가, 학번 7자리, 당첨자는 마스킹 이름·학번으로 Mattermost 공지, 경품은 Mattermost로 발송, 개인정보는 정산 30일 후 파기.
 - 초기 구현의 선택 공개 동의(동의자만 추첨 대상), 1인 1장 추첨권, 발표 기간 상위 3개 전시는 폐기했다.
-- 검수자 FK를 `members`에서 `admin_accounts`로 바로잡았다. 관리자 세션 ID는 `admin_accounts.id`다.
+- 초기 구현에서 검수자 FK를 `admin_accounts`로 변경했으나 현재 회원 기반 관리자 인증과 맞지 않았다. 관리자 세션 ID는 `members.id`이며 권한은 `admin_profiles`에서 확인한다. 후속 수정은 Issue #488의 forward-only migration으로 관리자 기록 FK 8개를 `members(id)`로 일치시킨다.
+- 2026-09-26 (Issue #488): `20260926184710_fix_showcase_admin_member_references.sql`을 백업 복원 후보 DB에서 검증한 뒤 실제 Preview에 적용했다. 관리자 FK 8개와 승인·수정 요청·반려·숨김 RPC 성공을 확인하고 검증 상태 변경은 롤백했다. 프로젝트 행 해시가 검증 전후 동일하다. 원본 백업은 서버에 보관한다. 후보 복원에서만 legacy `ensure_rls` 이벤트 트리거 소유자를 `supabase_admin`으로 지정했으며 원본 트리거 소유권은 변경하지 않았다. Preview 이력은 205개이며 저장소 병합과 이후 exact-SHA schema 승인 갱신은 남아 있다. Production 미적용.
 
 ## PR 1 — 이벤트 기반과 출품
 

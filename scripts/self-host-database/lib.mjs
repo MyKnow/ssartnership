@@ -150,8 +150,10 @@ export function normalizeMigrationTransaction(source) {
   if (/^\s*\\/mu.test(source)) throw new Error("self-host database migration contains a psql directive");
   const controls = [...source.matchAll(CONTROL)];
   if (controls.length === 0) return source;
-  if (!BEGIN.test(source) || !COMMIT.test(source) || controls.length !== 2) throw new Error("self-host database migration has unsupported top-level transaction control");
-  return source.replace(BEGIN, "").replace(COMMIT, "").trim();
+  const header = source.match(/^(?:\s*--[^\n]*(?:\n|$))*/u)?.[0] ?? "";
+  const body = source.slice(header.length);
+  if (!BEGIN.test(body) || !COMMIT.test(body) || controls.length !== 2) throw new Error("self-host database migration has unsupported top-level transaction control");
+  return (header + body.replace(BEGIN, "").replace(COMMIT, "")).trim();
 }
 export function createMigrationPlan(migrations) {
   const seen = new Set();
