@@ -130,6 +130,15 @@ export const mockScenarios = [
     requiredStates: ["미확인 알림", "읽음 알림", "수신 설정"],
   },
   {
+    id: "public.showcase.default",
+    label: "프로젝트 쇼케이스",
+    surface: "public",
+    description: "프로젝트 쇼케이스의 단계별 허브, 출품, 내 참여, 체험 기간 상세 상태입니다.",
+    syntheticOnly: true,
+    dataSources: ["repository", "service"],
+    requiredStates: ["모집 중", "체험 기간 밖", "출품 확인 대기", "수정 요청"],
+  },
+  {
     id: "public.event.detail",
     label: "이벤트 상세",
     surface: "public",
@@ -378,6 +387,15 @@ export const mockScenarios = [
     syntheticOnly: true,
     dataSources: ["api-route", "storybook"],
     requiredStates: ["작성", "미리보기", "발송 로그", "설정 누락"],
+  },
+  {
+    id: "admin.showcase.default",
+    label: "관리자 프로젝트 쇼케이스",
+    surface: "admin",
+    description: "쇼케이스 일정·경품 수량, 상태별 출품 검수, 로그·집계 상태입니다.",
+    syntheticOnly: true,
+    dataSources: ["repository", "service"],
+    requiredStates: ["검토 대기", "승인", "수정 요청", "활동 로그"],
   },
   {
     id: "admin.event.default",

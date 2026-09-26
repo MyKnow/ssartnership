@@ -60,6 +60,7 @@ export const IMAGE_UPLOAD_PURPOSES = [
   "graduate-verification",
   "manual-member-import",
   "promotion",
+  "showcase-project",
 ] as const;
 
 export type ImageUploadPurpose = (typeof IMAGE_UPLOAD_PURPOSES)[number];
@@ -156,12 +157,26 @@ const PROMOTION_POLICY = definePolicy({
   fit: "cover",
 });
 
+const SHOWCASE_PROJECT_POLICY = definePolicy({
+  purpose: "showcase-project",
+  role: "image",
+  width: 1440,
+  height: 1080,
+  aspectRatio: 4 / 3,
+  quality: 78,
+  maxSourceBytes: 10 * MEBIBYTE,
+  maxInputPixels: DEFAULT_MAX_PIXELS,
+  maxOutputBytes: 5 * MEBIBYTE,
+  fit: "cover",
+});
+
 const policies = [
   PARTNER_THUMBNAIL_POLICY,
   PARTNER_GALLERY_POLICY,
   REVIEW_POLICY,
   PROFILE_POLICY,
   PROMOTION_POLICY,
+  SHOWCASE_PROJECT_POLICY,
   definePolicy({ ...PARTNER_THUMBNAIL_POLICY, purpose: "partner-registration" }),
   definePolicy({ ...PARTNER_GALLERY_POLICY, purpose: "partner-registration" }),
   definePolicy({ ...PARTNER_THUMBNAIL_POLICY, purpose: "partner-change-request" }),

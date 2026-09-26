@@ -88,4 +88,14 @@ export const HOME_PROMOTIONS: PromotionSlide[] = [
     audiences: [...DEFAULT_PROMOTION_AUDIENCES],
     allowedCampuses: [],
   },
+  {
+    id: "project-showcase",
+    title: "내 프로젝트를 소개합니다!",
+    description: "SSAFY 구성원이 만든 서비스를 소개하고 함께 체험해 보세요.",
+    imageSrc: "/ads/project-showcase.png",
+    imageAlt: "SSAFY가 만든 프로젝트를 직접 둘러보고 체험해 보세요",
+    href: "/events/project-showcase",
+    audiences: [...DEFAULT_PROMOTION_AUDIENCES],
+    allowedCampuses: [],
+  },
 ];

@@ -11,6 +11,7 @@ const STATE_CHANGING_CRON_GET_ROUTES = [
   "mattermost-sender-health",
   "partner-billing",
   "purge-expired-operational-logs",
+  "purge-showcase-personal-data",
   "push-expiring-partners",
   "reconcile-apple-wallet-passes",
   "rss",

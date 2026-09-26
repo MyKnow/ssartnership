@@ -17,8 +17,13 @@ import { adPackageRepository, partnerRepository } from "@/lib/repositories";
 import {
   getPromotionCampaignState,
   listManagedEventCampaigns,
-  listManagedPromotionSlides,
+  listEditablePromotionSlides,
 } from "@/lib/promotions/events";
+import {
+  formatPromotionSlideError,
+  isPromotionSlideErrorCode,
+  parsePromotionSlideNumber,
+} from "@/lib/promotions/slide-validation";
 import { SITE_NAME } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +49,10 @@ function statusMessage(status?: string) {
   return null;
 }
 
-function errorMessage(error?: string) {
+function errorMessage(error?: string, slide?: string) {
+  if (isPromotionSlideErrorCode(error)) {
+    return formatPromotionSlideError(error, parsePromotionSlideNumber(slide));
+  }
   if (error === "ad_campaign_create_failed") {
     return "광고 캠페인을 생성하지 못했습니다. 입력값과 권한을 확인한 뒤 다시 시도해 주세요.";
   }
@@ -55,7 +63,7 @@ function errorMessage(error?: string) {
     return "광고 캠페인 상태를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.";
   }
   if (error === "promotion_slide_save_failed") {
-    return "광고 카드 저장에 실패했습니다. 이미지와 입력값을 확인한 뒤 다시 시도해 주세요.";
+    return "광고 카드를 저장하지 못했습니다. 입력한 내용은 그대로 두었으니 잠시 후 다시 시도해 주세요.";
   }
   return null;
 }
@@ -65,11 +73,11 @@ async function AdminAdvertisementContent({
   params,
 }: {
   session: Awaited<ReturnType<typeof requireAdminPermission>>;
-  params: { status?: string; error?: string };
+  params: { status?: string; error?: string; slide?: string };
 }) {
   const message = statusMessage(params.status);
-  const actionErrorMessage = errorMessage(params.error);
-  let slides: Awaited<ReturnType<typeof listManagedPromotionSlides>>;
+  const actionErrorMessage = errorMessage(params.error, params.slide);
+  let slides: Awaited<ReturnType<typeof listEditablePromotionSlides>>;
   let eventCampaigns: Awaited<ReturnType<typeof listManagedEventCampaigns>>;
   let preparedCampaigns: Awaited<
     ReturnType<typeof adPackageRepository.prepareAdminCampaigns>
@@ -87,7 +95,7 @@ async function AdminAdvertisementContent({
     .catch(() => ({ status: "error" as const }));
   try {
     [slides, eventCampaigns, preparedCampaigns] = await Promise.all([
-      listManagedPromotionSlides({ includeInactive: true }),
+      listEditablePromotionSlides(),
       listManagedEventCampaigns({ includeInactive: false }),
       campaignPreparationPromise,
     ]);
@@ -97,7 +105,7 @@ async function AdminAdvertisementContent({
         <AdminStatePanel
           kind="error"
           title="홈 광고 운영 정보를 불러오지 못했습니다."
-          description="잠시 후 다시 확인해 주세요. 문제가 계속되면 운영 기록을 확인해 주세요."
+          description="저장된 광고 정보를 확인할 수 없어 편집을 중단했습니다. 잠시 후 다시 확인하고, 반복되면 서버 연결과 배포 상태를 확인해 주세요."
           action={<Button href="/admin/advertisement" variant="secondary">다시 확인</Button>}
         />
       </div>
@@ -132,7 +140,7 @@ async function AdminAdvertisementContent({
 export default async function AdminAdvertisementPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ status?: string; error?: string }>;
+  searchParams?: Promise<{ status?: string; error?: string; slide?: string }>;
 }) {
   const session = await requireAdminPermission("home_ads", "read", {
     path: "/admin/advertisement",
@@ -145,7 +153,7 @@ export default async function AdminAdvertisementPage({
         <AdminPageHeader
           eyebrow="자동화"
           title="홈 광고 관리"
-          description="홈 캐러셀 카드의 순서, 이미지, 문구, 연결 페이지, 노출 권한을 한 번에 편집합니다."
+          description="홈 캐러셀 카드의 순서, 이미지, 문구, 연결 페이지, 노출 권한을 한 번에 편집합니다. 기본 안내·이벤트 카드는 서비스 설정 시 자동 등록될 수 있습니다."
         />
         <Suspense fallback={<AdminAdvertisementSkeletonContent showHeader={false} />}>
           <AdminAdvertisementContent session={session} params={params} />

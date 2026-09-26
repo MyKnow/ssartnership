@@ -38,7 +38,6 @@ const reviewedWorkflowNpmCommands = new Set([
   "npm run install:trusted",
   "npm run lint",
   "npm run measure:admin:preview",
-  "npm run sync:preview",
   "npm run test:e2e:ci",
   "npm run test-storybook",
   "npm run test:visual",
@@ -900,18 +899,8 @@ test("Dependabot keeps pinned GitHub Actions refs reviewable", () => {
 });
 
 test("secret-bearing Actions keep credentials out of dependency installation", () => {
-  const previewSync = read(".github/workflows/preview-sync.yml");
   const adminPerformance = read(".github/workflows/admin-performance.yml");
 
-  assert.doesNotMatch(previewSync, /timeout-minutes: 120\s*\n\s+env:/);
-  assert.match(
-    previewSync,
-    /name: Check preview database connection[\s\S]+?env:\s*\n\s+SUPABASE_PREVIEW_DB_URL:[\s\S]+?run: node scripts\/supabase-sync-preview\.mjs --check-only/,
-  );
-  assert.match(
-    previewSync,
-    /name: Sync production data and storage to preview[\s\S]+?env:\s*\n\s+SUPABASE_PRODUCTION_DB_URL:[\s\S]+?SUPABASE_PREVIEW_SERVICE_ROLE_KEY:[\s\S]+?run: npm run sync:preview/,
-  );
   assert.doesNotMatch(adminPerformance, /timeout-minutes: 20\s*\n\s+env:/);
   assert.match(
     adminPerformance,

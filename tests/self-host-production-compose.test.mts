@@ -8,8 +8,8 @@ test('home deployment disables all Vercel Git builds and preserves the shared cr
  const config=JSON.parse(readFileSync(new URL('../vercel.json',import.meta.url),'utf8'));
  assert.equal(config.git.deploymentEnabled,false);
  assert.equal(config.installCommand,'npm run install:trusted');
- assert.equal(config.crons.length,11);
- assert.equal(new Set(config.crons.map((entry:{path:string})=>entry.path)).size,11);
+ assert.equal(config.crons.length,12);
+ assert.equal(new Set(config.crons.map((entry:{path:string})=>entry.path)).size,12);
 });
 test('Production application and monitoring use separate data networks, secrets and volumes',()=>{
  const source=readFileSync(new URL('../deploy/self-host/compose.production.yaml',import.meta.url),'utf8');

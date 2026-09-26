@@ -149,6 +149,7 @@ export async function resolveImageUploadActorForRoute(input: {
     case "partner-change-request":
       return { actor: await getPartnerActor() };
     case "review":
+    case "showcase-project":
       return { actor: await getMemberActor() };
     case "profile":
       return { actor: await getMemberActor() };

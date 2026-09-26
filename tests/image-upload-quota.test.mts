@@ -273,3 +273,35 @@ test("서명 URL 실패는 이미 증가한 quota를 환불하지 않는다", as
   assert.deepEqual(rpcNames, ["reserve_image_upload_sessions"]);
   assert.deepEqual(failedUpdates, [{ status: "failed", failure_code: "sign_failed" }]);
 });
+
+test("reservation RPC와 세션 제약은 앱이 쓰는 모든 업로드 목적을 허용한다", async () => {
+  const { readdir } = await import("node:fs/promises");
+  const { IMAGE_UPLOAD_PURPOSES } = await import("../src/lib/image-upload/policy.ts");
+  const migrationsDir = new URL("../supabase/migrations/", import.meta.url);
+  const names = (await readdir(migrationsDir)).filter((name) => name.endsWith(".sql")).sort();
+  const sources = [
+    ...(await Promise.all(names.map((name) => readFile(new URL(name, migrationsDir), "utf8")))),
+  ];
+  const schema = await readFile(new URL("../supabase/schema.sql", import.meta.url), "utf8");
+
+  function lastMatch(sql: string, pattern: RegExp) {
+    return [...sql.matchAll(pattern)].at(-1)?.[1] ?? null;
+  }
+  function latestAcrossMigrations(pattern: RegExp) {
+    return sources.map((sql) => lastMatch(sql, pattern)).filter(Boolean).at(-1) ?? null;
+  }
+  const rpcAllowlist = /p_purpose not in \(([^)]*)\)/g;
+  const tableCheck = /add constraint image_upload_sessions_purpose_check\s+check \(purpose in \(([^)]*)\)\)/g;
+
+  for (const [label, allowlist] of [
+    ["latest migration RPC", latestAcrossMigrations(rpcAllowlist)],
+    ["schema.sql RPC", lastMatch(schema, rpcAllowlist)],
+    ["latest migration constraint", latestAcrossMigrations(tableCheck)],
+    ["schema.sql constraint", lastMatch(schema, tableCheck)],
+  ] as const) {
+    assert.ok(allowlist, `${label} allowlist`);
+    for (const purpose of IMAGE_UPLOAD_PURPOSES) {
+      assert.ok(allowlist.includes(`'${purpose}'`), `${label} must allow ${purpose}`);
+    }
+  }
+});

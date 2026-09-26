@@ -73,6 +73,25 @@ docker compose -p ssartnership-edge -f deploy/self-host/compose.edge.yaml run --
 
 `config --quiet`와 Caddy validate는 공개 변경 없이 설정만 검사한다. 공개 전환 전 원본 Preview의 외부 암호화 백업/복구 드릴, 원본 쓰기 중지와 최종 동등성, DNS 수정 권한, 방화벽 전달 경로 및 기존 DNS 복구값을 확보한다. 합성 환경의 백업은 원본 Preview 복구 증거를 대신하지 않는다. 승인된 전환 창에서 edge를 시작하고 두 DNS 레코드를 홈 서버로 연결한 뒤 실제 TLS 발급과 외부 probe를 검증한다. 발급 전에 TLS 성공을 선행 조건으로 요구하지 않는다. 두 origin의 HTTPS redirect, 정상 Host/protocol 전달, `/api/health`, 로그인, Storage 업로드·다운로드를 확인하고 인증서 갱신 상태도 운영 점검에 포함한다. 실패하면 기존 DNS를 복원하고 Caddy를 중지한다. 전환 중 홈 서버에 새 쓰기가 있었다면 원본을 재개하기 전에 데이터 차이를 확인한다.
 
+### 부팅 뒤 공개 edge 자동 복구
+
+Compose의 Caddy healthcheck는 Caddyfile 설정만 검증하며, 실제 80/443 수신이나 인증서 handshake를 확인하지 않는다. 배포된 root 소유 release에서 전용 설치기를 한 번 실행하면 root systemd timer가 부팅 1분 뒤부터 매분 Production과 Preview의 SNI 및 인증서 검증 TLS handshake를 검사한다. 이 검사는 Caddy가 TLS 연결을 받는지 확인하며 HTTP 응답이나 app/API upstream은 호출하지 않는다. 실행 중인 Caddy에서 두 번 연속 handshake 실패하면 기존 Caddy 컨테이너만 재시작하고, 정지하거나 일시 정지된 컨테이너는 시작 또는 재개를 시도한다. 모든 복구 동작은 5분 cooldown으로 제한되며 결과와 실패는 journal에 기록된다.
+
+```bash
+sudo /opt/ssartnership/node24/node /opt/ssartnership/control/current/scripts/self-host-operations/install-edge-recovery.mjs
+systemctl status ssartnership-edge-recovery.timer
+systemctl list-timers ssartnership-edge-recovery.timer
+journalctl -u ssartnership-edge-recovery.service --since today
+```
+
+복구를 비활성화하려면 timer만 중지·비활성화한다. 서비스 파일은 진단을 위해 그대로 둔다. 다시 켤 때는 `systemctl enable --now ssartnership-edge-recovery.timer`를 실행한다.
+
+```bash
+sudo systemctl disable --now ssartnership-edge-recovery.timer
+```
+
+이 내부 검사는 전체 호스트 프리징, 정전, 공유기·ISP 장애나 외부 방화벽 전달을 복구하지 못한다. 또한 TLS handshake 뒤 HTTP 처리가 멈춘 상태를 판별하지 못한다. loopback TLS 성공은 외부 인터넷에서의 접근 성공 증거가 아니므로, HTTP synthetic probe와 공개 URL 확인은 별도 감시에서 유지한다. 앱/API HTTP health는 upstream 상태로 계속 따로 관찰하며, 그 실패만으로 Caddy를 재시작하지 않는다. 기존 설치 파일이 현재 저장소 템플릿과 다르면 설치기는 덮어쓰기를 거절하므로 차이를 검토한 뒤 수동 교체한다.
+
 ## Cron 이식
 
 Production 홈 서버 전환에서는 `vercel.json`의 `git.deploymentEnabled.main=false`로 main 커밋의 Vercel 자동 배포를 중지한다. 지정하지 않은 dev와 작업 브랜치는 Preview 배포를 유지한다. 이는 새 앱이 이전 Cloud 스키마에 먼저 배포되는 것을 막는 전환 계약이다. 기존 Vercel 배포는 복구용으로 보존하며 이 설정만으로 기존 요청이나 Cron이 중지되지는 않는다. 최종 데이터 복사 직전에 Vercel 설정에서 Cron을 비활성화하고 기존 Production 요청을 정지한 뒤 진행 중인 쓰기 종료와 원본 쓰기 차단을 확인한다. 신규 Production 검증은 승인된 main SHA의 홈 서버 이미지·DB·실제 공개 흐름을 기준으로 수행한다. 새 서버가 쓰기를 받은 뒤에는 데이터 차이 확인 없이 기존 서비스와 DNS를 재개하지 않는다.

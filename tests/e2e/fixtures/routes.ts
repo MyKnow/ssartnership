@@ -8,6 +8,8 @@ export const memberProtectedRoutes: RedirectRoute[] = [
   { path: "/certification/photo", expectedPath: "/auth/login" },
   { path: "/coupons", expectedPath: "/auth/login" },
   { path: "/notifications", expectedPath: "/auth/login" },
+  { path: "/events/project-showcase/my", expectedPath: "/auth/login" },
+  { path: "/events/project-showcase/projects/new", expectedPath: "/auth/login" },
 ];
 
 export const partnerProtectedRoutes: RedirectRoute[] = [
@@ -39,6 +41,11 @@ export const adminProtectedRoutes: RedirectRoute[] = [
   { path: "/admin/cycle", expectedPath: "/auth/login" },
   { path: "/admin/event", expectedPath: "/auth/login" },
   { path: "/admin/event/signup-reward", expectedPath: "/auth/login" },
+  { path: "/admin/events", expectedPath: "/auth/login" },
+  { path: "/admin/events/project-showcase", expectedPath: "/auth/login" },
+  { path: "/admin/events/project-showcase/draw", expectedPath: "/auth/login" },
+  { path: "/admin/events/project-showcase/feedback", expectedPath: "/auth/login" },
+  { path: "/admin/events/project-showcase/logs", expectedPath: "/auth/login" },
   { path: "/admin/graduate-verifications", expectedPath: "/auth/login" },
   { path: "/admin/logs", expectedPath: "/auth/login" },
   { path: "/admin/members", expectedPath: "/auth/login" },

@@ -9,8 +9,6 @@ function readRepoFile(pathname: string) {
 const WORKFLOW_FILES = [
   "admin-performance.yml",
   "cross-platform-development.yml",
-  "preview-migrations.yml",
-  "preview-sync.yml",
   "production-migrations.yml",
   "public-readiness.yml",
   "storybook.yml",
@@ -390,91 +388,25 @@ test("production Supabase migrations require an explicit guarded dispatch", () =
   assert.doesNotMatch(workflow, /--include-all/);
 });
 
-test("Preview Supabase migrations apply dev schema changes without syncing data", () => {
-  const workflow = readRepoFile(".github/workflows/preview-migrations.yml");
+test("retired cloud Preview migration and sync workflows stay removed", () => {
+  const workflowsDirectory = new URL("../.github/workflows/", import.meta.url);
+  const workflowNames = readdirSync(workflowsDirectory)
+    .filter((name) => /\.ya?ml$/.test(name))
+    .sort();
 
-  for (const requiredText of [
-    "name: Apply Preview Supabase Migrations",
-    "push:",
-    "branches: [dev]",
-    '"supabase/migrations/**"',
-    '"supabase/schema.sql"',
-    "workflow_dispatch:",
-    "APPLY_PREVIEW_MIGRATIONS",
-    "expected_dev_sha:",
-    "github.event_name == 'push'",
-    "github.ref == 'refs/heads/dev'",
-    "github.ref == 'refs/heads/main'",
-    "ref: ${{ steps.select-dev.outputs.sha }}",
-    "npm run validate:migrations",
-    "SUPABASE_PREVIEW_DB_URL",
-    'supabase db push --db-url "$SUPABASE_PREVIEW_DB_URL" --yes',
-  ]) {
-    assert.match(
-      workflow,
-      new RegExp(requiredText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
-    );
+  assert.ok(!workflowNames.includes("preview-migrations.yml"));
+  assert.ok(!workflowNames.includes("preview-sync.yml"));
+
+  for (const workflowName of workflowNames) {
+    const workflow = readFileSync(new URL(workflowName, workflowsDirectory), "utf8");
+
+    // The frozen cloud Preview baseline must not receive DDL or data again.
+    assert.doesNotMatch(workflow, /supabase db push --db-url "\$SUPABASE_PREVIEW_DB_URL"/, workflowName);
+    assert.doesNotMatch(workflow, /npm run sync:preview|supabase-sync-preview/, workflowName);
+    assert.doesNotMatch(workflow, /app_id=\$SUPABASE_GITHUB_APP_ID|\.app\.id == 330661/, workflowName);
+    // Self-host schema approval stays an operator-written file, never CI-written.
+    assert.doesNotMatch(workflow, /schema-approval\.json/, workflowName);
   }
-
-  assert.doesNotMatch(
-    workflow,
-    /sync:preview|SUPABASE_PRODUCTION_DB_URL|--include-all|migration repair/,
-  );
-  assert.doesNotMatch(workflow, /ref: dev/);
-  assert.doesNotMatch(workflow, /workflow_run:/);
-  assert.doesNotMatch(workflow, /gh run rerun/);
-  assert.doesNotMatch(workflow, /"\.github\/workflows\/preview-migrations\.yml"/);
-  assert.match(workflow, /permissions:\s*\n\s+contents: read\s*\n\s+checks: read/);
-  assert.match(workflow, /git ls-remote "\$REPOSITORY_URL" refs\/heads\/dev/);
-  assert.match(workflow, /echo "is_current=false" >> "\$GITHUB_OUTPUT"/);
-  assert.match(
-    workflow,
-    /name: Wait for the exact Supabase Preview check[\s\S]+?github\.event_name == 'push'[\s\S]+?SUPABASE_GITHUB_APP_ID: "330661"[\s\S]+?for _ in \{1\.\.60\}[\s\S]+?commits\/\$EXPECTED_DEV_SHA\/check-runs\?filter=latest&per_page=100&app_id=\$SUPABASE_GITHUB_APP_ID[\s\S]+?select\(\.name == "Supabase Preview" and \.app\.id == 330661\)[\s\S]+?sleep 5/,
-  );
-  assert.match(
-    workflow,
-    /"present\|\\\(\$checks\[0\]\.status\)\|\\\(\$checks\[0\]\.conclusion \/\/ ""\)"/,
-  );
-  assert.match(
-    workflow,
-    /"\$match_state" == "present" && "\$check_status" == "completed"[\s\S]+?"\$check_conclusion" != "success"/,
-  );
-  assert.ok(
-    workflow.indexOf("name: Wait for the exact Supabase Preview check") <
-      workflow.indexOf("name: List Preview migrations before apply"),
-    "the provider check must settle before inspecting or mutating Preview migrations",
-  );
-  assert.match(
-    workflow,
-    /name: Apply pending Preview migrations[\s\S]+?test "\$\(git rev-parse HEAD\)" = "\$EXPECTED_DEV_SHA"[\s\S]+?git ls-remote origin refs\/heads\/dev[\s\S]+?supabase db push/,
-  );
-});
-
-test("Preview data and Storage sync is an explicit exact-dev maintenance operation", () => {
-  const workflow = readRepoFile(".github/workflows/preview-sync.yml");
-
-  assert.match(workflow, /name: Sync Preview Supabase/);
-  assert.match(workflow, /workflow_dispatch:/);
-  assert.doesNotMatch(workflow, /workflow_run:/);
-  assert.doesNotMatch(workflow, /^\s+push:\s*$/m);
-  assert.match(workflow, /confirmation:/);
-  assert.match(workflow, /SYNC_PREVIEW_DATA/);
-  assert.match(workflow, /expected_dev_sha:/);
-  assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
-  assert.match(workflow, /group:\s+preview-data-sync/);
-  assert.match(workflow, /cancel-in-progress:\s+false/);
-  assert.match(workflow, /ref: \$\{\{ steps\.select-dev\.outputs\.sha \}\}/);
-  assert.doesNotMatch(workflow, /ref: dev/);
-  assert.doesNotMatch(workflow, /ref: main/);
-  assert.match(workflow, /git ls-remote origin refs\/heads\/dev/);
-  assert.match(workflow, /run: npm run sync:preview/);
-  assert.match(workflow, /SUPABASE_PRODUCTION_DB_URL/);
-  assert.match(workflow, /SUPABASE_PREVIEW_SERVICE_ROLE_KEY/);
-  assert.match(workflow, /node-version:\s+24\.18\.1/);
-  assert.match(workflow, /npm run install:trusted/);
-  assert.match(workflow, /version:\s+2\.114\.0/);
-  assert.match(workflow, /persist-credentials:\s+false/);
-  assert.doesNotMatch(workflow, /\bnpm (?:ci|install)\b/);
 });
 
 test("playwright config can use the CI-hosted Chrome channel", () => {

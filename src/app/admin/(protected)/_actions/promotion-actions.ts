@@ -12,6 +12,11 @@ import {
   type PromotionAudience,
 } from "@/lib/promotions/catalog";
 import { assertPromotionSlideImageSource } from "@/lib/promotions/image-source";
+import {
+  PromotionSlideSaveError,
+  promotionSlideDatabaseErrorCode,
+  validatePromotionSlide,
+} from "@/lib/promotions/slide-validation";
 import { getEventPageDefinition } from "@/lib/event-pages";
 import {
   createStoredEventRewardDraw,
@@ -91,7 +96,11 @@ function redirectAdvertisementError(fallback: string, error?: unknown): never {
   const code = error
     ? getSafeAdminActionErrorCode(error, fallback)
     : fallback;
-  redirect(`/admin/advertisement?error=${encodeURIComponent(code)}`);
+  const params = new URLSearchParams({ error: code });
+  if (error instanceof PromotionSlideSaveError && error.slideNumber) {
+    params.set("slide", String(error.slideNumber));
+  }
+  redirect(`/admin/advertisement?${params.toString()}`);
 }
 
 function redirectEventRewardDrawError(params: {
@@ -241,25 +250,29 @@ function extractEventSlugFromHref(href: string) {
 }
 
 function parsePromotionSlideDrafts(formData: FormData) {
-  const raw = getRequiredString(formData, "slidesJson");
+  const raw = getString(formData, "slidesJson");
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error("광고 카드 데이터를 불러올 수 없습니다.");
+    throw new PromotionSlideSaveError("promotion_slide_payload_invalid");
   }
-  if (!Array.isArray(parsed) || parsed.length === 0) {
-    throw new Error("최소 1개의 광고 카드가 필요합니다.");
+  if (!Array.isArray(parsed)) {
+    throw new PromotionSlideSaveError("promotion_slide_payload_invalid");
+  }
+  if (parsed.length === 0) {
+    throw new PromotionSlideSaveError("promotion_slide_empty");
   }
 
-  const slides = parsed.map((item): PromotionSlideDraftPayload => {
+  const slides = parsed.map((item, index): PromotionSlideDraftPayload => {
+    const slideNumber = index + 1;
     if (!item || typeof item !== "object") {
-      throw new Error("광고 카드 데이터를 확인해 주세요.");
+      throw new PromotionSlideSaveError("promotion_slide_payload_invalid", slideNumber);
     }
     const record = item as Record<string, unknown>;
     const id = typeof record.id === "string" ? record.id.trim() : "";
     if (!id) {
-      throw new Error("광고 카드 식별자가 필요합니다.");
+      throw new PromotionSlideSaveError("promotion_slide_id_required", slideNumber);
     }
     const href = typeof record.href === "string" ? record.href.trim() : "";
     const derivedEventSlug = extractEventSlugFromHref(href);
@@ -274,14 +287,14 @@ function parsePromotionSlideDrafts(formData: FormData) {
     const sponsorLabel =
       typeof record.sponsorLabel === "string" ? record.sponsorLabel.trim() : "";
     if (sponsorLabel.length > AD_PACKAGE_FORM_LIMITS.sponsorLabelMax) {
-      throw new Error("광고 카드의 스폰서 표기는 60자 이하로 입력해 주세요.");
+      throw new PromotionSlideSaveError("promotion_slide_sponsor_label_too_long", slideNumber);
     }
     const uploadId = typeof record.uploadId === "string" ? record.uploadId.trim() : "";
     if (
       uploadId
       && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(uploadId)
     ) {
-      throw new Error("광고 이미지 업로드 정보를 확인해 주세요.");
+      throw new PromotionSlideSaveError("promotion_slide_upload_invalid", slideNumber);
     }
     return {
       id,
@@ -304,9 +317,28 @@ function parsePromotionSlideDrafts(formData: FormData) {
   });
   const ids = new Set(slides.map((slide) => slide.id));
   if (ids.size !== slides.length) {
-    throw new Error("광고 카드 식별자가 중복되었습니다.");
+    throw new PromotionSlideSaveError("promotion_slide_id_duplicated");
   }
   return slides;
+}
+
+async function listRegisteredPromotionEventSlugs(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  slugs: string[],
+) {
+  const unique = [...new Set(slugs)];
+  if (unique.length === 0) {
+    return new Set<string>();
+  }
+  const { data, error } = await supabase
+    .from("promotion_events")
+    .select("slug")
+    .in("slug", unique);
+  if (error) {
+    console.error("[admin-advertisement] event lookup failed", error);
+    throw new PromotionSlideSaveError(promotionSlideDatabaseErrorCode(error.code, "promotion_slide_event_lookup_failed"));
+  }
+  return new Set(((data ?? []) as Array<{ slug: string }>).map((row) => row.slug));
 }
 
 function revalidateAdvertisementPaths() {
@@ -455,7 +487,8 @@ async function savePromotionSlidesMutation(formData: FormData) {
     .order("display_order", { ascending: true })
     .order("created_at", { ascending: true });
   if (existingError) {
-    throw new Error(existingError.message);
+    console.error("[admin-advertisement] slide lookup failed", existingError);
+    throw new PromotionSlideSaveError(promotionSlideDatabaseErrorCode(existingError.code, "promotion_slide_database_read_failed"));
   }
 
   const existingMap = new Map<string, { id: string; image_src: string | null }>(
@@ -483,28 +516,36 @@ async function savePromotionSlidesMutation(formData: FormData) {
   }> = [];
   const removedImageUrls = new Set<string>();
   const nextImageUrls = new Set<string>();
+  // promotion_slides.event_slug references promotion_events(slug). Event pages that
+  // are not promotion campaigns (the project showcase) keep a null link; the read
+  // model derives their slug from href for visibility.
+  const registeredEventSlugs = await listRegisteredPromotionEventSlugs(
+    supabase,
+    slides.flatMap((slide) => (slide.eventSlug ? [slide.eventSlug] : [])),
+  );
   const uploadActor = await resolveImageUploadActorForServerAction("promotion", "admin");
   const uploadRepository = getImageUploadRepository();
 
   for (const [index, slide] of slides.entries()) {
+    const slideNumber = index + 1;
     const existing = existingMap.get(slide.id);
-    const isExistingSlide = Boolean(existing);
-
-    if (!slide.title || !slide.subtitle || !slide.href || !slide.imageAlt) {
-      throw new Error("광고 카드의 제목, 부제, 이미지 대체 텍스트, 연결 페이지를 모두 입력해 주세요.");
-    }
-    if (slide.audiences.length === 0) {
-      throw new Error("광고 카드의 노출 대상을 하나 이상 선택해 주세요.");
-    }
-    if (!isExistingSlide && !slide.uploadId) {
-      throw new Error("새 광고 카드는 이미지를 업로드해 주세요.");
-    }
-
-    assertPromotionSlideImageSource({
-      imageSrc: slide.imageSrc,
-      existingImageSrc: existing?.image_src,
-      uploadId: slide.uploadId,
+    const [issue] = validatePromotionSlide({
+      ...slide,
+      hasImage: Boolean(slide.uploadId || existing?.image_src),
     });
+    if (issue) {
+      throw new PromotionSlideSaveError(issue.code, slideNumber);
+    }
+
+    try {
+      assertPromotionSlideImageSource({
+        imageSrc: slide.imageSrc,
+        existingImageSrc: existing?.image_src,
+        uploadId: slide.uploadId,
+      });
+    } catch {
+      throw new PromotionSlideSaveError("promotion_slide_image_source_invalid", slideNumber);
+    }
     let imageSrc = slide.imageSrc;
     if (slide.uploadId) {
       const attached = await uploadRepository.attach({
@@ -519,11 +560,17 @@ async function savePromotionSlidesMutation(formData: FormData) {
           isPublic: true,
         },
         resource: { type: "promotion_slide", id: slide.id },
+      }).catch((error: unknown) => {
+        console.error("[admin-advertisement] promotion slide image attach failed", {
+          slideNumber,
+          error: error instanceof Error ? error.message : "unknown",
+        });
+        throw new PromotionSlideSaveError("promotion_slide_image_attach_failed", slideNumber);
       });
       imageSrc = attached.url ?? "";
     }
     if (!imageSrc) {
-      throw new Error("광고 카드 이미지를 업로드해 주세요.");
+      throw new PromotionSlideSaveError("promotion_slide_image_required", slideNumber);
     }
 
     nextRows.push({
@@ -537,7 +584,10 @@ async function savePromotionSlidesMutation(formData: FormData) {
       is_active: slide.isActive,
       audiences: slide.audiences,
       allowed_campuses: slide.allowedCampuses,
-      event_slug: slide.eventSlug,
+      event_slug:
+        slide.eventSlug && registeredEventSlugs.has(slide.eventSlug)
+          ? slide.eventSlug
+          : null,
       ad_campaign_id: slide.adCampaignId,
       sponsor_label: slide.sponsorLabel,
     });
@@ -560,7 +610,8 @@ async function savePromotionSlidesMutation(formData: FormData) {
     .from("promotion_slides")
     .upsert(nextRows, { onConflict: "id" });
   if (upsertError) {
-    throw new Error(upsertError.message);
+    console.error("[admin-advertisement] slide upsert failed", upsertError);
+    throw new PromotionSlideSaveError(promotionSlideDatabaseErrorCode(upsertError.code, "promotion_slide_database_write_failed"));
   }
 
   if (removedRows.length > 0) {
@@ -572,7 +623,8 @@ async function savePromotionSlidesMutation(formData: FormData) {
         removedRows.map((row) => row.id),
       );
     if (deleteError) {
-      throw new Error(deleteError.message);
+      console.error("[admin-advertisement] slide deletion failed", deleteError);
+      throw new PromotionSlideSaveError("promotion_slide_delete_failed");
     }
   }
 

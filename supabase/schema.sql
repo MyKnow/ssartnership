@@ -14110,6 +14110,1497 @@ alter table public.member_password_action_tokens
   add constraint member_password_action_tokens_delivery_channel_check
   check (delivery_channel in ('mattermost', 'email', 'admin'));
 
+-- Snapshot of 20260925200437_add_project_showcase_event.sql
+-- SSAFY project showcase event («내 프로젝트를 소개합니다!»).
+-- Data model for submission, experience/feedback, weighted prize draws and
+-- post-settlement purge. Every table is service-role only; the server
+-- repository mediates all reads and writes. Member links are nullable so the
+-- purge job can detach identities while keeping anonymous aggregates.
+
+create table if not exists public.showcase_events (
+  id uuid primary key default uuid_generate_v4(),
+  slug text not null unique,
+  title text not null,
+  description text not null default '',
+  hero_image_src text not null default '/ads/project-showcase-banner.png',
+  submission_start_at timestamptz,
+  submission_end_at timestamptz,
+  experience_start_at timestamptz,
+  experience_end_at timestamptz,
+  announcement_start_at timestamptz,
+  announcement_end_at timestamptz,
+  submitter_selection_count integer not null default 20,
+  experiencer_selection_count integer not null default 25,
+  is_active boolean not null default false,
+  settled_at timestamptz,
+  settled_by_admin_id uuid references public.admin_accounts(id) on delete set null,
+  purged_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint showcase_events_slug_check
+    check (slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
+  constraint showcase_events_timeline_check
+    check (
+      submission_start_at is null or submission_end_at is null
+      or experience_start_at is null or experience_end_at is null
+      or announcement_start_at is null
+      or (
+        submission_start_at < submission_end_at
+        and submission_end_at <= experience_start_at
+        and experience_start_at < experience_end_at
+        and experience_end_at <= announcement_start_at
+        and (announcement_end_at is null or announcement_start_at < announcement_end_at)
+      )
+    ),
+  constraint showcase_events_selection_count_check
+    check (submitter_selection_count between 0 and 500 and experiencer_selection_count between 0 and 500)
+);
+
+insert into public.showcase_events (slug, title, description)
+values (
+  'project-showcase',
+  '내 프로젝트를 소개합니다!',
+  'SSAFY 구성원이 직접 개발·배포한 서비스를 소개하고 함께 체험하는 이벤트예요.'
+)
+on conflict (slug) do nothing;
+
+create table if not exists public.showcase_projects (
+  id uuid primary key default uuid_generate_v4(),
+  event_id uuid not null references public.showcase_events(id) on delete cascade,
+  owner_member_id uuid references public.members(id) on delete set null,
+  project_type text not null,
+  title text not null,
+  team_name text,
+  summary text not null,
+  description text not null,
+  image_url text not null,
+  image_upload_id uuid references public.image_upload_sessions(id) on delete set null,
+  service_url text not null,
+  announcement_consented_at timestamptz not null,
+  status text not null default 'pending',
+  review_note text,
+  reviewed_by_admin_id uuid references public.admin_accounts(id) on delete set null,
+  reviewed_at timestamptz,
+  withdrawn_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint showcase_projects_type_check
+    check (project_type in ('web', 'app', 'game', 'embedded')),
+  constraint showcase_projects_status_check
+    check (status in ('pending', 'approved', 'changes_requested', 'rejected', 'hidden', 'withdrawn')),
+  constraint showcase_projects_title_check
+    check (char_length(btrim(title)) between 2 and 100),
+  constraint showcase_projects_team_name_check
+    check (team_name is null or char_length(btrim(team_name)) between 1 and 60),
+  constraint showcase_projects_summary_check
+    check (char_length(btrim(summary)) between 5 and 240),
+  constraint showcase_projects_description_check
+    check (char_length(btrim(description)) between 20 and 8000),
+  constraint showcase_projects_service_url_check
+    check (service_url ~ '^https://' and char_length(service_url) <= 2048),
+  constraint showcase_projects_review_note_check
+    check (review_note is null or char_length(review_note) <= 2000),
+  constraint showcase_projects_withdrawn_check
+    check ((status = 'withdrawn') = (withdrawn_at is not null))
+);
+
+create index if not exists showcase_projects_public_list_idx
+  on public.showcase_projects(event_id, status, project_type, created_at desc);
+-- 참가자 1인당 출품 1개: a member may own one non-withdrawn project per event.
+create unique index if not exists showcase_projects_one_active_per_owner_idx
+  on public.showcase_projects(event_id, owner_member_id)
+  where status <> 'withdrawn' and owner_member_id is not null;
+
+create table if not exists public.showcase_project_participants (
+  id uuid primary key default uuid_generate_v4(),
+  event_id uuid not null references public.showcase_events(id) on delete cascade,
+  project_id uuid not null references public.showcase_projects(id) on delete cascade,
+  position smallint not null,
+  name text not null,
+  student_number text not null,
+  is_owner boolean not null default false,
+  created_at timestamptz not null default now(),
+  constraint showcase_project_participants_position_check check (position between 0 and 19),
+  constraint showcase_project_participants_name_check check (char_length(btrim(name)) between 1 and 80),
+  constraint showcase_project_participants_student_number_check check (student_number ~ '^[0-9]{7}$'),
+  constraint showcase_project_participants_owner_position_check check (is_owner = (position = 0)),
+  unique (project_id, position)
+);
+-- The same student may appear in only one project roster per event.
+-- Withdrawing a project deletes its roster, freeing the student numbers.
+create unique index if not exists showcase_project_participants_student_idx
+  on public.showcase_project_participants(event_id, student_number);
+
+create table if not exists public.showcase_registrations (
+  id uuid primary key default uuid_generate_v4(),
+  event_id uuid not null references public.showcase_events(id) on delete cascade,
+  member_id uuid references public.members(id) on delete set null,
+  student_number text,
+  consented_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  constraint showcase_registrations_student_number_check
+    check (student_number is null or student_number ~ '^[0-9]{7}$')
+);
+create unique index if not exists showcase_registrations_member_idx
+  on public.showcase_registrations(event_id, member_id) where member_id is not null;
+create unique index if not exists showcase_registrations_student_idx
+  on public.showcase_registrations(event_id, student_number) where student_number is not null;
+
+create table if not exists public.showcase_project_views (
+  id uuid primary key default uuid_generate_v4(),
+  event_id uuid not null references public.showcase_events(id) on delete cascade,
+  project_id uuid not null references public.showcase_projects(id) on delete cascade,
+  member_id uuid references public.members(id) on delete set null,
+  created_at timestamptz not null default now(),
+  unique (event_id, project_id, member_id)
+);
+create index if not exists showcase_project_views_project_idx
+  on public.showcase_project_views(event_id, project_id);
+
+create table if not exists public.showcase_experiences (
+  id uuid primary key default uuid_generate_v4(),
+  event_id uuid not null references public.showcase_events(id) on delete cascade,
+  project_id uuid not null references public.showcase_projects(id) on delete cascade,
+  member_id uuid references public.members(id) on delete set null,
+  started_at timestamptz not null default now(),
+  unique (event_id, project_id, member_id)
+);
+create index if not exists showcase_experiences_member_idx
+  on public.showcase_experiences(event_id, member_id);
+
+-- A submitted feedback row is the proof of one valid experience (60 seconds
+-- after the experience start). Hiding moderates the text only.
+create table if not exists public.showcase_feedback (
+  id uuid primary key default uuid_generate_v4(),
+  event_id uuid not null references public.showcase_events(id) on delete cascade,
+  project_id uuid not null references public.showcase_projects(id) on delete cascade,
+  member_id uuid references public.members(id) on delete set null,
+  body text not null,
+  created_at timestamptz not null default now(),
+  hidden_at timestamptz,
+  hidden_by_admin_id uuid references public.admin_accounts(id) on delete set null,
+  constraint showcase_feedback_body_check check (char_length(btrim(body)) between 10 and 300),
+  unique (event_id, project_id, member_id)
+);
+create index if not exists showcase_feedback_project_idx
+  on public.showcase_feedback(event_id, project_id, created_at desc);
+create index if not exists showcase_feedback_member_idx
+  on public.showcase_feedback(event_id, member_id);
+
+create table if not exists public.showcase_interests (
+  id uuid primary key default uuid_generate_v4(),
+  event_id uuid not null references public.showcase_events(id) on delete cascade,
+  project_id uuid not null references public.showcase_projects(id) on delete cascade,
+  member_id uuid references public.members(id) on delete set null,
+  created_at timestamptz not null default now(),
+  unique (event_id, project_id, member_id)
+);
+create index if not exists showcase_interests_project_idx
+  on public.showcase_interests(event_id, project_id);
+
+create table if not exists public.showcase_candidate_exclusions (
+  id uuid primary key default uuid_generate_v4(),
+  event_id uuid not null references public.showcase_events(id) on delete cascade,
+  candidate_group text not null,
+  project_id uuid references public.showcase_projects(id) on delete cascade,
+  member_id uuid references public.members(id) on delete set null,
+  reason text not null,
+  excluded_by_admin_id uuid references public.admin_accounts(id) on delete set null,
+  created_at timestamptz not null default now(),
+  restored_at timestamptz,
+  restored_by_admin_id uuid references public.admin_accounts(id) on delete set null,
+  constraint showcase_candidate_exclusions_group_check
+    check (candidate_group in ('submitter', 'experiencer')),
+  -- Experiencer exclusions keep their row (with a detached member) after purge.
+  constraint showcase_candidate_exclusions_target_check
+    check (candidate_group <> 'submitter' or project_id is not null),
+  constraint showcase_candidate_exclusions_reason_check
+    check (char_length(btrim(reason)) between 2 and 500)
+);
+create unique index if not exists showcase_candidate_exclusions_active_project_idx
+  on public.showcase_candidate_exclusions(event_id, project_id)
+  where restored_at is null and candidate_group = 'submitter';
+create unique index if not exists showcase_candidate_exclusions_active_member_idx
+  on public.showcase_candidate_exclusions(event_id, member_id)
+  where restored_at is null and candidate_group = 'experiencer' and member_id is not null;
+
+create table if not exists public.showcase_draws (
+  id uuid primary key default uuid_generate_v4(),
+  event_id uuid not null references public.showcase_events(id) on delete cascade,
+  candidate_group text not null,
+  draw_kind text not null,
+  requested_count integer not null,
+  candidate_count integer not null,
+  ticket_count integer not null,
+  replaces_winner_id uuid,
+  admin_id uuid references public.admin_accounts(id) on delete set null,
+  created_at timestamptz not null default now(),
+  constraint showcase_draws_group_check check (candidate_group in ('submitter', 'experiencer')),
+  constraint showcase_draws_kind_check check (draw_kind in ('initial', 'redraw')),
+  constraint showcase_draws_count_check
+    check (requested_count between 1 and 500 and candidate_count >= 0 and ticket_count >= candidate_count),
+  constraint showcase_draws_redraw_check check ((draw_kind = 'redraw') = (replaces_winner_id is not null))
+);
+create unique index if not exists showcase_draws_initial_idx
+  on public.showcase_draws(event_id, candidate_group) where draw_kind = 'initial';
+
+create table if not exists public.showcase_winners (
+  id uuid primary key default uuid_generate_v4(),
+  event_id uuid not null references public.showcase_events(id) on delete cascade,
+  draw_id uuid not null references public.showcase_draws(id) on delete cascade,
+  candidate_group text not null,
+  member_id uuid references public.members(id) on delete set null,
+  project_id uuid references public.showcase_projects(id) on delete set null,
+  project_title text,
+  masked_name text not null,
+  masked_student_number text not null,
+  position smallint not null,
+  status text not null default 'active',
+  void_reason text,
+  voided_at timestamptz,
+  voided_by_admin_id uuid references public.admin_accounts(id) on delete set null,
+  delivered_at timestamptz,
+  delivered_by_admin_id uuid references public.admin_accounts(id) on delete set null,
+  created_at timestamptz not null default now(),
+  constraint showcase_winners_group_check check (candidate_group in ('submitter', 'experiencer')),
+  constraint showcase_winners_status_check check (status in ('active', 'voided')),
+  constraint showcase_winners_void_check
+    check (
+      (status = 'active' and void_reason is null and voided_at is null)
+      or (status = 'voided' and void_reason in ('duplicate', 'unreachable', 'verification_failed') and voided_at is not null)
+    ),
+  constraint showcase_winners_masked_check
+    check (char_length(masked_name) between 2 and 40 and masked_student_number ~ '^[0-9]{2}\*{4}[0-9]{2}$'),
+  constraint showcase_winners_submitter_project_check
+    check (candidate_group <> 'submitter' or project_title is not null),
+  constraint showcase_winners_position_check check (position between 1 and 500)
+);
+alter table public.showcase_draws
+  drop constraint if exists showcase_draws_replaces_winner_fkey;
+alter table public.showcase_draws
+  add constraint showcase_draws_replaces_winner_fkey
+  foreign key (replaces_winner_id) references public.showcase_winners(id) on delete set null;
+-- 1인 1경품 across both groups, and one prize per submitted project.
+create unique index if not exists showcase_winners_active_member_idx
+  on public.showcase_winners(event_id, member_id) where status = 'active' and member_id is not null;
+create unique index if not exists showcase_winners_active_project_idx
+  on public.showcase_winners(event_id, project_id)
+  where status = 'active' and candidate_group = 'submitter' and project_id is not null;
+create index if not exists showcase_winners_public_idx
+  on public.showcase_winners(event_id, candidate_group, status, position);
+
+drop trigger if exists showcase_events_set_updated_at on public.showcase_events;
+create trigger showcase_events_set_updated_at
+  before update on public.showcase_events
+  for each row execute function public.set_partnership_updated_at();
+
+drop trigger if exists showcase_projects_set_updated_at on public.showcase_projects;
+create trigger showcase_projects_set_updated_at
+  before update on public.showcase_projects
+  for each row execute function public.set_partnership_updated_at();
+
+do $$
+declare
+  table_name text;
+begin
+  foreach table_name in array array[
+    'showcase_events', 'showcase_projects', 'showcase_project_participants',
+    'showcase_registrations', 'showcase_project_views', 'showcase_experiences',
+    'showcase_feedback', 'showcase_interests', 'showcase_candidate_exclusions',
+    'showcase_draws', 'showcase_winners'
+  ] loop
+    execute format('alter table public.%I enable row level security', table_name);
+    execute format('revoke all on table public.%I from public, anon, authenticated', table_name);
+    execute format('grant select, insert, update, delete on table public.%I to service_role', table_name);
+  end loop;
+end;
+$$;
+
+comment on table public.showcase_project_participants is
+  'Private roster names and 7-digit student numbers. Service-role only; deleted on withdrawal and by the post-settlement purge.';
+comment on table public.showcase_registrations is
+  'Experience participation registration (student number + announcement consent). Service-role only.';
+comment on table public.showcase_feedback is
+  'One-line feedback; a row is one valid experience. Owners see body text only, never the author.';
+comment on table public.showcase_winners is
+  'Draw results with masked display snapshots. Member links are detached by the post-settlement purge.';
+
+alter table public.image_upload_sessions
+  drop constraint if exists image_upload_sessions_purpose_check;
+alter table public.image_upload_sessions
+  add constraint image_upload_sessions_purpose_check
+  check (purpose in (
+    'partner', 'partner-registration', 'partner-change-request', 'review',
+    'profile', 'member-signup-profile', 'graduate-verification',
+    'manual-member-import', 'promotion', 'showcase-project'
+  ));
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'showcase-projects', 'showcase-projects', true, 10485760,
+  array['image/webp']::text[]
+)
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+-- Submission writes ---------------------------------------------------------
+
+create or replace function public.showcase_assert_submission_open(p_event_id uuid)
+returns void
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  if not exists (
+    select 1 from public.showcase_events event_row
+    where event_row.id = p_event_id
+      and event_row.is_active
+      and event_row.submission_start_at <= now()
+      and now() < event_row.submission_end_at
+  ) then
+    raise exception 'showcase_submission_closed';
+  end if;
+end;
+$$;
+
+create or replace function public.showcase_replace_participants(
+  p_event_id uuid,
+  p_project_id uuid,
+  p_owner_name text,
+  p_owner_student_number text,
+  p_teammates jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  if p_teammates is null or jsonb_typeof(p_teammates) <> 'array'
+    or jsonb_array_length(p_teammates) > 19 then
+    raise exception 'showcase_participants_invalid';
+  end if;
+
+  delete from public.showcase_project_participants where project_id = p_project_id;
+
+  begin
+    insert into public.showcase_project_participants (
+      event_id, project_id, position, name, student_number, is_owner
+    ) values (
+      p_event_id, p_project_id, 0, btrim(p_owner_name), btrim(p_owner_student_number), true
+    );
+
+    insert into public.showcase_project_participants (
+      event_id, project_id, position, name, student_number, is_owner
+    )
+    select p_event_id, p_project_id, (teammate.ordinality)::smallint,
+      btrim(teammate.value ->> 'name'), btrim(teammate.value ->> 'student_number'), false
+    from jsonb_array_elements(p_teammates) with ordinality as teammate(value, ordinality);
+  exception when unique_violation then
+    raise exception 'showcase_student_number_taken';
+  end;
+end;
+$$;
+
+create or replace function public.create_showcase_project(
+  p_event_id uuid,
+  p_project_id uuid,
+  p_owner_member_id uuid,
+  p_owner_name text,
+  p_project_type text,
+  p_title text,
+  p_team_name text,
+  p_summary text,
+  p_description text,
+  p_service_url text,
+  p_image_url text,
+  p_image_upload_id uuid,
+  p_owner_student_number text,
+  p_teammates jsonb
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  perform public.showcase_assert_submission_open(p_event_id);
+
+  begin
+    insert into public.showcase_projects (
+      id, event_id, owner_member_id, project_type, title, team_name, summary,
+      description, service_url, image_url, image_upload_id, announcement_consented_at
+    ) values (
+      p_project_id, p_event_id, p_owner_member_id, p_project_type, btrim(p_title),
+      nullif(btrim(coalesce(p_team_name, '')), ''), btrim(p_summary), btrim(p_description),
+      btrim(p_service_url), p_image_url, p_image_upload_id, now()
+    );
+  exception when unique_violation then
+    raise exception 'showcase_owner_already_submitted';
+  end;
+
+  perform public.showcase_replace_participants(
+    p_event_id, p_project_id, p_owner_name, p_owner_student_number, p_teammates
+  );
+  return p_project_id;
+end;
+$$;
+
+create or replace function public.update_showcase_project(
+  p_project_id uuid,
+  p_owner_member_id uuid,
+  p_owner_name text,
+  p_project_type text,
+  p_title text,
+  p_team_name text,
+  p_summary text,
+  p_description text,
+  p_service_url text,
+  p_image_url text,
+  p_image_upload_id uuid,
+  p_owner_student_number text,
+  p_teammates jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  project_row public.showcase_projects%rowtype;
+begin
+  select * into project_row
+  from public.showcase_projects
+  where id = p_project_id and owner_member_id = p_owner_member_id
+  for update;
+  if not found then
+    raise exception 'showcase_project_not_found';
+  end if;
+  perform public.showcase_assert_submission_open(project_row.event_id);
+  if project_row.status not in ('pending', 'changes_requested') then
+    raise exception 'showcase_project_not_editable';
+  end if;
+
+  update public.showcase_projects
+  set project_type = p_project_type,
+      title = btrim(p_title),
+      team_name = nullif(btrim(coalesce(p_team_name, '')), ''),
+      summary = btrim(p_summary),
+      description = btrim(p_description),
+      service_url = btrim(p_service_url),
+      image_url = coalesce(p_image_url, image_url),
+      image_upload_id = coalesce(p_image_upload_id, image_upload_id),
+      announcement_consented_at = now(),
+      status = 'pending'
+  where id = p_project_id;
+
+  perform public.showcase_replace_participants(
+    project_row.event_id, p_project_id, p_owner_name, p_owner_student_number, p_teammates
+  );
+end;
+$$;
+
+create or replace function public.withdraw_showcase_project(
+  p_project_id uuid,
+  p_owner_member_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  project_row public.showcase_projects%rowtype;
+begin
+  select * into project_row
+  from public.showcase_projects
+  where id = p_project_id and owner_member_id = p_owner_member_id
+  for update;
+  if not found then
+    raise exception 'showcase_project_not_found';
+  end if;
+  perform public.showcase_assert_submission_open(project_row.event_id);
+  if project_row.status = 'withdrawn' then
+    raise exception 'showcase_project_not_editable';
+  end if;
+
+  update public.showcase_projects
+  set status = 'withdrawn', withdrawn_at = now()
+  where id = p_project_id;
+  delete from public.showcase_project_participants where project_id = p_project_id;
+end;
+$$;
+
+create or replace function public.review_showcase_project(
+  p_project_id uuid,
+  p_admin_id uuid,
+  p_status text,
+  p_review_note text
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  if p_status not in ('approved', 'changes_requested', 'rejected', 'hidden')
+    or char_length(coalesce(p_review_note, '')) > 2000 then
+    raise exception 'showcase_review_invalid';
+  end if;
+
+  update public.showcase_projects
+  set status = p_status,
+      review_note = nullif(btrim(coalesce(p_review_note, '')), ''),
+      reviewed_by_admin_id = p_admin_id,
+      reviewed_at = now()
+  where id = p_project_id and status <> 'withdrawn';
+  if not found then
+    raise exception 'showcase_project_not_found';
+  end if;
+end;
+$$;
+
+-- Experience-phase reads/writes ------------------------------------------------
+
+create or replace function public.record_showcase_project_view(
+  p_project_id uuid,
+  p_member_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  inserted_count integer;
+begin
+  if p_project_id is null or p_member_id is null then
+    return false;
+  end if;
+
+  insert into public.showcase_project_views (event_id, project_id, member_id)
+  select event_row.id, project_row.id, p_member_id
+  from public.showcase_projects project_row
+  join public.showcase_events event_row on event_row.id = project_row.event_id
+  where project_row.id = p_project_id
+    and project_row.status = 'approved'
+    and project_row.owner_member_id is distinct from p_member_id
+    and event_row.is_active
+    and event_row.experience_start_at <= now()
+    and now() < event_row.experience_end_at
+  on conflict (event_id, project_id, member_id) do nothing;
+
+  get diagnostics inserted_count = row_count;
+  return inserted_count = 1;
+end;
+$$;
+
+create or replace function public.get_showcase_project_counts(p_event_id uuid)
+returns table(
+  project_id uuid,
+  view_count bigint,
+  experience_count bigint,
+  valid_experience_count bigint,
+  interest_count bigint
+)
+language sql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+  select project.id,
+    (select count(*) from public.showcase_project_views v where v.project_id = project.id),
+    (select count(*) from public.showcase_experiences e where e.project_id = project.id),
+    (select count(*) from public.showcase_feedback f where f.project_id = project.id),
+    (select count(*) from public.showcase_interests i where i.project_id = project.id)
+  from public.showcase_projects project
+  where project.event_id = p_event_id;
+$$;
+
+do $$
+declare
+  signature text;
+begin
+  foreach signature in array array[
+    'public.showcase_assert_submission_open(uuid)',
+    'public.showcase_replace_participants(uuid, uuid, text, text, jsonb)',
+    'public.create_showcase_project(uuid, uuid, uuid, text, text, text, text, text, text, text, text, uuid, text, jsonb)',
+    'public.update_showcase_project(uuid, uuid, text, text, text, text, text, text, text, text, uuid, text, jsonb)',
+    'public.withdraw_showcase_project(uuid, uuid)',
+    'public.review_showcase_project(uuid, uuid, text, text)',
+    'public.record_showcase_project_view(uuid, uuid)',
+    'public.get_showcase_project_counts(uuid)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', signature);
+    execute format('grant execute on function %s to service_role', signature);
+  end loop;
+end;
+$$;
+
+insert into public.promotion_slides (
+  id, display_order, title, subtitle, image_src, image_alt, href,
+  is_active, audiences, allowed_campuses, event_slug, sponsor_label
+)
+values (
+  'be48d541-6e8f-45d3-a50d-04baf4bf4801'::uuid,
+  1,
+  '내 프로젝트를 소개합니다!',
+  'SSAFY 구성원이 만든 서비스를 소개하고 함께 체험해 보세요.',
+  '/ads/project-showcase.png',
+  'SSAFY가 만든 프로젝트를 직접 둘러보고 체험해 보세요',
+  '/events/project-showcase',
+  false,
+  array['guest', 'student', 'graduate', 'staff']::text[],
+  '{}'::text[],
+  null,
+  ''
+)
+on conflict (id) do update set
+  title = excluded.title,
+  subtitle = excluded.subtitle,
+  image_src = excluded.image_src,
+  image_alt = excluded.image_alt,
+  href = excluded.href,
+  audiences = excluded.audiences,
+  allowed_campuses = excluded.allowed_campuses,
+  event_slug = excluded.event_slug,
+  sponsor_label = excluded.sponsor_label;
+
+-- Snapshot of 20260925220016_add_showcase_admin_analytics.sql
+-- Aggregate and activity reads for the showcase admin screens. Both functions
+-- are service-role only and return no member IDs, student numbers, IP
+-- addresses, user agents or feedback authors.
+
+create or replace function public.get_showcase_admin_metrics(p_event_id uuid)
+returns table(
+  status_counts jsonb,
+  type_counts jsonb,
+  total_unique_views bigint,
+  total_experience_starts bigint,
+  total_valid_experiences bigint,
+  total_interests bigint,
+  registered_experiencers bigint,
+  completed_draws bigint,
+  active_winners bigint,
+  project_stats jsonb
+)
+language sql
+stable
+security definer
+set search_path = pg_catalog, public
+as $function$
+  select
+    coalesce((
+      select jsonb_object_agg(status_row.status, status_row.total)
+      from (
+        select project.status, count(*) as total
+        from public.showcase_projects project
+        where project.event_id = p_event_id
+        group by project.status
+      ) status_row
+    ), '{}'::jsonb),
+    coalesce((
+      select jsonb_object_agg(type_row.project_type, type_row.total)
+      from (
+        select project.project_type, count(*) as total
+        from public.showcase_projects project
+        where project.event_id = p_event_id and project.status <> 'withdrawn'
+        group by project.project_type
+      ) type_row
+    ), '{}'::jsonb),
+    (select count(*) from public.showcase_project_views v where v.event_id = p_event_id),
+    (select count(*) from public.showcase_experiences e where e.event_id = p_event_id),
+    (select count(*) from public.showcase_feedback f where f.event_id = p_event_id),
+    (select count(*) from public.showcase_interests i where i.event_id = p_event_id),
+    (select count(*) from public.showcase_registrations r where r.event_id = p_event_id),
+    (select count(*) from public.showcase_draws d where d.event_id = p_event_id and d.draw_kind = 'initial'),
+    (select count(*) from public.showcase_winners w where w.event_id = p_event_id and w.status = 'active'),
+    coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'id', counts.project_id,
+        'title', project.title,
+        'project_type', project.project_type,
+        'view_count', counts.view_count,
+        'experience_count', counts.experience_count,
+        'valid_experience_count', counts.valid_experience_count,
+        'interest_count', counts.interest_count
+      ) order by project.title)
+      from public.get_showcase_project_counts(p_event_id) counts
+      join public.showcase_projects project on project.id = counts.project_id
+      where project.status = 'approved'
+    ), '[]'::jsonb);
+$function$;
+
+create or replace function public.list_showcase_admin_activity(
+  p_event_id uuid,
+  p_limit integer default 51,
+  p_before_at timestamptz default null,
+  p_before_id uuid default null,
+  p_activity_type text default null
+)
+returns table(
+  activity_id uuid,
+  occurred_at timestamptz,
+  activity_type text,
+  project_id uuid,
+  project_title text,
+  actor_type text,
+  details jsonb
+)
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $function$
+begin
+  if p_limit is null or p_limit < 1 or p_limit > 101 then
+    raise exception 'showcase_activity_limit_invalid';
+  end if;
+  if (p_before_at is null) <> (p_before_id is null) then
+    raise exception 'showcase_activity_cursor_invalid';
+  end if;
+  if p_activity_type is not null and p_activity_type not in (
+    'project_submitted', 'project_withdrawn', 'project_viewed', 'experience_started',
+    'feedback_submitted', 'project_reviewed', 'event_settings_updated', 'draw_created'
+  ) then
+    raise exception 'showcase_activity_type_invalid';
+  end if;
+
+  return query
+  with event_info as (
+    select event_row.id, event_row.slug, event_row.title
+    from public.showcase_events event_row
+    where event_row.id = p_event_id
+  ), activity as (
+    select project.id as activity_id, project.created_at as occurred_at,
+      'project_submitted'::text as activity_type, project.id as project_id,
+      project.title as project_title, 'member'::text as actor_type,
+      jsonb_build_object('project_type', project.project_type) as details
+    from public.showcase_projects project
+    where project.event_id = p_event_id
+
+    union all
+    select project.id, project.withdrawn_at, 'project_withdrawn', project.id, project.title,
+      'member', '{}'::jsonb
+    from public.showcase_projects project
+    where project.event_id = p_event_id and project.withdrawn_at is not null
+
+    union all
+    select v.id, v.created_at, 'project_viewed', project.id, project.title, 'member', '{}'::jsonb
+    from public.showcase_project_views v
+    join public.showcase_projects project on project.id = v.project_id
+    where v.event_id = p_event_id
+
+    union all
+    select e.id, e.started_at, 'experience_started', project.id, project.title, 'member', '{}'::jsonb
+    from public.showcase_experiences e
+    join public.showcase_projects project on project.id = e.project_id
+    where e.event_id = p_event_id
+
+    union all
+    select f.id, f.created_at, 'feedback_submitted', project.id, project.title, 'member', '{}'::jsonb
+    from public.showcase_feedback f
+    join public.showcase_projects project on project.id = f.project_id
+    where f.event_id = p_event_id
+
+    union all
+    select d.id, d.created_at, 'draw_created', null::uuid, event_info.title, 'admin',
+      jsonb_build_object(
+        'candidate_group', d.candidate_group,
+        'candidate_count', d.candidate_count,
+        'selected_count', (select count(*) from public.showcase_winners w where w.draw_id = d.id)
+      )
+    from public.showcase_draws d
+    join event_info on event_info.id = d.event_id
+
+    union all
+    select audit.id, audit.created_at,
+      case audit.action when 'showcase_project_review' then 'project_reviewed' else 'event_settings_updated' end,
+      project.id, coalesce(project.title, event_info.title), 'admin',
+      jsonb_strip_nulls(jsonb_build_object(
+        'status', audit.properties ->> 'status',
+        'is_active', audit.properties -> 'is_active'
+      ))
+    from public.admin_audit_logs audit
+    cross join event_info
+    left join public.showcase_projects project
+      on audit.target_type = 'showcase_project'
+      and audit.target_id = project.id::text
+      and project.event_id = event_info.id
+    where (
+        (audit.action = 'showcase_event_settings_update'
+          and audit.target_type = 'showcase_event' and audit.target_id = event_info.slug)
+        or (audit.action = 'showcase_project_review'
+          and audit.target_type = 'showcase_project' and project.id is not null)
+      )
+      and audit.created_at is not null
+  )
+  select activity.activity_id, activity.occurred_at, activity.activity_type, activity.project_id,
+    activity.project_title, activity.actor_type, activity.details
+  from activity
+  where (p_activity_type is null or activity.activity_type = p_activity_type)
+    and (p_before_at is null or (activity.occurred_at, activity.activity_id) < (p_before_at, p_before_id))
+  order by activity.occurred_at desc, activity.activity_id desc
+  limit p_limit;
+end;
+$function$;
+
+do $$
+declare
+  signature text;
+begin
+  foreach signature in array array[
+    'public.get_showcase_admin_metrics(uuid)',
+    'public.list_showcase_admin_activity(uuid, integer, timestamptz, uuid, text)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', signature);
+    execute format('grant execute on function %s to service_role', signature);
+  end loop;
+end;
+$$;
+
+-- Snapshot of 20260926112840_add_showcase_experience_rpcs.sql
+-- Project showcase experience phase: participation registration, experience
+-- start, 60-second feedback gate, interest toggles and feedback moderation.
+-- Every function is service-role only and enforces the phase, ownership and
+-- uniqueness rules at the database boundary.
+
+create or replace function public.showcase_assert_experience_open(p_event_id uuid)
+returns void
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  if not exists (
+    select 1 from public.showcase_events event_row
+    where event_row.id = p_event_id
+      and event_row.is_active
+      and event_row.experience_start_at <= now()
+      and now() < event_row.experience_end_at
+  ) then
+    raise exception 'showcase_experience_closed';
+  end if;
+end;
+$$;
+
+-- Resolves an approved project and asserts that the experience phase is open.
+create or replace function public.showcase_open_project(p_project_id uuid)
+returns public.showcase_projects
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  project_row public.showcase_projects%rowtype;
+begin
+  select * into project_row
+  from public.showcase_projects
+  where id = p_project_id and status = 'approved';
+  if not found then
+    raise exception 'showcase_project_not_found';
+  end if;
+  perform public.showcase_assert_experience_open(project_row.event_id);
+  return project_row;
+end;
+$$;
+
+create or replace function public.register_showcase_participant(
+  p_event_id uuid,
+  p_member_id uuid,
+  p_student_number text
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  perform public.showcase_assert_experience_open(p_event_id);
+  if p_member_id is null or btrim(coalesce(p_student_number, '')) !~ '^[0-9]{7}$' then
+    raise exception 'showcase_registration_invalid';
+  end if;
+  if exists (
+    select 1 from public.showcase_registrations
+    where event_id = p_event_id and member_id = p_member_id
+  ) then
+    raise exception 'showcase_registration_exists';
+  end if;
+
+  begin
+    insert into public.showcase_registrations (event_id, member_id, student_number, consented_at)
+    values (p_event_id, p_member_id, btrim(p_student_number), now());
+  exception when unique_violation then
+    raise exception 'showcase_student_number_taken';
+  end;
+end;
+$$;
+
+create or replace function public.start_showcase_experience(
+  p_project_id uuid,
+  p_member_id uuid
+)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  project_row public.showcase_projects%rowtype;
+  started timestamptz;
+begin
+  project_row := public.showcase_open_project(p_project_id);
+  if p_member_id is null or project_row.owner_member_id = p_member_id then
+    raise exception 'showcase_own_project';
+  end if;
+  if not exists (
+    select 1 from public.showcase_registrations
+    where event_id = project_row.event_id and member_id = p_member_id
+  ) then
+    raise exception 'showcase_registration_required';
+  end if;
+
+  insert into public.showcase_experiences (event_id, project_id, member_id)
+  values (project_row.event_id, project_row.id, p_member_id)
+  on conflict (event_id, project_id, member_id) do nothing;
+
+  select started_at into started
+  from public.showcase_experiences
+  where event_id = project_row.event_id and project_id = project_row.id and member_id = p_member_id;
+  return started;
+end;
+$$;
+
+create or replace function public.submit_showcase_feedback(
+  p_project_id uuid,
+  p_member_id uuid,
+  p_body text
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  project_row public.showcase_projects%rowtype;
+  started timestamptz;
+begin
+  project_row := public.showcase_open_project(p_project_id);
+  if char_length(btrim(coalesce(p_body, ''))) not between 10 and 300 then
+    raise exception 'showcase_feedback_invalid';
+  end if;
+
+  select started_at into started
+  from public.showcase_experiences
+  where event_id = project_row.event_id and project_id = project_row.id and member_id = p_member_id;
+  if started is null then
+    raise exception 'showcase_experience_not_started';
+  end if;
+  if now() < started + interval '60 seconds' then
+    raise exception 'showcase_feedback_too_early';
+  end if;
+
+  begin
+    insert into public.showcase_feedback (event_id, project_id, member_id, body)
+    values (project_row.event_id, project_row.id, p_member_id, btrim(p_body));
+  exception when unique_violation then
+    raise exception 'showcase_feedback_exists';
+  end;
+end;
+$$;
+
+create or replace function public.set_showcase_interest(
+  p_project_id uuid,
+  p_member_id uuid,
+  p_interested boolean
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  project_row public.showcase_projects%rowtype;
+begin
+  project_row := public.showcase_open_project(p_project_id);
+  if p_member_id is null or project_row.owner_member_id = p_member_id then
+    raise exception 'showcase_own_project';
+  end if;
+
+  if coalesce(p_interested, false) then
+    insert into public.showcase_interests (event_id, project_id, member_id)
+    values (project_row.event_id, project_row.id, p_member_id)
+    on conflict (event_id, project_id, member_id) do nothing;
+  else
+    delete from public.showcase_interests
+    where event_id = project_row.event_id and project_id = project_row.id and member_id = p_member_id;
+  end if;
+  return coalesce(p_interested, false);
+end;
+$$;
+
+create or replace function public.set_showcase_feedback_hidden(
+  p_feedback_id uuid,
+  p_admin_id uuid,
+  p_hidden boolean
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  update public.showcase_feedback
+  set hidden_at = case when coalesce(p_hidden, false) then now() else null end,
+      hidden_by_admin_id = case when coalesce(p_hidden, false) then p_admin_id else null end
+  where id = p_feedback_id;
+  if not found then
+    raise exception 'showcase_feedback_not_found';
+  end if;
+end;
+$$;
+
+do $$
+declare
+  signature text;
+begin
+  foreach signature in array array[
+    'public.showcase_assert_experience_open(uuid)',
+    'public.showcase_open_project(uuid)',
+    'public.register_showcase_participant(uuid, uuid, text)',
+    'public.start_showcase_experience(uuid, uuid)',
+    'public.submit_showcase_feedback(uuid, uuid, text)',
+    'public.set_showcase_interest(uuid, uuid, boolean)',
+    'public.set_showcase_feedback_hidden(uuid, uuid, boolean)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', signature);
+    execute format('grant execute on function %s to service_role', signature);
+  end loop;
+end;
+$$;
+
+-- Snapshot of 20260926121241_add_showcase_draw_rpcs.sql
+-- Project showcase verification, prize draws, delivery, settlement and the
+-- post-settlement purge. Random selection happens on the server with a CSPRNG;
+-- these service-role functions re-check phase, order, eligibility and the
+-- one-prize-per-person rule before anything is recorded.
+
+create or replace function public.showcase_assert_draw_open(p_event_id uuid)
+returns void
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  if not exists (
+    select 1 from public.showcase_events event_row
+    where event_row.id = p_event_id
+      and event_row.is_active
+      and event_row.experience_end_at <= now()
+      and event_row.settled_at is null
+  ) then
+    raise exception 'showcase_draw_closed';
+  end if;
+end;
+$$;
+
+create or replace function public.create_showcase_candidate_exclusion(
+  p_event_id uuid,
+  p_candidate_group text,
+  p_project_id uuid,
+  p_member_id uuid,
+  p_reason text,
+  p_admin_id uuid
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  exclusion_id uuid;
+begin
+  perform public.showcase_assert_draw_open(p_event_id);
+  if char_length(btrim(coalesce(p_reason, ''))) not between 2 and 500 then
+    raise exception 'showcase_exclusion_invalid';
+  end if;
+  if p_candidate_group = 'submitter' then
+    if p_project_id is null or not exists (
+      select 1 from public.showcase_projects
+      where id = p_project_id and event_id = p_event_id and status = 'approved'
+    ) then
+      raise exception 'showcase_exclusion_invalid';
+    end if;
+  elsif p_candidate_group = 'experiencer' then
+    if p_member_id is null or not exists (
+      select 1 from public.showcase_registrations
+      where event_id = p_event_id and member_id = p_member_id
+    ) then
+      raise exception 'showcase_exclusion_invalid';
+    end if;
+  else
+    raise exception 'showcase_exclusion_invalid';
+  end if;
+
+  begin
+    insert into public.showcase_candidate_exclusions (
+      event_id, candidate_group, project_id, member_id, reason, excluded_by_admin_id
+    ) values (
+      p_event_id, p_candidate_group,
+      case when p_candidate_group = 'submitter' then p_project_id end,
+      case when p_candidate_group = 'experiencer' then p_member_id end,
+      btrim(p_reason), p_admin_id
+    ) returning id into exclusion_id;
+  exception when unique_violation then
+    raise exception 'showcase_exclusion_exists';
+  end;
+  return exclusion_id;
+end;
+$$;
+
+create or replace function public.restore_showcase_candidate_exclusion(
+  p_exclusion_id uuid,
+  p_admin_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  exclusion_row public.showcase_candidate_exclusions%rowtype;
+begin
+  select * into exclusion_row
+  from public.showcase_candidate_exclusions
+  where id = p_exclusion_id and restored_at is null
+  for update;
+  if not found then
+    raise exception 'showcase_exclusion_not_found';
+  end if;
+  perform public.showcase_assert_draw_open(exclusion_row.event_id);
+  update public.showcase_candidate_exclusions
+  set restored_at = now(), restored_by_admin_id = p_admin_id
+  where id = p_exclusion_id;
+end;
+$$;
+
+create or replace function public.create_showcase_draw(
+  p_event_id uuid,
+  p_candidate_group text,
+  p_draw_kind text,
+  p_replaces_winner_id uuid,
+  p_admin_id uuid,
+  p_requested_count integer,
+  p_candidate_count integer,
+  p_ticket_count integer,
+  p_winners jsonb
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  draw_id uuid;
+  replaced public.showcase_winners%rowtype;
+  item record;
+  project_row public.showcase_projects%rowtype;
+  next_position integer;
+begin
+  perform public.showcase_assert_draw_open(p_event_id);
+  if p_candidate_group not in ('submitter', 'experiencer')
+    or p_draw_kind not in ('initial', 'redraw')
+    or p_requested_count not between 1 and 500
+    or p_candidate_count < 0
+    or p_ticket_count < p_candidate_count
+    or p_winners is null or jsonb_typeof(p_winners) <> 'array'
+    or jsonb_array_length(p_winners) > least(p_requested_count, p_candidate_count) then
+    raise exception 'showcase_draw_invalid';
+  end if;
+
+  -- 출품 추첨이 먼저, 체험 추첨이 나중이다.
+  if p_draw_kind = 'initial' and p_candidate_group = 'experiencer' and not exists (
+    select 1 from public.showcase_draws
+    where event_id = p_event_id and candidate_group = 'submitter' and draw_kind = 'initial'
+  ) then
+    raise exception 'showcase_draw_order_invalid';
+  end if;
+
+  if p_draw_kind = 'redraw' then
+    select * into replaced
+    from public.showcase_winners
+    where id = p_replaces_winner_id and event_id = p_event_id
+    for update;
+    if not found or replaced.status <> 'voided' or replaced.candidate_group <> p_candidate_group
+      or p_requested_count <> 1
+      or exists (select 1 from public.showcase_draws where replaces_winner_id = p_replaces_winner_id) then
+      raise exception 'showcase_redraw_invalid';
+    end if;
+  elsif p_replaces_winner_id is not null then
+    raise exception 'showcase_draw_invalid';
+  end if;
+
+  begin
+    insert into public.showcase_draws (
+      event_id, candidate_group, draw_kind, requested_count, candidate_count,
+      ticket_count, replaces_winner_id, admin_id
+    ) values (
+      p_event_id, p_candidate_group, p_draw_kind, p_requested_count, p_candidate_count,
+      p_ticket_count, p_replaces_winner_id, p_admin_id
+    ) returning id into draw_id;
+  exception when unique_violation then
+    raise exception 'showcase_draw_exists';
+  end;
+
+  next_position := case when p_draw_kind = 'redraw' then replaced.position else 1 end;
+  for item in
+    select * from jsonb_to_recordset(p_winners) as winner(
+      member_id uuid, project_id uuid, masked_name text, masked_student_number text
+    )
+  loop
+    if item.member_id is null then
+      raise exception 'showcase_winner_ineligible';
+    end if;
+    if exists (
+      select 1 from public.showcase_winners previous
+      where previous.event_id = p_event_id and previous.member_id = item.member_id
+    ) then
+      raise exception 'showcase_winner_duplicate';
+    end if;
+    if exists (
+      select 1 from public.showcase_candidate_exclusions exclusion
+      where exclusion.event_id = p_event_id and exclusion.restored_at is null
+        and ((exclusion.candidate_group = 'submitter' and exclusion.project_id = item.project_id)
+          or (exclusion.candidate_group = 'experiencer' and exclusion.member_id = item.member_id))
+    ) then
+      raise exception 'showcase_winner_ineligible';
+    end if;
+
+    if p_candidate_group = 'submitter' then
+      select * into project_row
+      from public.showcase_projects
+      where id = item.project_id and event_id = p_event_id and status = 'approved'
+        and owner_member_id = item.member_id;
+      if not found then
+        raise exception 'showcase_winner_ineligible';
+      end if;
+    elsif not exists (
+      select 1 from public.showcase_registrations
+      where event_id = p_event_id and member_id = item.member_id
+    ) or not exists (
+      select 1 from public.showcase_feedback
+      where event_id = p_event_id and member_id = item.member_id
+    ) then
+      raise exception 'showcase_winner_ineligible';
+    end if;
+
+    begin
+      insert into public.showcase_winners (
+        event_id, draw_id, candidate_group, member_id, project_id, project_title,
+        masked_name, masked_student_number, position
+      ) values (
+        p_event_id, draw_id, p_candidate_group, item.member_id,
+        case when p_candidate_group = 'submitter' then item.project_id end,
+        case when p_candidate_group = 'submitter' then project_row.title end,
+        item.masked_name, item.masked_student_number, next_position
+      );
+    exception when unique_violation then
+      raise exception 'showcase_winner_duplicate';
+    end;
+    next_position := next_position + 1;
+  end loop;
+
+  return draw_id;
+end;
+$$;
+
+create or replace function public.void_showcase_winner(
+  p_winner_id uuid,
+  p_admin_id uuid,
+  p_reason text
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  winner_row public.showcase_winners%rowtype;
+begin
+  select * into winner_row
+  from public.showcase_winners
+  where id = p_winner_id and status = 'active'
+  for update;
+  if not found then
+    raise exception 'showcase_winner_not_found';
+  end if;
+  perform public.showcase_assert_draw_open(winner_row.event_id);
+  if p_reason not in ('duplicate', 'unreachable', 'verification_failed') then
+    raise exception 'showcase_void_invalid';
+  end if;
+  update public.showcase_winners
+  set status = 'voided', void_reason = p_reason, voided_at = now(), voided_by_admin_id = p_admin_id
+  where id = p_winner_id;
+end;
+$$;
+
+create or replace function public.set_showcase_winner_delivered(
+  p_winner_id uuid,
+  p_admin_id uuid,
+  p_delivered boolean
+)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  winner_row public.showcase_winners%rowtype;
+begin
+  select * into winner_row
+  from public.showcase_winners
+  where id = p_winner_id and status = 'active'
+  for update;
+  if not found then
+    raise exception 'showcase_winner_not_found';
+  end if;
+  perform public.showcase_assert_draw_open(winner_row.event_id);
+  update public.showcase_winners
+  set delivered_at = case when coalesce(p_delivered, false) then now() else null end,
+      delivered_by_admin_id = case when coalesce(p_delivered, false) then p_admin_id else null end
+  where id = p_winner_id;
+end;
+$$;
+
+create or replace function public.settle_showcase_event(
+  p_event_id uuid,
+  p_admin_id uuid
+)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  settled timestamptz;
+begin
+  update public.showcase_events
+  set settled_at = now(), settled_by_admin_id = p_admin_id
+  where id = p_event_id
+    and settled_at is null
+    and announcement_start_at <= now()
+  returning settled_at into settled;
+  if settled is null then
+    raise exception 'showcase_settlement_invalid';
+  end if;
+  return settled;
+end;
+$$;
+
+-- Detaches identities 30 days after settlement. Anonymous aggregates, feedback
+-- bodies and masked draw snapshots remain as evidence.
+create or replace function public.purge_showcase_personal_data(p_event_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  if not exists (
+    select 1 from public.showcase_events
+    where id = p_event_id
+      and settled_at is not null
+      and settled_at <= now() - interval '30 days'
+      and purged_at is null
+  ) then
+    return false;
+  end if;
+
+  delete from public.showcase_project_participants where event_id = p_event_id;
+  update public.showcase_registrations set member_id = null, student_number = null where event_id = p_event_id;
+  update public.showcase_project_views set member_id = null where event_id = p_event_id;
+  update public.showcase_experiences set member_id = null where event_id = p_event_id;
+  update public.showcase_feedback set member_id = null where event_id = p_event_id;
+  update public.showcase_interests set member_id = null where event_id = p_event_id;
+  update public.showcase_candidate_exclusions set member_id = null where event_id = p_event_id;
+  update public.showcase_winners set member_id = null where event_id = p_event_id;
+  update public.showcase_projects set owner_member_id = null where event_id = p_event_id;
+  update public.showcase_events set purged_at = now() where id = p_event_id;
+  return true;
+end;
+$$;
+
+do $$
+declare
+  signature text;
+begin
+  foreach signature in array array[
+    'public.showcase_assert_draw_open(uuid)',
+    'public.create_showcase_candidate_exclusion(uuid, text, uuid, uuid, text, uuid)',
+    'public.restore_showcase_candidate_exclusion(uuid, uuid)',
+    'public.create_showcase_draw(uuid, text, text, uuid, uuid, integer, integer, integer, jsonb)',
+    'public.void_showcase_winner(uuid, uuid, text)',
+    'public.set_showcase_winner_delivered(uuid, uuid, boolean)',
+    'public.settle_showcase_event(uuid, uuid)',
+    'public.purge_showcase_personal_data(uuid)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', signature);
+    execute format('grant execute on function %s to service_role', signature);
+  end loop;
+end;
+$$;
+
+-- Snapshot of 20260926184710_fix_showcase_admin_member_references.sql
+-- Admin sessions identify members; admin_profiles supplies their permissions.
+-- Keep historical actor values and ON DELETE SET NULL. Each replacement FK
+-- validates existing rows; inconsistent legacy values must abort the migration.
+begin;
+
+alter table public.showcase_events
+  drop constraint showcase_events_settled_by_admin_id_fkey,
+  add constraint showcase_events_settled_by_admin_id_fkey
+    foreign key (settled_by_admin_id) references public.members(id) on delete set null;
+
+alter table public.showcase_projects
+  drop constraint showcase_projects_reviewed_by_admin_id_fkey,
+  add constraint showcase_projects_reviewed_by_admin_id_fkey
+    foreign key (reviewed_by_admin_id) references public.members(id) on delete set null;
+
+alter table public.showcase_feedback
+  drop constraint showcase_feedback_hidden_by_admin_id_fkey,
+  add constraint showcase_feedback_hidden_by_admin_id_fkey
+    foreign key (hidden_by_admin_id) references public.members(id) on delete set null;
+
+alter table public.showcase_candidate_exclusions
+  drop constraint showcase_candidate_exclusions_excluded_by_admin_id_fkey,
+  add constraint showcase_candidate_exclusions_excluded_by_admin_id_fkey
+    foreign key (excluded_by_admin_id) references public.members(id) on delete set null,
+  drop constraint showcase_candidate_exclusions_restored_by_admin_id_fkey,
+  add constraint showcase_candidate_exclusions_restored_by_admin_id_fkey
+    foreign key (restored_by_admin_id) references public.members(id) on delete set null;
+
+alter table public.showcase_draws
+  drop constraint showcase_draws_admin_id_fkey,
+  add constraint showcase_draws_admin_id_fkey
+    foreign key (admin_id) references public.members(id) on delete set null;
+
+alter table public.showcase_winners
+  drop constraint showcase_winners_voided_by_admin_id_fkey,
+  add constraint showcase_winners_voided_by_admin_id_fkey
+    foreign key (voided_by_admin_id) references public.members(id) on delete set null,
+  drop constraint showcase_winners_delivered_by_admin_id_fkey,
+  add constraint showcase_winners_delivered_by_admin_id_fkey
+    foreign key (delivered_by_admin_id) references public.members(id) on delete set null;
+
+commit;
+
 -- Snapshot of 20260905192117_convert_graduate_periods_to_cohorts.sql
 begin;
 
@@ -19569,6 +21060,265 @@ revoke all on function public.get_admin_ad_campaign_rollups(uuid) from public;
 revoke all on function public.get_admin_ad_campaign_rollups(uuid) from anon;
 revoke all on function public.get_admin_ad_campaign_rollups(uuid) from authenticated;
 grant execute on function public.get_admin_ad_campaign_rollups(uuid) to service_role;
+
+-- Snapshot of 20260926160638_allow_showcase_image_upload_reservations.sql
+-- The showcase submission form stages its cover image through the common upload
+-- flow, but reserve_image_upload_sessions still carried the purpose allowlist from
+-- 20260831093232 and rejected 'showcase-project' with image_upload_reservation_invalid.
+-- Redefine the RPC with the same body plus the new purpose; the table constraint
+-- already allows it since 20260925200437.
+create or replace function public.reserve_image_upload_sessions(
+  p_owner_kind text,
+  p_owner_id text,
+  p_purpose text,
+  p_quota_identifiers text[],
+  p_sessions jsonb
+)
+returns integer
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_now timestamp with time zone := pg_catalog.statement_timestamp();
+  v_window_started_at timestamp with time zone;
+  v_session_count integer;
+  v_distinct_session_count integer;
+  v_total_quota_size_bytes bigint;
+  v_active_object_count bigint;
+  v_active_quota_size_bytes bigint;
+  v_identifier_count integer;
+  v_distinct_identifier_count integer;
+  v_sessions_valid boolean;
+  lock_record record;
+  quota_record record;
+begin
+  if p_owner_kind is null
+    or p_owner_kind not in (
+      'admin',
+      'member',
+      'partner',
+      'graduate_challenge',
+      'guest',
+      'signup'
+    )
+    or p_owner_id is null
+    or pg_catalog.char_length(pg_catalog.btrim(p_owner_id)) not between 1 and 256
+    or p_purpose is null
+    or p_purpose not in (
+      'partner',
+      'partner-registration',
+      'partner-change-request',
+      'review',
+      'profile',
+      'member-signup-profile',
+      'graduate-verification',
+      'manual-member-import',
+      'promotion',
+      'showcase-project'
+    )
+    or p_quota_identifiers is null
+    or p_sessions is null
+    or pg_catalog.jsonb_typeof(p_sessions) <> 'array' then
+    raise exception using
+      errcode = '22023',
+      message = 'image_upload_reservation_invalid';
+  end if;
+
+  select
+    pg_catalog.count(*)::integer,
+    pg_catalog.count(distinct identifier_hash)::integer
+  into v_identifier_count, v_distinct_identifier_count
+  from pg_catalog.unnest(p_quota_identifiers) as quota(identifier_hash);
+
+  if v_identifier_count not between 1 and 4
+    or v_distinct_identifier_count <> v_identifier_count
+    or exists (
+      select 1
+      from pg_catalog.unnest(p_quota_identifiers) as quota(identifier_hash)
+      where quota.identifier_hash is null
+        or quota.identifier_hash !~ '^[0-9a-f]{64}$'
+    ) then
+    raise exception using
+      errcode = '22023',
+      message = 'image_upload_reservation_invalid';
+  end if;
+
+  select
+    pg_catalog.count(*)::integer,
+    pg_catalog.count(distinct session.id)::integer,
+    coalesce(pg_catalog.sum(session.quota_size_bytes), 0)::bigint,
+    pg_catalog.bool_and(coalesce(
+      session.id is not null
+      and session.role is not null
+      and pg_catalog.char_length(pg_catalog.btrim(session.role)) between 1 and 64
+      and session.role ~ '^[a-z][a-z0-9-]*$'
+      and session.storage_path is not null
+      and session.storage_path like 'staging/' || session.id::text || '.%'
+      and pg_catalog.char_length(session.storage_path) between 46 and 320
+      and session.source_content_type is not null
+      and pg_catalog.char_length(pg_catalog.btrim(session.source_content_type)) between 1 and 128
+      and session.source_size_bytes between 1 and 10485760
+      and session.quota_size_bytes between session.source_size_bytes and 10485760
+      and session.signed_url_expires_at > v_now
+      and session.signed_url_expires_at <= v_now + interval '15 minutes'
+      and session.expires_at > session.signed_url_expires_at
+      and session.expires_at <= v_now + interval '3 hours',
+      false
+    ))
+  into
+    v_session_count,
+    v_distinct_session_count,
+    v_total_quota_size_bytes,
+    v_sessions_valid
+  from pg_catalog.jsonb_to_recordset(p_sessions) as session(
+    id uuid,
+    role text,
+    storage_path text,
+    source_content_type text,
+    source_size_bytes integer,
+    quota_size_bytes bigint,
+    signed_url_expires_at timestamp with time zone,
+    expires_at timestamp with time zone
+  );
+
+  if v_session_count not between 1 and 20
+    or v_distinct_session_count <> v_session_count
+    or v_sessions_valid is not true
+    or v_total_quota_size_bytes > 209715200 then
+    raise exception using
+      errcode = '22023',
+      message = 'image_upload_reservation_invalid';
+  end if;
+
+  -- Lock in globally sorted advisory-key order so overlapping owner and quota
+  -- reservations cannot acquire the same locks in opposite order.
+  for lock_record in
+    select distinct
+      pg_catalog.hashtextextended(lock_source.lock_name, 0) as advisory_key
+    from (
+      select 'image-upload-owner:' || p_owner_kind || ':' || p_owner_id as lock_name
+      union all
+      select 'image-upload-quota:' || quota.identifier_hash
+      from pg_catalog.unnest(p_quota_identifiers) as quota(identifier_hash)
+    ) as lock_source
+    order by advisory_key
+  loop
+    perform pg_catalog.pg_advisory_xact_lock(lock_record.advisory_key);
+  end loop;
+
+  select
+    pg_catalog.count(*),
+    coalesce(pg_catalog.sum(quota_size_bytes), 0)
+  into v_active_object_count, v_active_quota_size_bytes
+  from public.image_upload_sessions
+  where owner_kind = p_owner_kind
+    and owner_id = p_owner_id
+    and status in ('signed', 'processing', 'ready', 'attaching')
+    and expires_at > v_now;
+
+  if v_active_object_count + v_session_count > 40
+    or v_active_quota_size_bytes + v_total_quota_size_bytes > 209715200 then
+    raise exception using
+      errcode = 'P0001',
+      message = 'image_upload_quota_exceeded';
+  end if;
+
+  v_window_started_at := pg_catalog.to_timestamp(
+    pg_catalog.floor(extract(epoch from v_now) / 600) * 600
+  );
+
+  for quota_record in
+    select
+      requested.identifier_hash,
+      coalesce(existing.request_count, 0) as request_count,
+      coalesce(existing.object_count, 0) as object_count,
+      coalesce(existing.reserved_size_bytes, 0) as reserved_size_bytes
+    from pg_catalog.unnest(p_quota_identifiers) as requested(identifier_hash)
+    left join public.image_upload_quota_windows as existing
+      on existing.identifier_hash = requested.identifier_hash
+     and existing.window_started_at = v_window_started_at
+    order by requested.identifier_hash
+  loop
+    if quota_record.request_count + 1 > 20
+      or quota_record.object_count + v_session_count > 60
+      or quota_record.reserved_size_bytes + v_total_quota_size_bytes > 209715200 then
+      raise exception using
+        errcode = 'P0001',
+        message = 'image_upload_quota_exceeded';
+    end if;
+
+    insert into public.image_upload_quota_windows (
+      identifier_hash,
+      window_started_at,
+      request_count,
+      object_count,
+      reserved_size_bytes,
+      updated_at
+    ) values (
+      quota_record.identifier_hash,
+      v_window_started_at,
+      1,
+      v_session_count,
+      v_total_quota_size_bytes,
+      v_now
+    )
+    on conflict (identifier_hash, window_started_at) do update
+    set request_count = public.image_upload_quota_windows.request_count + 1,
+        object_count = public.image_upload_quota_windows.object_count + excluded.object_count,
+        reserved_size_bytes = public.image_upload_quota_windows.reserved_size_bytes
+          + excluded.reserved_size_bytes,
+        updated_at = excluded.updated_at;
+  end loop;
+
+  insert into public.image_upload_sessions (
+    id,
+    owner_kind,
+    owner_id,
+    purpose,
+    role,
+    storage_bucket,
+    storage_path,
+    source_storage_path,
+    source_content_type,
+    source_size_bytes,
+    quota_size_bytes,
+    signed_url_expires_at,
+    expires_at
+  )
+  select
+    session.id,
+    p_owner_kind,
+    p_owner_id,
+    p_purpose,
+    session.role,
+    'image-upload-staging',
+    session.storage_path,
+    session.storage_path,
+    session.source_content_type,
+    session.source_size_bytes,
+    session.quota_size_bytes,
+    session.signed_url_expires_at,
+    session.expires_at
+  from pg_catalog.jsonb_to_recordset(p_sessions) as session(
+    id uuid,
+    role text,
+    storage_path text,
+    source_content_type text,
+    source_size_bytes integer,
+    quota_size_bytes bigint,
+    signed_url_expires_at timestamp with time zone,
+    expires_at timestamp with time zone
+  );
+
+  return v_session_count;
+end;
+$$;
+
+revoke all on function public.reserve_image_upload_sessions(text, text, text, text[], jsonb) from public;
+revoke all on function public.reserve_image_upload_sessions(text, text, text, text[], jsonb) from anon;
+revoke all on function public.reserve_image_upload_sessions(text, text, text, text[], jsonb) from authenticated;
+grant execute on function public.reserve_image_upload_sessions(text, text, text, text[], jsonb) to service_role;
 
 -- Snapshot of 20260902150504_fix_graduate_approval_member_schema.sql
 -- The recovery-aware approval RPC was introduced after the members table had
