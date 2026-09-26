@@ -41,6 +41,13 @@ export default async function MyShowcaseProjectPage({
   ]);
   if (!project) notFound();
   const phase = getShowcasePhase(event);
+  const feedback = await projectShowcaseRepository.listOwnerFeedback(session.userId, project.id);
+  const metrics = [
+    { label: "고유 조회", value: project.viewCount },
+    { label: "체험 시작", value: project.experienceCount },
+    { label: "피드백", value: project.validExperienceCount },
+    { label: "관심 표시", value: project.interestCount },
+  ];
   const canEdit = canOwnerEditShowcaseProject(project.status, phase);
   const canWithdraw = canOwnerWithdrawShowcaseProject(project.status, phase);
 
@@ -69,6 +76,32 @@ export default async function MyShowcaseProjectPage({
             </div>
           ) : null}
         </section>
+
+        {project.status === "approved" ? (
+          <section className="mt-6 grid gap-4 rounded-2xl border border-border bg-surface p-5 sm:p-6" aria-labelledby="my-showcase-feedback-heading">
+            <h2 id="my-showcase-feedback-heading" className="text-lg font-bold text-foreground">받은 반응</h2>
+            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {metrics.map((metric) => (
+                <div key={metric.label} className="rounded-xl bg-surface-muted/60 p-4">
+                  <dt className="text-xs font-medium text-muted-foreground">{metric.label}</dt>
+                  <dd className="mt-2 text-2xl font-bold tabular-nums text-foreground">{metric.value.toLocaleString("ko-KR")}</dd>
+                </div>
+              ))}
+            </dl>
+            <div>
+              <h3 className="font-semibold text-foreground">한 줄 피드백 <span className="text-sm font-normal text-muted-foreground">작성자 정보 없이 보여요</span></h3>
+              {feedback.length > 0 ? (
+                <ul className="mt-3 grid gap-2">
+                  {feedback.map((item) => (
+                    <li key={item.id} className="whitespace-pre-wrap break-words rounded-xl bg-surface-muted/60 px-4 py-3 text-sm leading-6 text-foreground">{item.body}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">{phase === "experience" ? "아직 받은 피드백이 없어요." : "체험 기간이 시작되면 피드백이 이곳에 모여요."}</p>
+              )}
+            </div>
+          </section>
+        ) : null}
 
         <article className="mt-6 overflow-hidden rounded-3xl border border-border bg-surface">
           <div className="aspect-[4/3] max-h-[420px] w-full overflow-hidden bg-surface-muted sm:aspect-[16/8]">

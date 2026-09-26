@@ -70,13 +70,17 @@ export default async function ProjectShowcasePage({
   const selectedType = SHOWCASE_PROJECT_TYPES.find((type) => type === firstParam(params.type)) ?? "";
   const query = firstParam(params.q).trim().slice(0, 80);
   const selectedSort = params.sort === "title" ? "title" : "newest";
-  const [projects, ownProject, headerSession] = await Promise.all([
+  const [projects, ownProject, completedProjectIds, headerSession] = await Promise.all([
     phase === "experience"
       ? projectShowcaseRepository.listPublicProjects({ type: selectedType, query, sort: selectedSort })
       : Promise.resolve([]),
     session?.userId ? projectShowcaseRepository.getActiveOwnerProject(session.userId) : Promise.resolve(null),
+    phase === "experience" && session?.userId
+      ? projectShowcaseRepository.listMemberCompletedProjectIds(session.userId)
+      : Promise.resolve([]),
     getHeaderSession(session?.userId),
   ]);
+  const completed = new Set(completedProjectIds);
 
   const primaryAction = (() => {
     if (phase === "submission") {
@@ -182,7 +186,10 @@ export default async function ProjectShowcasePage({
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">PROJECT GALLERY</p>
                 <h2 id="showcase-projects-heading" className="mt-2 text-2xl font-bold text-foreground">프로젝트 둘러보기</h2>
               </div>
-              <p className="text-sm text-muted-foreground">{projects.length.toLocaleString("ko-KR")}개 프로젝트</p>
+              <p className="text-sm text-muted-foreground">
+                {projects.length.toLocaleString("ko-KR")}개 프로젝트
+                {session?.userId ? ` · 체험 완료 ${completed.size.toLocaleString("ko-KR")}개` : ""}
+              </p>
             </div>
             <form action={EVENT_PATH} className="mb-5 grid gap-2 rounded-2xl border border-border bg-surface p-3 sm:grid-cols-[minmax(0,1fr)_150px_150px_auto] sm:items-center">
               <label className="sr-only" htmlFor="showcase-search">프로젝트 검색</label>
@@ -201,7 +208,7 @@ export default async function ProjectShowcasePage({
             </form>
             {projects.length > 0 ? (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {projects.map((project) => <ShowcaseProjectCard key={project.id} project={project} />)}
+                {projects.map((project) => <ShowcaseProjectCard key={project.id} project={project} completed={completed.has(project.id)} />)}
               </div>
             ) : (
               <div className="rounded-3xl border border-dashed border-border bg-surface px-5 py-14 text-center">

@@ -176,3 +176,61 @@ export function canOwnerEditShowcaseProject(status: ShowcaseProjectStatus, phase
 export function canOwnerWithdrawShowcaseProject(status: ShowcaseProjectStatus, phase: ShowcasePhase) {
   return phase === "submission" && status !== "withdrawn";
 }
+
+/** Seconds between the experience start and the moment feedback (a valid experience) is accepted. */
+export const SHOWCASE_FEEDBACK_UNLOCK_SECONDS = 60;
+
+export type ShowcaseRegistration = {
+  maskedStudentNumber: string;
+  registeredAt: string;
+};
+
+/** The signed-in member's state on one project's detail page. */
+export type ShowcaseMemberProjectState = {
+  registered: boolean;
+  startedAt: string | null;
+  feedbackSubmitted: boolean;
+  interested: boolean;
+};
+
+export type ShowcaseMemberExperience = {
+  projectId: string;
+  projectTitle: string;
+  startedAt: string;
+  feedbackSubmitted: boolean;
+};
+
+export type ShowcaseMemberParticipation = {
+  registration: ShowcaseRegistration | null;
+  experiences: ShowcaseMemberExperience[];
+  ticketCount: number;
+};
+
+export type ShowcaseOwnerFeedback = {
+  id: string;
+  body: string;
+};
+
+export type ShowcaseAdminFeedback = {
+  id: string;
+  projectId: string;
+  projectTitle: string;
+  body: string;
+  hidden: boolean;
+  createdAt: string;
+};
+
+export function getShowcaseFeedbackUnlockAt(startedAt: string) {
+  return new Date(new Date(startedAt).getTime() + SHOWCASE_FEEDBACK_UNLOCK_SECONDS * 1000);
+}
+
+export function canSubmitShowcaseFeedback(startedAt: string | null, now = new Date()) {
+  if (!startedAt) return false;
+  const unlockAt = getShowcaseFeedbackUnlockAt(startedAt).getTime();
+  return Number.isFinite(unlockAt) && now.getTime() >= unlockAt;
+}
+
+/** 추첨권 = 유효 체험(피드백 제출) 프로젝트 수. No base ticket without a valid experience. */
+export function countShowcaseTickets(experiences: Array<{ feedbackSubmitted: boolean }>) {
+  return experiences.filter((experience) => experience.feedbackSubmitted).length;
+}

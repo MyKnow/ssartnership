@@ -15,13 +15,19 @@ import {
   type ShowcaseProjectWriteInput,
 } from "./repository";
 import {
+  countShowcaseTickets,
   getShowcasePhase,
   isShowcaseProjectStatus,
   isShowcaseProjectType,
+  maskShowcaseStudentNumber,
   PROJECT_SHOWCASE_SLUG,
   SHOWCASE_PROJECT_STATUSES,
   SHOWCASE_PROJECT_TYPES,
+  type ShowcaseAdminFeedback,
   type ShowcaseEvent,
+  type ShowcaseMemberParticipation,
+  type ShowcaseMemberProjectState,
+  type ShowcaseOwnerFeedback,
   type ShowcaseOwnerProject,
   type ShowcaseProject,
   type ShowcaseProjectCounts,
@@ -342,6 +348,179 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
       p_owner_member_id: input.ownerMemberId,
     });
     if (error) throwDomain(error, "출품을 취소하지 못했습니다.");
+  }
+
+  private async requireEvent() {
+    const event = await this.getEvent();
+    if (!event) throw new ShowcaseDomainError("experience_closed");
+    return event;
+  }
+
+  async registerParticipant(input: { memberId: string; studentNumber: string }) {
+    const event = await this.requireEvent();
+    const { error } = await this.client().rpc("register_showcase_participant", {
+      p_event_id: event.id,
+      p_member_id: input.memberId,
+      p_student_number: input.studentNumber,
+    });
+    if (error) throwDomain(error, "참여 등록을 저장하지 못했습니다.");
+  }
+
+  async getMemberProjectState(projectId: string, memberId: string): Promise<ShowcaseMemberProjectState> {
+    const event = await this.getEvent();
+    if (!event || !memberId) return { registered: false, startedAt: null, feedbackSubmitted: false, interested: false };
+    const client = this.client();
+    const [registration, experience, feedback, interest] = await Promise.all([
+      client.from("showcase_registrations").select("id").eq("event_id", event.id).eq("member_id", memberId).maybeSingle(),
+      client.from("showcase_experiences").select("started_at").eq("project_id", projectId).eq("member_id", memberId).maybeSingle(),
+      client.from("showcase_feedback").select("id").eq("project_id", projectId).eq("member_id", memberId).maybeSingle(),
+      client.from("showcase_interests").select("id").eq("project_id", projectId).eq("member_id", memberId).maybeSingle(),
+    ]);
+    if (registration.error || experience.error || feedback.error || interest.error) {
+      throw new Error("체험 상태를 불러오지 못했습니다.");
+    }
+    return {
+      registered: Boolean(registration.data),
+      startedAt: experience.data?.started_at ?? null,
+      feedbackSubmitted: Boolean(feedback.data),
+      interested: Boolean(interest.data),
+    };
+  }
+
+  async startExperience(input: { projectId: string; memberId: string }) {
+    const { data, error } = await this.client().rpc("start_showcase_experience", {
+      p_project_id: input.projectId,
+      p_member_id: input.memberId,
+    });
+    if (error || typeof data !== "string") throwDomain(error, "체험 시작을 기록하지 못했습니다.");
+    return { startedAt: data };
+  }
+
+  async submitFeedback(input: { projectId: string; memberId: string; body: string }) {
+    const { error } = await this.client().rpc("submit_showcase_feedback", {
+      p_project_id: input.projectId,
+      p_member_id: input.memberId,
+      p_body: input.body,
+    });
+    if (error) throwDomain(error, "피드백을 저장하지 못했습니다.");
+  }
+
+  async setInterest(input: { projectId: string; memberId: string; interested: boolean }) {
+    const { error } = await this.client().rpc("set_showcase_interest", {
+      p_project_id: input.projectId,
+      p_member_id: input.memberId,
+      p_interested: input.interested,
+    });
+    if (error) throwDomain(error, "관심 표시를 저장하지 못했습니다.");
+  }
+
+  async getMemberParticipation(memberId: string): Promise<ShowcaseMemberParticipation> {
+    const event = await this.getEvent();
+    if (!event || !memberId) return { registration: null, experiences: [], ticketCount: 0 };
+    const client = this.client();
+    const [registration, experiences, feedback] = await Promise.all([
+      client.from("showcase_registrations").select("student_number,created_at").eq("event_id", event.id).eq("member_id", memberId).maybeSingle(),
+      client.from("showcase_experiences").select("project_id,started_at").eq("event_id", event.id).eq("member_id", memberId).order("started_at", { ascending: false }),
+      client.from("showcase_feedback").select("project_id").eq("event_id", event.id).eq("member_id", memberId),
+    ]);
+    if (registration.error || experiences.error || feedback.error) throw new Error("참여 현황을 불러오지 못했습니다.");
+    const projectIds = (experiences.data ?? []).map((row) => row.project_id as string);
+    const titles = new Map<string, string>();
+    if (projectIds.length > 0) {
+      const projects = await client.from("showcase_projects").select("id,title").in("id", projectIds);
+      if (projects.error) throw new Error("참여 현황을 불러오지 못했습니다.");
+      for (const row of projects.data ?? []) titles.set(row.id as string, row.title as string);
+    }
+    const completed = new Set((feedback.data ?? []).map((row) => row.project_id as string));
+    const items = (experiences.data ?? []).map((row) => ({
+      projectId: row.project_id as string,
+      projectTitle: titles.get(row.project_id as string) ?? "프로젝트",
+      startedAt: row.started_at as string,
+      feedbackSubmitted: completed.has(row.project_id as string),
+    }));
+    return {
+      registration: registration.data?.student_number
+        ? {
+          maskedStudentNumber: maskShowcaseStudentNumber(registration.data.student_number as string),
+          registeredAt: registration.data.created_at as string,
+        }
+        : null,
+      experiences: items,
+      ticketCount: countShowcaseTickets(items),
+    };
+  }
+
+  async listMemberCompletedProjectIds(memberId: string) {
+    const event = await this.getEvent();
+    if (!event || !memberId) return [];
+    const { data, error } = await this.client()
+      .from("showcase_feedback")
+      .select("project_id")
+      .eq("event_id", event.id)
+      .eq("member_id", memberId);
+    if (error) throw new Error("체험 기록을 불러오지 못했습니다.");
+    return (data ?? []).map((row) => row.project_id as string);
+  }
+
+  async listOwnerFeedback(memberId: string, projectId: string): Promise<ShowcaseOwnerFeedback[]> {
+    const owned = await this.client()
+      .from("showcase_projects")
+      .select("id")
+      .eq("id", projectId)
+      .eq("owner_member_id", memberId)
+      .maybeSingle();
+    if (owned.error) throw new Error("피드백을 불러오지 못했습니다.");
+    if (!owned.data) return [];
+    // Only the body leaves the database: no author, no timestamp.
+    const { data, error } = await this.client()
+      .from("showcase_feedback")
+      .select("id,body")
+      .eq("project_id", projectId)
+      .is("hidden_at", null)
+      .order("id", { ascending: true })
+      .limit(1000);
+    if (error) throw new Error("피드백을 불러오지 못했습니다.");
+    return (data ?? []).map((row) => ({ id: row.id as string, body: row.body as string }));
+  }
+
+  async listAdminFeedback(input: { hidden?: boolean } = {}): Promise<ShowcaseAdminFeedback[]> {
+    const event = await this.getEvent();
+    if (!event) return [];
+    let query = this.client()
+      .from("showcase_feedback")
+      .select("id,project_id,body,hidden_at,created_at")
+      .eq("event_id", event.id)
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (input.hidden === true) query = query.not("hidden_at", "is", null);
+    if (input.hidden === false) query = query.is("hidden_at", null);
+    const { data, error } = await query;
+    if (error) throw new Error("피드백 목록을 불러오지 못했습니다.");
+    const rows = data ?? [];
+    const projectIds = [...new Set(rows.map((row) => row.project_id as string))];
+    const titles = new Map<string, string>();
+    if (projectIds.length > 0) {
+      const projects = await this.client().from("showcase_projects").select("id,title").in("id", projectIds);
+      if (projects.error) throw new Error("피드백 목록을 불러오지 못했습니다.");
+      for (const row of projects.data ?? []) titles.set(row.id as string, row.title as string);
+    }
+    return rows.map((row) => ({
+      id: row.id as string,
+      projectId: row.project_id as string,
+      projectTitle: titles.get(row.project_id as string) ?? "프로젝트",
+      body: row.body as string,
+      hidden: Boolean(row.hidden_at),
+      createdAt: row.created_at as string,
+    }));
+  }
+
+  async setFeedbackHidden(input: { feedbackId: string; adminId: string; hidden: boolean }) {
+    const { error } = await this.client().rpc("set_showcase_feedback_hidden", {
+      p_feedback_id: input.feedbackId,
+      p_admin_id: input.adminId,
+      p_hidden: input.hidden,
+    });
+    if (error) throwDomain(error, "피드백 공개 상태를 바꾸지 못했습니다.");
   }
 
   async getAdminMetrics(): Promise<ShowcaseAdminMetrics | null> {

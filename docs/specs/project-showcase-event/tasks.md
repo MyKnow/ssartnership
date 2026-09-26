@@ -21,14 +21,17 @@ authority: descriptive
 - [x] 기간 밖 상세 안내 화면
 - [x] 관리자 일정·경품 수량, 상태별 전체 출품 목록과 검수(사유 필수 규칙), 로그·집계
 - [x] 도메인 테스트 `tests/project-showcase.test.mts`
-- [ ] 실제 Postgres에 migration 적용 확인
-- [ ] 360px·820px·1366px 화면 캡처
-- [ ] `verify:change`, dev PR
+- [x] 360px·820px·1366px 화면 캡처, Production 빌드, E2E 접근 제어
+- [x] `verify:change`, dev PR #481 (원격 첫 실행 감사 완료)
+- [ ] 실제 Postgres에 migration 적용 확인 (dev 병합 후 Preview migration)
 
 ## PR 2 — 체험·피드백
 
-- [ ] 참여 등록, 체험 시작, 60초 게이트 피드백, 관심 표시, 추첨권
-- [ ] 내 참여 체험 영역, 출품자 피드백 목록, 관리자 피드백 숨김
+- [x] 참여 등록, 체험 시작, 60초 게이트 피드백, 관심 표시, 추첨권 RPC와 mock/Supabase Repository
+- [x] 상세 체험 패널(서버 시각 기준 카운트다운), 갤러리 체험 완료 배지
+- [x] 내 참여 체험 영역, 출품자 받은 반응·피드백 목록, 관리자 피드백 숨김 화면
+- [x] 체험 규칙 도메인 테스트
+- [ ] PR 1 병합 후 dev PR
 
 ## PR 3 — 검증·추첨·발표
 

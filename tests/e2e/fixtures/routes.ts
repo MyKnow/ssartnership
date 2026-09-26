@@ -43,6 +43,7 @@ export const adminProtectedRoutes: RedirectRoute[] = [
   { path: "/admin/event/signup-reward", expectedPath: "/auth/login" },
   { path: "/admin/events", expectedPath: "/auth/login" },
   { path: "/admin/events/project-showcase", expectedPath: "/auth/login" },
+  { path: "/admin/events/project-showcase/feedback", expectedPath: "/auth/login" },
   { path: "/admin/events/project-showcase/logs", expectedPath: "/auth/login" },
   { path: "/admin/graduate-verifications", expectedPath: "/auth/login" },
   { path: "/admin/logs", expectedPath: "/auth/login" },
