@@ -11,6 +11,7 @@ const CRON_ERROR_MESSAGES = {
   "mattermost-sender-health": "Mattermost Sender 상태를 확인하지 못했습니다.",
   "partner-billing": "Partner billing cron failed",
   "purge-expired-operational-logs": "만료된 운영 로그를 정리하지 못했습니다.",
+  "purge-showcase-personal-data": "쇼케이스 개인정보 파기를 완료하지 못했습니다.",
   "push-expiring-partners": "만료 예정 제휴처를 불러오지 못했습니다.",
   "reconcile-apple-wallet-passes":
     "Apple Wallet 패스 상태 조정을 완료하지 못했습니다.",

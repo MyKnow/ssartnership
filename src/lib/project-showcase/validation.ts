@@ -234,3 +234,13 @@ export function parseShowcaseFeedback(value: unknown): ShowcaseValidationResult<
   }
   return { success: true, data: { body } };
 }
+
+/** Shared by the candidate exclusion form and `excludeShowcaseCandidate`. */
+export function parseShowcaseExclusionReason(value: unknown): ShowcaseValidationResult<{ reason: string }> {
+  const reason = typeof value === "string" ? value.trim() : "";
+  const length = Array.from(reason).length;
+  if (length < 2 || length > 500) {
+    return { success: false, message: "제외 사유를 2자 이상 500자 이하로 입력해 주세요.", field: "reason" };
+  }
+  return { success: true, data: { reason } };
+}

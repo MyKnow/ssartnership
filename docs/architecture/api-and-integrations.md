@@ -114,6 +114,7 @@ authority: descriptive
 | GET | `/api/cron/push-expiring-partners` | 종료 예정 제휴 push |
 | GET | `/api/cron/rss` | RSS refresh |
 | GET | `/api/cron/purge-expired-operational-logs` | 1년 경과 운영·보안 원본 로그 정리 |
+| GET | `/api/cron/purge-showcase-personal-data` | 쇼케이스 정산 30일 후 학번·체험 기록의 회원 연결 파기 |
 
 ## External integrations
 

@@ -1,4 +1,10 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import {
+  sampleShowcaseUniform,
+  sampleShowcaseWeighted,
+  secureRandomInt,
+  type ShowcaseRandomInt,
+} from "./draw";
 import { ShowcaseDomainError, showcaseErrorCodeFromDatabase } from "./errors";
 import {
   SHOWCASE_ADMIN_ACTIVITY_TYPES,
@@ -19,12 +25,21 @@ import {
   getShowcasePhase,
   isShowcaseProjectStatus,
   isShowcaseProjectType,
+  maskShowcaseName,
   maskShowcaseStudentNumber,
   PROJECT_SHOWCASE_SLUG,
   SHOWCASE_PROJECT_STATUSES,
   SHOWCASE_PROJECT_TYPES,
   type ShowcaseAdminFeedback,
+  type ShowcaseAdminWinner,
+  type ShowcaseCandidateGroup,
+  type ShowcaseDrawReceipt,
+  type ShowcaseDrawState,
   type ShowcaseEvent,
+  type ShowcaseExperiencerCandidate,
+  type ShowcasePublicWinner,
+  type ShowcaseSubmitterCandidate,
+  type ShowcaseVoidReason,
   type ShowcaseMemberParticipation,
   type ShowcaseMemberProjectState,
   type ShowcaseOwnerFeedback,
@@ -521,6 +536,321 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
       p_hidden: input.hidden,
     });
     if (error) throwDomain(error, "피드백 공개 상태를 바꾸지 못했습니다.");
+  }
+
+  async getDrawState(): Promise<ShowcaseDrawState> {
+    const event = await this.getEvent();
+    if (!event) return { submitterDrawn: false, experiencerDrawn: false, settledAt: null, purgedAt: null };
+    const client = this.client();
+    const [draws, lifecycle] = await Promise.all([
+      client.from("showcase_draws").select("candidate_group").eq("event_id", event.id).eq("draw_kind", "initial"),
+      client.from("showcase_events").select("settled_at,purged_at").eq("id", event.id).maybeSingle(),
+    ]);
+    if (draws.error || lifecycle.error) throw new Error("추첨 상태를 불러오지 못했습니다.");
+    const groups = new Set((draws.data ?? []).map((row) => row.candidate_group as string));
+    return {
+      submitterDrawn: groups.has("submitter"),
+      experiencerDrawn: groups.has("experiencer"),
+      settledAt: (lifecycle.data?.settled_at as string | null) ?? null,
+      purgedAt: (lifecycle.data?.purged_at as string | null) ?? null,
+    };
+  }
+
+  private async loadDrawContext(eventId: string) {
+    const client = this.client();
+    const [exclusions, winners] = await Promise.all([
+      client.from("showcase_candidate_exclusions").select("id,candidate_group,project_id,member_id,reason").eq("event_id", eventId).is("restored_at", null),
+      // Voided winners stay ineligible so a redraw never re-selects the person it replaces.
+      client.from("showcase_winners").select("member_id").eq("event_id", eventId),
+    ]);
+    if (exclusions.error || winners.error) throw new Error("추첨 후보를 불러오지 못했습니다.");
+    const projectExclusions = new Map<string, { id: string; reason: string }>();
+    const memberExclusions = new Map<string, { id: string; reason: string }>();
+    for (const row of exclusions.data ?? []) {
+      const exclusion = { id: row.id as string, reason: row.reason as string };
+      if (row.candidate_group === "submitter" && row.project_id) projectExclusions.set(row.project_id as string, exclusion);
+      if (row.candidate_group === "experiencer" && row.member_id) memberExclusions.set(row.member_id as string, exclusion);
+    }
+    const winnerMemberIds = new Set((winners.data ?? []).flatMap((row) => row.member_id ? [row.member_id as string] : []));
+    return { projectExclusions, memberExclusions, winnerMemberIds };
+  }
+
+  private async memberNames(memberIds: string[]) {
+    const names = new Map<string, string>();
+    if (memberIds.length === 0) return names;
+    const { data, error } = await this.client().from("members").select("id,display_name").in("id", memberIds);
+    if (error) throw new Error("회원 정보를 불러오지 못했습니다.");
+    for (const row of data ?? []) names.set(row.id as string, (row.display_name as string | null)?.trim() || "회원");
+    return names;
+  }
+
+  private async loadSubmitterPool(eventId: string) {
+    const client = this.client();
+    const { data, error } = await client
+      .from("showcase_projects")
+      .select("id,title,owner_member_id")
+      .eq("event_id", eventId)
+      .eq("status", "approved")
+      .order("created_at", { ascending: true });
+    if (error) throw new Error("추첨 후보를 불러오지 못했습니다.");
+    const projects = (data ?? []) as Array<{ id: string; title: string; owner_member_id: string | null }>;
+    const [context, names, owners] = await Promise.all([
+      this.loadDrawContext(eventId),
+      this.memberNames(projects.flatMap((project) => project.owner_member_id ? [project.owner_member_id] : [])),
+      projects.length
+        ? client.from("showcase_project_participants").select("project_id,student_number").in("project_id", projects.map((project) => project.id)).eq("is_owner", true)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (owners.error) throw new Error("추첨 후보를 불러오지 못했습니다.");
+    const ownerNumbers = new Map((owners.data ?? []).map((row) => [row.project_id as string, row.student_number as string]));
+    return projects.map((project) => ({
+      projectId: project.id,
+      projectTitle: project.title,
+      memberId: project.owner_member_id,
+      ownerDisplayName: (project.owner_member_id && names.get(project.owner_member_id)) || "회원",
+      studentNumber: ownerNumbers.get(project.id) ?? "",
+      exclusion: context.projectExclusions.get(project.id) ?? null,
+      alreadyWon: Boolean(project.owner_member_id && context.winnerMemberIds.has(project.owner_member_id)),
+    }));
+  }
+
+  private async loadExperiencerPool(eventId: string) {
+    const client = this.client();
+    const [feedback, registrations] = await Promise.all([
+      client.from("showcase_feedback").select("member_id").eq("event_id", eventId).not("member_id", "is", null),
+      client.from("showcase_registrations").select("member_id,student_number").eq("event_id", eventId).not("member_id", "is", null),
+    ]);
+    if (feedback.error || registrations.error) throw new Error("추첨 후보를 불러오지 못했습니다.");
+    const tickets = new Map<string, number>();
+    for (const row of feedback.data ?? []) tickets.set(row.member_id as string, (tickets.get(row.member_id as string) ?? 0) + 1);
+    const numbers = new Map((registrations.data ?? []).map((row) => [row.member_id as string, row.student_number as string]));
+    const memberIds = [...tickets.keys()].filter((memberId) => numbers.has(memberId));
+    const [context, names] = await Promise.all([this.loadDrawContext(eventId), this.memberNames(memberIds)]);
+    return memberIds.map((memberId) => ({
+      memberId,
+      displayName: names.get(memberId) ?? "회원",
+      studentNumber: numbers.get(memberId) ?? "",
+      tickets: tickets.get(memberId) ?? 0,
+      exclusion: context.memberExclusions.get(memberId) ?? null,
+      alreadyWon: context.winnerMemberIds.has(memberId),
+    }));
+  }
+
+  async listSubmitterCandidates(): Promise<ShowcaseSubmitterCandidate[]> {
+    const event = await this.getEvent();
+    if (!event) return [];
+    return (await this.loadSubmitterPool(event.id)).map(({ projectId, projectTitle, ownerDisplayName, exclusion, alreadyWon }) => ({
+      projectId, projectTitle, ownerDisplayName, exclusion, alreadyWon,
+    }));
+  }
+
+  async listExperiencerCandidates(): Promise<ShowcaseExperiencerCandidate[]> {
+    const event = await this.getEvent();
+    if (!event) return [];
+    return this.loadExperiencerPool(event.id);
+  }
+
+  async excludeCandidate(input: { group: ShowcaseCandidateGroup; projectId?: string; memberId?: string; reason: string; adminId: string }) {
+    const event = await this.getEvent();
+    if (!event) throw new ShowcaseDomainError("draw_closed");
+    const { error } = await this.client().rpc("create_showcase_candidate_exclusion", {
+      p_event_id: event.id,
+      p_candidate_group: input.group,
+      p_project_id: input.projectId ?? null,
+      p_member_id: input.memberId ?? null,
+      p_reason: input.reason,
+      p_admin_id: input.adminId,
+    });
+    if (error) throwDomain(error, "후보를 제외하지 못했습니다.");
+  }
+
+  async restoreCandidate(input: { exclusionId: string; adminId: string }) {
+    const { error } = await this.client().rpc("restore_showcase_candidate_exclusion", {
+      p_exclusion_id: input.exclusionId,
+      p_admin_id: input.adminId,
+    });
+    if (error) throwDomain(error, "후보를 복구하지 못했습니다.");
+  }
+
+  private async selectWinners(eventId: string, group: ShowcaseCandidateGroup, count: number, random: ShowcaseRandomInt) {
+    if (group === "submitter") {
+      const eligible = (await this.loadSubmitterPool(eventId))
+        .filter((candidate) => candidate.memberId && candidate.studentNumber && !candidate.exclusion && !candidate.alreadyWon);
+      const chosen = sampleShowcaseUniform(eligible, count, random);
+      return {
+        candidateCount: eligible.length,
+        ticketCount: eligible.length,
+        winners: chosen.map((candidate) => ({
+          member_id: candidate.memberId,
+          project_id: candidate.projectId,
+          masked_name: maskShowcaseName(candidate.ownerDisplayName),
+          masked_student_number: maskShowcaseStudentNumber(candidate.studentNumber),
+        })),
+      };
+    }
+    const eligible = (await this.loadExperiencerPool(eventId))
+      .filter((candidate) => candidate.studentNumber && candidate.tickets > 0 && !candidate.exclusion && !candidate.alreadyWon);
+    const chosen = sampleShowcaseWeighted(eligible.map((candidate) => ({ ...candidate, weight: candidate.tickets })), count, random);
+    return {
+      candidateCount: eligible.length,
+      ticketCount: eligible.reduce((total, candidate) => total + candidate.tickets, 0),
+      winners: chosen.map((candidate) => ({
+        member_id: candidate.memberId,
+        project_id: null,
+        masked_name: maskShowcaseName(candidate.displayName),
+        masked_student_number: maskShowcaseStudentNumber(candidate.studentNumber),
+      })),
+    };
+  }
+
+  async runDraw(input: { group: ShowcaseCandidateGroup; adminId: string; random?: ShowcaseRandomInt }): Promise<ShowcaseDrawReceipt> {
+    const event = await this.getEvent();
+    if (!event) throw new ShowcaseDomainError("draw_closed");
+    const requested = input.group === "submitter" ? event.submitterSelectionCount : event.experiencerSelectionCount;
+    if (requested < 1) throw new ShowcaseDomainError("draw_invalid");
+    const selection = await this.selectWinners(event.id, input.group, requested, input.random ?? secureRandomInt);
+    const { error } = await this.client().rpc("create_showcase_draw", {
+      p_event_id: event.id,
+      p_candidate_group: input.group,
+      p_draw_kind: "initial",
+      p_replaces_winner_id: null,
+      p_admin_id: input.adminId,
+      p_requested_count: requested,
+      p_candidate_count: selection.candidateCount,
+      p_ticket_count: selection.ticketCount,
+      p_winners: selection.winners,
+    });
+    if (error) throwDomain(error, "추첨 결과를 저장하지 못했습니다.");
+    return { candidateGroup: input.group, candidateCount: selection.candidateCount, ticketCount: selection.ticketCount, selectedCount: selection.winners.length };
+  }
+
+  async voidWinner(input: { winnerId: string; adminId: string; reason: ShowcaseVoidReason }) {
+    const { error } = await this.client().rpc("void_showcase_winner", {
+      p_winner_id: input.winnerId,
+      p_admin_id: input.adminId,
+      p_reason: input.reason,
+    });
+    if (error) throwDomain(error, "당첨을 무효 처리하지 못했습니다.");
+  }
+
+  async redrawWinner(input: { winnerId: string; adminId: string; random?: ShowcaseRandomInt }): Promise<ShowcaseDrawReceipt> {
+    const event = await this.getEvent();
+    if (!event) throw new ShowcaseDomainError("draw_closed");
+    const { data, error } = await this.client()
+      .from("showcase_winners")
+      .select("candidate_group,status")
+      .eq("id", input.winnerId)
+      .eq("event_id", event.id)
+      .maybeSingle();
+    if (error) throw new Error("당첨 기록을 불러오지 못했습니다.");
+    if (!data || data.status !== "voided") throw new ShowcaseDomainError("redraw_invalid");
+    const group = data.candidate_group as ShowcaseCandidateGroup;
+    const selection = await this.selectWinners(event.id, group, 1, input.random ?? secureRandomInt);
+    const result = await this.client().rpc("create_showcase_draw", {
+      p_event_id: event.id,
+      p_candidate_group: group,
+      p_draw_kind: "redraw",
+      p_replaces_winner_id: input.winnerId,
+      p_admin_id: input.adminId,
+      p_requested_count: 1,
+      p_candidate_count: selection.candidateCount,
+      p_ticket_count: selection.ticketCount,
+      p_winners: selection.winners,
+    });
+    if (result.error) throwDomain(result.error, "재추첨 결과를 저장하지 못했습니다.");
+    return { candidateGroup: group, candidateCount: selection.candidateCount, ticketCount: selection.ticketCount, selectedCount: selection.winners.length };
+  }
+
+  async setWinnerDelivered(input: { winnerId: string; adminId: string; delivered: boolean }) {
+    const { error } = await this.client().rpc("set_showcase_winner_delivered", {
+      p_winner_id: input.winnerId,
+      p_admin_id: input.adminId,
+      p_delivered: input.delivered,
+    });
+    if (error) throwDomain(error, "발송 상태를 저장하지 못했습니다.");
+  }
+
+  private async loadWinnerRows(eventId: string, activeOnly: boolean) {
+    let query = this.client()
+      .from("showcase_winners")
+      .select("id,candidate_group,position,masked_name,masked_student_number,project_title,status,void_reason,delivered_at,created_at")
+      .eq("event_id", eventId)
+      .order("candidate_group", { ascending: false })
+      .order("position", { ascending: true })
+      .order("created_at", { ascending: true });
+    if (activeOnly) query = query.eq("status", "active");
+    const { data, error } = await query;
+    if (error) throw new Error("당첨 결과를 불러오지 못했습니다.");
+    return (data ?? []) as Array<Record<string, unknown>>;
+  }
+
+  async listAdminWinners(): Promise<ShowcaseAdminWinner[]> {
+    const event = await this.getEvent();
+    if (!event) return [];
+    const [rows, replacements] = await Promise.all([
+      this.loadWinnerRows(event.id, false),
+      this.client().from("showcase_draws").select("replaces_winner_id").eq("event_id", event.id).not("replaces_winner_id", "is", null),
+    ]);
+    if (replacements.error) throw new Error("당첨 결과를 불러오지 못했습니다.");
+    const replaced = new Set((replacements.data ?? []).map((row) => row.replaces_winner_id as string));
+    return rows.map((row) => ({
+      id: row.id as string,
+      candidateGroup: row.candidate_group as ShowcaseCandidateGroup,
+      position: Number(row.position),
+      maskedName: row.masked_name as string,
+      maskedStudentNumber: row.masked_student_number as string,
+      projectTitle: (row.project_title as string | null) ?? null,
+      status: row.status === "voided" ? "voided" : "active",
+      voidReason: (row.void_reason as ShowcaseVoidReason | null) ?? null,
+      deliveredAt: (row.delivered_at as string | null) ?? null,
+      replaced: replaced.has(row.id as string),
+    }));
+  }
+
+  async listPublicWinners(): Promise<ShowcasePublicWinner[]> {
+    const event = await this.getEvent();
+    const phase = getShowcasePhase(event);
+    if (!event || (phase !== "announcement" && phase !== "closed")) return [];
+    return (await this.loadWinnerRows(event.id, true)).map((row) => ({
+      candidateGroup: row.candidate_group as ShowcaseCandidateGroup,
+      position: Number(row.position),
+      maskedName: row.masked_name as string,
+      maskedStudentNumber: row.masked_student_number as string,
+      projectTitle: (row.project_title as string | null) ?? null,
+    }));
+  }
+
+  async getMemberWinnings(memberId: string) {
+    const event = await this.getEvent();
+    const phase = getShowcasePhase(event);
+    if (!event || !memberId || (phase !== "announcement" && phase !== "closed")) return [];
+    const { data, error } = await this.client()
+      .from("showcase_winners")
+      .select("candidate_group,project_title,delivered_at")
+      .eq("event_id", event.id)
+      .eq("member_id", memberId)
+      .eq("status", "active");
+    if (error) throw new Error("당첨 결과를 불러오지 못했습니다.");
+    return (data ?? []).map((row) => ({
+      candidateGroup: row.candidate_group as ShowcaseCandidateGroup,
+      projectTitle: (row.project_title as string | null) ?? null,
+      deliveredAt: (row.delivered_at as string | null) ?? null,
+    }));
+  }
+
+  async settleEvent(adminId: string) {
+    const event = await this.getEvent();
+    if (!event) throw new ShowcaseDomainError("settlement_invalid");
+    const { error } = await this.client().rpc("settle_showcase_event", { p_event_id: event.id, p_admin_id: adminId });
+    if (error) throwDomain(error, "정산 완료를 기록하지 못했습니다.");
+  }
+
+  async purgePersonalDataIfDue() {
+    const event = await this.getEvent();
+    if (!event) return false;
+    const { data, error } = await this.client().rpc("purge_showcase_personal_data", { p_event_id: event.id });
+    if (error) throw new Error("쇼케이스 개인정보 파기를 실행하지 못했습니다.");
+    return data === true;
   }
 
   async getAdminMetrics(): Promise<ShowcaseAdminMetrics | null> {

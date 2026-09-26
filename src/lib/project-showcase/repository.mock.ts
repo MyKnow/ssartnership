@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { MOCK_MEMBER_ID } from "@/lib/mock/member";
+import {
+  sampleShowcaseUniform,
+  sampleShowcaseWeighted,
+  secureRandomInt,
+  type ShowcaseRandomInt,
+} from "./draw";
 import { ShowcaseDomainError } from "./errors";
 import type {
   ProjectShowcaseRepository,
@@ -17,12 +23,22 @@ import {
   canSubmitShowcaseFeedback,
   countShowcaseTickets,
   getShowcasePhase,
+  maskShowcaseName,
   maskShowcaseStudentNumber,
   PROJECT_SHOWCASE_SLUG,
+  SHOWCASE_VOID_REASONS,
   SHOWCASE_PROJECT_STATUSES,
   SHOWCASE_PROJECT_TYPES,
   type ShowcaseAdminFeedback,
+  type ShowcaseAdminWinner,
+  type ShowcaseCandidateGroup,
+  type ShowcaseDrawReceipt,
+  type ShowcaseDrawState,
   type ShowcaseEvent,
+  type ShowcaseExperiencerCandidate,
+  type ShowcasePublicWinner,
+  type ShowcaseSubmitterCandidate,
+  type ShowcaseVoidReason,
   type ShowcaseMemberParticipation,
   type ShowcaseMemberProjectState,
   type ShowcaseOwnerFeedback,
@@ -49,6 +65,24 @@ type ShowcaseMockStore = {
   experiences: Array<{ id: string; projectId: string; memberId: string; startedAt: string }>;
   feedback: Array<{ id: string; projectId: string; memberId: string; body: string; createdAt: string; hiddenAt: string | null }>;
   interests: Array<{ projectId: string; memberId: string }>;
+  exclusions: Array<{ id: string; group: ShowcaseCandidateGroup; target: string; reason: string; restoredAt: string | null }>;
+  draws: Array<{ id: string; group: ShowcaseCandidateGroup; kind: "initial" | "redraw"; replacesWinnerId: string | null; candidateCount: number; createdAt: string }>;
+  winners: Array<{
+    id: string;
+    candidateGroup: ShowcaseCandidateGroup;
+    memberId: string;
+    projectTitle: string | null;
+    maskedName: string;
+    maskedStudentNumber: string;
+    position: number;
+    status: "active" | "voided";
+    voidReason: ShowcaseVoidReason | null;
+    deliveredAt: string | null;
+    createdAt: string;
+  }>;
+  settledAt: string | null;
+  settledBy: string | null;
+  purgedAt: string | null;
   activities: ShowcaseAdminActivityLog[];
 };
 
@@ -162,6 +196,12 @@ function createStore(now = Date.now()): ShowcaseMockStore {
     experiences: [],
     feedback: [],
     interests: [],
+    exclusions: [],
+    draws: [],
+    winners: [],
+    settledAt: null,
+    settledBy: null,
+    purgedAt: null,
     activities: [],
   };
 }
@@ -251,6 +291,116 @@ function openProject(store: ShowcaseMockStore, projectId: string) {
   if (!project) throw new ShowcaseDomainError("project_not_found");
   if (getShowcasePhase(store.event) !== "experience") throw new ShowcaseDomainError("experience_closed");
   return project;
+}
+
+/** Mirrors `showcase_assert_draw_open`: after the experience ends and before settlement. */
+function assertDrawOpen(store: ShowcaseMockStore) {
+  const experienceEnd = store.event.experienceEndAt ? new Date(store.event.experienceEndAt).getTime() : Number.POSITIVE_INFINITY;
+  if (!store.event.isActive || Date.now() < experienceEnd || store.settledAt) throw new ShowcaseDomainError("draw_closed");
+}
+
+function activeExclusion(store: ShowcaseMockStore, group: ShowcaseCandidateGroup, target: string) {
+  const exclusion = store.exclusions.find((item) => !item.restoredAt && item.group === group && item.target === target);
+  return exclusion ? { id: exclusion.id, reason: exclusion.reason } : null;
+}
+
+/** Anyone drawn before in this event — including voided winners — cannot be drawn again. */
+function hasActivePrize(store: ShowcaseMockStore, memberId: string) {
+  return store.winners.some((winner) => winner.memberId === memberId);
+}
+
+function submitterPool(store: ShowcaseMockStore) {
+  return store.projects
+    .filter((project) => project.status === "approved")
+    .map((project) => ({
+      projectId: project.id,
+      projectTitle: project.title,
+      memberId: project.ownerMemberId,
+      ownerDisplayName: store.memberNames.get(project.ownerMemberId) ?? "회원",
+      studentNumber: project.participants.find((participant) => participant.isOwner)?.studentNumber ?? "",
+      exclusion: activeExclusion(store, "submitter", project.id),
+      alreadyWon: Boolean(project.ownerMemberId && hasActivePrize(store, project.ownerMemberId)),
+    }));
+}
+
+function experiencerPool(store: ShowcaseMockStore) {
+  const tickets = new Map<string, number>();
+  for (const item of store.feedback) {
+    if (item.memberId) tickets.set(item.memberId, (tickets.get(item.memberId) ?? 0) + 1);
+  }
+  return [...tickets.entries()]
+    .filter(([memberId]) => store.registrations.has(memberId))
+    .map(([memberId, count]) => ({
+      memberId,
+      displayName: store.memberNames.get(memberId) ?? "회원",
+      studentNumber: store.registrations.get(memberId)?.studentNumber ?? "",
+      tickets: count,
+      exclusion: activeExclusion(store, "experiencer", memberId),
+      alreadyWon: hasActivePrize(store, memberId),
+    }));
+}
+
+function recordDraw(
+  store: ShowcaseMockStore,
+  group: ShowcaseCandidateGroup,
+  kind: "initial" | "redraw",
+  replacesWinnerId: string | null,
+  requested: number,
+  random: ShowcaseRandomInt,
+  firstPosition: number,
+): ShowcaseDrawReceipt {
+  const now = new Date().toISOString();
+  const drawId = randomUUID();
+  let candidateCount = 0;
+  let ticketCount = 0;
+  let chosen: Array<{ memberId: string; displayName: string; studentNumber: string; projectTitle: string | null }> = [];
+  if (group === "submitter") {
+    const eligible = submitterPool(store).filter((item) => item.memberId && item.studentNumber && !item.exclusion && !item.alreadyWon);
+    candidateCount = eligible.length;
+    ticketCount = eligible.length;
+    chosen = sampleShowcaseUniform(eligible, requested, random).map((item) => ({
+      memberId: item.memberId, displayName: item.ownerDisplayName, studentNumber: item.studentNumber, projectTitle: item.projectTitle,
+    }));
+  } else {
+    const eligible = experiencerPool(store).filter((item) => item.studentNumber && !item.exclusion && !item.alreadyWon);
+    candidateCount = eligible.length;
+    ticketCount = eligible.reduce((total, item) => total + item.tickets, 0);
+    chosen = sampleShowcaseWeighted(eligible.map((item) => ({ ...item, weight: item.tickets })), requested, random).map((item) => ({
+      memberId: item.memberId, displayName: item.displayName, studentNumber: item.studentNumber, projectTitle: null,
+    }));
+  }
+  store.draws.push({ id: drawId, group, kind, replacesWinnerId, candidateCount, createdAt: now });
+  chosen.forEach((item, index) => {
+    store.winners.push({
+      id: randomUUID(),
+      candidateGroup: group,
+      memberId: item.memberId,
+      projectTitle: item.projectTitle,
+      maskedName: maskShowcaseName(item.displayName),
+      maskedStudentNumber: maskShowcaseStudentNumber(item.studentNumber),
+      position: firstPosition + index,
+      status: "active",
+      voidReason: null,
+      deliveredAt: null,
+      createdAt: now,
+    });
+  });
+  store.activities.push({
+    id: drawId,
+    occurredAt: now,
+    type: "draw_created",
+    projectId: null,
+    projectTitle: store.event.title,
+    actorType: "admin",
+    details: { candidateGroup: group, candidateCount, selectedCount: chosen.length },
+  });
+  return { candidateGroup: group, candidateCount, ticketCount, selectedCount: chosen.length };
+}
+
+function sortWinners<T extends { candidateGroup: ShowcaseCandidateGroup; position: number; createdAt: string }>(winners: T[]) {
+  return [...winners].sort((left, right) => (left.candidateGroup === right.candidateGroup ? 0 : left.candidateGroup === "submitter" ? -1 : 1)
+    || left.position - right.position
+    || left.createdAt.localeCompare(right.createdAt));
 }
 
 function pushActivity(store: ShowcaseMockStore, activity: Omit<ShowcaseAdminActivityLog, "id" | "occurredAt">) {
@@ -516,6 +666,150 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
     item.hiddenAt = input.hidden ? new Date().toISOString() : null;
   }
 
+  async getDrawState(): Promise<ShowcaseDrawState> {
+    const store = getStore();
+    return {
+      submitterDrawn: store.draws.some((draw) => draw.group === "submitter" && draw.kind === "initial"),
+      experiencerDrawn: store.draws.some((draw) => draw.group === "experiencer" && draw.kind === "initial"),
+      settledAt: store.settledAt,
+      purgedAt: store.purgedAt,
+    };
+  }
+
+  async listSubmitterCandidates(): Promise<ShowcaseSubmitterCandidate[]> {
+    return submitterPool(getStore()).map(({ projectId, projectTitle, ownerDisplayName, exclusion, alreadyWon }) => ({
+      projectId, projectTitle, ownerDisplayName, exclusion, alreadyWon,
+    }));
+  }
+
+  async listExperiencerCandidates(): Promise<ShowcaseExperiencerCandidate[]> {
+    return experiencerPool(getStore());
+  }
+
+  async excludeCandidate(input: { group: ShowcaseCandidateGroup; projectId?: string; memberId?: string; reason: string; adminId: string }) {
+    const store = getStore();
+    assertDrawOpen(store);
+    const reason = input.reason.trim();
+    if (Array.from(reason).length < 2 || Array.from(reason).length > 500) throw new ShowcaseDomainError("exclusion_invalid");
+    const target = input.group === "submitter" ? input.projectId : input.memberId;
+    const valid = input.group === "submitter"
+      ? store.projects.some((project) => project.id === target && project.status === "approved")
+      : Boolean(target && store.registrations.has(target));
+    if (!target || !valid) throw new ShowcaseDomainError("exclusion_invalid");
+    if (store.exclusions.some((exclusion) => !exclusion.restoredAt && exclusion.group === input.group && exclusion.target === target)) {
+      throw new ShowcaseDomainError("exclusion_exists");
+    }
+    store.exclusions.push({ id: randomUUID(), group: input.group, target, reason, restoredAt: null });
+  }
+
+  async restoreCandidate(input: { exclusionId: string; adminId: string }) {
+    const store = getStore();
+    const exclusion = store.exclusions.find((item) => item.id === input.exclusionId && !item.restoredAt);
+    if (!exclusion) throw new ShowcaseDomainError("exclusion_not_found");
+    assertDrawOpen(store);
+    exclusion.restoredAt = new Date().toISOString();
+  }
+
+  async runDraw(input: { group: ShowcaseCandidateGroup; adminId: string; random?: ShowcaseRandomInt }): Promise<ShowcaseDrawReceipt> {
+    const store = getStore();
+    assertDrawOpen(store);
+    const requested = input.group === "submitter" ? store.event.submitterSelectionCount : store.event.experiencerSelectionCount;
+    if (requested < 1) throw new ShowcaseDomainError("draw_invalid");
+    if (store.draws.some((draw) => draw.group === input.group && draw.kind === "initial")) throw new ShowcaseDomainError("draw_exists");
+    if (input.group === "experiencer" && !store.draws.some((draw) => draw.group === "submitter" && draw.kind === "initial")) {
+      throw new ShowcaseDomainError("draw_order_invalid");
+    }
+    return recordDraw(store, input.group, "initial", null, requested, input.random ?? secureRandomInt, 1);
+  }
+
+  async voidWinner(input: { winnerId: string; adminId: string; reason: ShowcaseVoidReason }) {
+    const store = getStore();
+    const winner = store.winners.find((item) => item.id === input.winnerId && item.status === "active");
+    if (!winner) throw new ShowcaseDomainError("winner_not_found");
+    assertDrawOpen(store);
+    if (!SHOWCASE_VOID_REASONS.includes(input.reason)) throw new ShowcaseDomainError("void_invalid");
+    Object.assign(winner, { status: "voided", voidReason: input.reason });
+  }
+
+  async redrawWinner(input: { winnerId: string; adminId: string; random?: ShowcaseRandomInt }): Promise<ShowcaseDrawReceipt> {
+    const store = getStore();
+    assertDrawOpen(store);
+    const replaced = store.winners.find((item) => item.id === input.winnerId);
+    if (!replaced || replaced.status !== "voided" || store.draws.some((draw) => draw.replacesWinnerId === input.winnerId)) {
+      throw new ShowcaseDomainError("redraw_invalid");
+    }
+    return recordDraw(store, replaced.candidateGroup, "redraw", replaced.id, 1, input.random ?? secureRandomInt, replaced.position);
+  }
+
+  async setWinnerDelivered(input: { winnerId: string; adminId: string; delivered: boolean }) {
+    const store = getStore();
+    const winner = store.winners.find((item) => item.id === input.winnerId && item.status === "active");
+    if (!winner) throw new ShowcaseDomainError("winner_not_found");
+    assertDrawOpen(store);
+    winner.deliveredAt = input.delivered ? new Date().toISOString() : null;
+  }
+
+  async listAdminWinners(): Promise<ShowcaseAdminWinner[]> {
+    const store = getStore();
+    return sortWinners(store.winners).map((winner) => ({
+      id: winner.id,
+      candidateGroup: winner.candidateGroup,
+      position: winner.position,
+      maskedName: winner.maskedName,
+      maskedStudentNumber: winner.maskedStudentNumber,
+      projectTitle: winner.projectTitle,
+      status: winner.status,
+      voidReason: winner.voidReason,
+      deliveredAt: winner.deliveredAt,
+      replaced: store.draws.some((draw) => draw.replacesWinnerId === winner.id),
+    }));
+  }
+
+  async listPublicWinners(): Promise<ShowcasePublicWinner[]> {
+    const store = getStore();
+    const phase = getShowcasePhase(store.event);
+    if (phase !== "announcement" && phase !== "closed") return [];
+    return sortWinners(store.winners.filter((winner) => winner.status === "active")).map((winner) => ({
+      candidateGroup: winner.candidateGroup,
+      position: winner.position,
+      maskedName: winner.maskedName,
+      maskedStudentNumber: winner.maskedStudentNumber,
+      projectTitle: winner.projectTitle,
+    }));
+  }
+
+  async getMemberWinnings(memberId: string) {
+    const store = getStore();
+    const phase = getShowcasePhase(store.event);
+    if (phase !== "announcement" && phase !== "closed") return [];
+    return store.winners
+      .filter((winner) => winner.status === "active" && winner.memberId === memberId)
+      .map((winner) => ({ candidateGroup: winner.candidateGroup, projectTitle: winner.projectTitle, deliveredAt: winner.deliveredAt }));
+  }
+
+  async settleEvent(adminId: string) {
+    const store = getStore();
+    const announcementStart = store.event.announcementStartAt ? new Date(store.event.announcementStartAt).getTime() : Number.POSITIVE_INFINITY;
+    if (store.settledAt || Date.now() < announcementStart) throw new ShowcaseDomainError("settlement_invalid");
+    store.settledAt = new Date().toISOString();
+    store.settledBy = adminId;
+  }
+
+  async purgePersonalDataIfDue() {
+    const store = getStore();
+    if (!store.settledAt || store.purgedAt || Date.now() - new Date(store.settledAt).getTime() < 30 * DAY) return false;
+    for (const project of store.projects) {
+      project.participants = [];
+      project.ownerMemberId = "";
+    }
+    store.registrations.clear();
+    for (const collection of [store.views, store.experiences, store.feedback, store.interests, store.winners]) {
+      for (const item of collection) item.memberId = "";
+    }
+    store.purgedAt = new Date().toISOString();
+    return true;
+  }
+
   async getAdminMetrics(): Promise<ShowcaseAdminMetrics> {
     const store = getStore();
     const statusCounts = Object.fromEntries(SHOWCASE_PROJECT_STATUSES.map((status) => [status, 0])) as ShowcaseAdminMetrics["statusCounts"];
@@ -532,8 +826,8 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
       totalValidExperiences: store.feedback.length,
       totalInterests: store.interests.length,
       registeredExperiencers: store.registrations.size,
-      completedDraws: 0,
-      activeWinners: 0,
+      completedDraws: store.draws.filter((draw) => draw.kind === "initial").length,
+      activeWinners: store.winners.filter((winner) => winner.status === "active").length,
       projectStats: store.projects
         .filter((project) => project.status === "approved")
         .sort((left, right) => left.title.localeCompare(right.title, "ko-KR"))

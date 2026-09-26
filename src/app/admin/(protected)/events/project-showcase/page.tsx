@@ -40,6 +40,7 @@ export default async function AdminProjectShowcasePage({
           description="모집·체험·발표 일정과 경품 수량을 설정하고 출품작을 검수합니다. 참여자 이름과 학번은 이 운영 화면에서만 볼 수 있어요."
         />
         <div className="flex flex-wrap gap-3">
+          <Button href={`${ADMIN_PATH}/draw`}>추첨·발표</Button>
           <Button href={`${ADMIN_PATH}/feedback`} variant="secondary">피드백 관리</Button>
           <Button href={`${ADMIN_PATH}/logs`} variant="secondary">로그·집계</Button>
           <Button href="/events/project-showcase" variant="secondary">공개 페이지 보기</Button>

@@ -12,7 +12,7 @@ import {
   type ShowcasePhase,
 } from "@/lib/project-showcase";
 import { formatShowcaseDateTime, formatShowcasePeriod } from "@/lib/project-showcase/format";
-import { SHOWCASE_PHASE_LABELS, SHOWCASE_TYPE_LABELS } from "@/lib/project-showcase/labels";
+import { SHOWCASE_PHASE_LABELS, SHOWCASE_PRIZES, SHOWCASE_TYPE_LABELS } from "@/lib/project-showcase/labels";
 import { SHOWCASE_PROJECT_TYPES } from "@/lib/project-showcase/types";
 import { getSignedUserSession } from "@/lib/user-auth";
 
@@ -70,7 +70,8 @@ export default async function ProjectShowcasePage({
   const selectedType = SHOWCASE_PROJECT_TYPES.find((type) => type === firstParam(params.type)) ?? "";
   const query = firstParam(params.q).trim().slice(0, 80);
   const selectedSort = params.sort === "title" ? "title" : "newest";
-  const [projects, ownProject, completedProjectIds, headerSession] = await Promise.all([
+  const showResults = phase === "announcement" || phase === "closed";
+  const [projects, ownProject, completedProjectIds, winners, drawState, headerSession] = await Promise.all([
     phase === "experience"
       ? projectShowcaseRepository.listPublicProjects({ type: selectedType, query, sort: selectedSort })
       : Promise.resolve([]),
@@ -78,6 +79,8 @@ export default async function ProjectShowcasePage({
     phase === "experience" && session?.userId
       ? projectShowcaseRepository.listMemberCompletedProjectIds(session.userId)
       : Promise.resolve([]),
+    showResults ? projectShowcaseRepository.listPublicWinners() : Promise.resolve([]),
+    showResults ? projectShowcaseRepository.getDrawState() : Promise.resolve(null),
     getHeaderSession(session?.userId),
   ]);
   const completed = new Set(completedProjectIds);
@@ -219,11 +222,38 @@ export default async function ProjectShowcasePage({
           </section>
         ) : null}
 
-        {phase === "announcement" ? (
+        {phase === "announcement" || phase === "closed" ? (
           <section id="showcase-results" className="mt-12 scroll-mt-24 rounded-3xl border border-border bg-surface p-5 sm:p-7" aria-labelledby="showcase-results-heading">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">ANNOUNCEMENT</p>
             <h2 id="showcase-results-heading" className="mt-2 text-2xl font-bold text-foreground">당첨 결과</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">당첨 결과는 운영진 추첨 후 이곳과 Mattermost에서 공지해요.</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              무작위 추첨 결과예요. 이름·학번은 일부를 가려 보여 주고, 경품은 당첨자 Mattermost로 보내 드려요.
+              {session?.userId ? " 내 당첨 여부는 내 참여에서 확인할 수 있어요." : ""}
+            </p>
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              {(["submitter", "experiencer"] as const).map((group) => {
+                const groupWinners = winners.filter((winner) => winner.candidateGroup === group);
+                const drawn = group === "submitter" ? drawState?.submitterDrawn : drawState?.experiencerDrawn;
+                return (
+                  <div key={group} className="rounded-2xl bg-surface-muted/60 p-4">
+                    <h3 className="font-bold text-foreground">{SHOWCASE_PRIZES[group].title}</h3>
+                    <p className="text-xs text-muted-foreground">{SHOWCASE_PRIZES[group].prize} · {groupWinners.length}{SHOWCASE_PRIZES[group].unit}</p>
+                    {groupWinners.length > 0 ? (
+                      <ol className="mt-3 grid gap-1.5">
+                        {groupWinners.map((winner) => (
+                          <li key={`${group}-${winner.position}`} className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl bg-surface px-3 py-2 text-sm">
+                            <span className="min-w-0 break-words font-medium text-foreground">{winner.projectTitle ?? winner.maskedName}</span>
+                            <span className="tabular-nums text-muted-foreground">{winner.projectTitle ? `${winner.maskedName} · ` : ""}{winner.maskedStudentNumber}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    ) : (
+                      <p className="mt-3 text-sm text-muted-foreground">{drawn ? "이번 분야는 당첨자가 없어요." : "추첨 결과를 준비하고 있어요."}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </section>
         ) : null}
 

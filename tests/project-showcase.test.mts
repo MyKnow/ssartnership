@@ -470,3 +470,207 @@ describe("mock Repository 체험 규칙", () => {
     }
   });
 });
+
+type DrawModule = typeof import("../src/lib/project-showcase/draw");
+const draw = await (import(new URL("../src/lib/project-showcase/draw.ts", import.meta.url).href) as Promise<DrawModule>);
+
+/** Deterministic stand-in for the CSPRNG: returns queued values modulo the range. */
+function queuedRandom(values: number[]) {
+  let index = 0;
+  return (maxExclusive: number) => (values[index++ % values.length] ?? 0) % maxExclusive;
+}
+
+describe("추첨 알고리즘", () => {
+  test("균등 추첨은 중복 없이 요청 수만큼, 후보보다 많이 요청하면 전원을 뽑는다", () => {
+    const picked = draw.sampleShowcaseUniform(["a", "b", "c", "d"], 2, queuedRandom([3, 0]));
+    assert.deepEqual(picked, ["d", "b"]);
+    assert.equal(new Set(draw.sampleShowcaseUniform(["a", "b", "c"], 10)).size, 3);
+    assert.deepEqual(draw.sampleShowcaseUniform([], 3), []);
+  });
+
+  test("가중 추첨은 추첨권 구간으로 고르고, 뽑힌 사람은 다시 뽑히지 않는다", () => {
+    const people = [{ id: "a", weight: 1 }, { id: "b", weight: 3 }, { id: "zero", weight: 0 }];
+    assert.equal(draw.sampleShowcaseWeighted(people, 1, queuedRandom([0]))[0]?.id, "a");
+    for (const ticket of [1, 2, 3]) assert.equal(draw.sampleShowcaseWeighted(people, 1, queuedRandom([ticket]))[0]?.id, "b");
+    const both = draw.sampleShowcaseWeighted(people, 5, queuedRandom([1, 0]));
+    assert.deepEqual(both.map((person) => person.id), ["b", "a"]);
+  });
+
+  test("Mattermost 공지는 분야별 마스킹 명단과 미당첨 분야를 담는다", () => {
+    const text = draw.buildShowcaseAnnouncement("내 프로젝트를 소개합니다!", [
+      { candidateGroup: "experiencer", position: 1, maskedName: "천**", maskedStudentNumber: "15****44", projectTitle: null },
+      { candidateGroup: "submitter", position: 1, maskedName: "정**", maskedStudentNumber: "15****43", projectTitle: "싸트너십" },
+    ]);
+    assert.match(text, /^\[내 프로젝트를 소개합니다!\] 당첨자 안내/u);
+    assert.match(text, /■ 출품 경품 · 배달의민족 상품권 1만 원 \(1개 프로젝트\)\n1\. 싸트너십 · 정\*\* \(15\*\*\*\*43\)/u);
+    assert.match(text, /■ 체험 경품 · 메가커피 아이스 아메리카노 교환권 \(1명\)\n1\. 천\*\* \(15\*\*\*\*44\)/u);
+    assert.doesNotMatch(text, /1512343|1512344|정민호/u);
+    assert.match(draw.buildShowcaseAnnouncement("E", []), /당첨자 없음/u);
+  });
+});
+
+describe("mock Repository 추첨·정산 규칙", () => {
+  const repository = new mock.MockProjectShowcaseRepository();
+  const OWNER = "mock-member-green-route";
+  const TESTER = "member-tester";
+  const TESTER2 = "member-tester-2";
+  let store: ReturnType<typeof mock.resetProjectShowcaseMockStore>;
+
+  async function expectCode(promise: Promise<unknown>, code: string) {
+    await assert.rejects(promise, (error: unknown) => error instanceof errors.ShowcaseDomainError && error.code === code);
+  }
+
+  async function giveFeedback(memberId: string, projectId: string) {
+    await repository.startExperience({ projectId, memberId });
+    const experience = store.experiences.find((item) => item.projectId === projectId && item.memberId === memberId);
+    assert.ok(experience);
+    experience.startedAt = new Date(Date.now() - 120_000).toISOString();
+    await repository.submitFeedback({ projectId, memberId, body: "직접 써 보니 정말 편리했어요" });
+  }
+
+  async function moveTo(phase: "verification" | "announcement") {
+    const now = Date.now();
+    await repository.updateEventSchedule({
+      submissionStartAt: new Date(now - 20 * DAY).toISOString(),
+      submissionEndAt: new Date(now - 15 * DAY).toISOString(),
+      experienceStartAt: new Date(now - 14 * DAY).toISOString(),
+      experienceEndAt: new Date(now - 2 * DAY).toISOString(),
+      announcementStartAt: new Date(now + (phase === "verification" ? DAY : -DAY)).toISOString(),
+      announcementEndAt: new Date(now + 10 * DAY).toISOString(),
+      submitterSelectionCount: 20,
+      experiencerSelectionCount: 25,
+      isActive: true,
+    });
+  }
+
+  beforeEach(async () => {
+    const now = Date.now();
+    store = mock.resetProjectShowcaseMockStore({
+      memberNames: { [TESTER]: "천창현", [TESTER2]: "김싸피" },
+      event: {
+        submissionStartAt: new Date(now - 10 * DAY).toISOString(),
+        submissionEndAt: new Date(now - 3 * DAY).toISOString(),
+        experienceStartAt: new Date(now - DAY).toISOString(),
+        experienceEndAt: new Date(now + 6 * DAY).toISOString(),
+        announcementStartAt: new Date(now + 8 * DAY).toISOString(),
+      },
+    });
+    // The Green Route owner also experiences another project, so they are in both pools.
+    await repository.registerParticipant({ memberId: OWNER, studentNumber: "1500002" });
+    await repository.registerParticipant({ memberId: TESTER, studentNumber: "1512344" });
+    await repository.registerParticipant({ memberId: TESTER2, studentNumber: "1612345" });
+    await giveFeedback(OWNER, "mock-showcase-pixel-quest");
+    await giveFeedback(TESTER, "mock-showcase-pixel-quest");
+    await giveFeedback(TESTER, "mock-showcase-green-route");
+    await giveFeedback(TESTER2, "mock-showcase-green-route");
+  });
+
+  test("체험이 끝나기 전에는 추첨과 검증을 막는다", async () => {
+    await expectCode(repository.runDraw({ group: "submitter", adminId: "admin" }), "draw_closed");
+    await expectCode(repository.excludeCandidate({ group: "experiencer", memberId: TESTER, reason: "중복 계정", adminId: "admin" }), "draw_closed");
+  });
+
+  test("출품 추첨이 먼저이고, 출품 당첨 대표자는 체험 추첨에서 빠진다", async () => {
+    await moveTo("verification");
+    await expectCode(repository.runDraw({ group: "experiencer", adminId: "admin" }), "draw_order_invalid");
+    const submitter = await repository.runDraw({ group: "submitter", adminId: "admin" });
+    assert.equal(submitter.selectedCount, 2);
+    await expectCode(repository.runDraw({ group: "submitter", adminId: "admin" }), "draw_exists");
+
+    const experiencers = await repository.listExperiencerCandidates();
+    assert.equal(experiencers.find((candidate) => candidate.memberId === OWNER)?.alreadyWon, true);
+    assert.equal(experiencers.find((candidate) => candidate.memberId === TESTER)?.tickets, 2);
+    const receipt = await repository.runDraw({ group: "experiencer", adminId: "admin" });
+    assert.deepEqual({ candidates: receipt.candidateCount, tickets: receipt.ticketCount, selected: receipt.selectedCount }, { candidates: 2, tickets: 3, selected: 2 });
+
+    const winners = await repository.listAdminWinners();
+    assert.equal(winners.filter((winner) => winner.candidateGroup === "experiencer").length, 2);
+    const activeMembers = store.winners.filter((winner) => winner.status === "active").map((winner) => winner.memberId);
+    assert.equal(new Set(activeMembers).size, activeMembers.length);
+    assert.ok(winners.every((winner) => /^\d{2}\*{4}\d{2}$/u.test(winner.maskedStudentNumber) && winner.maskedName.endsWith("**")));
+  });
+
+  test("제외한 후보는 추첨되지 않고, 복구하면 다시 후보가 된다", async () => {
+    await moveTo("verification");
+    await expectCode(repository.excludeCandidate({ group: "experiencer", memberId: TESTER, reason: " ", adminId: "admin" }), "exclusion_invalid");
+    await repository.excludeCandidate({ group: "experiencer", memberId: TESTER, reason: "중복 계정 의심", adminId: "admin" });
+    await expectCode(repository.excludeCandidate({ group: "experiencer", memberId: TESTER, reason: "중복 계정 의심", adminId: "admin" }), "exclusion_exists");
+    await repository.runDraw({ group: "submitter", adminId: "admin" });
+    await repository.runDraw({ group: "experiencer", adminId: "admin" });
+    assert.equal(store.winners.some((winner) => winner.memberId === TESTER), false);
+    const exclusion = (await repository.listExperiencerCandidates()).find((candidate) => candidate.memberId === TESTER)?.exclusion;
+    assert.ok(exclusion);
+    await repository.restoreCandidate({ exclusionId: exclusion.id, adminId: "admin" });
+    assert.equal((await repository.listExperiencerCandidates()).find((candidate) => candidate.memberId === TESTER)?.exclusion, null);
+  });
+
+  test("무효 처리한 당첨은 같은 분야에서 1명만 재추첨하고, 후보가 없으면 미집행으로 남긴다", async () => {
+    await moveTo("verification");
+    await repository.runDraw({ group: "submitter", adminId: "admin" });
+    await repository.runDraw({ group: "experiencer", adminId: "admin" });
+    const experiencerWinner = (await repository.listAdminWinners()).find((winner) => winner.candidateGroup === "experiencer");
+    assert.ok(experiencerWinner);
+    await expectCode(repository.redrawWinner({ winnerId: experiencerWinner.id, adminId: "admin" }), "redraw_invalid");
+    await repository.voidWinner({ winnerId: experiencerWinner.id, adminId: "admin", reason: "unreachable" });
+    const redraw = await repository.redrawWinner({ winnerId: experiencerWinner.id, adminId: "admin" });
+    assert.equal(redraw.selectedCount, 0);
+    await expectCode(repository.redrawWinner({ winnerId: experiencerWinner.id, adminId: "admin" }), "redraw_invalid");
+    const after = await repository.listAdminWinners();
+    assert.equal(after.find((winner) => winner.id === experiencerWinner.id)?.replaced, true);
+  });
+
+  test("당첨 명단과 내 당첨은 발표 시작부터 보이고, 정산 뒤에는 더 바꿀 수 없다", async () => {
+    await moveTo("verification");
+    await repository.runDraw({ group: "submitter", adminId: "admin" });
+    assert.deepEqual(await repository.listPublicWinners(), []);
+    assert.deepEqual(await repository.getMemberWinnings(OWNER), []);
+    await expectCode(repository.settleEvent("admin"), "settlement_invalid");
+
+    await moveTo("announcement");
+    const publicWinners = await repository.listPublicWinners();
+    assert.equal(publicWinners.length, 2);
+    assert.ok(publicWinners.every((winner) => !("memberId" in winner)));
+    assert.equal((await repository.getMemberWinnings(OWNER))[0]?.projectTitle, "Green Route");
+
+    const winner = (await repository.listAdminWinners())[0];
+    assert.ok(winner);
+    await repository.setWinnerDelivered({ winnerId: winner.id, adminId: "admin", delivered: true });
+    await repository.settleEvent("admin");
+    await expectCode(repository.settleEvent("admin"), "settlement_invalid");
+    await expectCode(repository.voidWinner({ winnerId: winner.id, adminId: "admin", reason: "duplicate" }), "draw_closed");
+    await expectCode(repository.runDraw({ group: "experiencer", adminId: "admin" }), "draw_closed");
+  });
+
+  test("개인정보는 정산 30일 뒤에만 파기되고, 마스킹 당첨 명단은 남는다", async () => {
+    await moveTo("verification");
+    await repository.runDraw({ group: "submitter", adminId: "admin" });
+    await moveTo("announcement");
+    await repository.settleEvent("admin");
+    assert.equal(await repository.purgePersonalDataIfDue(), false);
+
+    store.settledAt = new Date(Date.now() - 31 * DAY).toISOString();
+    assert.equal(await repository.purgePersonalDataIfDue(), true);
+    assert.equal(await repository.purgePersonalDataIfDue(), false);
+    assert.equal(store.registrations.size, 0);
+    assert.ok(store.projects.every((project) => project.participants.length === 0 && project.ownerMemberId === ""));
+    assert.ok(store.feedback.every((item) => item.memberId === ""));
+    assert.equal((await repository.listPublicWinners()).length, 2);
+    assert.equal((await repository.getDrawState()).purgedAt !== null, true);
+  });
+});
+
+test("쇼케이스 migration은 schema.sql 스냅샷에 원문 그대로 들어 있다", async () => {
+  const { readFileSync, readdirSync } = await import("node:fs");
+  const root = new URL("../", import.meta.url);
+  const schema = readFileSync(new URL("supabase/schema.sql", root), "utf8");
+  const migrations = readdirSync(new URL("supabase/migrations/", root)).filter((name) => /showcase/u.test(name)).sort();
+  assert.ok(migrations.length >= 4);
+  for (const name of migrations) {
+    const header = `-- Snapshot of ${name}\n`;
+    const start = schema.indexOf(header);
+    assert.notEqual(start, -1, `${name} snapshot header`);
+    const next = schema.indexOf("\n-- Snapshot of ", start + header.length);
+    const body = schema.slice(start + header.length, next === -1 ? undefined : next).trim();
+    assert.equal(body, readFileSync(new URL(`supabase/migrations/${name}`, root), "utf8").trim(), `${name} snapshot body`);
+  }
+});
