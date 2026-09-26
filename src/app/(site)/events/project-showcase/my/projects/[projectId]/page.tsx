@@ -104,7 +104,7 @@ export default async function MyShowcaseProjectPage({
         ) : null}
 
         <article className="mt-6 overflow-hidden rounded-3xl border border-border bg-surface">
-          <div className="aspect-[4/3] max-h-[420px] w-full overflow-hidden bg-surface-muted sm:aspect-[16/8]">
+          <div className="aspect-video w-full overflow-hidden bg-surface-muted">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={project.imageUrl} alt={`${project.title} 대표 이미지`} className="h-full w-full object-cover" />
           </div>

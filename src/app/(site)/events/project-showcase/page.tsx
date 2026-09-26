@@ -107,7 +107,7 @@ export default async function ProjectShowcasePage({
       <SiteHeader initialSession={headerSession} />
       <main className="mx-auto w-full max-w-7xl px-4 pb-20 pt-6 sm:px-6 sm:pt-8 lg:px-8">
         <section className="relative isolate overflow-hidden rounded-3xl bg-slate-950">
-          <div className="relative aspect-[21/9] min-h-56 w-full sm:min-h-80">
+          <div className="relative aspect-video w-full">
             <Image
               src="/ads/project-showcase-banner.png"
               alt="SSAFY 구성원이 만든 프로젝트를 소개하고 직접 체험하는 프로젝트 쇼케이스"
@@ -117,10 +117,10 @@ export default async function ProjectShowcasePage({
               className="object-cover"
             />
           </div>
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/85 via-slate-950/30 to-transparent px-5 pb-5 pt-20 text-white sm:px-8 sm:pb-8">
-            <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-sky-200 sm:text-sm">SSAFY PROJECT SHOWCASE</p>
-            <h1 className="max-w-3xl text-2xl font-bold leading-tight sm:text-4xl">내 프로젝트를 소개합니다!</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/85 sm:text-base">
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/85 via-slate-950/30 to-transparent px-4 pb-4 pt-4 text-white sm:px-8 sm:pb-8 sm:pt-20">
+            <p className="mb-1 text-xs font-bold uppercase tracking-[0.2em] text-sky-200 sm:mb-2 sm:text-sm">SSAFY PROJECT SHOWCASE</p>
+            <h1 className="max-w-3xl text-xl font-bold leading-tight sm:text-4xl">내 프로젝트를 소개합니다!</h1>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-white/85 sm:mt-2 sm:text-base sm:leading-6">
               <span className="block">SSAFY 구성원이 직접 만든 서비스를</span>
               <span className="block">소개하고 함께 체험해 보세요</span>
             </p>
@@ -166,7 +166,7 @@ export default async function ProjectShowcasePage({
             <ul className="mt-5 grid gap-3 sm:grid-cols-2">
               {[
                 ["배포·운영 중인 서비스 주소", "Web·Game은 서비스 주소, App은 스토어나 다운로드 안내 주소, Embedded는 YouTube·Vimeo 시연 영상 주소"],
-                ["대표 홍보 이미지 1장", "4:3 비율로 잘라 저장해요. 서비스 화면이 잘 보이는 이미지를 권장해요."],
+                ["대표 홍보 이미지 1장", "16:9 비율로 잘라 저장해요. 서비스 화면이 잘 보이는 이미지를 권장해요."],
                 ["서비스 설명", "한 줄 소개와 20자 이상의 설명. 주요 기능과 이용 방법을 알려 주세요."],
                 ["여러 프로젝트 출품", "학번·팀원 등록 없이 출품해요. 승인된 프로젝트 1개당 추첨 기회 1개가 생겨요."],
               ].map(([title, body]) => (

@@ -160,9 +160,9 @@ const PROMOTION_POLICY = definePolicy({
 const SHOWCASE_PROJECT_POLICY = definePolicy({
   purpose: "showcase-project",
   role: "image",
-  width: 1440,
-  height: 1080,
-  aspectRatio: 4 / 3,
+  width: 1600,
+  height: 900,
+  aspectRatio: 16 / 9,
   quality: 78,
   maxSourceBytes: 10 * MEBIBYTE,
   maxInputPixels: DEFAULT_MAX_PIXELS,

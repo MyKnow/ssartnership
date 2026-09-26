@@ -93,7 +93,7 @@ export default async function AdminProjectShowcasePage({
                 {project.teamName ? <span className="text-sm text-muted-foreground">{project.teamName}</span> : null}
               </div>
               <div className="grid gap-4 sm:grid-cols-[170px_minmax(0,1fr)]">
-                <div className="aspect-[4/3] overflow-hidden rounded-xl bg-surface-muted">
+                <div className="aspect-video overflow-hidden rounded-xl bg-surface-muted">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={project.imageUrl} alt={`${project.title} 대표 이미지`} className="h-full w-full object-cover" />
                 </div>
