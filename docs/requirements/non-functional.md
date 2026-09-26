@@ -125,8 +125,8 @@ authority: normative
 - `dev` branch는 Vercel Preview와 Supabase Preview 기준이다.
 - planned work는 typed branch에서 시작하고 PR은 `dev` 대상으로 만든다.
 - `npm run release`가 기본 release path다.
-- GitHub Actions: lockfile-check, preview-sync, public-readiness, storybook.
-- Supabase Preview sync는 production data를 sanitizer를 거쳐 preview에 복원한다.
+- GitHub Actions: lockfile-check, public-readiness, storybook.
+- Cloud Supabase Preview는 frozen 복구 기준선이며 Actions의 migration/sync 대상이 아니다(Issue #484). 자체 호스팅 Preview/Production DDL은 운영자가 검증 후 작성하는 `schema-approval.json`으로만 배포가 허용된다.
 - migration은 forward-only, 실제 현재 시각 prefix, lexicographic order를 지켜야 한다.
 
 ## Observability
