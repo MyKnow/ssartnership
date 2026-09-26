@@ -9,7 +9,11 @@ import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { projectShowcaseRepository } from "@/lib/project-showcase";
 import { ShowcaseDomainError, toShowcaseFailure } from "@/lib/project-showcase/errors";
 import { getShowcasePhase, PROJECT_SHOWCASE_SLUG } from "@/lib/project-showcase/types";
-import { parseShowcaseProjectSubmission } from "@/lib/project-showcase/validation";
+import {
+  parseShowcaseFeedback,
+  parseShowcaseProjectSubmission,
+  parseShowcaseRegistration,
+} from "@/lib/project-showcase/validation";
 import { getSignedUserSession } from "@/lib/user-auth";
 
 const EVENT_PATH = `/events/${PROJECT_SHOWCASE_SLUG}`;
@@ -175,5 +179,83 @@ export async function recordShowcaseProjectView(projectId: string) {
   } catch (error) {
     logUnexpected("view", error);
     return { ok: false as const };
+  }
+}
+
+function readProjectId(projectId: unknown) {
+  return typeof projectId === "string" && projectId.length > 0 && projectId.length <= 128 ? projectId : null;
+}
+
+async function requireMember() {
+  const session = await getSignedUserSession();
+  return session?.userId ?? null;
+}
+
+export async function registerShowcaseParticipant(input: {
+  studentNumber: string;
+  studentNumberConsent: boolean;
+  announcementConsent: boolean;
+}) {
+  const memberId = await requireMember();
+  if (!memberId) return { ok: false as const, message: "로그인 후 참여 등록을 해 주세요.", field: null };
+  const parsed = parseShowcaseRegistration(input);
+  if (!parsed.success) return { ok: false as const, message: parsed.message, field: parsed.field };
+  try {
+    await projectShowcaseRepository.registerParticipant({ memberId, studentNumber: parsed.data.studentNumber });
+    revalidatePath(`${EVENT_PATH}/my`);
+    return { ok: true as const, message: "참여 등록을 마쳤어요. 이제 체험을 시작할 수 있어요." };
+  } catch (error) {
+    logUnexpected("register", error);
+    const failure = toShowcaseFailure(error);
+    return failure.code === "student_number_taken" ? { ...failure, field: "studentNumber" } : failure;
+  }
+}
+
+export async function startShowcaseExperience(projectId: string) {
+  const id = readProjectId(projectId);
+  const memberId = await requireMember();
+  if (!memberId) return { ok: false as const, message: "로그인 후 체험해 주세요.", field: null };
+  if (!id) return toShowcaseFailure(new ShowcaseDomainError("project_not_found"));
+  try {
+    const project = await projectShowcaseRepository.getPublicProject(id);
+    if (!project) throw new ShowcaseDomainError("project_not_found");
+    const { startedAt } = await projectShowcaseRepository.startExperience({ projectId: id, memberId });
+    revalidatePath(`${EVENT_PATH}/my`);
+    return { ok: true as const, destination: project.serviceUrl, startedAt, serverNow: new Date().toISOString() };
+  } catch (error) {
+    logUnexpected("experience", error);
+    return toShowcaseFailure(error);
+  }
+}
+
+export async function submitShowcaseFeedback(projectId: string, body: string) {
+  const id = readProjectId(projectId);
+  const memberId = await requireMember();
+  if (!memberId) return { ok: false as const, message: "로그인 후 피드백을 남겨 주세요.", field: null };
+  if (!id) return toShowcaseFailure(new ShowcaseDomainError("project_not_found"));
+  const parsed = parseShowcaseFeedback(body);
+  if (!parsed.success) return { ok: false as const, message: parsed.message, field: parsed.field };
+  try {
+    await projectShowcaseRepository.submitFeedback({ projectId: id, memberId, body: parsed.data.body });
+    revalidatePath(EVENT_PATH);
+    revalidatePath(`${EVENT_PATH}/my`);
+    return { ok: true as const, message: "피드백을 남겼어요. 추첨권 1장을 받았어요." };
+  } catch (error) {
+    logUnexpected("feedback", error);
+    return toShowcaseFailure(error);
+  }
+}
+
+export async function setShowcaseInterest(projectId: string, interested: boolean) {
+  const id = readProjectId(projectId);
+  const memberId = await requireMember();
+  if (!memberId) return { ok: false as const, message: "로그인 후 관심 표시를 해 주세요.", field: null };
+  if (!id || typeof interested !== "boolean") return toShowcaseFailure(new ShowcaseDomainError("project_not_found"));
+  try {
+    await projectShowcaseRepository.setInterest({ projectId: id, memberId, interested });
+    return { ok: true as const, interested };
+  } catch (error) {
+    logUnexpected("interest", error);
+    return toShowcaseFailure(error);
   }
 }

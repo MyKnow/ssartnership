@@ -13,9 +13,10 @@ export const dynamic = "force-dynamic";
 export default async function MyShowcaseParticipationPage() {
   const session = await getSignedUserSession();
   if (!session?.userId) redirect("/auth/login?returnTo=%2Fevents%2Fproject-showcase%2Fmy");
-  const [event, project, headerSession] = await Promise.all([
+  const [event, project, participation, headerSession] = await Promise.all([
     projectShowcaseRepository.getEvent(),
     projectShowcaseRepository.getActiveOwnerProject(session.userId),
+    projectShowcaseRepository.getMemberParticipation(session.userId),
     getHeaderSession(session.userId),
   ]);
   const phase = getShowcasePhase(event);
@@ -81,13 +82,53 @@ export default async function MyShowcaseParticipationPage() {
         </section>
 
         <section className="mt-10 grid gap-4" aria-labelledby="my-showcase-experience-heading">
-          <h2 id="my-showcase-experience-heading" className="text-xl font-bold text-foreground">체험과 추첨권</h2>
-          <div className="rounded-2xl border border-dashed border-border bg-surface px-5 py-10 text-center">
-            <p className="font-semibold text-foreground">체험 기간에 참여할 수 있어요</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              체험 기간: {formatShowcasePeriod(event?.experienceStartAt ?? null, event?.experienceEndAt ?? null)}
-            </p>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 id="my-showcase-experience-heading" className="text-xl font-bold text-foreground">체험과 추첨권</h2>
+            {phase === "experience" ? <Button href="/events/project-showcase#showcase-gallery" variant="secondary">프로젝트 둘러보기</Button> : null}
           </div>
+          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-border bg-surface p-4">
+              <dt className="text-xs font-medium text-muted-foreground">보유 추첨권</dt>
+              <dd className="mt-2 text-2xl font-bold tabular-nums text-foreground">{participation.ticketCount.toLocaleString("ko-KR")}장</dd>
+            </div>
+            <div className="rounded-xl border border-border bg-surface p-4">
+              <dt className="text-xs font-medium text-muted-foreground">체험한 프로젝트</dt>
+              <dd className="mt-2 text-2xl font-bold tabular-nums text-foreground">{participation.experiences.length.toLocaleString("ko-KR")}개</dd>
+            </div>
+            <div className="col-span-2 rounded-xl border border-border bg-surface p-4 sm:col-span-1">
+              <dt className="text-xs font-medium text-muted-foreground">참여 등록</dt>
+              <dd className="mt-2 text-sm font-semibold text-foreground">
+                {participation.registration ? `완료 · 학번 ${participation.registration.maskedStudentNumber}` : "아직 등록하지 않았어요"}
+              </dd>
+            </div>
+          </dl>
+          <p className="text-xs leading-5 text-muted-foreground">
+            체험을 시작하고 1분 뒤 한 줄 피드백을 남긴 프로젝트 1개마다 추첨권 1장을 받아요. 같은 프로젝트를 여러 번 체험해도 1장이에요.
+          </p>
+          {participation.experiences.length > 0 ? (
+            <ul className="grid gap-2">
+              {participation.experiences.map((experience) => (
+                <li key={experience.projectId}>
+                  <Link
+                    href={`/events/project-showcase/projects/${experience.projectId}`}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-sm hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    <span className="min-w-0 truncate font-medium text-foreground">{experience.projectTitle}</span>
+                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${experience.feedbackSubmitted ? "bg-success/10 text-success" : "bg-warning/10 text-foreground"}`}>
+                      {experience.feedbackSubmitted ? "추첨권 1장" : "피드백 대기"}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border bg-surface px-5 py-8 text-center">
+              <p className="font-semibold text-foreground">{phase === "experience" ? "아직 체험한 프로젝트가 없어요" : "체험 기간에 참여할 수 있어요"}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                체험 기간: {formatShowcasePeriod(event?.experienceStartAt ?? null, event?.experienceEndAt ?? null)}
+              </p>
+            </div>
+          )}
         </section>
       </main>
     </div>

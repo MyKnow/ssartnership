@@ -71,3 +71,28 @@ export async function reviewShowcaseProject(formData: FormData) {
     return toShowcaseFailure(error);
   }
 }
+
+export async function setShowcaseFeedbackHidden(feedbackId: string, hidden: boolean) {
+  const admin = await requireAdminPermission("events", "update", { path: `${ADMIN_PATH}/feedback` });
+  if (typeof feedbackId !== "string" || !feedbackId || feedbackId.length > 128 || typeof hidden !== "boolean") {
+    return { ok: false as const, message: "피드백을 찾을 수 없어요.", field: null };
+  }
+  try {
+    await projectShowcaseRepository.setFeedbackHidden({ feedbackId, adminId: admin.adminId, hidden });
+    await logAdminAudit({
+      action: "showcase_feedback_visibility_update",
+      targetType: "showcase_feedback",
+      targetId: feedbackId,
+      path: `${ADMIN_PATH}/feedback`,
+      properties: { hidden },
+    });
+    revalidatePath(`${ADMIN_PATH}/feedback`);
+    revalidatePath(`${EVENT_PATH}/my`, "layout");
+    return { ok: true as const, message: hidden ? "피드백을 숨겼어요." : "피드백을 다시 공개했어요." };
+  } catch (error) {
+    if (!(error instanceof ShowcaseDomainError)) {
+      console.error("[project-showcase/feedback-visibility]", error instanceof Error ? error.message : "unknown");
+    }
+    return toShowcaseFailure(error);
+  }
+}

@@ -327,3 +327,146 @@ test("mock 쇼케이스 이벤트는 실행 시각과 관계없이 모집 기간
   }
   mock.resetProjectShowcaseMockStore();
 });
+
+describe("체험·피드백 규칙", () => {
+  test("피드백은 체험 시작 60초 뒤부터 열리고, 추첨권은 유효 체험 수만큼이다", () => {
+    const startedAt = "2026-10-05T01:00:00.000Z";
+    assert.equal(types.canSubmitShowcaseFeedback(null), false);
+    assert.equal(types.canSubmitShowcaseFeedback(startedAt, new Date("2026-10-05T01:00:59.999Z")), false);
+    assert.equal(types.canSubmitShowcaseFeedback(startedAt, new Date("2026-10-05T01:01:00.000Z")), true);
+    assert.equal(types.countShowcaseTickets([]), 0);
+    assert.equal(types.countShowcaseTickets([{ feedbackSubmitted: true }, { feedbackSubmitted: false }, { feedbackSubmitted: true }]), 2);
+  });
+
+  test("참여 등록은 7자리 학번과 두 동의가 필요하다", () => {
+    const valid = { studentNumber: "1612345", studentNumberConsent: true, announcementConsent: true };
+    assert.equal(validation.parseShowcaseRegistration(valid).success, true);
+    for (const [override, field] of [
+      [{ studentNumber: "16123" }, "studentNumber"],
+      [{ studentNumberConsent: false }, "studentNumberConsent"],
+      [{ announcementConsent: false }, "announcementConsent"],
+    ] as const) {
+      const result = validation.parseShowcaseRegistration({ ...valid, ...override });
+      assert.equal(result.success, false);
+      if (!result.success) assert.equal(result.field, field);
+    }
+  });
+
+  test("피드백 길이는 DB char_length와 같게 코드 포인트로 센다", () => {
+    assert.equal(validation.parseShowcaseFeedback("  아홉 글자 입니다  ").success, false);
+    assert.equal(validation.parseShowcaseFeedback("열 글자를 딱 채웠어요").success, true);
+    assert.equal(validation.parseShowcaseFeedback("😀".repeat(300)).success, true);
+    assert.equal(validation.parseShowcaseFeedback("😀".repeat(301)).success, false);
+  });
+});
+
+describe("mock Repository 체험 규칙", () => {
+  const repository = new mock.MockProjectShowcaseRepository();
+  const MEMBER = "member-experiencer";
+  const OTHER = "member-other-experiencer";
+  const PROJECT = "mock-showcase-green-route";
+  const PROJECT_OWNER = "mock-member-green-route";
+  let store: ReturnType<typeof mock.resetProjectShowcaseMockStore>;
+
+  async function expectCode(promise: Promise<unknown>, code: string) {
+    await assert.rejects(promise, (error: unknown) => error instanceof errors.ShowcaseDomainError && error.code === code);
+  }
+
+  function rewindStart(projectId: string, memberId: string, seconds: number) {
+    const experience = store.experiences.find((item) => item.projectId === projectId && item.memberId === memberId);
+    assert.ok(experience);
+    experience.startedAt = new Date(Date.now() - seconds * 1000).toISOString();
+  }
+
+  beforeEach(() => {
+    const now = Date.now();
+    store = mock.resetProjectShowcaseMockStore({
+      event: {
+        submissionStartAt: new Date(now - 10 * DAY).toISOString(),
+        submissionEndAt: new Date(now - 3 * DAY).toISOString(),
+        experienceStartAt: new Date(now - DAY).toISOString(),
+        experienceEndAt: new Date(now + 6 * DAY).toISOString(),
+        announcementStartAt: new Date(now + 8 * DAY).toISOString(),
+      },
+    });
+  });
+
+  test("참여 등록은 회원·학번당 1번이다", async () => {
+    await repository.registerParticipant({ memberId: MEMBER, studentNumber: "1612345" });
+    await expectCode(repository.registerParticipant({ memberId: MEMBER, studentNumber: "1612346" }), "registration_exists");
+    await expectCode(repository.registerParticipant({ memberId: OTHER, studentNumber: "1612345" }), "student_number_taken");
+    const participation = await repository.getMemberParticipation(MEMBER);
+    assert.equal(participation.registration?.maskedStudentNumber, "16****45");
+    assert.equal(participation.ticketCount, 0);
+  });
+
+  test("체험 시작은 등록 회원만, 본인 프로젝트는 불가하고 첫 시작 시각을 유지한다", async () => {
+    await expectCode(repository.startExperience({ projectId: PROJECT, memberId: MEMBER }), "registration_required");
+    await repository.registerParticipant({ memberId: MEMBER, studentNumber: "1612345" });
+    const first = await repository.startExperience({ projectId: PROJECT, memberId: MEMBER });
+    const second = await repository.startExperience({ projectId: PROJECT, memberId: MEMBER });
+    assert.equal(second.startedAt, first.startedAt);
+    await repository.registerParticipant({ memberId: PROJECT_OWNER, studentNumber: "1500002" });
+    await expectCode(repository.startExperience({ projectId: PROJECT, memberId: PROJECT_OWNER }), "own_project");
+    await expectCode(repository.startExperience({ projectId: "mock-showcase-study-buddy", memberId: MEMBER }), "project_not_found");
+  });
+
+  test("피드백은 1분 뒤 1번만 남길 수 있고 추첨권이 1장씩 늘어난다", async () => {
+    await repository.registerParticipant({ memberId: MEMBER, studentNumber: "1612345" });
+    await expectCode(repository.submitFeedback({ projectId: PROJECT, memberId: MEMBER, body: "길찾기가 편했어요 최고" }), "experience_not_started");
+    await repository.startExperience({ projectId: PROJECT, memberId: MEMBER });
+    await expectCode(repository.submitFeedback({ projectId: PROJECT, memberId: MEMBER, body: "길찾기가 편했어요 최고" }), "feedback_too_early");
+    rewindStart(PROJECT, MEMBER, 61);
+    await repository.submitFeedback({ projectId: PROJECT, memberId: MEMBER, body: "길찾기가 편했어요 최고" });
+    await expectCode(repository.submitFeedback({ projectId: PROJECT, memberId: MEMBER, body: "한 번 더 남기고 싶어요" }), "feedback_exists");
+
+    await repository.startExperience({ projectId: "mock-showcase-pixel-quest", memberId: MEMBER });
+    rewindStart("mock-showcase-pixel-quest", MEMBER, 120);
+    await repository.submitFeedback({ projectId: "mock-showcase-pixel-quest", memberId: MEMBER, body: "퍼즐이 짧고 재밌어요!" });
+
+    const participation = await repository.getMemberParticipation(MEMBER);
+    assert.equal(participation.ticketCount, 2);
+    assert.deepEqual((await repository.listMemberCompletedProjectIds(MEMBER)).sort(), ["mock-showcase-green-route", "mock-showcase-pixel-quest"]);
+    const project = await repository.getPublicProject(PROJECT);
+    assert.equal(project?.experienceCount, 1);
+    assert.equal(project?.validExperienceCount, 1);
+  });
+
+  test("출품자에게는 숨기지 않은 피드백 본문만 작성자 없이 전달되고, 숨겨도 유효 체험은 유지된다", async () => {
+    await repository.registerParticipant({ memberId: MEMBER, studentNumber: "1612345" });
+    await repository.startExperience({ projectId: PROJECT, memberId: MEMBER });
+    rewindStart(PROJECT, MEMBER, 90);
+    await repository.submitFeedback({ projectId: PROJECT, memberId: MEMBER, body: "쉼터 추천이 정말 유용했어요" });
+
+    const visible = await repository.listOwnerFeedback(PROJECT_OWNER, PROJECT);
+    assert.deepEqual(visible.map((item) => Object.keys(item).sort()), [["body", "id"]]);
+    assert.deepEqual(await repository.listOwnerFeedback(MEMBER, PROJECT), []);
+
+    const [adminItem] = await repository.listAdminFeedback({ hidden: false });
+    assert.ok(adminItem);
+    await repository.setFeedbackHidden({ feedbackId: adminItem.id, adminId: "admin", hidden: true });
+    assert.deepEqual(await repository.listOwnerFeedback(PROJECT_OWNER, PROJECT), []);
+    assert.equal((await repository.getPublicProject(PROJECT))?.validExperienceCount, 1);
+    assert.equal((await repository.getMemberParticipation(MEMBER)).ticketCount, 1);
+  });
+
+  test("관심 표시는 토글되고 본인 프로젝트·체험 기간 밖에서는 거절한다", async () => {
+    await repository.setInterest({ projectId: PROJECT, memberId: MEMBER, interested: true });
+    await repository.setInterest({ projectId: PROJECT, memberId: MEMBER, interested: true });
+    assert.equal((await repository.getPublicProject(PROJECT))?.interestCount, 1);
+    assert.equal((await repository.getMemberProjectState(PROJECT, MEMBER)).interested, true);
+    await repository.setInterest({ projectId: PROJECT, memberId: MEMBER, interested: false });
+    assert.equal((await repository.getPublicProject(PROJECT))?.interestCount, 0);
+    await expectCode(repository.setInterest({ projectId: PROJECT, memberId: PROJECT_OWNER, interested: true }), "own_project");
+
+    mock.resetProjectShowcaseMockStore();
+    await expectCode(repository.setInterest({ projectId: PROJECT, memberId: MEMBER, interested: true }), "experience_closed");
+    await expectCode(repository.registerParticipant({ memberId: MEMBER, studentNumber: "1612345" }), "experience_closed");
+  });
+
+  test("체험 단계 DB 예외도 공용 에러 코드로 바뀐다", () => {
+    for (const code of ["feedback_too_early", "registration_required", "own_project", "experience_closed"]) {
+      assert.equal(errors.showcaseErrorCodeFromDatabase(`ERROR: showcase_${code}`), code);
+    }
+  });
+});

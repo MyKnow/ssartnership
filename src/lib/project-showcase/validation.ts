@@ -199,3 +199,38 @@ export const SHOWCASE_SERVICE_URL_HINTS: Record<ShowcaseProjectType, { label: st
   game: { label: "웹 게임 또는 스토어 주소", placeholder: "https://..." },
   embedded: { label: "시연 영상 주소 (YouTube 또는 Vimeo)", placeholder: "https://youtu.be/..." },
 };
+
+export const showcaseRegistrationSchema = z.object({
+  studentNumber: showcaseStudentNumberSchema,
+  studentNumberConsent: z.literal(true, "학번을 이벤트 운영에 사용하는 데 동의해 주세요."),
+  announcementConsent: z.literal(true, "당첨 시 이름·학번 일부를 가려 공지하는 데 동의해 주세요."),
+});
+
+/** Shared by the experience registration form and `registerShowcaseParticipant`. */
+export function parseShowcaseRegistration(value: unknown): ShowcaseValidationResult<{ studentNumber: string }> {
+  const result = showcaseRegistrationSchema.safeParse(value);
+  if (!result.success) {
+    const issue = result.error.issues[0];
+    const field = typeof issue?.path[0] === "string" ? issue.path[0] : null;
+    return { success: false, message: issue?.message ?? "입력 내용을 확인해 주세요.", field };
+  }
+  return { success: true, data: { studentNumber: result.data.studentNumber } };
+}
+
+export const SHOWCASE_FEEDBACK_MIN_LENGTH = 10;
+export const SHOWCASE_FEEDBACK_MAX_LENGTH = 300;
+
+/** Shared by the feedback form and `submitShowcaseFeedback`. */
+export function parseShowcaseFeedback(value: unknown): ShowcaseValidationResult<{ body: string }> {
+  const body = typeof value === "string" ? value.trim() : "";
+  // Count code points like Postgres char_length so emoji do not diverge between FE and DB.
+  const length = Array.from(body).length;
+  if (length < SHOWCASE_FEEDBACK_MIN_LENGTH || length > SHOWCASE_FEEDBACK_MAX_LENGTH) {
+    return {
+      success: false,
+      message: `피드백은 ${SHOWCASE_FEEDBACK_MIN_LENGTH}자 이상 ${SHOWCASE_FEEDBACK_MAX_LENGTH}자 이하로 남겨 주세요.`,
+      field: "body",
+    };
+  }
+  return { success: true, data: { body } };
+}

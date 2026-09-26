@@ -14,11 +14,18 @@ import type {
 } from "./repository";
 import {
   canOwnerEditShowcaseProject,
+  canSubmitShowcaseFeedback,
+  countShowcaseTickets,
   getShowcasePhase,
+  maskShowcaseStudentNumber,
   PROJECT_SHOWCASE_SLUG,
   SHOWCASE_PROJECT_STATUSES,
   SHOWCASE_PROJECT_TYPES,
+  type ShowcaseAdminFeedback,
   type ShowcaseEvent,
+  type ShowcaseMemberParticipation,
+  type ShowcaseMemberProjectState,
+  type ShowcaseOwnerFeedback,
   type ShowcaseOwnerProject,
   type ShowcaseProject,
   type ShowcaseProjectParticipant,
@@ -38,6 +45,10 @@ type ShowcaseMockStore = {
   memberNames: Map<string, string>;
   projects: StoredProject[];
   views: Array<{ id: string; projectId: string; memberId: string; createdAt: string }>;
+  registrations: Map<string, { studentNumber: string; createdAt: string }>;
+  experiences: Array<{ id: string; projectId: string; memberId: string; startedAt: string }>;
+  feedback: Array<{ id: string; projectId: string; memberId: string; body: string; createdAt: string; hiddenAt: string | null }>;
+  interests: Array<{ projectId: string; memberId: string }>;
   activities: ShowcaseAdminActivityLog[];
 };
 
@@ -147,6 +158,10 @@ function createStore(now = Date.now()): ShowcaseMockStore {
       }),
     ],
     views: [],
+    registrations: new Map(),
+    experiences: [],
+    feedback: [],
+    interests: [],
     activities: [],
   };
 }
@@ -172,9 +187,9 @@ export function resetProjectShowcaseMockStore(input: {
 function countsFor(store: ShowcaseMockStore, projectId: string) {
   return {
     viewCount: store.views.filter((view) => view.projectId === projectId).length,
-    experienceCount: 0,
-    validExperienceCount: 0,
-    interestCount: 0,
+    experienceCount: store.experiences.filter((experience) => experience.projectId === projectId).length,
+    validExperienceCount: store.feedback.filter((item) => item.projectId === projectId).length,
+    interestCount: store.interests.filter((interest) => interest.projectId === projectId).length,
   };
 }
 
@@ -228,6 +243,14 @@ function assertStudentNumbersFree(store: ShowcaseMockStore, participants: Showca
   if (participants.some((participant) => taken.has(participant.studentNumber))) {
     throw new ShowcaseDomainError("student_number_taken");
   }
+}
+
+/** Mirrors `showcase_open_project`: an approved project while the experience phase is open. */
+function openProject(store: ShowcaseMockStore, projectId: string) {
+  const project = store.projects.find((item) => item.id === projectId && item.status === "approved");
+  if (!project) throw new ShowcaseDomainError("project_not_found");
+  if (getShowcasePhase(store.event) !== "experience") throw new ShowcaseDomainError("experience_closed");
+  return project;
 }
 
 function pushActivity(store: ShowcaseMockStore, activity: Omit<ShowcaseAdminActivityLog, "id" | "occurredAt">) {
@@ -362,6 +385,137 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
     pushActivity(store, { type: "project_withdrawn", projectId: project.id, projectTitle: project.title, actorType: "member", details: {} });
   }
 
+  async registerParticipant(input: { memberId: string; studentNumber: string }) {
+    const store = getStore();
+    if (getShowcasePhase(store.event) !== "experience") throw new ShowcaseDomainError("experience_closed");
+    if (!/^\d{7}$/u.test(input.studentNumber.trim())) throw new ShowcaseDomainError("registration_invalid");
+    if (store.registrations.has(input.memberId)) throw new ShowcaseDomainError("registration_exists");
+    if ([...store.registrations.values()].some((registration) => registration.studentNumber === input.studentNumber.trim())) {
+      throw new ShowcaseDomainError("student_number_taken");
+    }
+    store.registrations.set(input.memberId, { studentNumber: input.studentNumber.trim(), createdAt: new Date().toISOString() });
+  }
+
+  async getMemberProjectState(projectId: string, memberId: string): Promise<ShowcaseMemberProjectState> {
+    const store = getStore();
+    return {
+      registered: store.registrations.has(memberId),
+      startedAt: store.experiences.find((item) => item.projectId === projectId && item.memberId === memberId)?.startedAt ?? null,
+      feedbackSubmitted: store.feedback.some((item) => item.projectId === projectId && item.memberId === memberId),
+      interested: store.interests.some((item) => item.projectId === projectId && item.memberId === memberId),
+    };
+  }
+
+  async startExperience(input: { projectId: string; memberId: string }) {
+    const store = getStore();
+    const project = openProject(store, input.projectId);
+    if (project.ownerMemberId === input.memberId) throw new ShowcaseDomainError("own_project");
+    if (!store.registrations.has(input.memberId)) throw new ShowcaseDomainError("registration_required");
+    const existing = store.experiences.find((item) => item.projectId === project.id && item.memberId === input.memberId);
+    if (existing) return { startedAt: existing.startedAt };
+    const experience = { id: randomUUID(), projectId: project.id, memberId: input.memberId, startedAt: new Date().toISOString() };
+    store.experiences.push(experience);
+    store.activities.push({
+      id: experience.id,
+      occurredAt: experience.startedAt,
+      type: "experience_started",
+      projectId: project.id,
+      projectTitle: project.title,
+      actorType: "member",
+      details: {},
+    });
+    return { startedAt: experience.startedAt };
+  }
+
+  async submitFeedback(input: { projectId: string; memberId: string; body: string }) {
+    const store = getStore();
+    const project = openProject(store, input.projectId);
+    const body = input.body.trim();
+    if (Array.from(body).length < 10 || Array.from(body).length > 300) throw new ShowcaseDomainError("feedback_invalid");
+    const experience = store.experiences.find((item) => item.projectId === project.id && item.memberId === input.memberId);
+    if (!experience) throw new ShowcaseDomainError("experience_not_started");
+    if (!canSubmitShowcaseFeedback(experience.startedAt)) throw new ShowcaseDomainError("feedback_too_early");
+    if (store.feedback.some((item) => item.projectId === project.id && item.memberId === input.memberId)) {
+      throw new ShowcaseDomainError("feedback_exists");
+    }
+    const item = { id: randomUUID(), projectId: project.id, memberId: input.memberId, body, createdAt: new Date().toISOString(), hiddenAt: null };
+    store.feedback.push(item);
+    store.activities.push({
+      id: item.id,
+      occurredAt: item.createdAt,
+      type: "feedback_submitted",
+      projectId: project.id,
+      projectTitle: project.title,
+      actorType: "member",
+      details: {},
+    });
+  }
+
+  async setInterest(input: { projectId: string; memberId: string; interested: boolean }) {
+    const store = getStore();
+    const project = openProject(store, input.projectId);
+    if (project.ownerMemberId === input.memberId) throw new ShowcaseDomainError("own_project");
+    const exists = store.interests.some((item) => item.projectId === project.id && item.memberId === input.memberId);
+    if (input.interested && !exists) store.interests.push({ projectId: project.id, memberId: input.memberId });
+    if (!input.interested && exists) {
+      store.interests = store.interests.filter((item) => !(item.projectId === project.id && item.memberId === input.memberId));
+    }
+  }
+
+  async getMemberParticipation(memberId: string): Promise<ShowcaseMemberParticipation> {
+    const store = getStore();
+    const registration = store.registrations.get(memberId);
+    const experiences = store.experiences
+      .filter((item) => item.memberId === memberId)
+      .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
+      .map((item) => ({
+        projectId: item.projectId,
+        projectTitle: store.projects.find((project) => project.id === item.projectId)?.title ?? "프로젝트",
+        startedAt: item.startedAt,
+        feedbackSubmitted: store.feedback.some((feedback) => feedback.projectId === item.projectId && feedback.memberId === memberId),
+      }));
+    return {
+      registration: registration
+        ? { maskedStudentNumber: maskShowcaseStudentNumber(registration.studentNumber), registeredAt: registration.createdAt }
+        : null,
+      experiences,
+      ticketCount: countShowcaseTickets(experiences),
+    };
+  }
+
+  async listMemberCompletedProjectIds(memberId: string) {
+    return getStore().feedback.filter((item) => item.memberId === memberId).map((item) => item.projectId);
+  }
+
+  async listOwnerFeedback(memberId: string, projectId: string): Promise<ShowcaseOwnerFeedback[]> {
+    const store = getStore();
+    if (!store.projects.some((project) => project.id === projectId && project.ownerMemberId === memberId)) return [];
+    return store.feedback
+      .filter((item) => item.projectId === projectId && !item.hiddenAt)
+      .map((item) => ({ id: item.id, body: item.body }));
+  }
+
+  async listAdminFeedback(input: { hidden?: boolean } = {}): Promise<ShowcaseAdminFeedback[]> {
+    const store = getStore();
+    return store.feedback
+      .filter((item) => input.hidden === undefined || Boolean(item.hiddenAt) === input.hidden)
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .map((item) => ({
+        id: item.id,
+        projectId: item.projectId,
+        projectTitle: store.projects.find((project) => project.id === item.projectId)?.title ?? "프로젝트",
+        body: item.body,
+        hidden: Boolean(item.hiddenAt),
+        createdAt: item.createdAt,
+      }));
+  }
+
+  async setFeedbackHidden(input: { feedbackId: string; adminId: string; hidden: boolean }) {
+    const item = getStore().feedback.find((feedback) => feedback.id === input.feedbackId);
+    if (!item) throw new ShowcaseDomainError("feedback_not_found");
+    item.hiddenAt = input.hidden ? new Date().toISOString() : null;
+  }
+
   async getAdminMetrics(): Promise<ShowcaseAdminMetrics> {
     const store = getStore();
     const statusCounts = Object.fromEntries(SHOWCASE_PROJECT_STATUSES.map((status) => [status, 0])) as ShowcaseAdminMetrics["statusCounts"];
@@ -374,10 +528,10 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
       statusCounts,
       projectTypeCounts,
       totalUniqueViews: store.views.length,
-      totalExperienceStarts: 0,
-      totalValidExperiences: 0,
-      totalInterests: 0,
-      registeredExperiencers: 0,
+      totalExperienceStarts: store.experiences.length,
+      totalValidExperiences: store.feedback.length,
+      totalInterests: store.interests.length,
+      registeredExperiencers: store.registrations.size,
       completedDraws: 0,
       activeWinners: 0,
       projectStats: store.projects

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
+import ShowcaseExperiencePanel from "@/components/project-showcase/ShowcaseExperiencePanel";
 import ShowcaseProjectViewRecorder from "@/components/project-showcase/ShowcaseProjectViewRecorder";
 import Button from "@/components/ui/Button";
 import { getHeaderSession } from "@/lib/header-session";
@@ -74,6 +75,10 @@ export default async function ShowcaseProjectDetailPage({
   const project = await projectShowcaseRepository.getPublicProject(projectId);
   if (!project) notFound();
   const isOwner = Boolean(session?.userId && project.ownerMemberId === session.userId);
+  const memberState = session?.userId && !isOwner
+    ? await projectShowcaseRepository.getMemberProjectState(project.id, session.userId)
+    : { registered: false, startedAt: null, feedbackSubmitted: false, interested: false };
+  const loginHref = `/auth/login?returnTo=${encodeURIComponent(`/events/project-showcase/projects/${project.id}`)}`;
 
   return (
     <div className="min-h-screen bg-background">
@@ -101,9 +106,16 @@ export default async function ShowcaseProjectDetailPage({
               <h2 id="showcase-experience-heading" className="font-bold text-foreground">체험하기</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">{EXPERIENCE_HINTS[project.projectType]}</p>
               <div className="mt-5">
-                <Button href={project.serviceUrl} target="_blank" rel="noopener noreferrer" variant="secondary">서비스 열기</Button>
+                <ShowcaseExperiencePanel
+                  projectId={project.id}
+                  serviceUrl={project.serviceUrl}
+                  authenticated={Boolean(session?.userId)}
+                  isOwner={isOwner}
+                  loginHref={loginHref}
+                  initialState={memberState}
+                  serverNow={new Date().toISOString()}
+                />
               </div>
-              {isOwner ? <p className="mt-3 text-xs leading-5 text-muted-foreground">내 프로젝트의 조회·체험은 집계에서 제외돼요.</p> : null}
             </aside>
           </div>
         </article>

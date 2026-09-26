@@ -122,6 +122,7 @@ export const ADMIN_AUDIT_ACTIONS = [
   'event_reward_draw_create',
   'showcase_event_settings_update',
   'showcase_project_review',
+  'showcase_feedback_visibility_update',
   'showcase_public_draw',
   'event_reward_winner_notification_test_send',
   'event_reward_winner_notification_send',

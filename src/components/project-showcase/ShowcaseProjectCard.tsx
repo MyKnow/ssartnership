@@ -2,7 +2,14 @@ import Link from "next/link";
 import { SHOWCASE_TYPE_LABELS } from "@/lib/project-showcase/labels";
 import type { ShowcaseProject } from "@/lib/project-showcase/types";
 
-export default function ShowcaseProjectCard({ project }: { project: ShowcaseProject }) {
+export default function ShowcaseProjectCard({
+  project,
+  completed = false,
+}: {
+  project: ShowcaseProject;
+  /** The viewer already left feedback (a valid experience) on this project. */
+  completed?: boolean;
+}) {
   return (
     <article className="group overflow-hidden rounded-2xl border border-border bg-surface shadow-sm transition-shadow hover:shadow-md">
       <Link
@@ -21,6 +28,9 @@ export default function ShowcaseProjectCard({ project }: { project: ShowcaseProj
           <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-slate-900">
             {SHOWCASE_TYPE_LABELS[project.projectType]}
           </span>
+          {completed ? (
+            <span className="absolute right-3 top-3 rounded-full bg-success px-3 py-1 text-xs font-bold text-white">체험 완료</span>
+          ) : null}
         </div>
         <div className="grid gap-3 p-4 sm:p-5">
           <div className="grid gap-1.5">

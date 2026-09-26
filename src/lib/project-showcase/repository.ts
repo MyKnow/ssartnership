@@ -1,6 +1,10 @@
 import type {
+  ShowcaseAdminFeedback,
   ShowcaseCandidateGroup,
   ShowcaseEvent,
+  ShowcaseMemberParticipation,
+  ShowcaseMemberProjectState,
+  ShowcaseOwnerFeedback,
   ShowcaseOwnerProject,
   ShowcaseProject,
   ShowcaseProjectParticipant,
@@ -122,6 +126,21 @@ export interface ProjectShowcaseRepository {
   createProject(input: ShowcaseProjectWriteInput & { eventId: string }): Promise<void>;
   updateProject(input: ShowcaseProjectWriteInput): Promise<void>;
   withdrawProject(input: { projectId: string; ownerMemberId: string }): Promise<void>;
+
+  /** Experience phase — each write asserts the phase, approval and ownership rules. */
+  registerParticipant(input: { memberId: string; studentNumber: string }): Promise<void>;
+  getMemberProjectState(projectId: string, memberId: string): Promise<ShowcaseMemberProjectState>;
+  /** Idempotent: returns the first recorded start time. */
+  startExperience(input: { projectId: string; memberId: string }): Promise<{ startedAt: string }>;
+  submitFeedback(input: { projectId: string; memberId: string; body: string }): Promise<void>;
+  setInterest(input: { projectId: string; memberId: string; interested: boolean }): Promise<void>;
+  getMemberParticipation(memberId: string): Promise<ShowcaseMemberParticipation>;
+  /** Project ids the member has a valid experience (submitted feedback) for. */
+  listMemberCompletedProjectIds(memberId: string): Promise<string[]>;
+  /** Visible feedback on the owner's project, without any author data. */
+  listOwnerFeedback(memberId: string, projectId: string): Promise<ShowcaseOwnerFeedback[]>;
+  listAdminFeedback(input?: { hidden?: boolean }): Promise<ShowcaseAdminFeedback[]>;
+  setFeedbackHidden(input: { feedbackId: string; adminId: string; hidden: boolean }): Promise<void>;
 
   getAdminMetrics(): Promise<ShowcaseAdminMetrics | null>;
   listAdminActivity(input: {
