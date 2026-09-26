@@ -271,15 +271,17 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
       <div className="grid gap-3">
         <div>
           <p className="text-sm font-semibold text-foreground">대표 홍보 이미지</p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">4:3 비율로 잘라 저장해요. 최대 10MB 이미지를 선택할 수 있어요.</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">16:9 비율로 잘라 저장해요. 최대 10MB 이미지를 선택할 수 있어요.</p>
         </div>
-        <label className={`flex min-h-36 cursor-pointer flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border border-dashed p-5${fieldError("imageUploadId") ? " border-danger bg-danger/5" : " border-border bg-surface-muted/50"} text-center focus-within:ring-2 focus-within:ring-primary`}>
-          {previewUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={previewUrl} alt="대표 이미지 미리보기" className="aspect-[4/3] max-h-64 w-full rounded-xl object-cover" />
-          ) : (
-            <PhotoIcon className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
-          )}
+        <label className={`grid cursor-pointer gap-3 overflow-hidden rounded-2xl border border-dashed p-4${fieldError("imageUploadId") ? " border-danger bg-danger/5" : " border-border bg-surface-muted/50"} text-center focus-within:ring-2 focus-within:ring-primary`}>
+          <span className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-xl bg-surface-muted">
+            {previewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={previewUrl} alt="대표 이미지 미리보기" className="h-full w-full object-cover" />
+            ) : (
+              <PhotoIcon className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
+            )}
+          </span>
           <span className="text-sm font-medium text-foreground">
             {file?.name ?? (project ? "이미지 바꾸기" : "이미지 파일 선택")}
           </span>
@@ -332,6 +334,8 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
         outputName="showcase-project.webp"
         outputWidth={IMAGE_POLICY.width}
         outputHeight={IMAGE_POLICY.height}
+        zoomControl
+        frameAspectRatio={IMAGE_POLICY.aspectRatio}
         policy={IMAGE_POLICY}
         onCancel={closeImageEditor}
         onApply={(croppedFile) => {

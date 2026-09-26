@@ -95,6 +95,8 @@ export default function ImageCropDialog({
   outputName,
   outputWidth,
   outputHeight,
+  zoomControl = false,
+  frameAspectRatio,
   quality = 0.78,
   policy,
   onCancel,
@@ -107,6 +109,10 @@ export default function ImageCropDialog({
   outputName: string;
   outputWidth: number;
   outputHeight: number;
+  /** Show the zoom slider for flows that need precise crop framing. */
+  zoomControl?: boolean;
+  /** Match the image viewport to the crop ratio for a consistent preview. */
+  frameAspectRatio?: number;
   quality?: number;
   policy?: ImageTransformPolicy;
   onCancel: () => void;
@@ -115,6 +121,7 @@ export default function ImageCropDialog({
   const { notify } = useToast();
   const portalRoot = typeof document === "undefined" ? null : document.body;
   const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,6 +139,7 @@ export default function ImageCropDialog({
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     setCrop({ x: 0, y: 0 });
+    setZoom(1);
     setCroppedAreaPixels(null);
     setError(null);
     setRequiresServerFallback(false);
@@ -207,7 +215,13 @@ export default function ImageCropDialog({
           <div className="grid min-h-0 gap-3 sm:gap-4">
             <div
               data-testid="image-crop-frame"
-              className="relative h-[clamp(15.5rem,42dvh,21rem)] w-full min-w-0 overflow-hidden rounded-[1.35rem] border border-border bg-slate-950/95 sm:h-[clamp(18rem,42dvh,26rem)] xl:h-[clamp(22rem,52dvh,32rem)]"
+              className={cn(
+                "relative w-full min-w-0 overflow-hidden rounded-[1.35rem] border border-border bg-slate-950/95",
+                frameAspectRatio
+                  ? "h-auto"
+                  : "h-[clamp(15.5rem,42dvh,21rem)] sm:h-[clamp(18rem,42dvh,26rem)] xl:h-[clamp(22rem,52dvh,32rem)]",
+              )}
+              style={frameAspectRatio ? { aspectRatio: frameAspectRatio } : undefined}
             >
               {requiresServerFallback && sourceFile ? (
                 <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center text-sm leading-6 text-slate-200">
@@ -221,7 +235,7 @@ export default function ImageCropDialog({
                 <Cropper
                   image={sourceUrl}
                   crop={crop}
-                  zoom={1}
+                  zoom={zoom}
                   rotation={0}
                   aspect={effectiveAspectRatio}
                   minZoom={1}
@@ -230,9 +244,10 @@ export default function ImageCropDialog({
                   restrictPosition
                   showGrid
                   zoomSpeed={1}
-                  zoomWithScroll={false}
+                  zoomWithScroll={zoomControl}
                   keyboardStep={1}
                   onCropChange={setCrop}
+                  onZoomChange={zoomControl ? setZoom : undefined}
                   onCropComplete={(_, croppedPixels) => setCroppedAreaPixels(croppedPixels)}
                   onMediaLoaded={() => {
                     setRequiresServerFallback(false);
@@ -261,6 +276,29 @@ export default function ImageCropDialog({
                 />
               )}
             </div>
+
+            {zoomControl && !requiresServerFallback ? (
+              <div data-testid="image-crop-tools" className="grid gap-1.5">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <label htmlFor="image-crop-zoom" className="font-medium text-foreground">이미지 확대·축소</label>
+                  <output htmlFor="image-crop-zoom" className="min-w-12 text-right text-muted-foreground">
+                    {Math.round(zoom * 100)}%
+                  </output>
+                </div>
+                <input
+                  id="image-crop-zoom"
+                  type="range"
+                  min={1}
+                  max={3}
+                  step={0.01}
+                  value={zoom}
+                  onChange={(event) => setZoom(Number(event.currentTarget.value))}
+                  aria-label="이미지 확대·축소"
+                  aria-valuetext={`${Math.round(zoom * 100)}%`}
+                  className="min-h-11 w-full cursor-pointer accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                />
+              </div>
+            ) : null}
 
             {error ? <FormMessage variant="error">{error}</FormMessage> : null}
           </div>
