@@ -87,7 +87,7 @@ export default async function ShowcaseProjectDetailPage({
       <main className="mx-auto w-full max-w-5xl px-4 pb-20 pt-8 sm:px-6 sm:pt-12">
         <Button href="/events/project-showcase#showcase-gallery" variant="secondary" size="sm">프로젝트 목록</Button>
         <article className="mt-5 overflow-hidden rounded-3xl border border-border bg-surface">
-          <div className="aspect-[4/3] max-h-[560px] overflow-hidden bg-surface-muted sm:aspect-[16/8]">
+          <div className="aspect-video overflow-hidden bg-surface-muted">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={project.imageUrl} alt={`${project.title} 대표 이미지`} className="h-full w-full object-cover" />
           </div>

@@ -16,7 +16,7 @@ export default function ShowcaseProjectCard({
         href={`/events/project-showcase/projects/${encodeURIComponent(project.id)}`}
         className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
       >
-        <div className="relative aspect-[4/3] overflow-hidden bg-surface-muted">
+        <div className="relative aspect-video overflow-hidden bg-surface-muted">
           {/* Project covers live in a public Storage bucket rather than next/image remote patterns. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
