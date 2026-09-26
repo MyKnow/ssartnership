@@ -48,6 +48,7 @@ def main():
     transfer_started = time.time()
     # Bandwidth is capped at 8 MiB/s and both endpoints are fixed lab addresses.
     run(['scp', '-l', '65536', *SSH_OPTIONS, BUILD + ':/home/builder/build-lab/requests/' + sha + '/app.tar', str(archive)], timeout=300)
+    download_finished = time.time()
     if archive.stat().st_size > 2 * 1024**3:
         raise ValueError('Artifact exceeds transfer budget')
     checksum = hashlib.sha256()
@@ -57,8 +58,10 @@ def main():
     if checksum.hexdigest() != receipt['archiveSha256']:
         raise ValueError('Transferred artifact mismatch')
     status = run(['qm', 'status', '4971']).strip()
+    preview_boot_requested = None
     if status == 'status: stopped':
         run(['/usr/local/sbin/build-lab-497-network'])
+        preview_boot_requested = time.time()
         run(['qm', 'start', '4971'], timeout=90)
     elif status != 'status: running':
         raise RuntimeError('Unexpected Preview state')
@@ -71,7 +74,9 @@ def main():
             time.sleep(5)
     else:
         raise RuntimeError('Preview SSH unavailable')
+    preview_ssh_ready = time.time()
     run(['ssh', *SSH_OPTIONS, PREVIEW, 'mkdir -p -m 700 /home/builder/build-lab-incoming'])
+    upload_started = time.time()
     run(['scp', '-l', '65536', *SSH_OPTIONS, str(archive), PREVIEW + ':/home/builder/build-lab-incoming/' + sha + '.tar'], timeout=300)
     run(['ssh', *SSH_OPTIONS, PREVIEW, 'sudo -n install -m 600 /home/builder/build-lab-incoming/' + sha + '.tar /srv/build-lab-497/incoming/' + sha + '.tar'])
     transfer_finished = time.time()
@@ -80,6 +85,9 @@ def main():
     if deployed.get('sha') != sha or deployed.get('environment') != 'synthetic-lab' or deployed.get('externalEgress') is not False:
         raise RuntimeError('Deployment receipt mismatch')
     result = {**receipt, 'deployed': True, 'transferStartedAt': transfer_started, 'transferFinishedAt': transfer_finished, 'preview': deployed}
+    result.update(downloadFinishedAt=download_finished, previewBootRequestedAt=preview_boot_requested,
+                  previewSshReadyAt=preview_ssh_ready, uploadStartedAt=upload_started,
+                  archiveBytes=archive.stat().st_size)
     (destination / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result), flush=True)
 

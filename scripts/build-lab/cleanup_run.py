@@ -8,7 +8,7 @@ import sys
 
 
 def cleanup(name, base=Path('/home/builder/build-lab/runs')):
-    match = re.fullmatch(r'((?:vm[248]c6g|ram-vm[248]c[68]g))-(cold|warm)-([123])', name)
+    match = re.fullmatch(r'(vm[248]c6g|ram-vm[248]c[68]g|opt-[a-f0-9]{12}-(?:off|on))-(cold|warm)-([123])', name)
     if not match:
         raise ValueError('Unexpected cleanup target')
     for mode in ('cold', 'warm'):

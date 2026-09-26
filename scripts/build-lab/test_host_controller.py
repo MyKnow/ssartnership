@@ -79,6 +79,8 @@ class HostBoundary(unittest.TestCase):
         with patch.object(host, 'observe_sha', return_value=A), patch.object(host, 'guest', side_effect=[{'busy': False}, {'status': 'ready', 'artifact': artifact}]), patch.object(host, 'run', side_effect=with_delivery):
             host.tick()
         self.assertEqual(json.loads((self.root / 'state.json').read_text())['deploymentStatus'], 'ready')
+        events = [json.loads(line)['event'] for line in (self.root / 'events' / (A + '.jsonl')).read_text().splitlines()]
+        self.assertEqual(events, ['observed', 'deployment-started', 'ready'])
         with patch.object(host, 'observe_sha', return_value=A), patch.object(host, 'guest', return_value={'busy': False}) as guest:
             host.tick()
         guest.assert_called_once_with('status')

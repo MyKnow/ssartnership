@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import time
 import fcntl
+import re
 from controller import BRANCH_REF, BUILD_VMID, decision, parse_remote_sha
 from artifact import validate_artifact
 
@@ -36,6 +37,17 @@ def save(state):
     tmp.replace(STATE_ROOT / 'state.json')
 
 
+def record_event(sha, event):
+    if not re.fullmatch(r'[a-f0-9]{40}', sha) or event not in (
+            'observed', 'boot-requested', 'dispatched', 'build-failed',
+            'deployment-started', 'deployment-failed', 'ready', 'shutdown-requested'):
+        raise ValueError('Invalid timeline event')
+    directory = STATE_ROOT / 'events'
+    directory.mkdir(mode=0o700, exist_ok=True)
+    with (directory / (sha + '.jsonl')).open('a') as handle:
+        handle.write(json.dumps({'sha': sha, 'event': event, 'at': time.time()}) + '\n')
+
+
 def tick():
     if os.getuid() != 0 or run(['hostname', '-s']).strip() != 'myknow-pve':
         raise RuntimeError('Wrong execution host')
@@ -61,6 +73,7 @@ def tick():
         now = time.time()
         if state.get('observedSha') != sha:
             state.update(observedSha=sha, observedAt=now)
+            record_event(sha, 'observed')
         if observation['busy']:
             state.pop('idleSince', None)
         elif running:
@@ -69,19 +82,23 @@ def tick():
             result = guest('result', sha)
             if result.get('status') == 'failed' and result.get('sha') == sha:
                 state.update(deploymentAttempt=sha, deploymentStatus='build-failed')
+                record_event(sha, 'build-failed')
             elif result.get('status') == 'ready':
                 validate_artifact(result['artifact'], sha)
                 # Persist before the external effect: failures require diagnosis,
                 # rather than an automatic retry every timer tick.
                 state.update(deploymentAttempt=sha, deploymentStatus='started')
                 save(state)
+                record_event(sha, 'deployment-started')
                 try:
                     delivered = json.loads(run(['/usr/bin/python3', '/usr/local/lib/build-lab-497/deliver_preview.py', sha], timeout=1200))
                     if delivered.get('sha') != sha or delivered.get('deployed') is not True:
                         raise ValueError('Deployment identity mismatch')
                     state.update(deploymentStatus='ready', readyAt=delivered['preview']['readyAt'], idleSince=time.time())
+                    record_event(sha, 'ready')
                 except Exception:
                     state['deploymentStatus'] = 'failed'
+                    record_event(sha, 'deployment-failed')
                     save(state)
                     raise
                 save(state)
@@ -92,6 +109,7 @@ def tick():
         action = decision(sha, state, running, observation['busy'], now)['action']
         if action == 'start':
             run(['/usr/local/sbin/build-lab-497-network'])
+            record_event(sha, 'boot-requested')
             run(['qm', 'start', str(BUILD_VMID)], timeout=90)
             state['bootRequestedAt'] = now
         elif action == 'dispatch':
@@ -103,11 +121,13 @@ def tick():
                 if launched.get('acceptedSha') != sha:
                     raise RuntimeError('Dispatch identity mismatch')
                 state.update(lastAttempt=sha, dispatchedAt=time.time())
+                record_event(sha, 'dispatched')
                 state.pop('idleSince', None)
         elif action == 'shutdown':
             if observe_sha() != sha or guest('status')['busy']:
                 action = 'wait'
             else:
+                record_event(sha, 'shutdown-requested')
                 run(['qm', 'shutdown', str(BUILD_VMID), '--timeout', '120'], timeout=130)
                 state['shutdownRequestedAt'] = now
         save(state)

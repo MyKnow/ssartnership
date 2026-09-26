@@ -37,8 +37,10 @@ def main():
     source = request / 'source'
     source.mkdir()
     run(['tar', '-xf', str(archive), '-C', str(source)])
+    stages = {'sourceReadyAt': time.time()}
     gate_tag = 'ssartnership-lab-gate:' + sha
     run(['sudo', '-n', 'env', 'DOCKER_BUILDKIT=1', 'docker', 'build', '--platform', 'linux/amd64', '--tag', gate_tag, str(source / 'deploy/self-host-ci')])
+    stages['gateImageReadyAt'] = time.time()
     benchmark.BASE_SHA = sha
     benchmark.BASE_ARCHIVE_HASH = hashlib.sha256(archive.read_bytes()).hexdigest()
     benchmark.ARCHIVE_NAME = str(archive.relative_to(root))
@@ -48,16 +50,20 @@ def main():
     # Provisional resources; replace only after resource experiments select a winner.
     run_id = 'request-' + sha
     sys.argv = ['benchmark.py', '--cpus', '4', '--memory-mib', '5120', '--run-id', run_id]
+    stages['gateStartedAt'] = time.time()
     benchmark.main()
+    stages['gateFinishedAt'] = time.time()
     work = root / 'runs' / run_id / 'work'
     tag = 'ssartnership-lab-app:' + sha
     packaging = time.monotonic()
+    stages['packagingStartedAt'] = time.time()
     run(['sudo', '-n', 'env', 'DOCKER_BUILDKIT=1', 'docker', 'build', '--platform', 'linux/amd64', '--label', 'org.opencontainers.image.revision=' + sha, '--tag', tag, '--file', str(work / 'deploy/self-host-ci/App.Dockerfile'), str(work)])
     output = request / 'app.tar'
     run(['sudo', '-n', 'docker', 'save', '--output', str(output), tag])
     # Archive content is public build output, never an operational env file.
     run(['sudo', '-n', 'chmod', '0644', str(output)])
     result = {'sha': sha, 'image': tag, 'archiveSha256': hashlib.sha256(output.read_bytes()).hexdigest(), 'startedAt': started, 'finishedAt': time.time(), 'packagingSeconds': time.monotonic() - packaging, 'deployed': False}
+    result['stages'] = stages
     (request / 'artifact.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result), flush=True)
 

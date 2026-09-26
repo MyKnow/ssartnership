@@ -16,4 +16,17 @@ def validate_artifact(value, sha):
             raise ValueError('Invalid artifact timing')
     if value['finishedAt'] < value['startedAt']:
         raise ValueError('Invalid artifact order')
-    return {key: value[key] for key in ('sha', 'image', 'archiveSha256', 'startedAt', 'finishedAt', 'packagingSeconds', 'deployed')}
+    result = {key: value[key] for key in ('sha', 'image', 'archiveSha256', 'startedAt', 'finishedAt', 'packagingSeconds', 'deployed')}
+    if 'stages' in value:
+        stages = value['stages']
+        names = ('sourceReadyAt', 'gateImageReadyAt', 'gateStartedAt', 'gateFinishedAt', 'packagingStartedAt')
+        if not isinstance(stages, dict) or set(stages) != set(names):
+            raise ValueError('Invalid artifact stages')
+        previous = value['startedAt']
+        for name in names:
+            stamp = stages[name]
+            if type(stamp) not in (int, float) or not math.isfinite(stamp) or not previous <= stamp <= value['finishedAt']:
+                raise ValueError('Invalid stage order')
+            previous = stamp
+        result['stages'] = {name: stages[name] for name in names}
+    return result

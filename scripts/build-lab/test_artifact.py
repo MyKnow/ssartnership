@@ -16,5 +16,14 @@ class ArtifactContract(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(ValueError):
                 validate_artifact({**self.valid, **change}, SHA)
 
+    def test_stage_timings_are_ordered_and_allowlisted(self):
+        stages = dict(sourceReadyAt=1.1, gateImageReadyAt=1.2, gateStartedAt=1.3,
+                      gateFinishedAt=1.5, packagingStartedAt=1.6)
+        value = validate_artifact({**self.valid, 'stages': stages}, SHA)
+        self.assertEqual(value['stages'], stages)
+        for patch in ({'gateFinishedAt': 1.0}, {'sourceReadyAt': float('inf')}, {'unknown': 1.1}):
+            with self.subTest(patch=patch), self.assertRaises(ValueError):
+                validate_artifact({**self.valid, 'stages': {**stages, **patch}}, SHA)
+
 if __name__ == '__main__':
     unittest.main()

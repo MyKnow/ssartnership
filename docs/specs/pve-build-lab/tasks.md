@@ -80,3 +80,13 @@ Docker Compose 2.39.4 checksum을 확인했고, Node 24.18.1/npm 11.16.0은 dige
 ## 내부 네트워크의 호스트 접속 보완
 
 과거 Actions ledger의 internal-only Docker 포트 미발행 장애를 확인했다. 최신 초안은 Docker port publication을 제거하고 systemd-socket-proxyd가 VM loopback 3100/54321에서 실제 private container IP로만 전달한다. 내부 전용 네트워크와 외부 동작 차단은 유지한다. 최초 DB/Storage 초기화 스크립트는 기존 stack이 있으면 중단하며, 별도 합성 smoke 및 지속성 marker만 사용한다. 이 변경은 로컬 준비 단계이며 실제 Preview에서 포트·차단·재부팅 검증이 남아 있다. 필수 Actions skill·ledger 523줄 전체를 읽고 저장소 trigger를 대조했다. 실험 브랜치 최초 push의 예상 GitHub workflow는 0개, Vercel Git deployment는 false이며, 현재 진행 중 Actions와 이 브랜치의 PR은 없다. 최초 publication은 자동 제어기 비활성 상태의 기반 코드 전달이며 성능 측정용 push와 구분한다.
+
+## 비교 실행기 및 집계
+
+캐시 비교 실행기는 동일 후보 SHA와 immutable gate image ID를 고정하고 off/on을 번갈아 실행한다. 각 변형 cold/warm 3회, 동일 VM 및 container 자원이며 resource-matrix lock을 공유한다. 후보 source archive hash와 이미지 ID를 검증하고 실패 실행은 재시도하지 않는다. 이 실행기는 로컬 준비 단계이며 아직 VM에 설치하지 않았다.
+
+집계기는 SHA·VM CPU/RAM·container memory·cache mode·최적화 여부·측정 profile이 다른 결과를 합치지 않는다. 중복/실패/OOM/비정상 수치 및 83 E2E 계약 위반을 거절하고 3회 미만은 incomplete로 표시한다. 현재 수집한 CPU 결과 5개 중 2 vCPU cold 3회 중앙값은 475.833초(474.723~476.279초)다. 최고 cgroup 메모리는 5368709120바이트로 한도에 닿았으나 OOM은 없었으며 파일 캐시를 포함한다. warm 3회도 완료했으며 450.771/447.966/451.214초, 중앙값 450.771초로 cold 대비 약 5.3% 단축이다. 여섯 실행 모두 83 E2E와 결과 SHA 계약을 통과했다. Python 계약 테스트는 41개 통과했고 verify:change도 통과했다. 기존 mock rollback 진단 4개 외 새 오류는 없다. 05:02 KST에 VM 4970이 4 vCPU/6144 MiB로 전환되어 cold-1을 시작했다. 같은 시각 기존 production/preview의 /api/health는 모두 HTTP 200이었다. 이는 해당 시점의 가용성 확인이며 운영 무영향 전체를 증명하지는 않는다.
+
+## 전체 경로 시간 기록 준비
+
+로컬 실행기는 sourceReadyAt, gateImageReadyAt, gateStartedAt, gateFinishedAt, packagingStartedAt을 기록하며 guest/host 경계에서 유한한 숫자와 시간 순서를 검증한다. 전송 receipt는 다운로드 완료, Preview 기동 요청·SSH 준비, 업로드 시작·완료, archive 크기를 분리한다. 따라서 기존 transferStartedAt~transferFinishedAt 전체를 순수 전송 시간으로 해석하지 않는다. host controller는 SHA별 observed/boot-requested/dispatched/deployment-started/ready/shutdown-requested 이벤트를 별도 보존한다. 이 변경은 아직 설치하지 않았고, 실제 push 요청 시각과의 결합 및 전체 경로 검증은 남아 있다. 관련 Python 테스트 42개가 통과했다.
