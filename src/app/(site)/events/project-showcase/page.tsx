@@ -25,7 +25,7 @@ const MY_PATH = `${EVENT_PATH}/my`;
 const PHASE_DESCRIPTIONS: Record<ShowcasePhase, string> = {
   setup: "운영진이 이벤트 일정을 준비하고 있어요. 일정이 정해지면 이곳에서 안내할게요.",
   paused: "운영진이 이벤트를 잠시 중단했어요. 다시 열리면 이곳에서 안내할게요.",
-  upcoming: "곧 프로젝트 모집이 시작돼요. 출품할 서비스와 팀원 학번을 미리 준비해 주세요.",
+  upcoming: "곧 프로젝트 모집이 시작돼요. 출품할 서비스의 소개와 대표 이미지를 미리 준비해 주세요.",
   submission: "직접 개발·배포한 서비스를 출품해 주세요. 프로젝트는 체험 기간에 공개돼요.",
   reviewing: "모집이 끝났어요. 운영진이 출품작을 확인하고 있고, 체험 기간에 공개할게요.",
   experience: "동료가 만든 서비스를 체험하고 한 줄 피드백을 남겨 주세요. 피드백을 남긴 서비스마다 추첨권을 받아요.",
@@ -71,11 +71,10 @@ export default async function ProjectShowcasePage({
   const query = firstParam(params.q).trim().slice(0, 80);
   const selectedSort = params.sort === "title" ? "title" : "newest";
   const showResults = phase === "announcement" || phase === "closed";
-  const [projects, ownProject, completedProjectIds, winners, drawState, headerSession] = await Promise.all([
+  const [projects, completedProjectIds, winners, drawState, headerSession] = await Promise.all([
     phase === "experience"
       ? projectShowcaseRepository.listPublicProjects({ type: selectedType, query, sort: selectedSort })
       : Promise.resolve([]),
-    session?.userId ? projectShowcaseRepository.getActiveOwnerProject(session.userId) : Promise.resolve(null),
     phase === "experience" && session?.userId
       ? projectShowcaseRepository.listMemberCompletedProjectIds(session.userId)
       : Promise.resolve([]),
@@ -90,9 +89,7 @@ export default async function ProjectShowcasePage({
       if (!session?.userId) {
         return { href: `/auth/login?returnTo=${encodeURIComponent(NEW_PROJECT_PATH)}`, label: "로그인 후 출품하기" };
       }
-      return ownProject
-        ? { href: `${MY_PATH}/projects/${ownProject.id}`, label: "내 출품 보기" }
-        : { href: NEW_PROJECT_PATH, label: "출품하기" };
+      return { href: NEW_PROJECT_PATH, label: "출품하기" };
     }
     if (phase === "experience") return { href: "#showcase-gallery", label: "프로젝트 둘러보기" };
     if (phase === "announcement") return { href: "#showcase-results", label: "결과 확인" };
@@ -171,7 +168,7 @@ export default async function ProjectShowcasePage({
                 ["배포·운영 중인 서비스 주소", "Web·Game은 서비스 주소, App은 스토어나 다운로드 안내 주소, Embedded는 YouTube·Vimeo 시연 영상 주소"],
                 ["대표 홍보 이미지 1장", "4:3 비율로 잘라 저장해요. 서비스 화면이 잘 보이는 이미지를 권장해요."],
                 ["서비스 설명", "한 줄 소개와 20자 이상의 설명. 주요 기능과 이용 방법을 알려 주세요."],
-                ["참여자 이름·학번", "학번은 숫자 7자리예요. 팀 출품은 팀명과 팀원 모두의 이름·학번이 필요해요."],
+                ["여러 프로젝트 출품", "학번·팀원 등록 없이 출품해요. 승인된 프로젝트 1개당 추첨 기회 1개가 생겨요."],
               ].map(([title, body]) => (
                 <li key={title} className="rounded-2xl bg-surface-muted/60 p-4">
                   <p className="font-semibold text-foreground">{title}</p>
@@ -227,7 +224,7 @@ export default async function ProjectShowcasePage({
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">ANNOUNCEMENT</p>
             <h2 id="showcase-results-heading" className="mt-2 text-2xl font-bold text-foreground">당첨 결과</h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              무작위 추첨 결과예요. 이름·학번은 일부를 가려 보여 주고, 경품은 당첨자 Mattermost로 보내 드려요.
+              무작위 추첨 결과예요. 이름 일부를 가려 보여 줘요. 당첨자에게 등록된 MM 또는 이메일로 구글폼 작성 안내를 보내 드려요.
               {session?.userId ? " 내 당첨 여부는 내 참여에서 확인할 수 있어요." : ""}
             </p>
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
@@ -243,7 +240,7 @@ export default async function ProjectShowcasePage({
                         {groupWinners.map((winner) => (
                           <li key={`${group}-${winner.position}`} className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl bg-surface px-3 py-2 text-sm">
                             <span className="min-w-0 break-words font-medium text-foreground">{winner.projectTitle ?? winner.maskedName}</span>
-                            <span className="tabular-nums text-muted-foreground">{winner.projectTitle ? `${winner.maskedName} · ` : ""}{winner.maskedStudentNumber}</span>
+                            <span className="tabular-nums text-muted-foreground">{winner.projectTitle ? winner.maskedName : ""}</span>
                           </li>
                         ))}
                       </ol>

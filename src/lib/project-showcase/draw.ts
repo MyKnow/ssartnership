@@ -18,6 +18,20 @@ export function sampleShowcaseUniform<T>(items: readonly T[], count: number, ran
   return pool.slice(0, take);
 }
 
+/** Each approved project is one ticket; a selected member's other tickets are removed. */
+export function sampleShowcaseProjects<T extends { memberId: string | null }>(
+  items: readonly T[], count: number, random: ShowcaseRandomInt = secureRandomInt,
+) {
+  let pool = items.filter((item) => Boolean(item.memberId));
+  const selected: T[] = [];
+  while (selected.length < count && pool.length > 0) {
+    const winner = pool[random(pool.length)]!;
+    selected.push(winner);
+    pool = pool.filter((item) => item.memberId !== winner.memberId);
+  }
+  return selected;
+}
+
 /**
  * Weighted sample without replacement: each draw picks one ticket among all
  * remaining tickets, then removes that person so nobody is selected twice.
@@ -55,11 +69,11 @@ export function buildShowcaseAnnouncement(eventTitle: string, winners: readonly 
     lines.push(`■ ${prize.title} · ${prize.prize} (${groupWinners.length}${prize.unit})`);
     if (groupWinners.length === 0) lines.push("- 당첨자 없음");
     groupWinners.forEach((winner, index) => {
-      const person = `${winner.maskedName} (${winner.maskedStudentNumber})`;
+      const person = winner.maskedName;
       lines.push(`${index + 1}. ${group === "submitter" && winner.projectTitle ? `${winner.projectTitle} · ${person}` : person}`);
     });
     lines.push("");
   }
-  lines.push("경품은 당첨자 Mattermost로 보내 드려요. 참여해 주셔서 감사합니다!");
+  lines.push("당첨자에게 등록된 MM 또는 이메일로 구글폼 작성 안내를 보내 드려요. 학번은 해당 폼에서 확인해요.");
   return lines.join("\n");
 }

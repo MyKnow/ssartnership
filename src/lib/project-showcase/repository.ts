@@ -15,7 +15,6 @@ import type {
   ShowcaseOwnerFeedback,
   ShowcaseOwnerProject,
   ShowcaseProject,
-  ShowcaseProjectParticipant,
   ShowcaseProjectStatus,
   ShowcaseProjectSubmission,
   ShowcaseProjectType,
@@ -43,7 +42,6 @@ export type ShowcaseEventScheduleInput = Pick<
 
 export type ShowcaseAdminProject = ShowcaseProject & {
   ownerDisplayName: string;
-  participants: ShowcaseProjectParticipant[];
   reviewNote: string | null;
 };
 
@@ -115,8 +113,8 @@ export type ShowcaseProjectWriteInput = {
 
 /**
  * Data access for the project showcase event. Mock and Supabase implementations
- * must enforce the same phase, ownership, one-project-per-member and
- * student-number uniqueness rules, raising `ShowcaseDomainError` on violation.
+ * must enforce the same phase, ownership, multiple-project-per-member and
+ * one-prize-per-member rules, raising `ShowcaseDomainError` on violation.
  */
 export interface ProjectShowcaseRepository {
   getEvent(): Promise<ShowcaseEvent | null>;
@@ -128,15 +126,15 @@ export interface ProjectShowcaseRepository {
   getPublicProject(id: string): Promise<ShowcaseProject | null>;
   recordUniqueView(projectId: string, memberId: string): Promise<void>;
 
-  /** The member's current (non-withdrawn) project, if any. */
-  getActiveOwnerProject(memberId: string): Promise<ShowcaseOwnerProject | null>;
+  /** All of the member's submissions, including withdrawn projects, newest first. */
+  listOwnerProjects(memberId: string): Promise<ShowcaseOwnerProject[]>;
   getOwnerProject(memberId: string, projectId: string): Promise<ShowcaseOwnerProject | null>;
   createProject(input: ShowcaseProjectWriteInput & { eventId: string }): Promise<void>;
   updateProject(input: ShowcaseProjectWriteInput): Promise<void>;
   withdrawProject(input: { projectId: string; ownerMemberId: string }): Promise<void>;
 
   /** Experience phase — each write asserts the phase, approval and ownership rules. */
-  registerParticipant(input: { memberId: string; studentNumber: string }): Promise<void>;
+  registerParticipant(input: { memberId: string }): Promise<void>;
   getMemberProjectState(projectId: string, memberId: string): Promise<ShowcaseMemberProjectState>;
   /** Idempotent: returns the first recorded start time. */
   startExperience(input: { projectId: string; memberId: string }): Promise<{ startedAt: string }>;

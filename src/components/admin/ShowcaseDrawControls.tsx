@@ -239,7 +239,7 @@ export function ShowcaseSettleButton({ disabledReason }: { disabledReason: strin
     <div className="grid justify-items-start gap-2">
       {confirming ? (
         <div className="grid gap-2 rounded-xl border border-danger/30 bg-danger/5 p-3">
-          <p className="text-sm text-foreground">정산 완료 뒤에는 추첨·무효·발송 기록을 바꿀 수 없고, 30일 뒤 학번과 체험 기록의 회원 연결이 파기돼요.</p>
+          <p className="text-sm text-foreground">정산 완료 뒤에는 추첨·무효·발송 기록을 바꿀 수 없고, 30일 뒤 체험·추첨 기록의 회원 연결이 파기돼요.</p>
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="danger" disabled={isPending} onClick={() => { setConfirming(false); run(settleShowcaseEvent); }}>
               {isPending ? "기록 중…" : "정산 완료로 기록"}

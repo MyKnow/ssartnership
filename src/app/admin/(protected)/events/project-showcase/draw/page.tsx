@@ -1,3 +1,4 @@
+import Link from "next/link";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminShell from "@/components/admin/AdminShell";
 import {
@@ -40,7 +41,8 @@ export default async function AdminShowcaseDrawPage() {
     : !drawWindowOpen ? "체험 기간이 끝난 뒤에 추첨과 검증을 할 수 있어요." : null;
   const activeWinners = winners.filter((winner) => winner.status === "active");
   const announcement = buildShowcaseAnnouncement(event?.title ?? "내 프로젝트를 소개합니다!", activeWinners);
-  const eligibleSubmitters = submitters.filter((candidate) => !candidate.exclusion && !candidate.alreadyWon).length;
+  const eligibleProjects = submitters.filter((candidate) => candidate.memberId && !candidate.exclusion && !candidate.alreadyWon);
+  const eligibleSubmitters = new Set(eligibleProjects.map((candidate) => candidate.memberId)).size;
   const eligibleExperiencers = experiencers.filter((candidate) => !candidate.exclusion && !candidate.alreadyWon);
   const eligibleTickets = eligibleExperiencers.reduce((total, candidate) => total + candidate.tickets, 0);
   const drawReason = (group: ShowcaseCandidateGroup) => {
@@ -82,9 +84,9 @@ export default async function AdminShowcaseDrawPage() {
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 id="showcase-submitter-candidates" className="text-lg font-bold text-foreground">출품 후보 <span className="text-sm font-semibold text-muted-foreground">{submitters.length}건</span></h2>
-              <p className="mt-1 text-sm text-muted-foreground">승인된 출품 1건이 추첨 1건이에요. {SHOWCASE_PRIZES.submitter.prize} · 최대 {event?.submitterSelectionCount ?? 0}건</p>
+              <p className="mt-1 text-sm text-muted-foreground">승인된 프로젝트 1개당 기회 1개예요. 당첨되면 그 회원의 나머지 출품은 제외해요. {SHOWCASE_PRIZES.submitter.prize} · 최대 {event?.submitterSelectionCount ?? 0}명</p>
             </div>
-            <ShowcaseDrawButton group="submitter" label={`출품 추첨 실행 (대상 ${eligibleSubmitters}건)`} disabledReason={drawReason("submitter")} />
+            <ShowcaseDrawButton group="submitter" label={`출품 추첨 실행 (대상 ${eligibleSubmitters}명 · ${eligibleProjects.length}장)`} disabledReason={drawReason("submitter")} />
           </div>
           {submitters.length === 0 ? <p className="text-sm text-muted-foreground">승인된 출품이 없어요.</p> : (
             <ul className="grid gap-2">
@@ -116,7 +118,7 @@ export default async function AdminShowcaseDrawPage() {
               {experiencers.map((candidate) => (
                 <li key={candidate.memberId} className="grid gap-2 rounded-xl border border-border px-4 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] sm:items-start">
                   <div className="min-w-0">
-                    <p className="font-medium text-foreground">{candidate.displayName} <span className="text-sm font-normal tabular-nums text-muted-foreground">{candidate.studentNumber}</span></p>
+                    <p className="font-medium text-foreground">{candidate.displayName}</p>
                     <p className="text-xs text-muted-foreground">
                       추첨권 {candidate.tickets}장{candidate.alreadyWon ? " · 당첨" : ""}{candidate.exclusion ? " · 제외됨" : ""}
                     </p>
@@ -140,8 +142,11 @@ export default async function AdminShowcaseDrawPage() {
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-primary">{SHOWCASE_PRIZES[winner.candidateGroup].title} #{winner.position}</p>
                     <p className="mt-1 font-medium text-foreground">
-                      {winner.projectTitle ? `${winner.projectTitle} · ` : ""}{winner.maskedName} <span className="tabular-nums text-muted-foreground">({winner.maskedStudentNumber})</span>
+                      {winner.projectTitle ? `${winner.projectTitle} · ` : ""}{winner.maskedName}
                     </p>
+                  {winner.memberId && canAdmin(admin.account.permissions, "members", "read") ? (
+                    <Link href={`/admin/members/${winner.memberId}`} className="text-sm font-semibold text-primary underline">회원 연락처 확인 · 구글폼 안내</Link>
+                  ) : null}
                   </div>
                   <ShowcaseWinnerControls winner={winner} disabled={locked} />
                 </li>
@@ -152,13 +157,13 @@ export default async function AdminShowcaseDrawPage() {
 
         <section className="grid gap-3 rounded-2xl border border-border bg-surface p-5 sm:p-6" aria-labelledby="showcase-announcement-heading">
           <h2 id="showcase-announcement-heading" className="text-lg font-bold text-foreground">Mattermost 공지 문구</h2>
-          <p className="text-sm text-muted-foreground">유효 당첨만 이름·학번을 가려 담았어요. 공지는 직접 게시해 주세요. 공개 페이지에는 발표 시작부터 같은 명단이 보여요.</p>
+          <p className="text-sm text-muted-foreground">유효 당첨만 이름 일부를 가려 담았어요. 공지는 직접 게시해 주세요. 공개 페이지에는 발표 시작부터 같은 명단이 보여요.</p>
           <ShowcaseAnnouncementCopy text={announcement} />
         </section>
 
         <section className="grid gap-3 rounded-2xl border border-border bg-surface p-5 sm:p-6" aria-labelledby="showcase-settle-heading">
           <h2 id="showcase-settle-heading" className="text-lg font-bold text-foreground">정산</h2>
-          <p className="text-sm text-muted-foreground">모든 경품 발송과 정산을 마치면 기록해 주세요. 30일 뒤 매일 도는 예약 작업이 학번과 체험·피드백·관심·추첨 기록의 회원 연결을 파기해요.</p>
+          <p className="text-sm text-muted-foreground">모든 경품 발송과 정산을 마치면 기록해 주세요. 30일 뒤 매일 도는 예약 작업이 체험·피드백·관심·추첨 기록의 회원 연결을 파기해요.</p>
           {state.settledAt ? (
             <p className="text-sm font-semibold text-foreground">정산 완료 · {formatShowcaseDateTime(state.settledAt, { withTime: true })}</p>
           ) : (
