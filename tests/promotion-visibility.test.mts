@@ -197,3 +197,20 @@ test("linked home carousel slides are hidden when the event is no longer visible
     true,
   );
 });
+
+test("non-campaign event slides follow the event's own visibility instead of a missing campaign", async () => {
+  const { canDisplayHomePromotionSlide } = await promotionsPromise;
+  const viewer = { authenticated: false, year: null, campus: null };
+  const showcaseSlide = createSlide({ audiences: ["guest"], eventSlug: "project-showcase" });
+  const now = new Date("2026-10-01T12:00:00+09:00");
+
+  assert.equal(canDisplayHomePromotionSlide(showcaseSlide, viewer, new Map(), now), false);
+  assert.equal(
+    canDisplayHomePromotionSlide(showcaseSlide, viewer, new Map(), now, new Map([["project-showcase", true]])),
+    true,
+  );
+  assert.equal(
+    canDisplayHomePromotionSlide(showcaseSlide, viewer, new Map(), now, new Map([["project-showcase", false]])),
+    false,
+  );
+});

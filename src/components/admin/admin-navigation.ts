@@ -270,10 +270,10 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         permission: { resource: "home_ads" },
       },
       {
-        href: "/admin/event",
+        href: "/admin/events",
         label: "이벤트 관리",
-        description: "이벤트 게시와 운영",
-        keywords: ["행사", "프로모션", "게시"],
+        description: "이벤트 운영과 쇼케이스 검수·로그·집계",
+        keywords: ["행사", "프로모션", "게시", "쇼케이스", "프로젝트", "출품", "검수", "추첨", "집계", "로그"],
         iconKey: "calendar",
         permission: { resource: "events" },
       },
