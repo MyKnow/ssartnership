@@ -29,6 +29,9 @@ class HostBoundary(unittest.TestCase):
         self.output = contextlib.redirect_stdout(io.StringIO())
         self.output.__enter__()
         self.addCleanup(self.output.__exit__, None, None, None)
+        discovery = patch.object(host, 'collect_revisions', side_effect=lambda state, tip: state)
+        discovery.start()
+        self.addCleanup(discovery.stop)
 
     def test_host_resource_matrix_lock_prevents_actions(self):
         with (self.root / 'resource-matrix.lock').open('w') as lock:
@@ -90,3 +93,44 @@ class HostBoundary(unittest.TestCase):
             host.tick()
         guest.assert_called_once_with('status')
         self.assertFalse(any('start' in command for command in self.commands))
+
+    def test_new_push_does_not_skip_completed_previous_deployment(self):
+        (self.root / 'state.json').write_text(json.dumps({'lastAttempt': A}))
+        artifact = {'sha': A, 'image': 'ssartnership-lab-app:' + A, 'archiveSha256': 'b' * 64, 'startedAt': 1, 'finishedAt': 2, 'packagingSeconds': 0.5, 'deployed': False}
+        ordinary_run = host.run
+        def with_delivery(args, timeout=30):
+            if args[0] == '/usr/bin/python3':
+                self.assertEqual(args[-1], A)
+                return json.dumps({'sha': A, 'deployed': True, 'preview': {'readyAt': 1001}})
+            return ordinary_run(args, timeout=timeout)
+        with patch.object(host, 'observe_sha', return_value=B), patch.object(host, 'guest', side_effect=[{'busy': False}, {'status': 'ready', 'artifact': artifact}]) as guest, patch.object(host, 'run', side_effect=with_delivery):
+            host.tick()
+        self.assertEqual(guest.call_args_list[-1].args, ('result', A))
+        state = json.loads((self.root / 'state.json').read_text())
+        self.assertEqual(state['deploymentAttempt'], A)
+        self.assertEqual(state['deploymentStatus'], 'ready')
+        self.assertEqual(state['observedSha'], B)
+
+    def test_dispatch_uses_first_queued_sha_and_retains_next(self):
+        (self.root / 'state.json').write_text(json.dumps({'pending': [A, B], 'cursor': B}))
+        with patch.object(host, 'observe_sha', return_value=B), patch.object(host, 'guest', side_effect=[{'busy': False}, {'busy': False}, {'acceptedSha': A}]) as guest:
+            host.tick()
+        self.assertEqual(guest.call_args_list[-1].args, ('launch', A))
+        state = json.loads((self.root / 'state.json').read_text())
+        self.assertEqual(state['pending'], [B])
+        self.assertEqual(state['lastAttempt'], A)
+
+    def test_uncertain_launch_is_recorded_before_guest_side_effect(self):
+        (self.root / 'state.json').write_text(json.dumps({'pending': [A, B], 'cursor': B}))
+        def guest_call(*args):
+            if args == ('status',):
+                return {'busy': False}
+            self.assertEqual(args, ('launch', A))
+            state = json.loads((self.root / 'state.json').read_text())
+            self.assertEqual(state['lastAttempt'], A)
+            self.assertEqual(state['pending'], [B])
+            self.assertEqual(state['dispatchStatus'], 'requested')
+            raise RuntimeError('Response lost after launch')
+        with patch.object(host, 'observe_sha', return_value=B), patch.object(host, 'guest', side_effect=guest_call):
+            with self.assertRaises(RuntimeError):
+                host.tick()

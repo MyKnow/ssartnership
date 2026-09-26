@@ -10,6 +10,7 @@ import sys
 import time
 import benchmark
 from build_profile import load_profile
+from revision_queue import ensure_ancestor
 
 REPOSITORY = 'https://github.com/MyKnow/ssartnership.git'
 REF = 'refs/heads/ci/497-pve-build-lab'
@@ -30,10 +31,9 @@ def main():
             subprocess.run(args, cwd=cwd, env=env, stdout=log, stderr=subprocess.STDOUT, timeout=timeout, check=True)
     repo = request / 'repo'
     run(['git', 'init', '--quiet', str(repo)])
-    run(['git', '-c', 'core.hooksPath=/dev/null', 'fetch', '--depth=1', REPOSITORY, REF], cwd=repo)
+    run(['git', '-c', 'core.hooksPath=/dev/null', 'fetch', '--no-tags', REPOSITORY, REF], cwd=repo)
     head = subprocess.run(['git', 'rev-parse', 'FETCH_HEAD'], cwd=repo, env=env, capture_output=True, text=True, check=True).stdout.strip()
-    if head != sha:
-        raise ValueError('Branch moved before source acquisition')
+    ensure_ancestor(repo, sha, head)
     archive = request / 'source.tar'
     run(['git', 'archive', '--format=tar', '--output', str(archive), sha], cwd=repo)
     source = request / 'source'

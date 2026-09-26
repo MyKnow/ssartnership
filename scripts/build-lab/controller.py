@@ -24,8 +24,15 @@ def parse_remote_sha(text):
 def decision(sha, state, running, busy, now):
     if not re.fullmatch(r'[a-f0-9]{40}', sha):
         raise ValueError('Invalid SHA')
+    pending = state.get('pending', [])
+    if (not isinstance(pending, list) or len(pending) > 64
+            or any(not isinstance(item, str) or not re.fullmatch(r'[a-f0-9]{40}', item) for item in pending)
+            or len(set(pending)) != len(pending)):
+        raise ValueError('Invalid pending queue')
     if busy:
         return {'action': 'wait', 'sha': sha}
+    if pending:
+        return {'action': 'dispatch' if running else 'start', 'sha': pending[0]}
     if sha != state.get('lastAttempt'):
         return {'action': 'dispatch' if running else 'start', 'sha': sha}
     if not running:

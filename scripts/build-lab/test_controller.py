@@ -28,5 +28,18 @@ class ControllerContract(unittest.TestCase):
     def test_missing_observation_cannot_trigger_shutdown(self):
         self.assertEqual(decision(A, {'lastAttempt': A}, True, False, 1000)['action'], 'idle')
 
+    def test_pending_request_precedes_latest_tip_and_idle_shutdown(self):
+        state = {'lastAttempt': B, 'idleSince': 1, 'pending': [A]}
+        self.assertEqual(decision(B, state, True, False, 1000), {'action': 'dispatch', 'sha': A})
+        self.assertEqual(decision(B, state, False, False, 1000), {'action': 'start', 'sha': A})
+
+    def test_pending_request_does_not_interrupt_active_job(self):
+        self.assertEqual(decision(B, {'pending': [A]}, True, True, 1000)['action'], 'wait')
+
+    def test_invalid_queue_is_rejected_before_actions(self):
+        for pending in ('bad', ['main'], [A, A], [None]):
+            with self.subTest(pending=pending), self.assertRaises(ValueError):
+                decision(B, {'pending': pending}, True, False, 1000)
+
 if __name__ == '__main__':
     unittest.main()

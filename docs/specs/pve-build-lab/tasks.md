@@ -7,6 +7,14 @@ authority: normative
 
 # 작업 상태
 
+## 최신 로컬 보완: 연속 변경 처리
+
+기존 최신 tip polling은 빌드 중 도착한 중간 SHA와 이전 SHA의 배포를 건너뛸 수 있어 수정 중이다. 로컬 제어기는 별도 bare history에서 고정 실험 브랜치의 새 커밋을 위상 순서로 수집하고, 최대 64개의 pending 큐와 cursor를 먼저 저장한다. fast-forward 이력이 아니거나 수집이 불완전하거나 한도를 넘으면 요청을 버리지 않고 중단한다. push 이벤트를 수신하는 방식은 아니므로 한 push에 여러 커밋이 있으면 각각 빌드하며, 강제 push는 지원하지 않는다. 실제 Git 저장소의 연속 커밋·되돌림·없는 SHA 테스트를 포함한다.
+
+완료된 이전 SHA의 배포는 최신 tip과 분리한다. 큐의 첫 SHA를 실행하고 다음 요청을 보존하며, 대기 요청이 있으면 유휴 종료하지 않는다. 실행 요청 전에 SHA와 dispatch intent를 저장하므로 guest 응답 유실 시 자동으로 재실행하지 않는다. 다음 tick에서 해당 SHA의 결과를 확인하며, 실제 실행 여부가 불확실한 실패는 진단 후 복구해야 한다. 빌더는 고정 브랜치 전체 이력을 받아 요청 SHA가 현재 tip의 조상인지 검증한다. 이로 인한 source 준비 시간은 전체 경로 측정에 포함한다.
+
+현재 Python 테스트 72개 및 diff 검사가 통과했다. 변경은 아직 로컬에만 있으며 서버 설치·실제 연속 push·큐 복구 검증은 남았다. RAM matrix 실행 파일은 교체하지 않았다.
+
 - [x] Issue #497, dev 기준 SHA 및 별도 작업 브랜치 준비.
 - [x] 빌드 VM 4970의 KVM 부팅·SSH·Docker·QEMU agent 확인.
 - [x] 전용 사설망·운영 주소 차단·전송 상한 구성 및 연결 검사.
@@ -31,17 +39,20 @@ authority: normative
 
 ## 2026-09-27 현재 측정
 
-PVE host의 `build-lab-497-resource-matrix.service`가 실제 VM 할당량을 비교한다. 최초 확인 MainPID는 15715다. 재개 시 동일 unit·PID·결과를 먼저 확인하고 중복 실행하지 않는다. VM 4970을 정상 종료한 뒤 2/4/8 vCPU 및 6144 MiB로 바꾸며, 각 조건에서 cold/warm 3회씩 실행한다. gate 컨테이너는 5120 MiB 제한이다. CPU 비교 뒤 RAM 비교와 코드 최적화 비교가 남아 있다.
+PVE host의 `build-lab-497-resource-matrix.service`는 06:19:29 KST에 success/inactive/MainPID 0으로 종료했다. VM 4970의 실제 2/4/8 vCPU 및 6144 MiB, gate 컨테이너 5120 MiB에서 각 cold/warm 3회, 총 18회가 모두 유효하다. 기준 SHA·archive와 83 E2E 계약을 유지했으며 실패·OOM이 없다. 이 CPU unit은 재시작 대상이 아니다.
 
-로컬 측정기는 다음 RAM 비교를 지원하도록 준비했다. CPU 결과에서 선택한 동일 코어 수를 고정하고 VM/container를 각각 6144/5120 MiB와 8192/6144 MiB로 비교한다. 따라서 이는 VM 메모리만의 효과가 아니라 실제 사용 가능한 메모리 구성 비교다. 각 조건 cold/warm 3회이며 `ram-` 실행 이름으로 CPU 비교 결과와 분리한다. 현재 실행 중인 host/guest 스크립트는 교체하지 않았다.
+4 vCPU를 효율 기준으로 선택했다. 2→4 vCPU는 cold 약 18.5%, warm 약 20.0% 단축인 반면 4→8 vCPU는 CPU를 두 배 할당해 cold 약 6.1%, warm 약 6.7% 단축이다. 가장 짧은 CPU 비교 시간은 8 vCPU지만, 나머지 VM을 위한 여유와 추가 할당 대비 개선 폭을 고려해 이후 실험은 4 vCPU로 고정한다.
 
-- 실제 VM 2 vCPU/6144 MiB cold 3회 중앙값 475.833초, warm 3회 중앙값 450.771초다. 4 vCPU에서는 각각 387.796초와 360.576초이며 모두 유효 gate다. 8 vCPU는 cold-1 363.548초, cold-2 365.951초, warm-1 336.305초까지 확인했고 나머지는 실행 중이다. 최종 CPU 선택과 RAM 비교는 아직 하지 않았다.
+CPU unit 종료·guest busy=false를 확인한 뒤 `de9bc0851a0da8ef0ccf1598f744a805f581206d` 실행 파일을 host와 빌드 VM에 설치했다. 이전 코드는 각각 `installed-before-<SHA>`와 `/root/build-lab-before-<SHA>`에 보존했다. 두 환경에서 Python 59개가 통과했다. RAM 비교는 `build-lab-497-ram-matrix.service`, 최초 MainPID 55984로 06:22 KST에 시작했다. 재개 시 이 unit의 실제 상태를 먼저 확인한다. 4 vCPU를 고정하고 VM/container를 각각 6144/5120 MiB와 8192/6144 MiB로 비교하므로 VM 메모리만의 효과가 아닌 실제 메모리 구성 비교다. 각 cold/warm 3회이며 `ram-` 실행 이름으로 CPU 결과와 분리한다. 첫 `ram-vm4c6g-cold-1`은 388.662초로 통과했고 나머지는 진행 중이다. 실행 중인 RAM 측정 코드는 교체하지 않는다.
+
+- 실제 VM 2 vCPU/6144 MiB cold/warm 중앙값은 475.833/450.771초, 4 vCPU는 387.796/360.576초, 8 vCPU는 364.294/336.516초다. 모든 조건 n=3이며 RAM 및 코드 최적화 선택은 미완료다.
 - 이전 탐색은 VM 8 vCPU/8192 MiB에서 컨테이너 2 CPU/5120 MiB만 제한했다. cold-1 452.415초, warm-1 426.275초, cold-2 456.580초다. 세 실행 모두 83 E2E 통과, 실패/오류/skip/retry 0이다. 실제 VM 조건별 통계와 섞지 않는다.
 - 탐색 guest matrix는 cold-2 완료 및 Docker 실행 없음 확인 후 정상 종료했다. MainPID 0/inactive, guest busy false를 확인했으며 재개 대상이 아니다.
 - cold는 새 workspace 및 npm/Next cache 없음이다. gate image는 준비되어 있고 host page cache는 통제하지 않았다. warm은 동일 SHA의 성공 결과에서 npm 및 두 Next cache만 복사한다. 준비 시간을 별도 기록한다.
 - cgroup memory.peak는 파일 캐시 등을 포함하므로 앱 RSS로 해석하지 않는다. guest 메모리는 MemTotal-MemAvailable의 1초 표본 최댓값이다.
 - 성공한 cold/warm 쌍의 `result.json`, `phases.json`, `gate.log`, `validated-gate.json`을 보존하고 재생성 가능한 work만 해제한다. 실패한 쌍은 보존하며 자동 재시도하지 않는다.
 - gate 시간은 이미지 준비·패키징·전송·배포를 포함하지 않는다. GitHub 전체 job 시간과 직접 동일 범위로 비교하지 않는다.
+- 비교 중 PVE 전력 정책은 `amd-pstate-epp`, governor `powersave`, EPP `balance_power`, boost `0`으로 확인했다. 기존 저전력 설정을 변경하지 않았다. 따라서 이 결과는 해당 정책에서의 실제 운영 후보 성능이며, 이 CPU의 최대 성능이나 GitHub runner와 동일한 주파수 조건을 뜻하지 않는다. 호스트 전력 정책 변경 효과는 이번 VM 자원 비교와 섞지 않는다.
 
 ## 인프라
 
