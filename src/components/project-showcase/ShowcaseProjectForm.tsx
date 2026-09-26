@@ -70,6 +70,16 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
   const nextTeammateIdRef = useRef(teammates.length);
   const ownerStudentNumber = project?.participants.find((participant) => participant.isOwner)?.studentNumber ?? "";
   const urlHint = SHOWCASE_SERVICE_URL_HINTS[projectType];
+  const fieldError = (field: string) => (error && errorField === field ? error : "");
+
+  function fieldProps(field: string, errorId: string, extraClass = "") {
+    const invalid = Boolean(fieldError(field));
+    return {
+      className: [INPUT_CLASS, extraClass, invalid ? "border-danger bg-danger/5" : ""].filter(Boolean).join(" "),
+      "aria-invalid": invalid || undefined,
+      "aria-describedby": invalid ? errorId : undefined,
+    };
+  }
 
   useEffect(() => {
     if (!file) return;
@@ -185,14 +195,20 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
         if (project) payload.set("projectId", project.id);
         if (file) {
           setMessage("이미지를 준비하고 있어요.");
-          const prepared = await prepareImageUploadSource(file, IMAGE_POLICY);
-          const [uploaded] = await uploadImagesToStaging({
-            purpose: "showcase-project",
-            actorMode: "member",
-            uploads: [{ clientId: "showcase-cover", role: "image", file: prepared }],
-          });
-          if (!uploaded?.uploadId) throw new Error("이미지 업로드 결과를 확인하지 못했어요.");
-          payload.set("imageUploadId", uploaded.uploadId);
+          try {
+            const prepared = await prepareImageUploadSource(file, IMAGE_POLICY);
+            const [uploaded] = await uploadImagesToStaging({
+              purpose: "showcase-project",
+              actorMode: "member",
+              uploads: [{ clientId: "showcase-cover", role: "image", file: prepared }],
+            });
+            if (!uploaded?.uploadId) throw new Error("이미지 업로드 결과를 확인하지 못했어요.");
+            payload.set("imageUploadId", uploaded.uploadId);
+          } catch (caught) {
+            const detail = caught instanceof Error && caught.message ? ` ${caught.message}` : "";
+            showError(`대표 홍보 이미지를 올리지 못했어요. 입력한 내용은 그대로 있어요.${detail}`, "imageUploadId");
+            return;
+          }
         }
         setMessage(mode === "create" ? "출품 내용을 제출하고 있어요." : "수정한 내용을 제출하고 있어요.");
         const result = mode === "create" ? await submitShowcaseProject(payload) : await updateShowcaseProject(payload);
@@ -232,16 +248,19 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
             </label>
           ))}
         </div>
+        <FieldError id="showcase-project-type-error" message={fieldError("projectType")} />
       </fieldset>
 
       <div className="grid gap-5">
         <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-project-title">
           서비스 이름
-          <input id="showcase-project-title" name="title" maxLength={100} defaultValue={project?.title} className={INPUT_CLASS} placeholder="서비스 이름을 입력해 주세요" />
+          <input id="showcase-project-title" name="title" maxLength={100} defaultValue={project?.title} {...fieldProps("title", "showcase-project-title-error")} placeholder="서비스 이름을 입력해 주세요" />
+          <FieldError id="showcase-project-title-error" message={fieldError("title")} />
         </label>
         <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-project-summary">
           한 줄 소개
-          <input id="showcase-project-summary" name="summary" maxLength={240} defaultValue={project?.summary} className={INPUT_CLASS} placeholder="어떤 문제를 해결하는 서비스인지 알려 주세요" />
+          <input id="showcase-project-summary" name="summary" maxLength={240} defaultValue={project?.summary} {...fieldProps("summary", "showcase-project-summary-error")} placeholder="어떤 문제를 해결하는 서비스인지 알려 주세요" />
+          <FieldError id="showcase-project-summary-error" message={fieldError("summary")} />
         </label>
         <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-project-description">
           서비스 설명
@@ -251,9 +270,10 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
             maxLength={8000}
             rows={7}
             defaultValue={project?.description}
-            className={`${INPUT_CLASS} py-3`}
+            {...fieldProps("description", "showcase-project-description-error", "py-3")}
             placeholder="주요 기능, 이용 방법, 만든 계기 등을 적어 주세요 (20자 이상)"
           />
+          <FieldError id="showcase-project-description-error" message={fieldError("description")} />
         </label>
         <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-project-url">
           {urlHint.label}
@@ -264,9 +284,10 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
             inputMode="url"
             maxLength={2048}
             defaultValue={project?.serviceUrl}
-            className={INPUT_CLASS}
+            {...fieldProps("serviceUrl", "showcase-project-url-error")}
             placeholder={urlHint.placeholder}
           />
+          <FieldError id="showcase-project-url-error" message={fieldError("serviceUrl")} />
           <span className="text-xs font-normal leading-5 text-muted-foreground">
             배포·운영 중인 서비스 주소를 입력해 주세요. 서비스에 별도 코드를 넣을 필요는 없어요.
           </span>
@@ -278,7 +299,7 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
           <p className="text-sm font-semibold text-foreground">대표 홍보 이미지</p>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">4:3 비율로 잘라 저장해요. 최대 10MB 이미지를 선택할 수 있어요.</p>
         </div>
-        <label className="flex min-h-36 cursor-pointer flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border border-dashed border-border bg-surface-muted/50 p-5 text-center focus-within:ring-2 focus-within:ring-primary">
+        <label className={`flex min-h-36 cursor-pointer flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border border-dashed p-5${fieldError("imageUploadId") ? " border-danger bg-danger/5" : " border-border bg-surface-muted/50"} text-center focus-within:ring-2 focus-within:ring-primary`}>
           {previewUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={previewUrl} alt="대표 이미지 미리보기" className="aspect-[4/3] max-h-64 w-full rounded-xl object-cover" />
@@ -296,8 +317,11 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
             className="sr-only"
             onChange={(changeEvent) => handleImageSelection(changeEvent.target.files?.[0])}
             aria-label="대표 홍보 이미지 선택"
+            aria-invalid={Boolean(fieldError("imageUploadId")) || undefined}
+            aria-describedby={fieldError("imageUploadId") ? "showcase-project-image-error" : undefined}
           />
         </label>
+        <FieldError id="showcase-project-image-error" message={fieldError("imageUploadId")} />
       </div>
 
       <fieldset className="grid min-w-0 gap-4">
@@ -316,15 +340,17 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
               autoComplete="off"
               maxLength={7}
               defaultValue={ownerStudentNumber}
-              className={INPUT_CLASS}
+              {...fieldProps("ownerStudentNumber", "showcase-project-owner-number-error")}
               placeholder="숫자 7자리"
             />
+            <FieldError id="showcase-project-owner-number-error" message={fieldError("ownerStudentNumber")} />
           </label>
         </div>
 
         <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-project-team">
           팀명 <span className="text-xs font-normal text-muted-foreground">팀으로 출품하면 필수</span>
-          <input id="showcase-project-team" name="teamName" maxLength={60} defaultValue={project?.teamName ?? ""} className={INPUT_CLASS} placeholder="개인 출품이면 비워 두세요" />
+          <input id="showcase-project-team" name="teamName" maxLength={60} defaultValue={project?.teamName ?? ""} {...fieldProps("teamName", "showcase-project-team-error")} placeholder="개인 출품이면 비워 두세요" />
+          <FieldError id="showcase-project-team-error" message={fieldError("teamName")} />
         </label>
 
         {teammates.length > 0 ? (
@@ -339,8 +365,9 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
                     maxLength={80}
                     value={teammate.name}
                     onChange={(changeEvent) => updateTeammate(teammate.id, "name", changeEvent.target.value)}
-                    className={INPUT_CLASS}
+                    {...fieldProps(`#showcase-teammate-name-${teammate.id}`, `showcase-teammate-name-${teammate.id}-error`)}
                   />
+                  <FieldError id={`showcase-teammate-name-${teammate.id}-error`} message={fieldError(`#showcase-teammate-name-${teammate.id}`)} />
                 </label>
                 <label className="grid min-w-0 gap-2 text-sm font-medium text-foreground" htmlFor={`showcase-teammate-number-${teammate.id}`}>
                   팀원 {index + 1} 학번
@@ -351,9 +378,10 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
                     maxLength={7}
                     value={teammate.studentNumber}
                     onChange={(changeEvent) => updateTeammate(teammate.id, "studentNumber", changeEvent.target.value)}
-                    className={INPUT_CLASS}
+                    {...fieldProps(`#showcase-teammate-number-${teammate.id}`, `showcase-teammate-number-${teammate.id}-error`)}
                     placeholder="숫자 7자리"
                   />
+                  <FieldError id={`showcase-teammate-number-${teammate.id}-error`} message={fieldError(`#showcase-teammate-number-${teammate.id}`)} />
                 </label>
                 <Button
                   type="button"
@@ -383,10 +411,12 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
           <input className="mt-1 h-4 w-4 shrink-0 accent-primary" type="checkbox" name="participantsConsent" value="true" defaultChecked={mode === "edit"} />
           <span>(필수) 팀원에게 이름·학번을 이벤트 운영에 사용한다는 점을 안내했고 동의를 받았어요.</span>
         </label>
+        <FieldError id="showcase-participantsConsent-error" message={fieldError("participantsConsent")} />
         <label className="flex items-start gap-3 text-sm leading-6 text-foreground">
           <input className="mt-1 h-4 w-4 shrink-0 accent-primary" type="checkbox" name="announcementConsent" value="true" defaultChecked={mode === "edit"} />
           <span>(필수) 경품에 당첨되면 대표자 이름·학번 일부를 가려(예: 정** · 15****43) 공지하는 데 동의해요.</span>
         </label>
+        <FieldError id="showcase-announcementConsent-error" message={fieldError("announcementConsent")} />
       </div>
 
       {error ? (
@@ -418,4 +448,9 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
       />
     </form>
   );
+}
+
+function FieldError({ id, message }: { id: string; message: string }) {
+  if (!message) return null;
+  return <span id={id} className="text-xs font-medium leading-5 text-danger">{message}</span>;
 }
