@@ -19,6 +19,11 @@ import {
   listManagedEventCampaigns,
   listManagedPromotionSlides,
 } from "@/lib/promotions/events";
+import {
+  formatPromotionSlideError,
+  isPromotionSlideErrorCode,
+  parsePromotionSlideNumber,
+} from "@/lib/promotions/slide-validation";
 import { SITE_NAME } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +49,10 @@ function statusMessage(status?: string) {
   return null;
 }
 
-function errorMessage(error?: string) {
+function errorMessage(error?: string, slide?: string) {
+  if (isPromotionSlideErrorCode(error)) {
+    return formatPromotionSlideError(error, parsePromotionSlideNumber(slide));
+  }
   if (error === "ad_campaign_create_failed") {
     return "광고 캠페인을 생성하지 못했습니다. 입력값과 권한을 확인한 뒤 다시 시도해 주세요.";
   }
@@ -55,7 +63,7 @@ function errorMessage(error?: string) {
     return "광고 캠페인 상태를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.";
   }
   if (error === "promotion_slide_save_failed") {
-    return "광고 카드 저장에 실패했습니다. 이미지와 입력값을 확인한 뒤 다시 시도해 주세요.";
+    return "광고 카드를 저장하지 못했습니다. 입력한 내용은 그대로 두었으니 잠시 후 다시 시도해 주세요.";
   }
   return null;
 }
@@ -65,10 +73,10 @@ async function AdminAdvertisementContent({
   params,
 }: {
   session: Awaited<ReturnType<typeof requireAdminPermission>>;
-  params: { status?: string; error?: string };
+  params: { status?: string; error?: string; slide?: string };
 }) {
   const message = statusMessage(params.status);
-  const actionErrorMessage = errorMessage(params.error);
+  const actionErrorMessage = errorMessage(params.error, params.slide);
   let slides: Awaited<ReturnType<typeof listManagedPromotionSlides>>;
   let eventCampaigns: Awaited<ReturnType<typeof listManagedEventCampaigns>>;
   let preparedCampaigns: Awaited<
@@ -132,7 +140,7 @@ async function AdminAdvertisementContent({
 export default async function AdminAdvertisementPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ status?: string; error?: string }>;
+  searchParams?: Promise<{ status?: string; error?: string; slide?: string }>;
 }) {
   const session = await requireAdminPermission("home_ads", "read", {
     path: "/admin/advertisement",

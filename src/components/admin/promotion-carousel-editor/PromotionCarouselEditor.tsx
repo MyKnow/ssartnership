@@ -41,6 +41,11 @@ import {
   type PromotionAudience,
 } from "@/lib/promotions/catalog";
 import type { ManagedPromotionSlide } from "@/lib/promotions/events";
+import {
+  formatPromotionSlideError,
+  validatePromotionSlide,
+  type PromotionSlideField,
+} from "@/lib/promotions/slide-validation";
 import { cn } from "@/lib/cn";
 import {
   getPromotionCarouselDraftFiles,
@@ -349,34 +354,26 @@ export default function PromotionCarouselEditor({
     [slides],
   );
 
-  const validationErrors = useMemo(() => {
-    const issues: string[] = [];
-    slides.forEach((slide, index) => {
-      const label = `카드 ${index + 1}`;
-      if (!slide.title.trim()) {
-        issues.push(`${label}: 타이틀을 입력해 주세요.`);
-      }
-      if (!slide.subtitle.trim()) {
-        issues.push(`${label}: 부제를 입력해 주세요.`);
-      }
-      if (!slide.href.trim()) {
-        issues.push(`${label}: 연결 페이지를 입력해 주세요.`);
-      }
-      if (!slide.imageAlt.trim()) {
-        issues.push(`${label}: 이미지 대체 텍스트를 입력해 주세요.`);
-      }
-      if (slide.source === "database" && !slide.hasImageFile) {
-        issues.push(`${label}: 이미지를 업로드해 주세요.`);
-      }
-      if (slide.audiences.length === 0) {
-        issues.push(`${label}: 노출 대상을 하나 이상 선택해 주세요.`);
-      }
-      if (slide.sponsorLabel.length > AD_PACKAGE_FORM_LIMITS.sponsorLabelMax) {
-        issues.push(`${label}: 스폰서 표기는 60자 이하로 입력해 주세요.`);
-      }
-    });
-    return issues;
-  }, [slides]);
+  const validationIssues = useMemo(
+    () =>
+      slides.flatMap((slide, index) =>
+        validatePromotionSlide({
+          ...slide,
+          hasImage: slide.source !== "database" || slide.hasImageFile,
+        }).map((issue) => ({
+          ...issue,
+          slideId: slide.id,
+          text: formatPromotionSlideError(issue.code, index + 1),
+        })),
+      ),
+    [slides],
+  );
+
+  function focusSlideField(slideId: string, field: PromotionSlideField) {
+    const target = document.getElementById(promotionSlideFieldId(slideId, field));
+    target?.focus();
+    target?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
 
   const editableCount = slides.filter(
     (slide) => slide.source === "database",
@@ -386,7 +383,7 @@ export default function PromotionCarouselEditor({
     canUpdate &&
     slides.length > 0 &&
     slides.every((slide) => slide.source === "database") &&
-    validationErrors.length === 0;
+    validationIssues.length === 0;
 
   function registerFileInput(id: string, element: HTMLInputElement | null) {
     fileInputRefs.current.set(id, element);
@@ -555,10 +552,12 @@ export default function PromotionCarouselEditor({
       allowUploadedFormSubmitRef.current = false;
       return;
     }
-    if (validationErrors.length > 0) {
+    const [firstIssue] = validationIssues;
+    if (firstIssue) {
       event.preventDefault();
       void persistDraft();
-      setError(validationErrors[0] ?? "광고 카드 입력값을 확인해 주세요.");
+      setError(firstIssue.text);
+      focusSlideField(firstIssue.slideId, firstIssue.field);
       return;
     }
     if (pendingCrop) {
@@ -673,10 +672,19 @@ export default function PromotionCarouselEditor({
         </div>
 
         {error ? <FormMessage variant="error">{error}</FormMessage> : null}
-        {validationErrors.length > 0 ? (
+        {validationIssues.length > 0 ? (
           <FormMessage variant="info">
-            저장 전 확인이 필요한 항목이 {validationErrors.length}개 있습니다.
-            첫 번째 항목: {validationErrors[0]}
+            저장 전 확인이 필요한 항목이 {validationIssues.length}개 있습니다.
+            첫 번째 항목: {validationIssues[0].text}{" "}
+            <button
+              type="button"
+              className="font-semibold text-primary underline underline-offset-2"
+              onClick={() =>
+                focusSlideField(validationIssues[0].slideId, validationIssues[0].field)
+              }
+            >
+              항목으로 이동
+            </button>
           </FormMessage>
         ) : null}
         {!canUpdate ? (
@@ -700,6 +708,8 @@ export default function PromotionCarouselEditor({
             const subtitleInvalid = !slide.subtitle.trim();
             const hrefInvalid = !slide.href.trim();
             const altInvalid = !slide.imageAlt.trim();
+            const imageInvalid =
+              slide.source === "database" && !slide.hasImageFile;
             const audienceInvalid = slide.audiences.length === 0;
             const sponsorInvalid =
               slide.sponsorLabel.length >
@@ -742,6 +752,9 @@ export default function PromotionCarouselEditor({
                     </div>
                     <div className="mt-4 grid gap-2">
                       <Input
+                        id={promotionSlideFieldId(slide.id, "title")}
+                        aria-label={`카드 ${index + 1} 타이틀`}
+                        aria-invalid={titleInvalid || undefined}
                         value={slide.title}
                         onChange={(event) =>
                           updateSlide(slide.id, (current) => ({
@@ -758,6 +771,9 @@ export default function PromotionCarouselEditor({
                         }
                       />
                       <Textarea
+                        id={promotionSlideFieldId(slide.id, "subtitle")}
+                        aria-label={`카드 ${index + 1} 부제`}
+                        aria-invalid={subtitleInvalid || undefined}
                         value={slide.subtitle}
                         onChange={(event) =>
                           updateSlide(slide.id, (current) => ({
@@ -816,7 +832,15 @@ export default function PromotionCarouselEditor({
 
                 <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
                   <div className="grid gap-3">
-                    <div className="relative aspect-[21/9] overflow-hidden rounded-panel border border-border/70 bg-surface-inset">
+                    <div
+                      id={promotionSlideFieldId(slide.id, "image")}
+                      tabIndex={-1}
+                      aria-label={`카드 ${index + 1} 이미지`}
+                      className={cn(
+                        "relative aspect-[21/9] overflow-hidden rounded-panel border bg-surface-inset outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+                        imageInvalid ? "border-danger/60" : "border-border/70",
+                      )}
+                    >
                       {/* eslint-disable-next-line @next/next/no-img-element -- live preview can use blob/object URLs */}
                       <img
                         src={previewSrc}
@@ -838,6 +862,9 @@ export default function PromotionCarouselEditor({
                         이미지 업로드
                       </Button>
                       <Input
+                        id={promotionSlideFieldId(slide.id, "imageAlt")}
+                        aria-label={`카드 ${index + 1} 이미지 대체 텍스트`}
+                        aria-invalid={altInvalid || undefined}
                         value={slide.imageAlt}
                         onChange={(event) =>
                           updateSlide(slide.id, (current) => ({
@@ -961,6 +988,8 @@ export default function PromotionCarouselEditor({
                     <label className="grid gap-2 text-sm font-medium text-foreground">
                       스폰서 표기
                       <Input
+                        id={promotionSlideFieldId(slide.id, "sponsorLabel")}
+                        aria-invalid={sponsorInvalid || undefined}
                         value={slide.sponsorLabel}
                         onChange={(event) =>
                           updateSlide(slide.id, (current) => ({
@@ -985,6 +1014,8 @@ export default function PromotionCarouselEditor({
                     <label className="grid gap-2 text-sm font-medium text-foreground">
                       연결 페이지
                       <Input
+                        id={promotionSlideFieldId(slide.id, "href")}
+                        aria-invalid={hrefInvalid || undefined}
                         value={slide.href}
                         onChange={(event) => {
                           const href = event.target.value;
@@ -1043,7 +1074,7 @@ export default function PromotionCarouselEditor({
                         </p>
                       </div>
                       <div className="grid gap-2 sm:grid-cols-2">
-                        {PROMOTION_AUDIENCE_OPTIONS.map((option) => {
+                        {PROMOTION_AUDIENCE_OPTIONS.map((option, optionIndex) => {
                           const checked = slide.audiences.includes(option.key);
                           return (
                             <label
@@ -1057,6 +1088,11 @@ export default function PromotionCarouselEditor({
                             >
                               <span className="flex items-center gap-2 font-medium">
                                 <input
+                                  id={
+                                    optionIndex === 0
+                                      ? promotionSlideFieldId(slide.id, "audiences")
+                                      : undefined
+                                  }
                                   type="checkbox"
                                   checked={checked}
                                   onChange={(event) =>
@@ -1161,4 +1197,8 @@ export default function PromotionCarouselEditor({
       />
     </div>
   );
+}
+
+function promotionSlideFieldId(slideId: string, field: PromotionSlideField) {
+  return `promotion-slide-${slideId}-${field}`;
 }

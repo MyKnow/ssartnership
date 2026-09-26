@@ -1,6 +1,6 @@
 {
   "name": "ssartnership",
-  "version": "1.11.21",
+  "version": "1.11.22",
   "private": true,
   "type": "module",
   "packageManager": "npm@11.16.0",
