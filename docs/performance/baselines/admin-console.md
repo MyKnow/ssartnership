@@ -187,7 +187,8 @@ RPC 또는 migration이 아직 적용되지 않은 환경에서는 안전한 빈
 checkout하고 GitHub Secret으로 Preview migration을 자동 적용하며, 수동 `preview-migrations.yml`은
 `main`에서 명시적 확인 문자열을 받아 `dev` 기준 migration을 적용한다. 따라서 현재처럼
 migration이 아직 `dev`에 반영되지 않은 상태에서는 어느 workflow도 이 RPC를 Preview에 적용하지
-않는다. 실제 RPC p95 측정은 아직 완료하지 않았다.
+않는다. 실제 RPC p95 측정은 아직 완료하지 않았다. (2026-09-26: 두 Cloud Preview workflow는
+[Issue #484](https://github.com/MyKnow/ssartnership/issues/484)에서 삭제됐다.)
 
 핵심 관리자 읽기 API에는 `Server-Timing` 헤더를 추가해 `auth`, `session`, `query`, `total`
 구간을 브라우저·Playwright에서 분리해 확인할 수 있게 했다. 로그·리뷰·알림·발송 API뿐 아니라
