@@ -13,8 +13,20 @@ DATA = '/etc/myknow/secrets/ssartnership-lab-497/data.env'
 PROJECT = 'ssartnership-lab-497'
 
 
-def run(args, timeout=60):
+def validate_config(config):
+    if config.get('name') != PROJECT or set(config.get('services', {})) != {'db', 'rest', 'storage', 'gateway'}:
+        raise ValueError('Unexpected database project')
+    networks = config.get('networks', {})
+    if not networks or any(network.get('internal') is not True for network in networks.values()):
+        raise ValueError('External runtime network forbidden')
+    for service in config['services'].values():
+        if service.get('ports') or service.get('network_mode'):
+            raise ValueError('Published ports and alternate network modes forbidden')
+
+
+def run(args, timeout=60, input=None):
     return subprocess.run(args, capture_output=True, text=True, check=True, timeout=timeout,
+                          input=input,
                           env={'PATH': '/usr/local/bin:/usr/bin:/bin', 'HOME': '/root'}).stdout
 
 
@@ -27,10 +39,11 @@ def main():
     compose = ['docker', 'compose', '--project-name', PROJECT, '--env-file', DATA,
                '-f', str(ROOT / 'source/compose.supabase.yaml'), '-f', str(ROOT / 'compose.preview.yaml')]
     config = json.loads(run([*compose, 'config', '--format', 'json']))
-    if config.get('name') != PROJECT or set(config['services']) != {'db', 'rest', 'storage', 'gateway'}:
-        raise ValueError('Unexpected database project')
-    if any(network.get('internal') is not True for network in config['networks'].values()):
-        raise ValueError('External runtime network forbidden')
+    validate_config(config)
+    seed_file = ROOT / 'seed-preview.sql'
+    if seed_file.is_symlink() or not seed_file.is_file():
+        raise ValueError('Synthetic seed file must be installed first')
+    seed_sql = seed_file.read_text()
     # Exclusive marker preserves failed initialization for diagnosis.
     with (ROOT / 'provision-started.json').open('x') as marker:
         json.dump({'startedAt': time.time(), 'project': PROJECT}, marker)
@@ -43,8 +56,12 @@ def main():
     cli = ['/usr/local/bin/node', str(ROOT / 'source/scripts/self-host-database/cli.mjs')]
     run([*cli, 'migrate', '--env-file', DATA, '--project', PROJECT], timeout=660)
     run([*cli, 'smoke', '--env-file', DATA, '--project', PROJECT], timeout=180)
-    # Smoke uses generated rows and Storage markers only; no source DB is read.
+    # Fixed synthetic rows only. SQL aborts atomically if application data exists.
+    run([*compose, 'exec', '-T', 'db', 'psql', '--no-psqlrc', '--set', 'ON_ERROR_STOP=1',
+         '--username', 'postgres', '--dbname', 'postgres'],
+        input=seed_sql, timeout=60)
     result = {'project': PROJECT, 'readyAt': time.time(), 'syntheticDatabaseStorageSmoke': True,
+              'syntheticPartnerId': '00000497-0000-4000-8000-000000000003',
               'externalNetworks': False, 'productionDataCopied': False}
     (ROOT / 'provision-complete.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result), flush=True)

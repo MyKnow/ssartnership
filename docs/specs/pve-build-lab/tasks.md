@@ -35,7 +35,7 @@ PVE host의 `build-lab-497-resource-matrix.service`가 실제 VM 할당량을 �
 
 로컬 측정기는 다음 RAM 비교를 지원하도록 준비했다. CPU 결과에서 선택한 동일 코어 수를 고정하고 VM/container를 각각 6144/5120 MiB와 8192/6144 MiB로 비교한다. 따라서 이는 VM 메모리만의 효과가 아니라 실제 사용 가능한 메모리 구성 비교다. 각 조건 cold/warm 3회이며 `ram-` 실행 이름으로 CPU 비교 결과와 분리한다. 현재 실행 중인 host/guest 스크립트는 교체하지 않았다.
 
-- 실제 VM 2 vCPU/6144 MiB cold-1: 474.723초, warm-1: 450.771초. 두 실행 모두 유효 gate이며 cold-2도 475.833초로 완료했다. 다음 warm-2는 live unit에서 확인한다.
+- 실제 VM 2 vCPU/6144 MiB cold 3회 중앙값 475.833초, warm 3회 중앙값 450.771초다. 4 vCPU에서는 각각 387.796초와 360.576초이며 모두 유효 gate다. 8 vCPU는 cold-1 363.548초, cold-2 365.951초, warm-1 336.305초까지 확인했고 나머지는 실행 중이다. 최종 CPU 선택과 RAM 비교는 아직 하지 않았다.
 - 이전 탐색은 VM 8 vCPU/8192 MiB에서 컨테이너 2 CPU/5120 MiB만 제한했다. cold-1 452.415초, warm-1 426.275초, cold-2 456.580초다. 세 실행 모두 83 E2E 통과, 실패/오류/skip/retry 0이다. 실제 VM 조건별 통계와 섞지 않는다.
 - 탐색 guest matrix는 cold-2 완료 및 Docker 실행 없음 확인 후 정상 종료했다. MainPID 0/inactive, guest busy false를 확인했으며 재개 대상이 아니다.
 - cold는 새 workspace 및 npm/Next cache 없음이다. gate image는 준비되어 있고 host page cache는 통제하지 않았다. warm은 동일 SHA의 성공 결과에서 npm 및 두 Next cache만 복사한다. 준비 시간을 별도 기록한다.
@@ -56,7 +56,7 @@ PVE host의 `build-lab-497-resource-matrix.service`가 실제 VM 할당량을 �
 
 호스트의 브랜치 제어기는 설치했으나 timer는 disabled/inactive다. guest agent 및 request worker의 초기 버전도 설치되어 있다. root 소유 제어 코드는 브랜치에서 자동 갱신하지 않는다. host controller가 resource-matrix lock을 존중하는 것은 실제 PVE 호출에서 `wait-resource-matrix`로 확인했다.
 
-최신 로컬 초안에는 완료 결과 검증, PVE가 두 실험 게스트 사이에서 수행하는 제한된 artifact 전송, Preview의 SHA/해시/image label/내부 네트워크 검사 및 정상 응답 receipt가 추가되어 있다. 이 최신 배포 경로는 아직 설치·실행하지 않았다. 전송 전용 SSH key 배치, DB/스토리지 준비, 브랜치 push 및 전체 경로 측정이 남았다. 실패한 빌드/배포는 자동 반복하지 않는다. 빌드 origin은 실험 서비스의 loopback 주소로 설정하며, 빌드 VM에 운영 또는 Preview 비밀값을 제공하지 않는다.
+최신 로컬 초안에는 완료 결과 검증, PVE가 두 실험 게스트 사이에서 수행하는 제한된 artifact 전송, Preview의 SHA/해시/image label/내부 네트워크 검사 및 정상 응답 receipt가 추가되어 있다. 이 최신 배포 경로는 아직 설치·실행하지 않았다. 아래 일회용 전송 인증의 설치·실제 전송, DB/스토리지 준비, 브랜치 push 및 전체 경로 측정이 남았다. 실패한 빌드/배포는 자동 반복하지 않는다. 빌드 origin은 실험 서비스의 loopback 주소로 설정하며, 빌드 VM에 운영 또는 Preview 비밀값을 제공하지 않는다.
 
 ## Preview 준비
 
@@ -110,3 +110,17 @@ Docker Compose 2.39.4 checksum을 확인했고, Node 24.18.1/npm 11.16.0은 dige
 ## GitHub 실험 publication 사전 검증
 
 전체 local Release 두 번 모두 83 E2E, 실패/오류/skip/retry 0이다. 처음과 새 개발 캐시 실행 모두 시작 1회·관리자 전환 2회의 full-reload 경고가 있었다. 별도 fresh-server 첫 경로 진단은 Next WebSocket의 hadRuntimeError=false와 HMR fetch 실패, failed HMR request 1개, page/console error 0개를 기록했다. 설치된 Next 소스 및 기존 Issue #435 기록과 대조해 개발 HMR의 비런타임 분기로 분류했고 원본 로그를 보존했다. 경고를 숨기거나 테스트를 완화하지 않았으며 이 검토는 실험용 publication 범위다. GitHub의 production fixture gate 6회는 별도로 검증해야 한다. 타임스탬프 Python 3.9 호환 회귀 테스트를 포함한 Python 47개도 통과했다.
+
+## 후속 준비 및 검증 범위
+
+GitHub 비교 workflow는 `c1a33345d6450f939f47f13d944a62205f6604af`에서 [run 36269916621](https://github.com/MyKnow/ssartnership/actions/runs/36269916621) attempt 1로 성공했다. 구조 감사는 로그·annotation 수집 완료, 실패/skip step 및 오류 signature 없음이다. 여섯 결과는 기준 SHA가 일치하고 각각 83 E2E, 실패/오류/skip/retry 0, OOM 없음이다. 앞 절의 미게시 상태는 당시 준비 기록이며 현재 상태가 아니다.
+
+GitHub cold 368.101/369.996/365.341초의 중앙값은 368.101초, warm 387.391/379.660/382.513초의 중앙값은 382.513초다. container는 2 CPU/5120 MiB이고 runner는 4 CPU를 노출하므로 실제 2 vCPU VM과 topology까지 같지는 않다. cold 설치는 18.1~20.7초로 PVE의 약 46초보다 빠르다. warm 설치는 16.4~17.5초지만 real/fixture compile 구간이 cold의 약 51초에서 약 55~58초로 늘었다. 기존 캐시 복사만으로 전체 실행이 빨라진다고 볼 수 없으며 원인과 최적화 효과는 별도 비교한다. 단순 VM 이전의 절대적인 속도 우위를 입증한 결과가 아니다.
+
+합성 데이터 파일 `deploy/build-lab/seed-preview.sql`은 실제 회원 없이 가상 업체와 제휴 한 곳만 추가한다. 기존 회원·업체·제휴 데이터가 있으면 트랜잭션을 거부하며, 일반 migration 경로에는 포함하지 않는다. Preview 초기화 전에 이 파일을 `/srv/build-lab-497/seed-preview.sql`에 설치해야 한다. 파일 누락, 공개 포트, 외부 네트워크, 예상하지 않은 서비스는 컨테이너 생성 전에 거부한다. 실제 SQL 적용·기존 데이터 보호·화면 검증은 아직 남았다.
+
+`timed_git.py`는 opt-in PATH shim으로 canonical release의 실제 push 시작·종료를 기록한다. `/usr/bin/git`으로 전달하며 고정 실험 브랜치·origin URL·정해진 push 인자만 측정한다. SHA별 최초 실패 기록도 덮어쓰지 않는다. `.tmp/build-lab/push-events/<SHA>.json`의 pushStartedAt을 host 이벤트와 결합하고, 로컬 prepush 검사 시간을 배포 지연으로 합산하지 않는다. 실제 push 연결 검증은 아직 남았다.
+
+`ephemeral_transfer.py`는 PVE의 Python cryptography와 OpenSSH agent를 사용한다. 개인키를 메모리에서 생성하여 stdin으로 agent에 전달하고 파일에 쓰지 않는다. `/run`의 전용 임시 디렉터리에는 공개키·known_hosts·agent socket만 있으며 전송 종료 시 agent와 디렉터리를 정리한다. 키 유효시간은 1800초다. `transfer_identity.py`는 QGA를 통해 실험 게스트 두 곳에만 공개키를 설치하고, 기존 관리용 authorized_keys를 보존한다. 새 키는 `from="10.77.49.1",restrict`를 적용한다. 호스트 키도 QGA에서 조회해 StrictHostKeyChecking으로 사용하며 agent forwarding은 하지 않는다. 두 게스트에 root 소유 helper를 설치한 뒤 실제 전송을 검증해야 한다.
+
+PVE에서 guest 변경 없이 수행한 agent 시험은 identity 1개, 개인키 파일 없음, 종료된 agent와 제거된 임시 디렉터리를 확인했다. Python 계약 59개가 통과했다. Preview seed 준비 시점의 full Release는 83 E2E(191.721초), 실패/오류/skip 0 및 검토된 HMR 경고 3회였다. 후속 push timing의 Quick gate도 통과했다. 이후 추가한 전송 인증 코드는 집중 검사와 PVE agent 시험까지 확인했으며 전체 변경 gate·게스트 적용·전송·배포 실증은 남아 있다. 이 기록은 운영 전환 승인이나 성능 실증 완료를 뜻하지 않는다.

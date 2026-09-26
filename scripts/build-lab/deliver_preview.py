@@ -10,11 +10,11 @@ import subprocess
 import sys
 import time
 from artifact import validate_artifact
+from ephemeral_transfer import EphemeralTransfer
 
 ROOT = Path('/var/lib/build-lab-497')
 BUILD = 'builder@10.77.49.10'
 PREVIEW = 'builder@10.77.49.20'
-SSH_OPTIONS = ['-o', 'BatchMode=yes', '-o', 'IdentitiesOnly=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'ConnectTimeout=10', '-o', 'UserKnownHostsFile=' + str(ROOT / 'known_hosts'), '-i', str(ROOT / 'transfer_key')]
 
 
 def run(args, timeout=60):
@@ -41,11 +41,18 @@ def main():
         raise ValueError('Invalid requested SHA')
     sha = sys.argv[1]
     os.umask(0o077)
+    with EphemeralTransfer() as identity:
+        deliver(sha, identity)
+
+
+def deliver(sha, identity):
+    SSH_OPTIONS = identity.options
     receipt = guest_result(sha)
     destination = ROOT / 'deliveries' / sha
     destination.mkdir(parents=True, exist_ok=False)
     archive = destination / 'app.tar'
     transfer_started = time.time()
+    identity.prepare('4970')
     # Bandwidth is capped at 8 MiB/s and both endpoints are fixed lab addresses.
     run(['scp', '-l', '65536', *SSH_OPTIONS, BUILD + ':/home/builder/build-lab/requests/' + sha + '/app.tar', str(archive)], timeout=300)
     download_finished = time.time()
@@ -65,6 +72,16 @@ def main():
         run(['qm', 'start', '4971'], timeout=90)
     elif status != 'status: running':
         raise RuntimeError('Unexpected Preview state')
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
+        try:
+            run(['qm', 'agent', '4971', 'ping'], timeout=15)
+            break
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            time.sleep(5)
+    else:
+        raise RuntimeError('Preview guest agent unavailable')
+    identity.prepare('4971')
     deadline = time.monotonic() + 120
     while time.monotonic() < deadline:
         try:
