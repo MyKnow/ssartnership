@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { MOCK_MEMBER_ID } from "@/lib/mock/member";
 import {
-  sampleShowcaseUniform,
+  sampleShowcaseProjects,
   sampleShowcaseWeighted,
   secureRandomInt,
   type ShowcaseRandomInt,
@@ -24,7 +24,6 @@ import {
   countShowcaseTickets,
   getShowcasePhase,
   maskShowcaseName,
-  maskShowcaseStudentNumber,
   PROJECT_SHOWCASE_SLUG,
   SHOWCASE_VOID_REASONS,
   SHOWCASE_PROJECT_STATUSES,
@@ -44,13 +43,11 @@ import {
   type ShowcaseOwnerFeedback,
   type ShowcaseOwnerProject,
   type ShowcaseProject,
-  type ShowcaseProjectParticipant,
   type ShowcaseProjectStatus,
   type ShowcaseReviewStatus,
 } from "./types";
 
 type StoredProject = Omit<ShowcaseProject, "viewCount" | "experienceCount" | "validExperienceCount" | "interestCount"> & {
-  participants: ShowcaseProjectParticipant[];
   reviewNote: string | null;
   updatedAt: string;
   withdrawnAt: string | null;
@@ -61,7 +58,7 @@ type ShowcaseMockStore = {
   memberNames: Map<string, string>;
   projects: StoredProject[];
   views: Array<{ id: string; projectId: string; memberId: string; createdAt: string }>;
-  registrations: Map<string, { studentNumber: string; createdAt: string }>;
+  registrations: Map<string, { createdAt: string }>;
   experiences: Array<{ id: string; projectId: string; memberId: string; startedAt: string }>;
   feedback: Array<{ id: string; projectId: string; memberId: string; body: string; createdAt: string; hiddenAt: string | null }>;
   interests: Array<{ projectId: string; memberId: string }>;
@@ -73,7 +70,6 @@ type ShowcaseMockStore = {
     memberId: string;
     projectTitle: string | null;
     maskedName: string;
-    maskedStudentNumber: string;
     position: number;
     status: "active" | "voided";
     voidReason: ShowcaseVoidReason | null;
@@ -93,7 +89,6 @@ function seedProject(input: {
   id: string;
   ownerMemberId: string;
   ownerName: string;
-  studentNumber: string;
   projectType: StoredProject["projectType"];
   title: string;
   summary: string;
@@ -114,7 +109,6 @@ function seedProject(input: {
     serviceUrl: input.serviceUrl,
     status: "approved",
     createdAt: input.createdAt,
-    participants: [{ name: input.ownerName, studentNumber: input.studentNumber, isOwner: true }],
     reviewNote: null,
     updatedAt: input.createdAt,
     withdrawnAt: null,
@@ -150,7 +144,6 @@ function createStore(now = Date.now()): ShowcaseMockStore {
           id: "mock-showcase-study-buddy",
           ownerMemberId: MOCK_MEMBER_ID,
           ownerName: "정민호",
-          studentNumber: "1500001",
           projectType: "web",
           title: "Study Buddy",
           summary: "팀 프로젝트에 필요한 학습 기록과 일정 관리를 한곳에 모았어요.",
@@ -161,16 +154,11 @@ function createStore(now = Date.now()): ShowcaseMockStore {
         teamName: "스터디버디",
         status: "changes_requested",
         reviewNote: "체험 주소가 열리지 않아요. 배포된 주소로 바꿔 다시 제출해 주세요.",
-        participants: [
-          { name: "정민호", studentNumber: "1500001", isOwner: true },
-          { name: "천창현", studentNumber: "1500004", isOwner: false },
-        ],
       },
       seedProject({
         id: "mock-showcase-green-route",
         ownerMemberId: "mock-member-green-route",
         ownerName: "이두리",
-        studentNumber: "1500002",
         projectType: "app",
         title: "Green Route",
         summary: "걷기 좋은 길과 캠퍼스 주변의 작은 쉼터를 추천해요.",
@@ -182,7 +170,6 @@ function createStore(now = Date.now()): ShowcaseMockStore {
         id: "mock-showcase-pixel-quest",
         ownerMemberId: "mock-member-pixel-quest",
         ownerName: "박세모",
-        studentNumber: "1600003",
         projectType: "game",
         title: "Pixel Quest",
         summary: "점심시간 5분 안에 끝나는 협동 퍼즐 웹 게임이에요.",
@@ -254,35 +241,13 @@ function toProject(store: ShowcaseMockStore, project: StoredProject): ShowcasePr
 function toOwnerProject(store: ShowcaseMockStore, project: StoredProject): ShowcaseOwnerProject {
   return {
     ...toProject(store, project),
-    participants: project.participants.map((participant) => ({ ...participant })),
     reviewNote: project.reviewNote,
     updatedAt: project.updatedAt,
   };
 }
 
-function buildParticipants(input: ShowcaseProjectWriteInput): ShowcaseProjectParticipant[] {
-  return [
-    { name: input.ownerName.trim(), studentNumber: input.submission.ownerStudentNumber, isOwner: true },
-    ...input.submission.teammates.map((teammate) => ({
-      name: teammate.name.trim(),
-      studentNumber: teammate.studentNumber,
-      isOwner: false,
-    })),
-  ];
-}
-
 function assertSubmissionOpen(store: ShowcaseMockStore) {
   if (getShowcasePhase(store.event) !== "submission") throw new ShowcaseDomainError("submission_closed");
-}
-
-/** Mirrors the DB unique index on (event_id, student_number): withdrawn rosters are deleted. */
-function assertStudentNumbersFree(store: ShowcaseMockStore, participants: ShowcaseProjectParticipant[], exceptProjectId?: string) {
-  const taken = new Set(store.projects
-    .filter((project) => project.id !== exceptProjectId && project.status !== "withdrawn")
-    .flatMap((project) => project.participants.map((participant) => participant.studentNumber)));
-  if (participants.some((participant) => taken.has(participant.studentNumber))) {
-    throw new ShowcaseDomainError("student_number_taken");
-  }
 }
 
 /** Mirrors `showcase_open_project`: an approved project while the experience phase is open. */
@@ -317,7 +282,7 @@ function submitterPool(store: ShowcaseMockStore) {
       projectTitle: project.title,
       memberId: project.ownerMemberId,
       ownerDisplayName: store.memberNames.get(project.ownerMemberId) ?? "회원",
-      studentNumber: project.participants.find((participant) => participant.isOwner)?.studentNumber ?? "",
+
       exclusion: activeExclusion(store, "submitter", project.id),
       alreadyWon: Boolean(project.ownerMemberId && hasActivePrize(store, project.ownerMemberId)),
     }));
@@ -333,7 +298,7 @@ function experiencerPool(store: ShowcaseMockStore) {
     .map(([memberId, count]) => ({
       memberId,
       displayName: store.memberNames.get(memberId) ?? "회원",
-      studentNumber: store.registrations.get(memberId)?.studentNumber ?? "",
+
       tickets: count,
       exclusion: activeExclusion(store, "experiencer", memberId),
       alreadyWon: hasActivePrize(store, memberId),
@@ -353,20 +318,20 @@ function recordDraw(
   const drawId = randomUUID();
   let candidateCount = 0;
   let ticketCount = 0;
-  let chosen: Array<{ memberId: string; displayName: string; studentNumber: string; projectTitle: string | null }> = [];
+  let chosen: Array<{ memberId: string; displayName: string; projectTitle: string | null }> = [];
   if (group === "submitter") {
-    const eligible = submitterPool(store).filter((item) => item.memberId && item.studentNumber && !item.exclusion && !item.alreadyWon);
-    candidateCount = eligible.length;
+    const eligible = submitterPool(store).filter((item) => item.memberId && !item.exclusion && !item.alreadyWon);
+    candidateCount = new Set(eligible.map((item) => item.memberId)).size;
     ticketCount = eligible.length;
-    chosen = sampleShowcaseUniform(eligible, requested, random).map((item) => ({
-      memberId: item.memberId, displayName: item.ownerDisplayName, studentNumber: item.studentNumber, projectTitle: item.projectTitle,
+    chosen = sampleShowcaseProjects(eligible, requested, random).map((item) => ({
+      memberId: item.memberId, displayName: item.ownerDisplayName, projectTitle: item.projectTitle,
     }));
   } else {
-    const eligible = experiencerPool(store).filter((item) => item.studentNumber && !item.exclusion && !item.alreadyWon);
+    const eligible = experiencerPool(store).filter((item) => !item.exclusion && !item.alreadyWon);
     candidateCount = eligible.length;
     ticketCount = eligible.reduce((total, item) => total + item.tickets, 0);
     chosen = sampleShowcaseWeighted(eligible.map((item) => ({ ...item, weight: item.tickets })), requested, random).map((item) => ({
-      memberId: item.memberId, displayName: item.displayName, studentNumber: item.studentNumber, projectTitle: null,
+      memberId: item.memberId, displayName: item.displayName, projectTitle: null,
     }));
   }
   store.draws.push({ id: drawId, group, kind, replacesWinnerId, candidateCount, createdAt: now });
@@ -377,7 +342,6 @@ function recordDraw(
       memberId: item.memberId,
       projectTitle: item.projectTitle,
       maskedName: maskShowcaseName(item.displayName),
-      maskedStudentNumber: maskShowcaseStudentNumber(item.studentNumber),
       position: firstPosition + index,
       status: "active",
       voidReason: null,
@@ -457,10 +421,11 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
     });
   }
 
-  async getActiveOwnerProject(memberId: string) {
+  async listOwnerProjects(memberId: string) {
     const store = getStore();
-    const project = store.projects.find((item) => item.ownerMemberId === memberId && item.status !== "withdrawn");
-    return project ? toOwnerProject(store, project) : null;
+    return store.projects.filter((item) => item.ownerMemberId === memberId)
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .map((project) => toOwnerProject(store, project));
   }
 
   async getOwnerProject(memberId: string, projectId: string) {
@@ -473,11 +438,6 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
     const store = getStore();
     assertSubmissionOpen(store);
     if (!input.imageUrl) throw new ShowcaseDomainError("image_unavailable");
-    if (store.projects.some((project) => project.ownerMemberId === input.ownerMemberId && project.status !== "withdrawn")) {
-      throw new ShowcaseDomainError("owner_already_submitted");
-    }
-    const participants = buildParticipants(input);
-    assertStudentNumbersFree(store, participants);
     const now = new Date().toISOString();
     store.projects.unshift({
       id: input.projectId,
@@ -492,7 +452,6 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
       serviceUrl: input.submission.serviceUrl,
       status: "pending",
       createdAt: now,
-      participants,
       reviewNote: null,
       updatedAt: now,
       withdrawnAt: null,
@@ -508,8 +467,6 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
     if (!canOwnerEditShowcaseProject(project.status, getShowcasePhase(store.event))) {
       throw new ShowcaseDomainError("project_not_editable");
     }
-    const participants = buildParticipants(input);
-    assertStudentNumbersFree(store, participants, project.id);
     Object.assign(project, {
       projectType: input.submission.projectType,
       title: input.submission.title,
@@ -519,7 +476,6 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
       serviceUrl: input.submission.serviceUrl,
       imageUrl: input.imageUrl ?? project.imageUrl,
       status: "pending" satisfies ShowcaseProjectStatus,
-      participants,
       updatedAt: new Date().toISOString(),
     });
   }
@@ -531,19 +487,15 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
     assertSubmissionOpen(store);
     if (project.status === "withdrawn") throw new ShowcaseDomainError("project_not_editable");
     const now = new Date().toISOString();
-    Object.assign(project, { status: "withdrawn", withdrawnAt: now, updatedAt: now, participants: [] });
+    Object.assign(project, { status: "withdrawn", withdrawnAt: now, updatedAt: now });
     pushActivity(store, { type: "project_withdrawn", projectId: project.id, projectTitle: project.title, actorType: "member", details: {} });
   }
 
-  async registerParticipant(input: { memberId: string; studentNumber: string }) {
+  async registerParticipant(input: { memberId: string }) {
     const store = getStore();
     if (getShowcasePhase(store.event) !== "experience") throw new ShowcaseDomainError("experience_closed");
-    if (!/^\d{7}$/u.test(input.studentNumber.trim())) throw new ShowcaseDomainError("registration_invalid");
     if (store.registrations.has(input.memberId)) throw new ShowcaseDomainError("registration_exists");
-    if ([...store.registrations.values()].some((registration) => registration.studentNumber === input.studentNumber.trim())) {
-      throw new ShowcaseDomainError("student_number_taken");
-    }
-    store.registrations.set(input.memberId, { studentNumber: input.studentNumber.trim(), createdAt: new Date().toISOString() });
+    store.registrations.set(input.memberId, { createdAt: new Date().toISOString() });
   }
 
   async getMemberProjectState(projectId: string, memberId: string): Promise<ShowcaseMemberProjectState> {
@@ -626,7 +578,7 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
       }));
     return {
       registration: registration
-        ? { maskedStudentNumber: maskShowcaseStudentNumber(registration.studentNumber), registeredAt: registration.createdAt }
+        ? { registeredAt: registration.createdAt }
         : null,
       experiences,
       ticketCount: countShowcaseTickets(experiences),
@@ -677,8 +629,8 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
   }
 
   async listSubmitterCandidates(): Promise<ShowcaseSubmitterCandidate[]> {
-    return submitterPool(getStore()).map(({ projectId, projectTitle, ownerDisplayName, exclusion, alreadyWon }) => ({
-      projectId, projectTitle, ownerDisplayName, exclusion, alreadyWon,
+    return submitterPool(getStore()).map(({ projectId, projectTitle, memberId, ownerDisplayName, exclusion, alreadyWon }) => ({
+      projectId, projectTitle, memberId, ownerDisplayName, exclusion, alreadyWon,
     }));
   }
 
@@ -753,10 +705,10 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
     const store = getStore();
     return sortWinners(store.winners).map((winner) => ({
       id: winner.id,
+      memberId: winner.memberId || null,
       candidateGroup: winner.candidateGroup,
       position: winner.position,
       maskedName: winner.maskedName,
-      maskedStudentNumber: winner.maskedStudentNumber,
       projectTitle: winner.projectTitle,
       status: winner.status,
       voidReason: winner.voidReason,
@@ -773,7 +725,6 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
       candidateGroup: winner.candidateGroup,
       position: winner.position,
       maskedName: winner.maskedName,
-      maskedStudentNumber: winner.maskedStudentNumber,
       projectTitle: winner.projectTitle,
     }));
   }
@@ -799,7 +750,6 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
     const store = getStore();
     if (!store.settledAt || store.purgedAt || Date.now() - new Date(store.settledAt).getTime() < 30 * DAY) return false;
     for (const project of store.projects) {
-      project.participants = [];
       project.ownerMemberId = "";
     }
     store.registrations.clear();
@@ -874,7 +824,7 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
       .map((project) => ({
         ...toProject(store, project),
         ownerDisplayName: store.memberNames.get(project.ownerMemberId) ?? "회원",
-        participants: project.participants.map((participant) => ({ ...participant })),
+
         reviewNote: project.reviewNote,
       }));
   }

@@ -59,7 +59,6 @@ export default function ShowcaseExperiencePanel({
   const clockOffsetRef = useRef(0);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const studentNumberRef = useRef<HTMLInputElement>(null);
   const feedbackRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -103,15 +102,11 @@ export default function ShowcaseExperiencePanel({
     setError("");
     const formData = new FormData(submitEvent.currentTarget);
     const input = {
-      studentNumber: String(formData.get("studentNumber") ?? ""),
-      studentNumberConsent: formData.get("studentNumberConsent") === "true",
       announcementConsent: formData.get("announcementConsent") === "true",
     };
     const parsed = parseShowcaseRegistration(input);
     if (!parsed.success) {
-      const target = parsed.field === "studentNumber"
-        ? studentNumberRef.current
-        : formRef.current?.querySelector<HTMLElement>(`[name="${parsed.field}"]`);
+      const target = formRef.current?.querySelector<HTMLElement>(`[name="${parsed.field}"]`);
       fail(parsed.message, target);
       return;
     }
@@ -120,7 +115,7 @@ export default function ShowcaseExperiencePanel({
       const result = await registerShowcaseParticipant(input);
       if (!result.ok) {
         tab?.close();
-        fail(result.message, result.field === "studentNumber" ? studentNumberRef.current : null);
+        fail(result.message, formRef.current?.querySelector<HTMLElement>('[name="announcementConsent"]'));
         return;
       }
       await beginExperience(tab);
@@ -200,26 +195,9 @@ export default function ShowcaseExperiencePanel({
       {!state.registered ? (
         <form ref={formRef} onSubmit={handleRegister} className="grid gap-3" noValidate>
           <p className="text-sm font-semibold text-foreground">처음 체험하기 전에 참여 등록을 한 번 해 주세요.</p>
-          <label className="grid gap-1.5 text-sm font-medium text-foreground" htmlFor="showcase-register-number">
-            내 학번
-            <input
-              ref={studentNumberRef}
-              id="showcase-register-number"
-              name="studentNumber"
-              inputMode="numeric"
-              autoComplete="off"
-              maxLength={7}
-              placeholder="숫자 7자리"
-              className={INPUT_CLASS}
-            />
-          </label>
-          <label className="flex items-start gap-2 text-xs leading-5 text-foreground">
-            <input type="checkbox" name="studentNumberConsent" value="true" className="mt-0.5 h-4 w-4 shrink-0 accent-primary" />
-            <span>(필수) 학번을 이벤트 운영과 중복 참여 확인에 사용하는 데 동의해요.</span>
-          </label>
           <label className="flex items-start gap-2 text-xs leading-5 text-foreground">
             <input type="checkbox" name="announcementConsent" value="true" className="mt-0.5 h-4 w-4 shrink-0 accent-primary" />
-            <span>(필수) 당첨되면 이름·학번 일부를 가려(예: 정** · 15****43) 공지하는 데 동의해요.</span>
+            <span>(필수) 당첨되면 이름 일부를 가려(예: 정**) 공지하는 데 동의해요.</span>
           </label>
           <Button type="submit" disabled={isPending}>{isPending ? "처리 중…" : "참여 등록하고 체험 시작"}</Button>
         </form>

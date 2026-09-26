@@ -1,7 +1,5 @@
 export const SHOWCASE_ERROR_CODES = [
   "submission_closed",
-  "owner_already_submitted",
-  "student_number_taken",
   "project_not_found",
   "project_not_editable",
   "owner_name_unavailable",
@@ -36,8 +34,6 @@ export type ShowcaseErrorCode = (typeof SHOWCASE_ERROR_CODES)[number];
 
 export const SHOWCASE_ERROR_MESSAGES: Record<ShowcaseErrorCode, { message: string; field: string | null }> = {
   submission_closed: { message: "지금은 프로젝트 출품 기간이 아니에요.", field: null },
-  owner_already_submitted: { message: "이미 출품한 프로젝트가 있어요. 참가자 1인당 1개만 출품할 수 있어요.", field: null },
-  student_number_taken: { message: "이미 다른 곳에 등록된 학번이에요. 학번을 다시 확인해 주세요.", field: "teammates" },
   project_not_found: { message: "프로젝트를 찾을 수 없어요.", field: null },
   project_not_editable: { message: "지금은 이 프로젝트를 수정하거나 취소할 수 없어요.", field: null },
   owner_name_unavailable: { message: "회원 정보를 확인하지 못했어요. 다시 로그인해 주세요.", field: null },
@@ -45,7 +41,7 @@ export const SHOWCASE_ERROR_MESSAGES: Record<ShowcaseErrorCode, { message: strin
   experience_closed: { message: "지금은 체험 기간이 아니에요.", field: null },
   registration_required: { message: "체험 전에 참여 등록을 먼저 해 주세요.", field: null },
   registration_exists: { message: "이미 참여 등록을 마쳤어요.", field: null },
-  registration_invalid: { message: "학번을 다시 확인해 주세요.", field: "studentNumber" },
+  registration_invalid: { message: "회원 정보를 확인한 뒤 다시 참여 등록해 주세요.", field: null },
   own_project: { message: "내 프로젝트는 체험하거나 관심 표시할 수 없어요.", field: null },
   experience_not_started: { message: "체험 시작을 먼저 눌러 주세요.", field: null },
   feedback_too_early: { message: "체험을 시작하고 1분이 지나야 피드백을 남길 수 있어요.", field: "body" },
@@ -78,7 +74,7 @@ export class ShowcaseDomainError extends Error {
   }
 }
 
-/** Maps a raised DB exception text (e.g. `showcase_owner_already_submitted`) to a domain code. */
+/** Maps a raised DB exception text (e.g. `showcase_submission_closed`) to a domain code. */
 export function showcaseErrorCodeFromDatabase(message: string | null | undefined): ShowcaseErrorCode {
   const match = /showcase_([a-z_]+)/u.exec(message ?? "");
   const code = match?.[1] as ShowcaseErrorCode | undefined;

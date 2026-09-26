@@ -13,22 +13,14 @@ export const dynamic = "force-dynamic";
 export default async function MyShowcaseParticipationPage() {
   const session = await getSignedUserSession();
   if (!session?.userId) redirect("/auth/login?returnTo=%2Fevents%2Fproject-showcase%2Fmy");
-  const [event, project, participation, winnings, headerSession] = await Promise.all([
+  const [event, projects, participation, winnings, headerSession] = await Promise.all([
     projectShowcaseRepository.getEvent(),
-    projectShowcaseRepository.getActiveOwnerProject(session.userId),
+    projectShowcaseRepository.listOwnerProjects(session.userId),
     projectShowcaseRepository.getMemberParticipation(session.userId),
     projectShowcaseRepository.getMemberWinnings(session.userId),
     getHeaderSession(session.userId),
   ]);
   const phase = getShowcasePhase(event);
-  const metrics = project
-    ? [
-      { label: "고유 조회", value: project.viewCount },
-      { label: "체험 시작", value: project.experienceCount },
-      { label: "피드백", value: project.validExperienceCount },
-      { label: "관심 표시", value: project.interestCount },
-    ]
-    : [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -42,9 +34,13 @@ export default async function MyShowcaseParticipationPage() {
         </div>
 
         <section className="mt-8 grid gap-4" aria-labelledby="my-showcase-project-heading">
-          <h2 id="my-showcase-project-heading" className="text-xl font-bold text-foreground">내 출품</h2>
-          {project ? (
-            <article className="grid gap-5 rounded-2xl border border-border bg-surface p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="my-showcase-project-heading" className="text-xl font-bold text-foreground">내 출품 · {projects.length}개</h2>
+            {phase === "submission" ? <Button href="/events/project-showcase/projects/new">프로젝트 출품하기</Button> : null}
+          </div>
+          <p className="text-sm leading-6 text-muted-foreground">승인된 프로젝트 {projects.filter((project) => project.status === "approved").length}개 · 출품작마다 추첨 기회가 1개씩 생겨요. 경품은 출품·체험을 통틀어 한 사람당 1개예요.</p>
+          {projects.length > 0 ? projects.map((project) => (
+            <article key={project.id} className="grid gap-5 rounded-2xl border border-border bg-surface p-5 sm:p-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -60,7 +56,12 @@ export default async function MyShowcaseParticipationPage() {
                 <p className="rounded-xl bg-warning/10 px-4 py-3 text-sm leading-6 text-foreground">운영진이 수정을 요청했어요. 사유를 확인하고 모집 기간 안에 다시 제출해 주세요.</p>
               ) : null}
               <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {metrics.map((metric) => (
+                {[
+                  { label: "고유 조회", value: project.viewCount },
+                  { label: "체험 시작", value: project.experienceCount },
+                  { label: "피드백", value: project.validExperienceCount },
+                  { label: "관심 표시", value: project.interestCount },
+                ].map((metric) => (
                   <div key={metric.label} className="rounded-xl bg-surface-muted/60 p-4">
                     <dt className="text-xs font-medium text-muted-foreground">{metric.label}</dt>
                     <dd className="mt-2 text-2xl font-bold tabular-nums text-foreground">{metric.value.toLocaleString("ko-KR")}</dd>
@@ -68,7 +69,7 @@ export default async function MyShowcaseParticipationPage() {
                 ))}
               </dl>
             </article>
-          ) : (
+          )) : (
             <div className="rounded-2xl border border-dashed border-border bg-surface px-5 py-10 text-center">
               <p className="font-semibold text-foreground">출품한 프로젝트가 없어요</p>
               {phase === "submission" ? (
@@ -91,7 +92,7 @@ export default async function MyShowcaseParticipationPage() {
                 <p className="mt-1 text-sm text-foreground">
                   {SHOWCASE_PRIZES[winning.candidateGroup].prize}{winning.projectTitle ? ` · ${winning.projectTitle}` : ""}
                 </p>
-                <p className="mt-1 text-sm text-muted-foreground">{winning.deliveredAt ? "Mattermost로 경품을 보냈어요." : "경품은 Mattermost로 보내 드릴게요."}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{winning.deliveredAt ? "경품 발송을 완료했어요." : "등록된 MM 또는 이메일로 구글폼 작성 안내를 보내 드려요. 학번은 해당 폼에서 확인해요."}</p>
               </div>
             )) : (
               <div className="rounded-2xl border border-border bg-surface px-5 py-4 text-sm text-muted-foreground">
@@ -118,7 +119,7 @@ export default async function MyShowcaseParticipationPage() {
             <div className="col-span-2 rounded-xl border border-border bg-surface p-4 sm:col-span-1">
               <dt className="text-xs font-medium text-muted-foreground">참여 등록</dt>
               <dd className="mt-2 text-sm font-semibold text-foreground">
-                {participation.registration ? `완료 · 학번 ${participation.registration.maskedStudentNumber}` : "아직 등록하지 않았어요"}
+                {participation.registration ? "완료" : "아직 등록하지 않았어요"}
               </dd>
             </div>
           </dl>

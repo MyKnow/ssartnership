@@ -24,10 +24,7 @@ function submission(overrides: Record<string, unknown> = {}) {
     summary: "SSAFY 제휴 혜택을 한곳에서 찾아봐요.",
     description: "역삼역 주변 제휴처와 혜택을 검색하고 구성원 인증까지 제공하는 서비스입니다.",
     serviceUrl: "https://ssartnership.example.com",
-    ownerStudentNumber: "1512343",
-    teammates: [],
     imageUploadId: IMAGE_ID,
-    participantsConsent: true,
     announcementConsent: true,
     ...overrides,
   };
@@ -59,31 +56,16 @@ function eventAt(now: number, isActive = true) {
 }
 
 describe("출품 입력 검증", () => {
-  test("학번은 숫자 7자리만 허용한다", () => {
-    for (const value of ["151234", "15123456", "15-1234", "abcdefg", " "]) {
-      const result = validation.parseShowcaseProjectSubmission(submission({ ownerStudentNumber: value }));
-      assert.equal(result.success, false, value);
-      if (!result.success) assert.equal(result.field, "ownerStudentNumber");
-    }
-    assert.equal(validation.parseShowcaseProjectSubmission(submission({ ownerStudentNumber: " 1612345 " })).success, true);
+  test("학번·팀원 없이 출품하고 오래된 폼의 식별 정보는 저장 데이터에서 제외한다", () => {
+    const parsed = parsedSubmission({ ownerStudentNumber: "1512343", teammates: [{ name: "팀원" }], participantsConsent: false });
+    assert.equal("ownerStudentNumber" in parsed, false);
+    assert.equal("teammates" in parsed, false);
+    assert.equal("participantsConsent" in parsed, false);
   });
-
-  test("팀원이 있으면 팀명이 필요하다", () => {
-    const teammates = [{ name: "천창현", studentNumber: "1500001" }];
-    const missing = validation.parseShowcaseProjectSubmission(submission({ teammates }));
-    assert.equal(missing.success, false);
-    if (!missing.success) assert.equal(missing.field, "teamName");
-    assert.equal(parsedSubmission({ teammates, teamName: "싸트너십팀" }).teamName, "싸트너십팀");
+  test("팀명은 선택이며 길이는 검증한다", () => {
     assert.equal(parsedSubmission({ teamName: "  " }).teamName, null);
-  });
-
-  test("대표자와 팀원 사이에서 학번이 겹치면 거절한다", () => {
-    const result = validation.parseShowcaseProjectSubmission(submission({
-      teamName: "팀",
-      teammates: [{ name: "천창현", studentNumber: "1512343" }],
-    }));
-    assert.equal(result.success, false);
-    if (!result.success) assert.equal(result.field, "teammates");
+    assert.equal(parsedSubmission({ teamName: "팀" }).teamName, "팀");
+    assert.equal(validation.parseShowcaseProjectSubmission(submission({ teamName: "가".repeat(61) })).success, false);
   });
 
   test("체험 주소는 https만, Embedded는 허용된 영상 호스트만 받는다", () => {
@@ -93,8 +75,8 @@ describe("출품 입력 검증", () => {
     assert.equal(parsedSubmission({ projectType: "game", serviceUrl: "https://example.com/game" }).projectType, "game");
   });
 
-  test("두 가지 동의는 모두 필수다", () => {
-    for (const field of ["participantsConsent", "announcementConsent"]) {
+  test("이름 공개 동의는 필수다", () => {
+    for (const field of ["announcementConsent"]) {
       const result = validation.parseShowcaseProjectSubmission(submission({ [field]: false }));
       assert.equal(result.success, false);
       if (!result.success) assert.equal(result.field, field);
@@ -147,11 +129,9 @@ describe("이벤트 단계", () => {
   });
 });
 
-test("당첨 공지 마스킹은 정** · 15****43 형식이다", () => {
+test("당첨 공지에는 이름 일부만 남긴다", () => {
   assert.equal(types.maskShowcaseName("정민호"), "정**");
   assert.equal(types.maskShowcaseName("  김  "), "김**");
-  assert.equal(types.maskShowcaseStudentNumber("1512343"), "15****43");
-  assert.equal(types.maskShowcaseStudentNumber("1600001"), "16****01");
 });
 
 describe("관리자 일정·검수 검증", () => {
@@ -199,11 +179,11 @@ describe("관리자 일정·검수 검증", () => {
 });
 
 test("DB 예외 문구를 공용 에러 코드와 메시지로 바꾼다", () => {
-  assert.equal(errors.showcaseErrorCodeFromDatabase("showcase_owner_already_submitted"), "owner_already_submitted");
-  assert.equal(errors.showcaseErrorCodeFromDatabase("ERROR: showcase_student_number_taken"), "student_number_taken");
+  assert.equal(errors.showcaseErrorCodeFromDatabase("showcase_project_not_editable"), "project_not_editable");
+  assert.equal(errors.showcaseErrorCodeFromDatabase("ERROR: showcase_registration_exists"), "registration_exists");
   assert.equal(errors.showcaseErrorCodeFromDatabase("duplicate key value"), "unknown");
-  const failure = errors.toShowcaseFailure(new errors.ShowcaseDomainError("student_number_taken"));
-  assert.equal(failure.field, "teammates");
+  const failure = errors.toShowcaseFailure(new errors.ShowcaseDomainError("feedback_invalid"));
+  assert.equal(failure.field, "body");
   assert.equal(errors.toShowcaseFailure(new Error("secret db detail")).message.includes("secret"), false);
 });
 
@@ -231,30 +211,26 @@ describe("mock Repository 출품 규칙", () => {
     mock.resetProjectShowcaseMockStore({ memberNames: { [OWNER]: "정민호", [OTHER]: "천창현" } });
   });
 
-  test("참가자 1인당 출품은 1개다", async () => {
+  test("한 회원이 여러 출품을 등록하고 각각 조회한다", async () => {
     await repository.createProject(write("p1", OWNER));
-    const own = await repository.getActiveOwnerProject(OWNER);
-    assert.equal(own?.status, "pending");
-    assert.deepEqual(own?.participants, [{ name: "정민호", studentNumber: "1512343", isOwner: true }]);
-    await expectCode(repository.createProject(write("p2", OWNER, { ownerStudentNumber: "1512344" })), "owner_already_submitted");
+    await repository.createProject(write("p2", OWNER));
+    const own = await repository.listOwnerProjects(OWNER);
+    assert.equal(own.length, 2);
+    assert.ok(own.every((project) => project.status === "pending"));
+    assert.ok(own.every((project) => !("participants" in project)));
+    assert.equal((await repository.listOwnerProjects(OTHER)).length, 0);
   });
-
-  test("같은 학번은 다른 프로젝트 명단에 들어갈 수 없고, 출품을 취소하면 학번과 출품 자격이 풀린다", async () => {
+  test("중복 프로젝트는 운영자가 반려하고, 한 출품 취소는 다른 출품에 영향을 주지 않는다", async () => {
     await repository.createProject(write("p1", OWNER));
-    await expectCode(repository.createProject(write("p2", OTHER, {
-      ownerStudentNumber: "1500009",
-      teamName: "팀",
-      teammates: [{ name: "정민호", studentNumber: "1512343" }],
-    })), "student_number_taken");
-
+    await repository.createProject(write("p2", OTHER));
+    await repository.reviewProject({ projectId: "p2", adminId: "admin", status: "rejected", reviewNote: validation.SHOWCASE_DUPLICATE_PROJECT_REASON });
+    assert.equal((await repository.getOwnerProject(OTHER, "p2"))?.reviewNote, "이미 등록된 프로젝트입니다");
+    await repository.createProject(write("p3", OWNER));
     await repository.withdrawProject({ projectId: "p1", ownerMemberId: OWNER });
-    assert.equal(await repository.getActiveOwnerProject(OWNER), null);
-    await repository.createProject(write("p2", OTHER, {
-      ownerStudentNumber: "1500009",
-      teamName: "팀",
-      teammates: [{ name: "정민호", studentNumber: "1512343" }],
-    }));
-    await repository.createProject(write("p3", OWNER, { ownerStudentNumber: "1512399" }));
+    assert.equal((await repository.getOwnerProject(OWNER, "p1"))?.status, "withdrawn");
+    assert.equal((await repository.getOwnerProject(OWNER, "p3"))?.status, "pending");
+    await repository.createProject(write("p4", OWNER));
+    assert.equal((await repository.listOwnerProjects(OWNER)).length, 3);
   });
 
   test("확인 대기·수정 요청 상태만 수정할 수 있고 수정하면 다시 확인 대기로 돌아간다", async () => {
@@ -338,18 +314,13 @@ describe("체험·피드백 규칙", () => {
     assert.equal(types.countShowcaseTickets([{ feedbackSubmitted: true }, { feedbackSubmitted: false }, { feedbackSubmitted: true }]), 2);
   });
 
-  test("참여 등록은 7자리 학번과 두 동의가 필요하다", () => {
-    const valid = { studentNumber: "1612345", studentNumberConsent: true, announcementConsent: true };
-    assert.equal(validation.parseShowcaseRegistration(valid).success, true);
-    for (const [override, field] of [
-      [{ studentNumber: "16123" }, "studentNumber"],
-      [{ studentNumberConsent: false }, "studentNumberConsent"],
-      [{ announcementConsent: false }, "announcementConsent"],
-    ] as const) {
-      const result = validation.parseShowcaseRegistration({ ...valid, ...override });
-      assert.equal(result.success, false);
-      if (!result.success) assert.equal(result.field, field);
-    }
+  test("참여 등록은 당첨 발표 동의만 필요하다", () => {
+    assert.equal(validation.parseShowcaseRegistration({ announcementConsent: true }).success, true);
+    const missing = validation.parseShowcaseRegistration({ announcementConsent: false });
+    assert.equal(missing.success, false);
+    if (!missing.success) assert.equal(missing.field, "announcementConsent");
+    const legacy = validation.parseShowcaseRegistration({ announcementConsent: true });
+    if (legacy.success) assert.deepEqual(legacy.data, { announcementConsent: true });
   });
 
   test("피드백 길이는 DB char_length와 같게 코드 포인트로 센다", () => {
@@ -391,28 +362,29 @@ describe("mock Repository 체험 규칙", () => {
     });
   });
 
-  test("참여 등록은 회원·학번당 1번이다", async () => {
-    await repository.registerParticipant({ memberId: MEMBER, studentNumber: "1612345" });
-    await expectCode(repository.registerParticipant({ memberId: MEMBER, studentNumber: "1612346" }), "registration_exists");
-    await expectCode(repository.registerParticipant({ memberId: OTHER, studentNumber: "1612345" }), "student_number_taken");
+  test("참여 등록은 회원당 1번이며 다른 회원의 등록을 막지 않는다", async () => {
+    await repository.registerParticipant({ memberId: MEMBER });
+    await expectCode(repository.registerParticipant({ memberId: MEMBER }), "registration_exists");
+    await repository.registerParticipant({ memberId: OTHER });
     const participation = await repository.getMemberParticipation(MEMBER);
-    assert.equal(participation.registration?.maskedStudentNumber, "16****45");
+    assert.ok(participation.registration?.registeredAt);
+    assert.equal("maskedStudentNumber" in participation.registration, false);
     assert.equal(participation.ticketCount, 0);
   });
 
   test("체험 시작은 등록 회원만, 본인 프로젝트는 불가하고 첫 시작 시각을 유지한다", async () => {
     await expectCode(repository.startExperience({ projectId: PROJECT, memberId: MEMBER }), "registration_required");
-    await repository.registerParticipant({ memberId: MEMBER, studentNumber: "1612345" });
+    await repository.registerParticipant({ memberId: MEMBER });
     const first = await repository.startExperience({ projectId: PROJECT, memberId: MEMBER });
     const second = await repository.startExperience({ projectId: PROJECT, memberId: MEMBER });
     assert.equal(second.startedAt, first.startedAt);
-    await repository.registerParticipant({ memberId: PROJECT_OWNER, studentNumber: "1500002" });
+    await repository.registerParticipant({ memberId: PROJECT_OWNER });
     await expectCode(repository.startExperience({ projectId: PROJECT, memberId: PROJECT_OWNER }), "own_project");
     await expectCode(repository.startExperience({ projectId: "mock-showcase-study-buddy", memberId: MEMBER }), "project_not_found");
   });
 
   test("피드백은 1분 뒤 1번만 남길 수 있고 추첨권이 1장씩 늘어난다", async () => {
-    await repository.registerParticipant({ memberId: MEMBER, studentNumber: "1612345" });
+    await repository.registerParticipant({ memberId: MEMBER });
     await expectCode(repository.submitFeedback({ projectId: PROJECT, memberId: MEMBER, body: "길찾기가 편했어요 최고" }), "experience_not_started");
     await repository.startExperience({ projectId: PROJECT, memberId: MEMBER });
     await expectCode(repository.submitFeedback({ projectId: PROJECT, memberId: MEMBER, body: "길찾기가 편했어요 최고" }), "feedback_too_early");
@@ -433,7 +405,7 @@ describe("mock Repository 체험 규칙", () => {
   });
 
   test("출품자에게는 숨기지 않은 피드백 본문만 작성자 없이 전달되고, 숨겨도 유효 체험은 유지된다", async () => {
-    await repository.registerParticipant({ memberId: MEMBER, studentNumber: "1612345" });
+    await repository.registerParticipant({ memberId: MEMBER });
     await repository.startExperience({ projectId: PROJECT, memberId: MEMBER });
     rewindStart(PROJECT, MEMBER, 90);
     await repository.submitFeedback({ projectId: PROJECT, memberId: MEMBER, body: "쉼터 추천이 정말 유용했어요" });
@@ -461,7 +433,7 @@ describe("mock Repository 체험 규칙", () => {
 
     mock.resetProjectShowcaseMockStore();
     await expectCode(repository.setInterest({ projectId: PROJECT, memberId: MEMBER, interested: true }), "experience_closed");
-    await expectCode(repository.registerParticipant({ memberId: MEMBER, studentNumber: "1612345" }), "experience_closed");
+    await expectCode(repository.registerParticipant({ memberId: MEMBER }), "experience_closed");
   });
 
   test("체험 단계 DB 예외도 공용 에러 코드로 바뀐다", () => {
@@ -498,12 +470,12 @@ describe("추첨 알고리즘", () => {
 
   test("Mattermost 공지는 분야별 마스킹 명단과 미당첨 분야를 담는다", () => {
     const text = draw.buildShowcaseAnnouncement("내 프로젝트를 소개합니다!", [
-      { candidateGroup: "experiencer", position: 1, maskedName: "천**", maskedStudentNumber: "15****44", projectTitle: null },
-      { candidateGroup: "submitter", position: 1, maskedName: "정**", maskedStudentNumber: "15****43", projectTitle: "싸트너십" },
+      { candidateGroup: "experiencer", position: 1, maskedName: "천**", projectTitle: null },
+      { candidateGroup: "submitter", position: 1, maskedName: "정**", projectTitle: "싸트너십" },
     ]);
     assert.match(text, /^\[내 프로젝트를 소개합니다!\] 당첨자 안내/u);
-    assert.match(text, /■ 출품 경품 · 배달의민족 상품권 1만 원 \(1개 프로젝트\)\n1\. 싸트너십 · 정\*\* \(15\*\*\*\*43\)/u);
-    assert.match(text, /■ 체험 경품 · 메가커피 아이스 아메리카노 교환권 \(1명\)\n1\. 천\*\* \(15\*\*\*\*44\)/u);
+    assert.match(text, /■ 출품 경품 · 배달의민족 상품권 1만 원 \(1명\)\n1\. 싸트너십 · 정\*\*/u);
+    assert.match(text, /■ 체험 경품 · 메가커피 아이스 아메리카노 교환권 \(1명\)\n1\. 천\*\*/u);
     assert.doesNotMatch(text, /1512343|1512344|정민호/u);
     assert.match(draw.buildShowcaseAnnouncement("E", []), /당첨자 없음/u);
   });
@@ -556,13 +528,34 @@ describe("mock Repository 추첨·정산 규칙", () => {
       },
     });
     // The Green Route owner also experiences another project, so they are in both pools.
-    await repository.registerParticipant({ memberId: OWNER, studentNumber: "1500002" });
-    await repository.registerParticipant({ memberId: TESTER, studentNumber: "1512344" });
-    await repository.registerParticipant({ memberId: TESTER2, studentNumber: "1612345" });
+    await repository.registerParticipant({ memberId: OWNER });
+    await repository.registerParticipant({ memberId: TESTER });
+    await repository.registerParticipant({ memberId: TESTER2 });
     await giveFeedback(OWNER, "mock-showcase-pixel-quest");
     await giveFeedback(TESTER, "mock-showcase-pixel-quest");
     await giveFeedback(TESTER, "mock-showcase-green-route");
     await giveFeedback(TESTER2, "mock-showcase-green-route");
+  });
+
+  test("복수 승인 출품은 표본을 늘리지만 경품은 회원별 하나만 준다", async () => {
+    const original = store.projects.find((project) => project.ownerMemberId === OWNER);
+    assert.ok(original);
+    store.projects.push({ ...original, id: "second-approved", title: "두 번째 출품" });
+    store.projects.push({ ...original, id: "pending-project", status: "pending" });
+    store.projects.push({ ...original, id: "rejected-project", status: "rejected" });
+    store.projects.push({ ...original, id: "withdrawn-project", status: "withdrawn" });
+    await moveTo("verification");
+    const bounds: number[] = [];
+    const receipt = await repository.runDraw({ group: "submitter", adminId: "admin", random: (max) => { bounds.push(max); return 0; } });
+    assert.deepEqual({ people: receipt.candidateCount, tickets: receipt.ticketCount, winners: receipt.selectedCount }, { people: 2, tickets: 3, winners: 2 });
+    assert.deepEqual(bounds, [3, 1]);
+    assert.equal(store.winners.filter((winner) => winner.memberId === OWNER).length, 1);
+    await repository.runDraw({ group: "experiencer", adminId: "admin" });
+    assert.equal(store.winners.filter((winner) => winner.memberId === OWNER).length, 1);
+    await moveTo("announcement");
+    for (const winner of await repository.listPublicWinners()) {
+      assert.deepEqual(Object.keys(winner).sort(), ["candidateGroup", "maskedName", "position", "projectTitle"]);
+    }
   });
 
   test("체험이 끝나기 전에는 추첨과 검증을 막는다", async () => {
@@ -587,7 +580,7 @@ describe("mock Repository 추첨·정산 규칙", () => {
     assert.equal(winners.filter((winner) => winner.candidateGroup === "experiencer").length, 2);
     const activeMembers = store.winners.filter((winner) => winner.status === "active").map((winner) => winner.memberId);
     assert.equal(new Set(activeMembers).size, activeMembers.length);
-    assert.ok(winners.every((winner) => /^\d{2}\*{4}\d{2}$/u.test(winner.maskedStudentNumber) && winner.maskedName.endsWith("**")));
+    assert.ok(winners.every((winner) => !("maskedStudentNumber" in winner) && winner.maskedName.endsWith("**")));
   });
 
   test("제외한 후보는 추첨되지 않고, 복구하면 다시 후보가 된다", async () => {
@@ -652,7 +645,7 @@ describe("mock Repository 추첨·정산 규칙", () => {
     assert.equal(await repository.purgePersonalDataIfDue(), true);
     assert.equal(await repository.purgePersonalDataIfDue(), false);
     assert.equal(store.registrations.size, 0);
-    assert.ok(store.projects.every((project) => project.participants.length === 0 && project.ownerMemberId === ""));
+    assert.ok(store.projects.every((project) => project.ownerMemberId === ""));
     assert.ok(store.feedback.every((item) => item.memberId === ""));
     assert.equal((await repository.listPublicWinners()).length, 2);
     assert.equal((await repository.getDrawState()).purgedAt !== null, true);

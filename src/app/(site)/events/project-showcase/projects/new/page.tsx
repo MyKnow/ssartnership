@@ -15,13 +15,11 @@ export default async function NewShowcaseProjectPage() {
   if (!session?.userId) {
     redirect("/auth/login?returnTo=%2Fevents%2Fproject-showcase%2Fprojects%2Fnew");
   }
-  const [event, ownerName, activeProject, headerSession] = await Promise.all([
+  const [event, ownerName, headerSession] = await Promise.all([
     projectShowcaseRepository.getEvent(),
     projectShowcaseRepository.getMemberDisplayName(session.userId),
-    projectShowcaseRepository.getActiveOwnerProject(session.userId),
     getHeaderSession(session.userId),
   ]);
-  if (activeProject) redirect(`/events/project-showcase/my/projects/${activeProject.id}`);
   const submissionOpen = getShowcasePhase(event) === "submission";
 
   return (

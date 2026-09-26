@@ -69,21 +69,9 @@ export type ShowcaseProject = ShowcaseProjectCounts & {
   createdAt: string;
 };
 
-export type ShowcaseProjectParticipant = {
-  name: string;
-  studentNumber: string;
-  isOwner: boolean;
-};
-
 export type ShowcaseOwnerProject = ShowcaseProject & {
-  participants: ShowcaseProjectParticipant[];
   reviewNote: string | null;
   updatedAt: string;
-};
-
-export type ShowcaseTeammateInput = {
-  name: string;
-  studentNumber: string;
 };
 
 export type ShowcaseProjectSubmission = {
@@ -93,10 +81,7 @@ export type ShowcaseProjectSubmission = {
   summary: string;
   description: string;
   serviceUrl: string;
-  ownerStudentNumber: string;
-  teammates: ShowcaseTeammateInput[];
   imageUploadId: string | null;
-  participantsConsent: true;
   announcementConsent: true;
 };
 
@@ -163,12 +148,6 @@ export function maskShowcaseName(name: string) {
   return `${first ?? "참"}**`;
 }
 
-export function maskShowcaseStudentNumber(studentNumber: string) {
-  const digits = studentNumber.trim();
-  if (digits.length < 4) return "****";
-  return `${digits.slice(0, 2)}****${digits.slice(-2)}`;
-}
-
 export function canOwnerEditShowcaseProject(status: ShowcaseProjectStatus, phase: ShowcasePhase) {
   return phase === "submission" && (status === "pending" || status === "changes_requested");
 }
@@ -181,7 +160,6 @@ export function canOwnerWithdrawShowcaseProject(status: ShowcaseProjectStatus, p
 export const SHOWCASE_FEEDBACK_UNLOCK_SECONDS = 60;
 
 export type ShowcaseRegistration = {
-  maskedStudentNumber: string;
   registeredAt: string;
 };
 
@@ -243,11 +221,11 @@ export type ShowcasePublicWinner = {
   candidateGroup: ShowcaseCandidateGroup;
   position: number;
   maskedName: string;
-  maskedStudentNumber: string;
   projectTitle: string | null;
 };
 
 export type ShowcaseAdminWinner = ShowcasePublicWinner & {
+  memberId: string | null;
   id: string;
   status: "active" | "voided";
   voidReason: ShowcaseVoidReason | null;
@@ -256,6 +234,7 @@ export type ShowcaseAdminWinner = ShowcasePublicWinner & {
 };
 
 export type ShowcaseSubmitterCandidate = {
+  memberId: string | null;
   projectId: string;
   projectTitle: string;
   ownerDisplayName: string;
@@ -266,7 +245,6 @@ export type ShowcaseSubmitterCandidate = {
 export type ShowcaseExperiencerCandidate = {
   memberId: string;
   displayName: string;
-  studentNumber: string;
   tickets: number;
   exclusion: { id: string; reason: string } | null;
   alreadyWon: boolean;
