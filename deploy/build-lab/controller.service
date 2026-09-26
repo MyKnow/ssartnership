@@ -1,0 +1,10 @@
+[Unit]
+Description=Issue 497 lab branch controller
+After=network-online.target build-lab-497-network.service
+Requires=build-lab-497-network.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/lib/build-lab-497/host_controller.py
+TimeoutStartSec=1500
+UMask=0077

@@ -1,0 +1,4 @@
+# Host-loopback socket proxies provide access while all Docker networks stay internal.
+services:
+  app:
+    ports: !reset []

@@ -1,0 +1,10 @@
+# All runtime containers are offline except for their private Compose network.
+# The Docker daemon may pull public images; app code has no outbound route.
+services:
+  gateway:
+    ports: !reset []
+networks:
+  edge:
+    internal: true
+  default:
+    internal: true

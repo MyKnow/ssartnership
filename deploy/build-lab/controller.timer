@@ -1,0 +1,11 @@
+[Unit]
+Description=Poll the approved lab branch
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=30s
+AccuracySec=1s
+Unit=build-lab-497-controller.service
+
+[Install]
+WantedBy=timers.target

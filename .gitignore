@@ -55,3 +55,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local lab harness bytecode
+/scripts/build-lab/__pycache__/

@@ -1,0 +1,12 @@
+[Unit]
+Description=Issue 497 isolated build lab network
+After=network.target
+Before=pve-guests.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/build-lab-497-network
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
