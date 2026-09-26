@@ -90,3 +90,23 @@ Docker Compose 2.39.4 checksum을 확인했고, Node 24.18.1/npm 11.16.0은 dige
 ## 전체 경로 시간 기록 준비
 
 로컬 실행기는 sourceReadyAt, gateImageReadyAt, gateStartedAt, gateFinishedAt, packagingStartedAt을 기록하며 guest/host 경계에서 유한한 숫자와 시간 순서를 검증한다. 전송 receipt는 다운로드 완료, Preview 기동 요청·SSH 준비, 업로드 시작·완료, archive 크기를 분리한다. 따라서 기존 transferStartedAt~transferFinishedAt 전체를 순수 전송 시간으로 해석하지 않는다. host controller는 SHA별 observed/boot-requested/dispatched/deployment-started/ready/shutdown-requested 이벤트를 별도 보존한다. 이 변경은 아직 설치하지 않았고, 실제 push 요청 시각과의 결합 및 전체 경로 검증은 남아 있다. 관련 Python 테스트 42개가 통과했다.
+
+## 첫 4 vCPU 결과의 단계 비교
+
+4 vCPU/6144 MiB cold-1은 387.862초, 83 E2E 및 zero failure/error/skip/retry로 완료했다. 2 vCPU cold 중앙값 475.833초 대비 약 18.5% 짧지만 1회이므로 자원 선택의 최종 통계로 사용하지 않는다. 단계 marker 간 시간은 install 46.20초, lint 38.77초, typecheck 31.87초, Node/unit test 묶음 34.62초, real compile 49.90초, fixture compile 50.69초다. 2 vCPU cold의 test 묶음은 약 81.6초, 두 compile은 약 60초였다. 컴파일 marker 구간은 전체 Next build 시간이 아니며 누락된 후처리/trace/검사 구간과 혼동하지 않는다. 4 vCPU warm-1은 같은 matrix process에서 실행 중이다.
+
+## 연속 push 캐시 및 선택 자원 적용 준비
+
+자동 빌드의 임시 자원 하드코딩을 제거했다. root 소유 `/etc/build-lab-497/profile.json`에 cpus, vmMemoryMiB, containerMemoryMiB, stableLabCache, reuseCache를 선택해야 실행되며 guest CPU·메모리와 불일치하면 중단한다. 아직 최적 조합을 선택하거나 설정 파일을 설치하지 않았다.
+
+성공한 이전 request의 캐시를 재사용할 수 있게 연결했다. 기본 benchmark는 동일 SHA만 허용하며, request 경로가 명시적으로 cross-SHA를 허용하더라도 gate image ID·lockfile·Next 설정·npm 정책·Node 버전·public origin의 fingerprint와 성공한 83 E2E 계약이 맞아야 한다. 캐시 조건이 달라지면 cold로 진행하고 모든 검사와 결과물은 새로 생성한다. latest-success는 이미지 패키징까지 성공한 뒤에만 교체한다. 실제 연속 push 및 저장공간 보존 정책 검증은 남아 있다. 관련 Python 테스트 46개 통과.
+
+## GitHub 비교 기준 반복 준비
+
+기존 GitHub run 36247463568의 head SHA가 기준 308281074ed752b6cccce693d27755da13dd675f와 일치하고 attempt 1 성공임을 API로 재확인했다. workflow 전체는 809초이며 build job 563초, publish job 238초다. 보존한 동일 job 108419205216의 marker에서 install 시작~app packaging 시작은 466.709초다. 이는 VM gate 시간과 근접한 범위지만 정확히 동일 시작/끝 marker는 아니며 packaging·게시·서버 배포는 포함하지 않는다.
+
+1회 과거 기록을 반복 비교 결과로 취급하지 않기 위해 실험 브랜치 전용 Isolated Build Lab Baseline workflow를 준비했다. 해당 workflow 파일 변경 push에만 실행되며 contents:read와 credential 미보존 checkout을 사용한다. 기준 SHA/archive hash·기존 gate image source를 고정하고 container 2 CPU/5120 MiB에서 cold/warm 3회씩 순차 실행한다. 이미지 게시·운영 배포·운영 비밀값 접근은 없다. GitHub host 메모리 표본은 전체 runner 값이므로 전용 VM 메모리와 직접 비교하지 않는다. 현재 workflow 경계 테스트는 통과했으며 전체 release 검증은 진행 중, push 및 원격 실행은 아직 하지 않았다. 이 파일을 push하는 단계의 예상 Actions는 기존 0개에서 실험 workflow 1개로 달라진다.
+
+## GitHub 실험 publication 사전 검증
+
+전체 local Release 두 번 모두 83 E2E, 실패/오류/skip/retry 0이다. 처음과 새 개발 캐시 실행 모두 시작 1회·관리자 전환 2회의 full-reload 경고가 있었다. 별도 fresh-server 첫 경로 진단은 Next WebSocket의 hadRuntimeError=false와 HMR fetch 실패, failed HMR request 1개, page/console error 0개를 기록했다. 설치된 Next 소스 및 기존 Issue #435 기록과 대조해 개발 HMR의 비런타임 분기로 분류했고 원본 로그를 보존했다. 경고를 숨기거나 테스트를 완화하지 않았으며 이 검토는 실험용 publication 범위다. GitHub의 production fixture gate 6회는 별도로 검증해야 한다. 타임스탬프 Python 3.9 호환 회귀 테스트를 포함한 Python 47개도 통과했다.

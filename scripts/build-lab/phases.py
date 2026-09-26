@@ -29,6 +29,8 @@ def markers(text):
         elif re.search(r'\b83 passed \(', content):
             label = 'e2e-complete'
         if label:
+            # Docker emits nanoseconds; Python 3.9 accepts only microseconds.
+            stamp = re.sub(r'(\.\d{6})\d+', r'\1', stamp)
             events.append({'at': datetime.fromisoformat(stamp.replace('Z', '+00:00')).timestamp(), 'marker': label})
     return sorted(events, key=lambda row: row['at'])
 

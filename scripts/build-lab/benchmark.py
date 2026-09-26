@@ -28,16 +28,31 @@ def validate_gate(gate):
         raise ValueError('Fixture boundary invalid')
     return {k: gate[k] for k in ('tests', 'failures', 'errors', 'skipped', 'retries', 'e2eRuntime', 'fixtureBuildDeployable')}
 
-def cache_sources(root, run_id):
+def cache_sources(root, run_id, *, context=None, cross_sha=False):
     if not re.fullmatch(r'[a-z0-9][a-z0-9-]{1,60}', run_id):
         raise ValueError('Invalid warm source')
     result = json.loads((root / 'runs' / run_id / 'result.json').read_text())
-    if result.get('valid') is not True or result.get('sha') != BASE_SHA:
+    if result.get('valid') is not True or (result.get('sha') != BASE_SHA and not cross_sha):
         raise ValueError('Warm source must be a valid same-SHA run')
+    if cross_sha and (not isinstance(context, str) or not re.fullmatch(r'[a-f0-9]{64}', context)):
+        raise ValueError('Cross-SHA cache requires an immutable context')
+    if context is not None and result.get('cacheContext') != context:
+        raise ValueError('Warm cache toolchain or configuration changed')
+    validate_gate(result['gate'])
     work = root / 'runs' / run_id / 'work'
     if not all((work / item).is_dir() for item in ('.tmp/install-state/cache', '.next/cache', '.next-e2e/cache')):
         raise ValueError('Warm cache source is unavailable')
     return work
+
+
+def build_cache_context(work, image_id):
+    if not re.fullmatch(r'sha256:[a-f0-9]{64}', image_id):
+        raise ValueError('Invalid gate image identity')
+    identity = hashlib.sha256()
+    for item in ('package-lock.json', 'next.config.ts', '.npmrc', '.node-version'):
+        identity.update(item.encode() + b'\0' + (work / item).read_bytes() + b'\0')
+    identity.update((image_id + '\0' + SITE_ORIGIN + '\0' + API_ORIGIN).encode())
+    return identity.hexdigest()
 
 
 def main():
@@ -47,6 +62,7 @@ def main():
     p.add_argument('--run-id', required=True)
     p.add_argument('--warm-from')
     p.add_argument('--stable-lab-cache', action='store_true')
+    p.add_argument('--warm-cross-sha', action='store_true')
     args = p.parse_args()
     if not re.fullmatch(r'[a-z0-9][a-z0-9-]{1,60}', args.run_id):
         p.error('invalid run id')
@@ -59,9 +75,12 @@ def main():
     work = target / 'work'
     work.mkdir()
     subprocess.run(['tar', '-xf', str(archive), '-C', str(work)], check=True)
+    image_id = subprocess.run(['sudo', '-n', 'docker', 'image', 'inspect', '--format', '{{.Id}}', GATE_IMAGE],
+                              capture_output=True, text=True, check=True).stdout.strip()
+    cache_context = build_cache_context(work, image_id)
     cache_started = time.monotonic()
     if args.warm_from:
-        previous = cache_sources(root, args.warm_from)
+        previous = cache_sources(root, args.warm_from, context=cache_context, cross_sha=args.warm_cross_sha)
         previous_result = json.loads((previous.parent / 'result.json').read_text())
         if bool(previous_result.get('stableLabCache', False)) != args.stable_lab_cache:
             raise ValueError('Warm cache optimization mode mismatch')
@@ -80,14 +99,17 @@ def main():
             shutil.copytree(keys, work / '.tmp/build-lab-keys')
     cache_prepare_seconds = round(time.monotonic() - cache_started, 3)
     name = 'ssartnership-lab-' + args.run_id
-    command = ['sudo', '-n', 'docker', 'run', '--name', name, '--init', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--user', f'{os.getuid()}:{os.getgid()}', '--pids-limit', '1024', '--memory', f'{args.memory_mib}m', '--memory-swap', f'{args.memory_mib}m', '--cpus', str(args.cpus), '--tmpfs', '/tmp:mode=1777,size=512m', '--shm-size', '256m', '--env', 'CI_EXECUTION_PROFILE=github-amd64', '--env', 'CI_BUILD_SITE_ORIGIN=' + SITE_ORIGIN, '--env', 'CI_BUILD_SUPABASE_ORIGIN=' + API_ORIGIN, '--env', 'CI_BUILD_VAPID_PUBLIC_KEY=', '--mount', f'type=bind,src={work},dst=/work', GATE_IMAGE]
+    command = ['sudo', '-n', 'docker', 'run', '--name', name, '--init', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--user', f'{os.getuid()}:{os.getgid()}', '--pids-limit', '1024', '--memory', f'{args.memory_mib}m', '--memory-swap', f'{args.memory_mib}m', '--cpus', str(args.cpus), '--tmpfs', '/tmp:mode=1777,size=512m', '--shm-size', '256m', '--env', 'CI_EXECUTION_PROFILE=github-amd64', '--env', 'CI_BUILD_SITE_ORIGIN=' + SITE_ORIGIN, '--env', 'CI_BUILD_SUPABASE_ORIGIN=' + API_ORIGIN, '--env', 'CI_BUILD_VAPID_PUBLIC_KEY=', '--mount', f'type=bind,src={work},dst=/work', image_id]
     evidence = {'sha': BASE_SHA, 'archiveSha256': BASE_ARCHIVE_HASH, 'runId': args.run_id, 'cpus': args.cpus, 'memoryMiB': args.memory_mib, 'cache': 'fresh-workspace-no-npm-or-next-cache; gate-image-prebuilt; host-page-cache-uncontrolled', 'startedAt': time.time(), 'peakContainerMemoryBytes': 0, 'peakGuestUsedMemoryBytes': 0}
     evidence.update(cacheMode='warm' if args.warm_from else 'cold', warmFrom=args.warm_from, cachePrepareSeconds=cache_prepare_seconds, protocolVersion=2)
     evidence['stableLabCache'] = args.stable_lab_cache
+    evidence.update(cacheContext=cache_context, gateImageId=image_id, crossShaCache=args.warm_cross_sha)
     if args.stable_lab_cache:
         command[-1:-1] = ['--env', 'SSARTNERSHIP_BUILD_LAB_CACHE=1']
     if args.warm_from:
         evidence['cache'] = 'same-SHA npm and both Next caches copied; new node_modules and outputs; gate-image-prebuilt; host-page-cache-uncontrolled'
+        if args.warm_cross_sha:
+            evidence['cache'] = 'verified prior-commit caches; same toolchain/lock/config/origins; fresh node_modules and outputs; host-page-cache-uncontrolled'
     stop = threading.Event()
     def sample():
         while not stop.wait(1):

@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 import benchmark
+from build_profile import load_profile
 
 REPOSITORY = 'https://github.com/MyKnow/ssartnership.git'
 REF = 'refs/heads/ci/497-pve-build-lab'
@@ -18,6 +19,7 @@ def main():
     if len(sys.argv) != 2 or not re.fullmatch(r'[a-f0-9]{40}', sys.argv[1]) or os.getuid() == 0:
         raise ValueError('Invalid lab build request')
     sha = sys.argv[1]
+    profile = load_profile()
     root = Path.home() / 'build-lab'
     request = root / 'requests' / sha
     request.mkdir(parents=True, exist_ok=False)
@@ -40,16 +42,32 @@ def main():
     stages = {'sourceReadyAt': time.time()}
     gate_tag = 'ssartnership-lab-gate:' + sha
     run(['sudo', '-n', 'env', 'DOCKER_BUILDKIT=1', 'docker', 'build', '--platform', 'linux/amd64', '--tag', gate_tag, str(source / 'deploy/self-host-ci')])
+    image_id = subprocess.run(['sudo', '-n', 'docker', 'image', 'inspect', '--format', '{{.Id}}', gate_tag],
+                              capture_output=True, text=True, check=True).stdout.strip()
     stages['gateImageReadyAt'] = time.time()
     benchmark.BASE_SHA = sha
     benchmark.BASE_ARCHIVE_HASH = hashlib.sha256(archive.read_bytes()).hexdigest()
     benchmark.ARCHIVE_NAME = str(archive.relative_to(root))
-    benchmark.GATE_IMAGE = gate_tag
+    benchmark.GATE_IMAGE = image_id
     benchmark.SITE_ORIGIN = 'http://127.0.0.1:3100'
     benchmark.API_ORIGIN = 'http://127.0.0.1:54321'
-    # Provisional resources; replace only after resource experiments select a winner.
     run_id = 'request-' + sha
-    sys.argv = ['benchmark.py', '--cpus', '4', '--memory-mib', '5120', '--run-id', run_id]
+    sys.argv = ['benchmark.py', '--cpus', str(profile['cpus']), '--memory-mib', str(profile['containerMemoryMiB']), '--run-id', run_id]
+    if profile['stableLabCache']:
+        sys.argv += ['--stable-lab-cache']
+    previous_file = root / 'latest-success.json'
+    if profile['reuseCache'] and previous_file.is_file():
+        previous = json.loads(previous_file.read_text())
+        previous_run = previous.get('runId', '')
+        context = benchmark.build_cache_context(source, image_id)
+        try:
+            prior = benchmark.cache_sources(root, previous_run, context=context, cross_sha=True)
+            prior_result = json.loads((prior.parent / 'result.json').read_text())
+            if bool(prior_result.get('stableLabCache', False)) == profile['stableLabCache']:
+                sys.argv += ['--warm-from', previous_run, '--warm-cross-sha']
+        except (OSError, ValueError, KeyError):
+            # Cache incompatibility is a miss. Never omit any gate or reuse outputs.
+            pass
     stages['gateStartedAt'] = time.time()
     benchmark.main()
     stages['gateFinishedAt'] = time.time()
@@ -65,6 +83,9 @@ def main():
     result = {'sha': sha, 'image': tag, 'archiveSha256': hashlib.sha256(output.read_bytes()).hexdigest(), 'startedAt': started, 'finishedAt': time.time(), 'packagingSeconds': time.monotonic() - packaging, 'deployed': False}
     result['stages'] = stages
     (request / 'artifact.json').write_text(json.dumps(result, indent=2) + '\n')
+    pending = root / 'latest-success.pending'
+    pending.write_text(json.dumps({'runId': run_id, 'sha': sha}) + '\n')
+    pending.replace(previous_file)
     print(json.dumps(result), flush=True)
 
 

@@ -1,0 +1,34 @@
+name: Isolated Build Lab Baseline
+
+on:
+  push:
+    branches: [ci/497-pve-build-lab]
+    paths: [.github/workflows/build-lab-baseline.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: isolated-build-lab-baseline
+  cancel-in-progress: false
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Measure fixed baseline without publishing
+        run: python3 scripts/build-lab/github_baseline.py
+      - name: Preserve measurement evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-lab-baseline-${{ github.sha }}
+          path: ~/build-lab/runs/gh2c5g-*/evidence/
+          if-no-files-found: error
+          retention-days: 2
+          compression-level: 0
