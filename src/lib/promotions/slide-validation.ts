@@ -15,6 +15,12 @@ export type PromotionSlideField =
   | "sponsorLabel";
 
 export const PROMOTION_SLIDE_ERROR_MESSAGES = {
+  promotion_slide_database_read_failed: "저장된 광고 목록을 읽지 못해 저장을 중단했습니다. 입력값 문제가 아닙니다. 잠시 후 다시 시도해 주세요.",
+  promotion_slide_event_lookup_failed: "연결 페이지의 이벤트 등록 여부를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  promotion_slide_database_write_failed: "광고 카드 데이터를 서버에 저장하지 못했습니다. 입력 항목 검사는 통과했습니다. 반복되면 서버 저장 오류 기록을 확인해 주세요.",
+  promotion_slide_database_schema_mismatch: "광고 저장에 필요한 서버 데이터 구조가 현재 앱과 맞지 않습니다. 운영자가 배포 및 데이터베이스 업데이트 상태를 확인해야 합니다.",
+  promotion_slide_reference_invalid: "연결된 이벤트 또는 광고 캠페인이 더 이상 유효하지 않습니다. 연결 항목을 다시 선택해 주세요.",
+  promotion_slide_delete_failed: "카드 저장 후 삭제한 카드의 정리를 완료하지 못했습니다. 새로고침하여 실제 저장 상태를 확인해 주세요.",
   promotion_slide_title_required: "타이틀을 입력해 주세요.",
   promotion_slide_subtitle_required: "부제를 입력해 주세요.",
   promotion_slide_href_required: "연결 페이지를 입력해 주세요.",
@@ -32,6 +38,18 @@ export const PROMOTION_SLIDE_ERROR_MESSAGES = {
   promotion_slide_payload_invalid: "광고 카드 데이터를 읽지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.",
   promotion_slide_empty: "최소 1개의 광고 카드가 필요합니다.",
 } as const;
+
+/** Classify provider codes without exposing database messages or submitted data. */
+export function promotionSlideDatabaseErrorCode(
+  code: string | undefined,
+  fallback: PromotionSlideErrorCode,
+): PromotionSlideErrorCode {
+  if (["42703", "42P01", "PGRST204", "PGRST205"].includes(code ?? "")) {
+    return "promotion_slide_database_schema_mismatch";
+  }
+  if (code === "23503") return "promotion_slide_reference_invalid";
+  return fallback;
+}
 
 export type PromotionSlideErrorCode = keyof typeof PROMOTION_SLIDE_ERROR_MESSAGES;
 

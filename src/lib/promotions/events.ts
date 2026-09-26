@@ -278,8 +278,12 @@ function staticSlides() {
 
 async function loadManagedPromotionSlides(options?: {
   includeInactive?: boolean;
+  requireDatabase?: boolean;
 }): Promise<ManagedPromotionSlide[]> {
   if (!canUseSupabase()) {
+    if (options?.requireDatabase && process.env.NEXT_PUBLIC_DATA_SOURCE !== "mock") {
+      throw new Error("promotion_slide_database_unavailable");
+    }
     return staticSlides();
   }
 
@@ -297,6 +301,9 @@ async function loadManagedPromotionSlides(options?: {
     }
     const { data, error } = await query;
     if (error) {
+      if (options?.requireDatabase) {
+        throw error;
+      }
       if (isMissingPromotionSlideAdColumns(error.message)) {
         let legacyQuery = supabase
           .from("promotion_slides")
@@ -328,9 +335,18 @@ async function loadManagedPromotionSlides(options?: {
     const slides = ((data ?? []) as PromotionSlideRow[]).map((row) => mapSlideRow(row));
     return slides;
   } catch (error) {
+    if (options?.requireDatabase) {
+      console.error("[promotions] editable slides query failed", error);
+      throw new Error("promotion_slide_database_unavailable");
+    }
     console.error("[promotions] promotion_slides fallback", error);
     return staticSlides();
   }
+}
+
+/** Editing must use current persisted rows, never cached catalog fallbacks. */
+export async function listEditablePromotionSlides(): Promise<ManagedPromotionSlide[]> {
+  return loadManagedPromotionSlides({ includeInactive: true, requireDatabase: true });
 }
 
 const getCachedManagedPromotionSlides = unstable_cache(

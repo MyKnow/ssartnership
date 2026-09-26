@@ -14,6 +14,7 @@ import {
 import { assertPromotionSlideImageSource } from "@/lib/promotions/image-source";
 import {
   PromotionSlideSaveError,
+  promotionSlideDatabaseErrorCode,
   validatePromotionSlide,
 } from "@/lib/promotions/slide-validation";
 import { getEventPageDefinition } from "@/lib/event-pages";
@@ -334,7 +335,8 @@ async function listRegisteredPromotionEventSlugs(
     .select("slug")
     .in("slug", unique);
   if (error) {
-    throw new Error(error.message);
+    console.error("[admin-advertisement] event lookup failed", error);
+    throw new PromotionSlideSaveError(promotionSlideDatabaseErrorCode(error.code, "promotion_slide_event_lookup_failed"));
   }
   return new Set(((data ?? []) as Array<{ slug: string }>).map((row) => row.slug));
 }
@@ -485,7 +487,8 @@ async function savePromotionSlidesMutation(formData: FormData) {
     .order("display_order", { ascending: true })
     .order("created_at", { ascending: true });
   if (existingError) {
-    throw new Error(existingError.message);
+    console.error("[admin-advertisement] slide lookup failed", existingError);
+    throw new PromotionSlideSaveError(promotionSlideDatabaseErrorCode(existingError.code, "promotion_slide_database_read_failed"));
   }
 
   const existingMap = new Map<string, { id: string; image_src: string | null }>(
@@ -607,7 +610,8 @@ async function savePromotionSlidesMutation(formData: FormData) {
     .from("promotion_slides")
     .upsert(nextRows, { onConflict: "id" });
   if (upsertError) {
-    throw new Error(upsertError.message);
+    console.error("[admin-advertisement] slide upsert failed", upsertError);
+    throw new PromotionSlideSaveError(promotionSlideDatabaseErrorCode(upsertError.code, "promotion_slide_database_write_failed"));
   }
 
   if (removedRows.length > 0) {
@@ -619,7 +623,8 @@ async function savePromotionSlidesMutation(formData: FormData) {
         removedRows.map((row) => row.id),
       );
     if (deleteError) {
-      throw new Error(deleteError.message);
+      console.error("[admin-advertisement] slide deletion failed", deleteError);
+      throw new PromotionSlideSaveError("promotion_slide_delete_failed");
     }
   }
 
