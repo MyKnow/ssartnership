@@ -123,17 +123,6 @@ export default async function MyShowcaseProjectPage({
               <h3 className="font-bold text-foreground">체험 주소</h3>
               <a href={project.serviceUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block break-all text-sm font-semibold text-primary underline">{project.serviceUrl}</a>
             </div>
-            <div className="border-t border-border pt-5">
-              <h3 className="font-bold text-foreground">참여자 <span className="text-sm font-normal text-muted-foreground">공개되지 않아요</span></h3>
-              <ul className="mt-3 grid gap-2">
-                {project.participants.map((participant) => (
-                  <li key={participant.studentNumber} className="flex flex-wrap justify-between gap-2 rounded-xl bg-surface-muted/60 px-4 py-3 text-sm">
-                    <span className="font-medium text-foreground">{participant.name}{participant.isOwner ? " · 대표자" : ""}</span>
-                    <span className="tabular-nums text-muted-foreground">{participant.studentNumber}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
           </div>
         </article>
       </main>

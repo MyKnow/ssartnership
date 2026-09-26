@@ -1,6 +1,6 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
-  sampleShowcaseUniform,
+  sampleShowcaseProjects,
   sampleShowcaseWeighted,
   secureRandomInt,
   type ShowcaseRandomInt,
@@ -26,7 +26,6 @@ import {
   isShowcaseProjectStatus,
   isShowcaseProjectType,
   maskShowcaseName,
-  maskShowcaseStudentNumber,
   PROJECT_SHOWCASE_SLUG,
   SHOWCASE_PROJECT_STATUSES,
   SHOWCASE_PROJECT_TYPES,
@@ -46,7 +45,6 @@ import {
   type ShowcaseOwnerProject,
   type ShowcaseProject,
   type ShowcaseProjectCounts,
-  type ShowcaseProjectParticipant,
   type ShowcaseProjectStatus,
   type ShowcaseReviewStatus,
 } from "./types";
@@ -86,14 +84,6 @@ type ProjectRow = {
   review_note: string | null;
   created_at: string;
   updated_at: string;
-};
-
-type ParticipantRow = {
-  project_id: string;
-  name: string;
-  student_number: string;
-  is_owner: boolean;
-  position: number;
 };
 
 const EMPTY_COUNTS: ShowcaseProjectCounts = {
@@ -138,12 +128,6 @@ function mapProject(row: ProjectRow, counts: ShowcaseProjectCounts = EMPTY_COUNT
     createdAt: row.created_at,
     ...counts,
   };
-}
-
-function mapParticipants(rows: ParticipantRow[]): ShowcaseProjectParticipant[] {
-  return [...rows]
-    .sort((left, right) => left.position - right.position)
-    .map((row) => ({ name: row.name, studentNumber: row.student_number, isOwner: row.is_owner }));
 }
 
 function mapActivityDetails(value: unknown): ShowcaseAdminActivityDetails {
@@ -219,28 +203,10 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
     }]));
   }
 
-  private async getParticipants(projectIds: string[]) {
-    const byProject = new Map<string, ParticipantRow[]>();
-    if (projectIds.length === 0) return byProject;
-    const { data, error } = await this.client()
-      .from("showcase_project_participants")
-      .select("project_id,name,student_number,is_owner,position")
-      .in("project_id", projectIds);
-    if (error) throw new Error("프로젝트 참여자 정보를 불러오지 못했습니다.");
-    for (const row of (data ?? []) as ParticipantRow[]) {
-      byProject.set(row.project_id, [...(byProject.get(row.project_id) ?? []), row]);
-    }
-    return byProject;
-  }
-
   private async toOwnerProject(row: ProjectRow): Promise<ShowcaseOwnerProject> {
-    const [counts, participants] = await Promise.all([
-      this.getCounts(row.event_id),
-      this.getParticipants([row.id]),
-    ]);
+    const counts = await this.getCounts(row.event_id);
     return {
       ...mapProject(row, counts.get(row.id)),
-      participants: mapParticipants(participants.get(row.id) ?? []),
       reviewNote: row.review_note,
       updatedAt: row.updated_at,
     };
@@ -292,18 +258,18 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
     if (error) throw new Error("프로젝트 조회를 기록하지 못했습니다.");
   }
 
-  async getActiveOwnerProject(memberId: string) {
+  async listOwnerProjects(memberId: string) {
     const event = await this.getEvent();
-    if (!event || !memberId) return null;
+    if (!event || !memberId) return [];
     const { data, error } = await this.client()
-      .from("showcase_projects")
-      .select(PROJECT_COLUMNS)
-      .eq("event_id", event.id)
-      .eq("owner_member_id", memberId)
-      .neq("status", "withdrawn")
-      .maybeSingle();
+      .from("showcase_projects").select(PROJECT_COLUMNS)
+      .eq("event_id", event.id).eq("owner_member_id", memberId)
+      .order("created_at", { ascending: false });
     if (error) throw new Error("내 프로젝트를 불러오지 못했습니다.");
-    return data ? this.toOwnerProject(data as ProjectRow) : null;
+    const counts = await this.getCounts(event.id);
+    return ((data ?? []) as ProjectRow[]).map((row) => ({
+      ...mapProject(row, counts.get(row.id)), reviewNote: row.review_note, updatedAt: row.updated_at,
+    }));
   }
 
   async getOwnerProject(memberId: string, projectId: string) {
@@ -331,11 +297,6 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
       p_service_url: submission.serviceUrl,
       p_image_url: input.imageUrl,
       p_image_upload_id: input.imageUrl ? submission.imageUploadId : null,
-      p_owner_student_number: submission.ownerStudentNumber,
-      p_teammates: submission.teammates.map((teammate) => ({
-        name: teammate.name,
-        student_number: teammate.studentNumber,
-      })),
     };
   }
 
@@ -371,12 +332,11 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
     return event;
   }
 
-  async registerParticipant(input: { memberId: string; studentNumber: string }) {
+  async registerParticipant(input: { memberId: string }) {
     const event = await this.requireEvent();
     const { error } = await this.client().rpc("register_showcase_participant", {
       p_event_id: event.id,
       p_member_id: input.memberId,
-      p_student_number: input.studentNumber,
     });
     if (error) throwDomain(error, "참여 등록을 저장하지 못했습니다.");
   }
@@ -434,7 +394,7 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
     if (!event || !memberId) return { registration: null, experiences: [], ticketCount: 0 };
     const client = this.client();
     const [registration, experiences, feedback] = await Promise.all([
-      client.from("showcase_registrations").select("student_number,created_at").eq("event_id", event.id).eq("member_id", memberId).maybeSingle(),
+      client.from("showcase_registrations").select("created_at").eq("event_id", event.id).eq("member_id", memberId).maybeSingle(),
       client.from("showcase_experiences").select("project_id,started_at").eq("event_id", event.id).eq("member_id", memberId).order("started_at", { ascending: false }),
       client.from("showcase_feedback").select("project_id").eq("event_id", event.id).eq("member_id", memberId),
     ]);
@@ -454,9 +414,8 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
       feedbackSubmitted: completed.has(row.project_id as string),
     }));
     return {
-      registration: registration.data?.student_number
+      registration: registration.data
         ? {
-          maskedStudentNumber: maskShowcaseStudentNumber(registration.data.student_number as string),
           registeredAt: registration.data.created_at as string,
         }
         : null,
@@ -594,21 +553,16 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
       .order("created_at", { ascending: true });
     if (error) throw new Error("추첨 후보를 불러오지 못했습니다.");
     const projects = (data ?? []) as Array<{ id: string; title: string; owner_member_id: string | null }>;
-    const [context, names, owners] = await Promise.all([
+    const [context, names] = await Promise.all([
       this.loadDrawContext(eventId),
       this.memberNames(projects.flatMap((project) => project.owner_member_id ? [project.owner_member_id] : [])),
-      projects.length
-        ? client.from("showcase_project_participants").select("project_id,student_number").in("project_id", projects.map((project) => project.id)).eq("is_owner", true)
-        : Promise.resolve({ data: [], error: null }),
     ]);
-    if (owners.error) throw new Error("추첨 후보를 불러오지 못했습니다.");
-    const ownerNumbers = new Map((owners.data ?? []).map((row) => [row.project_id as string, row.student_number as string]));
     return projects.map((project) => ({
       projectId: project.id,
       projectTitle: project.title,
       memberId: project.owner_member_id,
       ownerDisplayName: (project.owner_member_id && names.get(project.owner_member_id)) || "회원",
-      studentNumber: ownerNumbers.get(project.id) ?? "",
+
       exclusion: context.projectExclusions.get(project.id) ?? null,
       alreadyWon: Boolean(project.owner_member_id && context.winnerMemberIds.has(project.owner_member_id)),
     }));
@@ -618,18 +572,18 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
     const client = this.client();
     const [feedback, registrations] = await Promise.all([
       client.from("showcase_feedback").select("member_id").eq("event_id", eventId).not("member_id", "is", null),
-      client.from("showcase_registrations").select("member_id,student_number").eq("event_id", eventId).not("member_id", "is", null),
+      client.from("showcase_registrations").select("member_id").eq("event_id", eventId).not("member_id", "is", null),
     ]);
     if (feedback.error || registrations.error) throw new Error("추첨 후보를 불러오지 못했습니다.");
     const tickets = new Map<string, number>();
     for (const row of feedback.data ?? []) tickets.set(row.member_id as string, (tickets.get(row.member_id as string) ?? 0) + 1);
-    const numbers = new Map((registrations.data ?? []).map((row) => [row.member_id as string, row.student_number as string]));
-    const memberIds = [...tickets.keys()].filter((memberId) => numbers.has(memberId));
+    const registered = new Set((registrations.data ?? []).map((row) => row.member_id as string));
+    const memberIds = [...tickets.keys()].filter((memberId) => registered.has(memberId));
     const [context, names] = await Promise.all([this.loadDrawContext(eventId), this.memberNames(memberIds)]);
     return memberIds.map((memberId) => ({
       memberId,
       displayName: names.get(memberId) ?? "회원",
-      studentNumber: numbers.get(memberId) ?? "",
+
       tickets: tickets.get(memberId) ?? 0,
       exclusion: context.memberExclusions.get(memberId) ?? null,
       alreadyWon: context.winnerMemberIds.has(memberId),
@@ -639,8 +593,8 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
   async listSubmitterCandidates(): Promise<ShowcaseSubmitterCandidate[]> {
     const event = await this.getEvent();
     if (!event) return [];
-    return (await this.loadSubmitterPool(event.id)).map(({ projectId, projectTitle, ownerDisplayName, exclusion, alreadyWon }) => ({
-      projectId, projectTitle, ownerDisplayName, exclusion, alreadyWon,
+    return (await this.loadSubmitterPool(event.id)).map(({ projectId, projectTitle, memberId, ownerDisplayName, exclusion, alreadyWon }) => ({
+      projectId, projectTitle, memberId, ownerDisplayName, exclusion, alreadyWon,
     }));
   }
 
@@ -675,21 +629,20 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
   private async selectWinners(eventId: string, group: ShowcaseCandidateGroup, count: number, random: ShowcaseRandomInt) {
     if (group === "submitter") {
       const eligible = (await this.loadSubmitterPool(eventId))
-        .filter((candidate) => candidate.memberId && candidate.studentNumber && !candidate.exclusion && !candidate.alreadyWon);
-      const chosen = sampleShowcaseUniform(eligible, count, random);
+        .filter((candidate) => candidate.memberId && !candidate.exclusion && !candidate.alreadyWon);
+      const chosen = sampleShowcaseProjects(eligible, count, random);
       return {
-        candidateCount: eligible.length,
+        candidateCount: new Set(eligible.map((candidate) => candidate.memberId)).size,
         ticketCount: eligible.length,
         winners: chosen.map((candidate) => ({
           member_id: candidate.memberId,
           project_id: candidate.projectId,
           masked_name: maskShowcaseName(candidate.ownerDisplayName),
-          masked_student_number: maskShowcaseStudentNumber(candidate.studentNumber),
         })),
       };
     }
     const eligible = (await this.loadExperiencerPool(eventId))
-      .filter((candidate) => candidate.studentNumber && candidate.tickets > 0 && !candidate.exclusion && !candidate.alreadyWon);
+      .filter((candidate) => candidate.tickets > 0 && !candidate.exclusion && !candidate.alreadyWon);
     const chosen = sampleShowcaseWeighted(eligible.map((candidate) => ({ ...candidate, weight: candidate.tickets })), count, random);
     return {
       candidateCount: eligible.length,
@@ -698,7 +651,6 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
         member_id: candidate.memberId,
         project_id: null,
         masked_name: maskShowcaseName(candidate.displayName),
-        masked_student_number: maskShowcaseStudentNumber(candidate.studentNumber),
       })),
     };
   }
@@ -773,7 +725,7 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
   private async loadWinnerRows(eventId: string, activeOnly: boolean) {
     let query = this.client()
       .from("showcase_winners")
-      .select("id,candidate_group,position,masked_name,masked_student_number,project_title,status,void_reason,delivered_at,created_at")
+      .select("id,member_id,candidate_group,position,masked_name,project_title,status,void_reason,delivered_at,created_at")
       .eq("event_id", eventId)
       .order("candidate_group", { ascending: false })
       .order("position", { ascending: true })
@@ -795,10 +747,11 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
     const replaced = new Set((replacements.data ?? []).map((row) => row.replaces_winner_id as string));
     return rows.map((row) => ({
       id: row.id as string,
+      memberId: (row.member_id as string | null) ?? null,
       candidateGroup: row.candidate_group as ShowcaseCandidateGroup,
       position: Number(row.position),
       maskedName: row.masked_name as string,
-      maskedStudentNumber: row.masked_student_number as string,
+
       projectTitle: (row.project_title as string | null) ?? null,
       status: row.status === "voided" ? "voided" : "active",
       voidReason: (row.void_reason as ShowcaseVoidReason | null) ?? null,
@@ -815,7 +768,7 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
       candidateGroup: row.candidate_group as ShowcaseCandidateGroup,
       position: Number(row.position),
       maskedName: row.masked_name as string,
-      maskedStudentNumber: row.masked_student_number as string,
+
       projectTitle: (row.project_title as string | null) ?? null,
     }));
   }
@@ -948,9 +901,8 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
     const rows = (data ?? []) as ProjectRow[];
     if (rows.length === 0) return [];
     const ownerIds = [...new Set(rows.flatMap((row) => row.owner_member_id ? [row.owner_member_id] : []))];
-    const [counts, participants, membersResult] = await Promise.all([
+    const [counts, membersResult] = await Promise.all([
       this.getCounts(event.id),
-      this.getParticipants(rows.map((row) => row.id)),
       this.client().from("members").select("id,display_name").in("id", ownerIds),
     ]);
     if (membersResult.error) throw new Error("출품자 정보를 불러오지 못했습니다.");
@@ -961,7 +913,7 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
     return rows.map((row) => ({
       ...mapProject(row, counts.get(row.id)),
       ownerDisplayName: (row.owner_member_id && names.get(row.owner_member_id)) || "회원",
-      participants: mapParticipants(participants.get(row.id) ?? []),
+
       reviewNote: row.review_note,
     }));
   }

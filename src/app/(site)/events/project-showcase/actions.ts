@@ -24,14 +24,6 @@ function readString(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function readTeammates(formData: FormData): unknown {
-  try {
-    return JSON.parse(readString(formData, "teammates") || "[]");
-  } catch {
-    return null;
-  }
-}
-
 function parseSubmissionForm(formData: FormData, requireImage: boolean) {
   return parseShowcaseProjectSubmission({
     projectType: readString(formData, "projectType"),
@@ -40,10 +32,7 @@ function parseSubmissionForm(formData: FormData, requireImage: boolean) {
     summary: readString(formData, "summary"),
     description: readString(formData, "description"),
     serviceUrl: readString(formData, "serviceUrl"),
-    ownerStudentNumber: readString(formData, "ownerStudentNumber"),
-    teammates: readTeammates(formData),
     imageUploadId: readString(formData, "imageUploadId") || null,
-    participantsConsent: readString(formData, "participantsConsent") === "true",
     announcementConsent: readString(formData, "announcementConsent") === "true",
   }, { requireImage });
 }
@@ -104,9 +93,6 @@ export async function submitShowcaseProject(formData: FormData) {
   }
   const parsed = parseSubmissionForm(formData, true);
   if (!parsed.success) return { ok: false as const, message: parsed.message, field: parsed.field };
-  if (await projectShowcaseRepository.getActiveOwnerProject(owner.memberId)) {
-    return toShowcaseFailure(new ShowcaseDomainError("owner_already_submitted"));
-  }
 
   const projectId = randomUUID();
   try {
@@ -192,8 +178,6 @@ async function requireMember() {
 }
 
 export async function registerShowcaseParticipant(input: {
-  studentNumber: string;
-  studentNumberConsent: boolean;
   announcementConsent: boolean;
 }) {
   const memberId = await requireMember();
@@ -201,13 +185,13 @@ export async function registerShowcaseParticipant(input: {
   const parsed = parseShowcaseRegistration(input);
   if (!parsed.success) return { ok: false as const, message: parsed.message, field: parsed.field };
   try {
-    await projectShowcaseRepository.registerParticipant({ memberId, studentNumber: parsed.data.studentNumber });
+    await projectShowcaseRepository.registerParticipant({ memberId });
     revalidatePath(`${EVENT_PATH}/my`);
     return { ok: true as const, message: "참여 등록을 마쳤어요. 이제 체험을 시작할 수 있어요." };
   } catch (error) {
     logUnexpected("register", error);
     const failure = toShowcaseFailure(error);
-    return failure.code === "student_number_taken" ? { ...failure, field: "studentNumber" } : failure;
+    return failure;
   }
 }
 

@@ -37,7 +37,7 @@ export default async function AdminProjectShowcasePage({
         <AdminPageHeader
           eyebrow="이벤트 운영"
           title="내 프로젝트를 소개합니다!"
-          description="모집·체험·발표 일정과 경품 수량을 설정하고 출품작을 검수합니다. 참여자 이름과 학번은 이 운영 화면에서만 볼 수 있어요."
+          description="모집·체험·발표 일정과 경품 수량을 설정하고 출품작을 검수합니다. 동일한 프로젝트가 중복 등록됐다면 이미 등록된 프로젝트라는 사유로 반려해 주세요."
         />
         <div className="flex flex-wrap gap-3">
           <Button href={`${ADMIN_PATH}/draw`}>추첨·발표</Button>
@@ -104,17 +104,6 @@ export default async function AdminProjectShowcasePage({
                   <p className="mt-3 text-xs text-muted-foreground">
                     대표자 {project.ownerDisplayName} · 조회 {project.viewCount} · 피드백 {project.validExperienceCount} · 관심 {project.interestCount}
                   </p>
-                  <details className="mt-3 rounded-xl bg-surface-muted/50 px-3 py-2 text-sm">
-                    <summary className="cursor-pointer font-medium text-foreground">참여자 {project.participants.length}명 · 운영자 전용</summary>
-                    <ul className="mt-3 grid gap-2">
-                      {project.participants.map((participant) => (
-                        <li key={participant.studentNumber} className="flex flex-wrap justify-between gap-2 text-sm text-muted-foreground">
-                          <span>{participant.name}{participant.isOwner ? " · 대표자" : ""}</span>
-                          <span className="tabular-nums">{participant.studentNumber}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
                 </div>
               </div>
               {canUpdate && project.status !== "withdrawn" ? (

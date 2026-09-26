@@ -77,7 +77,7 @@ export default function ShowcaseEventSettingsForm({ event }: { event: ShowcaseEv
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium text-foreground" htmlFor="showcase-submitter-count">
-          출품 경품 수량 (프로젝트)
+          출품 경품 수량 (명)
           <input id="showcase-submitter-count" name="submitterSelectionCount" type="number" inputMode="numeric" min={0} max={500} defaultValue={event.submitterSelectionCount} className={INPUT_CLASS} />
         </label>
         <label className="grid gap-2 text-sm font-medium text-foreground" htmlFor="showcase-experiencer-count">

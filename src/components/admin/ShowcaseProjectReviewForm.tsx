@@ -5,7 +5,7 @@ import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import { reviewShowcaseProject } from "@/app/admin/(protected)/events/project-showcase/actions";
 import type { ShowcaseProjectStatus, ShowcaseReviewStatus } from "@/lib/project-showcase/types";
-import { parseShowcaseReview } from "@/lib/project-showcase/validation";
+import { parseShowcaseReview, SHOWCASE_DUPLICATE_PROJECT_REASON } from "@/lib/project-showcase/validation";
 
 const ACTIONS: Array<{ status: ShowcaseReviewStatus; label: string; variant: "primary" | "secondary" | "danger" }> = [
   { status: "approved", label: "승인", variant: "primary" },
@@ -68,6 +68,11 @@ export default function ShowcaseProjectReviewForm({
           placeholder="수정이 필요한 부분이나 판단 근거를 적어 주세요."
         />
       </label>
+      <div>
+        <Button type="button" variant="secondary" disabled={isPending} onClick={() => {
+          if (noteRef.current) { noteRef.current.value = SHOWCASE_DUPLICATE_PROJECT_REASON; noteRef.current.focus(); }
+        }}>중복 출품 사유 넣기</Button>
+      </div>
       <div className="flex flex-wrap gap-2">
         {actions.map((action) => (
           <Button key={action.status} type="button" variant={action.variant} disabled={isPending} onClick={() => submit(action.status)}>

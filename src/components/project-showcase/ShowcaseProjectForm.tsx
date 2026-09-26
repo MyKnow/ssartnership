@@ -22,7 +22,6 @@ import {
 } from "@/lib/project-showcase/types";
 import {
   parseShowcaseProjectSubmission,
-  SHOWCASE_MAX_TEAMMATES,
   SHOWCASE_SERVICE_URL_HINTS,
 } from "@/lib/project-showcase/validation";
 
@@ -37,14 +36,9 @@ const FIELD_SELECTORS: Record<string, string> = {
   summary: "#showcase-project-summary",
   description: "#showcase-project-description",
   serviceUrl: "#showcase-project-url",
-  ownerStudentNumber: "#showcase-project-owner-number",
-  teammates: '[name="teammateName"]',
   imageUploadId: "#showcase-project-image",
-  participantsConsent: 'input[name="participantsConsent"]',
   announcementConsent: 'input[name="announcementConsent"]',
 };
-
-type TeammateDraft = { id: number; name: string; studentNumber: string };
 
 type ShowcaseProjectFormProps =
   | { mode: "create"; ownerName: string; project?: undefined }
@@ -58,17 +52,12 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
   const [previewUrl, setPreviewUrl] = useState(project?.imageUrl ?? "");
   const [cropSourceFile, setCropSourceFile] = useState<File | null>(null);
   const [cropSourceUrl, setCropSourceUrl] = useState("");
-  const [teammates, setTeammates] = useState<TeammateDraft[]>(() => (project?.participants ?? [])
-    .filter((participant) => !participant.isOwner)
-    .map((participant, index) => ({ id: index, name: participant.name, studentNumber: participant.studentNumber })));
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [errorField, setErrorField] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const errorRegionRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const nextTeammateIdRef = useRef(teammates.length);
-  const ownerStudentNumber = project?.participants.find((participant) => participant.isOwner)?.studentNumber ?? "";
   const urlHint = SHOWCASE_SERVICE_URL_HINTS[projectType];
   const fieldError = (field: string) => (error && errorField === field ? error : "");
 
@@ -135,23 +124,11 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
     }
   }
 
-  function updateTeammate(id: number, field: "name" | "studentNumber", value: string) {
-    setTeammates((current) => current.map((teammate) => (teammate.id === id ? { ...teammate, [field]: value } : teammate)));
-  }
-
-  function addTeammate() {
-    if (teammates.length >= SHOWCASE_MAX_TEAMMATES) return;
-    const id = nextTeammateIdRef.current;
-    nextTeammateIdRef.current += 1;
-    setTeammates((current) => [...current, { id, name: "", studentNumber: "" }]);
-  }
-
   function handleSubmit(submitEvent: FormEvent<HTMLFormElement>) {
     submitEvent.preventDefault();
     setError("");
     setErrorField(null);
     const formData = new FormData(submitEvent.currentTarget);
-    const teammateRows = teammates.map(({ name, studentNumber }) => ({ name, studentNumber }));
     const fields = {
       projectType,
       title: String(formData.get("title") ?? ""),
@@ -159,9 +136,6 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
       summary: String(formData.get("summary") ?? ""),
       description: String(formData.get("description") ?? ""),
       serviceUrl: String(formData.get("serviceUrl") ?? ""),
-      ownerStudentNumber: String(formData.get("ownerStudentNumber") ?? ""),
-      teammates: teammateRows,
-      participantsConsent: formData.get("participantsConsent") === "true",
       announcementConsent: formData.get("announcementConsent") === "true",
     };
     // Editing may keep the current image; a new project must choose one.
@@ -170,12 +144,7 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
       { requireImage: mode === "create" },
     );
     if (!parsed.success) {
-      const [, index, key] = parsed.path ?? [];
-      const teammate = typeof index === "number" ? teammates[index] : undefined;
-      const teammateSelector = parsed.field === "teammates" && teammate
-        ? `#showcase-teammate-${key === "studentNumber" ? "number" : "name"}-${teammate.id}`
-        : null;
-      showError(parsed.message, teammateSelector ?? parsed.field);
+      showError(parsed.message, parsed.field);
       return;
     }
     if (file) {
@@ -257,6 +226,11 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
           <input id="showcase-project-title" name="title" maxLength={100} defaultValue={project?.title} {...fieldProps("title", "showcase-project-title-error")} placeholder="서비스 이름을 입력해 주세요" />
           <FieldError id="showcase-project-title-error" message={fieldError("title")} />
         </label>
+        <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-project-team">
+          팀명 (선택)
+          <input id="showcase-project-team" name="teamName" maxLength={60} defaultValue={project?.teamName ?? ""} {...fieldProps("teamName", "showcase-project-team-error")} />
+          <FieldError id="showcase-project-team-error" message={fieldError("teamName")} />
+        </label>
         <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-project-summary">
           한 줄 소개
           <input id="showcase-project-summary" name="summary" maxLength={240} defaultValue={project?.summary} {...fieldProps("summary", "showcase-project-summary-error")} placeholder="어떤 문제를 해결하는 서비스인지 알려 주세요" />
@@ -324,97 +298,16 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
         <FieldError id="showcase-project-image-error" message={fieldError("imageUploadId")} />
       </div>
 
-      <fieldset className="grid min-w-0 gap-4">
-        <legend className="mb-1 text-sm font-semibold text-foreground">참여자</legend>
-        <div className="grid min-w-0 gap-3 rounded-2xl border border-border bg-surface-muted/40 p-4 sm:grid-cols-2">
-          <div className="grid min-w-0 gap-2 text-sm font-medium text-foreground">
-            대표자 이름
-            <p className="flex min-h-12 items-center rounded-xl border border-border bg-surface px-4 text-base font-normal text-muted-foreground">{ownerName}</p>
-          </div>
-          <label className="grid min-w-0 gap-2 text-sm font-medium text-foreground" htmlFor="showcase-project-owner-number">
-            대표자 학번
-            <input
-              id="showcase-project-owner-number"
-              name="ownerStudentNumber"
-              inputMode="numeric"
-              autoComplete="off"
-              maxLength={7}
-              defaultValue={ownerStudentNumber}
-              {...fieldProps("ownerStudentNumber", "showcase-project-owner-number-error")}
-              placeholder="숫자 7자리"
-            />
-            <FieldError id="showcase-project-owner-number-error" message={fieldError("ownerStudentNumber")} />
-          </label>
-        </div>
-
-        <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-project-team">
-          팀명 <span className="text-xs font-normal text-muted-foreground">팀으로 출품하면 필수</span>
-          <input id="showcase-project-team" name="teamName" maxLength={60} defaultValue={project?.teamName ?? ""} {...fieldProps("teamName", "showcase-project-team-error")} placeholder="개인 출품이면 비워 두세요" />
-          <FieldError id="showcase-project-team-error" message={fieldError("teamName")} />
-        </label>
-
-        {teammates.length > 0 ? (
-          <div className="grid min-w-0 gap-3">
-            {teammates.map((teammate, index) => (
-              <div key={teammate.id} className="grid min-w-0 gap-3 rounded-2xl border border-border bg-surface-muted/40 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
-                <label className="grid min-w-0 gap-2 text-sm font-medium text-foreground" htmlFor={`showcase-teammate-name-${teammate.id}`}>
-                  팀원 {index + 1} 이름
-                  <input
-                    id={`showcase-teammate-name-${teammate.id}`}
-                    name="teammateName"
-                    maxLength={80}
-                    value={teammate.name}
-                    onChange={(changeEvent) => updateTeammate(teammate.id, "name", changeEvent.target.value)}
-                    {...fieldProps(`#showcase-teammate-name-${teammate.id}`, `showcase-teammate-name-${teammate.id}-error`)}
-                  />
-                  <FieldError id={`showcase-teammate-name-${teammate.id}-error`} message={fieldError(`#showcase-teammate-name-${teammate.id}`)} />
-                </label>
-                <label className="grid min-w-0 gap-2 text-sm font-medium text-foreground" htmlFor={`showcase-teammate-number-${teammate.id}`}>
-                  팀원 {index + 1} 학번
-                  <input
-                    id={`showcase-teammate-number-${teammate.id}`}
-                    inputMode="numeric"
-                    autoComplete="off"
-                    maxLength={7}
-                    value={teammate.studentNumber}
-                    onChange={(changeEvent) => updateTeammate(teammate.id, "studentNumber", changeEvent.target.value)}
-                    {...fieldProps(`#showcase-teammate-number-${teammate.id}`, `showcase-teammate-number-${teammate.id}-error`)}
-                    placeholder="숫자 7자리"
-                  />
-                  <FieldError id={`showcase-teammate-number-${teammate.id}-error`} message={fieldError(`#showcase-teammate-number-${teammate.id}`)} />
-                </label>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => setTeammates((current) => current.filter((item) => item.id !== teammate.id))}
-                  ariaLabel={`팀원 ${index + 1} 삭제`}
-                >
-                  삭제
-                </Button>
-              </div>
-            ))}
-          </div>
-        ) : null}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button type="button" variant="secondary" onClick={addTeammate} disabled={teammates.length >= SHOWCASE_MAX_TEAMMATES}>
-            팀원 추가
-          </Button>
-          <span className="text-xs text-muted-foreground">대표자 포함 {teammates.length + 1}명 · 최대 {SHOWCASE_MAX_TEAMMATES + 1}명</span>
-        </div>
-        <p className="text-xs leading-5 text-muted-foreground">
-          참가자 1명은 프로젝트 1개에만 참여할 수 있어요. 이름과 학번은 운영진 확인과 당첨 안내에만 쓰고 공개하지 않아요.
-        </p>
-      </fieldset>
+      <div className="grid gap-2 text-sm text-muted-foreground">
+        <p className="font-semibold text-foreground">출품자: {ownerName}</p>
+        <p className="leading-6">여러 프로젝트를 출품할 수 있어요. 승인된 프로젝트마다 추첨 기회가 1개씩 생기며, 경품은 한 사람당 1개예요.</p>
+        <p className="leading-6">같은 프로젝트를 다른 사람이 이미 등록했다면 반려될 수 있어요. 당첨 안내는 회원 정보에 등록된 MM 또는 이메일로 보내 드려요.</p>
+      </div>
 
       <div className="grid gap-3 rounded-2xl border border-border bg-surface-muted/40 p-4">
         <label className="flex items-start gap-3 text-sm leading-6 text-foreground">
-          <input className="mt-1 h-4 w-4 shrink-0 accent-primary" type="checkbox" name="participantsConsent" value="true" defaultChecked={mode === "edit"} />
-          <span>(필수) 팀원에게 이름·학번을 이벤트 운영에 사용한다는 점을 안내했고 동의를 받았어요.</span>
-        </label>
-        <FieldError id="showcase-participantsConsent-error" message={fieldError("participantsConsent")} />
-        <label className="flex items-start gap-3 text-sm leading-6 text-foreground">
           <input className="mt-1 h-4 w-4 shrink-0 accent-primary" type="checkbox" name="announcementConsent" value="true" defaultChecked={mode === "edit"} />
-          <span>(필수) 경품에 당첨되면 대표자 이름·학번 일부를 가려(예: 정** · 15****43) 공지하는 데 동의해요.</span>
+          <span>(필수) 경품에 당첨되면 출품자 이름 일부를 가려(예: 정**) 공지하는 데 동의해요.</span>
         </label>
         <FieldError id="showcase-announcementConsent-error" message={fieldError("announcementConsent")} />
       </div>

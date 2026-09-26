@@ -5,14 +5,7 @@ import {
   type ShowcaseProjectType,
 } from "./types";
 
-export const SHOWCASE_MAX_TEAMMATES = 19;
-export const SHOWCASE_STUDENT_NUMBER_PATTERN = /^\d{7}$/u;
-export const SHOWCASE_STUDENT_NUMBER_MESSAGE = "학번은 숫자 7자리로 입력해 주세요.";
-
 const ALLOWED_DEMO_VIDEO_HOSTS = new Set(["youtube.com", "youtu.be", "m.youtube.com", "vimeo.com", "player.vimeo.com"]);
-
-export const showcaseStudentNumberSchema = z.string().trim()
-  .regex(SHOWCASE_STUDENT_NUMBER_PATTERN, SHOWCASE_STUDENT_NUMBER_MESSAGE);
 
 const httpsUrlSchema = z.string().trim().min(1, "체험 주소를 입력해 주세요.").max(2048).refine((value) => {
   try {
@@ -21,11 +14,6 @@ const httpsUrlSchema = z.string().trim().min(1, "체험 주소를 입력해 주�
     return false;
   }
 }, "https로 시작하는 주소를 입력해 주세요.");
-
-const teammateSchema = z.object({
-  name: z.string().trim().min(1, "팀원 이름을 입력해 주세요.").max(80, "팀원 이름은 80자 이하로 입력해 주세요."),
-  studentNumber: showcaseStudentNumberSchema,
-});
 
 export function isSupportedDemoVideoUrl(value: string) {
   try {
@@ -44,19 +32,9 @@ export const showcaseProjectSubmissionSchema = z.object({
   summary: z.string().trim().min(5, "한 줄 소개를 5자 이상 입력해 주세요.").max(240, "한 줄 소개는 240자 이하로 입력해 주세요."),
   description: z.string().trim().min(20, "서비스 설명을 20자 이상 입력해 주세요.").max(8000, "서비스 설명은 8000자 이하로 입력해 주세요."),
   serviceUrl: httpsUrlSchema,
-  ownerStudentNumber: showcaseStudentNumberSchema,
-  teammates: z.array(teammateSchema).max(SHOWCASE_MAX_TEAMMATES, `팀원은 최대 ${SHOWCASE_MAX_TEAMMATES}명까지 추가할 수 있어요.`),
   imageUploadId: z.string().uuid("대표 이미지를 선택해 주세요.").nullable(),
-  participantsConsent: z.literal(true, "팀원에게 이름·학번의 이벤트 운영 사용을 안내하고 동의를 확인해 주세요."),
-  announcementConsent: z.literal(true, "당첨 시 이름·학번 일부를 가려 공지하는 데 동의해 주세요."),
+  announcementConsent: z.literal(true, "당첨 시 이름 일부를 가려 공지하는 데 동의해 주세요."),
 }).superRefine((value, context) => {
-  if (value.teammates.length > 0 && !value.teamName) {
-    context.addIssue({ code: "custom", path: ["teamName"], message: "팀으로 출품하면 팀명을 입력해 주세요." });
-  }
-  const studentNumbers = [value.ownerStudentNumber, ...value.teammates.map((teammate) => teammate.studentNumber)];
-  if (new Set(studentNumbers).size !== studentNumbers.length) {
-    context.addIssue({ code: "custom", path: ["teammates"], message: "같은 학번을 두 번 입력할 수 없어요." });
-  }
   if (value.projectType === "embedded" && !isSupportedDemoVideoUrl(value.serviceUrl)) {
     context.addIssue({ code: "custom", path: ["serviceUrl"], message: "YouTube 또는 Vimeo 시연 영상 주소를 입력해 주세요." });
   }
@@ -174,6 +152,8 @@ export function parseShowcaseSchedule(input: Record<string, string>): ShowcaseVa
   };
 }
 
+export const SHOWCASE_DUPLICATE_PROJECT_REASON = "이미 등록된 프로젝트입니다";
+
 export const SHOWCASE_REVIEW_STATUSES = ["approved", "changes_requested", "rejected", "hidden"] as const;
 
 /** Shared by the admin review form and `reviewShowcaseProject`. */
@@ -201,20 +181,18 @@ export const SHOWCASE_SERVICE_URL_HINTS: Record<ShowcaseProjectType, { label: st
 };
 
 export const showcaseRegistrationSchema = z.object({
-  studentNumber: showcaseStudentNumberSchema,
-  studentNumberConsent: z.literal(true, "학번을 이벤트 운영에 사용하는 데 동의해 주세요."),
-  announcementConsent: z.literal(true, "당첨 시 이름·학번 일부를 가려 공지하는 데 동의해 주세요."),
+  announcementConsent: z.literal(true, "당첨 시 이름 일부를 가려 공지하는 데 동의해 주세요."),
 });
 
 /** Shared by the experience registration form and `registerShowcaseParticipant`. */
-export function parseShowcaseRegistration(value: unknown): ShowcaseValidationResult<{ studentNumber: string }> {
+export function parseShowcaseRegistration(value: unknown): ShowcaseValidationResult<{ announcementConsent: true }> {
   const result = showcaseRegistrationSchema.safeParse(value);
   if (!result.success) {
     const issue = result.error.issues[0];
     const field = typeof issue?.path[0] === "string" ? issue.path[0] : null;
     return { success: false, message: issue?.message ?? "입력 내용을 확인해 주세요.", field };
   }
-  return { success: true, data: { studentNumber: result.data.studentNumber } };
+  return { success: true, data: { announcementConsent: result.data.announcementConsent } };
 }
 
 export const SHOWCASE_FEEDBACK_MIN_LENGTH = 10;

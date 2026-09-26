@@ -59,6 +59,6 @@ export const SHOWCASE_ADMIN_STATUS_LABELS: Record<ShowcaseProjectStatus, string>
 
 /** Prize items from the approved plan; winner counts come from the event settings. */
 export const SHOWCASE_PRIZES = {
-  submitter: { title: "출품 경품", prize: "배달의민족 상품권 1만 원", unit: "개 프로젝트" },
+  submitter: { title: "출품 경품", prize: "배달의민족 상품권 1만 원", unit: "명" },
   experiencer: { title: "체험 경품", prize: "메가커피 아이스 아메리카노 교환권", unit: "명" },
 } as const;
