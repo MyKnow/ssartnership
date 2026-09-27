@@ -7,7 +7,15 @@ authority: normative
 
 # 작업 상태
 
-## 현재 실행: 보안 검사 오류 응답 차단 수정
+## 현재 실행: 전체 경로 반복 계측
+
+보안 검사 수정 `c3a905e75d99a19fd738cbcf7fb0066e29127cd4`의 cold 준비 빌드는 394.621초, 83 E2E 및 strict audit로 통과했고 합성 Preview의 실제 image SHA·healthy·상세 HTTP 200을 검증했다. 정상 캐시를 만든 뒤 정식 running/warm 첫 push `96f4e5d2697c6034fba32b95d4ec0e31fcd9a222`를 자동 감지해 배포했다. push-to-ready 604.037초, gate 295.746초, 전송 245.951초, 배포 3.782초다. 응답의 실험 표식과 SHA가 일치했고 GitHub Actions/운영 배포는 0회다. 1회 결과이므로 최종 통계는 아니다.
+
+running/cold 첫 시도 `a8f63471a84f4a8600f1bd938f3e532be5ac3afd`는 의존성 다운로드 중 ECONNRESET으로 43.865초 후 실패했고 배포가 차단됐다. 원래 push·로그·실패 결과를 보존하고 성공 통계에서 제외한다. 같은 빌더에서 잠금 파일의 Next 패키지를 읽기 전용 조회해 HTTP 200·SHA-512 일치를 확인했다. 새 SHA의 별도 cold 실행으로 표본을 계속 수집하며 자동 설치 재시도나 캐시 조건 변경은 하지 않는다. 유효 표본은 아직 1/12다.
+
+운영 앱 두 곳의 컨테이너·이미지·시작 시각을 읽기 전용으로 기록했다. production revision은 `17ddf32b2b6d67c3d197d428347861cdfea18c1f`, 기존 preview는 `308281074ed752b6cccce693d27755da13dd675f`이며 모두 healthy다. 초기 준비 실행 30e0ed83의 생성된 work 폴더만 제거했고 원본 source/image archive·측정·실패 작업 폴더·최신 캐시는 보존했다.
+
+## 수정 및 준비 검증 이력
 
 재부팅 수정 `5065fe30974a06f0f50cb4cc8bcb52d340985203` 게시 후 설치 코드 및 controller unit을 동기화했다. timer를 켜서 준비 빌드를 자동 접수했지만 npm 보안 endpoint의 HTTP 503/exit 1을 기존 wrapper가 빈 취약점 목록으로 해석하는 결함을 발견했다. 배포 전에 timer를 disabled/inactive로 되돌렸으며 이 실행은 성공 표본에서 제외한다. 정식 push 12회는 아직 시작하지 않았다. 실제 운영 health 두 곳은 HTTP 200이었다.
 
