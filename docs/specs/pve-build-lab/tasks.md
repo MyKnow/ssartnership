@@ -7,23 +7,58 @@ authority: normative
 
 # 작업 상태
 
+## 현재 실행: 전체 경로 계측 준비
+
+CPU 18회, RAM 12회, GitHub 기준 6회, 같은 후보 SHA의 캐시 최적화 12회를 완료했다. 모든 결과는 각 조건 n=3, SHA 일치, E2E 83개 및 실패/오류/skip/retry 0, OOM 없음이다. `build-lab-497-optimization-matrix.service`는 2026-09-27 09:00:29 KST에 success/inactive/MainPID 0으로 종료했으므로 재시작하지 않는다.
+
+| 캐시 | 최적화 미적용 중앙값 | 적용 중앙값 | 조건별 반복 |
+| --- | ---: | ---: | ---: |
+| cold | 386.184초 | 386.629초 | 3회 |
+| warm | 359.106초 | 292.786초 | 3회 |
+
+warm은 66.320초, 약 18.5% 단축됐다. cold는 차이가 거의 없다. compile marker 구간은 off warm 첫 두 회에서 real/fixture 각각 약 51초, on에서 약 19초였으며 전체 Next build 시간과 구분한다. 측정은 4 vCPU/6144 MiB VM 및 5120 MiB container, 같은 후보 SHA `30e0ed839979f79026cea477a1db168346dd1017`와 image `sha256:0074c15043d3aec5b59f5576b8b2ddcede3a2ff7a9cd918e88ad486230ee68e8`다. 이미지 준비·부팅·전송·배포를 포함한 결과는 아직 아니다.
+
+효율 기준은 4 vCPU/6 GiB로 선택했다. CPU 4→8은 할당 두 배 대비 약 6~7% 개선, RAM VM/container 6144/5120→8192/6144 MiB는 약 0.4~0.5% 개선이었다. 빌더 root 소유 profile은 cpus=4, vmMemoryMiB=6144, containerMemoryMiB=5120, stableLabCache=true, reuseCache=true로 설치했고 실제 guest 자원과 일치함을 검증했다. root 제어기는 아직 disabled/inactive다.
+
+측정 종료 후 API로 Preview VM 4971을 기동했다. 이전 설치본을 `/root/build-lab-preview-before-<SHA>`에 보존한 뒤 같은 후보의 스크립트 42개와 Compose overlay·합성 seed를 설치했다. 설치 묶음은 174080바이트, SHA-256 `e0b759c850e4fd94b141121862b1c973f59f7385b6f5d37aa3546331c5662aca`다. 합성 env는 재생성하거나 출력하지 않았다. guest의 관련 계약 12개와 실제 Compose config 검증이 통과했다. 서비스는 db/rest/storage/gateway 4개, 네트워크 2개 모두 internal=true, 공개 포트 없음이다.
+
+`build-lab-preview-provision-30e0ed83.service`는 09:09:55 KST에 success/inactive/MainPID 0으로 종료했다. 실제 db/rest/storage/gateway 4개가 healthy이며 migration·DB/Storage smoke·합성 seed가 성공했다. 회원 0명, 가상 업체/제휴 각 1개다. seed 재적용은 `LAB_SEED_REQUIRES_EMPTY_APPLICATION_DATA`로 거부됐고 행 수가 유지됐다. 모든 실행 네트워크 internal 및 port publication 없음도 inspect로 확인했다.
+
+Storage 컨테이너에서 내부 gateway:8000 TCP 연결은 성공하고 인터넷 443·SMTP 587·PVE SSH·현재 운영 공인 IP 443은 모두 차단됐다. 발송 자격증명 설정 없음, DB cron.job 0개, runtime env root 소유 0600도 확인했다. 앱 자체에서도 같은 외부 연결 차단과 내부 gateway 연결을 검증했다. guest 재부팅은 아래 결함 수정 후 검증을 완료했다.
+
+제어기를 한 번만 호출해 현재 후보의 첫 request를 시작했고 timer는 계속 disabled/inactive다. request `30e0ed839979f79026cea477a1db168346dd1017`은 gate 389.534초, cold, 83 E2E 및 zero failure/error/skip/retry로 완료했다. source 준비부터 artifact 완료까지 약 408초, packaging 약 7.138초이며 이는 실제 push 측정에서 제외하는 준비 실행이다. archive는 343201280바이트, SHA-256 `d754ca21d5d6570b36c4d68858617490260424e60a80aa1b6ebd16769edda1f8`이다. 첫 delivery는 host의 `build-lab-first-delivery-30e0ed83.service`에서 09:19:32 KST success/inactive/MainPID 0으로 완료했다. 전송 약 246.306초, Preview 이미지 적용~HTTP readiness 약 3.843초다. 실행 이미지 ID는 `sha256:82e6869c358e11651a99176a14cd6a7e7c62be0dcbbc54ce983d414eafb48f86`이며 archive·SHA·label이 일치했다. 이 준비 실행은 push-to-ready 반복 통계에서 제외한다. Mac loopback 3100/54321 SSH 터널을 사용하며 공개 DNS/공유기는 변경하지 않았다.
+
+PVE의 일회용 인증으로 두 guest의 hostname 조회와 제한된 SCP 다운로드를 실제 검증했다. 공개 파일 hash는 builder controller `30527dfde0d998dee32efb9971dd426234f29a3abc5d092ae5c6bafab00b1f84`, Preview seed `1eaaa55a83a8f83b87e1165af89ecdab42bd4464410aee129821dd3de0c8a482`다. 개인키 파일 없이 메모리/agent에서만 사용했고 종료 후 agent와 임시 디렉터리 제거를 확인했다. 기존 관리 SSH도 유지됐다. 실제 app artifact 전달과 최초 배포도 검증했다.
+
+실제 push 시간 측정용 opt-in Git shim은 준비했고 read-only Git passthrough를 확인했다. 아직 시간 측정 대상 push는 하지 않았다. 설치·전송 검증은 기존 production/preview와 분리했고 마지막 운영 health 확인은 08:35 KST 두 URL 모두 HTTP 200이었다.
+
+## 재부팅 복구 결함과 수정
+
+첫 Preview 재부팅에서 Docker가 private IP를 재할당했으나 loopback proxy unit이 이전 IP를 고정해 앱/API 연결이 reset됐다. 컨테이너와 볼륨은 정상이며, 실패한 최초 검증과 후속 진단을 보존했다. 이 실패를 초기화 재실행이나 공개 포트 추가로 우회하지 않았다.
+
+현재 로컬 변경은 proxy service activation마다 고정 lab container의 주소 및 모든 네트워크의 internal 여부를 조회한다. root는 주소 조회에만 사용하고 groups를 비운 뒤 UID/GID nobody로 내려가 proxy를 exec한다. 잘못된 서비스/host/외부 네트워크/기동 timeout과 권한 강등 순서를 포함해 Python 78개가 통과했다. Preview에만 helper hash `fbdefb9962e8236b8a2d540afc9d7fe9833bb38388e7ee43e6aa0514984389a8`를 적용했고 이전 파일은 `/root/build-lab-loopback-before-reboot-fix`에 보존했다. 아직 Git 커밋/게시 및 host/builder 코드 동기화는 하지 않았다.
+
+수정 후 두 번째 재부팅에서 boot ID 변경, 5개 healthy 컨테이너·같은 이미지/볼륨/컨테이너 ID, 회원 0·가상 업체/제휴 각 1개 유지, 기존 Storage marker와 private signed object smoke, 앱 health/합성 상세 HTTP 200을 확인했다. 두 프록시의 UID 65534, effective capabilities 0도 실제 process에서 확인했다. Chrome에서 재접속 후 합성 제휴 상세를 검증하고 screenshot을 보존했다. 앱 출처의 경고/오류 0, 브라우저 확장 출처 경고 12, 출처 불명 0이다.
+
+로컬 `verify-loopback-reboot-fix-release-1.log`는 exit 0, E2E 83개, 실패/오류/skip/retry 0, XML 110.390초로 완료했다. 전체 2495줄에는 기존 검토된 startup/admin full-reload 3개와 rollback mock 진단 4개만 있었다. 새 오류 서명이 없으며 실패 ledger에 재부팅 원인·수정·실증을 기록했다. 다음 단계는 수정 게시/설치 상태 정리 후 timer 활성화 및 작은 변경의 stopped/running × cold/warm 각 3회 계측이다. 기존 운영 환경 전환은 하지 않는다.
+
 ## 최신 로컬 보완: 연속 변경 처리
 
 기존 최신 tip polling은 빌드 중 도착한 중간 SHA와 이전 SHA의 배포를 건너뛸 수 있어 수정 중이다. 로컬 제어기는 별도 bare history에서 고정 실험 브랜치의 새 커밋을 위상 순서로 수집하고, 최대 64개의 pending 큐와 cursor를 먼저 저장한다. fast-forward 이력이 아니거나 수집이 불완전하거나 한도를 넘으면 요청을 버리지 않고 중단한다. push 이벤트를 수신하는 방식은 아니므로 한 push에 여러 커밋이 있으면 각각 빌드하며, 강제 push는 지원하지 않는다. 실제 Git 저장소의 연속 커밋·되돌림·없는 SHA 테스트를 포함한다.
 
 완료된 이전 SHA의 배포는 최신 tip과 분리한다. 큐의 첫 SHA를 실행하고 다음 요청을 보존하며, 대기 요청이 있으면 유휴 종료하지 않는다. 실행 요청 전에 SHA와 dispatch intent를 저장하므로 guest 응답 유실 시 자동으로 재실행하지 않는다. 다음 tick에서 해당 SHA의 결과를 확인하며, 실제 실행 여부가 불확실한 실패는 진단 후 복구해야 한다. 빌더는 고정 브랜치 전체 이력을 받아 요청 SHA가 현재 tip의 조상인지 검증한다. 이로 인한 source 준비 시간은 전체 경로 측정에 포함한다.
 
-현재 Python 테스트 72개 및 diff 검사가 통과했다. 변경은 아직 로컬에만 있으며 서버 설치·실제 연속 push·큐 복구 검증은 남았다. RAM matrix 실행 파일은 교체하지 않았다.
+Python 테스트 72개 및 diff 검사가 통과했고 30e0ed83으로 게시 및 host/builder 설치를 완료했다. 실제 연속 push·큐 복구 검증은 남았다. 실행 중인 optimization matrix 파일은 교체하지 않는다.
 
 - [x] Issue #497, dev 기준 SHA 및 별도 작업 브랜치 준비.
 - [x] 빌드 VM 4970의 KVM 부팅·SSH·Docker·QEMU agent 확인.
 - [x] 전용 사설망·운영 주소 차단·전송 상한 구성 및 연결 검사.
 - [x] 기준 코드의 탐색 cold/warm gate와 SHA·83 E2E 검증.
-- [ ] 실제 VM 자원 조합별 cold/warm 각각 최소 3회.
-- [ ] 고정 자원에서 코드 최적화별 cold/warm 각각 최소 3회.
+- [x] 실제 VM 자원 조합별 cold/warm 각각 최소 3회.
+- [x] 고정 자원에서 코드 최적화별 cold/warm 각각 최소 3회.
 - [ ] 브랜치 push → 기동 → 빌드 → 배포 → 유휴 종료 실증.
 - [x] Preview VM 4971의 디스크·게스트 도구·새 합성 환경값 준비.
-- [ ] 합성 DB·스토리지·서비스 실행 및 외부 동작 차단 실증.
+- [x] 합성 DB·스토리지·서비스 실행 및 외부 동작 차단 실증.
 - [ ] 작은 변경 push부터 Preview 정상 응답까지 측정.
 - [ ] 비교 결과 및 전환·복구안 제출. 운영 전환은 별도 승인.
 
@@ -37,7 +72,9 @@ authority: normative
 - 기존 production/preview·dev/main 배포·도메인·공유기·운영 DB·운영 비밀값은 변경하지 않는다.
 - 원본 checkout의 미추적 사용자 파일은 보존한다. 기반 코드 `81dc3a368adcf2fa74d88aa3f2deeabbd175667e`를 실험 브랜치에 push했고 원격 SHA 일치를 확인했다. 해당 SHA의 Actions/check runs/status contexts는 모두 0개이며 PR과 자동 제어기 활성화는 아직 없다.
 
-## 2026-09-27 현재 측정
+## 2026-09-27 측정 이력
+
+이하 절은 당시 진행 기록이다. 현재 실행 및 완료 여부는 문서 상단과 체크리스트를 기준으로 하며, 아래의 실행 중·미게시·미설치 표현을 재실행 지시로 해석하지 않는다.
 
 PVE host의 `build-lab-497-resource-matrix.service`는 06:19:29 KST에 success/inactive/MainPID 0으로 종료했다. VM 4970의 실제 2/4/8 vCPU 및 6144 MiB, gate 컨테이너 5120 MiB에서 각 cold/warm 3회, 총 18회가 모두 유효하다. 기준 SHA·archive와 83 E2E 계약을 유지했으며 실패·OOM이 없다. 이 CPU unit은 재시작 대상이 아니다.
 
