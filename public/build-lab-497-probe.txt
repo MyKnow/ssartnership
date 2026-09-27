@@ -1,3 +1,4 @@
 Synthetic Preview build lab #497
-Measurement: control-running-warm-3
+Final queued publication probe.
+Preceding documentation SHA: 0f66a8917eb35a7e2b725c5bb81417caeddb1e80
 No production service or customer data.
