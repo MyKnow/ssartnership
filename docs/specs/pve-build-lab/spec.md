@@ -1,7 +1,7 @@
 ---
 title: PVE 빌드 실험 요구사항
 type: feature-spec
-status: active
+status: current
 authority: normative
 ---
 

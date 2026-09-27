@@ -1,0 +1,31 @@
+{
+  "optimizedN": 3,
+  "controlN": 3,
+  "sameEnvironment": true,
+  "workload": "small synthetic public-file change with complete gate",
+  "coldControlPreparationExcluded": true,
+  "transportFailureCauseUnresolved": true,
+  "metrics": [
+    {
+      "metric": "gate_seconds",
+      "optimizedMedianSeconds": 296.795,
+      "controlMedianSeconds": 365.162,
+      "savedSeconds": 68.36699999999996,
+      "reductionPercent": 18.722375274535676
+    },
+    {
+      "metric": "push_to_ready_seconds",
+      "optimizedMedianSeconds": 604.0366244316101,
+      "controlMedianSeconds": 661.5825917720795,
+      "savedSeconds": 57.54596734046936,
+      "reductionPercent": 8.698228770852303
+    },
+    {
+      "metric": "push_to_probe_observed_seconds",
+      "optimizedMedianSeconds": 611.9329063892365,
+      "controlMedianSeconds": 670.1521241664886,
+      "savedSeconds": 58.2192177772522,
+      "reductionPercent": 8.687462992027847
+    }
+  ]
+}

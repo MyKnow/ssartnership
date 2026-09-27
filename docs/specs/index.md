@@ -28,4 +28,4 @@ last_verified: 2026-09-25
 - [문서 책임·테스트 정비](./documentation-architecture/spec.md) — Issue #474
 - [SSAFY 프로젝트 쇼케이스·체험 이벤트](./project-showcase-event/spec.md) — Issue #480, active
 
-- [PVE 빌드 성능 실험](./pve-build-lab/spec.md) — Issue #497, active
+- [PVE 빌드 성능 실험](./pve-build-lab/spec.md) — Issue #497, 측정·복구 결과와 최종 게시 검증 정본 연결

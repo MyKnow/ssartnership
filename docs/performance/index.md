@@ -15,6 +15,8 @@ last_verified: 2026-08-29
 
 ## Measurements and reports
 
+- [격리 PVE 빌드 최적화 측정](./measurements/pve-build-lab-2026-09-27.md)
+
 - [Speed Insights 배포 후 측정](./measurements/speed-insights.md)
 - [DB query 최적화 보고서](./reports/db-query-optimization.md)
 

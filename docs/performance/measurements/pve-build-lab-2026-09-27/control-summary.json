@@ -1,0 +1,35 @@
+{
+  "accepted": 3,
+  "groups": [
+    {
+      "state": "running",
+      "cache": "warm",
+      "n": 3,
+      "gate_seconds": {
+        "median": 365.162,
+        "min": 363.404,
+        "max": 365.418
+      },
+      "transfer_seconds": {
+        "median": 246.24059987068176,
+        "min": 245.94623708724976,
+        "max": 246.60972785949707
+      },
+      "deploy_seconds": {
+        "median": 4.000358819961548,
+        "min": 3.971555233001709,
+        "max": 4.0825231075286865
+      },
+      "push_to_ready_seconds": {
+        "median": 661.5825917720795,
+        "min": 659.4716947078705,
+        "max": 675.5477206707001
+      },
+      "push_to_probe_observed_seconds": {
+        "median": 670.1521241664886,
+        "min": 669.9714641571045,
+        "max": 690.7297041416168
+      }
+    }
+  ]
+}

@@ -1,0 +1,153 @@
+{
+  "provision-complete": {
+    "project": "ssartnership-lab-497",
+    "readyAt": 1790467795.0008647,
+    "syntheticDatabaseStorageSmoke": true,
+    "syntheticPartnerId": "00000497-0000-4000-8000-000000000003",
+    "externalNetworks": false,
+    "productionDataCopied": false
+  },
+  "isolation-inventory": {
+    "databaseStorageProvisioned": true,
+    "members": 0,
+    "companies": 1,
+    "partners": 1,
+    "seedReapplyRejected": true,
+    "dataUnchangedAfterRejection": true,
+    "runtimeNetworksInternal": true,
+    "runtimePortsPublished": false
+  },
+  "storage-egress-probe": [
+    {
+      "name": "internal",
+      "connected": true,
+      "reason": "connected"
+    },
+    {
+      "name": "internet",
+      "connected": false,
+      "reason": "timeout"
+    },
+    {
+      "name": "smtp",
+      "connected": false,
+      "reason": "timeout"
+    },
+    {
+      "name": "pve",
+      "connected": false,
+      "reason": "timeout"
+    },
+    {
+      "name": "operating",
+      "connected": false,
+      "reason": "timeout"
+    }
+  ],
+  "app-egress-probe": [
+    {
+      "name": "internal",
+      "connected": true,
+      "reason": "connected"
+    },
+    {
+      "name": "internet",
+      "connected": false,
+      "reason": "timeout"
+    },
+    {
+      "name": "smtp",
+      "connected": false,
+      "reason": "timeout"
+    },
+    {
+      "name": "pve",
+      "connected": false,
+      "reason": "timeout"
+    },
+    {
+      "name": "operating",
+      "connected": false,
+      "reason": "timeout"
+    }
+  ],
+  "before-reboot": {
+    "bootId": "82d0f04d-52b1-494b-b3cc-a91bd751aa87",
+    "appImageId": "sha256:82e6869c358e11651a99176a14cd6a7e7c62be0dcbbc54ce983d414eafb48f86",
+    "containerIds": [
+      "4699858fcb30",
+      "52fe9b1d02e7",
+      "5b58a19d0627",
+      "869ac4ebf090",
+      "b594b6adddcc"
+    ],
+    "volumes": [
+      "ssartnership-lab-497_db-data",
+      "ssartnership-lab-497_storage-data"
+    ],
+    "healthyContainers": 5
+  },
+  "reboot-diagnostic": {
+    "purpose": "diagnostic_after_failed_first_persistence_check",
+    "at": 1790468684.957555,
+    "endpointChecks": [
+      {
+        "name": "storage",
+        "errorClass": "ConnectionResetError"
+      },
+      {
+        "name": "app",
+        "errorClass": "ConnectionResetError"
+      }
+    ],
+    "smokeExitCode": 1,
+    "signature": "fetch failed",
+    "statusSuffix": [],
+    "stderrLength": 12
+  },
+  "reboot-fix-recovery": {
+    "api": {
+      "http200": true,
+      "uid": 65534,
+      "effectiveCapabilities": 0,
+      "noNewPrivileges": true
+    },
+    "app": {
+      "http200": true,
+      "uid": 65534,
+      "effectiveCapabilities": 0,
+      "noNewPrivileges": true
+    },
+    "storagePersistenceRecoveredAfterFix": true
+  },
+  "before-reboot-fixed": {
+    "bootId": "7d212510-d9db-44e7-94cf-ebd8d298abe8",
+    "appImageId": "sha256:82e6869c358e11651a99176a14cd6a7e7c62be0dcbbc54ce983d414eafb48f86",
+    "containerIds": [
+      "4699858fcb30",
+      "52fe9b1d02e7",
+      "5b58a19d0627",
+      "869ac4ebf090",
+      "b594b6adddcc"
+    ],
+    "volumes": [
+      "ssartnership-lab-497_db-data",
+      "ssartnership-lab-497_storage-data"
+    ],
+    "healthyContainers": 5
+  },
+  "after-reboot-fixed": {
+    "bootIdChanged": true,
+    "healthyContainers": 5,
+    "sameContainerIds": true,
+    "sameAppImage": true,
+    "sameVolumes": true,
+    "syntheticDataPreserved": true,
+    "databaseStoragePersistenceSmoke": true,
+    "healthHttp200": true,
+    "syntheticDetailHttp200": true,
+    "proxyUid": 65534,
+    "proxyEffectiveCapabilities": 0,
+    "verifiedAt": 1790469062.1859248
+  }
+}

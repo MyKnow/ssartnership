@@ -1,0 +1,50 @@
+{
+  "failures": [
+    {
+      "sha": "0d64ab3881fe2a83bdb016aee8e1482bc1680db5",
+      "case": "running-cold-3",
+      "phase": "dependency-install",
+      "error": "ECONNRESET",
+      "unfinishedPackage": "next",
+      "gateSeconds": 43.711,
+      "exitCode": 1,
+      "oomKilled": false,
+      "valid": false,
+      "deployed": false,
+      "includedInSuccessfulMedians": false,
+      "rootCause": "unresolved",
+      "originalPushStartedAt": 1790478482.6627169
+    },
+    {
+      "sha": "a8f63471a84f4a8600f1bd938f3e532be5ac3afd",
+      "case": "running-cold-1",
+      "phase": "dependency-install",
+      "error": "ECONNRESET",
+      "unfinishedPackage": "next",
+      "gateSeconds": 43.865,
+      "exitCode": 1,
+      "oomKilled": false,
+      "valid": false,
+      "deployed": false,
+      "includedInSuccessfulMedians": false,
+      "rootCause": "unresolved",
+      "originalPushStartedAt": 1790472211.848734
+    },
+    {
+      "sha": "9fc1d6a80abac8c5378ab4615694b68000262a6c",
+      "case": "control-running-cold-1",
+      "phase": "dependency-install",
+      "error": "ECONNRESET",
+      "unfinishedPackage": "exceljs",
+      "gateSeconds": 48.579,
+      "exitCode": 1,
+      "oomKilled": false,
+      "valid": false,
+      "deployed": false,
+      "includedInSuccessfulMedians": false,
+      "rootCause": "unresolved",
+      "originalPushStartedAt": 1790481338.8442729
+    }
+  ],
+  "successDoesNotEraseFailures": true
+}

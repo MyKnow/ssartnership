@@ -1,7 +1,7 @@
 ---
 title: PVE 빌드 실험 구현 계획
 type: implementation-plan
-status: active
+status: current
 authority: normative
 ---
 
@@ -27,7 +27,7 @@ authority: normative
 
 ## 검증
 
-동일 테스트 목록과 zero retry/failure/skip, image/source SHA, HTTP readiness, 자원 상한, 중복 push·취소·timeout·유휴 종료를 검증한다. cold/warm 조건별 중앙값·범위와 원시 숫자 기록을 보관한다. 캐시 효과와 하드웨어·코드 효과를 따로 보고한다.
+동일 테스트 목록과 E2E zero retry/failure/skip (Node의 기존 구성 skip 8개와 구분), image/source SHA, HTTP readiness, 자원 상한, 중복 push·취소·timeout·유휴 종료를 검증한다. cold/warm 조건별 중앙값·범위와 원시 숫자 기록을 보관한다. 캐시 효과와 하드웨어·코드 효과를 따로 보고한다.
 
 ### 실험 Preview 브라우저 접근
 
@@ -41,6 +41,10 @@ ssh -N -o BatchMode=yes -o ExitOnForwardFailure=yes \
   builder@10.77.49.20
 ```
 
-접속 URL은 `http://127.0.0.1:3100`이며 빌드 시 public origin 및 합성 runtime origin과 일치해야 한다. 실제 터널·브라우저·합성 데이터 검증은 Preview 구성 이후 수행한다. 검증 종료 시 해당 SSH 프로세스를 정상 종료하면 관리 Mac의 listener가 해제된다.
+접속 URL은 `http://127.0.0.1:3100`이며 빌드 시 public origin 및 합성 runtime origin과 일치해야 한다. 실제 터널·브라우저·합성 데이터 및 Preview guest 재부팅은 검증했다. 최종 게시 SHA의 마감 검증은 Issue #497의 최종 기록으로 확인한다. 검증 종료 시 해당 SSH 프로세스를 정상 종료하면 관리 Mac의 listener가 해제된다.
 
 [요구사항](./spec.md) · [진행 상태](./tasks.md)
+
+## 측정 후 선택
+
+권장 빌더는 4 vCPU/6144 MiB VM/5120 MiB container, stable lab cache 및 warm reuse 활성화다. 운영 자원 회수 없이 동시 실행 1개로 제한한다. [측정 결과](../../performance/measurements/pve-build-lab-2026-09-27.md)와 [운영·복구 절차](../../operations/runbooks/pve-build-lab.md)를 참조한다. 운영 전환은 별도 승인 대상이다.

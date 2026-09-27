@@ -1,0 +1,125 @@
+{
+  "accepted": 12,
+  "groups": [
+    {
+      "state": "running",
+      "cache": "cold",
+      "n": 3,
+      "gate_seconds": {
+        "median": 391.805,
+        "min": 391.299,
+        "max": 393.088
+      },
+      "transfer_seconds": {
+        "median": 246.35950016975403,
+        "min": 246.2064402103424,
+        "max": 246.88028860092163
+      },
+      "deploy_seconds": {
+        "median": 3.8453853130340576,
+        "min": 3.739257574081421,
+        "max": 3.9127085208892822
+      },
+      "push_to_ready_seconds": {
+        "median": 714.7308542728424,
+        "min": 695.182487487793,
+        "max": 717.3996253013611
+      },
+      "push_to_probe_observed_seconds": {
+        "median": 730.9194278717041,
+        "min": 711.7878279685974,
+        "max": 731.6268653869629
+      }
+    },
+    {
+      "state": "running",
+      "cache": "warm",
+      "n": 3,
+      "gate_seconds": {
+        "median": 296.795,
+        "min": 295.746,
+        "max": 297.978
+      },
+      "transfer_seconds": {
+        "median": 246.11892342567444,
+        "min": 245.95147013664246,
+        "max": 246.5247368812561
+      },
+      "deploy_seconds": {
+        "median": 3.917665958404541,
+        "min": 3.7818315029144287,
+        "max": 3.949802875518799
+      },
+      "push_to_ready_seconds": {
+        "median": 604.0366244316101,
+        "min": 601.6591174602509,
+        "max": 618.5072948932648
+      },
+      "push_to_probe_observed_seconds": {
+        "median": 611.9329063892365,
+        "min": 611.1378676891327,
+        "max": 630.9986889362335
+      }
+    },
+    {
+      "state": "stopped",
+      "cache": "cold",
+      "n": 3,
+      "gate_seconds": {
+        "median": 388.249,
+        "min": 387.282,
+        "max": 389.248
+      },
+      "transfer_seconds": {
+        "median": 246.4068901538849,
+        "min": 246.3828365802765,
+        "max": 246.4523913860321
+      },
+      "deploy_seconds": {
+        "median": 3.907608985900879,
+        "min": 3.7700929641723633,
+        "max": 3.9230856895446777
+      },
+      "push_to_ready_seconds": {
+        "median": 731.8705770969391,
+        "min": 727.7531609535217,
+        "max": 732.1510622501373
+      },
+      "push_to_probe_observed_seconds": {
+        "median": 751.0069432258606,
+        "min": 732.1244509220123,
+        "max": 753.137640953064
+      }
+    },
+    {
+      "state": "stopped",
+      "cache": "warm",
+      "n": 3,
+      "gate_seconds": {
+        "median": 293.205,
+        "min": 292.985,
+        "max": 294.741
+      },
+      "transfer_seconds": {
+        "median": 246.3885953426361,
+        "min": 246.26611518859863,
+        "max": 246.45354866981506
+      },
+      "deploy_seconds": {
+        "median": 3.8583426475524902,
+        "min": 3.841447114944458,
+        "max": 3.9060797691345215
+      },
+      "push_to_ready_seconds": {
+        "median": 648.5088210105896,
+        "min": 639.0607786178589,
+        "max": 649.9390833377838
+      },
+      "push_to_probe_observed_seconds": {
+        "median": 650.3244318962097,
+        "min": 650.075690984726,
+        "max": 651.8810770511627
+      }
+    }
+  ]
+}

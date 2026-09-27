@@ -1,0 +1,14 @@
+{
+  "previousSha": "f794e471c6b562af569e73c319c17ed535df3564",
+  "restoredSha": "d417cedbedae2c9ac4bfea7e2912f6781ee35d27",
+  "dataAndStoragePreserved": true,
+  "nonAppContainersUnchanged": true,
+  "latestProbeMatched": true,
+  "timerRestarted": true,
+  "at": 1790484799.782144,
+  "coreDataSha256Unchanged": true,
+  "coreDataSha256": "15054da363b7fba6c87f49ad24e4d4eb9262cc9986592635ce36dcb1a232cdff",
+  "storageSha256": "b24040b26c831006cf083479743c8d78d4ab6f5900718dce379b096663c8c53c",
+  "previousAndRestoredHealthHttp200": true,
+  "previousAndRestoredDetailHttp200": true
+}

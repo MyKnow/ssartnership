@@ -1,0 +1,1 @@
+{"sha": "5065fe30974a06f0f50cb4cc8bcb52d340985203", "reason": "NPM_AUDIT_ERROR_JSON_FAIL_OPEN", "httpStatus": 503, "auditExitCode": 1, "rejectedAt": 1790470342.1058712, "deploymentPrevented": true}

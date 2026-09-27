@@ -14,6 +14,8 @@ last_verified: 2026-08-29
 
 ## Runbooks
 
+- [격리 PVE 빌드 실험 운영 및 복구](./runbooks/pve-build-lab.md)
+
 - [자체 호스팅 앱 빌드·실행·Cron 전환](./runbooks/self-hosting.md)
 - [자체 호스팅 DB·Storage·Preview](./runbooks/self-host-database.md)
 - [자체 호스팅 백업·PITR·운영 관리](./runbooks/self-host-operations.md)
