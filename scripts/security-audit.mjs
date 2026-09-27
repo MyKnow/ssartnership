@@ -26,6 +26,37 @@ export const ALLOWED_DEVELOPMENT_ADVISORIES = new Map(
   ].map((advisory) => [advisoryKey(advisory), advisory]),
 );
 
+export function parseNpmAuditResult(result) {
+  const unavailable = () => new Error("SECURITY_AUDIT_REPORT_UNAVAILABLE");
+  if (result.error || result.signal || ![0, 1].includes(result.status)) {
+    throw unavailable();
+  }
+  let report;
+  try {
+    report = JSON.parse(result.stdout);
+  } catch {
+    throw unavailable();
+  }
+  const record = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  if (!record(report) || "error" in report || report.auditReportVersion !== 2
+    || !record(report.vulnerabilities) || !record(report.metadata?.vulnerabilities)
+    || !Number.isSafeInteger(report.metadata.vulnerabilities.total)
+    || report.metadata.vulnerabilities.total < 0
+    || (result.status === 1 && report.metadata.vulnerabilities.total === 0)
+    || (report.metadata.vulnerabilities.total === 0) !== (Object.keys(report.vulnerabilities).length === 0)
+    || Object.values(report.vulnerabilities).some((entry) => !record(entry)
+      || !Array.isArray(entry.via) || entry.via.length === 0
+      || entry.via.some((source) => typeof source === "string"
+        ? !Object.hasOwn(report.vulnerabilities, source)
+        : !record(source) || typeof source.url !== "string" || !source.url
+          || !["info", "low", "moderate", "high", "critical"].includes(source.severity)))
+    || (report.metadata.vulnerabilities.total > 0
+      && !Object.values(report.vulnerabilities).some((entry) => entry.via.some(record)))) {
+    throw unavailable();
+  }
+  return result.stdout;
+}
+
 export function runNpmAuditJson({ omitDev = false } = {}) {
   const args = ["audit", "--json", "--audit-level=moderate"];
   if (omitDev) {
@@ -36,15 +67,7 @@ export function runNpmAuditJson({ omitDev = false } = {}) {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   });
-  if (typeof result.stdout === "string" && result.stdout.trim()) {
-    return result.stdout;
-  }
-  if (result.error) {
-    throw result.error;
-  }
-  throw new Error(
-    `npm audit가 JSON 출력 없이 종료 코드 ${result.status ?? 1}로 실패했습니다.`,
-  );
+  return parseNpmAuditResult(result);
 }
 
 export function collectAdvisories(report) {

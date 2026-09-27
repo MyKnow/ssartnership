@@ -7,7 +7,13 @@ authority: normative
 
 # 작업 상태
 
-## 현재 실행: 전체 경로 계측 준비
+## 현재 실행: 보안 검사 오류 응답 차단 수정
+
+재부팅 수정 `5065fe30974a06f0f50cb4cc8bcb52d340985203` 게시 후 설치 코드 및 controller unit을 동기화했다. timer를 켜서 준비 빌드를 자동 접수했지만 npm 보안 endpoint의 HTTP 503/exit 1을 기존 wrapper가 빈 취약점 목록으로 해석하는 결함을 발견했다. 배포 전에 timer를 disabled/inactive로 되돌렸으며 이 실행은 성공 표본에서 제외한다. 정식 push 12회는 아직 시작하지 않았다. 실제 운영 health 두 곳은 HTTP 200이었다.
+
+오류 envelope·불완전한 report·프로세스 중단을 실패로 처리하고 정상 advisory exit 1은 정책 평가에 전달하는 회귀 검사를 추가했다. 집중 검사 6개와 live npm audit는 통과했다. 전체 Release도 E2E 83개, 실패/오류/skip/retry 0, XML 115.943초로 통과했다. 기존 startup/admin full-reload 안내 3개 및 rollback mock 진단 4개 외 새 오류는 없다. 원래 준비 실행은 598.362초 후 gate 성공을 보고했으나 원본 receipt와 별도 host rejection 기록을 함께 보존하고 배포하지 않았다. 수정 게시 후 계측을 재개한다. 이전 48회 결과는 시간·E2E 수치이며, 당시 wrapper가 audit transport 성공까지 보장하지 못했다는 한계를 유지한다.
+
+## 완료된 자원 및 캐시 계측
 
 CPU 18회, RAM 12회, GitHub 기준 6회, 같은 후보 SHA의 캐시 최적화 12회를 완료했다. 모든 결과는 각 조건 n=3, SHA 일치, E2E 83개 및 실패/오류/skip/retry 0, OOM 없음이다. `build-lab-497-optimization-matrix.service`는 2026-09-27 09:00:29 KST에 success/inactive/MainPID 0으로 종료했으므로 재시작하지 않는다.
 
