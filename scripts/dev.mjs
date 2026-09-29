@@ -2,6 +2,7 @@
 
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { loadEnvironmentProfile, nextProcessEnvironment } from "./lib/project-environment.mjs";
 
 import {
   collectDoctorDiagnostics,
@@ -19,12 +20,14 @@ if (summary.FAIL > 0) {
 const nextCliPath = fileURLToPath(
   new URL("../node_modules/next/dist/bin/next", import.meta.url),
 );
+const selected = loadEnvironmentProfile({ root: repositoryRoot, command: "dev" });
+process.stdout.write(`[environment] dev: ${selected.loadedFiles[0] ?? "injected"}\n`);
 const child = spawn(
   process.execPath,
   [nextCliPath, "dev", "--webpack", ...process.argv.slice(2)],
   {
     cwd: repositoryRoot,
-    env: process.env,
+    env: nextProcessEnvironment({ ...selected.values, NODE_ENV: "development" }),
     stdio: "inherit",
   },
 );

@@ -17,6 +17,11 @@
 !scripts/
 !scripts/check-install-scripts.mjs
 !scripts/install-dependencies.mjs
+!scripts/next.mjs
+!scripts/lib/
+!scripts/lib/development-environment.mjs
+!scripts/lib/project-environment.mjs
+!scripts/lib/next-environment.cjs
 !deploy/
 !deploy/self-host/
 !deploy/self-host/*.mjs

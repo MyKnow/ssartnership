@@ -78,15 +78,19 @@ test("표준 개발 명령과 교차 플랫폼 정책이 repository contract에 
     developmentEnvironment,
     /DEPLOYMENT_NODE_VERSION_RANGE = ">=24\.18\.1 <25"/u,
   );
-  assert.match(developmentEnvironment, /const ENV_FILES = \["\.env"\]/u);
+  assert.match(developmentEnvironment, /loadEnvironmentProfile/u);
   assert.doesNotMatch(developmentEnvironment, /"\.env\.local"/u);
-  assert.match(bootstrap, /join\(repositoryRoot, "\.env"\)/u);
+  assert.match(bootstrap, /join\(repositoryRoot, "\.env\.preview"\)/u);
   assert.doesNotMatch(bootstrap, /"\.env\.local"/u);
-  assert.match(vercelWrapper, /const ENV_FILES = \["\.env"\]/u);
+  assert.match(vercelWrapper, /const ENV_FILES = \["\.env\.preview"\]/u);
   assert.doesNotMatch(vercelWrapper, /"\.env\.local"/u);
   assert.equal(scripts.bootstrap, "node scripts/bootstrap.mjs");
   assert.equal(scripts.doctor, "node scripts/doctor.mjs");
   assert.equal(scripts.dev, "node scripts/dev.mjs");
+  assert.equal(scripts.build, "node scripts/next.mjs build");
+  assert.equal(scripts.start, "node scripts/next.mjs start");
+  assert.match(scripts["migrate:legacy-member-avatars"], /--env-file-if-exists=\.env\.preview/u);
+  assert.match(scripts["migrate:image-assets"], /--env-file-if-exists=\.env\.preview/u);
   assert.equal(scripts.release, "node scripts/release.mjs");
   assert.equal(
     scripts["install:trusted"],
