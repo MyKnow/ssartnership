@@ -98,3 +98,23 @@ test("monitoring secret mounts remain readable under a private operator umask", 
     }
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+
+test("restored environments retain service failure alarms without claiming the synthetic PITR collector", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { createRequire } = await import("node:module");
+  const { load } = createRequire(import.meta.url)("js-yaml");
+  const read = (file: string) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+  const rules = load(read("deploy/observability/restored-service-alerts.yml")).groups.flatMap((g: {rules: Array<{alert:string,expr:string}>}) => g.rules);
+  assert.deepEqual(rules.map((r: {alert:string}) => r.alert).sort(), ["AlertDeliveryUnavailable", "DatabaseUnavailable", "HostDiskLow", "HostMemoryLow", "ServiceDown"]);
+  assert.ok(rules.every((r: {expr:string}) => !r.expr.includes("ssartnership_operations_")));
+  const synthetic = read("deploy/observability/alerts.yml");
+  assert.match(synthetic, /OperationsExporterStale/);
+  assert.match(synthetic, /ArchiveUnhealthy/);
+  for (const [name, database] of [["original-preview", "ssartnership-original-preview-34141078185-db-1"], ["production", "ssartnership-production-data-db-1"]]) {
+    const compose = load(read(`deploy/self-host/compose.${name}.yaml`));
+    assert.ok(compose.services.prometheus.volumes.includes("../observability/restored-service-alerts.yml:/etc/prometheus/alerts.yml:ro"));
+    assert.equal(compose.services["postgres-exporter"].environment.DATA_SOURCE_URI, `${database}:5432/postgres?sslmode=disable`);
+    if (name === "production") assert.ok(compose.services.prometheus.volumes.includes("../observability/production-backup-alerts.yml:/etc/prometheus/production-backup-alerts.yml:ro"));
+  }
+});

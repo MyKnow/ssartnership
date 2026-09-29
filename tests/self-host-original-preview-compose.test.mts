@@ -28,11 +28,11 @@ test("original Preview overlay keeps restored data isolated and bounded", () => 
   assert.match(compose, /env_file: \["\$\{MONITORING_ENV_FILE:\?monitoring env file required\}"\]/u);
   assert.match(compose, /--collector\.textfile\.directory=\/textfile/u);
   assert.match(compose, /\$\{MONITORING_TEXTFILE_DIR:\?monitoring textfile directory required\}:\/textfile:ro/u);
-  for (const path of ["prometheus.yml", "alerts.yml", "alertmanager.yml"]) assert.match(compose, new RegExp(`\\.\\./observability/${path}:`, "u"));
+  for (const path of ["prometheus.yml", "restored-service-alerts.yml", "alertmanager.yml"]) assert.match(compose, new RegExp(`\\.\\./observability/${path}:`, "u"));
   assert.match(compose, /\.\.\/observability\/grafana\/provisioning:/u);
   assert.match(compose, /\.\.\/observability\/grafana\/dashboards:/u);
   assert.doesNotMatch(compose, /\.\/deploy\/observability\//u);
-  for (const relative of ["../observability/prometheus.yml", "../observability/alerts.yml", "../observability/alertmanager.yml", "../observability/grafana/provisioning", "../observability/grafana/dashboards"]) {
+  for (const relative of ["../observability/prometheus.yml", "../observability/restored-service-alerts.yml", "../observability/alertmanager.yml", "../observability/grafana/provisioning", "../observability/grafana/dashboards"]) {
     assert.equal(existsSync(path.resolve(composeDirectory, relative)), true, `Compose source path exists: ${relative}`);
   }
   assert.doesNotMatch(compose, /SELF_HOST_VITALS_TOKEN: \$\{/u);

@@ -151,3 +151,12 @@ private monitoring env의 `OPS_ALERT_WEBHOOK_URL`에 운영자가 지정한 HTTP
 클라이언트는 원본 경로를 8개 고정 화면 분류로 바꾼다. `/api/web-vitals`는 설정 origin, JSON content type, 512-byte 실제 body 한도, 프로세스당 분당 1200개 전역 제한과 strict schema를 적용한다. 회원/IP/세션 ID를 rate-limit 저장소에 쌓지 않는다. 추가 키·URL·metric ID·entries·비정상 수치는 거절한다. 내부 collector는 별도 token으로 인증하고 고정 histogram만 보관한다. 원본 event 저장소가 없고 Prometheus의 7일 보존 정책이 집계 데이터에 적용된다. 익명 클라이언트 수치는 위조 가능하므로 보안 감사나 과금 근거로 사용하지 않는다. 단일 app/collector 기준의 quota이며 다중 replica 도입 시 공유 ingress 제한이 필요하다.
 
 Vercel 배포의 기존 Analytics/SpeedInsights와 제품 이벤트는 유지한다. 자체 호스팅의 웹 성능 수집은 비활성 기본값이며 monitoring overlay에서 활성화한다. 공개 GET 설정에는 활성 여부와 샘플링 비율만 들어간다. 수집 실패는 사용자 화면의 오류로 표출하지 않지만 endpoint 실패와 운영 metric으로 점검한다.
+
+
+## 복원된 원본 환경의 모니터링 경계
+
+원본 Preview/Production overlay는 `restored-service-alerts.yml`의 서비스·DB·호스트·알림 전송 규칙을 사용한다. 합성 pgBackRest 환경용 `alerts.yml`의 WAL/복원/운영 manifest collector 규칙을 이 환경의 완료 증거로 사용하지 않는다. Production에는 별도 `production-backup-alerts.yml`과 실제 snapshot/PVE/Mac collector를 함께 유지한다. 원본 Preview 정기 백업·연속 PITR은 이 변경의 구현 범위가 아니다.
+
+Postgres exporter는 각 환경의 전체 DB 컨테이너 이름에 연결한다. 배포 전에 실제 전용 DB 네트워크 CIDR을 확인하고 `pg_hba.conf`에 그 CIDR의 `postgres` DB, `ssartnership_monitor` 역할, `scram-sha-256`만 허용한다. 기존 파일을 보존하고 `pg_hba_file_rules` 오류가 없을 때 reload한다. 앱 역할이나 공개 네트워크 접근을 확장하지 않는다. monitor는 `pg_monitor`/CONNECT만 유지하고 회원 table 조회 거절을 다시 확인한다.
+
+Preview 외부 알림은 해당 환경의 root 전용 monitoring env에 기존 운영자 이메일 발송 설정만 연결한다. 앱 비밀·회원 데이터는 복사하지 않고 relay token/DB credential은 환경별로 유지한다. telemetry 이미지와 env 변경은 앱 교체만 수행하는 자동 receiver와 별도로 적용한다. 각 환경의 5개 target과 `pg_up=1`, 실제 실패/복구 전달을 확인하며 경보가 없어졌다는 사실만으로 백업/PITR 완료를 주장하지 않는다.

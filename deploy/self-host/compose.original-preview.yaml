@@ -72,7 +72,7 @@ services:
     command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus, --storage.tsdb.retention.time=7d, --storage.tsdb.retention.size=2GB, --web.external-url=https://ssartnership-infra-dev.myknow.xyz/infra/prometheus/, --web.route-prefix=/]
     volumes:
       - ../observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ../observability/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ../observability/restored-service-alerts.yml:/etc/prometheus/alerts.yml:ro
       - original-prometheus-data:/prometheus
   alertmanager:
     image: prom/alertmanager:v0.34.0@sha256:690c7b525f4367aa91f73e2f91c632206d32e97c6384bdbf2fb7a861b420340d
@@ -135,7 +135,7 @@ services:
     logging: *bounded-logs
     networks: [original_default, monitoring]
     environment:
-      DATA_SOURCE_URI: db:5432/postgres?sslmode=disable
+      DATA_SOURCE_URI: ssartnership-original-preview-34141078185-db-1:5432/postgres?sslmode=disable
       DATA_SOURCE_USER: ssartnership_monitor
       DATA_SOURCE_PASS_FILE: /run/postgres-monitor-password
     volumes:
