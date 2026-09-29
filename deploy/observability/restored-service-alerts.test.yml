@@ -1,0 +1,41 @@
+rule_files: [restored-service-alerts.yml]
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'up{job="postgres"}'
+        values: '1+0x8'
+      - series: pg_up
+        values: '0 0 0 1 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: DatabaseUnavailable
+        exp_alerts:
+          - exp_labels: { severity: critical }
+      - eval_time: 4m
+        alertname: DatabaseUnavailable
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: OperationsExporterStale
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: 'up{job="telemetry"}'
+        values: '0 0 0 1 1 1 1 1'
+      - series: ssartnership_alert_receiver_configured
+        values: '0 0 0 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: ServiceDown
+        exp_alerts:
+          - exp_labels: { job: telemetry, severity: critical }
+      - eval_time: 2m
+        alertname: AlertDeliveryUnavailable
+        exp_alerts:
+          - exp_labels: { severity: critical }
+      - eval_time: 5m
+        alertname: ServiceDown
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: AlertDeliveryUnavailable
+        exp_alerts: []
