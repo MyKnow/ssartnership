@@ -77,12 +77,12 @@ npm run build
 
 1. OS와 CPU Architecture 감지
 2. Node.js 24.18.1과 npm 11.16.0 확인
-3. `.env`가 없으면 gitignored `.env`에 local mock profile 생성
+3. `.env.preview`가 없으면 gitignored `.env.preview`에 local mock profile 생성
 4. `package-lock.json` 기반 dependency 설치
 5. container/local DB/code generation 필요 여부 판정
 6. doctor 전체 진단 실행
 
-dependency 설치는 `.npmrc` 정책과 lockfile registry identity를 먼저 검증하는 `install:trusted` 경계를 사용한다. 모든 lifecycle script를 비활성화하고 optional native package를 포함한 뒤, 현재 플랫폼의 고정된 esbuild binary 무결성과 버전을 직접 확인한다. 같은 명령을 반복해도 기존 tracked 파일이나 환경 파일을 덮어쓰지 않는다. 기존 `.env`가 있으면 bootstrap은 내용을 변경하지 않는다. 프로젝트 루트의 실제 환경 파일은 `.env` 하나만 허용하고, `.env.example`은 실제 비밀값이 없는 공유용 변수 계약으로만 유지한다.
+dependency 설치는 `.npmrc` 정책과 lockfile registry identity를 먼저 검증하는 `install:trusted` 경계를 사용한다. 모든 lifecycle script를 비활성화하고 optional native package를 포함한 뒤, 현재 플랫폼의 고정된 esbuild binary 무결성과 버전을 직접 확인한다. 같은 명령을 반복해도 기존 tracked 파일이나 환경 파일을 덮어쓰지 않는다. 실제 앱 설정은 `.env.preview`와 `.env.production`으로 분리하고, `.env.example`은 비밀값이 없는 공유용 변수 계약으로 유지한다. 과거 `.env`는 지원하지 않으며 doctor와 bootstrap이 거부한다.
 
 CI에서는 `npm run bootstrap -- --ci`를 사용한다. clean checkout에는 secret 값을 출력하지 않는 임시 local mock profile을 생성하고, 의존성 설치 child process에는 application 환경을 전달하지 않는다. CI mode는 port 점유 검사만 생략한다.
 
@@ -113,9 +113,25 @@ Secret 값은 진단 결과에 포함하지 않는다. 실패 결과는 변수 �
 
 환경변수 이름은 OS와 관계없이 같은 대문자 이름을 사용한다. `PATH`, `Path`, `path`처럼 같은 의미의 이름을 혼용하지 않는다.
 
-bootstrap이 만드는 `.env` local mock profile은 외부 cloud, container, local DB 없이 화면과 테스트를 시작하기 위한 값만 포함한다. Secret은 machine에서 무작위로 생성하고 출력하지 않는다. Production credential을 local mock profile에 복사하지 않는다. `.env.local`, `.env.development`, `.env.development.local` 같은 추가 파일은 우선순위를 숨기므로 doctor와 bootstrap이 거부한다.
+| 실행 | 선택하는 설정 |
+| --- | --- |
+| `npm run dev`, `doctor`, `bootstrap` | 브랜치와 무관하게 `.env.preview` |
+| `npm run build`, `npm start` — `main` | `.env.production` |
+| `npm run build`, `npm start` — `dev`, `feat/*` 등 다른 브랜치 | `.env.preview` |
+| CI·Vercel·자체 호스팅 빌드에서 두 data source를 명시적으로 주입 | 주입한 환경만 사용 |
+| 두 data source가 명시적으로 `mock`인 검증 | 주입한 합성 환경만 사용 |
 
-Supabase 또는 Production profile을 선택하면 doctor는 필요한 cloud 변수, HTTPS URL, secret 길이, placeholder, Production/mock 충돌을 fail-closed로 검증한다. `.env` 처리는 shell의 `export`, `set`, `$VAR`, `%VAR%` 문법을 사용하지 않는다.
+`scripts/lib/project-environment.mjs`가 선택 계약의 최종 근거다. `NODE_ENV=production`은 최적화 모드이며 데이터 환경을 결정하지 않는다. 로컬 build/start에서 detached HEAD나 Git 조회 실패는 중단한다. 선택한 파일이 없으면 반대 환경이나 과거 `.env`로 대체하지 않는다. bootstrap은 파일이 없는 새 개발환경에만 외부 연결 없는 mock `.env.preview`를 생성한다. 두 실제 파일은 Git과 Docker context에서 제외하고 소유자 전용 권한으로 보관한다.
+
+로컬 빌드 성공 시 산출물에 프로필 이름과 공개 설정의 해시만 기록한다. `npm start`는 이 기록이 현재 선택과 다르면 재빌드를 요구한다. Preview에서 만든 클라이언트 번들과 Production 서버 설정이 섞이는 실행을 방지하며 비밀값은 기록하지 않는다.
+
+Next의 기본 dotenv 로더는 빌드 시 `.env.production`을 추가로 읽으므로, 표준 명령은 선택한 값을 먼저 주입한 후 `scripts/lib/next-environment.cjs`를 Node preload로 적용한다. 이 어댑터는 Next의 `@next/env` 진입점에서 추가 파일 읽기를 차단하며 worker에도 상속된다. 강제 재로딩과 standalone 산출물에도 다른 환경 파일이 유입되지 않는 것을 프로세스 회귀 테스트로 검증한다. Next 업그레이드 때 이 테스트를 유지한다. **환경 파일이나 브랜치를 바꾼 뒤 서버를 재시작하고, 공개 설정이 바뀌면 다시 빌드한다.** `npx next` 직접 실행은 이 저장소의 환경 선택을 우회하므로 사용하지 않는다.
+
+최신 설정은 현재 자체 호스팅 서버의 해당 환경 `app.env`에서 가져온다. 폐기된 managed Supabase/Vercel 설정을 최신 원본으로 취급하지 않는다. Mac에서 사용할 파일에는 Compose 내부 `SUPABASE_INTERNAL_URL`을 그대로 복사하지 말고 검증된 공개 API 주소를 사용한다. localhost에서는 Preview 데이터와 세션 설정을 사용하되 사이트 origin은 실제 로컬 주소로 지정한다. 비밀을 출력하지 않고 각 환경에서 카테고리/공개 캐시 버전의 읽기 전용 요청으로 연결을 확인한다.
+
+bootstrap의 mock Secret은 machine에서 무작위로 생성하고 출력하지 않는다. Production credential을 mock profile에 복사하지 않는다. `.env`, `.env.local`, `.env.development`, `.env.development.local` 같은 추가 파일은 doctor와 bootstrap이 거부한다. 로컬 Vercel 도구와 일회성 이미지 migration도 명시적으로 `.env.preview`를 사용한다.
+
+doctor는 Preview 설정의 필수 변수, URL과 secret 형식을 검사한다. Production 검증 helper는 별도로 mock 충돌과 운영 필수값을 검사한다. 환경 파일은 Node dotenv 파서로 읽으며 shell 명령이나 `$VAR` 확장을 실행하지 않는다. 명시적인 프로세스 환경변수는 선택 파일보다 우선한다.
 
 ## 7. 경로, 파일, shell 정책
 

@@ -67,11 +67,11 @@ const unexpectedEnvironmentFiles = findUnexpectedProjectEnvironmentFiles({
 if (unexpectedEnvironmentFiles.length > 0) {
   fail(
     `지원하지 않는 환경 파일이 있습니다: ${unexpectedEnvironmentFiles.join(", ")}.`,
-    "검토한 값을 .env로 통합하고 추가 환경 파일을 제거하세요.",
+    "검토한 값을 .env.preview 또는 .env.production으로 옮기고 지원하지 않는 파일을 제거하세요.",
   );
 }
-if (currentEnvironment.loadedFiles.length === 0) {
-  const envPath = join(repositoryRoot, ".env");
+if (currentEnvironment.profile !== "injected" && currentEnvironment.loadedFiles.length === 0) {
+  const envPath = join(repositoryRoot, ".env.preview");
   if (!existsSync(envPath)) {
     writeFileSync(
       envPath,
@@ -79,7 +79,7 @@ if (currentEnvironment.loadedFiles.length === 0) {
       { encoding: "utf8", flag: "wx", mode: 0o600 },
     );
     process.stdout.write(
-      "PASS Environment: 로컬 mock 개발용 .env를 생성했습니다. Secret 값은 출력하지 않았습니다.\n",
+      "PASS Environment: 로컬 mock 개발용 .env.preview를 생성했습니다. Secret 값은 출력하지 않았습니다.\n",
     );
   }
 } else {

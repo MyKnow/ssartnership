@@ -223,7 +223,7 @@ npm run ci:local
 - 사이트 URL / SEO
   - `NEXT_PUBLIC_SITE_URL`
 
-환경 변수 예시는 [.env.example](./.env.example)에 있습니다.
+환경 변수 예시는 [.env.example](./.env.example)에 있습니다. 앱 실행은 `.env.preview`와 `.env.production`을 사용하며, [명령·브랜치별 선택 규칙](./docs/operations/runbooks/cross-platform-development.md#6-환경변수와-로컬-profile)을 따릅니다.
 
 ## 파트너 결제 운영 설정
 

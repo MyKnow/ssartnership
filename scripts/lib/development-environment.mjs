@@ -10,6 +10,7 @@ import {
 import { createServer } from "node:net";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadEnvironmentProfile } from "./project-environment.mjs";
 
 export const REQUIRED_NODE_VERSION = "24.18.1";
 export const DEPLOYMENT_NODE_VERSION_RANGE = ">=24.18.1 <25";
@@ -26,8 +27,7 @@ const PLATFORM_MATRIX = new Map([
   ["linux-x64", { key: "linux-x64", label: "Linux x64", support: "ci-only" }],
 ]);
 
-const ENV_FILES = [".env"];
-const ALLOWED_PROJECT_ENV_FILES = new Set([".env", ".env.example"]);
+const ALLOWED_PROJECT_ENV_FILES = new Set([".env.preview", ".env.production", ".env.example"]);
 
 const DEVELOPMENT_REQUIRED_ENV = [
   "NEXT_PUBLIC_DATA_SOURCE",
@@ -150,22 +150,7 @@ export function findUnexpectedProjectEnvironmentFiles({ root = repositoryRoot } 
 }
 
 export function loadProjectEnvironment({ root = repositoryRoot, environment = process.env } = {}) {
-  const loaded = {};
-  const loadedFiles = [];
-
-  for (const relativePath of ENV_FILES) {
-    const filePath = join(root, relativePath);
-    if (!existsSync(filePath)) {
-      continue;
-    }
-    Object.assign(loaded, parseEnvFile(readFileSync(filePath, "utf8")));
-    loadedFiles.push(relativePath);
-  }
-
-  return {
-    values: { ...loaded, ...environment },
-    loadedFiles,
-  };
+  return loadEnvironmentProfile({ root, environment, command: "doctor", allowMissing: true });
 }
 
 export function buildLocalDevelopmentEnv(
@@ -662,7 +647,7 @@ export async function collectDoctorDiagnostics({
           "PASS",
           "environment_files",
           "Environment files",
-          "Only .env and .env.example are present at the repository root.",
+          "Only Preview/Production profile files and .env.example are present.",
           "No action required.",
         )
       : diagnostic(
@@ -670,11 +655,14 @@ export async function collectDoctorDiagnostics({
           "environment_files",
           "Environment files",
           `Unsupported environment files are present: ${unexpectedEnvironmentFiles.join(", ")}.`,
-          "Consolidate their reviewed values into .env, then remove the extra files.",
+          "Move reviewed values into .env.preview or .env.production; remove unsupported overrides.",
         ),
   );
 
   const projectEnvironment = loadProjectEnvironment({ root, environment });
+  if (projectEnvironment.profile !== "injected" && projectEnvironment.loadedFiles.length === 0) {
+    diagnostics.push(diagnostic("FAIL", "environment_profile_missing", "Environment profile", ".env.preview is missing.", "Restore the reviewed Preview file or run npm run bootstrap for local mock development."));
+  }
   diagnostics.push(...validateEnvironment(projectEnvironment.values));
 
   const usesMock =
