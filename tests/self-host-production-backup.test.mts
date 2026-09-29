@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseBackupCommand, validateBackupReceipt, selectBackupRetention, backupApplicationIdentity } from "../scripts/self-host-operations/production-backup-contract.mjs";
+import { parseBackupCommand, validateBackupReceipt, selectBackupRetention, backupApplicationIdentity, backupAcknowledgementPath } from "../scripts/self-host-operations/production-backup-contract.mjs";
+import { backupAcknowledgementMetrics } from "../scripts/self-host-operations/production-backup-metrics.mjs";
 import { assertRestoreDatabaseIdentity } from "../scripts/self-host-operations/restore-production-backup.mjs";
 
 const id = "12345678-1234-4234-8234-123456789abc";
@@ -44,4 +45,19 @@ test("retention selects only older validated successes and keeps newest recovery
   assert.deepEqual(selectBackupRetention(records, 30), []);
   assert.throws(() => selectBackupRetention(records, 0));
   assert.throws(() => selectBackupRetention([...records, records[0]], 7));
+});
+
+
+test("PVE acknowledgement is independently parsed and cannot overwrite Mac state", () => {
+  assert.deepEqual(parseBackupCommand(`ack-pve ${id} ${receipt.sha256}`), {command:"ack-pve",id,sha256:receipt.sha256});
+  assert.equal(backupAcknowledgementPath("ack"), "/var/lib/ssartnership-backup-ack/latest.json");
+  assert.equal(backupAcknowledgementPath("ack-pve"), "/var/lib/ssartnership-backup-ack/latest-pve.json");
+  for(const command of ["get","ack-other","../../tmp","ack\n"]) assert.throws(()=>backupAcknowledgementPath(command));
+  for(const command of [`ack-pve ${id} a`,`ack-pve ${id} ${receipt.sha256} extra`]) assert.throws(()=>parseBackupCommand(command));
+});
+test("fresh copy acknowledgement cannot renew an old recovery point", () => {
+  const now=Date.parse(receipt.createdAt)+3600_000;
+  const ack={id,sha256:receipt.sha256,copiedAt:new Date(now).toISOString()};
+  assert.deepEqual(backupAcknowledgementMetrics(ack,[receipt],now),{copied:now/1000,created:Date.parse(receipt.createdAt)/1000});
+  for(const bad of [{...ack,sha256:'b'.repeat(64)},{...ack,copiedAt:new Date(now+120000).toISOString()},{...ack,copiedAt:'invalid'},{...ack,copiedAt:'2000-01-01T00:00:00Z'}])assert.deepEqual(backupAcknowledgementMetrics(bad,[receipt],now),{copied:0,created:0});
 });

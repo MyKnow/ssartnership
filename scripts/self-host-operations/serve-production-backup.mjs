@@ -2,9 +2,8 @@
 import { open, readFile, readdir, lstat, writeFile, rename, realpath } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
-import { parseBackupCommand, validateBackupReceipt } from './production-backup-contract.mjs';
+import { parseBackupCommand, validateBackupReceipt, backupAcknowledgementPath } from './production-backup-contract.mjs';
 const ROOT = '/srv/ssartnership-backup-export';
-const ACK = '/var/lib/ssartnership-backup-ack/latest.json';
 async function receipt(id) {
   const directory = `${ROOT}/${id}`;
   if (await realpath(directory) !== directory || (await lstat(directory)).uid !== 0) throw Error();
@@ -31,6 +30,7 @@ try {
       finally { await file.close(); }
     } else {
       if (request.sha256 !== value.sha256) throw Error();
+      const ACK = backupAcknowledgementPath(request.command);
       await writeFile(`${ACK}.new`, JSON.stringify({ version: 1, id: value.id, sha256: value.sha256, copiedAt: new Date().toISOString(), backupCreatedAt: value.createdAt }), { mode: 0o600 });
       await rename(`${ACK}.new`, ACK); console.log('{"acknowledged":true}');
     }

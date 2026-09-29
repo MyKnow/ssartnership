@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { test } from "node:test";
+import { createRequire } from "node:module";
+import { selectEnvironmentProfile } from "../scripts/lib/project-environment.mjs";
+
+const { load: parse } = createRequire(import.meta.url)("js-yaml");
 
 function readRepoFile(pathname: string) {
   return readFileSync(new URL(`../${pathname}`, import.meta.url), "utf8");
@@ -11,6 +15,7 @@ const WORKFLOW_FILES = [
   "cross-platform-development.yml",
   "production-migrations.yml",
   "public-readiness.yml",
+  "self-host-public-health.yml",
   "storybook.yml",
 ] as const;
 
@@ -433,4 +438,25 @@ test("public readiness TODO keeps the launch blocker remediation tracked", () =>
   assert.match(todo, /Issue #55/);
   assert.match(todo, /Mattermost 직접 연동 전환 \(Issue #155\)/);
   assert.match(todo, /GitHub Actions 공개 readiness gate/);
+});
+
+test("CI build steps select an explicit secret-free mock profile without local dotenv files", () => {
+  const workflow = parse(readRepoFile(".github/workflows/public-readiness.yml"));
+  for (const id of ["promotion-smoke", "full-release"]) {
+    const step = workflow.jobs.verify.steps.find((value: { id?: string }) => value.id === id);
+    assert.ok(step);
+    assert.equal(selectEnvironmentProfile({ command: "build", environment: { CI: "true", ...step.env } }), "injected");
+    assert.equal(step.env.NEXT_PUBLIC_DATA_SOURCE, "mock");
+    assert.equal(step.env.NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE, "mock");
+  }
+});
+
+
+test("external self-host verification is manual, fixed-scope and GitHub hosted", () => {
+  const workflow = parse(readRepoFile(".github/workflows/self-host-public-health.yml"));
+  assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
+  assert.deepEqual(workflow.permissions, {contents:"read"});
+  assert.equal(workflow.jobs.verify["runs-on"], "ubuntu-24.04");
+  assert.equal(workflow.jobs.verify.steps.at(-1).run, "node scripts/self-host-operations/verify-public-health.mjs");
+  assert.doesNotMatch(readRepoFile(".github/workflows/self-host-public-health.yml"), /secrets\.|schedule:|inputs:|continue-on-error/);
 });

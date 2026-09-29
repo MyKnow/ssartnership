@@ -248,3 +248,17 @@ test("cron timeout과 오류 출력은 secret 또는 응답 본문을 노출하�
   assert.equal(`${stdout.join("\n")}\n${stderr.join("\n")}`.includes(secret), false);
   assert.deepEqual(stderr, ["self-host-cron: CRON_RESPONSE_REJECTED"]);
 });
+
+test("cron HTTP success requires bounded successful JSON and rejects partial job failures", async () => {
+  for (const result of [{ ok: false }, { ok: true, failed: 1 }, { ok: true, failed: '0' }, { message: 'success' }]) {
+    await assert.rejects(() => invokeSelfHostCron(cronOptions({ fetchImpl: async () => Response.json(result) })), expectCode('CRON_RESPONSE_REJECTED'));
+  }
+  for (const response of [new Response('<html>login</html>'), new Response('{invalid}',{headers:{'content-type':'application/json'}}), Response.json({ok:true,extra:'x'.repeat(256*1024)})]) {
+    await assert.rejects(() => invokeSelfHostCron(cronOptions({ fetchImpl: async () => response })), expectCode('CRON_RESPONSE_REJECTED'));
+  }
+  await invokeSelfHostCron(cronOptions({ fetchImpl: async () => Response.json({ok:true,failed:0}) }));
+});
+test("cron timeout also bounds a response body that never completes", async () => {
+  const body=new ReadableStream({start(controller){controller.enqueue(new TextEncoder().encode('{"ok":'));}});
+  await assert.rejects(() => invokeSelfHostCron(cronOptions({ timeoutMs:10, fetchImpl:async()=>new Response(body,{headers:{'content-type':'application/json'}}) })),expectCode('CRON_INVOCATION_TIMEOUT'));
+});

@@ -1,0 +1,10 @@
+[Unit]
+Description=Check SSARTNERSHIP encrypted backup copy every 15 minutes
+[Timer]
+OnBootSec=2min
+OnCalendar=*-*-* *:00/15:00
+Persistent=true
+RandomizedDelaySec=30
+Unit=ssartnership-pve-backup-pull.service
+[Install]
+WantedBy=timers.target

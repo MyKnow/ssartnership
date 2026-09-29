@@ -1,7 +1,7 @@
 [Unit]
-Description=SSARTNERSHIP Production daily backup schedule
+Description=SSARTNERSHIP Production six-hour online backup schedule
 [Timer]
-OnCalendar=*-*-* 03:00:00 Asia/Seoul
+OnCalendar=*-*-* 03/6:00:00 Asia/Seoul
 Persistent=true
 RandomizedDelaySec=60
 Unit=ssartnership-production-backup.service

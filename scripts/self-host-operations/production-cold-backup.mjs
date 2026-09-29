@@ -124,7 +124,7 @@ export async function publishProductionBackup(temporary, config, id) {
     if (!/^[a-f0-9-]{36}$/u.test(name)) continue;
     receipts.push(validateBackupReceipt(JSON.parse(await readFile(`${outgoing}/${name}/receipt.json`, 'utf8'))));
   }
-  for (const old of selectBackupRetention(receipts, 7)) await rm(`${outgoing}/${old}`, { recursive: true });
+  for (const old of selectBackupRetention(receipts, 28)) await rm(`${outgoing}/${old}`, { recursive: true });
   console.log(JSON.stringify({ captured: true, ...receipt }));
 }
 if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href) {
