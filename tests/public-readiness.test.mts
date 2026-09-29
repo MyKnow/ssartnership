@@ -15,6 +15,7 @@ const WORKFLOW_FILES = [
   "cross-platform-development.yml",
   "production-migrations.yml",
   "public-readiness.yml",
+  "self-host-public-health.yml",
   "storybook.yml",
 ] as const;
 
@@ -448,4 +449,14 @@ test("CI build steps select an explicit secret-free mock profile without local d
     assert.equal(step.env.NEXT_PUBLIC_DATA_SOURCE, "mock");
     assert.equal(step.env.NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE, "mock");
   }
+});
+
+
+test("external self-host verification is manual, fixed-scope and GitHub hosted", () => {
+  const workflow = parse(readRepoFile(".github/workflows/self-host-public-health.yml"));
+  assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
+  assert.deepEqual(workflow.permissions, {contents:"read"});
+  assert.equal(workflow.jobs.verify["runs-on"], "ubuntu-24.04");
+  assert.equal(workflow.jobs.verify.steps.at(-1).run, "node scripts/self-host-operations/verify-public-health.mjs");
+  assert.doesNotMatch(readRepoFile(".github/workflows/self-host-public-health.yml"), /secrets\.|schedule:|inputs:|continue-on-error/);
 });
