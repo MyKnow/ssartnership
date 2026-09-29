@@ -121,6 +121,8 @@ jobs:
         if: ${{ needs.classify.outputs.run_smoke == 'true' }}
         env:
           PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
+          NEXT_PUBLIC_DATA_SOURCE: mock
+          NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE: mock
         run: npm run verify:promotion:smoke
 
       - name: Production build and full E2E
@@ -128,6 +130,8 @@ jobs:
         if: ${{ needs.classify.outputs.run_release == 'true' }}
         env:
           PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
+          NEXT_PUBLIC_DATA_SOURCE: mock
+          NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE: mock
         run: npm run verify:release:post-quick
 
   policy:
