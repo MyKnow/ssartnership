@@ -6,10 +6,18 @@ groups:
         for: 2m
         labels: { severity: critical }
       - alert: ProductionBackupStale
-        expr: (time() - ssartnership_production_backup_created_seconds > 93600) or absent(ssartnership_production_backup_created_seconds)
+        expr: (time() - ssartnership_production_backup_created_seconds > 28800) or absent(ssartnership_production_backup_created_seconds)
         for: 5m
         labels: { severity: critical }
       - alert: ProductionMacBackupStale
         expr: (time() - ssartnership_production_backup_mac_created_seconds > 93600) or absent(ssartnership_production_backup_mac_created_seconds)
+        for: 5m
+        labels: { severity: critical }
+      - alert: ProductionPveBackupStale
+        expr: (time() - ssartnership_production_backup_pve_created_seconds > 28800) or absent(ssartnership_production_backup_pve_created_seconds)
+        for: 5m
+        labels: { severity: critical }
+      - alert: ProductionPveBackupPullStale
+        expr: (time() - ssartnership_production_backup_pve_ack_seconds > 2400) or absent(ssartnership_production_backup_pve_ack_seconds)
         for: 5m
         labels: { severity: critical }

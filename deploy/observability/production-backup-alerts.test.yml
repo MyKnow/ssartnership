@@ -53,3 +53,42 @@ tests:
         alertname: ProductionMacBackupStale
         exp_alerts:
           - exp_labels: { severity: critical }
+  - interval: 1m
+    input_series:
+      - series: ssartnership_production_backup_pve_created_seconds
+        values: '-40000+0x50'
+      - series: ssartnership_production_backup_pve_ack_seconds
+        values: '0+60x50'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: ProductionPveBackupStale
+        exp_alerts:
+          - exp_labels: { severity: critical }
+      - eval_time: 8m
+        alertname: ProductionPveBackupPullStale
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: ssartnership_production_backup_pve_created_seconds
+        values: '0+60x50'
+      - series: ssartnership_production_backup_pve_ack_seconds
+        values: '0+0x50'
+    alert_rule_test:
+      - eval_time: 48m
+        alertname: ProductionPveBackupStale
+        exp_alerts: []
+      - eval_time: 48m
+        alertname: ProductionPveBackupPullStale
+        exp_alerts:
+          - exp_labels: { severity: critical }
+  - interval: 1m
+    input_series: []
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: ProductionPveBackupStale
+        exp_alerts:
+          - exp_labels: { severity: critical }
+      - eval_time: 8m
+        alertname: ProductionPveBackupPullStale
+        exp_alerts:
+          - exp_labels: { severity: critical }

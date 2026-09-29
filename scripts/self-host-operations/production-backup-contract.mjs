@@ -12,8 +12,8 @@ export function parseBackupCommand(value) {
   if (typeof value !== "string" || /[\r\n\0]/u.test(value)) fail();
   const get = value.match(new RegExp(`^get (${UUID})$`, "u"));
   if (get) return { command: "get", id: get[1] };
-  const ack = value.match(new RegExp(`^ack (${UUID}) (${HASH})$`, "u"));
-  if (ack) return { command: "ack", id: ack[1], sha256: ack[2] };
+  const ack = value.match(new RegExp(`^(ack|ack-pve) (${UUID}) (${HASH})$`, "u"));
+  if (ack) return { command: ack[1], id: ack[2], sha256: ack[3] };
   return fail();
 }
 export function validateBackupReceipt(value) {
@@ -32,4 +32,10 @@ export function selectBackupRetention(receipts, keep) {
   const sorted = receipts.map(validateBackupReceipt).toSorted((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
   if (new Set(sorted.map(x => x.id)).size !== sorted.length) fail();
   return sorted.slice(0, Math.max(0, sorted.length - keep)).map(x => x.id);
+}
+
+export function backupAcknowledgementPath(command) {
+  if (command === "ack") return "/var/lib/ssartnership-backup-ack/latest.json";
+  if (command === "ack-pve") return "/var/lib/ssartnership-backup-ack/latest-pve.json";
+  return fail();
 }
