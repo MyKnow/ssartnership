@@ -1,7 +1,7 @@
 const CRON_PATH_PATTERN = /^\/api\/cron\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const HTTP_LOCAL_HOSTS = new Set(["localhost", "[::1]", "app"]);
 
-export const SELF_HOST_CRON_TIMEOUT_MS = 10_000;
+export const SELF_HOST_CRON_TIMEOUT_MS = 60_000;
 
 export class SelfHostCronError extends Error {
   constructor(code) {
@@ -171,6 +171,41 @@ function requireCronSecret(secret) {
   return secret;
 }
 
+async function requireSuccessfulCronBody(response, signal) {
+  if (response.status === 204) return;
+  if (!response.headers?.get('content-type')?.toLowerCase().startsWith('application/json') || !response.body) {
+    fail('CRON_RESPONSE_REJECTED');
+  }
+  const reader = response.body.getReader();
+  let abort;
+  const aborted = new Promise((_, reject) => {
+    abort = () => reject(new SelfHostCronError('CRON_INVOCATION_TIMEOUT'));
+    signal.addEventListener('abort', abort, { once: true });
+    if (signal.aborted) abort();
+  });
+  try {
+    const chunks = [];
+    let bytes = 0;
+    for (;;) {
+      const { done, value } = await Promise.race([reader.read(), aborted]);
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > 256 * 1024) fail('CRON_RESPONSE_REJECTED');
+      chunks.push(value);
+    }
+    let result;
+    try { result = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+    catch { fail('CRON_RESPONSE_REJECTED'); }
+    if (!result || typeof result !== 'object' || result.ok !== true
+      || (Object.hasOwn(result, 'failed') && (!Number.isSafeInteger(result.failed) || result.failed !== 0))) {
+      fail('CRON_RESPONSE_REJECTED');
+    }
+  } finally {
+    signal.removeEventListener('abort', abort);
+    void reader.cancel().catch(() => {});
+  }
+}
+
 export async function invokeSelfHostCron({
   entries,
   path,
@@ -210,6 +245,7 @@ export async function invokeSelfHostCron({
       fail("CRON_RESPONSE_REJECTED");
     }
 
+    await requireSuccessfulCronBody(response, controller.signal);
     return Object.freeze({ path: entry.path, schedule: entry.schedule });
   } catch (error) {
     if (error instanceof SelfHostCronError) throw error;

@@ -94,11 +94,11 @@ sudo systemctl disable --now ssartnership-edge-recovery.timer
 
 ## Cron 이식
 
-Production 홈 서버 전환에서는 `vercel.json`의 `git.deploymentEnabled.main=false`로 main 커밋의 Vercel 자동 배포를 중지한다. 지정하지 않은 dev와 작업 브랜치는 Preview 배포를 유지한다. 이는 새 앱이 이전 Cloud 스키마에 먼저 배포되는 것을 막는 전환 계약이다. 기존 Vercel 배포는 복구용으로 보존하며 이 설정만으로 기존 요청이나 Cron이 중지되지는 않는다. 최종 데이터 복사 직전에 Vercel 설정에서 Cron을 비활성화하고 기존 Production 요청을 정지한 뒤 진행 중인 쓰기 종료와 원본 쓰기 차단을 확인한다. 신규 Production 검증은 승인된 main SHA의 홈 서버 이미지·DB·실제 공개 흐름을 기준으로 수행한다. 새 서버가 쓰기를 받은 뒤에는 데이터 차이 확인 없이 기존 서비스와 DNS를 재개하지 않는다.
+Production 홈 서버 전환에서는 `vercel.json`의 `git.deploymentEnabled=false`로 모든 브랜치의 Vercel 자동 배포를 중지한다. Production과 Preview 모두 자체 호스팅 이미지 경로를 사용한다. 이는 새 앱이 이전 Cloud 스키마에 먼저 배포되는 것을 막는 전환 계약이다. 기존 Vercel 배포는 복구용으로 보존하며 이 설정만으로 기존 요청이나 Cron이 중지되지는 않는다. 최종 데이터 복사 직전에 Vercel 설정에서 Cron을 비활성화하고 기존 Production 요청을 정지한 뒤 진행 중인 쓰기 종료와 원본 쓰기 차단을 확인한다. 신규 Production 검증은 승인된 main SHA의 홈 서버 이미지·DB·실제 공개 흐름을 기준으로 수행한다. 새 서버가 쓰기를 받은 뒤에는 데이터 차이 확인 없이 기존 서비스와 DNS를 재개하지 않는다.
 
 운영 이미지 준비 입력의 `refs/heads/main`은 앱 origin `https://ssartnership.myknow.xyz`, API origin `https://ssartnership-api.myknow.xyz`, `linux/amd64`, 유효한 공개 VAPID 키를 모두 요구한다. 기존 SHA·소스 archive hash·만료·root 소유 파일·전체 Release 검증을 유지하며, 실제 운영 키와 빌드/실행 값의 일치도 별도로 확인한다. 일반 main 입력이나 Preview 주소를 섞은 main 입력은 거절한다. `main` push는 Production 전용 GitHub workflow에서 이미지를 발행하고, 서버 수신기는 첫 성공 attempt와 현재 main SHA·schema approval·immutable digest를 다시 확인한 뒤 app만 자동 적용한다. 설치·중지·복구 절차는 [격리 CI·배포·유지보수](./self-host-ci-maintenance.md)를 따른다.
 
-일정과 endpoint는 `vercel.json`이 정본이며 모두 UTC다. 목록 조회는 HTTP 요청을 보내지 않는다.
+등록 endpoint와 중지된 Vercel 호환 일정은 `vercel.json`에 남긴다. 아래 범용 CLI는 이 복구용 UTC 목록을 조회하며 HTTP 요청을 보내지 않는다. 현재 Production 실행 일정은 아래의 별도 자체 호스팅 구성이다.
 
 ```bash
 node scripts/self-host-cron.mjs --list
@@ -110,11 +110,27 @@ node scripts/self-host-cron.mjs --list
 node scripts/self-host-cron.mjs --run /api/cron/rss
 ```
 
-외부 scheduler는 목록의 각 UTC 일정에 대응하는 단발 명령을 실행한다. 같은 job이 겹치지 않게 실행 잠금을 설정하고 종료 코드와 실패 알림을 수집한다. 도구가 timeout으로 끝났다고 서버 작업까지 취소됐다고 가정하지 않는다. 재실행 전에 실행 로그와 실제 데이터 결과를 확인한다.
+별도 scheduler를 구성할 때는 승인된 실행 주기에 대응하는 단발 명령을 사용한다. 같은 job이 겹치지 않게 실행 잠금을 설정하고 종료 코드와 실패 알림을 수집한다. 도구가 timeout으로 끝났다고 서버 작업까지 취소됐다고 가정하지 않는다. 재실행 전에 실행 로그와 실제 데이터 결과를 확인한다.
 
 운영 전환에서는 기존 Vercel Cron을 중지한 다음 새 scheduler 하나만 활성화한다. 전환 직후 job별 마지막 실행 시각, 결과, 중복 여부를 확인한다. 이 앱 Compose는 반복 scheduler를 자동으로 시작하지 않는다.
 
-홈 Production의 `production-cron.mjs`는 이 목록에서 일일 UTC systemd timer를 생성하고, 그 밖의 일정 문법은 설치 전에 거절한다. `ssartnership-production-cron@.service`는 고정 loopback 앱으로만 요청하며 비밀은 root 전용 파일에서 읽는다. 먼저 검증된 버전의 스크립트·공용 Cron 모듈·vercel.json을 `/opt/ssartnership/production-cron/` 아래에 설치하고 `current` 링크와 11개 timer를 준비하되 활성화하지 않는다. 기존 Cron 비활성화·최종 동기화·공개 전환 검증 뒤에만 root 전용 `cron-owner` 파일에 `home-production`을 기록하고 timer를 활성화한다. 파일이 없거나 값이 다르면 실행하지 않는다. timer는 `Persistent=false`라서 중지 중의 과거 작업을 한꺼번에 실행하지 않는다. 단발 호출은 전용 잠금으로 직렬화하고 HTTP timeout 뒤 자동 재시도하지 않는다. 누락/실패는 systemd 결과와 앱의 작업 이력을 확인한 뒤 판단한다.
+홈 Production의 실제 일정은 `deploy/self-host-operations/production-cron/schedules.json`이 정의한다. Vercel의 중지된 복구용 일정과 구분하며, 전체 등록 경로 대조에서 Wallet을 제외한 작업이 하나라도 누락·중복·추가되면 설치를 중단한다. `production-cron.mjs`는 검증한 매일·매시간·분 간격 부분집합만 UTC systemd calendar로 변환한다. `Persistent=false`이므로 중지 중의 작업을 재개 직후 몰아서 실행하지 않는다.
+
+| 작업 | 권장 실행 주기 (KST) |
+| --- | --- |
+| Mattermost 발신 계정 상태 | 5분, 매시 01/06/11…56분 |
+| 만료 프로모션 정리 | 10분, 매시 04/14/24/34/44/54분 |
+| RSS 갱신 | 15분, 매시 02/17/32/47분 |
+| 제휴 결제 상태 반영 | 매시간 10분 |
+| 졸업 증빙·임시 이미지·수동 명부 정리 | 매시간 각각 30/32/35분 |
+| 삭제 회원 익명화·운영 로그·프로젝트 개인정보 정리 | 매일 각각 03:40/03:50/03:55 |
+| 만료 제휴 알림 | 매일 09:00 |
+
+Wallet timer와 기능은 이번 운영 전환에서 제외하고 비활성 상태를 유지한다. 고정 loopback 앱에만 요청하고 비밀은 root 전용 파일에서 읽는다. 검증한 버전 아래에 스크립트·공용 모듈·일정·등록 경로 목록·실패 알림 모듈을 설치한다. 기존 설정을 보존한 뒤 `current` 링크와 해당 11개 timer만 갱신한다. `systemd-analyze calendar`와 unit validation을 통과하고, 기존 Vercel Cron 비활성화·공개 전환·복원 검증을 확인한 후 root 전용 `cron-owner=home-production`으로 단일 소유를 보장한다.
+
+전용 잠금은 최대 120초 대기하고 호출은 응답 본문까지 60초로 제한한다. HTTP 성공이어도 JSON의 `ok`가 true가 아니거나 `failed`가 0이 아니면 실패다. 잘못된 JSON·HTML·256KiB 초과 본문도 거절한다. 실패 시 자동 재시도하지 않으며 systemd OnFailure로 기존 운영자 이메일 경로에 작업명만 알린다. 같은 작업의 반복 실패 메일은 시간 단위 idempotency 키로 중복을 억제한다. 응답의 회원 정보·비밀·원문 오류는 출력하지 않는다. 시간 초과는 서버 작업의 롤백을 뜻하지 않으므로 작업 이력과 진행 상태를 먼저 확인하고 수동 재실행한다.
+
+중지·복구는 이 11개 timer만 대상으로 한다. 이전 코드와 timer로 되돌려도 이미 수행한 개인정보 보존 정책이나 결제 상태 변경이 되돌아가지는 않는다. 복구용 Vercel Cron을 동시에 다시 켜지 않는다.
 
 ## 운영·복구 검증
 
