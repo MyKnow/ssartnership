@@ -160,3 +160,5 @@ Vercel 배포의 기존 Analytics/SpeedInsights와 제품 이벤트는 유지한
 Postgres exporter는 각 환경의 전체 DB 컨테이너 이름에 연결한다. 배포 전에 실제 전용 DB 네트워크 CIDR을 확인하고 `pg_hba.conf`에 그 CIDR의 `postgres` DB, `ssartnership_monitor` 역할, `scram-sha-256`만 허용한다. 기존 파일을 보존하고 `pg_hba_file_rules` 오류가 없을 때 reload한다. 앱 역할이나 공개 네트워크 접근을 확장하지 않는다. monitor는 `pg_monitor`/CONNECT만 유지하고 회원 table 조회 거절을 다시 확인한다.
 
 Preview 외부 알림은 해당 환경의 root 전용 monitoring env에 기존 운영자 이메일 발송 설정만 연결한다. 앱 비밀·회원 데이터는 복사하지 않고 relay token/DB credential은 환경별로 유지한다. telemetry 이미지와 env 변경은 앱 교체만 수행하는 자동 receiver와 별도로 적용한다. 각 환경의 5개 target과 `pg_up=1`, 실제 실패/복구 전달을 확인하며 경보가 없어졌다는 사실만으로 백업/PITR 완료를 주장하지 않는다.
+
+2026-09-30 운영 점검에서 원본 Preview의 기존 `ssartnership_monitor`는 이미 `pg_monitor`와 CONNECT만 보유하고 회원 조회 권한은 없었다. 실제 전용 네트워크 `172.30.85.0/24`의 해당 역할에 SCRAM 접속 규칙을 추가하고 파일 구문 확인·reload 후 Prometheus의 `pg_up=1`을 확인했다. 이전 HBA와 monitoring env는 root 전용 복구 디렉터리에 보존했다. 이메일 설정은 준비했으며 telemetry 재배포 후 실제 전달 검증과 구분한다.
