@@ -84,6 +84,16 @@ relay는 인증된 Alertmanager 요청에서 알려진 경보명·심각도·발
 
 참고: [PostgreSQL 온라인 base backup](https://www.postgresql.org/docs/17/app-pgbasebackup.html), [Resend idempotency](https://resend.com/docs/dashboard/emails/idempotency-keys).
 
+### Preview 인프라 전용 로그인
+
+`deploy/self-host/Caddyfile`의 `ssartnership-infra-dev.myknow.xyz/infra/`는 앱·Storage와 분리된 관리 origin이다. `compose.edge.yaml`이 mount하는 private `infra-auth/users`에는 bcrypt hash만 둔다. 실제 비밀번호는 별도 monitoring secret으로 관리하며 저장소·로그에 기록하지 않는다. Grafana는 같은 operator 계정을 자체 검증한다.
+
+Prometheus·Alertmanager는 GET/HEAD만 허용하며 Authorization·Cookie를 제거한다. 외부 Origin, cross-site API 요청과 iframe을 차단한다. Grafana의 인증 대리 헤더는 제거한다. Preview monitoring upstream은 환경별 전체 컨테이너 이름을 사용한다. 공용 edge에 Production 네트워크를 연결할 때 앱과 gateway의 기존 별칭도 실제 Preview 이름으로 치환하고, 활성 복합 Caddyfile을 이 템플릿 하나로 덮어쓰지 않는다.
+
+적용 전 설정을 보존하고 Compose config와 Caddy validate를 통과시킨다. 무인증·오류 암호 401, 정상 로그인 및 각 subpath assets/API, 외부 Origin 403, 조회 서비스 POST 405, 원본 포트 loopback을 함께 확인한다. 접근 문제 시 이전 Caddyfile과 Compose 설정을 복원한다. 인증 경계만 같다고 화면 검증을 대체하지 않는다.
+
+2026-09-09의 세 서비스별 360/820/1440px 렌더링 검증은 [Issue #452](https://github.com/MyKnow/ssartnership/issues/452)에 보존돼 있다. 2026-09-29에 두 환경의 TLS·401/403/405·Grafana API 인증을 다시 확인했다. 현재 Browser 도구는 해당 Basic 인증 페이지 진입을 차단하여 새 캡처를 얻지 못했다. 이번 소스 정리는 이미 적용된 서버 설정을 반영하며, UI 변경은 없다. Alertmanager의 기존 360px 가로 넘침과 일부 Grafana 지표 미수집은 그대로 구분한다.
+
 ### Production 외부 관측 경로
 
 `deploy/self-host/Caddyfile.production`는 API 및 인프라 도메인 전용 조각이다. 활성화 시 기존 edge 설정을 보존한 새 버전 설정에 이 조각을 결합하고 Caddy 검증을 통과시킨다. Caddy를 Production edge·monitoring 네트워크에 연결하고, Dev와 Prod의 upstream은 서비스 별칭 대신 환경별 전체 컨테이너 이름으로 구분한다. 전체 네트워크를 연결한 뒤 `app` 같은 중복 별칭을 남기면 다른 환경으로 연결될 수 있다. 기존 Dev upstream도 전체 이름으로 고정하고 두 환경 응답을 함께 검증한다.

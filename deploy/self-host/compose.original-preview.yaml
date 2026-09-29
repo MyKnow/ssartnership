@@ -69,7 +69,7 @@ services:
     logging: *bounded-logs
     networks: [original_edge, monitoring]
     ports: ["127.0.0.1:59190:9090"]
-    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus, --storage.tsdb.retention.time=7d, --storage.tsdb.retention.size=2GB]
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus, --storage.tsdb.retention.time=7d, --storage.tsdb.retention.size=2GB, --web.external-url=https://ssartnership-infra-dev.myknow.xyz/infra/prometheus/, --web.route-prefix=/]
     volumes:
       - ../observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ../observability/alerts.yml:/etc/prometheus/alerts.yml:ro
@@ -86,7 +86,7 @@ services:
     logging: *bounded-logs
     networks: [original_edge, monitoring]
     ports: ["127.0.0.1:59193:9093"]
-    command: [--config.file=/etc/alertmanager/alertmanager.yml, --storage.path=/alertmanager, --cluster.listen-address=]
+    command: [--config.file=/etc/alertmanager/alertmanager.yml, --storage.path=/alertmanager, --cluster.listen-address=, --web.external-url=https://ssartnership-infra-dev.myknow.xyz/infra/alertmanager/, --web.route-prefix=/]
     volumes:
       - ../observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - ${MONITORING_SECRETS_DIR:?monitoring secrets required}/alert-relay-token:/run/alert-relay-token:ro
@@ -105,6 +105,9 @@ services:
     ports: ["127.0.0.1:53100:3000"]
     tmpfs: [/tmp:mode=1777]
     environment:
+      GF_SERVER_ROOT_URL: https://ssartnership-infra-dev.myknow.xyz/infra/grafana/
+      GF_AUTH_BASIC_ENABLED: "true"
+      GF_SECURITY_COOKIE_SECURE: "true"
       GF_SECURITY_ADMIN_USER: operator
       GF_SECURITY_ADMIN_PASSWORD__FILE: /run/grafana-password
       GF_USERS_ALLOW_SIGN_UP: "false"
