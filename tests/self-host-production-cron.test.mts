@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync, mkdtempSync, symlinkSync, rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {spawnSync} from 'node:child_process';
 import {test} from 'node:test';
 import {productionCronTimers, productionCronCalendar, loadProductionCronSchedules} from '../scripts/self-host-operations/production-cron.mjs';
 const catalog = readFileSync(new URL('../vercel.json',import.meta.url),'utf8');
@@ -22,4 +26,20 @@ test('unknown, missing, duplicate or excluded job stops the scheduler before ins
  for (const crons of [entries.slice(1),[...entries,entries[0]],[...entries,{path:'/api/cron/reconcile-apple-wallet-passes',schedule:'0 0 * * *'}],entries.map((v: {path:string,schedule:string},i:number)=>i===0?{...v,path:'/api/cron/unknown'}:v)]) {
   assert.throws(()=>loadProductionCronSchedules(JSON.stringify({crons}),catalog));
  }
+});
+
+test('Cron failure CLI executes through both canonical and installed symlink paths',()=>{
+ const directory=mkdtempSync(join(tmpdir(),'ssart-cron-entrypoint-'));
+ try {
+  const target=fileURLToPath(new URL('../scripts/self-host-operations',import.meta.url));
+  const linked=join(directory,'current');
+  symlinkSync(target,linked,'junction');
+  for(const root of [target,linked]) {
+   const result=spawnSync(process.execPath,[join(root,'notify-cron-failure.mjs'),'not-a-production-job'],{encoding:'utf8',timeout:10000});
+   assert.equal(result.error,undefined);
+   assert.equal(result.status,1,'invalid job must reach validation, never exit as a no-op');
+   assert.equal(result.stdout,'');
+   assert.equal(result.stderr.trim(),'{"error":"CRON_FAILURE_EMAIL_FAILED"}');
+  }
+ } finally {rmSync(directory,{recursive:true,force:true});}
 });
