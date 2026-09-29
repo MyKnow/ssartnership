@@ -146,3 +146,10 @@ npm run check:docs
 ```
 
 설계 근거: [Next.js 환경 변수와 self-hosting](https://nextjs.org/docs/app/guides/self-hosting), [Compose 파일 병합](https://docs.docker.com/compose/how-tos/multiple-compose-files/merge/).
+
+
+### 독립 회선 HTTPS 수동 검증
+
+`.github/workflows/self-host-public-health.yml`은 운영자 요청 때만 GitHub-hosted Ubuntu에서 실행한다. 예약 실행·배포 권한·앱 비밀·URL 입력이 없다. `verify-public-health.mjs`는 고정 Production/Preview health의 TLS·HTTP 200·비캐시 `{status:"ok"}`와 두 infra origin의 Basic 인증 401을 확인한다. redirect를 따르거나 실패 요청을 재시도하지 않는다. 결과에는 환경명과 고정 상태만 남긴다.
+
+재부팅 복구 또는 공개 edge 변경 후 승인된 main 소스에서 한 번 실행하고 run의 실제 head SHA·첫 attempt·전체 결과를 확인한다. 서버 내부 검증이나 같은 회선의 브라우저를 독립 회선 증거로 표현하지 않는다. 이 작업은 웹 접속·인증 경계 검증이며 DB 가용성·실제 로그인·상시 외부 감시를 대신하지 않는다. 실패한 실행은 보존하고 원인 확인 후 새 증거로 검증한다.
