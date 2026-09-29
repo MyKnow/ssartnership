@@ -23,6 +23,7 @@ services:
     volumes:
       - caddy-data:/data
       - caddy-config:/config
+      - /etc/myknow/secrets/ssartnership-original-preview/infra-auth:/run/infra-auth:ro
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
     tmpfs:
       - /tmp:mode=1777
