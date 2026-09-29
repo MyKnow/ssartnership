@@ -1,7 +1,7 @@
 import { readFile, lstat } from 'node:fs/promises';
+import { realpathSync } from 'node:fs';
 import { parseEnv } from 'node:util';
 import { fileURLToPath } from 'node:url';
-import path from 'node:path';
 import { alertDeliveryConfiguration, deliverOperationalAlert } from '../../deploy/observability/alert-delivery.mjs';
 import { loadProductionCronSchedules } from './production-cron.mjs';
 
@@ -23,6 +23,6 @@ export async function notifyCronFailure(job) {
   });
   console.log('{"cronFailureEmailAccepted":true}');
 }
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try { await notifyCronFailure(process.argv[2]); } catch { console.error('{"error":"CRON_FAILURE_EMAIL_FAILED"}'); process.exitCode = 1; }
 }
