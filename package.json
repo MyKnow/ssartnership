@@ -76,7 +76,7 @@
     "jszip": "^3.10.1",
     "lucide-react": "^0.577.0",
     "marked": "^18.0.6",
-    "next": "16.3.4",
+    "next": "16.3.8",
     "next-themes": "^0.4.6",
     "nodemailer": "10.0.12",
     "passkit-generator": "3.5.7",
@@ -130,13 +130,13 @@
     "nanoid": "3.3.18",
     "sharp": "$sharp",
     "minimatch@3.1.5": {
-      "brace-expansion": "1.1.18"
+      "brace-expansion": "1.1.21"
     },
     "minimatch@10.2.4": {
-      "brace-expansion": "5.0.9"
+      "brace-expansion": "5.0.12"
     },
     "minimatch@10.2.5": {
-      "brace-expansion": "5.0.9"
+      "brace-expansion": "5.0.12"
     },
     "passkit-generator": {
       "joi": "17.13.7"
