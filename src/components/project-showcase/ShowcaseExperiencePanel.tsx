@@ -27,6 +27,7 @@ const INPUT_CLASS = "min-h-11 w-full min-w-0 rounded-xl border border-border bg-
 type Props = {
   projectId: string;
   serviceUrl: string;
+  allowImmediateFeedback: boolean;
   authenticated: boolean;
   isOwner: boolean;
   loginHref: string;
@@ -45,6 +46,7 @@ function openPendingTab() {
 export default function ShowcaseExperiencePanel({
   projectId,
   serviceUrl,
+  allowImmediateFeedback,
   authenticated,
   isOwner,
   loginHref,
@@ -68,7 +70,12 @@ export default function ShowcaseExperiencePanel({
     clockOffsetRef.current = serverNowMs - Date.now();
   }, [serverNowMs]);
 
-  const unlockAt = state.startedAt ? getShowcaseFeedbackUnlockAt(state.startedAt).getTime() : null;
+  let unlockAt: number | null = null;
+  if (state.startedAt) {
+    unlockAt = allowImmediateFeedback
+      ? new Date(state.startedAt).getTime()
+      : getShowcaseFeedbackUnlockAt(state.startedAt).getTime();
+  }
   const remainingSeconds = unlockAt === null ? null : Math.max(0, Math.ceil((unlockAt - now) / 1000));
 
   useEffect(() => {
@@ -102,7 +109,9 @@ export default function ShowcaseExperiencePanel({
     clockOffsetRef.current = resultServerNow - Date.now();
     setNow(resultServerNow);
     setState((current) => ({ ...current, registered: true, startedAt: result.startedAt }));
-    setMessage("체험을 시작했어요. 1분 뒤 이곳에서 한 줄 피드백을 남기면 추첨권 1장을 받아요.");
+    setMessage(allowImmediateFeedback
+      ? "링크 클릭을 체험으로 기록했어요. 바로 피드백을 남길 수 있어요."
+      : "체험을 시작했어요. 1분 뒤 이곳에서 한 줄 피드백을 남기면 추첨권 1장을 받아요.");
     if (tab) tab.location.assign(result.destination);
     else window.open(result.destination, "_blank", "noopener,noreferrer");
   }

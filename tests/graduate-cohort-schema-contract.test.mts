@@ -72,9 +72,13 @@ test("graduate correction targets and approval snapshot survive the cohort cutov
   assert.ok(phaseOneIndex !== -1, "Phase 1 snapshot must exist");
   assert.ok(phaseTwoIndex > phaseOneIndex, "Phase 2 must follow Phase 1");
   assert.ok(parityIndex > phaseTwoIndex, "Phase 2 must precede Preview parity");
+  const nextSnapshotIndex = schemaSql.indexOf("\n-- Snapshot of ", phaseTwoIndex + 1);
+  const phaseTwoEnd = nextSnapshotIndex !== -1 && nextSnapshotIndex < parityIndex
+    ? nextSnapshotIndex
+    : parityIndex;
   assert.equal(
     schemaSql
-      .slice(phaseTwoIndex + `-- Snapshot of ${phaseTwoMigration}`.length, parityIndex)
+      .slice(phaseTwoIndex + `-- Snapshot of ${phaseTwoMigration}`.length, phaseTwoEnd)
       .trim(),
     readRepoFile(`supabase/migrations/${phaseTwoMigration}`).trim(),
   );

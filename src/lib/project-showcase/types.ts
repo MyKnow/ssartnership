@@ -64,6 +64,7 @@ export type ShowcaseProject = ShowcaseProjectCounts & {
   description: string;
   imageUrl: string;
   serviceUrl: string;
+  allowImmediateFeedback: boolean;
   status: ShowcaseProjectStatus;
   ownerMemberId: string;
   createdAt: string;
@@ -202,8 +203,15 @@ export function getShowcaseFeedbackUnlockAt(startedAt: string) {
   return new Date(new Date(startedAt).getTime() + SHOWCASE_FEEDBACK_UNLOCK_SECONDS * 1000);
 }
 
-export function canSubmitShowcaseFeedback(startedAt: string | null, now = new Date()) {
+export function canSubmitShowcaseFeedback(
+  startedAt: string | null,
+  now = new Date(),
+  options: { allowImmediateFeedback?: boolean } = {},
+) {
   if (!startedAt) return false;
+  const started = new Date(startedAt).getTime();
+  if (!Number.isFinite(started)) return false;
+  if (options.allowImmediateFeedback) return true;
   const unlockAt = getShowcaseFeedbackUnlockAt(startedAt).getTime();
   return Number.isFinite(unlockAt) && now.getTime() >= unlockAt;
 }

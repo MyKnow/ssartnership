@@ -50,7 +50,7 @@ import {
 } from "./types";
 
 const EVENT_COLUMNS = "id,slug,title,description,hero_image_src,submission_start_at,submission_end_at,experience_start_at,experience_end_at,announcement_start_at,announcement_end_at,submitter_selection_count,experiencer_selection_count,is_active";
-const PROJECT_COLUMNS = "id,event_id,owner_member_id,project_type,title,team_name,summary,description,image_url,service_url,status,review_note,created_at,updated_at";
+const PROJECT_COLUMNS = "id,event_id,owner_member_id,project_type,title,team_name,summary,description,image_url,service_url,allow_immediate_feedback,status,review_note,created_at,updated_at";
 
 type EventRow = {
   id: string;
@@ -80,6 +80,7 @@ type ProjectRow = {
   description: string;
   image_url: string;
   service_url: string;
+  allow_immediate_feedback: boolean;
   status: string;
   review_note: string | null;
   created_at: string;
@@ -124,6 +125,7 @@ function mapProject(row: ProjectRow, counts: ShowcaseProjectCounts = EMPTY_COUNT
     description: row.description,
     imageUrl: row.image_url,
     serviceUrl: row.service_url,
+    allowImmediateFeedback: row.allow_immediate_feedback,
     status: isShowcaseProjectStatus(row.status) ? row.status : "hidden",
     createdAt: row.created_at,
     ...counts,
@@ -949,5 +951,13 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
       p_review_note: input.reviewNote,
     });
     if (error) throwDomain(error, "프로젝트 검수 결과를 저장하지 못했습니다.");
+  }
+
+  async setImmediateFeedback(input: { projectId: string; allowed: boolean }) {
+    const { error } = await this.client().rpc("set_showcase_project_immediate_feedback", {
+      p_project_id: input.projectId,
+      p_allowed: input.allowed,
+    });
+    if (error) throwDomain(error, "프로젝트 체험 정책을 저장하지 못했습니다.");
   }
 }

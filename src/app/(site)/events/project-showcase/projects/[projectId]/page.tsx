@@ -16,8 +16,8 @@ export const dynamic = "force-dynamic";
 
 const EXPERIENCE_HINTS: Record<ShowcaseProjectType, string> = {
   web: "새 탭에서 서비스를 열어요.",
-  app: "스토어나 다운로드 안내 페이지를 열어요. 설치 여부는 확인하지 않아요.",
-  game: "새 탭에서 게임이나 스토어 페이지를 열어요.",
+  app: "스토어나 다운로드 안내 페이지를 열어요. 설치 완료 여부는 확인하지 않아요.",
+  game: "게임이나 스토어 페이지를 열어요. 실제 플레이 여부는 확인하지 않아요.",
   embedded: "시연 영상을 열어 프로젝트를 살펴봐요.",
 };
 const EVENT_PATH = "/events/project-showcase";
@@ -91,6 +91,11 @@ export default async function ShowcaseProjectDetailPage({
       .find((candidate) => candidate.id === projectId) ?? null
     : await projectShowcaseRepository.getPublicProject(projectId);
   if (!project) notFound();
+  const experienceHint = previewMode
+    ? "미리보기에서는 실제 서비스 주소를 열지 않아요."
+    : project.allowImmediateFeedback
+      ? "링크를 열면 체험을 기록하고 바로 피드백을 남길 수 있어요. 다운로드·설치 완료나 실제 사용 여부는 확인하지 않아요."
+      : EXPERIENCE_HINTS[project.projectType];
   const isOwner = !previewMode && Boolean(session?.userId && project.ownerMemberId === session.userId);
   const memberState = session?.userId && !isOwner
     ? await projectShowcaseRepository.getMemberProjectState(project.id, session.userId)
@@ -128,11 +133,12 @@ export default async function ShowcaseProjectDetailPage({
             </div>
             <aside className="h-fit rounded-2xl border border-border bg-surface-muted/50 p-4 sm:p-5" aria-labelledby="showcase-experience-heading">
               <h2 id="showcase-experience-heading" className="font-bold text-foreground">체험하기</h2>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">{previewMode ? "미리보기에서는 실제 서비스 주소를 열지 않아요." : EXPERIENCE_HINTS[project.projectType]}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{experienceHint}</p>
               <div className="mt-5">
                 <ShowcaseExperiencePanel
                   projectId={project.id}
                   serviceUrl={project.serviceUrl}
+                  allowImmediateFeedback={project.allowImmediateFeedback}
                   authenticated={previewMode || Boolean(session?.userId)}
                   isOwner={isOwner}
                   loginHref={loginHref}

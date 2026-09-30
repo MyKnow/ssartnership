@@ -61,6 +61,14 @@ test.describe("authenticated administrator console", () => {
 
   test("simulates the showcase experience flow without saving or opening external links", async ({ page }) => {
     await page.goto("/admin/events/project-showcase", { waitUntil: "domcontentloaded" });
+    await page.goto("/admin/events/project-showcase?status=approved", { waitUntil: "domcontentloaded" });
+    const immediatePolicies = page.getByRole("checkbox", { name: "링크 클릭 기록 후 바로 피드백 허용" });
+    await expect(immediatePolicies).toHaveCount(2);
+    await expect(immediatePolicies.first()).toBeChecked();
+    await expect(immediatePolicies.last()).toBeChecked();
+    await captureResponsivePage(page, "admin-immediate-feedback-policy", immediatePolicies.first());
+
+    await page.goto("/admin/events/project-showcase", { waitUntil: "domcontentloaded" });
     const previewLink = page.getByRole("link", { name: "체험 기간 미리보기" });
     await expect(previewLink).toBeVisible();
     await captureResponsivePage(page, "admin-entry", previewLink);
@@ -88,10 +96,9 @@ test.describe("authenticated administrator console", () => {
     await page.getByRole("checkbox", { name: /당첨되면 이름 일부를 가려/ }).check();
     await page.getByRole("button", { name: "참여 등록하고 체험 시작" }).click();
     const fastForward = page.getByRole("button", { name: "1분 경과 상태 미리보기" });
-    await expect(fastForward).toBeVisible();
-    await fastForward.click();
-
     const feedback = page.getByRole("textbox", { name: "한 줄 피드백" });
+    await expect.poll(async () => (await feedback.isEnabled()) || (await fastForward.isVisible())).toBe(true);
+    if (await fastForward.isVisible()) await fastForward.click();
     await expect(feedback).toBeEnabled();
     await feedback.fill("프로젝트 흐름이 명확하고 화면 구성이 좋아요.");
     await page.getByRole("button", { name: "피드백 제출 미리보기" }).click();

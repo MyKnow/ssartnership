@@ -173,6 +173,19 @@ export function parseShowcaseReview(input: { status: string; reviewNote: string 
   return { success: true, data: { status, reviewNote } };
 }
 
+const showcaseImmediateFeedbackPolicySchema = z.object({
+  allowed: z.boolean("즉시 피드백 설정을 다시 확인해 주세요."),
+});
+
+/** Shared by the admin review control and its server action. */
+export function parseShowcaseImmediateFeedbackPolicy(value: unknown): ShowcaseValidationResult<{ allowed: boolean }> {
+  const result = showcaseImmediateFeedbackPolicySchema.safeParse(value);
+  if (!result.success) {
+    return { success: false, message: result.error.issues[0]?.message ?? "즉시 피드백 설정을 다시 확인해 주세요.", field: "allowed" };
+  }
+  return { success: true, data: result.data };
+}
+
 export const SHOWCASE_SERVICE_URL_HINTS: Record<ShowcaseProjectType, { label: string; placeholder: string }> = {
   web: { label: "서비스 주소", placeholder: "https://..." },
   app: { label: "스토어 또는 다운로드 안내 주소", placeholder: "https://play.google.com/..." },

@@ -13,6 +13,7 @@ import {
 } from "@/lib/project-showcase/types";
 import {
   parseShowcaseExclusionReason,
+  parseShowcaseImmediateFeedbackPolicy,
   parseShowcaseReview,
   parseShowcaseSchedule,
   SHOWCASE_SCHEDULE_FIELDS,
@@ -62,6 +63,7 @@ export async function reviewShowcaseProject(formData: FormData) {
     await projectShowcaseRepository.reviewProject({ projectId, adminId: admin.adminId, status, reviewNote });
     await logAdminAudit({
       action: "showcase_project_review",
+      actorId: admin.adminId,
       targetType: "showcase_project",
       targetId: projectId,
       path: ADMIN_PATH,
@@ -73,6 +75,39 @@ export async function reviewShowcaseProject(formData: FormData) {
   } catch (error) {
     if (!(error instanceof ShowcaseDomainError)) {
       console.error("[project-showcase/review]", error instanceof Error ? error.message : "unknown");
+    }
+    return toShowcaseFailure(error);
+  }
+}
+
+export async function updateShowcaseImmediateFeedback(projectId: string, allowed: unknown) {
+  const admin = await requireAdminPermission("events", "update", { path: ADMIN_PATH });
+  if (typeof projectId !== "string" || !projectId.trim() || projectId.length > 128) {
+    return { ok: false as const, message: "설정을 바꿀 프로젝트를 찾을 수 없어요.", field: null };
+  }
+  const parsed = parseShowcaseImmediateFeedbackPolicy({ allowed });
+  if (!parsed.success) return { ok: false as const, message: parsed.message, field: parsed.field };
+  try {
+    await projectShowcaseRepository.setImmediateFeedback({ projectId, allowed: parsed.data.allowed });
+    await logAdminAudit({
+      action: "showcase_project_review",
+      actorId: admin.adminId,
+      targetType: "showcase_project",
+      targetId: projectId,
+      path: ADMIN_PATH,
+      properties: { action: "immediate_feedback_policy_update", allow_immediate_feedback: parsed.data.allowed },
+    });
+    revalidatePath(EVENT_PATH);
+    revalidatePath(`${EVENT_PATH}/projects/${projectId}`);
+    return {
+      ok: true as const,
+      message: parsed.data.allowed
+        ? "링크를 연 직후 피드백을 허용하도록 저장했어요."
+        : "체험 시작 후 1분이 지나면 피드백을 허용하도록 저장했어요.",
+    };
+  } catch (error) {
+    if (!(error instanceof ShowcaseDomainError)) {
+      console.error("[project-showcase/immediate-feedback]", error instanceof Error ? error.message : "unknown");
     }
     return toShowcaseFailure(error);
   }
