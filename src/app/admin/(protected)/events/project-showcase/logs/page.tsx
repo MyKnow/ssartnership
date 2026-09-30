@@ -53,7 +53,7 @@ function activitySummary(item: ShowcaseAdminActivityLog) {
     case "experience_started":
       return "체험 시작 버튼 기록 · 회원별 최초 1회";
     case "feedback_submitted":
-      return "체험 1분 경과 후 피드백 · 유효 체험 1건";
+      return "피드백 제출 · 유효 체험 1건";
     case "project_reviewed":
       return item.details.status ? `검수 결과 · ${SHOWCASE_ADMIN_STATUS_LABELS[item.details.status]}` : "검수 결과 저장";
     case "event_settings_updated":

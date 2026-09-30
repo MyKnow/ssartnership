@@ -107,9 +107,14 @@ export default async function AdminProjectShowcasePage({
                   </p>
                 </div>
               </div>
-              {canUpdate && project.status !== "withdrawn" ? (
-                <ShowcaseProjectReviewForm projectId={project.id} currentStatus={project.status} currentNote={project.reviewNote} />
-              ) : project.reviewNote ? (
+                {canUpdate && project.status !== "withdrawn" ? (
+                  <ShowcaseProjectReviewForm
+                    projectId={project.id}
+                    currentStatus={project.status}
+                    currentNote={project.reviewNote}
+                    allowImmediateFeedback={project.allowImmediateFeedback}
+                  />
+                ) : project.reviewNote ? (
                 <p className="text-sm text-muted-foreground">검수 사유: {project.reviewNote}</p>
               ) : null}
             </article>

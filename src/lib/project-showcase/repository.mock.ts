@@ -107,6 +107,7 @@ function seedProject(input: {
     description: input.description,
     imageUrl: "/ads/project-showcase-banner.png",
     serviceUrl: input.serviceUrl,
+    allowImmediateFeedback: input.projectType === "app" || input.projectType === "game",
     status: "approved",
     createdAt: input.createdAt,
     reviewNote: null,
@@ -232,6 +233,7 @@ function toProject(store: ShowcaseMockStore, project: StoredProject): ShowcasePr
     description: project.description,
     imageUrl: project.imageUrl,
     serviceUrl: project.serviceUrl,
+    allowImmediateFeedback: project.allowImmediateFeedback,
     status: project.status,
     createdAt: project.createdAt,
     ...countsFor(store, project.id),
@@ -450,6 +452,7 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
       description: input.submission.description,
       imageUrl: input.imageUrl,
       serviceUrl: input.submission.serviceUrl,
+      allowImmediateFeedback: input.submission.projectType === "app" || input.submission.projectType === "game",
       status: "pending",
       createdAt: now,
       reviewNote: null,
@@ -469,6 +472,7 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
     }
     Object.assign(project, {
       projectType: input.submission.projectType,
+      allowImmediateFeedback: input.submission.projectType === "app" || input.submission.projectType === "game",
       title: input.submission.title,
       teamName: input.submission.teamName,
       summary: input.submission.summary,
@@ -536,7 +540,9 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
     if (Array.from(body).length < 10 || Array.from(body).length > 300) throw new ShowcaseDomainError("feedback_invalid");
     const experience = store.experiences.find((item) => item.projectId === project.id && item.memberId === input.memberId);
     if (!experience) throw new ShowcaseDomainError("experience_not_started");
-    if (!canSubmitShowcaseFeedback(experience.startedAt)) throw new ShowcaseDomainError("feedback_too_early");
+    if (!canSubmitShowcaseFeedback(experience.startedAt, new Date(), { allowImmediateFeedback: project.allowImmediateFeedback })) {
+      throw new ShowcaseDomainError("feedback_too_early");
+    }
     if (store.feedback.some((item) => item.projectId === project.id && item.memberId === input.memberId)) {
       throw new ShowcaseDomainError("feedback_exists");
     }
@@ -860,5 +866,13 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
       actorType: "admin",
       details: { status: input.status },
     });
+  }
+
+  async setImmediateFeedback(input: { projectId: string; allowed: boolean }) {
+    const store = getStore();
+    const project = store.projects.find((item) => item.id === input.projectId && item.status !== "withdrawn");
+    if (!project) throw new ShowcaseDomainError("project_not_found");
+    project.allowImmediateFeedback = input.allowed;
+    project.updatedAt = new Date().toISOString();
   }
 }

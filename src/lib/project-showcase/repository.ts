@@ -189,4 +189,5 @@ export interface ProjectShowcaseRepository {
     status: ShowcaseReviewStatus;
     reviewNote: string;
   }): Promise<void>;
+  setImmediateFeedback(input: { projectId: string; allowed: boolean }): Promise<void>;
 }
