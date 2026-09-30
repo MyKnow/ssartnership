@@ -27,6 +27,7 @@ const ACTIVITY_LABELS: Record<ShowcaseAdminActivityType, string> = {
   project_reviewed: "출품 검수",
   event_settings_updated: "이벤트 설정 변경",
   draw_created: "경품 추첨",
+  project_admin_changed: "관리자 출품작 변경",
 };
 
 function firstParam(value: string | string[] | undefined) {
@@ -67,6 +68,15 @@ function activitySummary(item: ShowcaseAdminActivityLog) {
       return candidates !== undefined && selected !== undefined
         ? `${group} 후보 ${candidates.toLocaleString("ko-KR")} 중 ${selected.toLocaleString("ko-KR")} 선정`
         : `${group} 경품 추첨`;
+    }
+    case "project_admin_changed": {
+      if (item.details.operation === "deleted") return "출품작과 연결된 체험·피드백 기록을 완전 삭제";
+      if (item.details.operation === "created") {
+        return `관리자 등록${item.details.projectType ? ` · ${SHOWCASE_TYPE_LABELS[item.details.projectType]}` : ""}`;
+      }
+      return item.details.status
+        ? `관리자 수정 · ${SHOWCASE_ADMIN_STATUS_LABELS[item.details.status]}`
+        : "관리자 출품작 정보 수정";
     }
   }
 }

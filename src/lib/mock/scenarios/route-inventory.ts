@@ -470,6 +470,22 @@ const mockRouteInventoryBase = [
     requiredScenarioIds: ["admin.showcase.default"],
   },
   {
+    routePath: "/admin/events/project-showcase/projects/new",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "ShowcaseAdminProjectForm",
+    dataSources: ["repository", "service"],
+    requiredScenarioIds: ["admin.showcase.default"],
+  },
+  {
+    routePath: "/admin/events/project-showcase/projects/[projectId]/edit",
+    surface: "admin",
+    authScope: "admin",
+    viewComponent: "ShowcaseAdminProjectForm",
+    dataSources: ["repository", "service"],
+    requiredScenarioIds: ["admin.showcase.default"],
+  },
+  {
     routePath: "/admin/login",
     surface: "admin",
     authScope: "public",
@@ -1068,6 +1084,16 @@ const routeContracts: Record<string, RouteContractDefinition> = {
     routeKind: "canonical",
     screenContractId: "admin.showcase-logs",
     primaryTask: "쇼케이스 활동 로그와 집계를 확인한다.",
+  },
+  "/admin/events/project-showcase/projects/new": {
+    routeKind: "canonical",
+    screenContractId: "admin.showcase-project-crud",
+    primaryTask: "관리자가 회원을 출품자로 선택해 쇼케이스 프로젝트를 등록한다.",
+  },
+  "/admin/events/project-showcase/projects/[projectId]/edit": {
+    routeKind: "canonical",
+    screenContractId: "admin.showcase-project-crud",
+    primaryTask: "관리자가 출품자를 유지한 채 쇼케이스 프로젝트 정보를 수정한다.",
   },
   "/admin/login": {
     routeKind: "compat-redirect",

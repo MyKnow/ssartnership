@@ -3,6 +3,7 @@ import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminShell from "@/components/admin/AdminShell";
 import ShowcaseEventSettingsForm from "@/components/admin/ShowcaseEventSettingsForm";
 import ShowcaseProjectReviewForm from "@/components/admin/ShowcaseProjectReviewForm";
+import ShowcaseAdminProjectDeleteButton from "@/components/admin/ShowcaseAdminProjectDeleteButton";
 import Button from "@/components/ui/Button";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { canAdmin } from "@/lib/admin-permissions";
@@ -45,6 +46,7 @@ export default async function AdminProjectShowcasePage({
           <Button href={`${ADMIN_PATH}/logs`} variant="secondary">로그·집계</Button>
           <Button href="/events/project-showcase?preview=experience" variant="secondary">체험 기간 미리보기</Button>
           <Button href="/events/project-showcase" variant="secondary">공개 페이지 보기</Button>
+          {canAdmin(admin.account.permissions, "events", "create") ? <Button href={`${ADMIN_PATH}/projects/new`} variant="secondary">출품작 등록</Button> : null}
         </div>
 
         {event ? (
@@ -103,19 +105,25 @@ export default async function AdminProjectShowcasePage({
                   <p className="mt-2 line-clamp-6 whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">{project.description}</p>
                   <a href={project.serviceUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block break-all text-sm font-semibold text-primary underline">체험 주소 확인</a>
                   <p className="mt-3 text-xs text-muted-foreground">
-                    대표자 {project.ownerDisplayName} · 조회 {project.viewCount} · 피드백 {project.validExperienceCount} · 관심 {project.interestCount}
+                    대표자 {canAdmin(admin.account.permissions, "members", "read") && project.ownerMemberId ? (
+                      <a href={`/admin/members/${encodeURIComponent(project.ownerMemberId)}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary underline underline-offset-2">{project.ownerDisplayName}</a>
+                    ) : project.ownerDisplayName} · 조회 {project.viewCount} · 피드백 {project.validExperienceCount} · 관심 {project.interestCount}
                   </p>
                 </div>
               </div>
-                {canUpdate && project.status !== "withdrawn" ? (
-                  <ShowcaseProjectReviewForm
-                    projectId={project.id}
-                    currentStatus={project.status}
-                    currentNote={project.reviewNote}
-                    allowImmediateFeedback={project.allowImmediateFeedback}
-                  />
-                ) : project.reviewNote ? (
+              {canUpdate ? <Button href={`${ADMIN_PATH}/projects/${encodeURIComponent(project.id)}/edit`} variant="secondary" className="justify-self-start">출품작 수정</Button> : null}
+              {canUpdate && project.status !== "withdrawn" ? (
+                <ShowcaseProjectReviewForm
+                  projectId={project.id}
+                  currentStatus={project.status}
+                  currentNote={project.reviewNote}
+                  allowImmediateFeedback={project.allowImmediateFeedback}
+                />
+              ) : project.reviewNote ? (
                 <p className="text-sm text-muted-foreground">검수 사유: {project.reviewNote}</p>
+              ) : null}
+              {canAdmin(admin.account.permissions, "events", "delete") ? (
+                <ShowcaseAdminProjectDeleteButton projectId={project.id} projectTitle={project.title} />
               ) : null}
             </article>
           ))}

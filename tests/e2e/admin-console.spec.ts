@@ -110,6 +110,42 @@ test.describe("authenticated administrator console", () => {
     await captureResponsivePage(page, "detail-complete", page.locator("aside"));
   });
 
+  test("creates and edits showcase projects with a fixed exhibitor and responsive form", async ({ page }) => {
+    await openAdminRoute(page, "/admin/events/project-showcase/projects/new");
+    await expect(page.getByRole("heading", { name: "출품작 등록", exact: true })).toBeVisible();
+    await page.getByLabel("회원 이름 검색").fill("정민호");
+    await page.getByRole("button", { name: "회원 검색" }).click();
+    const ownerOption = page.getByRole("button", { name: /정민호/ });
+    await expect(ownerOption).toBeVisible();
+    const immediateFeedback = page.getByRole("checkbox", { name: /링크 클릭 기록 후 바로 피드백 허용/ });
+    await expect(immediateFeedback).not.toBeChecked();
+    await page.setViewportSize({ width: 360, height: 844 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.getByText("App", { exact: true }).click();
+    await expect(immediateFeedback).toBeChecked();
+    await page.getByText("Web", { exact: true }).click();
+    await expect(immediateFeedback).not.toBeChecked();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await captureResponsivePage(page, "admin-project-create", page.locator("main form").first());
+    await ownerOption.click();
+    await expect(page.getByText("정민호", { exact: false }).first()).toBeVisible();
+    await page.getByRole("button", { name: "출품작 등록" }).last().click();
+    await expect(page.getByText("서비스 이름을 2자 이상 입력해 주세요.")).toBeVisible();
+
+    await openAdminRoute(page, "/admin/events/project-showcase/projects/mock-showcase-green-route/edit");
+    await expect(page.getByRole("heading", { name: "출품작 수정", exact: true })).toBeVisible();
+    await expect(page.getByText(/출품자 연결은 이 화면에서 변경할 수 없어요/)).toBeVisible();
+    await expect(page.locator('input[name="ownerMemberId"]')).toHaveCount(0);
+    await expect(page.getByRole("checkbox", { name: /링크 클릭 기록 후 바로 피드백 허용/ })).toBeChecked();
+    await captureResponsivePage(page, "admin-project-edit", page.locator("main form").first());
+
+    await openAdminRoute(page, "/admin/events/project-showcase?status=approved");
+    const exhibitorLink = page.getByRole("link", { name: "이두리", exact: true });
+    await expect(exhibitorLink).toBeVisible();
+    await expect(exhibitorLink).toHaveAttribute("target", "_blank");
+    await expect(exhibitorLink).toHaveAttribute("rel", /noopener noreferrer/);
+  });
+
   test("keeps the member search context in the rendered route", async ({ page }) => {
     await openAdminRoute(
       page,

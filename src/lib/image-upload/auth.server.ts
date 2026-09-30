@@ -63,6 +63,17 @@ async function getAdminActorForPurpose(purpose: ImageUploadPurpose) {
     }
     return { kind: "admin" as const, id: session.adminId };
   }
+  if (purpose === "showcase-project") {
+    if (!session) {
+      throw new ImageUploadAuthorizationError(401, "관리자 인증이 필요합니다.");
+    }
+    const permitted = canAdmin(session.account.permissions, "events", "create")
+      || canAdmin(session.account.permissions, "events", "update");
+    if (!permitted) {
+      throw new ImageUploadAuthorizationError(403, "이벤트 출품작 관리 권한이 필요합니다.");
+    }
+    return { kind: "admin" as const, id: session.adminId };
+  }
   throw new ImageUploadAuthorizationError(403, "이 이미지 업로드 용도는 관리자 권한을 지원하지 않습니다.");
 }
 
