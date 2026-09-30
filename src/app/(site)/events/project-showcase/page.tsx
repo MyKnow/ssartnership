@@ -4,11 +4,13 @@ import SiteHeader from "@/components/SiteHeader";
 import ShowcaseGuideSection from "@/components/project-showcase/ShowcaseGuideSection";
 import ShowcaseProjectCard from "@/components/project-showcase/ShowcaseProjectCard";
 import Button from "@/components/ui/Button";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { getHeaderSession } from "@/lib/header-session";
 import {
   getShowcaseNextMilestone,
   getShowcasePhase,
   projectShowcaseRepository,
+  type ShowcaseProject,
   type ShowcasePhase,
 } from "@/lib/project-showcase";
 import { formatShowcaseDateTime, formatShowcasePeriod } from "@/lib/project-showcase/format";
@@ -19,6 +21,7 @@ import { getSignedUserSession } from "@/lib/user-auth";
 export const dynamic = "force-dynamic";
 
 const EVENT_PATH = "/events/project-showcase";
+const ADMIN_PATH = "/admin/events/project-showcase";
 const NEW_PROJECT_PATH = `${EVENT_PATH}/projects/new`;
 const MY_PATH = `${EVENT_PATH}/my`;
 
@@ -55,17 +58,39 @@ function firstParam(value: string | string[] | undefined) {
   return typeof value === "string" ? value : "";
 }
 
+function filterPreviewProjects(
+  projects: ShowcaseProject[],
+  filters: { type: string; query: string; sort: "newest" | "title" },
+) {
+  const search = filters.query.trim().toLocaleLowerCase("ko-KR");
+  return projects
+    .filter((project) => project.status === "approved")
+    .filter((project) => !filters.type || project.projectType === filters.type)
+    .filter((project) => !search
+      || `${project.title} ${project.teamName ?? ""} ${project.summary} ${project.description}`
+        .toLocaleLowerCase("ko-KR").includes(search))
+    .sort((left, right) => filters.sort === "title"
+      ? left.title.localeCompare(right.title, "ko-KR")
+      : right.createdAt.localeCompare(left.createdAt));
+}
+
 export default async function ProjectShowcasePage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const [event, session] = await Promise.all([
+  const previewMode = firstParam(params.preview) === "experience";
+  if (previewMode) {
+    await requireAdminPermission("events", "read", { path: ADMIN_PATH });
+  }
+
+  const [event, signedSession] = await Promise.all([
     projectShowcaseRepository.getEvent(),
-    getSignedUserSession(),
+    previewMode ? Promise.resolve(null) : getSignedUserSession(),
   ]);
-  const phase = getShowcasePhase(event);
+  const session = previewMode ? null : signedSession;
+  const phase: ShowcasePhase = previewMode ? "experience" : getShowcasePhase(event);
   const milestone = getShowcaseNextMilestone(event, phase);
   const selectedType = SHOWCASE_PROJECT_TYPES.find((type) => type === firstParam(params.type)) ?? "";
   const query = firstParam(params.q).trim().slice(0, 80);
@@ -73,7 +98,13 @@ export default async function ProjectShowcasePage({
   const showResults = phase === "announcement" || phase === "closed";
   const [projects, completedProjectIds, winners, drawState, headerSession] = await Promise.all([
     phase === "experience"
-      ? projectShowcaseRepository.listPublicProjects({ type: selectedType, query, sort: selectedSort })
+      ? previewMode
+        ? projectShowcaseRepository.listAdminProjects("approved").then((approved) => filterPreviewProjects(approved, {
+          type: selectedType,
+          query,
+          sort: selectedSort,
+        }))
+        : projectShowcaseRepository.listPublicProjects({ type: selectedType, query, sort: selectedSort })
       : Promise.resolve([]),
     phase === "experience" && session?.userId
       ? projectShowcaseRepository.listMemberCompletedProjectIds(session.userId)
@@ -91,7 +122,6 @@ export default async function ProjectShowcasePage({
       }
       return { href: NEW_PROJECT_PATH, label: "출품하기" };
     }
-    if (phase === "experience") return { href: "#showcase-gallery", label: "프로젝트 둘러보기" };
     if (phase === "announcement") return { href: "#showcase-results", label: "결과 확인" };
     return null;
   })();
@@ -106,6 +136,16 @@ export default async function ProjectShowcasePage({
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
       <main className="mx-auto w-full max-w-7xl px-4 pb-20 pt-6 sm:px-6 sm:pt-8 lg:px-8">
+        {previewMode ? (
+          <section className="mb-5 flex flex-col gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5" aria-label="관리자 미리보기 안내">
+            <div>
+              <p className="font-bold text-foreground">관리자 미리보기 · 체험 기간</p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">승인된 프로젝트의 상세·체험 흐름까지 확인할 수 있어요. 실제 서비스 이동과 조회·체험·피드백 기록은 남지 않아요.</p>
+            </div>
+            <Button href={ADMIN_PATH} variant="secondary" className="shrink-0">운영 화면으로 돌아가기</Button>
+          </section>
+        ) : null}
+
         <section className="relative isolate overflow-hidden rounded-3xl bg-slate-950">
           <div className="relative aspect-video w-full">
             <Image
@@ -192,6 +232,7 @@ export default async function ProjectShowcasePage({
               </p>
             </div>
             <form action={EVENT_PATH} className="mb-5 grid gap-2 rounded-2xl border border-border bg-surface p-3 sm:grid-cols-[minmax(0,1fr)_150px_150px_auto] sm:items-center">
+              {previewMode ? <input type="hidden" name="preview" value="experience" /> : null}
               <label className="sr-only" htmlFor="showcase-search">프로젝트 검색</label>
               <input id="showcase-search" name="q" type="search" defaultValue={query} placeholder="서비스 이름, 팀명, 설명 검색" className="min-h-11 rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary" />
               <label className="sr-only" htmlFor="showcase-type">프로젝트 유형</label>
@@ -208,7 +249,7 @@ export default async function ProjectShowcasePage({
             </form>
             {projects.length > 0 ? (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {projects.map((project) => <ShowcaseProjectCard key={project.id} project={project} completed={completed.has(project.id)} />)}
+                {projects.map((project) => <ShowcaseProjectCard key={project.id} project={project} completed={completed.has(project.id)} previewMode={previewMode} />)}
               </div>
             ) : (
               <div className="rounded-3xl border border-dashed border-border bg-surface px-5 py-14 text-center">
