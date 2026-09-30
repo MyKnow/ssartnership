@@ -476,7 +476,6 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
     }
     Object.assign(project, {
       projectType: input.submission.projectType,
-      allowImmediateFeedback: input.submission.projectType === "app" || input.submission.projectType === "game",
       title: input.submission.title,
       teamName: input.submission.teamName,
       summary: input.submission.summary,

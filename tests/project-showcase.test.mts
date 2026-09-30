@@ -258,6 +258,15 @@ describe("mock Repository 출품 규칙", () => {
     assert.equal(ownerProjects.find((project) => project.id === "game-project")?.allowImmediateFeedback, true);
     assert.equal(ownerProjects.find((project) => project.id === "embedded-project")?.allowImmediateFeedback, false);
   });
+  test("출품자가 유형을 유지해 수정하면 운영 정책을 보존하고 유형을 바꾸면 새 기본 정책을 적용한다", async () => {
+    await repository.createProject(write("policy-project", OWNER, { projectType: "web" }));
+    await repository.setImmediateFeedback({ projectId: "policy-project", allowed: true });
+    await repository.updateProject(write("policy-project", OWNER, { projectType: "web", title: "수정한 제목" }));
+    assert.equal((await repository.getOwnerProject(OWNER, "policy-project"))?.allowImmediateFeedback, true);
+
+    await repository.updateProject(write("policy-project", OWNER, { projectType: "embedded", serviceUrl: "https://youtu.be/abc" }));
+    assert.equal((await repository.getOwnerProject(OWNER, "policy-project"))?.allowImmediateFeedback, false);
+  });
   test("중복 프로젝트는 운영자가 반려하고, 한 출품 취소는 다른 출품에 영향을 주지 않는다", async () => {
     await repository.createProject(write("p1", OWNER));
     await repository.createProject(write("p2", OTHER));
