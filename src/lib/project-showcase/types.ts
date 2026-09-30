@@ -64,6 +64,7 @@ export type ShowcaseProject = ShowcaseProjectCounts & {
   description: string;
   imageUrl: string;
   serviceUrl: string;
+  /** Link clicks immediately unlock feedback after an experience start. */
   allowImmediateFeedback: boolean;
   status: ShowcaseProjectStatus;
   ownerMemberId: string;
