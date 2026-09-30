@@ -1,4 +1,7 @@
-import { expect, test, type Page } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+
+const screenshotDirectory = ".tmp/ui-qa/project-showcase-preview";
 
 async function waitForAdminShellHydration(page: Page) {
   await expect(
@@ -9,6 +12,21 @@ async function waitForAdminShellHydration(page: Page) {
 async function openAdminRoute(page: Page, path: string) {
   await page.goto(path, { waitUntil: "domcontentloaded" });
   await waitForAdminShellHydration(page);
+}
+
+async function captureResponsivePage(page: Page, name: string, target?: Locator) {
+  await mkdir(screenshotDirectory, { recursive: true });
+  await page.evaluate(async () => {
+    await document.fonts?.ready;
+  });
+
+  for (const width of [360, 820, 1366]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await target?.scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: `${screenshotDirectory}/${name}-${width}.png`,
+    });
+  }
 }
 
 test.describe("authenticated administrator console", () => {
@@ -31,6 +49,58 @@ test.describe("authenticated administrator console", () => {
       page.getByRole("heading", { name: "관리 홈", exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("link", { name: /회원/ }).first()).toBeVisible();
+  });
+
+  test("requires an administrator before revealing the showcase experience preview", async ({ page }) => {
+    await page.context().clearCookies();
+    await page.goto("/events/project-showcase?preview=experience", {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(page).toHaveURL(/\/auth\/login\?/);
+  });
+
+  test("simulates the showcase experience flow without saving or opening external links", async ({ page }) => {
+    await page.goto("/admin/events/project-showcase", { waitUntil: "domcontentloaded" });
+    const previewLink = page.getByRole("link", { name: "체험 기간 미리보기" });
+    await expect(previewLink).toBeVisible();
+    await captureResponsivePage(page, "admin-entry", previewLink);
+    await previewLink.click();
+
+    await expect(page).toHaveURL(/\/events\/project-showcase\?preview=experience/);
+    await expect(page.getByText("관리자 미리보기 · 체험 기간")).toBeVisible();
+    const detailLink = page.getByRole("link", { name: /상세 체험 흐름 미리보기/ }).first();
+    await expect(detailLink).toBeVisible();
+    await captureResponsivePage(page, "listing", page.locator("#showcase-gallery"));
+
+    await detailLink.click();
+    await expect(page).toHaveURL(/\/events\/project-showcase\/projects\/[^?]+\?preview=experience/);
+    await expect(page.getByText("관리자 미리보기 · 체험 상세")).toBeVisible();
+    await expect(page.getByText("미리보기에서는 실제 서비스 주소를 열지 않아요.")).toBeVisible();
+    await expect(page.locator("aside").locator('a[href^="https://"]')).toHaveCount(0);
+
+    let popupCount = 0;
+    let postRequestCount = 0;
+    page.on("popup", () => { popupCount += 1; });
+    page.on("request", (request) => {
+      if (request.method() === "POST") postRequestCount += 1;
+    });
+
+    await page.getByRole("checkbox", { name: /당첨되면 이름 일부를 가려/ }).check();
+    await page.getByRole("button", { name: "참여 등록하고 체험 시작" }).click();
+    const fastForward = page.getByRole("button", { name: "1분 경과 상태 미리보기" });
+    await expect(fastForward).toBeVisible();
+    await fastForward.click();
+
+    const feedback = page.getByRole("textbox", { name: "한 줄 피드백" });
+    await expect(feedback).toBeEnabled();
+    await feedback.fill("프로젝트 흐름이 명확하고 화면 구성이 좋아요.");
+    await page.getByRole("button", { name: "피드백 제출 미리보기" }).click();
+    await expect(page.getByText("피드백 제출 완료 상태")).toBeVisible();
+    await expect(page.getByText("미리보기 상태이며 실제 추첨권은 발급되지 않았어요.")).toBeVisible();
+    expect(popupCount).toBe(0);
+    expect(postRequestCount).toBe(0);
+
+    await captureResponsivePage(page, "detail-complete", page.locator("aside"));
   });
 
   test("keeps the member search context in the rendered route", async ({ page }) => {

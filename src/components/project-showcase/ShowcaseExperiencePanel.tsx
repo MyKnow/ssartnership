@@ -32,6 +32,7 @@ type Props = {
   loginHref: string;
   initialState: ShowcaseMemberProjectState;
   serverNow: string;
+  previewMode?: boolean;
 };
 
 /** Opens a tab synchronously (before awaiting the server) so popup blockers allow it. */
@@ -49,6 +50,7 @@ export default function ShowcaseExperiencePanel({
   loginHref,
   initialState,
   serverNow,
+  previewMode = false,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -82,6 +84,14 @@ export default function ShowcaseExperiencePanel({
   }
 
   async function beginExperience(tab: Window | null) {
+    if (previewMode) {
+      const startedAt = new Date(Date.now() + clockOffsetRef.current).toISOString();
+      setState((current) => ({ ...current, registered: true, startedAt }));
+      setNow(new Date(startedAt).getTime());
+      setMessage("미리보기에서 체험을 시작했어요. 실제 서비스 이동이나 기록은 없어요.");
+      return;
+    }
+
     const result = await startShowcaseExperience(projectId);
     if (!result.ok) {
       tab?.close();
@@ -110,22 +120,24 @@ export default function ShowcaseExperiencePanel({
       fail(parsed.message, target);
       return;
     }
-    const tab = openPendingTab();
+    const tab = previewMode ? null : openPendingTab();
     startTransition(async () => {
-      const result = await registerShowcaseParticipant(input);
-      if (!result.ok) {
-        tab?.close();
-        fail(result.message, formRef.current?.querySelector<HTMLElement>('[name="announcementConsent"]'));
-        return;
+      if (!previewMode) {
+        const result = await registerShowcaseParticipant(input);
+        if (!result.ok) {
+          tab?.close();
+          fail(result.message, formRef.current?.querySelector<HTMLElement>('[name="announcementConsent"]'));
+          return;
+        }
       }
       await beginExperience(tab);
-      router.refresh();
+      if (!previewMode) router.refresh();
     });
   }
 
   function handleStart() {
     setError("");
-    const tab = openPendingTab();
+    const tab = previewMode ? null : openPendingTab();
     startTransition(() => beginExperience(tab));
   }
 
@@ -136,6 +148,11 @@ export default function ShowcaseExperiencePanel({
     const parsed = parseShowcaseFeedback(body);
     if (!parsed.success) {
       fail(parsed.message, feedbackRef.current);
+      return;
+    }
+    if (previewMode) {
+      setState((current) => ({ ...current, feedbackSubmitted: true }));
+      setMessage("미리보기에서 피드백 완료 상태를 확인했어요. 실제 저장이나 추첨권 발급은 없어요.");
       return;
     }
     startTransition(async () => {
@@ -153,6 +170,7 @@ export default function ShowcaseExperiencePanel({
   function toggleInterest() {
     const next = !state.interested;
     setState((current) => ({ ...current, interested: next }));
+    if (previewMode) return;
     startTransition(async () => {
       const result = await setShowcaseInterest(projectId, next);
       if (!result.ok) {
@@ -160,6 +178,11 @@ export default function ShowcaseExperiencePanel({
         fail(result.message);
       }
     });
+  }
+
+  function fastForwardOneMinute() {
+    const unlockAt = state.startedAt ? getShowcaseFeedbackUnlockAt(state.startedAt).getTime() : null;
+    if (previewMode && unlockAt !== null) setNow(unlockAt);
   }
 
   if (!authenticated) {
@@ -205,12 +228,12 @@ export default function ShowcaseExperiencePanel({
         <Button type="button" onClick={handleStart} disabled={isPending}>{isPending ? "기록 중…" : "체험 시작"}</Button>
       ) : state.feedbackSubmitted ? (
         <div className="grid gap-2 rounded-xl bg-success/10 px-4 py-3">
-          <p className="text-sm font-semibold text-foreground">피드백 완료 · 추첨권 1장</p>
-          <a href={serviceUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-primary underline">서비스 다시 열기</a>
+          <p className="text-sm font-semibold text-foreground">{previewMode ? "피드백 제출 완료 상태" : "피드백 완료 · 추첨권 1장"}</p>
+          {previewMode ? <p className="text-xs leading-5 text-muted-foreground">미리보기 상태이며 실제 추첨권은 발급되지 않았어요.</p> : <a href={serviceUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-primary underline">서비스 다시 열기</a>}
         </div>
       ) : (
         <form onSubmit={handleFeedback} className="grid gap-3" noValidate>
-          <a href={serviceUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-primary underline">서비스 다시 열기</a>
+          {previewMode ? <p className="text-xs leading-5 text-muted-foreground">미리보기에서는 외부 서비스 링크가 비활성화돼요.</p> : <a href={serviceUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-primary underline">서비스 다시 열기</a>}
           <label className="grid gap-1.5 text-sm font-medium text-foreground" htmlFor="showcase-feedback-body">
             한 줄 피드백
             <textarea
@@ -224,8 +247,11 @@ export default function ShowcaseExperiencePanel({
             />
           </label>
           <Button type="submit" disabled={isPending || remainingSeconds !== 0}>
-            {remainingSeconds ? `${remainingSeconds}초 뒤 작성할 수 있어요` : isPending ? "저장 중…" : "피드백 남기고 추첨권 받기"}
+            {remainingSeconds ? `${remainingSeconds}초 뒤 작성할 수 있어요` : isPending ? "저장 중…" : previewMode ? "피드백 제출 미리보기" : "피드백 남기고 추첨권 받기"}
           </Button>
+          {previewMode && remainingSeconds !== null && remainingSeconds > 0 ? (
+            <Button type="button" variant="secondary" onClick={fastForwardOneMinute}>1분 경과 상태 미리보기</Button>
+          ) : null}
           <p className="text-xs leading-5 text-muted-foreground">피드백은 작성자 정보 없이 출품자에게 전달돼요.</p>
         </form>
       )}

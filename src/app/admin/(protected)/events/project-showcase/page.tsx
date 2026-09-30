@@ -43,6 +43,7 @@ export default async function AdminProjectShowcasePage({
           <Button href={`${ADMIN_PATH}/draw`}>추첨·발표</Button>
           <Button href={`${ADMIN_PATH}/feedback`} variant="secondary">피드백 관리</Button>
           <Button href={`${ADMIN_PATH}/logs`} variant="secondary">로그·집계</Button>
+          <Button href="/events/project-showcase?preview=experience" variant="secondary">체험 기간 미리보기</Button>
           <Button href="/events/project-showcase" variant="secondary">공개 페이지 보기</Button>
         </div>
 
