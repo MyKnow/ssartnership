@@ -6,7 +6,7 @@ import { mkdtemp, readFile, writeFile, chmod, rm, symlink } from "node:fs/promis
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { isMainModule, isSameApprovedRelease, parseReleaseArtifact, RECEIVER_PROFILES, selectFirstAttemptRun, validatePulledImage, receiveRelease } from "../scripts/self-host-ci/receive-release.mjs";
+import { receiverFailureCode, isMainModule, isSameApprovedRelease, parseReleaseArtifact, RECEIVER_PROFILES, selectFirstAttemptRun, validatePulledImage, receiveRelease } from "../scripts/self-host-ci/receive-release.mjs";
 import { imageReference, RELEASE_PROFILES } from "../scripts/self-host-ci/github-contract.mjs";
 import { isInstallerMainModule, PRODUCTION_RECEIVER_UNITS, productionReceiverInstallPlan } from "../deploy/self-host-ci/install-production-receiver.mjs";
 
@@ -222,4 +222,13 @@ test("receiver independently verifies GitHub API, manifest, jobs and deploy call
     await assert.rejects(() => receiveRelease({ ...options, readSchema: async () => { throw new Error("RECEIVER_SCHEMA_APPROVAL_FILE_INVALID"); } }), /RECEIVER_SCHEMA_APPROVAL_FILE_INVALID/);
     assert.equal(dockerCalls.length, dockerCount);
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("receiver exposes only reviewed fixed schema failure codes", () => {
+  for (const code of ["RECEIVER_SCHEMA_NOT_APPROVED", "RECEIVER_SCHEMA_APPROVAL_INVALID", "RECEIVER_SCHEMA_APPROVAL_FILE_INVALID", "RECEIVER_SCHEMA_TREE_INVALID", "RECEIVER_OPERATOR_REQUIRED"]) {
+    assert.equal(receiverFailureCode(new Error(code)), code);
+  }
+  for (const cause of [new Error("private token and database URL"), new Error("RECEIVER_SCHEMA_NOT_APPROVED: private"), { message: "RECEIVER_SCHEMA_NOT_APPROVED" }, null]) {
+    assert.equal(receiverFailureCode(cause), "RECEIVER_FAILED");
+  }
 });

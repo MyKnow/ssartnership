@@ -91,7 +91,7 @@ npm audit --omit=dev --audit-level=high
 
 ## 5. Production DB·Vercel 배포 순서
 
-> **주의:** Production Supabase 마이그레이션은 [`production-migrations.yml`](../../../.github/workflows/production-migrations.yml)의 수동 실행(`workflow_dispatch`)이다. `main` 병합에 따른 Vercel 코드 배포가 먼저 시작될 수 있으므로, 스키마 의존 변경은 반드시 배포 순서와 짧은 불일치 구간의 안전성을 확인한 뒤 진행한다.
+> **주의:** Production Supabase 마이그레이션은 `production-migrations.yml` (현재 폐기됨; 현행 절차는 [자체 호스팅 배포 운영](../../operations/runbooks/self-host-ci-maintenance.md))의 수동 실행(`workflow_dispatch`)이다. `main` 병합에 따른 Vercel 코드 배포가 먼저 시작될 수 있으므로, 스키마 의존 변경은 반드시 배포 순서와 짧은 불일치 구간의 안전성을 확인한 뒤 진행한다.
 
 - [ ] 배포 담당자, 배포 시간, 롤백 담당자와 연락 경로를 정한다.
 - [ ] 새 컬럼·테이블이 없는 상태에서도 새 코드가 안전하게 동작하는지 확인하거나, 승인된 마이그레이션 우선/점검 창 전략을 선택한다.

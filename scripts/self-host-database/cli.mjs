@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { composeEnvironment, createDatabaseEnvironment, createMigrationPlan, deriveProjectName, loadDatabaseEnvironment, renderMigrationRunnerSql, resolveSignedStorageUrl, validateProjectName, writeNewEnvironmentFile } from "./lib.mjs";
+import { composeEnvironment, createDatabaseEnvironment, createMigrationPlan, databasePsqlArguments, deriveProjectName, loadDatabaseEnvironment, renderMigrationRunnerSql, renderMigrationVerificationSql, resolveSignedStorageUrl, validateProjectName, writeNewEnvironmentFile } from "./lib.mjs";
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
 const compose = resolve(root, "compose.supabase.yaml");
@@ -16,7 +16,7 @@ function options(argv) {
   if (!command || command === "--help" || command === "-h") return {
     command: "help"
   };
-  if (!new Set(["init", "up", "migrate", "status", "smoke", "down"]).has(command)) fail("command_invalid");
+  if (!new Set(["init", "up", "migrate", "verify-schema", "status", "smoke", "down"]).has(command)) fail("command_invalid");
   const result = {
     command,
     expectPersistence: false
@@ -86,8 +86,7 @@ const psql = (file, project, sql, fields = false) => runCompose(
   file,
   project,
   [
-    "exec", "-T", "db", "psql", "--no-psqlrc", "--set", "ON_ERROR_STOP=1",
-    "--username", "postgres", "--dbname", "postgres",
+    ...databasePsqlArguments(project),
     ...(fields ? ["--tuples-only", "--no-align", "--field-separator", "\t"] : []),
   ],
   sql,
@@ -229,7 +228,7 @@ async function smoke(env, file, project, persisted) {
 async function main() {
   const input = options(process.argv.slice(2));
   if (input.command === "help") {
-    process.stdout.write("usage: node scripts/self-host-database/cli.mjs <init|up|migrate|status|smoke|down> --env-file <ignored .tmp path> [--project <ssartnership-name>] [--port <1024-65535>] [--expect-persistence]\n");
+    process.stdout.write("usage: node scripts/self-host-database/cli.mjs <init|up|migrate|verify-schema|status|smoke|down> --env-file <environment path> [--project <ssartnership-name>] [--port <1024-65535>] [--expect-persistence]\n");
     return;
   }
   const file = resolve(root, input.envFile);
@@ -246,6 +245,12 @@ async function main() {
     project = input.project ?? env.COMPOSE_PROJECT_NAME;
   validateProjectName(project);
   if (project !== env.COMPOSE_PROJECT_NAME) fail("project_env_mismatch");
+  if (input.command === "verify-schema") {
+    const migrationsPlan = await plan();
+    await psql(file, project, renderMigrationVerificationSql(migrationsPlan));
+    process.stdout.write(`${JSON.stringify({ status: "verified", project, migrationCount: migrationsPlan.length })}\n`);
+    return;
+  }
   if (input.command === "up") {
     const volumes = await run("docker", ["volume", "ls", "--filter", `name=^${project}_pgbackrest-repo$`, "--format", "{{.Name}}"]);
     const labels = await run("docker", ["ps", "--all", "--filter", `label=com.docker.compose.project=${project}`, "--format", '{{.Label "io.ssartnership.backup-managed"}}']);
