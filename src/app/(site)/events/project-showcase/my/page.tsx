@@ -124,7 +124,7 @@ export default async function MyShowcaseParticipationPage() {
             </div>
           </dl>
           <p className="text-xs leading-5 text-muted-foreground">
-            체험을 시작하고 1분 뒤 한 줄 피드백을 남긴 프로젝트 1개마다 추첨권 1장을 받아요. 같은 프로젝트를 여러 번 체험해도 1장이에요.
+            프로젝트 안내에 따라 바로 또는 1분 뒤 한 줄 피드백을 남긴 프로젝트 1개마다 추첨권 1장을 받아요. 같은 프로젝트를 여러 번 체험해도 1장이에요.
           </p>
           {participation.experiences.length > 0 ? (
             <ul className="grid gap-2">

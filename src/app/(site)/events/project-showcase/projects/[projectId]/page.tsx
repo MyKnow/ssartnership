@@ -4,6 +4,7 @@ import SiteHeader from "@/components/SiteHeader";
 import ShowcaseExperiencePanel from "@/components/project-showcase/ShowcaseExperiencePanel";
 import ShowcaseProjectViewRecorder from "@/components/project-showcase/ShowcaseProjectViewRecorder";
 import Button from "@/components/ui/Button";
+import { requireAdminPermission } from "@/lib/admin-access";
 import { getHeaderSession } from "@/lib/header-session";
 import { getShowcasePhase, projectShowcaseRepository } from "@/lib/project-showcase";
 import { formatShowcasePeriod } from "@/lib/project-showcase/format";
@@ -15,10 +16,16 @@ export const dynamic = "force-dynamic";
 
 const EXPERIENCE_HINTS: Record<ShowcaseProjectType, string> = {
   web: "새 탭에서 서비스를 열어요.",
-  app: "스토어나 다운로드 안내 페이지를 열어요. 설치 여부는 확인하지 않아요.",
-  game: "새 탭에서 게임이나 스토어 페이지를 열어요.",
+  app: "스토어나 다운로드 안내 페이지를 열어요. 설치 완료 여부는 확인하지 않아요.",
+  game: "게임이나 스토어 페이지를 열어요. 실제 플레이 여부는 확인하지 않아요.",
   embedded: "시연 영상을 열어 프로젝트를 살펴봐요.",
 };
+const EVENT_PATH = "/events/project-showcase";
+const ADMIN_PATH = "/admin/events/project-showcase";
+
+function firstParam(value: string | string[] | undefined) {
+  return typeof value === "string" ? value : "";
+}
 
 export async function generateMetadata({
   params,
@@ -41,18 +48,25 @@ export async function generateMetadata({
 
 export default async function ShowcaseProjectDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ projectId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { projectId } = await params;
+  const [{ projectId }, query] = await Promise.all([params, searchParams]);
+  const previewMode = firstParam(query.preview) === "experience";
+  if (previewMode) {
+    await requireAdminPermission("events", "read", { path: ADMIN_PATH });
+  }
+
   const [event, session] = await Promise.all([
     projectShowcaseRepository.getEvent(),
-    getSignedUserSession(),
+    previewMode ? Promise.resolve(null) : getSignedUserSession(),
   ]);
-  const phase = getShowcasePhase(event);
+  const phase = previewMode ? "experience" : getShowcasePhase(event);
   const headerSession = await getHeaderSession(session?.userId);
 
-  if (phase !== "experience") {
+  if (!previewMode && phase !== "experience") {
     return (
       <div className="min-h-screen bg-background">
         <SiteHeader initialSession={headerSession} />
@@ -72,20 +86,35 @@ export default async function ShowcaseProjectDetailPage({
     );
   }
 
-  const project = await projectShowcaseRepository.getPublicProject(projectId);
+  const project = previewMode
+    ? (await projectShowcaseRepository.listAdminProjects("approved"))
+      .find((candidate) => candidate.id === projectId) ?? null
+    : await projectShowcaseRepository.getPublicProject(projectId);
   if (!project) notFound();
-  const isOwner = Boolean(session?.userId && project.ownerMemberId === session.userId);
+  const experienceHint = previewMode
+    ? "미리보기에서는 실제 서비스 주소를 열지 않아요."
+    : project.allowImmediateFeedback
+      ? "링크를 열면 체험을 기록하고 바로 피드백을 남길 수 있어요. 다운로드·설치 완료나 실제 사용 여부는 확인하지 않아요."
+      : EXPERIENCE_HINTS[project.projectType];
+  const isOwner = !previewMode && Boolean(session?.userId && project.ownerMemberId === session.userId);
   const memberState = session?.userId && !isOwner
     ? await projectShowcaseRepository.getMemberProjectState(project.id, session.userId)
     : { registered: false, startedAt: null, feedbackSubmitted: false, interested: false };
-  const loginHref = `/auth/login?returnTo=${encodeURIComponent(`/events/project-showcase/projects/${project.id}`)}`;
+  const loginHref = `/auth/login?returnTo=${encodeURIComponent(`${EVENT_PATH}/projects/${project.id}`)}`;
+  const listHref = previewMode ? `${EVENT_PATH}?preview=experience#showcase-gallery` : `${EVENT_PATH}#showcase-gallery`;
 
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
-      <ShowcaseProjectViewRecorder projectId={project.id} enabled={Boolean(session?.userId) && !isOwner} />
+      {!previewMode ? <ShowcaseProjectViewRecorder projectId={project.id} enabled={Boolean(session?.userId) && !isOwner} /> : null}
       <main className="mx-auto w-full max-w-5xl px-4 pb-20 pt-8 sm:px-6 sm:pt-12">
-        <Button href="/events/project-showcase#showcase-gallery" variant="secondary" size="sm">프로젝트 목록</Button>
+        {previewMode ? (
+          <section className="mb-5 flex flex-col gap-2 rounded-2xl border border-primary/20 bg-primary/5 p-4" aria-label="관리자 상세 미리보기 안내">
+            <p className="font-bold text-foreground">관리자 미리보기 · 체험 상세</p>
+            <p className="text-sm leading-6 text-muted-foreground">참여 등록, 체험 시작, 1분 경과, 피드백 완료 상태를 화면에서 확인해요. 외부 서비스로 이동하거나 실제 기록을 저장하지 않아요.</p>
+          </section>
+        ) : null}
+        <Button href={listHref} variant="secondary" size="sm">프로젝트 목록</Button>
         <article className="mt-5 overflow-hidden rounded-3xl border border-border bg-surface">
           <div className="aspect-video overflow-hidden bg-surface-muted">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -104,16 +133,18 @@ export default async function ShowcaseProjectDetailPage({
             </div>
             <aside className="h-fit rounded-2xl border border-border bg-surface-muted/50 p-4 sm:p-5" aria-labelledby="showcase-experience-heading">
               <h2 id="showcase-experience-heading" className="font-bold text-foreground">체험하기</h2>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">{EXPERIENCE_HINTS[project.projectType]}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{experienceHint}</p>
               <div className="mt-5">
                 <ShowcaseExperiencePanel
                   projectId={project.id}
                   serviceUrl={project.serviceUrl}
-                  authenticated={Boolean(session?.userId)}
+                  allowImmediateFeedback={project.allowImmediateFeedback}
+                  authenticated={previewMode || Boolean(session?.userId)}
                   isOwner={isOwner}
                   loginHref={loginHref}
                   initialState={memberState}
                   serverNow={new Date().toISOString()}
+                  previewMode={previewMode}
                 />
               </div>
             </aside>

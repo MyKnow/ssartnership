@@ -14,6 +14,10 @@ import type {
   ShowcaseAdminActivityType,
   ShowcaseAdminMetrics,
   ShowcaseAdminProject,
+  ShowcaseAdminMemberOption,
+  ShowcaseAdminProjectWriteInput,
+  ShowcaseAdminProjectUpdateInput,
+  ShowcaseDeletedProject,
   ShowcaseEventScheduleInput,
   ShowcaseProjectFilters,
   ShowcaseProjectWriteInput,
@@ -107,6 +111,7 @@ function seedProject(input: {
     description: input.description,
     imageUrl: "/ads/project-showcase-banner.png",
     serviceUrl: input.serviceUrl,
+    allowImmediateFeedback: input.projectType === "app" || input.projectType === "game",
     status: "approved",
     createdAt: input.createdAt,
     reviewNote: null,
@@ -232,6 +237,7 @@ function toProject(store: ShowcaseMockStore, project: StoredProject): ShowcasePr
     description: project.description,
     imageUrl: project.imageUrl,
     serviceUrl: project.serviceUrl,
+    allowImmediateFeedback: project.allowImmediateFeedback,
     status: project.status,
     createdAt: project.createdAt,
     ...countsFor(store, project.id),
@@ -450,6 +456,7 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
       description: input.submission.description,
       imageUrl: input.imageUrl,
       serviceUrl: input.submission.serviceUrl,
+      allowImmediateFeedback: input.submission.projectType === "app" || input.submission.projectType === "game",
       status: "pending",
       createdAt: now,
       reviewNote: null,
@@ -475,6 +482,9 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
       description: input.submission.description,
       serviceUrl: input.submission.serviceUrl,
       imageUrl: input.imageUrl ?? project.imageUrl,
+      allowImmediateFeedback: input.submission.projectType !== project.projectType
+        ? input.submission.projectType === "app" || input.submission.projectType === "game"
+        : project.allowImmediateFeedback,
       status: "pending" satisfies ShowcaseProjectStatus,
       updatedAt: new Date().toISOString(),
     });
@@ -536,7 +546,9 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
     if (Array.from(body).length < 10 || Array.from(body).length > 300) throw new ShowcaseDomainError("feedback_invalid");
     const experience = store.experiences.find((item) => item.projectId === project.id && item.memberId === input.memberId);
     if (!experience) throw new ShowcaseDomainError("experience_not_started");
-    if (!canSubmitShowcaseFeedback(experience.startedAt)) throw new ShowcaseDomainError("feedback_too_early");
+    if (!canSubmitShowcaseFeedback(experience.startedAt, new Date(), { allowImmediateFeedback: project.allowImmediateFeedback })) {
+      throw new ShowcaseDomainError("feedback_too_early");
+    }
     if (store.feedback.some((item) => item.projectId === project.id && item.memberId === input.memberId)) {
       throw new ShowcaseDomainError("feedback_exists");
     }
@@ -829,6 +841,111 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
       }));
   }
 
+  async getAdminProject(projectId: string): Promise<ShowcaseAdminProject | null> {
+    const store = getStore();
+    const project = store.projects.find((item) => item.id === projectId);
+    return project ? {
+      ...toProject(store, project),
+      ownerDisplayName: store.memberNames.get(project.ownerMemberId) ?? "회원",
+      reviewNote: project.reviewNote,
+    } : null;
+  }
+
+  async searchAdminMembers(query: string): Promise<ShowcaseAdminMemberOption[]> {
+    const normalized = query.trim().toLocaleLowerCase("ko-KR");
+    if (normalized.length < 2 || normalized.length > 50) return [];
+    return [...getStore().memberNames.entries()]
+      .filter(([id, name]) => id.toLocaleLowerCase("en-US").includes(normalized)
+        || name.toLocaleLowerCase("ko-KR").includes(normalized))
+      .sort((left, right) => left[1].localeCompare(right[1], "ko-KR"))
+      .slice(0, 20)
+      .map(([id, displayName]) => ({ id, displayName }));
+  }
+
+  async createAdminProject(input: ShowcaseAdminProjectWriteInput): Promise<void> {
+    const store = getStore();
+    const ownerName = store.memberNames.get(input.ownerMemberId);
+    if (input.eventId !== store.event.id || !ownerName || ownerName !== input.ownerName) {
+      throw new Error("출품자로 선택한 회원을 찾을 수 없습니다.");
+    }
+    if (!input.imageUrl || !input.submission.imageUploadId) throw new Error("대표 이미지가 필요합니다.");
+    const now = new Date().toISOString();
+    const project: StoredProject = {
+      id: input.projectId,
+      eventId: input.eventId,
+      ownerMemberId: input.ownerMemberId,
+      projectType: input.submission.projectType,
+      title: input.submission.title,
+      teamName: input.submission.teamName,
+      summary: input.submission.summary,
+      description: input.submission.description,
+      imageUrl: input.imageUrl,
+      serviceUrl: input.submission.serviceUrl,
+      allowImmediateFeedback: input.allowImmediateFeedback,
+      status: input.status,
+      createdAt: now,
+      reviewNote: input.reviewNote || null,
+      updatedAt: now,
+      withdrawnAt: input.status === "withdrawn" ? now : null,
+    };
+    store.projects.unshift(project);
+    pushActivity(store, {
+      type: "project_admin_changed",
+      projectId: project.id,
+      projectTitle: project.title,
+      actorType: "admin",
+      details: { operation: "created", status: project.status, projectType: project.projectType },
+    });
+  }
+
+  async updateAdminProject(input: ShowcaseAdminProjectUpdateInput): Promise<void> {
+    const store = getStore();
+    const project = store.projects.find((item) => item.id === input.projectId && item.eventId === input.eventId);
+    if (!project) throw new Error("출품작을 찾을 수 없습니다.");
+    Object.assign(project, {
+      projectType: input.submission.projectType,
+      title: input.submission.title,
+      teamName: input.submission.teamName,
+      summary: input.submission.summary,
+      description: input.submission.description,
+      serviceUrl: input.submission.serviceUrl,
+      imageUrl: input.imageUrl ?? project.imageUrl,
+      allowImmediateFeedback: input.allowImmediateFeedback,
+      status: input.status,
+      reviewNote: input.reviewNote || null,
+      withdrawnAt: input.status === "withdrawn" ? new Date().toISOString() : null,
+      updatedAt: new Date().toISOString(),
+    });
+    pushActivity(store, {
+      type: "project_admin_changed",
+      projectId: project.id,
+      projectTitle: project.title,
+      actorType: "admin",
+      details: { operation: "updated", status: project.status, projectType: project.projectType },
+    });
+  }
+
+  async deleteAdminProject(input: { projectId: string; adminId: string }): Promise<ShowcaseDeletedProject> {
+    const store = getStore();
+    const projectId = input.projectId;
+    const index = store.projects.findIndex((project) => project.id === projectId);
+    if (index < 0) throw new Error("삭제할 출품작을 찾을 수 없습니다.");
+    const [project] = store.projects.splice(index, 1);
+    store.views = store.views.filter((view) => view.projectId !== projectId);
+    store.experiences = store.experiences.filter((experience) => experience.projectId !== projectId);
+    store.feedback = store.feedback.filter((feedback) => feedback.projectId !== projectId);
+    store.interests = store.interests.filter((interest) => interest.projectId !== projectId);
+    store.exclusions = store.exclusions.filter((exclusion) => !(exclusion.group === "submitter" && exclusion.target === projectId));
+    pushActivity(store, {
+      type: "project_admin_changed",
+      projectId: null,
+      projectTitle: project.title,
+      actorType: "admin",
+      details: { operation: "deleted", projectType: project.projectType },
+    });
+    return { id: project.id, eventId: project.eventId, title: project.title, ownerMemberId: project.ownerMemberId, projectType: project.projectType };
+  }
+
   async updateEventSchedule(input: ShowcaseEventScheduleInput) {
     const store = getStore();
     Object.assign(store.event, input);
@@ -860,5 +977,13 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
       actorType: "admin",
       details: { status: input.status },
     });
+  }
+
+  async setImmediateFeedback(input: { projectId: string; allowed: boolean }) {
+    const store = getStore();
+    const project = store.projects.find((item) => item.id === input.projectId && item.status !== "withdrawn");
+    if (!project) throw new ShowcaseDomainError("project_not_found");
+    project.allowImmediateFeedback = input.allowed;
+    project.updatedAt = new Date().toISOString();
   }
 }

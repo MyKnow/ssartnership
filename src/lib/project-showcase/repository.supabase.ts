@@ -16,6 +16,10 @@ import {
   type ShowcaseAdminActivityType,
   type ShowcaseAdminMetrics,
   type ShowcaseAdminProject,
+  type ShowcaseAdminMemberOption,
+  type ShowcaseAdminProjectWriteInput,
+  type ShowcaseAdminProjectUpdateInput,
+  type ShowcaseDeletedProject,
   type ShowcaseEventScheduleInput,
   type ShowcaseProjectFilters,
   type ShowcaseProjectWriteInput,
@@ -50,7 +54,7 @@ import {
 } from "./types";
 
 const EVENT_COLUMNS = "id,slug,title,description,hero_image_src,submission_start_at,submission_end_at,experience_start_at,experience_end_at,announcement_start_at,announcement_end_at,submitter_selection_count,experiencer_selection_count,is_active";
-const PROJECT_COLUMNS = "id,event_id,owner_member_id,project_type,title,team_name,summary,description,image_url,service_url,status,review_note,created_at,updated_at";
+const PROJECT_COLUMNS = "id,event_id,owner_member_id,project_type,title,team_name,summary,description,image_url,service_url,allow_immediate_feedback,status,review_note,created_at,updated_at";
 
 type EventRow = {
   id: string;
@@ -80,6 +84,7 @@ type ProjectRow = {
   description: string;
   image_url: string;
   service_url: string;
+  allow_immediate_feedback: boolean;
   status: string;
   review_note: string | null;
   created_at: string;
@@ -124,6 +129,7 @@ function mapProject(row: ProjectRow, counts: ShowcaseProjectCounts = EMPTY_COUNT
     description: row.description,
     imageUrl: row.image_url,
     serviceUrl: row.service_url,
+    allowImmediateFeedback: Boolean(row.allow_immediate_feedback),
     status: isShowcaseProjectStatus(row.status) ? row.status : "hidden",
     createdAt: row.created_at,
     ...counts,
@@ -144,6 +150,9 @@ function mapActivityDetails(value: unknown): ShowcaseAdminActivityDetails {
     if (Number.isSafeInteger(count) && count >= 0) details[targetKey] = count;
   }
   if (typeof raw.is_active === "boolean") details.isActive = raw.is_active;
+  if (raw.operation === "created" || raw.operation === "updated" || raw.operation === "deleted") {
+    details.operation = raw.operation;
+  }
   return details;
 }
 
@@ -918,6 +927,115 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
     }));
   }
 
+  async getAdminProject(projectId: string): Promise<ShowcaseAdminProject | null> {
+    const event = await this.getEvent();
+    if (!event) return null;
+    const { data, error } = await this.client()
+      .from("showcase_projects")
+      .select(PROJECT_COLUMNS)
+      .eq("event_id", event.id)
+      .eq("id", projectId)
+      .maybeSingle();
+    if (error) throw new Error("출품작을 불러오지 못했습니다.");
+    if (!data) return null;
+    const row = data as ProjectRow;
+    const [counts, ownerName] = await Promise.all([
+      this.getCounts(event.id),
+      row.owner_member_id ? this.getMemberDisplayName(row.owner_member_id) : Promise.resolve(null),
+    ]);
+    return {
+      ...mapProject(row, counts.get(row.id)),
+      ownerDisplayName: ownerName ?? "회원",
+      reviewNote: row.review_note,
+    };
+  }
+
+  async searchAdminMembers(query: string): Promise<ShowcaseAdminMemberOption[]> {
+    const normalized = query.trim();
+    if (normalized.length < 2 || normalized.length > 50 || /[%_,()]/u.test(normalized)) return [];
+    let request = this.client()
+      .from("members")
+      .select("id,display_name")
+      .is("deleted_at", null)
+      .not("display_name", "is", null)
+      .order("display_name", { ascending: true })
+      .limit(20);
+    if (/^[0-9a-f-]{36}$/iu.test(normalized)) request = request.eq("id", normalized);
+    else request = request.ilike("display_name", `%${normalized}%`);
+    const { data, error } = await request;
+    if (error) throw new Error("출품자를 검색하지 못했습니다.");
+    return (data ?? []).flatMap((row) => {
+      const id = typeof row.id === "string" ? row.id : "";
+      const displayName = typeof row.display_name === "string" ? row.display_name.trim() : "";
+      return id && displayName ? [{ id, displayName }] : [];
+    });
+  }
+
+  async createAdminProject(input: ShowcaseAdminProjectWriteInput): Promise<void> {
+    const ownerName = await this.getMemberDisplayName(input.ownerMemberId);
+    if (!ownerName) throw new Error("출품자로 선택한 회원을 찾을 수 없습니다.");
+    if (ownerName !== input.ownerName) throw new Error("출품자 정보를 다시 확인해 주세요.");
+    if (!input.imageUrl || !input.submission.imageUploadId) throw new Error("대표 이미지가 필요합니다.");
+    const { submission } = input;
+    const { error } = await this.client().rpc("admin_create_showcase_project", {
+      p_event_id: input.eventId,
+      p_project_id: input.projectId,
+      p_admin_id: input.adminId,
+      p_owner_member_id: input.ownerMemberId,
+      p_project_type: submission.projectType,
+      p_title: submission.title,
+      p_team_name: submission.teamName,
+      p_summary: submission.summary,
+      p_description: submission.description,
+      p_image_url: input.imageUrl,
+      p_image_upload_id: submission.imageUploadId,
+      p_service_url: submission.serviceUrl,
+      p_status: input.status,
+      p_review_note: input.reviewNote || null,
+      p_allow_immediate_feedback: input.allowImmediateFeedback,
+    });
+    if (error) throw new Error("출품작을 등록하지 못했습니다. 입력한 회원과 프로젝트 정보를 확인해 주세요.");
+  }
+
+  async updateAdminProject(input: ShowcaseAdminProjectUpdateInput): Promise<void> {
+    const { submission } = input;
+    const { error } = await this.client().rpc("admin_update_showcase_project", {
+      p_event_id: input.eventId,
+      p_project_id: input.projectId,
+      p_admin_id: input.adminId,
+      p_project_type: submission.projectType,
+      p_title: submission.title,
+      p_team_name: submission.teamName,
+      p_summary: submission.summary,
+      p_description: submission.description,
+      p_image_url: input.imageUrl,
+      p_image_upload_id: input.imageUrl ? submission.imageUploadId : null,
+      p_service_url: submission.serviceUrl,
+      p_status: input.status,
+      p_review_note: input.reviewNote || null,
+      p_allow_immediate_feedback: input.allowImmediateFeedback,
+    });
+    if (error) throw new Error("출품작을 수정하지 못했습니다. 입력한 내용을 확인해 주세요.");
+  }
+
+  async deleteAdminProject(input: { projectId: string; adminId: string }): Promise<ShowcaseDeletedProject> {
+    const { data, error } = await this.client().rpc("admin_delete_showcase_project", {
+      p_project_id: input.projectId,
+      p_admin_id: input.adminId,
+    });
+    const row = Array.isArray(data) ? data[0] as Record<string, unknown> | undefined : undefined;
+    if (error || !row || typeof row.project_id !== "string" || typeof row.event_id !== "string") {
+      throw new Error("출품작과 연결된 기록을 삭제하지 못했습니다.");
+    }
+    return {
+      id: row.project_id,
+      eventId: row.event_id,
+      title: typeof row.title === "string" ? row.title : "프로젝트",
+      ownerMemberId: typeof row.owner_member_id === "string" ? row.owner_member_id : "",
+      projectType: isShowcaseProjectType(row.project_type) ? row.project_type : "web",
+    };
+  }
+
   async updateEventSchedule(input: ShowcaseEventScheduleInput) {
     const { error } = await this.client()
       .from("showcase_events")
@@ -949,5 +1067,13 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
       p_review_note: input.reviewNote,
     });
     if (error) throwDomain(error, "프로젝트 검수 결과를 저장하지 못했습니다.");
+  }
+
+  async setImmediateFeedback(input: { projectId: string; allowed: boolean }) {
+    const { error } = await this.client().rpc("set_showcase_project_immediate_feedback", {
+      p_project_id: input.projectId,
+      p_allowed: input.allowed,
+    });
+    if (error) throwDomain(error, "프로젝트 체험 정책을 저장하지 못했습니다.");
   }
 }

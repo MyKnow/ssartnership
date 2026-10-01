@@ -89,6 +89,29 @@ describe("출품 입력 검증", () => {
     if (!create.success) assert.equal(create.field, "imageUploadId");
     assert.equal(validation.parseShowcaseProjectSubmission(submission({ imageUploadId: null }), { requireImage: false }).success, true);
   });
+
+  test("관리자 등록은 출품 동의를 확인하고, 수정 요청·반려 상태에는 사유를 요구한다", () => {
+    const base = {
+      ...submission(),
+      status: "pending",
+      reviewNote: "",
+      allowImmediateFeedback: false,
+    };
+    assert.equal(validation.parseShowcaseAdminProjectSubmission(
+      { ...base, announcementConsent: false },
+      { requireImage: true, requireConsent: true },
+    ).success, false);
+    assert.equal(validation.parseShowcaseAdminProjectSubmission(
+      { ...base, announcementConsent: true },
+      { requireImage: true, requireConsent: true },
+    ).success, true);
+    const rejected = validation.parseShowcaseAdminProjectSubmission(
+      { ...base, announcementConsent: false, status: "rejected" },
+      { requireImage: false, requireConsent: false },
+    );
+    assert.equal(rejected.success, false);
+    if (!rejected.success) assert.equal(rejected.field, "reviewNote");
+  });
 });
 
 describe("이벤트 단계", () => {
@@ -176,6 +199,12 @@ describe("관리자 일정·검수 검증", () => {
     }
     assert.equal(validation.parseShowcaseReview({ status: "withdrawn", reviewNote: "x" }).success, false);
   });
+
+  test("즉시 피드백 정책은 boolean만 받는다", () => {
+    assert.deepEqual(validation.parseShowcaseImmediateFeedbackPolicy({ allowed: true }), { success: true, data: { allowed: true } });
+    assert.deepEqual(validation.parseShowcaseImmediateFeedbackPolicy({ allowed: false }), { success: true, data: { allowed: false } });
+    assert.equal(validation.parseShowcaseImmediateFeedbackPolicy({ allowed: "true" }).success, false);
+  });
 });
 
 test("DB 예외 문구를 공용 에러 코드와 메시지로 바꾼다", () => {
@@ -219,6 +248,24 @@ describe("mock Repository 출품 규칙", () => {
     assert.ok(own.every((project) => project.status === "pending"));
     assert.ok(own.every((project) => !("participants" in project)));
     assert.equal((await repository.listOwnerProjects(OTHER)).length, 0);
+  });
+  test("새 APP·GAME은 즉시 피드백, WEB·EMBEDDED는 1분 대기를 기본으로 한다", async () => {
+    await repository.createProject(write("app-project", OWNER, { projectType: "app" }));
+    await repository.createProject(write("game-project", OWNER, { projectType: "game" }));
+    await repository.createProject(write("embedded-project", OWNER, { projectType: "embedded", serviceUrl: "https://youtu.be/abc" }));
+    const ownerProjects = await repository.listOwnerProjects(OWNER);
+    assert.equal(ownerProjects.find((project) => project.id === "app-project")?.allowImmediateFeedback, true);
+    assert.equal(ownerProjects.find((project) => project.id === "game-project")?.allowImmediateFeedback, true);
+    assert.equal(ownerProjects.find((project) => project.id === "embedded-project")?.allowImmediateFeedback, false);
+  });
+  test("출품자가 유형을 유지해 수정하면 운영 정책을 보존하고 유형을 바꾸면 새 기본 정책을 적용한다", async () => {
+    await repository.createProject(write("policy-project", OWNER, { projectType: "web" }));
+    await repository.setImmediateFeedback({ projectId: "policy-project", allowed: true });
+    await repository.updateProject(write("policy-project", OWNER, { projectType: "web", title: "수정한 제목" }));
+    assert.equal((await repository.getOwnerProject(OWNER, "policy-project"))?.allowImmediateFeedback, true);
+
+    await repository.updateProject(write("policy-project", OWNER, { projectType: "embedded", serviceUrl: "https://youtu.be/abc" }));
+    assert.equal((await repository.getOwnerProject(OWNER, "policy-project"))?.allowImmediateFeedback, false);
   });
   test("중복 프로젝트는 운영자가 반려하고, 한 출품 취소는 다른 출품에 영향을 주지 않는다", async () => {
     await repository.createProject(write("p1", OWNER));
@@ -293,6 +340,94 @@ describe("mock Repository 출품 규칙", () => {
   });
 });
 
+describe("mock Repository 관리자 CRUD", () => {
+  const repository = new mock.MockProjectShowcaseRepository();
+  const OWNER = "admin-crud-owner";
+  const PROJECT = "admin-crud-project";
+  let store: ReturnType<typeof mock.resetProjectShowcaseMockStore>;
+
+  beforeEach(() => {
+    store = mock.resetProjectShowcaseMockStore({ memberNames: { [OWNER]: "테스트 출품자" } });
+  });
+
+  test("출품자 검색·관리자 수정은 출품자 연결을 보존한다", async () => {
+    const [owner] = await repository.searchAdminMembers("테스트 출품자");
+    assert.deepEqual(owner, { id: OWNER, displayName: "테스트 출품자" });
+    const parsed = validation.parseShowcaseAdminProjectSubmission({
+      ...submission(), status: "approved", reviewNote: "", announcementConsent: true, allowImmediateFeedback: false,
+    }, { requireImage: true, requireConsent: true });
+    assert.equal(parsed.success, true);
+    if (!parsed.success) return;
+    await repository.createAdminProject({
+      projectId: PROJECT,
+      eventId: store.event.id,
+      adminId: "admin",
+      ownerMemberId: OWNER,
+      ownerName: "테스트 출품자",
+      submission: parsed.data.submission,
+      imageUrl: "https://images.example.test/showcase.webp",
+      status: parsed.data.status,
+      reviewNote: parsed.data.reviewNote,
+      allowImmediateFeedback: parsed.data.allowImmediateFeedback,
+    });
+    await repository.updateAdminProject({
+      projectId: PROJECT,
+      eventId: store.event.id,
+      adminId: "admin",
+      submission: parsed.data.submission,
+      imageUrl: null,
+      status: "hidden",
+      reviewNote: "운영 중 숨김",
+      allowImmediateFeedback: false,
+    });
+    assert.equal((await repository.getAdminProject(PROJECT))?.ownerMemberId, OWNER);
+    assert.equal((await repository.getAdminProject(PROJECT))?.status, "hidden");
+  });
+
+  test("완전 삭제는 체험 종속 기록만 지우고 당첨 제목과 관리자 기록은 남긴다", async () => {
+    const parsed = validation.parseShowcaseAdminProjectSubmission({
+      ...submission(), status: "approved", reviewNote: "", announcementConsent: true, allowImmediateFeedback: true,
+    }, { requireImage: true, requireConsent: true });
+    assert.equal(parsed.success, true);
+    if (!parsed.success) return;
+    await repository.createAdminProject({
+      projectId: PROJECT,
+      eventId: store.event.id,
+      adminId: "admin",
+      ownerMemberId: OWNER,
+      ownerName: "테스트 출품자",
+      submission: parsed.data.submission,
+      imageUrl: "https://images.example.test/showcase.webp",
+      status: parsed.data.status,
+      reviewNote: parsed.data.reviewNote,
+      allowImmediateFeedback: parsed.data.allowImmediateFeedback,
+    });
+    store.views.push({ id: "view", projectId: PROJECT, memberId: "viewer", createdAt: new Date().toISOString() });
+    store.experiences.push({ id: "experience", projectId: PROJECT, memberId: "viewer", startedAt: new Date().toISOString() });
+    store.feedback.push({ id: "feedback", projectId: PROJECT, memberId: "viewer", body: "체험 피드백입니다.", createdAt: new Date().toISOString(), hiddenAt: null });
+    store.interests.push({ projectId: PROJECT, memberId: "viewer" });
+    store.exclusions.push({ id: "exclusion", group: "submitter", target: PROJECT, reason: "검증 대기", restoredAt: null });
+    store.winners.push({
+      id: "winner", candidateGroup: "submitter", memberId: OWNER, projectTitle: "싸트너십",
+      maskedName: "테**", position: 1, status: "active", voidReason: null, deliveredAt: null,
+      createdAt: new Date().toISOString(),
+    });
+
+    const deleted = await repository.deleteAdminProject({ projectId: PROJECT, adminId: "admin" });
+    assert.equal(deleted.title, "싸트너십");
+    assert.equal(await repository.getAdminProject(PROJECT), null);
+    assert.equal(store.views.length, 0);
+    assert.equal(store.experiences.length, 0);
+    assert.equal(store.feedback.length, 0);
+    assert.equal(store.interests.length, 0);
+    assert.equal(store.exclusions.length, 0);
+    assert.equal(store.winners[0]?.projectTitle, "싸트너십");
+    const audit = (await repository.listAdminActivity({ limit: 10, type: "project_admin_changed" })).items;
+    const deleteAudit = audit.find((item) => item.details.operation === "deleted");
+    assert.equal(deleteAudit?.projectTitle, "싸트너십");
+  });
+});
+
 test("mock 쇼케이스 이벤트는 실행 시각과 관계없이 모집 기간으로 시작한다", async () => {
   const repository = new mock.MockProjectShowcaseRepository();
   for (const now of [Date.UTC(2026, 8, 26, 14, 59), Date.UTC(2026, 11, 31, 15, 0), Date.UTC(2031, 0, 1)]) {
@@ -310,6 +445,7 @@ describe("체험·피드백 규칙", () => {
     assert.equal(types.canSubmitShowcaseFeedback(null), false);
     assert.equal(types.canSubmitShowcaseFeedback(startedAt, new Date("2026-10-05T01:00:59.999Z")), false);
     assert.equal(types.canSubmitShowcaseFeedback(startedAt, new Date("2026-10-05T01:01:00.000Z")), true);
+    assert.equal(types.canSubmitShowcaseFeedback(startedAt, new Date("2026-10-05T01:00:00.000Z"), { allowImmediateFeedback: true }), true);
     assert.equal(types.countShowcaseTickets([]), 0);
     assert.equal(types.countShowcaseTickets([{ feedbackSubmitted: true }, { feedbackSubmitted: false }, { feedbackSubmitted: true }]), 2);
   });
@@ -385,6 +521,7 @@ describe("mock Repository 체험 규칙", () => {
 
   test("피드백은 1분 뒤 1번만 남길 수 있고 추첨권이 1장씩 늘어난다", async () => {
     await repository.registerParticipant({ memberId: MEMBER });
+    await repository.setImmediateFeedback({ projectId: PROJECT, allowed: false });
     await expectCode(repository.submitFeedback({ projectId: PROJECT, memberId: MEMBER, body: "길찾기가 편했어요 최고" }), "experience_not_started");
     await repository.startExperience({ projectId: PROJECT, memberId: MEMBER });
     await expectCode(repository.submitFeedback({ projectId: PROJECT, memberId: MEMBER, body: "길찾기가 편했어요 최고" }), "feedback_too_early");
@@ -402,6 +539,31 @@ describe("mock Repository 체험 규칙", () => {
     const project = await repository.getPublicProject(PROJECT);
     assert.equal(project?.experienceCount, 1);
     assert.equal(project?.validExperienceCount, 1);
+  });
+
+  test("APP·GAME은 즉시 피드백이 기본이고 WEB도 운영자가 즉시 허용할 수 있다", async () => {
+    const appProject = await repository.getPublicProject(PROJECT);
+    const gameProject = await repository.getPublicProject("mock-showcase-pixel-quest");
+    assert.equal(appProject?.allowImmediateFeedback, true);
+    assert.equal(gameProject?.allowImmediateFeedback, true);
+    assert.equal((await repository.listAdminProjects()).find((project) => project.id === "mock-showcase-study-buddy")?.allowImmediateFeedback, false);
+
+    const webProject = store.projects.find((project) => project.id === "mock-showcase-study-buddy");
+    assert.ok(webProject);
+    webProject.status = "approved";
+    await repository.setImmediateFeedback({ projectId: webProject.id, allowed: true });
+    await repository.registerParticipant({ memberId: MEMBER });
+    await repository.startExperience({ projectId: webProject.id, memberId: MEMBER });
+    await repository.submitFeedback({ projectId: webProject.id, memberId: MEMBER, body: "웹 서비스도 바로 의견을 남겨요" });
+
+    assert.equal((await repository.getPublicProject(webProject.id))?.allowImmediateFeedback, true);
+    assert.equal((await repository.getMemberParticipation(MEMBER)).ticketCount, 1);
+    await expectCode(repository.setImmediateFeedback({ projectId: "missing-project", allowed: true }), "project_not_found");
+
+    await repository.registerParticipant({ memberId: OTHER });
+    await repository.startExperience({ projectId: PROJECT, memberId: OTHER });
+    await repository.submitFeedback({ projectId: PROJECT, memberId: OTHER, body: "앱 링크만 열고도 바로 의견을 남겨요" });
+    assert.equal((await repository.getMemberParticipation(OTHER)).ticketCount, 1);
   });
 
   test("출품자에게는 숨기지 않은 피드백 본문만 작성자 없이 전달되고, 숨겨도 유효 체험은 유지된다", async () => {
@@ -663,7 +825,25 @@ test("쇼케이스 migration은 schema.sql 스냅샷에 원문 그대로 들어 
     const start = schema.indexOf(header);
     assert.notEqual(start, -1, `${name} snapshot header`);
     const next = schema.indexOf("\n-- Snapshot of ", start + header.length);
-    const body = schema.slice(start + header.length, next === -1 ? undefined : next).trim();
+    const parity = schema.indexOf("\n-- Preview catalog parity:", start + header.length);
+    const boundaries = [next, parity].filter((index) => index >= 0);
+    const end = boundaries.length ? Math.min(...boundaries) : undefined;
+    const body = schema.slice(start + header.length, end).trim();
     assert.equal(body, readFileSync(new URL(`supabase/migrations/${name}`, root), "utf8").trim(), `${name} snapshot body`);
   }
+});
+
+test("관리자 CRUD migration은 즉시 피드백 설정과 삭제 이력을 보호한다", async () => {
+  const { readFileSync } = await import("node:fs");
+  const root = new URL("../", import.meta.url);
+  const migration = readFileSync(new URL(
+    "supabase/migrations/20261001040036_showcase_admin_project_crud.sql",
+    root,
+  ), "utf8");
+  assert.match(migration, /add column if not exists allow_immediate_feedback boolean not null default false/u);
+  assert.equal((migration.match(/p_allow_immediate_feedback boolean/gu) ?? []).length, 2);
+  assert.match(migration, /set allow_immediate_feedback = p_allow_immediate_feedback/gu);
+  assert.match(migration, /update public\.showcase_winners[\s\S]*?project_title = project_row\.title[\s\S]*?project_title is null/u);
+  assert.match(migration, /revoke all on function %s from public, anon, authenticated/u);
+  assert.match(migration, /grant execute on function %s to service_role/u);
 });

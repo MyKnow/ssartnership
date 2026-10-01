@@ -1,7 +1,9 @@
 import { z } from "zod";
 import {
+  isShowcaseProjectStatus,
   SHOWCASE_PROJECT_TYPES,
   type ShowcaseProjectSubmission,
+  type ShowcaseProjectStatus,
   type ShowcaseProjectType,
 } from "./types";
 
@@ -171,6 +173,77 @@ export function parseShowcaseReview(input: { status: string; reviewNote: string 
     return { success: false, message: "수정 요청이나 반려는 출품자에게 보여 줄 사유를 입력해 주세요.", field: "reviewNote" };
   }
   return { success: true, data: { status, reviewNote } };
+}
+
+const showcaseImmediateFeedbackPolicySchema = z.object({
+  allowed: z.boolean("즉시 피드백 설정을 다시 확인해 주세요."),
+});
+
+/** Shared by the admin review control and its server action. */
+export function parseShowcaseImmediateFeedbackPolicy(value: unknown): ShowcaseValidationResult<{ allowed: boolean }> {
+  const result = showcaseImmediateFeedbackPolicySchema.safeParse(value);
+  if (!result.success) {
+    return { success: false, message: result.error.issues[0]?.message ?? "즉시 피드백 설정을 다시 확인해 주세요.", field: "allowed" };
+  }
+  return { success: true, data: result.data };
+}
+
+export function parseShowcaseAdminProjectSubmission(
+  input: {
+    projectType: unknown;
+    title: unknown;
+    teamName: unknown;
+    summary: unknown;
+    description: unknown;
+    serviceUrl: unknown;
+    imageUploadId: unknown;
+    announcementConsent: unknown;
+    status: unknown;
+    reviewNote: unknown;
+    allowImmediateFeedback: unknown;
+  },
+  options: { requireImage: boolean; requireConsent: boolean },
+): ShowcaseValidationResult<{
+  submission: ShowcaseProjectSubmission;
+  status: ShowcaseProjectStatus;
+  reviewNote: string;
+  allowImmediateFeedback: boolean;
+}> {
+  const submission = parseShowcaseProjectSubmission({
+    projectType: input.projectType,
+    title: input.title,
+    teamName: input.teamName,
+    summary: input.summary,
+    description: input.description,
+    serviceUrl: input.serviceUrl,
+    imageUploadId: input.imageUploadId,
+    announcementConsent: options.requireConsent ? input.announcementConsent : true,
+  }, { requireImage: options.requireImage });
+  if (!submission.success) return submission;
+
+  if (!isShowcaseProjectStatus(input.status)) {
+    return { success: false, message: "출품 상태를 다시 선택해 주세요.", field: "status" };
+  }
+  if (typeof input.allowImmediateFeedback !== "boolean") {
+    return { success: false, message: "링크 클릭 후 피드백 허용 설정을 확인해 주세요.", field: "allowImmediateFeedback" };
+  }
+  const reviewNote = typeof input.reviewNote === "string" ? input.reviewNote.trim() : "";
+  const noteLength = Array.from(reviewNote).length;
+  if (noteLength > 2000) {
+    return { success: false, message: "검수 사유는 2000자 이하로 입력해 주세요.", field: "reviewNote" };
+  }
+  if ((input.status === "changes_requested" || input.status === "rejected") && noteLength === 0) {
+    return { success: false, message: "수정 요청이나 반려는 출품자에게 보여 줄 사유를 입력해 주세요.", field: "reviewNote" };
+  }
+  return {
+    success: true,
+    data: {
+      submission: submission.data,
+      status: input.status,
+      reviewNote,
+      allowImmediateFeedback: input.allowImmediateFeedback,
+    },
+  };
 }
 
 export const SHOWCASE_SERVICE_URL_HINTS: Record<ShowcaseProjectType, { label: string; placeholder: string }> = {

@@ -62,6 +62,11 @@ test("graduate correction targets and approval snapshot survive the cohort cutov
   const phaseOneIndex = schemaSql.indexOf(`-- Snapshot of ${phaseOneMigration}`);
   const phaseTwoIndex = schemaSql.indexOf(`-- Snapshot of ${phaseTwoMigration}`);
   const parityIndex = schemaSql.indexOf(previewParityHeader);
+  const phaseTwoBodyStart = phaseTwoIndex + `-- Snapshot of ${phaseTwoMigration}`.length;
+  const nextSnapshotIndex = schemaSql.indexOf("\n-- Snapshot of ", phaseTwoBodyStart);
+  const phaseTwoEnd = [nextSnapshotIndex, parityIndex]
+    .filter((index) => index >= 0)
+    .reduce((nearest, index) => Math.min(nearest, index), Number.POSITIVE_INFINITY);
   const finalApprovalHeader = `-- Snapshot of ${finalApprovalMigration}`;
   const finalApprovalIndex = schemaSql.lastIndexOf(finalApprovalHeader);
 
@@ -73,9 +78,7 @@ test("graduate correction targets and approval snapshot survive the cohort cutov
   assert.ok(phaseTwoIndex > phaseOneIndex, "Phase 2 must follow Phase 1");
   assert.ok(parityIndex > phaseTwoIndex, "Phase 2 must precede Preview parity");
   assert.equal(
-    schemaSql
-      .slice(phaseTwoIndex + `-- Snapshot of ${phaseTwoMigration}`.length, parityIndex)
-      .trim(),
+    schemaSql.slice(phaseTwoBodyStart, phaseTwoEnd).trim(),
     readRepoFile(`supabase/migrations/${phaseTwoMigration}`).trim(),
   );
   assert.ok(

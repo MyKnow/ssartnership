@@ -45,6 +45,11 @@ export type ShowcaseAdminProject = ShowcaseProject & {
   reviewNote: string | null;
 };
 
+export type ShowcaseAdminMemberOption = {
+  id: string;
+  displayName: string;
+};
+
 export type ShowcaseAdminMetrics = {
   statusCounts: Record<ShowcaseProjectStatus, number>;
   projectTypeCounts: Record<ShowcaseProjectType, number>;
@@ -70,6 +75,7 @@ export const SHOWCASE_ADMIN_ACTIVITY_TYPES = [
   "project_reviewed",
   "event_settings_updated",
   "draw_created",
+  "project_admin_changed",
 ] as const;
 export type ShowcaseAdminActivityType = (typeof SHOWCASE_ADMIN_ACTIVITY_TYPES)[number];
 
@@ -80,6 +86,7 @@ export type ShowcaseAdminActivityDetails = {
   candidateCount?: number;
   selectedCount?: number;
   isActive?: boolean;
+  operation?: "created" | "updated" | "deleted";
 };
 
 export type ShowcaseAdminActivityLog = {
@@ -109,6 +116,29 @@ export type ShowcaseProjectWriteInput = {
   submission: ShowcaseProjectSubmission;
   /** Public URL of a newly attached cover image; null keeps the current image on update. */
   imageUrl: string | null;
+};
+
+export type ShowcaseAdminProjectWriteInput = {
+  projectId: string;
+  eventId: string;
+  adminId: string;
+  ownerMemberId: string;
+  ownerName: string;
+  submission: ShowcaseProjectSubmission;
+  imageUrl: string | null;
+  status: ShowcaseProjectStatus;
+  reviewNote: string;
+  allowImmediateFeedback: boolean;
+};
+
+export type ShowcaseAdminProjectUpdateInput = Omit<ShowcaseAdminProjectWriteInput, "ownerMemberId" | "ownerName">;
+
+export type ShowcaseDeletedProject = {
+  id: string;
+  eventId: string;
+  title: string;
+  ownerMemberId: string;
+  projectType: ShowcaseProjectType;
 };
 
 /**
@@ -182,6 +212,11 @@ export interface ProjectShowcaseRepository {
     type?: ShowcaseAdminActivityType | null;
   }): Promise<ShowcaseAdminActivityPage>;
   listAdminProjects(status?: ShowcaseProjectStatus): Promise<ShowcaseAdminProject[]>;
+  getAdminProject(projectId: string): Promise<ShowcaseAdminProject | null>;
+  searchAdminMembers(query: string): Promise<ShowcaseAdminMemberOption[]>;
+  createAdminProject(input: ShowcaseAdminProjectWriteInput): Promise<void>;
+  updateAdminProject(input: ShowcaseAdminProjectUpdateInput): Promise<void>;
+  deleteAdminProject(input: { projectId: string; adminId: string }): Promise<ShowcaseDeletedProject>;
   updateEventSchedule(input: ShowcaseEventScheduleInput): Promise<void>;
   reviewProject(input: {
     projectId: string;
@@ -189,4 +224,5 @@ export interface ProjectShowcaseRepository {
     status: ShowcaseReviewStatus;
     reviewNote: string;
   }): Promise<void>;
+  setImmediateFeedback(input: { projectId: string; allowed: boolean }): Promise<void>;
 }
