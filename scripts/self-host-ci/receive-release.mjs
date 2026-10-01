@@ -449,6 +449,15 @@ export async function receiveRelease(options = {}) {
   return { status: "deployed", sha: liveSha, image: appImage };
 }
 
+export function receiverFailureCode(cause) {
+  const codes = new Set([
+    "RECEIVER_SCHEMA_NOT_APPROVED", "RECEIVER_SCHEMA_APPROVAL_INVALID",
+    "RECEIVER_SCHEMA_APPROVAL_FILE_INVALID", "RECEIVER_SCHEMA_TREE_INVALID",
+    "RECEIVER_OPERATOR_REQUIRED",
+  ]);
+  return cause instanceof Error && codes.has(cause.message) ? cause.message : "RECEIVER_FAILED";
+}
+
 if (isMainModule()) {
   const [profileName = "preview", ...unexpected] = process.argv.slice(2);
   const profile = RECEIVER_PROFILES[profileName];
@@ -456,6 +465,6 @@ if (isMainModule()) {
     process.stderr.write('{"error":"RECEIVER_PROFILE_INVALID"}\n');
     process.exitCode = 1;
   } else {
-    receiveRelease({ profile }).then((result) => process.stdout.write(`${JSON.stringify(result)}\n`)).catch(() => { process.stderr.write('{"error":"RECEIVER_FAILED"}\n'); process.exitCode = 1; });
+    receiveRelease({ profile }).then((result) => process.stdout.write(`${JSON.stringify(result)}\n`)).catch((cause) => { process.stderr.write(`${JSON.stringify({ error: receiverFailureCode(cause) })}\n`); process.exitCode = 1; });
   }
 }

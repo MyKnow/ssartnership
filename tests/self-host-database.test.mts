@@ -4,7 +4,7 @@ import { mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { assertSafeEnvironmentOutputPath, composeEnvironment, createDatabaseEnvironment, createMigrationPlan, deriveProjectName, evaluateMigrationLedger, normalizeMigrationTransaction, parseEnvironmentText, renderMigrationRunnerSql, resolveSignedStorageUrl, validateDatabaseEnvironment, validateProjectName, writeNewEnvironmentFile } from "../scripts/self-host-database/lib.mjs";
+import { assertSafeEnvironmentOutputPath, composeEnvironment, createDatabaseEnvironment, createMigrationPlan, databasePsqlArguments, deriveProjectName, evaluateMigrationLedger, normalizeMigrationTransaction, parseEnvironmentText, renderMigrationRunnerSql, renderMigrationVerificationSql, resolveSignedStorageUrl, validateDatabaseEnvironment, validateProjectName, writeNewEnvironmentFile } from "../scripts/self-host-database/lib.mjs";
 test("init emits distinct local credentials only to a new owner-only ignored file", async () => {
   const root = await mkdtemp(join(tmpdir(), "ssartnership-self-host-"));
   try {
@@ -95,6 +95,8 @@ test("migration ledger keeps raw checksums, safely unwraps only outer transactio
   assert.throws(() => normalizeMigrationTransaction("\\i unsafe.sql\n"), /psql directive/u);
   const runner = renderMigrationRunnerSql(plan);
   assert.match(runner, /pg_advisory_lock/u);
+  assert.match(runner, /self_host_migration_baseline_required/u);
+  assert.ok(runner.indexOf("$baseline_guard$") < runner.indexOf("create schema if not exists self_host"));
   assert.match(runner, /self_host_migration_checksum_drift/u);
   assert.match(runner, /\\if :self_host_pending/u);
   assert.match(runner, /insert into self_host\.migration_ledger/u);
@@ -125,4 +127,30 @@ test("compose pins data services and exposes only a loopback gateway", async () 
   assert.match(compose, /db-data:\/var\/lib\/postgresql\/data/u);
   assert.match(compose, /storage-data:\/var\/lib\/storage/u);
   assert.match(compose, /internal: true/u);
+});
+
+test("restored live databases use their login role and private Unix socket", () => {
+  for (const project of ["ssartnership-production-data", "ssartnership-original-preview-34141078185"]) {
+    const args = databasePsqlArguments(project);
+    assert.equal(args[args.indexOf("--username") + 1], "supabase_admin");
+    assert.equal(args[args.indexOf("--host") + 1], "/tmp");
+    assert.equal(args[args.indexOf("--user") + 1], "postgres");
+  }
+  const local = databasePsqlArguments("ssartnership-test");
+  assert.equal(local[local.indexOf("--username") + 1], "postgres");
+  assert.equal(local.includes("--host"), false);
+  assert.throws(() => databasePsqlArguments("untrusted"));
+});
+
+test("schema verification compares all names and checksums without migration writes", () => {
+  const plan = createMigrationPlan([{ name: "20261001123000_sample.sql", source: "create table secret_example(id int);" }]);
+  const sql = renderMigrationVerificationSql(plan);
+  assert.match(sql, /repeatable read read only/);
+  assert.match(sql, /full outer join self_host\.migration_ledger/);
+  assert.match(sql, /expected\.checksum is distinct from actual\.checksum/);
+  assert.ok(sql.includes(plan[0].checksum));
+  assert.doesNotMatch(sql, /secret_example|insert into|create table|delete from|update /i);
+  assert.throws(() => renderMigrationVerificationSql([]));
+  assert.throws(() => renderMigrationVerificationSql([...plan, ...plan]));
+  assert.throws(() => renderMigrationVerificationSql([{ ...plan[0], checksum: "invalid'" }]));
 });

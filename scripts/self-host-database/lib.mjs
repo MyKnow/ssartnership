@@ -185,8 +185,52 @@ export function resolveSignedStorageUrl(storageBase, signedUrl) {
   return `${base.origin}${base.pathname}${signedUrl}`;
 }
 const literal = value => `'${value.replaceAll("'", "''")}'`;
+export function databasePsqlArguments(project) {
+  validateProjectName(project);
+  const restored = ["ssartnership-production-data", "ssartnership-original-preview-34141078185"].includes(project);
+  return [
+    "exec", "-T", "--user", "postgres", "db", "psql", "--no-psqlrc", "--set", "ON_ERROR_STOP=1",
+    "--username", restored ? "supabase_admin" : "postgres", "--dbname", "postgres",
+    ...(restored ? ["--host", "/tmp"] : []),
+  ];
+}
+
+/** Verify the complete ledger in one read-only snapshot, without applying DDL. */
+export function renderMigrationVerificationSql(plan) {
+  const names = new Set();
+  if (!Array.isArray(plan) || plan.length === 0) throw error("migration_plan_invalid");
+  for (const item of plan) {
+    if (!/^(?:[0-9]{8}|[0-9]{14})_[a-z0-9_]+\.sql$/u.test(item.name)
+      || !/^[a-f0-9]{64}$/u.test(item.checksum) || names.has(item.name)) throw error("migration_plan_invalid");
+    names.add(item.name);
+  }
+  const values = plan.map(item => `(${literal(item.name)}, ${literal(item.checksum)})`).join(",\n");
+  return `\\set ON_ERROR_STOP on
+begin isolation level repeatable read read only;
+set local statement_timeout = '30s';
+do $verify_ledger$
+begin
+  if exists (
+    select 1 from (values ${values}) as expected(name, checksum)
+    full outer join self_host.migration_ledger as actual using (name)
+    where expected.checksum is distinct from actual.checksum
+  ) then raise exception 'self_host_migration_ledger_mismatch'; end if;
+end
+$verify_ledger$;
+commit;
+`;
+}
+
 export function renderMigrationRunnerSql(plan) {
-  const lines = ["\\set ON_ERROR_STOP on", `select pg_advisory_lock(${LOCK});`, "begin;", "create schema if not exists self_host;", "create table if not exists self_host.migration_ledger (name text primary key, checksum text not null check (checksum ~ '^[0-9a-f]{64}$'), applied_at timestamp with time zone not null default now());", "commit;"];
+  const lines = ["\\set ON_ERROR_STOP on", `select pg_advisory_lock(${LOCK});`, "begin;", `do $baseline_guard$
+declare legacy_count bigint;
+begin
+  if to_regclass('self_host.migration_ledger') is null and to_regclass('supabase_migrations.schema_migrations') is not null then
+    execute 'select count(*) from supabase_migrations.schema_migrations' into legacy_count;
+    if legacy_count > 0 then raise exception 'self_host_migration_baseline_required'; end if;
+  end if;
+end
+$baseline_guard$;`, "create schema if not exists self_host;", "create table if not exists self_host.migration_ledger (name text primary key, checksum text not null check (checksum ~ '^[0-9a-f]{64}$'), applied_at timestamp with time zone not null default now());", "commit;"];
   for (const migration of plan) {
     const name = literal(migration.name);
     const checksum = literal(migration.checksum);

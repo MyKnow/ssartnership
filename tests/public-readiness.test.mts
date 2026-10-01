@@ -13,19 +13,15 @@ function readRepoFile(pathname: string) {
 const WORKFLOW_FILES = [
   "admin-performance.yml",
   "cross-platform-development.yml",
-  "production-migrations.yml",
   "public-readiness.yml",
   "self-host-public-health.yml",
   "storybook.yml",
 ] as const;
 
-const VERIFIED_SUPABASE_CLI_VERSION = "2.114.0";
 const CHECKOUT_ACTION_SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1";
 const CHECKOUT_ACTION_VERSION = "v7.0.1";
 const SETUP_NODE_ACTION_SHA = "820762786026740c76f36085b0efc47a31fe5020";
 const SETUP_NODE_ACTION_VERSION = "v7.0.0";
-const SUPABASE_SETUP_CLI_ACTION_SHA = "3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf";
-const SUPABASE_SETUP_CLI_ACTION_VERSION = "v2.1.1";
 
 test("GitHub Actions use the Node 24 action runtime and project runtime with read-only repository access", () => {
   for (const filename of WORKFLOW_FILES) {
@@ -221,67 +217,11 @@ test("active workflows use the current Node 24 GitHub action majors", () => {
   assert.ok(actionCount > 0, "expected active workflows to use GitHub Node actions");
 });
 
-test("active Supabase workflows pin the Production-validated CLI version", () => {
+test("retired Cloud migration CLI actions are not reintroduced", () => {
   const workflowsDirectory = new URL("../.github/workflows/", import.meta.url);
-  const workflowNames = readdirSync(workflowsDirectory)
-    .filter((name) => /\.ya?ml$/.test(name))
-    .sort();
-  let setupCliStepCount = 0;
-
-  for (const workflowName of workflowNames) {
-    const workflow = readFileSync(new URL(workflowName, workflowsDirectory), "utf8");
-    const lines = workflow.split("\n");
-
-    assert.doesNotMatch(
-      workflow,
-      /^\s*version:\s*["']?latest["']?(?:\s+#.*)?$/m,
-      `${workflowName}: active workflows must not float a CLI version`,
-    );
-
-    for (let index = 0; index < lines.length; index += 1) {
-      const setupCliUse = lines[index].match(
-        new RegExp(
-          `^(\\s*)uses:\\s*supabase/setup-cli@${SUPABASE_SETUP_CLI_ACTION_SHA}\\s+#\\s+${SUPABASE_SETUP_CLI_ACTION_VERSION}\\s*$`,
-        ),
-      );
-      if (!setupCliUse) {
-        continue;
-      }
-
-      setupCliStepCount += 1;
-      const usesIndent = setupCliUse[1].length;
-      let configuredVersion: string | null = null;
-
-      for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
-        const line = lines[cursor];
-        const trimmedLine = line.trimStart();
-        const lineIndent = line.length - trimmedLine.length;
-
-        if (trimmedLine.startsWith("- ") && lineIndent < usesIndent) {
-          break;
-        }
-
-        const version = line.match(
-          /^\s+version:\s*["']?([^\s"'#]+)["']?(?:\s+#.*)?$/,
-        );
-        if (version) {
-          configuredVersion = version[1];
-          break;
-        }
-      }
-
-      assert.equal(
-        configuredVersion,
-        VERIFIED_SUPABASE_CLI_VERSION,
-        `${workflowName}: supabase/setup-cli must keep the Production-validated CLI version`,
-      );
-    }
+  for (const name of readdirSync(workflowsDirectory).filter(name => /\.ya?ml$/.test(name))) {
+    assert.doesNotMatch(readFileSync(new URL(name, workflowsDirectory), "utf8"), /supabase\/setup-cli@/, name);
   }
-
-  assert.ok(
-    setupCliStepCount > 0,
-    "expected at least one active Supabase setup-cli step",
-  );
 });
 
 test("Dependabot tracks pinned GitHub Actions workflow refs", () => {
@@ -359,53 +299,21 @@ test("Public Readiness delegates canonical lockfile verification to the shared Q
   assert.match(packageJson.scripts["verify:quick"], /check:lockfile/);
 });
 
-test("production Supabase migrations require an explicit guarded dispatch", () => {
-  const workflow = readRepoFile(".github/workflows/production-migrations.yml");
-
-  assert.match(workflow, /name: Apply Production Supabase Migrations/);
-  assert.match(workflow, /workflow_dispatch:/);
-  assert.doesNotMatch(workflow, /^\s+push:\s*$/m);
-  assert.match(workflow, /confirmation:/);
-  assert.match(workflow, /APPLY_PRODUCTION_MIGRATIONS/);
-  assert.match(workflow, /expected_sha:/);
-  assert.match(workflow, /maintenance_window_approved:/);
-  assert.match(workflow, /test "\$GITHUB_REF" = "refs\/heads\/main"/);
-  assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
-  assert.doesNotMatch(workflow, /ref: main/);
-  assert.match(workflow, /permissions:\s*\n\s+contents: read/);
-  assert.match(
-    workflow,
-    /SUPABASE_PRODUCTION_DB_URL:\s*\$\{\{ secrets\.SUPABASE_PRODUCTION_DB_URL \}\}/,
-  );
-  assert.match(workflow, /npm run validate:migrations/);
-  assert.match(
-    workflow,
-    /supabase migration list --db-url "\$SUPABASE_PRODUCTION_DB_URL"/,
-  );
-  assert.match(
-    workflow,
-    /supabase db push --db-url "\$SUPABASE_PRODUCTION_DB_URL" --yes --skip-vault/,
-  );
-  assert.match(
-    workflow,
-    /supabase db push --db-url "\$SUPABASE_PRODUCTION_DB_URL" --dry-run --skip-vault/,
-  );
-  assert.doesNotMatch(workflow, /--include-all/);
-});
-
-test("retired cloud Preview migration and sync workflows stay removed", () => {
+test("retired cloud migration and sync workflows stay removed", () => {
   const workflowsDirectory = new URL("../.github/workflows/", import.meta.url);
   const workflowNames = readdirSync(workflowsDirectory)
     .filter((name) => /\.ya?ml$/.test(name))
     .sort();
 
+  assert.ok(!workflowNames.includes("production-migrations.yml"));
   assert.ok(!workflowNames.includes("preview-migrations.yml"));
   assert.ok(!workflowNames.includes("preview-sync.yml"));
 
   for (const workflowName of workflowNames) {
     const workflow = readFileSync(new URL(workflowName, workflowsDirectory), "utf8");
 
-    // The frozen cloud Preview baseline must not receive DDL or data again.
+    // Frozen cloud baselines must not receive DDL or data again.
+    assert.doesNotMatch(workflow, /supabase\s+db\s+push|supabase\s+migration\s+(?:up|repair)|APPLY_PRODUCTION_MIGRATIONS/, workflowName);
     assert.doesNotMatch(workflow, /supabase db push --db-url "\$SUPABASE_PREVIEW_DB_URL"/, workflowName);
     assert.doesNotMatch(workflow, /npm run sync:preview|supabase-sync-preview/, workflowName);
     assert.doesNotMatch(workflow, /app_id=\$SUPABASE_GITHUB_APP_ID|\.app\.id == 330661/, workflowName);
