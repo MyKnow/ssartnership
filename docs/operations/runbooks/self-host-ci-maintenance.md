@@ -41,13 +41,26 @@ Preview 공개 빌드 origin은 앱 `https://ssartnership-dev.myknow.xyz`, API `
 
 ### 앱 자동 배포의 DB schema 승인
 
-수신기는 DB DDL을 적용하지 않는다. Preview의 `/etc/myknow/secrets/ssartnership-original-preview/schema-approval.json`과 Production의 `/etc/myknow/secrets/ssartnership-production/schema-approval.json`은 root-owned·0600·단일 regular file이어야 하며 symlink와 4KiB 초과를 거절한다. 버전 1의 정확한 필드는 `repository`, `environment`, `project`, `migrationTree`, `verifiedSourceSha`, `migrationCount`, `verifiedAt`이다. Preview는 `environment=original-preview`, `project=ssartnership-original-preview-34141078185`, Production은 `environment=production`, `project=ssartnership-production-data`만 허용한다.
+수신기는 DB DDL을 적용하지 않는다. Preview의 `/etc/myknow/secrets/ssartnership-original-preview/schema-approval.json`과 Production의 `/etc/myknow/secrets/ssartnership-production/schema-approval.json`은 root-owned·0600·단일 regular file이어야 하며 symlink와 4KiB 초과를 거절한다. 버전 1의 정확한 필드는 `version`, `repository`, `environment`, `project`, `migrationTree`, `verifiedSourceSha`, `migrationCount`, `verifiedAt`이다. Preview는 `environment=original-preview`, `project=ssartnership-original-preview-34141078185`, Production은 `environment=production`, `project=ssartnership-production-data`만 허용한다.
 
-운영자는 실제 원본 Preview의 적용 migration 목록/내용과 source 동등성, 현재 백업 및 필요한 새 DDL 적용·회귀 검증을 확인한 뒤에만 승인 파일을 작성한다. `migrationTree`는 해당 source의 `supabase/migrations` Git tree SHA다. git ref 자체나 app SHA를 대신 넣지 않는다. 승인 파일은 비밀을 포함하지 않지만 배포 권한이므로 CI·앱·builder가 쓰지 못해야 한다.
+운영자는 해당 Preview 또는 Production의 적용 migration 목록/내용과 source 동등성, 현재 백업 및 필요한 새 DDL 적용·회귀 검증을 확인한 뒤에만 승인 파일을 작성한다. `migrationTree`는 해당 source의 `supabase/migrations` Git tree SHA다. git ref 자체나 app SHA를 대신 넣지 않는다. 승인 파일은 비밀을 포함하지 않지만 배포 권한이므로 CI·앱·builder가 쓰지 못해야 한다.
 
 receiver는 [GitHub Trees API](https://docs.github.com/en/rest/git/trees#get-a-tree)의 비재귀 응답을 두 단계 읽어 환경별 exact SHA → supabase → migrations tree를 찾는다. 요청 SHA·완전한 응답·경로/종류/모드·단일 항목을 검증하고 운영 승인 tree와 다르면 manifest 저장·이미지 pull·앱 교체 전에 중단한다. 같은 앱 릴리스가 이미 적용됐어도 schema 검사를 생략하지 않는다. 새 migration의 추가·삭제·수정은 모두 tree를 바꾸므로 운영자 검증 없이 자동 통과하지 않는다.
 
 이는 승인 시점 이후 운영자가 수행한 임의 DDL까지 지속 감지하는 schema drift scanner가 아니다. DB 변경은 별도 운영 절차와 백업/동등성 증거를 남겨야 한다. 승인 파일을 latest dev 값으로 자동 갱신하거나 단순 count 일치만으로 새 migration을 적용한 것으로 간주하지 않는다.
+
+### 스키마 변경을 포함한 배포 완료 순서
+
+사용자가 해당 환경 배포를 승인했다면, 에이전트도 그 요청 범위에서 운영자로서 아래 절차를 끝까지 수행한다. 확인 기록 갱신만 사용자에게 다시 넘기지 않는다. CI·앱·builder·자동 수신기의 DDL/승인 권한은 추가하지 않는다.
+
+1. 환경과 실제 Compose DB project를 확인한다. Production은 `ssartnership-production-data`, Preview는 `ssartnership-original-preview-34141078185`다. 동결된 Cloud DB와 폐기된 `production-migrations.yml`을 사용하지 않는다. 기존 workflow의 과거 revision을 dispatch하지 않는다.
+2. 검토한 정확한 source SHA와 `git rev-parse <SHA>:supabase/migrations` 값을 고정하고 해당 source만 root 소유 디렉터리에 설치한다. 현재 백업 성공/시각, DB 식별자, 공유 heavy lock을 확인한다. 새 DDL이 기존 앱과 호환되는지 검토한다.
+3. 해당 환경의 기존 private data env 파일을 사용한다. root 운영자와 공유 heavy lock 안에서 `scripts/self-host-database/cli.mjs migrate --env-file <data.env> --project <DB project>`를 실행한다. 복원된 두 DB는 컨테이너 OS 사용자 `postgres`, DB 로그인 역할 `supabase_admin`, Unix socket `/tmp`를 사용하도록 도구에 고정되어 있다. 일반 합성 DB는 기존 연결을 유지한다.
+4. 같은 source와 연결로 `cli.mjs verify-schema --env-file <data.env> --project <DB project>`를 실행한다. 읽기 전용 단일 snapshot에서 **전체 파일명과 SHA256**을 비교하며 누락·추가·내용 변경 중 하나라도 있으면 실패한다. 단순 migration 개수나 최신 파일명만으로 승인하지 않는다. 이 검사는 이력 동등성 증거이며, 필요한 권한/RPC 검증과 임의 DDL drift 점검을 대체하지 않는다.
+5. 기존 승인 파일을 root 전용 위치에 보존한다. 검증한 SHA/tree/count와 UTC 검증 시각으로 새 파일을 같은 디렉터리에 root 0600으로 생성하고 flush한 뒤 원자적으로 교체한다. 환경별 정확한 profile과 버전 1 필드만 유지한다. 검증과 기록은 같은 운영 잠금 안에서 수행한다.
+6. 잠금을 해제한 뒤 해당 환경 수신기 서비스를 실행하고, 실제 container revision과 receiver state가 목표 branch SHA인지 확인한다. 외부 HTTPS `/api/health`·`/auth/login` 응답까지 확인해야 배포 완료다. schema 미승인 로그는 `RECEIVER_SCHEMA_NOT_APPROVED`, 파일/내용 오류는 구분된 고정 코드이며 임의 오류 본문과 비밀은 출력하지 않는다.
+
+`self_host.migration_ledger`가 없는데 `supabase_migrations.schema_migrations`에 기존 이력이 있으면 자동으로 전체 SQL을 재실행하지 않는다. 기존 승인 source의 파일명·checksum과 실제 전체 version 집합, schema 동등성을 대조하고 백업한 뒤 한 번만 baseline 이력을 이관한다. 원래 Supabase 이력은 보존하며 이후 자체 호스팅 적용의 기준은 `self_host.migration_ledger`다. 자동 baseline 작성이나 실패한 migration의 이력 조작은 허용하지 않는다.
 
 ## 검증과 이미지 전달
 
