@@ -138,23 +138,20 @@ ssartnership-infra.myknow.xyz {
 	}
 }
 
-# Keep the laptop's existing ClayFarm route until its separate retirement.
+# ClayFarm was retired on 2026-10-02; keep a terminal response for old clients.
 clayfarm.myknow.xyz {
-	request_body {
-		max_size 53477376
-	}
 	header Cache-Control "no-store"
-	reverse_proxy 192.168.1.191:9080
+	respond "서비스 운영을 종료했습니다." 410
 }
 
 malmoa.myknow.xyz {
 	encode zstd gzip
 	header X-MALMOA-Environment team
-	# The MALMOA guests currently allow only the laptop ingress address.
-	reverse_proxy 192.168.1.191:9080
+	# The guest ingress permits this operations VM and the PVE management host.
+	reverse_proxy 192.168.1.78:8080
 }
 malmoa-preview.myknow.xyz {
 	encode zstd gzip
 	header X-MALMOA-Environment preview
-	reverse_proxy 192.168.1.191:9080
+	reverse_proxy 192.168.1.136:8080
 }
