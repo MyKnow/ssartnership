@@ -1,0 +1,9 @@
+[Unit]
+Description=Collect PVE host observations every minute
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+Unit=pve-host-metrics.service
+[Install]
+WantedBy=timers.target

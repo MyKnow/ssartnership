@@ -2,22 +2,29 @@ groups:
   - name: production-backup
     rules:
       - alert: ProductionBackupCollectorStale
-        expr: (time() - ssartnership_production_backup_collected_seconds > 300) or absent(ssartnership_production_backup_collected_seconds)
+        expr: (time() - ssartnership_production_backup_collected_seconds > 600) or absent(ssartnership_production_backup_collected_seconds)
         for: 2m
-        labels: { severity: critical }
+        labels: { severity: critical, environment: production, vm: "5200" }
       - alert: ProductionBackupStale
         expr: (time() - ssartnership_production_backup_created_seconds > 28800) or absent(ssartnership_production_backup_created_seconds)
         for: 5m
-        labels: { severity: critical }
+        labels: { severity: critical, environment: production, vm: "5200" }
       - alert: ProductionMacBackupStale
         expr: (time() - ssartnership_production_backup_mac_created_seconds > 93600) or absent(ssartnership_production_backup_mac_created_seconds)
         for: 5m
-        labels: { severity: critical }
+        labels: { severity: critical, environment: production, vm: "5200" }
       - alert: ProductionPveBackupStale
         expr: (time() - ssartnership_production_backup_pve_created_seconds > 28800) or absent(ssartnership_production_backup_pve_created_seconds)
         for: 5m
-        labels: { severity: critical }
+        labels: { severity: critical, environment: production, vm: "5200" }
       - alert: ProductionPveBackupPullStale
         expr: (time() - ssartnership_production_backup_pve_ack_seconds > 2400) or absent(ssartnership_production_backup_pve_ack_seconds)
         for: 5m
-        labels: { severity: critical }
+        labels: { severity: critical, environment: production, vm: "5200" }
+      - alert: ProductionBackupJobFailed
+        expr: ssartnership_production_backup_job_success == 0
+        labels: { severity: warning, environment: production, vm: "5200" }
+      - alert: ProductionRestoreDrillStale
+        expr: (time() - ssartnership_production_restore_verified_seconds > 2592000) or absent(ssartnership_production_restore_verified_seconds)
+        for: 5m
+        labels: { severity: warning, environment: production, vm: "5200" }

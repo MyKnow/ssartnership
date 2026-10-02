@@ -1,0 +1,14 @@
+[Unit]
+Description=SSARTNERSHIP private legacy relay from operations guest only
+Requires=docker.service
+After=docker.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/ssartnership/pve-legacy-relay-523/legacy-relay-firewall apply
+ExecStop=/opt/ssartnership/pve-legacy-relay-523/legacy-relay-firewall remove
+
+[Install]
+WantedBy=docker.service

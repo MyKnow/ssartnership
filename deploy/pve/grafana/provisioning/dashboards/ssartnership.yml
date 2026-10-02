@@ -1,0 +1,9 @@
+apiVersion: 1
+providers:
+  - name: ssartnership
+    folder: SSARTNERSHIP
+    type: file
+    disableDeletion: true
+    editable: false
+    options:
+      path: /etc/grafana/dashboards

@@ -1,0 +1,24 @@
+#!/bin/bash
+set -euo pipefail
+mode=${1:-}
+[[ $# == 1 && ( "$mode" == apply || "$mode" == remove ) ]] || exit 64
+ipt=/usr/sbin/iptables
+network_id=$(docker network inspect --format '{{.Id}}' ssartnership-production-data_edge)
+subnet=$(docker network inspect --format '{{(index .IPAM.Config 0).Subnet}}' ssartnership-production-data_edge)
+[[ "$network_id" =~ ^[a-f0-9]{64}$ && "$subnet" == 172.23.0.0/16 ]] || exit 65
+bridge="br-${network_id:0:12}"
+[[ -d "/sys/class/net/$bridge" ]]
+"$ipt" -w 10 -S MYKNOW-DOCKER >/dev/null
+"$ipt" -w 10 -C MYKNOW-DOCKER -i enp3s0f1 -j DROP
+rule=(-i enp3s0f1 -s 192.168.1.2/32 -o "$bridge" -d 172.23.0.0/16
+  -p tcp --dport 9080 -m conntrack --ctstate NEW --ctdir ORIGINAL
+  --ctorigdst 192.168.1.191 --ctorigdstport 9080
+  -m comment --comment ssartnership-523-private-legacy -j RETURN)
+if [[ "$mode" == apply ]]; then
+  if ! "$ipt" -w 10 -C MYKNOW-DOCKER "${rule[@]}" 2>/dev/null; then
+    "$ipt" -w 10 -I MYKNOW-DOCKER 2 "${rule[@]}"
+  fi
+  "$ipt" -w 10 -C MYKNOW-DOCKER "${rule[@]}"
+elif "$ipt" -w 10 -C MYKNOW-DOCKER "${rule[@]}" 2>/dev/null; then
+  "$ipt" -w 10 -D MYKNOW-DOCKER "${rule[@]}"
+fi

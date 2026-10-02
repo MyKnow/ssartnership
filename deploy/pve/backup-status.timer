@@ -1,0 +1,9 @@
+[Unit]
+Description=Collect backup outcome every minute
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+AccuracySec=10s
+Unit=backup-status.service
+[Install]
+WantedBy=timers.target

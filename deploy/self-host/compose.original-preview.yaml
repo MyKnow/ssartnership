@@ -17,7 +17,7 @@ services:
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
     mem_limit: 768m
-    cpus: 1.5
+    cpus: 1
     pids_limit: 256
     logging: *bounded-logs
     ports: ["127.0.0.1:3108:3000"]

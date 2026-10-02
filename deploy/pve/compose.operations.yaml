@@ -1,0 +1,176 @@
+# Preserve the approved edge-recovery helper's exact Compose project boundary.
+name: ssartnership-edge
+x-logs: &logs
+  driver: local
+  options: { max-size: 10m, max-file: "3" }
+services:
+  caddy:
+    image: caddy:2.11.4@sha256:98eb57d882ccd5213d1688764db10c1ca2c58a1ca3a6717a3411ad798f7a423a
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 128
+    logging: *logs
+    environment:
+      # Rehearsal data must not accept public writes before final equality proof.
+      PVE_PUBLIC_SERVICES_READY: ${PVE_PUBLIC_SERVICES_READY:-0}
+    networks: [edge, monitoring]
+    ports: ["80:80/tcp", "443:443/tcp", "443:443/udp"]
+    tmpfs: [/tmp:mode=1777]
+    volumes:
+      - ./edge.Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${PVE_CADDY_DATA:?verified certificate storage required}:/data
+      - caddy-config:/config
+      - /etc/myknow/secrets/ssartnership-production/infra-auth:/run/production-infra-auth:ro
+    healthcheck:
+      test: [CMD, caddy, validate, --config, /etc/caddy/Caddyfile, --adapter, caddyfile]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  prometheus:
+    image: prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+    cpus: 0.5
+    pids_limit: 128
+    logging: *logs
+    networks: [edge, monitoring]
+    ports: ["127.0.0.1:59191:9090"]
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.path=/prometheus, --storage.tsdb.retention.time=7d, --storage.tsdb.retention.size=2GB, --web.external-url=https://ssartnership-infra.myknow.xyz/infra/prometheus/, --web.route-prefix=/]
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./service-alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ${PVE_OBSERVABILITY_ROOT}/production-backup-alerts.yml:/etc/prometheus/production-backup-alerts.yml:ro
+      - prometheus-data:/prometheus
+  alertmanager:
+    image: prom/alertmanager:v0.34.0@sha256:690c7b525f4367aa91f73e2f91c632206d32e97c6384bdbf2fb7a861b420340d
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.25
+    pids_limit: 128
+    logging: *logs
+    networks: [edge, monitoring]
+    ports: ["127.0.0.1:59194:9093"]
+    command: [--config.file=/etc/alertmanager/alertmanager.yml, --storage.path=/alertmanager, --cluster.listen-address=, --web.external-url=https://ssartnership-infra.myknow.xyz/infra/alertmanager/, --web.route-prefix=/]
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - /etc/myknow/secrets/ssartnership-production/monitoring/secrets/alert-relay-token:/run/production-alert-relay-token:ro
+      - /etc/myknow/secrets/ssartnership-original-preview/monitoring/secrets/alert-relay-token:/run/preview-alert-relay-token:ro
+      - alertmanager-data:/alertmanager
+  grafana:
+    image: grafana/grafana:13.2.1@sha256:f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+    cpus: 0.5
+    pids_limit: 128
+    logging: *logs
+    networks: [edge, monitoring]
+    ports: ["127.0.0.1:53110:3000"]
+    tmpfs: [/tmp:mode=1777]
+    environment:
+      GF_SERVER_ROOT_URL: https://ssartnership-infra.myknow.xyz/infra/grafana/
+      GF_AUTH_BASIC_ENABLED: "true"
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_ADMIN_USER: operator
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/grafana-password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      # Grafana 13.2 moves core data sources into separately bundled plugins.
+      # Load the digest-pinned image bundle without modifying the read-only root.
+      GF_PATHS_BUNDLED_PLUGINS: /usr/share/grafana/data/plugins-bundled
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      GF_PLUGINS_PREINSTALL_AUTO_UPDATE: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_LOG_MODE: console
+      GF_LOG_LEVEL: warn
+    volumes:
+      - /etc/myknow/secrets/ssartnership-production/monitoring/secrets/grafana-password:/run/grafana-password:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+  notifier:
+    image: node:24.18.1-bookworm-slim@sha256:235600a8101ab264e117b1768e925532262668dc9b581ef1dd7d96ced463b8e7
+    user: "1001:1001"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 96m
+    cpus: 0.25
+    pids_limit: 64
+    logging: *logs
+    networks: [edge, monitoring]
+    env_file: ["${PVE_NOTIFIER_ENV:?private notifier configuration required}"]
+    environment:
+      OPS_ALERT_STATE_FILE: /state/events.json
+    working_dir: /service
+    command: [node, notifier.mjs]
+    volumes:
+      - ${PVE_NOTIFIER_SOURCE:?versioned notifier source required}/notifier.mjs:/service/notifier.mjs:ro
+      - ${PVE_NOTIFIER_SOURCE}/alert-delivery.mjs:/service/alert-delivery.mjs:ro
+      - ${PVE_NOTIFIER_SOURCE}/pwa-push.mjs:/service/pwa-push.mjs:ro
+      - ${PVE_PUSH_NODE_MODULES:?verified existing push dependency subset required}:/service/node_modules:ro
+      - ${PVE_PUSH_SUBSCRIPTIONS:?private operator subscriptions required}:/run/operator-push-subscriptions:ro
+      - ${PVE_NOTIFIER_STATE:?private notifier state required}:/state
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:9465/health').then(r=>{if(r.status!==204)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  observer:
+    image: node:24.18.1-bookworm-slim@sha256:235600a8101ab264e117b1768e925532262668dc9b581ef1dd7d96ced463b8e7
+    user: "1001:1001"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 64m
+    cpus: 0.25
+    pids_limit: 64
+    logging: *logs
+    networks: [edge, monitoring]
+    env_file: ["${PVE_HEARTBEAT_ENV:?private heartbeat configuration required}"]
+    command: [node, /service/observer.mjs]
+    volumes:
+      - ${PVE_NOTIFIER_SOURCE}/observer.mjs:/service/observer.mjs:ro
+  node-exporter:
+    image: prom/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 64m
+    cpus: 0.25
+    pids_limit: 128
+    logging: *logs
+    networks: [monitoring]
+    command: [--path.rootfs=/host, --path.procfs=/host/proc, --path.sysfs=/host/sys, --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker|run/docker)($|/)]
+    volumes:
+      - /:/host:ro,rslave
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+volumes:
+  caddy-config:
+  prometheus-data:
+  alertmanager-data:
+  grafana-data:
+networks:
+  edge:
+  monitoring:
+    internal: true

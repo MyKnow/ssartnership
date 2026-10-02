@@ -1,0 +1,39 @@
+{
+	admin off
+	auto_https off
+	persist_config off
+	servers {
+		# Preserve HTTPS and client headers from the single public ingress.
+		trusted_proxies static {$OPS_VM_IP}/32
+		trusted_proxies_strict
+		timeouts {
+			read_body 70s
+			write 70s
+			idle 5m
+		}
+	}
+}
+
+http://:{$APP_PORT} {
+	reverse_proxy {$APP_CONTAINER}:3000
+}
+
+http://:8000 {
+	reverse_proxy {$GATEWAY_CONTAINER}:8000
+}
+
+http://:9464 {
+	reverse_proxy {$TELEMETRY_CONTAINER}:9464
+}
+
+http://:9187 {
+	reverse_proxy {$POSTGRES_EXPORTER_CONTAINER}:9187
+}
+
+http://:9100 {
+	reverse_proxy {$NODE_EXPORTER_CONTAINER}:9100
+}
+
+http://:19000 {
+	respond /health 204
+}

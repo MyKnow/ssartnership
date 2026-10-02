@@ -1,0 +1,67 @@
+groups:
+  - name: pve-service
+    rules:
+      - alert: ExporterDown
+        expr: up{environment!="preview"} == 0
+        for: 2m
+        labels: { severity: critical }
+      - alert: ExporterDown
+        expr: up{environment="preview"} == 0
+        for: 2m
+        labels: { severity: warning }
+      - alert: AppHealthFailed
+        expr: (ssartnership_app_probe_success{vm!="",environment!="preview"} == 0) or (time() - ssartnership_app_probe_completed_seconds{vm!="",environment!="preview"} > 90)
+        for: 2m
+        labels: { severity: critical }
+      - alert: AppHealthFailed
+        expr: (ssartnership_app_probe_success{vm!="",environment="preview"} == 0) or (time() - ssartnership_app_probe_completed_seconds{vm!="",environment="preview"} > 90)
+        for: 2m
+        labels: { severity: warning }
+      - alert: DatabaseUnavailable
+        expr: pg_up{environment!="preview"} == 0
+        for: 1m
+        labels: { severity: critical }
+      - alert: DatabaseUnavailable
+        expr: pg_up{environment="preview"} == 0
+        for: 1m
+        labels: { severity: warning }
+      - alert: HostDiskLow
+        expr: node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes < 0.15
+        for: 5m
+        labels: { severity: critical }
+      - alert: HostMemoryLow
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.1
+        for: 5m
+        labels: { severity: warning }
+      - alert: HostCpuBusy
+        expr: 1 - avg by (environment, vm) (rate(node_cpu_seconds_total{mode="idle"}[5m])) > 0.9
+        for: 10m
+        labels: { severity: warning }
+      - alert: AlertDeliveryUnavailable
+        expr: (ssartnership_notifier_configured == 0) or (increase(ssartnership_notifier_deliveries_total{result="failure"}[10m]) > 0)
+        for: 2m
+        labels: { severity: critical }
+      - alert: PveHostCollectorStale
+        expr: (time() - myknow_pve_collected_seconds > 300) or absent(myknow_pve_collected_seconds)
+        for: 2m
+        labels: { severity: warning, environment: operations, vm: host }
+      - alert: PveDiskUnhealthy
+        expr: (myknow_pve_system_disk_healthy == 0) or (myknow_pve_backup_disk_healthy == 0)
+        for: 2m
+        labels: { severity: critical, environment: operations, vm: host }
+      - alert: PveThinPoolLow
+        expr: (myknow_pve_thin_data_used_ratio > 0.85) or (myknow_pve_thin_metadata_used_ratio > 0.85)
+        for: 5m
+        labels: { severity: critical, environment: operations, vm: host }
+      - alert: IngressEndpointDown
+        expr: ssartnership_ingress_probe_success{environment="production"} == 0
+        for: 2m
+        labels: { severity: critical }
+      - alert: IngressEndpointDown
+        expr: ssartnership_ingress_probe_success{environment="preview"} == 0
+        for: 2m
+        labels: { severity: warning }
+      - alert: CertificateExpiring
+        expr: ssartnership_ingress_probe_expires - time() < 1209600 and ssartnership_ingress_probe_expires > 0
+        for: 10m
+        labels: { severity: warning }
