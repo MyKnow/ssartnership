@@ -14,7 +14,23 @@ issue: https://github.com/MyKnow/ssartnership/issues/435
 
 2026-10-02 공개 전환 후 Production의 앱·DB·Storage·수신기·Cron·온라인 백업은 VM 5200, 원본 Preview는 VM 5201, 공용 Caddy·Prometheus·Grafana·Alertmanager와 edge 복구 timer는 VM 5202에서 실행한다. 주소·자원·전환 및 복구 증거와 남은 검증은 [PVE 이전 작업 목록](../../specs/pve-service-migration/tasks.md)을 기준으로 한다. 노트북의 원본 쓰기 작업을 다시 켜지 않는다.
 
-현재 공개 구성은 `deploy/pve/compose.operations.yaml`과 `edge.Caddyfile`, 앱의 private 연결은 `compose.relay.yaml`이다. 아래의 같은 호스트 edge overlay 예시는 기존 배치에 대한 구성 절차다. 현재 운영 VM의 복합 설정을 그 템플릿으로 덮어쓰지 않는다. 관리 SSH는 pinned PVE 경유 경로를 사용하며, 해당 역할의 VM 안에서만 운영 unit을 실행한다. MALMOA·ClayFarm은 노트북의 제한된 relay를 계속 사용하므로 노트북 초기화는 별도 이전이 필요하다.
+현재 공개 구성은 `deploy/pve/compose.operations.yaml`과 `edge.Caddyfile`, 앱의 private 연결은 `compose.relay.yaml`이다. 아래의 같은 호스트 edge overlay 예시는 기존 배치에 대한 구성 절차다. 현재 운영 VM의 복합 설정을 그 템플릿으로 덮어쓰지 않는다. 관리 SSH는 pinned PVE 경유 경로를 사용하며, 해당 역할의 VM 안에서만 운영 unit을 실행한다. MALMOA는 아래 직접 연결 절차를 따른다. ClayFarm과 전용 노트북 relay는 아래 종료 절차로 제거했으며, 현재 공개 서비스는 노트북을 경유하지 않는다.
+
+### MALMOA의 PVE 직접 연결
+
+[Issue #526](https://github.com/MyKnow/ssartnership/issues/526)의 경로는 공용 ingress VM 5202(`192.168.1.2`) → team VM 5100(`192.168.1.78:8080`) 또는 Preview VM 5101(`192.168.1.136:8080`)이다. 노트북은 MALMOA 공개 요청을 전달하지 않는다. 각 MALMOA guest의 `/opt/malmoa/ingress-firewall.sh`와 `malmoa-ingress.service`는 8080 유입에 ingress 주소와 기존 PVE 관리 주소 `192.168.1.132`만 허용한다. 다른 IPv4·IPv6 유입 차단과 Docker 시작 선행 조건을 유지한다. Preview nginx도 `set_real_ip_from`을 ingress 주소로 맞춰 클라이언트 IP 귀속과 위조 전달 헤더 거부를 유지한다.
+
+전환은 기존 nftables 전용 테이블에 ingress 허용을 먼저 추가하고 직접 `/healthz`를 확인한 뒤 Caddy 후보를 validate하고 graceful reload하는 순서다. 두 공개 홈·`/healthz`, Preview `/api/health`, 싸트너십 경로를 확인한 뒤 노트북 허용과 MALMOA legacy handler를 제거한다. 최종 규칙을 시작 스크립트에도 반영하고 비허용 출발지의 TCP 차단을 확인한다. `malmoa-ingress.service`를 재시작하면 Docker 의존성 때문에 컨테이너가 중단될 수 있으므로, 실행 중에는 전용 규칙 스크립트의 원자적 nft 트랜잭션만 적용한다.
+
+이후 구성 변경이 실패하면 직전에 검증한 guest ingress 규칙·Preview nginx 설정과 Caddy의 MALMOA 블록만 복구하고 validate·reload한다. 제거한 노트북 relay 주소로 upstream을 되돌리지 않는다. 다른 프로젝트의 변경이 들어온 오래된 전체 파일로 덮어쓰지 않는다. 단일 파일 bind는 원자적 rename만으로 컨테이너가 새 inode를 읽지 못할 수 있으므로 실제 mount와 내부 hash를 확인한다.
+
+### ClayFarm 운영 종료와 노트북 relay 제거
+
+2026-10-02 사용자 요청으로 `clayfarm-api-1`과 `ssartnership-legacy-relay-relay-1` 컨테이너를 제거하고, `ssartnership-legacy-relay-firewall.service`와 해당 unit이 소유한 9080 허용 규칙을 제거했다. 노트북의 8765·9080 listener와 두 서비스의 Docker 자동 재시작 설정은 남아 있지 않다. 저장소의 legacy relay 배포 템플릿도 제거했으며, `clayfarm.myknow.xyz`는 VM 5202에서 `Cache-Control: no-store`와 HTTP 410으로 운영 종료를 응답한다.
+
+`clayfarm_state` 볼륨, 기존 이미지·release·비밀 설정·백업과 원본 환경의 공유 network는 보존한다. 종료 전 Caddy·relay 구성과 복구 참조는 각 호스트의 root 전용 `clayfarm-retirement-526` 디렉터리에 보존한다. 데이터 정리나 서비스 재개는 별도 승인 범위다. `down -v`, volume/image/network prune, 전체 방화벽 flush를 사용하지 않는다.
+
+노트북의 옛 `ssartnership-home-preview` 시험 환경은 2026-10-02 사용자 요청으로 컨테이너 11개와 예약 작업을 중지하고 자동 재시작을 비활성화했다. DB·Storage·감시 볼륨과 원본 환경 데이터는 보존했다. 이를 현재 VM 5201의 공개 Preview와 혼동하거나 복구 명령으로 다시 켜지 않는다.
 
 ## Docker Desktop 로컬 smoke
 
