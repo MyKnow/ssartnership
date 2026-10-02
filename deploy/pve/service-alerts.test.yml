@@ -1,0 +1,47 @@
+rule_files: [service-alerts.yml]
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'up{job="telemetry",environment="production",vm="5200"}'
+        values: '0 0 0 1 1 1'
+      - series: 'up{job="telemetry",environment="preview",vm="5201"}'
+        values: '0 0 0 1 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: ExporterDown
+        exp_alerts:
+          - exp_labels: { job: telemetry, environment: production, vm: "5200", severity: critical }
+          - exp_labels: { job: telemetry, environment: preview, vm: "5201", severity: warning }
+      - eval_time: 4m
+        alertname: ExporterDown
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: 'ssartnership_app_probe_success{environment="production",vm="5200"}'
+        values: '0 0 0 1 1 1'
+      - series: 'pg_up{environment="preview",vm="5201"}'
+        values: '0 0 0 1 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: AppHealthFailed
+        exp_alerts:
+          - exp_labels: { environment: production, vm: "5200", severity: critical }
+      - eval_time: 2m
+        alertname: DatabaseUnavailable
+        exp_alerts:
+          - exp_labels: { environment: preview, vm: "5201", severity: warning }
+  - interval: 1m
+    input_series:
+      - series: 'myknow_pve_collected_seconds{environment="operations",vm="host"}'
+        values: '0+60x10'
+      - series: 'myknow_pve_system_disk_healthy{environment="operations",vm="host"}'
+        values: '0+0x10'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: PveHostCollectorStale
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: PveDiskUnhealthy
+        exp_alerts:
+          - exp_labels: { environment: operations, vm: host, severity: critical }

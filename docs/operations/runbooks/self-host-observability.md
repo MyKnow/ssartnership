@@ -9,6 +9,12 @@ authority: normative
 
 범위와 전환 게이트는 [데이터 계획](../../specs/self-host-database/plan.md), 기존 백업/PITR은 [운영 복구](./self-host-operations.md)를 따른다. 아래 도구는 운영자의 SSH 권한에서만 실행하며 공개 관리 API가 아니다. 실제 실행 여부는 [작업 목록](../../specs/self-host-database/tasks.md)에 별도로 기록한다.
 
+2026-10-02 PVE 이전 뒤 현재 Production 백업 생성·수집은 VM 5200, 두 환경 공용 감시는 VM 5202가 소유한다. 두 infra origin은 익명 요청에 Basic 인증 401을 반환하며 Preview 관리 로그인 후 공용 dashboard로 이동한다. 구성은 `deploy/pve/`를 사용하며 아래의 같은 호스트 monitoring overlay와 별도 Preview dashboard 설명으로 현재 설정을 덮어쓰지 않는다. 최종 백업·Mac/PVE custody·격리 복원·신규 감시 이력 및 미검증 경계는 [PVE 이전 작업 목록](../../specs/pve-service-migration/tasks.md)에 기록한다.
+
+공용 [SSARTNERSHIP Operations 대시보드](https://ssartnership-infra.myknow.xyz/infra/grafana/d/ssartnership-operations/ssartnership-operations)는 `SSARTNERSHIP` 폴더에 등록된다. Grafana 관리자 사용자의 홈 대시보드는 UID `ssartnership-operations`로 지정했다. 홈 지정이 없으면 기본 홈에 운영 대시보드가 보이지 않을 수 있으므로, 위 직접 주소나 Dashboards의 해당 폴더에서 연다. [Preferences API](https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/api-legacy/preferences/)의 `PATCH /api/user/preferences`로 `homeDashboardUID`만 변경하며 다른 사용자 설정은 보존한다. 2026-10-02 후속 개편에서 46개 패널로 확장했고, 사용자 요청에 따라 로그인된 외부 Chrome에서 화면과 환경 필터를 검증했다. 내장 브라우저의 Basic 인증 차단은 서버 인증을 완화하지 않고 외부 브라우저로 해결했다.
+
+Grafana 자체 계정은 사용자가 변경했으며 2026-10-02 10:05 KST에 새 계정의 API 조회를 검증했다. 자동 검증은 Mac 키체인의 generic password 서비스 `ssartnership-grafana`에서 계정명과 암호를 실행 시점에 읽고, pinned SSH를 통해 VM 5202의 loopback API를 사용한다. 평문 자격 증명 파일을 만들거나 값을 로그에 출력하지 않는다. 키체인 항목 접근이 실패하면 기존 Grafana 계정으로 대체하지 않고 실패로 보고한다. 앞단 Caddy Basic 인증은 별도 계정이며 기존 서버의 `infra-auth/users`와 보호된 암호 파일을 유지한다. Grafana 계정 변경은 이 앞단 인증이나 초기 설치용 `GF_SECURITY_ADMIN_USER`·암호 파일을 자동 갱신하지 않는다. 새 Grafana 자격 증명만으로 공개 origin의 앞단 인증을 통과할 수 있다고 가정하지 않는다.
+
 ## 외부 백업
 
 `scripts/self-host-operations/offhost.mjs`는 로컬 pgBackRest 저장소·Storage Restic 저장소·선택한 paired manifest를 별도의 암호화 Restic 저장소로 전송한다. 전송된 시점의 **paired 복구 지점까지** 복원할 수 있다. 외부의 실시간 WAL 복제가 아니며 전송 주기보다 짧은 재해 RPO를 주장하지 않는다. `capture`는 기존 operations 잠금을 공유하여 backup/expire/prune와 겹치지 않는다. 이미 보관된 WAL은 불변 파일이고 이후 추가되는 WAL은 선택한 복구 지점의 필수 조건이 아니다.
@@ -60,6 +66,8 @@ Mac의 `dev.myknow.ssartnership-production-backup` LaunchAgent는 로그인 시�
 
 전용 SSH 계정은 고정 Mac 주소·고정 호스트 키·전용 키로만 연결하며 `list`, `get <UUID>`, `ack <UUID> <SHA256>`만 허용한다. sudo, Docker 권한, 셸, 포트 전달은 제공하지 않는다. 서버의 공개 recipient로 암호화하고 private 복구 키는 Mac Keychain 기반 envelope로 보관한다. 호스트 키 변경 오류는 관리자 확인 후 핀을 교체하며 검증을 끄지 않는다.
 
+PVE 이전 뒤 Mac의 전용 백업 키는 Mac에 남기며 pinned PVE SSH의 `ProxyCommand`를 통해 Production `192.168.1.182`에 접속한다. PVE 자체 전용 백업 키도 호스트에서만 사용한다. 새 서버에서 보이는 전송 source는 PVE LAN 주소로 제한한다. 임시 bootstrap 관리자 키로 정기 백업 전용 키를 대체하지 않는다. 기존 host pin·암호문 이력을 보존하며 새 서버 pin을 확인해 추가한다.
+
 서버의 metrics timer는 매분 마지막 스냅샷과 Mac에 실제 복사된 스냅샷 시각을 갱신한다. Production 전용 경보는 수집 중단 5분, 서버/PVE 사본 8시간 노후, PVE 전송 확인 40분 중단, Mac 사본 26시간 노후 또는 지표 누락을 감지한다. 오래된 파일을 다시 확인해도 사본의 생성 시각은 갱신하지 않는다. 외부 알림 수신처 설정과 전달 성공은 별도로 검증한다.
 
 복구 시험은 Mac 암호문과 Keychain 키로 복원한 새 서버 비공개 경로와 검증한 receipt의 `databaseSystemId`를 `restore-production-backup.mjs <경로> <databaseSystemId>`에 제공한다. 식별자는 초기 후보 상수가 아니라 해당 백업의 receipt·암호화 manifest·실제 격리 복원 DB에서 모두 일치해야 한다. network-none DB에서 테이블별 전체 행 hash와 Storage 전체 파일 hash·메타데이터를 비교하고 원본 mount가 없음을 확인한다. 새 백업의 암호화 manifest는 캡처 당시 실행 중인 앱의 Git SHA와 이미지 식별자도 보존하므로 데이터 시점에 맞는 앱을 복구할 때 사용한다. 실제 설치·예약 실행·Mac 수신·복구 시험의 결과는 각각 Issue #453 receipt로 구분하며, 최종 데이터 전환 후 새 스냅샷으로 다시 확인한다.
@@ -86,13 +94,13 @@ relay는 인증된 Alertmanager 요청에서 알려진 경보명·심각도·발
 
 ### PVE SSD의 상시 암호화 사본
 
-2026-09-29 운영자 승인으로 별도 PVE 호스트의 Samsung 850 EVO 120GB SSD를 암호화 사본 저장소로 사용한다. 시스템 NVMe는 건드리지 않는다. `/mnt/ssartnership-backups`의 ext4 UUID를 root 전용 `config.json`의 `filesystemUuid`와 대조하고, mount가 없거나 다른 디스크이면 복사를 거절한다. 파일 시스템은 `nodev,nosuid,noexec`, 부모 0700, 비밀 0600을 유지한다.
+2026-09-29 운영자 승인으로 PVE 호스트의 Samsung 850 EVO 120GB SSD를 암호화 사본 저장소로 사용한다. 당시에는 Production 노트북과 호스트가 분리되어 있었지만 2026-10-02 이후 Production VM과 이 SSD는 같은 PVE 호스트다. 장치가 달라도 호스트 고장·전원·회선에 대한 독립 장애 영역은 아니며 Mac 사본을 계속 유지한다. 시스템 NVMe는 건드리지 않는다. `/mnt/ssartnership-backups`의 ext4 UUID를 root 전용 `config.json`의 `filesystemUuid`와 대조하고, mount가 없거나 다른 디스크이면 복사를 거절한다. 파일 시스템은 `nodev,nosuid,noexec`, 부모 0700, 비밀 0600을 유지한다.
 
 `scripts/self-host-operations/pve-backup-pull.py`와 `deploy/self-host-operations/pve-backup/`의 unit을 설치한다. 별도 source-IP 제한 SSH key와 pinned host key를 `/etc/myknow/secrets/ssartnership-backup/`에 준비한다. 임시 bootstrap 관리자 키는 재사용하지 않는다. 전용 source 계정은 고정 `list/get/ack/ack-pve` 명령만 제공하고 셸·sudo·포트 전달은 제공하지 않는다. `ack-pve`는 별도 `latest-pve.json`에만 기록하여 Mac 확인 상태를 갱신하지 않는다. 새 전송 handler와 계약 모듈을 버전 디렉터리에 설치하고 sshd 구문 확인 후 forced-command 경로만 교체한다. 기존 파일과 설정은 복귀용으로 보존한다.
 
 PVE timer는 부팅 후 및 15분마다 복사를 확인한다. receipt 형식·크기·SHA-256, root 소유권과 symlink 차단을 검증한 뒤에만 암호문을 최종 파일로 승격하고 PVE 전용 ACK를 보낸다. 기존 파일도 다시 검증한다. 최신 사본이 8시간 이상 오래되면 실패이며, 오래된 사본을 재확인해도 복구 지점의 생성 시각은 바뀌지 않는다. 운영 서버 collector와 Prometheus는 PVE의 사본 생성 시각과 최근 ACK를 별도로 관측한다. 경보 규칙과 telemetry 이미지의 허용 경보명을 함께 반영하고 `promtool test rules`를 통과시킨다.
 
-SSD에서는 기존 성공 사본을 자동 삭제하지 않는다. 여유 공간 4GiB를 보존할 수 없으면 실패하고, PVE ACK 노후 경보로 드러난다. 향후 보존 삭제는 확인된 성공 사본과 복구 정책을 기준으로 별도 수행한다. PVE에는 암호문만 저장하며 복구 키는 Mac Keychain envelope에 남긴다. 같은 집의 별도 장치이므로 지리적 재해 사본이나 연속 PITR로 표현하지 않는다.
+SSD에서는 기존 성공 사본을 자동 삭제하지 않는다. 여유 공간 4GiB를 보존할 수 없으면 실패하고, PVE ACK 노후 경보로 드러난다. 향후 보존 삭제는 확인된 성공 사본과 복구 정책을 기준으로 별도 수행한다. PVE에는 암호문만 저장하며 복구 키는 Mac Keychain envelope에 남긴다. 같은 호스트의 다른 디스크이므로 독립 호스트·지리적 재해 사본이나 연속 PITR로 표현하지 않는다.
 
 실복구는 SSD에서 받은 암호문을 검증하고 Mac Keychain에서 복구한 키를 메모리에서만 사용하여, 운영 서버의 새 root 전용 격리 경로로 전송한다. 운영 DB mount 없이 network-none 복원으로 전체 행·Storage hash와 메타데이터를 비교한다. 2026-09-29 검증에서는 148개 테이블 175,548행, 906개 파일 42,648,961 bytes가 일치했다. 복원 도구의 `encrypted-mac-roundtrip` 표기는 전송 경로이며, 이번 복원 입력의 보관 출처는 PVE SSD다. 평문은 Mac/PVE 디스크에 남기지 않았다.
 
@@ -162,3 +170,60 @@ Postgres exporter는 각 환경의 전체 DB 컨테이너 이름에 연결한다
 Preview 외부 알림은 해당 환경의 root 전용 monitoring env에 기존 운영자 이메일 발송 설정만 연결한다. 앱 비밀·회원 데이터는 복사하지 않고 relay token/DB credential은 환경별로 유지한다. telemetry 이미지와 env 변경은 앱 교체만 수행하는 자동 receiver와 별도로 적용한다. 각 환경의 5개 target과 `pg_up=1`, 실제 실패/복구 전달을 확인하며 경보가 없어졌다는 사실만으로 백업/PITR 완료를 주장하지 않는다.
 
 2026-09-30 운영 점검에서 원본 Preview의 기존 `ssartnership_monitor`는 이미 `pg_monitor`와 CONNECT만 보유하고 회원 조회 권한은 없었다. 실제 전용 네트워크 `172.30.85.0/24`의 해당 역할에 SCRAM 접속 규칙을 추가하고 파일 구문 확인·reload 후 Prometheus의 `pg_up=1`을 확인했다. 이전 HBA와 monitoring env는 root 전용 복구 디렉터리에 보존했다. 이메일 설정은 준비했으며 telemetry 재배포 후 실제 전달 검증과 구분한다.
+
+
+## PVE 공용 감시와 운영자 알림
+
+PVE 이전 이후의 활성 구성은 `deploy/pve/compose.operations.yaml`이다. 이전 노트북 overlay와 구분하며 실제 적용된 VM 경계는 [PVE 이전 명세](../../specs/pve-service-migration/spec.md)를 따른다. 공용 VM 5202에서 Prometheus → Alertmanager → `notifier.mjs`가 실행된다. Production·Preview telemetry는 앱 probe와 Web Vitals만 수집하며 활성 monitoring env 및 container에서 `OPS_ALERT_*` 발송 설정을 제거한다. 다음 receiver 실행이 이 설정을 복구하지 않도록 환경별 private monitoring env도 같이 정리한다. VAPID는 기존 앱의 기능에 계속 필요하지만 notifier는 앱·DB를 호출하지 않고 별도 private 사본으로 발송한다.
+
+### 대시보드 계약
+
+대상은 인프라 관리 계정의 운영자이며, 한 가지 행동은 장애의 환경·VM·원인을 확인하고 대응하는 것이다. Grafana의 기존 UI·provisioning·UID를 유지한다. Next.js/TDS 컴포넌트와 Storybook을 이 도구에 이식하지 않는 예외이며 앱 UI나 공개 공유 범위는 변경하지 않는다. 첫 행의 내부 상태와 경보 수 → 활성 경보 표 → 서비스/DB → VM/물리 호스트 → 백업 → 체감 성능 → 감시 자체 상태 순으로 읽는다. Grafana 고유 색상 역할은 정상 green, 장애 red, 미연동 gray이며 수치는 단위와 범례로 함께 표현한다. 많은 패널이 있으므로 자주 보지 않는 행은 사용자 화면에서 접어 사용한다.
+
+지표 소유자는 각 collector와 Prometheus다. VM/환경별 30초 scrape, 물리 호스트·backup outcome 1분 수집, 기존 snapshot collector 5분을 구분하며 시간대는 Asia/Seoul이다. 운영자가 보는 host/backup/notifier 전체 지표와 환경 필터를 따르는 서비스·VM·Vitals 지표를 구분한다. CPU는 비율, 메모리·디스크는 bytes와 비율, 응답 시간은 seconds, LCP/INP는 milliseconds, CLS는 무단위다. 물리 CPU는 `/proc/stat`의 1초 간격 차분이며 user/nice에 이미 포함된 guest를 중복 합산하지 않는다. 물리 가용 메모리는 `/proc/meminfo`의 `MemAvailable`을 사용하며 `MemFree`와 구분한다. 데이터 없음·미연동·표본 부족을 정상이나 0으로 대체하지 않는다. 활성 경보가 없는 경우에만 count를 0으로 표시한다. 빈 경보 표는 상단의 감시 상태와 경보 수를 함께 확인하며 패널 설명에 해석을 명시한다. 최소 5개 표본이 있는 최근 15분 Vitals p75를 표시하며 route별 p75를 다시 평균하지 않는다. `node deploy/pve/grafana/build-dashboard.mjs`로 동일 UID의 46개 패널·8개 행을 생성한다.
+
+Grafana 13.2의 Prometheus는 별도 bundled plugin이다. 고정 digest 이미지의 `/usr/share/grafana/data/plugins-bundled`를 `GF_PATHS_BUNDLED_PLUGINS`로 지정하고 `GF_PLUGINS_PREINSTALL_DISABLED=true`, `GF_PLUGINS_PREINSTALL_AUTO_UPDATE=false`로 시작 시 다운로드·갱신을 막는다. 분석용 update check를 끄는 설정만으로는 plugin 자동 설치가 꺼지지 않는다. root filesystem의 `read_only`와 plugin 서명 검증은 유지한다. `Datasource prometheus was not found`가 나타나면 datasource UID 존재만 확인하지 말고 plugin 경로·시작 로그·datasource health·실제 `/api/ds/query` 응답을 확인한다. 설정 의미는 [Grafana 공식 설정 문서](https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/)와 [13.2.1 plugin 설정 소스](https://github.com/grafana/grafana/blob/v13.2.1/pkg/setting/setting_plugins.go)를 따른다.
+
+Ingress probe는 실제 hostname의 TLS를 검증하면서 LAN 주소에 연결한다. 인증서 만료일을 읽기 위해 probe마다 새 HTTPS agent를 사용한다. 재사용 TLS session의 `getPeerCertificate()`가 빈 객체를 반환할 수 있으므로 만료 timestamp 0을 과거 날짜로 표시하지 않는다. 인증서 정보가 없으면 해당 패널은 데이터 없음으로 표시하며 probe 결과와 구분한다.
+
+`최근 백업 작업 결과/종료 시각`은 현재 부팅 이후 systemd가 기록한 실제 종료가 있을 때만 값이 있다. 이미 확보한 snapshot/복사본의 존재와 이 값은 별개다. 복원 검증 시각은 실제 전체 행·파일 hash·Storage metadata 대조 성공의 증거를 확인한 뒤 root 전용 `restore-proof.json`에 기록하며 단순 백업 성공으로 갱신하지 않는다. PVE SATA 사본은 같은 물리 호스트의 장애 영역이다. snapshot은 연속 PITR이 아니다.
+
+### 경보와 수신처
+
+| 상황 | 지속/기준 | 전달 |
+| --- | --- | --- |
+| Production 앱·HTTPS 경로 실패, exporter 중단 | 2분 | 운영자 메일 + PWA |
+| Production DB 접속 실패 | 1분 | 운영자 메일 + PWA |
+| Preview 앱·HTTPS 경로·exporter/DB 실패 | 2분 / DB 1분 | warning 메일만, 1분 묶음 대기·12시간 반복 |
+| 디스크 여유 / 메모리 여유 / CPU | 15% 미만 5분 / 10% 미만 5분 / 90% 초과 10분 | 디스크 critical, 나머지 warning; Preview PWA 제외 |
+| PVE SMART 불량 / thin pool 데이터·메타데이터 | 2분 / 85% 초과 5분 | critical 메일 + PWA |
+| PVE 수집 지연 | 5분 이상 + 2분 지속 | warning 메일 |
+| 백업 지표 갱신 / 유효 snapshot / PVE copy / Mac copy | 10분 / 8시간 / 8시간 / 26시간 초과 | critical 메일 + PWA |
+| PVE 복사 확인 / 복원 검증 | 40분 / 30일 초과 | critical / warning |
+| 실제 백업 작업 실패 | 다음 평가 즉시 | warning 메일, 정상 작업 종료 시 복구 |
+| 알림 설정 누락·발송 실패 | 2분 | critical; 이 경보가 firing이면 외부 heartbeat도 중지 |
+| TLS 인증서 | 14일 미만, 10분 지속 | warning 메일 |
+
+기본 group wait는 15초, group interval 1분, 반복 4시간이며 발생·복구를 모두 보낸다. 동일 환경·VM의 exporter 장애가 해당 앱/DB 원인 경보를 억제한다. 메시지는 고정된 경보명·환경·VM·조건·KST 시각·Grafana 링크만 포함한다. 임의 annotations/회원·경로·오류 본문을 전달하지 않는다. 발송 성공은 제공자 접수이며 실제 단말/수신함 도착과 별도로 확인한다.
+
+내부 메일 수신자는 기존 운영자 Naver 주소다. PWA는 해당 운영자 이메일과 일치하는 `members`에 연결된 활성 admin/member 구독만 export한다. 전체 회원 구독을 복사하거나 방송하지 않는다. 세 구독을 초기 설치 시 복사했으며 endpoint가 달라진 경우 동일한 소유 검증을 거쳐 별도 갱신한다. 만료·실패는 발송 실패 metric으로 드러나고 재시도하므로 PWA 재구독 후 private 구독 파일을 갱신해야 한다.
+
+발송기는 UID 1001, 96MiB이고 observer는 64MiB다. 포트를 호스트에 publish하지 않는다. `PVE_NOTIFIER_ENV`, `PVE_PUSH_SUBSCRIPTIONS`는 별도 승인된 서버 비밀 경로에만 보관하며 저장소·로그·Mac 평문 파일에 넣지 않는다. 구독 파일은 UID 1001/0400, 부모는 root/0700, 상태 디렉터리는 UID 1001/0700이다. 발송의 안정된 본문·순번·채널별 성공·recipient hash를 상태 파일에 원자적으로 보존한다. 제공자 idempotency key와 4시간 알림 반복을 구분하고, 메일 성공 후 일부 push 실패 시 메일과 성공한 구독을 다시 보내지 않는다. 기존 lockfile과 일치하는 web-push 3.6.7 의존성 17개만 notifier에 mount하며 node-forge는 포함하지 않는다. 이는 앱 전체 dependency audit의 해결을 의미하지 않는다.
+
+### 외부 생존 감시와 호스트 수집
+
+Healthchecks.io에는 `SSARTNERSHIP PVE · 감시 엔진 생존`을 1분 period·2분 grace로 설정하고 계정의 Gmail 이메일 integration을 켠다. URL은 root 전용 `PVE_HEARTBEAT_ENV`에 저장하며 문서/로그/화면 증거에 노출하지 않는다. observer는 Prometheus 규칙 평가·Alertmanager·notifier 정상과 알림 전달 실패 경보가 없을 때만 내용 없는 HEAD 신호를 보낸다. 최근 성공 신호에서 약 3분 경과 시 외부 서비스가 알림을 담당한다. 운영자에 대한 통보는 Healthchecks가 자체 발송하므로 PVE·앱·DB가 정지해도 이 경로의 발송 서버는 살아 있다. 외부 서비스/메일 자체의 전달 보장은 별도다.
+
+observer의 Production·Preview TLS 검사는 실제 hostname/SNI/인증서 검증을 유지하고 LAN ingress로 직접 연결한다. 이 검사는 독립 회선에서 공개 DNS·WAN port forwarding을 검증하는 외부 HTTPS polling이 아니다. `ssartnership_external_monitor_configured=0` 및 대시보드의 미연동을 유지하며 외부 polling 서비스의 실측 결과를 확보하기 전 정상으로 표시하지 않는다.
+
+사용자가 승인한 PVE 호스트 수집은 `pve-host-metrics.service/timer`와 `/opt/myknow-monitoring/pve-host-metrics.py`다. systemd는 `ProtectSystem=strict`를 유지하며 `pvesh get`, SMART 검사, `lvs --nolocking --nohints` 보고만 실행한다. thin pool의 live kernel 통계를 숨기는 `--readonly` 옵션은 사용하지 않는다. 디스크·관리 계정·방화벽·호스트 DNS는 수정하지 않는다. `OPS_HOST_METRICS_URL`은 고정 HTTPS 주소이며 LAN IP에 연결하고 실제 hostname의 TLS를 검증한다. Caddy는 `/infra/host-metrics`의 요청을 PVE source IP `192.168.1.132`, POST, 4KB 및 전용 bearer token으로 제한하고 notifier의 숫자 allowlist·120초 timestamp 검증을 통과시킨다. 일반 관리 인증 경로는 유지한다.
+
+Production의 `backup-status.service/timer`는 systemd 작업 결과와 검증한 restore marker를 1분마다 기존 textfile 디렉터리에 기록한다. `backup-failure-monitoring.conf`를 기존 OnFailure unit의 drop-in으로 설치하여 즉시 지표를 갱신하고 환경별 직접 이메일 발송을 없앤다. snapshot backup timer의 주기는 바꾸지 않는다.
+
+### 안전한 적용·복귀·검증
+
+기존 운영 env의 `PVE_PUBLIC_SERVICES_READY=1`과 certificate/data volume을 보존한다. 새 코드·규칙을 versioned 디렉터리에 준비한 뒤 Compose config, Caddy validate, amtool, promtool unit rules를 통과시킨다. promtool은 read-only container와 임시 `/tmp`를 함께 사용한다. 바뀐 bind mount를 위해 Prometheus만 재생성하고 notifier/observer만 시작한다. Alertmanager는 HUP, Caddy 2.11.4는 USR1으로 file reload한다. 이미 bind mounted인 단일 설정 파일은 inode가 바뀌지 않도록 제자리에서 기록한다. Grafana dashboard directory provisioning은 변경된 JSON을 읽으며 사용자 계정은 변경하지 않는다.
+
+되돌릴 때 versioned rollback의 기존 Compose·Caddy·규칙·dashboard·private monitoring env를 복구하고 같은 검증/재적용 순서로 처리한다. host timer를 stop/disable하고 승인된 host 입력 경로를 제거하면 host 수집을 철회할 수 있다. Production backup outcome timer/drop-in을 철회할 때 기존 OnFailure 발송 경로와 자격 증명도 함께 복구하여 알림이 누락되지 않게 한다. backup snapshot/원본 데이터/사용자 관리 계정은 복귀 범위에서 삭제하지 않는다.
+
+검증은 12개 target과 모든 rule health, 숫자 지표의 신선도, 실제 source IP·token 거부, 두 앱 HTTPS, synthetic 발생/복구의 Alertmanager→발송기→제공자 접수, 재시도/중복 방지, Healthchecks 외부 실패·회복을 포함한다. Grafana API 쿼리 성공과 360/820/1440px 화면 증거는 구분한다. 브라우저가 Basic 인증 페이지를 차단하면 인증을 완화하지 않고 사용자 직접 로그인 후 화면 검증을 이어간다.

@@ -1,0 +1,160 @@
+{
+	admin off
+	servers {
+		timeouts {
+			read_body 70s
+			write 70s
+			idle 5m
+		}
+	}
+}
+
+(final_snapshot_gate) {
+	@preparing expression {$PVE_PUBLIC_SERVICES_READY:0} == 0
+	header @preparing Retry-After "120"
+	respond @preparing "서버 이전 준비 중입니다. 잠시 후 다시 시도해주세요." 503
+}
+
+ssartnership.myknow.xyz {
+	import final_snapshot_gate
+	encode zstd gzip
+	header X-SSARTNERSHIP-Ingress pve-5202
+	request_body {
+		max_size 64MB
+	}
+	reverse_proxy 192.168.1.182:3110
+}
+
+ssartnership-dev.myknow.xyz {
+	import final_snapshot_gate
+	encode zstd gzip
+	header X-SSARTNERSHIP-Ingress pve-5202
+	request_body {
+		max_size 64MB
+	}
+	reverse_proxy 192.168.1.69:3108
+}
+
+ssartnership-api.myknow.xyz {
+	import final_snapshot_gate
+	encode zstd gzip
+	header X-SSARTNERSHIP-Ingress pve-5202
+	request_body {
+		max_size 64MB
+	}
+	reverse_proxy 192.168.1.182:8000
+}
+
+ssartnership-api-dev.myknow.xyz {
+	import final_snapshot_gate
+	encode zstd gzip
+	header X-SSARTNERSHIP-Ingress pve-5202
+	request_body {
+		max_size 64MB
+	}
+	reverse_proxy 192.168.1.69:8000
+}
+
+# Both environments share one dashboard with the Production access boundary.
+ssartnership-infra-dev.myknow.xyz {
+	route {
+		basic_auth bcrypt infra {
+			import /run/production-infra-auth/users
+		}
+		header Cache-Control "no-store"
+		redir https://ssartnership-infra.myknow.xyz{uri} 308
+	}
+}
+
+ssartnership-infra.myknow.xyz {
+	encode zstd gzip
+	# Read-only PVE observations: only this LAN producer can submit numeric data.
+	handle /infra/host-metrics {
+		@wrong_host not remote_ip 192.168.1.132
+		respond @wrong_host 403
+		@wrong_method not method POST
+		respond @wrong_method 405
+		request_body {
+			max_size 4KB
+		}
+		rewrite * /host-metrics
+		reverse_proxy notifier:9465 {
+			header_up -Cookie
+			header_up -Origin
+		}
+	}
+	@infra path /infra /infra/*
+	handle @infra {
+		route {
+			basic_auth bcrypt infra {
+				import /run/production-infra-auth/users
+			}
+			header Cache-Control "no-store"
+			header Referrer-Policy "no-referrer"
+			header X-Frame-Options "DENY"
+			@cross_site {
+				header Sec-Fetch-Site cross-site
+				not header Sec-Fetch-Mode navigate
+			}
+			respond @cross_site 403
+			@foreign_origin {
+				header Origin *
+				not header Origin https://ssartnership-infra.myknow.xyz
+			}
+			respond @foreign_origin 403
+			@unsafe_readonly {
+				path /infra/prometheus/* /infra/alertmanager/*
+				not method GET HEAD
+			}
+			respond @unsafe_readonly 405
+			redir /infra/prometheus /infra/prometheus/ 308
+			redir /infra/alertmanager /infra/alertmanager/ 308
+			redir /infra/grafana /infra/grafana/ 308
+			handle_path /infra/prometheus/* {
+				reverse_proxy prometheus:9090 {
+					header_up -Authorization
+					header_up -Cookie
+					header_down -Access-Control-Allow-Origin
+				}
+			}
+			handle_path /infra/alertmanager/* {
+				reverse_proxy alertmanager:9093 {
+					header_up -Authorization
+					header_up -Cookie
+					header_down -Access-Control-Allow-Origin
+				}
+			}
+			handle_path /infra/grafana/* {
+				reverse_proxy grafana:3000 {
+					header_up -X-WEBAUTH-USER
+					header_up -X-WEBAUTH-ROLE
+				}
+			}
+			respond "Infrastructure: /infra/prometheus/ /infra/alertmanager/ /infra/grafana/" 200
+		}
+	}
+	handle {
+		redir /infra/prometheus/ 302
+	}
+}
+
+# Keep the laptop's existing ClayFarm route until its separate retirement.
+clayfarm.myknow.xyz {
+	request_body {
+		max_size 53477376
+	}
+	header Cache-Control "no-store"
+	reverse_proxy 192.168.1.191:9080
+}
+
+malmoa.myknow.xyz {
+	encode zstd gzip
+	header X-MALMOA-Environment team
+	# The MALMOA guests currently allow only the laptop ingress address.
+	reverse_proxy 192.168.1.191:9080
+}
+malmoa-preview.myknow.xyz {
+	encode zstd gzip
+	header X-MALMOA-Environment preview
+	reverse_proxy 192.168.1.191:9080
+}

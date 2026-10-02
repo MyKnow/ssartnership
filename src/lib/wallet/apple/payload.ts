@@ -1,4 +1,4 @@
-import type { PassProps } from "passkit-generator";
+import type { AppleWalletPassPayload } from "./pass-types";
 
 import type { AppleWalletConfig, AppleWalletPassInput } from "./types";
 
@@ -37,7 +37,7 @@ export function buildAppleWalletPassPayload(
     | "teamIdentifier"
     | "siteUrl"
   >,
-): PassProps {
+): AppleWalletPassPayload {
   const barcodeUrl = new URL(input.verificationUrl, config.siteUrl).toString();
 
   const updatedAtLabel = formatUpdatedAtKst(input.updatedAt);

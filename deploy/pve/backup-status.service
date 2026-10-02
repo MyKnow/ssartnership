@@ -1,0 +1,9 @@
+[Unit]
+Description=Backup outcome and verified restore metrics
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/ssartnership/pve-monitoring/monitoring-backup-status.py
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/etc/myknow/secrets/ssartnership-production/monitoring/textfile
+PrivateTmp=true

@@ -1,0 +1,48 @@
+# This private relay keeps the existing app receiver's loopback binding intact.
+# Install the relay firewall before starting it; only the operations VM may
+# reach these ports. Database containers have no published ports.
+services:
+  relay:
+    image: caddy:2.11.4@sha256:98eb57d882ccd5213d1688764db10c1ca2c58a1ca3a6717a3411ad798f7a423a
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    # The official Caddy binary carries this file capability even on high ports.
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 64m
+    cpus: 0.25
+    pids_limit: 64
+    logging:
+      driver: local
+      options: { max-size: 10m, max-file: "3" }
+    tmpfs: [/data:size=16m, /config:size=16m]
+    environment:
+      OPS_VM_IP: ${OPS_VM_IP:?operations address required}
+      APP_PORT: ${APP_PORT:?environment app port required}
+      APP_CONTAINER: ${APP_CONTAINER:?app container required}
+      GATEWAY_CONTAINER: ${GATEWAY_CONTAINER:?gateway container required}
+      TELEMETRY_CONTAINER: ${TELEMETRY_CONTAINER:?telemetry container required}
+      POSTGRES_EXPORTER_CONTAINER: ${POSTGRES_EXPORTER_CONTAINER:?postgres exporter required}
+      NODE_EXPORTER_CONTAINER: ${NODE_EXPORTER_CONTAINER:?node exporter required}
+    ports:
+      - "${PVE_RELAY_BIND_IP:?guest LAN address required}:${APP_PORT}:${APP_PORT}"
+      - "${PVE_RELAY_BIND_IP}:8000:8000"
+      - "${PVE_RELAY_BIND_IP}:9464:9464"
+      - "${PVE_RELAY_BIND_IP}:9187:9187"
+      - "${PVE_RELAY_BIND_IP}:9100:9100"
+    volumes:
+      - ./relay.Caddyfile:/etc/caddy/Caddyfile:ro
+    networks: [edge, monitoring]
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:19000/health]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+networks:
+  edge:
+    external: true
+    name: ${PVE_EDGE_NETWORK:?existing data edge network required}
+  monitoring:
+    external: true
+    name: ${PVE_MONITORING_NETWORK:?existing collector network required}

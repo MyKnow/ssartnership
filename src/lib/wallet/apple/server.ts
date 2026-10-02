@@ -1,7 +1,4 @@
-import { Buffer } from "node:buffer";
-
-import { PKPass } from "passkit-generator";
-
+import { createAppleWalletPassArchive } from "./archive";
 import { createAppleWalletIconBuffers } from "./assets";
 import { getAppleWalletConfigStatus } from "./config";
 import { buildAppleWalletPassPayload } from "./payload";
@@ -33,22 +30,7 @@ export async function createAppleWalletPass(input: AppleWalletPassInput) {
   try {
     const payload = buildAppleWalletPassPayload(input, status.config);
     const iconBuffers = await createAppleWalletIconBuffers();
-    const pass = new PKPass(
-      {
-        ...iconBuffers,
-        "pass.json": Buffer.from(JSON.stringify(payload, null, 2)),
-      },
-      {
-        wwdr: status.config.wwdr,
-        signerCert: status.config.signerCert,
-        signerKey: status.config.signerKey,
-        ...(status.config.signerKeyPassphrase
-          ? { signerKeyPassphrase: status.config.signerKeyPassphrase }
-          : {}),
-      },
-    );
-
-    return pass.getAsBuffer();
+    return await createAppleWalletPassArchive(payload, iconBuffers, status.config);
   } catch (error) {
     if (error instanceof AppleWalletPassError) {
       throw error;
