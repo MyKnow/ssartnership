@@ -1,0 +1,13 @@
+[Unit]
+Description=Read-only PVE host monitoring observations
+After=network-online.target
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/myknow-monitoring/host-metrics.env
+ExecStart=/usr/bin/python3 /opt/myknow-monitoring/pve-host-metrics.py
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+# Device visibility remains read-only by program contract for SMART.
+TimeoutStartSec=90

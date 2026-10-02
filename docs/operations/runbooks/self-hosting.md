@@ -10,6 +10,12 @@ issue: https://github.com/MyKnow/ssartnership/issues/435
 
 이 절차는 [자체 호스팅 명세](../../specs/self-hosting/spec.md)의 앱 실행 작업이다. 전체 데이터 이전과 서버 전환의 남은 조건은 [작업 목록](../../specs/self-hosting/tasks.md)을 확인한다. 모든 명령은 저장소 루트에서 실행한다.
 
+## 현재 PVE 운영 배치
+
+2026-10-02 공개 전환 후 Production의 앱·DB·Storage·수신기·Cron·온라인 백업은 VM 5200, 원본 Preview는 VM 5201, 공용 Caddy·Prometheus·Grafana·Alertmanager와 edge 복구 timer는 VM 5202에서 실행한다. 주소·자원·전환 및 복구 증거와 남은 검증은 [PVE 이전 작업 목록](../../specs/pve-service-migration/tasks.md)을 기준으로 한다. 노트북의 원본 쓰기 작업을 다시 켜지 않는다.
+
+현재 공개 구성은 `deploy/pve/compose.operations.yaml`과 `edge.Caddyfile`, 앱의 private 연결은 `compose.relay.yaml`이다. 아래의 같은 호스트 edge overlay 예시는 기존 배치에 대한 구성 절차다. 현재 운영 VM의 복합 설정을 그 템플릿으로 덮어쓰지 않는다. 관리 SSH는 pinned PVE 경유 경로를 사용하며, 해당 역할의 VM 안에서만 운영 unit을 실행한다. MALMOA·ClayFarm은 노트북의 제한된 relay를 계속 사용하므로 노트북 초기화는 별도 이전이 필요하다.
+
 ## Docker Desktop 로컬 smoke
 
 Docker Desktop이 실행 중인지 확인한 뒤 독립적인 Compose project 이름으로 빌드하고 시작한다. 로컬 덮어쓰기는 상속된 secret 환경 파일을 제거하는 `!reset` 문법을 사용하므로 Docker Compose 2.24.4 이상을 사용한다.

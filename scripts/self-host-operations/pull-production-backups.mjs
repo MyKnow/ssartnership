@@ -9,7 +9,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { validateBackupReceipt, selectBackupRetention } from './production-backup-contract.mjs';
 const ROOT = path.join(os.homedir(), 'Library/Application Support/ssartnership-backups/production');
-const SSH = ['-F', '/dev/null', '-S', 'none', '-o', 'BatchMode=yes', '-o', 'IdentitiesOnly=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'GlobalKnownHostsFile=/dev/null', '-o', `UserKnownHostsFile="${ROOT}/known_hosts"`, '-o', 'HostKeyAlias=192.168.1.191', '-o', 'ForwardAgent=no', '-o', 'ClearAllForwardings=yes', '-o', 'ConnectTimeout=8', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=3', '-i', `${ROOT}/ssh-key`, 'ssartnership-backup@100.121.111.50'];
+// The restricted backup identity stays on this Mac. The separately pinned PVE
+// administrator connection provides transport to the private Production guest.
+const JUMP = '/usr/bin/ssh -S none -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ForwardAgent=no -o ClearAllForwardings=yes -W %h:%p pve-agent';
+const SSH = ['-F', '/dev/null', '-S', 'none', '-o', 'BatchMode=yes', '-o', 'IdentitiesOnly=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'GlobalKnownHostsFile=/dev/null', '-o', `UserKnownHostsFile="${ROOT}/known_hosts"`, '-o', 'HostKeyAlias=192.168.1.182', '-o', `ProxyCommand=${JUMP}`, '-o', 'ForwardAgent=no', '-o', 'ClearAllForwardings=yes', '-o', 'ConnectTimeout=8', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=3', '-i', `${ROOT}/ssh-key`, 'ssartnership-backup@192.168.1.182'];
 const ssh = command => execFileSync('/usr/bin/ssh', [...SSH, command], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 128 * 1024, timeout: 20000 });
 async function hashFile(file) { const hash = createHash('sha256'); for await (const bytes of createReadStream(file)) hash.update(bytes); return hash.digest('hex'); }
 let locked = false;

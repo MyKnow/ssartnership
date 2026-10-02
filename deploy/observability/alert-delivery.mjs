@@ -18,7 +18,7 @@ export function alertDeliveryConfiguration(env) {
   } catch { return null; }
 }
 
-export async function deliverOperationalAlert(config, text, payload, deliver = fetch) {
+export async function deliverOperationalAlert(config, text, payload, deliver = fetch, { idempotencyKey } = {}) {
   if (!config) throw new Error("ALERT_NOT_CONFIGURED");
   const headers = { "Content-Type": "application/json" };
   let url, body;
@@ -29,7 +29,7 @@ export async function deliverOperationalAlert(config, text, payload, deliver = f
     // Status and event time distinguish recovery and subsequent incidents.
     // Retries/repeated notifications for one event are deduplicated for 24h.
     const identity = JSON.stringify({ text, groupKey: payload.groupKey ?? "", alerts: payload.alerts.map(a => [a.startsAt ?? "", a.endsAt ?? ""]) });
-    headers["Idempotency-Key"] = `ops-${createHash("sha256").update(identity).digest("hex")}`;
+    headers["Idempotency-Key"] = idempotencyKey ?? `ops-${createHash("sha256").update(identity).digest("hex")}`;
     body = { from: config.from, to: [config.to], subject: "[싸트너십] 운영 장애·복구 알림", text };
   } else { url = config.url; body = { text }; }
   const result = await deliver(url, { method: "POST", redirect: "error", signal: AbortSignal.timeout(5000), headers, body: JSON.stringify(body) });

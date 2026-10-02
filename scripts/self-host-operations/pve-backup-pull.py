@@ -5,7 +5,7 @@ ROOT = pathlib.Path('/mnt/ssartnership-backups')
 SECRETS = pathlib.Path('/etc/myknow/secrets/ssartnership-backup')
 UUID = re.compile(r'[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}')
 HASH = re.compile(r'[a-f0-9]{64}')
-SSH = ['/usr/bin/ssh','-F','/dev/null','-S','none','-o','BatchMode=yes','-o','IdentitiesOnly=yes','-o','StrictHostKeyChecking=yes','-o','GlobalKnownHostsFile=/dev/null','-o',f'UserKnownHostsFile={SECRETS}/known_hosts','-o','HostKeyAlias=192.168.1.191','-o','ForwardAgent=no','-o','ClearAllForwardings=yes','-o','ConnectTimeout=10','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3','-i',str(SECRETS/'ssh-key'),'ssartnership-backup@100.121.111.50']
+SSH = ['/usr/bin/ssh','-F','/dev/null','-S','none','-o','BatchMode=yes','-o','IdentitiesOnly=yes','-o','StrictHostKeyChecking=yes','-o','GlobalKnownHostsFile=/dev/null','-o',f'UserKnownHostsFile={SECRETS}/known_hosts','-o','HostKeyAlias=192.168.1.182','-o','ForwardAgent=no','-o','ClearAllForwardings=yes','-o','ConnectTimeout=10','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=3','-i',str(SECRETS/'ssh-key'),'ssartnership-backup@192.168.1.182']
 
 def validate_receipt(v):
     if not isinstance(v,dict) or set(v) != {'version','id','sha256','recipient','bytes','createdAt','databaseSystemId','continuousPitr'}: raise ValueError()

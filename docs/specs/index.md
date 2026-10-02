@@ -18,6 +18,7 @@ last_verified: 2026-09-25
 
 ## 현재 기능
 
+- [Production·Preview PVE 이전](./pve-service-migration/spec.md) — Issue #523, active
 - [자체 호스팅 마이그레이션](./self-hosting/spec.md) — Issue #435, active
 - [자체 호스팅 데이터와 운영 복구](./self-host-database/spec.md) — Issue #435, active
 - [자체 호스팅 공개 edge 복구](./self-host-edge-recovery/spec.md) — Issue #478, active

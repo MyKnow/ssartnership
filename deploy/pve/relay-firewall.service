@@ -1,0 +1,16 @@
+[Unit]
+Description=SSARTNERSHIP private relay ingress rules
+Before=docker.service
+After=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+UMask=0077
+EnvironmentFile=/etc/myknow/secrets/ssartnership-pve-relay.env
+ExecStart=/usr/bin/python3 /opt/ssartnership/pve/relay-firewall.py
+
+[Install]
+WantedBy=multi-user.target
