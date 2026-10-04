@@ -9,6 +9,7 @@ import {
   sendAndRecordCampusScopedNewPartnerNotification,
 } from "@/lib/new-partner-notifications";
 import {
+  canTransitionPartnerRegistrationStatus,
   isPartnerRegistrationRequestStatus,
   type PartnerRegistrationRequestStatus,
 } from "@/lib/partner-registration";
@@ -98,6 +99,19 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
     redirectAdminActionError(returnTo, "regional_admin_scope_denied");
   }
 
+  if (!canTransitionPartnerRegistrationStatus(previousStatus, status)) {
+    redirectAdminActionError(returnTo, "partner_form_status_locked", {
+      action: "partner_update",
+      targetType: "partner_registration_request",
+      targetId: registrationRequest.id,
+      properties: {
+        previousStatus,
+        requestedStatus: status,
+        stage: "status_transition",
+      },
+    });
+  }
+
   const payload: {
     status: PartnerRegistrationRequestStatus;
     visibility: PartnerVisibility;
@@ -135,6 +149,7 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
   }
 
   let convertedPartnerId: string | null = null;
+  let convertedPartnerIds: string[] = [];
   if (status === "converted" && previousStatus !== "converted") {
     try {
       const conversion = await createPartnerFromPortalRegistrationRequest({
@@ -146,6 +161,7 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
       if (conversion.partners.length === 0) {
         throw new Error("등록 가능한 제휴처가 생성되지 않았습니다.");
       }
+      convertedPartnerIds = conversion.partners.map((partner) => partner.id);
       convertedPartnerId =
         conversion.partners.length === 1
           ? conversion.partners[0]?.id ?? null
@@ -221,6 +237,21 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
       });
     }
   }
+
+  await logAdminAction("partner_update", {
+    targetType: "partner_registration_request",
+    targetId: registrationRequest.id,
+    properties: {
+      source: "admin_partner_registration_queue",
+      changeType: "status",
+      previousStatus,
+      status,
+      previousVisibility: registrationRequest.visibility ?? null,
+      visibility,
+      adminNoteChanged: (registrationRequest.admin_note ?? "") !== adminNote,
+      convertedPartnerIds,
+    },
+  });
 
   revalidatePath("/admin/partner-registrations");
   if (convertedPartnerId) {

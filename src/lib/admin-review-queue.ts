@@ -101,6 +101,12 @@ const ERROR_MESSAGES: Record<string, AdminReviewQueueFeedback> = {
     title: "신청 정보 저장을 확인해 주세요",
     description: "필수 항목과 링크·기간 형식을 확인한 뒤 다시 시도해 주세요.",
   },
+  partner_form_status_locked: {
+    tone: "info",
+    title: "등록 완료 신청은 처리 상태를 바꿀 수 없습니다",
+    description:
+      "이미 제휴처로 등록된 신청입니다. 제휴처 정보와 공개 상태는 제휴처 상세 화면에서 관리해 주세요.",
+  },
   partner_form_details_locked: {
     tone: "info",
     title: "등록 완료 신청은 여기서 수정하지 않습니다",

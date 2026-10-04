@@ -290,6 +290,39 @@ export function isPartnerRegistrationRequestStatus(
   );
 }
 
+/**
+ * `converted` is terminal: the request already produced partner rows, so a
+ * reversal followed by a second conversion would create duplicate partners.
+ * Partner details are managed on the partner editor after conversion.
+ */
+export const PARTNER_REGISTRATION_TERMINAL_STATUSES = [
+  "converted",
+] as const satisfies PartnerRegistrationRequestStatus[];
+
+export function isPartnerRegistrationTerminalStatus(
+  status: PartnerRegistrationRequestStatus,
+) {
+  return (
+    PARTNER_REGISTRATION_TERMINAL_STATUSES as readonly PartnerRegistrationRequestStatus[]
+  ).includes(status);
+}
+
+/** Statuses an admin may save from `from`, including keeping the same status. */
+export function getAllowedPartnerRegistrationStatusTransitions(
+  from: PartnerRegistrationRequestStatus,
+): readonly PartnerRegistrationRequestStatus[] {
+  return isPartnerRegistrationTerminalStatus(from)
+    ? [from]
+    : PARTNER_REGISTRATION_STATUS_OPTIONS;
+}
+
+export function canTransitionPartnerRegistrationStatus(
+  from: PartnerRegistrationRequestStatus,
+  to: PartnerRegistrationRequestStatus,
+) {
+  return getAllowedPartnerRegistrationStatusTransitions(from).includes(to);
+}
+
 const maxLengthByField: Partial<Record<PartnerRegistrationFieldName, number>> = {
   branchScopeNote: 600,
   brandName: 100,
