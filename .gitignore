@@ -46,6 +46,10 @@ yarn-error.log*
 .env.*
 !.env.example
 
+# retired Vercel CLI link state: kept ignored only so a leftover local
+# .vercel/ directory is never committed (Vercel deployment was retired in RF-04)
+/.vercel/
+
 # local Codex configuration
 .codex/config.toml
 
