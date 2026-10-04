@@ -106,7 +106,7 @@ authority: normative
 - 이 endpoint는 페이지 조회·클릭 등 **클라이언트 텔레메트리 전용 이벤트**만 받는다. 쿠폰 사용, 푸시 구독 변경, 리뷰 작성처럼 서버가 확인한 업무 이벤트는 해당 서버 route/action에서 기록한다.
 - 이벤트별 허용 `properties`와 `target_type`·`target_id` 조합을 검증한다. 알 수 없는 `properties` key는 저장하지 않는다.
 - 요청 본문은 12 KiB를 넘길 수 없다. `Content-Length` fast-fail 뒤에도 stream을 누적 읽어 한도를 넘는 즉시 취소한다. `properties`는 최종 저장 직전에도 깊이·항목 수·문자열 길이·전체 크기 제한을 거친다.
-- 요청 본문을 읽기 전에 Vercel 원본 전달 IP(`x-vercel-forwarded-for` 우선) 기준 ingress 제한을 적용하고, 계약 검증 뒤에는 IP·세션·이벤트별 제한을 한 번 더 적용한다. 이 제한은 프로세스 로컬 best-effort 보호 장치이며 Vercel WAF/분산 rate limit을 대체하지 않는다.
+- 요청 본문을 읽기 전에 [클라이언트 IP 신뢰 계약](../security/client-ip-trust.md)으로 판정한 IP 기준 ingress 제한을 적용하고, 계약 검증 뒤에는 IP·세션·이벤트별 제한을 한 번 더 적용한다. 이 제한은 단일 replica 기준의 프로세스 로컬 best-effort 보호 장치이며 엣지 차단이나 분산 rate limit을 대체하지 않는다.
 - `event_logs.event_id`의 partial unique index와 `ingest_product_event()` RPC가 원자적으로 동작한다. 신규 row가 실제로 insert될 때만 기존 trigger가 rollup을 증가시키므로, 별도 rollup fallback을 두지 않는다.
 - endpoint의 `202` 응답은 비동기 처리 접수 결과다. 제품 텔레메트리는 일부 유실을 허용하며, 정산·쿠폰 사용 같은 정확한 업무 수치는 브라우저 이벤트로 계산하지 않는다.
 

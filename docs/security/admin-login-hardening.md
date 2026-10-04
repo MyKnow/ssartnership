@@ -48,6 +48,8 @@ Updated: 2026-07-05
 ## 권장 운영 설정
 
 1. 관리자 IP 대역이 안정적이면 `ADMIN_ALLOWED_IPS`를 설정한다.
+   - 전제: [클라이언트 IP 신뢰 계약](./client-ip-trust.md)이 성립하는 배포 체인이어야 한다. IP를 판정할 수 없는 환경에서 이 값을 설정하면 관리자 경로 전체가 403이 된다.
+   - 값은 정규화한 IP와 정확히 일치해야 하며 CIDR 대역은 지원하지 않는다. 적용 전 실제 관리자 접속 IP가 판정되는지 보안 로그로 확인한다.
 2. `/admin/login` 앞에 두 번째 gate를 두기 위해 `ADMIN_BASIC_AUTH_USERNAME`, `ADMIN_BASIC_AUTH_PASSWORD`를 활성화한다.
 3. 네트워크 지원이 가능하면 public admin login page보다 VPN 또는 internal access layer를 우선한다.
 4. 반복 공격이 관측되면 `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`를 회전한다.
