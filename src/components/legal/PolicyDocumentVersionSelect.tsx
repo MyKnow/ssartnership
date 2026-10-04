@@ -8,6 +8,7 @@ import {
   type PolicyKind,
 } from "@/lib/policy-documents";
 import { formatKoreanDate } from "@/lib/datetime";
+import { sanitizeReturnTo } from "@/lib/return-to";
 
 export default function PolicyDocumentVersionSelect({
   kind,
@@ -20,7 +21,8 @@ export default function PolicyDocumentVersionSelect({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const returnTo = searchParams.get("returnTo") ?? undefined;
+  const returnTo =
+    sanitizeReturnTo(searchParams.get("returnTo"), "") || undefined;
 
   return (
     <Select
@@ -31,7 +33,7 @@ export default function PolicyDocumentVersionSelect({
           getPolicyHref(
             kind,
             Number.isNaN(nextVersion) ? undefined : nextVersion,
-            returnTo ?? undefined,
+            returnTo,
           ),
         );
       }}
