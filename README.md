@@ -179,7 +179,7 @@ npm run ci:local
 
 ## 환경 변수
 
-`.env.example`에는 서비스 런타임에 필요한 운영 변수만 둡니다. Preview 동기화, Mock 전환, 일회성 스크립트와 레거시 호환 변수는 CI 또는 해당 운영 문서에서만 관리합니다.
+`.env.example`에는 서비스 런타임에 필요한 운영 변수만 둡니다. 전체 목록과 필수/선택/호환/폐기 예정 분류의 정본은 [env 매니페스트](scripts/lib/env-manifest.mjs)이며, `npm run check:env`가 매니페스트·두 예시 파일·코드의 env 읽기 drift를 확인합니다. Mock 전환과 E2E 스위치는 주석으로만 안내하고, 폐기 예정 별칭은 예시에 두지 않습니다.
 
 주요 그룹은 다음과 같습니다.
 
@@ -577,7 +577,7 @@ npm run release -- --version=none --lighthouse=skip --message="chore: 교차 플
 PVE 자체 호스팅이 유일한 운영 정본입니다. Vercel 배포 경로는 RF-04(#537)에서 폐기했습니다.
 
 1. `main`/`dev` push가 GitHub Actions에서 자체 호스팅 이미지를 발행하고, 서버 수신기가 승인된 digest만 적용합니다. 절차는 [격리 CI·배포·유지보수](docs/operations/runbooks/self-host-ci-maintenance.md)를 따릅니다.
-2. 런타임 비밀은 각 환경의 root 전용 `app.env`에 두며 형식은 [runtime.env.example](deploy/self-host/runtime.env.example)과 환경 변수 매니페스트를 따릅니다.
+2. 런타임 비밀은 각 환경의 root 전용 `app.env`에 두며 형식은 [runtime.env.example](deploy/self-host/runtime.env.example)과 [env 매니페스트](scripts/lib/env-manifest.mjs)를 따릅니다.
 3. DB 변경은 운영자가 검증한 schema 승인 뒤에만 배포됩니다.
 
 권장:

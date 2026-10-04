@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { warnDeprecatedEnvironmentAlias } from "@/lib/env-deprecation";
 
 export type SmtpConfig = {
   host: string;
@@ -163,6 +164,8 @@ export function getSmtpConfig(
 
   const port = 465;
   const secure = true;
+  if (env.NAVER_SMTP_USER?.trim()) warnDeprecatedEnvironmentAlias("NAVER_SMTP_USER");
+  if (env.NAVER_SMTP_PASS?.trim()) warnDeprecatedEnvironmentAlias("NAVER_SMTP_PASS");
   const fromEmailValue = env.NAVER_SMTP_USER;
   const tlsMinDhSize = parseOptionalPositiveInteger(
     env.SMTP_TLS_MIN_DH_SIZE,

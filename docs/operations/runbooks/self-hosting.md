@@ -69,7 +69,7 @@ docker build --platform linux/amd64 \
   --tag ssartnership:reviewed-sha .
 ```
 
-`deploy/self-host/runtime.env.example`에서 환경별 비밀 파일 `deploy/self-host/runtime.env`를 준비한다. 파일은 Git에서 제외하고 소유자만 읽도록 권한을 제한한다. 환경 값을 터미널 출력·공유 로그·이미지 build argument에 포함하지 않는다. `docker compose config`는 비밀을 표시할 수 있으므로 검증할 때 `--quiet`를 사용한다.
+`deploy/self-host/runtime.env.example`에서 환경별 비밀 파일 `deploy/self-host/runtime.env`를 준비한다. 필수·공개 build 값은 주석 없이, 선택 기능은 주석 항목을 필요한 것만 해제한다. 전체 목록과 필수/선택/호환/폐기 예정 분류의 정본은 `scripts/lib/env-manifest.mjs`이며, 예시 파일이나 코드의 env 읽기를 바꾸면 `npm run check:env`로 drift를 확인한다. 폐기 예정 별칭(`NAVER_SMTP_*`, `DATA_GO_KR_SERVICE_KEY`)은 읽을 때 이름만 남기는 경고를 출력하며, 운영 env에서 제거를 확인한 뒤 코드에서 삭제한다. 파일은 Git에서 제외하고 소유자만 읽도록 권한을 제한한다. 환경 값을 터미널 출력·공유 로그·이미지 build argument에 포함하지 않는다. `docker compose config`는 비밀을 표시할 수 있으므로 검증할 때 `--quiet`를 사용한다.
 
 공개 값은 위 이미지와 동일하게 설정한다. `SUPABASE_URL`은 SDK가 브라우저용 파일 URL을 만들 수 있도록 `NEXT_PUBLIC_SUPABASE_URL`과 같은 공개 origin을 사용한다. 서버 전송은 선택적인 `SUPABASE_INTERNAL_URL`에 Compose 내부 서비스 주소(예: `http://gateway:8000`)를 지정한다. `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, 세션 키와 기능별 외부 연동 비밀은 runtime 파일로만 전달한다. 정확한 필수 설정과 오류 코드는 `deploy/self-host/runtime-env.mjs`가 최종 근거다. `runtime.env.example`의 placeholder 상태로 운영 실행하지 않는다.
 

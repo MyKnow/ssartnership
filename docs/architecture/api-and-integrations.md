@@ -164,7 +164,7 @@ authority: descriptive
 
 - 협력사 결제/등록 과정에서 사업자 상태조회에 사용한다.
 - 주요 env: `NTS_BUSINESS_STATUS_SERVICE_KEY`
-- fallback env: `DATA_GO_KR_SERVICE_KEY`
+- fallback env: `DATA_GO_KR_SERVICE_KEY`(폐기 예정 별칭, 읽을 때 경고)
 - 상호/대표자/주소 자동 채움이 아니라 휴업/폐업 상태와 과세유형 확인 용도다.
 
 ### 배포·CI
@@ -175,18 +175,7 @@ authority: descriptive
 
 ## Environment variable groups
 
-| 그룹 | 주요 env |
-| --- | --- |
-| 관리자 | `ADMIN_ID`, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, `ADMIN_ALLOWED_IPS`, `ADMIN_BASIC_AUTH_USERNAME`, `ADMIN_BASIC_AUTH_PASSWORD` |
-| 회원 세션/QR | `USER_SESSION_SECRET`, `CERTIFICATION_QR_SECRET` |
-| 협력사 | `PARTNER_SESSION_SECRET`, billing bank envs |
-| Supabase | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, optional `NEXT_PUBLIC_SUPABASE_URL` |
-| Data source | `NEXT_PUBLIC_DATA_SOURCE`, `NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE` |
-| Mattermost | `MM_BASE_URL`, `MM_SENDER_CREDENTIALS_KEY_V1`, `MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION` |
-| SMTP | `SMTP_*`, `NAVER_SMTP_*`, `SUGGEST_NOTIFY_EMAIL` |
-| Web Push/Cron | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET` |
-| Apple Wallet | `APPLE_WALLET_ENABLED`, `APPLE_WALLET_TEAM_ID`, `APPLE_WALLET_PASS_TYPE_ID`, `APPLE_WALLET_ORGANIZATION_NAME`, `APPLE_WALLET_CERTIFICATE_BASE64`, `APPLE_WALLET_PRIVATE_KEY_BASE64`, `APPLE_WALLET_PRIVATE_KEY_PASSPHRASE`, `APPLE_WALLET_WWDR_CERTIFICATE_BASE64`, `APPLE_WALLET_DEVICE_TOKEN_ENCRYPTION_KEY_BASE64`, `NEXT_PUBLIC_SITE_URL` |
-| SEO | `NEXT_PUBLIC_SITE_URL` |
+환경 변수 목록·그룹·분류(필수/build/선택/플랫폼/호환/폐기 예정/개발)의 정본은 `scripts/lib/env-manifest.mjs`다. `npm run check:env`와 `tests/env-manifest.test.mts`가 매니페스트, `src/`·`next.config.ts`의 env 읽기, `.env.example`, `deploy/self-host/runtime.env.example`의 drift를 막는다. 주요 그룹은 Supabase, 세션·HMAC, 관리자 edge 보호, Mattermost Sender, Cron·Web Push, 공개 build 값, 파트너 청구·사업자 상태, 이메일, Apple Wallet, 자체 호스팅 Web Vitals다. 폐기 예정 별칭(`NAVER_SMTP_*`, `DATA_GO_KR_SERVICE_KEY`)은 읽을 때 경고만 남기고 예시 파일에 두지 않는다.
 
 ## API design constraints
 
