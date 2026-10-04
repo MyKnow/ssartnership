@@ -14,6 +14,8 @@ authority: normative
 
 Accepted. 2026-08-13 재감사에서 runtime과 코드 env reader는 제거됐지만 Vercel Verify env와 Production legacy data가 남아 있었다. 삭제 판정과 승인 순서는 [SSAFY Verify 레거시 삭제 준비도](../plans/active/ssafy-verify-legacy-removal.md)를 따른다.
 
+2026-10 PVE 자체 호스팅 전환 뒤 Vercel은 운영 경로가 아니다. 남은 Verify env 정리는 자체 호스팅 runtime env 점검으로 바뀌며, 절차는 같은 준비도 문서를 따른다.
+
 ## Context
 
 외부 SSAFY Verify에 위임하던 가입·프로필·알림 흐름은 운영 가용성과 데이터 경계를 서비스가 직접 통제하기 어려웠다. 기존 위임 계획은 [역사 문서](../history/architecture/ssafy-verify-external-api-delegation.md)로 보존한다.
@@ -69,7 +71,7 @@ SSAFY Verify runtime과 사용자 UI는 제거하고, 회원 인증·프로필 �
 
 - sender credential, 코드, session/token, 비밀번호 평문은 로그·응답·브라우저 상태에 남기지 않는다.
 - 민감 테이블은 RLS를 활성화하고 `anon`/`authenticated`의 전체 권한을 회수하며 service-role RPC만 실행한다.
-- Verify runtime/UI/routes와 코드 env reader는 제거했다. Vercel에는 미사용 Verify env가 남아 있고 레거시 Verify 데이터는 읽지 않는 상태로 보존한다.
+- Verify runtime/UI/routes와 코드 env reader는 제거했다. 2026-08-13 당시 Vercel에 미사용 Verify env가 남아 있었고(자체 호스팅 전환 뒤에는 runtime env 점검 대상), 레거시 Verify 데이터는 읽지 않는 상태로 보존한다.
 - 레거시 삭제는 별도 승인과 forward migration으로 수행한다. generic notification provider 컬럼·현행 회귀 테스트·역사 migration은 삭제하지 않으며, `anonymize_deleted_member`를 먼저 현행 스키마에 맞춰 교체한다.
 
 ## Alternatives
