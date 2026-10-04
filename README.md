@@ -516,6 +516,18 @@ npm run test:mm-profile
 npm run release
 ```
 
+### 검증 계층
+
+| 명령 | 언제 | 내용 |
+| --- | --- | --- |
+| `npm run verify:change` (`prepush`) | 모든 push 전 | 실제 merge-base diff를 GitHub와 같은 위험 tier(docs·development·ui·standard·high)로 분류해 필요한 검사만 실행 |
+| `npm run verify:quick` | high tier·의존성·CI 변경 | 설치 스크립트·교차 플랫폼·lockfile·migration·lint·typecheck·Node/unit 테스트·보안 audit |
+| `npm run verify:release` | `dev` → `main` 승격 전 | quick 전체 + Production build + 재시도 없는 전체 E2E |
+| `npm run check:docs` / `check:env` / `check:lockfile` | 문서·env·의존성 변경 시 | 문서 메타데이터·링크, env 매니페스트 drift, canonical lockfile |
+| `npm run test:node` / `test:unit` | 집중 확인 | Node 계약·도메인 테스트 / Vitest unit |
+
+운영 CLI(`self-host:database`, `self-host:operations`, `node scripts/self-host-cron.mjs`)는 해당 runbook에서만 사용합니다. 호출 흔적이 없던 일회성 스크립트(`migrate:image-assets`, `rss:refresh`, A4 홍보물 렌더러)와 부분 테스트 별칭은 RF-04에서 정리했습니다.
+
 ### Storybook
 
 공용 UI primitives와 실제 도메인 컴포넌트를 함께 검증할 수 있도록 Storybook을 구성했습니다.

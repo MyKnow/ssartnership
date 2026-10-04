@@ -88,7 +88,17 @@ test("표준 개발 명령과 교차 플랫폼 정책이 repository contract에 
   assert.equal(scripts.build, "node scripts/next.mjs build");
   assert.equal(scripts.start, "node scripts/next.mjs start");
   assert.match(scripts["migrate:legacy-member-avatars"], /--env-file-if-exists=\.env\.preview/u);
-  assert.match(scripts["migrate:image-assets"], /--env-file-if-exists=\.env\.preview/u);
+  for (const retiredScript of [
+    "migrate:image-assets",
+    "measure:admin:preview",
+    "rss:refresh",
+    "self-host:receive",
+    "sync:preview",
+    "test:partner-portal",
+    "test:ssafy-cycle",
+  ]) {
+    assert.equal(scripts[retiredScript], undefined, `${retiredScript} must stay retired`);
+  }
   assert.equal(scripts.release, "node scripts/release.mjs");
   assert.equal(
     scripts["install:trusted"],
