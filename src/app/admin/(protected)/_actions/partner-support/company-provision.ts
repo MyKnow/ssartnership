@@ -1,4 +1,5 @@
 import {
+  PARTNER_ACCOUNT_SELECT,
   PARTNER_COMPANY_SELECT,
   buildNewPartnerAccountInsert,
   normalizePartnerAccountRow,
@@ -176,7 +177,7 @@ export async function ensurePartnerCompanyRow(
 
     const { data: existingAccount, error: accountLookupError } = await supabase
       .from("partner_accounts")
-      .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at")
+      .select(PARTNER_ACCOUNT_SELECT)
       .eq("login_id", loginId)
       .maybeSingle();
 
@@ -198,7 +199,7 @@ export async function ensurePartnerCompanyRow(
           is_active: true,
         })
         .eq("id", existingAccount.id)
-        .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at")
+        .select(PARTNER_ACCOUNT_SELECT)
         .single();
 
       if (updateError) {
@@ -229,7 +230,7 @@ export async function ensurePartnerCompanyRow(
             now: new Date().toISOString(),
           }),
         )
-        .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at")
+        .select(PARTNER_ACCOUNT_SELECT)
         .single();
 
       if (createAccountError) {

@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import { getSafeAdminActionErrorCode } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
-import { buildNewPartnerAccountInsert } from "@/lib/partner-admin/company-account-rows";
+import {
+  PARTNER_ACCOUNT_SELECT,
+  buildNewPartnerAccountInsert,
+} from "@/lib/partner-admin/company-account-rows";
 import { issuePartnerAccountInitialSetupLink } from "./partner-support/setup-link";
 import {
   parsePartnerAccountCreatePayload,
@@ -127,9 +130,7 @@ export async function createPartnerAccountAction(formData: FormData) {
         now: new Date().toISOString(),
       }),
     )
-    .select(
-      "id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_expires_at",
-    )
+    .select(PARTNER_ACCOUNT_SELECT)
     .single();
 
   if (createError || !createdAccount) {

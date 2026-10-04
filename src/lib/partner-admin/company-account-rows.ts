@@ -9,6 +9,13 @@ import { generateTempPassword, hashPassword } from "@/lib/password";
 export const PARTNER_COMPANY_SELECT =
   "id,name,slug,description,is_active,managed_campus_slugs";
 
+/**
+ * Admin projection for partner accounts. Password material is deliberately
+ * excluded: admin actions never need to read `password_hash`/`password_salt`.
+ */
+export const PARTNER_ACCOUNT_SELECT =
+  "id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_expires_at,last_login_at,created_at,updated_at";
+
 export type PartnerCompanyRow = {
   id: string;
   name: string;
@@ -23,8 +30,6 @@ export type PartnerAccountRow = {
   login_id: string;
   display_name: string;
   email?: string | null;
-  password_hash?: string | null;
-  password_salt?: string | null;
   must_change_password?: boolean | null;
   is_active?: boolean | null;
   email_verified_at?: string | null;
@@ -65,8 +70,6 @@ export function normalizePartnerAccountRow(
     login_id: row.login_id,
     display_name: row.display_name,
     email: row.email ?? null,
-    password_hash: row.password_hash ?? null,
-    password_salt: row.password_salt ?? null,
     must_change_password: row.must_change_password ?? true,
     is_active: row.is_active ?? true,
     email_verified_at: row.email_verified_at ?? null,

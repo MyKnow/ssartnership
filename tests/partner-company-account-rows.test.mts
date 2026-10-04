@@ -3,8 +3,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  PARTNER_ACCOUNT_SELECT,
   PARTNER_COMPANY_SELECT,
   buildNewPartnerAccountInsert,
+  normalizePartnerAccountRow,
   normalizePartnerCompanyRow,
 } from "../src/lib/partner-admin/company-account-rows.ts";
 
@@ -98,5 +100,32 @@ test("관리자 파트너사·계정 쓰기 경로는 공용 행 계약을 재�
   for (const source of [provision, accountCreate]) {
     assert.match(source, /buildNewPartnerAccountInsert\(/);
     assert.doesNotMatch(source, /generateTempPassword/);
+  }
+});
+
+test("관리자 계정 조회는 비밀번호 해시와 솔트를 읽지 않는다", async () => {
+  assert.doesNotMatch(PARTNER_ACCOUNT_SELECT, /password_(hash|salt)/);
+  const normalized = normalizePartnerAccountRow({
+    id: "account-1",
+    login_id: "owner@example.com",
+    display_name: "담당자",
+    password_hash: "hash",
+    password_salt: "salt",
+  } as Parameters<typeof normalizePartnerAccountRow>[0]);
+  assert.ok(normalized);
+  assert.equal("password_hash" in normalized, false);
+  assert.equal("password_salt" in normalized, false);
+
+  const sources = await Promise.all(
+    [
+      "src/app/admin/(protected)/_actions/account-actions.shared.ts",
+      "src/app/admin/(protected)/_actions/account-actions.account.ts",
+      "src/app/admin/(protected)/_actions/partner-support/company-provision.ts",
+      "src/app/admin/(protected)/_actions/partner-support/setup-link.ts",
+    ].map((path) => readFile(new URL(path, root), "utf8")),
+  );
+  for (const source of sources) {
+    assert.doesNotMatch(source, /select\([^)]*password_(hash|salt)/);
+    assert.match(source, /PARTNER_ACCOUNT_SELECT|buildNewPartnerAccountInsert/);
   }
 });
