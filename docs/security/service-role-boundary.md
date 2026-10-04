@@ -41,6 +41,7 @@ Supabase service role key는 RLS를 우회할 수 있으므로 서버 전용 코
 ### 파트너 포털
 
 - 파트너 계정 route/action은 partner session을 확인하고, 해당 계정이 접근 가능한 회사/브랜드인지 검증한다.
+- 파트너 API route는 same-origin 확인 뒤, 본문을 읽기 전에 `requirePartnerApiSession()`(`src/lib/partner-auth/api-session.ts`)을 호출한다. 세션이 없으면 401, 비밀번호 변경이 필요한 상태면 403을 돌려준다. 비밀번호 변경 대기 중 허용은 노출을 줄이는 요청(push 구독 해제)만이며, 예외 route와 사유는 `tests/partner-api-session.test.mts`의 허용 목록에 둔다.
 - 초기 설정 token route는 token 자체 검증 외에도 same-origin form submit을 요구한다.
 - 파트너 변경 요청은 요청자 계정 식별자를 감사 이력에 남긴다.
 

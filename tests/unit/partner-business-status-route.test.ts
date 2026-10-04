@@ -120,6 +120,20 @@ describe("partner business status route", () => {
     expect((await POST(createJsonRequest(payload))).status).toBe(401);
     expect(isCompanyAllowedMock).not.toHaveBeenCalled();
 
+    getPartnerSessionMock.mockResolvedValueOnce({
+      accountId: "account-1",
+      loginId: "partner-one",
+      displayName: "파트너 1",
+      companyIds: ["company-1"],
+      mustChangePassword: true,
+    });
+    const passwordChangeResponse = await POST(createJsonRequest(payload));
+    expect(passwordChangeResponse.status).toBe(403);
+    expect(await passwordChangeResponse.json()).toMatchObject({
+      error: "password_change_required",
+    });
+    expect(isCompanyAllowedMock).not.toHaveBeenCalled();
+
     isCompanyAllowedMock.mockReturnValueOnce(false);
     expect((await POST(createJsonRequest(payload))).status).toBe(403);
     expect(consumeQuotaMock).not.toHaveBeenCalled();

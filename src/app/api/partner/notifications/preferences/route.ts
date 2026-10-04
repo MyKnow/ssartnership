@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPartnerSession } from "@/lib/partner-session";
+import { requirePartnerApiSession } from "@/lib/partner-auth/api-session";
 import {
   getPartnerOperationalNotificationPreferences,
   upsertPartnerOperationalNotificationPreferences,
@@ -21,10 +21,11 @@ function toOptionalBoolean(value: unknown) {
 }
 
 export async function GET() {
-  const session = await getPartnerSession();
-  if (!session) {
-    return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requirePartnerApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
   try {
     return NextResponse.json({
       preferences: await getPartnerOperationalNotificationPreferences(
@@ -53,10 +54,11 @@ export async function POST(request: NextRequest) {
   ) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
-  const session = await getPartnerSession();
-  if (!session) {
-    return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requirePartnerApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
   try {
     const body = await readRouteJsonBodyWithinLimit<Record<string, unknown>>(
       request,
