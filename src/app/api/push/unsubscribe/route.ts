@@ -11,6 +11,7 @@ import {
   deactivatePushSubscription,
 } from "@/lib/push";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import { getPushSubscriptionLogTargetId } from "@/lib/push/log-target";
 import {
   getSafeNotificationRouteError,
   shouldLogNotificationRouteError,
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
       targetId:
         scope === "all"
           ? session.userId
-          : (body?.subscriptionId ?? body?.endpoint ?? null),
+          : getPushSubscriptionLogTargetId(body?.subscriptionId),
       properties: {
         scope,
         enabled: preferences.enabled,
