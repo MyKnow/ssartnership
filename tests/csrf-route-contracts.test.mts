@@ -48,12 +48,12 @@ test("state-changing cron GET routes require the cron bearer secret only", () =>
     assert.equal(
       configuredCronPaths.has(`/api/cron/${routeName}`),
       true,
-      `${relativePath} must remain registered as a Vercel cron path`,
+      `${relativePath} must remain registered in the self-hosted cron catalog`,
     );
     assert.match(
       source,
       /export async function GET\(request: NextRequest\)/,
-      `${relativePath} must keep Vercel cron GET compatibility`,
+      `${relativePath} must keep the cron GET entry point`,
     );
     assert.match(
       source,
