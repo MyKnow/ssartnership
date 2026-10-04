@@ -8,14 +8,7 @@ import {
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
 import { getSignedUserSession } from "@/lib/user-auth";
-
-function safeDecodeSegment(value: string) {
-  try {
-    return decodeURIComponent(value).trim();
-  } catch {
-    return "";
-  }
-}
+import { readRouteParam } from "@/lib/route-params";
 
 export async function POST(
   request: Request,
@@ -41,7 +34,7 @@ export async function POST(
   }
 
   const resolvedParams = await params;
-  const partnerId = resolvedParams?.id ? safeDecodeSegment(resolvedParams.id) : "";
+  const partnerId = readRouteParam(resolvedParams?.id);
   if (!partnerId) {
     return NextResponse.json(
       { message: "유효한 제휴처를 찾을 수 없습니다." },

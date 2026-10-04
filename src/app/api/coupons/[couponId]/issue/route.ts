@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adPackageRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSignedUserSession } from "@/lib/user-auth";
+import { readRouteParam } from "@/lib/route-params";
 
 function statusForReason(reason: string) {
   if (reason === "not_found") return 404;
@@ -21,7 +22,7 @@ export async function POST(
   if (!session?.userId) {
     return NextResponse.json({ ok: false, message: "로그인이 필요합니다." }, { status: 401 });
   }
-  const couponId = decodeURIComponent((await params).couponId ?? "").trim();
+  const couponId = readRouteParam((await params).couponId, 128);
   if (!couponId || couponId.length > 128) {
     return NextResponse.json({ ok: false, message: "쿠폰 정보를 확인할 수 없습니다." }, { status: 400 });
   }

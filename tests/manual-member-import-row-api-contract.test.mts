@@ -14,6 +14,10 @@ test("회원 XLSX 업로드는 생성 전에 인증된 행 전개 API로만 파�
   assert.match(route, /isTrustedSameOriginRequest/);
   assert.match(route, /canAdmin\(session\.account\.permissions, "members", "create"\)/);
   assert.match(route, /parseManualMemberImportWorkbook/);
+  assert.match(route, /readMultipartFormDataWithinLimit\(/);
+  assert.match(route, /MANUAL_MEMBER_IMPORT_LIMITS\.xlsxBytes \+ MULTIPART_FORM_OVERHEAD_BYTES/);
+  assert.match(route, /\{ status: 413 \}/);
+  assert.doesNotMatch(route, /request\.formData\(\)/);
   assert.match(panel, /\/api\/admin\/member-imports\/rows/);
   assert.match(panel, /appendManualMemberImportWorkbookRows/);
 });

@@ -6,6 +6,7 @@ import SiteHeader from "@/components/SiteHeader";
 import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
 import { SITE_NAME } from "@/lib/site";
+import { readRouteParam } from "@/lib/route-params";
 import { createCanonicalAlternates, serializeJsonLd } from "@/lib/seo";
 import { getPartnerViewerContext } from "@/lib/partner-view-context";
 import PartnerDetailContactSection from "./_page/PartnerDetailContactSection";
@@ -53,9 +54,7 @@ export async function generateMetadata({
   }
 
   const resolvedParams = await params;
-  const rawId = resolvedParams?.id
-    ? decodeURIComponent(resolvedParams.id).trim()
-    : "";
+  const rawId = readRouteParam(resolvedParams?.id);
 
   if (!rawId) {
     return {
@@ -138,9 +137,7 @@ export default async function PartnerDetailPage({
           preview?: string | string[];
         }>({}),
     ]);
-  const rawId = resolvedParams?.id
-    ? decodeURIComponent(resolvedParams.id).trim()
-    : "";
+  const rawId = readRouteParam(resolvedParams?.id);
   if (!rawId) {
     notFound();
   }
