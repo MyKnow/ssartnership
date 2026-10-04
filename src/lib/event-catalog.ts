@@ -130,6 +130,7 @@ export const ADMIN_AUDIT_ACTIONS = [
   'showcase_candidate_exclusion_update',
   'showcase_winner_update',
   'showcase_event_settle',
+  'showcase_personal_data_purge',
   'event_reward_winner_notification_test_send',
   'event_reward_winner_notification_send',
   'ad_campaign_create',

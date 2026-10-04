@@ -27,6 +27,9 @@ export const SHOWCASE_ERROR_CODES = [
   "exclusion_exists",
   "exclusion_not_found",
   "settlement_invalid",
+  "settlement_draw_required",
+  "event_settled",
+  "status_transition_invalid",
   "unknown",
 ] as const;
 
@@ -61,6 +64,9 @@ export const SHOWCASE_ERROR_MESSAGES: Record<ShowcaseErrorCode, { message: strin
   exclusion_exists: { message: "이미 제외한 후보예요.", field: null },
   exclusion_not_found: { message: "제외 기록을 찾을 수 없어요.", field: null },
   settlement_invalid: { message: "결과 발표가 시작된 뒤 한 번만 정산 완료로 기록할 수 있어요.", field: null },
+  settlement_draw_required: { message: "경품이 있는 분야의 추첨을 모두 실행한 뒤 정산할 수 있어요.", field: null },
+  event_settled: { message: "정산을 마친 이벤트라 일정·출품·검수를 더 바꿀 수 없어요.", field: null },
+  status_transition_invalid: { message: "출품자가 취소한 프로젝트는 다른 상태로 바꿀 수 없어요.", field: "status" },
   unknown: { message: "요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.", field: null },
 };
 

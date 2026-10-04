@@ -22882,6 +22882,266 @@ revoke all on function public.anonymize_deleted_member(uuid) from anon;
 revoke all on function public.anonymize_deleted_member(uuid) from authenticated;
 grant execute on function public.anonymize_deleted_member(uuid) to service_role;
 
+-- Project showcase terminal states -------------------------------------------
+-- Settlement starts the 30-day purge clock and closes the event for good: no
+-- schedule edit can reopen submission or experience, and projects can no
+-- longer be created, reviewed, edited or deleted. A withdrawn project never
+-- comes back. Identity detachment (purge, member anonymization) and FK
+-- set-null actions remain allowed.
+create or replace function public.showcase_assert_submission_open(p_event_id uuid)
+returns void
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  if not exists (
+    select 1 from public.showcase_events event_row
+    where event_row.id = p_event_id
+      and event_row.is_active
+      and event_row.settled_at is null
+      and event_row.submission_start_at <= now()
+      and now() < event_row.submission_end_at
+  ) then
+    raise exception 'showcase_submission_closed';
+  end if;
+end;
+$$;
+
+create or replace function public.showcase_assert_experience_open(p_event_id uuid)
+returns void
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  if not exists (
+    select 1 from public.showcase_events event_row
+    where event_row.id = p_event_id
+      and event_row.is_active
+      and event_row.settled_at is null
+      and event_row.experience_start_at <= now()
+      and now() < event_row.experience_end_at
+  ) then
+    raise exception 'showcase_experience_closed';
+  end if;
+end;
+$$;
+
+create or replace function public.showcase_guard_settled_event()
+returns trigger
+language plpgsql
+set search_path = pg_catalog, public
+as $$
+begin
+  if old.settled_at is not null and (
+    new.settled_at is distinct from old.settled_at
+    or new.submission_start_at is distinct from old.submission_start_at
+    or new.submission_end_at is distinct from old.submission_end_at
+    or new.experience_start_at is distinct from old.experience_start_at
+    or new.experience_end_at is distinct from old.experience_end_at
+    or new.announcement_start_at is distinct from old.announcement_start_at
+    or new.announcement_end_at is distinct from old.announcement_end_at
+    or new.submitter_selection_count is distinct from old.submitter_selection_count
+    or new.experiencer_selection_count is distinct from old.experiencer_selection_count
+    or new.is_active is distinct from old.is_active
+  ) then
+    raise exception 'showcase_event_settled';
+  end if;
+  if old.purged_at is not null and new.purged_at is distinct from old.purged_at then
+    raise exception 'showcase_event_settled';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists showcase_events_guard_settled on public.showcase_events;
+create trigger showcase_events_guard_settled
+  before update on public.showcase_events
+  for each row execute function public.showcase_guard_settled_event();
+
+create or replace function public.showcase_guard_project_mutation()
+returns trigger
+language plpgsql
+set search_path = pg_catalog, public
+as $$
+declare
+  event_settled boolean;
+begin
+  select event_row.settled_at is not null
+  into event_settled
+  from public.showcase_events event_row
+  where event_row.id = case when tg_op = 'DELETE' then old.event_id else new.event_id end;
+
+  if tg_op = 'UPDATE' then
+    if coalesce(event_settled, false)
+      and (pg_catalog.to_jsonb(new) - array['owner_member_id', 'image_upload_id', 'reviewed_by_admin_id', 'updated_at'])
+        is distinct from
+        (pg_catalog.to_jsonb(old) - array['owner_member_id', 'image_upload_id', 'reviewed_by_admin_id', 'updated_at']) then
+      raise exception 'showcase_event_settled';
+    end if;
+    if old.status = 'withdrawn' and new.status <> 'withdrawn' then
+      raise exception 'showcase_status_transition_invalid';
+    end if;
+    return new;
+  end if;
+
+  if coalesce(event_settled, false) then
+    raise exception 'showcase_event_settled';
+  end if;
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists showcase_projects_guard_mutation on public.showcase_projects;
+create trigger showcase_projects_guard_mutation
+  before insert or update or delete on public.showcase_projects
+  for each row execute function public.showcase_guard_project_mutation();
+
+-- Settlement needs every initial draw that has a prize to award.
+create or replace function public.settle_showcase_event(
+  p_event_id uuid,
+  p_admin_id uuid
+)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  event_row public.showcase_events%rowtype;
+  settled timestamptz;
+begin
+  select * into event_row
+  from public.showcase_events
+  where id = p_event_id
+  for update;
+  if not found
+    or event_row.settled_at is not null
+    or event_row.announcement_start_at is null
+    or event_row.announcement_start_at > now() then
+    raise exception 'showcase_settlement_invalid';
+  end if;
+  if (
+    event_row.submitter_selection_count > 0
+    and not exists (
+      select 1 from public.showcase_draws draw
+      where draw.event_id = p_event_id
+        and draw.candidate_group = 'submitter'
+        and draw.draw_kind = 'initial'
+    )
+  ) or (
+    event_row.experiencer_selection_count > 0
+    and not exists (
+      select 1 from public.showcase_draws draw
+      where draw.event_id = p_event_id
+        and draw.candidate_group = 'experiencer'
+        and draw.draw_kind = 'initial'
+    )
+  ) then
+    raise exception 'showcase_settlement_draw_required';
+  end if;
+
+  update public.showcase_events
+  set settled_at = now(), settled_by_admin_id = p_admin_id
+  where id = p_event_id
+  returning settled_at into settled;
+  return settled;
+end;
+$$;
+
+-- The 30-day purge records its own audit row in the same transaction (AC-029).
+create or replace function public.purge_showcase_personal_data(p_event_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  settled timestamptz;
+  participant_count integer := 0;
+  registration_count integer := 0;
+  detached_count integer := 0;
+  affected integer := 0;
+begin
+  select settled_at into settled
+  from public.showcase_events
+  where id = p_event_id
+    and settled_at is not null
+    and settled_at <= now() - interval '30 days'
+    and purged_at is null
+  for update;
+  if not found then
+    return false;
+  end if;
+
+  delete from public.showcase_project_participants where event_id = p_event_id;
+  get diagnostics participant_count = row_count;
+  update public.showcase_registrations set member_id = null, student_number = null
+  where event_id = p_event_id and (member_id is not null or student_number is not null);
+  get diagnostics registration_count = row_count;
+  update public.showcase_project_views set member_id = null where event_id = p_event_id and member_id is not null;
+  get diagnostics affected = row_count;
+  detached_count := detached_count + affected;
+  update public.showcase_experiences set member_id = null where event_id = p_event_id and member_id is not null;
+  get diagnostics affected = row_count;
+  detached_count := detached_count + affected;
+  update public.showcase_feedback set member_id = null where event_id = p_event_id and member_id is not null;
+  get diagnostics affected = row_count;
+  detached_count := detached_count + affected;
+  update public.showcase_interests set member_id = null where event_id = p_event_id and member_id is not null;
+  get diagnostics affected = row_count;
+  detached_count := detached_count + affected;
+  update public.showcase_candidate_exclusions set member_id = null where event_id = p_event_id and member_id is not null;
+  get diagnostics affected = row_count;
+  detached_count := detached_count + affected;
+  update public.showcase_winners set member_id = null where event_id = p_event_id and member_id is not null;
+  get diagnostics affected = row_count;
+  detached_count := detached_count + affected;
+  update public.showcase_projects set owner_member_id = null where event_id = p_event_id and owner_member_id is not null;
+  get diagnostics affected = row_count;
+  detached_count := detached_count + affected;
+  update public.showcase_events set purged_at = now() where id = p_event_id;
+
+  insert into public.admin_audit_logs (
+    actor_type, actor_id, action, path, target_type, target_id, properties
+  ) values (
+    'system', 'system', 'showcase_personal_data_purge',
+    '/api/cron/purge-showcase-personal-data', 'showcase_event', p_event_id::text,
+    jsonb_build_object(
+      'settled_at', settled,
+      'participants_deleted', participant_count,
+      'registrations_detached', registration_count,
+      'member_links_detached', detached_count
+    )
+  );
+  return true;
+end;
+$$;
+
+do $showcase_guard_privileges$
+declare
+  signature text;
+begin
+  foreach signature in array array[
+    'public.showcase_assert_submission_open(uuid)',
+    'public.showcase_assert_experience_open(uuid)',
+    'public.showcase_guard_settled_event()',
+    'public.showcase_guard_project_mutation()',
+    'public.settle_showcase_event(uuid, uuid)',
+    'public.purge_showcase_personal_data(uuid)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', signature);
+    execute format('grant execute on function %s to service_role', signature);
+  end loop;
+end;
+$showcase_guard_privileges$;
+
 -- Public schema privilege defaults --------------------------------------------
 -- The application reaches the database only through the service role. Remove
 -- every PUBLIC/anon/authenticated privilege that earlier migrations may have

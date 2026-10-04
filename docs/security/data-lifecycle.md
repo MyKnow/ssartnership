@@ -42,6 +42,8 @@ authority: normative
 
 보안 사고·분쟁은 `log_retention_holds`에 그룹·기간·사유를 남겨 파기를 멈춘다. 그룹은 원본 로그 6종과 `rate_limit_attempts`, `notification_deliveries`, `image_upload_sessions`, `platform_active_identities`, `partner_metric_unique_visitors`다. hold는 만료 시각이 지나면 효력이 없다.
 
+쇼케이스 파기 시계는 관리자가 정산을 기록해야 시작한다. 결과 발표가 시작된 뒤에도 정산하지 않으면 추첨·발표 화면이 경고한다. 정산은 경품이 있는 분야의 첫 추첨이 모두 끝난 뒤에만 기록할 수 있고, 정산 뒤에는 일정·출품·검수를 바꿀 수 없다.
+
 ## 회원 익명화 범위
 
 `members` 행은 지우지 않고 갱신하므로 FK cascade가 동작하지 않는다. `anonymize_deleted_member()`가 직접 처리하는 범위는 다음과 같고, 회원 FK가 있는 테이블이 이 목록이나 보존 목록 중 하나에 반드시 들어가도록 [FK 범위 테스트](../../tests/member-anonymization-fk-coverage.test.mts)가 막는다.

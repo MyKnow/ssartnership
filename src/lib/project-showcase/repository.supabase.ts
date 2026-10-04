@@ -994,7 +994,7 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
       p_review_note: input.reviewNote || null,
       p_allow_immediate_feedback: input.allowImmediateFeedback,
     });
-    if (error) throw new Error("출품작을 등록하지 못했습니다. 입력한 회원과 프로젝트 정보를 확인해 주세요.");
+    if (error) throwDomain(error, "출품작을 등록하지 못했습니다. 입력한 회원과 프로젝트 정보를 확인해 주세요.");
   }
 
   async updateAdminProject(input: ShowcaseAdminProjectUpdateInput): Promise<void> {
@@ -1015,7 +1015,7 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
       p_review_note: input.reviewNote || null,
       p_allow_immediate_feedback: input.allowImmediateFeedback,
     });
-    if (error) throw new Error("출품작을 수정하지 못했습니다. 입력한 내용을 확인해 주세요.");
+    if (error) throwDomain(error, "출품작을 수정하지 못했습니다. 입력한 내용을 확인해 주세요.");
   }
 
   async deleteAdminProject(input: { projectId: string; adminId: string }): Promise<ShowcaseDeletedProject> {
@@ -1023,8 +1023,9 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
       p_project_id: input.projectId,
       p_admin_id: input.adminId,
     });
+    if (error) throwDomain(error, "출품작과 연결된 기록을 삭제하지 못했습니다.");
     const row = Array.isArray(data) ? data[0] as Record<string, unknown> | undefined : undefined;
-    if (error || !row || typeof row.project_id !== "string" || typeof row.event_id !== "string") {
+    if (!row || typeof row.project_id !== "string" || typeof row.event_id !== "string") {
       throw new Error("출품작과 연결된 기록을 삭제하지 못했습니다.");
     }
     return {
@@ -1037,7 +1038,7 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
   }
 
   async updateEventSchedule(input: ShowcaseEventScheduleInput) {
-    const { error } = await this.client()
+    const { data, error } = await this.client()
       .from("showcase_events")
       .update({
         submission_start_at: input.submissionStartAt,
@@ -1050,8 +1051,14 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
         experiencer_selection_count: input.experiencerSelectionCount,
         is_active: input.isActive,
       })
-      .eq("slug", PROJECT_SHOWCASE_SLUG);
-    if (error) throw new Error("이벤트 운영 설정을 저장하지 못했습니다.");
+      .eq("slug", PROJECT_SHOWCASE_SLUG)
+      .is("settled_at", null)
+      .select("id");
+    if (error) throwDomain(error, "이벤트 운영 설정을 저장하지 못했습니다.");
+    if (!data || data.length === 0) {
+      if ((await this.getDrawState()).settledAt) throw new ShowcaseDomainError("event_settled");
+      throw new Error("이벤트 운영 설정을 저장하지 못했습니다.");
+    }
   }
 
   async reviewProject(input: {

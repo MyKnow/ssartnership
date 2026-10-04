@@ -790,6 +790,9 @@ describe("mock Repository 추첨·정산 규칙", () => {
     const winner = (await repository.listAdminWinners())[0];
     assert.ok(winner);
     await repository.setWinnerDelivered({ winnerId: winner.id, adminId: "admin", delivered: true });
+    // Settlement needs every prized initial draw, so the experiencer draw comes first.
+    await expectCode(repository.settleEvent("admin"), "settlement_draw_required");
+    await repository.runDraw({ group: "experiencer", adminId: "admin" });
     await repository.settleEvent("admin");
     await expectCode(repository.settleEvent("admin"), "settlement_invalid");
     await expectCode(repository.voidWinner({ winnerId: winner.id, adminId: "admin", reason: "duplicate" }), "draw_closed");
@@ -799,9 +802,12 @@ describe("mock Repository 추첨·정산 규칙", () => {
   test("개인정보는 정산 30일 뒤에만 파기되고, 마스킹 당첨 명단은 남는다", async () => {
     await moveTo("verification");
     await repository.runDraw({ group: "submitter", adminId: "admin" });
+    await repository.runDraw({ group: "experiencer", adminId: "admin" });
     await moveTo("announcement");
     await repository.settleEvent("admin");
     assert.equal(await repository.purgePersonalDataIfDue(), false);
+    const publicWinnerCount = (await repository.listPublicWinners()).length;
+    assert.ok(publicWinnerCount > 0);
 
     store.settledAt = new Date(Date.now() - 31 * DAY).toISOString();
     assert.equal(await repository.purgePersonalDataIfDue(), true);
@@ -809,7 +815,7 @@ describe("mock Repository 추첨·정산 규칙", () => {
     assert.equal(store.registrations.size, 0);
     assert.ok(store.projects.every((project) => project.ownerMemberId === ""));
     assert.ok(store.feedback.every((item) => item.memberId === ""));
-    assert.equal((await repository.listPublicWinners()).length, 2);
+    assert.equal((await repository.listPublicWinners()).length, publicWinnerCount);
     assert.equal((await repository.getDrawState()).purgedAt !== null, true);
   });
 });

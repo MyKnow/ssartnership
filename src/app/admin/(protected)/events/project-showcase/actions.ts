@@ -9,6 +9,7 @@ import { resolveImageTransformPolicy } from "@/lib/image-upload/policy";
 import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { projectShowcaseRepository } from "@/lib/project-showcase";
 import { ShowcaseDomainError, toShowcaseFailure } from "@/lib/project-showcase/errors";
+import { canTransitionShowcaseProjectStatus, isShowcaseEventSettled } from "@/lib/project-showcase/status";
 import {
   PROJECT_SHOWCASE_SLUG,
   SHOWCASE_VOID_REASONS,
@@ -56,6 +57,7 @@ export async function updateShowcaseSchedule(formData: FormData) {
     revalidatePath(ADMIN_PATH);
     return { ok: true as const, message: "이벤트 일정을 저장했어요." };
   } catch (error) {
+    if (error instanceof ShowcaseDomainError) return toShowcaseFailure(error);
     console.error("[project-showcase/schedule]", error instanceof Error ? error.message : "unknown");
     return { ok: false as const, message: "이벤트 일정을 저장하지 못했어요.", field: null };
   }
@@ -198,6 +200,9 @@ export async function createAdminShowcaseProject(formData: FormData) {
   if (!parsed.success) return { ok: false as const, message: parsed.message, field: parsed.field };
   const event = await projectShowcaseRepository.getEvent();
   if (!event) return { ok: false as const, message: "쇼케이스 이벤트를 찾을 수 없어요.", field: null };
+  if (isShowcaseEventSettled(await projectShowcaseRepository.getDrawState())) {
+    return toShowcaseFailure(new ShowcaseDomainError("event_settled"));
+  }
   const ownerName = await projectShowcaseRepository.getMemberDisplayName(ownerMemberId);
   if (!ownerName) return { ok: false as const, message: "출품자로 선택한 회원을 찾을 수 없어요.", field: "ownerMemberId" };
   const projectId = randomUUID();
@@ -218,9 +223,8 @@ export async function createAdminShowcaseProject(formData: FormData) {
     revalidateAdminProject(projectId);
     return { ok: true as const, projectId, message: "출품작을 등록했어요." };
   } catch (error) {
-    if (!(error instanceof ShowcaseDomainError)) {
-      console.error("[project-showcase/admin-create]", error instanceof Error ? error.message : "unknown");
-    }
+    if (error instanceof ShowcaseDomainError && error.code !== "unknown") return toShowcaseFailure(error);
+    console.error("[project-showcase/admin-create]", error instanceof Error ? error.message : "unknown");
     return { ok: false as const, message: "출품작을 등록하지 못했어요. 입력한 회원과 프로젝트 정보를 확인해 주세요.", field: null };
   }
 }
@@ -235,6 +239,12 @@ export async function updateAdminShowcaseProject(formData: FormData) {
   const existing = await projectShowcaseRepository.getAdminProject(projectId);
   if (!event || !existing || existing.eventId !== event.id) {
     return { ok: false as const, message: "수정할 출품작을 찾을 수 없어요.", field: null };
+  }
+  if (isShowcaseEventSettled(await projectShowcaseRepository.getDrawState())) {
+    return toShowcaseFailure(new ShowcaseDomainError("event_settled"));
+  }
+  if (!canTransitionShowcaseProjectStatus(existing.status, parsed.data.status)) {
+    return toShowcaseFailure(new ShowcaseDomainError("status_transition_invalid"));
   }
   try {
     const imageUrl = parsed.data.submission.imageUploadId
@@ -253,9 +263,8 @@ export async function updateAdminShowcaseProject(formData: FormData) {
     revalidateAdminProject(projectId);
     return { ok: true as const, projectId, message: "출품작을 수정했어요." };
   } catch (error) {
-    if (!(error instanceof ShowcaseDomainError)) {
-      console.error("[project-showcase/admin-update]", error instanceof Error ? error.message : "unknown");
-    }
+    if (error instanceof ShowcaseDomainError && error.code !== "unknown") return toShowcaseFailure(error);
+    console.error("[project-showcase/admin-update]", error instanceof Error ? error.message : "unknown");
     return { ok: false as const, message: "출품작을 수정하지 못했어요. 입력한 내용을 확인해 주세요.", field: null };
   }
 }
@@ -285,9 +294,10 @@ export async function deleteAdminShowcaseProject(projectId: unknown) {
       title: deleted.title,
     };
   } catch (error) {
-    if (!(error instanceof ShowcaseDomainError)) {
-      console.error("[project-showcase/admin-delete]", error instanceof Error ? error.message : "unknown");
+    if (error instanceof ShowcaseDomainError && error.code !== "unknown") {
+      return { ok: false as const, message: toShowcaseFailure(error).message };
     }
+    console.error("[project-showcase/admin-delete]", error instanceof Error ? error.message : "unknown");
     return { ok: false as const, message: "출품작과 연결된 기록을 삭제하지 못했어요." };
   }
 }

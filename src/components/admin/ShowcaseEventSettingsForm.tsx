@@ -26,7 +26,15 @@ const PERIODS = [
   { title: "결과 발표", start: "announcementStartAt", end: "announcementEndAt" },
 ] as const;
 
-export default function ShowcaseEventSettingsForm({ event }: { event: ShowcaseEvent }) {
+export default function ShowcaseEventSettingsForm({
+  event,
+  lockedReason = null,
+}: {
+  event: ShowcaseEvent;
+  /** Set after settlement: the server rejects every schedule change. */
+  lockedReason?: string | null;
+}) {
+  const locked = Boolean(lockedReason);
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState("");
@@ -39,6 +47,7 @@ export default function ShowcaseEventSettingsForm({ event }: { event: ShowcaseEv
 
   function handleSubmit(submitEvent: FormEvent<HTMLFormElement>) {
     submitEvent.preventDefault();
+    if (locked) return;
     setMessage("");
     setError("");
     const formData = new FormData(submitEvent.currentTarget);
@@ -62,6 +71,8 @@ export default function ShowcaseEventSettingsForm({ event }: { event: ShowcaseEv
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="grid gap-5" noValidate>
+      {lockedReason ? <FormMessage variant="info">{lockedReason}</FormMessage> : null}
+      <fieldset disabled={locked} className="grid min-w-0 gap-5 disabled:opacity-70">
       <div className="grid gap-4">
         {PERIODS.map((period) => (
           <fieldset key={period.title} className="grid gap-3 sm:grid-cols-2">
@@ -93,8 +104,9 @@ export default function ShowcaseEventSettingsForm({ event }: { event: ShowcaseEv
         <p className="text-xs leading-5 text-muted-foreground">모집 → 체험 → 발표 순서로 겹치지 않게 설정해 주세요. 체험 종료와 발표 시작 사이가 검증·추첨 기간이에요.</p>
         {error ? <FormMessage variant="error">{error}</FormMessage> : null}
         {message ? <FormMessage variant="info">{message}</FormMessage> : null}
-        <div><Button type="submit" disabled={isPending}>{isPending ? "저장 중…" : "일정 저장"}</Button></div>
+        <div><Button type="submit" disabled={isPending || locked}>{isPending ? "저장 중…" : "일정 저장"}</Button></div>
       </div>
+      </fieldset>
     </form>
   );
 }
