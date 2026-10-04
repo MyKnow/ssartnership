@@ -150,7 +150,8 @@ direct Mattermost 흐름은 `auth_security_logs.properties`에 안정적인 상�
 ## 보존 및 파기 정책
 
 - `event_logs`, `admin_audit_logs`, `auth_security_logs`, `push_message_logs`, `push_delivery_logs`의 원본은 생성일로부터 1년간 보존한다.
-- `platform_active_identities`, `partner_metric_rollups`, DAU·WAU·MAU 등 집계 데이터는 회원 ID, IP, user-agent, session ID를 포함하지 않는 통계 형태로 장기 보존한다.
+- `partner_metric_rollups`, DAU·WAU·MAU 등 집계 데이터는 회원 ID, IP, user-agent, session ID를 포함하지 않는 통계 형태로 장기 보존한다.
+- `platform_active_identities`와 `partner_metric_unique_visitors`는 해시·방문자 키를 담은 식별자 원장이므로 400일 뒤 파기한다. rate-limit 시도 기록, 알림 발송 결과, 만료된 업로드 세션의 기간도 같은 purge가 [데이터 수명주기 결정표](../security/data-lifecycle.md#보존파기-결정표)에 따라 정리한다.
 - `partner_benefit_usages`는 로그가 아닌 혜택 사용 원장으로 취급하며, 정산·분쟁 대응에 필요한 기간 동안 보존한다. 기본 보존기간은 1년이다.
 - 1년이 지난 원본 로그와 회원 연결형 혜택 사용 원장은 Vercel cron의 `/api/cron/purge-expired-operational-logs`가 보존 hold가 없는 행만 파기한다.
 - 보안 사고·분쟁·법령상 보존 사유가 발생하면 `log_retention_holds`에 대상 로그 그룹과 기간, 사유, 만료 시각을 등록한 뒤 원본을 예외 보존한다.
