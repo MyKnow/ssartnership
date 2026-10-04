@@ -11,7 +11,6 @@ function readRepoFile(pathname: string) {
 }
 
 const WORKFLOW_FILES = [
-  "admin-performance.yml",
   "cross-platform-development.yml",
   "public-readiness.yml",
   "self-host-public-health.yml",

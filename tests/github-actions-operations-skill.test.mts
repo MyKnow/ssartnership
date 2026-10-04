@@ -37,7 +37,6 @@ const reviewedWorkflowNpmCommands = new Set([
   "npm run doctor -- --ci",
   "npm run install:trusted",
   "npm run lint",
-  "npm run measure:admin:preview",
   "npm run test:e2e:ci",
   "npm run test-storybook",
   "npm run test:visual",
@@ -898,14 +897,27 @@ test("Dependabot keeps pinned GitHub Actions refs reviewable", () => {
   assert.match(config, /interval:\s*weekly/);
 });
 
-test("secret-bearing Actions keep credentials out of dependency installation", () => {
-  const adminPerformance = read(".github/workflows/admin-performance.yml");
+test("workflows reference no repository secret except the scoped GITHUB_TOKEN", () => {
+  const workflowDirectory = new URL("../.github/workflows/", import.meta.url);
+  const workflowNames = readdirSync(workflowDirectory).filter((name) => /\.ya?ml$/u.test(name));
 
-  assert.doesNotMatch(adminPerformance, /timeout-minutes: 20\s*\n\s+env:/);
-  assert.match(
-    adminPerformance,
-    /name: Measure Preview administrator performance[\s\S]+?env:\s*\n\s+SUPABASE_PREVIEW_URL:[\s\S]+?ADMIN_PREVIEW_LOGIN_PASSWORD:[\s\S]+?run: npm run measure:admin:preview/,
-  );
+  assert.ok(workflowNames.length > 0);
+  for (const name of [
+    "admin-performance.yml",
+    "self-host-preview-export.yml",
+    "self-host-production-export.yml",
+  ]) {
+    assert.equal(workflowNames.includes(name), false, `${name} is a retired cloud-era workflow`);
+  }
+  for (const name of workflowNames) {
+    const workflow = read(`.github/workflows/${name}`);
+    const secretNames = [...workflow.matchAll(/secrets\.([A-Za-z0-9_]+)/gu)].map((match) => match[1]);
+    assert.deepEqual(
+      [...new Set(secretNames)].filter((secretName) => secretName !== "GITHUB_TOKEN"),
+      [],
+      `${name} must not reintroduce cloud or preview credentials`,
+    );
+  }
 });
 
 test("the failure ledger records a paginated retained-run census", () => {

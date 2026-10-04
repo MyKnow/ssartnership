@@ -135,34 +135,11 @@ Mac engine은 사용자 소유 Docker Desktop Unix socket에 고정하고 환경
 
 ## 별도 장치 반출·복구
 
-### 원래 Cloud Preview의 암호화 이전 준비
+### 원래 Cloud 환경 반출 도구(폐기)
 
-원격 Storage 수집은 최대 4개 요청을 병렬 처리하되 다운로드와 재검증 pass 사이의 DB 목록 대조를 유지한다. 실패 시 다른 진행 요청도 중단하고 종료를 기다린 뒤 전체 실패로 반환하며, 재시도·파일 생략·부분 성공은 없다. 각 pass의 100개 단위 및 마지막 처리 건수만 공개 로그에 남긴다. 20분 상한은 늘리지 않으며 최종 목록 조회 도중 만료돼도 성공 ledger를 발급하지 않는다.
+원래 Cloud Preview·Production을 홈 서버로 옮길 때 쓴 읽기 전용 수집·age 암호화 전송 도구(`scripts/self-host-migration/`, `deploy/self-host-migration/`)와 GitHub export workflow 2개는 이전 완료 뒤 RF-04(#537)에서 삭제했다. PVE 자체 호스팅이 유일한 운영 정본이며 Cloud 반출·재export 경로는 유지하지 않는다. 당시 절차와 검증 근거는 삭제 직전 커밋 `b2a212f4`의 이 절과 [데이터 작업 목록](../../specs/self-host-database/tasks.md)에 남아 있다. 이 workflow들이 쓰던 Cloud 저장소 비밀의 삭제와 Cloud 프로젝트 키 폐기·해지는 저장소 밖 운영자 조치다.
 
-이전용 파일에는 기존 Production→Preview 정제를 적용하지 않는다. 원래 Preview의 완전 export·Storage byte 검증·새 DB 복원·쓰기를 정지한 최종 동등성 확인은 [데이터 기술 계획](../../specs/self-host-database/plan.md)을 따른다. `self-host-migration/database.mjs`와 `storage.mjs`는 읽기 전용 수집 모듈이고 `transfer.mjs`는 암호화 전송 경계다. Cloud export workflow 실행과 서버 복원·공개 전환의 완료를 뜻하지 않는다.
-
-DB 수집은 고정 Preview direct/session-pooler identity·5432·PostgreSQL 17·TLS `verify-full`을 요구한다. 기본 transaction을 읽기 전용으로 설정하며, 같은 `REPEATABLE READ READ ONLY` transaction의 exported snapshot으로 전체 custom-format `pg_dump`와 최초 Storage 목록을 연결한다. 원래 Preview 회원 비밀번호를 정제하지 않는다. DB 로그인 비밀번호는 별도 교체 대상이며 role 속성·membership만 별도 private JSON에 보존한다. 자격증명은 명령 인수가 아닌 명시적 PG 환경 이름으로만 client container에 전달하고 원본 stderr/SQL/객체 경로는 로그에 내보내지 않는다.
-
-연결용 CA는 시스템 기본 bundle이 아니라 [공식 dashboard가 제공하는 Supabase Root 2021 CA](https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt)를 사용한다. 저장소의 공개 certificate만 client에 read-only mount하며 파일 SHA256 `700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7`과 유효 기간을 확인한다. 시스템 신뢰 저장소는 수정하지 않는다. pooler URL이 6543으로 저장돼 있으면 동일하게 검증된 host/project의 session port 5432로 연결하며 direct host의 다른 port는 거부한다. [Supabase SSL 안내](https://supabase.com/docs/guides/platform/ssl-enforcement)의 인증서와 hostname 검증을 유지한다.
-
-원격 수집 진입점은 `self-host-migration/github-export.mjs`다. 전용 `self-host-preview-export.yml`은 이 작업 브랜치의 `deploy/self-host-migration/export-request.json` 변경에만 실행된다. repository/workflow/ref/SHA/첫 attempt, 현재 원격 branch head와 24시간 이하의 만료 요청을 확인한다. tool 준비에는 Cloud 비밀을 넣지 않고, 실제 capture step에만 기존 Preview DB/URL/service-role Secrets를 주입한다. Production/다른 Preview API identity·PR event·재실행·stale ref를 거부한다. 수집 후 다시 ref/만료를 확인하며, 성공한 암호문 `snapshot.tar.age`와 공개 전송 `receipt.json`만 2일 보존 artifact로 올린다. 평문 dump·객체·private ledger·age private key를 업로드하지 않는다. 원격 export 성공도 서버 복원이나 도메인 전환 성공이 아니다.
-
-전체 원본 archive는 검토·복구용 증거다. [Supabase의 자체 호스팅 복원 안내](https://supabase.com/docs/guides/self-hosting/restore-from-platform)가 설명하듯 managed 내부 schema/role과 대상 Storage/Auth 버전은 다를 수 있다. 따라서 이를 기존 대상에 무조건 `pg_restore`하지 않으며, receipt의 `restoreApproved:false`를 유지한다. 관리 schema와 custom role 매핑, 확장·함수·자동 RLS/event trigger·마이그레이션 이력·전체 데이터 검증이 새 격리 대상에서 먼저 필요하다.
-
-Storage는 snapshot에 있는 **모든** bucket/객체 metadata를 보존하고, 공개·비공개·빈 bucket·0바이트 파일을 제외하지 않는다. 원래 객체 경로 대신 일련번호 파일명을 사용하는 새 0700 directory에 0600 파일을 쓴다. 고정 Cloud Preview 인증 GET만 허용하고 redirect·부분 응답·누락·크기 초과·전송 실패를 재시도 없이 거부한다. 모든 파일을 다시 읽어 SHA256을 비교하고 두 번의 최신 DB 목록도 대조한다. GET이 갱신할 수 있는 `last_accessed_at`만 비교에서 제외하되 원래 값은 보존한다. 최대 파일 50MiB·합계 1GiB·20,000객체를 넘으면 전체 수집을 거부하며 일부만 성공으로 기록하지 않는다. 최종 private ledger는 전체 검증 이후에만 생성한다. 이 ledger에도 식별자/경로/metadata가 있으므로 공개 artifact로 올리지 않는다.
-
-이 검사는 관측 구간의 경합을 검출할 뿐 DB와 Storage의 원자적 시점을 보장하지 않는다. 실제 전환 직전 쓰기 정지와 최종 대조가 필수다. 실패한 private 부분 작업은 성공 ledger가 없으며 기존 directory를 재사용하지 않는다. 현재 합성 Docker 시험 명령은 아래와 같다. 실데이터를 Mac에 평문 수집하는 용도로 사용하지 않는다.
-
-```sh
-node tests/fixtures/self-host-migration-database.mjs .tmp/migration-database-fixture-new
-node tests/fixtures/self-host-migration-storage.mjs .tmp/migration-storage-fixture-new
-```
-
-첫 시험은 독립 internal network/tmpfs PG17에서 덤프 도중 원본을 바꾸고 새 DB 복원을 비교한다. 두 번째는 새 Supabase data Compose(58920 포트)의 실제 Storage API와 DB 수집, 전체 archive의 age 암호화/복호화를 함께 검사한다. 두 시험은 고정 image를 미리 준비해야 하고 두 번째는 `age`/`age-keygen`도 필요하다. 성공한 합성 컨테이너만 정리하며 실패 증거와 Compose 데이터 볼륨은 보존한다.
-
-전송에는 [표준 age](https://github.com/FiloSottile/age)의 native recipient를 사용한다. `install-age.mjs`는 Linux AMD64/ARM64의 1.3.2 공식 archive SHA256을 고정해 새 도구 directory에만 설치하고 기존 시스템 도구를 교체하지 않는다. Docker 시험에서는 실행 가능한 `/tools`와 실행 불가능한 데이터 tmpfs를 분리한다. 서버의 이전용 private identity는 새 root 0700 directory/0600 file에만 생성하고 GitHub에는 공개 recipient만 전달한다. SSH private key·DB 암호를 recipient로 재사용하지 않는다.
-
-받은 ciphertext와 receipt는 독립적으로 승인한 GitHub run/SHA/artifact에 연결하고 서버 private staging에서만 복호화한다. ciphertext hash·age 종료·평문 크기를 모두 확인한 뒤 새 최종 파일을 공개한다. 실패 시 해당 새 대상의 부분 평문만 제거하고 원본·암호화 사본·identity는 보존한다. `.partial` 제거는 포렌식 삭제나 디스크 암호화의 보장이 아니다. 실제 개인정보를 디스크 암호화가 미검증된 Mac에 복호화하지 않는다. 서버 key custody와 원본 재export 가능성을 확보하기 전에는 기존 Cloud Preview를 폐기하지 않는다.
+### 장치 고장 대비 반출
 
 독립 REST 백업 목적지가 결정되기 전의 장치 고장 대비 경로는 `pull-recovery.mjs <새 .tmp bundle 디렉터리> <별도 새 .tmp 키 디렉터리>`다. 기존 pinned VPN SSH wrapper로 읽기 반출하며 새 listener·포트 전달·SSH 개인키 복사를 하지 않는다. 운영 heavy/operations 잠금 안에서 최신 paired manifest와 암호화된 pgBackRest/Restic 저장소를 고정한다. 키 묶음은 Mac에서 생성한 RSA 4096 공개키에 RSA-OAEP-SHA256/AES-256-GCM으로 봉인한다. 서버에는 수신 공개키만 전달한다.
 
@@ -219,7 +196,7 @@ timer는 `OnUnitActiveSec=5min`과 최대 60초 분산 지연으로 동작한다
 
 스키마 tree가 달라지면 앱 수신은 차단된다. legacy Cloud Preview writer였던 `preview-migrations.yml`과 `preview-sync.yml`은 [Issue #484](https://github.com/MyKnow/ssartnership/issues/484)에서 삭제했으므로 migration이 포함된 `dev` push는 Cloud Preview에 DDL을 쓰지 않고 Supabase 앱 검사도 기대하지 않는다. 다음 SQL 변경은 백업·새 후보 복구·실제 migration 검증을 거쳐 운영자가 home 승인 baseline을 갱신해야 한다. 승인 JSON의 hash만 바꾸거나 기존 migration 파일을 수정하는 방식은 허용하지 않는다. Preview와 Production의 승인 파일은 서로 대체할 수 없다.
 
-원본 Cloud는 삭제하지 않은 frozen 복구 기준선이다. 홈 서버 쓰기 이후의 복귀에는 변경분 조정이 필요하며 CONNECT grant와 DNS만 되돌리는 절차를 정상 rollback으로 사용하지 않는다. 원본의 수동 외부 cold backup/복원 성공은 상시 WAL/PITR·정기 외부 사본·독립 지역 복구의 완료 근거가 아니다. 운영 이미지 정리도 별도 보존 정책이 필요한 단계이며 `docker system prune` 또는 volume 삭제를 자동 수신기에 추가하지 않는다.
+원본 Cloud는 더 이상 복구 경로로 유지하지 않는다. 홈 서버 쓰기 이후 Cloud로 되돌리는 절차는 없으며 CONNECT grant와 DNS만 되돌리는 방식을 rollback으로 사용하지 않는다. 원본의 수동 외부 cold backup/복원 성공은 상시 WAL/PITR·정기 외부 사본·독립 지역 복구의 완료 근거가 아니다. 운영 이미지 정리도 별도 보존 정책이 필요한 단계이며 `docker system prune` 또는 volume 삭제를 자동 수신기에 추가하지 않는다.
 
 ## 테스트 정리와 수신기 호환성
 
