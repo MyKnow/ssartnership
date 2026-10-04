@@ -1,4 +1,5 @@
 import { normalizeNotificationTargetUrl } from "@/lib/notifications/shared";
+import { toOperationalTemplateChannel } from "@/lib/notifications/channel";
 import { forEachWithConcurrency } from "@/lib/async-concurrency";
 import { listAdminAccounts } from "@/lib/admin-accounts";
 import { canAdmin } from "@/lib/admin-permissions";
@@ -502,7 +503,11 @@ export async function createAdminOperationalNotification(input: {
   const supabase = getSupabaseAdminClient();
   const targetUrl = toTargetUrl(input.targetUrl, "/admin/notifications");
   const inAppTemplate = await resolveNotificationTemplate(
-    getAdminOperationalTemplateKey("in_app", input.type, input.templateVariant),
+    getAdminOperationalTemplateKey(
+      toOperationalTemplateChannel("portal"),
+      input.type,
+      input.templateVariant,
+    ),
   );
   const inAppVariables = mergeNotificationTemplateVariables({
     context: input.templateContext,
@@ -720,7 +725,11 @@ const ADMIN_OPERATIONAL_PUSH: OperationalPushAudienceConfig = {
   subscriptionTable: "admin_push_subscriptions",
   ownerColumn: "admin_id",
   getTemplateKey: (type, variant) =>
-    getAdminOperationalTemplateKey("push", type, variant),
+    getAdminOperationalTemplateKey(
+      toOperationalTemplateChannel("push"),
+      type,
+      variant,
+    ),
   recordDelivery: ({ ownerId, ...input }) =>
     recordAdminDelivery({ ...input, adminId: ownerId, channel: "push" }),
 };
@@ -729,7 +738,11 @@ const PARTNER_OPERATIONAL_PUSH: OperationalPushAudienceConfig = {
   subscriptionTable: "partner_push_subscriptions",
   ownerColumn: "account_id",
   getTemplateKey: (type, variant) =>
-    getPartnerOperationalTemplateKey("push", type, variant),
+    getPartnerOperationalTemplateKey(
+      toOperationalTemplateChannel("push"),
+      type,
+      variant,
+    ),
   recordDelivery: ({ ownerId, ...input }) =>
     recordPartnerDelivery({ ...input, accountId: ownerId, channel: "push" }),
 };
@@ -884,7 +897,7 @@ export async function createPartnerOperationalNotification(input: {
   const targetUrl = toTargetUrl(input.targetUrl, "/partner/notifications");
   const inAppTemplate = await resolveNotificationTemplate(
     getPartnerOperationalTemplateKey(
-      "in_app",
+      toOperationalTemplateChannel("portal"),
       input.type,
       input.templateVariant,
     ),

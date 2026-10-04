@@ -27,6 +27,7 @@ import {
   collectRowsByFilterChunks,
 } from "@/lib/supabase/paging";
 import { getCampaignTemplateKey } from "@/lib/notification-templates/catalog";
+import { toMemberTemplateChannel } from "@/lib/notifications/channel";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
 import {
   NOTIFICATION_TEMPLATE_MAX_BODY_LENGTH,
@@ -615,7 +616,11 @@ export async function sendAdminNotificationCampaign(
   }
 
   const inAppTemplate = await resolveNotificationTemplate(
-    getCampaignTemplateKey("in_app", input.notificationType, source),
+    getCampaignTemplateKey(
+      toMemberTemplateChannel("in_app"),
+      input.notificationType,
+      source,
+    ),
   );
   const templateVariables = mergeNotificationTemplateVariables({
     context: input.templateContext,

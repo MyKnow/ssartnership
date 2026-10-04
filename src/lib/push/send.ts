@@ -1,5 +1,6 @@
 import { notificationRepository } from "@/lib/repositories";
 import { normalizeNotificationTargetUrl } from "@/lib/notifications/shared";
+import { toMemberTemplateChannel } from "@/lib/notifications/channel";
 import { getCampaignTemplateKey } from "@/lib/notification-templates/catalog";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
 import { renderNotificationTemplate } from "@/lib/notification-templates/template";
@@ -176,10 +177,10 @@ export async function sendPushToAudience(
   }
 
   const template = await resolveNotificationTemplate(
-    getCampaignTemplateKey("push", rawPayload.type),
+    getCampaignTemplateKey(toMemberTemplateChannel("push"), rawPayload.type),
   );
   const inAppTemplate = await resolveNotificationTemplate(
-    getCampaignTemplateKey("in_app", rawPayload.type),
+    getCampaignTemplateKey(toMemberTemplateChannel("in_app"), rawPayload.type),
   );
   const templateVariables = {
     title: rawPayload.title,

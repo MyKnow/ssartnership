@@ -29,6 +29,7 @@ import type {
   AdminNotificationType,
 } from "@/lib/admin-notification-ops-types";
 import { getCampaignTemplateKey } from "@/lib/notification-templates/catalog";
+import { toMemberTemplateChannel } from "@/lib/notifications/channel";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
 import { renderNotificationTemplate } from "@/lib/notification-templates/template";
 import {
@@ -346,7 +347,11 @@ async function sendMattermostCampaignDeliveriesDirect(params: {
   let sent = 0;
   let failed = 0;
   const template = await resolveNotificationTemplate(
-    getCampaignTemplateKey("mattermost", params.notificationType, params.source),
+    getCampaignTemplateKey(
+      toMemberTemplateChannel("mm"),
+      params.notificationType,
+      params.source,
+    ),
   );
   const categoryLabel = params.notificationType === "marketing" ? "광고" : "공지";
   const templateVariables = mergeNotificationTemplateVariables({
@@ -465,7 +470,11 @@ export async function sendPushCampaignDeliveries(params: {
   }
 
   const template = await resolveNotificationTemplate(
-    getCampaignTemplateKey("push", params.payload.type, params.source),
+    getCampaignTemplateKey(
+      toMemberTemplateChannel("push"),
+      params.payload.type,
+      params.source,
+    ),
   );
   const templateVariables = mergeNotificationTemplateVariables({
     context: params.templateContext,
