@@ -11,7 +11,7 @@ authority: normative
 
 | 데이터 | 수집·접근·저장 | 삭제·복제·복구 확인 지점 |
 | --- | --- | --- |
-| 회원·인증 | 최소 입력, 서버 전용 비밀번호 해시·토큰 처리; 원문 로그 금지 | [익명화 계약](../../tests/member-anonymization-schema-contract.test.mts), [계정 삭제](../../tests/member-account-deletion-flow.test.mts) |
+| 회원·인증 | 최소 입력, 서버 전용 비밀번호 해시·토큰 처리; 원문 로그 금지 | [익명화 계약](../../tests/member-anonymization-schema-contract.test.mts), [익명화 FK 범위](../../tests/member-anonymization-fk-coverage.test.mts), [계정 삭제](../../tests/member-account-deletion-flow.test.mts) |
 | 사진·증명서·리뷰 미디어 | 소유권·타입·크기 확인 후 Storage 저장, 필요한 범위만 조회 | [파일 계약](../../tests/graduate-verification-files.test.mts), [미디어 정리](../../tests/partner-media-attachment-cleanup.test.mts) |
 | 감사·제품·보안 로그 | 민감 값 제거, 역할별 조회 | [로그 정본](../architecture/event-logging.md), [보존 정책 테스트](../../tests/log-retention-policy.test.mts), [보존 확장 테스트](../../tests/log-retention-expansion.test.mts) |
 | Preview 복제 | `scripts/self-host-environments/sanitize.mjs`가 비밀번호·토큰·PIN 계열 컬럼을 sentinel로 바꾸고, 검토되지 않은 비밀 후보 컬럼이 있으면 실패한다. 이메일은 마스킹하고 nullable IP·user-agent는 비운다 | [환경 복제 계약](../../tests/self-host-environments.test.mts) |
@@ -41,6 +41,14 @@ authority: normative
 | 15기 종료 후 회원 데이터 | 미정. 서비스 종료·이관 방향 결정에 따른다 | 없음 | 운영자 결정 필요 |
 
 보안 사고·분쟁은 `log_retention_holds`에 그룹·기간·사유를 남겨 파기를 멈춘다. 그룹은 원본 로그 6종과 `rate_limit_attempts`, `notification_deliveries`, `image_upload_sessions`, `platform_active_identities`, `partner_metric_unique_visitors`다. hold는 만료 시각이 지나면 효력이 없다.
+
+## 회원 익명화 범위
+
+`members` 행은 지우지 않고 갱신하므로 FK cascade가 동작하지 않는다. `anonymize_deleted_member()`가 직접 처리하는 범위는 다음과 같고, 회원 FK가 있는 테이블이 이 목록이나 보존 목록 중 하나에 반드시 들어가도록 [FK 범위 테스트](../../tests/member-anonymization-fk-coverage.test.mts)가 막는다.
+
+- 삭제: 프로필 사진 기록, 이메일 인증·로그인 전환·비밀번호 토큰, 졸업 프로필, 레거시 SSAFY 검증(테이블이 있을 때만), 푸시 설정·구독, 회원 알림함·발송 결과, 즐겨찾기, 리뷰 반응, 관리자 알림 수신자·설정·구독·발송 결과, 쇼케이스 대표자 명단 행, Wallet 패스(별도 purge RPC)
+- 식별 정보만 제거: 정책 동의의 IP·user-agent, 수료생 인증 요청(마스킹), 수동 가져오기 행의 이름·이메일·Mattermost ID, 이벤트 경품 당첨 스냅샷, 푸시 로그의 회원 연결, 수료생 업로드의 회원 연결, 쇼케이스 등록·조회·체험·피드백·관심·제외·당첨·출품의 회원 연결과 학번
+- 보존: 리뷰 본문과 미디어(작성자는 "탈퇴한 회원"으로 표시), 제휴 혜택 이용·쿠폰 발급·사용 기록(정산 증빙, 로그 보존 기간 적용), 관리자로서 남긴 처리 주체 FK(검수자·발송자·작성자 등), 비활성화한 관리자 프로필
 
 ## 백업과 파기
 

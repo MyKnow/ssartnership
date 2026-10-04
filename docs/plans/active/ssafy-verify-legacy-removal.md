@@ -22,11 +22,11 @@ authority: normative
 
 **HOLD — 현재는 삭제를 승인할 수 없다.**
 
-런타임의 SSAFY Verify reader·writer·route는 제거됐지만, 다음 네 가지가 남아 있다.
+런타임의 SSAFY Verify reader·writer·route는 제거됐지만, 다음 항목이 남아 있다. 3번은 2026-10-05에 해소됐다.
 
 1. Production에 Verify proof 13행과 legacy Mattermost alias 8행이 남아 있다. 둘 다 식별 가능 정보이므로 보관 또는 삭제 결정을 운영자가 명시해야 한다.
 2. Vercel에 런타임이 더 이상 읽지 않는 Verify 환경 변수 key 10종, target별 엔트리 12개가 남아 있다. 그중 server client secret 엔트리는 삭제와 provider credential 폐기를 함께 결정해야 한다.
-3. `anonymize_deleted_member(uuid)`가 `member_ssafy_verifications`를 직접 삭제하고, 이미 제거된 `members.ssafy_*` 컬럼도 참조한다. 현재 30일 익명화 대기 행은 0건이지만, 향후 대상이 생기면 익명화 작업이 실패할 수 있으므로 레거시 테이블보다 함수를 먼저 교체해야 한다.
+3. 해소됨. `anonymize_deleted_member(uuid)`는 `20260813014223`·`20260813114408`부터 현행 `members` 컬럼만 참조한다. `20261005030746_harden_privileges_retention_and_lifecycle.sql`부터는 `member_ssafy_verifications`가 있을 때만 동적으로 삭제하므로, 레거시 테이블 drop이 함수 교체에 더 이상 의존하지 않는다.
 4. TypeScript와 DB constraint에 휴면 상태의 `ssafy_sub` 식별자 예약 계약이 남아 있다. Production 예약 행은 0건이지만, 스키마 삭제와 함께 계약·테스트를 정리해야 한다.
 
 ## Production 비식별 집계
@@ -140,7 +140,7 @@ Production `members`에는 현재 `ssafy_*` 컬럼이 없다. 과거 migration�
 2. 현행 `members` 컬럼만 사용하는 `anonymize_deleted_member` 계약 테스트를 먼저 추가한다. proof table 삭제 전후 모두 익명화가 성립해야 한다.
 3. `MemberIdentifierReservation`의 `ssafy_sub`, `ssafySub` input과 관련 test를 제거한다.
 4. 실제 현재시각 prefix의 forward migration 하나에서 다음 순서를 지킨다.
-   1. `anonymize_deleted_member`를 현행 컬럼만 사용하고 proof table을 참조하지 않도록 교체한다.
+   1. (완료) `anonymize_deleted_member`는 현행 컬럼만 쓰고 proof table을 존재할 때만 정리한다. 별도 교체가 필요 없다.
    2. `member_identifier_reservations_kind_check`에서 `ssafy_sub`를 제거한다.
    3. `member_ssafy_verifications`를 drop한다.
    4. `mm_user_directory.legacy_ssafy_mattermost_user_id`와 partial index를 drop한다.

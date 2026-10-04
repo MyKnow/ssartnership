@@ -14203,116 +14203,8 @@ revoke all on function public.soft_delete_member(uuid, jsonb) from anon;
 revoke all on function public.soft_delete_member(uuid, jsonb) from authenticated;
 grant execute on function public.soft_delete_member(uuid, jsonb) to service_role;
 
-create or replace function public.anonymize_deleted_member(p_member_id uuid)
-returns boolean
-language plpgsql
-security invoker
-set search_path = public
-as $$
-declare
-  member_row public.members%rowtype;
-  mattermost_account_uuid uuid;
-  verification_request_uuid uuid;
-begin
-  select * into member_row
-  from public.members
-  where id = p_member_id
-    and deleted_at is not null
-    and deleted_at <= now() - interval '30 days'
-    and anonymized_at is null
-  for update;
-
-  if not found then
-    return false;
-  end if;
-
-  if not public.purge_deleted_member_wallet_data_for_anonymization(p_member_id) then
-    raise exception 'member_wallet_lifecycle_anonymization_gate_failed';
-  end if;
-
-  mattermost_account_uuid := member_row.mattermost_account_id;
-  select verification_request_id into verification_request_uuid
-  from public.graduate_profiles
-  where member_id = p_member_id;
-
-  delete from public.member_profile_images where member_id = p_member_id;
-  delete from public.member_ssafy_verifications where member_id = p_member_id;
-  delete from public.member_email_challenges where member_id = p_member_id;
-  delete from public.member_email_login_transitions where member_id = p_member_id;
-  delete from public.member_password_action_tokens where member_id = p_member_id;
-
-  -- The normalized member contract dropped this legacy table. Keep cleanup
-  -- compatible with a lagging environment without making it a dependency of
-  -- the current Production function.
-  if pg_catalog.to_regclass('public.member_auth_identities') is not null then
-    execute 'delete from public.member_auth_identities where member_id = $1'
-      using p_member_id;
-  end if;
-
-  delete from public.graduate_profiles where member_id = p_member_id;
-
-  update public.graduate_verification_requests as request
-  set email = concat('deleted+', request.id::text, '@deleted.invalid'),
-      email_normalized = concat('deleted+', request.id::text, '@deleted.invalid'),
-      legal_name = '탈퇴한 수료생',
-      document_number_hmac = null,
-      certificate_storage_path = null,
-      certificate_sha256 = null,
-      certificate_deleted_at = coalesce(request.certificate_deleted_at, now()),
-      review_note = null,
-      rejection_reason = null,
-      status = case
-        when request.request_kind = 'existing_member_recovery'
-          and request.recovery_member_id = p_member_id
-          and request.status = 'approved'
-        then 'withdrawn'
-        else request.status
-      end,
-      recovery_member_id = case
-        when request.recovery_member_id = p_member_id then null
-        else request.recovery_member_id
-      end,
-      updated_at = now()
-  where request.id = verification_request_uuid
-     or request.recovery_member_id = p_member_id;
-
-  update public.members
-  set email = null,
-      email_normalized = null,
-      email_verified_at = null,
-      manual_login_id = null,
-      password_hash = null,
-      password_salt = null,
-      must_change_password = false,
-      display_name = '탈퇴한 회원',
-      campus = null,
-      staff_source_generation = null,
-      mattermost_account_id = null,
-      mattermost_login_disabled_at = null,
-      mattermost_login_disabled_reason = null,
-      auth_session_version = auth_session_version + 1,
-      anonymized_at = now(),
-      updated_at = now()
-  where id = p_member_id;
-
-  if mattermost_account_uuid is not null then
-    delete from public.mm_user_directory directory
-    where directory.id = mattermost_account_uuid
-      and not exists (
-        select 1
-        from public.members linked_member
-        where linked_member.mattermost_account_id = directory.id
-      );
-  end if;
-
-  return true;
-end;
-$$;
-
-revoke all on function public.anonymize_deleted_member(uuid) from public;
-revoke all on function public.anonymize_deleted_member(uuid) from anon;
-revoke all on function public.anonymize_deleted_member(uuid) from authenticated;
-grant execute on function public.anonymize_deleted_member(uuid) to service_role;
+-- anonymize_deleted_member(uuid): the current contract is the
+-- 20261005030746_harden_privileges_retention_and_lifecycle.sql snapshot.
 
 -- Source: 20260821001338_add_admin_member_password_reset.sql
 -- Keep table-constraint mutations before the read-model parity section so
@@ -22814,6 +22706,181 @@ revoke all on function public.purge_expired_operational_logs(timestamp with time
 revoke all on function public.purge_expired_operational_logs(timestamp with time zone) from anon;
 revoke all on function public.purge_expired_operational_logs(timestamp with time zone) from authenticated;
 grant execute on function public.purge_expired_operational_logs(timestamp with time zone) to service_role;
+
+-- Member anonymization scope -------------------------------------------------
+-- members rows are anonymized in place, so FK cascades never fire on this path.
+-- Every member-linked table is either cleared here or explicitly retained
+-- (tests/member-anonymization-fk-coverage.test.mts keeps that list complete).
+create or replace function public.anonymize_deleted_member(p_member_id uuid)
+returns boolean
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  member_row public.members%rowtype;
+  mattermost_account_uuid uuid;
+  verification_request_uuid uuid;
+begin
+  select * into member_row
+  from public.members
+  where id = p_member_id
+    and deleted_at is not null
+    and deleted_at <= now() - interval '30 days'
+    and anonymized_at is null
+  for update;
+
+  if not found then
+    return false;
+  end if;
+
+  if not public.purge_deleted_member_wallet_data_for_anonymization(p_member_id) then
+    raise exception 'member_wallet_lifecycle_anonymization_gate_failed';
+  end if;
+
+  mattermost_account_uuid := member_row.mattermost_account_id;
+  select verification_request_id into verification_request_uuid
+  from public.graduate_profiles
+  where member_id = p_member_id;
+
+  delete from public.member_profile_images where member_id = p_member_id;
+  delete from public.member_email_challenges where member_id = p_member_id;
+  delete from public.member_email_login_transitions where member_id = p_member_id;
+  delete from public.member_password_action_tokens where member_id = p_member_id;
+
+  -- Legacy tables are cleaned only while they exist, so dropping them later
+  -- does not depend on replacing this function first.
+  if pg_catalog.to_regclass('public.member_ssafy_verifications') is not null then
+    execute 'delete from public.member_ssafy_verifications where member_id = $1'
+      using p_member_id;
+  end if;
+  if pg_catalog.to_regclass('public.member_auth_identities') is not null then
+    execute 'delete from public.member_auth_identities where member_id = $1'
+      using p_member_id;
+  end if;
+
+  delete from public.graduate_profiles where member_id = p_member_id;
+
+  -- Settings, devices, inbox and member-only interactions.
+  delete from public.push_preferences where member_id = p_member_id;
+  delete from public.push_subscriptions where member_id = p_member_id;
+  delete from public.member_notifications where member_id = p_member_id;
+  delete from public.notification_deliveries where member_id = p_member_id;
+  delete from public.partner_favorites where member_id = p_member_id;
+  delete from public.partner_review_reactions where member_id = p_member_id;
+  delete from public.admin_push_subscriptions where admin_id = p_member_id;
+  delete from public.admin_notification_recipients where admin_id = p_member_id;
+  delete from public.admin_notification_preferences where admin_id = p_member_id;
+  delete from public.admin_notification_deliveries where admin_id = p_member_id;
+
+  -- Evidence rows stay, without the network identifiers or contact snapshots.
+  update public.member_policy_consents
+  set ip_address = null,
+      user_agent = null
+  where member_id = p_member_id
+    and (ip_address is not null or user_agent is not null);
+  update public.graduate_verification_uploads
+  set member_id = null
+  where member_id = p_member_id;
+  update public.push_delivery_logs
+  set member_id = null
+  where member_id = p_member_id;
+  update public.push_message_logs
+  set target_member_id = null
+  where target_member_id = p_member_id;
+  update public.manual_member_import_rows
+  set member_id = null,
+      display_name = null,
+      mm_username = null,
+      email = null,
+      email_normalized = null
+  where member_id = p_member_id;
+  update public.event_reward_winners
+  set display_name = '탈퇴한 회원',
+      mm_username = null,
+      campus = null
+  where member_id = p_member_id;
+
+  -- Project showcase: the same detachment the post-settlement purge applies.
+  delete from public.showcase_project_participants participant
+  using public.showcase_projects project
+  where project.id = participant.project_id
+    and project.owner_member_id = p_member_id
+    and participant.is_owner;
+  update public.showcase_registrations
+  set member_id = null,
+      student_number = null
+  where member_id = p_member_id;
+  update public.showcase_project_views set member_id = null where member_id = p_member_id;
+  update public.showcase_experiences set member_id = null where member_id = p_member_id;
+  update public.showcase_feedback set member_id = null where member_id = p_member_id;
+  update public.showcase_interests set member_id = null where member_id = p_member_id;
+  update public.showcase_candidate_exclusions set member_id = null where member_id = p_member_id;
+  update public.showcase_winners set member_id = null where member_id = p_member_id;
+  update public.showcase_projects set owner_member_id = null where owner_member_id = p_member_id;
+
+  update public.graduate_verification_requests as request
+  set email = concat('deleted+', request.id::text, '@deleted.invalid'),
+      email_normalized = concat('deleted+', request.id::text, '@deleted.invalid'),
+      legal_name = '탈퇴한 수료생',
+      document_number_hmac = null,
+      certificate_storage_path = null,
+      certificate_sha256 = null,
+      certificate_deleted_at = coalesce(request.certificate_deleted_at, now()),
+      review_note = null,
+      rejection_reason = null,
+      status = case
+        when request.request_kind = 'existing_member_recovery'
+          and request.recovery_member_id = p_member_id
+          and request.status = 'approved'
+        then 'withdrawn'
+        else request.status
+      end,
+      recovery_member_id = case
+        when request.recovery_member_id = p_member_id then null
+        else request.recovery_member_id
+      end,
+      updated_at = now()
+  where request.id = verification_request_uuid
+     or request.recovery_member_id = p_member_id;
+
+  update public.members
+  set email = null,
+      email_normalized = null,
+      email_verified_at = null,
+      manual_login_id = null,
+      password_hash = null,
+      password_salt = null,
+      must_change_password = false,
+      display_name = '탈퇴한 회원',
+      campus = null,
+      staff_source_generation = null,
+      mattermost_account_id = null,
+      mattermost_login_disabled_at = null,
+      mattermost_login_disabled_reason = null,
+      auth_session_version = auth_session_version + 1,
+      anonymized_at = now(),
+      updated_at = now()
+  where id = p_member_id;
+
+  if mattermost_account_uuid is not null then
+    delete from public.mm_user_directory directory
+    where directory.id = mattermost_account_uuid
+      and not exists (
+        select 1
+        from public.members linked_member
+        where linked_member.mattermost_account_id = directory.id
+      );
+  end if;
+
+  return true;
+end;
+$$;
+
+revoke all on function public.anonymize_deleted_member(uuid) from public;
+revoke all on function public.anonymize_deleted_member(uuid) from anon;
+revoke all on function public.anonymize_deleted_member(uuid) from authenticated;
+grant execute on function public.anonymize_deleted_member(uuid) to service_role;
 
 -- Public schema privilege defaults --------------------------------------------
 -- The application reaches the database only through the service role. Remove
