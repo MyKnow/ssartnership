@@ -32,6 +32,15 @@ test("web-push 모듈 로더는 push/web-push-client.ts 한 곳에만 있다", (
     ),
   );
   assert.deepEqual(importers, ["src/lib/push/web-push-client.ts"]);
+
+  const directSenders = listSourceFiles("src").filter((path) =>
+    /\.sendNotification\(/.test(readSource(path)),
+  );
+  assert.deepEqual(
+    directSenders,
+    ["src/lib/push/web-push-client.ts"],
+    "발송은 타임아웃이 걸린 sendWebPush만 사용한다",
+  );
 });
 
 test("관리자 알림 운영 타입은 서버 모듈과 분리되어 있고 역import 순환이 없다", () => {

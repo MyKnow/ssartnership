@@ -19,13 +19,13 @@ import {
 } from "@/lib/partner-notification-routing";
 import { sendPartnerOperationalNotificationEmail } from "@/lib/partner-email";
 import { isPushConfigured } from "@/lib/push/config";
-import { getWebPush } from "@/lib/push/web-push-client";
 import {
-  buildTrustedPushSubscriptionRequest,
-  validateTrustedPushSubscription,
-} from "@/lib/push/subscription-trust";
+  getWebPush,
+  sendWebPush,
+  shouldDeactivatePushSubscription,
+} from "@/lib/push/web-push-client";
+import { validateTrustedPushSubscription } from "@/lib/push/subscription-trust";
 import type { SubscriptionInput } from "@/lib/push/types";
-import { PushError } from "@/lib/push/types";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { isPartnerPortalMock } from "@/lib/partner-portal";
 import {
@@ -819,14 +819,7 @@ async function sendOperationalPushDeliveries(
     async (subscription) => {
       const ownerId = String(subscription[config.ownerColumn] ?? "");
       try {
-        await webpush.sendNotification(
-          await buildTrustedPushSubscriptionRequest({
-            endpoint: subscription.endpoint,
-            p256dh: subscription.p256dh,
-            auth: subscription.auth,
-          }),
-          serialized,
-        );
+        await sendWebPush(webpush, subscription, serialized);
         await markOperationalPushResult({
           table: config.subscriptionTable,
           id: subscription.id,
@@ -838,13 +831,6 @@ async function sendOperationalPushDeliveries(
           status: "sent",
         });
       } catch (error) {
-        const statusCode =
-          typeof error === "object" && error && "statusCode" in error
-            ? Number((error as { statusCode?: number }).statusCode)
-            : null;
-        const isInvalidSubscription =
-          error instanceof PushError &&
-          (error as InstanceType<typeof PushError>).code === "invalid_request";
         const errorMessage =
           error instanceof Error ? error.message : "푸시 발송 실패";
         await markOperationalPushResult({
@@ -852,8 +838,7 @@ async function sendOperationalPushDeliveries(
           id: subscription.id,
           ok: false,
           errorMessage,
-          deactivate:
-            isInvalidSubscription || statusCode === 404 || statusCode === 410,
+          deactivate: shouldDeactivatePushSubscription(error),
         });
         await config.recordDelivery({
           notificationId: input.notificationId,

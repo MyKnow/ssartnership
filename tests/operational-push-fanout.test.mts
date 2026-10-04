@@ -336,6 +336,7 @@ for (const scenario of scenarios) {
         icon: "/icon-192.png",
         badge: "/icon-192.png",
       });
+      assert.deepEqual(send.options, { timeout: 10_000 });
     }
 
     const subscriptionUpdates = new Map(

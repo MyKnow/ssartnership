@@ -11,7 +11,11 @@ import {
 } from "../supabase/paging.ts";
 import { forEachWithConcurrency } from "../async-concurrency.ts";
 import { isPushConfigured, wrapPushDbError } from "./config.ts";
-import { getWebPush } from "./web-push-client.ts";
+import {
+  getWebPush,
+  sendWebPush,
+  shouldDeactivatePushSubscription,
+} from "./web-push-client.ts";
 import { getDefaultPushAudience, resolvePushAudience } from "./audience.ts";
 import {
   createPushMessageLog,
@@ -27,7 +31,6 @@ import {
   sanitizeNotificationUrl,
 } from "./payloads.ts";
 import { getActiveSubscriptionPushPreferences } from "./preferences.ts";
-import { buildTrustedPushSubscriptionRequest } from "./subscription-trust.ts";
 import {
   PushError,
 } from "./types.ts";
@@ -338,14 +341,7 @@ export async function sendPushToAudience(
     await forEachWithConcurrency(targets, PUSH_SEND_CONCURRENCY, async (subscription) => {
       let providerError: unknown = null;
       try {
-        await webpush.sendNotification(
-          await buildTrustedPushSubscriptionRequest({
-            endpoint: subscription.endpoint,
-            p256dh: subscription.p256dh,
-            auth: subscription.auth,
-          }),
-          serialized,
-        );
+        await sendWebPush(webpush, subscription, serialized);
       } catch (error) {
         providerError = error;
       }
@@ -372,21 +368,11 @@ export async function sendPushToAudience(
       }
 
       failed += 1;
-      const statusCode =
-        typeof providerError === "object" &&
-        providerError &&
-        "statusCode" in providerError
-          ? Number((providerError as { statusCode?: number }).statusCode)
-          : null;
       const errorMessage =
         providerError instanceof Error
           ? providerError.message
           : "푸시 알림 전송에 실패했습니다.";
-      const deactivate =
-        (providerError instanceof PushError &&
-          providerError.code === "invalid_request") ||
-        statusCode === 404 ||
-        statusCode === 410;
+      const deactivate = shouldDeactivatePushSubscription(providerError);
       await settlePushBookkeeping([
         markPushFailure(subscription, errorMessage, deactivate),
         logPushDelivery({
@@ -472,14 +458,7 @@ export async function sendPushTemplateTest(input: {
     PUSH_SEND_CONCURRENCY,
     async (subscription) => {
       try {
-        await webpush.sendNotification(
-          await buildTrustedPushSubscriptionRequest({
-            endpoint: subscription.endpoint,
-            p256dh: subscription.p256dh,
-            auth: subscription.auth,
-          }),
-          serialized,
-        );
+        await sendWebPush(webpush, subscription, serialized);
         delivered += 1;
         await settlePushBookkeeping([
           markPushSuccess(subscription.id),
@@ -493,16 +472,7 @@ export async function sendPushTemplateTest(input: {
         ], "sent");
       } catch (error) {
         failed += 1;
-        const statusCode =
-          typeof error === "object" &&
-          error &&
-          "statusCode" in error
-            ? Number((error as { statusCode?: number }).statusCode)
-            : null;
-        const deactivate =
-          (error instanceof PushError && error.code === "invalid_request") ||
-          statusCode === 404 ||
-          statusCode === 410;
+        const deactivate = shouldDeactivatePushSubscription(error);
         await settlePushBookkeeping([
           markPushFailure(subscription, "템플릿 테스트 푸시 발송 실패", deactivate),
           logPushDelivery({
