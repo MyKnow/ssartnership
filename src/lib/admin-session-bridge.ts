@@ -58,11 +58,13 @@ export function sanitizeAdminReturnTo(
  * closed.
  */
 export function isMemberSessionFreshForAdminBridge(
-  session: { issuedAt: number },
+  session: { issuedAt: number; authenticatedAt?: number },
   ttlSeconds: number,
   now = Date.now(),
 ) {
-  const authenticatedAt = session.issuedAt;
+  // Prefer the credential time; tokens issued before it existed fall back to
+  // the issue time, which is never earlier than the credential check.
+  const authenticatedAt = session.authenticatedAt ?? session.issuedAt;
   if (!Number.isFinite(authenticatedAt) || authenticatedAt > now) {
     return false;
   }

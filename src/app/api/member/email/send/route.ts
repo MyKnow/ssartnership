@@ -23,6 +23,10 @@ import { logMemberEmailSecurity } from "@/lib/member-email-security-log";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { requireMemberApiSession } from "@/lib/member-api-session";
+import {
+  getMemberRecentAuthErrorBody,
+  verifyMemberRecentAuthentication,
+} from "@/lib/member-recent-auth.server";
 import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
 import {
   RouteJsonBodyError,
@@ -52,9 +56,13 @@ export async function POST(request: Request) {
 
   let body: {
     email?: unknown;
+    currentPassword?: unknown;
   } | null = null;
   try {
-    body = await readRouteJsonBodyWithinLimit<{ email?: unknown }>(request, {
+    body = await readRouteJsonBodyWithinLimit<{
+      email?: unknown;
+      currentPassword?: unknown;
+    }>(request, {
       maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
       invalidMessage: "이메일 주소를 확인해 주세요.",
       tooLargeMessage: "요청 본문이 너무 큽니다.",
@@ -130,6 +138,26 @@ export async function POST(request: Request) {
     currentMember.email_verified_at
   ) {
     return NextResponse.json({ ok: true, alreadyVerified: true });
+  }
+
+  // Binding a new login/recovery email lets the holder reset the password
+  // later, so a stolen session must not be enough on its own.
+  const recentAuth = await verifyMemberRecentAuthentication({
+    session,
+    currentPassword: body?.currentPassword,
+    ipAddress: context.ipAddress ?? null,
+  });
+  if (!recentAuth.ok) {
+    await logMemberEmailSecurity({
+      context,
+      flow: "verification",
+      stage: "send",
+      status: recentAuth.code === "recent_auth_blocked" ? "blocked" : "failure",
+      actorId: session.userId,
+      reason: recentAuth.code,
+    });
+    const denied = getMemberRecentAuthErrorBody(recentAuth.code);
+    return NextResponse.json(denied.body, { status: denied.status });
   }
   if (await hasReservedMemberIdentifier({ emailNormalized: email })) {
     return NextResponse.json(

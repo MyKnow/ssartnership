@@ -70,6 +70,27 @@ function verifyToken(token: string) {
   return parseUserSessionToken(token, getSecret());
 }
 
+/**
+ * `freshAuthentication` is passed only by flows that just checked a
+ * credential (password login, emailed setup link, recovery code, current
+ * password change). Every other re-issue (for example a consent snapshot
+ * refresh) carries the previous credential time forward so it cannot reset
+ * the recent-auth window.
+ */
+function resolveSessionAuthenticatedAt(
+  userId: string,
+  currentSession: SignedUserSession | null,
+  freshAuthentication: boolean | undefined,
+  now: number,
+) {
+  if (freshAuthentication) {
+    return now;
+  }
+  return currentSession?.userId === userId
+    ? currentSession.authenticatedAt
+    : undefined;
+}
+
 async function getRawSignedUserSession() {
   noStore();
   const store = await cookies();
@@ -162,6 +183,12 @@ export async function setUserSession(
           ? currentSession.policyConsentSnapshot ?? undefined
           : undefined;
     const persistent = options?.persistent ?? currentSession?.persistent ?? true;
+    const authenticatedAt = resolveSessionAuthenticatedAt(
+      userId,
+      currentSession,
+      options?.freshAuthentication,
+      now,
+    );
     const payload = JSON.stringify({
       userId,
       authSessionVersion: member.authSessionVersion,
@@ -173,6 +200,7 @@ export async function setUserSession(
       ...(resolvedPolicyConsentSnapshot !== undefined
         ? { policyConsentSnapshot: resolvedPolicyConsentSnapshot }
         : {}),
+      ...(authenticatedAt !== undefined ? { authenticatedAt } : {}),
     });
     const token = signPayload(payload);
     const store = await cookies();
@@ -224,6 +252,12 @@ export async function setUserSession(
         ? currentSession.policyConsentSnapshot ?? undefined
         : undefined;
   const persistent = options?.persistent ?? currentSession?.persistent ?? true;
+  const authenticatedAt = resolveSessionAuthenticatedAt(
+    userId,
+    currentSession,
+    options?.freshAuthentication,
+    now,
+  );
   const payload = JSON.stringify({
     userId,
     authSessionVersion: member.auth_session_version,
@@ -235,6 +269,7 @@ export async function setUserSession(
     ...(resolvedPolicyConsentSnapshot !== undefined
       ? { policyConsentSnapshot: resolvedPolicyConsentSnapshot }
       : {}),
+    ...(authenticatedAt !== undefined ? { authenticatedAt } : {}),
   });
   const token = signPayload(payload);
   const store = await cookies();

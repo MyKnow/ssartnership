@@ -30,6 +30,13 @@ export type UserSessionTokenPayload = {
   mustChangePassword?: boolean;
   persistent?: boolean;
   policyConsentSnapshot?: PolicyConsentSnapshot | null;
+  /**
+   * Time of the last credential check (password, emailed setup link, or
+   * recovery code). Optional and additive: tokens issued before the field
+   * existed still parse and are simply treated as "not recently
+   * authenticated" by the recent-auth rule.
+   */
+  authenticatedAt?: number;
 };
 
 export type AdminSessionTokenPayload = {
@@ -138,6 +145,17 @@ export function parseUserSessionToken(
   if (policyConsentSnapshot === false) {
     return null;
   }
+  if (
+    parsed.authenticatedAt !== undefined
+    && (
+      typeof parsed.authenticatedAt !== "number"
+      || !Number.isSafeInteger(parsed.authenticatedAt)
+      || parsed.authenticatedAt <= 0
+      || parsed.authenticatedAt > parsed.issuedAt
+    )
+  ) {
+    return null;
+  }
 
   return {
     userId: parsed.userId,
@@ -150,6 +168,9 @@ export function parseUserSessionToken(
       : {}),
     ...(parsed.persistent !== undefined ? { persistent: parsed.persistent } : {}),
     ...(policyConsentSnapshot !== undefined ? { policyConsentSnapshot } : {}),
+    ...(parsed.authenticatedAt !== undefined
+      ? { authenticatedAt: parsed.authenticatedAt as number }
+      : {}),
   };
 }
 

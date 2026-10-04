@@ -45,6 +45,7 @@ test("회원 탈퇴 경고 화면은 최종 모달 확인 후에만 동일 출�
   assert.match(page, /getMemberAccountDeletionNavigation/);
   assert.match(page, /getSignedUserSession/);
   assert.match(page, /redirect\(`\/auth\/login\?returnTo=/);
-  assert.match(page, /<MemberAccountDeletionView settingsHref=\{settingsHref\} \/>/);
+  assert.match(page, /<MemberAccountDeletionView\s+settingsHref=\{settingsHref\}\s+recentAuthRequirement=\{recentAuthRequirement\}\s+\/>/);
+  assert.match(page, /getMemberRecentAuthRequirement\(session\)/);
   assert.match(story, /findByRole\("dialog", \{ name: "정말 탈퇴하시겠습니까\?" \}\)/);
 });

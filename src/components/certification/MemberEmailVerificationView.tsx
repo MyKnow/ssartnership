@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil } from "lucide-react";
+import MemberRecentAuthField from "@/components/auth/MemberRecentAuthField";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import InlineMessage from "@/components/ui/InlineMessage";
@@ -17,12 +18,19 @@ import {
   MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS,
   resolveMemberEmailDeadline,
 } from "@/lib/member-email-verification-timing";
+import {
+  getMemberCurrentPasswordFieldError,
+  getMemberRecentAuthFeedback,
+  isMemberRecentAuthErrorCode,
+  type MemberRecentAuthRequirement,
+} from "@/lib/member-recent-auth";
 import { isValidEmail } from "@/lib/validation";
 
 type MemberEmailResponse = {
   ok?: boolean;
   alreadyVerified?: boolean;
   code?: string;
+  error?: string;
   message?: string;
   expiresAt?: string;
   expiresInSeconds?: number;
@@ -42,15 +50,21 @@ export default function MemberEmailVerificationView({
   initialEmail,
   emailVerified,
   completionHref,
+  recentAuthRequirement = "none",
 }: {
   initialEmail?: string | null;
   emailVerified?: boolean;
   completionHref: string;
+  recentAuthRequirement?: MemberRecentAuthRequirement;
 }) {
   const router = useRouter();
   const { notify } = useToast();
   const emailInputRef = useRef<HTMLInputElement>(null);
   const codeInputRef = useRef<HTMLInputElement>(null);
+  const currentPasswordRef = useRef<HTMLInputElement>(null);
+  const [requirement, setRequirement] = useState(recentAuthRequirement);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   const [email, setEmail] = useState(initialEmail ?? "");
   const [lockedEmail, setLockedEmail] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -103,18 +117,49 @@ export default function MemberEmailVerificationView({
       emailInputRef.current?.focus();
       return;
     }
+    if (requirement === "reauthentication") {
+      return;
+    }
+    const currentPasswordError = getMemberCurrentPasswordFieldError(
+      currentPassword,
+      requirement,
+    );
+    if (currentPasswordError) {
+      setPasswordError(currentPasswordError);
+      currentPasswordRef.current?.focus();
+      return;
+    }
 
     setSending(true);
     setErrorMessage(null);
+    setPasswordError(null);
     try {
       const response = await fetch("/api/member/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: normalizedEmail }),
+        body: JSON.stringify({
+          email: normalizedEmail,
+          ...(requirement === "password" ? { currentPassword } : {}),
+        }),
       });
       const payload = (await response
         .json()
         .catch(() => null)) as MemberEmailResponse | null;
+
+      if (isMemberRecentAuthErrorCode(payload?.error)) {
+        // The password field lives in step 1; return there so it is visible.
+        const feedback = getMemberRecentAuthFeedback(payload.error);
+        if (feedback.requirement) setRequirement(feedback.requirement);
+        setLockedEmail(null);
+        setCode("");
+        setCodeExpiresAt(null);
+        setPasswordError(feedback.fieldError ?? null);
+        setErrorMessage(feedback.formError ?? null);
+        if (feedback.fieldError) {
+          window.setTimeout(() => currentPasswordRef.current?.focus(), 0);
+        }
+        return;
+      }
 
       if (!response.ok || !payload?.ok) {
         if (
@@ -395,6 +440,19 @@ export default function MemberEmailVerificationView({
             />
           </label>
 
+          <MemberRecentAuthField
+            id="member-email-current-password"
+            requirement={requirement}
+            value={currentPassword}
+            onChange={(value) => {
+              setCurrentPassword(value);
+              setPasswordError(null);
+            }}
+            error={passwordError}
+            inputRef={currentPasswordRef}
+            disabled={sending || verifying}
+          />
+
           {errorMessage ? (
             <FormMessage id="member-email-error" variant="error">
               {errorMessage}
@@ -407,7 +465,10 @@ export default function MemberEmailVerificationView({
             loading={sending}
             loadingText="인증 코드 전송 중"
             disabled={
-              verifying || resendRemainingSeconds > 0 || !hasValidEmail
+              verifying
+              || resendRemainingSeconds > 0
+              || !hasValidEmail
+              || requirement === "reauthentication"
             }
           >
             {resendRemainingSeconds > 0
