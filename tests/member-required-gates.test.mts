@@ -48,10 +48,6 @@ const passwordLoginRoutePath = new URL(
   "../src/app/api/auth/login/route.ts",
   import.meta.url,
 );
-const legacyMattermostLoginRoutePath = new URL(
-  "../src/app/api/mm/login/route.ts",
-  import.meta.url,
-);
 const mattermostProfileSyncRoutePath = new URL(
   "../src/app/api/mm/profile-sync/route.ts",
   import.meta.url,
@@ -246,18 +242,15 @@ test("본인 사진 게이트는 검증한 회원 세션을 헤더와 Drawer에�
 });
 
 test("비밀번호 로그인 완료 경로는 사진 미제출 상태를 반환해 즉시 사진 게이트로 보낸다", async () => {
-  const [passwordLoginRoute, legacyMattermostLoginRoute, loginForm] =
+  const [passwordLoginRoute, loginForm] =
     await Promise.all([
       readFile(passwordLoginRoutePath, "utf8"),
-      readFile(legacyMattermostLoginRoutePath, "utf8"),
       readFile(new URL("../src/components/auth/LoginForm.tsx", import.meta.url), "utf8"),
     ]);
 
-  for (const source of [passwordLoginRoute, legacyMattermostLoginRoute]) {
-    assert.match(source, /getMemberProfilePhotoState/);
-    assert.match(source, /requiresMemberProfilePhotoUpdate/);
-    assert.match(source, /requiresProfilePhotoUpdate/);
-  }
+  assert.match(passwordLoginRoute, /getMemberProfilePhotoState/);
+  assert.match(passwordLoginRoute, /requiresMemberProfilePhotoUpdate/);
+  assert.match(passwordLoginRoute, /requiresProfilePhotoUpdate/);
   for (const source of [loginForm]) {
     assert.match(source, /requiresProfilePhotoUpdate:\s*Boolean\([^)]*requiresProfilePhotoUpdate\)/);
   }

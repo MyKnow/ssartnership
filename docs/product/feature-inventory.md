@@ -26,7 +26,7 @@ authority: normative
 
 | 기능 | 현재 구현 | 주요 데이터/규칙 |
 | --- | --- | --- |
-| 회원 로그인 | `/api/mm/login`, `LoginForm`, `user-auth.ts` | HMAC session, auth attempts, user-safe errors |
+| 회원 로그인 | `/api/auth/login`, `LoginForm`, `user-auth.ts` | HMAC session, auth attempts, user-safe errors |
 | 회원가입 | `/auth/signup`, `/api/mm/code/*`, `/api/mm/signup` | 기수별 Sender, MM ID, 코드 HMAC, members |
 | Sender 운영 | `/admin/cycle`, `MattermostSenderManager` | AES-GCM credential registry, Super Admin 이중 권한, 테스트 DM |
 | 비밀번호 재설정 | `/auth/reset`, `/api/mm/code/*`, `/api/mm/reset-password/complete` | direct DM code, reset session, auth security log |

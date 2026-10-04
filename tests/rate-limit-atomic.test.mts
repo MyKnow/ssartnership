@@ -336,13 +336,13 @@ test("abuse-sensitive callers distinguish storage failure before normal block ha
     ["src/app/api/mm/change-password/route.ts", "blockedState", 1],
     ["src/app/api/mm/code/issue/route.ts", "blocked", 1],
     ["src/app/api/mm/code/verify/route.ts", "blocked", 1],
-    ["src/app/api/mm/login/route.ts", "blockedState", 1],
     ["src/app/api/partner/change-password/route.ts", "blockedState", 1],
     ["src/app/api/partner/reset-password/route.ts", "blockedState", 1],
     ["src/app/api/suggest/route.ts", "blockingState", 1],
     ["src/app/api/uploads/images/complete/route.ts", "blockingState", 1],
     ["src/app/api/uploads/images/sign/route.ts", "blockingState", 1],
     ["src/app/partner/login/_actions/login.ts", "blockedState", 1],
+    ["src/lib/member-recent-auth.server.ts", "blockingState", 1],
   ] as const;
 
   for (const [path, decision, expectedOccurrences] of callers) {

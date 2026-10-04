@@ -28,11 +28,11 @@ authority: descriptive
 
 | Method | Route | 목적 |
 | --- | --- | --- |
-| POST | `/api/mm/login` | 회원 로그인 |
-| POST | `/api/mm/logout` | 회원 로그아웃 |
+| POST | `/api/auth/login` | 회원 로그인(아이디·이메일·비밀번호) |
+| POST | `/api/mm/logout` | 회원 로그아웃(모든 기기 세션 무효화) |
 | POST | `/api/mm/change-password` | 회원 비밀번호 변경 |
 | POST | `/api/mm/consent` | 정책 동의 |
-| POST | `/api/mm/delete` | 회원 삭제/탈퇴 |
+| POST | `/api/mm/delete` | 회원 탈퇴(최근 인증 또는 현재 비밀번호 필요) |
 | GET | `/api/mm/avatar` | 현재 회원 avatar |
 | GET | `/api/mm/certification-token` | 인증 QR token |
 | POST | `/api/mm/profile-sync` | 회원 프로필 동기화 |
