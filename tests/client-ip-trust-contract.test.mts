@@ -78,29 +78,30 @@ test("app containers stay off public interfaces and run in the trusted proxy mod
   }
 });
 
+const srcRoot = fileURLToPath(new URL("../src", import.meta.url));
+
+function listSourceFiles(directory = srcRoot): string[] {
+  const files: string[] = [];
+  for (const entry of readdirSync(directory)) {
+    const path = join(directory, entry);
+    if (statSync(path).isDirectory()) {
+      files.push(...listSourceFiles(path));
+      continue;
+    }
+    if (/\.(ts|tsx|mts|js|mjs)$/u.test(entry) && !/\.stories\.tsx?$/u.test(entry)) {
+      files.push(path);
+    }
+  }
+  return files;
+}
+
 test("only the shared client IP helper reads client address headers", () => {
-  const srcRoot = fileURLToPath(new URL("../src", import.meta.url));
   const allowed = new Set([join(srcRoot, "lib", "client-ip.ts")]);
   const forbidden =
     /["'`](x-forwarded-for|x-real-ip|x-vercel-forwarded-for|cf-connecting-ip|true-client-ip|x-client-ip)["'`]/iu;
-  const offenders: string[] = [];
-
-  const walk = (directory: string) => {
-    for (const entry of readdirSync(directory)) {
-      const path = join(directory, entry);
-      if (statSync(path).isDirectory()) {
-        walk(path);
-        continue;
-      }
-      if (!/\.(ts|tsx|mts|js|mjs)$/u.test(entry) || /\.stories\.tsx?$/u.test(entry)) {
-        continue;
-      }
-      if (!allowed.has(path) && forbidden.test(readFileSync(path, "utf8"))) {
-        offenders.push(path.slice(srcRoot.length + 1));
-      }
-    }
-  };
-  walk(srcRoot);
+  const offenders = listSourceFiles()
+    .filter((path) => !allowed.has(path) && forbidden.test(readFileSync(path, "utf8")))
+    .map((path) => path.slice(srcRoot.length + 1));
 
   assert.deepEqual(offenders, []);
 
@@ -109,4 +110,19 @@ test("only the shared client IP helper reads client address headers", () => {
   assert.equal([...helper.matchAll(/headerStore\.get\(/gu)].length, 1);
   assert.match(helper, /headerStore\.get\(CLIENT_IP_HEADER\)/u);
   assert.doesNotMatch(helper, /process\.env\.VERCEL/u);
+});
+
+test("request correlation never depends on hosting-platform request headers", () => {
+  // 자체 호스팅 체인에는 플랫폼 전용 헤더를 붙이는 홉이 없으므로, 클라이언트가 보낸
+  // 같은 이름의 헤더가 요청 식별·IP 판정에 섞이지 않도록 src 전체에서 읽지 않는다.
+  const offenders = listSourceFiles()
+    .filter((path) => /["'`]x-vercel-[a-z-]+["'`]/iu.test(readFileSync(path, "utf8")))
+    .map((path) => path.slice(srcRoot.length + 1));
+  assert.deepEqual(offenders, []);
+
+  // 파트너 초기 설정 실패 로그는 보안 로그와 같은 서버 생성 requestId로 연결한다.
+  const setupRoute = read("src/app/api/partner/setup/[token]/route.ts");
+  assert.match(setupRoute, /const logContext = getRequestLogContext\(request\);/u);
+  assert.match(setupRoute, /requestId: logContext\.requestId,/u);
+  assert.match(setupRoute, /\.\.\.logContext,/u);
 });

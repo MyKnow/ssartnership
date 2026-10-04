@@ -129,6 +129,10 @@ function isIpv4CompatibleIpv6Address(bytes: Uint8Array) {
  * - 64:ff9b:1::/48 NAT64 local-use prefix (RFC 8215)
  * - 2002::/16     6to4 (RFC 3056, RFC 7526으로 폐기)
  * - 2001::/32     Teredo (RFC 4380)
+ *
+ * 이 판정은 이미지 프록시·프로필 사진 원격 fetch와 웹 푸시 endpoint 신뢰 검사가 함께
+ * 쓴다. DNS64 resolver 뒤에서는 공개 호스트도 64:ff9b::로 해석돼 위 경로가 모두
+ * 거부되므로, 서버 egress는 네이티브 IPv4/IPv6 resolver를 전제로 한다.
  */
 function isIpv4TransitionIpv6Address(bytes: Uint8Array) {
   const isNat64Prefix = bytes[0] === 0x00 && bytes[1] === 0x64 && bytes[2] === 0xff && bytes[3] === 0x9b;
