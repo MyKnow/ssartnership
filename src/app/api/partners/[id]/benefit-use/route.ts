@@ -15,7 +15,7 @@ import {
   RouteJsonBodyError,
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
-import { getSignedUserSession } from "@/lib/user-auth";
+import { requireMemberApiSession } from "@/lib/member-api-session";
 import { isMockDataSource } from "@/lib/mock/member";
 
 export const runtime = "nodejs";
@@ -171,10 +171,11 @@ export async function POST(
     return NextResponse.json({ ok: false, message: "잘못된 요청입니다." }, { status: 403 });
   }
 
-  const session = await getSignedUserSession();
-  if (!session?.userId) {
-    return NextResponse.json({ ok: false, message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requireMemberApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
 
   const partnerId = safeDecodeSegment((await params).id ?? "");
   if (!UUID_PATTERN.test(partnerId) && !(isMockDataSource() && isSafeMockPartnerId(partnerId))) {

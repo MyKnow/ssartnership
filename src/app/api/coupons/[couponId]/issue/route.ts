@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adPackageRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
-import { getSignedUserSession } from "@/lib/user-auth";
+import { requireMemberApiSession } from "@/lib/member-api-session";
 
 function statusForReason(reason: string) {
   if (reason === "not_found") return 404;
@@ -17,10 +17,11 @@ export async function POST(
   if (!isTrustedSameOriginRequest(request, { expectedOrigin: request.nextUrl.origin })) {
     return NextResponse.json({ ok: false, message: "잘못된 요청입니다." }, { status: 403 });
   }
-  const session = await getSignedUserSession();
-  if (!session?.userId) {
-    return NextResponse.json({ ok: false, message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requireMemberApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
   const couponId = decodeURIComponent((await params).couponId ?? "").trim();
   if (!couponId || couponId.length > 128) {
     return NextResponse.json({ ok: false, message: "쿠폰 정보를 확인할 수 없습니다." }, { status: 400 });

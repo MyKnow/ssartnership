@@ -237,11 +237,11 @@ test("본문 제한은 기존 same-origin·인증·quota 순서를 보존한다"
   const routeChecks = [
     {
       path: "src/app/api/coupon-issues/[issueId]/redeem/route.ts",
-      before: ["isTrustedSameOriginRequest", "getSignedUserSession", "safeDecodeSegment"],
+      before: ["isTrustedSameOriginRequest", "requireMemberApiSession", "safeDecodeSegment"],
     },
     {
       path: "src/app/api/coupons/[couponId]/redeem/route.ts",
-      before: ["isTrustedSameOriginRequest", "getSignedUserSession", "safeDecodeSegment"],
+      before: ["isTrustedSameOriginRequest", "requireMemberApiSession", "safeDecodeSegment"],
     },
     {
       path: "src/app/api/mm/signup/route.ts",
@@ -253,11 +253,11 @@ test("본문 제한은 기존 same-origin·인증·quota 순서를 보존한다"
     },
     {
       path: "src/app/api/partners/[id]/benefit-use/route.ts",
-      before: ["isTrustedSameOriginRequest", "getSignedUserSession", "safeDecodeSegment"],
+      before: ["isTrustedSameOriginRequest", "requireMemberApiSession", "safeDecodeSegment"],
     },
     {
       path: "src/app/api/partners/[id]/favorite/route.ts",
-      before: ["isTrustedSameOriginRequest", "getSignedUserSession", "partnerExists"],
+      before: ["isTrustedSameOriginRequest", "requireMemberApiSession", "partnerExists"],
     },
     {
       path: "src/app/api/partners/[id]/reviews/[reviewId]/reaction/route.ts",

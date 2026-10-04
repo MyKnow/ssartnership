@@ -17,6 +17,7 @@ import {
   readPartnerReviewSubmission,
   resolveReviewMediaPayload,
 } from "./_shared";
+import { memberApiSessionDeniedResponse } from "@/lib/member-api-session";
 
 export const runtime = "nodejs";
 
@@ -82,6 +83,9 @@ export async function POST(
       { ok: false, message: "로그인 후 리뷰를 작성할 수 있습니다." },
       { status: 401 },
     );
+  }
+  if (session.mustChangePassword) {
+    return memberApiSessionDeniedResponse("password_change_required");
   }
 
   const partner = await ensureVisibleReviewPartner(id, session.userId);

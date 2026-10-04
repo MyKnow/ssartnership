@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { notificationRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
-import { getSignedUserSession } from "@/lib/user-auth";
+import { requireMemberApiSession } from "@/lib/member-api-session";
 import { getSafeNotificationRouteError } from "@/lib/notifications/safe-error";
 
 export const runtime = "nodejs";
@@ -18,10 +18,11 @@ export async function PATCH(
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
 
-  const session = await getSignedUserSession();
-  if (!session?.userId) {
-    return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requireMemberApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
 
   try {
     const { id } = await params;
@@ -62,10 +63,11 @@ export async function DELETE(
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
 
-  const session = await getSignedUserSession();
-  if (!session?.userId) {
-    return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requireMemberApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
 
   try {
     const { id } = await params;

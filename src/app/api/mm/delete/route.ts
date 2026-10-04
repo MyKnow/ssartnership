@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
-import { getSignedUserSession, clearUserSession } from "@/lib/user-auth";
+import { clearUserSession } from "@/lib/user-auth";
+import { requireMemberApiSession } from "@/lib/member-api-session";
 import { clearAdminSession } from "@/lib/auth";
 import { softDeleteMember } from "@/lib/member-lifecycle";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
@@ -20,17 +21,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  const session = await getSignedUserSession();
-  if (!session?.userId) {
+  const auth = await requireMemberApiSession();
+  if ("response" in auth) {
+    const unauthorized = auth.response.status === 401;
     await logAuthSecurity({
       ...context,
       eventName: "member_delete",
       status: "failure",
-      actorType: "guest",
-      properties: { reason: "unauthorized" },
+      actorType: unauthorized ? "guest" : "member",
+      properties: {
+        reason: unauthorized ? "unauthorized" : "password_change_required",
+      },
     });
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    return auth.response;
   }
+  const { session } = auth;
 
   try {
     const deleted = await softDeleteMember(session.userId);

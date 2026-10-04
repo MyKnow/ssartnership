@@ -10,6 +10,10 @@ import type { ImageUploadPurpose } from "@/lib/image-upload/policy";
 import { getGraduateApplicationSession } from "@/lib/graduate-verification-security";
 import { getPartnerSession } from "@/lib/partner-session";
 import { getSignedUserSession } from "@/lib/user-auth";
+import {
+  MEMBER_API_SESSION_DENIALS,
+  resolveMemberApiSessionDenial,
+} from "@/lib/member-api-session";
 import { getMattermostCodeSession } from "@/lib/mattermost-code-session";
 
 export const IMAGE_UPLOAD_GUEST_COOKIE = "image_upload_guest";
@@ -79,8 +83,10 @@ async function getAdminActorForPurpose(purpose: ImageUploadPurpose) {
 
 async function getMemberActor() {
   const session = await getSignedUserSession();
-  if (!session?.userId) {
-    throw new ImageUploadAuthorizationError(401, "로그인이 필요합니다.");
+  const denial = resolveMemberApiSessionDenial(session);
+  if (denial || !session) {
+    const { status, message } = MEMBER_API_SESSION_DENIALS[denial ?? "unauthorized"];
+    throw new ImageUploadAuthorizationError(status, message);
   }
   return { kind: "member" as const, id: session.userId };
 }

@@ -7,7 +7,7 @@ import {
   isGraduateVerificationBlocked,
   recordGraduateVerificationAttempt,
 } from "@/lib/graduate-verification-rate-limit";
-import { getSignedUserSession } from "@/lib/user-auth";
+import { requireMemberApiSession } from "@/lib/member-api-session";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
 import {
@@ -23,10 +23,11 @@ export async function POST(request: Request) {
   if (!isTrustedSameOriginRequest(request, { allowedContentTypes: ["application/json"] })) {
     return NextResponse.json({ ok: false, message: "요청을 확인해 주세요." }, { status: 403 });
   }
-  const session = await getSignedUserSession();
-  if (!session?.userId) {
-    return NextResponse.json({ ok: false, message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requireMemberApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
   const rateLimitContext = {
     route: "member-profile-photo-submit" as const,
     accountIdentifier: session.userId,

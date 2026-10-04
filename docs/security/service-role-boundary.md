@@ -18,7 +18,7 @@ Supabase service role key는 RLS를 우회할 수 있으므로 서버 전용 코
 - service role 접근은 항상 명시적인 실행 맥락 뒤에 둔다.
   - 관리자 화면·server action 맥락: `requireAdminPageAccess()` 또는 `requireAdminPermission(resource, action)` 계열
   - 관리자 API 맥락: `ensureAdminApiPermission(request, resource, action)` 또는 세션이 필요하면 `getAdminApiPermissionSession(...)`. `getAdminSession()`과 `canAdmin()`을 route에서 직접 조합하지 않는다(거부 보안 로그가 빠진다).
-  - 회원 맥락: signed member session 확인
+  - 회원 맥락: signed member session 확인. 회원 쓰기 API는 `requireMemberApiSession()`으로 비밀번호 변경 필요 상태(403)까지 함께 확인한다. 예외(비밀번호 변경·동의·로그아웃)는 `tests/member-api-session.test.mts`의 허용 목록에 사유와 함께 둔다.
   - 파트너 맥락: partner session 확인과 연결 회사/브랜드 권한 확인
   - cron 맥락: `CRON_SECRET` Bearer(상수시간 비교)
   - 공개 읽기 맥락: 공개 projection만 반환하는 repository/helper
