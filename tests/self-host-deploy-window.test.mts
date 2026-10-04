@@ -61,3 +61,15 @@ test("the relay firewall waits for routed networking and retries a bounded numbe
   // Docker still refuses to start without the rules (fail closed).
   assert.match(read("deploy/pve/docker-relay.conf"), /^Requires=ssartnership-relay-firewall\.service$/mu);
 });
+
+test("release manifests outlive a quiet branch for the receiver's re-verification", () => {
+  for (const workflow of ["self-host-production.yml", "self-host-preview.yml"]) {
+    const config = load(read(`.github/workflows/${workflow}`)) as { jobs: Record<string, { steps: { name?: string; with?: Record<string, unknown> }[] }> };
+    const steps = Object.values(config.jobs).flatMap((job) => job.steps);
+    const manifest = steps.find((step) => step.name === "Publish immutable deployment manifest");
+    assert.equal(manifest?.with?.["retention-days"], 90, workflow);
+  }
+  const runbook = read("docs/operations/runbooks/self-host-ci-maintenance.md");
+  assert.match(runbook, /## 수동 롤백과 이미지 보존/u);
+  assert.match(runbook, /docker image prune -a/u);
+});
