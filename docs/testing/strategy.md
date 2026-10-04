@@ -22,6 +22,25 @@ authority: normative
 
 명령 정본은 [package.json](../../package.json), 위험 분류 정본은 [change-policy](../../scripts/lib/change-policy.mjs)다. `verify:change`를 평소 실행하고 `verify:release`는 승격과 검사 정책·E2E 변경에 실행한다. Storybook·Visual은 수동 워크플로다. 재시도·skip으로 필수 검사를 통과 처리하지 않는다.
 
+## 러너 선택
+
+| 러너 | 위치·명령 | 쓰는 경우 |
+| --- | --- | --- |
+| `node:test` | `tests/*.test.mts`, `tests/push/*.test.mts` · `npm run test:node` | 순수 helper·selector·parser·지표 계산, repository mock, 마이그레이션·설정 파일 같은 소스 계약 |
+| Vitest unit | `tests/unit/*.test.ts` · `npm run test:unit` | `vi.mock`으로 `next/headers`·`next/cache`·Supabase client·세션 모듈을 바꿔야 하는 route handler·server action |
+| Vitest Storybook | `npm run test-storybook` | 컴포넌트 상호작용·a11y(수동 실행) |
+| Playwright | `npm run test:e2e` | 여러 화면에 걸친 사용자 과업, 인증·권한 흐름 |
+
+새 테스트는 대상 모듈을 import해 동작을 확인하는 방식을 우선한다. 파일을 텍스트로 읽어 정규식으로 검사하는 소스 계약은 서버 없이 동작을 실행할 수 없는 경우(마이그레이션 SQL, workflow, 배포 설정 등)에만 좁게 쓴다.
+
+## 리팩토링과 소스 계약 테스트
+
+2026-10-05 기준 Node 테스트 파일 475개 중 285개가 `readFileSync`/`readFile`로 저장소 파일을 읽는다. 이 테스트는 경로나 문자열이 바뀌면 동작과 무관하게 실패하거나, 더 나쁘게는 다른 파일을 읽으며 조용히 의미를 잃는다.
+
+- 파일을 옮기거나 이름·문자열을 바꾸기 전에 `grep -rl "<경로|식별자|문자열>" tests`로 참조 테스트를 찾고, 같은 커밋에서 새 경로·문자열로 갱신한다.
+- 큰 모듈을 분해하는 PR은 첫 커밋에서 분해 대상 순수 함수의 현재 동작을 import 기반 특성화 테스트로 고정한다.
+- 공용 읽기 헬퍼 `tests/support/read-source.mts`가 생기면 새 소스 계약 테스트는 그 헬퍼를 사용한다.
+
 ## 유지·삭제 판단
 
 보호하는 과업·실패 영향·대체 검증·실행 빈도·비용을 함께 판단한다. 접근 차단, 소유 범위, 개인정보, 금전·쿠폰 원자성, 발송 중복, 운영 복구는 유지한다. CSS 클래스·컴포넌트 배치 문자열, 이미 다른 행동 검사에서 확인하는 렌더 스모크, 일회성 QA 스크린샷 반복은 삭제·통합 후보이다. 파일 이름에 UI가 있다는 이유로 권한·중복 제출 검사를 함께 삭제하지 않는다.

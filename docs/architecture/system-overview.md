@@ -66,6 +66,21 @@ Browser
 - repository method는 raw DB row가 아니라 domain model을 반환한다.
 - Supabase row-to-domain mapping은 Supabase repository 근처에 둔다.
 
+## Mock 모드 지원 범위
+
+mock 데이터 모드는 기본 E2E(`playwright.config.ts`), Storybook, `npm run bootstrap`이 만드는 로컬 profile을 위해 유지한다([리팩토링 기본 결정 D6](../plans/active/refactor-program-2026-10.md#기본-결정)). 모든 모듈에 mock 경로를 두는 것이 목표가 아니다.
+
+| 범위 | 지원 방식 |
+| --- | --- |
+| 공개 카탈로그·리뷰·즐겨찾기·회원 알림·쿠폰·혜택 사용 | `src/lib/repositories/index.ts`의 6개 mock 저장소 |
+| 쇼케이스 | `src/lib/project-showcase/repository.mock.ts` |
+| 협력사 포털 | `NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE=mock`과 `src/lib/mock/partner-portal*` |
+| 회원 로그인 | `MOCK_MEMBER_AUTH=1`(mock profile 전용) |
+| Storybook·화면 상태 | `src/lib/mock/scenarios/*` 시나리오 레지스트리 |
+| E2E 쓰기 | `E2E_MOCK_MUTATIONS=1`일 때 허용된 mock 쓰기와 `/api/e2e/mock/reset` |
+
+이 밖에서 Supabase를 직접 조회하는 모듈은 mock 모드 동작을 보장하지 않는다. E2E·Storybook이 렌더하는 경로는 직접 조회 대신 위 저장소나 시나리오 adapter를 거쳐야 한다(CI에는 Supabase 비밀이 없다). 새 mock 쓰기 경로는 E2E나 Storybook이 실제로 필요할 때만 추가한다. 자체 호스팅 real 모드 실행 검증(`deploy/self-host/runtime-env.mjs`)은 두 data source가 `supabase`가 아니거나 `MOCK_MEMBER_AUTH`가 켜져 있으면 거절한다.
+
 ## Supabase access
 
 - 서버 코드는 `getSupabaseAdminClient()`를 통해 service role 기반 query를 수행한다.

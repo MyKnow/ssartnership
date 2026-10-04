@@ -62,6 +62,9 @@ History shows these files commonly move together:
 - Put Supabase row-to-domain mapping near the Supabase repository implementation.
 - Keep service/business rules such as visibility, authorization, periods, state transitions, and recoverable errors outside page components when they grow beyond simple rendering.
 - When changing a model, check `src/lib/types.ts`, relevant repository interfaces, mock repository, Supabase repository, migrations, schema snapshot, pages, and admin forms.
+- Placement: a table used by one domain gets a domain-folder repository (`src/lib/<domain>/repository.ts`, `repository.supabase.ts`, `repository.mock.ts` when mock mode needs it). An entity shared by several domains belongs in `src/lib/repositories/` (interface, `mock/*.mock.ts`, `supabase/*.supabase.ts`, selected in `index.ts`). Do not create a third layout.
+- Do not add a new file that calls `.from("<table>")` outside `src/lib/repositories/`; move the query behind the domain repository instead. The ratchet baseline and measurement commands live in `docs/plans/tech-debt.md`. Do not mass-introduce new repository+mock pairs only to reach zero.
+- Mock mode exists for E2E, Storybook, and the local bootstrap profile. Keep the documented support scope in `docs/architecture/system-overview.md`; a module outside it may return an unavailable result in mock mode instead of growing a new mock write path.
 
 ## Feature Workflow
 
@@ -106,10 +109,26 @@ For a new user-facing or admin-facing feature:
 
 ## Testing Patterns
 
-- Tests live in `tests/` and use `.test.mts`.
-- Name tests after the behavior or helper surface: `partner-portal.mock.test.mts`, `partner-metric-rollups.test.mts`, `security-hardening.test.mts`.
-- Prefer focused Node tests for pure helpers, selectors, parser logic, metrics, SEO helpers, and repository mocks.
+- Choose the runner by what the test needs (details in `docs/testing/strategy.md`):
+  - `node:test` in `tests/*.test.mts` (`npm run test:node`): pure helpers, selectors, parsers, metrics, SEO helpers, repository mocks, and source-text contracts.
+  - Vitest in `tests/unit/*.test.ts` (`npm run test:unit`): route handlers and server actions that need module mocks (`vi.mock`) such as `next/headers`, `next/cache`, or the Supabase client.
+  - Playwright E2E for user tasks across pages; Storybook for component states (manual).
+- Name tests after the behavior or helper surface: `partner-portal.mock.test.mts`, `partner-metric-rollups.test.mts`, `security-hardening.test.mts`. Avoid incident-named files.
+- New tests import the module and assert behavior. Add a source-text (`readFileSync` + regex) contract only when behavior cannot be exercised without a server, and keep it narrow.
 - Add tests when behavior crosses data filtering, sorting, auth state, visibility, metrics, or recovery flows.
+
+## Refactoring Procedure
+
+Program-wide defaults are recorded in `docs/plans/active/refactor-program-2026-10.md`. When splitting, moving, or renaming code:
+
+1. Characterize first. The first commit of a large-module split adds import-based characterization tests for the current behavior of the pure functions it touches; later commits must keep them green.
+2. Find source-text contracts before moving anything: `grep -rl "<old path|identifier|literal>" tests`. Update every hit in the **same commit** as the move or string change. Roughly half of the Node tests read `src/` paths as text, so a move without this step silently breaks them.
+3. When the shared helper `tests/support/read-source.mts` exists, new source-text contracts read files through it instead of hand-built relative `readFileSync` paths.
+4. Keep behavior and structure apart: a pure move or split must not change wire formats, error codes, user-facing Korean copy, or redirect targets. Put intended behavior changes in their own commit with their own test.
+5. Server action failures keep the redirect helper convention (`redirectAdminActionError` family). Do not introduce a parallel `ActionResult` object convention.
+6. Keep the `src/app/admin/(protected)/actions.ts` barrel for existing callers, but new admin actions are imported directly from `_actions/*`.
+7. Cache invalidation prefers `unstable_cache` tags: call `revalidateTag(tag, "max")` as the existing actions do (the one-argument form is deprecated in Next 16; check `node_modules/next/dist/docs` before using `updateTag`). Use `revalidatePath` only as a page-level supplement. Keep the session-gated dynamic rendering of public pages; do not switch to `cacheComponents`/PPR.
+8. `supabase/migrations` is the schema source of truth and `supabase/schema.sql` is derived from it. Never edit an applied migration to fix drift.
 
 ## Validation
 
