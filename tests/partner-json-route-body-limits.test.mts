@@ -42,7 +42,6 @@ function createStreamedRequest(byteLength: number) {
 test("쿠폰·MM·파트너·Wallet JSON 경로는 공용 bounded reader와 shared cap을 사용한다", async () => {
   const standardRoutePaths = [
     "src/app/api/coupon-issues/[issueId]/redeem/route.ts",
-    "src/app/api/coupons/[couponId]/redeem/route.ts",
     "src/app/api/mm/code/issue/route.ts",
     "src/app/api/mm/code/verify/route.ts",
     "src/app/api/partner/reviews/[reviewId]/route.ts",
@@ -237,10 +236,6 @@ test("본문 제한은 기존 same-origin·인증·quota 순서를 보존한다"
   const routeChecks = [
     {
       path: "src/app/api/coupon-issues/[issueId]/redeem/route.ts",
-      before: ["isTrustedSameOriginRequest", "getSignedUserSession", "safeDecodeSegment"],
-    },
-    {
-      path: "src/app/api/coupons/[couponId]/redeem/route.ts",
       before: ["isTrustedSameOriginRequest", "getSignedUserSession", "safeDecodeSegment"],
     },
     {

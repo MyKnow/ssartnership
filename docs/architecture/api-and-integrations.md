@@ -62,7 +62,8 @@ authority: descriptive
 | POST | `/api/partners/[id]/reviews/uploads/sign` | 리뷰 이미지 업로드 sign |
 | POST | `/api/partners/[id]/reviews/uploads/cleanup` | 리뷰 이미지 cleanup |
 | GET | `/api/partners/home-state` | 홈 partner state |
-| POST | `/api/coupons/[couponId]/redeem` | 쿠폰 사용 |
+| POST | `/api/coupons/[couponId]/issue` | 쿠폰 발급 |
+| POST | `/api/coupon-issues/[issueId]/redeem` | 발급된 쿠폰 사용 확인(쿠폰 ID 직접 사용 경로는 폐기) |
 | POST | `/api/suggest` | 제휴 제안 제출 |
 | GET | `/wallet/verify/[token]` | Apple Wallet 공개 실시간 검증 페이지 |
 | GET | `/api/wallet/apple/avatar/[token]` | Apple Wallet 공개 검증용 승인 프로필 사진 스트리밍 |
