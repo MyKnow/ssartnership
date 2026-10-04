@@ -188,6 +188,13 @@ Wallet QR 서명과 Apple `authenticationToken` 원문은 DB에 저장하지 않
 - 앱 서버는 대부분 service role admin client를 사용하므로 API/server action 경계 검증이 필수 방어선이다.
 - 성능상 중요한 index는 partner/category lookup, registration status, member display/year/campus, event log pagination/filter, admin audit/auth security logs, review/favorite counts, notification delivery, billing status, promotion periods에 존재한다.
 
+## 삭제 연쇄와 재무·감사 기록
+
+- 제휴처(`partners`) 행은 방금 만든 제휴처의 생성 실패를 되돌릴 때만 hard delete한다. 그 밖의 운영 경로는 비공개·비활성 전환을 쓴다.
+- 청구서(`partner_billing_invoices.partner_id`, `company_id`), 혜택 이용 기록(`partner_benefit_usages.partner_id`), 쿠폰 사용 기록(`ad_coupon_redemptions.partner_id`)은 `on delete restrict`다. 기록이 있는 제휴처·파트너사는 삭제되지 않고, 관리자 파트너사 삭제는 `company_has_billing_records` 안내로 비활성화를 권한다. 청구서가 남으므로 그에 딸린 결제·세금계산서 기록도 남는다.
+- 리뷰, 즐겨찾기, 지표 롤업, 방문자 원장, 변경 요청은 제휴처 삭제 때 함께 지워진다. 위 hard delete 경로에서는 아직 행이 없다.
+- 파트너사 삭제는 청구서가 없을 때만 성공하며, 이때 플랜 변경 이벤트·청구 프로필·업그레이드 요청은 함께 지워진다. 감사 이력이 필요한 파트너사는 삭제 대신 비활성화한다.
+
 ## 마이그레이션 시 보존해야 하는 상태값
 
 - partner visibility: `public`, `confidential`, `private`

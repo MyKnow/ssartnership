@@ -1056,6 +1056,60 @@ create index if not exists auth_security_logs_actor_created_at_idx
 create index if not exists partners_campus_slugs_idx
   on public.partners using gin (campus_slugs);
 
+-- Billing records ------------------------------------------------------------
+-- Invoices are issued in Korea; the date must follow KST, not the UTC session.
+alter table public.partner_billing_invoices
+  alter column issue_date set default ((now() at time zone 'Asia/Seoul')::date);
+
+-- Financial records must survive partner or company cleanup. Partners are only
+-- hard-deleted to roll back a partner that was just created (no records yet);
+-- deleting a company with invoices now fails instead of erasing them.
+do $audit_preserving_foreign_keys$
+declare
+  target record;
+  existing_constraint text;
+begin
+  for target in
+    select *
+    from (values
+      ('partner_billing_invoices', 'partner_id', 'partners'),
+      ('partner_billing_invoices', 'company_id', 'partner_companies'),
+      ('partner_benefit_usages', 'partner_id', 'partners'),
+      ('ad_coupon_redemptions', 'partner_id', 'partners')
+    ) as foreign_key(table_name, column_name, referenced_table)
+  loop
+    if pg_catalog.to_regclass(pg_catalog.format('public.%I', target.table_name)) is null then
+      continue;
+    end if;
+    for existing_constraint in
+      select constraint_row.conname
+      from pg_catalog.pg_constraint constraint_row
+      join pg_catalog.pg_attribute attribute_row
+        on attribute_row.attrelid = constraint_row.conrelid
+       and attribute_row.attnum = constraint_row.conkey[1]
+      where constraint_row.contype = 'f'
+        and constraint_row.conrelid = pg_catalog.to_regclass(pg_catalog.format('public.%I', target.table_name))
+        and constraint_row.confrelid = pg_catalog.to_regclass(pg_catalog.format('public.%I', target.referenced_table))
+        and pg_catalog.array_length(constraint_row.conkey, 1) = 1
+        and attribute_row.attname = target.column_name
+    loop
+      execute pg_catalog.format(
+        'alter table public.%I drop constraint %I',
+        target.table_name,
+        existing_constraint
+      );
+    end loop;
+    execute pg_catalog.format(
+      'alter table public.%I add constraint %I foreign key (%I) references public.%I(id) on delete restrict',
+      target.table_name,
+      target.table_name || '_' || target.column_name || '_fkey',
+      target.column_name,
+      target.referenced_table
+    );
+  end loop;
+end
+$audit_preserving_foreign_keys$;
+
 -- Public schema privilege defaults --------------------------------------------
 -- The application reaches the database only through the service role. Remove
 -- every PUBLIC/anon/authenticated privilege that earlier migrations may have

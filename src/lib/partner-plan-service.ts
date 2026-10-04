@@ -12,6 +12,7 @@ import {
   type PartnerBillingInvoiceStatus,
   type PartnerTaxDocumentStatus,
 } from "@/lib/partner-billing";
+import { createPartnerBillingInvoiceNumber } from "@/lib/partner-billing-invoice-number";
 import { resolvePartnerBillingProfileForPlanRequest } from "@/lib/partner-billing-profiles";
 import { listMockPartnerPortalCompanySetups } from "@/lib/mock/partner-portal/store";
 import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
@@ -329,11 +330,6 @@ function normalizeCompanyIds(companyIds: string[]) {
 
 function addDaysIso(value: string, days: number) {
   return new Date(new Date(value).getTime() + days * 86_400_000).toISOString();
-}
-
-function createPartnerBillingInvoiceNumber(nowIso: string) {
-  const date = nowIso.slice(0, 10).replaceAll("-", "");
-  return `SSP-${date}-${randomUUID().slice(0, 8).toUpperCase()}`;
 }
 
 function resolveBillingServicePeriod(input: {
@@ -713,7 +709,7 @@ export async function createPartnerPlanUpgradeRequest(input: {
       p_expected_current_plan_tier: brand.planTier,
       p_expected_plan_updated_at: brand.planUpdatedAt,
       p_requested_plan_tier: requestedPlanTier,
-      p_invoice_number: createPartnerBillingInvoiceNumber(nowIso),
+      p_invoice_number: createPartnerBillingInvoiceNumber(nowIso, randomUUID()),
       p_billing_policy: charge.policy,
       p_remaining_days: charge.remainingDays,
       p_service_period_start: servicePeriod.servicePeriodStart,
