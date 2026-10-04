@@ -34,6 +34,7 @@ import {
 } from "@/lib/image-upload/policy";
 import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { PARTNER_MEDIA_BUCKET } from "@/lib/partner-media";
+import { partnerRepository } from "@/lib/repositories";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { loadXlsxWorkbookWithinResourceLimits } from "@/lib/xlsx-resource-limits.server";
 
@@ -94,16 +95,10 @@ function buildRegistrationBenefitGroupRows(
   }));
 }
 
-export async function loadPartnerRegistrationCategories() {
-  const result = await getSupabaseAdminClient()
-    .from("categories")
-    .select("id,key,label")
-    .order("created_at", { ascending: true });
-
-  if (result.error) {
-    throw new Error(result.error.message);
-  }
-  return (result.data ?? []) as AdminPartnerFileCategory[];
+export async function loadPartnerRegistrationCategories(): Promise<
+  AdminPartnerFileCategory[]
+> {
+  return partnerRepository.getCategoryOptions();
 }
 
 async function rollbackCreatedPartnerRegistrationRequest(input: {

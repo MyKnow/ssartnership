@@ -1,6 +1,7 @@
 import type { Category, Partner } from "@/lib/types";
 import type {
   AdminPartnerOption,
+  PartnerCategoryOption,
   PartnerRepository,
   PartnerViewContext,
   PublicPartnerSeoEntry,
@@ -187,6 +188,15 @@ export class MockPartnerRepository implements PartnerRepository {
 
   async getCategories(): Promise<Category[]> {
     return categories;
+  }
+
+  async getCategoryOptions(): Promise<PartnerCategoryOption[]> {
+    // Mock categories have no database id, so the stable key doubles as id.
+    return categories.map((category) => ({
+      id: category.key,
+      key: category.key,
+      label: category.label,
+    }));
   }
 
   async getPublicPartnerSeoEntries(
