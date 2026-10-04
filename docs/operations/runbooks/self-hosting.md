@@ -8,7 +8,7 @@ issue: https://github.com/MyKnow/ssartnership/issues/435
 
 # 자체 호스팅 앱 빌드와 실행
 
-이 절차는 [자체 호스팅 명세](../../specs/self-hosting/spec.md)의 앱 실행 작업이다. 전체 데이터 이전과 서버 전환의 남은 조건은 [작업 목록](../../specs/self-hosting/tasks.md)을 확인한다. 모든 명령은 저장소 루트에서 실행한다.
+이 절차는 [자체 호스팅 명세](../../specs/self-hosting/spec.md)의 앱 실행 작업이다. 이전 작업의 완료 증거는 [작업 기록](../../specs/self-hosting/tasks.md), 남은 후속은 [기술 부채 원장](../../plans/tech-debt.md#종료-issue에서-이관한-잔여-항목)을 확인한다. 모든 명령은 저장소 루트에서 실행한다.
 
 ## 현재 PVE 운영 배치
 

@@ -1,8 +1,8 @@
 ---
 title: 자체 호스팅 공개 edge 복구 기술 계획
 type: implementation-plan
-status: active
-authority: normative
+status: completed
+authority: evidence
 ---
 
 # 공개 edge 복구 기술 계획

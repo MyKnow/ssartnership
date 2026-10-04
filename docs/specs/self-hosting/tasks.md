@@ -1,12 +1,18 @@
 ---
 title: 자체 호스팅 작업과 검증 증거
 type: task-list
-status: active
-authority: descriptive
+status: completed
+authority: evidence
 issue: https://github.com/MyKnow/ssartnership/issues/435
 ---
 
 # 자체 호스팅 작업과 검증 증거
+
+> 종료 정리(2026-10-05): Issue #435는 2026-09-29, Production 자동 배포 #467은 2026-09-20에 종료됐다. 이 문서는 시점 증거다. 미체크 항목의 판정은 다음과 같다.
+>
+> - 자체 호스팅 API 연결과 로그인·공개 조회·권한, ingress·관리 경로·외부 백업 복원, 단일 writer·단일 scheduler 전환, `dev` 통합·`main` 승격, Production 수신기 설치와 exact-SHA health: [PVE 이전 작업 기록](../pve-service-migration/tasks.md)의 공개 전환·재부팅 복구 증거로 완료됐다.
+> - 메일·Mattermost·Push는 운영 중이다. Apple Wallet은 기능과 timer가 비활성이라 실제 연동 확인이 남았다.
+> - 자원 부하 측정, Wallet 실연동 확인은 [기술 부채 원장](../../plans/tech-debt.md#종료-issue에서-이관한-잔여-항목)으로 옮겼다.
 
 기준은 Issue #435의 `dev` → `feat/self-host-compose-foundation-20260906` → `dev` 흐름이다. 최초 2026-09-06에는 서버 접근 없이 로컬 선행 작업을 수행했다. 2026-09-07 한시적 서버 접근 이후의 진행은 [데이터 작업 목록](../self-host-database/tasks.md)에 기록하며 아래 초기 증거와 구분한다.
 

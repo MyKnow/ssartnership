@@ -1,8 +1,8 @@
 ---
 title: 자체 호스팅 데이터와 운영 복구 기술 계획
 type: implementation-plan
-status: active
-authority: normative
+status: completed
+authority: evidence
 ---
 
 # 데이터와 운영 복구 기술 계획

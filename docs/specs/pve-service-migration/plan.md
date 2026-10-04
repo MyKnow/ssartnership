@@ -1,8 +1,8 @@
 ---
 title: Production·Preview PVE 이전 기술 계획
 type: implementation-plan
-status: active
-authority: normative
+status: completed
+authority: evidence
 ---
 
 # 기술 계획

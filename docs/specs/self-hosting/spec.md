@@ -1,7 +1,7 @@
 ---
 title: 자체 호스팅 마이그레이션 명세
 type: feature-spec
-status: active
+status: current
 authority: normative
 issue: https://github.com/MyKnow/ssartnership/issues/435
 ---

@@ -1,11 +1,13 @@
 ---
 title: SSAFY 프로젝트 쇼케이스 구현 계획
 type: implementation-plan
-status: active
-authority: descriptive
+status: completed
+authority: evidence
 ---
 
 # SSAFY 프로젝트 쇼케이스 구현 계획
+
+> 종료 정리(2026-10-05): Issue #512 절의 미체크 항목은 구현 계획 당시의 목록이다. 구현과 화면 확인은 [작업 기록](./tasks.md)의 #512 절에서 완료됐고, 배포 적용은 같은 문서의 종료 정리를 따른다.
 
 기준: [기능 명세](./spec.md). 운영 일정에 맞춰 PR 3개로 나눠 각 단계 시작 전에 Production에 반영한다.
 

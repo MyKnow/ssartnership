@@ -1,8 +1,8 @@
 ---
 title: 자체 호스팅 기술 계획
 type: implementation-plan
-status: active
-authority: normative
+status: completed
+authority: evidence
 issue: https://github.com/MyKnow/ssartnership/issues/435
 ---
 

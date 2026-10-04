@@ -1,8 +1,8 @@
 ---
 title: 문서 이관 장부
 type: report
-status: active
-authority: descriptive
+status: completed
+authority: evidence
 ---
 
 # 문서 이관 장부
