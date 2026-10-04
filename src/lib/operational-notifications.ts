@@ -18,12 +18,13 @@ import {
   type PartnerOperationalNotificationType,
 } from "@/lib/partner-notification-routing";
 import { sendPartnerOperationalNotificationEmail } from "@/lib/partner-email";
-import { getPushEnv, isPushConfigured } from "@/lib/push/config";
+import { isPushConfigured } from "@/lib/push/config";
+import { getWebPush } from "@/lib/push/web-push-client";
 import {
   buildTrustedPushSubscriptionRequest,
   validateTrustedPushSubscription,
 } from "@/lib/push/subscription-trust";
-import type { SubscriptionInput, WebPushModule } from "@/lib/push/types";
+import type { SubscriptionInput } from "@/lib/push/types";
 import { PushError } from "@/lib/push/types";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { isPartnerPortalMock } from "@/lib/partner-portal";
@@ -50,7 +51,6 @@ type PushSubscriptionDevice = {
   lastSuccessAt: string | null;
 };
 
-let webPushPromise: Promise<WebPushModule> | null = null;
 const OPERATIONAL_PUSH_CONCURRENCY = 8;
 const OPERATIONAL_DELIVERY_CONCURRENCY = 8;
 const OPERATIONAL_EMAIL_CONCURRENCY = 4;
@@ -88,17 +88,6 @@ async function rollbackCreatedOperationalNotification(input: {
       },
     );
   }
-}
-
-async function getWebPush() {
-  if (!webPushPromise) {
-    webPushPromise = import("web-push").then((module) => {
-      const { publicKey, privateKey, subject } = getPushEnv();
-      module.setVapidDetails(subject, publicKey, privateKey);
-      return module;
-    });
-  }
-  return webPushPromise;
 }
 
 function toTargetUrl(value?: string | null, fallback = "/") {

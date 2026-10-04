@@ -6,17 +6,14 @@ import {
 } from "@/lib/notifications/shared";
 import { getPolicyDocumentByKind } from "@/lib/policy-documents.server";
 import { getActiveSubscriptionPushPreferences } from "@/lib/push/preferences";
-import { getPushEnv, isPushConfigured } from "@/lib/push/config";
+import { isPushConfigured } from "@/lib/push/config";
+import { getWebPush } from "@/lib/push/web-push-client";
 import { resolvePushAudience } from "@/lib/push/audience";
-import type {
-  PushAudience,
-  PushNotificationType,
-} from "@/lib/push";
+import type { PushNotificationType } from "@/lib/push";
 import type {
   PushPreferenceState,
   ResolvedPushAudience,
   StoredSubscription,
-  WebPushModule,
 } from "@/lib/push/types";
 import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -32,10 +29,7 @@ import {
   NOTIFICATION_TEMPLATE_MAX_TITLE_LENGTH,
   renderNotificationTemplate,
 } from "@/lib/notification-templates/template";
-import {
-  mergeNotificationTemplateVariables,
-  type NotificationTemplateContext,
-} from "@/lib/notification-templates/context";
+import { mergeNotificationTemplateVariables } from "@/lib/notification-templates/context";
 import {
   EMPTY_CHANNEL_RESULTS,
   absoluteUrl,
@@ -56,133 +50,35 @@ import {
   sendPushCampaignDeliveries,
 } from "@/lib/admin-notification-ops-delivery";
 
-export const ADMIN_NOTIFICATION_TYPES = [
-  "announcement",
-  "marketing",
-  "new_partner",
-  "expiring_partner",
-] as const;
+import {
+  ADMIN_NOTIFICATION_TYPES,
+  type AdminNotificationChannelPreview,
+  type AdminNotificationComposerInput,
+  type AdminNotificationEligibleMember,
+  type AdminNotificationOperationLog,
+  type AdminNotificationPreview,
+  type AdminNotificationPreviewReasonCode,
+  type AdminNotificationSendResult,
+  type AdminNotificationSource,
+  type AdminNotificationType,
+  type AutomaticNotificationRuleSummary,
+} from "@/lib/admin-notification-ops-types";
 
-export type AdminNotificationType = (typeof ADMIN_NOTIFICATION_TYPES)[number];
-
-export type AdminNotificationSource = "manual" | "automatic";
-
-export type AdminNotificationChannelSelection = Record<NotificationChannel, boolean>;
-
-export type AdminNotificationComposerInput = {
-  notificationType: AdminNotificationType;
-  title: string;
-  body: string;
-  url?: string | null;
-  audience: PushAudience;
-  channels: AdminNotificationChannelSelection;
-  confirmationText?: string | null;
-  idempotencyKey?: string | null;
-  templateContext?: NotificationTemplateContext;
-};
-
-export type AdminNotificationPreviewReasonCode =
-  | "type_disabled"
-  | "marketing_not_consented"
-  | "push_disabled"
-  | "no_push_subscription"
-  | "mm_disabled"
-  | "channel_unavailable";
-
-export type AdminNotificationPreviewReason = {
-  code: AdminNotificationPreviewReasonCode;
-  label: string;
-  count: number;
-};
-
-export type AdminNotificationEligibleMember = {
-  id: string;
-  name: string;
-  mmUsername: string;
-  year: number;
-  campus: string | null;
-  channels: NotificationChannel[];
-};
-
-export type AdminNotificationChannelPreview = {
-  channel: NotificationChannel;
-  label: string;
-  eligibleCount: number;
-  excludedCount: number;
-  reasons: AdminNotificationPreviewReason[];
-};
-
-export type AdminNotificationPreview = {
-  notificationType: AdminNotificationType;
-  selectedChannels: NotificationChannel[];
-  audienceScope: ResolvedPushAudience["scope"];
-  audienceLabel: string;
-  totalAudienceCount: number;
-  eligibleMemberCount: number;
-  eligibleMembers: AdminNotificationEligibleMember[];
-  destinationLabel: string;
-  channels: AdminNotificationChannelPreview[];
-  canSend: boolean;
-  highRisk: boolean;
-  requiresConfirmation: boolean;
-  confirmationPhrase: string;
-  validationMessage: string | null;
-};
-
-export type AdminNotificationSendResult = {
-  notificationId: string;
-  preview: AdminNotificationPreview;
-  channelResults: Record<
-    NotificationChannel,
-    {
-      targeted: number;
-      sent: number;
-      failed: number;
-      skipped: number;
-    }
-  >;
-  warnings: string[];
-  alreadyExists?: boolean;
-};
-
-export type AdminNotificationOperationLog = {
-  id: string;
-  notificationType: AdminNotificationType;
-  source: AdminNotificationSource;
-  selectedChannels: NotificationChannel[];
-  targetScope: ResolvedPushAudience["scope"];
-  targetLabel: string;
-  targetYear: number | null;
-  targetCampus: string | null;
-  targetMemberId: string | null;
-  title: string;
-  body: string;
-  url: string | null;
-  status: "pending" | "sent" | "partial_failed" | "failed" | "no_target";
-  totalAudienceCount: number;
-  marketing: boolean;
-  channelResults: Record<
-    NotificationChannel,
-    {
-      targeted: number;
-      sent: number;
-      failed: number;
-      skipped: number;
-    }
-  >;
-  exclusionReasons: AdminNotificationPreviewReason[];
-  createdAt: string;
-  completedAt: string | null;
-};
-
-export type AutomaticNotificationRuleSummary = {
-  notificationType: Extract<AdminNotificationType, "new_partner" | "expiring_partner">;
-  label: string;
-  lastRunAt: string | null;
-  recentCount: number;
-  failedCount: number;
-  failureSamples: string[];
-};
+export { ADMIN_NOTIFICATION_TYPES };
+export type {
+  AdminNotificationChannelPreview,
+  AdminNotificationChannelSelection,
+  AdminNotificationComposerInput,
+  AdminNotificationEligibleMember,
+  AdminNotificationOperationLog,
+  AdminNotificationPreview,
+  AdminNotificationPreviewReason,
+  AdminNotificationPreviewReasonCode,
+  AdminNotificationSendResult,
+  AdminNotificationSource,
+  AdminNotificationType,
+  AutomaticNotificationRuleSummary,
+} from "@/lib/admin-notification-ops-types";
 
 type AudienceMember = {
   id: string;
@@ -306,22 +202,10 @@ type PushMessageLogRow = {
   completed_at: string | null;
 };
 
-let webPushPromise: Promise<WebPushModule> | null = null;
 const NOTIFICATION_CAMPAIGN_LEASE_SECONDS = 10 * 60;
 
 export function isMattermostNotificationConfigured() {
   return isMattermostConfigured();
-}
-
-async function getWebPush() {
-  if (!webPushPromise) {
-    webPushPromise = import("web-push").then((module) => {
-      const { publicKey, privateKey, subject } = getPushEnv();
-      module.setVapidDetails(subject, publicKey, privateKey);
-      return module;
-    });
-  }
-  return webPushPromise;
 }
 
 async function listAudienceMembers(resolvedAudience: ResolvedPushAudience) {

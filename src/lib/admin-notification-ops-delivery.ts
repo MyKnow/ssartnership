@@ -25,7 +25,7 @@ import type {
   AdminNotificationComposerInput,
   AdminNotificationSource,
   AdminNotificationType,
-} from "@/lib/admin-notification-ops";
+} from "@/lib/admin-notification-ops-types";
 import { getCampaignTemplateKey } from "@/lib/notification-templates/catalog";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
 import { renderNotificationTemplate } from "@/lib/notification-templates/template";

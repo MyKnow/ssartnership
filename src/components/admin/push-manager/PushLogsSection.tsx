@@ -10,7 +10,7 @@ import type { PushAudienceScope } from "@/lib/push";
 import type {
   AdminNotificationOperationLog,
   AdminNotificationType,
-} from "@/lib/admin-notification-ops";
+} from "@/lib/admin-notification-ops-types";
 import {
   audienceLabels,
   formatNotificationChannels,

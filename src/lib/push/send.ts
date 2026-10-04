@@ -10,7 +10,8 @@ import {
   collectRowsByFilterChunks,
 } from "../supabase/paging.ts";
 import { forEachWithConcurrency } from "../async-concurrency.ts";
-import { getPushEnv, isPushConfigured, wrapPushDbError } from "./config.ts";
+import { isPushConfigured, wrapPushDbError } from "./config.ts";
+import { getWebPush } from "./web-push-client.ts";
 import { getDefaultPushAudience, resolvePushAudience } from "./audience.ts";
 import {
   createPushMessageLog,
@@ -36,10 +37,8 @@ import type {
   PushPayload,
   ResolvedPushAudience,
   StoredSubscription,
-  WebPushModule,
 } from "./types.ts";
 
-let webPushPromise: Promise<WebPushModule> | null = null;
 const PUSH_SEND_CONCURRENCY = 8;
 const PUSH_AUDIENCE_PAGE_SIZE = DEFAULT_SUPABASE_IN_FILTER_CHUNK_SIZE;
 
@@ -145,17 +144,6 @@ async function listPushPreferences(memberIds: string[]) {
     },
   );
   return result.rows;
-}
-
-async function getWebPush() {
-  if (!webPushPromise) {
-    webPushPromise = import("web-push").then((module) => {
-      const { publicKey, privateKey, subject } = getPushEnv();
-      module.setVapidDetails(subject, publicKey, privateKey);
-      return module;
-    });
-  }
-  return webPushPromise;
 }
 
 async function settlePushBookkeeping(

@@ -13,7 +13,7 @@ import type {
   AdminNotificationSendResult,
   AdminNotificationSource,
   AdminNotificationType,
-} from "@/lib/admin-notification-ops";
+} from "@/lib/admin-notification-ops-types";
 import type { PushPreferenceState, ResolvedPushAudience } from "@/lib/push/types";
 
 export const EMPTY_CHANNEL_RESULTS: AdminNotificationSendResult["channelResults"] = {
