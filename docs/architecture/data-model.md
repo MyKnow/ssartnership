@@ -15,19 +15,23 @@ last_verified: 2026-10-05
 - 이 문서는 테이블·함수를 손으로 나열하지 않는다. 손으로 만든 목록은 금방 빠지고 틀려진다. 목록이 필요하면 아래 명령으로 마이그레이션에서 직접 뽑는다.
 
 ```bash
-# 생성됐다가 삭제되지 않은 테이블
-comm -23 \
-  <(grep -ohiE "create table (if not exists )?(public\.)?\"?[a-z_0-9]+" supabase/migrations/*.sql | sed -E 's/.* (public\.)?"?//I' | sort -u) \
-  <(grep -ohiE "drop table (if exists )?(public\.)?[a-z_0-9]+" supabase/migrations/*.sql | sed -E 's/.* (public\.)?//I' | sort -u)
+# 현재 테이블: 마이그레이션 순서대로 create·drop·rename을 적용한다(SQL 주석 제외)
+cat supabase/migrations/*.sql | sed -E 's/--.*$//' | tr 'A-Z' 'a-z' \
+  | grep -oE "(create table (if not exists )?|drop table (if exists )?)(public\.)?\"?[a-z_0-9]+|alter table (if exists )?(only )?(public\.)?[a-z_0-9]+ rename to [a-z_0-9]+" \
+  | awk '{
+      if ($1 == "alter") { for (i = 1; i <= NF; i++) if ($i == "rename") { o = $(i - 1); n = $(i + 2) }; sub(/^public\./, "", o); if (o in t) { delete t[o]; t[n] = 1 }; next }
+      n = $NF; sub(/^public\./, "", n); gsub(/"/, "", n)
+      if ($1 == "create") t[n] = 1; else delete t[n]
+    } END { for (k in t) print k }' | sort
 
-# 정의된 함수(RPC·trigger) 이름
-grep -ohiE "create (or replace )?function (public\.)?[a-z_0-9]+" supabase/migrations/*.sql | sed -E 's/.* (public\.)?//I' | sort -u
+# 한 번이라도 정의된 함수(RPC·trigger) 이름(SQL 주석 제외)
+cat supabase/migrations/*.sql | sed -E 's/--.*$//' | grep -oiE "create (or replace )?function (public\.)?[a-z_0-9]+" | sed -E 's/.* (public\.)?//I' | tr 'A-Z' 'a-z' | sort -u
 
 # 특정 테이블·함수의 최신 정의가 들어 있는 마이그레이션
 grep -l "<name>" supabase/migrations/*.sql | sort | tail -1
 ```
 
-2026-10-05 `dev` 기준 마이그레이션은 208개, 남아 있는 테이블은 111개, 고유 함수 이름은 176개다.
+2026-10-05 `dev` 기준 마이그레이션은 208개, 현재 테이블은 112개, 고유 함수 이름은 176개다. 이 결과와 `supabase/schema.sql`의 `create table` 목록이 다르면 스냅샷 드리프트다(같은 날 기준 스냅샷에는 `20260713204059`에서 삭제한 `member_auth_identities`가 남아 있다).
 
 ## 도메인별 테이블 지도
 
@@ -36,7 +40,7 @@ grep -l "<name>" supabase/migrations/*.sql | sort | tail -1
 | 도메인 | 테이블 접두사·대표 테이블 | 비고 |
 | --- | --- | --- |
 | 공개 제휴 카탈로그 | `categories`, `partners`, `partner_benefits`, `partner_companies`, `partner_company_branches`, `partner_offer_branches`, `partner_brand_profiles`, `public_cache_versions` | `public_cache_versions`가 공개 캐시 key의 기준이다. |
-| 협력사 포털 | `partner_accounts`, `partner_account_companies`, `partner_auth_attempts`, `partner_change_requests`, `partner_plan_upgrade_requests`, `partner_company_plan_events`, `partner_billing_*`, `partner_tax_documents`, `partner_preview_tokens` | 결제·세금 문서는 정산 증거다. |
+| 협력사 포털 | `partner_accounts`, `partner_account_companies`, `partner_auth_attempts`, `partner_change_requests`, `partner_plan_upgrade_requests`, `partner_brand_plan_events`, `partner_billing_*`, `partner_tax_documents`, `partner_preview_tokens` | 결제·세금 문서는 정산 증거다. |
 | 협력사 등록 신청 | `partner_registration_*` | 외부 신청 본문과 레이트리밋 |
 | 회원·인증 | `members`, `mm_user_directory`, `member_*`(이메일·비밀번호 작업·식별자 예약·가입 승인·프로필 사진·알림·Wallet), `mattermost_*`, `password_reset_attempts`, `manual_member_import_*` | 아래 회원 도메인 원칙을 따른다. |
 | 수료생 | `graduate_profiles`, `graduate_verification_*`, `graduate_email_challenges` | 비공개 파일은 정해진 기간 뒤 정리한다. |
