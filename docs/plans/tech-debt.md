@@ -38,6 +38,25 @@ grep -rlE "\.from\([\"'][a-z_]+[\"']\)" src | grep -v "^src/lib/repositories/" |
 | `src/components/admin/promotion-carousel-editor/PromotionCarouselEditor.tsx` | 1,204줄이며 default 컴포넌트 하나가 대부분을 차지한다. | 프로모션 편집기 기능 변경이 예정될 때 | — |
 | `src/lib/project-showcase/repository.supabase.ts`·`repository.mock.ts` | 1,079줄·989줄, 공개·소유자·관리자 지표·추첨·정산·파기가 한 인터페이스에 있다. | 다음 쇼케이스 운영을 위한 기능 변경 때(한시 기능이라 그 전에는 분해하지 않는다) | — |
 
+## webpack 고정
+
+Next 16의 기본 bundler는 Turbopack이지만 `scripts/next.mjs`(build)와 `scripts/dev.mjs`(dev), Playwright 개발 서버, 자체 호스팅 E2E 빌드는 `--webpack`을 명시한다. `next.config.ts`의 아래 계약이 webpack hook에 묶여 있기 때문이다.
+
+| webpack 의존 | 위치 | 역할 |
+| --- | --- | --- |
+| fixture module boundary | `scripts/webpack-fixture-boundary.mjs` | 명시적 CI·mock·별도 출력 조건에서만 E2E fixture 정책 모듈을 바꾸고, 일반 compiler에 테스트 전용 모듈이 들어오면 실패시킨다. |
+| 개발 manifest 원자적 쓰기 | `scripts/webpack-atomic-manifests.mjs` | 자체 호스팅 E2E 개발 서버에서 manifest를 빈 파일로 읽는 문제를 막는다. |
+| heic wasm 규칙 | `next.config.ts`의 `asset/resource` rule | `@discourse/heic` 디코더 wasm을 npm 모듈로 해석하지 않게 한다. |
+| 테스트 | `tests/self-host-production-e2e.test.mts`, `tests/self-host-atomic-manifests.test.mts` | `next/dist/compiled/webpack`을 import해 위 경계를 검증한다. |
+
+해제 조건(모두 충족해야 한다):
+
+1. 세 계약을 Turbopack 설정이나 bundler 독립적인 방식으로 다시 구현하고, fixture 경계가 Production 빌드에 섞이지 않음을 같은 수준의 테스트로 다시 증명했다.
+2. 위 두 테스트가 webpack 내부 모듈 없이 같은 계약을 검사한다.
+3. 로컬·자체 호스팅 CI에서 빌드 시간과 메모리를 측정해 전환 이득을 확인했다.
+
+Next가 webpack 지원 축소를 예고하면 위 조건과 무관하게 이 항목을 Issue로 올린다. 관련 Issue: —
+
 ## 보류: 대규모 재배치·타입 생성·공용 프레임워크
 
 효용이 탐색성과 장기 타입 안전에 한정되고, 소스 경로를 하드코딩한 계약 테스트와 병합 충돌 비용이 크다. 아래 허용 범위(각각 작은 PR)만 필요할 때 기능 변경에 편승해 진행한다.
