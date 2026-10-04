@@ -7,7 +7,13 @@ import {
   getMemberPolicyConsentVersions,
 } from "@/lib/policy-documents.server";
 import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
-import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "./hmac.js";
+import { createHmacDigest } from "./hmac.js";
+import {
+  parseUserSessionToken,
+  type PolicyConsentSnapshot,
+  type UserSessionAuthenticationMethod,
+  type UserSessionTokenPayload,
+} from "./session-tokens.ts";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { requiresMemberProfilePhotoUpdate } from "@/lib/member-profile-photo";
 import { requiresMemberEmailRegistration } from "@/lib/member-required-gates";
@@ -20,35 +26,11 @@ const COOKIE_NAME = "user_session";
 const SESSION_TTL_DAYS = 7;
 const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
 
-type PolicyConsentSnapshot = {
-  serviceVersion: number;
-  privacyVersion: number;
-};
-
-type SignedUserSession = {
-  userId: string;
-  authSessionVersion: number;
-  authenticationMethod: UserSessionAuthenticationMethod;
-  issuedAt: number;
-  expiresAt: number;
-  mustChangePassword?: boolean;
+type SignedUserSession = UserSessionTokenPayload & {
   requiresEmailRegistration?: boolean;
-  persistent?: boolean;
-  policyConsentSnapshot?: PolicyConsentSnapshot | null;
 };
 
-export type UserSessionAuthenticationMethod =
-  | "email"
-  | "manual"
-  | "mattermost";
-
-function isUserSessionAuthenticationMethod(
-  value: unknown,
-): value is UserSessionAuthenticationMethod {
-  return value === "email"
-    || value === "manual"
-    || value === "mattermost";
-}
+export type { UserSessionAuthenticationMethod };
 
 export class UserSessionIssueError extends Error {
   readonly code:
@@ -88,52 +70,7 @@ function signPayload(payload: string) {
 }
 
 function verifyToken(token: string) {
-  const signedToken = splitSignedToken(token);
-  if (!signedToken) {
-    return null;
-  }
-  const [payload, signature] = signedToken;
-  if (!payload || !signature) {
-    return null;
-  }
-  if (!verifyHmacDigest(payload, signature, getSecret(), "hex")) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(payload) as SignedUserSession;
-    if (
-      typeof parsed.userId !== "string" ||
-      typeof parsed.authSessionVersion !== "number" ||
-      !Number.isInteger(parsed.authSessionVersion) ||
-      parsed.authSessionVersion < 1 ||
-      !isUserSessionAuthenticationMethod(parsed.authenticationMethod) ||
-      typeof parsed.issuedAt !== "number" ||
-      typeof parsed.expiresAt !== "number"
-    ) {
-      return null;
-    }
-    if (parsed.expiresAt <= Date.now() || parsed.issuedAt > Date.now()) {
-      return null;
-    }
-    if (
-      parsed.persistent !== undefined &&
-      typeof parsed.persistent !== "boolean"
-    ) {
-      return null;
-    }
-    if (
-      parsed.policyConsentSnapshot !== undefined &&
-      parsed.policyConsentSnapshot !== null &&
-      (typeof parsed.policyConsentSnapshot !== "object" ||
-        typeof parsed.policyConsentSnapshot.serviceVersion !== "number" ||
-        typeof parsed.policyConsentSnapshot.privacyVersion !== "number")
-    ) {
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
+  return parseUserSessionToken(token, getSecret());
 }
 
 async function getRawSignedUserSession() {

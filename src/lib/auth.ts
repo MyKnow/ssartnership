@@ -1,11 +1,11 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
+import { createHmacDigest } from "./hmac.js";
 import {
-  createHmacDigest,
-  splitSignedToken,
-  verifyHmacDigest,
-} from "./hmac.js";
+  parseAdminSessionToken as parseSignedAdminSessionToken,
+  type AdminSessionTokenPayload,
+} from "./session-tokens.ts";
 import { getAdminSessionTtlSeconds } from "./admin-security";
 import {
   authenticateAdminCredentials,
@@ -15,13 +15,7 @@ import {
 
 const COOKIE_NAME = "admin_session";
 
-type AdminSessionPayload = {
-  issuedAt: number;
-  expiresAt: number;
-  adminId: string;
-  loginId: string;
-  permissionVersion: number;
-};
+type AdminSessionPayload = AdminSessionTokenPayload;
 
 function getSecret() {
   const secret = process.env.ADMIN_SESSION_SECRET;
@@ -43,43 +37,7 @@ function signPayload(payload: string) {
 }
 
 function parseAdminSessionToken(token: string): AdminSessionPayload | null {
-  const signedToken = splitSignedToken(token);
-  if (!signedToken) {
-    return null;
-  }
-  const [payload, signature] = signedToken;
-  if (!payload || !signature) {
-    return null;
-  }
-  if (!verifyHmacDigest(payload, signature, getSecret(), "hex")) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(payload) as Partial<AdminSessionPayload>;
-    if (
-      typeof parsed.issuedAt !== "number" ||
-      typeof parsed.expiresAt !== "number" ||
-      typeof parsed.adminId !== "string" ||
-      parsed.adminId.length === 0 ||
-      typeof parsed.loginId !== "string" ||
-      parsed.loginId.length === 0 ||
-      typeof parsed.permissionVersion !== "number"
-    ) {
-      return null;
-    }
-    if (!(parsed.expiresAt > Date.now() && parsed.issuedAt <= Date.now())) {
-      return null;
-    }
-    return {
-      issuedAt: parsed.issuedAt,
-      expiresAt: parsed.expiresAt,
-      adminId: parsed.adminId,
-      loginId: parsed.loginId,
-      permissionVersion: parsed.permissionVersion,
-    };
-  } catch {
-    return null;
-  }
+  return parseSignedAdminSessionToken(token, getSecret());
 }
 
 export async function setAdminSession(account: Pick<AdminAccount, "id" | "loginId" | "permissionVersion">) {
