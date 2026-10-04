@@ -39,7 +39,11 @@ async function updateInitialSetupState(
     .eq("id", accountId);
 
   if (error) {
-    throw new Error(error.message);
+    console.error("[partner-setup-link] issue update failed", {
+      accountId,
+      message: error.message,
+    });
+    throw new Error("partner_account_setup_link_failed");
   }
 
   return { expiresAt };
@@ -57,22 +61,28 @@ export async function issuePartnerAccountInitialSetupLink(
     .eq("id", accountId)
     .maybeSingle();
 
+  // Errors carry admin action error codes (see admin-action-errors.ts) so the
+  // caller can tell the operator what to fix instead of a generic input error.
   if (accountError) {
-    throw new Error(accountError.message);
+    console.error("[partner-setup-link] account lookup failed", {
+      accountId,
+      message: accountError.message,
+    });
+    throw new Error("partner_account_setup_link_failed");
   }
   if (!account) {
-    throw new Error("초기설정 URL을 전송할 계정을 찾을 수 없습니다.");
+    throw new Error("partner_account_missing_id");
   }
   if (!account.is_active) {
-    throw new Error("비활성화된 계정입니다. 먼저 활성화해 주세요.");
+    throw new Error("partner_account_inactive");
   }
   if (account.initial_setup_completed_at) {
-    throw new Error("이미 초기 설정이 완료된 계정입니다.");
+    throw new Error("partner_account_setup_completed");
   }
 
   const emailSentTo = normalizePartnerLoginId(account.email ?? account.login_id);
   if (!isValidEmail(emailSentTo)) {
-    throw new Error("담당자 이메일 형식이 올바르지 않습니다.");
+    throw new Error("partner_account_invalid_email");
   }
 
   const setupToken = generateOpaqueToken();

@@ -58,6 +58,13 @@ export const adminActionErrorMessages: Record<string, string> = {
   partner_account_missing_id: "대상을 찾을 수 없습니다.",
   partner_account_invalid_email: "담당자 이메일 형식이 올바르지 않습니다.",
   partner_account_invalid_request: "파트너사 계정 입력값을 확인해 주세요.",
+  partner_account_inactive: "비활성화된 계정입니다. 먼저 계정을 활성화해 주세요.",
+  partner_account_setup_completed:
+    "이미 초기 설정을 마친 계정입니다. 비밀번호를 잊었다면 비밀번호 재설정을 안내해 주세요.",
+  partner_account_setup_link_failed:
+    "초기설정 URL을 발급하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  partner_account_setup_email_failed:
+    "초기설정 URL은 새로 발급했지만 메일을 보내지 못했습니다. 메일 발송 설정을 확인하거나 '초기설정 URL 재생성'으로 받은 링크를 직접 전달해 주세요.",
   partner_account_exists: "이미 존재하는 로그인 아이디입니다.",
   partner_account_create_uncertain:
     "파트너사 계정 생성 중 정리가 끝나지 않았을 수 있습니다. 계정 목록을 확인한 뒤 다시 시도해 주세요.",
