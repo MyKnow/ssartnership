@@ -74,7 +74,8 @@ Browser
 - 토큰 wire 포맷(`<json>.<hex hmac>`)과 필드 이름은 고정한다. 바꾸면 배포만으로 전원 로그아웃된다. `tests/session-token-parity.test.mts`의 golden token이 이를 고정한다.
 - 운영 필수 전용 비밀값(QR, 식별자 예약, 이메일 인증 HMAC)은 `USER_SESSION_SECRET`으로 fallback하지 않는다. 남은 fallback은 레지스트리 주석과 `tests/session-secrets.test.mts`가 고정한다.
 - token signature, raw secret, password 원문은 로그에 남기지 않는다.
-- 관리자 session은 account active, mustChangePassword, permissionVersion mismatch 시 무효 처리된다.
+- 관리자 session은 account active, mustChangePassword, permissionVersion mismatch 시 무효 처리되고, 자신을 발급한 회원 session이 무효가 되면 함께 무효 처리된다.
+- 회원 로그아웃(`/api/mm/logout`)은 `members.auth_session_version`을 올려 그 계정의 모든 기기 session을 끝낸다.
 - 협력사 session은 companyIds가 비어 있거나 비정상 값이면 무효 처리된다.
 
 ## Domain service/helper 배치

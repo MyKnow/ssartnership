@@ -250,6 +250,28 @@ export async function clearUserSession() {
   store.delete(COOKIE_NAME);
 }
 
+/**
+ * Signs the member out on every device by advancing `auth_session_version`.
+ * Every signed session carries the version it was issued with, so all of
+ * them (and any admin session bridged from them) fail validation afterwards.
+ * The compare-and-set keeps concurrent logouts idempotent. Mock members have
+ * a fixed version, so mock mode only clears the local cookie.
+ */
+export async function revokeUserSessions(session: {
+  userId: string;
+  authSessionVersion: number;
+}) {
+  if (isMockMemberAuthEnabled()) {
+    return true;
+  }
+  const { error } = await getSupabaseAdminClient()
+    .from("members")
+    .update({ auth_session_version: session.authSessionVersion + 1 })
+    .eq("id", session.userId)
+    .eq("auth_session_version", session.authSessionVersion);
+  return !error;
+}
+
 export const getUserSession = cache(async () => {
   noStore();
   const session = (await getSignedUserSession()) as SignedUserSession | null;

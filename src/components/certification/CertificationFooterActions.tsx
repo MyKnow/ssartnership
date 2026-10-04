@@ -72,7 +72,7 @@ export default function CertificationFooterActions({
         <CertificationSettingRow
           icon={<ArrowRightStartOnRectangleIcon className="h-5 w-5" />}
           title="로그아웃"
-          description="이 기기에서 로그아웃합니다."
+          description="이 계정으로 로그인된 모든 기기에서 로그아웃합니다."
           className="md:hidden"
           onClick={() => setLogoutConfirmationOpen(true)}
         />
@@ -92,7 +92,7 @@ export default function CertificationFooterActions({
       <Modal
         open={logoutConfirmationOpen}
         title="로그아웃하시겠습니까?"
-        description="이 기기에서 현재 계정의 세션을 종료합니다."
+        description="이 계정으로 로그인된 모든 기기의 세션을 종료합니다."
         onClose={() => {
           if (!loggingOut) {
             setLogoutConfirmationOpen(false);

@@ -17,6 +17,7 @@ import {
   getAdminAccountById,
   type AdminAccount,
 } from "./admin-accounts";
+import { getSignedUserSession } from "./user-auth.ts";
 
 const COOKIE_NAME = ADMIN_SESSION_COOKIE_NAME;
 
@@ -79,12 +80,20 @@ export const getAdminSession = cache(async (): Promise<AdminSession | null> => {
     if (!payload) {
       return null;
     }
-    const account = await getAdminAccountById(payload.adminId);
+    // Admin sessions are minted from the member session by /admin/session.
+    // Requiring that same member session to still be valid means a logout
+    // (which bumps auth_session_version) or a password change also ends the
+    // admin session on every device instead of leaving it alive for its TTL.
+    const [account, memberSession] = await Promise.all([
+      getAdminAccountById(payload.adminId),
+      getSignedUserSession(),
+    ]);
     if (
       !account ||
       !account.isActive ||
       account.mustChangePassword ||
-      account.permissionVersion !== payload.permissionVersion
+      account.permissionVersion !== payload.permissionVersion ||
+      memberSession?.userId !== payload.adminId
     ) {
       return null;
     }
