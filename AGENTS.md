@@ -86,7 +86,7 @@ For UI creation or modification, include visual proof in the final handoff. Capt
 
 ## Preview Data Copy
 
-- Preview runs on the self-hosted `original-preview` stack that the `dev` branch deploys to. The legacy `npm run sync:preview` scripts still target the frozen cloud Supabase baseline; do not run them (see `github-actions-operations`).
+- Preview runs on the self-hosted `original-preview` stack that the `dev` branch deploys to. The cloud-era `npm run sync:preview` path is retired (it targeted the frozen cloud Supabase baseline); never use it or reintroduce it for Preview data.
 - A Production-to-Preview copy is an operator procedure: `node scripts/self-host-environments/cli.mjs prepare-copy <pair-directory>` restores an existing paired backup into an isolated volume, sanitizes it there, and loads a new Preview candidate. See `docs/operations/runbooks/self-host-environments.md`.
 - The copy must not carry credential material. The sanitizer replaces password and other secret columns, masks email addresses, and empties auth, delivery, Wallet credential, and log tables; an unreviewed secret-like column fails the copy closed. Member profile photos (`member_profile_images` and the private `member-profile-images` bucket) are copied and remain personal data.
 - Production member passwords therefore do not work in a Preview copy. Use the Preview password reset flow, or `seed-preview-member <pair-directory> <private-credential.json>` for exactly one Preview test member. Never put credential values on the command line, in chat, or in logs.
