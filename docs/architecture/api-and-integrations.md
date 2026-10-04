@@ -167,11 +167,11 @@ authority: descriptive
 - fallback env: `DATA_GO_KR_SERVICE_KEY`
 - 상호/대표자/주소 자동 채움이 아니라 휴업/폐업 상태와 과세유형 확인 용도다.
 
-### Vercel
+### 배포·CI
 
-- Production은 `main`, Preview는 `dev` branch 기준이다.
-- Analytics와 Speed Insights가 root layout에 포함된다.
-- CI workflow는 lockfile, preview sync, public readiness, Storybook을 검증한다.
+- PVE 자체 호스팅이 유일한 운영 정본이다. `main`은 Production, `dev`는 원본 Preview 이미지로 배포된다([격리 CI·배포](../operations/runbooks/self-host-ci-maintenance.md)). Vercel 배포·Analytics·Speed Insights와 클라우드 Supabase 반출·Preview 동기화 도구는 RF-04(#537)에서 제거했다.
+- 브라우저 성능은 [자체 호스팅 Web Vitals·Lighthouse 측정](../performance/measurements/web-vitals.md)으로만 확인한다.
+- CI workflow는 change-aware public readiness, 교차 플랫폼 개발환경, 수동 Storybook, 자체 호스팅 이미지 발행과 공개 health 수동 확인을 담당한다.
 
 ## Environment variable groups
 

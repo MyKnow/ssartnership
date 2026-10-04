@@ -131,7 +131,7 @@ authority: normative
 
 ## Observability
 
-- Vercel Analytics와 Speed Insights가 전역으로 켜져 있다.
+- 브라우저 성능은 Vercel 대신 자체 호스팅 Web Vitals(`/api/web-vitals`, supabase 빌드에서만 수집기 탑재)와 Lighthouse 수동 측정으로 확인한다.
 - product analytics는 `event_logs`에 저장된다.
 - admin audit와 auth security log가 분리되어 있다.
 - notification delivery와 push message/delivery log가 분리되어 있다.

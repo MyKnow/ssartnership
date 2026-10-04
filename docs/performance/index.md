@@ -15,7 +15,7 @@ last_verified: 2026-08-29
 
 ## Measurements and reports
 
-- [Speed Insights 배포 후 측정](./measurements/speed-insights.md)
+- [자체 호스팅 Web Vitals·Lighthouse 측정](./measurements/web-vitals.md)
 - [DB query 최적화 보고서](./reports/db-query-optimization.md)
 
 ## Point-in-time audits

@@ -1,4 +1,5 @@
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import { SITE_URL } from "@/lib/site";
 
 type PartnerInitialSetupStateInput = {
   initial_setup_completed_at?: string | null;
@@ -17,7 +18,7 @@ export function formatPartnerAccountDateTime(value?: string | null) {
 export function buildPartnerInitialSetupUrl(token: string, siteUrl?: string) {
   return new URL(
     `/partner/setup/${token}`,
-    siteUrl ?? "https://ssartnership.vercel.app",
+    siteUrl ?? SITE_URL,
   ).toString();
 }
 

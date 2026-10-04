@@ -20,7 +20,7 @@ authority: normative
 ```bash
 SUPABASE_URL="..." \
 SUPABASE_SERVICE_ROLE_KEY="..." \
-NEXT_PUBLIC_SITE_URL="https://ssartnership.vercel.app" \
+NEXT_PUBLIC_SITE_URL="https://ssartnership.myknow.xyz" \
 npm run bootstrap:super-admin
 ```
 

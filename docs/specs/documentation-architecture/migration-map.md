@@ -65,7 +65,7 @@ authority: descriptive
 | `docs/performance/baselines/2026-04-03-speed-insights.md` | 기존 정본/시점 기록 유지 |
 | `docs/performance/baselines/admin-console.md` | 기존 정본/시점 기록 유지 |
 | `docs/performance/index.md` | 기존 정본/시점 기록 유지 |
-| `docs/performance/measurements/speed-insights.md` | 기존 정본/시점 기록 유지 |
+| `docs/performance/measurements/web-vitals.md` | `speed-insights.md`를 자체 호스팅 Web Vitals·Lighthouse 절차로 재작성(RF-04) |
 | `docs/performance/reports/db-query-optimization.md` | 기존 정본/시점 기록 유지 |
 | `docs/plans/active/ssafy-verify-legacy-removal.md` | 기존 정본/시점 기록 유지 |
 | `docs/plans/completed/15-form-validation-benefit-visibility.md` | 기존 정본/시점 기록 유지 |

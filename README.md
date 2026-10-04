@@ -77,7 +77,7 @@ SSARTNERSHIP는 SSAFY 구성원을 위한 제휴 혜택 플랫폼입니다.
 - Tailwind CSS v4
 - Supabase
 - Mattermost API (서버 전용 Sender registry)
-- Vercel Analytics / Speed Insights
+- 자체 호스팅 Web Vitals 수집(`/api/web-vitals`)
 - Nodemailer
 - Web Push (VAPID)
 
