@@ -3,67 +3,43 @@ import { generateOpaqueToken, hashOpaqueToken } from "@/lib/password";
 import { normalizePartnerLoginId } from "@/lib/partner-utils";
 import { isValidEmail } from "@/lib/validation";
 import type { AdminSupabaseClient } from "../shared-types";
-import {
-  buildPartnerSetupIssuePayload,
-  resolvePartnerSetupSchemaCapabilitiesFromError,
-} from "@/lib/partner-auth/setup-schema";
 
 const INITIAL_SETUP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Issues a fresh single-use setup link. Only the SHA-256 hash and its expiry
+ * are stored (the plaintext token column was dropped in 20260501012004), so a
+ * write error is a real failure and is never retried with another column set.
+ */
+export function buildPartnerSetupIssuePayload(input: {
+  setupTokenHash: string;
+  expiresAt: string;
+  now: string;
+}) {
+  return {
+    initial_setup_token_hash: input.setupTokenHash,
+    initial_setup_expires_at: input.expiresAt,
+    initial_setup_link_sent_at: null,
+    must_change_password: true,
+    email_verified_at: null,
+    updated_at: input.now,
+  };
+}
 
 async function updateInitialSetupState(
   supabase: AdminSupabaseClient,
   accountId: string,
   now: string,
-  setupToken: string,
   setupTokenHash: string,
 ) {
   const expiresAt = new Date(Date.now() + INITIAL_SETUP_TTL_MS).toISOString();
-  const basePayload = {
-    initial_setup_link_sent_at: null,
-    must_change_password: true,
-    email_verified_at: null,
-    updated_at: now,
-  };
-
-  const primaryPayload = buildPartnerSetupIssuePayload(
-    basePayload,
-    { setupToken, setupTokenHash, expiresAt },
-    {
-      supportsPlainToken: false,
-      supportsHash: true,
-      supportsExpiry: true,
-    },
-  );
-
-  const withExpires = await supabase
+  const { error } = await supabase
     .from("partner_accounts")
-    .update(primaryPayload)
+    .update(buildPartnerSetupIssuePayload({ setupTokenHash, expiresAt, now }))
     .eq("id", accountId);
 
-  if (!withExpires.error) {
-    return { expiresAt };
-  }
-
-  const fallbackCapabilities = resolvePartnerSetupSchemaCapabilitiesFromError(
-    withExpires.error.message,
-  );
-
-  if (fallbackCapabilities.supportsExpiry && fallbackCapabilities.supportsHash) {
-    throw new Error(withExpires.error.message);
-  }
-
-  const fallbackPayload = buildPartnerSetupIssuePayload(
-    basePayload,
-    { setupToken, setupTokenHash, expiresAt },
-    fallbackCapabilities,
-  );
-  const fallback = await supabase
-    .from("partner_accounts")
-    .update(fallbackPayload)
-    .eq("id", accountId);
-
-  if (fallback.error) {
-    throw new Error(fallback.error.message);
+  if (error) {
+    throw new Error(error.message);
   }
 
   return { expiresAt };
@@ -106,7 +82,6 @@ export async function issuePartnerAccountInitialSetupLink(
     supabase,
     account.id,
     now,
-    setupToken,
     setupTokenHash,
   );
 
