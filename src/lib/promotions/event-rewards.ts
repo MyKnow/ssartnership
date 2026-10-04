@@ -813,6 +813,8 @@ async function fetchAllEventMembers(
     const { data, error } = await supabase
       .from("members")
       .select(MEMBER_EVENT_CANDIDATE_SELECT)
+      .is("deleted_at", null)
+      // 추첨 후보 순서(동점·동명 tie-break)가 이 정렬에 의존하므로 PK 정렬로 바꾸지 않는다.
       .order("generation", { ascending: false })
       .order("display_name", { ascending: true })
       .order("id", { ascending: true })

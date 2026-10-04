@@ -55,3 +55,29 @@ test("관리자 알림 운영 타입은 서버 모듈과 분리되어 있고 역
   );
   assert.deepEqual(componentImporters, []);
 });
+
+test("알림·이벤트 회원 순회는 탈퇴 회원을 제외하고 PK 순서로 페이지를 나눈다", () => {
+  const operations = readSource("src/lib/admin-notification-ops.ts");
+  assert.equal(
+    (
+      operations.match(
+        /\.select\(MEMBER_IDENTITY_SELECT\)\s*\.is\("deleted_at", null\)/g,
+      ) ?? []
+    ).length,
+    2,
+  );
+  assert.doesNotMatch(operations, /\.order\("display_name"/);
+
+  const newPartner = readSource("src/lib/new-partner-notifications.ts");
+  assert.match(
+    newPartner,
+    /\.select\("id,campus"\)\s*\.is\("deleted_at", null\)[\s\S]{0,120}\.order\("id", \{ ascending: true \}\)/,
+  );
+
+  // 추첨 후보 순서 계약 때문에 이벤트 보상 후보는 기존 정렬을 유지한다.
+  const eventRewards = readSource("src/lib/promotions/event-rewards.ts");
+  assert.match(
+    eventRewards,
+    /\.select\(MEMBER_EVENT_CANDIDATE_SELECT\)\s*\.is\("deleted_at", null\)[\s\S]{0,200}\.order\("generation", \{ ascending: false \}\)\s*\.order\("display_name", \{ ascending: true \}\)\s*\.order\("id", \{ ascending: true \}\)/,
+  );
+});

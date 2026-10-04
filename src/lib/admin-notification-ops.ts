@@ -215,6 +215,7 @@ async function listAudienceMembers(resolvedAudience: ResolvedPushAudience) {
             const { data, error } = await supabase
               .from("members")
               .select(MEMBER_IDENTITY_SELECT)
+              .is("deleted_at", null)
               .in("id", [...memberIdChunk]);
             if (error) {
               throw new Error("발송 대상을 불러오지 못했습니다.");
@@ -231,7 +232,8 @@ async function listAudienceMembers(resolvedAudience: ResolvedPushAudience) {
           const { data, error } = await supabase
             .from("members")
             .select(MEMBER_IDENTITY_SELECT)
-            .order("display_name", { ascending: true })
+            .is("deleted_at", null)
+            // PK 순서로만 페이지를 나누고 표시 순서는 아래 메모리 정렬이 정한다.
             .order("id", { ascending: true })
             .range(from, to);
           if (error) {
