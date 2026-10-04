@@ -183,8 +183,8 @@ Wallet QR 서명과 Apple `authenticationToken` 원문은 DB에 저장하지 않
 
 ## RLS and indexes
 
-- `schema.sql` 기준 주요 application table은 모두 row level security가 enable되어 있다.
-- public read policy가 `categories`, `partners` 등에 정의되어 있다.
+- 모든 `public` 테이블은 row level security가 enable되어 있고 `anon`·`authenticated`·`PUBLIC` 권한이 없다. 과거 `categories`, `partners`의 public read policy는 `20260831090039`에서 제거했다.
+- 함수와 새 객체의 기본 권한도 브라우저 역할에 닫혀 있다. 기준은 [Service Role 접근 경계](../security/service-role-boundary.md#db-권한-기본값)다.
 - 앱 서버는 대부분 service role admin client를 사용하므로 API/server action 경계 검증이 필수 방어선이다.
 - 성능상 중요한 index는 partner/category lookup, registration status, member display/year/campus, event log pagination/filter, admin audit/auth security logs, review/favorite counts, notification delivery, billing status, promotion periods에 존재한다.
 

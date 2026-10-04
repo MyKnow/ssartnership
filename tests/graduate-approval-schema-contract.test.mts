@@ -99,9 +99,15 @@ test("graduate approval migration matches the final schema snapshot", () => {
   const snapshotStart = schemaSql.lastIndexOf(snapshotHeader);
 
   assert.notEqual(snapshotStart, -1, "hotfix snapshot must exist");
+  const nextSnapshot = schemaSql.indexOf("\n-- Snapshot of ", snapshotStart + snapshotHeader.length);
   assert.equal(
-    schemaSql.slice(snapshotStart + snapshotHeader.length).trim(),
+    schemaSql.slice(snapshotStart + snapshotHeader.length, nextSnapshot === -1 ? undefined : nextSnapshot).trim(),
     migrationSql.trim(),
+  );
+  const lastDefinition = schemaSql.lastIndexOf("create or replace function public.approve_graduate_verification(");
+  assert.ok(
+    lastDefinition > snapshotStart && (nextSnapshot === -1 || lastDefinition < nextSnapshot),
+    "no later snapshot may redefine the approval RPC",
   );
 });
 
