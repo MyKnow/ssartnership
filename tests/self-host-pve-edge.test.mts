@@ -90,7 +90,19 @@ test("access logs mask client networks and drop credentials and one-time tokens"
   for (const field of ["request>remote_ip", "request>client_ip"]) {
     assert.match(log, new RegExp(`${field} ip_mask 24 48`, "u"));
   }
-  for (const field of ["request>headers>Cookie", "request>headers>Authorization", "request>headers>Referer", "resp_headers>Set-Cookie", "resp_headers>Location"]) {
+  // Apikey carries Supabase keys (operator scripts send the service role key);
+  // client-sent forwarding headers would bypass the address mask.
+  for (const field of [
+    "request>headers>Cookie",
+    "request>headers>Authorization",
+    "request>headers>Proxy-Authorization",
+    "request>headers>Apikey",
+    "request>headers>X-Forwarded-For",
+    "request>headers>X-Real-Ip",
+    "request>headers>Referer",
+    "resp_headers>Set-Cookie",
+    "resp_headers>Location",
+  ]) {
     assert.match(log, new RegExp(`${field} delete`, "u"));
   }
   const [, pattern, replacement] = log.match(/request>uri regexp "([^"]+)" "([^"]+)"/u) ?? [];

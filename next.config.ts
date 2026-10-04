@@ -56,8 +56,9 @@ const selfHostBuild = process.env.SELF_HOST_BUILD === "1";
 
 // Uploads are stored under per-upload Storage paths (uploadId), so optimized
 // variants can live for a month on the persistent `.next/cache` volume.
-// Replacing a file under `public/` at the same path needs a new file name or
-// a manual purge of `.next/cache/images` (see the self-hosting runbook).
+// Replacing a file under `public/` at the same path, or an external image the
+// /api/image proxy relays changing at the same URL, needs a new name or a
+// manual purge of `.next/cache/images` (see the self-hosting runbook).
 const IMAGE_MINIMUM_CACHE_TTL_SECONDS = 31 * 24 * 60 * 60;
 // The largest stored source is 2100px wide (promotion slides), so the 3840px
 // default only re-encodes the same pixels. Small widths cover the 96-448px

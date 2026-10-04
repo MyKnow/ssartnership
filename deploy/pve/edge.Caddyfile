@@ -16,6 +16,8 @@
 # Access logs are JSON on stdout; Docker's bounded local driver rotates them.
 # Mask client networks and drop credentials, referrers, redirect targets,
 # query strings and one-time token path segments before they are written.
+# Supabase clients and operator scripts send keys in the apikey header, and a
+# client-sent forwarding header can carry an unmasked address.
 (ssartnership_access_log) {
 	log {
 		output stdout
@@ -25,6 +27,10 @@
 			request>uri regexp "^((?:/api)?/(?:admin|partner)/setup/|/(?:wallet/)?verify/|/api/(?:certification|wallet/apple)/avatar/)[^/?]+|([?]).*$" "${1}${2}redacted"
 			request>headers>Cookie delete
 			request>headers>Authorization delete
+			request>headers>Proxy-Authorization delete
+			request>headers>Apikey delete
+			request>headers>X-Forwarded-For delete
+			request>headers>X-Real-Ip delete
 			request>headers>Referer delete
 			resp_headers>Set-Cookie delete
 			resp_headers>Location delete

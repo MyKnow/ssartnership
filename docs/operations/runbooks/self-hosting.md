@@ -101,7 +101,7 @@ Storage SDK의 signed/public URL과 공개 이미지 프록시는 [데이터 실
 
 데이터 캐시는 의도적으로 영속하지 않는다. Next 16.3.8의 `revalidateTag` 무효화 기록은 프로세스 메모리에만 있고 `unstable_cache` key에는 빌드 정보가 없다. 이전 프로세스가 쓴 data entry를 다시 읽으면 무효화된 값이나 이전 코드의 모양이 돌아올 수 있으므로 `start.sh`는 매 시작마다 `.next/cache/fetch-cache`만 비운다. ISR 페이지 산출물은 `.next/server`에 쓰이며 이 볼륨과 무관하다.
 
-볼륨은 처음 만들어질 때 이미지의 `/app/.next/cache`(uid 1001 소유)를 복사한다. 이 디렉터리가 없는 이전 이미지로 먼저 볼륨이 생기면 root 소유가 되어 캐시가 쓰이지 않고 `start.sh`가 경고를 남긴다. 그때는 app을 멈춘 뒤 해당 볼륨만 지우고 새 이미지로 다시 올린다. `public/` 아래 이미지를 같은 경로로 교체하면 최대 31일 동안 이전 최적화본이 남으므로 파일 이름을 바꾸거나 app 컨테이너에서 `.next/cache/images`만 비운다. 볼륨 크기는 VM 디스크 경보와 함께 월 1회 `docker system df -v`로 확인한다.
+볼륨은 처음 만들어질 때 이미지의 `/app/.next/cache`(uid 1001 소유)를 복사한다. 이 디렉터리가 없는 이전 이미지로 먼저 볼륨이 생기면 root 소유가 되어 캐시가 쓰이지 않고 `start.sh`가 경고를 남긴다. 그때는 app을 멈춘 뒤 해당 볼륨만 지우고 새 이미지로 다시 올린다. `public/` 아래 이미지를 같은 경로로 교체하거나 `/api/image`가 중계하는 외부 이미지가 같은 주소에서 바뀌면 최대 31일 동안 이전 최적화본이 남는다. 파일 이름(주소)을 바꾸거나 app 컨테이너에서 `.next/cache/images`만 비운다. 볼륨 크기는 VM 디스크 경보와 함께 월 1회 `docker system df -v`로 확인한다.
 
 컨테이너 하드닝 평가(2026-10-05):
 
@@ -118,7 +118,7 @@ relay 방화벽 unit은 `network-online.target` 뒤에 실행하고 실패하면
 - 클라이언트 IP: edge에는 `trusted_proxies`가 없으므로 Caddy가 클라이언트가 보낸 `X-Forwarded-For`를 버리고 연결 주소로 다시 쓴다. 기본 관리 대상이 아닌 `X-Real-IP`는 `{remote_host}`로 덮어쓴다. relay는 `trusted_proxies static {$OPS_VM_IP}/32`와 `trusted_proxies_strict`로 이 edge 한 홉만 신뢰하므로 앱은 `클라이언트, edge` 순서의 값을 받는다. 앱은 `SELF_HOST_MODE=real`일 때만 첫 값을 IP 형식 검증 후 신뢰한다(앱 쪽 해석은 신뢰 프록시 IP 작업 단위가 소유). 임의 forwarded IP를 신뢰하도록 앱이나 relay를 완화하지 않는다.
 - 내부 전용 경로: 앱 origin의 `/api/cron`, `/api/cron/*`, `/api/ready`, `/api/ready/*`는 edge가 404로 응답한다. Cron은 앱 VM의 loopback 포트로, readiness는 비공개 probe로만 호출한다.
 - 보안 헤더: 네 공개 origin과 두 infra origin은 응답에 HSTS가 없을 때 `max-age=63072000; includeSubDomains`를 붙인다. 앱 페이지는 Next가 보내는 HSTS를 그대로 사용하므로 header가 중복되지 않는다.
-- 접근 로그: 네 공개 origin은 JSON 접근 로그를 stdout으로 남기며 Docker local driver가 크기 제한으로 회전한다. 기록 전에 클라이언트 주소를 IPv4 /24·IPv6 /48로 가리고 Cookie·Authorization·Referer·Set-Cookie·Location과 query string, 일회성 token 경로 조각을 제거한다. 새 `[token]` route를 추가하면 계약 테스트가 로그 필터 누락을 실패로 알린다. 확인은 `docker logs`로 한다.
+- 접근 로그: 네 공개 origin은 JSON 접근 로그를 stdout으로 남기며 Docker local driver가 크기 제한으로 회전한다. 기록 전에 클라이언트 주소를 IPv4 /24·IPv6 /48로 가리고 Cookie·Authorization·Proxy-Authorization·`apikey`·Referer·Set-Cookie·Location 헤더, 클라이언트가 보낸 `X-Forwarded-For`·`X-Real-IP`, query string, 일회성 token 경로 조각을 제거한다. 새 `[token]` route를 추가하면 계약 테스트가 로그 필터 누락을 실패로 알린다. 확인은 `docker logs`로 한다.
 - 지표: 전역 `metrics`를 켜고 `http://:9180/metrics`에서만 노출한다. 이 listener는 사설 대역이 아닌 출발지를 403으로 거절하고, Compose는 80/443만 게시한다. host label은 임의 Host header로 지표 종류가 늘지 않도록 끈다. Prometheus scrape job과 경보 규칙은 관측 구성에서 따로 추가한다.
 - 이전 준비 게이트: PVE 이전 리허설에서 쓰던 `PVE_PUBLIC_SERVICES_READY` 503 snippet은 공개 전환 이후 제거했다. 환경 변수가 빠져도 공개 origin이 503으로 닫히지 않는다. 다시 점검 창이 필요하면 Caddyfile에 임시 응답을 추가하고 validate 후 reload한다.
 - HTTP 캐시: edge에는 HTTP 응답 캐시가 없다. `s-maxage`는 공유 캐시를 기대하는 값이 아니며 이미지 재사용은 앱 컨테이너의 `.next/cache` 볼륨이 담당한다.
@@ -163,7 +163,7 @@ Production 홈 서버 전환에서는 `vercel.json`의 `git.deploymentEnabled=fa
 node scripts/self-host-cron.mjs --list
 ```
 
-단발 호출은 운영 쓰기가 생길 수 있다. `SELF_HOST_CRON_BASE_URL`과 `CRON_SECRET`을 보안 환경에서 주입한 상태에서 등록된 한 경로만 지정한다. 정확한 명령은 CLI의 사용법과 맞춰 검증한다. 로컬 smoke에서는 실행하지 않는다.
+단발 호출은 운영 쓰기가 생길 수 있다. `SELF_HOST_CRON_BASE_URL`과 `CRON_SECRET`을 보안 환경에서 주입한 상태에서 등록된 한 경로만 지정한다. 공개 origin의 `/api/cron`은 edge가 404로 막으므로 base URL은 해당 앱 VM의 loopback 앱 포트를 쓴다(`npm run rss:refresh`도 `RSS_REFRESH_URL`로 같은 주소를 지정한다). 정확한 명령은 CLI의 사용법과 맞춰 검증한다. 로컬 smoke에서는 실행하지 않는다.
 
 ```bash
 node scripts/self-host-cron.mjs --run /api/cron/rss
