@@ -5,8 +5,10 @@ import { buildTrustedRedirectUrl } from "@/lib/request-guards";
 import {
   buildMemberGateHref,
   getMemberGateCompletionReturnTo,
+  getMemberLoginCompletionHref,
   getMemberRequiredGateRedirect,
   requiresMemberEmailRegistration,
+  resolveMemberAuthDestination,
   resolveMemberRequiredGate,
 } from "@/lib/member-required-gates";
 
@@ -207,8 +209,12 @@ test("회원 게이트 진입점과 완료 화면은 공통 리디렉션 계약�
     Promise.all(gateEntrypointPaths.map((path) => readFile(path, "utf8"))),
     Promise.all(gateCompletionPaths.map((path) => readFile(path, "utf8"))),
   ]);
-  for (const source of entrypoints) assert.match(source, /getMemberRequiredGateRedirect/);
-  for (const source of completions) assert.match(source, /getMemberGateCompletionReturnTo/);
+  for (const source of entrypoints) {
+    assert.match(source, /getMemberRequiredGateRedirect|getMemberLoginCompletionHref/);
+  }
+  for (const source of completions) {
+    assert.match(source, /getMemberGateCompletionReturnTo|completedGate: "change-password"/);
+  }
 });
 
 test("관리자 발급 비밀번호 작업 완료는 사진 화면을 가정하지 않고 서버 게이트를 다시 거친다", async () => {
@@ -222,7 +228,7 @@ test("관리자 발급 비밀번호 작업 완료는 사진 화면을 가정하�
 
   assert.match(
     source,
-    /window\.location\.replace\(\s*getMemberGateCompletionReturnTo\(\s*"\/",\s*"change-password"\s*\)/,
+    /window\.location\.replace\(\s*getMemberLoginCompletionHref\(\{[\s\S]*?completedGate: "change-password",\s*\}\)/,
   );
   assert.doesNotMatch(source, /router\.replace\(\s*"\/certification\/photo"\s*\)/);
 });
@@ -272,3 +278,76 @@ test("사진 동기화를 건너뛴 사진 미제출 회원은 새로고침 없�
     /if \(payload\.requiresProfilePhotoSubmission\) \{[\s\S]*window\.location\.assign[\s\S]*return;/,
   );
 });
+
+test("로그인 완료 목적지는 안전한 returnTo를 보존하고 로그인 진입 화면으로 돌아가지 않는다", () => {
+  assert.equal(resolveMemberAuthDestination("/partners?tab=benefit#top"), "/partners?tab=benefit#top");
+  assert.equal(resolveMemberAuthDestination(undefined, "/certification"), "/certification");
+  assert.equal(resolveMemberAuthDestination("https://attacker.example/next"), "/");
+  assert.equal(resolveMemberAuthDestination("//attacker.example"), "/");
+  for (const entry of [
+    "/auth/login?returnTo=%2Fadmin",
+    "/auth/signup",
+    "/auth/signup/complete",
+    "/auth/mock",
+    "/auth/recover-email",
+    "/auth/reset",
+    "/auth/member/setup",
+    "/auth/graduate/setup",
+  ]) {
+    assert.equal(resolveMemberAuthDestination(entry, "/certification"), "/certification", entry);
+  }
+  assert.equal(resolveMemberAuthDestination("/auth/login", "/auth/login"), "/");
+  assert.equal(resolveMemberAuthDestination("/auth/consent?returnTo=%2F"), "/auth/consent?returnTo=%2F");
+});
+
+test("모든 로그인 완료 지점은 같은 완료 계약으로 게이트 우선순위와 목적지를 함께 정한다", async () => {
+  assert.equal(
+    getMemberLoginCompletionHref({ currentPath: "/auth/login", returnTo: "/partners?q=1" }),
+    "/partners?q=1",
+  );
+  assert.equal(
+    getMemberLoginCompletionHref({
+      currentPath: "/auth/login",
+      returnTo: "/partners?q=1",
+      mustChangePassword: true,
+      requiresConsent: true,
+    }),
+    "/auth/change-password?returnTo=%2Fpartners%3Fq%3D1",
+  );
+  assert.equal(
+    getMemberLoginCompletionHref({
+      currentPath: "/auth/graduate/setup",
+      returnTo: null,
+      fallback: "/certification",
+      requiresProfilePhotoUpdate: true,
+    }),
+    "/certification/photo?returnTo=%2Fcertification",
+  );
+  assert.equal(
+    getMemberLoginCompletionHref({
+      currentPath: "/auth/member/setup",
+      returnTo: "/auth/change-password?returnTo=%2F",
+      completedGate: "change-password",
+    }),
+    "/",
+  );
+
+  const completionClients = await Promise.all([
+    "../src/components/auth/LoginForm.tsx",
+    "../src/components/auth/MemberEmailRecoveryForm.tsx",
+    "../src/components/graduate-verification/GraduatePasswordSetupView.tsx",
+    "../src/components/member-manual-import/ManualMemberPasswordSetupView.tsx",
+  ].map((path) => readFile(new URL(path, import.meta.url), "utf8")));
+  for (const source of completionClients) {
+    assert.match(source, /getMemberLoginCompletionHref\(/);
+    assert.doesNotMatch(source, /router\.replace\("\/(?:certification)?"\)|router\.replace\(data\.redirectTo/);
+  }
+
+  const loginPage = await readFile(new URL("../src/app/auth/login/page.tsx", import.meta.url), "utf8");
+  assert.match(loginPage, /getSignedUserSession\(\)/);
+  assert.match(loginPage, /redirect\(resolveMemberAuthDestination\(requestedReturnTo, "\/"\)\)/);
+  assert.ok(
+    loginPage.indexOf("redirect(resolveMemberAuthDestination") < loginPage.indexOf("<LoginPageView"),
+  );
+});
+
