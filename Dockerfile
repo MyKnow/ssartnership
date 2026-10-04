@@ -33,11 +33,16 @@ RUN node deploy/self-host/write-build-env-manifest.mjs /app/.self-host-build/bui
 RUN npm run build
 
 FROM base AS runner
+# Korean local time for server-rendered dates, and a keep-alive that outlives
+# the relay Caddy's 2m idle upstream connections. Compose pins both values.
 ENV NODE_ENV=production \
     PORT=3000 \
-    HOSTNAME=0.0.0.0
+    HOSTNAME=0.0.0.0 \
+    TZ=Asia/Seoul \
+    KEEP_ALIVE_TIMEOUT=130000
 RUN groupadd --system --gid 1001 nextjs \
-    && useradd --system --uid 1001 --gid nextjs --create-home nextjs
+    && useradd --system --uid 1001 --gid nextjs --create-home nextjs \
+    && install -d -o nextjs -g nextjs -m 0755 /app/.next /app/.next/cache
 COPY --from=builder --chown=nextjs:nextjs /app/public ./public
 COPY --from=builder --chown=nextjs:nextjs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nextjs /app/.next/static ./.next/static

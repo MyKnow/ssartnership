@@ -22,6 +22,11 @@ http://:{$APP_PORT} {
 		# stop_grace_period plus startup time below lb_try_duration.
 		lb_try_duration 20s
 		lb_try_interval 250ms
+		transport http {
+			# The app's KEEP_ALIVE_TIMEOUT must outlive this idle upstream
+			# connection lifetime so Node never closes a socket Caddy reuses.
+			keepalive 2m
+		}
 	}
 }
 

@@ -86,12 +86,27 @@ Storage SDK의 signed/public URL과 공개 이미지 프록시는 [데이터 실
 
 ## 배포 창과 앱 런타임 기본값
 
-이 절의 값은 `deploy/pve/relay.Caddyfile`·`relay-firewall.service`, `deploy/self-host/compose.production.yaml`·`compose.original-preview.yaml`이 정본이며 `tests/self-host-deploy-window.test.mts`가 서로의 관계를 고정한다.
+이 절의 값은 `deploy/pve/relay.Caddyfile`·`relay-firewall.service`, `deploy/self-host/compose.production.yaml`·`compose.original-preview.yaml`, 두 Dockerfile, `deploy/self-host/runtime-env.mjs`, `next.config.ts`가 정본이며 `tests/self-host-deploy-window.test.mts`·`tests/self-host-runtime-defaults.test.mts`가 서로의 관계를 고정한다.
 
 | 항목 | 값 | 이유 |
 | --- | --- | --- |
 | relay 앱 upstream 재시도 | `lb_try_duration 20s`, `lb_try_interval 250ms` | 수신기가 app 컨테이너를 재생성하는 동안 새 요청을 502 대신 대기시킨다. 실제 장애에서는 20초 뒤 실패한다. |
 | app `stop_grace_period` | 15초 | Next는 SIGTERM에서 진행 중 요청을 마무리한다. 유예+기동(약 5초)이 relay 재시도 창 안에 있어야 한다. |
+| relay upstream keepalive | `keepalive 2m` | Caddy가 유휴 연결을 재사용하는 최대 시간이다. |
+| `KEEP_ALIVE_TIMEOUT` | `130000` (이미지 기본값, Compose 고정) | Node 기본 5초가 relay의 2분보다 짧으면 이미 닫힌 socket 재사용으로 간헐 502가 난다. 시작 검증은 120000 이하·600000 초과·숫자가 아닌 값을 거절한다. |
+| `TZ` | `Asia/Seoul` (이미지 기본값, Compose 고정) | 서버 렌더링 날짜·월 기준 규칙이 한국 시간을 가정한다. 다른 값은 시작 검증이 거절한다. |
+| Next `compress` | 배포 이미지(`SELF_HOST_BUILD=1`)에서 끔 | edge Caddy가 `encode zstd gzip`을 수행하므로 단일 앱 프로세스의 gzip을 중복하지 않는다. 수신기 health·Cron·telemetry의 loopback 호출은 압축이 필요 없다. 로컬 `next start`는 기본값을 유지한다. |
+| `.next/cache` | 환경별 named volume(`production-app-next-cache`, `original-app-next-cache`) | 최적화 이미지가 배포 뒤에도 남아 재인코딩 burst를 줄인다. |
+| 이미지 최적화 | `minimumCacheTTL` 31일, `deviceSizes` 최대 2048, `imageSizes` 64~384 | 저장 이미지는 업로드마다 다른 경로이고 가장 넓은 원본은 2100px이다. 3840px 변형은 같은 픽셀을 다시 인코딩할 뿐이다. |
+
+데이터 캐시는 의도적으로 영속하지 않는다. Next 16.3.8의 `revalidateTag` 무효화 기록은 프로세스 메모리에만 있고 `unstable_cache` key에는 빌드 정보가 없다. 이전 프로세스가 쓴 data entry를 다시 읽으면 무효화된 값이나 이전 코드의 모양이 돌아올 수 있으므로 `start.sh`는 매 시작마다 `.next/cache/fetch-cache`만 비운다. ISR 페이지 산출물은 `.next/server`에 쓰이며 이 볼륨과 무관하다.
+
+볼륨은 처음 만들어질 때 이미지의 `/app/.next/cache`(uid 1001 소유)를 복사한다. 이 디렉터리가 없는 이전 이미지로 먼저 볼륨이 생기면 root 소유가 되어 캐시가 쓰이지 않고 `start.sh`가 경고를 남긴다. 그때는 app을 멈춘 뒤 해당 볼륨만 지우고 새 이미지로 다시 올린다. `public/` 아래 이미지를 같은 경로로 교체하면 최대 31일 동안 이전 최적화본이 남으므로 파일 이름을 바꾸거나 app 컨테이너에서 `.next/cache/images`만 비운다. 볼륨 크기는 VM 디스크 경보와 함께 월 1회 `docker system df -v`로 확인한다.
+
+컨테이너 하드닝 평가(2026-10-05):
+
+- 힙 상한: 같은 Node 24.18.1 base image를 `--memory 768m`으로 실행하면 V8 `heap_size_limit`이 432MiB로 cgroup 한도를 따른다. OOMKilled 기록이 확인되기 전에는 `NODE_OPTIONS=--max-old-space-size`를 추가하지 않는다. sharp/libvips의 native 메모리는 V8 힙 밖에 있으므로 메모리 경보는 컨테이너 RSS 기준으로 본다.
+- `read_only`: 다른 서비스와 달리 app은 아직 적용하지 않는다. 코드상 쓰기 경로는 `.next/cache`(볼륨)와 `/tmp`뿐이지만, 정적으로 판정된 ISR route가 생기면 Next가 `.next/server`에 재생성 결과를 쓰고 실패 경고를 반복한다. 종료 처리의 파일 쓰기 여부도 아직 실측하지 않았다. Preview에서 `read_only: true`와 `tmpfs: /tmp`로 기동·종료 시간·로그의 `EROFS`를 확인한 뒤 적용한다.
 
 relay 방화벽 unit은 `network-online.target` 뒤에 실행하고 실패하면 5초 간격으로 2분 동안 최대 10회 재시도한다. Docker는 이 unit을 `Requires=`하므로 규칙 없이 relay 포트를 열지 않는다. 호스트 적용 전 `systemd-analyze verify`와 VM 재부팅 리허설로 Docker·relay·app 기동 순서를 확인한다.
 
@@ -105,6 +120,7 @@ relay 방화벽 unit은 `network-online.target` 뒤에 실행하고 실패하면
 - 접근 로그: 네 공개 origin은 JSON 접근 로그를 stdout으로 남기며 Docker local driver가 크기 제한으로 회전한다. 기록 전에 클라이언트 주소를 IPv4 /24·IPv6 /48로 가리고 Cookie·Authorization·Referer·Set-Cookie·Location과 query string, 일회성 token 경로 조각을 제거한다. 새 `[token]` route를 추가하면 계약 테스트가 로그 필터 누락을 실패로 알린다. 확인은 `docker logs`로 한다.
 - 지표: 전역 `metrics`를 켜고 `http://:9180/metrics`에서만 노출한다. 이 listener는 사설 대역이 아닌 출발지를 403으로 거절하고, Compose는 80/443만 게시한다. host label은 임의 Host header로 지표 종류가 늘지 않도록 끈다. Prometheus scrape job과 경보 규칙은 관측 구성에서 따로 추가한다.
 - 이전 준비 게이트: PVE 이전 리허설에서 쓰던 `PVE_PUBLIC_SERVICES_READY` 503 snippet은 공개 전환 이후 제거했다. 환경 변수가 빠져도 공개 origin이 503으로 닫히지 않는다. 다시 점검 창이 필요하면 Caddyfile에 임시 응답을 추가하고 validate 후 reload한다.
+- HTTP 캐시: edge에는 HTTP 응답 캐시가 없다. `s-maxage`는 공유 캐시를 기대하는 값이 아니며 이미지 재사용은 앱 컨테이너의 `.next/cache` 볼륨이 담당한다.
 
 변경 전 운영 VM에서 현재 파일을 보존하고 설정만 검사한다. Compose 변수는 운영 VM의 env 파일에서 읽는다.
 
