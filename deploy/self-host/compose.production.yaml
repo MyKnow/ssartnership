@@ -10,6 +10,9 @@ services:
     image: ${SELF_HOST_IMAGE:?receiver supplies an immutable app image}
     init: true
     restart: unless-stopped
+    # Next drains in-flight requests on SIGTERM. Keep this grace plus startup
+    # below the relay's 20s lb_try_duration so new requests wait, not 502.
+    stop_grace_period: 15s
     # production_default is an internal-only restored Supabase network. Keep the
     # app attached to the existing edge network as well so Docker can publish
     # the loopback host port for the reverse proxy and receiver health probe.

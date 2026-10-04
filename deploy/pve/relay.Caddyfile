@@ -15,7 +15,14 @@
 }
 
 http://:{$APP_PORT} {
-	reverse_proxy {$APP_CONTAINER}:3000
+	reverse_proxy {$APP_CONTAINER}:3000 {
+		# A deploy recreates the app container. Hold requests until the
+		# replacement accepts connections instead of returning 502; a real
+		# outage still fails after this window. Keep the app's
+		# stop_grace_period plus startup time below lb_try_duration.
+		lb_try_duration 20s
+		lb_try_interval 250ms
+	}
 }
 
 http://:8000 {

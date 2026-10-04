@@ -84,6 +84,17 @@ SELF_HOST_IMAGE=registry.example.com/ssartnership@sha256:REVIEWED_DIGEST docker 
 
 Storage SDK의 signed/public URL과 공개 이미지 프록시는 [데이터 실행 절차](./self-host-database.md)에 따라 검증한다. 공개 origin과 내부 전송 주소를 설정한 것만으로 실제 업로드·다운로드 검증을 완료 처리하지 않는다.
 
+## 배포 창과 앱 런타임 기본값
+
+이 절의 값은 `deploy/pve/relay.Caddyfile`·`relay-firewall.service`, `deploy/self-host/compose.production.yaml`·`compose.original-preview.yaml`이 정본이며 `tests/self-host-deploy-window.test.mts`가 서로의 관계를 고정한다.
+
+| 항목 | 값 | 이유 |
+| --- | --- | --- |
+| relay 앱 upstream 재시도 | `lb_try_duration 20s`, `lb_try_interval 250ms` | 수신기가 app 컨테이너를 재생성하는 동안 새 요청을 502 대신 대기시킨다. 실제 장애에서는 20초 뒤 실패한다. |
+| app `stop_grace_period` | 15초 | Next는 SIGTERM에서 진행 중 요청을 마무리한다. 유예+기동(약 5초)이 relay 재시도 창 안에 있어야 한다. |
+
+relay 방화벽 unit은 `network-online.target` 뒤에 실행하고 실패하면 5초 간격으로 2분 동안 최대 10회 재시도한다. Docker는 이 unit을 `Requires=`하므로 규칙 없이 relay 포트를 열지 않는다. 호스트 적용 전 `systemd-analyze verify`와 VM 재부팅 리허설로 Docker·relay·app 기동 순서를 확인한다.
+
 ## 공개 edge와 TLS
 
 공개 edge는 운영 VM 5202의 `deploy/pve/compose.operations.yaml` Caddy 하나다. 앱 두 origin(`ssartnership.myknow.xyz`, `ssartnership-dev.myknow.xyz`)과 API 두 origin은 같은 snippet을 사용하며, 각 앱 VM의 relay(`deploy/pve/compose.relay.yaml`)로 전달한다. Caddy는 Docker socket·관리 API(`admin off`)·데이터 network에 접근하지 않는다. 계약은 `tests/self-host-pve-edge.test.mts`와 `tests/self-host-infra-access.test.mts`가 고정한다.
