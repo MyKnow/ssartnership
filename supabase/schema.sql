@@ -23517,6 +23517,30 @@ begin
 end
 $reconcile_partner_metric_operator_traffic$;
 
+-- Public media buckets and read-path indexes ---------------------------------
+-- Every writer of these public buckets stores a server-normalized WebP through
+-- the image upload attach step (largest policy output: 10 MiB). Storage now
+-- rejects anything else even if a future writer bypasses that step.
+do $public_media_bucket_limits$
+begin
+  if pg_catalog.to_regclass('storage.buckets') is not null then
+    update storage.buckets
+    set file_size_limit = 10485760,
+        allowed_mime_types = array['image/webp']::text[]
+    where id in ('partner-media', 'review-media', 'promotion-slides');
+  end if;
+end
+$public_media_bucket_limits$;
+
+-- Admin member detail: security log page by member, newest first, with count.
+create index if not exists auth_security_logs_actor_created_at_idx
+  on public.auth_security_logs (actor_type, actor_id, created_at desc)
+  where actor_id is not null;
+
+-- Campus catalog filters use campus_slugs @> '{slug}'.
+create index if not exists partners_campus_slugs_idx
+  on public.partners using gin (campus_slugs);
+
 -- Public schema privilege defaults --------------------------------------------
 -- The application reaches the database only through the service role. Remove
 -- every PUBLIC/anon/authenticated privilege that earlier migrations may have
