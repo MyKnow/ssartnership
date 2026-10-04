@@ -8,11 +8,27 @@ const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const CONTROL_CHARACTER_REGEX = /[\u0000-\u001F\u007F]/;
 
-export const PASSWORD_POLICY_MESSAGE =
-  "비밀번호는 8~64자, 영문/숫자/특수문자를 모두 포함해야 합니다.";
+const PASSWORD_FORBIDDEN_CHARACTER_REGEX = /[\u0000-\u001F\u007F-\u009F]/;
 
+export const PASSWORD_POLICY_MESSAGE =
+  "비밀번호는 8~64자, 영문/숫자/특수문자를 모두 포함해야 하며 앞뒤 공백은 사용할 수 없습니다.";
+
+/**
+ * FE 제출 전 검증과 BE route/server action 검증이 함께 쓰는 비밀번호 정책.
+ * 로그인·변경 경로 일부가 입력을 trim하므로, 저장 시점에 앞뒤 공백을 허용하면
+ * 같은 비밀번호로 다시 로그인하지 못한다. 제어문자도 입력 장치마다 달라 거부한다.
+ */
 export function isValidPasswordPolicy(value: string) {
+  if (typeof value !== "string") {
+    return false;
+  }
   if (value.length < 8 || value.length > 64) {
+    return false;
+  }
+  if (value !== value.trim()) {
+    return false;
+  }
+  if (PASSWORD_FORBIDDEN_CHARACTER_REGEX.test(value)) {
     return false;
   }
   const hasLetter = /[A-Za-z]/.test(value);
