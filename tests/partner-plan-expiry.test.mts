@@ -10,6 +10,7 @@ import {
 import {
   getAdminPartnerPlanExpiryBadge,
   getPartnerPlanDaysUntil,
+  matchesPartnerPlanFilter,
 } from "../src/lib/partner-plan-ui.ts";
 
 const root = new URL("..", import.meta.url);
@@ -17,7 +18,7 @@ const now = "2026-10-05T03:00:00.000Z";
 
 test("플랜 만료 정책은 자동 강등 없는 수동 유예다", () => {
   assert.equal(PARTNER_PLAN_EXPIRY_POLICY, "manual_grace");
-  assert.equal(PARTNER_PLAN_EXPIRING_SOON_DAYS, 14);
+  assert.equal(PARTNER_PLAN_EXPIRING_SOON_DAYS, 30);
 });
 
 test("Basic은 제휴 기간을 따르므로 플랜 만료 상태를 계산하지 않는다", () => {
@@ -59,10 +60,10 @@ test("유료 플랜 만료 상태는 만료일 기준으로 계산하고 만료 
   assert.deepEqual(
     getPartnerPlanExpiryState({
       planTier: "partner",
-      planExpiresAt: "2026-10-19T03:00:00.000Z",
+      planExpiresAt: "2026-11-04T03:00:00.000Z",
       now,
     }),
-    { status: "expiring_soon", daysUntilExpiry: 14, requiresManualReview: false },
+    { status: "expiring_soon", daysUntilExpiry: 30, requiresManualReview: false },
   );
   assert.deepEqual(
     getPartnerPlanExpiryState({
@@ -117,10 +118,24 @@ test("관리자 만료 배지는 만료·임박·미설정만 표시한다", () 
   );
 });
 
-test("파트너 포털 남은 일수 계산은 공용 날짜 헬퍼와 같은 값을 쓴다", () => {
+test("파트너 포털 남은 일수·만료 임박 기준은 관리자 만료 상태와 같은 헬퍼를 쓴다", () => {
   assert.equal(getPartnerPlanDaysUntil("2026-10-07T03:00:00.000Z", now), 2);
   assert.equal(getPartnerPlanDaysUntil("invalid", now), null);
   assert.equal(getPartnerPlanDaysUntil(null, now), null);
+  assert.equal(
+    matchesPartnerPlanFilter(
+      { planTier: "partner", hasPendingRequest: false, daysUntil: PARTNER_PLAN_EXPIRING_SOON_DAYS },
+      "expiring",
+    ),
+    true,
+  );
+  assert.equal(
+    matchesPartnerPlanFilter(
+      { planTier: "partner", hasPendingRequest: false, daysUntil: PARTNER_PLAN_EXPIRING_SOON_DAYS + 1 },
+      "expiring",
+    ),
+    false,
+  );
 });
 
 test("관리자 플랜 목록은 읽기 모델에서 만료 상태를 계산해 표시한다", async () => {

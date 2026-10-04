@@ -1,6 +1,7 @@
 import type { AdChannel } from "@/lib/ad-packages";
 import {
   PARTNER_COMPANY_PLAN_DEFINITIONS,
+  PARTNER_PLAN_EXPIRING_SOON_DAYS,
   getDaysUntilPartnerPlanDate,
   getPartnerCompanyPlanDefinition,
   type PartnerCompanyPlanTier,
@@ -101,7 +102,11 @@ export function matchesPartnerPlanFilter(
     case "pending":
       return brand.hasPendingRequest;
     case "expiring":
-      return brand.daysUntil !== null && brand.daysUntil >= 0 && brand.daysUntil <= 30;
+      return (
+        brand.daysUntil !== null &&
+        brand.daysUntil >= 0 &&
+        brand.daysUntil <= PARTNER_PLAN_EXPIRING_SOON_DAYS
+      );
     default:
       return brand.planTier === filter;
   }
@@ -126,7 +131,10 @@ export function getPartnerPlanExpiryStatus(
   }
   return {
     label: `${prefix} D-${daysUntil}`,
-    tone: daysUntil <= 30 ? ("warning" as const) : ("neutral" as const),
+    tone:
+      daysUntil <= PARTNER_PLAN_EXPIRING_SOON_DAYS
+        ? ("warning" as const)
+        : ("neutral" as const),
   };
 }
 

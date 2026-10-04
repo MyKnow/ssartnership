@@ -200,7 +200,8 @@ export function isPartnerPlanWindowOrderValid(input: {
  * state for display and follow-up.
  */
 export const PARTNER_PLAN_EXPIRY_POLICY = "manual_grace" as const;
-export const PARTNER_PLAN_EXPIRING_SOON_DAYS = 14;
+/** Shared "만료 임박" window for the admin plan list and the partner portal. */
+export const PARTNER_PLAN_EXPIRING_SOON_DAYS = 30;
 
 const DAY_MS = 86_400_000;
 
