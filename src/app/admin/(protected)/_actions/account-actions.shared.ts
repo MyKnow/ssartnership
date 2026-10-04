@@ -1,3 +1,4 @@
+import { PARTNER_COMPANY_SELECT } from "@/lib/partner-admin/company-account-rows";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   assertAdminCanAccessManagedCampuses,
@@ -37,7 +38,7 @@ export async function loadPartnerCompanyOrRedirect(companyId: string) {
   const supabase = getPartnerAccountSupabase();
   const { data: company, error } = await supabase
     .from("partner_companies")
-    .select("id,name,slug,description,is_active,managed_campus_slugs")
+    .select(PARTNER_COMPANY_SELECT)
     .eq("id", companyId)
     .maybeSingle();
 
