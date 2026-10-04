@@ -13,9 +13,9 @@ import {
 } from "./api";
 import { derivePushSettingsStatus } from "./status";
 import {
+  getOrCreatePushSubscription,
   getPushSettingsClientError,
   getServiceWorkerRegistration,
-  urlBase64ToUint8Array,
 } from "./device";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import type {
@@ -156,14 +156,7 @@ export function usePushSettingsController({
     setPendingAction("subscribe");
     try {
       await deviceState.requestNotificationPermission();
-      const registration = await getServiceWorkerRegistration();
-      let subscription = await registration.pushManager.getSubscription();
-      if (!subscription) {
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-        });
-      }
+      const subscription = await getOrCreatePushSubscription(vapidPublicKey);
 
       const data = await subscribePushDevice(subscription.toJSON());
       deviceState.markSubscribed(subscription.endpoint);

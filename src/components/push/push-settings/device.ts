@@ -31,10 +31,37 @@ function buildPushSettingsSafeMessage(
   }
 }
 
+export type PushDeviceSetupErrorCode = "push_unsupported" | "permission_denied";
+
+const PUSH_DEVICE_SETUP_MESSAGES: Record<PushDeviceSetupErrorCode, string> = {
+  push_unsupported: "이 브라우저에서는 푸시 알림을 사용할 수 없습니다.",
+  permission_denied: "브라우저에서 알림 권한을 허용해 주세요.",
+};
+
+/**
+ * 기기 준비 단계(지원 여부·권한)의 실패. 메시지는 고정 문구라 그대로 보여 줘도 안전하다.
+ */
+export class PushDeviceSetupError extends Error {
+  readonly code: PushDeviceSetupErrorCode;
+
+  constructor(code: PushDeviceSetupErrorCode) {
+    super(PUSH_DEVICE_SETUP_MESSAGES[code]);
+    this.name = "PushDeviceSetupError";
+    this.code = code;
+  }
+}
+
+/**
+ * 알림 설정 화면(회원·관리자·파트너)이 보여 줄 오류. 브라우저·서버 원문은
+ * 노출하지 않고 동작 이름이 들어간 안전 문구로 바꾼다.
+ */
 export function getPushSettingsClientError(
   error: unknown,
   actionLabel: string,
-) {
+): PushSettingsClientError | PushDeviceSetupError {
+  if (error instanceof PushDeviceSetupError) {
+    return error;
+  }
   if (error instanceof PushSettingsClientError) {
     return new PushSettingsClientError(
       error.code,
@@ -86,6 +113,81 @@ export async function getServiceWorkerRegistration() {
     return existing;
   }
   return navigator.serviceWorker.register("/sw.js");
+}
+
+export function isPushSubscriptionSupported() {
+  return (
+    typeof window !== "undefined" &&
+    typeof navigator !== "undefined" &&
+    "serviceWorker" in navigator &&
+    "PushManager" in window &&
+    "Notification" in window
+  );
+}
+
+/** 이미 허용된 권한은 다시 묻지 않고 현재 권한 상태를 돌려준다. */
+export async function requestPushNotificationPermission(): Promise<NotificationPermission> {
+  if (typeof window === "undefined" || !("Notification" in window)) {
+    throw new PushDeviceSetupError("push_unsupported");
+  }
+  return Notification.permission === "granted"
+    ? "granted"
+    : Notification.requestPermission();
+}
+
+export function assertPushNotificationPermissionGranted(
+  permission: NotificationPermission,
+) {
+  if (permission !== "granted") {
+    throw new PushDeviceSetupError("permission_denied");
+  }
+}
+
+function hasSameApplicationServerKey(
+  subscription: PushSubscription,
+  applicationServerKey: Uint8Array,
+) {
+  const currentKey = subscription.options?.applicationServerKey;
+  if (!currentKey) {
+    return true;
+  }
+  const currentBytes = new Uint8Array(currentKey);
+  return (
+    currentBytes.length === applicationServerKey.length &&
+    currentBytes.every((value, index) => value === applicationServerKey[index])
+  );
+}
+
+/**
+ * 이 브라우저의 기존 구독을 재사용하고, 없거나 VAPID 공개키가 바뀐 경우에만
+ * 새로 구독한다. 같은 기기를 다시 켤 때 endpoint가 바뀌어 서버에 중복 구독이
+ * 쌓이지 않게 한다.
+ */
+export async function getOrCreatePushSubscription(vapidPublicKey: string) {
+  if (!vapidPublicKey || !isPushSubscriptionSupported()) {
+    throw new PushDeviceSetupError("push_unsupported");
+  }
+  const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
+  const registration = await getServiceWorkerRegistration();
+  const existing = await registration.pushManager.getSubscription();
+  if (existing && hasSameApplicationServerKey(existing, applicationServerKey)) {
+    return existing;
+  }
+  if (existing) {
+    await existing.unsubscribe().catch(() => undefined);
+  }
+  return registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey,
+  });
+}
+
+/** 관리자·파트너 알림 패널용: 권한 확인 후 이 브라우저 구독을 확보한다. */
+export async function subscribeCurrentBrowserPush(vapidPublicKey: string) {
+  assertPushNotificationPermissionGranted(
+    await requestPushNotificationPermission(),
+  );
+  return getOrCreatePushSubscription(vapidPublicKey);
 }
 
 export async function parsePushSettingsJson<
