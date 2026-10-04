@@ -12,6 +12,7 @@ import AdminMemberDetailStatusMessages from "@/components/admin/member-detail/Ad
 import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import { AdminMemberDetailSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import Button from "@/components/ui/Button";
+import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { parseSsafyProfile } from "@/lib/mm-profile";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { formatSsafyMemberLifecycleLabel, getCurrentSsafyYear } from "@/lib/ssafy-year";
@@ -130,6 +131,18 @@ async function AdminMemberDetailContent({
     }
     notFound();
   }
+
+  // Opening a member detail exposes contact data and security logs; record the
+  // access like the private photo and certificate views.
+  await logAdminAudit({
+    ...(await getServerActionLogContext()),
+    action: "member_detail_view",
+    actorId: adminSession.adminId,
+    targetType: "member",
+    targetId: memberId,
+    path: `/admin/members/${memberId}`,
+    properties: { securityLogPage },
+  });
 
   const member = detail.member;
   const profile = parseSsafyProfile(

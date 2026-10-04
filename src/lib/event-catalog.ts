@@ -159,6 +159,7 @@ export const ADMIN_AUDIT_ACTIONS = [
   'member_profile_photo_active_reject',
   'member_profile_photo_replace',
   'graduate_certificate_view',
+  'member_detail_view',
   'graduate_profile_photo_view',
   'member_profile_photo_view',
   'member_signup_approval_approve',
