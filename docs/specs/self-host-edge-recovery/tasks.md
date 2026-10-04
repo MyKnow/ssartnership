@@ -7,7 +7,7 @@ authority: evidence
 
 # 공개 edge 복구 작업 목록
 
-> 종료 정리(2026-10-05): Issue #478은 2026-09-29에 종료됐다. "Production 승격 후 재부팅 복구와 데이터 서비스 불변 확인"은 [PVE 이전 작업 기록](../pve-service-migration/tasks.md)의 순차 재부팅 복구 증거와 edge 복구 timer 활성으로 완료됐다. "외부 회선 HTTPS 확인"은 [기술 부채 원장](../../plans/tech-debt.md#종료-issue에서-이관한-잔여-항목)으로 옮겼다.
+> 종료 정리(2026-10-05): Issue #478은 2026-09-30(KST)에 종료됐다. "Production 승격 후 재부팅 복구와 데이터 서비스 불변 확인"은 [PVE 이전 작업 기록](../pve-service-migration/tasks.md)의 순차 재부팅 복구 증거와 edge 복구 timer 활성으로 완료됐다. "외부 회선 HTTPS 확인"은 [기술 부채 원장](../../plans/tech-debt.md#종료-issue에서-이관한-잔여-항목)으로 옮겼다.
 
 Issue [#478](https://github.com/MyKnow/ssartnership/issues/478), related [#453](https://github.com/MyKnow/ssartnership/issues/453).
 

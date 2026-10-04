@@ -36,7 +36,7 @@ macOS x64, Windows arm64, Linux arm64는 현재 공식 개발환경이 아니다
 
 OS 수준 prerequisite는 Git과 Repository에 고정된 Node.js runtime뿐이다. Docker, local database, Supabase CLI, Vercel CLI의 global 설치는 기본 mock 개발환경의 필수 조건이 아니다.
 
-공식 local/GitHub 환경은 npm `11.16.0`을 사용한다. Vercel은 provider가 제공하는 검토된 npm `11.12.1` 이상 `11.x`를 허용하지만, 동일한 `install:trusted` 정책과 lockfile identity 검사를 통과해야 한다. npm 12는 별도 검토 전까지 거부한다.
+공식 local/GitHub 환경과 자체 호스팅 이미지의 Node image는 npm `11.16.0`을 사용한다. 설치 정책(`package.json`의 `engines.npm`)은 검토된 npm `11.12.1` 이상 `11.x`를 허용하지만, 동일한 `install:trusted` 정책과 lockfile identity 검사를 통과해야 한다. npm 12는 별도 검토 전까지 거부한다.
 
 ## 3. 표준 명령
 

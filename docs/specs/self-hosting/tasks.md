@@ -8,7 +8,7 @@ issue: https://github.com/MyKnow/ssartnership/issues/435
 
 # 자체 호스팅 작업과 검증 증거
 
-> 종료 정리(2026-10-05): Issue #435는 2026-09-29, Production 자동 배포 #467은 2026-09-20에 종료됐다. 이 문서는 시점 증거다. 미체크 항목의 판정은 다음과 같다.
+> 종료 정리(2026-10-05): Issue #435는 2026-09-30(KST), Production 자동 배포 #467은 2026-09-20에 종료됐다. 이 문서는 시점 증거다. 미체크 항목의 판정은 다음과 같다.
 >
 > - 자체 호스팅 API 연결과 로그인·공개 조회·권한, ingress·관리 경로·외부 백업 복원, 단일 writer·단일 scheduler 전환, `dev` 통합·`main` 승격, Production 수신기 설치와 exact-SHA health: [PVE 이전 작업 기록](../pve-service-migration/tasks.md)의 공개 전환·재부팅 복구 증거로 완료됐다.
 > - 메일·Mattermost·Push는 운영 중이다. Apple Wallet은 기능과 timer가 비활성이라 실제 연동 확인이 남았다.
