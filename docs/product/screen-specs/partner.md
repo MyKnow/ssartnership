@@ -16,7 +16,7 @@ authority: normative
 
 - 목표·위계: 계정 로그인 → 재설정/초기 설정 문의 순이다.
 - 액션·흐름: primary는 로그인, 보조는 비밀번호 재설정이다. 포털 보호 화면에서 진입하고 회사 선택·대시보드·필수 비밀번호 변경으로 이탈한다.
-- 경계·상태: partner session과 공용 FE/BE 검증, rate limit을 사용한다. 기본, validation error, 인증 실패, 제출 중, 이미 로그인 상태를 제공한다.
+- 경계·상태: partner session과 공용 FE/BE 검증, rate limit을 사용한다. 기본, validation error, 인증 실패, 제출 중, 이미 로그인 상태와 server action 중 세션이 만료되어 돌아온 상태(`?error=session_expired`)를 제공한다. `?error=`는 정해진 코드만 문구로 바꾸고 그 밖의 값은 표시하지 않는다.
 - 반응형·분석: 단일 form column을 유지한다. `partner_login_attempt/result`만 기록하고 로그인 식별자·비밀번호는 로그에서 제외한다.
 - 수용 기준: 회사 scope를 세션에서 다시 확인하고 실패 후 입력 보존, 첫 오류 focus, 중복 제출 차단이 동작한다.
 
@@ -72,7 +72,7 @@ authority: normative
 - 액션·흐름: primary는 플랜 변경 요청이며 보조는 증빙 프로필 저장과 대시보드 복귀다. 더보기 또는 잠긴 지표 CTA에서 진입한다.
 - 경계·상태: 해당 company scope의 plan/billing domain만 사용한다. 기본, 잠긴 지표, 결제 대기, 미납, 승인/반려, validation error, 제출 중을 제공한다.
 - 반응형·분석: 모바일은 플랜 비교를 세로 배치하고 sticky CTA를 과도하게 중복하지 않는다. `partner_plan_view/upgrade_request`를 기록한다.
-- 수용 기준: 금액·상태를 서버 값과 일치시키고 중복 요청을 막으며 `/partner/plans`는 선택 company의 canonical 경로로 이동한다.
+- 수용 기준: 금액·상태를 서버 값과 일치시키고 중복 요청을 막으며 `/partner/plans`는 선택 company의 canonical 경로로 이동한다. `?status=`·`?error=`는 계약된 값·안내 문구 allowlist만 표시하고 그 밖의 값은 일반 오류 문구로 바꾼다.
 
 <!-- screen-contract: partner.service-detail -->
 ## `/partner/companies/[companyId]/services/[partnerId]` — 제휴처 운영 상세

@@ -12,7 +12,7 @@ import {
   getPartnerGlobalPortalHref,
 } from "@/lib/partner-portal-paths";
 import { isPartnerPortalCompanyAllowed } from "@/lib/partner-portal-scope";
-import { getPartnerSession } from "@/lib/partner-session";
+import { requirePartnerActionSession } from "@/lib/partner-action-session";
 
 function getString(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -45,13 +45,7 @@ function redirectAccountInfoError(
 }
 
 async function readAuthorizedSessionCompany(formData: FormData) {
-  const session = await getPartnerSession();
-  if (!session) {
-    redirect("/partner/login");
-  }
-  if (session.mustChangePassword) {
-    redirect("/partner/change-password");
-  }
+  const session = await requirePartnerActionSession();
 
   const companyId = getString(formData, "companyId");
   if (!companyId || !isPartnerPortalCompanyAllowed(session, companyId)) {
