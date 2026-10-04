@@ -22,6 +22,26 @@ test("public ip checks block loopback and private ranges", async () => {
   assert.equal(isPublicIpAddress("ff02::1"), false);
 });
 
+test("public ip checks block IPv6 transition prefixes that embed IPv4 targets", async () => {
+  const { isPublicIpAddress } = await imageProxyModulePromise;
+
+  // NAT64 well-known(64:ff9b::/96)·local-use(64:ff9b:1::/48)
+  assert.equal(isPublicIpAddress("64:ff9b::7f00:1"), false);
+  assert.equal(isPublicIpAddress("64:ff9b::a00:1"), false);
+  assert.equal(isPublicIpAddress("64:ff9b::808:808"), false);
+  assert.equal(isPublicIpAddress("64:ff9b::192.168.0.1"), false);
+  assert.equal(isPublicIpAddress("64:ff9b:1::a00:1"), false);
+  // 6to4(2002::/16)
+  assert.equal(isPublicIpAddress("2002:7f00:1::1"), false);
+  assert.equal(isPublicIpAddress("2002:c0a8:1::"), false);
+  // Teredo(2001::/32)
+  assert.equal(isPublicIpAddress("2001:0:4136:e378:8000:63bf:3fff:fdd2"), false);
+  assert.equal(isPublicIpAddress("2001::1"), false);
+  // 인접한 공개 대역은 그대로 허용한다.
+  assert.equal(isPublicIpAddress("2001:4860:4860::8844"), true);
+  assert.equal(isPublicIpAddress("64:ff9c::1"), true);
+});
+
 test("public ip checks allow routable public addresses", async () => {
   const { isPublicIpAddress } = await imageProxyModulePromise;
 
