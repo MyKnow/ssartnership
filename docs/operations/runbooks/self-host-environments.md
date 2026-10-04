@@ -42,7 +42,7 @@ node scripts/self-host-environments/cli.mjs prepare-copy .tmp/environments/pair
 
 1. 읽기 전용 백업 저장소에서 네트워크 없는 새 볼륨으로 PITR/Storage 복원과 기존 marker 검증.
 2. 원본 ledger가 검토된 dev prefix인지 확인. 원본 migration 199개를 넘으면 copy-policy 검토 전 거부. 원본 catalog와 해당 migration을 재생한 새 DB catalog도 비교.
-3. 격리 복원본에서 회원 비밀번호·avatar_base64 제거, 필수 password column 난수 교체, 이메일 마스킹, 인증/발송/Wallet 자격증명·로그 테이블 비우기. 원본 DB 계정·세션·backup key는 새 DB로 dump하지 않음.
+3. 격리 복원본에서 회원 비밀번호 제거(이미 삭제된 레거시 `avatar_base64` 열이 남은 오래된 백업이면 함께 제거), 필수 password column 난수 교체, 이메일 마스킹, 인증/발송/Wallet 자격증명·로그 테이블 비우기. 원본 DB 계정·세션·backup key는 새 DB로 dump하지 않음.
 4. 새로운 Preview DB에 public 데이터와 허용 Storage metadata를 transaction으로 로드하고 FK 검증. dev 후속 마이그레이션 적용.
 5. 공개 bucket과 private `member-profile-images`만 복사. 사진은 익명화되지 않으므로 이 사본도 개인정보로 보호. 다른 private bucket은 정책상 제외하며 완전한 모든 파일 복제라고 부르지 않음.
 6. ledger가 참조하는 file-backend 객체를 새 Storage 볼륨에 복사하고 각 SHA256 확인. 파일의 확장 속성도 보존한다. 파일 내용만 같아도 Storage HTTP metadata가 없으면 API 조회가 실패하므로 바이트 비교만으로 성공 처리하지 않는다. symlink·경로 이탈·중복 파일은 거부.

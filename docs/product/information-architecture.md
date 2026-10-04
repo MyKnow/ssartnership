@@ -24,7 +24,7 @@ page route의 기계 판독 기준은 `src/lib/mock/scenarios/route-inventory.ts
 
 | 영역 | 경로 | 역할 |
 | --- | --- | --- |
-| Root | `src/app/layout.tsx` | 전역 metadata, theme, toast, PWA provider, Vercel Analytics/Speed Insights |
+| Root | `src/app/layout.tsx` | 전역 metadata, theme, toast, PWA provider, 자체 호스팅 Web Vitals 수집 |
 | Public site | `src/app/(site)` | 홈, 캠퍼스, 제휴 상세, 이벤트, 제안, 인증 카드, 알림, 쿠폰 |
 | Auth | `src/app/auth` | 회원 로그인, Mattermost DM 가입/재설정, 이메일 복구, 정책 동의, 비밀번호 재설정/변경 |
 | Admin | `src/app/admin` | 관리자 로그인, setup, protected 운영 화면 |

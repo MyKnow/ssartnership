@@ -18,7 +18,7 @@ Browser
   -> src/lib domain service/helper/repository interface
   -> mock repository or Supabase repository
   -> Supabase PostgreSQL / Storage
-  -> external services: Mattermost, SMTP, Web Push, NTS business status, Vercel
+  -> external services: Mattermost, SMTP, Web Push, NTS business status, Apple Wallet/APNs
 ```
 
 ## Next.js boundary

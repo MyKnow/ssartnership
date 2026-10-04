@@ -105,7 +105,7 @@ draft/submitted/needs_resubmission → withdrawn
 | --- | --- |
 | `GRADUATE_VERIFICATION_HMAC_SECRET` | 이메일/문서 HMAC 및 HttpOnly 신청 세션 서명. 32자 이상, production 전용 secret |
 | `SMTP_*` | 이메일 인증 코드와 비밀번호 설정/재설정 메일 전송 |
-| `CRON_SECRET` | Vercel Cron의 private 파일 정리 endpoint 인증 |
+| `CRON_SECRET` | 자체 호스팅 운영 Cron이 호출하는 private 파일 정리 endpoint 인증 |
 
 ## 검증 기준
 

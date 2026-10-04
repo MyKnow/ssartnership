@@ -123,7 +123,8 @@ authority: descriptive
 - PostgreSQL schema와 migration을 관리한다.
 - server side에서는 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`를 사용한다.
 - `NEXT_PUBLIC_SUPABASE_URL`은 image remote pattern 등 public 용도만 선택적으로 사용한다.
-- Preview sync는 production data를 preview로 복사하되 member password material과 legacy `members.avatar_base64`만 제거한다. `member_profile_images`와 private `member-profile-images` 객체는 유지해 Preview에서도 실제 프로필 사진을 표시한다.
+- 운영 DB·Storage는 PVE의 자체 호스팅 Supabase 구성(PostgreSQL·PostgREST·Storage·Kong)이다. 클라우드 Supabase는 운영 경로가 아니다.
+- Production→Preview 사본은 `scripts/self-host-environments/cli.mjs prepare-copy`가 격리 복원본에서 비밀번호·자격증명을 정제한 뒤 만든다. `member_profile_images`와 private `member-profile-images` 객체는 유지해 Preview에서도 실제 프로필 사진을 표시한다.
 - Apple Wallet pass와 device registration은 `member_wallet_passes`, `member_wallet_pass_revisions`, `apple_wallet_device_registrations`, `member_wallet_pass_operations` 및 service-role 전용 RPC(`issue_member_wallet_pass`, `revoke_member_wallet_pass`, `register_apple_wallet_device`, `unregister_apple_wallet_device`, `list_updated_apple_wallet_passes`)로 관리한다.
 
 ### Mattermost
@@ -156,7 +157,7 @@ authority: descriptive
 - Apple Wallet이 활성화되면 `NEXT_PUBLIC_SITE_URL`의 명시적인 공개 HTTPS origin이 필수며 fallback을 사용하지 않는다.
 - 공개 검증 경로(`/wallet/verify/[token]`, `/api/wallet/apple/avatar/[token]`)는 `no-store`, `noindex`와 opaque signed token을 사용하고 token 원문을 analytics 식별자나 로그 key로 남기지 않는다.
 - Apple device library identifier는 Wallet master key에서 용도 분리한 HMAC-SHA256 subkey로 hash한다. APNs push token도 별도의 암호화 subkey로 보호한 뒤 `apple_wallet_device_registrations`에 저장한다. master key 회전은 저장 token 재암호화와 기기 hash 재생성·재등록, 기존 패스 재발급 계획이 필요한 별도 작업이다.
-- Vercel cron은 설치된 active pass를 일일 재검사한다. 표시 정보만 달라졌고 자격·동의가 유효하면 새 snapshot revision을 저장하고, 자격 또는 동의가 무효하면 credential을 폐기한 뒤 APNs update를 보낸다. QR 검증은 cron 주기와 무관하게 현재 상태를 즉시 확인한다.
+- 일일 조정 Cron(`/api/cron/reconcile-apple-wallet-passes`)이 설치된 active pass를 재검사한다. Wallet 기능과 이 timer는 현재 비활성이다. 표시 정보만 달라졌고 자격·동의가 유효하면 새 snapshot revision을 저장하고, 자격 또는 동의가 무효하면 credential을 폐기한 뒤 APNs update를 보낸다. QR 검증은 cron 주기와 무관하게 현재 상태를 즉시 확인한다.
 - APNs가 일시 실패한 설치 pass는 active·revoked 상태 모두 다음 cron에서 재시도하며, 성공 상태의 revoked pass만 조정 큐에서 빠진다.
 - Apple의 `passesUpdatedSince` 목록 커서는 canonical pass의 `updated_at`만 사용한다. 기기 등록·해제 RPC가 registration과 pass 시각을 같은 트랜잭션에서 함께 갱신하므로 필터·정렬·응답 커서가 한 시계를 공유한다.
 
@@ -167,11 +168,11 @@ authority: descriptive
 - fallback env: `DATA_GO_KR_SERVICE_KEY`
 - 상호/대표자/주소 자동 채움이 아니라 휴업/폐업 상태와 과세유형 확인 용도다.
 
-### Vercel
+### 자체 호스팅 배포
 
-- Production은 `main`, Preview는 `dev` branch 기준이다.
-- Analytics와 Speed Insights가 root layout에 포함된다.
-- CI workflow는 lockfile, preview sync, public readiness, Storybook을 검증한다.
+- Production은 `main`, Preview는 `dev` branch 기준이다. 각 branch의 이미지 workflow가 exact-SHA 이미지를 게시하고 환경별 수신기가 앱만 교체한다. 절차는 [격리 CI·배포·유지보수](../operations/runbooks/self-host-ci-maintenance.md)를 따른다.
+- 공개 사이트 Web Vitals는 `/api/web-vitals` 자체 수집 경로로 보낸다. Vercel Analytics·Speed Insights는 PVE 이전 뒤 로드되지 않는다.
+- CI workflow는 `Public Readiness`(위험 등급별 검증)와 이미지 게시 workflow가 중심이고 Storybook·Visual은 수동 workflow다.
 
 ## Environment variable groups
 
@@ -182,7 +183,6 @@ authority: descriptive
 | 협력사 | `PARTNER_SESSION_SECRET`, billing bank envs |
 | Supabase | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, optional `NEXT_PUBLIC_SUPABASE_URL` |
 | Data source | `NEXT_PUBLIC_DATA_SOURCE`, `NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE` |
-| Preview sync | `PREVIEW_TEST_MEMBER_USERNAME`, `PREVIEW_TEST_MEMBER_PASSWORD` |
 | Mattermost | `MM_BASE_URL`, `MM_SENDER_CREDENTIALS_KEY_V1`, `MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION` |
 | SMTP | `SMTP_*`, `NAVER_SMTP_*`, `SUGGEST_NOTIFY_EMAIL` |
 | Web Push/Cron | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET` |

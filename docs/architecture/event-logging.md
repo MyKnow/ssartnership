@@ -106,7 +106,7 @@ authority: normative
 - 이 endpoint는 페이지 조회·클릭 등 **클라이언트 텔레메트리 전용 이벤트**만 받는다. 쿠폰 사용, 푸시 구독 변경, 리뷰 작성처럼 서버가 확인한 업무 이벤트는 해당 서버 route/action에서 기록한다.
 - 이벤트별 허용 `properties`와 `target_type`·`target_id` 조합을 검증한다. 알 수 없는 `properties` key는 저장하지 않는다.
 - 요청 본문은 12 KiB를 넘길 수 없다. `Content-Length` fast-fail 뒤에도 stream을 누적 읽어 한도를 넘는 즉시 취소한다. `properties`는 최종 저장 직전에도 깊이·항목 수·문자열 길이·전체 크기 제한을 거친다.
-- 요청 본문을 읽기 전에 Vercel 원본 전달 IP(`x-vercel-forwarded-for` 우선) 기준 ingress 제한을 적용하고, 계약 검증 뒤에는 IP·세션·이벤트별 제한을 한 번 더 적용한다. 이 제한은 프로세스 로컬 best-effort 보호 장치이며 Vercel WAF/분산 rate limit을 대체하지 않는다.
+- 요청 본문을 읽기 전에 클라이언트 IP 기준 ingress 제한을 적용하고, 계약 검증 뒤에는 IP·세션·이벤트별 제한을 한 번 더 적용한다. 클라이언트 IP를 어떤 전달 헤더에서 신뢰하는지는 `src/lib/client-ip.ts`가 정본이다. 이 제한은 프로세스 로컬 best-effort 보호 장치이며 분산 rate limit이나 edge 차단을 대체하지 않는다.
 - `event_logs.event_id`의 partial unique index와 `ingest_product_event()` RPC가 원자적으로 동작한다. 신규 row가 실제로 insert될 때만 기존 trigger가 rollup을 증가시키므로, 별도 rollup fallback을 두지 않는다.
 - endpoint의 `202` 응답은 비동기 처리 접수 결과다. 제품 텔레메트리는 일부 유실을 허용하며, 정산·쿠폰 사용 같은 정확한 업무 수치는 브라우저 이벤트로 계산하지 않는다.
 
@@ -152,7 +152,7 @@ direct Mattermost 흐름은 `auth_security_logs.properties`에 안정적인 상�
 - `event_logs`, `admin_audit_logs`, `auth_security_logs`, `push_message_logs`, `push_delivery_logs`의 원본은 생성일로부터 1년간 보존한다.
 - `platform_active_identities`, `partner_metric_rollups`, DAU·WAU·MAU 등 집계 데이터는 회원 ID, IP, user-agent, session ID를 포함하지 않는 통계 형태로 장기 보존한다.
 - `partner_benefit_usages`는 로그가 아닌 혜택 사용 원장으로 취급하며, 정산·분쟁 대응에 필요한 기간 동안 보존한다. 기본 보존기간은 1년이다.
-- 1년이 지난 원본 로그와 회원 연결형 혜택 사용 원장은 Vercel cron의 `/api/cron/purge-expired-operational-logs`가 보존 hold가 없는 행만 파기한다.
+- 1년이 지난 원본 로그와 회원 연결형 혜택 사용 원장은 자체 호스팅 운영 Cron이 매일 호출하는 `/api/cron/purge-expired-operational-logs`가 보존 hold가 없는 행만 파기한다.
 - 보안 사고·분쟁·법령상 보존 사유가 발생하면 `log_retention_holds`에 대상 로그 그룹과 기간, 사유, 만료 시각을 등록한 뒤 원본을 예외 보존한다.
 - 파기 작업은 서비스 역할 전용 Supabase RPC로 수행하며, 파기 결과 자체는 `admin_audit_logs`에 건수만 남긴다.
 - 보존기간 이후에도 원본이 필요한 경우에는 사건별 hold로 관리하고, 무기한 보존을 기본값으로 두지 않는다.
