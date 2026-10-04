@@ -254,20 +254,10 @@ npm run ci:local
 
 - 스키마 변경은 항상 `supabase/migrations`에 먼저 기록합니다.
 - `main`으로 merge하기 전에 migration이 누락되지 않았는지 확인합니다.
-- `dev` 브랜치 push 시 GitHub Actions가 production 데이터를 preview로 미러링한 뒤 migration을 적용합니다.
+- `dev` push는 DB에 migration을 자동 적용하지 않습니다. 자체 호스팅 Preview/Production DDL은 운영자가 백업·검증 후 schema 승인을 갱신해야 배포됩니다([격리 CI·배포](docs/operations/runbooks/self-host-ci-maintenance.md)).
 - Lighthouse 성능 체크는 release 스크립트에서만 실행합니다.
-- 이 워크플로를 위해 GitHub Secrets에 다음 값을 넣습니다.
-  - `SUPABASE_PRODUCTION_DB_URL`
-  - `SUPABASE_PRODUCTION_URL`
-  - `SUPABASE_PRODUCTION_SERVICE_ROLE_KEY`
-  - `SUPABASE_PREVIEW_DB_URL`
-  - `SUPABASE_PREVIEW_URL`
-- `SUPABASE_PREVIEW_SERVICE_ROLE_KEY`
-- `SUPABASE_PREVIEW_ANON_KEY`
-- `*_DB_URL` 값은 Supabase 대시보드에서 복사한 percent-encoded PostgreSQL 연결 문자열을 사용합니다.
-- 로컬 또는 CI에서 동일한 동기화 로직을 재사용하려면 `npm run sync:preview`를 실행합니다.
-- Preview에서 직접 발급한 Apple Wallet 데이터(`member_wallet_passes`, `member_wallet_pass_revisions`, `member_wallet_pass_operations`, `apple_wallet_device_registrations`)는 Production dump 대상에서 제외합니다. Production의 패스와 APNs 기기 등록 정보는 Preview로 복사하지 않습니다.
-- 동기화는 Preview Wallet 원장을 임시 테이블에 보관하고, Production 데이터 교체와 Wallet 원장 복원을 하나의 트랜잭션으로 실행합니다. 참조 회원이 Production 원장에 없거나 복원에 실패하면 전체 데이터 교체를 롤백해 Preview 패스를 조용히 유실하지 않습니다.
+- Production→Preview 데이터 복사는 자체 호스팅 환경 CLI(`scripts/self-host-environments/cli.mjs prepare-copy`)만 사용합니다. 복원본에서 비밀번호·토큰·인증 자격 증명을 센티넬로 바꾸고 미검토 비밀 컬럼이 있으면 실패하는 `sanitize.mjs` 계약과 Storage 범위는 [Production/Preview 격리와 데이터 복사](docs/operations/runbooks/self-host-environments.md)를 따릅니다.
+- Cloud Supabase 시대의 `npm run sync:preview`, 관련 GitHub Secrets와 Preview Wallet 원장 보존 동기화 로직은 RF-04(#537)에서 폐기했습니다.
 
 `schema.sql`에는 현재 기준 테이블, 정책 문서 v1, MM 유저 디렉토리, Push 관련 스키마, 제휴 업체 `이용 조건` 스키마가 포함되어 있습니다.
 

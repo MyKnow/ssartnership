@@ -14,7 +14,7 @@ authority: normative
 | 회원·인증 | 최소 입력, 서버 전용 비밀번호 해시·토큰 처리; 원문 로그 금지 | [익명화 계약](../../tests/member-anonymization-schema-contract.test.mts), [계정 삭제](../../tests/member-account-deletion-flow.test.mts) |
 | 사진·증명서·리뷰 미디어 | 소유권·타입·크기 확인 후 Storage 저장, 필요한 범위만 조회 | [파일 계약](../../tests/graduate-verification-files.test.mts), [미디어 정리](../../tests/partner-media-attachment-cleanup.test.mts) |
 | 감사·제품·보안 로그 | 민감 값 제거, 역할별 조회 | [로그 정본](../architecture/event-logging.md), [보존 정책 테스트](../../tests/log-retention-policy.test.mts) |
-| Preview 복제 | 비밀번호 hash/salt와 legacy avatar 제거, 승인된 사진 ledger·private 객체 유지 | [sanitizer](../../tests/preview-sync-sanitize.test.mts), [Storage 복제](../../tests/preview-sync-storage.test.mts) |
+| Preview 복제 | 원본 Preview 복원본에서 비밀 컬럼 센티넬 치환·미검토 비밀 컬럼 fail-closed·이메일 마스킹·로그/시도/구독 비우기, 공개 버킷과 비공개 프로필 사진만 복사 | [sanitizer·복사 계약](../../tests/self-host-environments.test.mts), [Storage 선택](../../tests/self-host-environment-storage-selection.test.mts), [절차](../operations/runbooks/self-host-environments.md) |
 | 백업·외부 사본 | 암호화·별도 권한·복원 검증 | [백업 runbook](../operations/runbooks/self-host-operations.md), [외부 사본](../operations/runbooks/self-host-observability.md) |
 
 ## 삭제와 복구

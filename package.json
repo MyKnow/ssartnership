@@ -44,7 +44,6 @@
     "verify:release:post-quick": "node scripts/run-package-scripts.mjs build test:e2e:ci",
     "verify:release": "node scripts/run-package-scripts.mjs verify:quick verify:release:post-quick",
     "prepush": "npm run verify:change",
-    "sync:preview": "node scripts/supabase-sync-preview.mjs",
     "self-host:database": "node -- scripts/self-host-database/cli.mjs",
     "self-host:operations": "node -- scripts/self-host-operations/cli.mjs",
     "self-host:receive": "node -- scripts/self-host-ci/receive-release.mjs",
