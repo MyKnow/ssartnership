@@ -7,7 +7,7 @@ authority: descriptive
 
 # 05. 시스템 아키텍처
 
-작성 기준일: 2026-07-09
+작성 기준일: 2026-07-09. 저장소 배치·캐시·외부 서비스 절은 2026-10-05 `dev` 기준으로 다시 대조했다.
 
 ## 계층 구조
 
@@ -33,7 +33,9 @@ Browser
 
 ## Repository pattern
 
-`src/lib/repositories/index.ts`는 환경에 따라 mock 또는 Supabase 구현을 선택한다.
+저장소는 두 위치에 둔다([리팩토링 기본 결정 D4](../plans/active/refactor-program-2026-10.md#기본-결정)). 여러 도메인이 공유하는 엔티티는 `src/lib/repositories`, 한 도메인 전용 테이블은 도메인 폴더의 `repository.ts`·`repository.supabase.ts`·`repository.mock.ts`에 둔다.
+
+`src/lib/repositories/index.ts`는 환경에 따라 아래 6개 저장소의 mock 또는 Supabase 구현을 선택한다.
 
 | Interface | Mock 구현 | Supabase 구현 | 역할 |
 | --- | --- | --- | --- |
@@ -42,6 +44,19 @@ Browser
 | `PartnerFavoriteRepository` | `mock/partner-favorite-repository.mock.ts` | `supabase/partner-favorite-repository.supabase.ts` | 즐겨찾기 count/member state |
 | `PartnerReviewRepository` | `mock/partner-review-repository.mock.ts` | `supabase/partner-review-repository.supabase.ts` | 리뷰 CRUD/reaction/moderation |
 | `AdPackageRepository` | `mock/ad-package-repository.mock.ts` | `supabase/ad-package-repository.supabase.ts` | 광고 캠페인/쿠폰/사용 |
+| `PartnerBenefitUsageRepository` | `mock/partner-benefit-usage-repository.mock.ts` | `supabase/partner-benefit-usage-repository.supabase.ts` | 혜택 사용 확인·이력 |
+
+같은 폴더에 있지만 index를 거치지 않는 저장소도 있다. Apple Wallet pass(`wallet-pass.ts`가 선택), 회원 이메일 인증·복구(`member-email-verification-service.ts`와 복구 route가 직접 생성)다.
+
+도메인 폴더 저장소:
+
+| 위치 | 구성 | 역할 |
+| --- | --- | --- |
+| `src/lib/project-showcase/` | `repository.ts`, `repository.supabase.ts`, `repository.mock.ts` | 쇼케이스 이벤트·출품·체험·추첨·정산·파기 |
+| `src/lib/image-upload/` | `repository.ts`, `repository.supabase.ts`, `repository.server.ts`(미설정 시 unavailable) | 업로드 세션·quota |
+| `src/lib/partner-auth/`, `src/lib/partner-change-requests/`, `src/lib/mattermost-senders/`, `src/lib/mm-directory/`, `src/lib/mm-signup-approval/`, `src/lib/notification-templates/` | 함수형 `repository.ts`(또는 `repository.server.ts`) | Supabase 전용 도메인 접근 |
+
+이 밖의 파일이 직접 `.from("<table>")`을 호출하는 경계 위반은 늘리지 않는다. 기준값과 측정 명령은 [기술 부채 원장](../plans/tech-debt.md#증가-금지-기준)에 있다.
 
 전환 규칙:
 
@@ -88,10 +103,21 @@ Browser
 | SEO/RSS | `seo/*`, `rss/*`, `site.ts` |
 | UI helpers | `cn.ts`, `validation.ts`, `auth-form-validation.ts`, `browser-password.ts`, `return-to.ts` |
 
+`src/lib`의 평면 파일은 접두사가 도메인을 나타낸다. 디렉터리로 옮기는 순수 재배치는 [보류](../plans/tech-debt.md#보류-대규모-재배치타입-생성공용-프레임워크)했으므로 파일을 찾을 때 접두사로 검색한다.
+
+| 접두사 | 도메인 |
+| --- | --- |
+| `partner-*` | 제휴처 공개 표시, 협력사 포털·플랜·결제·지표 |
+| `admin-*` | 관리자 권한·보안·대시보드·알림 운영 |
+| `member-*` | 회원 계정·인증·프로필·가져오기 |
+| `graduate-*` | 수료생 인증·파일 |
+| `mm-*`, `mattermost-*` | Mattermost 직접 연동·디렉터리·Sender |
+| `product-*`, `partner-metric-*`, `log-insights/` | 제품 이벤트·지표 |
+| `image-*`, `image-upload/`, `image-proxy/` | 이미지 업로드·프록시 |
+
 ## Caching and revalidation
 
-- 홈 page는 `revalidate = 300`으로 선언되어 있다.
-- `(site)` layout은 `dynamic = "force-dynamic"`으로 세션 상태를 매 요청 반영한다.
+- `(site)` layout은 `dynamic = "force-dynamic"`으로 세션 상태를 매 요청 반영한다. 그래서 하위 페이지(홈·캠퍼스·제휴처 상세)의 `revalidate = 300` 선언은 실제 캐시 효과가 없다. 공개 데이터 캐시는 아래 `unstable_cache` 계층이 담당한다.
 - partner Supabase repository는 `unstable_cache`와 `public_cache_versions`를 함께 사용한다.
 - `public_cache_versions`는 partners/categories scope 변경 시 cache key를 바꾸는 기준이다.
 - sitemap은 dynamic이며 partner 목록 조회 실패 시 홈/캠퍼스 entry만 반환하는 fail-soft 구조다.
@@ -115,7 +141,7 @@ Browser
 
 ## Current architectural gaps
 
-- 일부 partner portal 초기 설정 repository는 `UnconfiguredPartnerPortalRepository` façade가 남아 있고, 실제 production data flow는 개별 helper/Supabase query로 흩어져 있다.
+- 직접 `.from(` 호출 파일이 124개 남아 있다(증가 금지 기준). members·promotions 같은 공유 엔티티는 아직 저장소 인터페이스가 없다.
 - 관리자 server action은 여러 파일로 나뉘었지만 여전히 protected route 하위에 도메인별 액션이 집중되어 있다.
 - public/partner/admin 알림 API가 audience별로 나뉘어 있어 정책은 명확하지만 공통 envelope/에러 shape는 더 표준화할 여지가 있다.
 - UI 컴포넌트는 많이 분해되었지만 일부 page orchestration과 data preparation이 같은 파일에 남아 있다.
