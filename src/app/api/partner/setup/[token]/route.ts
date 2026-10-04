@@ -120,17 +120,18 @@ export async function POST(
       );
     }
 
+    const logContext = getRequestLogContext(request);
     console.error("[partner-setup-route] unexpected setup failure", {
       route: "/api/partner/setup/[token]",
-      requestId:
-        request.headers.get("x-vercel-id") ??
-        request.headers.get("x-request-id") ??
-        null,
+      // 서버가 만든 requestId로 보안 로그와 연결하고, 프록시가 붙인 x-request-id는 참고용으로만 남긴다.
+      requestId: logContext.requestId,
+      upstreamRequestId:
+        request.headers.get("x-request-id")?.slice(0, 128) ?? null,
       reasonCode: "unexpected_setup_failure",
     });
 
     await logAuthSecurity({
-      ...getRequestLogContext(request),
+      ...logContext,
       eventName: "partner_initial_setup",
       status: "failure",
       actorType: "guest",

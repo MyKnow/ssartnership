@@ -2,7 +2,7 @@ import {
   normalizeAdminIdentifier,
   validateAdminIdentifier,
 } from "./validation.ts";
-import { getTrustedPlatformClientIp } from "./client-ip.ts";
+import { getClientIp, normalizeClientIp } from "./client-ip.ts";
 
 export const ADMIN_LOGIN_ERROR_CODES = [
   "invalid_credentials",
@@ -182,10 +182,15 @@ export function shouldChallengeAdminBasicAuth(input: {
   return true;
 }
 
+/**
+ * 관리자 IP 허용목록은 공용 클라이언트 IP 계약(`client-ip.ts`)을 그대로 따른다.
+ * 신뢰 프록시 모드가 아니면 null이므로, `ADMIN_ALLOWED_IPS`를 설정한 환경은
+ * 그 계약이 성립하는 배포 체인에서만 관리자 경로를 열 수 있다.
+ */
 export function getForwardedClientIp(
   headers: Pick<Headers, "get">,
 ): string | null {
-  return getTrustedPlatformClientIp(headers);
+  return getClientIp(headers);
 }
 
 function parseAdminAllowedIps() {
@@ -193,7 +198,8 @@ function parseAdminAllowedIps() {
   return raw
     .split(",")
     .map((value) => value.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((value) => normalizeClientIp(value) ?? value);
 }
 
 export function isAllowedAdminIp(ipAddress?: string | null) {
@@ -201,10 +207,11 @@ export function isAllowedAdminIp(ipAddress?: string | null) {
   if (allowedIps.length === 0) {
     return true;
   }
-  if (!ipAddress) {
+  const normalizedIp = normalizeClientIp(ipAddress);
+  if (!normalizedIp) {
     return false;
   }
-  return allowedIps.includes(ipAddress);
+  return allowedIps.includes(normalizedIp);
 }
 
 function decodeBase64(value: string) {
