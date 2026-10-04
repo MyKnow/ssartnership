@@ -28,7 +28,7 @@ test("현재 저장소의 매니페스트·예시 파일·코드 env 읽기는 d
   assert.deepEqual(checkEnvironment(), []);
 });
 
-test("env 읽기 추출은 직접 접근·주입 객체·이름 상수·readEnv 호출을 모두 찾는다", () => {
+test("env 읽기 추출은 직접 접근·주입 객체·이름 상수·readEnv 호출·이름 목록 상수를 모두 찾는다", () => {
   const reads = extractEnvironmentReads(`
     const a = process.env.ALPHA_KEY;
     const b = env.BETA_KEY ?? environment.GAMMA_KEY;
@@ -36,11 +36,16 @@ test("env 읽기 추출은 직접 접근·주입 객체·이름 상수·readEnv 
     const DEVICE_ENV_NAME =
       "EPSILON_KEY";
     readEnv("ZETA_KEY");
+    export const SECRET_ENV_KEYS = {
+      "user-session": ["ETA_KEY"],
+      "fallback-session": ["THETA_KEY", "ETA_KEY"],
+    } as const satisfies Record<Purpose, readonly [string, ...string[]]>;
     const ignored = source.NOT_ENV;
+    const label = "NOT_A_READ";
   `);
   assert.deepEqual(
     [...reads].sort(),
-    ["ALPHA_KEY", "BETA_KEY", "DELTA_KEY", "EPSILON_KEY", "GAMMA_KEY", "ZETA_KEY"],
+    ["ALPHA_KEY", "BETA_KEY", "DELTA_KEY", "EPSILON_KEY", "ETA_KEY", "GAMMA_KEY", "THETA_KEY", "ZETA_KEY"],
   );
 });
 

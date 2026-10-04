@@ -151,11 +151,23 @@ const ACCESS_PATTERNS = Object.freeze([
   /\breadEnv\(\s*["']([A-Z][A-Z0-9_]+)["']\s*\)/gu,
 ]);
 
+/**
+ * A registry constant named `*ENV_KEYS` or `*ENV_NAMES` (for example a map of
+ * purpose to env keys that a helper reads by index) lists names the code
+ * reads indirectly. Every quoted upper-case name up to the declaration's
+ * terminating semicolon counts as a read.
+ */
+const NAME_LIST_DECLARATION = /\b[A-Z0-9_]*ENV_(?:KEYS|NAMES)\s*(?::[^=;]+)?=([^;]*)/gu;
+const QUOTED_NAME = /["'`]([A-Z][A-Z0-9_]+)["'`]/gu;
+
 /** Extracts environment variable names read by one source file. */
 export function extractEnvironmentReads(source) {
   const names = new Set();
   for (const pattern of ACCESS_PATTERNS) {
     for (const match of source.matchAll(pattern)) names.add(match[1]);
+  }
+  for (const declaration of source.matchAll(NAME_LIST_DECLARATION)) {
+    for (const match of declaration[1].matchAll(QUOTED_NAME)) names.add(match[1]);
   }
   return names;
 }
