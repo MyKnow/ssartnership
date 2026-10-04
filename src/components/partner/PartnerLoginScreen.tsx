@@ -17,6 +17,8 @@ export type PartnerLoginScreenProps = {
   action: PartnerLoginFormAction;
   defaultLoginId?: string;
   setupCompleted?: boolean;
+  /** Sanitized `/partner` destination to continue after login. */
+  returnTo?: string | null;
   fieldErrors?: {
     loginId?: string | null;
     password?: string | null;
@@ -28,6 +30,7 @@ export default function PartnerLoginScreen({
   action,
   defaultLoginId = "",
   setupCompleted = false,
+  returnTo = null,
   fieldErrors = {},
   formErrorMessage = null,
 }: PartnerLoginScreenProps) {
@@ -69,6 +72,9 @@ export default function PartnerLoginScreen({
             </div>
 
             <form action={action} className="space-y-4">
+              {returnTo ? (
+                <input type="hidden" name="returnTo" value={returnTo} />
+              ) : null}
               <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
                 담당자 이메일
                 <Input

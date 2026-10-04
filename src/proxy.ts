@@ -9,6 +9,12 @@ import {
   shouldChallengeAdminBasicAuth,
 } from "@/lib/admin-security";
 import { getMemberRequiredGateRedirect } from "@/lib/member-required-gates";
+import {
+  getPartnerLoginHref,
+  getPartnerPasswordChangeGateHref,
+  getPartnerRequestReturnTo,
+  PARTNER_PORTAL_HOME_PATH,
+} from "@/lib/partner-auth/return-to";
 import { buildTrustedRedirectUrl } from "@/lib/request-guards";
 import {
   buildForwardedRequestPath,
@@ -340,22 +346,32 @@ export async function proxy(request: NextRequest) {
       ? await verifyPartnerToken(partnerToken)
       : null;
 
+    const partnerReturnTo = getPartnerRequestReturnTo(
+      pathname,
+      request.nextUrl.search,
+    );
+
     if (
       partnerPayload?.mustChangePassword &&
       pathname !== "/partner/change-password" &&
       pathname !== "/partner/logout"
     ) {
-      const url = buildTrustedRedirectUrl(currentPath, request.url);
-      url.pathname = "/partner/change-password";
-      return NextResponse.redirect(url);
+      return NextResponse.redirect(
+        buildTrustedRedirectUrl(
+          getPartnerPasswordChangeGateHref(partnerReturnTo),
+          request.url,
+        ),
+      );
     }
 
     if (isPartnerLoginPath) {
       if (partnerPayload) {
-        const url = buildTrustedRedirectUrl(currentPath, request.url);
-        url.pathname =
-          partnerPayload.mustChangePassword ? "/partner/change-password" : "/partner";
-        return NextResponse.redirect(url);
+        return NextResponse.redirect(
+          buildTrustedRedirectUrl(
+            partnerReturnTo ?? PARTNER_PORTAL_HOME_PATH,
+            request.url,
+          ),
+        );
       }
       return nextWithRequestUrl(request);
     }
@@ -378,9 +394,11 @@ export async function proxy(request: NextRequest) {
       return nextWithRequestUrl(request);
     }
     if (!partnerPayload && !isPartnerLogoutPath) {
-      const url = buildTrustedRedirectUrl(currentPath, request.url);
-      url.pathname = "/partner/login";
-      return NextResponse.redirect(url);
+      // Keep the deep link as a sanitized returnTo instead of leaking its
+      // query string onto the login page.
+      return NextResponse.redirect(
+        buildTrustedRedirectUrl(getPartnerLoginHref(partnerReturnTo), request.url),
+      );
     }
   }
 

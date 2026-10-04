@@ -8,6 +8,7 @@ export type PartnerLoginSearchParams = {
   error?: string | string[];
   loginId?: string | string[];
   setup?: string | string[];
+  returnTo?: string | string[];
 };
 
 export function getLoginErrorMessage(errorCode: string | undefined) {
@@ -52,11 +53,16 @@ export function getPartnerLoginFieldErrors(errorCode: string | undefined): {
   }
 }
 
+/**
+ * `returnTo` must already be sanitized with `sanitizePartnerReturnTo`; it is
+ * carried back so a failed attempt does not lose the original destination.
+ */
 export function buildPartnerLoginErrorRedirect(
   errorCode: string,
   loginId?: string | null,
+  returnTo?: string | null,
 ) {
   return `/partner/login?error=${encodeURIComponent(errorCode)}${
     loginId ? `&loginId=${encodeURIComponent(loginId)}` : ""
-  }`;
+  }${returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ""}`;
 }

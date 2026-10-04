@@ -9,6 +9,10 @@ import {
   getPartnerGlobalPortalHref,
 } from "@/lib/partner-portal-paths";
 import { getPartnerPortalCompanySummaries } from "@/lib/partner-portal-scope";
+import {
+  getPartnerLoginHref,
+  sanitizePartnerReturnTo,
+} from "@/lib/partner-auth/return-to";
 import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
 
@@ -29,14 +33,18 @@ function getSingleSearchParam(value: string | string[] | undefined) {
 export default async function PartnerPasswordChangePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ companyId?: string | string[] }>;
+  searchParams?: Promise<{
+    companyId?: string | string[];
+    returnTo?: string | string[];
+  }>;
 }) {
+  const params = (await searchParams) ?? {};
+  const returnTo = sanitizePartnerReturnTo(getSingleSearchParam(params.returnTo));
   const session = await getPartnerSession();
   if (!session) {
-    redirect("/partner/login");
+    redirect(getPartnerLoginHref(returnTo));
   }
 
-  const params = (await searchParams) ?? {};
   const requestedCompanyId =
     getSingleSearchParam(params.companyId)?.trim() ?? "";
   const returnCompanyId = session.companyIds.includes(requestedCompanyId)
@@ -46,15 +54,18 @@ export default async function PartnerPasswordChangePage({
     ? []
     : await getPartnerPortalCompanySummaries(session.companyIds);
   const profileCompanyId = returnCompanyId ?? companies[0]?.id ?? null;
-  const successRedirectHref = returnCompanyId
-    ? getCompanyScopedPortalHref(returnCompanyId)
-    : "/partner";
+  // The original destination wins over the company dashboard once the
+  // forced change is done; the gate itself is never a destination.
+  const successRedirectHref =
+    returnTo ??
+    (returnCompanyId ? getCompanyScopedPortalHref(returnCompanyId) : "/partner");
   const mustChangePassword = session.mustChangePassword;
   if (!mustChangePassword) {
     redirect(
-      profileCompanyId
-        ? `${getPartnerGlobalPortalHref("account", profileCompanyId)}#security`
-        : "/partner",
+      returnTo ??
+        (profileCompanyId
+          ? `${getPartnerGlobalPortalHref("account", profileCompanyId)}#security`
+          : "/partner"),
     );
   }
   const heroTitle = mustChangePassword
