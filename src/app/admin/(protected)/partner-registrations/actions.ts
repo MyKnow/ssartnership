@@ -44,6 +44,7 @@ import {
   revalidatePartnerData,
 } from "@/app/admin/(protected)/_actions/shared-helpers";
 import { sanitizeReturnTo } from "@/lib/return-to";
+import type { PartnerVisibility } from "@/lib/types";
 
 const registrationCompanyProvisioner = {
   ensure: (supabase, input, options) =>
@@ -99,7 +100,7 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
 
   const payload: {
     status: PartnerRegistrationRequestStatus;
-    visibility: "public" | "confidential" | "private";
+    visibility: PartnerVisibility;
     admin_note: string | null;
     reviewed_by_admin_id?: string | null;
     reviewed_at?: string | null;
