@@ -10,6 +10,7 @@ last_verified: 2026-08-29
 
 ## Active
 
+- [2026-10 리팩토링·개선 프로그램](./active/refactor-program-2026-10.md) — 기본 결정과 진행 규칙, Issue #530
 - [SSAFY Verify 레거시 삭제 준비](./active/ssafy-verify-legacy-removal.md)
 
 ## Completed
