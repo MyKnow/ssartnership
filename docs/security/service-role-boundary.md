@@ -20,7 +20,7 @@ Supabase service role key는 RLS를 우회할 수 있으므로 서버 전용 코
   - 관리자 API 맥락: `ensureAdminApiPermission(request, resource, action)` 또는 세션이 필요하면 `getAdminApiPermissionSession(...)`. `getAdminSession()`과 `canAdmin()`을 route에서 직접 조합하지 않는다(거부 보안 로그가 빠진다).
   - 회원 맥락: signed member session 확인
   - 파트너 맥락: partner session 확인과 연결 회사/브랜드 권한 확인
-  - cron 맥락: admin session 또는 `CRON_SECRET`
+  - cron 맥락: `CRON_SECRET` Bearer(상수시간 비교)
   - 공개 읽기 맥락: 공개 projection만 반환하는 repository/helper
 - mutation route는 cookie 인증에만 의존하지 않고 same-origin 또는 CSRF 성격의 요청 검증을 함께 적용한다.
 - 로그, metric, cache version 같은 부가 기록 실패는 가능한 한 사용자 요청 실패로 전파하지 않는다.
@@ -48,7 +48,7 @@ Supabase service role key는 RLS를 우회할 수 있으므로 서버 전용 코
 
 ### Cron과 운영 자동화
 
-- cron route는 admin session 또는 `CRON_SECRET` 없이는 실행하지 않는다.
+- cron route는 `ensureCronApiAccess()`로 `Authorization: Bearer <CRON_SECRET>`을 상수시간 비교한 뒤에만 실행한다. 설정값이 없거나 32자 미만이면 모든 요청을 거부한다.
 - cron 내부에서 service role을 쓰더라도 입력 범위와 side effect를 route에서 제한한다.
 
 ### 공개 읽기와 repository
