@@ -13,7 +13,7 @@ create table if not exists categories (
   description text,
   color text,
   created_at timestamp with time zone default now(),
-  updated_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
 );
 
 alter table categories add column if not exists color text;
@@ -5487,31 +5487,12 @@ create index if not exists partner_notification_recipients_account_created_idx
   on partner_notification_recipients(account_id, created_at desc);
 create index if not exists partner_notification_deliveries_notification_idx
   on partner_notification_deliveries(notification_id);
-create index if not exists members_year_created_at_idx
-  on members(year desc, created_at desc);
 create index if not exists members_created_at_idx
   on members(created_at desc);
 create index if not exists members_display_name_idx
   on members(display_name);
-create index if not exists members_year_campus_display_name_idx
-  on members(year, campus, display_name);
 create index if not exists members_campus_display_name_idx
   on members(campus, display_name);
-create index if not exists members_admin_permission_id_idx
-  on members(admin_permission_id)
-  where admin_permission_id is not null;
-create index if not exists members_admin_managed_campus_slugs_idx
-  on members using gin(admin_managed_campus_slugs)
-  where cardinality(admin_managed_campus_slugs) > 0;
-create unique index if not exists members_ssafy_sub_key
-  on members(ssafy_sub)
-  where ssafy_sub is not null;
-create unique index if not exists members_ssafy_mattermost_user_id_key
-  on members(ssafy_mattermost_user_id)
-  where ssafy_mattermost_user_id is not null;
-create index if not exists members_ssafy_track_idx
-  on members(ssafy_track)
-  where ssafy_track is not null;
 create index if not exists partner_companies_managed_campus_slugs_idx
   on partner_companies using gin(managed_campus_slugs);
 create index if not exists partners_managed_campus_slugs_idx
@@ -6165,6 +6146,39 @@ create index if not exists promotion_slides_event_slug_idx
   on promotion_slides(event_slug);
 create index if not exists promotion_slides_ad_campaign_idx
   on promotion_slides(ad_campaign_id);
+
+-- 20260501000000_promotion_events.sql / 20260501001000_promotion_slides.sql
+create or replace function set_promotion_events_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists promotion_events_set_updated_at on promotion_events;
+create trigger promotion_events_set_updated_at
+before update on promotion_events
+for each row
+execute function set_promotion_events_updated_at();
+
+create or replace function public.set_promotion_slides_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists promotion_slides_set_updated_at on public.promotion_slides;
+create trigger promotion_slides_set_updated_at
+before update on public.promotion_slides
+for each row
+execute function public.set_promotion_slides_updated_at();
 
 create table if not exists event_reward_draws (
   id uuid primary key default uuid_generate_v4(),
@@ -8079,60 +8093,13 @@ begin
 end;
 $$;
 
-drop function if exists public.update_partner_immediate_fields_with_audit(
-  uuid, uuid[], text, text[], text[], text, text, text, text, text, text, text,
-  text, text, text, text, jsonb
-);
-
-create or replace function public.update_partner_immediate_fields_with_audit(
-  p_partner_id uuid, p_company_ids uuid[], p_thumbnail text, p_images text[],
-  p_tags text[], p_benefit_action_type text, p_benefit_action_link text,
-  p_benefit_use_max_count integer, p_reservation_link text, p_inquiry_link text,
-  p_actor_type text, p_actor_id text, p_request_id text, p_path text,
-  p_user_agent text, p_ip_address text, p_properties jsonb
-)
-returns table (company_id uuid, previous_thumbnail text, previous_images text[])
-language plpgsql security invoker set search_path = public as $$
-declare partner_row public.partners%rowtype;
-begin
-  if p_actor_type <> 'partner' or nullif(btrim(coalesce(p_actor_id, '')), '') is null then raise exception 'partner_immediate_update_invalid_audit_principal'; end if;
-  if nullif(btrim(coalesce(p_request_id, '')), '') is null then raise exception 'partner_immediate_update_missing_request_context'; end if;
-  if coalesce(array_length(p_company_ids, 1), 0) = 0 then raise exception 'partner_immediate_update_missing_company_scope'; end if;
-  if p_benefit_action_type not in ('certification', 'external_link', 'onsite', 'none') then raise exception 'partner_immediate_update_invalid_benefit_action_type'; end if;
-  if p_benefit_action_type = 'external_link' and nullif(btrim(coalesce(p_benefit_action_link, '')), '') is null then raise exception 'partner_immediate_update_missing_benefit_action_link'; end if;
-  if p_benefit_use_max_count is not null and p_benefit_use_max_count < 1 then raise exception 'partner_immediate_update_invalid_benefit_use_max_count'; end if;
-  if p_benefit_action_type <> 'certification' and p_benefit_use_max_count is not null then raise exception 'partner_immediate_update_invalid_benefit_use_max_count'; end if;
-  if jsonb_typeof(coalesce(p_properties, '{}'::jsonb)) <> 'object' then raise exception 'partner_immediate_update_invalid_audit_properties'; end if;
-  select * into partner_row from public.partners where id = p_partner_id for update;
-  if not found then raise exception 'partner_immediate_update_partner_not_found'; end if;
-  if partner_row.company_id is null or not (partner_row.company_id = any(p_company_ids)) or not exists (
-    select 1 from public.partner_account_companies access
-    where access.account_id::text = p_actor_id and access.company_id = partner_row.company_id and access.is_active = true
-  ) then raise exception 'partner_immediate_update_forbidden'; end if;
-  if partner_row.thumbnail is not distinct from p_thumbnail and partner_row.images is not distinct from coalesce(p_images, '{}'::text[])
-    and partner_row.tags is not distinct from coalesce(p_tags, '{}'::text[]) and partner_row.benefit_action_type is not distinct from p_benefit_action_type
-    and partner_row.benefit_action_link is not distinct from p_benefit_action_link and partner_row.benefit_use_max_count is not distinct from p_benefit_use_max_count
-    and partner_row.reservation_link is not distinct from p_reservation_link
-    and partner_row.inquiry_link is not distinct from p_inquiry_link then raise exception 'partner_immediate_update_no_changes'; end if;
-  update public.partners set thumbnail = p_thumbnail, images = coalesce(p_images, '{}'::text[]), tags = coalesce(p_tags, '{}'::text[]),
-    benefit_action_type = p_benefit_action_type, benefit_action_link = p_benefit_action_link,
-    benefit_use_max_count = p_benefit_use_max_count, reservation_link = p_reservation_link,
-    inquiry_link = p_inquiry_link, updated_at = now()
-  where id = partner_row.id;
-  insert into public.admin_audit_logs (request_id, actor_type, actor_id, action, path, target_type, target_id, properties, user_agent, ip_address)
-  values (p_request_id, p_actor_type, p_actor_id, 'partner_portal_immediate_update', p_path, 'partner', partner_row.id::text, coalesce(p_properties, '{}'::jsonb), p_user_agent, p_ip_address);
-  return query select partner_row.company_id, partner_row.thumbnail, partner_row.images;
-end;
-$$;
+-- The 20260722104701 integer benefit-use-count signature was replaced by the
+-- 20260722142117 jsonb benefit-items contract above; the stale copy is omitted.
 
 revoke all on function public.resolve_partner_change_request_with_audit(uuid, text, text, text, text, text, text, text, text, jsonb) from public;
 revoke all on function public.resolve_partner_change_request_with_audit(uuid, text, text, text, text, text, text, text, text, jsonb) from anon;
 revoke all on function public.resolve_partner_change_request_with_audit(uuid, text, text, text, text, text, text, text, text, jsonb) from authenticated;
 grant execute on function public.resolve_partner_change_request_with_audit(uuid, text, text, text, text, text, text, text, text, jsonb) to service_role;
-revoke all on function public.update_partner_immediate_fields_with_audit(uuid, uuid[], text, text[], text[], text, text, integer, text, text, text, text, text, text, text, text, jsonb) from public;
-revoke all on function public.update_partner_immediate_fields_with_audit(uuid, uuid[], text, text[], text[], text, text, integer, text, text, text, text, text, text, text, text, jsonb) from anon;
-revoke all on function public.update_partner_immediate_fields_with_audit(uuid, uuid[], text, text[], text[], text, text, integer, text, text, text, text, text, text, text, text, jsonb) from authenticated;
-grant execute on function public.update_partner_immediate_fields_with_audit(uuid, uuid[], text, text[], text[], text, text, integer, text, text, text, text, text, text, text, text, jsonb) to service_role;
 
 -- 20260715004318_add_manual_member_reissue_setup_guard.sql
 create or replace function public.reissue_manual_member_initial_setup(
@@ -9607,6 +9574,264 @@ revoke all on function public.approve_graduate_verification(uuid, uuid, text, te
 revoke all on function public.approve_graduate_verification(uuid, uuid, text, text, timestamp with time zone) from authenticated;
 grant execute on function public.approve_graduate_verification(uuid, uuid, text, text, timestamp with time zone) to service_role;
 
+-- 20260512115334_ux_db_query_performance.sql: base summary RPC that the
+-- following contract block rewrites through pg_get_functiondef().
+create or replace function public.get_admin_logs_summary(
+  input_start timestamp with time zone,
+  input_end timestamp with time zone,
+  input_bucket_ms bigint
+)
+returns jsonb
+language sql
+stable
+set search_path = public
+as $$
+  with params as (
+    select
+      input_start as start_at,
+      input_end as end_at,
+      greatest(coalesce(input_bucket_ms, 60000), 60000)::bigint as bucket_ms
+  ),
+  product_logs as materialized (
+    select
+      'product'::text as group_name,
+      event_logs.event_name::text as name,
+      null::text as status,
+      event_logs.actor_type::text as actor_type,
+      coalesce(
+        nullif('@' || members.mm_username, '@'),
+        nullif(members.display_name, ''),
+        nullif(event_logs.actor_id, ''),
+        case when event_logs.actor_type = 'guest' then '비로그인 사용자' end
+      ) as actor_label,
+      event_logs.ip_address::text as ip_address,
+      event_logs.path::text as path,
+      event_logs.created_at
+    from public.event_logs
+    left join public.members
+      on event_logs.actor_type = 'member'
+     and members.id::text = event_logs.actor_id
+    cross join params
+    where event_logs.created_at >= params.start_at
+      and event_logs.created_at <= params.end_at
+  ),
+  audit_logs as materialized (
+    select
+      'audit'::text as group_name,
+      admin_audit_logs.action::text as name,
+      null::text as status,
+      'admin'::text as actor_type,
+      coalesce(nullif(admin_audit_logs.actor_id, ''), 'admin') as actor_label,
+      admin_audit_logs.ip_address::text as ip_address,
+      admin_audit_logs.path::text as path,
+      admin_audit_logs.created_at
+    from public.admin_audit_logs
+    cross join params
+    where admin_audit_logs.created_at >= params.start_at
+      and admin_audit_logs.created_at <= params.end_at
+  ),
+  security_logs as materialized (
+    select
+      'security'::text as group_name,
+      auth_security_logs.event_name::text as name,
+      auth_security_logs.status::text as status,
+      auth_security_logs.actor_type::text as actor_type,
+      coalesce(
+        nullif('@' || members.mm_username, '@'),
+        nullif(members.display_name, ''),
+        nullif(auth_security_logs.identifier, ''),
+        nullif(auth_security_logs.actor_id, ''),
+        case when auth_security_logs.actor_type = 'guest' then '비로그인 사용자' end
+      ) as actor_label,
+      auth_security_logs.ip_address::text as ip_address,
+      auth_security_logs.path::text as path,
+      auth_security_logs.created_at
+    from public.auth_security_logs
+    left join public.members
+      on auth_security_logs.actor_type = 'member'
+     and members.id::text = auth_security_logs.actor_id
+    cross join params
+    where auth_security_logs.created_at >= params.start_at
+      and auth_security_logs.created_at <= params.end_at
+  ),
+  unified_logs as materialized (
+    select * from product_logs
+    union all
+    select * from audit_logs
+    union all
+    select * from security_logs
+  ),
+  bucket_series as (
+    select
+      generate_series(
+        0,
+        greatest(
+          ceil(extract(epoch from (params.end_at - params.start_at)) * 1000 / params.bucket_ms)::integer - 1,
+          0
+        )
+      ) as bucket_index
+    from params
+  ),
+  bucketed_logs as materialized (
+    select
+      floor(extract(epoch from (unified_logs.created_at - params.start_at)) * 1000 / params.bucket_ms)::integer as bucket_index,
+      unified_logs.group_name
+    from unified_logs
+    cross join params
+  ),
+  buckets as (
+    select
+      (params.start_at + ((bucket_series.bucket_index * params.bucket_ms)::double precision * interval '1 millisecond')) as bucket_start,
+      least(
+        params.end_at,
+        params.start_at + (((bucket_series.bucket_index + 1) * params.bucket_ms)::double precision * interval '1 millisecond')
+      ) as bucket_end,
+      count(*) filter (where bucketed_logs.group_name = 'product')::bigint as product_count,
+      count(*) filter (where bucketed_logs.group_name = 'audit')::bigint as audit_count,
+      count(*) filter (where bucketed_logs.group_name = 'security')::bigint as security_count,
+      count(bucketed_logs.group_name)::bigint as total_count
+    from bucket_series
+    cross join params
+    left join bucketed_logs
+      on bucketed_logs.bucket_index = bucket_series.bucket_index
+    group by bucket_series.bucket_index, params.start_at, params.end_at, params.bucket_ms
+    order by bucket_series.bucket_index
+  )
+  select jsonb_build_object(
+    'counts',
+    jsonb_build_object(
+      'product', (select count(*) from product_logs),
+      'audit', (select count(*) from audit_logs),
+      'security', (select count(*) from security_logs)
+    ),
+    'securityStatusCounts',
+    jsonb_build_object(
+      'success', (select count(*) from security_logs where status = 'success'),
+      'failure', (select count(*) from security_logs where status = 'failure'),
+      'blocked', (select count(*) from security_logs where status = 'blocked')
+    ),
+    'buckets',
+    coalesce(
+      (
+        select jsonb_agg(
+          jsonb_build_object(
+            'start', bucket_start,
+            'end', bucket_end,
+            'product', product_count,
+            'audit', audit_count,
+            'security', security_count,
+            'total', total_count
+          )
+          order by bucket_start
+        )
+        from buckets
+      ),
+      '[]'::jsonb
+    ),
+    'availableNames',
+    coalesce(
+      (
+        select jsonb_agg(
+          jsonb_build_object('group', group_name, 'name', name)
+          order by group_name, name
+        )
+        from (
+          select distinct group_name, name
+          from unified_logs
+          where name is not null
+        ) names
+      ),
+      '[]'::jsonb
+    ),
+    'actorOptions',
+    coalesce(
+      (
+        select jsonb_agg(actor_type order by actor_type)
+        from (
+          select distinct actor_type
+          from unified_logs
+          where actor_type is not null
+        ) actors
+      ),
+      '[]'::jsonb
+    ),
+    'topProductEvents',
+    coalesce(
+      (
+        select jsonb_agg(jsonb_build_object('name', name, 'count', event_count) order by event_count desc, name)
+        from (
+          select name, count(*)::bigint as event_count
+          from product_logs
+          group by name
+          order by event_count desc, name
+          limit 5
+        ) ranked
+      ),
+      '[]'::jsonb
+    ),
+    'topAuditActions',
+    coalesce(
+      (
+        select jsonb_agg(jsonb_build_object('name', name, 'count', action_count) order by action_count desc, name)
+        from (
+          select name, count(*)::bigint as action_count
+          from audit_logs
+          group by name
+          order by action_count desc, name
+          limit 5
+        ) ranked
+      ),
+      '[]'::jsonb
+    ),
+    'topActors',
+    coalesce(
+      (
+        select jsonb_agg(jsonb_build_object('label', actor_label, 'count', actor_count) order by actor_count desc, actor_label)
+        from (
+          select actor_label, count(*)::bigint as actor_count
+          from unified_logs
+          where actor_label is not null
+            and actor_label <> '비로그인 사용자'
+          group by actor_label
+          order by actor_count desc, actor_label
+          limit 5
+        ) ranked
+      ),
+      '[]'::jsonb
+    ),
+    'topIps',
+    coalesce(
+      (
+        select jsonb_agg(jsonb_build_object('label', ip_address, 'count', ip_count) order by ip_count desc, ip_address)
+        from (
+          select ip_address, count(*)::bigint as ip_count
+          from unified_logs
+          where ip_address is not null
+          group by ip_address
+          order by ip_count desc, ip_address
+          limit 5
+        ) ranked
+      ),
+      '[]'::jsonb
+    ),
+    'topPaths',
+    coalesce(
+      (
+        select jsonb_agg(jsonb_build_object('label', path, 'count', path_count) order by path_count desc, path)
+        from (
+          select path, count(*)::bigint as path_count
+          from unified_logs
+          where path is not null
+          group by path
+          order by path_count desc, path
+          limit 5
+        ) ranked
+      ),
+      '[]'::jsonb
+    )
+  );
+$$;
+
 do $$
 declare
   page_definition text;
@@ -10136,20 +10361,8 @@ set marketing_enabled = excluded.marketing_enabled,
 where public.push_preferences.marketing_enabled
   is distinct from excluded.marketing_enabled;
 
-create or replace function public.ensure_single_member_super_admin()
-returns trigger
-language plpgsql
-as $$
-declare super_admin_count integer;
-begin
-  if new.admin_permission_id = 'super_admin' and coalesce(new.mm_username, '') <> 'myknow' then
-    raise exception 'only myknow member can hold super_admin permission';
-  end if;
-  select count(*) into super_admin_count from public.members where admin_permission_id = 'super_admin';
-  if super_admin_count > 1 then raise exception 'only one super_admin member is allowed'; end if;
-  return new;
-end;
-$$;
+-- ensure_single_member_super_admin() was dropped by 20260713204059; the
+-- pre-contract copy that used to sit here is omitted from the snapshot.
 
 -- Schema snapshot sync: normalized member domain (2026-07-13).
 
@@ -13438,12 +13651,17 @@ revoke all on table public.partner_benefit_usages from public;
 revoke all on table public.partner_benefit_usages from anon;
 revoke all on table public.partner_benefit_usages from authenticated;
 
+drop function if exists public.record_partner_benefit_usage(uuid, uuid, text, integer, text, jsonb);
 drop function if exists public.record_partner_benefit_usage(uuid, uuid, text, text, jsonb);
+
+-- 20260723103348_fix_partner_benefit_usage_rpc_ambiguity.sql (current contract)
+-- The canonical usage RPC's partner benefit lookup must qualify partner_id.
+-- Otherwise PL/pgSQL resolves it against the RETURNS TABLE output variable.
 
 create or replace function public.record_partner_benefit_usage(
   p_partner_id uuid,
   p_member_id uuid,
-  p_benefit text,
+  p_benefit_id uuid,
   p_use_count integer,
   p_idempotency_key text,
   p_metadata jsonb default '{}'::jsonb
@@ -13452,6 +13670,7 @@ returns table (
   usage_id uuid,
   partner_id uuid,
   member_id uuid,
+  benefit_id uuid,
   benefit_snapshot text,
   use_count integer,
   verified_at timestamp with time zone,
@@ -13464,24 +13683,22 @@ set search_path = public
 as $$
 declare
   partner_row public.partners%rowtype;
+  benefit_row public.partner_benefits%rowtype;
   usage_row public.partner_benefit_usages%rowtype;
-  normalized_benefit text := trim(coalesce(p_benefit, ''));
-  normalized_idempotency_key text := trim(coalesce(p_idempotency_key, ''));
+  normalized_key text := trim(coalesce(p_idempotency_key, ''));
   current_kst_date date := (now() at time zone 'Asia/Seoul')::date;
   inserted_count integer := 0;
 begin
-  if p_partner_id is null or p_member_id is null then
+  if p_partner_id is null or p_member_id is null or p_benefit_id is null then
     raise exception 'partner_benefit_usage_subject_required';
-  end if;
-  if char_length(normalized_benefit) < 1 or char_length(normalized_benefit) > 500 then
-    raise exception 'partner_benefit_usage_benefit_invalid';
   end if;
   if p_use_count is null or p_use_count < 1 then
     raise exception 'partner_benefit_usage_use_count_invalid';
   end if;
-  if char_length(normalized_idempotency_key) < 16 or char_length(normalized_idempotency_key) > 128 then
+  if char_length(normalized_key) < 16 or char_length(normalized_key) > 128 then
     raise exception 'partner_benefit_usage_idempotency_key_invalid';
   end if;
+
   select * into partner_row from public.partners where id = p_partner_id;
   if not found then raise exception 'partner_benefit_usage_partner_not_found'; end if;
   if trim(coalesce(partner_row.location, '')) = '온라인' then
@@ -13493,54 +13710,66 @@ begin
   if partner_row.period_end is not null and partner_row.period_end < current_kst_date then
     raise exception 'partner_benefit_usage_period_inactive';
   end if;
-  if partner_row.benefit_use_max_count is not null
-    and p_use_count > partner_row.benefit_use_max_count then
+
+  select * into benefit_row
+  from public.partner_benefits benefit
+  where benefit.id = p_benefit_id and benefit.partner_id = p_partner_id;
+  if not found then raise exception 'partner_benefit_usage_benefit_not_found'; end if;
+  if p_use_count > coalesce(benefit_row.max_apply_count, 1) then
     raise exception 'partner_benefit_usage_use_count_exceeded';
-  end if;
-  if not normalized_benefit = any(coalesce(partner_row.benefits, '{}'::text[])) then
-    raise exception 'partner_benefit_usage_benefit_not_found';
   end if;
   if not exists (select 1 from public.members where id = p_member_id) then
     raise exception 'partner_benefit_usage_member_not_found';
   end if;
-  select * into usage_row from public.partner_benefit_usages
-  where idempotency_key = normalized_idempotency_key for update;
+
+  select * into usage_row
+  from public.partner_benefit_usages
+  where idempotency_key = normalized_key
+  for update;
   if found then
-    if usage_row.partner_id <> p_partner_id or usage_row.member_id <> p_member_id
-       or usage_row.benefit_snapshot <> normalized_benefit
+    if usage_row.partner_id <> p_partner_id
+       or usage_row.member_id <> p_member_id
+       or usage_row.benefit_id is distinct from p_benefit_id
        or usage_row.use_count <> p_use_count then
       raise exception 'partner_benefit_usage_idempotency_conflict';
     end if;
     return query select usage_row.id, usage_row.partner_id, usage_row.member_id,
-      usage_row.benefit_snapshot, usage_row.use_count, usage_row.verified_at,
-      usage_row.created_at, false;
+      usage_row.benefit_id, usage_row.benefit_snapshot, usage_row.use_count,
+      usage_row.verified_at, usage_row.created_at, false;
     return;
   end if;
+
   insert into public.partner_benefit_usages (
-    partner_id, member_id, benefit_snapshot, use_count, idempotency_key, metadata
+    partner_id, member_id, benefit_id, benefit_snapshot, use_count,
+    idempotency_key, metadata
   ) values (
-    p_partner_id, p_member_id, normalized_benefit, p_use_count,
-    normalized_idempotency_key, coalesce(p_metadata, '{}'::jsonb)
+    p_partner_id, p_member_id, p_benefit_id, benefit_row.title, p_use_count,
+    normalized_key, coalesce(p_metadata, '{}'::jsonb)
   ) on conflict (idempotency_key) do nothing;
   get diagnostics inserted_count = row_count;
-  select * into usage_row from public.partner_benefit_usages
-  where idempotency_key = normalized_idempotency_key for update;
+
+  select * into usage_row
+  from public.partner_benefit_usages
+  where idempotency_key = normalized_key
+  for update;
   if not found then raise exception 'partner_benefit_usage_record_failed'; end if;
-  if usage_row.partner_id <> p_partner_id or usage_row.member_id <> p_member_id
-     or usage_row.benefit_snapshot <> normalized_benefit
+  if usage_row.partner_id <> p_partner_id
+     or usage_row.member_id <> p_member_id
+     or usage_row.benefit_id is distinct from p_benefit_id
      or usage_row.use_count <> p_use_count then
     raise exception 'partner_benefit_usage_idempotency_conflict';
   end if;
+
   return query select usage_row.id, usage_row.partner_id, usage_row.member_id,
-    usage_row.benefit_snapshot, usage_row.use_count, usage_row.verified_at,
-    usage_row.created_at, inserted_count > 0;
+    usage_row.benefit_id, usage_row.benefit_snapshot, usage_row.use_count,
+    usage_row.verified_at, usage_row.created_at, inserted_count > 0;
 end;
 $$;
 
-revoke all on function public.record_partner_benefit_usage(uuid, uuid, text, integer, text, jsonb) from public;
-revoke all on function public.record_partner_benefit_usage(uuid, uuid, text, integer, text, jsonb) from anon;
-revoke all on function public.record_partner_benefit_usage(uuid, uuid, text, integer, text, jsonb) from authenticated;
-grant execute on function public.record_partner_benefit_usage(uuid, uuid, text, integer, text, jsonb) to service_role;
+revoke all on function public.record_partner_benefit_usage(uuid, uuid, uuid, integer, text, jsonb) from public;
+revoke all on function public.record_partner_benefit_usage(uuid, uuid, uuid, integer, text, jsonb) from anon;
+revoke all on function public.record_partner_benefit_usage(uuid, uuid, uuid, integer, text, jsonb) from authenticated;
+grant execute on function public.record_partner_benefit_usage(uuid, uuid, uuid, integer, text, jsonb) to service_role;
 
 -- 개인정보가 포함될 수 있는 운영·보안 원본 로그는 1년만 보관하고,
 -- 이미 생성된 집계 테이블은 장기 보관한다. 보안 사고·분쟁은 보존 hold로 예외 처리한다.

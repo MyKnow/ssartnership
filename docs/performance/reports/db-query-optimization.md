@@ -31,6 +31,7 @@ authority: evidence
 
 - Added `members_year_created_at_idx`:
   `create index if not exists members_year_created_at_idx on public.members (year desc, created_at desc);`
+  - Later note (2026-10-05): `20260713204059_contract_member_domain_legacy_columns.sql` dropped `members.year`, which removed this index with the column. The current schema has no `year` index.
 - Added `members_created_at_idx`:
   `create index if not exists members_created_at_idx on public.members (created_at desc);`
 - Added `event_logs_partner_metric_idx`:
