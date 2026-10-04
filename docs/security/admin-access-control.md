@@ -9,9 +9,9 @@ authority: normative
 
 ## 개요
 
-관리자 로그인은 `ADMIN_ID`/`ADMIN_PASSWORD` 환경변수를 사용하지 않는다. 모든 관리자 계정은 Supabase `admin_accounts`에 저장하고, 비밀번호는 `password_hash`/`password_salt`로만 보관한다.
+관리자 로그인은 `ADMIN_ID`/`ADMIN_PASSWORD` 환경변수를 사용하지 않고, 별도 관리자 비밀번호도 없다. 관리자는 회원 계정에 `admin_profiles`(권한 템플릿·관리 캠퍼스·`permission_version`)가 연결된 회원이며, 회원 로그인 뒤 `/admin/session` 브리지로 관리자 세션을 받는다.
 
-권한은 `admin_permissions`의 리소스별 CRUD 매트릭스로 판정한다. 로그 리소스는 감사 증적 보호를 위해 `read`만 허용한다.
+권한은 권한 템플릿의 리소스별 CRUD 매트릭스로 판정한다. 로그 리소스는 감사 증적 보호를 위해 `read`만 허용한다.
 
 ## myknow Super Admin 승격
 
