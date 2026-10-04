@@ -7,7 +7,12 @@ import {
   getMemberPolicyConsentVersions,
 } from "@/lib/policy-documents.server";
 import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
-import { createHmacDigest } from "./hmac.js";
+import { signPayloadWith } from "./hmac.js";
+import {
+  buildSessionCookieOptions,
+  USER_SESSION_COOKIE_NAME,
+} from "./session-cookies.ts";
+import { readSessionSecret } from "./session-secrets.ts";
 import {
   parseUserSessionToken,
   type PolicyConsentSnapshot,
@@ -22,9 +27,10 @@ import {
   isMockMemberAuthEnabled,
 } from "@/lib/mock/member";
 
-const COOKIE_NAME = "user_session";
+const COOKIE_NAME = USER_SESSION_COOKIE_NAME;
 const SESSION_TTL_DAYS = 7;
-const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
+const SESSION_TTL_SECONDS = SESSION_TTL_DAYS * 24 * 60 * 60;
+const SESSION_TTL_MS = SESSION_TTL_SECONDS * 1000;
 
 type SignedUserSession = UserSessionTokenPayload & {
   requiresEmailRegistration?: boolean;
@@ -53,20 +59,11 @@ export class UserSessionIssueError extends Error {
 }
 
 function getSecret() {
-  const secret = process.env.USER_SESSION_SECRET;
-  if (!secret) {
-    throw new Error("USER_SESSION_SECRET 환경 변수가 필요합니다.");
-  }
-  if (secret.length < 32) {
-    throw new Error("USER_SESSION_SECRET는 최소 32자 이상이어야 합니다.");
-  }
-  return secret;
+  return readSessionSecret("user-session");
 }
 
 function signPayload(payload: string) {
-  const secret = getSecret();
-  const signature = createHmacDigest(payload, secret, "hex");
-  return `${payload}.${signature}`;
+  return signPayloadWith(payload, getSecret(), "hex");
 }
 
 function verifyToken(token: string) {
@@ -179,13 +176,11 @@ export async function setUserSession(
     });
     const token = signPayload(payload);
     const store = await cookies();
-    store.set(COOKIE_NAME, token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      ...(persistent ? { maxAge: SESSION_TTL_DAYS * 24 * 60 * 60 } : {}),
-      path: "/",
-    });
+    store.set(
+      COOKIE_NAME,
+      token,
+      buildSessionCookieOptions(persistent ? SESSION_TTL_SECONDS : undefined),
+    );
     return;
   }
 
@@ -243,13 +238,11 @@ export async function setUserSession(
   });
   const token = signPayload(payload);
   const store = await cookies();
-  store.set(COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    ...(persistent ? { maxAge: SESSION_TTL_DAYS * 24 * 60 * 60 } : {}),
-    path: "/",
-  });
+  store.set(
+    COOKIE_NAME,
+    token,
+    buildSessionCookieOptions(persistent ? SESSION_TTL_SECONDS : undefined),
+  );
 }
 
 export async function clearUserSession() {

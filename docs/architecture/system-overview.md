@@ -70,6 +70,9 @@ Browser
 공통 원칙:
 
 - 모두 HMAC signed token을 httpOnly, sameSite=lax, production secure cookie로 저장한다.
+- 토큰 파서는 `src/lib/session-tokens.ts`, 비밀값 레지스트리와 길이 정책은 `src/lib/session-secrets.ts`, 쿠키 이름·기본 속성은 `src/lib/session-cookies.ts` 하나만 사용한다. `src/proxy.ts`도 같은 파서와 상수를 쓰므로 프록시 리디렉션과 서버 인가 판정이 갈라지지 않는다.
+- 토큰 wire 포맷(`<json>.<hex hmac>`)과 필드 이름은 고정한다. 바꾸면 배포만으로 전원 로그아웃된다. `tests/session-token-parity.test.mts`의 golden token이 이를 고정한다.
+- 운영 필수 전용 비밀값(QR, 식별자 예약, 이메일 인증 HMAC)은 `USER_SESSION_SECRET`으로 fallback하지 않는다. 남은 fallback은 레지스트리 주석과 `tests/session-secrets.test.mts`가 고정한다.
 - token signature, raw secret, password 원문은 로그에 남기지 않는다.
 - 관리자 session은 account active, mustChangePassword, permissionVersion mismatch 시 무효 처리된다.
 - 협력사 session은 companyIds가 비어 있거나 비정상 값이면 무효 처리된다.

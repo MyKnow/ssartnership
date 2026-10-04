@@ -235,3 +235,51 @@ export function parsePartnerSessionToken(
     expiresAt: parsed.expiresAt,
   };
 }
+
+export const MEMBER_EMAIL_RECOVERY_SESSION_TTL_MS = 15 * 60 * 1000;
+
+export type MemberEmailRecoveryTokenPayload = {
+  memberId: string;
+  authSessionVersion: number;
+  issuedAt: number;
+  expiresAt: number;
+};
+
+/**
+ * `member_email_recovery` shares `USER_SESSION_SECRET` with `user_session`,
+ * so the distinct required fields (`memberId` vs `userId`) and the 15-minute
+ * lifetime cap are what keep the two token purposes from being swapped.
+ */
+export function parseMemberEmailRecoveryToken(
+  token: string,
+  secret: string | null | undefined,
+  now = Date.now(),
+): MemberEmailRecoveryTokenPayload | null {
+  const value = parseSignedJsonObject(token, secret);
+  if (!value) {
+    return null;
+  }
+  if (
+    typeof value.memberId !== "string"
+    || !value.memberId
+    || !isPositiveInteger(value.authSessionVersion)
+    || !Number.isSafeInteger(value.issuedAt)
+    || !Number.isSafeInteger(value.expiresAt)
+  ) {
+    return null;
+  }
+  const issuedAt = value.issuedAt as number;
+  const expiresAt = value.expiresAt as number;
+  if (
+    !isWithinLifetime(issuedAt, expiresAt, now)
+    || expiresAt - issuedAt > MEMBER_EMAIL_RECOVERY_SESSION_TTL_MS
+  ) {
+    return null;
+  }
+  return {
+    memberId: value.memberId,
+    authSessionVersion: value.authSessionVersion,
+    issuedAt,
+    expiresAt,
+  };
+}

@@ -11,6 +11,12 @@ import {
 import { getMemberRequiredGateRedirect } from "@/lib/member-required-gates";
 import { buildTrustedRedirectUrl } from "@/lib/request-guards";
 import {
+  ADMIN_SESSION_COOKIE_NAME,
+  PARTNER_SESSION_COOKIE_NAME,
+  USER_SESSION_COOKIE_NAME,
+} from "@/lib/session-cookies";
+import { findSessionSecret } from "@/lib/session-secrets";
+import {
   parseAdminSessionToken,
   parsePartnerSessionToken,
   parseUserSessionToken,
@@ -20,9 +26,9 @@ import {
   REQUEST_PATH_HEADER,
 } from "@/lib/request-path";
 
-const COOKIE_NAME = "user_session";
-const ADMIN_COOKIE_NAME = "admin_session";
-const PARTNER_COOKIE_NAME = "partner_session";
+const COOKIE_NAME = USER_SESSION_COOKIE_NAME;
+const ADMIN_COOKIE_NAME = ADMIN_SESSION_COOKIE_NAME;
+const PARTNER_COOKIE_NAME = PARTNER_SESSION_COOKIE_NAME;
 
 function nextWithRequestUrl(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
@@ -37,40 +43,16 @@ function nextWithRequestUrl(request: NextRequest) {
   });
 }
 
-function getSecret() {
-  const secret = process.env.USER_SESSION_SECRET;
-  if (!secret || secret.length < 32) {
-    return null;
-  }
-  return secret;
-}
-
-function getPartnerSecret() {
-  const secret = process.env.PARTNER_SESSION_SECRET ?? process.env.USER_SESSION_SECRET;
-  if (!secret || secret.length < 32) {
-    return null;
-  }
-  return secret;
-}
-
-function getAdminSecret() {
-  const secret = process.env.ADMIN_SESSION_SECRET;
-  if (!secret || secret.length < 32) {
-    return null;
-  }
-  return secret;
-}
-
 function verifyToken(token: string) {
-  return parseUserSessionToken(token, getSecret());
+  return parseUserSessionToken(token, findSessionSecret("user-session"));
 }
 
 function verifyPartnerToken(token: string) {
-  return parsePartnerSessionToken(token, getPartnerSecret());
+  return parsePartnerSessionToken(token, findSessionSecret("partner-session"));
 }
 
 function verifyAdminToken(token: string) {
-  return parseAdminSessionToken(token, getAdminSecret());
+  return parseAdminSessionToken(token, findSessionSecret("admin-session"));
 }
 
 function isPublicAdminPath(pathname: string) {

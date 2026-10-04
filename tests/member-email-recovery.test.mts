@@ -7,12 +7,16 @@ const read = (path: string) => readFileSync(new URL(path, root), "utf8");
 
 test("MM 장애 이메일 복구는 기존 비밀번호와 15분 제한 세션을 모두 요구한다", () => {
   const session = read("src/lib/member-email-recovery-session.ts");
+  const tokens = read("src/lib/session-tokens.ts");
+  const cookies = read("src/lib/session-cookies.ts");
   const startRoute = read("src/app/api/member/recovery/start/route.ts");
   const authentication = read("src/lib/member-authentication.ts");
 
-  assert.match(session, /MEMBER_EMAIL_RECOVERY_SESSION_TTL_MS\s*=\s*15\s*\*\s*60\s*\*\s*1000/);
+  assert.match(tokens, /MEMBER_EMAIL_RECOVERY_SESSION_TTL_MS\s*=\s*15\s*\*\s*60\s*\*\s*1000/);
+  assert.match(tokens, /expiresAt - issuedAt > MEMBER_EMAIL_RECOVERY_SESSION_TTL_MS/);
   assert.match(session, /authSessionVersion/);
-  assert.match(session, /httpOnly:\s*true/);
+  assert.match(session, /buildSessionCookieOptions\(/);
+  assert.match(cookies, /httpOnly:\s*true/);
   assert.match(startRoute, /resolveMemberForEmailRecovery/);
   assert.match(startRoute, /verifyPassword\(/);
   assert.match(startRoute, /setMemberEmailRecoverySession/);

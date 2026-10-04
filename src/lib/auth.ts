@@ -1,7 +1,12 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
-import { createHmacDigest } from "./hmac.js";
+import { signPayloadWith } from "./hmac.js";
+import {
+  ADMIN_SESSION_COOKIE_NAME,
+  buildSessionCookieOptions,
+} from "./session-cookies.ts";
+import { readSessionSecret } from "./session-secrets.ts";
 import {
   parseAdminSessionToken as parseSignedAdminSessionToken,
   type AdminSessionTokenPayload,
@@ -13,27 +18,16 @@ import {
   type AdminAccount,
 } from "./admin-accounts";
 
-const COOKIE_NAME = "admin_session";
+const COOKIE_NAME = ADMIN_SESSION_COOKIE_NAME;
 
 type AdminSessionPayload = AdminSessionTokenPayload;
 
 function getSecret() {
-  const secret = process.env.ADMIN_SESSION_SECRET;
-  if (!secret) {
-    throw new Error("ADMIN_SESSION_SECRET 환경 변수가 필요합니다.");
-  }
-  if (secret.length < 32) {
-    throw new Error(
-      "ADMIN_SESSION_SECRET는 최소 32자 이상의 난수여야 합니다.",
-    );
-  }
-  return secret;
+  return readSessionSecret("admin-session");
 }
 
 function signPayload(payload: string) {
-  const secret = getSecret();
-  const signature = createHmacDigest(payload, secret, "hex");
-  return `${payload}.${signature}`;
+  return signPayloadWith(payload, getSecret(), "hex");
 }
 
 function parseAdminSessionToken(token: string): AdminSessionPayload | null {
@@ -53,13 +47,7 @@ export async function setAdminSession(account: Pick<AdminAccount, "id" | "loginI
   });
   const token = signPayload(payload);
   const cookieStore = await cookies();
-  cookieStore.set(COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: ttlSeconds,
-    path: "/",
-  });
+  cookieStore.set(COOKIE_NAME, token, buildSessionCookieOptions(ttlSeconds));
 }
 
 export async function clearAdminSession() {

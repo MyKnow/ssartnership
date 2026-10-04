@@ -1,21 +1,16 @@
 import { randomInt } from "node:crypto";
 import { createHmacDigest, verifyHmacDigest } from "@/lib/hmac.js";
 import { normalizeMemberEmail } from "@/lib/member-domain";
+import { readSessionSecret } from "@/lib/session-secrets";
 export {
   MEMBER_EMAIL_RESEND_COOLDOWN_SECONDS,
   MEMBER_EMAIL_VERIFICATION_CODE_TTL_SECONDS,
 } from "@/lib/member-email-verification-timing";
 
 export function getMemberEmailVerificationSecret() {
-  const secret =
-    process.env.MEMBER_EMAIL_VERIFICATION_HMAC_SECRET
-    ?? process.env.MEMBER_IDENTIFIER_RESERVATION_HMAC_SECRET
-    ?? process.env.GRADUATE_VERIFICATION_HMAC_SECRET
-    ?? process.env.USER_SESSION_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error("회원 이메일 인증용 HMAC 비밀값이 필요합니다.");
-  }
-  return secret;
+  return readSessionSecret("member-email-verification", {
+    errorMessage: "회원 이메일 인증용 HMAC 비밀값이 필요합니다.",
+  });
 }
 
 function requireNormalizedMemberEmail(value: string) {

@@ -1,14 +1,19 @@
 import { cookies } from "next/headers";
 import { unstable_noStore as noStore } from "next/cache";
-import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "@/lib/hmac.js";
+import { openSignedPayload, signPayloadWith } from "@/lib/hmac.js";
 import {
   normalizeMattermostSignupParseReason,
   type MattermostSignupMode,
   type MattermostSignupParseReason,
 } from "@/lib/mm-signup-approval";
+import {
+  buildSessionCookieOptions,
+  MATTERMOST_CODE_SESSION_COOKIE_NAME,
+} from "@/lib/session-cookies";
+import { readSessionSecret } from "@/lib/session-secrets";
 import { isUuid } from "@/lib/uuid";
 
-const COOKIE_NAME = "mattermost_code_session";
+const COOKIE_NAME = MATTERMOST_CODE_SESSION_COOKIE_NAME;
 const SESSION_TTL_MS = 20 * 60 * 1000;
 
 export type MattermostCodeSessionPurpose = "signup" | "reset_password";
@@ -32,11 +37,9 @@ type SignedMattermostCodeSession = MattermostCodeSession & {
 };
 
 function getSecret() {
-  const secret = process.env.USER_SESSION_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error("USER_SESSION_SECRET 환경 변수가 필요합니다.");
-  }
-  return secret;
+  return readSessionSecret("mattermost-code-session", {
+    errorMessage: "USER_SESSION_SECRET 환경 변수가 필요합니다.",
+  });
 }
 
 function parseSessionPayload(value: unknown): SignedMattermostCodeSession | null {
@@ -93,12 +96,8 @@ function parseSessionPayload(value: unknown): SignedMattermostCodeSession | null
 }
 
 function verifySessionToken(token: string) {
-  const split = splitSignedToken(token);
-  if (!split) {
-    return null;
-  }
-  const [payload, signature] = split;
-  if (!payload || !signature || !verifyHmacDigest(payload, signature, getSecret(), "hex")) {
+  const payload = openSignedPayload(token, getSecret(), "hex");
+  if (!payload) {
     return null;
   }
   try {
@@ -118,15 +117,9 @@ export async function setMattermostCodeSession(session: MattermostCodeSession) {
     issuedAt: now,
     expiresAt: now + SESSION_TTL_MS,
   }), "utf8").toString("base64url");
-  const token = `${payload}.${createHmacDigest(payload, getSecret(), "hex")}`;
+  const token = signPayloadWith(payload, getSecret(), "hex");
   const store = await cookies();
-  store.set(COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: SESSION_TTL_MS / 1000,
-    path: "/",
-  });
+  store.set(COOKIE_NAME, token, buildSessionCookieOptions(SESSION_TTL_MS / 1000));
 }
 
 export async function getMattermostCodeSession(

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mapWithConcurrency } from "@/lib/async-concurrency";
 import { SITE_NAME } from "@/lib/site";
 import { createHmacDigest } from "@/lib/hmac.js";
+import { readSessionSecret } from "@/lib/session-secrets";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   getConfiguredCurrentSsafyYear,
@@ -194,12 +195,9 @@ async function sendSetupEmail(input: {
 }
 
 function getManualMemberImportTokenSecret() {
-  const secret = process.env.MANUAL_MEMBER_IMPORT_TOKEN_SECRET
-    ?? process.env.USER_SESSION_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error("수동 회원 가져오기 토큰 비밀값이 필요합니다.");
-  }
-  return secret;
+  return readSessionSecret("manual-member-import-token", {
+    errorMessage: "수동 회원 가져오기 토큰 비밀값이 필요합니다.",
+  });
 }
 
 function getManualMemberImportSetupToken(rowId: string) {
