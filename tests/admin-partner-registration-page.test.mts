@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("제휴 등록 신청은 서버 범위 페이지 조회와 안전한 URL 페이지네이션을 사용한다", async () => {
-  const [pageSource, viewSource, actionSource, feedbackSource, migrationSource, schemaSource, followUpMigrationSource] = await Promise.all([
+  const [pageSource, viewSource, actionSource, conversionSource, feedbackSource, migrationSource, schemaSource, followUpMigrationSource] = await Promise.all([
     readFile(
       new URL(
         "../src/app/admin/(protected)/partner-registrations/page.tsx",
@@ -21,6 +21,13 @@ test("제휴 등록 신청은 서버 범위 페이지 조회와 안전한 URL �
     readFile(
       new URL(
         "../src/app/admin/(protected)/partner-registrations/actions.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/lib/partner-registration-conversion.server.ts",
         import.meta.url,
       ),
       "utf8",
@@ -62,7 +69,7 @@ test("제휴 등록 신청은 서버 범위 페이지 조회와 안전한 URL �
   assert.match(actionSource, /\/admin\/partners\/\$\{convertedPartnerId\}/);
   assert.match(actionSource, /conversion\.partners\.length === 0/);
   assert.match(actionSource, /rollbackPartnerRegistrationRequestStatus/);
-  assert.match(actionSource, /\.eq\("status", requestedStatus\)/);
+  assert.match(conversionSource, /\.eq\("status", requestedStatus\)/);
   assert.match(actionSource, /success: "already-updated"/);
   assert.match(feedbackSource, /partner_form_conversion_failed/);
   assert.match(migrationSource, /get_admin_partner_registration_request_page/);

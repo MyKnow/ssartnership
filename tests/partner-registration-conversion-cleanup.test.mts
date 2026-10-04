@@ -6,7 +6,7 @@ const root = new URL("..", import.meta.url);
 
 test("등록 신청 승인 변환 실패 시 이번 시도에 생성한 리소스를 정리한다", async () => {
   const source = await readFile(
-    new URL("src/app/admin/(protected)/partner-registrations/actions.ts", root),
+    new URL("src/lib/partner-registration-conversion.server.ts", root),
     "utf8",
   );
 
@@ -15,13 +15,28 @@ test("등록 신청 승인 변환 실패 시 이번 시도에 생성한 리소�
   assert.match(source, /resources\.createdPartnerIds\.push\(createdPartner\.id\)/);
   assert.match(source, /\.from\("partners"\)\s*\.delete\(\)\s*\.in\("id", resources\.createdPartnerIds\)/);
   assert.match(source, /\.from\("partner_brand_profiles"\)\s*\.delete\(\)\s*\.eq\("id", resources\.createdBrandProfileId\)/);
-  assert.match(source, /cleanupPartnerCompanyProvision\(supabase, resources\.companyProvision\)/);
+  assert.match(
+    source,
+    /companyProvisioner\s*\.cleanup\(supabase, resources\.companyProvision\)/,
+  );
   assert.match(source, /conversion rollback failed/);
   assert.match(source, /partner_registration_conversion_cleanup_failed/);
   assert.doesNotMatch(
     source,
-    /await rollbackRegistrationConversionResources\(supabase, resources\)\.catch\(/,
+    /await rollbackRegistrationConversionResources\([^)]*\)\.catch\(/,
   );
+});
+
+test("등록 신청 승인 action은 회사 필수 프로비저닝과 정리 함수를 전환 모듈에 주입한다", async () => {
+  const source = await readFile(
+    new URL("src/app/admin/(protected)/partner-registrations/actions.ts", root),
+    "utf8",
+  );
+
+  assert.match(source, /ensurePartnerCompanyRow\(supabase, input, true, options\)/);
+  assert.match(source, /cleanup: cleanupPartnerCompanyProvision/);
+  assert.match(source, /companyProvisioner: registrationCompanyProvisioner/);
+  assert.doesNotMatch(source, /\.from\("partners"\)/);
 });
 
 test("등록 승인 정리 쿼리 실패를 성공으로 삼키지 않는다", async () => {
