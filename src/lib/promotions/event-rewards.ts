@@ -3,6 +3,10 @@ import { getMemberNotificationPreferences } from "@/lib/notification-preferences
 import { fetchMemberVisibleReviewCountInRange } from "@/lib/partner-counts";
 import { collectPagedRows } from "@/lib/supabase/paging";
 import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
+import {
+  MEMBER_EVENT_CANDIDATE_SELECT,
+  type MemberEventCandidateRow,
+} from "@/lib/members/projections";
 import { getPolicyDocumentByKind } from "@/lib/policy-documents.server";
 import { hasEffectiveMarketingConsent } from "@/lib/notifications/marketing-consent";
 import { getPushPreferencesOrDefault } from "@/lib/push";
@@ -115,15 +119,6 @@ export type EventRewardDrawPlan = {
   candidateCount: number;
   totalTickets: number;
   winners: EventRewardDrawWinner[];
-};
-
-type MemberRow = {
-  id: string;
-  display_name: string | null;
-  mattermost_account_id: string | null;
-  generation: number | null;
-  campus: string | null;
-  created_at: string | null;
 };
 
 type PreferenceRow = {
@@ -814,16 +809,16 @@ function normalizePreferences(params: {
 async function fetchAllEventMembers(
   supabase: ReturnType<typeof getSupabaseAdminClient>,
 ) {
-  const result = await collectPagedRows<MemberRow>(null, async (from, to) => {
+  const result = await collectPagedRows<MemberEventCandidateRow>(null, async (from, to) => {
     const { data, error } = await supabase
       .from("members")
-      .select("id,display_name,mattermost_account_id,generation,campus,created_at")
+      .select(MEMBER_EVENT_CANDIDATE_SELECT)
       .order("generation", { ascending: false })
       .order("display_name", { ascending: true })
       .order("id", { ascending: true })
       .range(from, to);
     assertEventRewardQuerySucceeded(error, "members");
-    return { rows: (data ?? []) as MemberRow[], error: false };
+    return { rows: (data ?? []) as MemberEventCandidateRow[], error: false };
   });
   return result.rows;
 }

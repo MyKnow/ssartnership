@@ -18,6 +18,10 @@ import type {
 import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
+  MEMBER_IDENTITY_SELECT,
+  type MemberIdentityRow,
+} from "@/lib/members/projections";
+import {
   collectPagedRows,
   collectPagedRowsByFilterChunks,
   collectRowsByFilterChunks,
@@ -90,14 +94,6 @@ type AudienceMember = {
   isStaff: boolean;
   sourceYears: number[];
   senderGeneration: number | null;
-};
-
-type AudienceMemberRow = {
-  id: string;
-  mattermost_account_id: string | null;
-  display_name: string | null;
-  generation: number | null;
-  campus: string | null;
 };
 
 type AudiencePreferenceRow = {
@@ -213,32 +209,28 @@ async function listAudienceMembers(resolvedAudience: ResolvedPushAudience) {
   const selectedMemberIds = resolvedAudience.memberIds;
   const memberRows = selectedMemberIds
     ? (
-        await collectRowsByFilterChunks<string, AudienceMemberRow>(
+        await collectRowsByFilterChunks<string, MemberIdentityRow>(
           selectedMemberIds,
           async (memberIdChunk) => {
             const { data, error } = await supabase
               .from("members")
-              .select(
-                "id,mattermost_account_id,display_name,generation,campus",
-              )
+              .select(MEMBER_IDENTITY_SELECT)
               .in("id", [...memberIdChunk]);
             if (error) {
               throw new Error("발송 대상을 불러오지 못했습니다.");
             }
             return {
-              rows: (data ?? []) as AudienceMemberRow[],
+              rows: (data ?? []) as MemberIdentityRow[],
               error: false,
             };
           },
         )
       ).rows
     : (
-        await collectPagedRows<AudienceMemberRow>(null, async (from, to) => {
+        await collectPagedRows<MemberIdentityRow>(null, async (from, to) => {
           const { data, error } = await supabase
             .from("members")
-            .select(
-              "id,mattermost_account_id,display_name,generation,campus",
-            )
+            .select(MEMBER_IDENTITY_SELECT)
             .order("display_name", { ascending: true })
             .order("id", { ascending: true })
             .range(from, to);
@@ -246,7 +238,7 @@ async function listAudienceMembers(resolvedAudience: ResolvedPushAudience) {
             throw new Error("발송 대상을 불러오지 못했습니다.");
           }
           return {
-            rows: (data ?? []) as AudienceMemberRow[],
+            rows: (data ?? []) as MemberIdentityRow[],
             error: false,
           };
         })

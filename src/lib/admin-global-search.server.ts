@@ -6,18 +6,16 @@ import {
 } from "@/lib/admin-global-search";
 import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import {
+  MEMBER_SEARCH_SELECT,
+  type MemberSearchRow,
+} from "@/lib/members/projections";
 import { isUuid } from "@/lib/uuid";
 
 const SEARCH_RESULT_LIMIT = 8;
 export const ADMIN_GLOBAL_SEARCH_READ_MODEL_TIMEOUT_MS = 2_000;
 
-type AdminGlobalSearchMemberRow = {
-  id: string;
-  display_name: string | null;
-  manual_login_id: string | null;
-  generation: number | null;
-  campus: string | null;
-};
+type AdminGlobalSearchMemberRow = MemberSearchRow;
 
 type AdminGlobalSearchPartnerRow = {
   id: string;
@@ -91,7 +89,7 @@ export async function searchAdminGlobalEntities({
       ? [
           supabase
             .from("members")
-            .select("id,display_name,manual_login_id,generation,campus")
+            .select(MEMBER_SEARCH_SELECT)
             .is("deleted_at", null)
             .eq("id", normalizedQuery)
             .limit(1),
@@ -100,7 +98,7 @@ export async function searchAdminGlobalEntities({
         ? [
             supabase
               .from("members")
-              .select("id,display_name,manual_login_id,generation,campus")
+              .select(MEMBER_SEARCH_SELECT)
               .is("deleted_at", null)
               .or(`display_name.ilike.${pattern},manual_login_id.ilike.${pattern}`)
               .order("updated_at", { ascending: false })
@@ -109,14 +107,14 @@ export async function searchAdminGlobalEntities({
         : [
             supabase
               .from("members")
-              .select("id,display_name,manual_login_id,generation,campus")
+              .select(MEMBER_SEARCH_SELECT)
               .is("deleted_at", null)
               .ilike("display_name", pattern)
               .order("updated_at", { ascending: false })
               .limit(SEARCH_RESULT_LIMIT),
             supabase
               .from("members")
-              .select("id,display_name,manual_login_id,generation,campus")
+              .select(MEMBER_SEARCH_SELECT)
               .is("deleted_at", null)
               .ilike("manual_login_id", pattern)
               .order("updated_at", { ascending: false })
