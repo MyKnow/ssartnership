@@ -1,11 +1,13 @@
 ---
 title: Vercel Account Routing
-type: runbook
-status: current
-authority: normative
+type: history
+status: archived
+authority: evidence
 ---
 
 # Vercel Account Routing
+
+> 역사 기록: 2026-10 PVE 자체 호스팅 이전 뒤 Vercel 배포와 프로젝트 설정 작업은 운영 경로에서 빠졌다. 이 절차를 현재 runbook으로 실행하지 않는다. 현재 배포는 [자체 호스팅 격리 CI·배포·유지보수](../../operations/runbooks/self-host-ci-maintenance.md)를, 기본 결정은 [2026-10 리팩토링·개선 프로그램](../../plans/active/refactor-program-2026-10.md)을 따른다.
 
 `ssartnership` is owned by a different Vercel account than some local companion projects. Do not run project-changing Vercel CLI commands through the global `vercel` login in this repo.
 

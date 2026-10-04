@@ -58,7 +58,7 @@ authority: descriptive
 | `docs/operations/runbooks/self-host-operations.md` | 기존 정본/시점 기록 유지 |
 | `docs/operations/runbooks/self-hosting.md` | 기존 정본/시점 기록 유지 |
 | `docs/operations/runbooks/storybook-visual-workflow.md` | 기존 정본/시점 기록 유지 |
-| `docs/operations/runbooks/vercel-account-routing.md` | 기존 정본/시점 기록 유지 |
+| `docs/operations/runbooks/vercel-account-routing.md` | 2026-10 `docs/history/operations/vercel-account-routing.md`로 이동(PVE 이전 후 만료) |
 | `docs/performance/audits/2026-04-10-project-wide.md` | 기존 정본/시점 기록 유지 |
 | `docs/performance/audits/2026-07-21-schema-api-async-ci.md` | 기존 정본/시점 기록 유지 |
 | `docs/performance/audits/2026-07-29-issue-181-final.md` | 기존 정본/시점 기록 유지 |

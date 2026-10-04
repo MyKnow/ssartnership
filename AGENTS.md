@@ -5,7 +5,7 @@
 ## Product Direction
 
 - 빠른 MVP 출시와 낮은 운영 비용을 우선한다.
-- 기본 스택은 Next.js App Router, Supabase, Vercel, Tailwind CSS다.
+- 기본 스택은 Next.js App Router, 자체 호스팅 Supabase(PostgreSQL·PostgREST·Storage), Tailwind CSS다. 운영 정본은 PVE 자체 호스팅(Docker Compose)이며 Vercel과 클라우드 Supabase는 사용하지 않는다.
 - UI는 TDS처럼 깔끔하고 일관된 디자인을 지향한다.
 - 로직은 확장성과 교체 가능성을 우선한다.
 - 데이터 접근은 Repository 패턴으로 감싸고 mock/Supabase 전환이 쉬워야 한다.
@@ -28,12 +28,13 @@
 src/app/                  Next.js App Router routes, layouts, loading/error states
 src/components/           UI primitives and feature components
 src/hooks/                Client hooks
-src/lib/                  Domain logic, repositories, adapters, shared helpers
-src/lib/repositories/     Repository interfaces plus mock/Supabase implementations
+src/lib/                  Domain logic, domain-folder repositories, adapters, shared helpers
+src/lib/repositories/     Shared-entity repository interfaces plus mock/Supabase implementations
 src/lib/supabase/         Supabase server clients
-supabase/migrations/      Database migrations
-supabase/schema.sql       Current schema snapshot
-tests/                    Node test files for domain logic and helpers
+supabase/migrations/      Forward-only migrations; the schema source of truth
+supabase/schema.sql       Snapshot derived from migrations
+tests/                    node:test files (`*.test.mts`); `tests/unit/` holds Vitest route/action tests
+deploy/                   Self-hosting Compose, edge, CI receiver, and operations assets
 docs/index.md             Repository Knowledge map and source-of-truth entrypoint
 docs/specs/               Feature spec/plan/tasks lifecycle artifacts
 docs/plans/               Active, completed, and tech-debt execution knowledge
@@ -48,6 +49,8 @@ docs/plans/               Active, completed, and tech-debt execution knowledge
 - Repository methods should return domain models, not raw database rows.
 - Mapping between Supabase rows and domain models belongs near the repository implementation.
 - Business rules such as visibility, authorization, validation, and state transitions should be in service/domain helpers when they grow beyond simple mapping.
+- Domain-only tables use a domain folder (`repository.ts`, `repository.supabase.ts`, `repository.mock.ts`); entities shared by several domains use `src/lib/repositories`. Do not add new raw `.from("<table>")` files outside repositories; the ratchet baseline is in `docs/plans/tech-debt.md`.
+- Program-wide refactoring defaults (action error redirects, cache tags, mock scope, migration ownership) are recorded in `docs/plans/active/refactor-program-2026-10.md`.
 
 ## Skills
 
@@ -81,14 +84,14 @@ Run `next build` only when the change touches build/runtime behavior broadly or 
 
 For UI creation or modification, include visual proof in the final handoff. Capture the affected surface after the change at the relevant viewport classes and show the screenshots with Markdown image tags using absolute local paths: mobile (`360px`, plus `320px`/`390px` when risky), tablet (`820px` or `1024px`), and desktop (`1366px` or `1440px`). If a viewport class is out of scope or screenshot capture fails, state that explicitly with the reason and the fallback verification performed. Store these QA screenshots in an ignored temporary folder such as `.tmp/ui-qa/`; do not stage them.
 
-## Preview Supabase Sync
+## Preview Data Copy
 
-- `npm run sync:preview` may copy public Production data into Preview, but it must not copy member password material.
-- The preview sync sanitizer strips `members.password_hash`, `members.password_salt`, and legacy `members.avatar_base64` from the Production dump, while preserving the `member_profile_images` ledger and private `member-profile-images` Storage objects for visual Preview parity.
-- Because member password hashes are stripped, Production member passwords are not expected to work in `dev` or Preview after sync. Use the Preview password reset flow or explicit Preview test accounts instead.
-- If `PREVIEW_TEST_MEMBER_USERNAME` and `PREVIEW_TEST_MEMBER_PASSWORD` are configured, `npm run sync:preview` re-seeds that single Preview-only member password after restore.
+- Preview runs on the self-hosted `original-preview` stack that the `dev` branch deploys to. The legacy `npm run sync:preview` scripts still target the frozen cloud Supabase baseline; do not run them (see `github-actions-operations`).
+- A Production-to-Preview copy is an operator procedure: `node scripts/self-host-environments/cli.mjs prepare-copy <pair-directory>` restores an existing paired backup into an isolated volume, sanitizes it there, and loads a new Preview candidate. See `docs/operations/runbooks/self-host-environments.md`.
+- The copy must not carry credential material. The sanitizer replaces password and other secret columns, masks email addresses, and empties auth, delivery, Wallet credential, and log tables; an unreviewed secret-like column fails the copy closed. Member profile photos (`member_profile_images` and the private `member-profile-images` bucket) are copied and remain personal data.
+- Production member passwords therefore do not work in a Preview copy. Use the Preview password reset flow, or `seed-preview-member <pair-directory> <private-credential.json>` for exactly one Preview test member. Never put credential values on the command line, in chat, or in logs.
 - Do not “fix” this by copying Production member password hashes into Preview unless the user explicitly accepts the security risk for a one-off operation.
-- If login suddenly requires reset in Preview, first check the preview sync sanitizer diagnostics before assuming a migration failure.
+- If login suddenly requires a reset in Preview after a copy, check the copy receipt and sanitizer diagnostics before assuming a migration failure.
 
 ## Supabase Migration Naming
 
@@ -119,8 +122,9 @@ For UI creation or modification, include visual proof in the final handoff. Capt
 
 ### Branch Strategy
 
-- `main` is connected to Vercel Production and Supabase Production. Treat it as the production deployment branch.
-- `dev` is connected to Vercel Preview and Supabase Preview. Treat it as the integration and pre-production validation branch.
+- `main` is the Production deployment branch. A `main` push runs `.github/workflows/self-host-production.yml`, and the self-hosted Production receiver applies only the app image from that exact SHA's first successful attempt.
+- `dev` is the integration and pre-production validation branch. `.github/workflows/self-host-preview.yml` builds it, and the self-hosted Preview receiver applies it the same way.
+- Receivers never apply DDL. A migration reaches Preview or Production only after the operator applies it and writes that environment's schema approval; see `docs/operations/runbooks/self-host-ci-maintenance.md`.
 - Start all planned work from `dev`, then create a typed work branch such as `feat/*`, `fix/*`, `refactor/*`, `perf/*`, `chore/*`, `docs/*`, `test/*`, or `ci/*`.
 - For urgent production fixes, create `hotfix/*` branches directly from `main`.
 - Complete the task and run local verification inside the typed work branch before merging it into `dev`.

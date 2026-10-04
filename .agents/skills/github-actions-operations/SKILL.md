@@ -37,7 +37,7 @@ For each triggered SHA or dispatch:
 - Confirm test totals and zero retries for Playwright and Storybook. A successful job with a retry is an abnormal run.
 - Keep remote Playwright fail-closed: use zero retries for required CI or make the required job explicitly fail when the reporter records a retry/flaky result. A green badge must never hide a failed first attempt.
 - Keep every required wrapper fail-closed. A compiler, linter, test, audit, build, or deployment wrapper may collect a second diagnostic, but it must preserve the first nonzero result and may not turn a failed first invocation into green.
-- Confirm provider contracts: Vercel deployment SHA and alias, Supabase migration status, and manual Preview sync checkout/stale guard/data/storage/post-migration results when applicable.
+- Confirm provider contracts: the self-host image workflow's first attempt and published manifest, the environment receiver state for that exact SHA, and the operator's schema approval when migrations changed. Vercel deployments and cloud Supabase migration or sync runs are retired and are not expected checks.
 - Distinguish an expected job-level `skipped` guard from workflow-level cancellation or an unexpected missing check.
 - Do not call a change clean until every expected first attempt is complete and log-audited.
 
