@@ -199,6 +199,12 @@ body {
   max-height: max(0px, calc(100svh - env(safe-area-inset-top, 0px) - max(env(safe-area-inset-bottom, 0px), var(--pwa-viewport-bottom, 0px)) - 7rem));
 }
 
+/* 제휴처 확인 PIN은 비밀번호 저장 대상이 되지 않도록 text 입력을 쓰고 화면에서만 가립니다. */
+.pin-mask {
+  -webkit-text-security: disc;
+  letter-spacing: 0.3em;
+}
+
 /* 입력 중에는 검색과 키보드를 가리지 않고, 앱 하단 탐색과도 함께 뜨지 않습니다. */
 body:has(input:focus, textarea:focus, [contenteditable="true"]:focus) [data-pwa-visit-recommendation],
 body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
