@@ -5,6 +5,7 @@ import {
   inferCampusSlugsFromLocation,
   normalizeCampusSlugs,
 } from "@/lib/campuses";
+import { buildPartnerInsertRow } from "@/lib/partner-admin/partner-insert-row";
 import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
 import { persistPartnerBranchLinks } from "@/lib/partner-branch-links.server";
 import {
@@ -277,7 +278,8 @@ export async function createPartnerFromPortalRegistrationRequest<
   campusSlugs: string[];
   companyProvisioner: RegistrationCompanyProvisioner<TProvision>;
 }): Promise<RegistrationConversionResult> {
-  if (!request.category_id) {
+  const categoryId = request.category_id;
+  if (!categoryId) {
     return { partners: [], created: false };
   }
 
@@ -332,7 +334,7 @@ export async function createPartnerFromPortalRegistrationRequest<
           .insert({
             company_id: companyId,
             name: request.brand_name,
-            category_id: request.category_id,
+            category_id: categoryId,
             category_label: request.category_label,
             description: request.detail_description ?? null,
             inquiry_link: request.inquiry_link ?? null,
@@ -435,41 +437,43 @@ export async function createPartnerFromPortalRegistrationRequest<
           : null);
       const { data, error } = await supabase
         .from("partners")
-        .insert({
-          id: partnerId,
-          company_id: companyId,
-          brand_profile_id: brandProfileId,
-          name: partnerName,
-          category_id: request.category_id,
-          location: locationSummary,
-          detail_description: request.detail_description ?? null,
-          campus_slugs: partnerCampusSlugs,
-          managed_campus_slugs: partnerCampusSlugs,
-          map_url: groupBranches[0]?.map_url ?? request.map_url ?? null,
-          benefit_action_type: benefitActionType,
-          benefit_action_link: benefitActionLink,
-          reservation_link: null,
-          inquiry_link: request.inquiry_link ?? null,
-          period_start: group.period_start ?? request.period_start ?? null,
-          period_end: group.period_end ?? request.period_end ?? null,
-          conditions: group.conditions ?? request.conditions ?? [],
-          benefits: group.benefits ?? request.benefits ?? [],
-          applies_to: ["staff", "student", "graduate"],
-          thumbnail: request.thumbnail_url ?? null,
-          images: request.image_urls ?? [],
-          tags: group.tags ?? request.tags ?? [],
-          visibility: request.visibility ?? "public",
-          benefit_visibility: "public",
-          branch_scope_type:
-            request.service_mode === "online"
-              ? "online"
-              : request.branch_scope_type ?? "single_location",
-          branch_scope_note: request.branch_scope_note ?? null,
-          benefit_verification_pin_hash:
-            request.benefit_verification_pin_hash ?? null,
-          benefit_verification_pin_salt:
-            request.benefit_verification_pin_salt ?? null,
-        })
+        .insert(
+          buildPartnerInsertRow({
+            id: partnerId,
+            companyId,
+            brandProfileId,
+            name: partnerName,
+            categoryId,
+            location: locationSummary,
+            detailDescription: request.detail_description ?? null,
+            campusSlugs: partnerCampusSlugs,
+            managedCampusSlugs: partnerCampusSlugs,
+            mapUrl: groupBranches[0]?.map_url ?? request.map_url ?? null,
+            benefitActionType,
+            benefitActionLink,
+            benefitVerificationPinHash:
+              request.benefit_verification_pin_hash ?? null,
+            benefitVerificationPinSalt:
+              request.benefit_verification_pin_salt ?? null,
+            reservationLink: null,
+            inquiryLink: request.inquiry_link ?? null,
+            periodStart: group.period_start ?? request.period_start ?? null,
+            periodEnd: group.period_end ?? request.period_end ?? null,
+            conditions: group.conditions ?? request.conditions ?? [],
+            benefits: group.benefits ?? request.benefits ?? [],
+            appliesTo: ["staff", "student", "graduate"],
+            thumbnail: request.thumbnail_url ?? null,
+            images: request.image_urls ?? [],
+            tags: group.tags ?? request.tags ?? [],
+            visibility: request.visibility ?? "public",
+            benefitVisibility: "public",
+            branchScopeType:
+              request.service_mode === "online"
+                ? "online"
+                : request.branch_scope_type ?? "single_location",
+            branchScopeNote: request.branch_scope_note ?? null,
+          }),
+        )
         .select("id,name,location,campus_slugs,visibility,benefits,conditions,period_start,period_end,map_url")
         .single();
 
