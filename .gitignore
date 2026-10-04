@@ -46,9 +46,6 @@ yarn-error.log*
 .env.*
 !.env.example
 
-# vercel
-.vercel
-
 # local Codex configuration
 .codex/config.toml
 

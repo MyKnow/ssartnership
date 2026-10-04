@@ -313,7 +313,6 @@ test("trusted dependency installation disables every lifecycle and verifies one 
   const installScriptGate = read("scripts/check-install-scripts.mjs");
   const trustedInstaller = read("scripts/install-dependencies.mjs");
   const npmConfig = read(".npmrc");
-  const vercel = JSON.parse(read("vercel.json")) as { installCommand?: string };
   const policyModule = await import(
     new URL("../scripts/check-install-scripts.mjs", import.meta.url).href
   ) as {
@@ -383,7 +382,6 @@ test("trusted dependency installation disables every lifecycle and verifies one 
     /"prepush": "npm run verify:change"/,
   );
   assert.equal(packageJson.scripts?.["install:trusted"], "node scripts/install-dependencies.mjs");
-  assert.equal(vercel.installCommand, "npm run install:trusted");
 
   const vendorPackageJson = JSON.parse(read("vendor/archiver-cjs-compat/package.json"));
   const vendorDigests = {

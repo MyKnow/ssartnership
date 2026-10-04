@@ -1,15 +1,14 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 const require=createRequire(import.meta.url);
 const {load}=require('js-yaml');
-test('home deployment disables all Vercel Git builds and preserves the shared cron schedule',()=>{
- const config=JSON.parse(readFileSync(new URL('../vercel.json',import.meta.url),'utf8'));
- assert.equal(config.git.deploymentEnabled,false);
- assert.equal(config.installCommand,'npm run install:trusted');
- assert.equal(config.crons.length,12);
- assert.equal(new Set(config.crons.map((entry:{path:string})=>entry.path)).size,12);
+test('self-hosted cron schedule is the only cron catalog after Vercel retirement',()=>{
+ assert.equal(existsSync(new URL('../vercel.json',import.meta.url)),false);
+ const config=JSON.parse(readFileSync(new URL('../deploy/self-host-operations/production-cron/schedules.json',import.meta.url),'utf8'));
+ assert.equal(config.crons.length+config.unscheduled.length,12);
+ assert.equal(new Set([...config.crons,...config.unscheduled].map((entry:{path:string})=>entry.path)).size,12);
 });
 test('Production application and monitoring use separate data networks, secrets and volumes',()=>{
  const source=readFileSync(new URL('../deploy/self-host/compose.production.yaml',import.meta.url),'utf8');

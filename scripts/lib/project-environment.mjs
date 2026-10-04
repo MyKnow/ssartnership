@@ -16,7 +16,7 @@ function currentBranch(root) {
 export function selectEnvironmentProfile({ command = "dev", branch = "", environment = process.env } = {}) {
   const hasDataSources = environment.NEXT_PUBLIC_DATA_SOURCE && environment.NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE;
   const injected = hasDataSources && (
-    ["1", "true"].includes(environment.CI) || environment.VERCEL === "1" || environment.SELF_HOST_BUILD === "1"
+    ["1", "true"].includes(environment.CI) || environment.SELF_HOST_BUILD === "1"
     || (environment.NEXT_PUBLIC_DATA_SOURCE === "mock" && environment.NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE === "mock")
   );
   if (injected) return "injected";

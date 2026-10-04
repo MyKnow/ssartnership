@@ -32,7 +32,6 @@ const EXACT_HIGH_RISK_PATHS = new Set([
   "src/proxy.ts",
   "tsconfig.json",
   "tsconfig.typecheck.json",
-  "vercel.json",
   "vitest.config.ts",
 ]);
 
@@ -320,7 +319,6 @@ export function deriveExecutionPolicy({
     runSmoke,
     runRelease,
     runJob: runVerify || runSmoke || runRelease,
-    requiresVercel: true,
   };
 }
 

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -63,7 +64,6 @@ test("표준 개발 명령과 교차 플랫폼 정책이 repository contract에 
     "scripts/lib/development-environment.mjs",
   );
   const bootstrap = await readRepoFile("scripts/bootstrap.mjs");
-  const vercelWrapper = await readRepoFile("scripts/vercel-ssartnership.mjs");
   const lockfileCheck = await readRepoFile("scripts/check-lockfile.mjs");
 
   assert.equal(packageJson.packageManager, "npm@11.16.0");
@@ -82,8 +82,6 @@ test("표준 개발 명령과 교차 플랫폼 정책이 repository contract에 
   assert.doesNotMatch(developmentEnvironment, /"\.env\.local"/u);
   assert.match(bootstrap, /join\(repositoryRoot, "\.env\.preview"\)/u);
   assert.doesNotMatch(bootstrap, /"\.env\.local"/u);
-  assert.match(vercelWrapper, /const ENV_FILES = \["\.env\.preview"\]/u);
-  assert.doesNotMatch(vercelWrapper, /"\.env\.local"/u);
   assert.equal(scripts.bootstrap, "node scripts/bootstrap.mjs");
   assert.equal(scripts.doctor, "node scripts/doctor.mjs");
   assert.equal(scripts.dev, "node scripts/dev.mjs");
@@ -158,12 +156,18 @@ test("trusted installer가 공식 platform binary를 직접 검증한다", async
   assert.doesNotMatch(policy, /[A-Za-z]:\\\\/);
 });
 
-test("Vercel도 shell wrapper 없이 같은 trusted install 경계를 사용한다", async () => {
-  const vercel = JSON.parse(await readRepoFile("vercel.json")) as {
-    installCommand?: string;
-  };
-
-  assert.equal(vercel.installCommand, "npm run install:trusted");
+test("폐기된 Vercel 배포 설정과 계정 라우팅 도구는 다시 추가하지 않는다", () => {
+  for (const retiredPath of [
+    "vercel.json",
+    "scripts/vercel-ssartnership.mjs",
+    "docs/operations/runbooks/vercel-account-routing.md",
+  ]) {
+    assert.equal(
+      existsSync(new URL(`../${retiredPath}`, import.meta.url)),
+      false,
+      `${retiredPath} must stay retired`,
+    );
+  }
 });
 
 test("Node 테스트 로더는 폐기된 비동기 register API를 사용하지 않는다", async () => {

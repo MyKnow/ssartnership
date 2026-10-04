@@ -21,7 +21,6 @@ last_verified: 2026-08-29
 - [자체 호스팅 격리 CI·배포·유지보수](./runbooks/self-host-ci-maintenance.md)
 - [교차 플랫폼 개발환경](./runbooks/cross-platform-development.md)
 - [Storybook·Visual Baselines](./runbooks/storybook-visual-workflow.md)
-- [Vercel 계정 라우팅](./runbooks/vercel-account-routing.md)
 
 ## Audits
 

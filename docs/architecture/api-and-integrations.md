@@ -156,7 +156,7 @@ authority: descriptive
 - Apple Wallet이 활성화되면 `NEXT_PUBLIC_SITE_URL`의 명시적인 공개 HTTPS origin이 필수며 fallback을 사용하지 않는다.
 - 공개 검증 경로(`/wallet/verify/[token]`, `/api/wallet/apple/avatar/[token]`)는 `no-store`, `noindex`와 opaque signed token을 사용하고 token 원문을 analytics 식별자나 로그 key로 남기지 않는다.
 - Apple device library identifier는 Wallet master key에서 용도 분리한 HMAC-SHA256 subkey로 hash한다. APNs push token도 별도의 암호화 subkey로 보호한 뒤 `apple_wallet_device_registrations`에 저장한다. master key 회전은 저장 token 재암호화와 기기 hash 재생성·재등록, 기존 패스 재발급 계획이 필요한 별도 작업이다.
-- Vercel cron은 설치된 active pass를 일일 재검사한다. 표시 정보만 달라졌고 자격·동의가 유효하면 새 snapshot revision을 저장하고, 자격 또는 동의가 무효하면 credential을 폐기한 뒤 APNs update를 보낸다. QR 검증은 cron 주기와 무관하게 현재 상태를 즉시 확인한다.
+- `/api/cron/reconcile-apple-wallet-passes`가 설치된 active pass를 일일 재검사한다. 운영 Wallet은 비활성이라 이 경로는 현재 `schedules.json`의 `unscheduled`에 있으며 Wallet을 켤 때 일정에 등록한다. 표시 정보만 달라졌고 자격·동의가 유효하면 새 snapshot revision을 저장하고, 자격 또는 동의가 무효하면 credential을 폐기한 뒤 APNs update를 보낸다. QR 검증은 cron 주기와 무관하게 현재 상태를 즉시 확인한다.
 - APNs가 일시 실패한 설치 pass는 active·revoked 상태 모두 다음 cron에서 재시도하며, 성공 상태의 revoked pass만 조정 큐에서 빠진다.
 - Apple의 `passesUpdatedSince` 목록 커서는 canonical pass의 `updated_at`만 사용한다. 기기 등록·해제 RPC가 registration과 pass 시각을 같은 트랜잭션에서 함께 갱신하므로 필터·정렬·응답 커서가 한 시계를 공유한다.
 

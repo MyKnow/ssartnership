@@ -234,8 +234,8 @@ npm run ci:local
 1. 공공데이터포털에 로그인합니다.
 2. `국세청_사업자등록정보 진위확인 및 상태조회 서비스` 상세 페이지에서 활용신청을 진행합니다.
 3. 승인 후 `마이페이지 > 데이터활용 > Open API > 활용신청 현황`에서 일반 인증키를 확인합니다.
-4. 로컬은 `.env`, Vercel은 Project Settings의 Environment Variables에 `NTS_BUSINESS_STATUS_SERVICE_KEY`로 등록합니다.
-5. Preview/Production에 각각 등록한 뒤 재배포합니다.
+4. 로컬은 `.env`, 운영은 각 자체 호스팅 환경의 root 전용 `app.env`에 `NTS_BUSINESS_STATUS_SERVICE_KEY`로 등록합니다.
+5. Preview/Production에 각각 등록한 뒤 앱 컨테이너를 재시작합니다.
 
 인코딩/디코딩 인증키는 모두 사용할 수 있습니다. 앱은 값에 `%`가 포함되어 있지 않으면 호출 시 URL 인코딩합니다. 이 API의 상태조회 응답은 휴업/폐업 상태와 과세유형 확인용입니다. 상호, 대표자명, 주소, 업태, 종목은 자동 채움 대상이 아니므로 파트너가 직접 입력해야 합니다.
 
@@ -243,9 +243,9 @@ npm run ci:local
 
 계좌이체 플랜 결제에서 파트너에게 보여줄 관리자 입금 계좌는 서버 전용 환경변수로 관리합니다.
 
-1. 로컬은 `.env`, Vercel은 Project Settings의 Environment Variables를 엽니다.
+1. 로컬은 `.env`, 운영은 각 자체 호스팅 환경의 root 전용 `app.env`를 엽니다.
 2. `PARTNER_BILLING_BANK_NAME`, `PARTNER_BILLING_BANK_ACCOUNT`, `PARTNER_BILLING_ACCOUNT_HOLDER`를 등록합니다.
-3. 계좌 변경 시 Preview와 Production 값을 모두 갱신하고 재배포합니다.
+3. 계좌 변경 시 Preview와 Production 값을 모두 갱신하고 앱 컨테이너를 재시작합니다.
 4. 값이 비어 있으면 파트너 포털은 계좌를 노출하지 않고 “관리자가 입금 계좌를 안내”하는 문구를 표시합니다.
 
 계좌번호와 API 키는 `NEXT_PUBLIC_` 접두사를 붙이지 않습니다. 파트너 포털의 인증된 서버 렌더링 화면에서만 필요한 값만 내려줍니다.
@@ -412,7 +412,7 @@ erDiagram
 
 ### 서버 환경과 Sender 등록
 
-- 현행 애플리케이션 런타임은 직접 Mattermost 연동에 `MM_BASE_URL`, `MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION`, `MM_SENDER_CREDENTIALS_KEY_V1`만 읽습니다. Vercel에는 미사용 SSAFY Verify key가 남아 있어 별도 삭제 승인이 필요합니다.
+- 현행 애플리케이션 런타임은 직접 Mattermost 연동에 `MM_BASE_URL`, `MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION`, `MM_SENDER_CREDENTIALS_KEY_V1`만 읽습니다. Vercel 프로젝트에 남은 미사용 값의 정리는 Vercel 경로 폐기(RF-04)에 따른 저장소 밖 운영자 조치입니다.
 - 기수별 Sender의 로그인 ID·비밀번호는 Super Admin이 `/admin/cycle`에서 입력하며, AES-256-GCM으로 암호화되어 저장됩니다. 평문, MM 세션 토큰, credential metadata는 브라우저와 로그에 노출하지 않습니다.
 - 새 후보 Sender는 이전 활성 Sender 또는 Super Admin 연결 계정으로 테스트 DM을 보낸 뒤에만 활성화됩니다. 기수별 활성 Sender는 하나이고, 교체 성공 시 이전 ciphertext는 삭제됩니다.
 - 팀과 채널은 코드에서 `s{generation}public`과 `town-square`로만 계산합니다.
@@ -490,28 +490,13 @@ DM 발송 실패 시에는 비밀번호 / 생성 상태를 롤백합니다.
 - 공개 제휴 목록은 캐시를 사용합니다.
 - 관리자 변경 후 관련 캐시를 무효화합니다.
 - MM 프로필은 회원이 `/certification`에서 명시적으로 동기화할 때 즉시 반영합니다.
-- 탈퇴 후 30일이 지난 회원은 Vercel cron으로 익명화합니다.
+- 탈퇴 후 30일이 지난 회원은 자체 호스팅 cron으로 익명화합니다.
 - 제휴 종료 예정 알림도 하루 1회 실행합니다.
 
-[vercel.json](./vercel.json)
+Cron 일정의 단일 원본은 [schedules.json](./deploy/self-host-operations/production-cron/schedules.json)입니다. `crons`는 실행 일정(UTC), `unscheduled`는 등록됐지만 일부러 실행하지 않는 경로(현재 비활성 Apple Wallet 조정)입니다. 설치·검증 절차는 [자체 호스팅 runbook의 Cron 절](./docs/operations/runbooks/self-hosting.md#cron)을 따릅니다.
 
-```json
-{
-  "crons": [
-    {
-      "path": "/api/cron/push-expiring-partners",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/anonymize-deleted-members",
-      "schedule": "40 0 * * *"
-    },
-    {
-      "path": "/api/cron/purge-expired-operational-logs",
-      "schedule": "50 0 * * *"
-    }
-  ]
-}
+```bash
+node scripts/self-host-cron.mjs --list
 ```
 
 ## 주요 보안 포인트
@@ -599,13 +584,11 @@ npm run release -- --version=none --lighthouse=skip --message="chore: 교차 플
 
 ## 배포
 
-Vercel 배포를 기준으로 구성되어 있습니다.
+PVE 자체 호스팅이 유일한 운영 정본입니다. Vercel 배포 경로는 RF-04(#537)에서 폐기했습니다.
 
-1. GitHub 저장소 연결
-2. Vercel 프로젝트 생성
-3. `.env` 값을 Vercel Environment Variables에 등록
-4. Supabase migration / schema 적용
-5. 배포 후 `NEXT_PUBLIC_SITE_URL`을 실제 도메인으로 갱신
+1. `main`/`dev` push가 GitHub Actions에서 자체 호스팅 이미지를 발행하고, 서버 수신기가 승인된 digest만 적용합니다. 절차는 [격리 CI·배포·유지보수](docs/operations/runbooks/self-host-ci-maintenance.md)를 따릅니다.
+2. 런타임 비밀은 각 환경의 root 전용 `app.env`에 두며 형식은 [runtime.env.example](deploy/self-host/runtime.env.example)과 환경 변수 매니페스트를 따릅니다.
+3. DB 변경은 운영자가 검증한 schema 승인 뒤에만 배포됩니다.
 
 권장:
 

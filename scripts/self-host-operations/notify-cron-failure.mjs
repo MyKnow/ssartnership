@@ -3,14 +3,11 @@ import { realpathSync } from 'node:fs';
 import { parseEnv } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { alertDeliveryConfiguration, deliverOperationalAlert } from '../../deploy/observability/alert-delivery.mjs';
-import { loadProductionCronSchedules } from './production-cron.mjs';
+import { loadProductionCronSchedules, PRODUCTION_CRON_SCHEDULES_URL } from './production-cron.mjs';
 
 export async function notifyCronFailure(job) {
   if (process.getuid?.() !== 0) throw Error('OPERATOR_REQUIRED');
-  const entries = loadProductionCronSchedules(
-    await readFile(new URL('../../deploy/self-host-operations/production-cron/schedules.json', import.meta.url), 'utf8'),
-    await readFile(new URL('../../vercel.json', import.meta.url), 'utf8'),
-  );
+  const entries = loadProductionCronSchedules(await readFile(PRODUCTION_CRON_SCHEDULES_URL, 'utf8'));
   if (!entries.some(entry => entry.path === `/api/cron/${job}`)) throw Error('CRON_PATH_UNKNOWN');
   const file = '/etc/myknow/secrets/ssartnership-production/monitoring/monitoring.env';
   const stat = await lstat(file);
