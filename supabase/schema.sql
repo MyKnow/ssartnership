@@ -23142,6 +23142,381 @@ begin
 end;
 $showcase_guard_privileges$;
 
+-- Partner metric rollups -----------------------------------------------------
+-- The event_logs trigger and reconcile both call this function, so excluding
+-- admin/partner actors here covers new events and rebuilt history alike. The
+-- application fallback applies the same filter separately.
+create or replace function public.apply_partner_metric_event_rollups(
+  input_partner_id uuid,
+  input_event_name text,
+  input_actor_type text,
+  input_actor_id text,
+  input_session_id text,
+  input_created_at timestamp with time zone default now()
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  local_created_at timestamp without time zone;
+  resolved_visitor_key text;
+  inserted_count integer;
+begin
+  -- Operator traffic (admins previewing, partners checking their own page)
+  -- is not audience demand; it never reaches the partner-facing rollups.
+  if input_partner_id is null
+    or not is_partner_metric_event(input_event_name)
+    or input_actor_type in ('admin', 'partner') then
+    return;
+  end if;
+
+  local_created_at := date_trunc(
+    'hour',
+    timezone('Asia/Seoul', coalesce(input_created_at, now()))
+  );
+
+  insert into partner_metric_rollups (
+    partner_id,
+    metric_name,
+    metric_kind,
+    granularity,
+    bucket_timezone,
+    metric_count
+  )
+  values (
+    input_partner_id,
+    input_event_name,
+    'pv',
+    'total',
+    'Asia/Seoul',
+    1
+  )
+  on conflict (partner_id, metric_name, metric_kind, bucket_timezone)
+    where granularity = 'total'
+  do update set
+    metric_count = partner_metric_rollups.metric_count + 1,
+    updated_at = now();
+
+  insert into partner_metric_rollups (
+    partner_id,
+    metric_name,
+    metric_kind,
+    granularity,
+    bucket_timezone,
+    bucket_local_start,
+    metric_count
+  )
+  values (
+    input_partner_id,
+    input_event_name,
+    'pv',
+    'hour',
+    'Asia/Seoul',
+    local_created_at,
+    1
+  )
+  on conflict (partner_id, metric_name, metric_kind, bucket_timezone, bucket_local_start)
+    where granularity = 'hour'
+  do update set
+    metric_count = partner_metric_rollups.metric_count + 1,
+    updated_at = now();
+
+  insert into partner_metric_rollups (
+    partner_id,
+    metric_name,
+    metric_kind,
+    granularity,
+    bucket_timezone,
+    bucket_local_date,
+    metric_count
+  )
+  values (
+    input_partner_id,
+    input_event_name,
+    'pv',
+    'day',
+    'Asia/Seoul',
+    local_created_at::date,
+    1
+  )
+  on conflict (partner_id, metric_name, metric_kind, bucket_timezone, bucket_local_date)
+    where granularity = 'day'
+  do update set
+    metric_count = partner_metric_rollups.metric_count + 1,
+    updated_at = now();
+
+  insert into partner_metric_rollups (
+    partner_id,
+    metric_name,
+    metric_kind,
+    granularity,
+    bucket_timezone,
+    bucket_local_dow,
+    metric_count
+  )
+  values (
+    input_partner_id,
+    input_event_name,
+    'pv',
+    'weekday',
+    'Asia/Seoul',
+    extract(isodow from local_created_at)::smallint,
+    1
+  )
+  on conflict (partner_id, metric_name, metric_kind, bucket_timezone, bucket_local_dow)
+    where granularity = 'weekday'
+  do update set
+    metric_count = partner_metric_rollups.metric_count + 1,
+    updated_at = now();
+
+  if input_event_name = 'partner_detail_view' then
+    resolved_visitor_key := partner_metric_visitor_key(
+      input_actor_type,
+      input_actor_id,
+      input_session_id
+    );
+
+    if resolved_visitor_key is not null then
+      insert into partner_metric_unique_visitors (
+        partner_id,
+        metric_name,
+        granularity,
+        bucket_timezone,
+        visitor_key
+      )
+      values (
+        input_partner_id,
+        input_event_name,
+        'total',
+        'Asia/Seoul',
+        resolved_visitor_key
+      )
+      on conflict (partner_id, metric_name, bucket_timezone, visitor_key)
+        where granularity = 'total'
+      do nothing;
+      get diagnostics inserted_count = row_count;
+      if inserted_count > 0 then
+        insert into partner_metric_rollups (
+          partner_id,
+          metric_name,
+          metric_kind,
+          granularity,
+          bucket_timezone,
+          metric_count
+        )
+        values (
+          input_partner_id,
+          input_event_name,
+          'uv',
+          'total',
+          'Asia/Seoul',
+          1
+        )
+        on conflict (partner_id, metric_name, metric_kind, bucket_timezone)
+          where granularity = 'total'
+        do update set
+          metric_count = partner_metric_rollups.metric_count + 1,
+          updated_at = now();
+      end if;
+
+      insert into partner_metric_unique_visitors (
+        partner_id,
+        metric_name,
+        granularity,
+        bucket_timezone,
+        bucket_local_start,
+        visitor_key
+      )
+      values (
+        input_partner_id,
+        input_event_name,
+        'hour',
+        'Asia/Seoul',
+        local_created_at,
+        resolved_visitor_key
+      )
+      on conflict (partner_id, metric_name, bucket_timezone, bucket_local_start, visitor_key)
+        where granularity = 'hour'
+      do nothing;
+      get diagnostics inserted_count = row_count;
+      if inserted_count > 0 then
+        insert into partner_metric_rollups (
+          partner_id,
+          metric_name,
+          metric_kind,
+          granularity,
+          bucket_timezone,
+          bucket_local_start,
+          metric_count
+        )
+        values (
+          input_partner_id,
+          input_event_name,
+          'uv',
+          'hour',
+          'Asia/Seoul',
+          local_created_at,
+          1
+        )
+        on conflict (partner_id, metric_name, metric_kind, bucket_timezone, bucket_local_start)
+          where granularity = 'hour'
+        do update set
+          metric_count = partner_metric_rollups.metric_count + 1,
+          updated_at = now();
+      end if;
+
+      insert into partner_metric_unique_visitors (
+        partner_id,
+        metric_name,
+        granularity,
+        bucket_timezone,
+        bucket_local_date,
+        visitor_key
+      )
+      values (
+        input_partner_id,
+        input_event_name,
+        'day',
+        'Asia/Seoul',
+        local_created_at::date,
+        resolved_visitor_key
+      )
+      on conflict (partner_id, metric_name, bucket_timezone, bucket_local_date, visitor_key)
+        where granularity = 'day'
+      do nothing;
+      get diagnostics inserted_count = row_count;
+      if inserted_count > 0 then
+        insert into partner_metric_rollups (
+          partner_id,
+          metric_name,
+          metric_kind,
+          granularity,
+          bucket_timezone,
+          bucket_local_date,
+          metric_count
+        )
+        values (
+          input_partner_id,
+          input_event_name,
+          'uv',
+          'day',
+          'Asia/Seoul',
+          local_created_at::date,
+          1
+        )
+        on conflict (partner_id, metric_name, metric_kind, bucket_timezone, bucket_local_date)
+          where granularity = 'day'
+        do update set
+          metric_count = partner_metric_rollups.metric_count + 1,
+          updated_at = now();
+      end if;
+
+      insert into partner_metric_unique_visitors (
+        partner_id,
+        metric_name,
+        granularity,
+        bucket_timezone,
+        bucket_local_dow,
+        visitor_key
+      )
+      values (
+        input_partner_id,
+        input_event_name,
+        'weekday',
+        'Asia/Seoul',
+        extract(isodow from local_created_at)::smallint,
+        resolved_visitor_key
+      )
+      on conflict (partner_id, metric_name, bucket_timezone, bucket_local_dow, visitor_key)
+        where granularity = 'weekday'
+      do nothing;
+      get diagnostics inserted_count = row_count;
+      if inserted_count > 0 then
+        insert into partner_metric_rollups (
+          partner_id,
+          metric_name,
+          metric_kind,
+          granularity,
+          bucket_timezone,
+          bucket_local_dow,
+          metric_count
+        )
+        values (
+          input_partner_id,
+          input_event_name,
+          'uv',
+          'weekday',
+          'Asia/Seoul',
+          extract(isodow from local_created_at)::smallint,
+          1
+        )
+        on conflict (partner_id, metric_name, metric_kind, bucket_timezone, bucket_local_dow)
+          where granularity = 'weekday'
+        do update set
+          metric_count = partner_metric_rollups.metric_count + 1,
+          updated_at = now();
+      end if;
+    end if;
+  end if;
+end;
+$$;
+
+revoke all on function public.apply_partner_metric_event_rollups(uuid, text, text, text, text, timestamp with time zone) from public;
+revoke all on function public.apply_partner_metric_event_rollups(uuid, text, text, text, text, timestamp with time zone) from anon;
+revoke all on function public.apply_partner_metric_event_rollups(uuid, text, text, text, text, timestamp with time zone) from authenticated;
+grant execute on function public.apply_partner_metric_event_rollups(uuid, text, text, text, text, timestamp with time zone) to service_role;
+
+-- Rebuild only partners whose rollups already counted operator traffic, and
+-- only while their raw history is complete: reconcile rebuilds from
+-- event_logs, which the one-year retention eventually trims. A partner whose
+-- PV total no longer matches its raw events is skipped and reported instead.
+do $reconcile_partner_metric_operator_traffic$
+declare
+  target_partner_id uuid;
+  rollup_total bigint;
+  raw_total bigint;
+  skipped integer := 0;
+begin
+  for target_partner_id in
+    select distinct partner_row.id
+    from public.event_logs event_row
+    join public.partners partner_row
+      on partner_row.id::text = event_row.target_id
+    where event_row.target_type = 'partner'
+      and event_row.target_id is not null
+      and event_row.actor_type in ('admin', 'partner')
+      and public.is_partner_metric_event(event_row.event_name)
+  loop
+    select coalesce(sum(rollup.metric_count), 0)
+    into rollup_total
+    from public.partner_metric_rollups rollup
+    where rollup.partner_id = target_partner_id
+      and rollup.metric_kind = 'pv'
+      and rollup.granularity = 'total'
+      and public.is_partner_metric_event(rollup.metric_name);
+
+    select count(*)
+    into raw_total
+    from public.event_logs event_row
+    where event_row.target_type = 'partner'
+      and event_row.target_id = target_partner_id::text
+      and public.is_partner_metric_event(event_row.event_name);
+
+    if rollup_total = raw_total then
+      perform public.reconcile_partner_metric_rollups(target_partner_id);
+    else
+      skipped := skipped + 1;
+    end if;
+  end loop;
+
+  if skipped > 0 then
+    raise notice 'partner_metric_operator_reconcile_skipped:%', skipped;
+  end if;
+end
+$reconcile_partner_metric_operator_traffic$;
+
 -- Public schema privilege defaults --------------------------------------------
 -- The application reaches the database only through the service role. Remove
 -- every PUBLIC/anon/authenticated privilege that earlier migrations may have

@@ -163,7 +163,7 @@ Wallet QR 서명과 Apple `authenticationToken` 원문은 DB에 저장하지 않
 | `get_partner_favorite_counts` | partner favorite count bulk 조회 |
 | `get_partner_review_counts` | partner review count bulk 조회 |
 | `partner_metric_visitor_key` | metric unique visitor key |
-| `apply_partner_metric_event_rollups` | metric rollup 적용 |
+| `apply_partner_metric_event_rollups` | metric rollup 적용. 관리자·파트너 actor 이벤트는 집계하지 않는다 |
 | `apply_partner_metric_event` | 단일 metric event 적용 |
 | `reconcile_partner_metric_rollups` | metric rollup 재조정 |
 | `sync_partner_metric_rollups_from_event_logs` | event log 기반 metric 동기화 |
