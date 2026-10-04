@@ -33,5 +33,6 @@ last_verified: 2026-08-29
 
 - [카페 싸피 PIN 혜택 촬영](./guides/cafe-ssafy-pin-demo-filming.md)
 - [제휴처 쿠폰 운영](./guides/partner-coupon-operations.md)
+- [협력사 결제 운영 설정](./guides/partner-billing-setup.md)
 
 - [접근과 혜택의 공유 정책](./policies/access-and-benefits.md)

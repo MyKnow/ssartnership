@@ -10,132 +10,44 @@ SSARTNERSHIP는 SSAFY 구성원을 위한 제휴 혜택 플랫폼입니다.
 
 ## 핵심 기능
 
-### 공개 사용자 기능
+- 공개: 카테고리·캠퍼스별 제휴처 탐색과 검색, 제휴처 상세(혜택·이용 조건·지도·예약/문의), 공개/대외비/비공개 노출 정책, 이벤트, PWA 설치, RSS·sitemap·SEO
+- 회원: Mattermost DM 코드 기반 가입·비밀번호 재설정, 이메일 로그인, 약관 동의 버전 관리, 교육생·수료생·운영진 인증 카드와 QR 검증, 쿠폰함, 리뷰·즐겨찾기, Web Push 알림
+- 협력사: 파트너 포털(회사·브랜드 정보 변경 요청, 플랜·결제, 지표, 리뷰 응대, 알림)
+- 관리자: 제휴처·카테고리·회사·회원·수료생 인증·리뷰·광고·쿠폰·이벤트·푸시·로그 관리와 기수 설정
 
-- 카테고리별 제휴 업체 조회
-- 검색 및 정렬
-  - 현재 제휴 우선
-  - 등록순
-  - 종료일 임박순
-- 제휴 업체 상세 페이지
-  - 혜택
-  - 이용 조건
-  - 태그
-  - 이미지 캐러셀
-  - 지도 / 예약 / 문의 정보
-  - 공유 링크 복사
-- 공개 / 대외비 / 비공개 제휴 상태 지원
-- 제휴 기간 외 상세 조회 허용, 예약/문의 링크 비노출
-- 반응형 UI, 다크 모드, PWA 설치 지원
-- RSS, sitemap, robots, SEO 메타데이터 제공
+화면과 흐름의 계약은 [제품 지식](./docs/product/index.md)에 있습니다.
 
-### 회원 기능
+## 문서
 
-- Mattermost 디렉터리 기반 회원 로그인
-- Mattermost DM 6자리 코드 기반 회원가입 / 비밀번호 재설정 인증
-- 가입 대상
-  - 14기 교육생
-  - 15기 교육생
-  - 운영진
-- 임시 비밀번호 재설정
-- 비밀번호 강제 변경 플로우
-- 약관 / 개인정보 수집·이용 동의 버전 관리
-- 교육생 / 운영진 인증 카드
-- 공개 QR 검증 페이지
-- Web Push 구독 및 알림 설정
+프로젝트 지식은 [Repository Knowledge Map](./docs/index.md)에서 시작합니다. 이 README는 진입 안내만 담고, 같은 내용을 복제하지 않습니다.
 
-### 관리자 기능
+- 시스템 구조: [시스템 개요](./docs/architecture/system-overview.md), [데이터 모델](./docs/architecture/data-model.md), [API와 외부 연동](./docs/architecture/api-and-integrations.md)
+- 운영 절차: [운영 문서](./docs/operations/index.md)
+- 테스트: [위험에 따른 테스트 전략](./docs/testing/strategy.md)
+- 디자인: [디자인 시스템](./docs/design-system/index.md)
+- 진행 중인 작업과 부채: [실행 계획](./docs/plans/index.md), [기술 부채 원장](./docs/plans/tech-debt.md)
+- 작업 규칙: [AGENTS.md](./AGENTS.md)
 
-- 관리자 로그인
-- 카테고리 CRUD
-- 제휴 업체 CRUD
-- 기수 관리
-  - 기준 기수 / 기준 연도 / 기준 월 수정
-  - 조기 시작
-  - 자동 계산 복구
-  - 현재 학생 / 수료생 / 운영진 범위 확인
-  - Super Admin 전용 Mattermost Sender 암호화 등록·테스트·활성화
-- 회원 조회 / 수정 / 삭제
-- 회원 수동 추가
-  - 기수 선택
-  - MM ID 리스트 입력
-  - 임시 비밀번호 발송
-  - 강제 비밀번호 변경 상태 저장
-- 회원 백필 실행
-- 로그 조회 및 상세 확인
-- Mock 미리보기
-- 공지 Push 발송
-- 신규 제휴 / 종료 예정 제휴 자동 알림
+문서 상태·메타데이터·이동 규칙은 [문서 수명주기](./docs/operations/documentation-lifecycle.md)를 따릅니다.
 
-## 기술 스택
+## 기술 스택과 운영 환경
 
-자체 호스팅 마이그레이션의 로컬 Docker Desktop 실행과 운영 전환 절차는 [자체 호스팅 runbook](docs/operations/runbooks/self-hosting.md), 범위와 진행 상태는 [마이그레이션 명세](docs/specs/self-hosting/spec.md)를 참고합니다.
-
-- Next.js 16 App Router
-- React 19
-- TypeScript
-- Tailwind CSS v4
-- Supabase
-- Mattermost API (서버 전용 Sender registry)
-- Vercel Analytics / Speed Insights
-- Nodemailer
-- Web Push (VAPID)
-
-## 프로젝트 구조
+- Next.js 16 App Router, React 19, TypeScript, Tailwind CSS v4
+- 데이터: 자체 호스팅 Supabase(PostgreSQL, PostgREST, Storage). 스키마의 정본은 `supabase/migrations`이고 `supabase/schema.sql`은 파생 스냅샷입니다.
+- 연동: Mattermost API(서버 전용 Sender), SMTP(Nodemailer), Web Push(VAPID), 국세청 사업자 상태조회
+- 운영: PVE 자체 호스팅 VM 위의 Docker Compose와 Caddy edge. Vercel과 클라우드 Supabase는 사용하지 않습니다.
 
 ```text
-src/
-  app/
-    (site)/                공개 사용자 화면
-    admin/                 관리자 화면
-    api/                   인증, 제휴, 로그, cron, 알림 API
-    auth/                  로그인, 회원가입, 약관 동의, 비밀번호 변경
-    legal/                 공개 약관 / 개인정보 문서
-  components/
-    admin/                 관리자 전용 컴포넌트
-    analytics/             분석 이벤트 컴포넌트
-    auth/                  인증 / 약관 동의 UI
-    certification/         인증 카드 및 QR
-    legal/                 정책 문서 렌더링
-    ui/                    공용 UI 컴포넌트
-  lib/
-    repositories/          Repository 패턴
-    mattermost/            직접 Mattermost API client
-    mattermost-senders/    Sender 암호화 registry / 권한 / 회전
-    mm-directory.ts        Mattermost 디렉터리 조회 / 동기화
-    member-mattermost-profile-sync.ts  회원의 명시적 MM 프로필 동기화
-    member-manual-add.ts   관리자 수동 회원 추가
-    policy-documents.ts    약관 버전 / 동의 상태 계산
-    user-auth.ts           사용자 세션
-    auth.ts                관리자 세션
-
-supabase/
-  schema.sql              기준 스키마
-  migrations/             기준 migration
-
-tests/
-  mm-profile-csv.test.mts Mattermost 닉네임 파서 테스트
-  ssafy-cycle-simulation.test.mts 기수 / 수료생 시뮬레이션 테스트
-
-docs/
-  index.md                Repository Knowledge map
-  product/                제품 의도, 흐름, 화면 계약
-  requirements/           교차 기능 요구사항
-  specs/                  기능별 spec / plan / tasks
-  architecture/           현행 기술 경계
-  decisions/              Architecture Decision Records
-  plans/                  active / completed / tech debt
-  operations/             문서 lifecycle, runbook, 운영 감사
-  performance/            성능 baseline, 측정, 감사
-  security/               보안 정책과 시점 감사
-  testing/                테스트·Storybook 운영 계약
-  design-system/          UI foundation과 component 규칙
-  history/                만료·대체된 역사 기록
+src/app/              App Router routes, layouts, route handlers, server actions
+src/components/       UI primitives(ui/)와 기능 컴포넌트
+src/lib/              도메인 로직, 저장소, 외부 연동 adapter
+supabase/migrations/  forward-only 마이그레이션
+tests/                node:test(*.test.mts)와 Vitest(tests/unit)
+deploy/               자체 호스팅 Compose·edge·수신기·운영 자산
+docs/                 Repository Knowledge
 ```
 
-프로젝트 지식은 [Repository Knowledge Map](./docs/index.md)에서 탐색합니다. 문서 상태·메타데이터·이동 규칙은 [문서 수명주기](./docs/operations/documentation-lifecycle.md)를 따릅니다.
-
-## 로컬 실행
+## 로컬 개발
 
 새 PC에서는 Windows와 macOS 모두 같은 명령을 사용합니다.
 
@@ -155,471 +67,53 @@ npm run dev
 
 - 공식 개발 환경: Windows x64, macOS arm64
 - 고정 runtime: Node.js 24.18.1, npm 11.16.0
-- `bootstrap`: 검증된 `install:trusted` 경계의 lockfile 설치, 로컬 mock 환경 생성, 환경 진단
-- `doctor`: 환경을 변경하지 않고 OS/Architecture/runtime/env/cloud 연결/port/filesystem/native dependency 상태를 `PASS`/`WARN`/`FAIL`로 진단
-- 상세 계약: [교차 플랫폼 개발환경 운영 문서](./docs/operations/runbooks/cross-platform-development.md)
+- `bootstrap`: 검증된 `install:trusted` 경계의 lockfile 설치, 외부 연결 없는 mock `.env.preview` 생성, 환경 진단
+- `doctor`: 환경을 바꾸지 않고 OS·runtime·환경 파일·포트·파일시스템·native dependency 상태를 `PASS`/`WARN`/`FAIL`로 진단
+- 개발 서버: `http://localhost:3000`
 
-개발 서버:
+환경 파일은 `.env.preview`와 `.env.production` 두 개만 씁니다. `npm run dev`는 항상 `.env.preview`를, 로컬 `build`/`start`는 `main`에서만 `.env.production`을 읽습니다. `.env`, `.env.local`, `.env.development` 같은 파일은 `doctor`와 `bootstrap`이 거부합니다. 상세 계약과 이름을 유지하는 이유는 [교차 플랫폼 개발환경](./docs/operations/runbooks/cross-platform-development.md#6-환경변수와-로컬-profile)에 있습니다.
 
-```text
-http://localhost:3000
-```
-
-## CI 사전 점검
-
-Windows와 macOS에서 같은 저장소 계약을 확인하려면 아래 순서를 사용합니다.
+## 검증
 
 ```bash
-npm run check:lockfile
-npm run ci:local
+npm run check:lockfile   # Node 24.18.1·npm 11.16.0 기준 lockfile 재계산
+npm run verify:change    # 실제 diff 위험 등급에 맞춘 로컬 게이트(CI와 같은 분류기), push 전 필수
+npm run verify:release   # dev → main 승격 전 Production build와 전체 E2E
+npm run check:docs       # 문서 메타데이터·링크 검증
 ```
 
-- `check:lockfile`: Node.js 24.18.1과 npm 11.16.0으로 lockfile을 재계산해 canonical 여부 확인
-- `ci:local`: bootstrap 후 변경 위험에 따른 `verify:change`를 실행. Storybook·Visual은 별도 수동 검사
+집중 검사는 `npx tsc --noEmit --pretty false`, `npx eslint <파일>`, `node --import ./tests/alias-register.mjs --test tests/<파일>.test.mts`를 씁니다. Storybook과 visual 비교는 UI 변경 때 실행하는 수동 검사이며 절차는 [Storybook 문서](./docs/testing/storybook.md)에 있습니다.
+
+## 릴리스와 배포
+
+`npm run release`가 기본 커밋·push 경로입니다. 구현은 [scripts/release.mjs](./scripts/release.mjs)입니다.
+
+- `main` 외 브랜치: 선택적으로 Lighthouse를 실행하고, `prepush`(= `verify:change`)를 통과한 뒤 선택한 버전 업데이트를 적용해 **이미 stage한 변경**을 한국어 conventional 메시지로 커밋하고 push합니다. 태그는 만들지 않습니다.
+- `main`: 작업 트리가 깨끗해야 하며, `prepush` 뒤 현재 `package.json` 버전의 annotated tag를 만들고 branch와 tag를 push합니다.
+
+```text
+npm run release
+npm run release -- --version=none --lighthouse=skip --message="docs: 예시 메시지" --yes
+```
+
+여러 줄 메시지는 UTF-8 파일을 만든 뒤 `--message-file=경로`로 전달합니다.
+
+배포는 branch가 결정합니다.
+
+- `dev` push → `Self-host Preview Images` workflow가 exact-SHA 이미지를 게시 → Preview 서버 수신기가 앱만 교체
+- `main` push → `Self-host Production Images` workflow → Production 서버 수신기가 앱만 교체
+- 수신기는 DB DDL을 적용하지 않습니다. 마이그레이션은 운영자가 백업을 확인하고 적용한 뒤 환경별 스키마 승인을 갱신해야 배포됩니다.
+
+절차와 복구는 [격리 CI·배포·유지보수](./docs/operations/runbooks/self-host-ci-maintenance.md), [자체 호스팅 앱 실행](./docs/operations/runbooks/self-hosting.md), [Production/Preview 격리와 데이터 사본](./docs/operations/runbooks/self-host-environments.md)을 따릅니다. Production 데이터를 Preview로 옮기는 작업은 운영자 절차이며, `npm run sync:preview`(클라우드 시대 도구)는 사용하지 않습니다.
 
 ## 환경 변수
 
-`.env.example`에는 서비스 런타임에 필요한 운영 변수만 둡니다. Preview 동기화, Mock 전환, 일회성 스크립트와 레거시 호환 변수는 CI 또는 해당 운영 문서에서만 관리합니다.
-
-주요 그룹은 다음과 같습니다.
-
-- 관리자 인증
-  - `ADMIN_SESSION_SECRET`
-  - `ADMIN_BASIC_AUTH_USERNAME` / `ADMIN_BASIC_AUTH_PASSWORD` (Production `/admin` edge gate)
-  - 관리자 계정과 비밀번호는 Supabase `admin_accounts`에 저장하며 환경변수로 관리하지 않음
-- Supabase
-  - `SUPABASE_URL`
-  - `SUPABASE_ANON_KEY`
-  - `SUPABASE_SERVICE_ROLE_KEY`
-- Mattermost Sender registry (서버 전용)
-  - `MM_BASE_URL`
-  - `MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION`
-  - `MM_SENDER_CREDENTIALS_KEY_V1`
-  - Sender 로그인 ID와 비밀번호는 환경변수가 아니라 `/admin/cycle`의 Super Admin 화면에서 암호화해 등록
-- 사용자 세션 / QR
-  - `USER_SESSION_SECRET`
-  - `PARTNER_SESSION_SECRET`
-  - `CERTIFICATION_QR_SECRET`
-  - `MEMBER_IDENTIFIER_RESERVATION_HMAC_SECRET`
-  - `MEMBER_EMAIL_VERIFICATION_HMAC_SECRET`
-  - `GRADUATE_VERIFICATION_HMAC_SECRET`
-- 파트너 계좌이체 결제
-  - `PARTNER_BILLING_BANK_NAME`
-  - `PARTNER_BILLING_BANK_ACCOUNT`
-  - `PARTNER_BILLING_ACCOUNT_HOLDER`
-  - `NTS_BUSINESS_STATUS_SERVICE_KEY`
-- 제휴 제안 / 회원 이메일 인증 메일
-  - `SMTP_HOST`
-  - `SMTP_PORT`
-  - `SMTP_SECURE`
-  - `SMTP_USER`
-  - `SMTP_PASS`
-  - `SUGGEST_NOTIFY_EMAIL`
-- Web Push / Cron
-  - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`
-  - `VAPID_PRIVATE_KEY`
-  - `VAPID_SUBJECT`
-  - `CRON_SECRET`
-- 사이트 URL / SEO
-  - `NEXT_PUBLIC_SITE_URL`
-
-환경 변수 예시는 [.env.example](./.env.example)에 있습니다. 앱 실행은 `.env.preview`와 `.env.production`을 사용하며, [명령·브랜치별 선택 규칙](./docs/operations/runbooks/cross-platform-development.md#6-환경변수와-로컬-profile)을 따릅니다.
-
-## 파트너 결제 운영 설정
-
-### 사업자 상태조회 API 키 등록
-
-사업자 상태조회는 공공데이터포털의 `국세청_사업자등록정보 진위확인 및 상태조회 서비스`를 사용합니다.
-
-1. 공공데이터포털에 로그인합니다.
-2. `국세청_사업자등록정보 진위확인 및 상태조회 서비스` 상세 페이지에서 활용신청을 진행합니다.
-3. 승인 후 `마이페이지 > 데이터활용 > Open API > 활용신청 현황`에서 일반 인증키를 확인합니다.
-4. 로컬은 `.env`, Vercel은 Project Settings의 Environment Variables에 `NTS_BUSINESS_STATUS_SERVICE_KEY`로 등록합니다.
-5. Preview/Production에 각각 등록한 뒤 재배포합니다.
-
-인코딩/디코딩 인증키는 모두 사용할 수 있습니다. 앱은 값에 `%`가 포함되어 있지 않으면 호출 시 URL 인코딩합니다. 이 API의 상태조회 응답은 휴업/폐업 상태와 과세유형 확인용입니다. 상호, 대표자명, 주소, 업태, 종목은 자동 채움 대상이 아니므로 파트너가 직접 입력해야 합니다.
-
-### 관리자 입금 계좌 등록
-
-계좌이체 플랜 결제에서 파트너에게 보여줄 관리자 입금 계좌는 서버 전용 환경변수로 관리합니다.
-
-1. 로컬은 `.env`, Vercel은 Project Settings의 Environment Variables를 엽니다.
-2. `PARTNER_BILLING_BANK_NAME`, `PARTNER_BILLING_BANK_ACCOUNT`, `PARTNER_BILLING_ACCOUNT_HOLDER`를 등록합니다.
-3. 계좌 변경 시 Preview와 Production 값을 모두 갱신하고 재배포합니다.
-4. 값이 비어 있으면 파트너 포털은 계좌를 노출하지 않고 “관리자가 입금 계좌를 안내”하는 문구를 표시합니다.
-
-계좌번호와 API 키는 `NEXT_PUBLIC_` 접두사를 붙이지 않습니다. 파트너 포털의 인증된 서버 렌더링 화면에서만 필요한 값만 내려줍니다.
-
-## Supabase 설정
-
-- 스키마 변경은 항상 `supabase/migrations`에 먼저 기록합니다.
-- `main`으로 merge하기 전에 migration이 누락되지 않았는지 확인합니다.
-- `dev` 브랜치 push 시 GitHub Actions가 production 데이터를 preview로 미러링한 뒤 migration을 적용합니다.
-- Lighthouse 성능 체크는 release 스크립트에서만 실행합니다.
-- 이 워크플로를 위해 GitHub Secrets에 다음 값을 넣습니다.
-  - `SUPABASE_PRODUCTION_DB_URL`
-  - `SUPABASE_PRODUCTION_URL`
-  - `SUPABASE_PRODUCTION_SERVICE_ROLE_KEY`
-  - `SUPABASE_PREVIEW_DB_URL`
-  - `SUPABASE_PREVIEW_URL`
-- `SUPABASE_PREVIEW_SERVICE_ROLE_KEY`
-- `SUPABASE_PREVIEW_ANON_KEY`
-- `*_DB_URL` 값은 Supabase 대시보드에서 복사한 percent-encoded PostgreSQL 연결 문자열을 사용합니다.
-- 로컬 또는 CI에서 동일한 동기화 로직을 재사용하려면 `npm run sync:preview`를 실행합니다.
-- Preview에서 직접 발급한 Apple Wallet 데이터(`member_wallet_passes`, `member_wallet_pass_revisions`, `member_wallet_pass_operations`, `apple_wallet_device_registrations`)는 Production dump 대상에서 제외합니다. Production의 패스와 APNs 기기 등록 정보는 Preview로 복사하지 않습니다.
-- 동기화는 Preview Wallet 원장을 임시 테이블에 보관하고, Production 데이터 교체와 Wallet 원장 복원을 하나의 트랜잭션으로 실행합니다. 참조 회원이 Production 원장에 없거나 복원에 실패하면 전체 데이터 교체를 롤백해 Preview 패스를 조용히 유실하지 않습니다.
-
-`schema.sql`에는 현재 기준 테이블, 정책 문서 v1, MM 유저 디렉토리, Push 관련 스키마, 제휴 업체 `이용 조건` 스키마가 포함되어 있습니다.
-
-주의:
-
-- `SUPABASE_SERVICE_ROLE_KEY`는 서버 전용입니다.
-- `members`, `member_policy_consents`, `mm_user_directory`, `push_*` 테이블은 서비스 롤 기준으로만 다룹니다.
-
-## 회원 / 인증 모델
-
-### 핵심 원칙
-
-- `members`는 공통 계정·프로필의 원장이다. 교육생, 수료생, 운영진을 별도 회원 테이블로 나누지 않는다.
-- 교육생과 수료생의 핵심 분류값은 `generation`(기수)이다. 수료생의 이수/졸업 학기는 신규 신청·승인 판단에 사용하지 않는다.
-- 운영진은 `generation = 0`으로 표현하고, 확인 원본 기수는 `staff_source_generation`에 보관한다.
-- Mattermost, 수료생, 관리자 권한, 약관 동의는 모두 1:1 또는 이력 확장 테이블로 분리한다.
-- `deleted_at`이 있는 회원은 즉시 로그인·권한·혜택 접근이 차단된다. 30일 후 개인정보와 비공개 파일을 익명화하지만, HMAC 식별자 예약과 필요한 감사 이력은 남긴다.
-
-### 관계도
-
-```mermaid
-erDiagram
-    MEMBERS ||--o| MM_USER_DIRECTORY : "nullable mattermost_account_id"
-    MEMBERS ||--o| MEMBER_SSAFY_VERIFICATIONS : "SSAFY proof"
-    MEMBERS ||--o| GRADUATE_PROFILES : "graduate extension"
-    GRADUATE_VERIFICATION_REQUESTS ||--o| GRADUATE_PROFILES : "approved from"
-    MEMBERS ||--o| ADMIN_PROFILES : "admin extension"
-
-    MEMBERS ||--o{ MEMBER_PROFILE_IMAGES : "owns"
-    GRADUATE_VERIFICATION_REQUESTS ||--o{ MEMBER_PROFILE_IMAGES : "submits"
-    MEMBERS ||--o{ MEMBER_EMAIL_CHALLENGES : "verifies email"
-
-    MEMBERS ||--o{ MEMBER_POLICY_CONSENTS : "accepts"
-    POLICY_DOCUMENTS ||--o{ MEMBER_POLICY_CONSENTS : "versioned by"
-
-    MEMBERS {
-      uuid id PK
-      integer generation "cohort; 0 = staff"
-      integer staff_source_generation
-      text email
-      text email_normalized UK
-      timestamptz email_verified_at
-      text password_hash
-      text display_name
-      text campus
-      uuid mattermost_account_id FK "nullable"
-      uuid active_profile_image_id FK
-      timestamptz deleted_at
-      timestamptz anonymized_at
-    }
-
-    MM_USER_DIRECTORY {
-      uuid id PK
-      text mm_user_id UK
-      text mm_username UK
-      text display_name_snapshot
-      text campus_snapshot
-      boolean is_staff
-      integer[] source_generations
-      boolean is_active
-      timestamptz last_seen_at
-    }
-
-    MEMBER_SSAFY_VERIFICATIONS {
-      uuid member_id PK_FK
-      text ssafy_sub UK
-      timestamptz verified_at
-      text track
-      text track_name
-    }
-
-    GRADUATE_PROFILES {
-      uuid member_id PK_FK
-      uuid verification_request_id FK
-      timestamptz verified_at
-      text verification_source
-    }
-
-    ADMIN_PROFILES {
-      uuid id PK
-      uuid member_id FK
-      text permission_template_key FK
-      text[] managed_campus_slugs
-      boolean is_active
-      integer permission_version
-    }
-
-    MEMBER_PROFILE_IMAGES {
-      uuid id PK
-      uuid member_id FK
-      uuid graduate_verification_request_id FK
-      text storage_path
-      text sha256
-      text content_type "image/webp"
-      text source
-      text status
-    }
-
-    POLICY_DOCUMENTS {
-      uuid id PK
-      text kind
-      integer version
-      text content
-      boolean is_active
-    }
-
-    MEMBER_POLICY_CONSENTS {
-      uuid id PK
-      uuid member_id FK
-      uuid policy_document_id FK
-      timestamptz agreed_at
-    }
-```
-
-### 인증과 기수
-
-- 로그인 식별자는 Mattermost 아이디 또는 **인증된 이메일**이다. 이메일은 `/certification`에서 6자리 코드로 등록·변경한다.
-- `mm_username`은 로그인 입력과 디렉토리 조회에 쓰는 변경 가능한 외부 식별자다. 회원 테이블에서는 nullable FK만 보유하고, MM 세부값은 `mm_user_directory`가 보관한다.
-- `member_ssafy_verifications`는 더 이상 런타임에서 읽지 않는 SSAFY Verify 레거시 proof다. Production에는 2026-08-13 기준 13행이 남아 있고 기존 `members.ssafy_*` 컬럼은 이미 제거됐다. 삭제 조건과 승인 경계는 [SSAFY Verify 레거시 삭제 준비도](docs/plans/active/ssafy-verify-legacy-removal.md)를 따른다.
-- 기수 계산은 `ssafy_cycle_settings`와 날짜를 사용한다. 예를 들어 `generation = 15`는 15기이며, 현재 시점에 따라 교육생·수료생 역할 표시는 파생한다.
-- 반·강의실·반장·CA 등 운영에 불필요한 닉네임 파생값은 저장하지 않는다.
-
-### 외부 프로필과 이미지
-
-- Mattermost 프로필은 주기 Cron으로 덮어쓰지 않는다. 회원이 `/certification`에서 명시적으로 동기화할 때 이름·캠퍼스·사진을 즉시 반영하고 감사 로그를 남긴다.
-- 외부 사진은 원본/데이터 URL을 보관하지 않는다. 서버에서 640×640 WebP로 정규화해 private `member-profile-images` 버킷에 저장하고, 권한을 확인하는 private 이미지 API로만 읽는다.
-
-### 수료생·관리자·약관
-
-- 수료생 승인 시 `members.email`을 검증 완료 상태로 만들고 `graduate_profiles`를 생성한다. 교육 시작 연·월로 계산한 `inferred_generation`만 사용하며, `completion_stage`는 레거시 이력 컬럼이다.
-- 관리자 권한의 원천은 `admin_profiles.permission_template_key`와 템플릿이다. 현재 관리자 세션/감사 FK는 안전한 전환을 위해 회원 ID를 유지하며, Preview 검증 후 관리자 프로필 ID로 계약 전환한다.
-- `policy_documents`는 버전 콘텐츠를 수정하지 않고 새 버전을 발행한다. `member_policy_consents`는 약관 동의 이력을 보존한다.
-
-### 정규화 전환 상태
-
-1. 새 정규화 테이블·FK·인덱스 추가와 백필은 완료됐다.
-2. active reader는 정규화 회원·Mattermost 관계를 사용하고 `members.ssafy_*` 미러 컬럼은 제거됐다.
-3. SSAFY Verify proof table, legacy Mattermost alias, 휴면 `ssafy_sub` 예약 계약은 운영자 보관·rollback 결정 전까지 유지한다.
-4. 삭제할 때는 탈퇴 익명화 함수를 먼저 현행 스키마에 맞춘 뒤 별도 forward migration으로 정리한다.
-
-## Mattermost 직접 인증과 Sender 운영
-
-### 서버 환경과 Sender 등록
-
-- 현행 애플리케이션 런타임은 직접 Mattermost 연동에 `MM_BASE_URL`, `MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION`, `MM_SENDER_CREDENTIALS_KEY_V1`만 읽습니다. Vercel에는 미사용 SSAFY Verify key가 남아 있어 별도 삭제 승인이 필요합니다.
-- 기수별 Sender의 로그인 ID·비밀번호는 Super Admin이 `/admin/cycle`에서 입력하며, AES-256-GCM으로 암호화되어 저장됩니다. 평문, MM 세션 토큰, credential metadata는 브라우저와 로그에 노출하지 않습니다.
-- 새 후보 Sender는 이전 활성 Sender 또는 Super Admin 연결 계정으로 테스트 DM을 보낸 뒤에만 활성화됩니다. 기수별 활성 Sender는 하나이고, 교체 성공 시 이전 ciphertext는 삭제됩니다.
-- 팀과 채널은 코드에서 `s{generation}public`과 `town-square`로만 계산합니다.
-
-### 회원가입·재설정
-
-1. 사용자가 Mattermost ID와 기수를 입력하면 해당 기수의 활성 Sender가 DM으로 6자리 코드를 보냅니다.
-2. 코드는 HMAC hash만 저장하며 10분 만료, 1회 소비, 5회 검증 제한, 재전송 제한을 적용합니다.
-3. 회원가입은 검증된 immutable `mm_user_id`를 `mm_user_directory`에 연결하고 최신 약관 동의와 로컬 비밀번호를 저장합니다.
-4. 비밀번호 재설정은 기존 연결 회원에만 짧은 HttpOnly 완료 세션을 발급합니다. 계정 존재 여부는 응답에서 구분하지 않습니다.
-5. 직접 MM 조회·동기화·알림은 대상 기수 Sender만 사용하고, Sender가 없거나 MM API가 실패하면 이메일 자동 fallback을 하지 않습니다.
-
-### 프로필과 lifecycle
-
-- 프로필 동기화는 `mm_user_id` 일치를 강제하고 username, 표시명, 사진만 갱신합니다. 캠퍼스·트랙·기존 claim은 직접 MM 응답으로 덮어쓰지 않습니다.
-- 성공한 사용자 조회에서만 명시적 `delete_at > 0`이면 교육생은 `generation_completed`, 운영진은 `member_departed`로 전환합니다. 404, timeout, 권한 오류, rate limit, 형식 오류는 회원 상태를 바꾸지 않습니다.
-
-## 약관 / 개인정보 동의
-
-- 필수 동의
-  - 서비스 이용약관
-  - 개인정보 수집·이용 동의
-- 마케팅 / 수신 동의는 회원가입 단계에서 받지 않고, 별도 알림 설정 단계에서 처리합니다.
-- 정책 문서는 `policy_documents`에서 버전 관리합니다.
-- 회원 동의 이력은 `member_policy_consents`에 저장합니다.
-- 회원의 동의 버전이 없거나 오래되면 로그인 이후 동의 화면으로 보냅니다.
-
-공개 문서:
-
-- `/legal/service`: [정책 문서 route](./src/app/legal/[kind]/page.tsx)
-- `/legal/privacy`: [정책 문서 route](./src/app/legal/[kind]/page.tsx)
-
-## 관리자 운영 포인트
-
-- 회원 관리는 기수 / 캠퍼스 중심입니다.
-- 반 단위 관리 / 반 단위 Push는 제거되었습니다.
-- 관리자 페이지에서 다음 작업을 할 수 있습니다.
-  - 회원 수동 추가
-  - 백필 실행
-  - 로그 상세 조회
-  - 제휴 공개 상태 수정
-  - Push 발송
-  - Mock 미리보기
-
-회원 수동 추가는 다음 흐름으로 동작합니다.
-
-1. 기수 선택
-2. MM ID 리스트 입력
-3. 대상 사용자 조회
-4. 임시 비밀번호 발송
-5. `must_change_password=true` 저장
-6. 성공 / 실패 수 요약 표시
-
-DM 발송 실패 시에는 비밀번호 / 생성 상태를 롤백합니다.
-
-## 제휴 상태와 노출 정책
-
-- `공개`
-  - 누구나 카드 / 상세 조회 가능
-- `대외비`
-  - 로그인하지 않은 사용자는 강한 블러, 클릭 차단, 상세 직접 접근 시 홈 리다이렉트
-  - 로그인한 인증 회원은 일반 공개 카드처럼 조회 가능
-- `비공개`
-  - 모든 사용자에게 블러
-  - 상세 직접 접근 차단
-
-또한 제휴 기간이 아니면:
-
-- 상세 페이지 조회는 가능
-- 지도는 조회 가능
-- 예약 / 문의 링크는 UI와 서버 payload 모두에서 숨김
-
-## 성능 / 캐시 / Cron
-
-- 공개 제휴 목록은 캐시를 사용합니다.
-- 관리자 변경 후 관련 캐시를 무효화합니다.
-- MM 프로필은 회원이 `/certification`에서 명시적으로 동기화할 때 즉시 반영합니다.
-- 탈퇴 후 30일이 지난 회원은 Vercel cron으로 익명화합니다.
-- 제휴 종료 예정 알림도 하루 1회 실행합니다.
-
-[vercel.json](./vercel.json)
-
-```json
-{
-  "crons": [
-    {
-      "path": "/api/cron/push-expiring-partners",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/anonymize-deleted-members",
-      "schedule": "40 0 * * *"
-    },
-    {
-      "path": "/api/cron/purge-expired-operational-logs",
-      "schedule": "50 0 * * *"
-    }
-  ]
-}
-```
-
-## 주요 보안 포인트
-
-- 관리자 세션과 사용자 세션은 서명 + 만료 시각을 사용합니다.
-- 관리자 로그인은 입력 검증, suspicious parameter 탐지, IP/계정 기준 rate limit을 적용합니다.
-- 관리자 경로는 필요 시 IP allowlist 또는 Basic Auth로 한 번 더 제한할 수 있습니다.
-- 로그인, Mattermost DM 코드, 비밀번호 재설정 요청은 횟수 제한이 적용됩니다.
-- 교육생 인증 QR은 짧은 만료시간의 서명 토큰으로 발급됩니다.
-- 이미지 프록시는 내부망 / 사설 IP / 비정상 프로토콜을 차단합니다.
-- 외부 링크는 `noopener noreferrer`를 강제합니다.
-- Web Push 구독 정보는 서버 전용 테이블에 저장하고 실패한 endpoint는 비활성화합니다.
-
-## 스크립트
-
-```text
-npm run bootstrap
-npm run doctor
-npm run dev
-npm run lint
-npm run build
-npm run storybook
-npm run build-storybook
-npm run test-storybook
-npm run start
-npm run test:mm-profile
-npm run release
-```
-
-### Storybook
-
-공용 UI primitives와 실제 도메인 컴포넌트를 함께 검증할 수 있도록 Storybook을 구성했습니다.
-
-```bash
-npm run storybook
-```
-
-- 기본 포트는 `6006`
-- light/dark toolbar 지원
-- Tailwind v4 글로벌 스타일과 App Router 문맥을 함께 로드
-- 현재 포함 스토리: `Button`, `Badge`, `Card`, `Input`, `Select`, `Tabs`, `PartnerReviewCard`
-
-정적 산출물이 필요하면 아래를 사용합니다.
-
-```bash
-npm run build-storybook
-```
-
-스토리 기반 컴포넌트 테스트는 아래로 실행합니다.
-
-```bash
-npm run test-storybook
-```
-
-릴리즈 흐름에서는 `npm run build-storybook`과 `npm run test-storybook`을 커밋/푸시 전에 반드시 통과해야 합니다. Storybook 빌드가 실패하면 `npm run release`는 버전 업데이트, 커밋, 푸시를 진행하지 않습니다. Chromatic publish GitHub Actions는 무료 한도 소진으로 인한 외부 `UI Tests` pending을 피하기 위해 수동 실행 전용입니다.
-
-### release 스크립트
-
-`release` 스크립트는 다음을 수행합니다.
-
-- `main` 외 브랜치: Lighthouse 선택 실행 후 Storybook build/test를 강제하고, 통과 시 `npm version` 실행 후 commit + push
-- `main` 브랜치: 현재 `package.json` 버전 기준 annotated tag 생성 후 push
-
-대화형 실행:
-
-```text
-npm run release
-```
-
-자동화된 실행에서 선택값이 이미 정해졌다면 같은 Node.js 진입점에 명시적으로 전달합니다.
-
-```text
-npm run release -- --version=none --lighthouse=skip --message="chore: 교차 플랫폼 개발환경 정비" --yes
-```
-
-여러 줄 메시지는 UTF-8 파일을 만든 뒤 `--message-file=경로`로 전달할 수 있습니다. 구현은 [scripts/release.mjs](./scripts/release.mjs)에 있습니다.
-
-주의:
-
-- `main` 브랜치에서는 태그와 푸시만 수행하므로 작업 트리가 깨끗해야 합니다.
-- `main` 외 브랜치에서는 태그를 만들지 않습니다.
-- 작업 트리가 비어 있어도 `patch`, `minor`, `major`를 선택하면 버전 업데이트로 릴리즈할 수 있습니다.
-- 작업 트리가 비어 있는 상태에서 `no update`를 선택하면 종료됩니다.
-- Storybook build/test가 실패하면 로컬 release 단계에서 차단되므로, 실패 원인을 먼저 수정한 뒤 다시 release를 실행해야 합니다.
-
-## 배포
-
-Vercel 배포를 기준으로 구성되어 있습니다.
-
-1. GitHub 저장소 연결
-2. Vercel 프로젝트 생성
-3. `.env` 값을 Vercel Environment Variables에 등록
-4. Supabase migration / schema 적용
-5. 배포 후 `NEXT_PUBLIC_SITE_URL`을 실제 도메인으로 갱신
-
-권장:
-
-- `ADMIN_SESSION_SECRET`, `USER_SESSION_SECRET`, `CERTIFICATION_QR_SECRET`, `CRON_SECRET`, `MEMBER_IDENTIFIER_RESERVATION_HMAC_SECRET`, `MEMBER_EMAIL_VERIFICATION_HMAC_SECRET`는 충분히 긴 난수 사용
-- `SUPABASE_SERVICE_ROLE_KEY`, `MM_SENDER_CREDENTIALS_KEY_V1`, SMTP 계정, VAPID private key는 절대 클라이언트에 노출되지 않도록 관리
-- 운영 환경에서는 `ADMIN_ALLOWED_IPS` 또는 Basic Auth 중 최소 하나를 같이 두는 편이 안전
-
-## 현재 상태
-
-- `npm run lint` 통과
-- `npm run test:mm-profile` 통과
-- 회원가입 / 로그인 / 재설정 / 약관 동의 / 운영진 권한 흐름은 `members` 공통 원장과 확장 프로필 모델로 전환 중입니다.
-- Mattermost Sender registry와 직접 API 전환의 운영 절차는 관리자 기수 관리 화면과 Issue #155에 정리합니다.
-- 공개 제휴 페이지는 SEO, sitemap, RSS, robots를 포함합니다.
+- 로컬 profile 예시: [.env.example](./.env.example)
+- 운영 runtime 예시: [deploy/self-host/runtime.env.example](./deploy/self-host/runtime.env.example)
+- 필수 값·형식·오류 코드의 정본: [deploy/self-host/runtime-env.mjs](./deploy/self-host/runtime-env.mjs)
+- 그룹별 설명: [API와 외부 연동](./docs/architecture/api-and-integrations.md#environment-variable-groups)
+
+서비스 롤 키, 세션·HMAC 비밀, SMTP 계정, VAPID private key, Mattermost Sender 키, 입금 계좌와 사업자 상태조회 키는 서버 전용입니다. `NEXT_PUBLIC_` 접두사를 붙이지 않습니다. 운영 값은 해당 환경의 runtime env 파일을 바꾸고 앱을 다시 시작해 반영하며, `NEXT_PUBLIC_*` 공개 빌드 값이 바뀌면 이미지를 다시 빌드합니다. 협력사 결제용 값의 등록 절차는 [협력사 결제 운영 설정](./docs/product/guides/partner-billing-setup.md)에 있습니다.
 
 ## 라이선스
 

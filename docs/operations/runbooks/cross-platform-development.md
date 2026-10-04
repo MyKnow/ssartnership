@@ -123,6 +123,8 @@ Secret 값은 진단 결과에 포함하지 않는다. 실패 결과는 변수 �
 
 `scripts/lib/project-environment.mjs`가 선택 계약의 최종 근거다. `NODE_ENV=production`은 최적화 모드이며 데이터 환경을 결정하지 않는다. 로컬 build/start에서 detached HEAD나 Git 조회 실패는 중단한다. 선택한 파일이 없으면 반대 환경이나 과거 `.env`로 대체하지 않는다. bootstrap은 파일이 없는 새 개발환경에만 외부 연결 없는 mock `.env.preview`를 생성한다. 두 실제 파일은 Git과 Docker context에서 제외하고 소유자 전용 권한으로 보관한다.
 
+파일 이름 `.env.preview`는 클라우드 Preview 시절의 이름이지만 유지한다([리팩토링 기본 결정 D23](../../plans/active/refactor-program-2026-10.md#기본-결정)). 이 이름은 지금도 `dev` 브랜치가 배포되는 자체 호스팅 Preview 환경의 profile을 뜻하고, 실제 연결 profile을 만들 때도 Preview 데이터·세션 설정을 쓴다. bootstrap이 만드는 mock profile도 같은 이름을 쓰는 것은 "Production이 아닌 기본 profile"이라는 의미다. 개명하면 bootstrap·doctor·선택 계약·테스트와 각 개발 PC의 기존 파일을 한꺼번에 바꿔야 해서 이득보다 비용이 크다.
+
 로컬 빌드 성공 시 산출물에 프로필 이름과 공개 설정의 해시만 기록한다. `npm start`는 이 기록이 현재 선택과 다르면 재빌드를 요구한다. Preview에서 만든 클라이언트 번들과 Production 서버 설정이 섞이는 실행을 방지하며 비밀값은 기록하지 않는다.
 
 Next의 기본 dotenv 로더는 빌드 시 `.env.production`을 추가로 읽으므로, 표준 명령은 선택한 값을 먼저 주입한 후 `scripts/lib/next-environment.cjs`를 Node preload로 적용한다. 이 어댑터는 Next의 `@next/env` 진입점에서 추가 파일 읽기를 차단하며 worker에도 상속된다. 강제 재로딩과 standalone 산출물에도 다른 환경 파일이 유입되지 않는 것을 프로세스 회귀 테스트로 검증한다. Next 업그레이드 때 이 테스트를 유지한다. **환경 파일이나 브랜치를 바꾼 뒤 서버를 재시작하고, 공개 설정이 바뀌면 다시 빌드한다.** `npx next` 직접 실행은 이 저장소의 환경 선택을 우회하므로 사용하지 않는다.
