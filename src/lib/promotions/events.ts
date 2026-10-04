@@ -259,15 +259,6 @@ function canUseSupabase() {
   return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
-function isMissingPromotionSlideAdColumns(message: string) {
-  return (
-    message.includes("promotion_slides.ad_campaign_id") ||
-    message.includes("promotion_slides.sponsor_label") ||
-    message.includes("column ad_campaign_id does not exist") ||
-    message.includes("column sponsor_label does not exist")
-  );
-}
-
 function staticCampaigns() {
   return EVENT_CAMPAIGNS.map((campaign) => mapStaticCampaign(campaign));
 }
@@ -303,31 +294,6 @@ async function loadManagedPromotionSlides(options?: {
     if (error) {
       if (options?.requireDatabase) {
         throw error;
-      }
-      if (isMissingPromotionSlideAdColumns(error.message)) {
-        let legacyQuery = supabase
-          .from("promotion_slides")
-          .select(
-            "id,display_order,title,subtitle,image_src,image_alt,href,is_active,audiences,allowed_campuses,event_slug,created_at,updated_at",
-          )
-          .order("display_order", { ascending: true })
-          .order("created_at", { ascending: true });
-        if (!options?.includeInactive) {
-          legacyQuery = legacyQuery.eq("is_active", true);
-        }
-        const { data: legacyData, error: legacyError } = await legacyQuery;
-        if (!legacyError) {
-          return ((legacyData ?? []) as Omit<
-            PromotionSlideRow,
-            "ad_campaign_id" | "sponsor_label"
-          >[]).map((row) =>
-            mapSlideRow({
-              ...row,
-              ad_campaign_id: null,
-              sponsor_label: "",
-            }),
-          );
-        }
       }
       console.error("[promotions] promotion_slides query failed", error.message);
       return staticSlides();

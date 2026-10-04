@@ -200,18 +200,6 @@ function mapAdminSessionSnapshot(value: unknown): AdminAccount | null {
   };
 }
 
-async function getMemberById(memberId: string) {
-  const { data, error } = await getSupabaseAdminClient()
-    .from("members")
-    .select(ADMIN_MEMBER_SELECT)
-    .eq("id", memberId)
-    .maybeSingle();
-  if (error || !data) {
-    return null;
-  }
-  return data as AdminMemberRow;
-}
-
 async function getAdminProfileByMemberId(memberId: string) {
   const { data, error } = await getSupabaseAdminClient()
     .from("admin_profiles")
@@ -222,22 +210,6 @@ async function getAdminProfileByMemberId(memberId: string) {
     return null;
   }
   return data as AdminProfileRow;
-}
-
-async function getDirectoryById(directoryId: string | null) {
-  if (!directoryId) {
-    return null;
-  }
-
-  const { data, error } = await getSupabaseAdminClient()
-    .from("mm_user_directory")
-    .select(ADMIN_DIRECTORY_SELECT)
-    .eq("id", directoryId)
-    .maybeSingle();
-  if (error || !data) {
-    return null;
-  }
-  return data as AdminDirectoryRow;
 }
 
 function resolveRelation<T>(value: T | T[] | null | undefined) {
@@ -252,38 +224,23 @@ function mapAdminProfileSessionRow(
   return member && directory ? mapAdminProfile(row, member, directory) : null;
 }
 
-async function getAdminAccountFromProfileLegacy(memberId: string) {
-  const [profile, member] = await Promise.all([
-    getAdminProfileByMemberId(memberId),
-    getMemberById(memberId),
-  ]);
-  if (!profile || !member) {
-    return null;
-  }
-  const directory = await getDirectoryById(member.mattermost_account_id);
-  return directory ? mapAdminProfile(profile, member, directory) : null;
+function logAdminAccountReadFailure(
+  operation: string,
+  error: { message: string; code?: string },
+) {
+  console.error("[admin-accounts] read failed", {
+    operation,
+    code: error.code ?? null,
+    message: error.message,
+  });
 }
 
-async function getAdminAccountFromProfile(memberId: string) {
-  const { data, error } = await getSupabaseAdminClient()
-    .from("admin_profiles")
-    .select(ADMIN_PROFILE_SESSION_SELECT)
-    .eq("member_id", memberId)
-    .maybeSingle();
-
-  if (!error) {
-    const row = data as AdminProfileSessionRow | null;
-    if (!row) {
-      return null;
-    }
-    return mapAdminProfileSessionRow(row);
-  }
-
-  // Keep a compatibility fallback for a rolling deploy where the PostgREST
-  // schema cache has not learned the nested relationship yet.
-  return getAdminAccountFromProfileLegacy(memberId);
-}
-
+/**
+ * `get_admin_session_snapshot` (20260728032722) is part of the forward-only
+ * schema. A failure is logged and thrown instead of falling back to wider
+ * PostgREST reads, so permission or connectivity problems are not hidden.
+ * `getAdminSession()` converts the throw into "no admin session".
+ */
 async function getAdminAccountByIdUncached(memberId: string) {
   if (!memberId) {
     return null;
@@ -298,13 +255,12 @@ async function getAdminAccountByIdUncached(memberId: string) {
     "get_admin_session_snapshot",
     { p_member_id: memberId },
   );
-  if (!error) {
-    return mapAdminSessionSnapshot(data);
+  if (error) {
+    logAdminAccountReadFailure("get_admin_session_snapshot", error);
+    throw new Error("관리자 계정 정보를 불러오지 못했습니다.");
   }
 
-  // Keep the nested PostgREST read during a rolling deploy before the RPC is
-  // available in the target database or schema cache.
-  return getAdminAccountFromProfile(memberId);
+  return mapAdminSessionSnapshot(data);
 }
 
 /**
@@ -382,69 +338,12 @@ async function listAdminAccountsFromRelation() {
     .select(ADMIN_PROFILE_SESSION_SELECT)
     .order("updated_at", { ascending: false });
   if (error) {
-    return null;
+    logAdminAccountReadFailure("admin_profiles_relation", error);
+    throw new Error("관리자 계정 목록을 불러오지 못했습니다.");
   }
 
   return ((data ?? []) as unknown as AdminProfileSessionRow[])
     .map(mapAdminProfileSessionRow)
-    .filter((account): account is AdminAccount => account !== null);
-}
-
-async function listAdminAccountsLegacy() {
-  const supabase = getSupabaseAdminClient();
-  const { data: profiles, error: profileError } = await supabase
-    .from("admin_profiles")
-    .select(ADMIN_PROFILE_SELECT)
-    .order("updated_at", { ascending: false });
-  if (profileError) {
-    throw new Error("관리자 프로필을 불러오지 못했습니다.");
-  }
-
-  const normalizedProfiles = (profiles ?? []) as AdminProfileRow[];
-  if (normalizedProfiles.length === 0) {
-    return [];
-  }
-
-  const memberIds = normalizedProfiles.map((profile) => profile.member_id);
-  const { data: members, error: memberError } = await supabase
-    .from("members")
-    .select(ADMIN_MEMBER_SELECT)
-    .in("id", memberIds);
-  if (memberError) {
-    throw new Error("관리자 회원 정보를 불러오지 못했습니다.");
-  }
-
-  const normalizedMembers = (members ?? []) as AdminMemberRow[];
-  const directoryIds = normalizedMembers
-    .map((member) => member.mattermost_account_id)
-    .filter((directoryId): directoryId is string => Boolean(directoryId));
-  const { data: directories, error: directoryError } = directoryIds.length
-    ? await supabase
-        .from("mm_user_directory")
-        .select(ADMIN_DIRECTORY_SELECT)
-        .in("id", directoryIds)
-    : { data: [], error: null };
-  if (directoryError) {
-    throw new Error("관리자 Mattermost 계정을 불러오지 못했습니다.");
-  }
-
-  const memberById = new Map(
-    normalizedMembers.map((member) => [member.id, member]),
-  );
-  const directoryById = new Map(
-    ((directories ?? []) as AdminDirectoryRow[]).map((directory) => [
-      directory.id,
-      directory,
-    ]),
-  );
-  return normalizedProfiles
-    .map((profile) => {
-      const member = memberById.get(profile.member_id);
-      const directory = member?.mattermost_account_id
-        ? directoryById.get(member.mattermost_account_id)
-        : null;
-      return member && directory ? mapAdminProfile(profile, member, directory) : null;
-    })
     .filter((account): account is AdminAccount => account !== null);
 }
 
@@ -453,10 +352,7 @@ export async function listAdminAccounts() {
 }
 
 const getCachedAdminAccounts = unstable_cache(
-  async () => {
-    const relationAccounts = await listAdminAccountsFromRelation();
-    return relationAccounts ?? listAdminAccountsLegacy();
-  },
+  listAdminAccountsFromRelation,
   [ADMIN_ACCOUNTS_LIST_CACHE_TAG],
   {
     revalidate: ADMIN_ACCOUNTS_LIST_CACHE_REVALIDATE_SECONDS,

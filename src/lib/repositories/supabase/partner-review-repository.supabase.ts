@@ -53,9 +53,6 @@ type PartnerReviewSummaryRow = {
   rating_5_count: number | string | null;
 };
 
-const PARTNER_REVIEW_RATINGS = [1, 2, 3, 4, 5] as const;
-type PartnerReviewRating = (typeof PARTNER_REVIEW_RATINGS)[number];
-
 const REVIEW_SELECT =
   "id,partner_id,member_id,rating,title,body,images,created_at,updated_at,deleted_at,hidden_at,members!partner_reviews_member_id_fkey(display_name,generation)";
 
@@ -102,71 +99,6 @@ function mapPartnerReviewSummaryRow(row: PartnerReviewSummaryRow | null) {
   };
 }
 
-function isMissingPartnerReviewSummaryRpc(message: string) {
-  return (
-    message.includes("get_partner_review_summary") &&
-    (message.includes("schema cache") || message.includes("does not exist"))
-  );
-}
-
-async function getFilteredReviewSummaryFallback(
-  partnerId: string,
-  rating: string,
-  imagesOnly: boolean,
-) {
-  const supabase = getSupabaseAdminClient();
-  const selectedRatings: readonly PartnerReviewRating[] =
-    rating === "all"
-      ? PARTNER_REVIEW_RATINGS
-      : [Number(rating) as PartnerReviewRating];
-
-  const counts = await Promise.all(
-    selectedRatings.map(async (selectedRating) => {
-      let query = supabase
-        .from("partner_reviews")
-        .select("id", { count: "exact", head: true })
-        .eq("partner_id", partnerId)
-        .eq("rating", selectedRating)
-        .is("deleted_at", null)
-        .is("hidden_at", null);
-      if (imagesOnly) {
-        query = query.not("images", "eq", "{}");
-      }
-
-      const { count, error } = await query;
-      if (error) {
-        throw new Error(error.message);
-      }
-      return [selectedRating, count ?? 0] as const;
-    }),
-  );
-
-  const distribution = {
-    1: 0,
-    2: 0,
-    3: 0,
-    4: 0,
-    5: 0,
-  };
-  for (const [selectedRating, count] of counts) {
-    distribution[selectedRating] = count;
-  }
-
-  const totalCount = counts.reduce((sum, [, count]) => sum + count, 0);
-  if (totalCount === 0) {
-    return createEmptyPartnerReviewSummary();
-  }
-  const totalRating = counts.reduce(
-    (sum, [selectedRating, count]) => sum + selectedRating * count,
-    0,
-  );
-  return {
-    averageRating: Number((totalRating / totalCount).toFixed(1)),
-    totalCount,
-    distribution,
-  };
-}
-
 async function getFilteredReviewSummary(
   partnerId: string,
   rating: string,
@@ -179,9 +111,12 @@ async function getFilteredReviewSummary(
     input_images_only: imagesOnly,
   });
   if (error) {
-    if (isMissingPartnerReviewSummaryRpc(error.message)) {
-      return getFilteredReviewSummaryFallback(partnerId, rating, imagesOnly);
-    }
+    // get_partner_review_summary ships with 20260831083528; a missing RPC is a
+    // deployment error and is not replaced by per-rating count queries.
+    console.error("[partner-reviews] summary rpc failed", {
+      partnerId,
+      message: error.message,
+    });
     throw new Error(error.message);
   }
 
