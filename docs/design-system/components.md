@@ -26,14 +26,6 @@ authority: normative
 - 목록의 기본 필터 3~4개 바깥 조건을 접어 두되 적용 개수와 초기화 액션을 항상 보여준다.
 - 펼침 상태와 무관하게 필터 값은 URL query가 단일 기준이다.
 
-## CompactEntityRow / CollapsedList
-- 운영 목록의 핵심 식별자, 상태, 한두 개 메타, 상세 이동만 한 행에 둔다.
-- 혜택·태그·지점처럼 반복되는 값은 최대 노출 개수를 정하고 나머지는 `+N`으로 축약한다.
-
-## CompactStepper
-- 모바일 다단계 form은 `현재/전체 + 단계명`만 우선 표시하고 전체 단계 설명은 disclosure로 제공한다.
-- 이전/다음/제출 중 현재 primary CTA는 하나만 존재한다.
-
 ## FilterBar
 - 검색/정렬/상태 필터를 같은 surface 안에서 다룬다.
 - 작은 화면에서는 세로, 큰 화면에서는 가로 정렬한다.
@@ -48,8 +40,8 @@ authority: normative
 ## ResponsiveGrid
 - 카드 목록, 요약 패널, 문서 샘플을 auto-fit grid로 배치한다.
 
-## MotionReveal
-- 목록/섹션 등장 애니메이션은 이 컴포넌트로 통일한다.
+## 등장 모션
+- 목록·섹션 등장 애니메이션 컴포넌트는 두지 않는다. 기존 `MotionReveal`은 애니메이션 없는 래퍼이며 새 코드에서 사용하지 않는다. 모션 기준은 [Layout And Motion](./layout-and-motion.md#motion)을 따른다.
 
 ## CarouselSlideIndicators
 - 이미지 위에 겹치는 캐러셀 위치 표시는 `CarouselSlideIndicators`를 공유한다. 현재 항목은 긴 흰색 pill, 나머지는 낮은 대비의 원형 점으로 표시하고 `aria-pressed`를 함께 제공한다.
@@ -76,3 +68,15 @@ authority: normative
 - 회원 설정의 계정 정보는 연결 정보·보안·계정 그룹으로 나눈 설정형 리스트를 사용한다.
 - 각 행은 아이콘, 제목·보조 설명, 상태 badge, 우측 이동 또는 실행 피드백 순으로 구성하고 행 전체를 최소 44px의 조작 영역으로 제공한다.
 - 즉시 실행 행은 동작 라벨과 pending 상태를, 별도 화면 이동 행은 chevron을 사용한다. 회원 탈퇴는 일반 설정과 분리한 danger 그룹으로 표시한다.
+
+## 계획된 패턴(공용 컴포넌트 미구현)
+
+아래는 화면 계약이 요구하는 표현 규칙이다. 아직 같은 이름의 공용 컴포넌트는 없고 각 화면이 기존 primitive로 구현한다. 공용 컴포넌트로 만들 때 이 절을 위 현행 목록으로 옮긴다.
+
+### CompactEntityRow / CollapsedList
+- 운영 목록의 핵심 식별자, 상태, 한두 개 메타, 상세 이동만 한 행에 둔다.
+- 혜택·태그·지점처럼 반복되는 값은 최대 노출 개수를 정하고 나머지는 `+N`으로 축약한다.
+
+### CompactStepper
+- 모바일 다단계 form은 `현재/전체 + 단계명`만 우선 표시하고 전체 단계 설명은 disclosure로 제공한다.
+- 이전/다음/제출 중 현재 primary CTA는 하나만 존재한다.
