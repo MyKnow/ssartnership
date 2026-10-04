@@ -1,8 +1,10 @@
 import type { AdChannel } from "@/lib/ad-packages";
 import {
   PARTNER_COMPANY_PLAN_DEFINITIONS,
+  getDaysUntilPartnerPlanDate,
   getPartnerCompanyPlanDefinition,
   type PartnerCompanyPlanTier,
+  type PartnerPlanExpiryState,
 } from "@/lib/partner-company-plans";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 
@@ -239,20 +241,24 @@ export function getPartnerPlanDaysUntil(
   value?: string | null,
   referenceTime: string | number | Date = Date.now(),
 ) {
-  if (!value) {
-    return null;
-  }
+  return getDaysUntilPartnerPlanDate(value, referenceTime);
+}
 
-  const date = new Date(value);
-  const referenceDate = new Date(referenceTime);
-  if (
-    Number.isNaN(date.getTime()) ||
-    Number.isNaN(referenceDate.getTime())
-  ) {
-    return null;
+/** Admin badge for a plan's read-only expiry state (no automatic demotion). */
+export function getAdminPartnerPlanExpiryBadge(state: PartnerPlanExpiryState) {
+  switch (state.status) {
+    case "expired":
+      return { label: "플랜 만료 · 수동 유예", tone: "danger" as const };
+    case "expiring_soon":
+      return {
+        label: `플랜 만료 D-${Math.max(state.daysUntilExpiry ?? 0, 0)}`,
+        tone: "warning" as const,
+      };
+    case "no_expiry":
+      return { label: "플랜 만료일 미설정", tone: "neutral" as const };
+    default:
+      return null;
   }
-
-  return Math.ceil((date.getTime() - referenceDate.getTime()) / 86_400_000);
 }
 
 export function formatPartnerPlanMonthlyPrice(tier: PartnerCompanyPlanTier) {

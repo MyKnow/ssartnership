@@ -1,4 +1,5 @@
 import {
+  getPartnerPlanExpiryState,
   normalizePartnerCompanyPlanTier,
   resolvePartnerBrandPlanWindow,
 } from "@/lib/partner-company-plans";
@@ -256,6 +257,7 @@ async function getAdminPartnerListReadModelUnbounded({
     (partner) => partner.visibility === "confidential",
   ).length;
   const privateCount = partners.filter((partner) => partner.visibility === "private").length;
+  const planExpiryReferenceTime = Date.now();
   const planBrands = partners.map((partner) => {
     const planTier = normalizePartnerCompanyPlanTier(
       (partner as { plan_tier?: string | null }).plan_tier,
@@ -281,6 +283,11 @@ async function getAdminPartnerListReadModelUnbounded({
       planTier,
       planStartedAt: planWindow.planStartedAt,
       planExpiresAt: planWindow.planExpiresAt,
+      planExpiry: getPartnerPlanExpiryState({
+        planTier,
+        planExpiresAt: planWindow.planExpiresAt,
+        now: planExpiryReferenceTime,
+      }),
       planUpdatedAt:
         (partner as { plan_updated_at?: string | null }).plan_updated_at ?? null,
     };
