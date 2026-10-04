@@ -81,3 +81,15 @@ test("알림·이벤트 회원 순회는 탈퇴 회원을 제외하고 PK 순서
     /\.select\(MEMBER_EVENT_CANDIDATE_SELECT\)\s*\.is\("deleted_at", null\)[\s\S]{0,200}\.order\("generation", \{ ascending: false \}\)\s*\.order\("display_name", \{ ascending: true \}\)\s*\.order\("id", \{ ascending: true \}\)/,
   );
 });
+
+test("관리자·파트너 운영 푸시 팬아웃은 한 함수를 config로 공유한다", () => {
+  const operational = readSource("src/lib/operational-notifications.ts");
+  assert.equal((operational.match(/async function sendOperationalPushDeliveries\(/g) ?? []).length, 1);
+  assert.match(operational, /sendOperationalPushDeliveries\(ADMIN_OPERATIONAL_PUSH,/);
+  assert.match(operational, /sendOperationalPushDeliveries\(PARTNER_OPERATIONAL_PUSH,/);
+  assert.equal(
+    (operational.match(/forEachWithConcurrency\(\s*subscriptions,/g) ?? []).length,
+    1,
+    "구독 팬아웃 루프는 한 벌만 둔다",
+  );
+});

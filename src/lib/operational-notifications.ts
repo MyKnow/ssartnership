@@ -704,26 +704,70 @@ export async function notifyAdminsOfPartnerRegistrationRequest(input: {
   });
 }
 
-async function sendAdminPushDeliveries(input: {
-  notificationId: string;
-  type: string;
-  title: string;
-  body: string;
-  targetUrl: string;
-  adminIds: string[];
-  templateContext?: NotificationTemplateContext;
-  templateVariant?: string;
-}) {
+type OperationalPushAudienceConfig = {
+  subscriptionTable: "admin_push_subscriptions" | "partner_push_subscriptions";
+  ownerColumn: "admin_id" | "account_id";
+  getTemplateKey: (type: string, variant?: string) => string;
+  recordDelivery: (input: {
+    notificationId: string;
+    ownerId: string;
+    status: DeliveryStatus;
+    errorMessage?: string | null;
+  }) => Promise<void>;
+};
+
+const ADMIN_OPERATIONAL_PUSH: OperationalPushAudienceConfig = {
+  subscriptionTable: "admin_push_subscriptions",
+  ownerColumn: "admin_id",
+  getTemplateKey: (type, variant) =>
+    getAdminOperationalTemplateKey("push", type, variant),
+  recordDelivery: ({ ownerId, ...input }) =>
+    recordAdminDelivery({ ...input, adminId: ownerId, channel: "push" }),
+};
+
+const PARTNER_OPERATIONAL_PUSH: OperationalPushAudienceConfig = {
+  subscriptionTable: "partner_push_subscriptions",
+  ownerColumn: "account_id",
+  getTemplateKey: (type, variant) =>
+    getPartnerOperationalTemplateKey("push", type, variant),
+  recordDelivery: ({ ownerId, ...input }) =>
+    recordPartnerDelivery({ ...input, accountId: ownerId, channel: "push" }),
+};
+
+type OperationalPushSubscriptionRow = {
+  id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+} & Partial<Record<OperationalPushAudienceConfig["ownerColumn"], string>>;
+
+/**
+ * 관리자·파트너 운영 알림의 웹 푸시 팬아웃. 대상별 차이(구독 테이블, 소유자
+ * 컬럼, 템플릿 키, delivery 기록 테이블)는 config로만 주입하고 동시성·만료
+ * 구독 정리·실패 기록 규칙은 이 함수 하나에서 관리한다.
+ */
+async function sendOperationalPushDeliveries(
+  config: OperationalPushAudienceConfig,
+  input: {
+    notificationId: string;
+    type: string;
+    title: string;
+    body: string;
+    targetUrl: string;
+    ownerIds: string[];
+    templateContext?: NotificationTemplateContext;
+    templateVariant?: string;
+  },
+) {
   const supabase = getSupabaseAdminClient();
   if (!isPushConfigured()) {
     await forEachWithConcurrency(
-      input.adminIds,
+      input.ownerIds,
       OPERATIONAL_DELIVERY_CONCURRENCY,
-      async (adminId) => {
-        await recordAdminDelivery({
+      async (ownerId) => {
+        await config.recordDelivery({
           notificationId: input.notificationId,
-          adminId,
-          channel: "push",
+          ownerId,
           status: "skipped",
           errorMessage: "Web Push 환경 변수가 설정되지 않았습니다.",
         });
@@ -733,15 +777,16 @@ async function sendAdminPushDeliveries(input: {
   }
 
   const { data, error } = await supabase
-    .from("admin_push_subscriptions")
-    .select("id,admin_id,endpoint,p256dh,auth")
-    .in("admin_id", input.adminIds)
+    .from(config.subscriptionTable)
+    .select(`id,${config.ownerColumn},endpoint,p256dh,auth`)
+    .in(config.ownerColumn, input.ownerIds)
     .eq("is_active", true);
   if (error) {
     throw new Error(error.message);
   }
+  const subscriptions = (data ?? []) as unknown as OperationalPushSubscriptionRow[];
   const template = await resolveNotificationTemplate(
-    getAdminOperationalTemplateKey("push", input.type, input.templateVariant),
+    config.getTemplateKey(input.type, input.templateVariant),
   );
   const templateVariables = mergeNotificationTemplateVariables({
     context: input.templateContext,
@@ -769,9 +814,10 @@ async function sendAdminPushDeliveries(input: {
   });
 
   await forEachWithConcurrency(
-    data ?? [],
+    subscriptions,
     OPERATIONAL_PUSH_CONCURRENCY,
     async (subscription) => {
+      const ownerId = String(subscription[config.ownerColumn] ?? "");
       try {
         await webpush.sendNotification(
           await buildTrustedPushSubscriptionRequest({
@@ -782,14 +828,13 @@ async function sendAdminPushDeliveries(input: {
           serialized,
         );
         await markOperationalPushResult({
-          table: "admin_push_subscriptions",
+          table: config.subscriptionTable,
           id: subscription.id,
           ok: true,
         });
-        await recordAdminDelivery({
+        await config.recordDelivery({
           notificationId: input.notificationId,
-          adminId: subscription.admin_id,
-          channel: "push",
+          ownerId,
           status: "sent",
         });
       } catch (error) {
@@ -803,23 +848,39 @@ async function sendAdminPushDeliveries(input: {
         const errorMessage =
           error instanceof Error ? error.message : "푸시 발송 실패";
         await markOperationalPushResult({
-          table: "admin_push_subscriptions",
+          table: config.subscriptionTable,
           id: subscription.id,
           ok: false,
           errorMessage,
           deactivate:
             isInvalidSubscription || statusCode === 404 || statusCode === 410,
         });
-        await recordAdminDelivery({
+        await config.recordDelivery({
           notificationId: input.notificationId,
-          adminId: subscription.admin_id,
-          channel: "push",
+          ownerId,
           status: "failed",
           errorMessage,
         });
       }
     },
   );
+}
+
+async function sendAdminPushDeliveries(input: {
+  notificationId: string;
+  type: string;
+  title: string;
+  body: string;
+  targetUrl: string;
+  adminIds: string[];
+  templateContext?: NotificationTemplateContext;
+  templateVariant?: string;
+}) {
+  const { adminIds, ...rest } = input;
+  return sendOperationalPushDeliveries(ADMIN_OPERATIONAL_PUSH, {
+    ...rest,
+    ownerIds: adminIds,
+  });
 }
 
 export async function createPartnerOperationalNotification(input: {
@@ -1054,116 +1115,11 @@ async function sendPartnerPushDeliveries(input: {
   templateContext?: NotificationTemplateContext;
   templateVariant?: string;
 }) {
-  const supabase = getSupabaseAdminClient();
-  if (!isPushConfigured()) {
-    await forEachWithConcurrency(
-      input.accountIds,
-      OPERATIONAL_DELIVERY_CONCURRENCY,
-      async (accountId) => {
-        await recordPartnerDelivery({
-          notificationId: input.notificationId,
-          accountId,
-          channel: "push",
-          status: "skipped",
-          errorMessage: "Web Push 환경 변수가 설정되지 않았습니다.",
-        });
-      },
-    );
-    return;
-  }
-
-  const { data, error } = await supabase
-    .from("partner_push_subscriptions")
-    .select("id,account_id,endpoint,p256dh,auth")
-    .in("account_id", input.accountIds)
-    .eq("is_active", true);
-  if (error) {
-    throw new Error(error.message);
-  }
-  const template = await resolveNotificationTemplate(
-    getPartnerOperationalTemplateKey(
-      "push",
-      input.type as PartnerOperationalNotificationType,
-      input.templateVariant,
-    ),
-  );
-  const templateVariables = mergeNotificationTemplateVariables({
-    context: input.templateContext,
-    common: {
-      title: input.title,
-      body: input.body,
-      targetUrl: input.targetUrl,
-    },
+  const { accountIds, ...rest } = input;
+  return sendOperationalPushDeliveries(PARTNER_OPERATIONAL_PUSH, {
+    ...rest,
+    ownerIds: accountIds,
   });
-  const renderedTitle = renderNotificationTemplate(
-    template.titleTemplate,
-    templateVariables,
-  );
-  const renderedBody = renderNotificationTemplate(
-    template.bodyTemplate,
-    templateVariables,
-  );
-  const webpush = await getWebPush();
-  const serialized = toPushPayload({
-    type: input.type,
-    title: renderedTitle,
-    body: renderedBody,
-    targetUrl: input.targetUrl,
-    tag: `${input.type}:${input.notificationId}`,
-  });
-
-  await forEachWithConcurrency(
-    data ?? [],
-    OPERATIONAL_PUSH_CONCURRENCY,
-    async (subscription) => {
-      try {
-        await webpush.sendNotification(
-          await buildTrustedPushSubscriptionRequest({
-            endpoint: subscription.endpoint,
-            p256dh: subscription.p256dh,
-            auth: subscription.auth,
-          }),
-          serialized,
-        );
-        await markOperationalPushResult({
-          table: "partner_push_subscriptions",
-          id: subscription.id,
-          ok: true,
-        });
-        await recordPartnerDelivery({
-          notificationId: input.notificationId,
-          accountId: subscription.account_id,
-          channel: "push",
-          status: "sent",
-        });
-      } catch (error) {
-        const statusCode =
-          typeof error === "object" && error && "statusCode" in error
-            ? Number((error as { statusCode?: number }).statusCode)
-            : null;
-        const isInvalidSubscription =
-          error instanceof PushError &&
-          (error as InstanceType<typeof PushError>).code === "invalid_request";
-        const errorMessage =
-          error instanceof Error ? error.message : "푸시 발송 실패";
-        await markOperationalPushResult({
-          table: "partner_push_subscriptions",
-          id: subscription.id,
-          ok: false,
-          errorMessage,
-          deactivate:
-            isInvalidSubscription || statusCode === 404 || statusCode === 410,
-        });
-        await recordPartnerDelivery({
-          notificationId: input.notificationId,
-          accountId: subscription.account_id,
-          channel: "push",
-          status: "failed",
-          errorMessage,
-        });
-      }
-    },
-  );
 }
 
 export type OperationalNotificationDedupeInput = {
