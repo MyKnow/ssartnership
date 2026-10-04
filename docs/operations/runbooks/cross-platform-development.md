@@ -36,7 +36,7 @@ macOS x64, Windows arm64, Linux arm64는 현재 공식 개발환경이 아니다
 
 OS 수준 prerequisite는 Git과 Repository에 고정된 Node.js runtime뿐이다. Docker, local database, Supabase CLI, Vercel CLI의 global 설치는 기본 mock 개발환경의 필수 조건이 아니다.
 
-공식 local/GitHub 환경은 npm `11.16.0`을 사용한다. Vercel은 provider가 제공하는 검토된 npm `11.12.1` 이상 `11.x`를 허용하지만, 동일한 `install:trusted` 정책과 lockfile identity 검사를 통과해야 한다. npm 12는 별도 검토 전까지 거부한다.
+공식 local/GitHub 환경은 npm `11.16.0`을 사용한다. 설치 정책(`scripts/check-install-scripts.mjs`)은 GitHub 밖(로컬, 자체 호스팅 이미지의 Node 기본 npm)에서 검토된 npm `11.12.1` 이상 `11.x`를 허용하지만, 동일한 `install:trusted` 정책과 lockfile identity 검사를 통과해야 한다. npm 12는 별도 검토 전까지 거부한다. 이 하한은 폐기된 Vercel 빌더(RF-04, #537)를 위해 넓혔던 값이며, 좁히는 것은 별도 검토 대상이다.
 
 ## 3. 표준 명령
 
@@ -129,7 +129,7 @@ Next의 기본 dotenv 로더는 빌드 시 `.env.production`을 추가로 읽으
 
 최신 설정은 현재 자체 호스팅 서버의 해당 환경 `app.env`에서 가져온다. 폐기된 managed Supabase/Vercel 설정을 최신 원본으로 취급하지 않는다. Mac에서 사용할 파일에는 Compose 내부 `SUPABASE_INTERNAL_URL`을 그대로 복사하지 말고 검증된 공개 API 주소를 사용한다. localhost에서는 Preview 데이터와 세션 설정을 사용하되 사이트 origin은 실제 로컬 주소로 지정한다. 비밀을 출력하지 않고 각 환경에서 카테고리/공개 캐시 버전의 읽기 전용 요청으로 연결을 확인한다.
 
-bootstrap의 mock Secret은 machine에서 무작위로 생성하고 출력하지 않는다. Production credential을 mock profile에 복사하지 않는다. `.env`, `.env.local`, `.env.development`, `.env.development.local` 같은 추가 파일은 doctor와 bootstrap이 거부한다. 로컬 Vercel 도구와 일회성 이미지 migration도 명시적으로 `.env.preview`를 사용한다.
+bootstrap의 mock Secret은 machine에서 무작위로 생성하고 출력하지 않는다. Production credential을 mock profile에 복사하지 않는다. `.env`, `.env.local`, `.env.development`, `.env.development.local` 같은 추가 파일은 doctor와 bootstrap이 거부한다. 일회성 아바타 migration(`migrate:legacy-member-avatars`)도 명시적으로 `.env.preview`를 사용한다.
 
 doctor는 Preview 설정의 필수 변수, URL과 secret 형식을 검사한다. Production 검증 helper는 별도로 mock 충돌과 운영 필수값을 검사한다. 환경 파일은 Node dotenv 파서로 읽으며 shell 명령이나 `$VAR` 확장을 실행하지 않는다. 명시적인 프로세스 환경변수는 선택 파일보다 우선한다.
 

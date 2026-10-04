@@ -3,14 +3,14 @@ title: 성능 지식 인덱스
 type: index
 status: current
 authority: normative
-last_verified: 2026-08-29
+last_verified: 2026-10-05
 ---
 
 # 성능 지식 인덱스
 
 ## Baselines
 
-- [Speed Insights 기준선](./baselines/2026-04-03-speed-insights.md)
+- [2026-04-03 Vercel Speed Insights 기준선](./baselines/2026-04-03-speed-insights.md) (폐기된 측정 경로의 시점 증거)
 - [관리자 콘솔 측정 기준](./baselines/admin-console.md)
 
 ## Measurements and reports

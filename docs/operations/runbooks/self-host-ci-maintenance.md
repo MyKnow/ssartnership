@@ -74,7 +74,7 @@ Production standalone 산출물은 한 번 빌드하고 `App.Dockerfile`로 그�
 
 개발 페이지 보관 시간을 늘리는 `onDemandEntries` 실험으로도 같은 오류가 발생해 이 설정은 제거했다. 프레임워크 설정을 확정된 해결책으로 남기지 않는다. 실패 기록과 원인 진단은 [작업 증거](../../specs/self-host-database/tasks.md)와 CI 실패 원장에 보존한다.
 
-모든 페이지를 하나의 개발 서버에 누적시키는 초기 준비는 heap 부족으로 실패했다. 전용 CI는 Node 개발 스택 소스맵 캐시를 끄고, 전체 E2E를 16개 Playwright shard로 순차 실행한다. 묶음마다 개발 서버 프로세스는 새로 시작하며 선택된 테스트에 필요한 경로만 준비한다. 첫 진입 화면은 마지막에 준비한다. mock 환경에서는 자체 Web Vitals를 삽입하지 않고 설정 GET도 준비하지 않는다. 실제 비-Vercel Supabase 앱은 기존 runtime 활성화·샘플링 계약으로 수집한다. 디스크의 개발 캐시는 재사용할 수 있지만 이전 프로세스의 mock 세션·heap은 재사용하지 않는다. 전체 목록과 각 shard 목록의 테스트 ID 합집합을 먼저 비교하고, 결과마다 단 한 번의 passed/retry 0을 요구한다. 실행 후 ID 합집합도 다시 비교하므로 누락·중복·skip·재시도·부분 결과는 통과하지 못한다. 새 테스트 파일이나 인증 시나리오는 경로 준비 계획에 등록해야 한다. 각 묶음의 JSON/JUnit/HTML/실패 trace는 별도 디렉터리에 보존하며 전체 통과 전에는 complete receipt를 만들지 않는다.
+모든 페이지를 하나의 개발 서버에 누적시키는 초기 준비는 heap 부족으로 실패했다. 전용 CI는 Node 개발 스택 소스맵 캐시를 끄고, 전체 E2E를 16개 Playwright shard로 순차 실행한다. 묶음마다 개발 서버 프로세스는 새로 시작하며 선택된 테스트에 필요한 경로만 준비한다. 첫 진입 화면은 마지막에 준비한다. mock 환경에서는 자체 Web Vitals를 삽입하지 않고 설정 GET도 준비하지 않는다. 실제 Supabase 앱은 기존 runtime 활성화·샘플링 계약으로 수집한다. 디스크의 개발 캐시는 재사용할 수 있지만 이전 프로세스의 mock 세션·heap은 재사용하지 않는다. 전체 목록과 각 shard 목록의 테스트 ID 합집합을 먼저 비교하고, 결과마다 단 한 번의 passed/retry 0을 요구한다. 실행 후 ID 합집합도 다시 비교하므로 누락·중복·skip·재시도·부분 결과는 통과하지 못한다. 새 테스트 파일이나 인증 시나리오는 경로 준비 계획에 등록해야 한다. 각 묶음의 JSON/JUnit/HTML/실패 trace는 별도 디렉터리에 보존하며 전체 통과 전에는 complete receipt를 만들지 않는다.
 
 배포 운영자의 `import.mjs <request> <artifact directory> <새 release-stage directory>`는 다음을 검사한다.
 
@@ -155,7 +155,7 @@ Mac 반출 복원에서는 복호화한 pgBackRest/Restic 암호도 `runtimeKeys
 
 ## 공개 인증 리디렉션
 
-Next standalone의 route-handler `request.url`은 외부 HTTPS 요청에서도 컨테이너의 `0.0.0.0:3000`을 가리킬 수 있다. 실제 원본 Preview의 `/admin/session`에서 이를 확인했다. `buildTrustedRedirectUrl`은 real-mode에서 검증된 `NEXT_PUBLIC_SITE_URL`만 절대 redirect의 origin으로 사용한다. proxy의 관리자/파트너 분기와 회원 필수 단계, 관리자 세션 bridge, 파트너 로그아웃은 같은 helper를 사용한다. 일반 Vercel/로컬 실행은 기존 request origin을 유지한다.
+Next standalone의 route-handler `request.url`은 외부 HTTPS 요청에서도 컨테이너의 `0.0.0.0:3000`을 가리킬 수 있다. 실제 원본 Preview의 `/admin/session`에서 이를 확인했다. `buildTrustedRedirectUrl`은 real-mode에서 검증된 `NEXT_PUBLIC_SITE_URL`만 절대 redirect의 origin으로 사용한다. proxy의 관리자/파트너 분기와 회원 필수 단계, 관리자 세션 bridge, 파트너 로그아웃은 같은 helper를 사용한다. real 모드가 아닌 로컬 실행은 기존 request origin을 유지한다.
 
 목적지는 안전한 절대 경로만 허용하며 query와 sanitized returnTo는 유지한다. 외부 URL·프로토콜 상대 URL·역슬래시·제어 문자는 거절한다. Host/forwarded header를 운영 설정의 대용으로 사용하지 않으며 real-mode 설정 누락/오염 시 내부 주소로 되돌아가지 않는다. 필수 회원 단계 순서와 같은 출처 검사, Secure/HttpOnly/SameSite 쿠키는 변경하지 않는다. 기본 합성 E2E 외에 실제 공개 origin의 로그인·관리자 bridge·로그아웃 Location을 별도로 검증해야 한다.
 

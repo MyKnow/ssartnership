@@ -69,6 +69,8 @@ RPC가 500ms를 넘으면 안전한 빈 상태로 전환하도록 했다. SQL mi
 로컬 production 서버에서는 Vercel Analytics·Speed Insights 스크립트를 로드하지
 않도록 조건부 처리했다. Vercel 실행 환경에서는 기존 계측을 유지하고, 로컬 QA에서는
 선택적 외부 스크립트의 404가 관리자 화면 오류 신호를 오염시키지 않게 한다.
+(2026-10 후속: RF-04(#537)에서 Vercel Analytics·Speed Insights와 이 조건 분기를
+제거했다. 브라우저 성능은 [자체 호스팅 Web Vitals·Lighthouse 측정](../measurements/web-vitals.md)으로 확인한다.)
 
 프로필 사진 검토 큐는 최대 50개의 미리보기 요소를 렌더링하지만, 첫 제출 사진만
 즉시 로드하고 나머지는 브라우저 viewport 기준으로 지연 로드한다. 360px·820px·1366px

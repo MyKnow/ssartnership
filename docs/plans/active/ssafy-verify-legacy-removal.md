@@ -124,13 +124,13 @@ Production `members`에는 현재 `ssafy_*` 컬럼이 없다. 과거 migration�
 | legacy alias 8행 | `삭제` / `암호화 archive` / `YYYY-MM-DD까지 유지` | 미결정 |
 | archive 선택 시 위치·owner·만료일 | 구체 값 필수 | 미결정 |
 | Supabase backup/PITR | 보존 범위·복구 권한·복구 절차 확인 | 미확인 |
-| Vercel Verify env 12개 엔트리 | Preview/Production 삭제 승인 | 미결정 |
+| Vercel Verify env 12개 엔트리 | Vercel 프로젝트 폐기(RF-04, #537)의 env 전체 삭제에 포함 | 별도 승인 불필요, 운영자 외부 조치 대기 |
 | Verify provider credential | 폐기 또는 회전 승인 | 미결정 |
 | Preview 검증 후 Production forward migration | 수동 적용 승인 | 미결정 |
 
 권장 승인 문구는 다음과 같다.
 
-> SSAFY Verify 런타임 rollback을 포기한다. Production의 proof 13행과 legacy alias 8행은 별도 원문 export 없이 삭제한다. 승인된 Supabase backup/PITR의 보존·복구 범위를 확인한 뒤, Preview 검증을 통과한 forward migration을 Production에 수동 적용하고 Vercel의 Verify env 12개 엔트리와 provider credential을 제거한다.
+> SSAFY Verify 런타임 rollback을 포기한다. Production의 proof 13행과 legacy alias 8행은 별도 원문 export 없이 삭제한다. 승인된 Supabase backup/PITR의 보존·복구 범위를 확인한 뒤, Preview 검증을 통과한 forward migration을 Production에 수동 적용하고 Verify provider credential을 제거한다. Vercel의 Verify env 12개 엔트리는 Vercel 프로젝트 폐기 때 함께 삭제한다.
 
 다른 선택을 할 경우 숫자, 보관 종료일, archive 위치·owner·만료일을 위 문구에 명시한다.
 
@@ -148,7 +148,7 @@ Production `members`에는 현재 `ssafy_*` 컬럼이 없다. 과거 migration�
 6. Preview에 migration을 적용한 뒤 직접 Mattermost 가입·재설정·프로필 동기화·탈퇴/30일 익명화 계약을 확인한다. 운영 행을 임의로 만들거나 삭제하는 smoke는 별도 승인된 테스트 데이터에서만 수행한다.
 7. Production 적용 직전에 이 문서의 aggregate와 catalog boolean을 다시 SELECT-only로 확인하고 수치가 달라졌으면 승인을 갱신한다.
 8. 운영자가 backup/PITR와 수동 Production gate를 확인한 뒤 forward migration을 적용한다.
-9. 앱 배포와 직접 Mattermost smoke가 정상임을 확인한 뒤 Vercel Verify env를 제거하고 provider credential을 폐기 또는 회전한다.
+9. 앱 배포와 직접 Mattermost smoke가 정상임을 확인한 뒤 provider credential을 폐기 또는 회전한다. Vercel Verify env는 이 순서와 무관하게 Vercel 프로젝트 폐기(RF-04, #537) 때 함께 삭제한다.
 10. postflight에서 table·column·constraint·함수 정의·env key 부재를 확인하고 Issue에 식별값 없는 결과만 기록한다.
 
 forward migration을 되감는 reverse SQL을 기본 rollback으로 두지 않는다. 데이터 삭제 뒤 rollback이 필요하면 승인된 backup/PITR와 그 시점에 맞는 코드·환경 변수를 함께 복원해야 한다.

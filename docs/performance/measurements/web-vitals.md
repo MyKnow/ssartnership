@@ -24,7 +24,7 @@ Vercel Speed Insights·Analytics는 RF-04(#537)에서 제거했다. 브라우저
 
 배포 후 확인 순서:
 
-1. 배포한 환경에서 `GET /api/web-vitals`가 `{"enabled":true}`를 반환하는지 확인한다.
+1. 배포한 환경에서 `GET /api/web-vitals` 응답의 `enabled`가 `true`이고 `sampleRate`가 의도한 값인지 확인한다.
 2. 실제 트래픽이 쌓일 때까지 기다린다. 환경별 최근 15분 표본이 5개 미만이면 공용 대시보드가 p75를 표시하지 않는다.
 3. 공용 Grafana `SSARTNERSHIP Operations` 대시보드(정본: `deploy/pve/grafana`)의 `LCP p75`·`INP p75`·`CLS p75`와 `최근 표본 수` 패널을 기록 표에 옮긴다.
 4. 검증 환경에서 전체 표본이 필요하면 `SELF_HOST_VITALS_SAMPLE_RATE=1`을 해당 환경에만 일시 적용하고, 측정 후 기본값으로 되돌린다.
