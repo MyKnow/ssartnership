@@ -553,3 +553,41 @@ export function summarizePartnerNotificationUiModels(
     },
   );
 }
+
+/**
+ * '더 보기'로 받은 저장 알림을 현재 목록에 합친다. 이미 있는 항목은 화면에서
+ * 바뀐 읽음 상태를 지키기 위해 기존 값을 유지하고, 서버와 같은 순서
+ * (createdAt, id 내림차순)로 정렬한다.
+ */
+export function mergePartnerNotificationEntries(
+  current: readonly PartnerNotificationEntry[],
+  incoming: readonly PartnerNotificationEntry[],
+) {
+  const byId = new Map(current.map((item) => [item.id, item] as const));
+  for (const item of incoming) {
+    if (!byId.has(item.id)) {
+      byId.set(item.id, item);
+    }
+  }
+  return [...byId.values()].sort(
+    (left, right) =>
+      right.createdAt.localeCompare(left.createdAt) ||
+      right.id.localeCompare(left.id),
+  );
+}
+
+/**
+ * 저장 알림 전체 미확인 수가 불러온 미확인 수보다 많으면, 아직 불러오지 않은
+ * 이전 페이지에 미확인 알림이 남아 있다.
+ */
+export function hasUnloadedUnreadPartnerNotifications(input: {
+  storedUnreadCount: number | null;
+  loadedUnreadCount: number;
+  hasMore: boolean;
+}) {
+  return (
+    input.hasMore &&
+    input.storedUnreadCount !== null &&
+    input.storedUnreadCount > input.loadedUnreadCount
+  );
+}

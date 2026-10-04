@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { isPartnerPortalCompanyAllowed } from "@/lib/partner-portal-scope";
 import {
   deletePartnerStoredNotifications,
-  listPartnerStoredNotifications,
   markPartnerStoredNotificationsRead,
 } from "@/lib/partner-notification-store";
+import { listPartnerNotificationCenterStoredEntries } from "@/lib/partner-notifications";
+import {
+  parsePartnerNotificationPageQuery,
+  type PartnerNotificationListResponse,
+} from "@/lib/partner-notification-contract";
 import { getPartnerSession } from "@/lib/partner-session";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
@@ -76,20 +80,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: "권한이 없습니다." }, { status: 403 });
   }
   try {
-    const result = await listPartnerStoredNotifications({
+    const { offset, limit } = parsePartnerNotificationPageQuery(
+      request.nextUrl.searchParams,
+    );
+    const result = await listPartnerNotificationCenterStoredEntries({
       accountId: session.accountId,
-      companyId,
-      limit: 30,
+      companyIds: session.companyIds,
+      companyId: companyId || null,
+      offset,
+      limit,
     });
-    if (companyId && result.isEmptyScope) {
-      return NextResponse.json({ unreadCount: 0, items: [] });
-    }
     return NextResponse.json({
       ok: true,
       summary: { unreadCount: result.unreadCount },
       unreadCount: result.unreadCount,
       items: result.items,
-    });
+      nextOffset: result.nextOffset,
+      hasMore: result.hasMore,
+    } satisfies PartnerNotificationListResponse);
   } catch (error) {
     console.error("[partner-notifications] list failed", error);
     const safeError = getSafeNotificationRouteError(

@@ -98,7 +98,7 @@ authority: descriptive
 | GET/POST | `/api/partner/setup/[token]` | 초기 설정 context/complete |
 | POST | `/api/partner/billing/business-status` | 사업자 상태 조회 |
 | PATCH | `/api/partner/reviews/[reviewId]` | 협력사 리뷰 moderation |
-| GET/PATCH/DELETE | `/api/partner/notifications` | 협력사 notification 목록/일괄 처리 |
+| GET/PATCH/DELETE | `/api/partner/notifications` | 협력사 notification 목록(`offset`·`limit`≤20·`hasMore`)/일괄 처리 |
 | PATCH/DELETE | `/api/partner/notifications/[id]` | 협력사 notification 단건 처리 |
 | GET/POST | `/api/partner/notifications/preferences` | 협력사 notification preference |
 | POST | `/api/partner/push/subscribe` | 협력사 push 구독 |

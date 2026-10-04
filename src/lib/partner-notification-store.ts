@@ -1,4 +1,8 @@
 import { createNotificationStorageError } from "@/lib/notifications/safe-error";
+import {
+  MAX_PARTNER_NOTIFICATION_OFFSET,
+  PARTNER_NOTIFICATION_PAGE_SIZE,
+} from "@/lib/partner-notification-contract";
 import { listMockPartnerPortalSetupsInternal } from "@/lib/mock/partner-portal/store";
 import { isPartnerPortalMock } from "@/lib/partner-portal";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -28,6 +32,7 @@ export type StoredPartnerNotificationRow = {
 type PartnerStoredNotificationListParams = {
   accountId: string;
   companyId?: string | null;
+  offset?: number;
   limit?: number;
 };
 
@@ -39,11 +44,14 @@ type PartnerStoredNotificationMutationParams = {
 
 type PartnerStoredNotificationListResult = {
   isEmptyScope: boolean;
+  /** 계정(또는 회사 범위)의 전체 미확인 수. 페이지 크기와 무관하다. */
   unreadCount: number;
   items: StoredPartnerNotificationRow[];
+  nextOffset: number;
+  hasMore: boolean;
 };
 
-const DEFAULT_PARTNER_NOTIFICATION_LIST_LIMIT = 30;
+const DEFAULT_PARTNER_NOTIFICATION_LIST_LIMIT = PARTNER_NOTIFICATION_PAGE_SIZE;
 const MAX_PARTNER_NOTIFICATION_LIST_LIMIT = 100;
 
 function normalizePartnerNotificationListLimit(limit?: number) {
@@ -54,6 +62,16 @@ function normalizePartnerNotificationListLimit(limit?: number) {
   return Math.min(
     MAX_PARTNER_NOTIFICATION_LIST_LIMIT,
     Math.max(1, Math.trunc(limit as number)),
+  );
+}
+
+function normalizePartnerNotificationListOffset(offset?: number) {
+  if (!Number.isFinite(offset)) {
+    return 0;
+  }
+  return Math.min(
+    MAX_PARTNER_NOTIFICATION_OFFSET,
+    Math.max(0, Math.trunc(offset as number)),
   );
 }
 
@@ -68,9 +86,11 @@ type PartnerStoredNotificationRepository = {
     accountId: string;
     notificationIds?: string[] | null;
   }): Promise<number>;
+  /** 최신순(created_at, id 내림차순)으로 offset부터 최대 limit행을 돌려준다. */
   list(params: {
     accountId: string;
     notificationIds?: string[] | null;
+    offset: number;
     limit: number;
   }): Promise<StoredPartnerNotificationRow[]>;
   markRead(params: {
@@ -227,7 +247,7 @@ function createMockPartnerStoredNotificationRepository(): PartnerStoredNotificat
       ).length;
     },
 
-    async list({ accountId, notificationIds, limit }) {
+    async list({ accountId, notificationIds, offset, limit }) {
       const state = getMockPartnerStoredNotificationState();
       return state.recipients
         .filter(
@@ -241,7 +261,7 @@ function createMockPartnerStoredNotificationRepository(): PartnerStoredNotificat
           }
           return right.createdAt.localeCompare(left.createdAt);
         })
-        .slice(0, limit)
+        .slice(offset, offset + limit)
         .map((recipient) => {
           const notification = state.notifications.get(recipient.notificationId);
           return {
@@ -339,7 +359,7 @@ function createSupabasePartnerStoredNotificationRepository(): PartnerStoredNotif
       return count ?? 0;
     },
 
-    async list({ accountId, notificationIds, limit }) {
+    async list({ accountId, notificationIds, offset, limit }) {
       const supabase = getSupabaseAdminClient();
       let query = supabase
         .from("partner_notification_recipients")
@@ -349,7 +369,8 @@ function createSupabasePartnerStoredNotificationRepository(): PartnerStoredNotif
         .eq("account_id", accountId)
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
-        .limit(limit);
+        .order("id", { ascending: false })
+        .range(offset, offset + limit - 1);
       if (notificationIds && notificationIds.length > 0) {
         query = query.in("notification_id", notificationIds);
       }
@@ -411,15 +432,23 @@ export function createPartnerStoredNotificationService(
       params: PartnerStoredNotificationListParams,
     ): Promise<PartnerStoredNotificationListResult> {
       const limit = normalizePartnerNotificationListLimit(params.limit);
+      const offset = normalizePartnerNotificationListOffset(params.offset);
       const notificationIds = params.companyId
         ? await repository.listScopedNotificationIds(params.companyId)
         : null;
 
       if (notificationIds && notificationIds.length === 0) {
-        return { isEmptyScope: true, unreadCount: 0, items: [] };
+        return {
+          isEmptyScope: true,
+          unreadCount: 0,
+          items: [],
+          nextOffset: offset,
+          hasMore: false,
+        };
       }
 
-      const [unreadCount, items] = await Promise.all([
+      // 한 행을 더 읽어 다음 페이지 존재 여부를 판단한다(count 쿼리 없이).
+      const [unreadCount, rows] = await Promise.all([
         repository.countUnread({
           accountId: params.accountId,
           notificationIds,
@@ -427,11 +456,19 @@ export function createPartnerStoredNotificationService(
         repository.list({
           accountId: params.accountId,
           notificationIds,
-          limit,
+          offset,
+          limit: limit + 1,
         }),
       ]);
+      const items = rows.slice(0, limit);
 
-      return { isEmptyScope: false, unreadCount, items };
+      return {
+        isEmptyScope: false,
+        unreadCount,
+        items,
+        nextOffset: offset + items.length,
+        hasMore: rows.length > limit,
+      };
     },
 
     async markRead(
