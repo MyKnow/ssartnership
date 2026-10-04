@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import test from "node:test";
 import {
@@ -124,4 +124,27 @@ test("image optimizer sizes follow stored source widths and cache across deploys
     const all = [...images.imageSizes, ...images.deviceSizes];
     assert.ok(all.some((size) => size >= width) && all.some((size) => size >= width * 2), `width ${width}`);
   }
+});
+
+test("real-data images leave out the mock repository fixtures", () => {
+  const ignore = read("deploy/self-host-ci/App.Dockerfile.dockerignore").split("\n");
+  const included = ignore.indexOf("!public/**");
+  assert.ok(included !== -1 && ignore.indexOf("public/mock") > included && ignore.indexOf("public/mock/**") > included);
+  assert.match(read("Dockerfile"), /if \[ "\$\{NEXT_PUBLIC_DATA_SOURCE\}" != "mock" \]; then rm -rf public\/mock; fi/u);
+
+  // Only mock repositories, mock helpers and stories may reference the fixtures.
+  const offenders: string[] = [];
+  const walk = (directory: URL, relative: string) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = `${relative}${entry.name}`;
+      if (entry.isDirectory()) {
+        if (entry.name !== "mock") walk(new URL(`${entry.name}/`, directory), `${path}/`);
+      } else if (/\.(?:ts|tsx|mts|mjs)$/u.test(entry.name) && !/\.stories\.tsx$/u.test(entry.name)
+        && /["'`]\/mock\/(?:partners|members)\//u.test(readFileSync(new URL(entry.name, directory), "utf8"))) {
+        offenders.push(path);
+      }
+    }
+  };
+  walk(new URL("../src/", import.meta.url), "src/");
+  assert.deepEqual(offenders, []);
 });
