@@ -1,161 +1,101 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const imageProxyRateLimitModulePromise = import(
   new URL("../src/lib/image-proxy-rate-limit.ts", import.meta.url).href
 );
 
-test("image proxy quota uses a durable shared bucket when no trusted IP is available", async () => {
-  const { consumeImageProxyRequestQuota, getImageProxyRateLimitKey } =
-    await imageProxyRateLimitModulePromise;
-  const key = getImageProxyRateLimitKey("unknown");
+test("image proxy quota skips the IP bucket when no trusted client IP is available", async () => {
+  const {
+    consumeImageProxyRequestQuota,
+    IMAGE_PROXY_RATE_LIMIT,
+    resetImageProxyRateLimitForTests,
+  } = await imageProxyRateLimitModulePromise;
+  resetImageProxyRateLimitForTests();
 
-  const result = await consumeImageProxyRequestQuota(
-    { ipAddress: null },
-    {
-      getBlockingState: async (keys: string[]) => {
-        assert.deepEqual(keys, [key]);
-        return { ok: true, blocked: false } as const;
-      },
-      recordAttemptBatch: async (keys: string[], success: boolean) => {
-        assert.deepEqual(keys, [key]);
-        assert.equal(success, false);
-        return { ok: true, attemptedCount: 1, failedCount: 0 } as const;
-      },
-    },
-  );
-
-  assert.deepEqual(result, { ok: true });
-});
-
-test("image proxy quota returns blocked with a retry hint when the key is already blocked", async () => {
-  const { consumeImageProxyRequestQuota, getImageProxyRateLimitKey } =
-    await imageProxyRateLimitModulePromise;
-
-  const key = getImageProxyRateLimitKey("203.0.113.12");
-  let recordCalled = false;
-  const result = await consumeImageProxyRequestQuota(
-    { ipAddress: "203.0.113.12" },
-    {
-      getBlockingState: async (keys: string[]) => {
-        assert.deepEqual(keys, [key]);
-        return {
-          ok: true,
-          blocked: true,
-          identifier: key,
-          blockedUntil: new Date(Date.now() + 60_000).toISOString(),
-        } as const;
-      },
-      recordAttemptBatch: async () => {
-        recordCalled = true;
-        return { ok: true, attemptedCount: 1, failedCount: 0 } as const;
-      },
-    },
-  );
-
-  assert.equal(result.ok, false);
-  assert.equal(result.code, "blocked");
-  if (result.code === "blocked") {
-    assert.ok(result.retryAfterSeconds >= 59);
-    assert.ok(result.retryAfterSeconds <= 60);
+  // Next 이미지 옵티마이저 내부 호출은 전달 헤더가 없어 언제나 null이다.
+  for (let index = 0; index < IMAGE_PROXY_RATE_LIMIT.maxAttempts * 2; index += 1) {
+    assert.deepEqual(
+      consumeImageProxyRequestQuota({ ipAddress: null }, 1_000),
+      { ok: true, scope: "untracked" },
+    );
   }
-  assert.equal(recordCalled, false);
+  assert.deepEqual(
+    consumeImageProxyRequestQuota({ ipAddress: "unknown" }, 1_000),
+    { ok: true, scope: "untracked" },
+  );
+  resetImageProxyRateLimitForTests();
 });
 
-test("image proxy quota records a request and rechecks the block state", async () => {
-  const { consumeImageProxyRequestQuota, getImageProxyRateLimitKey } =
-    await imageProxyRateLimitModulePromise;
+test("image proxy quota blocks one IP after the window limit without touching other IPs", async () => {
+  const {
+    consumeImageProxyRequestQuota,
+    IMAGE_PROXY_RATE_LIMIT,
+    resetImageProxyRateLimitForTests,
+  } = await imageProxyRateLimitModulePromise;
+  resetImageProxyRateLimitForTests();
 
-  const key = getImageProxyRateLimitKey("203.0.113.12");
-  let calls = 0;
-  const result = await consumeImageProxyRequestQuota(
-    { ipAddress: "203.0.113.12" },
-    {
-      getBlockingState: async (keys: string[]) => {
-        assert.deepEqual(keys, [key]);
-        calls += 1;
-        if (calls === 1) {
-          return { ok: true, blocked: false } as const;
-        }
-        return {
-          ok: true,
-          blocked: true,
-          identifier: key,
-          blockedUntil: new Date(Date.now() + 60_000).toISOString(),
-        } as const;
-      },
-      recordAttemptBatch: async (keys: string[], success: boolean) => {
-        assert.deepEqual(keys, [key]);
-        assert.equal(success, false);
-        return { ok: true, attemptedCount: 1, failedCount: 0 } as const;
-      },
-    },
+  const now = 10_000;
+  for (let index = 0; index < IMAGE_PROXY_RATE_LIMIT.maxAttempts; index += 1) {
+    assert.deepEqual(
+      consumeImageProxyRequestQuota({ ipAddress: "203.0.113.12" }, now),
+      { ok: true, scope: "ip" },
+    );
+  }
+
+  const blocked = consumeImageProxyRequestQuota({ ipAddress: "203.0.113.12" }, now);
+  assert.equal(blocked.ok, false);
+  if (!blocked.ok) {
+    assert.equal(blocked.code, "blocked");
+    assert.equal(
+      blocked.retryAfterSeconds,
+      Math.ceil(IMAGE_PROXY_RATE_LIMIT.blockMs / 1_000),
+    );
+  }
+
+  // 같은 주소의 다른 표기도 같은 버킷이다.
+  assert.equal(
+    consumeImageProxyRequestQuota({ ipAddress: "::ffff:203.0.113.12" }, now + 1_000).ok,
+    false,
+  );
+  assert.deepEqual(
+    consumeImageProxyRequestQuota({ ipAddress: "203.0.113.13" }, now),
+    { ok: true, scope: "ip" },
   );
 
-  assert.equal(calls, 2);
-  assert.equal(result.ok, false);
-  assert.equal(result.code, "blocked");
-  if (result.code === "blocked") {
-    assert.ok(result.retryAfterSeconds >= 59);
-    assert.ok(result.retryAfterSeconds <= 60);
-  }
+  // 차단이 끝나면 새 창에서 다시 허용한다.
+  assert.deepEqual(
+    consumeImageProxyRequestQuota(
+      { ipAddress: "203.0.113.12" },
+      now + IMAGE_PROXY_RATE_LIMIT.blockMs,
+    ),
+    { ok: true, scope: "ip" },
+  );
+  resetImageProxyRateLimitForTests();
 });
 
-test("image proxy quota stores a hashed caller key", async () => {
+test("image proxy quota keys hash the caller IP", async () => {
   const { getImageProxyRateLimitKey } = await imageProxyRateLimitModulePromise;
 
   const key = getImageProxyRateLimitKey("203.0.113.12");
   assert.match(key, /^public-image-proxy:ip:[0-9a-f]{64}$/u);
   assert.doesNotMatch(key, /203\.0\.113\.12/u);
+  assert.equal(getImageProxyRateLimitKey("::FFFF:203.0.113.12"), key);
 });
 
-test("image proxy quota reports unavailable when persistence fails", async () => {
-  const { consumeImageProxyRequestQuota, getImageProxyRateLimitKey } =
-    await imageProxyRateLimitModulePromise;
-
-  const key = getImageProxyRateLimitKey("203.0.113.12");
-  const result = await consumeImageProxyRequestQuota(
-    { ipAddress: "203.0.113.12" },
-    {
-      getBlockingState: async (keys: string[]) => {
-        assert.deepEqual(keys, [key]);
-        return { ok: true, blocked: false } as const;
-      },
-      recordAttemptBatch: async () =>
-        ({
-          ok: false,
-          code: "rate_limit_storage_failed",
-          attemptedCount: 1,
-          failedCount: 1,
-        }) as const,
-    },
+test("image proxy quota no longer round-trips to the database per request", () => {
+  const source = readFileSync(
+    new URL("../src/lib/image-proxy-rate-limit.ts", import.meta.url),
+    "utf8",
+  );
+  const routeSource = readFileSync(
+    new URL("../src/app/api/image/route.ts", import.meta.url),
+    "utf8",
   );
 
-  assert.deepEqual(result, { ok: false, code: "unavailable" });
-});
-
-test("image proxy quota succeeds when the request stays within the shared window", async () => {
-  const { consumeImageProxyRequestQuota, getImageProxyRateLimitKey } =
-    await imageProxyRateLimitModulePromise;
-
-  const key = getImageProxyRateLimitKey("203.0.113.12");
-  let calls = 0;
-  const result = await consumeImageProxyRequestQuota(
-    { ipAddress: "203.0.113.12" },
-    {
-      getBlockingState: async (keys: string[]) => {
-        assert.deepEqual(keys, [key]);
-        calls += 1;
-        return { ok: true, blocked: false } as const;
-      },
-      recordAttemptBatch: async (keys: string[], success: boolean) => {
-        assert.deepEqual(keys, [key]);
-        assert.equal(success, false);
-        return { ok: true, attemptedCount: 1, failedCount: 0 } as const;
-      },
-    },
-  );
-
-  assert.equal(calls, 2);
-  assert.deepEqual(result, { ok: true });
+  assert.doesNotMatch(source, /@\/lib\/rate-limit"|getBlockingState|recordAttemptBatch|suggestion_attempts/u);
+  assert.match(source, /createInMemoryRateLimiter/u);
+  assert.doesNotMatch(routeSource, /getRequestLogContext|await consumeImageProxyRequestQuota/u);
+  assert.match(routeSource, /consumeImageProxyRequestQuota\(\{\s*ipAddress:\s*getClientIp\(request\.headers\)/u);
 });

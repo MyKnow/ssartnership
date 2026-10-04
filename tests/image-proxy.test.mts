@@ -141,9 +141,30 @@ test("public image route applies the raster policy and disables MIME sniffing", 
     routeSource,
     /fetchPublicImage\(parsed,\s*\{[\s\S]*allowedContentTypes:\s*PUBLIC_RASTER_IMAGE_CONTENT_TYPES[\s\S]*\}\)/u,
   );
+  assert.match(
+    routeSource,
+    /maxBytes:\s*PUBLIC_IMAGE_PROXY_FETCH_LIMITS\.maxBytes[\s\S]*timeoutMs:\s*PUBLIC_IMAGE_PROXY_FETCH_LIMITS\.timeoutMs/u,
+  );
   assert.match(routeSource, /consumeImageProxyRequestQuota/u);
   assert.match(routeSource, /status:\s*429/u);
   assert.match(routeSource, /"Retry-After":\s*String\(quota\.retryAfterSeconds\)/u);
-  assert.match(routeSource, /status:\s*503/u);
   assert.match(routeSource, /"x-content-type-options":\s*"nosniff"/u);
+});
+
+test("public image proxy fetch limits stay within the server-wide image bounds", async () => {
+  const {
+    PUBLIC_IMAGE_PROXY_FETCH_LIMITS,
+    resolveImageFetchTimeoutMs,
+  } = await imageProxyModulePromise;
+  const { IMAGE_FETCH_TIMEOUT_MS, MAX_IMAGE_BYTES } = await import(
+    new URL("../src/lib/image-proxy/shared.ts", import.meta.url).href
+  );
+
+  assert.ok(PUBLIC_IMAGE_PROXY_FETCH_LIMITS.maxBytes <= MAX_IMAGE_BYTES);
+  assert.ok(PUBLIC_IMAGE_PROXY_FETCH_LIMITS.timeoutMs <= IMAGE_FETCH_TIMEOUT_MS);
+  assert.equal(resolveImageFetchTimeoutMs(undefined), IMAGE_FETCH_TIMEOUT_MS);
+  assert.equal(resolveImageFetchTimeoutMs(2_000), 2_000);
+  for (const invalid of [0, -1, 1.5, IMAGE_FETCH_TIMEOUT_MS + 1]) {
+    assert.throws(() => resolveImageFetchTimeoutMs(invalid), /Invalid image timeout/u);
+  }
 });
