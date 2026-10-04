@@ -106,9 +106,9 @@ SSD에서는 기존 성공 사본을 자동 삭제하지 않는다. 여유 공�
 
 ### Preview 인프라 전용 로그인
 
-`deploy/self-host/Caddyfile`의 `ssartnership-infra-dev.myknow.xyz/infra/`는 앱·Storage와 분리된 관리 origin이다. `compose.edge.yaml`이 mount하는 private `infra-auth/users`에는 bcrypt hash만 둔다. 실제 비밀번호는 별도 monitoring secret으로 관리하며 저장소·로그에 기록하지 않는다. Grafana는 같은 operator 계정을 자체 검증한다.
+`deploy/pve/edge.Caddyfile`의 `ssartnership-infra-dev.myknow.xyz`는 인증 뒤 Production 관리 origin의 공용 대시보드로 이동하며 앱·Storage와 분리된다. `deploy/pve/compose.operations.yaml`이 mount하는 private `infra-auth/users`에는 bcrypt hash만 둔다. 실제 비밀번호는 별도 monitoring secret으로 관리하며 저장소·로그에 기록하지 않는다. Grafana는 같은 operator 계정을 자체 검증한다.
 
-Prometheus·Alertmanager는 GET/HEAD만 허용하며 Authorization·Cookie를 제거한다. 외부 Origin, cross-site API 요청과 iframe을 차단한다. Grafana의 인증 대리 헤더는 제거한다. Preview monitoring upstream은 환경별 전체 컨테이너 이름을 사용한다. 공용 edge에 Production 네트워크를 연결할 때 앱과 gateway의 기존 별칭도 실제 Preview 이름으로 치환하고, 활성 복합 Caddyfile을 이 템플릿 하나로 덮어쓰지 않는다.
+Prometheus·Alertmanager는 GET/HEAD만 허용하며 Authorization·Cookie를 제거한다. 외부 Origin, cross-site API 요청과 iframe을 차단한다. Grafana의 인증 대리 헤더는 제거한다. 운영 VM의 monitoring upstream은 같은 Compose의 서비스 이름(`prometheus`, `alertmanager`, `grafana`, `notifier`)만 사용한다.
 
 적용 전 설정을 보존하고 Compose config와 Caddy validate를 통과시킨다. 무인증·오류 암호 401, 정상 로그인 및 각 subpath assets/API, 외부 Origin 403, 조회 서비스 POST 405, 원본 포트 loopback을 함께 확인한다. 접근 문제 시 이전 Caddyfile과 Compose 설정을 복원한다. 인증 경계만 같다고 화면 검증을 대체하지 않는다.
 
@@ -116,7 +116,7 @@ Prometheus·Alertmanager는 GET/HEAD만 허용하며 Authorization·Cookie를 �
 
 ### Production 외부 관측 경로
 
-`deploy/self-host/Caddyfile.production`는 API 및 인프라 도메인 전용 조각이다. 활성화 시 기존 edge 설정을 보존한 새 버전 설정에 이 조각을 결합하고 Caddy 검증을 통과시킨다. Caddy를 Production edge·monitoring 네트워크에 연결하고, Dev와 Prod의 upstream은 서비스 별칭 대신 환경별 전체 컨테이너 이름으로 구분한다. 전체 네트워크를 연결한 뒤 `app` 같은 중복 별칭을 남기면 다른 환경으로 연결될 수 있다. 기존 Dev upstream도 전체 이름으로 고정하고 두 환경 응답을 함께 검증한다.
+API 및 인프라 도메인은 `deploy/pve/edge.Caddyfile` 하나에 함께 정의한다. 노트북 시대에 결합하던 `Caddyfile.production` 조각과 같은 호스트 edge overlay는 [Issue #531](https://github.com/MyKnow/ssartnership/issues/531)에서 삭제했다. 앱·API upstream은 각 앱 VM의 relay 주소, 관측 upstream은 운영 VM Compose 서비스 이름이다. edge Caddy는 내부 수집용 `caddy:9180/metrics`만 노출하고 공개 origin은 JSON 접근 로그를 남긴다. 세부 계약은 [자체 호스팅 운영 문서](./self-hosting.md#공개-edge와-tls)를 따른다.
 
 `/run/production-infra-auth/users`는 별도 Production 인프라 계정의 bcrypt hash 파일만 읽기 전용으로 mount한다. 원본 부모는 0700이며 사용자 비밀번호와 앱 계정을 설정 조각에 넣지 않는다. Prometheus·Alertmanager 경로는 GET/HEAD만 허용하고 인증 헤더와 쿠키를 upstream에 전달하지 않는다. Grafana는 동일한 전용 operator 계정을 자체 검증한다. 외부 Origin과 cross-site API 요청을 차단한다. DNS의 권한 서버 및 독립 resolver 응답이 일치한 뒤 TLS 발급을 시작한다. 원시 서비스 포트는 loopback으로 유지한다.
 
@@ -222,7 +222,7 @@ Production의 `backup-status.service/timer`는 systemd 작업 결과와 검증�
 
 ### 안전한 적용·복귀·검증
 
-기존 운영 env의 `PVE_PUBLIC_SERVICES_READY=1`과 certificate/data volume을 보존한다. 새 코드·규칙을 versioned 디렉터리에 준비한 뒤 Compose config, Caddy validate, amtool, promtool unit rules를 통과시킨다. promtool은 read-only container와 임시 `/tmp`를 함께 사용한다. 바뀐 bind mount를 위해 Prometheus만 재생성하고 notifier/observer만 시작한다. Alertmanager는 HUP, Caddy 2.11.4는 USR1으로 file reload한다. 이미 bind mounted인 단일 설정 파일은 inode가 바뀌지 않도록 제자리에서 기록한다. Grafana dashboard directory provisioning은 변경된 JSON을 읽으며 사용자 계정은 변경하지 않는다.
+certificate/data volume을 보존한다. `PVE_PUBLIC_SERVICES_READY`는 edge Caddyfile이 더 이상 읽지 않으므로 값이 빠져도 공개 origin이 닫히지 않는다. 새 코드·규칙을 versioned 디렉터리에 준비한 뒤 Compose config, Caddy validate, amtool, promtool unit rules를 통과시킨다. promtool은 read-only container와 임시 `/tmp`를 함께 사용한다. 바뀐 bind mount를 위해 Prometheus만 재생성하고 notifier/observer만 시작한다. Alertmanager는 HUP, Caddy 2.11.4는 USR1으로 file reload한다. 이미 bind mounted인 단일 설정 파일은 inode가 바뀌지 않도록 제자리에서 기록한다. Grafana dashboard directory provisioning은 변경된 JSON을 읽으며 사용자 계정은 변경하지 않는다.
 
 되돌릴 때 versioned rollback의 기존 Compose·Caddy·규칙·dashboard·private monitoring env를 복구하고 같은 검증/재적용 순서로 처리한다. host timer를 stop/disable하고 승인된 host 입력 경로를 제거하면 host 수집을 철회할 수 있다. Production backup outcome timer/drop-in을 철회할 때 기존 OnFailure 발송 경로와 자격 증명도 함께 복구하여 알림이 누락되지 않게 한다. backup snapshot/원본 데이터/사용자 관리 계정은 복귀 범위에서 삭제하지 않는다.
 

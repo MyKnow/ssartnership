@@ -1,5 +1,9 @@
 {
 	admin off
+	# Request metrics are exposed only by the internal scrape listener at the
+	# end of this file. Host labels stay off so arbitrary Host headers cannot
+	# grow label cardinality.
+	metrics
 	servers {
 		timeouts {
 			read_body 70s
@@ -9,54 +13,87 @@
 	}
 }
 
-(final_snapshot_gate) {
-	@preparing expression {$PVE_PUBLIC_SERVICES_READY:0} == 0
-	header @preparing Retry-After "120"
-	respond @preparing "서버 이전 준비 중입니다. 잠시 후 다시 시도해주세요." 503
+# Access logs are JSON on stdout; Docker's bounded local driver rotates them.
+# Mask client networks and drop credentials, referrers, redirect targets,
+# query strings and one-time token path segments before they are written.
+(ssartnership_access_log) {
+	log {
+		output stdout
+		format filter {
+			request>remote_ip ip_mask 24 48
+			request>client_ip ip_mask 24 48
+			request>uri regexp "^((?:/api)?/(?:admin|partner)/setup/|/(?:wallet/)?verify/|/api/(?:certification|wallet/apple)/avatar/)[^/?]+|([?]).*$" "${1}${2}redacted"
+			request>headers>Cookie delete
+			request>headers>Authorization delete
+			request>headers>Referer delete
+			resp_headers>Set-Cookie delete
+			resp_headers>Location delete
+			wrap json
+		}
+	}
+}
+
+# Shared by the four public app/API origins.
+(ssartnership_public_origin) {
+	encode zstd gzip
+	header X-SSARTNERSHIP-Ingress pve-5202
+	# Next already sends HSTS for app pages. The default also covers API and
+	# edge-generated responses without duplicating an upstream header.
+	header ?Strict-Transport-Security "max-age=63072000; includeSubDomains"
+	request_body {
+		max_size 64MB
+	}
+	import ssartnership_access_log
+}
+
+# Client address contract: this edge has no trusted_proxies, so Caddy replaces
+# any client-supplied X-Forwarded-For with the connection address. X-Real-IP is
+# not managed by default and is overwritten here. The relay trusts only this
+# edge hop and the app trusts only the first X-Forwarded-For value.
+(ssartnership_forwarded_client) {
+	header_up X-Real-IP {remote_host}
+}
+
+# Cron runs over the app VM loopback and readiness serves the private probe.
+# Neither is a public endpoint, so the edge answers a plain 404.
+(ssartnership_internal_routes) {
+	@internal_only path /api/cron /api/cron/* /api/ready /api/ready/*
+	respond @internal_only 404
 }
 
 ssartnership.myknow.xyz {
-	import final_snapshot_gate
-	encode zstd gzip
-	header X-SSARTNERSHIP-Ingress pve-5202
-	request_body {
-		max_size 64MB
+	import ssartnership_public_origin
+	import ssartnership_internal_routes
+	reverse_proxy 192.168.1.182:3110 {
+		import ssartnership_forwarded_client
 	}
-	reverse_proxy 192.168.1.182:3110
 }
 
 ssartnership-dev.myknow.xyz {
-	import final_snapshot_gate
-	encode zstd gzip
-	header X-SSARTNERSHIP-Ingress pve-5202
-	request_body {
-		max_size 64MB
+	import ssartnership_public_origin
+	import ssartnership_internal_routes
+	reverse_proxy 192.168.1.69:3108 {
+		import ssartnership_forwarded_client
 	}
-	reverse_proxy 192.168.1.69:3108
 }
 
 ssartnership-api.myknow.xyz {
-	import final_snapshot_gate
-	encode zstd gzip
-	header X-SSARTNERSHIP-Ingress pve-5202
-	request_body {
-		max_size 64MB
+	import ssartnership_public_origin
+	reverse_proxy 192.168.1.182:8000 {
+		import ssartnership_forwarded_client
 	}
-	reverse_proxy 192.168.1.182:8000
 }
 
 ssartnership-api-dev.myknow.xyz {
-	import final_snapshot_gate
-	encode zstd gzip
-	header X-SSARTNERSHIP-Ingress pve-5202
-	request_body {
-		max_size 64MB
+	import ssartnership_public_origin
+	reverse_proxy 192.168.1.69:8000 {
+		import ssartnership_forwarded_client
 	}
-	reverse_proxy 192.168.1.69:8000
 }
 
 # Both environments share one dashboard with the Production access boundary.
 ssartnership-infra-dev.myknow.xyz {
+	header ?Strict-Transport-Security "max-age=63072000; includeSubDomains"
 	route {
 		basic_auth bcrypt infra {
 			import /run/production-infra-auth/users
@@ -68,6 +105,7 @@ ssartnership-infra-dev.myknow.xyz {
 
 ssartnership-infra.myknow.xyz {
 	encode zstd gzip
+	header ?Strict-Transport-Security "max-age=63072000; includeSubDomains"
 	# Read-only PVE observations: only this LAN producer can submit numeric data.
 	handle /infra/host-metrics {
 		@wrong_host not remote_ip 192.168.1.132
@@ -154,4 +192,15 @@ malmoa-preview.myknow.xyz {
 	encode zstd gzip
 	header X-MALMOA-Environment preview
 	reverse_proxy 192.168.1.136:8080
+}
+
+# Internal Prometheus scrape listener. Compose publishes only 80/443 for this
+# container; the matcher also rejects any non-private source address.
+http://:9180 {
+	route {
+		@external not remote_ip private_ranges
+		respond @external 403
+		metrics /metrics
+		respond 404
+	}
 }
