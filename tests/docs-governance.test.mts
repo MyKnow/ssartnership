@@ -93,3 +93,34 @@ authority: normative
   assert.match(errors, /링크 대상이 없습니다/);
   assert.match(errors, /도달할 수 없는/);
 });
+
+test("validates links and personal paths in root knowledge files outside docs", () => {
+  const root = createRepository();
+  writeDocument(root, "docs/index.md", `${indexFrontmatter}\n\n# Test map\n`);
+  writeDocument(root, "README.md", "# Readme\n\n[Map](./docs/index.md)\n[Gone](./docs/missing.md)\n");
+  writeDocument(root, "AGENTS.md", "# Agents\n\nSee /Users/someone/project/notes.md\n");
+  writeDocument(root, ".agents/skills/example/SKILL.md", "# Skill\n\n[Outside](../../../../outside.md)\n");
+
+  const result = validateDocumentation({ rootDir: root });
+  const errors = result.errors.join("\n");
+
+  assert.deepEqual(result.rootKnowledgeFiles.map((path) => path.slice(root.length + 1)).sort(), [
+    ".agents/skills/example/SKILL.md",
+    "AGENTS.md",
+    "README.md",
+  ]);
+  assert.match(errors, /README\.md:4: 링크 대상이 없습니다: \.\/docs\/missing\.md/);
+  assert.doesNotMatch(errors, /README\.md:3/);
+  assert.match(errors, /AGENTS\.md: macOS 개인 절대 경로/);
+  assert.match(errors, /SKILL\.md:3: 저장소 밖 링크입니다/);
+});
+
+test("root knowledge files without frontmatter are not treated as docs", () => {
+  const root = createRepository();
+  writeDocument(root, "docs/index.md", `${indexFrontmatter}\n\n# Test map\n`);
+  writeDocument(root, "README.md", "# Readme\n\n[Map](./docs/index.md)\n");
+
+  const result = validateDocumentation({ rootDir: root });
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.documents.length, 1);
+});
