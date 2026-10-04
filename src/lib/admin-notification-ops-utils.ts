@@ -14,7 +14,7 @@ import type {
   AdminNotificationSource,
   AdminNotificationType,
 } from "@/lib/admin-notification-ops-types";
-import type { PushPreferenceState, ResolvedPushAudience } from "@/lib/push/types";
+import type { ResolvedPushAudience } from "@/lib/push/types";
 
 export const EMPTY_CHANNEL_RESULTS: AdminNotificationSendResult["channelResults"] = {
   in_app: { targeted: 0, sent: 0, failed: 0, skipped: 0 },
@@ -82,21 +82,7 @@ export function getNotificationTypeLabel(type: AdminNotificationType) {
   }
 }
 
-export function getTypePreferenceEnabled(
-  type: AdminNotificationType,
-  preference: PushPreferenceState,
-) {
-  switch (type) {
-    case "announcement":
-      return preference.announcementEnabled;
-    case "marketing":
-      return preference.marketingEnabled;
-    case "new_partner":
-      return preference.newPartnerEnabled;
-    case "expiring_partner":
-      return preference.expiringPartnerEnabled;
-  }
-}
+export { getTypePreferenceEnabled } from "@/lib/admin-notification-ops-eligibility";
 
 export function absoluteUrl(url: string) {
   return url.startsWith("http://") || url.startsWith("https://")

@@ -124,6 +124,8 @@ Wallet QR 서명과 Apple `authenticationToken` 원문은 DB에 저장하지 않
 | `partner_notification_deliveries` | 협력사 notification delivery |
 | `operational_notification_dedupes` | 운영 알림 중복 방지 |
 
+광고성(마케팅) 알림 수신 자격은 활성 마케팅 정책에 대한 `member_policy_consents` 행과 `push_preferences.marketing_enabled = true`를 함께 만족해야 한다. 철회는 `marketing_enabled`만 끄고 동의 행은 감사 증적으로 남기므로, 동의 행 존재만으로 판정하지 않는다. 판정 규칙은 `src/lib/notifications/marketing-consent.ts` 한 곳에 두고 관리자 캠페인 발송·회원 목록·이벤트 조건·회원 설정 화면이 같이 쓴다.
+
 ### Logs, metrics, admin security
 
 | Table | 역할 |

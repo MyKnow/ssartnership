@@ -21,6 +21,7 @@ import {
   markPushSuccess,
 } from "./logs.ts";
 import {
+  assertAudiencePushPayloadType,
   buildNotificationPayload,
   getPreferenceKey,
   sanitizeNotificationUrl,
@@ -166,6 +167,7 @@ export async function sendPushToAudience(
   rawPayload: PushPayload,
   options: PushSendOptions = {},
 ) {
+  assertAudiencePushPayloadType(rawPayload.type);
   if (!isPushConfigured()) {
     throw new PushError("config_missing", "Web Push 환경 변수가 설정되지 않았습니다.");
   }

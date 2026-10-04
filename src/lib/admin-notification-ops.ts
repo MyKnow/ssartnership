@@ -36,7 +36,6 @@ import {
   computeOperationStatus,
   getNotificationTypeLabel,
   getPreviewReasonLabel,
-  getTypePreferenceEnabled,
   isAdminNotificationType,
   isMattermostConfigured,
   mergeExclusionReasons,
@@ -45,6 +44,7 @@ import {
   resolveMattermostSenderGenerationForMember,
 } from "@/lib/admin-notification-ops-utils";
 import { mattermostSenderRepository } from "@/lib/mattermost-senders/repository";
+import { resolveAdminNotificationMemberChannelReasons } from "@/lib/admin-notification-ops-eligibility";
 import {
   sendMattermostCampaignDeliveries,
   sendPushCampaignDeliveries,
@@ -449,52 +449,25 @@ async function buildAudienceContext(
 
   for (const member of members) {
     const preference = getActiveSubscriptionPushPreferences(preferenceMap.get(member.id));
-    const hasCurrentMarketingConsent = Boolean(activeMarketingPolicy)
-      && marketingConsentedMemberIds.has(member.id);
-    const normalizedPreference = {
-      ...preference,
-      marketingEnabled: hasCurrentMarketingConsent,
-    };
-    const typeEnabled = getTypePreferenceEnabled(notificationType, normalizedPreference);
-    const marketingAllowed =
-      notificationType !== "marketing" || hasCurrentMarketingConsent;
-
     const activeSubscriptions = subscriptionsByMemberId.get(member.id) ?? [];
-    const channelReasons: Partial<Record<NotificationChannel, AdminNotificationPreviewReasonCode>> = {};
-
-    if (!typeEnabled) {
-      channelReasons.in_app = "type_disabled";
-      channelReasons.push = "type_disabled";
-      channelReasons.mm = "type_disabled";
-    } else if (!marketingAllowed) {
-      channelReasons.in_app = "marketing_not_consented";
-      channelReasons.push = "marketing_not_consented";
-      channelReasons.mm = "marketing_not_consented";
-    }
+    const channelReasons = resolveAdminNotificationMemberChannelReasons({
+      notificationType,
+      preference,
+      hasActiveMarketingPolicy: Boolean(activeMarketingPolicy),
+      hasCurrentMarketingPolicyConsent: marketingConsentedMemberIds.has(member.id),
+      activePushSubscriptionCount: activeSubscriptions.length,
+      hasMattermostUser: Boolean(member.mattermostUserId),
+    });
 
     if (!channelReasons.in_app) {
       eligibleMemberIds.in_app.push(member.id);
     }
-
     if (!channelReasons.push) {
-      if (!preference.enabled) {
-        channelReasons.push = "push_disabled";
-      } else if (activeSubscriptions.length === 0) {
-        channelReasons.push = "no_push_subscription";
-      } else {
-        eligibleMemberIds.push.push(member.id);
-        pushSubscriptions.push(...activeSubscriptions);
-      }
+      eligibleMemberIds.push.push(member.id);
+      pushSubscriptions.push(...activeSubscriptions);
     }
-
     if (!channelReasons.mm) {
-      if (!preference.mmEnabled) {
-        channelReasons.mm = "mm_disabled";
-      } else if (!member.mattermostUserId) {
-        channelReasons.mm = "channel_unavailable";
-      } else {
-        eligibleMemberIds.mm.push(member.id);
-      }
+      eligibleMemberIds.mm.push(member.id);
     }
 
     for (const channel of selectedChannels) {

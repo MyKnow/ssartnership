@@ -8,6 +8,7 @@ import type {
 } from "@/components/admin/member-manager/selectors";
 import type { AdminMemberPageSize } from "@/lib/admin-ia";
 import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
+import { getEffectiveMarketingConsentMemberIds } from "@/lib/notifications/marketing-consent";
 import {
   getAdminSearchLikePattern,
   normalizeAdminSearchQuery,
@@ -319,24 +320,6 @@ export function parseAdminMemberListFilters(
       getAdminMemberSearchParam(params, "marketingEnabled"),
     ),
   };
-}
-
-function getEffectiveMarketingConsentMemberIds(
-  policyConsentMemberIds: ReadonlySet<string>,
-  preferences: readonly MemberMarketingPreferenceRow[],
-) {
-  const enabledMemberIds = new Set(
-    preferences.flatMap((preference) =>
-      preference.member_id && preference.marketing_enabled === true
-        ? [preference.member_id]
-        : [],
-    ),
-  );
-  return new Set(
-    Array.from(policyConsentMemberIds).filter((memberId) =>
-      enabledMemberIds.has(memberId),
-    ),
-  );
 }
 
 function toAdminMemberCount(value: number | string | null | undefined) {

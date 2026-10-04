@@ -4,6 +4,7 @@ import { fetchMemberVisibleReviewCountInRange } from "@/lib/partner-counts";
 import { collectPagedRows } from "@/lib/supabase/paging";
 import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
 import { getPolicyDocumentByKind } from "@/lib/policy-documents.server";
+import { hasEffectiveMarketingConsent } from "@/lib/notifications/marketing-consent";
 import { getPushPreferencesOrDefault } from "@/lib/push";
 import {
   sendAdminNotificationCampaign,
@@ -129,6 +130,7 @@ type PreferenceRow = {
   member_id: string | null;
   enabled: boolean | null;
   mm_enabled: boolean | null;
+  marketing_enabled: boolean | null;
 };
 
 type ReviewRow = {
@@ -787,7 +789,8 @@ function mapDrawRow(
 
 function normalizePreferences(params: {
   row?: PreferenceRow | null;
-  marketingEnabled: boolean;
+  hasActiveMarketingPolicy: boolean;
+  hasCurrentMarketingPolicyConsent: boolean;
 }): MemberRewardSnapshot["preferences"] {
   const preferences = getPushPreferencesOrDefault(
     params.row
@@ -800,7 +803,11 @@ function normalizePreferences(params: {
   return {
     enabled: preferences.enabled,
     mmEnabled: preferences.mmEnabled,
-    marketingEnabled: params.marketingEnabled,
+    marketingEnabled: hasEffectiveMarketingConsent({
+      hasActiveMarketingPolicy: params.hasActiveMarketingPolicy,
+      hasCurrentPolicyConsent: params.hasCurrentMarketingPolicyConsent,
+      marketingEnabled: params.row?.marketing_enabled,
+    }),
   };
 }
 
@@ -851,7 +858,7 @@ async function fetchAllEventPreferences(
   const result = await collectPagedRows<PreferenceRow>(null, async (from, to) => {
     const { data, error } = await supabase
       .from("push_preferences")
-      .select("member_id,enabled,mm_enabled")
+      .select("member_id,enabled,mm_enabled,marketing_enabled")
       .order("member_id", { ascending: true })
       .range(from, to);
     assertEventRewardQuerySucceeded(error, "push_preferences");
@@ -926,7 +933,8 @@ export async function getEventRewardAdminOverview(campaign: EventCampaign) {
         createdAt: member.created_at,
         preferences: normalizePreferences({
           row: preferenceMap.get(member.id),
-          marketingEnabled: marketingConsentMemberIds.has(member.id),
+          hasActiveMarketingPolicy: Boolean(activeMarketingPolicy),
+          hasCurrentMarketingPolicyConsent: marketingConsentMemberIds.has(member.id),
         }),
         reviewCount: reviewCounts.get(member.id) ?? 0,
       };
