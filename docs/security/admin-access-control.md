@@ -35,6 +35,13 @@ ADMIN_BOOTSTRAP_EMAIL="other@example.com" \
 npm run bootstrap:super-admin
 ```
 
+## 권한 비트와 실제 통제
+
+- 리소스별 CRUD 비트 중 서버 가드가 실제로 검사하는 비트만 `ADMIN_PERMISSION_SUPPORTED_ACTIONS`(`src/lib/admin-permissions.ts`)에 둔다. 목록 밖의 비트는 템플릿·저장 행·폼 입력과 관계없이 항상 `false`로 정규화된다.
+- 예: 알림 `update`, 리뷰 `create`, 기수 `create`, 수료생 인증·프로필 사진 `create`/`delete`, 가입 승인 요청 `create`/`delete`, 알림 템플릿 `create`는 검사하는 코드가 없으므로 부여되지 않는다.
+- 새 가드가 새 비트를 검사하거나 기존 가드를 없애면 같은 변경에서 지원 목록을 고친다. `tests/admin-permissions.test.mts`가 가드 호출과 지원 목록의 불일치를 실패로 막는다.
+- 관리자 API route는 `getAdminSession()`과 `canAdmin()`을 직접 조합하지 않고 `ensureAdminApiPermission()` 또는 `getAdminApiPermissionSession()`을 써서 거부 시 `admin_access` 보안 로그를 남긴다.
+
 ## 운영 원칙
 
 - 활성 최고권한 관리자는 최소 1명 이상 유지한다.

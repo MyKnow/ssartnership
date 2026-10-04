@@ -144,13 +144,6 @@ const ADMIN_RATE_LIMIT: RateLimitConfig = {
   blockMs: 15 * 60 * 1000,
 };
 
-export const ADMIN_ACCOUNT_RATE_LIMIT: RateLimitConfig = {
-  table: "admin_login_attempts",
-  windowMs: 10 * 60 * 1000,
-  maxAttempts: 3,
-  blockMs: 30 * 60 * 1000,
-};
-
 export async function isBlocked(
   identifier: string,
   config: RateLimitConfig = ADMIN_RATE_LIMIT,

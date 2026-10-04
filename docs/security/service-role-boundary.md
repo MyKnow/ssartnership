@@ -16,7 +16,8 @@ Supabase service role key는 RLS를 우회할 수 있으므로 서버 전용 코
 - service role key는 클라이언트 컴포넌트, 브라우저 번들, public env에 절대 노출하지 않는다.
 - route handler, server action, repository, cron job에서만 `getSupabaseAdminClient()`를 사용할 수 있다.
 - service role 접근은 항상 명시적인 실행 맥락 뒤에 둔다.
-  - 관리자 맥락: `requireAdmin()` 또는 `ensureAdminApiAccess()`
+  - 관리자 화면·server action 맥락: `requireAdminPageAccess()` 또는 `requireAdminPermission(resource, action)` 계열
+  - 관리자 API 맥락: `ensureAdminApiPermission(request, resource, action)` 또는 세션이 필요하면 `getAdminApiPermissionSession(...)`. `getAdminSession()`과 `canAdmin()`을 route에서 직접 조합하지 않는다(거부 보안 로그가 빠진다).
   - 회원 맥락: signed member session 확인
   - 파트너 맥락: partner session 확인과 연결 회사/브랜드 권한 확인
   - cron 맥락: admin session 또는 `CRON_SECRET`
@@ -29,6 +30,7 @@ Supabase service role key는 RLS를 우회할 수 있으므로 서버 전용 코
 ### 관리자 화면과 관리자 API
 
 - `/admin` protected route, admin server action, admin API는 service role 사용 전에 관리자 세션을 확인한다.
+- 권한 비트는 `ADMIN_PERMISSION_SUPPORTED_ACTIONS`에 있는 것만 부여된다. 새 가드가 새 비트를 검사하면 같은 변경에서 지원 목록에 추가한다(`tests/admin-permissions.test.mts`가 둘의 불일치를 막는다).
 - 파일 업로드, XLSX 파싱, 알림 발송, 이벤트 관리처럼 데이터 범위가 넓은 기능은 handler/action 경계에서 guard를 먼저 호출한다.
 - admin basic auth는 선택적 추가 gate이며, 비교는 timing-safe 방식으로 수행한다.
 
