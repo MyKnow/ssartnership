@@ -3,118 +3,42 @@ title: 07. API와 외부 연동
 type: architecture
 status: current
 authority: descriptive
+last_verified: 2026-10-05
 ---
 
 # 07. API와 외부 연동
 
-작성 기준일: 2026-07-09
+route 목록의 정본은 `src/app/**/route.ts` 파일 자체다. 이 문서는 개별 route를 손으로 나열하지 않고 접두사별 책임과 보호 방식만 기록한다. 정확한 목록은 아래 명령으로 확인한다.
 
-## Internal API route map
+```bash
+find src/app -name route.ts | sed -E 's#^src/app##; s#/route\.ts$##; s#/\([^)]+\)##g' | sort
+```
 
-### Admin APIs
+## Route handler 지도
 
-| Method | Route | 목적 |
-| --- | --- | --- |
-| GET | `/api/admin/logs` | 관리자 로그 조회 |
-| GET | `/api/admin/logs/export` | 관리자 로그 export |
-| GET | `/api/admin/members/[id]/avatar` | 관리자 회원 avatar 조회 |
-| GET/PATCH/DELETE | `/api/admin/notifications` | 관리자 notification 목록/일괄 처리 |
-| PATCH/DELETE | `/api/admin/notifications/[id]` | 관리자 notification 단건 처리 |
-| GET/POST | `/api/admin/notifications/preferences` | 관리자 notification preference |
-| POST | `/api/admin/push/subscribe` | 관리자 push 구독 |
-| POST | `/api/admin/push/unsubscribe` | 관리자 push 구독 해제 |
+2026-10-05 `dev` 기준 route handler는 125개다(페이지 `page.tsx`는 제외).
 
-### Member/auth APIs
+| 접두사 | 개수 | 책임 | 보호 |
+| --- | --- | --- | --- |
+| `/api/admin/*` | 28 | 로그 조회·export, 회원 아바타·비밀번호 재설정·프로필 사진, 회원 가져오기, 가입 승인 신청 이미지, 수료생 인증 파일, 관리자 알림·푸시 구독, 알림 템플릿, 쿠폰 코드 업로드, 리뷰 moderation | 관리자 세션과 resource/action 권한 |
+| `/api/mm/*` | 13 | Mattermost DM 코드 발급·검증, 가입·가입 사진, 비밀번호 변경·재설정 완료, 동의, 탈퇴, 프로필 동기화, 인증 QR token, 아바타, 로그아웃. `/api/mm/login`은 화면에서 호출하지 않는 레거시 로그인 경로다. | 회원 세션 또는 짧은 인증 완료 세션, same-origin |
+| `/api/auth/login` | 1 | 회원 로그인(로그인 폼이 호출) | 레이트리밋, same-origin |
+| `/api/member/*`, `/api/member-password-action/*` | 7 | 이메일 등록·변경 코드, Mattermost 장애 시 이메일 복구 세션, 관리자 발급 비밀번호 설정·재설정 | 회원 세션 또는 단기 복구·작업 토큰 |
+| `/api/graduate-verification/*` | 9 | 수료생 신청·이메일 인증·업로드 서명·계정 설정·비밀번호 재설정·철회 | HttpOnly 신청 세션과 HMAC |
+| `/api/certification/*` | 4 | 인증 카드 사진 업로드 서명·확정, QR token 기반 아바타 | 회원 세션 또는 서명 token |
+| `/api/partners/*` | 6 | 즐겨찾기, 리뷰 CRUD·reaction, 혜택 사용 확인, 홈 상태 | 회원 세션(공개 읽기 제외) |
+| `/api/partner/*` | 10 | 협력사 비밀번호 변경·재설정, 초기 설정, 사업자 상태 조회, 리뷰 moderation, 알림·푸시 구독 | 협력사 세션 또는 초기 설정 token |
+| `/api/notifications/*`, `/api/push/*` | 10 | 회원 알림함·설정, 푸시 구독, 관리자 푸시 미리보기·발송·로그 삭제 | 회원 세션, 관리자 발송은 관리자 권한 |
+| `/api/coupons/*`, `/api/coupon-issues/*` | 3 | 쿠폰 발급과 사용. `/api/coupons/[couponId]/redeem`은 화면 호출처가 없는 레거시 사용 경로다. | 회원 세션 |
+| `/api/uploads/images/*` | 2 | 공용 이미지 업로드 서명·완료 | 업로드 세션과 quota |
+| `/api/wallet/*` | 6 | Apple Wallet 발급·폐기, Apple web service(기기 등록·변경 serial·pass·log), 공개 검증 아바타 | 회원 세션 또는 Apple 인증 token. 기능은 현재 비활성 |
+| `/api/cron/*` | 12 | 익명화, 로그·쇼케이스 개인정보 파기, 업로드·수료생 파일·수동 가져오기 정리, 프로모션 정리, 결제 상태, 만료 제휴 알림, Sender 상태, RSS, Wallet 조정 | `CRON_SECRET` Bearer |
+| `/api/events/product`, `/api/web-vitals` | 2 | 제품 이벤트와 Web Vitals 수집 | 크기·속도 제한, 계약 검증 |
+| `/api/image`, `/api/health`, `/api/suggest` | 3 | 이미지 프록시, liveness, 제휴 제안 | 공개(프록시는 내부망 차단, 제안은 레이트리밋) |
+| `/api/e2e/mock/reset`, `/auth/mock` | 2 | E2E·mock profile 전용 상태 초기화와 mock 로그인 | 명시적 mock·E2E 환경 변수 없으면 거절 |
+| 그 밖의 페이지 인접 route | 7 | `/admin/session`(회원 세션 기반 관리자 세션 bridge), `/partner/logout`, 관리자·등록 엑셀 템플릿과 이벤트 보상 export, `/rss.xml` | 각 화면의 세션 규칙 |
 
-| Method | Route | 목적 |
-| --- | --- | --- |
-| POST | `/api/mm/login` | 회원 로그인 |
-| POST | `/api/mm/logout` | 회원 로그아웃 |
-| POST | `/api/mm/change-password` | 회원 비밀번호 변경 |
-| POST | `/api/mm/consent` | 정책 동의 |
-| POST | `/api/mm/delete` | 회원 삭제/탈퇴 |
-| GET | `/api/mm/avatar` | 현재 회원 avatar |
-| GET | `/api/mm/certification-token` | 인증 QR token |
-| POST | `/api/mm/profile-sync` | 회원 프로필 동기화 |
-| POST | `/api/mm/reset-password/complete` | 비밀번호 재설정 완료 |
-| POST | `/api/mm/code/issue` | direct Mattermost DM 코드 발급 |
-| POST | `/api/mm/code/verify` | direct Mattermost DM 코드 검증 |
-| POST | `/api/mm/signup` | direct Mattermost 인증 가입 |
-| POST | `/api/member/recovery/start` | 기존 사이트 비밀번호로 15분 이메일 복구 세션 발급 |
-| POST | `/api/member/recovery/email/send` | 복구 세션의 이메일 코드 발송 |
-| POST | `/api/member/recovery/email/verify` | 복구 이메일 코드 검증 및 이메일 로그인 전환 |
-| GET | `/api/certification/avatar/[token]` | QR token 기반 avatar 조회 |
-| GET/POST/DELETE | `/api/wallet/apple/pass` | Apple Wallet `.pkpass` 발급/재다운로드/회원 요청 폐기 |
-
-### Public/member feature APIs
-
-| Method | Route | 목적 |
-| --- | --- | --- |
-| POST | `/api/events/product` | product analytics event 기록 |
-| GET | `/api/image` | image proxy/cache |
-| GET/PATCH/DELETE | `/api/notifications` | 회원 notification 목록/일괄 처리 |
-| PATCH/DELETE | `/api/notifications/[id]` | 회원 notification 단건 처리 |
-| POST | `/api/notifications/preferences` | 회원 notification preference |
-| POST | `/api/partners/[id]/favorite` | 제휴 즐겨찾기 토글 |
-| GET/POST | `/api/partners/[id]/reviews` | 리뷰 목록/생성 |
-| PATCH/DELETE | `/api/partners/[id]/reviews/[reviewId]` | 리뷰 수정/삭제 |
-| PATCH | `/api/partners/[id]/reviews/[reviewId]/reaction` | 리뷰 reaction |
-| POST | `/api/partners/[id]/reviews/uploads/sign` | 리뷰 이미지 업로드 sign |
-| POST | `/api/partners/[id]/reviews/uploads/cleanup` | 리뷰 이미지 cleanup |
-| GET | `/api/partners/home-state` | 홈 partner state |
-| POST | `/api/coupons/[couponId]/redeem` | 쿠폰 사용 |
-| POST | `/api/suggest` | 제휴 제안 제출 |
-| GET | `/wallet/verify/[token]` | Apple Wallet 공개 실시간 검증 페이지 |
-| GET | `/api/wallet/apple/avatar/[token]` | Apple Wallet 공개 검증용 승인 프로필 사진 스트리밍 |
-
-### Push APIs
-
-| Method | Route | 목적 |
-| --- | --- | --- |
-| POST | `/api/push/subscribe` | 회원 push 구독 |
-| POST | `/api/push/unsubscribe` | 회원 push 구독 해제 |
-| GET | `/api/push/subscriptions` | 회원 push 구독 목록 |
-| POST | `/api/push/preferences` | 회원 push preference |
-| POST | `/api/push/admin/preview` | 관리자 push preview |
-| POST | `/api/push/admin/broadcast` | 관리자 push broadcast |
-| DELETE | `/api/push/admin/logs/[id]` | push log 삭제 |
-
-### Apple Wallet web service APIs
-
-| Method | Route | 목적 |
-| --- | --- | --- |
-| GET | `/api/wallet/apple/v1/devices/[deviceId]/registrations/[passTypeId]` | Apple device library identifier 기준 변경된 serial 조회 |
-| POST/DELETE | `/api/wallet/apple/v1/devices/[deviceId]/registrations/[passTypeId]/[serialNumber]` | Apple Wallet 기기 등록/해제 |
-| GET | `/api/wallet/apple/v1/passes/[passTypeId]/[serialNumber]` | 최신 `.pkpass` 다운로드 |
-| POST | `/api/wallet/apple/v1/log` | Apple Wallet provider log 수신 |
-| GET | `/api/cron/reconcile-apple-wallet-passes` | 설치된 active pass의 자격·동의·snapshot 일일 재검사와 APNs 갱신 |
-
-### Partner APIs
-
-| Method | Route | 목적 |
-| --- | --- | --- |
-| POST | `/api/partner/change-password` | 협력사 비밀번호 변경 |
-| POST | `/api/partner/reset-password` | 협력사 비밀번호 재설정 |
-| GET/POST | `/api/partner/setup/[token]` | 초기 설정 context/complete |
-| POST | `/api/partner/billing/business-status` | 사업자 상태 조회 |
-| PATCH | `/api/partner/reviews/[reviewId]` | 협력사 리뷰 moderation |
-| GET/PATCH/DELETE | `/api/partner/notifications` | 협력사 notification 목록/일괄 처리 |
-| PATCH/DELETE | `/api/partner/notifications/[id]` | 협력사 notification 단건 처리 |
-| GET/POST | `/api/partner/notifications/preferences` | 협력사 notification preference |
-| POST | `/api/partner/push/subscribe` | 협력사 push 구독 |
-| POST | `/api/partner/push/unsubscribe` | 협력사 push 구독 해제 |
-
-### Cron APIs
-
-| Method | Route | 목적 |
-| --- | --- | --- |
-| GET | `/api/cron/archive-expired-promotions` | 만료 promotion archive |
-| GET | `/api/cron/member-sync` | 회원/디렉터리 동기화 |
-| GET | `/api/cron/partner-billing` | 협력사 billing batch |
-| GET | `/api/cron/push-expiring-partners` | 종료 예정 제휴 push |
-| GET | `/api/cron/rss` | RSS refresh |
-| GET | `/api/cron/purge-expired-operational-logs` | 1년 경과 운영·보안 원본 로그 정리 |
-| GET | `/api/cron/purge-showcase-personal-data` | 쇼케이스 정산 30일 후 학번·체험 기록의 회원 연결 파기 |
+Cron 실행 일정의 정본은 `deploy/self-host-operations/production-cron/schedules.json`이다. Wallet 조정 Cron은 기능과 함께 비활성이다.
 
 ## External integrations
 
@@ -176,13 +100,15 @@ authority: descriptive
 
 ## Environment variable groups
 
+필수·선택 값과 오류 코드의 정본은 `deploy/self-host/runtime-env.mjs`, 예시는 `.env.example`과 `deploy/self-host/runtime.env.example`이다. 아래 표는 그룹 안내다.
+
 | 그룹 | 주요 env |
 | --- | --- |
-| 관리자 | `ADMIN_ID`, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, `ADMIN_ALLOWED_IPS`, `ADMIN_BASIC_AUTH_USERNAME`, `ADMIN_BASIC_AUTH_PASSWORD` |
-| 회원 세션/QR | `USER_SESSION_SECRET`, `CERTIFICATION_QR_SECRET` |
+| 관리자 | `ADMIN_SESSION_SECRET`, `ADMIN_ALLOWED_IPS`, `ADMIN_BASIC_AUTH_USERNAME`, `ADMIN_BASIC_AUTH_PASSWORD`(관리자 계정과 비밀번호는 DB `admin_accounts`에 있다) |
+| 회원 세션/QR/HMAC | `USER_SESSION_SECRET`, `CERTIFICATION_QR_SECRET`, `MEMBER_IDENTIFIER_RESERVATION_HMAC_SECRET`, `MEMBER_EMAIL_VERIFICATION_HMAC_SECRET`, `GRADUATE_VERIFICATION_HMAC_SECRET` |
 | 협력사 | `PARTNER_SESSION_SECRET`, billing bank envs |
-| Supabase | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, optional `NEXT_PUBLIC_SUPABASE_URL` |
-| Data source | `NEXT_PUBLIC_DATA_SOURCE`, `NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE` |
+| Supabase | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, 서버 내부 전송용 `SUPABASE_INTERNAL_URL`, optional `NEXT_PUBLIC_SUPABASE_URL` |
+| Data source·실행 모드 | `NEXT_PUBLIC_DATA_SOURCE`, `NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE`, `SELF_HOST_MODE` |
 | Mattermost | `MM_BASE_URL`, `MM_SENDER_CREDENTIALS_KEY_V1`, `MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION` |
 | SMTP | `SMTP_*`, `NAVER_SMTP_*`, `SUGGEST_NOTIFY_EMAIL` |
 | Web Push/Cron | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET` |

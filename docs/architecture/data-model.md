@@ -3,184 +3,86 @@ title: 06. 데이터 모델
 type: architecture
 status: current
 authority: descriptive
+last_verified: 2026-10-05
 ---
 
 # 06. 데이터 모델
 
-작성 기준일: 2026-07-09
+## 진실 소재
 
-기준 소스는 `supabase/schema.sql`과 `supabase/migrations/**`이다.
+- `supabase/migrations/**`가 스키마의 단일 진실이다. 운영 Production·Preview는 이 마이그레이션을 운영자가 순서대로 적용하고, 수신기는 적용 승인된 마이그레이션 tree와 다른 배포를 거절한다.
+- `supabase/schema.sql`은 마이그레이션에서 파생된 **스냅샷**이다. 현재 형태를 읽기 쉽게 보여 주지만 마이그레이션과 어긋날 수 있다. 어긋나면 스냅샷을 고치고, 이미 적용된 마이그레이션 파일은 수정하지 않는다([리팩토링 기본 결정 D9](../plans/active/refactor-program-2026-10.md#기본-결정)).
+- 이 문서는 테이블·함수를 손으로 나열하지 않는다. 손으로 만든 목록은 금방 빠지고 틀려진다. 목록이 필요하면 아래 명령으로 마이그레이션에서 직접 뽑는다.
 
-## 도메인별 테이블
+```bash
+# 생성됐다가 삭제되지 않은 테이블
+comm -23 \
+  <(grep -ohiE "create table (if not exists )?(public\.)?\"?[a-z_0-9]+" supabase/migrations/*.sql | sed -E 's/.* (public\.)?"?//I' | sort -u) \
+  <(grep -ohiE "drop table (if exists )?(public\.)?[a-z_0-9]+" supabase/migrations/*.sql | sed -E 's/.* (public\.)?//I' | sort -u)
 
-### Public partner directory
+# 정의된 함수(RPC·trigger) 이름
+grep -ohiE "create (or replace )?function (public\.)?[a-z_0-9]+" supabase/migrations/*.sql | sed -E 's/.* (public\.)?//I' | sort -u
 
-| Table | 역할 |
-| --- | --- |
-| `categories` | 제휴 카테고리 key/label/description/color |
-| `public_cache_versions` | public partner/category cache busting scope |
-| `partner_companies` | 협력사 회사/브랜드 소유 단위 |
-| `partner_brand_profiles` | 회사별 브랜드 프로필 |
-| `partners` | 실제 제휴 서비스/매장/혜택 |
-| `partner_company_branches` | 회사 지점 |
-| `partner_offer_branches` | 제휴와 지점 연결 |
+# 특정 테이블·함수의 최신 정의가 들어 있는 마이그레이션
+grep -l "<name>" supabase/migrations/*.sql | sort | tail -1
+```
 
-주요 partner 필드:
+2026-10-05 `dev` 기준 마이그레이션은 208개, 남아 있는 테이블은 111개, 고유 함수 이름은 176개다.
 
-- `visibility`: `public`, `confidential`, `private`
-- `benefit_visibility`: `public`, `eligible_only`
-- `campus_slugs`: `seoul`, `gumi`, `daejeon`, `busan-ulsan-gyeongnam`, `gwangju`
-- `applies_to`: `staff`, `student`, `graduate`
-- `benefit_action_type`, `benefit_action_link`, `reservation_link`, `inquiry_link`
-- `period_start`, `period_end`, `conditions`, `benefits`, `images`, `thumbnail`, `tags`
+## 도메인별 테이블 지도
 
-### Partner accounts and portal
+테이블 이름 접두사가 도메인을 나타낸다. 새 테이블도 같은 접두사를 따른다.
 
-| Table | 역할 |
-| --- | --- |
-| `partner_accounts` | 협력사 로그인 계정, 초기 설정, reset 상태 |
-| `partner_account_companies` | 계정과 회사 연결 |
-| `partner_auth_attempts` | 협력사 인증 throttle/audit |
-| `partner_change_requests` | 협력사 정보 변경 요청 |
-| `partner_plan_upgrade_requests` | 플랜 업그레이드 요청 |
-| `partner_brand_plan_events` | 플랜 변경 이벤트 |
-| `partner_billing_profiles` | 협력사 정산/세금계산서 프로필 |
-| `partner_billing_invoices` | 협력사 청구서 |
-| `partner_billing_payments` | 입금/결제 기록 |
-| `partner_tax_documents` | 세금 관련 문서 상태 |
+| 도메인 | 테이블 접두사·대표 테이블 | 비고 |
+| --- | --- | --- |
+| 공개 제휴 카탈로그 | `categories`, `partners`, `partner_benefits`, `partner_companies`, `partner_company_branches`, `partner_offer_branches`, `partner_brand_profiles`, `public_cache_versions` | `public_cache_versions`가 공개 캐시 key의 기준이다. |
+| 협력사 포털 | `partner_accounts`, `partner_account_companies`, `partner_auth_attempts`, `partner_change_requests`, `partner_plan_upgrade_requests`, `partner_company_plan_events`, `partner_billing_*`, `partner_tax_documents`, `partner_preview_tokens` | 결제·세금 문서는 정산 증거다. |
+| 협력사 등록 신청 | `partner_registration_*` | 외부 신청 본문과 레이트리밋 |
+| 회원·인증 | `members`, `mm_user_directory`, `member_*`(이메일·비밀번호 작업·식별자 예약·가입 승인·프로필 사진·알림·Wallet), `mattermost_*`, `password_reset_attempts`, `manual_member_import_*` | 아래 회원 도메인 원칙을 따른다. |
+| 수료생 | `graduate_profiles`, `graduate_verification_*`, `graduate_email_challenges` | 비공개 파일은 정해진 기간 뒤 정리한다. |
+| 관리자 | `admin_accounts`, `admin_profiles`, `admin_permissions`, `admin_permission_templates`, `admin_login_attempts`, `admin_audit_logs` | 권한의 원천은 `admin_profiles.permission_template_key`와 템플릿이다. |
+| 약관·기수 | `policy_documents`, `member_policy_consents`, `ssafy_cycle_settings`, `ssafy_cohort_card_themes` | 정책 문서는 수정하지 않고 새 버전을 발행한다. |
+| 리뷰·즐겨찾기·혜택 사용 | `partner_reviews`, `partner_review_reactions`, `partner_favorites`, `partner_benefit_usages` | `partner_benefit_usages`는 로그가 아니라 혜택 사용 원장이다. |
+| 광고·쿠폰·프로모션·이벤트 | `ad_*`, `promotion_events`, `promotion_slides`, `event_reward_*` | 쿠폰 발급·사용은 RPC로 원자 처리한다. |
+| 쇼케이스 | `showcase_*` | 정산 뒤 정해진 기간에 개인정보 연결을 파기한다. |
+| 알림·푸시 | `notifications`, `notification_deliveries`, `notification_templates`, `push_*`, `admin_notification*`, `admin_push_subscriptions`, `partner_notification*`, `partner_push_subscriptions`, `partner_publication_notification_states`, `operational_notification_dedupes` | 회원·관리자·협력사 audience별 테이블을 섞지 않는다. |
+| 로그·지표·보존 | `event_logs`, `auth_security_logs`, `partner_metric_*`, `platform_active_identities`, `log_retention_holds`, `suggestion_attempts` | 보존·파기 기준은 [이벤트 로깅](./event-logging.md)과 [데이터 수명주기](../security/data-lifecycle.md)를 따른다. |
+| 업로드 | `image_upload_sessions`, `image_upload_quota_windows`, `image_asset_migrations` | 마지막 테이블은 일회성 이관 기록이다. |
+| Apple Wallet | `member_wallet_passes`, `member_wallet_pass_revisions`, `member_wallet_pass_operations`, `apple_wallet_device_registrations` | 기능은 현재 비활성이다. |
 
-### Partner registration
+`member_ssafy_verifications`는 런타임에서 읽지 않는 SSAFY Verify 레거시 테이블이다. 삭제 조건은 [SSAFY Verify 레거시 삭제 준비](../plans/active/ssafy-verify-legacy-removal.md)를 따른다.
 
-| Table | 역할 |
-| --- | --- |
-| `partner_registration_attempts` | 협력사 등록 rate limit/throttle |
-| `partner_registration_requests` | 외부 협력사 등록 신청 본문 |
-| `partner_registration_benefit_groups` | 신청서 내 혜택 그룹 |
-| `partner_registration_branches` | 신청서 내 지점 목록 |
+## 회원 도메인 원칙
 
-### Members and policy
+- `members`는 공통 계정·프로필 원장이다. 교육생·수료생·운영진을 별도 회원 테이블로 나누지 않는다.
+- 교육생과 수료생의 핵심 분류값은 `generation`(기수)이다. 운영진은 `generation = 0`이고 확인 원본 기수는 `staff_source_generation`에 둔다. 기수 계산은 `ssafy_cycle_settings`와 날짜로 파생한다.
+- Mattermost, 수료생, 관리자 권한, 약관 동의는 1:1 또는 이력 확장 테이블로 분리한다. 회원 테이블은 `mattermost_account_id` 같은 nullable FK만 갖고, Mattermost 세부값은 `mm_user_directory`가 보관한다.
+- 로그인 식별자는 Mattermost 아이디 또는 인증된 이메일이다. 반·강의실·반장처럼 운영에 불필요한 닉네임 파생값은 저장하지 않는다.
+- 외부 프로필 사진은 원본이나 data URL로 보관하지 않는다. 서버에서 정규화한 WebP를 private `member-profile-images` 버킷과 `member_profile_images` 원장에 저장하고, 권한을 확인하는 이미지 API로만 읽는다. 과거의 `members.avatar_base64` 열은 삭제됐다.
+- `deleted_at`이 있는 회원은 즉시 로그인·권한·혜택 접근이 막힌다. 정해진 기간 뒤 익명화하지만 HMAC 식별자 예약과 필요한 감사 이력은 남긴다.
 
-| Table | 역할 |
-| --- | --- |
-| `members` | SSAFY 회원, 인증/권한/프로필/정책 상태 |
-| `member_auth_attempts` | 회원 인증 시도 |
-| `mm_user_directory` | 직접 Mattermost 디렉터리 snapshot 및 최신 MM ID 연결 |
-| `mattermost_sender_credentials` | 기수별 AES-GCM 암호화 Sender 후보/활성 credential metadata |
-| `mattermost_sender_test_attempts` | Sender 테스트 rate limit/audit state |
-| `mattermost_verification_codes` | direct DM 가입·재설정 코드 hash와 delivery 상태 |
-| `member_email_challenges` | 이메일 변경·MM 장애 복구 코드 hash |
-| `password_reset_attempts` | 비밀번호 재설정 시도 |
-| `policy_documents` | 약관/개인정보/마케팅 문서 버전 |
-| `member_policy_consents` | 회원별 정책 동의 기록 |
-| `ssafy_cycle_settings` | 기준 기수/연도/월 설정 |
-| `ssafy_cohort_card_themes` | 기수 인증 카드 테마 |
-| `member_wallet_passes` | 회원별 canonical Apple Wallet credential, 공개 `public_id`, serial, 현재 snapshot, 발급/폐기/sync 상태 |
-| `member_wallet_pass_revisions` | Wallet 표시 snapshot과 동의 버전 이력 |
-| `apple_wallet_device_registrations` | Apple device library identifier hash, APNs push token 암호문, 마지막 등록/제거 시각 |
-| `member_wallet_pass_operations` | 발급/폐기 idempotency key, request fingerprint, 결과 pass/revision 연결 |
+```mermaid
+erDiagram
+    MEMBERS ||--o| MM_USER_DIRECTORY : "nullable mattermost_account_id"
+    MEMBERS ||--o| GRADUATE_PROFILES : "graduate extension"
+    GRADUATE_VERIFICATION_REQUESTS ||--o| GRADUATE_PROFILES : "approved from"
+    MEMBERS ||--o| ADMIN_PROFILES : "admin extension"
+    MEMBERS ||--o{ MEMBER_PROFILE_IMAGES : "owns"
+    MEMBERS ||--o{ MEMBER_EMAIL_CHALLENGES : "verifies email"
+    MEMBERS ||--o{ MEMBER_POLICY_CONSENTS : "accepts"
+    POLICY_DOCUMENTS ||--o{ MEMBER_POLICY_CONSENTS : "versioned by"
+```
+
+## Apple Wallet 키 경계
 
 Wallet QR 서명과 Apple `authenticationToken` 원문은 DB에 저장하지 않는다. `public_id`, Pass Type ID, 설치 수명 동안 불변인 32바이트 Wallet master key로 값을 결정적으로 만들되 QR 서명, ApplePass 인증, device library identifier hash, APNs token 암호화마다 HMAC-SHA256 context가 다른 subkey를 파생한다. `APPLE_WALLET_AUTH_SECRET*`는 Wallet 발급·검증 계약에 사용하지 않는다. Master key 회전은 단순 환경 변수 교체가 아니라 저장 APNs token 재암호화, device hash 재생성 또는 재등록, 기존 pass 폐기·재발급과 QR 교체를 포함하는 별도 migration이다.
 
-### Reviews, favorites, coupons, ads
-
-| Table | 역할 |
-| --- | --- |
-| `partner_reviews` | 제휴 리뷰 |
-| `partner_review_reactions` | 리뷰 reaction |
-| `partner_favorites` | 회원별 즐겨찾기 |
-| `ad_campaigns` | 광고 캠페인 |
-| `ad_coupons` | 광고/제휴 쿠폰 |
-| `ad_coupon_redemptions` | 쿠폰 사용 기록 |
-
-### Promotion/events
-
-| Table | 역할 |
-| --- | --- |
-| `promotion_events` | 이벤트 메타/노출 기간 |
-| `promotion_slides` | 홈 프로모션 슬라이드 |
-| `event_reward_draws` | 이벤트 리워드 추첨 회차 |
-| `event_reward_winners` | 이벤트 리워드 당첨자 |
-
-### Notifications and push
-
-| Table | 역할 |
-| --- | --- |
-| `push_preferences` | 회원 push preference |
-| `notifications` | 회원 대상 notification 원본 |
-| `member_notifications` | 회원별 notification 수신/읽음/삭제 |
-| `notification_deliveries` | 회원 notification provider delivery |
-| `push_subscriptions` | 회원 browser push subscription |
-| `push_message_logs` | push message 발송 로그 |
-| `push_delivery_logs` | push delivery 대상 로그 |
-| `admin_notification_preferences` | 관리자 알림 preference |
-| `admin_push_subscriptions` | 관리자 push subscription |
-| `admin_notifications` | 관리자 notification |
-| `admin_notification_recipients` | 관리자 notification recipient |
-| `admin_notification_deliveries` | 관리자 notification delivery |
-| `partner_notification_preferences` | 협력사 알림 preference |
-| `partner_push_subscriptions` | 협력사 push subscription |
-| `partner_notifications` | 협력사 notification |
-| `partner_notification_recipients` | 협력사 notification recipient |
-| `partner_notification_deliveries` | 협력사 notification delivery |
-| `operational_notification_dedupes` | 운영 알림 중복 방지 |
-
-### Logs, metrics, admin security
-
-| Table | 역할 |
-| --- | --- |
-| `event_logs` | product analytics 원본 |
-| `partner_metric_rollups` | partner metric 집계 |
-| `partner_metric_unique_visitors` | partner unique visitor 집계 |
-| `admin_audit_logs` | 관리자 조작 감사 로그 |
-| `auth_security_logs` | 인증/보안 로그 |
-| `admin_login_attempts` | 관리자 로그인 시도 |
-| `suggestion_attempts` | 제휴 제안 throttle |
-| `admin_accounts` | 관리자 계정 |
-| `admin_permissions` | 관리자 resource/action 권한 |
-| `admin_permission_templates` | 관리자 권한 template |
-
-## 주요 RPC/function
-
-| Function | 역할 |
-| --- | --- |
-| `infer_partner_campus_slugs` | location 기반 campus slug 추론 |
-| `set_partnership_updated_at` | partner/category update timestamp |
-| `sync_basic_partner_plan_dates` | basic partner plan date 동기화 |
-| `bump_public_cache_version` | public cache scope version 증가 |
-| `bump_partners_public_cache_version` | partners cache version 증가 |
-| `bump_categories_public_cache_version` | categories cache version 증가 |
-| `get_admin_review_counts` | 관리자 리뷰 count |
-| `get_admin_dashboard_counts` | 관리자 dashboard count |
-| `get_admin_logs_page` | 관리자 로그 페이지 조회 |
-| `get_partner_review_visibility_counts` | 제휴별 리뷰 visibility count |
-| `get_member_visible_review_count_in_range` | 회원 리뷰 count/range |
-| `get_partner_favorite_counts` | partner favorite count bulk 조회 |
-| `get_partner_review_counts` | partner review count bulk 조회 |
-| `partner_metric_visitor_key` | metric unique visitor key |
-| `apply_partner_metric_event_rollups` | metric rollup 적용 |
-| `apply_partner_metric_event` | 단일 metric event 적용 |
-| `reconcile_partner_metric_rollups` | metric rollup 재조정 |
-| `sync_partner_metric_rollups_from_event_logs` | event log 기반 metric 동기화 |
-| `bump_admin_permission_version` | 관리자 권한 version 증가 |
-| `ensure_active_privileged_admin_exists` | privileged admin 보존 guard |
-| `ensure_single_member_super_admin` | member super admin 제약 |
-| `set_ad_campaigns_updated_at` | ad campaign timestamp |
-| `set_ad_coupons_updated_at` | ad coupon timestamp |
-| `set_event_reward_draws_updated_at` | event reward draw timestamp |
-| `set_event_reward_winners_updated_at` | event reward winner timestamp |
-| `issue_member_wallet_pass` | Apple Wallet credential 생성/재발급, snapshot revision 기록, idempotency 보장 |
-| `revoke_member_wallet_pass` | Apple Wallet credential 폐기, 동일 member/platform 재시도 보호 |
-| `reconcile_member_wallet_pass_content` | 설치된 active pass의 표시 snapshot revision 갱신 또는 자격·동의 상실 credential 폐기 |
-| `register_apple_wallet_device` | Apple device registration upsert, 설치 상태 갱신, APNs push token 암호문 저장 |
-| `unregister_apple_wallet_device` | Apple device registration 제거, 설치 상태 갱신 |
-| `list_updated_apple_wallet_passes` | device library identifier 기준 변경된 serial 목록 조회 |
-
 ## RLS and indexes
 
-- `schema.sql` 기준 주요 application table은 모두 row level security가 enable되어 있다.
+- 주요 application table은 모두 row level security가 enable되어 있다. 테이블별 정책은 해당 테이블을 만든 마이그레이션과 이후 정책 마이그레이션이 정본이다.
 - public read policy가 `categories`, `partners` 등에 정의되어 있다.
 - 앱 서버는 대부분 service role admin client를 사용하므로 API/server action 경계 검증이 필수 방어선이다.
-- 성능상 중요한 index는 partner/category lookup, registration status, member display/year/campus, event log pagination/filter, admin audit/auth security logs, review/favorite counts, notification delivery, billing status, promotion periods에 존재한다.
+- 인덱스를 추가·삭제할 때는 스냅샷이 아니라 마이그레이션과 운영 DB 사용 통계를 근거로 한다. 사용 통계 없이 인덱스를 지우지 않는다([기술 부채 원장](../plans/tech-debt.md#성능ux운영)).
 
 ## 마이그레이션 시 보존해야 하는 상태값
 
