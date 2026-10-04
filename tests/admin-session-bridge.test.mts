@@ -59,3 +59,26 @@ test("admin session bridge eligibility rejects inactive or password-change membe
     false,
   );
 });
+
+test("관리자 세션 브리지는 관리자 TTL보다 오래된 회원 인증을 재사용하지 않는다", async () => {
+  const { isMemberSessionFreshForAdminBridge } = await bridgeModulePromise;
+  const ttlSeconds = 12 * 60 * 60;
+  const now = Date.UTC(2026, 9, 5, 12);
+
+  assert.equal(isMemberSessionFreshForAdminBridge({ issuedAt: now - 1_000 }, ttlSeconds, now), true);
+  assert.equal(isMemberSessionFreshForAdminBridge({ issuedAt: now - ttlSeconds * 1000 }, ttlSeconds, now), true);
+  assert.equal(isMemberSessionFreshForAdminBridge({ issuedAt: now - ttlSeconds * 1000 - 1 }, ttlSeconds, now), false);
+  assert.equal(isMemberSessionFreshForAdminBridge({ issuedAt: now + 1 }, ttlSeconds, now), false);
+  assert.equal(isMemberSessionFreshForAdminBridge({ issuedAt: Number.NaN }, ttlSeconds, now), false);
+});
+
+test("관리자 세션 브리지 route는 오래된 회원 세션을 지우고 재로그인으로 보낸다", async () => {
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync(new URL("../src/app/admin/session/route.ts", import.meta.url), "utf8");
+  const ageGateIndex = source.indexOf("isMemberSessionFreshForAdminBridge(memberSession, getAdminSessionTtlSeconds())");
+  const mintIndex = source.indexOf("await setAdminSession(adminAccount)");
+
+  assert.ok(ageGateIndex > 0 && ageGateIndex < mintIndex);
+  assert.match(source, /clearUserSession\(\), clearAdminSession\(\)/);
+  assert.match(source, /reason: "reauthentication_required"/);
+});

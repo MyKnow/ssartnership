@@ -7,15 +7,22 @@ authority: normative
 
 # 관리자 로그인 보안 강화
 
-Updated: 2026-07-05
+Updated: 2026-10-05
+
+## 현재 관리자 인증 모델
+
+- 별도 관리자 ID/비밀번호 로그인은 없다. `/admin/login`은 `/auth/login?returnTo=%2Fadmin`으로 영구 리디렉션한다.
+- 관리자는 회원 계정으로 로그인한 뒤 `/admin/session` 브리지에서 관리자 세션(`admin_session`)을 발급받는다. 브리지는 활성 관리자 프로필이 있고 비밀번호 변경이 필요하지 않은 회원에게만 발급한다.
+- 브리지는 회원 세션이 관리자 세션 TTL(기본 12시간)보다 오래됐으면 발급하지 않는다. 이때 회원·관리자 쿠키를 모두 지우고 `/auth/login?returnTo=<관리자 경로>`로 보내 다시 인증하게 한다. 7일 회원 세션으로 관리자 권한을 조용히 연장하지 못하게 하는 장치다.
+- 관리자 세션은 계정 활성 상태, 비밀번호 변경 필요 여부, `permission_version` 일치를 요청마다 다시 확인한다.
 
 ## 발생 배경
 
-- `/admin/login`에 반복적인 공격 시도가 관측됐다.
+- 과거 `/admin/login`(당시 독립 관리자 로그인 화면)에 반복적인 공격 시도가 관측됐다.
 - 확인된 payload 유형에는 SQLi 스타일 문자열, NoSQL operator 스타일 파라미터명, reflected XSS 탐색이 포함됐다.
 - 검토한 로그 기준 관리자 탈취나 성공적인 비정상 로그인은 확인되지 않았다.
 
-## 코드 수준 확인 사항
+## 당시 코드 수준 확인 사항
 
 1. `/admin/login`은 `dangerouslySetInnerHTML`을 사용하지 않았으므로 직접적인 reflected XSS 실행은 확인되지 않았다.
 2. 기존 페이지는 임의의 `error`, `id` query string을 받아 `id`를 form에 다시 표시할 수 있었다.
@@ -26,13 +33,8 @@ Updated: 2026-07-05
 
 ## 적용한 보완
 
-- `error` query param은 고정 enum만 허용한다.
-- `id` query param은 sanitize 후 허용된 관리자 identifier 형식일 때만 다시 표시한다.
+- 독립 관리자 로그인 화면을 없애고 회원 로그인과 세션 브리지로 일원화했다. 로그인 시도 제한은 회원 로그인 throttle(IP·계정 식별자)을 따른다.
 - 의심스러운 query param과 잘못된 form shape은 차단된 security event로 기록한다.
-- 관리자 ID 입력은 `A-Z a-z 0-9 . _ -` 기준 `3~64`자로 제한한다.
-- 관리자 password 입력은 과도하게 크거나 control character가 포함된 payload를 거부한다.
-- 관리자 throttling은 IP와 account identifier에 모두 적용한다.
-- 실패한 로그인 시도에는 짧은 서버 지연을 부여한다.
 - protected admin page와 admin API는 비인가 접근 시 `admin_access` blocked event를 남긴다.
 - 관리자 page view analytics는 query string을 저장하지 않는다.
 - 선택적 edge 보호를 환경 변수로 추가했다.
@@ -40,24 +42,24 @@ Updated: 2026-07-05
   - `ADMIN_BASIC_AUTH_USERNAME`
   - `ADMIN_BASIC_AUTH_PASSWORD`
 - 선택적 basic auth 비교는 timing-safe 방식으로 수행한다.
-- edge 보호 대상은 `/admin` 화면 전체와 `/api/admin`, `/api/push/admin`이다.
+- IP allowlist 대상은 `/admin` 화면 전체와 `/api/admin`, `/api/push/admin`이다. Basic Auth challenge는 관리자 API(`/api/admin`, `/api/push/admin`)에만 적용하고, 관리자 화면은 회원 세션 브리지가 인증을 맡는다.
 - 관리자 세션 기본 TTL은 7일에서 12시간으로 줄였다.
   - `ADMIN_SESSION_TTL_HOURS`로 조정할 수 있다.
   - 허용 범위는 1~24시간이며, 잘못된 값은 기본 12시간으로 처리한다.
+  - 브리지 age gate도 같은 TTL을 쓴다.
 
 ## 권장 운영 설정
 
-1. 관리자 IP 대역이 안정적이면 `ADMIN_ALLOWED_IPS`를 설정한다.
-2. `/admin/login` 앞에 두 번째 gate를 두기 위해 `ADMIN_BASIC_AUTH_USERNAME`, `ADMIN_BASIC_AUTH_PASSWORD`를 활성화한다.
-3. 네트워크 지원이 가능하면 public admin login page보다 VPN 또는 internal access layer를 우선한다.
-4. 반복 공격이 관측되면 `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`를 회전한다.
-5. 운영자 수가 늘어나면 env 기반 단일 관리자 로그인 대신 MFA를 지원하는 외부 IdP로 전환한다.
-6. Vercel Firewall에서 알려진 abusive IP 차단과 admin path 접근 축소를 검토한다.
+1. 관리자 IP 대역이 안정적이면 `ADMIN_ALLOWED_IPS`를 설정한다. 이 값은 신뢰 프록시 기준 클라이언트 IP가 앱에 전달될 때만 의미가 있다.
+2. 관리자 API 앞에 두 번째 gate를 두려면 `ADMIN_BASIC_AUTH_USERNAME`, `ADMIN_BASIC_AUTH_PASSWORD`를 설정한다.
+3. 네트워크 지원이 가능하면 공개 경로보다 VPN 또는 내부 접근 계층을 우선한다.
+4. 관리자 세션 탈취가 의심되면 `ADMIN_SESSION_SECRET`를 회전해 모든 관리자 세션을 무효화하고, 해당 회원 계정은 로그아웃(모든 기기 세션 무효화) 뒤 비밀번호를 바꾼다.
+5. 반복 공격이 관측되면 엣지 프록시에서 알려진 abusive IP 차단과 admin path 접근 축소를 검토한다.
 
 ## 남은 트레이드오프
 
-- React escaping이 `/admin/login`의 reflected XSS 위험을 낮추지만, 현재 보완은 그 동작에만 의존하지 않도록 입력과 query를 제한한다.
+- React escaping이 reflected XSS 위험을 낮추지만, 보완은 그 동작에만 의존하지 않도록 입력과 query를 제한한다.
 - IP allowlist와 Basic Auth는 해당 env가 설정되기 전까지 비활성이다.
-- Vercel env 변경은 새 배포부터 적용되므로, 배포 후 `/admin/login`이 401 Basic Auth challenge를 반환하는지 확인해야 한다.
-- MFA는 현재 env 기반 단일 관리자 credential 모델과 맞지 않으므로 이번 패치에서 직접 구현하지 않았다.
-- MFA가 필요해지는 시점에는 admin login 자체를 외부 IdP/OIDC로 교체하는 편이 현재 구조에 임시 OTP를 덧붙이는 것보다 안전하다.
+- 런타임 env 변경은 앱 컨테이너를 다시 시작해야 적용된다. 적용 후 `/api/admin/*`가 Basic Auth 미제공 요청에 401 challenge를 반환하는지 확인한다.
+- 관리자 권한은 회원 인증 강도에 묶인다. MFA가 필요해지면 관리자 전용 OTP를 덧붙이기보다 회원 인증 자체를 외부 IdP/OIDC 또는 WebAuthn으로 강화하는 편이 현재 구조에 맞다.
+- 관리자 세션은 발급 후 최대 TTL 동안 유효하므로, 인증 시점부터 관리자 권한이 유지될 수 있는 최대 시간은 TTL의 두 배다.

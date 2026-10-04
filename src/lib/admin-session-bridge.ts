@@ -50,6 +50,25 @@ export function sanitizeAdminReturnTo(
   }
 }
 
+/**
+ * The admin session (12h by default) is minted from the member session (7d).
+ * Without an age limit the bridge would silently re-issue admin access for
+ * the whole member session lifetime, so the member credential must itself be
+ * no older than one admin session TTL. Future or non-finite timestamps fail
+ * closed.
+ */
+export function isMemberSessionFreshForAdminBridge(
+  session: { issuedAt: number },
+  ttlSeconds: number,
+  now = Date.now(),
+) {
+  const authenticatedAt = session.issuedAt;
+  if (!Number.isFinite(authenticatedAt) || authenticatedAt > now) {
+    return false;
+  }
+  return now - authenticatedAt <= ttlSeconds * 1000;
+}
+
 export function isAdminAccountEligibleForSessionBridge(
   account: BridgeEligibleAdminAccount | null | undefined,
 ) {
