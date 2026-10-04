@@ -121,8 +121,8 @@ authority: normative
 
 ## Deployment/operations
 
-- `main` branch는 Vercel Production과 Supabase Production 기준이다.
-- `dev` branch는 Vercel Preview와 Supabase Preview 기준이다.
+- `main` branch는 PVE 자체 호스팅 Production 앱·DB 기준이다.
+- `dev` branch는 PVE 자체 호스팅 원본 Preview 앱·DB 기준이다. Vercel·Cloud Supabase 경로는 RF-04(#537)에서 폐기했다.
 - planned work는 typed branch에서 시작하고 PR은 `dev` 대상으로 만든다.
 - `npm run release`가 기본 release path다.
 - GitHub Actions: lockfile-check, public-readiness, storybook.

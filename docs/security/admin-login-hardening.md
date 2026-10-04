@@ -52,12 +52,12 @@ Updated: 2026-07-05
 3. 네트워크 지원이 가능하면 public admin login page보다 VPN 또는 internal access layer를 우선한다.
 4. 반복 공격이 관측되면 `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`를 회전한다.
 5. 운영자 수가 늘어나면 env 기반 단일 관리자 로그인 대신 MFA를 지원하는 외부 IdP로 전환한다.
-6. Vercel Firewall에서 알려진 abusive IP 차단과 admin path 접근 축소를 검토한다.
+6. PVE 엣지 Caddy에서 알려진 abusive IP 차단과 admin path 접근 축소를 검토한다.
 
 ## 남은 트레이드오프
 
 - React escaping이 `/admin/login`의 reflected XSS 위험을 낮추지만, 현재 보완은 그 동작에만 의존하지 않도록 입력과 query를 제한한다.
 - IP allowlist와 Basic Auth는 해당 env가 설정되기 전까지 비활성이다.
-- Vercel env 변경은 새 배포부터 적용되므로, 배포 후 `/admin/login`이 401 Basic Auth challenge를 반환하는지 확인해야 한다.
+- 운영 `app.env` 변경은 앱 컨테이너 재시작 뒤 적용되므로, 재시작 후 `/admin/login`이 401 Basic Auth challenge를 반환하는지 확인해야 한다.
 - MFA는 현재 env 기반 단일 관리자 credential 모델과 맞지 않으므로 이번 패치에서 직접 구현하지 않았다.
 - MFA가 필요해지는 시점에는 admin login 자체를 외부 IdP/OIDC로 교체하는 편이 현재 구조에 임시 OTP를 덧붙이는 것보다 안전하다.

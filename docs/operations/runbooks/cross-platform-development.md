@@ -118,7 +118,7 @@ Secret 값은 진단 결과에 포함하지 않는다. 실패 결과는 변수 �
 | `npm run dev`, `doctor`, `bootstrap` | 브랜치와 무관하게 `.env.preview` |
 | `npm run build`, `npm start` — `main` | `.env.production` |
 | `npm run build`, `npm start` — `dev`, `feat/*` 등 다른 브랜치 | `.env.preview` |
-| CI·Vercel·자체 호스팅 빌드에서 두 data source를 명시적으로 주입 | 주입한 환경만 사용 |
+| CI(`CI=1`)·자체 호스팅 빌드(`SELF_HOST_BUILD=1`)에서 두 data source를 명시적으로 주입 | 주입한 환경만 사용 |
 | 두 data source가 명시적으로 `mock`인 검증 | 주입한 합성 환경만 사용 |
 
 `scripts/lib/project-environment.mjs`가 선택 계약의 최종 근거다. `NODE_ENV=production`은 최적화 모드이며 데이터 환경을 결정하지 않는다. 로컬 build/start에서 detached HEAD나 Git 조회 실패는 중단한다. 선택한 파일이 없으면 반대 환경이나 과거 `.env`로 대체하지 않는다. bootstrap은 파일이 없는 새 개발환경에만 외부 연결 없는 mock `.env.preview`를 생성한다. 두 실제 파일은 Git과 Docker context에서 제외하고 소유자 전용 권한으로 보관한다.

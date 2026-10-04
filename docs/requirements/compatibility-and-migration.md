@@ -85,7 +85,7 @@ authority: normative
 - server action을 REST/RPC API로 바꿀지.
 - repository interface를 유지할지, query layer를 다른 패턴으로 대체할지.
 - auth/session을 custom HMAC cookie에서 auth provider/session store로 바꿀지.
-- Vercel hosting/analytics/speed insights를 유지할지.
+- ~~Vercel hosting/analytics/speed insights를 유지할지.~~ 결정됨: PVE 자체 호스팅이 유일한 정본이며 Vercel 배포·Analytics·Speed Insights는 RF-04(#537)에서 폐기했다.
 - Tailwind v4/design token 체계를 유지할지.
 - Storybook/Playwright/Node test runner를 유지할지.
 
