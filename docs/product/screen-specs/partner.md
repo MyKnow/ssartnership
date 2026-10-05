@@ -18,7 +18,7 @@ authority: normative
 - 액션·흐름: primary는 로그인, 보조는 비밀번호 재설정이다. 포털 보호 화면에서 진입하고 회사 선택·대시보드·필수 비밀번호 변경으로 이탈한다.
 - 경계·상태: partner session과 공용 FE/BE 검증, rate limit을 사용한다. 기본, validation error, 인증 실패, 제출 중, 이미 로그인 상태와 server action 중 세션이 만료되어 돌아온 상태(`?error=session_expired`)를 제공한다. `?error=`는 정해진 코드만 문구로 바꾸고 그 밖의 값은 표시하지 않는다.
 - 반응형·분석: 단일 form column을 유지한다. `partner_login_attempt/result`만 기록하고 로그인 식별자·비밀번호는 로그에서 제외한다.
-- 수용 기준: 회사 scope를 세션에서 다시 확인하고 실패 후 입력 보존, 첫 오류 focus, 중복 제출 차단이 동작한다. 로그인 없이 포털 딥링크에 들어오면 원래 경로를 `returnTo`로 보존해 로그인 후 그 화면으로 돌아간다. `returnTo`는 `/partner` 아래 경로만 허용하고 로그인·로그아웃·재설정·초기 설정·비밀번호 변경 화면과 외부·프로토콜 상대 URL은 버린다(`src/lib/partner-auth/return-to.ts`). 로그인 실패 후에도 `returnTo`를 유지한다.
+- 수용 기준: 회사 scope를 세션에서 다시 확인하고 실패 후 입력 보존, 첫 오류 focus, 중복 제출 차단이 동작한다. 로그인 없이 포털 딥링크에 들어오면 원래 경로를 `returnTo`로 보존해 로그인 후 그 화면으로 돌아간다. `returnTo`는 `/partner` 아래 경로만 허용하고 로그인·로그아웃·재설정·초기 설정·비밀번호 변경 화면과 외부·프로토콜 상대 URL은 버린다(`src/lib/partner-auth/return-to.ts`). 로그인 실패 후에도 `returnTo`를 유지한다. server action 중 세션이 만료되어 돌아온 경우(`?error=session_expired`)는 공용 action 세션 가드가 원래 화면 경로를 받지 않으므로 `returnTo` 없이 이동하고, 다시 로그인하면 `/partner`에서 회사 범위를 다시 정한다.
 
 <!-- screen-contract: partner.reset -->
 ## `/partner/reset` — 파트너 비밀번호 재설정
