@@ -68,8 +68,16 @@ test("빈 상태는 EmptyState 크기 변형을 쓰고 맥락 없는 '데이터�
     "src/components/admin/MattermostSenderManager.tsx",
     "src/components/admin/cohort-card-themes/AdminCohortCardThemeManager.tsx",
     "src/components/admin/member-detail/AdminMemberCommunicationPanel.tsx",
+    "src/components/admin/AdminMemberManualAddPanel.tsx",
+    "src/components/push/PushSettingsCard.tsx",
   ]) {
-    assert.match(await read(file), /<EmptyState[\s\S]*?size="sm"/, file);
+    const source = await read(file);
+    assert.match(source, /<EmptyState[\s\S]*?size="sm"/, file);
+    assert.doesNotMatch(
+      source,
+      /<div className="[^"]*border-dashed[^"]*">\s*(<p[^>]*>)?\s*[^<{]*(없습니다|입력해 주세요)/,
+      `${file}: 점선 빈 상태 상자를 직접 그립니다.`,
+    );
   }
 });
 

@@ -6,6 +6,7 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
 import IconActionButton, { IconActionGroup } from "@/components/ui/IconActionButton";
 import { getPolicyHref } from "@/lib/policy-documents";
 import { formatKoreanDateTime } from "@/lib/datetime";
@@ -238,11 +239,7 @@ export default function PushSettingsCard(props: PushSettingsCardProps) {
                       ))}
                     </div>
                   ) : (
-                    <div className="rounded-2xl border border-dashed border-border bg-surface-inset/75 px-3 py-3">
-                      <p className="text-sm text-muted-foreground">
-                        아직 푸시를 받을 기기가 없습니다.
-                      </p>
-                    </div>
+                    <EmptyState size="sm" title="아직 푸시를 받을 기기가 없습니다." />
                   )}
                 </div>
               ) : controller.canControlPush ? (

@@ -9,6 +9,7 @@ import {
 import ImageCropDialog from "@/components/media/ImageCropDialog";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
@@ -871,7 +872,11 @@ export default function AdminMemberManualAddPanel({
             <span className="text-sm text-muted-foreground">{rows.length} / {MANUAL_MEMBER_IMPORT_LIMITS.maxRows}명</span>
           </div>
           {rows.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-surface-inset px-4 py-6 text-sm text-muted-foreground">행 추가를 누르거나 회원 XLSX를 업로드해 초대할 회원을 입력해 주세요.</div>
+            <EmptyState
+              size="sm"
+              title="아직 초대할 회원 행이 없습니다."
+              description="행 추가를 누르거나 회원 XLSX를 업로드해 초대할 회원을 입력해 주세요."
+            />
           ) : (
             rows.map((row) => {
               const selectedPhoto = selectedPhotos.get(row.rowNumber);
