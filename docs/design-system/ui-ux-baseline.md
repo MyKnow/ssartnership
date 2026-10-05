@@ -69,7 +69,7 @@ public header는 브랜드와 계정·알림·쿠폰·테마·전체 메뉴처�
 - events/ads/promotions: event registration form, ad package manager, promotion carousel editor.
 - style guide/demo: `AdminStyleGuideTabsDemo`, shared page state stories.
 
-관리자 UI는 정보 밀도가 높은 operational tool이다. 마케팅 landing처럼 큰 hero나 과도한 장식보다 스캔 가능한 필터, 표, dense card, 빠른 액션을 우선한다. shell과 page가 제목을 중복하지 않고 목록은 기본 20행을 기준으로 한다. 행 목록은 `src/lib/admin-ia.ts`의 `ADMIN_LIST_DEFAULT_PAGE_SIZE`(20)와 `ADMIN_LIST_PAGE_SIZE_OPTIONS`(20·50·100)를 쓴다(회원 보안 로그, 쇼케이스 활동 로그, 혜택 이용 이력, 내 알림). 열 배수가 필요한 카드 그리드(제휴처 24, 리뷰 카드 12), 페이지네이션 없는 검토 큐 상한(프로필 사진 50), 자동 알림 요약 같은 집계 창, 발송 대상 검색 제안은 행 목록 기본값의 예외로 둔다.
+관리자 UI는 정보 밀도가 높은 operational tool이다. 마케팅 landing처럼 큰 hero나 과도한 장식보다 스캔 가능한 필터, 표, dense card, 빠른 액션을 우선한다. shell과 page가 제목을 중복하지 않고 목록은 기본 20행을 기준으로 한다. 행 목록은 `src/lib/admin-ia.ts`의 `ADMIN_LIST_DEFAULT_PAGE_SIZE`(20)와 `ADMIN_LIST_PAGE_SIZE_OPTIONS`(20·50·100)를 쓴다(회원 보안 로그, 쇼케이스 활동 로그, 혜택 이용 이력, 내 알림). 열 배수가 필요한 카드 그리드(제휴처 24, 리뷰 카드 12), 페이지네이션 없이 상한까지 모두 보여 주는 목록(프로필 사진 검토 큐 50, 제휴처 변경 요청 이력 50), 집계 창(자동 알림 요약 30, 최근 운영 로그 50), 발송 대상 검색 제안(30)은 행 목록 기본값의 예외로 둔다. 상한 목록을 20으로 줄이면 대기 항목이 가려지므로, 줄이려면 먼저 페이지네이션을 도입한다.
 
 ## Partner portal UI composition
 
