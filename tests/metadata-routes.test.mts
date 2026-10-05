@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 import postcss, { type Rule } from "postcss";
 import { optimize } from "@tailwindcss/node";
@@ -110,8 +110,12 @@ test("favicon.ico carries exactly the 16, 32, and 48 pixel frames", () => {
 });
 
 test("file-based app icon and its duplicate PNG stay removed", () => {
-  // src/app/icon.tsx overrode the configured icon set with a placeholder glyph.
-  assert.equal(existsSync(new URL("../src/app/icon.tsx", import.meta.url)), false);
+  // A file-based icon in any segment (icon.*, apple-icon.*) overrides the
+  // configured icon set; src/app/icon.tsx used to replace it with a placeholder.
+  const fileBasedIcons = readdirSync(new URL("../src/app/", import.meta.url), { recursive: true })
+    .map(String)
+    .filter((path) => /(?:^|[\\/])(?:apple-)?icon\d*\.[a-z]+$/i.test(path));
+  assert.deepEqual(fileBasedIcons, []);
   assert.equal(existsSync(new URL("../public/icon.png", import.meta.url)), false);
   assert.match(layoutSource, /url: "\/favicon\.ico", sizes: "any"/);
 });
