@@ -109,7 +109,7 @@ public header는 브랜드와 계정·알림·쿠폰·테마·전체 메뉴처�
 
 - route-specific `loading.tsx`와 shared skeleton을 함께 사용한다.
 - list empty는 `EmptyState` 또는 domain-specific empty panel로 표현한다.
-- app error는 `AppErrorScreen`과 route/global error surface를 사용한다.
+- app error는 `AppErrorScreen`과 route/global error surface를 사용한다. 루트 `error.tsx`·`global-error.tsx`는 `layout="page"`(기본값)로 화면 전체를 대체하고, 공개 `(site)`·파트너 그룹 `error.tsx`는 `layout="embedded"`로 그룹 셸(하단 탐색·Footer·파트너 포털 셸) 안에서 렌더해 복귀 동선을 유지한다. 그룹 layout 자체의 예외는 루트 경계가 받는다.
 - 상세 페이지에서 존재하지 않는 partner는 `not-found.tsx`로 분리되어 있다.
 
 ## Storybook 추적 기준
