@@ -15,8 +15,9 @@ const WEEK_SECONDS = 60 * 60 * 24 * 7;
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
-  // 프로세스 로컬 IP 쿼터라 요청당 DB 왕복이 없다. IP를 판정할 수 없는 요청
-  // (옵티마이저 내부 호출 등)은 IP 쿼터 대신 아래 fetch 한도로 바운드된다.
+  // 프로세스 로컬 IP 쿼터라 요청당 DB 왕복이 없다. IP를 판정할 수 없거나 내부 홉
+  // 주소로 판정되는 요청(옵티마이저 내부 호출 등)은 IP 쿼터 대신 아래 fetch 한도로
+  // 바운드된다.
   const quota = consumeImageProxyRequestQuota({
     ipAddress: getClientIp(request.headers),
   });

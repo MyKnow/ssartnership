@@ -13,8 +13,13 @@ import net from 'node:net';
  *   2. 앱 VM의 relay Caddy는 `trusted_proxies`로 엣지 단일 홉만 신뢰해 값을 이어 붙인다.
  *   3. 앱 컨테이너 포트는 loopback과 relay 외에는 공개하지 않는다.
  * - null은 "판정 불가"다. 호출부는 null을 다른 클라이언트와 공유하는 단일 버킷으로
- *   바꿀지(익명 폼의 보수적 차단) 또는 IP 쿼터를 건너뛸지(내부 이미지 옵티마이저 호출)
+ *   바꿀지(익명 폼의 보수적 차단) 또는 IP 쿼터를 건너뛸지(공개 이미지 프록시)
  *   경로별로 명시한다.
+ * - 전달 헤더 없이 앱에 닿은 요청(loopback 호출, Next 이미지 옵티마이저의 내부 호출)은
+ *   라우트 처리 단계에서 Next 서버가 접속 상대 주소로 `x-forwarded-for`를 채운다.
+ *   그래서 신뢰 프록시 모드에서도 이런 요청의 첫 값은 클라이언트가 아니라 relay
+ *   컨테이너·Docker gateway 같은 내부 홉 주소다. 여러 요청이 내부 주소 하나로 모이는
+ *   경로(공개 이미지 프록시)는 공개 주소에만 IP 쿼터를 적용한다.
  * - 체인이 바뀌면(CDN·추가 프록시 도입 등) 이 함수와
  *   `tests/client-ip-trust-contract.test.mts`를 같은 변경에서 갱신한다.
  */
@@ -82,8 +87,9 @@ export function getClientIp(headerStore: HeaderSource) {
 
 /**
  * 익명 폼 레이트리밋용 식별자. IP를 판정할 수 없으면 모든 미판정 요청이 공유하는
- * 보수적 버킷으로 묶는다. 신뢰 프록시 모드의 정상 경로에서는 relay가 항상
- * x-forwarded-for를 붙이므로 이 버킷은 loopback·내부 호출·비운영 환경에서만 쓰인다.
+ * 보수적 버킷으로 묶는다. 신뢰 프록시 모드에서는 relay가 x-forwarded-for를 붙이고
+ * 헤더 없이 들어온 요청도 Next 서버가 접속 상대 주소로 채우므로, 이 버킷은 주로
+ * 신뢰 프록시 모드가 아닌 환경(로컬·테스트)에서 쓰인다.
  */
 export const UNRESOLVED_CLIENT_BUCKET = 'unknown';
 
