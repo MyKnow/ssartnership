@@ -4,6 +4,10 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+const themePreferenceModulePromise = import(
+  new URL("../src/lib/theme-preference.ts", import.meta.url).href
+) as Promise<typeof import("../src/lib/theme-preference.ts")>;
+
 function read(path: string) {
   return readFile(new URL(`../${path}`, import.meta.url), "utf8");
 }
@@ -95,7 +99,48 @@ test("global-error는 루트 layout과 같은 전역 CSS를 직접 불러와 다
     assert.ok(source.includes(globalsCss));
     assert.ok(source.indexOf(fontCss) < source.indexOf(globalsCss));
   }
-  // global-error는 자체 문서를 렌더하므로 html·body를 직접 소유한다.
-  assert.match(globalError, /<html lang="ko" suppressHydrationWarning>/);
-  assert.match(globalError, /<body>/);
+  // global-error는 자체 문서를 렌더하므로 html·body를 직접 소유하고, body는 루트 layout과 같은 클래스를 쓴다.
+  assert.match(globalError, /<html\s+lang="ko"[^>]*\ssuppressHydrationWarning\s*>/);
+  const bodyClassName = /<body className="([^"]+)">/;
+  const layoutBody = layout.match(bodyClassName)?.[1];
+  assert.ok(layoutBody, "루트 layout body 클래스를 찾지 못했습니다.");
+  assert.equal(globalError.match(bodyClassName)?.[1], layoutBody);
+});
+
+test("global-error는 ThemeProvider와 같은 저장 키·기본값으로 해석한 테마를 html에 적용한다", async () => {
+  const [globalError, themeProvider, hook] = await Promise.all([
+    read("src/app/global-error.tsx"),
+    read("src/components/ThemeProvider.tsx"),
+    read("src/hooks/useStoredResolvedTheme.ts"),
+  ]);
+  const {
+    DEFAULT_THEME_PREFERENCE,
+    THEME_STORAGE_KEY,
+    resolveThemePreference,
+  } = await themePreferenceModulePromise;
+
+  // next-themes 기본 저장 키·이 앱의 기본 테마를 그대로 유지해 기존 사용자 선택이 이어진다.
+  assert.equal(THEME_STORAGE_KEY, "theme");
+  assert.equal(DEFAULT_THEME_PREFERENCE, "light");
+  assert.match(themeProvider, /attribute="class"/);
+  assert.match(themeProvider, /storageKey=\{THEME_STORAGE_KEY\}/);
+  assert.match(themeProvider, /defaultTheme=\{DEFAULT_THEME_PREFERENCE\}/);
+  assert.match(themeProvider, /\benableSystem\b/);
+
+  assert.equal(resolveThemePreference(null, true), "light");
+  assert.equal(resolveThemePreference("", true), "light");
+  assert.equal(resolveThemePreference("dark", false), "dark");
+  assert.equal(resolveThemePreference("light", true), "light");
+  assert.equal(resolveThemePreference("system", true), "dark");
+  assert.equal(resolveThemePreference("system", false), "light");
+  assert.equal(resolveThemePreference("unknown", true), "light");
+
+  // 저장소 접근 실패는 기본 테마로 처리하고, 서버·hydration 중에는 기본 테마를 쓴다.
+  assert.match(hook, /localStorage\.getItem\(THEME_STORAGE_KEY\)/);
+  assert.match(hook, /catch \{/);
+  assert.match(hook, /useSyncExternalStore\(subscribe, getSnapshot, getServerSnapshot\)/);
+
+  assert.match(globalError, /const theme = useStoredResolvedTheme\(\);/);
+  assert.match(globalError, /className=\{theme\}/);
+  assert.match(globalError, /style=\{\{ colorScheme: theme \}\}/);
 });
