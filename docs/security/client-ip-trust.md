@@ -39,10 +39,13 @@ CDN이나 추가 프록시를 엣지 앞에 둘 때는 첫 값이 더 이상 접
 | 관리자 IP 허용목록 | `ADMIN_ALLOWED_IPS`가 설정돼 있으면 거부한다. |
 | 활동·보안 로그 | `ip_address`를 비워 둔다. |
 
+공개 이미지 프록시의 요청당 상한은 DNS 해석부터 HTTP 본문 수신까지 합쳐 8초·8 MiB다. 상태 코드·MIME·선언된 길이가 허용 범위를 벗어나면 원격 응답 스트림을 즉시 닫고, 길이가 없는 응답도 실제 수신 바이트를 센다. 주소 해석과 HTTP 전송에 각각 새 제한 시간을 주지 않는다. 운영 상한과 하위 호출 제약은 [신뢰성 기준](../operations/reliability.md)에 둔다.
+
 ## 검증
 
 - 앱 동작: [보안 하드닝 테스트](../../tests/security-hardening.test.mts), [회원 인증 보안](../../tests/member-auth-security.test.mts)
 - 배포 체인 전제: [클라이언트 IP 신뢰 계약 테스트](../../tests/client-ip-trust-contract.test.mts)
 - 이미지 프록시 쿼터: [이미지 프록시 레이트리밋](../../tests/image-proxy-rate-limit.test.mts)
+- 이미지 전송 경계: [DNS·전송 시간·응답 중단](../../tests/unit/image-proxy-fetch-bounds.test.ts)
 
 운영 주소, 방화벽 규칙, 허용목록 값은 이 공개 문서에 기록하지 않는다.

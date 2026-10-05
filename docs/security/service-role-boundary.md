@@ -23,6 +23,7 @@ Supabase service role key는 RLS를 우회할 수 있으므로 서버 전용 코
   - cron 맥락: `CRON_SECRET` Bearer(상수시간 비교)
   - 공개 읽기 맥락: 공개 projection만 반환하는 repository/helper
 - mutation route는 cookie 인증에만 의존하지 않고 same-origin 또는 CSRF 성격의 요청 검증을 함께 적용한다.
+- 회원·파트너 비밀번호 변경 route는 새 비밀번호가 문자열인지 확인하고 원문에 공용 정책을 적용한다. 앞뒤 공백·제어문자를 제거하거나 다른 JSON 타입을 문자열로 변환해 저장하지 않는다. 현재 비밀번호 확인의 기존 정규화와 새 비밀번호 정책은 구분한다([경계 동작 테스트](../../tests/unit/password-change-input.test.ts)).
 - 로그, metric, cache version 같은 부가 기록 실패는 가능한 한 사용자 요청 실패로 전파하지 않는다.
 
 ## 허용되는 사용 범위
@@ -46,6 +47,7 @@ Supabase service role key는 RLS를 우회할 수 있으므로 서버 전용 코
 - 파트너 server action은 proxy에 기대지 않고 action 안에서 partner session을 읽는다(`requirePartnerActionSession()` 또는 `getPartnerSession()`). proxy는 로그인 쿠키가 없는 server action 요청을 로그인으로 이동시키지 않고 action에 넘기므로, 새 action도 같은 확인이 필요하다(`tests/partner-proxy-auth-redirects.test.mts`가 확인한다).
 - 파트너 API route는 same-origin 확인 뒤, 본문을 읽기 전에 `requirePartnerApiSession()`(`src/lib/partner-auth/api-session.ts`)을 호출한다. 세션이 없으면 401, 비밀번호 변경이 필요한 상태면 403을 돌려준다. 비밀번호 변경 대기 중 허용은 노출을 줄이는 요청(push 구독 해제)만이며, 예외 route와 사유는 `tests/partner-api-session.test.mts`의 허용 목록에 둔다.
 - 초기 설정 token route는 token 자체 검증 외에도 same-origin form submit을 요구한다.
+- 초기 설정 완료 쓰기는 조회한 계정의 활성 상태·세션 버전·변경 시각과 미사용 token을 다시 조건으로 확인하고, 쓰기 시점에도 링크가 만료되지 않았어야 한다. 설정 완료는 계정을 활성화하는 작업이 아니며, 처리 중 발생한 관리자 변경을 덮어쓰지 않는다([스키마·동시성 계약](../../tests/partner-auth-schema-contract.test.mts)).
 - 파트너 변경 요청은 요청자 계정 식별자를 감사 이력에 남긴다.
 
 ### Cron과 운영 자동화

@@ -58,7 +58,7 @@ process.env.SUPABASE_URL ??= "https://supabase.invalid";
 process.env.SUPABASE_SERVICE_ROLE_KEY ??= "test-service-role-key";
 
 type QueryOperation = "select" | "update";
-type QueryFilter = { kind: "eq" | "is" | "in"; column: string; value: unknown };
+type QueryFilter = { kind: "eq" | "is" | "in" | "gt"; column: string; value: unknown };
 type QueryCall = {
   table: string;
   operation: QueryOperation;
@@ -108,6 +108,11 @@ class FakeQuery {
 
   in(column: string, value: unknown) {
     this.call.filters.push({ kind: "in", column, value });
+    return this;
+  }
+
+  gt(column: string, value: unknown) {
+    this.call.filters.push({ kind: "gt", column, value });
     return this;
   }
 
@@ -326,6 +331,51 @@ test("초기 설정 완료 갱신의 스키마 오류는 payload를 바꿔 재�
     assert.equal(calls.filter((call) => call.operation === "update").length, 1);
   } finally {
     console.error = originalConsoleError;
+  }
+});
+
+test("초기 설정 조회 뒤 관리자 상태가 바뀌면 완료 쓰기가 그 변경을 덮어쓰지 않는다", async () => {
+  const { completeSupabasePartnerPortalInitialSetup } = await setupModulePromise;
+  const candidatePassword = "Valid-password1!";
+  for (const change of [
+    { is_active: false },
+    { login_id: "updated@example.com", updated_at: "2026-10-02T00:00:00.000Z" },
+    { auth_session_version: 4 },
+    { initial_setup_expires_at: PAST },
+  ]) {
+    let account = buildSetupAccount();
+    let updated = false;
+    installSupabase((call) => {
+      if (call.table === "partner_account_companies") {
+        account = { ...account, ...change };
+        return { data: [{ company_id: "company-1", is_active: true }] };
+      }
+      if (call.operation === "update") {
+        const row = account as Record<string, unknown>;
+        const matches = call.filters.every((filter) => filter.kind === "gt"
+          ? String(row[filter.column]) > String(filter.value)
+          : row[filter.column] === filter.value);
+        if (!matches) return { data: null };
+        account = { ...account, ...call.payload };
+        updated = true;
+        return { data: { id: account.id } };
+      }
+      return { data: { ...account } };
+    });
+
+    await assert.rejects(
+      completeSupabasePartnerPortalInitialSetup({
+        token: "setup-token",
+        password: candidatePassword,
+        confirmPassword: candidatePassword,
+      }),
+      (error: unknown) => (error as { code?: string }).code === "not_found",
+      JSON.stringify(change),
+    );
+    assert.equal(updated, false, JSON.stringify(change));
+    for (const [key, value] of Object.entries(change)) {
+      assert.equal((account as Record<string, unknown>)[key], value);
+    }
   }
 });
 
