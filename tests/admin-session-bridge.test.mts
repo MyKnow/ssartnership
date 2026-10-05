@@ -59,3 +59,44 @@ test("admin session bridge eligibility rejects inactive or password-change membe
     false,
   );
 });
+
+test("관리자 세션 브리지는 최근 10분 안의 회원 자격 확인만 승격한다", async () => {
+  const { isMemberSessionFreshForAdminBridge } = await bridgeModulePromise;
+  const { MEMBER_RECENT_AUTH_WINDOW_MS } = await import(
+    new URL("../src/lib/member-recent-auth.ts", import.meta.url).href
+  ) as typeof import("../src/lib/member-recent-auth.ts");
+  const now = Date.UTC(2026, 9, 5, 12);
+
+  assert.equal(MEMBER_RECENT_AUTH_WINDOW_MS, 10 * 60 * 1000);
+  assert.equal(isMemberSessionFreshForAdminBridge({ authenticatedAt: now - 1_000 }, now), true);
+  assert.equal(
+    isMemberSessionFreshForAdminBridge({ authenticatedAt: now - MEMBER_RECENT_AUTH_WINDOW_MS }, now),
+    true,
+  );
+  assert.equal(
+    isMemberSessionFreshForAdminBridge({ authenticatedAt: now - MEMBER_RECENT_AUTH_WINDOW_MS - 1 }, now),
+    false,
+  );
+  // A long-lived member session that was only re-issued (no credential
+  // check) carries an old authenticatedAt and must not mint admin access.
+  assert.equal(isMemberSessionFreshForAdminBridge({ authenticatedAt: now - 12 * 60 * 60 * 1000 }, now), false);
+  // Tokens minted before authenticatedAt existed fail closed.
+  assert.equal(isMemberSessionFreshForAdminBridge({}, now), false);
+  assert.equal(isMemberSessionFreshForAdminBridge({ authenticatedAt: now + 1 }, now), false);
+  assert.equal(isMemberSessionFreshForAdminBridge({ authenticatedAt: Number.NaN }, now), false);
+});
+
+test("관리자 세션 브리지 route는 오래된 회원 세션을 지우고 재로그인으로 보낸다", async () => {
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync(new URL("../src/app/admin/session/route.ts", import.meta.url), "utf8");
+  const notAdminIndex = source.indexOf('reason: "not_admin"');
+  const ageGateIndex = source.indexOf("isMemberSessionFreshForAdminBridge(memberSession)");
+  const mintIndex = source.indexOf("await setAdminSession(adminAccount)");
+
+  assert.ok(ageGateIndex > 0 && ageGateIndex < mintIndex);
+  // Ordinary members who follow an /admin link go to /admin/denied before the
+  // age gate, so the re-login branch never clears a non-admin member session.
+  assert.ok(notAdminIndex > 0 && notAdminIndex < ageGateIndex);
+  assert.match(source, /clearUserSession\(\), clearAdminSession\(\)/);
+  assert.match(source, /reason: "reauthentication_required"/);
+});

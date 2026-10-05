@@ -31,10 +31,8 @@ test("state-changing cron GET routes require the Vercel cron bearer secret only"
   const cronAccess = read("../src/lib/cron-route.ts");
 
   assert.match(cronAccess, /process\.env\.CRON_SECRET/);
-  assert.match(
-    cronAccess,
-    /request\.headers\.get\("authorization"\) === `Bearer \$\{secret\}`/,
-  );
+  assert.match(cronAccess, /timingSafeEqual\(provided, expected\)/);
+  assert.doesNotMatch(cronAccess, /=== `Bearer \$\{secret\}`/);
 
   for (const routeName of STATE_CHANGING_CRON_GET_ROUTES) {
     const relativePath = `../src/app/api/cron/${routeName}/route.ts`;

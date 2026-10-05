@@ -62,6 +62,7 @@ test("member and partner auth key helpers delegate to the common scoped rate-lim
       "mattermost-code-verify:account:adminuser",
       "change-password:account:adminuser",
       "manual-password-action:account:adminuser",
+      "recent-auth:account:adminuser",
     ],
   );
   assert.deepEqual(

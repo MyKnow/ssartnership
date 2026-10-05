@@ -7,7 +7,7 @@ import {
   RouteJsonBodyError,
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
-import { getSignedUserSession } from "@/lib/user-auth";
+import { requireMemberApiSession } from "@/lib/member-api-session";
 
 function safeDecodeSegment(value: string) {
   try {
@@ -32,13 +32,11 @@ export async function POST(
     );
   }
 
-  const session = await getSignedUserSession();
-  if (!session?.userId) {
-    return NextResponse.json(
-      { message: "로그인이 필요합니다." },
-      { status: 401 },
-    );
+  const auth = await requireMemberApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
 
   const resolvedParams = await params;
   const partnerId = resolvedParams?.id ? safeDecodeSegment(resolvedParams.id) : "";

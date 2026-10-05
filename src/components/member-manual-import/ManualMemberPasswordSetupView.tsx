@@ -5,7 +5,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import PasswordInput from "@/components/ui/PasswordInput";
-import { getMemberGateCompletionReturnTo } from "@/lib/member-required-gates";
+import { getMemberLoginCompletionHref } from "@/lib/member-required-gates";
 import { PASSWORD_POLICY_MESSAGE, isValidPasswordPolicy } from "@/lib/validation";
 
 export default function ManualMemberPasswordSetupView({
@@ -55,8 +55,14 @@ export default function ManualMemberPasswordSetupView({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message ?? "비밀번호를 설정하지 못했습니다.");
+      // Setting the password completes the change-password gate; the next
+      // request lets the server pick any remaining lower-priority gate.
       window.location.replace(
-        getMemberGateCompletionReturnTo("/", "change-password"),
+        getMemberLoginCompletionHref({
+          currentPath: "/auth/member/setup",
+          returnTo: new URLSearchParams(window.location.search).get("returnTo"),
+          completedGate: "change-password",
+        }),
       );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "비밀번호를 설정하지 못했습니다.");

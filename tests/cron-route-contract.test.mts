@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
+import { randomBytes } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
+  CRON_SECRET_MIN_LENGTH,
   ensureCronApiAccess,
   getCronErrorResponse,
+  isAuthorizedCronRequest,
 } from "../src/lib/cron-route.ts";
 
 const root = new URL("..", import.meta.url);
@@ -56,23 +59,47 @@ test("cron 인증은 설정된 bearer secret만 허용하고 실패 응답을 �
     assert.equal(missingSecret?.status, 401);
     assert.deepEqual(await missingSecret?.json(), { message: "Unauthorized" });
 
-    process.env.CRON_SECRET = "cron-test-secret";
+    process.env.CRON_SECRET = "short-cron-secret";
     assert.equal(
       ensureCronApiAccess(
         new Request("https://example.com/api/cron/rss", {
-          headers: { authorization: "Bearer wrong" },
+          headers: { authorization: "Bearer short-cron-secret" },
         }),
       )?.status,
       401,
+      "a configured secret below the runtime minimum must fail closed",
     );
+
+    const secret = randomBytes(CRON_SECRET_MIN_LENGTH).toString("hex");
+    process.env.CRON_SECRET = secret;
+    for (const authorization of [
+      "Bearer wrong",
+      `Bearer ${secret}x`,
+      `Bearer ${secret.slice(0, -1)}`,
+      `bearer ${secret}`,
+      secret,
+      "Bearer ",
+    ]) {
+      assert.equal(
+        ensureCronApiAccess(
+          new Request("https://example.com/api/cron/rss", {
+            headers: { authorization },
+          }),
+        )?.status,
+        401,
+        authorization,
+      );
+    }
     assert.equal(
       ensureCronApiAccess(
         new Request("https://example.com/api/cron/rss", {
-          headers: { authorization: "Bearer cron-test-secret" },
+          headers: { authorization: `Bearer ${secret}` },
         }),
       ),
       null,
     );
+    assert.equal(isAuthorizedCronRequest(null, secret), false);
+    assert.equal(isAuthorizedCronRequest(`Bearer ${secret}`, undefined), false);
   } finally {
     if (originalSecret === undefined) {
       delete process.env.CRON_SECRET;

@@ -5,7 +5,7 @@ import {
   deactivateMockPushDevice,
   isMockNotificationPreferenceMode,
 } from "@/lib/notification-preferences";
-import { getSignedUserSession } from "@/lib/user-auth";
+import { requireMemberApiSession } from "@/lib/member-api-session";
 import {
   deactivateAllPushSubscriptions,
   deactivatePushSubscription,
@@ -33,10 +33,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
 
-  const session = await getSignedUserSession();
-  if (!session?.userId) {
-    return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requireMemberApiSession({ allowPasswordChangeRequired: true });
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
 
   try {
     const body = await readRouteJsonBodyWithinLimit<{

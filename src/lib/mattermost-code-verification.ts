@@ -2,6 +2,7 @@ import { randomInt } from "node:crypto";
 import { createHmacDigest } from "@/lib/hmac.js";
 import { MATTERMOST_VERIFICATION_CODE_TTL_SECONDS } from "@/lib/mattermost-code-expiration";
 import { hashOpaqueToken, generateOpaqueToken } from "@/lib/password";
+import { findSessionSecret } from "@/lib/session-secrets";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type { MattermostVerificationRequest } from "@/lib/mattermost-code-input";
 import {
@@ -50,8 +51,8 @@ export class MattermostCodeVerificationError extends Error {
 }
 
 function getCodeSecret() {
-  const secret = process.env.USER_SESSION_SECRET;
-  if (!secret || secret.length < 32) {
+  const secret = findSessionSecret("mattermost-code-verification");
+  if (!secret) {
     throw new MattermostCodeVerificationError("storage_failed");
   }
   return secret;

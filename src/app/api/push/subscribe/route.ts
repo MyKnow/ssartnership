@@ -4,7 +4,7 @@ import {
   isMockNotificationPreferenceMode,
   upsertMockPushDevice,
 } from "@/lib/notification-preferences";
-import { getSignedUserSession } from "@/lib/user-auth";
+import { requireMemberApiSession } from "@/lib/member-api-session";
 import { isPushConfigured, upsertPushSubscription } from "@/lib/push";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
@@ -46,10 +46,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
 
-  const session = await getSignedUserSession();
-  if (!session?.userId) {
-    return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requireMemberApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
 
   if (!isMockNotificationPreferenceMode() && !isPushConfigured()) {
     return NextResponse.json(

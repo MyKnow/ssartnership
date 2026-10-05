@@ -15,13 +15,12 @@ import Input from "@/components/ui/Input";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
-import { getMemberRequiredGateRedirect } from "@/lib/member-required-gates";
+import { getMemberLoginCompletionHref } from "@/lib/member-required-gates";
 import {
   persistLastMemberLoginMethod,
   readLastMemberLoginMethod,
   type MemberLoginMethod,
 } from "@/lib/member-login-method-preference.client";
-import { sanitizeReturnTo } from "@/lib/return-to";
 import { isValidEmail, normalizeMmUsername, validateMmUsername } from "@/lib/validation";
 
 const loginMethods: MemberLoginMethod[] = ["username", "email"];
@@ -196,17 +195,16 @@ export default function LoginForm({
       setFormError(null);
       persistLastMemberLoginMethod(loginMethod);
       notify("로그인되었습니다.");
-      const safeReturnTo = sanitizeReturnTo(returnTo, "/");
-      const nextHref =
-        getMemberRequiredGateRedirect({
+      router.replace(
+        getMemberLoginCompletionHref({
           currentPath: "/auth/login",
-          returnTo: safeReturnTo,
+          returnTo,
           mustChangePassword: Boolean(data.mustChangePassword),
           requiresConsent: Boolean(data.requiresConsent),
           requiresEmailRegistration: Boolean(data.requiresEmailRegistration),
           requiresProfilePhotoUpdate: Boolean(data.requiresProfilePhotoUpdate),
-        }) ?? safeReturnTo;
-      router.replace(nextHref);
+        }),
+      );
     } finally {
       setPending(false);
     }

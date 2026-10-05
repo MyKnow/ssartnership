@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/auth";
-import { canAdmin } from "@/lib/admin-permissions";
+import { ensureAdminApiPermission } from "@/lib/admin-access";
 import { MANUAL_MEMBER_IMPORT_LIMITS } from "@/lib/member-manual-import/shared";
 import { parseManualMemberImportWorkbook } from "@/lib/member-manual-import/xlsx.server";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
@@ -16,11 +15,8 @@ export async function POST(request: NextRequest) {
     })) {
       return NextResponse.json({ message: "요청을 확인해 주세요." }, { status: 403 });
     }
-    const session = await timing.measure("auth", () => getAdminSession());
-    if (!session) return NextResponse.json({ message: "관리자 인증이 필요합니다." }, { status: 401 });
-    if (!canAdmin(session.account.permissions, "members", "create")) {
-      return NextResponse.json({ message: "회원 생성 권한이 필요합니다." }, { status: 403 });
-    }
+    const denied = await timing.measure("auth", () => ensureAdminApiPermission(request, "members", "create"));
+    if (denied) return denied;
 
     try {
       const formData = await request.formData();

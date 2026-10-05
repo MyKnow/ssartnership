@@ -45,7 +45,7 @@ export default function UserMenu({
       return;
     }
     if (typeof window !== "undefined") {
-      const ok = window.confirm("로그아웃하시겠습니까?");
+      const ok = window.confirm("모든 기기에서 로그아웃하시겠습니까?");
       if (!ok) {
         return;
       }

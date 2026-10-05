@@ -38,7 +38,8 @@ test("전송 결과 미확인 행은 관리자 확인 뒤에만 새 초기 설�
   assert.match(service, /\.lt\("updated_at", processingLeaseExpiredAt\)/);
   assert.match(service, /manual-member-import-reissue:/);
   assert.match(route, /isTrustedSameOriginRequest/);
-  assert.match(route, /canAdmin\(session\.account\.permissions, "members", "update"\)/);
+  assert.match(route, /getAdminApiPermissionSession\(request, "members", "update"\)/);
+  assert.doesNotMatch(route, /getAdminSession\(\)/);
   assert.match(route, /body\?\.confirmed !== true/);
   assert.match(route, /reissueManualMemberImportSetup/);
   assert.match(route, /logAdminAudit/);

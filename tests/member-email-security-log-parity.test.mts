@@ -67,16 +67,25 @@ test("회원 이메일 인증과 복구 라우트는 같은 보안 로그 분기
     "src/app/api/member/recovery/email/verify/route.ts",
   ];
 
+  // Email binding (verification send) adds one recent-authentication
+  // rejection branch on top of the shared five.
+  const expectedBranches: Record<string, number> = {
+    "src/app/api/member/email/send/route.ts": 6,
+  };
   for (const routePath of routePaths) {
     const source = read(routePath);
     assert.match(source, /logMemberEmailSecurity/);
     assert.doesNotMatch(source, /logAuthSecurity/);
     assert.equal(
       source.match(/logMemberEmailSecurity\(\{/g)?.length,
-      5,
+      expectedBranches[routePath] ?? 5,
       routePath,
     );
   }
+  assert.match(
+    read("src/app/api/member/email/send/route.ts"),
+    /reason: recentAuth\.code/,
+  );
 
   const recoverySend = read(
     "src/app/api/member/recovery/email/send/route.ts",

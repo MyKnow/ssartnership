@@ -349,7 +349,7 @@ test("회원 이메일 verify route는 원자 service에 위임하면서 기존 
 
   assert.match(route, /isTrustedSameOriginRequest/);
   assert.match(route, /allowedContentTypes:\s*\["application\/json"\]/);
-  assert.match(route, /getSignedUserSession/);
+  assert.match(route, /requireMemberApiSession\(\)/);
   assert.match(route, /normalizeMemberEmail/);
   assert.match(route, /\^\\d\{6\}\$/);
   assert.match(route, /getMemberEmailVerificationBlockingState\("verify"/);

@@ -11,7 +11,11 @@ test("관리자 대량 초대는 공통 이미지 staging 완료 뒤 행별 생�
     read("src/app/api/admin/member-imports/[batchId]/commit/route.ts"),
     read("src/lib/member-manual-import/service.server.ts"),
   ]);
-  assert.match(preflight, /canAdmin\(session\.account\.permissions, "members", "create"\)/);
+  assert.match(preflight, /getAdminApiPermissionSession\(request, "members", "create"\)/);
+  assert.match(commit, /getAdminApiPermissionSession\(request, "members", "create"\)/);
+  for (const source of [preflight, commit]) {
+    assert.doesNotMatch(source, /getAdminSession\(\)/);
+  }
   assert.match(preflight, /prepareManualMemberImport/);
   assert.match(commit, /commitManualMemberImport/);
   assert.match(service, /imageUploadRepository\.attach/);

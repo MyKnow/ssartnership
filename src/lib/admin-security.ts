@@ -131,14 +131,6 @@ export function inspectAdminLoginFormData(formData: FormData) {
   };
 }
 
-export function getAdminRateLimitKeys(clientIp: string, identifier?: string | null) {
-  const keys = [`ip:${clientIp || "unknown"}`];
-  if (identifier) {
-    keys.push(`account:${identifier}`);
-  }
-  return keys;
-}
-
 export function isProtectedAdminPath(pathname: string) {
   return (
     pathname.startsWith("/api/admin") ||

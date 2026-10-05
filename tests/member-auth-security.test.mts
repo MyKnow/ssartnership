@@ -35,6 +35,7 @@ test("member auth attempt keys are namespaced and normalized", async () => {
       "mattermost-code-verify:account:adminuser",
       "change-password:account:adminuser",
       "manual-password-action:account:adminuser",
+      "recent-auth:account:adminuser",
     ],
   );
 });

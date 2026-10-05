@@ -10,8 +10,17 @@ import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useHydrated } from "@/hooks/useHydrated";
 import { normalizeMemberEmail } from "@/lib/member-domain";
+import { getMemberLoginCompletionHref } from "@/lib/member-required-gates";
 
 type Step = "password" | "email" | "code";
+
+/** Returns where recovery should land: the page's `returnTo`, else `/`. */
+function getRecoveryCompletionHref() {
+  return getMemberLoginCompletionHref({
+    currentPath: "/auth/recover-email",
+    returnTo: new URLSearchParams(window.location.search).get("returnTo"),
+  });
+}
 
 export default function MemberEmailRecoveryForm() {
   const router = useRouter();
@@ -83,7 +92,7 @@ export default function MemberEmailRecoveryForm() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message ?? "인증 코드를 보내지 못했습니다.");
       if (data.alreadyVerified) {
-        router.replace(data.redirectTo ?? "/");
+        router.replace(getRecoveryCompletionHref());
         router.refresh();
         return;
       }
@@ -114,7 +123,7 @@ export default function MemberEmailRecoveryForm() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message ?? "이메일 인증을 완료하지 못했습니다.");
-      router.replace(data.redirectTo ?? "/");
+      router.replace(getRecoveryCompletionHref());
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "이메일 인증을 완료하지 못했습니다.");

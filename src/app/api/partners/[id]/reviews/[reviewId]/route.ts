@@ -14,6 +14,7 @@ import {
   readPartnerReviewSubmission,
   resolveReviewMediaPayload,
 } from "../_shared";
+import { memberApiSessionDeniedResponse } from "@/lib/member-api-session";
 
 export const runtime = "nodejs";
 
@@ -39,6 +40,9 @@ export async function PATCH(
       { ok: false, message: "로그인 후 리뷰를 수정할 수 있습니다." },
       { status: 401 },
     );
+  }
+  if (session.mustChangePassword) {
+    return memberApiSessionDeniedResponse("password_change_required");
   }
 
   const partner = await ensureVisibleReviewPartner(id, session.userId);
@@ -163,6 +167,9 @@ export async function DELETE(
       { ok: false, message: "로그인 후 리뷰를 삭제할 수 있습니다." },
       { status: 401 },
     );
+  }
+  if (session.mustChangePassword) {
+    return memberApiSessionDeniedResponse("password_change_required");
   }
 
   const partner = await ensureVisibleReviewPartner(id, session.userId);

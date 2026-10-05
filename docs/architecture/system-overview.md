@@ -93,15 +93,22 @@ mock 데이터 모드는 기본 E2E(`playwright.config.ts`), Storybook, `npm run
 
 | Session | Cookie | Secret | TTL | 주요 payload |
 | --- | --- | --- | --- | --- |
-| 회원 | `user_session` | `USER_SESSION_SECRET` | 7일 | userId, issuedAt, expiresAt, mustChangePassword, policy consent snapshot |
+| 회원 | `user_session` | `USER_SESSION_SECRET` | 7일 | userId, authSessionVersion, authenticationMethod, issuedAt, expiresAt, mustChangePassword, policy consent snapshot, authenticatedAt(선택) |
 | 관리자 | `admin_session` | `ADMIN_SESSION_SECRET` | admin security config | adminId, loginId, permissionVersion |
-| 협력사 | `partner_session` | `PARTNER_SESSION_SECRET` fallback `USER_SESSION_SECRET` | 7일 | accountId, loginId, displayName, companyIds, mustChangePassword |
+| 협력사 | `partner_session` | `PARTNER_SESSION_SECRET` | 7일 | accountId, loginId, displayName, companyIds, authSessionVersion, mustChangePassword |
 
 공통 원칙:
 
 - 모두 HMAC signed token을 httpOnly, sameSite=lax, production secure cookie로 저장한다.
+- 토큰 파서는 `src/lib/session-tokens.ts`, 비밀값 레지스트리와 길이 정책은 `src/lib/session-secrets.ts`, 쿠키 이름·기본 속성은 `src/lib/session-cookies.ts` 하나만 사용한다. `src/proxy.ts`도 같은 파서와 상수를 쓰므로 프록시 리디렉션과 서버 인가 판정이 갈라지지 않는다.
+- 토큰 wire 포맷(`<json>.<hex hmac>`)과 필드 이름은 고정한다. 바꾸면 배포만으로 전원 로그아웃된다. `tests/session-token-parity.test.mts`의 golden token이 이를 고정한다.
+- 운영 필수 전용 비밀값(협력사 세션, QR, 식별자 예약, 이메일 인증 HMAC)은 `USER_SESSION_SECRET`으로 fallback하지 않는다. 남은 fallback(운영 선택값인 MM 비밀번호 재설정 완료 토큰·수동 가입 설정 토큰)은 레지스트리 주석과 `tests/session-secrets.test.mts`가 고정한다.
 - token signature, raw secret, password 원문은 로그에 남기지 않는다.
-- 관리자 session은 account active, mustChangePassword, permissionVersion mismatch 시 무효 처리된다.
+- 관리자 session은 account active, mustChangePassword, permissionVersion mismatch 시 무효 처리되고, 자신을 발급한 회원 session이 무효가 되면 함께 무효 처리된다.
+- 회원 로그아웃(`/api/mm/logout`)은 `members.auth_session_version`을 올려 그 계정의 모든 기기 session을 끝낸다.
+- 회원 쓰기 API는 `requireMemberApiSession()`으로 미로그인(401)과 비밀번호 변경 필요(403)를 함께 거부한다.
+- 민감 작업(회원 탈퇴, 로그인·복구 이메일 바인딩, `/admin/session` 관리자 승격)은 최근 인증을 요구한다. `authenticatedAt`이 10분 이내이거나 현재 비밀번호를 확인해야 하며, 비밀번호가 없는 회원과 관리자 승격은 다시 로그인해야 한다. 규칙은 `src/lib/member-recent-auth.ts` 하나를 화면과 API가 함께 쓴다. `authenticatedAt`은 자격 확인 흐름(`freshAuthentication`)에서만 갱신되고 동의 갱신 같은 재발급은 이전 값을 유지한다.
+- 로그인·복구 이메일이 이전에 인증한 주소와 다른 주소로 바뀌면 응답 뒤 이전 주소로 변경 알림(`email.member_email_changed`, 새 주소는 일부 가림)을 보낸다. 발송 실패는 바인딩 결과를 바꾸지 않고 `member_email_verification`/`member_email_recovery` 보안 로그(`change_notice` 단계)로 남긴다.
 - 협력사 session은 companyIds가 비어 있거나 비정상 값이면 무효 처리된다.
 
 ## Domain service/helper 배치

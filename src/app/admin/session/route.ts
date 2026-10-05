@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logAuthSecurity, getRequestLogContext } from "@/lib/activity-logs";
 import {
+  isMemberSessionFreshForAdminBridge,
   resolveAdminAccountFromUserSession,
   sanitizeAdminReturnTo,
 } from "@/lib/admin-session-bridge";
-import { setAdminSession } from "@/lib/auth";
+import { clearAdminSession, setAdminSession } from "@/lib/auth";
 import { buildTrustedRedirectUrl, isTrustedAdminSessionNavigation } from "@/lib/request-guards";
-import { getSignedUserSession } from "@/lib/user-auth";
+import { clearUserSession, getSignedUserSession } from "@/lib/user-auth";
 
 export async function GET(request: NextRequest) {
   const returnTo = sanitizeAdminReturnTo(
@@ -63,6 +64,29 @@ export async function GET(request: NextRequest) {
     const deniedUrl = buildTrustedRedirectUrl("/admin/denied", request.url);
     deniedUrl.searchParams.set("returnTo", returnTo);
     return NextResponse.redirect(deniedUrl);
+  }
+
+  if (!isMemberSessionFreshForAdminBridge(memberSession)) {
+    // Promotion to admin needs a recent credential check instead of riding
+    // the 7-day member session. Clearing the member cookie also prevents a
+    // redirect loop through the logged-in /auth/login redirect. Non-admin
+    // members were already sent to /admin/denied above, so following an
+    // /admin link never signs an ordinary member out.
+    await Promise.all([clearUserSession(), clearAdminSession()]);
+    await logAuthSecurity({
+      ...context,
+      eventName: "admin_access",
+      status: "blocked",
+      actorType: "member",
+      actorId: memberSession.userId,
+      properties: {
+        reason: "reauthentication_required",
+        stage: "session_bridge",
+      },
+    });
+    const loginUrl = buildTrustedRedirectUrl("/auth/login", request.url);
+    loginUrl.searchParams.set("returnTo", returnTo);
+    return NextResponse.redirect(loginUrl);
   }
 
   await setAdminSession(adminAccount);

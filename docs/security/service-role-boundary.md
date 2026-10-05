@@ -16,10 +16,11 @@ Supabase service role key는 RLS를 우회할 수 있으므로 서버 전용 코
 - service role key는 클라이언트 컴포넌트, 브라우저 번들, public env에 절대 노출하지 않는다.
 - route handler, server action, repository, cron job에서만 `getSupabaseAdminClient()`를 사용할 수 있다.
 - service role 접근은 항상 명시적인 실행 맥락 뒤에 둔다.
-  - 관리자 맥락: `requireAdmin()` 또는 `ensureAdminApiAccess()`
-  - 회원 맥락: signed member session 확인
+  - 관리자 화면·server action 맥락: `requireAdminPageAccess()` 또는 `requireAdminPermission(resource, action)` 계열
+  - 관리자 API 맥락: `ensureAdminApiPermission(request, resource, action)` 또는 세션이 필요하면 `getAdminApiPermissionSession(...)`. `getAdminSession()`과 `canAdmin()`을 route에서 직접 조합하지 않는다(거부 보안 로그가 빠진다).
+  - 회원 맥락: signed member session 확인. 회원 쓰기 API는 `requireMemberApiSession()`으로 비밀번호 변경 필요 상태(403)까지 함께 확인한다. 예외(비밀번호 변경·동의·로그아웃)는 `tests/member-api-session.test.mts`의 허용 목록에 사유와 함께 둔다.
   - 파트너 맥락: partner session 확인과 연결 회사/브랜드 권한 확인
-  - cron 맥락: admin session 또는 `CRON_SECRET`
+  - cron 맥락: `CRON_SECRET` Bearer(상수시간 비교)
   - 공개 읽기 맥락: 공개 projection만 반환하는 repository/helper
 - mutation route는 cookie 인증에만 의존하지 않고 same-origin 또는 CSRF 성격의 요청 검증을 함께 적용한다.
 - 로그, metric, cache version 같은 부가 기록 실패는 가능한 한 사용자 요청 실패로 전파하지 않는다.
@@ -29,6 +30,7 @@ Supabase service role key는 RLS를 우회할 수 있으므로 서버 전용 코
 ### 관리자 화면과 관리자 API
 
 - `/admin` protected route, admin server action, admin API는 service role 사용 전에 관리자 세션을 확인한다.
+- 권한 비트는 `ADMIN_PERMISSION_SUPPORTED_ACTIONS`에 있는 것만 부여된다. 새 가드가 새 비트를 검사하면 같은 변경에서 지원 목록에 추가한다(`tests/admin-permissions.test.mts`가 둘의 불일치를 막는다).
 - 파일 업로드, XLSX 파싱, 알림 발송, 이벤트 관리처럼 데이터 범위가 넓은 기능은 handler/action 경계에서 guard를 먼저 호출한다.
 - admin basic auth는 선택적 추가 gate이며, 비교는 timing-safe 방식으로 수행한다.
 
@@ -46,7 +48,7 @@ Supabase service role key는 RLS를 우회할 수 있으므로 서버 전용 코
 
 ### Cron과 운영 자동화
 
-- cron route는 admin session 또는 `CRON_SECRET` 없이는 실행하지 않는다.
+- cron route는 `ensureCronApiAccess()`로 `Authorization: Bearer <CRON_SECRET>`을 상수시간 비교한 뒤에만 실행한다. 설정값이 없거나 32자 미만이면 모든 요청을 거부한다.
 - cron 내부에서 service role을 쓰더라도 입력 범위와 side effect를 route에서 제한한다.
 
 ### 공개 읽기와 repository

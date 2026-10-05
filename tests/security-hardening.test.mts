@@ -655,7 +655,6 @@ test("auth security logs redact raw messages regardless of reason code", async (
 
 test("session mutation routes require same-origin guards", () => {
   const guardedMutationFiles = [
-    "../src/app/api/mm/login/route.ts",
     "../src/app/api/mm/logout/route.ts",
     "../src/app/api/mm/change-password/route.ts",
     "../src/app/api/mm/consent/route.ts",

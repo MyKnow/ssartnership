@@ -11,13 +11,24 @@ import {
 import { getMemberRequiredGateRedirect } from "@/lib/member-required-gates";
 import { buildTrustedRedirectUrl } from "@/lib/request-guards";
 import {
+  ADMIN_SESSION_COOKIE_NAME,
+  PARTNER_SESSION_COOKIE_NAME,
+  USER_SESSION_COOKIE_NAME,
+} from "@/lib/session-cookies";
+import { findSessionSecret } from "@/lib/session-secrets";
+import {
+  parseAdminSessionToken,
+  parsePartnerSessionToken,
+  parseUserSessionToken,
+} from "@/lib/session-tokens";
+import {
   buildForwardedRequestPath,
   REQUEST_PATH_HEADER,
 } from "@/lib/request-path";
 
-const COOKIE_NAME = "user_session";
-const ADMIN_COOKIE_NAME = "admin_session";
-const PARTNER_COOKIE_NAME = "partner_session";
+const COOKIE_NAME = USER_SESSION_COOKIE_NAME;
+const ADMIN_COOKIE_NAME = ADMIN_SESSION_COOKIE_NAME;
+const PARTNER_COOKIE_NAME = PARTNER_SESSION_COOKIE_NAME;
 
 function nextWithRequestUrl(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
@@ -32,195 +43,16 @@ function nextWithRequestUrl(request: NextRequest) {
   });
 }
 
-function getSecret() {
-  const secret = process.env.USER_SESSION_SECRET;
-  if (!secret || secret.length < 32) {
-    return null;
-  }
-  return secret;
+function verifyToken(token: string) {
+  return parseUserSessionToken(token, findSessionSecret("user-session"));
 }
 
-function getPartnerSecret() {
-  const secret = process.env.PARTNER_SESSION_SECRET ?? process.env.USER_SESSION_SECRET;
-  if (!secret || secret.length < 32) {
-    return null;
-  }
-  return secret;
+function verifyPartnerToken(token: string) {
+  return parsePartnerSessionToken(token, findSessionSecret("partner-session"));
 }
 
-function getAdminSecret() {
-  const secret = process.env.ADMIN_SESSION_SECRET;
-  if (!secret || secret.length < 32) {
-    return null;
-  }
-  return secret;
-}
-
-function splitSignedToken(token: string) {
-  const separatorIndex = token.lastIndexOf(".");
-  if (separatorIndex <= 0 || separatorIndex >= token.length - 1) {
-    return null;
-  }
-  return [
-    token.slice(0, separatorIndex),
-    token.slice(separatorIndex + 1),
-  ] as const;
-}
-
-async function hmacSha256Hex(payload: string, secret: string) {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const signature = await crypto.subtle.sign("HMAC", key, enc.encode(payload));
-  return Array.from(new Uint8Array(signature))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-async function verifyToken(token: string) {
-  const signedToken = splitSignedToken(token);
-  if (!signedToken) {
-    return null;
-  }
-  const [payload, signature] = signedToken;
-  if (!payload || !signature) {
-    return null;
-  }
-  const secret = getSecret();
-  if (!secret) {
-    return null;
-  }
-  try {
-    const expected = await hmacSha256Hex(payload, secret);
-    if (expected !== signature) {
-      return null;
-    }
-    const parsed = JSON.parse(payload) as {
-      userId?: string;
-      mustChangePassword?: boolean;
-      issuedAt?: number;
-      expiresAt?: number;
-    };
-    if (
-      typeof parsed.userId !== "string" ||
-      typeof parsed.issuedAt !== "number" ||
-      typeof parsed.expiresAt !== "number"
-    ) {
-      return null;
-    }
-    if (parsed.issuedAt > Date.now() || parsed.expiresAt <= Date.now()) {
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-async function verifyPartnerToken(token: string) {
-  const signedToken = splitSignedToken(token);
-  if (!signedToken) {
-    return null;
-  }
-  const [payload, signature] = signedToken;
-  if (!payload || !signature) {
-    return null;
-  }
-  const secret = getPartnerSecret();
-  if (!secret) {
-    return null;
-  }
-  try {
-    const expected = await hmacSha256Hex(payload, secret);
-    if (expected !== signature) {
-      return null;
-    }
-    const parsed = JSON.parse(payload) as {
-      accountId?: string;
-      loginId?: string;
-      displayName?: string;
-      companyIds?: string[];
-      mustChangePassword?: boolean;
-      issuedAt?: number;
-      expiresAt?: number;
-    };
-    if (
-      typeof parsed.accountId !== "string" ||
-      typeof parsed.loginId !== "string" ||
-      typeof parsed.displayName !== "string" ||
-      !Array.isArray(parsed.companyIds) ||
-      (parsed.mustChangePassword !== undefined &&
-        typeof parsed.mustChangePassword !== "boolean") ||
-      typeof parsed.issuedAt !== "number" ||
-      typeof parsed.expiresAt !== "number"
-    ) {
-      return null;
-    }
-    if (
-      parsed.companyIds.some(
-        (companyId) => typeof companyId !== "string" || !companyId,
-      )
-    ) {
-      return null;
-    }
-    if (parsed.companyIds.length === 0) {
-      return null;
-    }
-    if (parsed.issuedAt > Date.now() || parsed.expiresAt <= Date.now()) {
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-async function verifyAdminToken(token: string) {
-  const signedToken = splitSignedToken(token);
-  if (!signedToken) {
-    return null;
-  }
-  const [payload, signature] = signedToken;
-  if (!payload || !signature) {
-    return null;
-  }
-  const secret = getAdminSecret();
-  if (!secret) {
-    return null;
-  }
-  try {
-    const expected = await hmacSha256Hex(payload, secret);
-    if (expected !== signature) {
-      return null;
-    }
-    const parsed = JSON.parse(payload) as {
-      adminId?: string;
-      loginId?: string;
-      permissionVersion?: number;
-      issuedAt?: number;
-      expiresAt?: number;
-    };
-    if (
-      typeof parsed.adminId !== "string" ||
-      typeof parsed.loginId !== "string" ||
-      typeof parsed.permissionVersion !== "number" ||
-      typeof parsed.issuedAt !== "number" ||
-      typeof parsed.expiresAt !== "number"
-    ) {
-      return null;
-    }
-    if (parsed.issuedAt > Date.now() || parsed.expiresAt <= Date.now()) {
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
+function verifyAdminToken(token: string) {
+  return parseAdminSessionToken(token, findSessionSecret("admin-session"));
 }
 
 function isPublicAdminPath(pathname: string) {
@@ -246,11 +78,11 @@ export async function proxy(request: NextRequest) {
   const adminToken = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
   const adminPayload =
     adminToken && (adminPagePath || isProtectedAdminPath(pathname))
-      ? await verifyAdminToken(adminToken)
+      ? verifyAdminToken(adminToken)
       : null;
   const userToken = request.cookies.get(COOKIE_NAME)?.value;
   const userPayload =
-    userToken && adminPagePath ? await verifyToken(userToken) : null;
+    userToken && adminPagePath ? verifyToken(userToken) : null;
 
   if (isAdminEdgeGuardPath(pathname)) {
     const clientIp = getForwardedClientIp(request.headers);
@@ -313,7 +145,7 @@ export async function proxy(request: NextRequest) {
 
   const token = request.cookies.get(COOKIE_NAME)?.value;
   if (token) {
-    const payload = await verifyToken(token);
+    const payload = verifyToken(token);
     const requiredGateRedirect = getMemberRequiredGateRedirect({
       currentPath,
       returnTo: currentPath,
@@ -337,7 +169,7 @@ export async function proxy(request: NextRequest) {
   if (isPartnerPath) {
     const partnerToken = request.cookies.get(PARTNER_COOKIE_NAME)?.value;
     const partnerPayload = partnerToken
-      ? await verifyPartnerToken(partnerToken)
+      ? verifyPartnerToken(partnerToken)
       : null;
 
     if (

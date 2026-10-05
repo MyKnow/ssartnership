@@ -11,7 +11,7 @@ test("설정의 로그아웃은 앱 내 확인 모달을 열고 탈퇴는 경고
   );
 
   assert.match(actions, /<Modal[\s\S]+title="로그아웃하시겠습니까\?"/);
-  assert.match(actions, /description="이 기기에서 현재 계정의 세션을 종료합니다\."/);
+  assert.match(actions, /description="이 계정으로 로그인된 모든 기기의 세션을 종료합니다\."/);
   assert.match(actions, /onClick=\{\(\) => setLogoutConfirmationOpen\(true\)\}/);
   assert.match(actions, /href=\{deletionHref\}/);
   assert.doesNotMatch(actions, /window\.confirm/);
@@ -45,6 +45,7 @@ test("회원 탈퇴 경고 화면은 최종 모달 확인 후에만 동일 출�
   assert.match(page, /getMemberAccountDeletionNavigation/);
   assert.match(page, /getSignedUserSession/);
   assert.match(page, /redirect\(`\/auth\/login\?returnTo=/);
-  assert.match(page, /<MemberAccountDeletionView settingsHref=\{settingsHref\} \/>/);
+  assert.match(page, /<MemberAccountDeletionView\s+settingsHref=\{settingsHref\}\s+recentAuthRequirement=\{recentAuthRequirement\}\s+\/>/);
+  assert.match(page, /getMemberRecentAuthRequirement\(session\)/);
   assert.match(story, /findByRole\("dialog", \{ name: "정말 탈퇴하시겠습니까\?" \}\)/);
 });

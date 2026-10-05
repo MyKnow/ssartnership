@@ -22,7 +22,7 @@ const ROUTE_CONTRACTS: RouteContract[] = [
     path: "src/app/api/certification/photo/route.ts",
     beforeParser: [
       "isTrustedSameOriginRequest",
-      "getSignedUserSession()",
+      "requireMemberApiSession()",
       "isGraduateVerificationBlocked(rateLimitContext)",
     ],
     afterParser: [],
@@ -85,7 +85,7 @@ const ROUTE_CONTRACTS: RouteContract[] = [
   },
   {
     path: "src/app/api/member/email/send/route.ts",
-    beforeParser: ["isTrustedSameOriginRequest", "getSignedUserSession()"],
+    beforeParser: ["isTrustedSameOriginRequest", "requireMemberApiSession()"],
     afterParser: [
       'getMemberEmailVerificationBlockingState("send", rateLimitContext)',
     ],
@@ -93,7 +93,7 @@ const ROUTE_CONTRACTS: RouteContract[] = [
   },
   {
     path: "src/app/api/member/email/verify/route.ts",
-    beforeParser: ["isTrustedSameOriginRequest", "getSignedUserSession()"],
+    beforeParser: ["isTrustedSameOriginRequest", "requireMemberApiSession()"],
     afterParser: [
       'getMemberEmailVerificationBlockingState("verify", rateLimitContext)',
     ],

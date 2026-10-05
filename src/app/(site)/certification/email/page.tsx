@@ -6,6 +6,7 @@ import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
 import { getHeaderSession } from "@/lib/header-session";
 import { getMemberCanonicalProfile } from "@/lib/member-profile-view";
+import { getMemberRecentAuthRequirement } from "@/lib/member-recent-auth.server";
 import { getMemberGateCompletionReturnTo } from "@/lib/member-required-gates";
 import { SITE_NAME } from "@/lib/site";
 import { getUserSession } from "@/lib/user-auth";
@@ -39,9 +40,10 @@ export default async function CertificationEmailPage({
     redirect(`/auth/login?returnTo=${encodeURIComponent(pageHref)}`);
   }
 
-  const [headerSession, member] = await Promise.all([
+  const [headerSession, member, recentAuthRequirement] = await Promise.all([
     getHeaderSession(session.userId),
     getMemberCanonicalProfile(session.userId),
+    getMemberRecentAuthRequirement(session),
   ]);
   if (!member) {
     redirect(`/auth/login?returnTo=${encodeURIComponent(pageHref)}`);
@@ -62,6 +64,7 @@ export default async function CertificationEmailPage({
               initialEmail={member.email}
               emailVerified={Boolean(member.emailVerifiedAt)}
               completionHref={completionHref}
+              recentAuthRequirement={recentAuthRequirement}
             />
           </div>
         </Container>

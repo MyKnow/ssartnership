@@ -55,10 +55,9 @@ test("public suggestion and member auth routes share bounded JSON parsing", asyn
   const root = new URL("..", import.meta.url);
   const read = async (path: string) =>
     (await import("node:fs/promises")).readFile(new URL(path, root), "utf8");
-  const [suggest, login, changePassword, consent, resetComplete] =
+  const [suggest, changePassword, consent, resetComplete] =
     await Promise.all([
       read("src/app/api/suggest/route.ts"),
-      read("src/app/api/mm/login/route.ts"),
       read("src/app/api/mm/change-password/route.ts"),
       read("src/app/api/mm/consent/route.ts"),
       read("src/app/api/mm/_shared/reset-password-complete.ts"),
@@ -66,7 +65,7 @@ test("public suggestion and member auth routes share bounded JSON parsing", asyn
 
   assert.match(suggest, /readJsonRequestBodyWithinLimit/);
   assert.match(suggest, /MAX_SUGGEST_JSON_BODY_BYTES = 16 \* 1024/);
-  for (const source of [login, changePassword, consent]) {
+  for (const source of [changePassword, consent]) {
     assert.match(source, /parseMemberAuthJsonBody/);
     assert.match(source, /error instanceof MemberAuthRouteBodyError/);
   }

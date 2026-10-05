@@ -10,6 +10,10 @@ import {
 } from "@/lib/route-json-body";
 import { getSignedUserSession } from "@/lib/user-auth";
 import {
+  MEMBER_API_SESSION_DENIALS,
+  resolveMemberApiSessionDenial,
+} from "@/lib/member-api-session";
+import {
   revokeAppleWalletPassRequestSchema,
   issueAppleWalletPassRequestSchema,
 } from "@/lib/wallet/wallet-pass-request";
@@ -75,6 +79,14 @@ async function requireSignedUserId() {
   const session = await getSignedUserSession();
   if (!session?.userId) {
     return { response: jsonMessage("로그인이 필요합니다.", 401) };
+  }
+  if (resolveMemberApiSessionDenial(session) === "password_change_required") {
+    return {
+      response: jsonMessage(
+        MEMBER_API_SESSION_DENIALS.password_change_required.message,
+        MEMBER_API_SESSION_DENIALS.password_change_required.status,
+      ),
+    };
   }
   return { userId: session.userId };
 }
