@@ -35,6 +35,7 @@ Runbook은 대상 환경·필요 권한·선행 조건·부작용·성공·중�
 | Web Vitals 수집기 | 2초 | `src/app/api/web-vitals/route.ts` |
 
 - Supabase 상한은 서버 SDK 클라이언트(`getSupabaseAdminClient`, `getSupabasePublicClient`)의 공용 fetch에 걸린다. 쿼리의 `.abortSignal()`이나 Request의 signal은 `AbortSignal.any`로 결합되어 먼저 발생한 쪽이 요청을 끊는다.
+- 예외: `getSupabasePublicClient`의 Next 데이터 캐시가 만료 항목을 다시 받아오는 재검증 요청(백그라운드 갱신·정적 재생성)에는 Next가 signal을 넘기지 않아 이 상한이 걸리지 않는다. 캐시 항목이 없어 처음 받아오는 요청과 admin 클라이언트(`cache: "no-store"`) 요청에는 상한이 걸린다.
 - 두 Supabase env는 1초~300초 정수 밀리초만 받는다. 잘못된 값은 무시하고 기본값을 쓰며, 서버 로그에는 env 이름만 남긴다.
 - 상한 초과는 일시 실패다. PostgREST는 메시지가 `TimeoutError:`로 시작하는 오류 객체를, Storage는 `originalError.name`이 `TimeoutError`인 `StorageUnknownError`를, SMTP는 `ETIMEDOUT`(DNS는 `ETIMEOUT`)을 돌려준다. 이를 "없음", 영구 거부, 구독·자격 비활성화로 분류하지 않는다.
 - 클라이언트 중단은 DB 안의 질의를 취소하지 않을 수 있다. 저장소는 역할별 `statement_timeout`을 설정하지 않으므로, DB 측 상한이 필요하면 측정 후 별도 migration으로 정한다.
