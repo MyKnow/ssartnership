@@ -18,17 +18,28 @@ import {
 } from "./shared";
 import { buildPartnerCompanySlug } from "./slug";
 import { logServerError } from "@/lib/server-log";
+import {
+  awaitPartnerMutation,
+  PartnerMutationCleanupError,
+  PartnerMutationOutcomeUnknownError,
+  requirePartnerMutationReceipt,
+  requirePartnerMutationRow,
+} from "@/lib/partner-admin/mutation-outcome";
 
 type CleanupQueryResult = {
+  data: unknown;
   error: { code?: string; message: string } | null;
+  status: number;
 };
 
 async function runPartnerCompanyCleanup(
   stage: string,
   operation: () => PromiseLike<CleanupQueryResult>,
+  expectedRow: Readonly<Record<string, unknown>>,
 ) {
-  const { error } = await operation();
+  const { data, error } = await awaitPartnerMutation(operation(), stage);
   if (!error) {
+    requirePartnerMutationReceipt(data, [expectedRow], stage);
     return true;
   }
 
@@ -40,19 +51,21 @@ async function runProvisionCleanupTasks(
   cleanupTasks: Array<() => Promise<void>>,
   originalError: unknown,
 ) {
-  let cleanupFailed = false;
+  const cleanupFailures: unknown[] = [];
 
   for (const cleanup of cleanupTasks.reverse()) {
     try {
       await cleanup();
-    } catch {
-      cleanupFailed = true;
+    } catch (error) {
+      if (error instanceof PartnerMutationOutcomeUnknownError) throw error;
+      cleanupFailures.push(error);
     }
   }
 
-  if (cleanupFailed) {
-    throw new Error("partner_company_cleanup_failed", {
-      cause: originalError,
+  if (cleanupFailures.length > 0) {
+    throw new PartnerMutationCleanupError("partner_company_cleanup_failed", {
+      originalError,
+      cleanupError: new AggregateError(cleanupFailures, "partner_company_cleanup_failed"),
     });
   }
 }
@@ -130,21 +143,24 @@ export async function ensurePartnerCompanyRow(
       throw new Error("partner_company_missing_email");
     }
 
-    const { data: created, error } = await supabase
+    const companySlug = buildPartnerCompanySlug(companyInput.name);
+    const { data: created, error } = await awaitPartnerMutation(supabase
       .from("partner_companies")
       .insert({
         name: companyInput.name,
-        slug: buildPartnerCompanySlug(companyInput.name),
+        slug: companySlug,
         description: companyInput.description,
         is_active: true,
         managed_campus_slugs: options.managedCampusSlugs ?? [],
       })
       .select(PARTNER_COMPANY_SELECT)
-      .single();
+      .single(), "company_insert");
 
     if (error) {
       throw new Error(error.message);
     }
+
+    requirePartnerMutationRow(created, { name: companyInput.name, slug: companySlug }, "company_insert");
 
     company = normalizePartnerCompanyRow(created as PartnerCompanyRow);
     createdCompany = true;
@@ -155,7 +171,9 @@ export async function ensurePartnerCompanyRow(
           supabase
             .from("partner_companies")
             .delete()
-            .eq("id", company?.id ?? ""),
+            .eq("id", company?.id ?? "")
+            .select("id"),
+        { id: company?.id ?? "" },
       );
       if (!cleaned) {
         throw new Error("partner_company_cleanup_failed");
@@ -188,7 +206,7 @@ export async function ensurePartnerCompanyRow(
         email: existingAccount.email ?? null,
         is_active: existingAccount.is_active ?? null,
       };
-      const { data: updatedAccount, error: updateError } = await supabase
+      const { data: updatedAccount, error: updateError } = await awaitPartnerMutation(supabase
         .from("partner_accounts")
         .update({
           display_name: displayName,
@@ -197,11 +215,14 @@ export async function ensurePartnerCompanyRow(
         })
         .eq("id", existingAccount.id)
         .select(PARTNER_ACCOUNT_SELECT)
-        .single();
+        .single(), "company_account_update");
 
       if (updateError) {
         throw new Error(updateError.message);
       }
+      requirePartnerMutationRow(updatedAccount, {
+        id: existingAccount.id, display_name: displayName, email: loginId, is_active: true,
+      }, "company_account_update");
       account = normalizePartnerAccountRow(updatedAccount as PartnerAccountRow);
       cleanupTasks.push(async () => {
         const cleaned = await runPartnerCompanyCleanup(
@@ -210,14 +231,16 @@ export async function ensurePartnerCompanyRow(
             supabase
               .from("partner_accounts")
               .update(updatedAccountPreviousValues!)
-              .eq("id", existingAccount.id),
+              .eq("id", existingAccount.id)
+              .select("id,display_name,email,is_active"),
+          { id: existingAccount.id, ...updatedAccountPreviousValues },
         );
         if (!cleaned) {
           throw new Error("partner_company_cleanup_failed");
         }
       });
     } else {
-      const { data: createdAccountRow, error: createAccountError } = await supabase
+      const { data: createdAccountRow, error: createAccountError } = await awaitPartnerMutation(supabase
         .from("partner_accounts")
         .insert(
           buildNewPartnerAccountInsert({
@@ -228,11 +251,15 @@ export async function ensurePartnerCompanyRow(
           }),
         )
         .select(PARTNER_ACCOUNT_SELECT)
-        .single();
+        .single(), "company_account_insert");
 
       if (createAccountError) {
         throw new Error(createAccountError.message);
       }
+
+      requirePartnerMutationRow(createdAccountRow, {
+        login_id: loginId, display_name: displayName, email: loginId, is_active: true,
+      }, "company_account_insert");
 
       account = normalizePartnerAccountRow(createdAccountRow as PartnerAccountRow);
       createdAccount = true;
@@ -243,7 +270,9 @@ export async function ensurePartnerCompanyRow(
             supabase
               .from("partner_accounts")
               .delete()
-              .eq("id", account?.id ?? ""),
+              .eq("id", account?.id ?? "")
+              .select("id"),
+          { id: account?.id ?? "" },
         );
         if (!cleaned) {
           throw new Error("partner_company_cleanup_failed");
@@ -257,17 +286,21 @@ export async function ensurePartnerCompanyRow(
     const accountId = account.id;
     const companyId = company.id;
 
-    const { error: createLinkError } = await supabase
+    const { data: createdLinkRows, error: createLinkError } = await awaitPartnerMutation(supabase
       .from("partner_account_companies")
       .insert({
         account_id: accountId,
         company_id: companyId,
         is_active: true,
-      });
+      }).select("account_id,company_id,is_active"), "company_account_link_insert");
 
     if (createLinkError) {
       throw new Error(createLinkError.message);
     }
+
+    requirePartnerMutationReceipt(createdLinkRows, [{
+      account_id: accountId, company_id: companyId, is_active: true,
+    }], "company_account_link_insert");
 
     createdLink = true;
     cleanupTasks.push(async () => {
@@ -278,7 +311,9 @@ export async function ensurePartnerCompanyRow(
             .from("partner_account_companies")
             .delete()
             .eq("account_id", accountId)
-            .eq("company_id", companyId),
+            .eq("company_id", companyId)
+            .select("account_id,company_id"),
+        { account_id: accountId, company_id: companyId },
       );
       if (!cleaned) {
         throw new Error("partner_company_cleanup_failed");
@@ -294,6 +329,7 @@ export async function ensurePartnerCompanyRow(
       updatedAccountPreviousValues,
     };
   } catch (error) {
+    if (error instanceof PartnerMutationOutcomeUnknownError) throw error;
     await runProvisionCleanupTasks(cleanupTasks, error);
     throw error;
   }
@@ -318,7 +354,9 @@ export async function cleanupPartnerCompanyProvision(
             .from("partner_account_companies")
             .delete()
             .eq("account_id", provision.account!.id)
-            .eq("company_id", provision.company!.id),
+            .eq("company_id", provision.company!.id)
+            .select("account_id,company_id"),
+        { account_id: provision.account.id, company_id: provision.company.id },
       ),
     );
   }
@@ -331,7 +369,9 @@ export async function cleanupPartnerCompanyProvision(
           supabase
             .from("partner_accounts")
             .delete()
-            .eq("id", provision.account!.id),
+            .eq("id", provision.account!.id)
+            .select("id"),
+        { id: provision.account.id },
       ),
     );
   } else if (provision.updatedAccountPreviousValues && provision.account) {
@@ -342,7 +382,9 @@ export async function cleanupPartnerCompanyProvision(
           supabase
             .from("partner_accounts")
             .update(provision.updatedAccountPreviousValues!)
-            .eq("id", provision.account!.id),
+            .eq("id", provision.account!.id)
+            .select("id,display_name,email,is_active"),
+        { id: provision.account.id, ...provision.updatedAccountPreviousValues },
       ),
     );
   }
@@ -355,12 +397,17 @@ export async function cleanupPartnerCompanyProvision(
           supabase
             .from("partner_companies")
             .delete()
-            .eq("id", provision.company!.id),
+            .eq("id", provision.company!.id)
+            .select("id"),
+        { id: provision.company.id },
       ),
     );
   }
 
   if (cleanupResults.includes(false)) {
-    throw new Error("partner_company_cleanup_failed");
+    throw new PartnerMutationCleanupError("partner_company_cleanup_failed", {
+      originalError: null,
+      cleanupError: new Error("partner_company_cleanup_failed"),
+    });
   }
 }

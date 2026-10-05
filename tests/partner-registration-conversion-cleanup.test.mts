@@ -52,7 +52,7 @@ test("등록 승인 정리 쿼리 실패를 성공으로 삼키지 않는다", a
   assert.match(source, /runProvisionCleanupTasks/);
   assert.match(source, /\[partner-company-provision\] cleanup failed/);
   assert.match(source, /partner_company_cleanup_failed/);
-  assert.match(source, /cause: originalError/);
+  assert.match(source, /new PartnerMutationCleanupError\("partner_company_cleanup_failed", \{\s*originalError/);
   assert.doesNotMatch(source, /await cleanup\(\)\.catch\(\(\) => undefined\)/);
 });
 

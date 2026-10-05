@@ -19,8 +19,10 @@ import {
 } from "@/lib/partner-registration";
 import {
   createPartnerFromPortalRegistrationRequest,
+  PartnerRegistrationConversionCleanupError,
   resolveRegistrationManagedCampusSlugs,
   rollbackPartnerRegistrationRequestStatus,
+  type ConvertedPartnerRow,
   type PartnerRegistrationRequestRow,
   type RegistrationCompanyProvisioner,
 } from "@/lib/partner-registration-conversion.server";
@@ -46,6 +48,7 @@ import {
 import { sanitizeReturnTo } from "@/lib/return-to";
 import type { PartnerVisibility } from "@/lib/types";
 import { isFourDigitPin } from "@/lib/validation";
+import { PartnerMutationOutcomeUnknownError } from "@/lib/partner-admin/mutation-outcome";
 
 const registrationCompanyProvisioner = {
   ensure: (supabase, input, options) =>
@@ -142,13 +145,15 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
     redirectAdminActionError(returnTo, "partner_form_invalid_request");
   }
 
-  if (!updatedRequest) {
+  if (!updatedRequest || typeof updatedRequest !== "object" || Array.isArray(updatedRequest) || updatedRequest.id !== id) {
     redirect(appendAdminReviewQueueQuery(returnTo, { success: "already-updated" }));
   }
 
   let convertedPartnerId: string | null = null;
   let convertedPartnerIds: string[] = [];
+  const notificationFailedPartnerIds: string[] = [];
   if (status === "converted" && previousStatus !== "converted") {
+    let convertedPartners: ConvertedPartnerRow[];
     try {
       const conversion = await createPartnerFromPortalRegistrationRequest({
         supabase,
@@ -159,54 +164,13 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
       if (conversion.partners.length === 0) {
         throw new Error("등록 가능한 제휴처가 생성되지 않았습니다.");
       }
-      convertedPartnerIds = conversion.partners.map((partner) => partner.id);
-      convertedPartnerId =
-        conversion.partners.length === 1
-          ? conversion.partners[0]?.id ?? null
-          : null;
-
-      for (const partner of conversion.partners) {
-        await logAdminAction("partner_create", {
-          targetType: "partner",
-          targetId: partner.id,
-          properties: {
-            source: "partner_registration_request",
-            requestId: registrationRequest.id,
-            requestSource: registrationRequest.source ?? null,
-            name: partner.name,
-            categoryId: registrationRequest.category_id ?? null,
-            categoryLabel: registrationRequest.category_label,
-            location: partner.location,
-            campusSlugs: partner.campus_slugs ?? managedCampusSlugs,
-            companyId: registrationRequest.company_id ?? null,
-          },
-        });
-
-        if (
-          getPartnerVisibilityState(
-            partner.visibility === "public" ? "public" : "private",
-            partner.period_start,
-            partner.period_end,
-          ) === "public"
-        ) {
-          await sendAndRecordCampusScopedNewPartnerNotification({
-            partnerId: partner.id,
-            name: partner.name,
-            location: partner.location,
-            categoryLabel: registrationRequest.category_label,
-            campusSlugs: partner.campus_slugs ?? managedCampusSlugs,
-            benefitSummary: (partner.benefits ?? []).join("\n"),
-            conditions: (partner.conditions ?? []).join("\n"),
-            periodStart: partner.period_start,
-            periodEnd: partner.period_end,
-            mapUrl: partner.map_url,
-          });
-        }
-
-        revalidateAdminAndPublicPaths(partner.id);
-      }
+      convertedPartners = conversion.partners;
     } catch (error) {
-      const rollbackSucceeded = await rollbackPartnerRegistrationRequestStatus({
+      const mutationOutcomeUnknown = error instanceof PartnerMutationOutcomeUnknownError;
+      const cleanupCompleted = !mutationOutcomeUnknown && !(error instanceof PartnerRegistrationConversionCleanupError);
+      // Incomplete compensation may leave partner rows behind. Keep this
+      // request terminal until an operator reconciles those resources.
+      const rollbackSucceeded = cleanupCompleted && await rollbackPartnerRegistrationRequestStatus({
         supabase,
         request: registrationRequest,
         requestedStatus: status,
@@ -215,8 +179,8 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
         error instanceof Error
           ? error.message
           : "제휴처 등록 신청 승인 후처리에 실패했습니다.";
-      logServerError("[partner-registration] converted follow-up failed", message);
-      if (!rollbackSucceeded) {
+      logServerError("[partner-registration] conversion failed", message);
+      if (cleanupCompleted && !rollbackSucceeded) {
         logServerError(
           "[partner-registration] converted status rollback failed",
         );
@@ -235,10 +199,72 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
         properties: {
           previousStatus,
           requestedStatus: status,
-          stage: "conversion_follow_up",
+          stage: "conversion",
+          cleanupCompleted,
           statusRestored: rollbackSucceeded,
+          mutationOutcomeUnknown,
+          mutationStage: mutationOutcomeUnknown ? error.stage : null,
+          statusRollbackSkippedReason: mutationOutcomeUnknown
+            ? "mutation_outcome_unknown"
+            : cleanupCompleted ? null : "conversion_cleanup_incomplete",
         },
       });
+    }
+
+    // Creation has committed. Follow-up failures must never reopen this request.
+    convertedPartnerIds = convertedPartners.map((partner) => partner.id);
+    convertedPartnerId =
+      convertedPartners.length === 1
+        ? convertedPartners[0]?.id ?? null
+        : null;
+
+    for (const partner of convertedPartners) {
+      await logAdminAction("partner_create", {
+        targetType: "partner",
+        targetId: partner.id,
+        properties: {
+          source: "partner_registration_request",
+          requestId: registrationRequest.id,
+          requestSource: registrationRequest.source ?? null,
+          name: partner.name,
+          categoryId: registrationRequest.category_id ?? null,
+          categoryLabel: registrationRequest.category_label,
+          location: partner.location,
+          campusSlugs: partner.campus_slugs ?? managedCampusSlugs,
+          companyId: registrationRequest.company_id ?? null,
+        },
+      });
+
+      if (
+        getPartnerVisibilityState(
+          partner.visibility === "public" ? "public" : "private",
+          partner.period_start,
+          partner.period_end,
+        ) === "public"
+      ) {
+        try {
+          await sendAndRecordCampusScopedNewPartnerNotification({
+            partnerId: partner.id,
+            name: partner.name,
+            location: partner.location,
+            categoryLabel: registrationRequest.category_label,
+            campusSlugs: partner.campus_slugs ?? managedCampusSlugs,
+            benefitSummary: (partner.benefits ?? []).join("\n"),
+            conditions: (partner.conditions ?? []).join("\n"),
+            periodStart: partner.period_start,
+            periodEnd: partner.period_end,
+            mapUrl: partner.map_url,
+          });
+        } catch (error) {
+          notificationFailedPartnerIds.push(partner.id);
+          logServerError("[partner-registration] converted notification failed", error, {
+            requestId: registrationRequest.id,
+            partnerId: partner.id,
+          });
+        }
+      }
+
+      revalidateAdminAndPublicPaths(partner.id);
     }
   }
 
@@ -254,6 +280,7 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
       visibility,
       adminNoteChanged: (registrationRequest.admin_note ?? "") !== adminNote,
       convertedPartnerIds,
+      notificationFailedPartnerIds,
     },
   });
 
