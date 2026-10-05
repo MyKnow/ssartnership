@@ -12,6 +12,7 @@ last_verified: 2026-08-29
 
 - [Speed Insights 기준선](./baselines/2026-04-03-speed-insights.md)
 - [관리자 콘솔 측정 기준](./baselines/admin-console.md)
+- [클라이언트 번들 기준선과 측정 절차](./baselines/2026-10-05-client-bundle.md)
 
 ## Measurements and reports
 
