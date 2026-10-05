@@ -26,6 +26,10 @@ import type {
 } from "@/lib/repositories/ad-package-repository";
 import type { Category, Partner } from "@/lib/types";
 import type { PartnerAudienceKey } from "@/lib/partner-audience";
+import {
+  emptyCouponListLoad,
+  loadCouponListSafely,
+} from "@/lib/partner-detail-coupon-load";
 import { logServerError } from "@/lib/server-log";
 
 const getCategoriesCached = cache(async () => partnerRepository.getCategories());
@@ -57,40 +61,23 @@ const getFavoriteCountsSafe = cache(async (partnerIds: string[]) => {
   }
 });
 
-function isMissingAdCouponSchemaError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  return (
-    message.includes("ad_coupons") &&
-    (message.includes("schema cache") || message.includes("does not exist"))
-  );
-}
+const getActiveCouponsSafe = cache(async (partnerId: string) =>
+  loadCouponListSafely(
+    () => adPackageRepository.listActiveCouponsForPartner(partnerId),
+    "[partner-detail] ad coupon fetch failed",
+  ),
+);
 
-const getActiveCouponsSafe = cache(async (partnerId: string) => {
-  try {
-    return await adPackageRepository.listActiveCouponsForPartner(partnerId);
-  } catch (error) {
-    if (isMissingAdCouponSchemaError(error)) {
-      return [] as AdCoupon[];
-    }
-    logServerError("[partner-detail] ad coupon fetch failed", error);
-    return [] as AdCoupon[];
-  }
-});
-
-const getIssuedCouponsSafe = cache(async (memberId: string, partnerId: string) => {
-  try {
-    return await adPackageRepository.listIssuedCouponsForMember({
-      memberId,
-      partnerIds: [partnerId],
-    });
-  } catch (error) {
-    if (isMissingAdCouponSchemaError(error)) {
-      return [] as AvailableAdCoupon[];
-    }
-    logServerError("[partner-detail] issued coupon fetch failed", error);
-    return [] as AvailableAdCoupon[];
-  }
-});
+const getIssuedCouponsSafe = cache(async (memberId: string, partnerId: string) =>
+  loadCouponListSafely(
+    () =>
+      adPackageRepository.listIssuedCouponsForMember({
+        memberId,
+        partnerIds: [partnerId],
+      }),
+    "[partner-detail] issued coupon fetch failed",
+  ),
+);
 
 function withAlpha(color: string, alphaHex: string) {
   if (!color.startsWith("#") || color.length !== 7) {
@@ -175,6 +162,8 @@ export type PartnerDetailPageData = {
   isFavorited: boolean;
   adCoupons: AdCoupon[];
   issuedAdCoupons: AvailableAdCoupon[];
+  /** A coupon lookup failed; the page shows an inline notice, not "no coupons". */
+  couponsUnavailable: boolean;
   isPreview: boolean;
 };
 
@@ -258,13 +247,15 @@ export async function getPartnerDetailPageData(
     ? getContactDisplay(normalizedLinks.inquiryLink)
     : null;
   const partnerUrl = buildSiteUrl(`/partners/${encodeURIComponent(resolvedPartner.id)}`);
-  const [adCoupons, memberCoupons] = await Promise.all([
+  const [activeCoupons, memberCoupons] = await Promise.all([
     getActiveCouponsSafe(resolvedPartner.id),
     currentUserId
       ? getIssuedCouponsSafe(currentUserId, resolvedPartner.id)
-      : Promise.resolve([] as AvailableAdCoupon[]),
+      : Promise.resolve(emptyCouponListLoad<AvailableAdCoupon>()),
   ]);
-  const issuedAdCoupons = memberCoupons.filter(
+  const adCoupons = activeCoupons.items;
+  const couponsUnavailable = activeCoupons.unavailable || memberCoupons.unavailable;
+  const issuedAdCoupons = memberCoupons.items.filter(
     (item) => item.coupon.partnerId === resolvedPartner.id,
   );
   const metrics = {
@@ -324,6 +315,7 @@ export async function getPartnerDetailPageData(
     isFavorited: favoriteIds.has(rawId),
     adCoupons,
     issuedAdCoupons,
+    couponsUnavailable,
     isPreview: Boolean(previewToken),
   };
 }
