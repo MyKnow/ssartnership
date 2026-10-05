@@ -62,6 +62,47 @@ type ImageUploadSessionRow = {
   failure_code: string | null;
 };
 
+/**
+ * 행 타입에 있는 열이 빠지면 타입 오류를 낸다. 매핑에 쓰지 않는 타임스탬프 열
+ * (completed_at·attached_at·created_at·updated_at)은 읽지 않는다.
+ */
+function defineSessionColumns<const T extends ReadonlyArray<keyof ImageUploadSessionRow>>(
+  columns: T
+    & ([Exclude<keyof ImageUploadSessionRow, T[number]>] extends [never]
+      ? unknown
+      : { missingColumns: Exclude<keyof ImageUploadSessionRow, T[number]> }),
+) {
+  return columns;
+}
+
+export const IMAGE_UPLOAD_SESSION_COLUMNS = defineSessionColumns([
+  "id",
+  "owner_kind",
+  "owner_id",
+  "purpose",
+  "role",
+  "storage_bucket",
+  "storage_path",
+  "source_storage_path",
+  "source_content_type",
+  "source_size_bytes",
+  "quota_size_bytes",
+  "content_type",
+  "sha256",
+  "width",
+  "height",
+  "final_bucket",
+  "final_path",
+  "final_url",
+  "status",
+  "signed_url_expires_at",
+  "expires_at",
+  "attached_resource_type",
+  "attached_resource_id",
+  "failure_code",
+]);
+const IMAGE_UPLOAD_SESSION_SELECT = IMAGE_UPLOAD_SESSION_COLUMNS.join(",");
+
 const MAX_SIGNED_UPLOADS_PER_REQUEST = 20;
 const MAX_QUOTA_IDENTIFIERS_PER_REQUEST = 4;
 const STORAGE_RETRY_DELAYS_MS = [0, 120, 300] as const;
@@ -313,7 +354,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
     const supabase = this.supabase;
     const { data, error } = await supabase
       .from("image_upload_sessions")
-      .select("*")
+      .select(IMAGE_UPLOAD_SESSION_SELECT)
       .in("id", uploadIds);
     if (error || (data?.length ?? 0) !== uploadIds.length) {
       throw new Error("이미지 업로드 세션을 찾을 수 없습니다.");
@@ -379,7 +420,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
           .update({ status: "processing", failure_code: null })
           .eq("id", session.id)
           .eq("status", "signed")
-          .select("*")
+          .select(IMAGE_UPLOAD_SESSION_SELECT)
           .maybeSingle();
         if (claimError) {
           throw new Error("이미지 업로드 처리 상태를 저장하지 못했습니다.");
@@ -387,7 +428,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         if (!claimedData) {
           const { data: latestData, error: latestError } = await supabase
             .from("image_upload_sessions")
-            .select("*")
+            .select(IMAGE_UPLOAD_SESSION_SELECT)
             .eq("id", session.id)
             .maybeSingle();
           const latest = latestData ? asSessionRow(latestData) : null;
@@ -510,7 +551,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
     const supabase = this.supabase;
     const { data, error } = await supabase
       .from("image_upload_sessions")
-      .select("*")
+      .select(IMAGE_UPLOAD_SESSION_SELECT)
       .eq("id", input.uploadId)
       .maybeSingle();
     if (error || !data) {
@@ -564,7 +605,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         })
         .eq("id", session.id)
         .eq("status", "ready")
-        .select("*")
+        .select(IMAGE_UPLOAD_SESSION_SELECT)
         .maybeSingle();
       if (claimError) {
         throw new Error("이미지 연결 상태를 저장하지 못했습니다.");
@@ -574,7 +615,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
       } else {
         const { data: latestData, error: latestError } = await supabase
           .from("image_upload_sessions")
-          .select("*")
+          .select(IMAGE_UPLOAD_SESSION_SELECT)
           .eq("id", session.id)
           .maybeSingle();
         const latest = latestData ? asSessionRow(latestData) : null;
@@ -694,7 +735,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         })
         .eq("id", claimedSession.id)
         .eq("status", "attaching")
-        .select("*")
+        .select(IMAGE_UPLOAD_SESSION_SELECT)
         .maybeSingle();
       if (updateError) {
         throw new ImageUploadError(
@@ -707,7 +748,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
       if (!attachedSession) {
         const { data: latestData, error: latestError } = await supabase
           .from("image_upload_sessions")
-          .select("*")
+          .select(IMAGE_UPLOAD_SESSION_SELECT)
           .eq("id", claimedSession.id)
           .maybeSingle();
         if (latestError || !latestData) {
@@ -755,7 +796,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
     const supabase = this.supabase;
     const { data, error } = await supabase
       .from("image_upload_sessions")
-      .select("*")
+      .select(IMAGE_UPLOAD_SESSION_SELECT)
       .eq("id", input.uploadId)
       .maybeSingle();
     if (error || !data) {
@@ -791,7 +832,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
     const supabase = this.supabase;
     const { data, error } = await supabase
       .from("image_upload_sessions")
-      .select("*")
+      .select(IMAGE_UPLOAD_SESSION_SELECT)
       .eq("id", input.uploadId)
       .maybeSingle();
     if (error || !data) {
