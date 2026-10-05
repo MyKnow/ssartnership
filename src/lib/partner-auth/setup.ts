@@ -42,7 +42,6 @@ export function buildPartnerSetupCompletionPayload(input: {
     password_salt: input.passwordSalt,
     auth_session_version: input.authSessionVersion,
     must_change_password: false,
-    is_active: true,
     email_verified_at: input.completedAt,
     initial_setup_completed_at: input.completedAt,
     initial_setup_token_hash: null,
@@ -122,7 +121,7 @@ export async function completeSupabasePartnerPortalInitialSetup(
     );
   }
 
-  const { data, error } = await getSupabaseAdminClient()
+  const updateQuery = getSupabaseAdminClient()
     .from("partner_accounts")
     .update(
       buildPartnerSetupCompletionPayload({
@@ -133,8 +132,16 @@ export async function completeSupabasePartnerPortalInitialSetup(
       }),
     )
     .eq("id", account.id)
+    .eq("is_active", true)
+    .eq("auth_session_version", getPartnerAccountAuthSessionVersion(account))
     .is("initial_setup_completed_at", null)
     .eq("initial_setup_token_hash", account.initial_setup_token_hash)
+    .gt("initial_setup_expires_at", new Date().toISOString());
+  // Completion must not undo a concurrent administrative change or consume
+  // a link that expired while the password and company access were checked.
+  const { data, error } = await (account.updated_at
+    ? updateQuery.eq("updated_at", account.updated_at)
+    : updateQuery.is("updated_at", null))
     .select("id")
     .maybeSingle();
 
