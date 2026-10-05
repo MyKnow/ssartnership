@@ -1,9 +1,27 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 function read(path: string) {
   return readFile(new URL(`../${path}`, import.meta.url), "utf8");
+}
+
+function errorBoundaryFiles() {
+  return execFileSync(
+    "git",
+    ["ls-files", "--cached", "--others", "--exclude-standard", "src/app"],
+    { cwd: new URL("..", import.meta.url), encoding: "utf8" },
+  )
+    .trim()
+    .split("\n")
+    .filter(
+      (file) =>
+        /(^|\/)(global-)?error\.tsx$/.test(file) &&
+        existsSync(new URL(`../${file}`, import.meta.url)),
+    )
+    .sort();
 }
 
 test("공개·파트너 그룹 오류 경계는 그룹 셸 안에서 embedded 오류 화면을 렌더한다", async () => {
@@ -40,4 +58,44 @@ test("AppErrorScreen은 page 기본값을 유지하고 embedded에서만 전체 
   for (const source of [rootError, globalError]) {
     assert.doesNotMatch(source, /layout=/);
   }
+});
+
+test("모든 오류 경계의 다시 시도는 세그먼트를 다시 불러오는 retry()를 쓴다", async () => {
+  const files = errorBoundaryFiles();
+  // 새 경계는 아래 반복에서 자동으로 검사하고, 기존 다섯 경계가 탐색에서 빠지지 않는지만 고정한다.
+  for (const expected of [
+    "src/app/(site)/error.tsx",
+    "src/app/admin/(protected)/error.tsx",
+    "src/app/error.tsx",
+    "src/app/global-error.tsx",
+    "src/app/partner/error.tsx",
+  ]) {
+    assert.ok(files.includes(expected), `${expected} 오류 경계를 찾지 못했습니다.`);
+  }
+
+  for (const file of files) {
+    const source = await read(file);
+    // Next.js 16.3의 reset()은 서버 컴포넌트를 다시 불러오지 않아 서버 예외가 그대로 남는다.
+    assert.match(source, /\bretry: \(\) => void;/, file);
+    assert.match(source, /(onRetry|onClick)=\{retry\}/, file);
+    assert.doesNotMatch(source, /\breset\b/, file);
+  }
+});
+
+test("global-error는 루트 layout과 같은 전역 CSS를 직접 불러와 다른 오류 화면과 같은 모양을 유지한다", async () => {
+  const [globalError, layout] = await Promise.all([
+    read("src/app/global-error.tsx"),
+    read("src/app/layout.tsx"),
+  ]);
+  const fontCss = 'import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";';
+  const globalsCss = 'import "./globals.css";';
+
+  for (const source of [layout, globalError]) {
+    assert.ok(source.includes(fontCss));
+    assert.ok(source.includes(globalsCss));
+    assert.ok(source.indexOf(fontCss) < source.indexOf(globalsCss));
+  }
+  // global-error는 자체 문서를 렌더하므로 html·body를 직접 소유한다.
+  assert.match(globalError, /<html lang="ko" suppressHydrationWarning>/);
+  assert.match(globalError, /<body>/);
 });

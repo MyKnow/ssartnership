@@ -7,10 +7,10 @@ import Container from "@/components/ui/Container";
 
 export default function AdminProtectedError({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
   return (
     <main className="min-h-screen bg-background py-10 sm:py-16">
@@ -25,7 +25,7 @@ export default function AdminProtectedError({
           </div>
           <ErrorDigest digest={error.digest} />
           <div className="flex flex-wrap justify-center gap-2">
-            <Button onClick={reset}>다시 시도</Button>
+            <Button onClick={retry}>다시 시도</Button>
             <Button href="/admin" variant="secondary">관리 홈</Button>
           </div>
         </Card>
