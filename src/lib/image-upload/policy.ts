@@ -206,6 +206,23 @@ export function resolveImageTransformPolicy(
   return policy;
 }
 
+/**
+ * 브라우저 크롭·HEIC 디코드로 만든 중간 WebP는 서버가 정책 품질로 한 번 더 재인코딩한다.
+ * 중간 파일까지 정책 품질로 손실 압축하면 같은 손실이 두 번 쌓이므로 중간 파일은 높은 품질로
+ * 만들고, 그 결과가 원본 용량 상한을 넘을 때만 정책 품질로 다시 인코딩한다.
+ */
+export const CLIENT_INTERMEDIATE_WEBP_QUALITY = 0.92;
+
+/** 중간 WebP 인코딩 품질 후보(0~1, 높은 순). 마지막 후보는 최종 정책 품질이다. */
+export function getClientIntermediateWebpQualities(finalQuality: number) {
+  const normalized = Number.isFinite(finalQuality)
+    ? Math.min(Math.max(finalQuality, 0.01), 1)
+    : CLIENT_INTERMEDIATE_WEBP_QUALITY;
+  return normalized >= CLIENT_INTERMEDIATE_WEBP_QUALITY
+    ? [normalized]
+    : [CLIENT_INTERMEDIATE_WEBP_QUALITY, normalized];
+}
+
 export type ImageUploadSourceDescriptor = {
   name: string;
   type?: string | null;
