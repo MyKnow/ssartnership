@@ -13,7 +13,6 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { isUuid, normalizeUuidList } from "@/lib/uuid";
 import {
   hashPartnerPreviewToken,
-  isMissingPartnerPreviewExpiryColumnError,
   isPartnerPreviewLinkActive,
   isValidPartnerPreviewToken,
 } from "@/lib/partner-preview";
@@ -285,24 +284,17 @@ async function hasValidPreviewToken(id: string, token: string) {
     return false;
   }
 
+  // `partner_preview_tokens.expires_at` is not null since 20260830215837, so
+  // there is no missing-column retry: a schema error surfaces instead of
+  // silently accepting tokens without an expiry check.
   const nowIso = new Date().toISOString();
-  const supabase = getSupabaseAdminClient();
-  let { data, error } = await supabase
+  const { data, error } = await getSupabaseAdminClient()
     .from("partner_preview_tokens")
     .select("partner_id,created_at,expires_at")
     .eq("partner_id", id)
     .eq("token_hash", hashPartnerPreviewToken(token))
     .gt("expires_at", nowIso)
     .maybeSingle();
-
-  if (error && isMissingPartnerPreviewExpiryColumnError(error.message)) {
-    ({ data, error } = await supabase
-      .from("partner_preview_tokens")
-      .select("partner_id,created_at")
-      .eq("partner_id", id)
-      .eq("token_hash", hashPartnerPreviewToken(token))
-      .maybeSingle());
-  }
 
   if (error) {
     throw new Error(error.message);
@@ -311,7 +303,7 @@ async function hasValidPreviewToken(id: string, token: string) {
   return Boolean(
     data &&
       isPartnerPreviewLinkActive(
-        "expires_at" in data ? data.expires_at : null,
+        data.expires_at,
         new Date(nowIso),
         data.created_at ?? null,
       ),

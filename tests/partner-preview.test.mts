@@ -156,7 +156,7 @@ describe("partner preview links", () => {
     assert.match(actionSource, /createPartnerPreviewExpiresAt\(now\)/);
     assert.match(actionSource, /isMissingPartnerPreviewExpiryColumnError\(error\.message\)/);
     assert.match(repositorySource, /\.gt\("expires_at",\s*nowIso\)/);
-    assert.match(repositorySource, /isMissingPartnerPreviewExpiryColumnError\(error\.message\)/);
+    assert.doesNotMatch(repositorySource, /isMissingPartnerPreviewExpiryColumnError/);
     assert.match(detailSource, /created_at,expires_at,token_ciphertext,token_nonce,token_auth_tag,token_key_version/);
     assert.match(detailSource, /partnerResult\.error \|\| previewTokenResult\.error/);
     assert.match(
