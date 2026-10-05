@@ -14,6 +14,18 @@ const archiveRouteSource = readFileSync(
   new URL("../src/app/api/cron/archive-expired-promotions/route.ts", import.meta.url),
   "utf8",
 );
+const cacheInvalidationSource = readFileSync(
+  new URL("../src/lib/promotions/cache-invalidation.ts", import.meta.url),
+  "utf8",
+);
+type CacheInvalidationModule = typeof import("../src/lib/promotions/cache-invalidation.ts");
+type EventsModule = typeof import("../src/lib/promotions/events.ts");
+const cacheInvalidationModulePromise = import(
+  new URL("../src/lib/promotions/cache-invalidation.ts", import.meta.url).href
+) as Promise<CacheInvalidationModule>;
+const eventsModulePromise = import(
+  new URL("../src/lib/promotions/events.ts", import.meta.url).href
+) as Promise<EventsModule>;
 const promotionEventsStoreSource = readFileSync(
   new URL("../src/lib/promotions/events-store.server.ts", import.meta.url),
   "utf8",
@@ -26,23 +38,45 @@ test("promotion raw loaders use viewer-independent cache tags", () => {
   assert.match(eventsSource, /const getCachedManagedEventCampaigns = unstable_cache/);
 });
 
-test("promotion mutations invalidate raw cache tags", () => {
-  assert.match(
-    promotionActionsSource,
-    /revalidateTag\(PROMOTION_EVENTS_CACHE_TAG, "max"\)/,
-  );
-  assert.match(
-    promotionActionsSource,
-    /revalidateTag\(PROMOTION_SLIDES_CACHE_TAG, "max"\)/,
-  );
-  assert.match(
-    archiveRouteSource,
-    /revalidateTag\(PROMOTION_EVENTS_CACHE_TAG, "max"\)/,
-  );
-  assert.match(
-    archiveRouteSource,
-    /revalidateTag\(PROMOTION_SLIDES_CACHE_TAG, "max"\)/,
-  );
+test("promotion mutations invalidate raw cache tags through the shared helper", async () => {
+  const { revalidatePromotionEventSurfaces, revalidatePromotionSurfaces } =
+    await cacheInvalidationModulePromise;
+  const { PROMOTION_EVENTS_CACHE_TAG, PROMOTION_SLIDES_CACHE_TAG } =
+    await eventsModulePromise;
+
+  const slideCalls: string[] = [];
+  revalidatePromotionSurfaces({
+    tag: (tag) => slideCalls.push(`tag:${tag}`),
+    path: (path, type) => slideCalls.push(type ? `${type}:${path}` : path),
+  });
+  assert.deepEqual(slideCalls, [
+    `tag:${PROMOTION_EVENTS_CACHE_TAG}`,
+    `tag:${PROMOTION_SLIDES_CACHE_TAG}`,
+    "/",
+    "/admin",
+    "/admin/advertisement",
+    "/admin/promotions",
+  ]);
+
+  const eventCalls: string[] = [];
+  revalidatePromotionEventSurfaces({
+    tag: (tag) => eventCalls.push(`tag:${tag}`),
+    path: (path, type) => eventCalls.push(type ? `${type}:${path}` : path),
+  });
+  assert.deepEqual(eventCalls, [
+    ...slideCalls,
+    "/admin/event",
+    "page:/admin/event/[slug]",
+    "page:/events/[slug]",
+  ]);
+  assert.equal(new Set(eventCalls).size, eventCalls.length);
+
+  assert.match(cacheInvalidationSource, /revalidateTag\(tag, "max"\)/);
+  assert.match(promotionActionsSource, /revalidatePromotionEventSurfaces\(\);/);
+  assert.match(promotionActionsSource, /revalidatePromotionSurfaces\(\);/);
+  assert.doesNotMatch(promotionActionsSource, /revalidatePath\(|revalidateTag\(/);
+  assert.match(archiveRouteSource, /revalidatePromotionEventSurfaces\(\);/);
+  assert.doesNotMatch(archiveRouteSource, /revalidatePath\(`\/events\/\$\{slug\}`\)/);
   assert.match(
     promotionEventsStoreSource,
     /rpc\("archive_expired_promotions_batch"/,

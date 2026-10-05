@@ -1,7 +1,6 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath, revalidateTag } from "next/cache";
 import { getAdminSession } from "@/lib/auth";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -34,11 +33,11 @@ import {
   sendEventRewardWinnerTestNotification,
   sendEventRewardWinnerNotifications,
 } from "@/lib/promotions/event-rewards";
+import { getManagedEventCampaign } from "@/lib/promotions/events";
 import {
-  getManagedEventCampaign,
-  PROMOTION_EVENTS_CACHE_TAG,
-  PROMOTION_SLIDES_CACHE_TAG,
-} from "@/lib/promotions/events";
+  revalidatePromotionEventSurfaces,
+  revalidatePromotionSurfaces,
+} from "@/lib/promotions/cache-invalidation";
 import {
   deletePromotionSlideImageUrls,
 } from "@/lib/promotion-slide-storage-server";
@@ -154,19 +153,6 @@ function parseDateTimeLocal(value: string) {
     throw new Error("이벤트 기간 형식을 확인해 주세요.");
   }
   return date.toISOString();
-}
-
-function revalidatePromotionPaths(slug: string) {
-  revalidateTag(PROMOTION_EVENTS_CACHE_TAG, "max");
-  revalidateTag(PROMOTION_SLIDES_CACHE_TAG, "max");
-  revalidatePath("/");
-  revalidatePath("/admin");
-  revalidatePath("/admin/advertisement");
-  revalidatePath("/admin/event");
-  revalidatePath("/admin/event/[slug]", "page");
-  revalidatePath("/admin/promotions");
-  revalidatePath("/events/[slug]", "page");
-  revalidatePath(`/events/${slug}`);
 }
 
 function parseTargetAudiences(formData: FormData) {
@@ -334,15 +320,6 @@ function parsePromotionSlideDrafts(formData: FormData) {
   return slides;
 }
 
-function revalidateAdvertisementPaths() {
-  revalidateTag(PROMOTION_EVENTS_CACHE_TAG, "max");
-  revalidateTag(PROMOTION_SLIDES_CACHE_TAG, "max");
-  revalidatePath("/");
-  revalidatePath("/admin");
-  revalidatePath("/admin/advertisement");
-  revalidatePath("/admin/promotions");
-}
-
 export async function createPromotionEventAction(formData: FormData) {
   await requireAdminPermission("events", "create", { path: "/admin/event" });
   const slug = normalizeSlug(getString(formData, "slug"));
@@ -362,7 +339,7 @@ export async function createPromotionEventAction(formData: FormData) {
       targetAudiences: payload.target_audiences,
     },
   });
-  revalidatePromotionPaths(payload.slug);
+  revalidatePromotionEventSurfaces();
   redirect(`/admin/event/${payload.slug}?status=created`);
 }
 
@@ -389,7 +366,7 @@ export async function updatePromotionEventAction(formData: FormData) {
       recoveredFromMissingId: !id,
     },
   });
-  revalidatePromotionPaths(payload.slug);
+  revalidatePromotionEventSurfaces();
   redirect(`/admin/event/${payload.slug}?status=updated`);
 }
 
@@ -410,7 +387,7 @@ export async function deletePromotionEventAction(formData: FormData) {
     targetId: id,
     properties: { slug },
   });
-  revalidatePromotionPaths(slug);
+  revalidatePromotionEventSurfaces();
   redirect("/admin/event?status=deleted");
 }
 
@@ -589,7 +566,7 @@ async function savePromotionSlidesMutation(formData: FormData) {
     },
   });
 
-  revalidateAdvertisementPaths();
+  revalidatePromotionSurfaces();
 }
 
 export async function createEventRewardDrawAction(formData: FormData) {
@@ -652,7 +629,7 @@ export async function createEventRewardDrawAction(formData: FormData) {
       totalTickets: draw.totalTickets,
     },
   });
-  revalidatePromotionPaths(slug);
+  revalidatePromotionEventSurfaces();
   redirect(`/admin/event/${slug}?status=draw-created`);
 }
 
@@ -724,7 +701,7 @@ export async function sendEventRewardWinnerNotificationsAction(formData: FormDat
       warnings: result.warnings.length,
     },
   });
-  revalidatePromotionPaths(slug);
+  revalidatePromotionEventSurfaces();
   redirect(`/admin/event/${slug}?status=winner-sent`);
 }
 
@@ -764,6 +741,6 @@ export async function sendEventRewardWinnerTestNotificationAction(formData: Form
       warnings: result.warnings.length,
     },
   });
-  revalidatePromotionPaths(slug);
+  revalidatePromotionEventSurfaces();
   redirect(`/admin/event/${slug}?status=winner-test-sent`);
 }

@@ -28,9 +28,6 @@ import {
 import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
 import type { OfflinePartnerBenefitAction } from "@/components/partner/PartnerBenefitUseAction";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 300;
-
 export async function generateMetadata({
   params,
   searchParams,

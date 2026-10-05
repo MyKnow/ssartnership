@@ -1,10 +1,6 @@
-import { revalidatePath, revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { ensureCronApiAccess, getCronErrorResponse } from "@/lib/cron-route";
-import {
-  PROMOTION_EVENTS_CACHE_TAG,
-  PROMOTION_SLIDES_CACHE_TAG,
-} from "@/lib/promotions/events";
+import { revalidatePromotionEventSurfaces } from "@/lib/promotions/cache-invalidation";
 import {
   archiveExpiredPromotionsBatch,
   PromotionArchiveError,
@@ -45,16 +41,7 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  revalidateTag(PROMOTION_EVENTS_CACHE_TAG, "max");
-  revalidateTag(PROMOTION_SLIDES_CACHE_TAG, "max");
-  revalidatePath("/");
-  revalidatePath("/admin");
-  revalidatePath("/admin/advertisement");
-  revalidatePath("/admin/event");
-  for (const slug of slugs) {
-    revalidatePath(`/events/${slug}`);
-    revalidatePath(`/admin/event/${slug}`);
-  }
+  revalidatePromotionEventSurfaces();
 
   return NextResponse.json({
     ok: true,

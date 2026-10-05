@@ -26,8 +26,6 @@ import { getSignedUserSession } from "@/lib/user-auth";
 import { resolvePartnerAudienceFromMemberYear } from "@/lib/partner-audience";
 import { loadHomePartnerDirectoryState } from "@/lib/home-partner-directory";
 
-export const revalidate = 300;
-
 export const metadata: Metadata = {
   title: SITE_TITLE,
   description: SITE_DESCRIPTION,

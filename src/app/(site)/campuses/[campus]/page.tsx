@@ -4,7 +4,6 @@ import { cache } from "react";
 import CampusLandingView from "@/components/campuses/CampusLandingView";
 import SiteHeader from "@/components/SiteHeader";
 import {
-  CAMPUS_DIRECTORY,
   getCampusBySlug,
   type CampusSlug,
 } from "@/lib/campuses";
@@ -39,15 +38,6 @@ const getCampusPublicDirectoryPartnersCached = cache((campusSlug: CampusSlug) =>
     authenticated: false,
   }),
 );
-
-export const dynamic = "force-dynamic";
-export const revalidate = 300;
-
-export function generateStaticParams() {
-  return CAMPUS_DIRECTORY.map((campus) => ({
-    campus: campus.slug,
-  })) satisfies Array<{ campus: CampusSlug }>;
-}
 
 export async function generateMetadata({
   params,
