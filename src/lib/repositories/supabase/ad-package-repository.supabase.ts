@@ -10,9 +10,9 @@ import {
 } from "@/lib/ad-packages";
 import {
   assertValidAdCouponCodeBatch,
-  getCouponIssueCountSnapshot,
-  getMemberIssueCountSnapshot,
-  isMemberIssueLimitReached,
+  getAvailableCouponUsage,
+  selectAvailableCouponsForMember,
+  type CouponIssueRecord,
 } from "@/lib/ad-coupon-domain";
 import {
   hashCouponVerificationPassword,
@@ -261,33 +261,6 @@ function mapRedemptionRow(row: RedemptionRow): AdCouponRedemption {
     sessionId: row.session_id,
     redemptionCode: row.redemption_code ?? "",
     createdAt: row.created_at,
-  };
-}
-
-function getTime(value: string) {
-  const time = new Date(value).getTime();
-  return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
-}
-
-function toAvailableCoupon(
-  coupon: AdCoupon,
-  memberUsedCount: number,
-): AvailableAdCoupon | null {
-  const remainingMemberUses = Math.max(0, coupon.perMemberLimit - memberUsedCount);
-  const remainingGlobalUses =
-    typeof coupon.usageLimit === "number"
-      ? Math.max(0, coupon.usageLimit - coupon.usedCount)
-      : null;
-
-  if (remainingMemberUses <= 0 || remainingGlobalUses === 0) {
-    return null;
-  }
-
-  return {
-    coupon,
-    memberUsedCount,
-    remainingMemberUses,
-    remainingGlobalUses,
   };
 }
 
@@ -719,32 +692,11 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
       redemptionRows.filter((row) => row.member_id === input.memberId),
       "coupon_id",
     );
-    const memberIssueRows = (memberIssueResult.data ?? []) as Array<{
-      coupon_id: string;
-      issued_at: string;
-    }>;
-    const memberIssueRecordsByCoupon = new Map<string, Array<{
-      couponId: string;
-      memberId: string;
-      issuedAt: string;
-    }>>();
-    for (const row of memberIssueRows) {
-      memberIssueRecordsByCoupon.set(row.coupon_id, [
-        ...(memberIssueRecordsByCoupon.get(row.coupon_id) ?? []),
-        {
-          couponId: row.coupon_id,
-          memberId: input.memberId,
-          issuedAt: row.issued_at,
-        },
-      ]);
-    }
-    const issueRecordsByCoupon = new Map<string, Array<{ couponId: string; issuedAt: string }>>();
-    for (const row of (issueResult.data ?? []) as Array<{ coupon_id: string; issued_at: string }>) {
-      issueRecordsByCoupon.set(row.coupon_id, [
-        ...(issueRecordsByCoupon.get(row.coupon_id) ?? []),
-        { couponId: row.coupon_id, issuedAt: row.issued_at },
-      ]);
-    }
+    const toIssueRecords = (data: unknown): CouponIssueRecord[] =>
+      ((data ?? []) as Array<{ coupon_id: string; issued_at: string }>).map((row) => ({
+        couponId: row.coupon_id,
+        issuedAt: row.issued_at,
+      }));
     const campaignsById = new Map(
       ((campaignResult.data ?? []) as AdCampaignRow[]).map((row) => [
         row.id,
@@ -752,62 +704,19 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
       ]),
     );
 
-    return rows
-      .map((row) => {
+    return selectAvailableCouponsForMember({
+      candidates: rows.map((row) => {
         const coupon = mapCouponRow(row, useCounts.get(row.id) ?? 0);
         return {
           coupon,
           campaign: coupon.campaignId ? campaignsById.get(coupon.campaignId) : null,
           memberUsedCount: memberUseCounts.get(coupon.id) ?? 0,
         };
-      })
-      .filter(({ coupon, campaign }) =>
-        isAdCouponDownloadable({
-          coupon,
-          campaign,
-          now,
-        }),
-      )
-      .filter(({ coupon }) =>
-        !isMemberIssueLimitReached(
-          getCouponIssueCountSnapshot({
-            couponId: coupon.id,
-            limits: {
-              daily: coupon.dailyIssueLimit,
-              weekly: coupon.weeklyIssueLimit,
-              monthly: coupon.monthlyIssueLimit,
-            },
-            records: issueRecordsByCoupon.get(coupon.id) ?? [],
-            now,
-          }),
-        ),
-      )
-      .filter(({ coupon }) =>
-        !isMemberIssueLimitReached(
-          getMemberIssueCountSnapshot({
-            couponId: coupon.id,
-            memberId: input.memberId,
-            limits: {
-              daily: coupon.perMemberDailyIssueLimit,
-              weekly: coupon.perMemberWeeklyIssueLimit,
-              monthly: coupon.perMemberMonthlyIssueLimit,
-            },
-            records: memberIssueRecordsByCoupon.get(coupon.id) ?? [],
-            now,
-          }),
-        ),
-      )
-      .map(({ coupon, memberUsedCount }) =>
-        toAvailableCoupon(coupon, memberUsedCount),
-      )
-      .filter((item): item is AvailableAdCoupon => Boolean(item))
-      .sort((left, right) => {
-        const endDiff = getTime(left.coupon.endsAt) - getTime(right.coupon.endsAt);
-        if (endDiff !== 0) {
-          return endDiff;
-        }
-        return right.coupon.createdAt.localeCompare(left.coupon.createdAt);
-      });
+      }),
+      couponIssueRecords: toIssueRecords(issueResult.data),
+      memberIssueRecords: toIssueRecords(memberIssueResult.data),
+      now,
+    });
   }
 
   async createCampaign(input: CreateAdCampaignInput): Promise<AdCampaign> {
@@ -1098,7 +1007,7 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
       throw new Error(couponError.message);
     }
     const coupon = mapCouponRow(couponData as AdCouponRow);
-    const available = toAvailableCoupon(coupon, 0);
+    const available = getAvailableCouponUsage(coupon, 0);
     if (!available) {
       return { ok: false, reason: "usage_limit", message: "현재 쿠폰을 사용할 수 없습니다." };
     }
@@ -1147,7 +1056,7 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
         : issue.ad_coupons;
       if (!couponRow) return [];
       const coupon = mapCouponRow(couponRow);
-      const available = toAvailableCoupon(coupon, 0);
+      const available = getAvailableCouponUsage(coupon, 0);
       return available
         ? [{ ...available, issueId: issue.id, assignedCode: issue.assigned_code, issuedAt: issue.issued_at, usedAt: issue.used_at }]
         : [];

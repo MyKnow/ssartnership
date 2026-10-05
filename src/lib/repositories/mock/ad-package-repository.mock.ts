@@ -8,9 +8,11 @@ import {
 } from "@/lib/ad-packages";
 import {
   assertValidAdCouponCodeBatch,
+  getAvailableCouponUsage,
   getCouponIssueCountSnapshot,
   getMemberIssueCountSnapshot,
   isMemberIssueLimitReached,
+  selectAvailableCouponsForMember,
 } from "@/lib/ad-coupon-domain";
 import {
   hashCouponVerificationPassword,
@@ -70,31 +72,12 @@ function cloneRedemption(redemption: AdCouponRedemption): AdCouponRedemption {
   return { ...redemption };
 }
 
-function getTime(value: string) {
-  const time = new Date(value).getTime();
-  return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
-}
-
 function toAvailableCoupon(
   coupon: AdCoupon,
   memberUsedCount: number,
 ): AvailableAdCoupon | null {
-  const remainingMemberUses = Math.max(0, coupon.perMemberLimit - memberUsedCount);
-  const remainingGlobalUses =
-    typeof coupon.usageLimit === "number"
-      ? Math.max(0, coupon.usageLimit - coupon.usedCount)
-      : null;
-
-  if (remainingMemberUses <= 0 || remainingGlobalUses === 0) {
-    return null;
-  }
-
-  return {
-    coupon: cloneCoupon(coupon),
-    memberUsedCount,
-    remainingMemberUses,
-    remainingGlobalUses,
-  };
+  const usage = getAvailableCouponUsage(coupon, memberUsedCount);
+  return usage ? { ...usage, coupon: cloneCoupon(usage.coupon) } : null;
 }
 
 function createMockCampaigns(): AdCampaign[] {
@@ -330,7 +313,7 @@ export class MockAdPackageRepository implements AdPackageRepository {
       return [];
     }
 
-    return this.coupons
+    const candidates = this.coupons
       .filter((coupon) => partnerIds.has(coupon.partnerId))
       .map((coupon) => ({
         coupon: {
@@ -339,54 +322,16 @@ export class MockAdPackageRepository implements AdPackageRepository {
         },
         campaign: this.campaigns.find((campaign) => campaign.id === coupon.campaignId),
         memberUsedCount: this.countCouponRedemptions(coupon.id, input.memberId),
-      }))
-      .filter(({ coupon, campaign }) =>
-        isAdCouponDownloadable({
-          coupon,
-          campaign,
-          now,
-        }),
-      )
-      .filter(({ coupon }) =>
-        !isMemberIssueLimitReached(
-          getCouponIssueCountSnapshot({
-            couponId: coupon.id,
-            limits: {
-              daily: coupon.dailyIssueLimit,
-              weekly: coupon.weeklyIssueLimit,
-              monthly: coupon.monthlyIssueLimit,
-            },
-            records: this.issues,
-            now,
-          }),
-        ),
-      )
-      .filter(({ coupon }) =>
-        !isMemberIssueLimitReached(
-          getMemberIssueCountSnapshot({
-            couponId: coupon.id,
-            memberId: input.memberId,
-            limits: {
-              daily: coupon.perMemberDailyIssueLimit,
-              weekly: coupon.perMemberWeeklyIssueLimit,
-              monthly: coupon.perMemberMonthlyIssueLimit,
-            },
-            records: this.issues,
-            now,
-          }),
-        ),
-      )
-      .map(({ coupon, memberUsedCount }) =>
-        toAvailableCoupon(coupon, memberUsedCount),
-      )
-      .filter((item): item is AvailableAdCoupon => Boolean(item))
-      .sort((left, right) => {
-        const endDiff = getTime(left.coupon.endsAt) - getTime(right.coupon.endsAt);
-        if (endDiff !== 0) {
-          return endDiff;
-        }
-        return right.coupon.createdAt.localeCompare(left.coupon.createdAt);
-      });
+      }));
+
+    return selectAvailableCouponsForMember({
+      candidates,
+      couponIssueRecords: this.issues,
+      memberIssueRecords: this.issues.filter(
+        (issue) => issue.memberId === input.memberId,
+      ),
+      now,
+    }).map((item) => ({ ...item, coupon: cloneCoupon(item.coupon) }));
   }
 
   async createCampaign(input: CreateAdCampaignInput): Promise<AdCampaign> {
