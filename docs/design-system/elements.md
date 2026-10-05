@@ -22,6 +22,7 @@ authority: normative
 - background는 surface 계층을 따른다
 - focus는 border 강조와 공용 포커스 링(Foundations > Focus)으로 표현한다
 - disabled는 opacity가 아니라 contrast 감소로 표현한다
+- 모바일 키패드와 엔터 키 라벨은 `src/components/ui/input-attributes.ts`로 맞춘다. 전화번호는 `type="tel"`(본인 번호만 `autoComplete="tel"`), Enter로 검색하는 입력은 `type="search" enterKeyHint="search"`, 숫자 코드는 `inputMode="numeric"`을 쓴다.
 
 ## Badges And Chips
 - badge는 상태/라벨

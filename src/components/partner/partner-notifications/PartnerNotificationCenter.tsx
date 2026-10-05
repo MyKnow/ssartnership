@@ -8,6 +8,7 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import EmptyState from "@/components/ui/EmptyState";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
+import { SEARCH_INPUT_ATTRIBUTES } from "@/components/ui/input-attributes";
 import PartnerPendingButtonLink from "@/components/partner/PartnerPendingButtonLink";
 import Select from "@/components/ui/Select";
 import StatsRow from "@/components/ui/StatsRow";
@@ -651,7 +652,7 @@ export default function PartnerNotificationCenter({
           <label className="grid min-w-0 gap-1.5">
             <span className="text-xs font-semibold text-muted-foreground">검색</span>
             <Input
-              type="search"
+              {...SEARCH_INPUT_ATTRIBUTES}
               value={filters.searchQuery}
               onChange={(event) => updateFilter("searchQuery", event.target.value)}
               placeholder="제휴처, 상태, 알림 내용 검색"

@@ -9,6 +9,7 @@ import {
 } from "@heroicons/react/24/outline";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { PHONE_INPUT_ATTRIBUTES } from "@/components/ui/input-attributes";
 import { cn } from "@/lib/cn";
 import {
   DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
@@ -640,6 +641,7 @@ export default function PartnerBranchListEditor({
                   description="대표 번호와 다른 지점 전용 번호가 있을 때 입력합니다."
                 >
                   <Input
+                    {...PHONE_INPUT_ATTRIBUTES}
                     id={`${row.id}-phone`}
                     value={row.phone}
                     onChange={(event) =>

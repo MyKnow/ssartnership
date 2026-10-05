@@ -17,6 +17,7 @@ import { formatShowcaseDateTime, formatShowcasePeriod } from "@/lib/project-show
 import { SHOWCASE_PHASE_LABELS, SHOWCASE_PRIZES, SHOWCASE_TYPE_LABELS } from "@/lib/project-showcase/labels";
 import { SHOWCASE_PROJECT_TYPES } from "@/lib/project-showcase/types";
 import { getSignedUserSession } from "@/lib/user-auth";
+import { SEARCH_INPUT_ATTRIBUTES } from "@/components/ui/input-attributes";
 
 export const dynamic = "force-dynamic";
 
@@ -234,7 +235,7 @@ export default async function ProjectShowcasePage({
             <form action={EVENT_PATH} className="mb-5 grid gap-2 rounded-2xl border border-border bg-surface p-3 sm:grid-cols-[minmax(0,1fr)_150px_150px_auto] sm:items-center">
               {previewMode ? <input type="hidden" name="preview" value="experience" /> : null}
               <label className="sr-only" htmlFor="showcase-search">프로젝트 검색</label>
-              <input id="showcase-search" name="q" type="search" defaultValue={query} placeholder="서비스 이름, 팀명, 설명 검색" className="min-h-11 rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary" />
+              <input id="showcase-search" name="q" {...SEARCH_INPUT_ATTRIBUTES} defaultValue={query} placeholder="서비스 이름, 팀명, 설명 검색" className="min-h-11 rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary" />
               <label className="sr-only" htmlFor="showcase-type">프로젝트 유형</label>
               <select id="showcase-type" name="type" defaultValue={selectedType} className="min-h-11 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary">
                 <option value="">전체 유형</option>

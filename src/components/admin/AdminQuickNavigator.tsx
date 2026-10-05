@@ -352,6 +352,7 @@ export default function AdminQuickNavigatorProvider({
                       ref={inputRef}
                       id="admin-quick-navigator-query"
                       type="search"
+                      enterKeyHint="go"
                       value={query}
                       onChange={(event) => {
                         setQuery(event.target.value);

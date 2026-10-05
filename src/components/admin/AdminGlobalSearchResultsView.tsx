@@ -10,6 +10,7 @@ import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import Input from "@/components/ui/Input";
+import { SEARCH_INPUT_ATTRIBUTES } from "@/components/ui/input-attributes";
 import Surface from "@/components/ui/Surface";
 import {
   buildAdminGlobalSearchHref,
@@ -126,7 +127,7 @@ export default function AdminGlobalSearchResultsView({
               <Input
                 id="admin-global-search-query"
                 name="q"
-                type="search"
+                {...SEARCH_INPUT_ATTRIBUTES}
                 defaultValue={query}
                 minLength={2}
                 maxLength={80}
