@@ -4,7 +4,7 @@ import PartnerPortalShellView from "@/components/partner/PartnerPortalShellView"
 import { isPartnerPortalMock } from "@/lib/partner-portal";
 import { getPartnerPortalCompanySummaries } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
-import { logServerError } from "@/lib/server-log";
+import { loadPartnerShellCompanies } from "@/lib/partner-shell-companies";
 
 export default async function PartnerLayout({
   children,
@@ -12,16 +12,14 @@ export default async function PartnerLayout({
   children: React.ReactNode;
 }) {
   const session = await getPartnerSession();
-  const companies = session
-    ? await getPartnerPortalCompanySummaries(session.companyIds).catch((error: unknown) => {
-        // The shell still renders without company navigation; make the
-        // degraded state visible to the operator instead of silent.
-        logServerError("[partner-layout] company summaries unavailable", error, {
-          companyCount: session.companyIds.length,
-        });
-        return [];
-      })
-    : [];
+  // A failed summary read keeps the shell usable without company navigation;
+  // the shell then shows an inline notice instead of looking company-less.
+  const { companies, unavailable: companiesUnavailable } = session
+    ? await loadPartnerShellCompanies(
+        session.companyIds,
+        getPartnerPortalCompanySummaries,
+      )
+    : { companies: [], unavailable: false };
 
   return (
     <>
@@ -31,6 +29,7 @@ export default async function PartnerLayout({
       <PartnerPortalShellView
         session={session}
         companies={companies}
+        companiesUnavailable={companiesUnavailable}
         isMock={isPartnerPortalMock}
       >
         {children}
