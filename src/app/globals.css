@@ -530,6 +530,11 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
     backdrop-filter: blur(24px) saturate(180%);
   }
 
+  /* 실패 토스트는 아이콘과 danger 테두리로 성공·안내 토스트와 구분합니다. */
+  .ui-toast-glass[data-toast-tone="error"] {
+    border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  }
+
   .site-mobile-nav-glass {
     border: 1px solid var(--navigation-glass-border);
     background:

@@ -101,6 +101,7 @@ export default function PartnerFavoriteButton({
           networkUnavailable:
             "즐겨찾기를 처리하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
         }).message,
+        { tone: "error" },
       );
     } finally {
       setIsPending(false);

@@ -110,7 +110,7 @@ export default function PartnerDetailCoupons({
         },
       }));
     } catch {
-      notify("쿠폰 코드 복사에 실패했습니다.");
+      notify("쿠폰 코드 복사에 실패했습니다.", { tone: "error" });
       setMessages((current) => ({
         ...current,
         [coupon.id]: {
@@ -143,7 +143,7 @@ export default function PartnerDetailCoupons({
         networkUnavailable:
           "쿠폰 다운로드에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
       }).message;
-      notify(message);
+      notify(message, { tone: "error" });
       setMessages((current) => ({ ...current, [coupon.id]: { tone: "error", text: message } }));
     } finally {
       setIssuingId(null);
@@ -202,7 +202,7 @@ export default function PartnerDetailCoupons({
           text: message,
         },
       }));
-      notify(message);
+      notify(message, { tone: "error" });
     } finally {
       setRedeemingId(null);
     }

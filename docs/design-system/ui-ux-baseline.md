@@ -88,7 +88,7 @@ public header는 브랜드와 계정·알림·쿠폰·테마·전체 메뉴처�
 - 첫 오류 필드에 focus를 이동하는 흐름을 우선한다.
 - 비밀번호/로그인/정책 동의/파트너 setup/reset/change-password form은 field error + inline form error 패턴으로 정리되어 있다.
 - server action/API 검증은 FE 검증의 대체가 아니라 신뢰 경계의 필수 방어선이다.
-- toast는 저장 완료, 복사 완료, 비동기 성공/실패처럼 화면 상태와 독립적인 feedback에 사용한다.
+- toast는 저장 완료, 복사 완료, 비동기 성공/실패처럼 화면 상태와 독립적인 feedback에 사용한다. 실패 toast는 `tone: "error"`로 보내 assertive live region과 오류 톤을 사용한다.
 
 ## Responsive baseline
 

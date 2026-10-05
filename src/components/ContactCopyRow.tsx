@@ -95,7 +95,7 @@ export default function ContactCopyRow({
             await navigator.clipboard.writeText(rawValue);
             notify("복사되었습니다.");
           } catch {
-            notify("복사에 실패했습니다.");
+            notify("복사에 실패했습니다.", { tone: "error" });
           }
         }}
         ariaLabel="복사하기"

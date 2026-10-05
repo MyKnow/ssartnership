@@ -330,14 +330,14 @@ export function useAdminLogsManager(
   function handleApplyCustomRange() {
     clearPendingSearch();
     if (!customStartInput || !customEndInput) {
-      notify('시작 시각과 종료 시각을 모두 입력해 주세요.');
+      notify('시작 시각과 종료 시각을 모두 입력해 주세요.', { tone: "error" });
       return;
     }
 
     const start = new Date(customStartInput);
     const end = new Date(customEndInput);
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-      notify('유효한 날짜 범위를 입력해 주세요.');
+      notify('유효한 날짜 범위를 입력해 주세요.', { tone: "error" });
       return;
     }
 
@@ -376,7 +376,7 @@ export function useAdminLogsManager(
       .map(([group]) => group);
 
     if (!selectedGroups.length) {
-      notify('내보낼 로그 종류를 하나 이상 선택해 주세요.');
+      notify('내보낼 로그 종류를 하나 이상 선택해 주세요.', { tone: "error" });
       return;
     }
 
@@ -385,14 +385,14 @@ export function useAdminLogsManager(
 
     if (exportScope === 'custom') {
       if (!exportCustomStart || !exportCustomEnd) {
-        notify('내보낼 사용자 지정 범위를 입력해 주세요.');
+        notify('내보낼 사용자 지정 범위를 입력해 주세요.', { tone: "error" });
         return;
       }
       try {
         start = toIsoFromLocalValue(exportCustomStart);
         end = toIsoFromLocalValue(exportCustomEnd);
       } catch {
-        notify('유효한 사용자 지정 범위를 입력해 주세요.');
+        notify('유효한 사용자 지정 범위를 입력해 주세요.', { tone: "error" });
         return;
       }
     }

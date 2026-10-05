@@ -29,7 +29,7 @@ export default function ShareLinkButton({
       });
       notify("공유 링크가 복사되었습니다.");
     } catch {
-      notify("복사에 실패했습니다.");
+      notify("복사에 실패했습니다.", { tone: "error" });
     }
   };
 

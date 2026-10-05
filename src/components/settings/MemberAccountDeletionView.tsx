@@ -37,14 +37,14 @@ export default function MemberAccountDeletionView({
         credentials: "same-origin",
       });
       if (!response.ok) {
-        notify("회원 탈퇴에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+        notify("회원 탈퇴에 실패했습니다. 잠시 후 다시 시도해 주세요.", { tone: "error" });
         return;
       }
 
       notify("회원 탈퇴가 처리되었습니다.");
       router.replace("/");
     } catch {
-      notify("회원 탈퇴에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+      notify("회원 탈퇴에 실패했습니다. 잠시 후 다시 시도해 주세요.", { tone: "error" });
     } finally {
       setDeleting(false);
     }
