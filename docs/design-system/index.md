@@ -27,7 +27,7 @@ SSARTNERSHIP 웹 UI의 공용 기준 문서다. 실제 구현은 이 문서를 �
 - [현행 UI/UX 기준선](./ui-ux-baseline.md)
 
 ## Operational Rule
-- 새 UI는 먼저 문서와 인앱 style guide에 반영한다.
+- 새 UI 규칙은 먼저 이 문서 묶음에 반영하고, 공용 컴포넌트는 Storybook 개요(`.storybook/overview.stories.tsx`)와 해당 컴포넌트 스토리로 상태를 보여 준다. 별도 인앱 style guide route는 없다.
 - 페이지 로컬 Tailwind 조합보다 공용 컴포넌트를 우선 사용한다.
 - 카테고리별 색은 구조적 chrome을 결정하지 않는다. 상태/메타 표현 수준에서만 제한적으로 사용한다.
 - route별 정보 우선순위와 화면 상태는 `docs/product/screen-specs/`의 화면 계약을 따른다.

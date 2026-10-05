@@ -1,3 +1,4 @@
+import Checkbox from "@/components/ui/Checkbox";
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import Card from "@/components/ui/Card";
 import SubmitButton from "@/components/ui/SubmitButton";
@@ -70,7 +71,7 @@ export default function AdminMemberOperationsPanel({
                 {selectedGeneration}기 중 Mattermost 로그인이 아직 활성인 회원만 중단합니다. 이메일 인증 계정은 계속 사용할 수 있습니다.
               </p>
             </div>
-            <div className="grid min-w-0 gap-1 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-100">
+            <div className="grid min-w-0 gap-1 rounded-2xl border border-warning/20 bg-warning/10 px-4 py-3 text-sm text-warning border-warning/30 bg-warning/10 text-warning">
               <p className="font-semibold">
                 실행 대상 {generationMattermostLoginTargetCount === null
                   ? "확인 중"
@@ -83,8 +84,7 @@ export default function AdminMemberOperationsPanel({
             <form action={disableGenerationAction} className="flex flex-wrap items-center gap-2">
               <input type="hidden" name="generation" value={selectedGeneration} />
               <label className="flex min-h-11 items-center gap-2 text-sm font-medium text-foreground">
-                <input
-                  type="checkbox"
+                <Checkbox
                   name="confirmedGeneration"
                   value={selectedGeneration}
                   required

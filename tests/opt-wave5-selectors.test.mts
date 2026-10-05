@@ -1,18 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-type HomeSelectorsModule = typeof import("../src/components/home-view/selectors.ts");
-type MemberSelectorsModule = typeof import("../src/components/admin/member-manager/selectors.ts");
-type LogsSelectorsModule = typeof import("../src/components/admin/logs/selectors.ts");
+type HomeSelectorsModule = typeof import("../src/lib/home-partner-selectors.ts");
+type MemberSelectorsModule = typeof import("../src/lib/admin-member-selectors.ts");
+type LogsSelectorsModule = typeof import("../src/lib/log-insights/selectors.ts");
 
 const homeSelectorsPromise = import(
-  new URL("../src/components/home-view/selectors.ts", import.meta.url).href,
+  new URL("../src/lib/home-partner-selectors.ts", import.meta.url).href,
 ) as Promise<HomeSelectorsModule>;
 const memberSelectorsPromise = import(
-  new URL("../src/components/admin/member-manager/selectors.ts", import.meta.url).href,
+  new URL("../src/lib/admin-member-selectors.ts", import.meta.url).href,
 ) as Promise<MemberSelectorsModule>;
 const logsSelectorsPromise = import(
-  new URL("../src/components/admin/logs/selectors.ts", import.meta.url).href,
+  new URL("../src/lib/log-insights/selectors.ts", import.meta.url).href,
 ) as Promise<LogsSelectorsModule>;
 
 test("home selectors apply search before splitting visible and locked cards", async () => {

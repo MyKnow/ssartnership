@@ -1,4 +1,3 @@
-import Footer from "@/components/Footer";
 import SiteHeader from "@/components/SiteHeader";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -14,7 +13,7 @@ export default async function PartnerDetailNotFound() {
         <Card tone="elevated" className="w-full max-w-xl">
           <div className="grid gap-4 text-center sm:text-left">
             <div className="grid gap-2">
-              <p className="ui-kicker">Partner Detail</p>
+              <p className="ui-kicker">404</p>
               <h1 className="text-2xl font-semibold tracking-[-0.03em] text-foreground sm:text-3xl">
                 제휴 정보를 찾을 수 없습니다
               </h1>
@@ -32,7 +31,6 @@ export default async function PartnerDetailNotFound() {
           </div>
         </Card>
       </main>
-      <Footer />
     </>
   );
 }

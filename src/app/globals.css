@@ -1,3 +1,7 @@
+/*! Pretendard Variable (dynamic-subset, self-hosted from the "pretendard" package)
+ * Copyright (c) 2021 Kil Hyung-jin, with Reserved Font Name Pretendard.
+ * Licensed under the SIL Open Font License, Version 1.1: https://openfontlicense.org
+ */
 @import "tailwindcss";
 @import "react-easy-crop/react-easy-crop.css";
 @source "..";
@@ -22,7 +26,10 @@
   --primary-emphasis: #172d53;
   --primary-soft: #e6edf8;
   --primary-foreground: #f7fbff;
+  --focus-ring: #213b68;
   --accent: #1ea6d7;
+  --info: #075985;
+  --info-soft: #e0f2fe;
   --success: #0b665f;
   --warning: #92400e;
   --danger: #a12f49;
@@ -31,12 +38,12 @@
   --hero-to: #2c4b7e;
   --hero-foreground: #f8fbff;
   --hero-muted: rgba(230, 238, 252, 0.82);
-  --radius-control: 1rem;
-  --radius-input: 1rem;
-  --radius-card: 1.5rem;
-  --radius-panel: 1.875rem;
-  --radius-overlay: 2.25rem;
-  --radius-pill: 999px;
+  --shape-radius-control: 1rem;
+  --shape-radius-input: 1rem;
+  --shape-radius-card: 1.5rem;
+  --shape-radius-panel: 1.875rem;
+  --shape-radius-overlay: 2.25rem;
+  --shape-radius-pill: 999px;
   --shadow-flat: 0 1px 2px rgba(17, 24, 39, 0.04);
   --shadow-raised:
     0 20px 48px rgba(24, 36, 61, 0.09),
@@ -85,7 +92,10 @@ html.dark {
   --primary-emphasis: #f2f7ff;
   --primary-soft: rgba(44, 67, 106, 0.42);
   --primary-foreground: #07101d;
+  --focus-ring: #d7e4ff;
   --accent: #6fd3ff;
+  --info: #7dd3fc;
+  --info-soft: #0c2d43;
   --success: #34d399;
   --warning: #fbbf24;
   --danger: #fb7185;
@@ -120,6 +130,18 @@ html.dark {
 }
 
 @theme inline {
+  --radius-pill: var(--shape-radius-pill);
+
+  --radius-overlay: var(--shape-radius-overlay);
+
+  --radius-panel: var(--shape-radius-panel);
+
+  --radius-card: var(--shape-radius-card);
+
+  --radius-input: var(--shape-radius-input);
+
+  --radius-control: var(--shape-radius-control);
+
   --color-background: var(--background);
   --color-background-muted: var(--background-muted);
   --color-surface: var(--surface);
@@ -138,7 +160,10 @@ html.dark {
   --color-primary-emphasis: var(--primary-emphasis);
   --color-primary-soft: var(--primary-soft);
   --color-primary-foreground: var(--primary-foreground);
+  --color-ring: var(--focus-ring);
   --color-accent: var(--accent);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
@@ -178,7 +203,7 @@ html.dark {
 }
 
 body {
-  min-height: 100vh;
+  min-height: 100dvh;
   background:
     radial-gradient(circle at top right, rgba(30, 166, 215, 0.08), transparent 24%),
     radial-gradient(circle at bottom left, rgba(33, 59, 104, 0.08), transparent 30%),
@@ -190,6 +215,18 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/*
+ * 설치형 앱에서 당겨서 새로고침이 실수로 일어나면 페이지가 다시 열려 작성 중인 입력이
+ * 사라집니다. standalone 화면에서만 문서 끝의 당김·튕김을 막고, 일반 브라우저 탭의
+ * 동작은 그대로 둡니다.
+ */
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+
 /* 브라우저의 보이는 영역과 홈 인디케이터 위에 설치 안내를 배치합니다. */
 .pwa-visit-recommendation {
   bottom: calc(max(env(safe-area-inset-bottom, 0px), var(--pwa-viewport-bottom, 0px)) + 1rem);
@@ -197,6 +234,12 @@ body {
 
 .pwa-visit-recommendation-content {
   max-height: max(0px, calc(100svh - env(safe-area-inset-top, 0px) - max(env(safe-area-inset-bottom, 0px), var(--pwa-viewport-bottom, 0px)) - 7rem));
+}
+
+/* 제휴처 확인 PIN은 비밀번호 저장 대상이 되지 않도록 text 입력을 쓰고 화면에서만 가립니다. */
+.pin-mask {
+  -webkit-text-security: disc;
+  letter-spacing: 0.3em;
 }
 
 /* 입력 중에는 검색과 키보드를 가리지 않고, 앱 하단 탐색과도 함께 뜨지 않습니다. */
@@ -233,12 +276,27 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
   body:has([data-partner-detail-mobile-action-bar]) [data-toast-viewport] {
     bottom: calc(env(safe-area-inset-bottom) + 6rem);
   }
+
+  /* 관리자 모바일 하단 탐색(높이 3.5rem) 위로 토스트를 띄웁니다. */
+  body:has([data-admin-mobile-navigation]) [data-toast-viewport] {
+    bottom: calc(env(safe-area-inset-bottom) + 4.75rem);
+  }
 }
 
 @media (min-width: 768px) {
   body:has([data-partner-detail-desktop-action-fab]) [data-toast-viewport] {
     bottom: 6rem;
   }
+}
+
+/* 플로팅 제출 버튼과 토스트가 겹치지 않게 합니다. base는 하단 1.25rem + 높이 3.5rem,
+   raised는 관리자 하단 탐색 위(하단 5rem + 높이 3rem)에 뜬 버튼입니다. */
+body:has([data-floating-submit-button]) [data-toast-viewport] {
+  bottom: calc(env(safe-area-inset-bottom) + 6rem);
+}
+
+body:has([data-floating-submit-button="raised"]) [data-toast-viewport] {
+  bottom: calc(env(safe-area-inset-bottom) + 9rem);
 }
 
 * {
@@ -326,7 +384,7 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
     border: 1px solid var(--border);
     background: var(--surface);
     box-shadow: var(--shadow-flat);
-    border-radius: var(--radius-panel);
+    border-radius: var(--shape-radius-panel);
     backdrop-filter: blur(14px);
   }
 
@@ -334,14 +392,14 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
     border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
     background: var(--surface-inset);
     box-shadow: none;
-    border-radius: var(--radius-panel);
+    border-radius: var(--shape-radius-panel);
   }
 
   .ui-panel-elevated {
     border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
     background: var(--surface-elevated);
     box-shadow: var(--shadow-raised);
-    border-radius: var(--radius-panel);
+    border-radius: var(--shape-radius-panel);
     backdrop-filter: blur(18px);
   }
 
@@ -371,7 +429,7 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
 
   .category-chip-preview-light,
   .category-chip-preview-dark {
-    border-radius: var(--radius-control);
+    border-radius: var(--shape-radius-control);
   }
 
   .category-chip-preview-light {
@@ -403,22 +461,6 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
     border: 1px solid var(--border);
     background: var(--surface-control);
     box-shadow: var(--shadow-flat);
-  }
-
-  .rounded-input {
-    border-radius: var(--radius-input);
-  }
-
-  .rounded-card {
-    border-radius: var(--radius-card);
-  }
-
-  .rounded-panel {
-    border-radius: var(--radius-panel);
-  }
-
-  .rounded-overlay {
-    border-radius: var(--radius-overlay);
   }
 
   .shadow-flat {
@@ -497,6 +539,10 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
     min-height: calc(6.5rem + env(safe-area-inset-top));
   }
 
+  .bottom-safe-toast {
+    bottom: calc(env(safe-area-inset-bottom) + 1rem);
+  }
+
   .bottom-safe-bottom-5 {
     bottom: calc(env(safe-area-inset-bottom) + 1.25rem);
   }
@@ -528,6 +574,11 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
     /* Keep the standard declaration last through production optimization. */
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     backdrop-filter: blur(24px) saturate(180%);
+  }
+
+  /* 실패 토스트는 아이콘과 danger 테두리로 성공·안내 토스트와 구분합니다. */
+  .ui-toast-glass[data-toast-tone="error"] {
+    border-color: color-mix(in srgb, var(--danger) 45%, transparent);
   }
 
   .site-mobile-nav-glass {

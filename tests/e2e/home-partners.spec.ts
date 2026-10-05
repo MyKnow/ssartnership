@@ -251,6 +251,27 @@ test.describe("public partner discovery", () => {
     expect(searchNavigations).toEqual([]);
   });
 
+  test("restores loaded cards and scroll after opening a detail beyond the initial page", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 844 });
+    await gotoDirectory(page, "/#benefits");
+    const cards = page.getByTestId("partner-card");
+    await expect(cards).toHaveCount(12);
+    await page.getByTestId("partner-infinite-scroll-sentinel").scrollIntoViewIfNeeded();
+    await expect.poll(() => cards.count()).toBeGreaterThan(12);
+    const detailLink = cards.nth(15).locator('a[aria-label$=" 상세 보기"]').first();
+    const detailName = (await detailLink.textContent())!.trim();
+    await detailLink.scrollIntoViewIfNeeded();
+    const count = await cards.count();
+    const scrollY = await page.evaluate(() => window.scrollY);
+    await detailLink.click();
+    await expect(page).toHaveURL(/\/partners\/[^?#]+$/);
+    await expect(page.getByRole("heading", { level: 1, name: detailName, exact: true })).toBeVisible();
+    await page.goBack();
+    await waitForDirectoryControls(page);
+    await expect(cards).toHaveCount(count);
+    await expect.poll(async () => Math.abs((await page.evaluate(() => window.scrollY)) - scrollY)).toBeLessThan(80);
+  });
+
   test("uses a clean detail URL and restores a submitted search with browser back", async ({
     page,
   }) => {
@@ -286,27 +307,36 @@ test.describe("public partner discovery", () => {
       return;
     }
     const cleanDetailUrl = new URL(detailHref, page.url()).toString();
+    await detailLink.scrollIntoViewIfNeeded();
+    const returnScrollY = await page.evaluate(() => window.scrollY);
+    expect(returnScrollY).toBeGreaterThan(100);
     await detailLink.click();
 
     await expect(page).toHaveURL(/\/partners\/[^?#]+$/);
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: firstPartnerName, exact: true })).toBeVisible();
     await page.goBack();
     await waitForDirectoryControls(page);
 
     await expect(page).toHaveURL(directoryUrl);
     await expect(page.getByTestId("partner-search-input")).toHaveValue(firstPartnerName);
     await expect(cards).toHaveCount(1);
+    await expect.poll(async () => Math.abs((await page.evaluate(() => window.scrollY)) - returnScrollY)).toBeLessThan(80);
 
-    await resultCard.locator("[data-partner-card-media]").click();
+    const cardMedia = resultCard.locator("[data-partner-card-media]");
+    await cardMedia.scrollIntoViewIfNeeded();
+    const mediaReturnScrollY = await page.evaluate(() => window.scrollY);
+    await cardMedia.click();
 
     await expect(page).toHaveURL(/\/partners\/[^?#]+$/);
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: firstPartnerName, exact: true })).toBeVisible();
     await page.goBack();
     await waitForDirectoryControls(page);
 
     await expect(page).toHaveURL(directoryUrl);
     await expect(page.getByTestId("partner-search-input")).toHaveValue(firstPartnerName);
     await expect(cards).toHaveCount(1);
+
+    await expect.poll(async () => Math.abs((await page.evaluate(() => window.scrollY)) - mediaReturnScrollY)).toBeLessThan(80);
 
     await page.goto(`${cleanDetailUrl}?returnTo=%2F%23benefits`);
     await expect(page).toHaveURL(cleanDetailUrl);

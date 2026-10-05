@@ -31,7 +31,7 @@ test("수료생 외 모든 이메일 기본 템플릿은 전용 거래성 디자
     renderDefaultNotificationEmailContent,
   } = await notificationEmailContentModulePromise;
 
-  assert.equal(nonGraduateEmailDefinitions.length, 15);
+  assert.equal(nonGraduateEmailDefinitions.length, 16);
   assert.deepEqual(
     [...DEFAULT_NOTIFICATION_EMAIL_EVENT_KEYS].sort(),
     nonGraduateEmailDefinitions.map((definition) => definition.eventKey).sort(),
@@ -192,7 +192,7 @@ test("관리자 편집기에 보이는 모든 이메일 기본 문구도 제거�
     (definition) => definition.channel === "email",
   );
 
-  assert.equal(emailDefinitions.length, 21);
+  assert.equal(emailDefinitions.length, 22);
   for (const definition of emailDefinitions) {
     assert.doesNotMatch(
       definition.bodyTemplate,

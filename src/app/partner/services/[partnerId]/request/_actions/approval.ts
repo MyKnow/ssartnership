@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
-import { getPartnerSession } from "@/lib/partner-session";
+import { requirePartnerActionSession } from "@/lib/partner-action-session";
 import { validateFormCampusSlugSelection } from "@/lib/campuses";
 import { parsePartnerAudienceSelection } from "@/lib/partner-audience";
 import {
@@ -19,15 +19,10 @@ import {
   parseList,
   revalidatePartnerServicePaths,
 } from "./shared";
+import { logServerError } from "@/lib/server-log";
 
 export async function submitPartnerChangeRequestAction(formData: FormData) {
-  const session = await getPartnerSession();
-  if (!session) {
-    redirect("/partner/login");
-  }
-  if (session.mustChangePassword) {
-    redirect("/partner/change-password");
-  }
+  const session = await requirePartnerActionSession();
 
   const partnerId = String(formData.get("partnerId") || "").trim();
   const { companyId, companyIds } = getAuthorizedCompanyIdsForPartnerAction(
@@ -162,10 +157,7 @@ export async function submitPartnerChangeRequestAction(formData: FormData) {
         requestUrl: "/admin/partner-requests",
       },
     }).catch((notificationError) => {
-      console.error(
-        "[partner-change-request] admin notification failed",
-        notificationError,
-      );
+      logServerError("[partner-change-request] admin notification failed", notificationError);
     });
   } catch (error) {
     if (error instanceof PartnerChangeRequestError) {

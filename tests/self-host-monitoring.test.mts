@@ -118,3 +118,17 @@ test("restored environments retain service failure alarms without claiming the s
     if (name === "production") assert.ok(compose.services.prometheus.volumes.includes("../observability/production-backup-alerts.yml:/etc/prometheus/production-backup-alerts.yml:ro"));
   }
 });
+
+test("게스트 VM 로컬 Grafana 대시보드는 PVE 공용 정본과 UID를 공유하지 않는다", async () => {
+  const { readFileSync } = await import("node:fs");
+  const read = (file: string) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+  const canonical = JSON.parse(read("deploy/pve/grafana/dashboards/ssartnership.json")) as { uid: string; title: string };
+  const guest = JSON.parse(read("deploy/observability/grafana/dashboards/ssartnership.json")) as { uid: string; title: string };
+  assert.equal(canonical.uid, "ssartnership-operations");
+  assert.match(read("deploy/pve/grafana/build-dashboard.mjs"), /uid: "ssartnership-operations"/u);
+  assert.notEqual(guest.uid, canonical.uid);
+  assert.notEqual(guest.title, canonical.title);
+  assert.match(guest.title, /비정본/u);
+  // Operator alerts must keep linking to the canonical PVE dashboard.
+  assert.match(read("deploy/observability/notifier.mjs"), /grafana\/d\/ssartnership-operations/u);
+});

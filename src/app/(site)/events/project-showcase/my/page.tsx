@@ -1,14 +1,22 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
 import { getHeaderSession } from "@/lib/header-session";
 import { getShowcasePhase, projectShowcaseRepository } from "@/lib/project-showcase";
 import { formatShowcasePeriod } from "@/lib/project-showcase/format";
 import { SHOWCASE_OWNER_STATUS_LABELS, SHOWCASE_PRIZES, SHOWCASE_TYPE_LABELS } from "@/lib/project-showcase/labels";
 import { getSignedUserSession } from "@/lib/user-auth";
+import BackLink from "@/components/ui/BackLink";
 
 export const dynamic = "force-dynamic";
+
+// Member-only participation screens are never search results.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function MyShowcaseParticipationPage() {
   const session = await getSignedUserSession();
@@ -26,7 +34,7 @@ export default async function MyShowcaseParticipationPage() {
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
       <main className="mx-auto w-full max-w-5xl px-4 pb-20 pt-8 sm:px-6 sm:pt-12">
-        <Link href="/events/project-showcase" className="text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">← 이벤트로 돌아가기</Link>
+        <BackLink href="/events/project-showcase">이벤트로 돌아가기</BackLink>
         <div className="mt-7">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">MY PARTICIPATION</p>
           <h1 className="mt-2 text-3xl font-bold text-foreground">내 참여</h1>
@@ -70,16 +78,19 @@ export default async function MyShowcaseParticipationPage() {
               </dl>
             </article>
           )) : (
-            <div className="rounded-2xl border border-dashed border-border bg-surface px-5 py-10 text-center">
-              <p className="font-semibold text-foreground">출품한 프로젝트가 없어요</p>
-              {phase === "submission" ? (
-                <div className="mt-4"><Button href="/events/project-showcase/projects/new">출품하기</Button></div>
-              ) : (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  모집 기간: {formatShowcasePeriod(event?.submissionStartAt ?? null, event?.submissionEndAt ?? null)}
-                </p>
-              )}
-            </div>
+            <EmptyState
+              title="출품한 프로젝트가 없어요"
+              description={
+                phase === "submission"
+                  ? undefined
+                  : `모집 기간: ${formatShowcasePeriod(event?.submissionStartAt ?? null, event?.submissionEndAt ?? null)}`
+              }
+              action={
+                phase === "submission" ? (
+                  <Button href="/events/project-showcase/projects/new">출품하기</Button>
+                ) : undefined
+              }
+            />
           )}
         </section>
 
@@ -143,12 +154,10 @@ export default async function MyShowcaseParticipationPage() {
               ))}
             </ul>
           ) : (
-            <div className="rounded-2xl border border-dashed border-border bg-surface px-5 py-8 text-center">
-              <p className="font-semibold text-foreground">{phase === "experience" ? "아직 체험한 프로젝트가 없어요" : "체험 기간에 참여할 수 있어요"}</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                체험 기간: {formatShowcasePeriod(event?.experienceStartAt ?? null, event?.experienceEndAt ?? null)}
-              </p>
-            </div>
+            <EmptyState
+              title={phase === "experience" ? "아직 체험한 프로젝트가 없어요" : "체험 기간에 참여할 수 있어요"}
+              description={`체험 기간: ${formatShowcasePeriod(event?.experienceStartAt ?? null, event?.experienceEndAt ?? null)}`}
+            />
           )}
         </section>
       </main>

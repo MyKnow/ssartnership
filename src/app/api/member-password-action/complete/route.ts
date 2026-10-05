@@ -6,7 +6,7 @@ import {
   getMemberAuthBlockingState,
   recordMemberAuthAttempt,
 } from "@/lib/member-auth-security";
-import { completeManualMemberPasswordAction } from "@/lib/member-manual-import/service.server";
+import { completeManualMemberPasswordAction } from "@/lib/member-manual-import/password-actions.server";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { setUserSession } from "@/lib/user-auth";
 import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";

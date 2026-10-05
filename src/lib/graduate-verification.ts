@@ -1,5 +1,6 @@
 import { isValidEmail } from "@/lib/validation";
 import { CAMPUS_DIRECTORY } from "@/lib/campuses";
+import { getSeoulDateParts } from "@/lib/ssafy-year";
 
 export const GRADUATE_COHORT_RULE_VERSION = "ssafy-half-year-v1" as const;
 
@@ -66,6 +67,9 @@ export const MAX_GRADUATE_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024;
 export const MAX_GRADUATE_PROFILE_IMAGE_PIXELS = 25_000_000;
 export const MIN_GRADUATE_PROFILE_IMAGE_DIMENSION = 320;
 export const GRADUATE_PROFILE_IMAGE_SIZE = 640;
+// The review RPCs set certificate_delete_after = now() + interval '30 days'.
+export const GRADUATE_CERTIFICATE_RETENTION_DAYS = 30;
+export const GRADUATE_FILE_RETENTION_NOTICE = `교육이수증은 검토가 끝난 날부터 ${GRADUATE_CERTIFICATE_RETENTION_DAYS}일 뒤 삭제하고, 승인된 사진은 탈퇴할 때까지 인증 카드에 사용합니다.`;
 export const GRADUATE_CAMPUS_OPTIONS = CAMPUS_DIRECTORY.map(
   (campus) => campus.label,
 );
@@ -93,15 +97,17 @@ const TRANSITIONS: Record<GraduateVerificationStatus, readonly GraduateVerificat
 const RESUBMISSION_TARGET_SET = new Set<string>(GRADUATE_RESUBMISSION_TARGETS);
 const GRADUATE_CAMPUS_SET = new Set<string>(GRADUATE_CAMPUS_OPTIONS);
 
-/** Returns selectable SSAFY generations, newest first. */
+/**
+ * Returns selectable SSAFY generations, newest first (1..current).
+ * The half-year boundary is evaluated on the Asia/Seoul calendar so a UTC
+ * server or a browser abroad shows the same options as Korea at midnight.
+ */
 export function getGraduateGenerationOptions(now = new Date()) {
-  if (now.getFullYear() === 2018 && now.getMonth() === 11) return [1];
+  const { year, month } = getSeoulDateParts(now);
+  if (year === 2018 && month === 12) return [1];
   const currentGeneration = Math.min(
     99,
-    Math.max(
-      0,
-      (now.getFullYear() - 2019) * 2 + (now.getMonth() + 1 >= 7 ? 2 : 1),
-    ),
+    Math.max(0, (year - 2019) * 2 + (month >= 7 ? 2 : 1)),
   );
   return Array.from({ length: currentGeneration }, (_, index) => currentGeneration - index);
 }
@@ -114,6 +120,9 @@ export type GraduateEducationDetails = {
 
 export type GraduateEducationFieldErrors = Partial<Record<"legalName" | "generation" | "campus", string>>;
 
+/** 수료생 인증 신청 이름(실명) 길이 상한. 신청 화면 `maxLength`와 서버 검증이 함께 참조한다. */
+export const GRADUATE_LEGAL_NAME_MAX_LENGTH = 100;
+
 export function validateGraduateEducationDetails(
   input: GraduateEducationDetails,
   now = new Date(),
@@ -123,7 +132,9 @@ export function validateGraduateEducationDetails(
   const campus = typeof input.campus === "string" ? input.campus.trim() : "";
   const validGenerations = new Set(getGraduateGenerationOptions(now));
   const fieldErrors: GraduateEducationFieldErrors = {};
-  if (legalName.length < 1 || legalName.length > 100) fieldErrors.legalName = "이름은 1~100자로 입력해 주세요.";
+  if (legalName.length < 1 || legalName.length > GRADUATE_LEGAL_NAME_MAX_LENGTH) {
+    fieldErrors.legalName = `이름은 1~${GRADUATE_LEGAL_NAME_MAX_LENGTH}자로 입력해 주세요.`;
+  }
   if (typeof generation !== "number" || !Number.isInteger(generation) || !validGenerations.has(generation)) fieldErrors.generation = "기수를 선택해 주세요.";
   if (!GRADUATE_CAMPUS_SET.has(campus)) fieldErrors.campus = "캠퍼스를 선택해 주세요.";
   const message = fieldErrors.legalName ?? fieldErrors.generation ?? fieldErrors.campus;
@@ -143,9 +154,16 @@ export function normalizeGraduateDocumentNumber(value: string) {
     .replace(/[\s-]+/g, "");
 }
 
+/** 수료증 문서 번호 길이 상한. 관리자 승인 입력 `maxLength`와 서버 검증이 함께 참조한다. */
+export const GRADUATE_DOCUMENT_NUMBER_MAX_LENGTH = 160;
+const GRADUATE_DOCUMENT_NUMBER_PATTERN = new RegExp(
+  `^[\\p{L}\\p{N}._/]{3,${GRADUATE_DOCUMENT_NUMBER_MAX_LENGTH}}$`,
+  "u",
+);
+
 export function validateGraduateDocumentNumber(value: string) {
   const normalized = normalizeGraduateDocumentNumber(value);
-  if (!/^[\p{L}\p{N}._/]{3,160}$/u.test(normalized)) {
+  if (!GRADUATE_DOCUMENT_NUMBER_PATTERN.test(normalized)) {
     return null;
   }
   return normalized;

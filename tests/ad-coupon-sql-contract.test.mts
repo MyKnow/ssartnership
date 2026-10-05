@@ -81,3 +81,76 @@ describe("issue_ad_coupon SQL contract", () => {
     );
   });
 });
+
+describe("ad coupon deletion and campaign status writes", () => {
+  const repositorySource = readFileSync(
+    new URL("../src/lib/repositories/supabase/ad-package-repository.supabase.ts", import.meta.url),
+    "utf8",
+  );
+  const issueRpc = readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8");
+
+  it("relies on the issue RPC locking and re-checking only active coupons", () => {
+    const rpcBody = issueRpc.slice(
+      issueRpc.indexOf("create or replace function public.issue_ad_coupon("),
+      issueRpc.indexOf("create or replace function public.redeem_ad_coupon_issue("),
+    );
+    assert.match(rpcBody, /where coupons\.id = p_coupon_id\s+for update;/);
+    assert.match(rpcBody, /if coupon_row\.status <> 'active'/);
+  });
+
+  it("bumps ad_coupons.updated_at on every update, which the delete compare-and-set relies on", () => {
+    const triggerFunction = issueRpc.slice(
+      issueRpc.indexOf("create or replace function set_ad_coupons_updated_at()"),
+      issueRpc.indexOf("drop trigger if exists ad_coupons_set_updated_at on ad_coupons;"),
+    );
+    assert.match(triggerFunction, /new\.updated_at = now\(\);/);
+    assert.match(
+      issueRpc,
+      /create trigger ad_coupons_set_updated_at\s+before update on ad_coupons\s+for each row\s+execute function set_ad_coupons_updated_at\(\);/,
+    );
+  });
+
+  it("deletes only an unchanged non-active coupon without history", () => {
+    const deleteSource = repositorySource.slice(
+      repositorySource.indexOf("async deleteCoupon("),
+      repositorySource.indexOf("async issueCoupon("),
+    );
+    const versionRead = deleteSource.indexOf('.select("status,updated_at")');
+    const historyCount = deleteSource.indexOf('.from("ad_coupon_issues")');
+    assert.ok(versionRead >= 0 && historyCount > versionRead);
+    assert.match(deleteSource, /canDeleteAdCouponWithStatus\(status\)/);
+    assert.match(
+      deleteSource,
+      /\.delete\(\)\s*\.eq\("id", couponId\)\s*\.neq\("status", "active"\)\s*\.eq\("updated_at", couponRow\.updated_at\)\s*\.select\("id"\)/,
+    );
+    assert.match(deleteSource, /reason: "state_changed"/);
+  });
+
+  it("re-checks the coupon status transition and updates with a compare-and-set", () => {
+    const updateSource = repositorySource.slice(
+      repositorySource.indexOf("async updateCoupon("),
+      repositorySource.indexOf("async duplicateCoupon("),
+    );
+    assert.match(updateSource, /canTransitionAdCouponStatus\(currentStatus, nextStatus\)/);
+    assert.match(updateSource, /throw new AdStatusTransitionError\("coupon", currentStatus, nextStatus\)/);
+    assert.match(updateSource, /status: nextStatus,/);
+    assert.match(
+      updateSource,
+      /\.eq\("partner_id", input\.partnerId\)\s*(\/\/[^\n]*\s*)?\.eq\("status", currentStatus\)\s*\.select\(AD_COUPON_SELECT\)\s*\.maybeSingle\(\)/,
+    );
+    assert.match(updateSource, /throw new Error\(AD_COUPON_STATE_CHANGED_ERROR\)/);
+  });
+
+  it("updates campaign status with a validated compare-and-set", () => {
+    const updateSource = repositorySource.slice(
+      repositorySource.indexOf("async updateCampaignStatus("),
+      repositorySource.indexOf("async createCoupon("),
+    );
+    assert.match(updateSource, /canTransitionAdCampaignStatus\(from, input\.status\)/);
+    assert.match(
+      updateSource,
+      /\.update\(\{ status: input\.status \}\)\s*\.eq\("id", input\.campaignId\)\s*\.eq\("status", from\)/,
+    );
+    assert.match(updateSource, /reason: "state_changed"/);
+  });
+});

@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { warnDeprecatedEnvironmentAlias } from "@/lib/env-deprecation";
 
 export type SmtpConfig = {
   host: string;
@@ -163,6 +164,8 @@ export function getSmtpConfig(
 
   const port = 465;
   const secure = true;
+  if (env.NAVER_SMTP_USER?.trim()) warnDeprecatedEnvironmentAlias("NAVER_SMTP_USER");
+  if (env.NAVER_SMTP_PASS?.trim()) warnDeprecatedEnvironmentAlias("NAVER_SMTP_PASS");
   const fromEmailValue = env.NAVER_SMTP_USER;
   const tlsMinDhSize = parseOptionalPositiveInteger(
     env.SMTP_TLS_MIN_DH_SIZE,
@@ -199,7 +202,37 @@ export function getSmtpConfig(
   };
 }
 
-export function createSmtpTransport(config = getSmtpConfig()) {
+export type SmtpTimeouts = Readonly<{
+  /**
+   * DNS 질의 시도 1회 상한. Node resolver는 기본 4회 시도하며 시도마다 대기를
+   * 두 배로 늘리므로, 응답하지 않는 DNS 서버 앞에서는 IPv4·IPv6 해석이 각각
+   * 이 값의 약 15배까지 걸릴 수 있다. 해석 실패는 `EDNS`로 보고된다.
+   */
+  dnsTimeoutMs: number;
+  /** TCP(및 implicit TLS) 연결 수립 상한. */
+  connectionTimeoutMs: number;
+  /** 연결 후 SMTP 220 인사 수신 상한. */
+  greetingTimeoutMs: number;
+  /** 연결된 소켓의 무응답(유휴) 상한. 전송 전체 시간이 아니라 정지 구간을 끊는다. */
+  socketTimeoutMs: number;
+}>;
+
+/**
+ * nodemailer 기본값(DNS 30초·연결 2분·인사 30초·소켓 10분)은 요청 처리와
+ * cron 상한(60~70초)보다 길어, 메일 서버 장애가 사용자 요청을 오래 붙잡는다.
+ * 외부 호출 상한 규약(docs/operations/reliability.md)에 맞춘 고정값이다.
+ */
+export const SMTP_TIMEOUTS: SmtpTimeouts = Object.freeze({
+  dnsTimeoutMs: 5_000,
+  connectionTimeoutMs: 10_000,
+  greetingTimeoutMs: 10_000,
+  socketTimeoutMs: 20_000,
+});
+
+export function buildSmtpTransportOptions(
+  config: SmtpConfig,
+  timeouts: SmtpTimeouts = SMTP_TIMEOUTS,
+) {
   const tls =
     config.tlsMinDhSize || config.tlsCiphers
       ? {
@@ -208,7 +241,7 @@ export function createSmtpTransport(config = getSmtpConfig()) {
         }
       : undefined;
 
-  return nodemailer.createTransport({
+  return {
     host: config.host,
     port: config.port,
     secure: config.secure,
@@ -217,5 +250,16 @@ export function createSmtpTransport(config = getSmtpConfig()) {
       user: config.user,
       pass: config.pass,
     },
-  });
+    dnsTimeout: timeouts.dnsTimeoutMs,
+    connectionTimeout: timeouts.connectionTimeoutMs,
+    greetingTimeout: timeouts.greetingTimeoutMs,
+    socketTimeout: timeouts.socketTimeoutMs,
+  };
+}
+
+export function createSmtpTransport(
+  config = getSmtpConfig(),
+  timeouts: SmtpTimeouts = SMTP_TIMEOUTS,
+) {
+  return nodemailer.createTransport(buildSmtpTransportOptions(config, timeouts));
 }

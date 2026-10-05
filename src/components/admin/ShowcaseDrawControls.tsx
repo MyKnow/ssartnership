@@ -1,5 +1,8 @@
 "use client";
 
+import Checkbox from "@/components/ui/Checkbox";
+
+
 import { useRef, useState, useTransition } from "react";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
@@ -18,7 +21,7 @@ import {
   type ShowcaseCandidateGroup,
   type ShowcaseVoidReason,
 } from "@/lib/project-showcase/types";
-import { parseShowcaseExclusionReason } from "@/lib/project-showcase/validation";
+import { parseShowcaseExclusionReason, SHOWCASE_PROJECT_LIMITS } from "@/lib/project-showcase/validation";
 
 type ActionResult = { ok: boolean; message: string };
 
@@ -89,7 +92,7 @@ export function ShowcaseCandidateExclusionControl({
       <input
         ref={reasonRef}
         id={`showcase-exclude-${targetId}`}
-        maxLength={500}
+        maxLength={SHOWCASE_PROJECT_LIMITS.exclusionReasonMax}
         disabled={disabled}
         placeholder="제외 사유 (외부인, 중복 계정, 허위 기록 등)"
         className="min-h-9 min-w-0 rounded-lg border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
@@ -160,8 +163,7 @@ export function ShowcaseWinnerControls({ winner, disabled }: { winner: ShowcaseA
   return (
     <div className="grid gap-2">
       <label className="flex items-center gap-2 text-sm text-foreground">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={delivered}
           disabled={disabled || isPending}
           onChange={(changeEvent) => {

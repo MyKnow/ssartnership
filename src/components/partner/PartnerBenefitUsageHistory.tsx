@@ -1,9 +1,11 @@
 import Link from "next/link";
+import AdminConfirmSubmitButton from "@/components/admin/AdminConfirmSubmitButton";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import SectionHeading from "@/components/ui/SectionHeading";
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import SubmitButton from "@/components/ui/SubmitButton";
+import { formatKoreanDateTimeLocalValue, formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import type { PartnerBenefit } from "@/lib/partner-benefit-items";
 import type { PartnerBenefitUsageHistoryPage } from "@/lib/repositories/partner-benefit-usage-repository";
 
@@ -15,14 +17,6 @@ type AdminUsageActions = {
   update: UsageAction;
   delete: UsageAction;
 };
-
-function formatDateTimeInput(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-  return date.toLocaleString("sv-SE", { timeZone: "Asia/Seoul" }).slice(0, 16).replace(" ", "T");
-}
 
 export default function PartnerBenefitUsageHistory({
   benefits,
@@ -102,9 +96,9 @@ export default function PartnerBenefitUsageHistory({
             </label>
             <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
               적용 시각
-              <input name="verifiedAt" type="datetime-local" defaultValue={formatDateTimeInput(new Date().toISOString())} required className="h-10 rounded-xl border border-border bg-surface px-3 text-sm text-foreground" />
+              <input name="verifiedAt" type="datetime-local" defaultValue={formatKoreanDateTimeLocalValue(new Date().toISOString())} required className="h-10 rounded-xl border border-border bg-surface px-3 text-sm text-foreground" />
             </label>
-            <button type="submit" className="h-10 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground">추가</button>
+            <SubmitButton pendingText="추가 중">추가</SubmitButton>
           </form>
         </div>
       ) : null}
@@ -174,14 +168,21 @@ export default function PartnerBenefitUsageHistory({
                   </label>
                   <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
                     적용 시각
-                    <input name="verifiedAt" type="datetime-local" defaultValue={formatDateTimeInput(usage.verifiedAt)} required className="h-10 rounded-xl border border-border bg-surface px-3 text-sm text-foreground" />
+                    <input name="verifiedAt" type="datetime-local" defaultValue={formatKoreanDateTimeLocalValue(usage.verifiedAt)} required className="h-10 rounded-xl border border-border bg-surface px-3 text-sm text-foreground" />
                   </label>
-                  <button type="submit" className="h-10 rounded-xl border border-primary px-4 text-sm font-semibold text-primary hover:bg-primary-soft">저장</button>
+                  <SubmitButton variant="soft" pendingText="저장 중">저장</SubmitButton>
                 </form>
                 <form action={adminActions.delete} className="flex justify-end">
                   <input type="hidden" name="partnerId" value={adminActions.partnerId} />
                   <input type="hidden" name="usageId" value={usage.usageId} />
-                  <button type="submit" className="min-h-11 rounded-xl px-3 text-sm font-semibold text-danger hover:bg-danger-soft">이력 삭제</button>
+                  <AdminConfirmSubmitButton
+                    confirmTitle="혜택 이용 이력을 삭제할까요?"
+                    confirmDescription="삭제한 이용 이력은 되돌릴 수 없습니다. 실제 이용이 아니었던 기록만 삭제해 주세요."
+                    confirmLabel="이력 삭제"
+                    pendingText="삭제 중"
+                  >
+                    이력 삭제
+                  </AdminConfirmSubmitButton>
                 </form>
               </div>
             );

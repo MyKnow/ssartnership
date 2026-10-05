@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import MotionReveal from "@/components/ui/MotionReveal";
 
 export default function HeroSection({
   eyebrow,
@@ -15,7 +14,7 @@ export default function HeroSection({
   const Heading = headingLevel;
 
   return (
-    <MotionReveal>
+    <div>
       <section className="hero-surface relative overflow-hidden rounded-overlay px-6 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
         <div className="absolute inset-0 ui-decor-grid opacity-25" aria-hidden="true" />
         <div className="relative max-w-3xl">
@@ -30,6 +29,6 @@ export default function HeroSection({
           </p>
         </div>
       </section>
-    </MotionReveal>
+    </div>
   );
 }

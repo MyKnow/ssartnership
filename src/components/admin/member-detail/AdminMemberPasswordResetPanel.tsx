@@ -61,12 +61,12 @@ export default function AdminMemberPasswordResetPanel({
       );
       const body = (await result.json().catch(() => null)) as PasswordResetResponse | null;
       if (!result.ok || body?.ok !== true) {
-        notify(getErrorMessage(body));
+        notify(getErrorMessage(body), { tone: "error" });
         return;
       }
       if (delivery === "copy") {
         if (typeof body.resetUrl !== "string" || !body.resetUrl) {
-          notify("비밀번호 재발급 링크를 확인하지 못했습니다. 다시 생성해 주세요.");
+          notify("비밀번호 재발급 링크를 확인하지 못했습니다. 다시 생성해 주세요.", { tone: "error" });
           return;
         }
         setResetUrl(body.resetUrl);
@@ -81,7 +81,7 @@ export default function AdminMemberPasswordResetPanel({
           : "등록된 이메일로 비밀번호 재발급 링크를 발송했습니다. 수신한 링크로 비밀번호를 설정하면 이메일 인증도 완료됩니다.",
       );
     } catch {
-      notify("비밀번호 재발급 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      notify("비밀번호 재발급 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.", { tone: "error" });
     } finally {
       setIsPending(false);
       setConfirmAction(null);
@@ -97,7 +97,7 @@ export default function AdminMemberPasswordResetPanel({
       await navigator.clipboard.writeText(resetUrl);
       notify(`${actionLabel} 링크를 복사했습니다.`);
     } catch {
-      notify("링크를 복사하지 못했습니다. 직접 선택해 복사해 주세요.");
+      notify("링크를 복사하지 못했습니다. 직접 선택해 복사해 주세요.", { tone: "error" });
     }
   };
 

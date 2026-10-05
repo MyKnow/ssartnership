@@ -44,7 +44,6 @@ test("browser request and local-key surfaces share the safe UUID helper", async 
       "../src/components/partner-reviews/PartnerReviewForm.tsx",
       "../src/components/review-media/shared.ts",
       "../src/lib/image-upload/draft.client.ts",
-      "../src/components/certification/AppleWalletPassSection.tsx",
       "../src/components/admin/push-manager/useAdminPushManager.ts",
     ].map((sourcePath) =>
       readFile(new URL(sourcePath, import.meta.url), "utf8"),

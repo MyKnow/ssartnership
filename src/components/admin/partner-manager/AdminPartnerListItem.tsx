@@ -28,7 +28,7 @@ function MetricPill({
       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
         {label}
       </p>
-      <p className="mt-1 text-sm font-semibold text-foreground">{value.toLocaleString()}</p>
+      <p className="mt-1 text-sm font-semibold text-foreground">{value.toLocaleString("ko-KR")}</p>
     </div>
   );
 }
@@ -43,8 +43,8 @@ export default function AdminPartnerListItem({
   const metrics = partner.metrics;
   const visibilityState = getPartnerVisibilityState(
     partner.visibility,
-    partner.period_start,
-    partner.period_end,
+    partner.periodStart,
+    partner.periodEnd,
   );
   const serviceMode = getPartnerServiceMode(partner.location);
   const isOnlineService = serviceMode === "online";
@@ -82,9 +82,9 @@ export default function AdminPartnerListItem({
             </Link>
             <div className="flex min-h-5 min-w-0 items-center gap-2 text-sm text-muted-foreground">
               {!isOnlineService ? <p className="min-w-0">{partner.location}</p> : null}
-              {isOnlineService && partner.map_url ? (
+              {isOnlineService && partner.mapUrl ? (
                 <a
-                  href={partner.map_url}
+                  href={partner.mapUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex h-11 w-11 items-center justify-center rounded-control border border-border bg-surface text-foreground hover:border-strong"
@@ -110,7 +110,7 @@ export default function AdminPartnerListItem({
             </div>
           </div>
 
-          <PartnerAudienceChips appliesTo={partner.applies_to ?? []} />
+          <PartnerAudienceChips appliesTo={partner.appliesTo} />
         </div>
 
         <div className="flex shrink-0 items-start">

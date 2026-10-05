@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { requestJson, isJsonRecord } from "@/lib/client-request";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
@@ -10,8 +11,18 @@ import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useHydrated } from "@/hooks/useHydrated";
 import { normalizeMemberEmail } from "@/lib/member-domain";
+import { getMemberLoginCompletionHref } from "@/lib/member-required-gates";
+import { isSixDigitCode, SIX_DIGIT_CODE_LENGTH } from "@/lib/validation";
 
 type Step = "password" | "email" | "code";
+
+/** Returns where recovery should land: the page's `returnTo`, else `/`. */
+function getRecoveryCompletionHref() {
+  return getMemberLoginCompletionHref({
+    currentPath: "/auth/recover-email",
+    returnTo: new URLSearchParams(window.location.search).get("returnTo"),
+  });
+}
 
 export default function MemberEmailRecoveryForm() {
   const router = useRouter();
@@ -47,13 +58,14 @@ export default function MemberEmailRecoveryForm() {
     setPending(true);
     resetMessage();
     try {
-      const response = await fetch("/api/member/recovery/start", {
+      await requestJson("/api/member/recovery/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier, password }),
+      }, {
+        fallbackMessage: "복구 세션을 시작하지 못했습니다.",
+        parse: (value) => isJsonRecord(value) ? value : null,
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message ?? "복구 세션을 시작하지 못했습니다.");
       setPassword("");
       setStep("email");
       setMessage("15분 안에 이메일을 등록하고 인증해 주세요.");
@@ -75,15 +87,16 @@ export default function MemberEmailRecoveryForm() {
     setPending(true);
     resetMessage();
     try {
-      const response = await fetch("/api/member/recovery/email/send", {
+      const data = await requestJson("/api/member/recovery/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: normalizedEmail }),
+      }, {
+        fallbackMessage: "인증 코드를 보내지 못했습니다.",
+        parse: (value) => isJsonRecord(value) ? value : null,
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message ?? "인증 코드를 보내지 못했습니다.");
       if (data.alreadyVerified) {
-        router.replace(data.redirectTo ?? "/");
+        router.replace(getRecoveryCompletionHref());
         router.refresh();
         return;
       }
@@ -99,7 +112,7 @@ export default function MemberEmailRecoveryForm() {
 
   async function verifyCode() {
     if (pending) return;
-    if (!/^\d{6}$/.test(code)) {
+    if (!isSixDigitCode(code)) {
       setFieldErrors({ code: "6자리 인증 코드를 입력해 주세요." });
       focusField(codeRef);
       return;
@@ -107,14 +120,15 @@ export default function MemberEmailRecoveryForm() {
     setPending(true);
     resetMessage();
     try {
-      const response = await fetch("/api/member/recovery/email/verify", {
+      const data = await requestJson("/api/member/recovery/email/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code }),
+      }, {
+        fallbackMessage: "이메일 인증을 완료하지 못했습니다.",
+        parse: (value) => isJsonRecord(value) ? value : null,
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message ?? "이메일 인증을 완료하지 못했습니다.");
-      router.replace(data.redirectTo ?? "/");
+      router.replace(getRecoveryCompletionHref());
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "이메일 인증을 완료하지 못했습니다.");
@@ -205,7 +219,7 @@ export default function MemberEmailRecoveryForm() {
                 ref={codeRef}
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                maxLength={6}
+                maxLength={SIX_DIGIT_CODE_LENGTH}
                 value={code}
                 onChange={(event) => {
                   setCode(event.target.value.replace(/\D/g, ""));

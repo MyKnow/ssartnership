@@ -3,13 +3,15 @@ import { getRequestLogContext, scheduleProductEventLog } from "@/lib/activity-lo
 import { consumeProductEventQuota } from "@/lib/product-event-throttle";
 import { adPackageRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
-import { getSignedUserSession } from "@/lib/user-auth";
+import { requireMemberApiSession } from "@/lib/member-api-session";
 import { normalizeCouponVerificationPassword } from "@/lib/coupon-verification-password";
 import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
 import {
   RouteJsonBodyError,
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
+import { readRouteParam } from "@/lib/route-params";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -17,14 +19,6 @@ type RedeemRequestBody = {
   sessionId?: unknown;
   onsitePassword?: unknown;
 };
-
-function safeDecodeSegment(value: string) {
-  try {
-    return decodeURIComponent(value).trim();
-  } catch {
-    return "";
-  }
-}
 
 function normalizeSessionId(value: unknown) {
   if (typeof value !== "string") {
@@ -63,12 +57,13 @@ export async function POST(
     return NextResponse.json({ ok: false, message: "잘못된 요청입니다." }, { status: 403 });
   }
 
-  const session = await getSignedUserSession();
-  if (!session?.userId) {
-    return NextResponse.json({ ok: false, message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requireMemberApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
 
-  const issueId = safeDecodeSegment((await params).issueId ?? "");
+  const issueId = readRouteParam((await params).issueId, 128);
   if (!issueId || issueId.length > 128) {
     return NextResponse.json({ ok: false, message: "쿠폰 정보를 확인할 수 없습니다." }, { status: 400 });
   }
@@ -164,7 +159,7 @@ export async function POST(
       issueId: result.issueId,
     });
   } catch (error) {
-    console.error("[coupon-issue-redeem] failed", error);
+    logServerError("[coupon-issue-redeem] failed", error);
     return NextResponse.json(
       { ok: false, message: "쿠폰 사용 확인에 실패했습니다." },
       { status: 503 },

@@ -2,12 +2,14 @@ import {
   getPartnerPortalLoginErrorMessage,
   type PartnerPortalLoginErrorCode,
 } from "@/lib/partner-auth";
+import { PARTNER_SESSION_EXPIRED_ERROR_CODE } from "@/lib/partner-auth/portal-paths";
 export { readFirstSearchParamOrEmpty as readSearchParam } from "@/lib/search-params";
 
 export type PartnerLoginSearchParams = {
   error?: string | string[];
   loginId?: string | string[];
   setup?: string | string[];
+  returnTo?: string | string[];
 };
 
 export function getLoginErrorMessage(errorCode: string | undefined) {
@@ -20,6 +22,8 @@ export function getLoginErrorMessage(errorCode: string | undefined) {
       return "이메일과 비밀번호를 모두 입력해 주세요.";
     case "invalid_email":
       return "이메일 형식이 올바르지 않습니다.";
+    case PARTNER_SESSION_EXPIRED_ERROR_CODE:
+      return "로그인 세션이 만료되었습니다. 다시 로그인한 뒤 작업을 이어 주세요.";
     case "invalid_credentials":
     case "inactive_account":
     case "setup_required":
@@ -52,11 +56,16 @@ export function getPartnerLoginFieldErrors(errorCode: string | undefined): {
   }
 }
 
+/**
+ * `returnTo` must already be sanitized with `sanitizePartnerReturnTo`; it is
+ * carried back so a failed attempt does not lose the original destination.
+ */
 export function buildPartnerLoginErrorRedirect(
   errorCode: string,
   loginId?: string | null,
+  returnTo?: string | null,
 ) {
   return `/partner/login?error=${encodeURIComponent(errorCode)}${
     loginId ? `&loginId=${encodeURIComponent(loginId)}` : ""
-  }`;
+  }${returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ""}`;
 }

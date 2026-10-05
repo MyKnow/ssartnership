@@ -1,5 +1,8 @@
 "use client";
 
+import Checkbox from "@/components/ui/Checkbox";
+
+
 import { useEffect, useMemo, useState } from "react";
 import Button from "@/components/ui/Button";
 import FilterBar from "@/components/ui/FilterBar";
@@ -20,7 +23,7 @@ import type {
   AdminNotificationEligibleMember,
   AdminNotificationType,
   AdminNotificationPreview,
-} from "@/lib/admin-notification-ops";
+} from "@/lib/admin-notification-ops-types";
 import type { PushAudienceScope } from "@/lib/push";
 import type { AdminPushManagerProps } from "./types";
 import { typeLabels } from "./constants";
@@ -100,8 +103,7 @@ function ChannelToggle({
     <label className="grid gap-2 rounded-2xl border border-border bg-surface-inset px-4 py-3">
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm font-semibold text-foreground">{label}</span>
-        <input
-          type="checkbox"
+        <Checkbox
           checked={checked}
           disabled={disabled}
           onChange={(event) => onChange(event.target.checked)}
@@ -508,8 +510,7 @@ function MemberPickerModal({
                     key={member.id}
                     className="grid min-h-11 w-full cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-start gap-3 px-3 py-2 text-left hover:bg-surface-muted focus-within:bg-surface-muted"
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={isSelected}
                       onChange={() => onToggleMember(member.id)}
                       className="mt-0.5 h-4 w-4 accent-primary"

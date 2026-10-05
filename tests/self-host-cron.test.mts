@@ -6,13 +6,18 @@ import test from "node:test";
 import {
   invokeSelfHostCron,
   loadCronSchedules,
+  parseCronScheduleCatalog,
   parseCronSchedules,
   parseTrustedCronBaseUrl,
+  REGISTERED_CRON_PATHS,
   SelfHostCronError,
 } from "../scripts/lib/self-host-cron.mjs";
 import { runSelfHostCronCli } from "../scripts/self-host-cron.mjs";
 
-const configUrl = new URL("../vercel.json", import.meta.url);
+const configUrl = new URL(
+  "../deploy/self-host-operations/production-cron/schedules.json",
+  import.meta.url,
+);
 const configSource = readFileSync(configUrl, "utf8");
 const configuredCrons = JSON.parse(configSource).crons;
 const schedules = loadCronSchedules(configSource);
@@ -33,7 +38,7 @@ function cronOptions(overrides = {}) {
   };
 }
 
-test("self-host cron 목록은 vercel.json의 모든 UTC 스케줄을 변경 없이 사용한다", async () => {
+test("self-host cron 목록은 schedules.json의 모든 UTC 스케줄을 변경 없이 사용한다", async () => {
   assert.deepEqual(parseCronSchedules({ crons: configuredCrons }), configuredCrons);
 
   const stdout: string[] = [];
@@ -54,6 +59,37 @@ test("self-host cron 목록은 vercel.json의 모든 UTC 스케줄을 변경 없
     ),
   );
   assert.deepEqual(stderr, []);
+});
+
+test("schedules.json은 등록된 모든 cron 경로를 예약 또는 사유 있는 미예약으로 한 번씩만 다룬다", () => {
+  const config = JSON.parse(configSource);
+  const catalog = parseCronScheduleCatalog(config);
+  const accounted = [
+    ...catalog.scheduled.map((entry: { path: string }) => entry.path),
+    ...catalog.unscheduled.map((entry: { path: string }) => entry.path),
+  ].sort();
+
+  assert.deepEqual(accounted, [...REGISTERED_CRON_PATHS].sort());
+  assert.deepEqual(catalog.unscheduled, [
+    { path: "/api/cron/reconcile-apple-wallet-passes", reason: "apple-wallet-disabled" },
+  ]);
+
+  const [first, ...rest] = config.crons;
+  for (const invalid of [
+    { ...config, crons: rest },
+    { ...config, crons: [...config.crons, { path: "/api/cron/unknown", schedule: "0 0 * * *" }] },
+    { ...config, crons: [...config.crons, { path: config.unscheduled[0].path, schedule: "0 0 * * *" }] },
+    { ...config, unscheduled: [] },
+    { ...config, unscheduled: [{ path: config.unscheduled[0].path, reason: "Not A Reason" }] },
+    { ...config, unscheduled: [...config.unscheduled, { path: first.path, reason: "duplicate" }] },
+  ]) {
+    assert.throws(
+      () => parseCronScheduleCatalog(invalid),
+      (error: unknown) =>
+        error instanceof SelfHostCronError &&
+        ["CRON_SCHEDULE_SCOPE_INVALID", "CRON_SCHEDULE_CONFIG_INVALID"].includes(error.code),
+    );
+  }
 });
 
 test("알 수 없는 명령과 cron 경로는 fetch 전에 거절한다", async () => {

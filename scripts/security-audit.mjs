@@ -7,24 +7,7 @@ export function advisoryKey({ packageName, url }) {
   return `${packageName}:${url}`;
 }
 
-export const ALLOWED_DEVELOPMENT_ADVISORIES = new Map(
-  [
-    {
-      packageName: "image-size",
-      url: "https://github.com/advisories/GHSA-w3rx-r6r6-pgpr",
-      reason:
-        "Storybook-only dependency; npm's replacement line requires an unpublished stable Storybook peer. Temporary grace expires 2026-09-09.",
-      allowPatchableUntil: "2026-09-09T00:00:00.000Z",
-    },
-    {
-      packageName: "image-size",
-      url: "https://github.com/advisories/GHSA-5p2g-fcmc-qvqq",
-      reason:
-        "Storybook-only dependency; npm's replacement line requires an unpublished stable Storybook peer. Temporary grace expires 2026-09-09.",
-      allowPatchableUntil: "2026-09-09T00:00:00.000Z",
-    },
-  ].map((advisory) => [advisoryKey(advisory), advisory]),
-);
+export const ALLOWED_DEVELOPMENT_ADVISORIES = new Map();
 
 export function runNpmAuditJson({ omitDev = false } = {}) {
   const args = ["audit", "--json", "--audit-level=moderate"];

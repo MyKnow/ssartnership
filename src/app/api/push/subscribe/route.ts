@@ -4,7 +4,7 @@ import {
   isMockNotificationPreferenceMode,
   upsertMockPushDevice,
 } from "@/lib/notification-preferences";
-import { getSignedUserSession } from "@/lib/user-auth";
+import { requireMemberApiSession } from "@/lib/member-api-session";
 import { isPushConfigured, upsertPushSubscription } from "@/lib/push";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
@@ -15,6 +15,7 @@ import { MAX_PUSH_SUBSCRIPTION_JSON_BODY_BYTES } from "@/lib/request-body-limit"
 import {
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -46,10 +47,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
 
-  const session = await getSignedUserSession();
-  if (!session?.userId) {
-    return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requireMemberApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
 
   if (!isMockNotificationPreferenceMode() && !isPushConfigured()) {
     return NextResponse.json(
@@ -96,7 +98,8 @@ export async function POST(request: NextRequest) {
       actorType: "member",
       actorId: session.userId,
       targetType: "push_subscription",
-      targetId: body.subscription.endpoint ?? null,
+      // endpoint URL은 구독 자격이라 로그에 남기지 않는다(구독 id는 upsert 응답에 없다).
+      targetId: null,
       properties: {
         enabled: preferences.enabled,
         announcementEnabled: preferences.announcementEnabled,
@@ -109,7 +112,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, preferences });
   } catch (error) {
     if (shouldLogNotificationRouteError(error)) {
-      console.error("[member-push-subscribe] request failed", error);
+      logServerError("[member-push-subscribe] request failed", error);
     }
     const safeError = getSafeNotificationRouteError(
       error,

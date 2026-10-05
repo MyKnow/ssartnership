@@ -11,7 +11,7 @@ import Image from "next/image";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import type { EventCampaign, EventConditionKey } from "@/lib/promotions/catalog";
-import type { EventRewardSummary } from "@/lib/promotions/event-rewards";
+import type { EventRewardSummary } from "@/lib/promotions/event-rewards-types";
 
 const conditionIcons: Record<EventConditionKey, typeof UserPlusIcon> = {
   signup: UserPlusIcon,

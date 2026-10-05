@@ -5,12 +5,13 @@ import {
   deactivateMockPushDevice,
   isMockNotificationPreferenceMode,
 } from "@/lib/notification-preferences";
-import { getSignedUserSession } from "@/lib/user-auth";
+import { requireMemberApiSession } from "@/lib/member-api-session";
 import {
   deactivateAllPushSubscriptions,
   deactivatePushSubscription,
 } from "@/lib/push";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import { getPushSubscriptionLogTargetId } from "@/lib/push/log-target";
 import {
   getSafeNotificationRouteError,
   shouldLogNotificationRouteError,
@@ -19,6 +20,7 @@ import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
 import {
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -33,10 +35,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
 
-  const session = await getSignedUserSession();
-  if (!session?.userId) {
-    return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requireMemberApiSession({ allowPasswordChangeRequired: true });
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
 
   try {
     const body = await readRouteJsonBodyWithinLimit<{
@@ -76,7 +79,7 @@ export async function POST(request: NextRequest) {
       targetId:
         scope === "all"
           ? session.userId
-          : (body?.subscriptionId ?? body?.endpoint ?? null),
+          : getPushSubscriptionLogTargetId(body?.subscriptionId),
       properties: {
         scope,
         enabled: preferences.enabled,
@@ -90,7 +93,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, preferences });
   } catch (error) {
     if (shouldLogNotificationRouteError(error)) {
-      console.error("[member-push-unsubscribe] request failed", error);
+      logServerError("[member-push-unsubscribe] request failed", error);
     }
     const safeError = getSafeNotificationRouteError(
       error,

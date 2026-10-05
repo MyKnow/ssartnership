@@ -13,6 +13,7 @@ import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
 import { readRouteJsonBodyWithinLimit } from "@/lib/route-json-body";
 import { withServerTiming } from "@/lib/server-timing";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
       );
       return NextResponse.json({ preferences });
     } catch (error) {
-      console.error("[admin-notification-preferences] read failed", error);
+      logServerError("[admin-notification-preferences] read failed", error);
       return NextResponse.json(
         { message: "알림 설정을 불러오지 못했습니다." },
         { status: 503 },
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, preferences });
     } catch (error) {
       if (shouldLogNotificationRouteError(error)) {
-        console.error("[admin-notification-preferences] write failed", error);
+        logServerError("[admin-notification-preferences] write failed", error);
       }
       const safeError = getSafeNotificationRouteError(
         error,

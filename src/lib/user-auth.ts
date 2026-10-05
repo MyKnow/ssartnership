@@ -1,13 +1,24 @@
 import { cookies } from "next/headers";
-import { unstable_noStore as noStore } from "next/cache";
 import { cache } from "react";
 import {
-  evaluateRequiredPolicyStatus,
-  getActiveRequiredPolicies,
+  evaluateRequiredPolicyVersionStatus,
+  getActiveRequiredPolicyVersions,
   getMemberPolicyConsentVersions,
+  isPolicyConsentSnapshotFresh,
 } from "@/lib/policy-documents.server";
 import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
-import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "./hmac.js";
+import { signPayloadWith } from "./hmac.js";
+import {
+  buildSessionCookieOptions,
+  USER_SESSION_COOKIE_NAME,
+} from "./session-cookies.ts";
+import { readSessionSecret } from "./session-secrets.ts";
+import {
+  parseUserSessionToken,
+  type PolicyConsentSnapshot,
+  type UserSessionAuthenticationMethod,
+  type UserSessionTokenPayload,
+} from "./session-tokens.ts";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { requiresMemberProfilePhotoUpdate } from "@/lib/member-profile-photo";
 import { requiresMemberEmailRegistration } from "@/lib/member-required-gates";
@@ -16,39 +27,16 @@ import {
   isMockMemberAuthEnabled,
 } from "@/lib/mock/member";
 
-const COOKIE_NAME = "user_session";
+const COOKIE_NAME = USER_SESSION_COOKIE_NAME;
 const SESSION_TTL_DAYS = 7;
-const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
+const SESSION_TTL_SECONDS = SESSION_TTL_DAYS * 24 * 60 * 60;
+const SESSION_TTL_MS = SESSION_TTL_SECONDS * 1000;
 
-type PolicyConsentSnapshot = {
-  serviceVersion: number;
-  privacyVersion: number;
-};
-
-type SignedUserSession = {
-  userId: string;
-  authSessionVersion: number;
-  authenticationMethod: UserSessionAuthenticationMethod;
-  issuedAt: number;
-  expiresAt: number;
-  mustChangePassword?: boolean;
+type SignedUserSession = UserSessionTokenPayload & {
   requiresEmailRegistration?: boolean;
-  persistent?: boolean;
-  policyConsentSnapshot?: PolicyConsentSnapshot | null;
 };
 
-export type UserSessionAuthenticationMethod =
-  | "email"
-  | "manual"
-  | "mattermost";
-
-function isUserSessionAuthenticationMethod(
-  value: unknown,
-): value is UserSessionAuthenticationMethod {
-  return value === "email"
-    || value === "manual"
-    || value === "mattermost";
-}
+export type { UserSessionAuthenticationMethod };
 
 export class UserSessionIssueError extends Error {
   readonly code:
@@ -71,73 +59,39 @@ export class UserSessionIssueError extends Error {
 }
 
 function getSecret() {
-  const secret = process.env.USER_SESSION_SECRET;
-  if (!secret) {
-    throw new Error("USER_SESSION_SECRET 환경 변수가 필요합니다.");
-  }
-  if (secret.length < 32) {
-    throw new Error("USER_SESSION_SECRET는 최소 32자 이상이어야 합니다.");
-  }
-  return secret;
+  return readSessionSecret("user-session");
 }
 
 function signPayload(payload: string) {
-  const secret = getSecret();
-  const signature = createHmacDigest(payload, secret, "hex");
-  return `${payload}.${signature}`;
+  return signPayloadWith(payload, getSecret(), "hex");
 }
 
 function verifyToken(token: string) {
-  const signedToken = splitSignedToken(token);
-  if (!signedToken) {
-    return null;
+  return parseUserSessionToken(token, getSecret());
+}
+
+/**
+ * `freshAuthentication` is passed only by flows that just checked a
+ * credential (password login, emailed setup link, recovery code, current
+ * password change). Every other re-issue (for example a consent snapshot
+ * refresh) carries the previous credential time forward so it cannot reset
+ * the recent-auth window.
+ */
+function resolveSessionAuthenticatedAt(
+  userId: string,
+  currentSession: SignedUserSession | null,
+  freshAuthentication: boolean | undefined,
+  now: number,
+) {
+  if (freshAuthentication) {
+    return now;
   }
-  const [payload, signature] = signedToken;
-  if (!payload || !signature) {
-    return null;
-  }
-  if (!verifyHmacDigest(payload, signature, getSecret(), "hex")) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(payload) as SignedUserSession;
-    if (
-      typeof parsed.userId !== "string" ||
-      typeof parsed.authSessionVersion !== "number" ||
-      !Number.isInteger(parsed.authSessionVersion) ||
-      parsed.authSessionVersion < 1 ||
-      !isUserSessionAuthenticationMethod(parsed.authenticationMethod) ||
-      typeof parsed.issuedAt !== "number" ||
-      typeof parsed.expiresAt !== "number"
-    ) {
-      return null;
-    }
-    if (parsed.expiresAt <= Date.now() || parsed.issuedAt > Date.now()) {
-      return null;
-    }
-    if (
-      parsed.persistent !== undefined &&
-      typeof parsed.persistent !== "boolean"
-    ) {
-      return null;
-    }
-    if (
-      parsed.policyConsentSnapshot !== undefined &&
-      parsed.policyConsentSnapshot !== null &&
-      (typeof parsed.policyConsentSnapshot !== "object" ||
-        typeof parsed.policyConsentSnapshot.serviceVersion !== "number" ||
-        typeof parsed.policyConsentSnapshot.privacyVersion !== "number")
-    ) {
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
+  return currentSession?.userId === userId
+    ? currentSession.authenticatedAt
+    : undefined;
 }
 
 async function getRawSignedUserSession() {
-  noStore();
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
   if (!token) {
@@ -195,6 +149,32 @@ export const getSignedUserSession = cache(async () => {
 
 export const getActiveUserSession = getSignedUserSession;
 
+/**
+ * `getSignedUserSession` maps a failed member lookup to a signed-out `null`
+ * on purpose, so page gates never loop during an outage. API routes that must
+ * answer 503 instead of 401 call this only after an empty session: it reports
+ * whether a validly signed cookie exists while the member row cannot be read.
+ */
+export async function isUserSessionLookupUnavailable() {
+  if (isMockMemberAuthEnabled()) {
+    return false;
+  }
+  const session = (await getRawSignedUserSession()) as SignedUserSession | null;
+  if (!session?.userId) {
+    return false;
+  }
+  try {
+    const { error } = await getSupabaseAdminClient()
+      .from("members")
+      .select("id")
+      .eq("id", session.userId)
+      .maybeSingle();
+    return Boolean(error);
+  } catch {
+    return true;
+  }
+}
+
 export async function setUserSession(
   userId: string,
   mustChangePassword = false,
@@ -228,6 +208,12 @@ export async function setUserSession(
           ? currentSession.policyConsentSnapshot ?? undefined
           : undefined;
     const persistent = options?.persistent ?? currentSession?.persistent ?? true;
+    const authenticatedAt = resolveSessionAuthenticatedAt(
+      userId,
+      currentSession,
+      options?.freshAuthentication,
+      now,
+    );
     const payload = JSON.stringify({
       userId,
       authSessionVersion: member.authSessionVersion,
@@ -239,16 +225,15 @@ export async function setUserSession(
       ...(resolvedPolicyConsentSnapshot !== undefined
         ? { policyConsentSnapshot: resolvedPolicyConsentSnapshot }
         : {}),
+      ...(authenticatedAt !== undefined ? { authenticatedAt } : {}),
     });
     const token = signPayload(payload);
     const store = await cookies();
-    store.set(COOKIE_NAME, token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      ...(persistent ? { maxAge: SESSION_TTL_DAYS * 24 * 60 * 60 } : {}),
-      path: "/",
-    });
+    store.set(
+      COOKIE_NAME,
+      token,
+      buildSessionCookieOptions(persistent ? SESSION_TTL_SECONDS : undefined),
+    );
     return;
   }
 
@@ -292,6 +277,12 @@ export async function setUserSession(
         ? currentSession.policyConsentSnapshot ?? undefined
         : undefined;
   const persistent = options?.persistent ?? currentSession?.persistent ?? true;
+  const authenticatedAt = resolveSessionAuthenticatedAt(
+    userId,
+    currentSession,
+    options?.freshAuthentication,
+    now,
+  );
   const payload = JSON.stringify({
     userId,
     authSessionVersion: member.auth_session_version,
@@ -303,16 +294,15 @@ export async function setUserSession(
     ...(resolvedPolicyConsentSnapshot !== undefined
       ? { policyConsentSnapshot: resolvedPolicyConsentSnapshot }
       : {}),
+    ...(authenticatedAt !== undefined ? { authenticatedAt } : {}),
   });
   const token = signPayload(payload);
   const store = await cookies();
-  store.set(COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    ...(persistent ? { maxAge: SESSION_TTL_DAYS * 24 * 60 * 60 } : {}),
-    path: "/",
-  });
+  store.set(
+    COOKIE_NAME,
+    token,
+    buildSessionCookieOptions(persistent ? SESSION_TTL_SECONDS : undefined),
+  );
 }
 
 export async function clearUserSession() {
@@ -320,35 +310,63 @@ export async function clearUserSession() {
   store.delete(COOKIE_NAME);
 }
 
+/**
+ * Signs the member out on every device by advancing `auth_session_version`.
+ * Every signed session carries the version it was issued with, so all of
+ * them (and any admin session bridged from them) fail validation afterwards.
+ * The compare-and-set keeps concurrent logouts idempotent. Mock members have
+ * a fixed version, so mock mode only clears the local cookie.
+ */
+export async function revokeUserSessions(session: {
+  userId: string;
+  authSessionVersion: number;
+}) {
+  if (isMockMemberAuthEnabled()) {
+    return true;
+  }
+  const { error } = await getSupabaseAdminClient()
+    .from("members")
+    .update({ auth_session_version: session.authSessionVersion + 1 })
+    .eq("id", session.userId)
+    .eq("auth_session_version", session.authSessionVersion);
+  return !error;
+}
+
 export const getUserSession = cache(async () => {
-  noStore();
   const session = (await getSignedUserSession()) as SignedUserSession | null;
   if (!session?.userId) {
     return null;
   }
 
-  const activePoliciesPromise = getActiveRequiredPolicies();
-  const consentVersionsPromise = getMemberPolicyConsentVersions(session.userId);
-  const photoStatePromise = getMemberProfilePhotoState(session.userId);
+  // The gate needs only the active versions, never the policy bodies. A fresh
+  // consent snapshot in the signed session skips the consent-table read; a
+  // session without a snapshot can never be fresh, so that read starts now.
+  const policyConsentSnapshot = session.policyConsentSnapshot ?? null;
+  const eagerConsentVersionsPromise = policyConsentSnapshot
+    ? null
+    : getMemberPolicyConsentVersions(session.userId);
+  eagerConsentVersionsPromise?.catch(() => undefined);
 
-  const [activePolicies, consentVersions, photoState] = await Promise.all([
-    activePoliciesPromise,
-    consentVersionsPromise,
-    photoStatePromise,
+  const [activePolicyVersions, photoState] = await Promise.all([
+    getActiveRequiredPolicyVersions(),
+    getMemberProfilePhotoState(session.userId),
   ]);
 
-  const policyStatus = evaluateRequiredPolicyStatus(
-    consentVersions,
-    activePolicies,
-  );
-  const consentSnapshotIsFresh =
-    session.policyConsentSnapshot?.serviceVersion === activePolicies.service.version &&
-    session.policyConsentSnapshot?.privacyVersion === activePolicies.privacy.version;
+  const requiresConsent = isPolicyConsentSnapshotFresh(
+    policyConsentSnapshot,
+    activePolicyVersions,
+  )
+    ? false
+    : evaluateRequiredPolicyVersionStatus(
+        await (eagerConsentVersionsPromise ??
+          getMemberPolicyConsentVersions(session.userId)),
+        activePolicyVersions,
+      ).requiresConsent;
 
   return {
     ...session,
     mustChangePassword: Boolean(session.mustChangePassword),
-    requiresConsent: consentSnapshotIsFresh ? false : policyStatus.requiresConsent,
+    requiresConsent,
     requiresEmailRegistration: Boolean(session.requiresEmailRegistration),
     requiresProfilePhotoUpdate: requiresMemberProfilePhotoUpdate(
       photoState.reviewStatus,

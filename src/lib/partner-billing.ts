@@ -33,6 +33,22 @@ export const PARTNER_TAX_DOCUMENT_STATUSES = [
 export type PartnerTaxDocumentStatus =
   (typeof PARTNER_TAX_DOCUMENT_STATUSES)[number];
 
+/**
+ * 청구 프로필 입력 길이 상한. 파트너 계정 정보 폼의 `maxLength`와 서버 정규화가 함께 참조한다.
+ * 사업자등록번호는 하이픈을 포함한 표기("000-00-00000") 기준 입력 길이다.
+ */
+export const PARTNER_BILLING_FIELD_LIMITS = {
+  profileLabel: 80,
+  payerName: 80,
+  businessRegistrationNumberInput: 12,
+  businessName: 120,
+  representativeName: 80,
+  businessAddress: 300,
+  businessType: 80,
+  businessItem: 120,
+  taxInvoiceEmail: 254,
+} as const;
+
 export type PartnerBillingProfileInput = {
   businessRegistrationNumber: string;
   businessName: string;
@@ -67,7 +83,11 @@ function normalizeRequiredText(value: string, fieldName: string, maxLength: numb
 }
 
 function normalizeEmail(value: string) {
-  const normalized = normalizeRequiredText(value, "세금계산서 이메일", 254).toLowerCase();
+  const normalized = normalizeRequiredText(
+    value,
+    "세금계산서 이메일",
+    PARTNER_BILLING_FIELD_LIMITS.taxInvoiceEmail,
+  ).toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
     throw new Error("세금계산서 이메일 형식을 확인해 주세요.");
   }
@@ -122,11 +142,31 @@ export function normalizePartnerBillingProfileInput(
     businessRegistrationNumber: normalizeBusinessRegistrationNumber(
       input.businessRegistrationNumber,
     ),
-    businessName: normalizeRequiredText(input.businessName, "상호", 120),
-    representativeName: normalizeRequiredText(input.representativeName, "대표자명", 80),
-    businessAddress: normalizeRequiredText(input.businessAddress, "사업장 주소", 300),
-    businessType: normalizeRequiredText(input.businessType, "업태", 80),
-    businessItem: normalizeRequiredText(input.businessItem, "종목", 120),
+    businessName: normalizeRequiredText(
+      input.businessName,
+      "상호",
+      PARTNER_BILLING_FIELD_LIMITS.businessName,
+    ),
+    representativeName: normalizeRequiredText(
+      input.representativeName,
+      "대표자명",
+      PARTNER_BILLING_FIELD_LIMITS.representativeName,
+    ),
+    businessAddress: normalizeRequiredText(
+      input.businessAddress,
+      "사업장 주소",
+      PARTNER_BILLING_FIELD_LIMITS.businessAddress,
+    ),
+    businessType: normalizeRequiredText(
+      input.businessType,
+      "업태",
+      PARTNER_BILLING_FIELD_LIMITS.businessType,
+    ),
+    businessItem: normalizeRequiredText(
+      input.businessItem,
+      "종목",
+      PARTNER_BILLING_FIELD_LIMITS.businessItem,
+    ),
     taxInvoiceEmail: normalizeEmail(input.taxInvoiceEmail),
   };
 }

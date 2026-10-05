@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+import { adminPartnerCouponErrorMessages } from "@/lib/admin-action-errors";
+
 test("쿠폰 다운로드와 관리자 CRUD 버튼은 제출 중 상태를 표시한다", async () => {
   const [detail, form, manager, actions, partnerDetail] = await Promise.all([
     readFile(new URL("../src/app/(site)/partners/[id]/_page/PartnerDetailCoupons.tsx", import.meta.url), "utf8"),
@@ -36,12 +38,43 @@ test("쿠폰 다운로드와 관리자 CRUD 버튼은 제출 중 상태를 표�
   assert.match(actions, /ad_coupon_create_failed/);
   assert.match(actions, /ad_coupon_update_failed/);
   assert.match(actions, /ad_coupon_duplicate_failed/);
-  assert.match(partnerDetail, /ad_coupon_delete_has_history/);
-  assert.match(partnerDetail, /ad_coupon_create_failed/);
-  assert.match(partnerDetail, /ad_coupon_update_failed/);
-  assert.match(partnerDetail, /ad_coupon_duplicate_failed/);
+  assert.match(partnerDetail, /pickAllowedEntry<string>\(\s*adminPartnerCouponErrorMessages,/);
+  for (const code of [
+    "ad_coupon_delete_has_history",
+    "ad_coupon_create_failed",
+    "ad_coupon_update_failed",
+    "ad_coupon_duplicate_failed",
+  ]) {
+    assert.ok(Object.hasOwn(adminPartnerCouponErrorMessages, code), code);
+  }
   assert.doesNotMatch(manager, /제휴처를 바꾸지 않고 현재 상세 페이지의 쿠폰만 등록합니다/);
   assert.doesNotMatch(form, /from "@\/components\/ui\/Card"/);
+});
+
+test("쿠폰 상태 변경과 삭제는 FE·BE가 같은 전이·삭제 규칙을 쓴다", async () => {
+  const [form, manager, actions, partnerDetail, validation] = await Promise.all([
+    readFile(new URL("../src/components/admin/ad-packages/AdminPartnerCouponForm.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/components/admin/ad-packages/AdminPartnerCouponManager.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/admin/(protected)/_actions/ad-package-actions.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/admin/(protected)/partners/[partnerId]/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/ad-package-validation.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(form, /listAdCouponStatusOptions\(coupon\.status\)/);
+  assert.match(form, /currentStatus: mode === "edit" \? coupon\?\.status : null/);
+  assert.match(validation, /canTransitionAdCouponStatus\(options\.currentStatus, status\)/);
+  assert.match(actions, /currentStatus: existing\.status/);
+  assert.match(actions, /error instanceof AdStatusTransitionError/);
+  assert.match(actions, /"ad_coupon_delete_active"/);
+  assert.match(actions, /deletion\.reason === "state_changed"\s*\?\s*"ad_coupon_delete_state_changed"/);
+  assert.ok(Object.hasOwn(adminPartnerCouponErrorMessages, "ad_coupon_invalid_status_transition"));
+  assert.ok(Object.hasOwn(adminPartnerCouponErrorMessages, "ad_coupon_delete_active"));
+  assert.match(partnerDetail, /adminPartnerCouponErrorMessages/);
+  // Compare-and-set conflicts from the repository surface as their own codes.
+  assert.ok(Object.hasOwn(adminPartnerCouponErrorMessages, "ad_coupon_state_changed"));
+  assert.ok(Object.hasOwn(adminPartnerCouponErrorMessages, "ad_coupon_delete_state_changed"));
+  assert.match(manager, /canDeleteAdCouponWithStatus\(coupon\.status\)/);
+  assert.match(manager, /활성 쿠폰은 삭제할 수 없습니다\./);
 });
 
 test("쿠폰 생성 UI는 발급·사용 방식에 맞는 필드만 렌더링한다", async () => {
@@ -75,7 +108,10 @@ test("제휴처 수정 저장 CTA는 폼 안에서 고정 버튼을 렌더링한
   );
 
   assert.doesNotMatch(source, /<div className="pointer-events-auto flex/);
-  assert.match(source, /<div className="pointer-events-none fixed/);
+  assert.match(
+    source,
+    /<div\s+data-floating-submit-button="raised"\s+className="pointer-events-none fixed/,
+  );
   assert.match(source, /pointer-events-auto min-h-12 w-full max-w-sm/);
   assert.match(source, /bottom-safe-bottom-20/);
   assert.match(source, /md:right-\[5\.5rem\]/);

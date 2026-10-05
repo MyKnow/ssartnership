@@ -5,7 +5,6 @@ import { useTransition } from "react";
 
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
-import MotionReveal from "@/components/ui/MotionReveal";
 import HomeDirectorySectionHeader from "@/components/home-view/HomeDirectorySectionHeader";
 
 export default function HomeDirectoryError() {
@@ -19,7 +18,7 @@ export default function HomeDirectoryError() {
   };
 
   return (
-    <MotionReveal>
+    <div>
       <section id="benefits" className="flex scroll-mt-24 flex-col gap-4 pt-7">
         <HomeDirectorySectionHeader />
         <EmptyState
@@ -38,6 +37,6 @@ export default function HomeDirectoryError() {
           }
         />
       </section>
-    </MotionReveal>
+    </div>
   );
 }

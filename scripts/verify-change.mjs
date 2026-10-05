@@ -9,6 +9,7 @@ import {
   requireSuccessfulResult,
   runPackageScript,
 } from "./lib/package-manager.mjs";
+import { changesAlertRules } from "./check-alert-rules.mjs";
 
 function parseArguments(argv) {
   const options = {};
@@ -63,6 +64,12 @@ try {
   );
 
   runRequired("check:docs");
+
+  // Prometheus/Alertmanager rule changes are verified with the pinned
+  // promtool/amtool images regardless of the runtime tier.
+  if (changesAlertRules(collected.changes.filter((change) => !change.status?.startsWith("D")).map((change) => change.path))) {
+    runRequired("check:alerts");
+  }
 
   if (policy.verifyProfile === "none") {
     process.stdout.write("문서 전용 변경: 문서 계약 검증 후 런타임 검증을 생략합니다.\n");

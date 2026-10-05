@@ -1,9 +1,10 @@
 "use client";
 
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeftIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 import Button from "@/components/ui/Button";
+import { resolveBackHref } from "@/lib/return-to";
 
 export default function BackButton({
   fallbackHref = "/",
@@ -16,21 +17,12 @@ export default function BackButton({
       return fallbackHref;
     }
 
-    const queryReturnTo = new URLSearchParams(window.location.search).get("returnTo");
-    if (queryReturnTo && queryReturnTo.startsWith("/")) {
-      return queryReturnTo;
-    }
-
-    try {
-      const referrer = document.referrer ? new URL(document.referrer) : null;
-      if (referrer && referrer.origin === window.location.origin && referrer.pathname) {
-        return `${referrer.pathname}${referrer.search}${referrer.hash}`;
-      }
-    } catch {
-      // ignore malformed referrer URLs
-    }
-
-    return fallbackHref;
+    return resolveBackHref({
+      search: window.location.search,
+      referrer: document.referrer,
+      currentOrigin: window.location.origin,
+      fallbackHref,
+    });
   }, [fallbackHref]);
 
   return (
@@ -43,7 +35,7 @@ export default function BackButton({
       ariaLabel="뒤로 가기"
       className="w-fit border-strong bg-surface-elevated shadow-raised hover:bg-surface-overlay"
     >
-      <ChevronLeft size={16} />
+      <ChevronLeftIcon className="h-4 w-4" aria-hidden="true" />
       뒤로 가기
     </Button>
   );

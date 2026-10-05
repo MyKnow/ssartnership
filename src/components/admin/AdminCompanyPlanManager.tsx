@@ -8,13 +8,16 @@ import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
 import Textarea from "@/components/ui/Textarea";
 import AdminPlanWindowFields from "@/components/admin/AdminPlanWindowFields";
+import InlineMessage from "@/components/ui/InlineMessage";
 import {
   PARTNER_COMPANY_PLAN_DEFINITIONS,
   type PartnerCompanyPlanTier,
+  type PartnerPlanExpiryState,
 } from "@/lib/partner-company-plans";
 import type { PartnerBillingInvoiceRecord } from "@/lib/partner-plan-service";
 import {
   formatPartnerPlanDateTime,
+  getAdminPartnerPlanExpiryBadge,
   getPartnerPlanBadgeLabel,
   getPartnerPlanBadgeVariant,
 } from "@/lib/partner-plan-ui";
@@ -24,6 +27,7 @@ import {
   rejectPartnerPlanUpgradeRequest,
   updatePartnerBrandPlan,
 } from "@/app/admin/(protected)/actions";
+import { formatKoreanWon } from "@/lib/number-format";
 
 export type AdminBrandPlanBrand = {
   id: string;
@@ -36,6 +40,8 @@ export type AdminBrandPlanBrand = {
   planTier: PartnerCompanyPlanTier;
   planStartedAt: string | null;
   planExpiresAt: string | null;
+  /** Read-only expiry state; expired paid plans are not demoted automatically. */
+  planExpiry: PartnerPlanExpiryState;
   planUpdatedAt: string | null;
 };
 
@@ -79,10 +85,6 @@ function toDateInputValue(value?: string | null) {
     return "";
   }
   return date.toISOString().slice(0, 10);
-}
-
-function formatCurrency(value: number) {
-  return `${value.toLocaleString("ko-KR")}원`;
 }
 
 function getStatusBadgeVariant(status: AdminCompanyPlanRequest["status"]) {
@@ -156,6 +158,9 @@ export default function AdminCompanyPlanManager({
   events: AdminCompanyPlanEvent[];
 }) {
   const pendingRequests = requests.filter((request) => request.status === "pending");
+  const expiredPaidPlanCount = brands.filter(
+    (brand) => brand.planExpiry.requiresManualReview,
+  ).length;
 
   return (
     <div className="grid gap-5">
@@ -172,7 +177,7 @@ export default function AdminCompanyPlanManager({
                 <Badge variant="neutral">제휴처 {count}개</Badge>
               </div>
               <p className="text-lg font-semibold text-foreground">
-                {definition.monthlyPriceKrw === 0 ? "무료" : `월 ${formatCurrency(definition.monthlyPriceKrw)}`}
+                {definition.monthlyPriceKrw === 0 ? "무료" : `월 ${formatKoreanWon(definition.monthlyPriceKrw)}`}
               </p>
             </Card>
           );
@@ -217,7 +222,7 @@ export default function AdminCompanyPlanManager({
                       </div>
                     </div>
                     <p className="text-sm font-semibold text-foreground">
-                      {formatCurrency(billing?.totalAmountKrw ?? request.paymentAmountKrw)}
+                      {formatKoreanWon(billing?.totalAmountKrw ?? request.paymentAmountKrw)}
                     </p>
                   </div>
 
@@ -227,7 +232,7 @@ export default function AdminCompanyPlanManager({
                     <p><span className="font-semibold text-foreground">납부기한</span><br />{formatPartnerPlanDateTime(billing?.dueAt)}</p>
                     <p>
                       <span className="font-semibold text-foreground">공급가액 / VAT</span><br />
-                      {billing ? `${formatCurrency(billing.supplyAmountKrw)} / ${formatCurrency(billing.vatAmountKrw)}` : "미생성"}
+                      {billing ? `${formatKoreanWon(billing.supplyAmountKrw)} / ${formatKoreanWon(billing.vatAmountKrw)}` : "미생성"}
                     </p>
                     <p>
                       <span className="font-semibold text-foreground">청구 기간</span><br />
@@ -239,7 +244,7 @@ export default function AdminCompanyPlanManager({
                   <div className="grid gap-3 lg:grid-cols-3">
                     <form action={confirmPartnerPlanBankTransferPayment} className="grid gap-3">
                       <input type="hidden" name="requestId" value={request.id} />
-                      <Select name="taxDocumentStatus" defaultValue="pending_issue" disabled={isPaid}>
+                      <Select name="taxDocumentStatus" defaultValue="pending_issue" disabled={isPaid} aria-label="세금계산서 발급 상태">
                         <option value="pending_issue">입금 확인 · 세금계산서 발급 대기</option>
                         <option value="issued">입금 확인 · 세금계산서 발급 완료</option>
                       </Select>
@@ -277,17 +282,28 @@ export default function AdminCompanyPlanManager({
       <section className="grid gap-4">
         <SectionHeading
           title="제휴처별 플랜"
-          description="Basic은 제휴기간과 동일하게 적용되고, Partner/Boost는 별도 계약 기간을 입력합니다."
+          description="Basic은 제휴기간과 동일하게 적용되고, Partner/Boost는 별도 계약 기간을 입력합니다. 만료된 유료 플랜은 자동으로 낮추지 않습니다."
         />
+        {expiredPaidPlanCount > 0 ? (
+          <InlineMessage
+            tone="warning"
+            title={`만료 후 유지 중인 유료 플랜 ${expiredPaidPlanCount}개`}
+            description="계약과 입금 상태를 확인한 뒤 플랜을 연장하거나 Basic으로 직접 변경해 주세요."
+          />
+        ) : null}
         <div className="grid gap-3">
           {brands.map((brand) => {
             const formId = `brand-plan-${brand.id}`;
+            const expiryBadge = getAdminPartnerPlanExpiryBadge(brand.planExpiry);
             return (
               <Card key={brand.id} tone="default" padding="md" className="grid gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <PlanBadge tier={brand.planTier} />
+                      {expiryBadge ? (
+                        <Badge variant={expiryBadge.tone}>{expiryBadge.label}</Badge>
+                      ) : null}
                       <Badge variant="neutral">{brand.companyName}</Badge>
                       {brand.periodStart || brand.periodEnd ? (
                         <Badge variant="neutral">

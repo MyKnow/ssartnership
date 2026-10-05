@@ -16,12 +16,7 @@ import Card from "@/components/ui/Card";
 import ShellHeader from "@/components/ui/ShellHeader";
 import { cn } from "@/lib/cn";
 import type { AvailableAdCoupon } from "@/lib/repositories/ad-package-repository";
-
-const dateFormatter = new Intl.DateTimeFormat("ko-KR", {
-  year: "numeric",
-  month: "long",
-  day: "numeric",
-});
+import { formatKoreanDateTime } from "@/lib/datetime";
 
 type CouponWalletSection = {
   id: "available";
@@ -30,11 +25,12 @@ type CouponWalletSection = {
 };
 
 function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "만료일 미정";
-  }
-  return `${dateFormatter.format(date)}까지`;
+  const formatted = formatKoreanDateTime(value, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  return formatted ? `${formatted}까지` : "만료일 미정";
 }
 
 function buildWalletSections(coupons: AvailableAdCoupon[]): CouponWalletSection[] {

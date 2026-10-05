@@ -42,7 +42,6 @@ function createStreamedRequest(byteLength: number) {
 test("쿠폰·MM·파트너·Wallet JSON 경로는 공용 bounded reader와 shared cap을 사용한다", async () => {
   const standardRoutePaths = [
     "src/app/api/coupon-issues/[issueId]/redeem/route.ts",
-    "src/app/api/coupons/[couponId]/redeem/route.ts",
     "src/app/api/mm/code/issue/route.ts",
     "src/app/api/mm/code/verify/route.ts",
     "src/app/api/partner/reviews/[reviewId]/route.ts",
@@ -127,9 +126,16 @@ test("회원 리뷰 생성·수정은 인증 뒤 16KiB bounded JSON 계약을 �
   assert.match(shared, /class ReviewMediaInputError extends Error/);
   assert.match(shared, /assertReviewMediaExistingUrls/);
   assert.match(shared, /throw new ReviewMediaInputError\(\)/);
-  assert.match(shared, /const uploadedUrls: string\[\] = \[\]/);
+  assert.match(
+    shared,
+    /const uploadedUrls: string\[\] = options\.attachedUrls \?\? \[\]/,
+  );
   assert.match(shared, /uploadedUrls\.push\(uploadedUrl\)/);
   assert.match(shared, /deleteReviewMediaUrls\(uploadedUrls\)/);
+  // Review creation collects attachments and cleans up only after checking
+  // for a review stored by a duplicate request.
+  assert.match(shared, /if \(!callerOwnsCleanup\)/);
+  assert.match(createRoute, /\{ attachedUrls: uploadedUrls \}/);
   assert.match(shared, /uploadedUrls,\s*\n\s*\};/);
 
   assert.match(form, /headers: \{ "content-type": "application\/json" \}/);
@@ -237,11 +243,7 @@ test("본문 제한은 기존 same-origin·인증·quota 순서를 보존한다"
   const routeChecks = [
     {
       path: "src/app/api/coupon-issues/[issueId]/redeem/route.ts",
-      before: ["isTrustedSameOriginRequest", "getSignedUserSession", "safeDecodeSegment"],
-    },
-    {
-      path: "src/app/api/coupons/[couponId]/redeem/route.ts",
-      before: ["isTrustedSameOriginRequest", "getSignedUserSession", "safeDecodeSegment"],
+      before: ["isTrustedSameOriginRequest", "requireMemberApiSession", "readRouteParam("],
     },
     {
       path: "src/app/api/mm/signup/route.ts",
@@ -249,15 +251,15 @@ test("본문 제한은 기존 same-origin·인증·quota 순서를 보존한다"
     },
     {
       path: "src/app/api/partner/reviews/[reviewId]/route.ts",
-      before: ["isTrustedSameOriginRequest", "getPartnerSession"],
+      before: ["isTrustedSameOriginRequest", "requirePartnerApiSession"],
     },
     {
       path: "src/app/api/partners/[id]/benefit-use/route.ts",
-      before: ["isTrustedSameOriginRequest", "getSignedUserSession", "safeDecodeSegment"],
+      before: ["isTrustedSameOriginRequest", "requireMemberApiSession", "readRouteParam("],
     },
     {
       path: "src/app/api/partners/[id]/favorite/route.ts",
-      before: ["isTrustedSameOriginRequest", "getSignedUserSession", "partnerExists"],
+      before: ["isTrustedSameOriginRequest", "requireMemberApiSession", "partnerExists"],
     },
     {
       path: "src/app/api/partners/[id]/reviews/[reviewId]/reaction/route.ts",

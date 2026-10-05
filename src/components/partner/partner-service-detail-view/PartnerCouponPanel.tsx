@@ -6,6 +6,7 @@ import FormSubmitButton from "@/components/ui/FormSubmitButton";
 import Input from "@/components/ui/Input";
 import { getPartnerPeriodEndAt, toDateTimeLocalInput } from "@/lib/ad-coupon-period";
 import type { AdCoupon } from "@/lib/repositories/ad-package-repository";
+import { FOUR_DIGIT_PIN_INPUT_PATTERN, FOUR_DIGIT_PIN_LENGTH } from "@/lib/validation";
 
 export default function PartnerCouponPanel({
   coupons,
@@ -63,8 +64,8 @@ export default function PartnerCouponPanel({
             name="onsitePassword"
             type="text"
             inputMode="numeric"
-            pattern="[0-9]{4}"
-            maxLength={4}
+            pattern={FOUR_DIGIT_PIN_INPUT_PATTERN}
+            maxLength={FOUR_DIGIT_PIN_LENGTH}
             autoComplete="off"
             placeholder="제휴처에서 사용할 4자리 PIN"
             required

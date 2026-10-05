@@ -26,7 +26,10 @@ test("푸시 운영 첫 화면은 대상자 전체 목록 대신 서버 read-mod
   assert.match(readModel, /includeAudience = true/);
   assert.match(readModel, /getAdminNotificationOverview/);
   assert.match(readModel, /unstable_cache/);
-  assert.match(readModel, /ADMIN_PUSH_READ_MODEL_CACHE_REVALIDATE_SECONDS = 3/);
+  assert.match(
+    readModel,
+    /ADMIN_PUSH_READ_MODEL_CACHE_REVALIDATE_SECONDS =\s*ADMIN_READ_BURST_CACHE_SECONDS/,
+  );
   assert.match(readModel, /admin-push-audience-facets/);
   assert.match(readModel, /admin-push-notification-overview/);
   assert.match(manager, /recipientOptions/);
@@ -53,7 +56,10 @@ test("개인 수신자 검색은 권한 검증된 제한 API와 안전한 입력
   assert.match(route, /listAdminPushRecipientOptions/);
   assert.match(searchService, /MAX_RECIPIENT_LIMIT = 50/);
   assert.match(searchService, /unstable_cache/);
-  assert.match(searchService, /INITIAL_RECIPIENT_CACHE_SECONDS = 3/);
+  assert.match(
+    searchService,
+    /INITIAL_RECIPIENT_CACHE_SECONDS = ADMIN_READ_BURST_CACHE_SECONDS/,
+  );
   assert.match(searchService, /admin-push-initial-recipient-options/);
   assert.match(searchService, /ilike/);
   assert.match(

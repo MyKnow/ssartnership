@@ -73,7 +73,7 @@ draft/submitted/needs_resubmission → withdrawn
 
 | 대상 | 입력 제약 | 처리 | 보관 |
 | --- | --- | --- | --- |
-| 교육이수증 | PDF, 10MB 이하, 5페이지 이하 | MIME + `%PDF-` + `pdf-lib` parse + 암호화/JS/첨부 marker 검사 | private `graduate-certificates`; 승인·반려·철회 후 30일 내 삭제 |
+| 교육이수증 | PDF, 10MB 이하, 5페이지 이하 | MIME + `%PDF-` + `pdf-lib` parse + 해석된 PDF 구조 기준 암호화/스크립트·실행 동작/첨부 검사(구조를 끝까지 해석하지 못하면 거부) | private `graduate-certificates`; 승인·반려·철회 후 30일 내 삭제. 관리자 원본 응답은 attachment·sandbox CSP로 제공하고 화면은 pdf.js 이미지 렌더링만 사용 |
 | 본인 사진 | JPEG/PNG/WebP, 5MB 이하, 최소 320×320, 비애니메이션 | `sharp` 재디코딩, 중앙 1:1 crop, 640×640 WebP 재인코딩, EXIF/GPS/ICC/원본 파일명 제거 | private `member-profile-images`; 활성 사진은 인증 유지 기간, 거절·교체본은 30일 후 삭제 |
 
 브라우저는 UUID 기반 short-lived signed upload URL로 격리 경로에만 업로드한다. Storage bucket도 수료증은 PDF·10MB, 사진은 JPEG/PNG/WebP·5MB로 제한한다. 서버가 검증·재인코딩을 끝낸 뒤 원본 intake 파일을 삭제하며, 남은 미제출 객체는 cron이 24시간 후 정리한다.
@@ -105,7 +105,7 @@ draft/submitted/needs_resubmission → withdrawn
 | --- | --- |
 | `GRADUATE_VERIFICATION_HMAC_SECRET` | 이메일/문서 HMAC 및 HttpOnly 신청 세션 서명. 32자 이상, production 전용 secret |
 | `SMTP_*` | 이메일 인증 코드와 비밀번호 설정/재설정 메일 전송 |
-| `CRON_SECRET` | Vercel Cron의 private 파일 정리 endpoint 인증 |
+| `CRON_SECRET` | 자체 호스팅 운영 Cron이 호출하는 private 파일 정리 endpoint 인증 |
 
 ## 검증 기준
 

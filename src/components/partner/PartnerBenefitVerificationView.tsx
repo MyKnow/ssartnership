@@ -12,6 +12,11 @@ import {
 import { getProductSessionId } from "@/lib/product-events";
 import { createClientUuid } from "@/lib/client-uuid";
 import type { CohortCardTheme } from "@/lib/cohort-card-themes";
+import {
+  FOUR_DIGIT_PIN_INPUT_PATTERN,
+  FOUR_DIGIT_PIN_LENGTH,
+  isFourDigitPin,
+} from "@/lib/validation";
 
 type VerificationMember = {
   mattermostUsername?: string | null;
@@ -58,7 +63,7 @@ export default function PartnerBenefitVerificationView({
   } | null>(null);
 
   async function confirmBenefitUse() {
-    if (!/^\d{4}$/.test(pin)) {
+    if (!isFourDigitPin(pin)) {
       setMessage({
         tone: "error",
         text: "제휴처 확인 PIN은 숫자 4자리로 입력해 주세요.",
@@ -146,18 +151,24 @@ export default function PartnerBenefitVerificationView({
             <label className="grid gap-2 text-sm font-medium text-foreground">
               제휴처 확인 PIN
               <input
-                id="partnerBenefitPin"
-                name="partnerBenefitPin"
-                type="password"
+                id="partnerBenefitCheckDigits"
+                name="partnerBenefitCheckDigits"
+                type="text"
                 inputMode="numeric"
-                pattern="[0-9]{4}"
-                maxLength={4}
+                pattern={FOUR_DIGIT_PIN_INPUT_PATTERN}
+                maxLength={FOUR_DIGIT_PIN_LENGTH}
                 autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                data-1p-ignore="true"
+                data-lpignore="true"
+                data-form-type="other"
                 value={pin}
                 disabled={isCompleted}
-                onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
+                onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, FOUR_DIGIT_PIN_LENGTH))}
                 placeholder="4자리 PIN 입력"
-                className="h-12 w-full rounded-2xl border border-border bg-surface-control px-3 text-base text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+                className="pin-mask h-12 w-full rounded-2xl border border-border bg-surface-control px-3 text-base text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
               />
               <span className="text-xs font-normal text-muted-foreground">
                 제휴처에서 관리하는 숫자 4자리 PIN입니다.

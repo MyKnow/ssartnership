@@ -10,6 +10,7 @@ import {
 import { getExpiringPartnershipOffsets } from "@/lib/partner-notification-routing";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { runPendingPartnerPublicationNotifications } from "@/lib/new-partner-notifications";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -79,18 +80,15 @@ export async function GET(request: NextRequest) {
   const publicationResult = await runPendingPartnerPublicationNotifications(today);
 
   memberPushResult.failures.forEach((failure) => {
-    console.error("[push-expiring-partners] partner push failed", failure);
+    logServerError("[push-expiring-partners] partner push failed", failure.message, { partnerId: failure.partnerId });
   });
   operationalResults.forEach((result) => {
     result.failures.forEach((failure) => {
-      console.error("[push-expiring-partners] operational notification failed", failure);
+      logServerError("[push-expiring-partners] operational notification failed", failure.message, { audience: failure.audience, partnerId: failure.partnerId });
     });
   });
   publicationResult.failures.forEach((failure) => {
-    console.error(
-      "[push-expiring-partners] public transition notification failed",
-      failure,
-    );
+    logServerError("[push-expiring-partners] public transition notification failed", failure.message, { partnerId: failure.partnerId });
   });
 
   return NextResponse.json({

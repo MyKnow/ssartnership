@@ -4,10 +4,9 @@ import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
 import EmptyState from "@/components/ui/EmptyState";
-import MotionReveal from "@/components/ui/MotionReveal";
 import ShellHeader from "@/components/ui/ShellHeader";
-import type { PartnerPortalCompanyScope } from "@/lib/partner-portal-scope";
-import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
+import type { PartnerPortalCompanyScope } from "@/lib/partner-auth/portal-scope";
+import { getCompanyScopedPortalHref } from "@/lib/partner-auth/portal-paths";
 import type { PartnerSession } from "@/lib/partner-session";
 
 export default function PartnerCompanySelectionView({
@@ -21,7 +20,7 @@ export default function PartnerCompanySelectionView({
     <div className="bg-background">
       <Container size="wide" className="pb-16 pt-6 lg:pt-8">
         <div className="space-y-6">
-          <MotionReveal>
+          <div>
             <ShellHeader
               eyebrow="Partner Portal"
               title="파트너사 선택"
@@ -35,7 +34,7 @@ export default function PartnerCompanySelectionView({
                 </Badge>
               }
             />
-          </MotionReveal>
+          </div>
 
           {companies.length === 0 ? (
             <EmptyState
@@ -43,7 +42,7 @@ export default function PartnerCompanySelectionView({
               description="관리자에서 이 계정과 파트너사를 먼저 연결해야 합니다."
             />
           ) : (
-            <MotionReveal delay={0.08}>
+            <div>
               <div className="grid gap-4">
                 <div className="grid gap-3 rounded-panel border border-border/70 bg-surface-elevated/95 p-4 shadow-flat sm:grid-cols-3">
                   <div>
@@ -104,7 +103,7 @@ export default function PartnerCompanySelectionView({
                   ))}
                 </div>
               </div>
-            </MotionReveal>
+            </div>
           )}
         </div>
       </Container>

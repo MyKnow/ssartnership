@@ -23,7 +23,7 @@ test("관리자 사진 직접 변경 API는 공통 이미지 staging과 동일 �
   const [panel, submitRoute, service, imageUploadClient] = await Promise.all([
     read("src/components/admin/member-detail/AdminMemberProfilePhotoPanel.tsx"),
     read("src/app/api/admin/members/[id]/profile-photo/route.ts"),
-    read("src/lib/graduate-verification-service.ts"),
+    read("src/lib/member-profile-image-service.ts"),
     read("src/lib/image-upload/client.ts"),
   ]);
 
@@ -36,7 +36,7 @@ test("관리자 사진 직접 변경 API는 공통 이미지 staging과 동일 �
   assert.match(submitRoute, /body\?\.uploadSource !== "common"/);
   assert.doesNotMatch(submitRoute, /submitMemberProfileImageReplacement/);
   assert.match(submitRoute, /member_profile_photo_replace/);
-  assert.match(panel, /IMAGE_SOURCE_ACCEPT/);
+  assert.match(panel, /accept=\{getImageSourceAccept\(PROFILE_IMAGE_POLICY\)\}/);
   assert.match(panel, /prepareImageUploadSource/);
   assert.match(panel, /사진 변경/);
   assert.doesNotMatch(panel, /사진 변경 요청/);

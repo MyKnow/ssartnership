@@ -49,7 +49,7 @@ test("security audit uses the repository npm runner on every platform", () => {
 });
 
 test("production advisories always fail even when their URL is tracked for development", () => {
-  const [tracked] = ALLOWED_DEVELOPMENT_ADVISORIES.values();
+  const tracked = { packageName: "fixture", url: "https://example.com/advisory", reason: "test policy", allowPatchableUntil: "2026-09-09T00:00:00.000Z" };
   const advisory = {
     fixAvailable: false,
     packageName: tracked.packageName,
@@ -67,7 +67,7 @@ test("production advisories always fail even when their URL is tracked for devel
 });
 
 test("only exact development advisories under an active policy are allowed", () => {
-  const [tracked] = ALLOWED_DEVELOPMENT_ADVISORIES.values();
+  const tracked = { packageName: "fixture", url: "https://example.com/advisory", reason: "test policy", allowPatchableUntil: "2026-09-09T00:00:00.000Z" };
   const allowedReport = createAuditReport([
     {
       fixAvailable: false,
@@ -84,15 +84,18 @@ test("only exact development advisories under an active policy are allowed", () 
   ]);
 
   const allowed = evaluateAuditPolicy({
+    allowedDevelopmentAdvisories: new Map([[`${tracked.packageName}:${tracked.url}`, tracked]]),
     fullReport: allowedReport,
     productionReport: createAuditReport([]),
   });
   const patchable = evaluateAuditPolicy({
+    allowedDevelopmentAdvisories: new Map([[`${tracked.packageName}:${tracked.url}`, tracked]]),
     fullReport: patchableReport,
     productionReport: createAuditReport([]),
     now: new Date("2026-09-02T14:00:00.000Z"),
   });
   const expiredPatchable = evaluateAuditPolicy({
+    allowedDevelopmentAdvisories: new Map([[`${tracked.packageName}:${tracked.url}`, tracked]]),
     fullReport: patchableReport,
     productionReport: createAuditReport([]),
     now: new Date("2026-09-09T00:00:00.000Z"),
@@ -128,3 +131,5 @@ test("unknown development advisories fail and duplicate URLs are reported once",
   });
   assert.equal(result.developmentFailures.length, 1);
 });
+
+test("expired development exceptions are removed from the repository policy", () => { assert.equal(ALLOWED_DEVELOPMENT_ADVISORIES.size, 0); });

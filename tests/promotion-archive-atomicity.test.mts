@@ -11,12 +11,17 @@ const routePath = new URL(
   "../src/app/api/cron/archive-expired-promotions/route.ts",
   import.meta.url,
 );
+const storePath = new URL(
+  "../src/lib/promotions/events-store.server.ts",
+  import.meta.url,
+);
 
 test("만료 프로모션 정리 RPC는 이벤트와 슬라이드를 하나의 service-role 전용 함수로 보관 처리한다", async () => {
-  const [migration, schema, route] = await Promise.all([
+  const [migration, schema, route, store] = await Promise.all([
     readFile(migrationPath, "utf8"),
     readFile(schemaPath, "utf8"),
     readFile(routePath, "utf8"),
+    readFile(storePath, "utf8"),
   ]);
 
   assert.match(
@@ -52,11 +57,15 @@ test("만료 프로모션 정리 RPC는 이벤트와 슬라이드를 하나의 s
   );
   assert.ok(schema.includes(migration.trim()));
 
-  assert.match(route, /rpc\("archive_expired_promotions_batch"/);
-  assert.match(route, /input_limit: ARCHIVE_EVENT_BATCH_SIZE/);
-  assert.match(route, /const slugs = Array\.isArray\(row\.archived_event_slugs\)/);
-  assert.match(route, /const archivedSlides = Number\(row\.archived_slide_count \?\? 0\)/);
-  assert.doesNotMatch(route, /\.from\("promotion_events"\)\s*\.select\("slug"\)/);
-  assert.doesNotMatch(route, /\.from\("promotion_events"\)\s*\.update\(\{ is_active: false \}\)/);
-  assert.doesNotMatch(route, /\.from\("promotion_slides"\)\s*\.update\(\{ is_active: false \}\)/);
+  assert.match(route, /archiveExpiredPromotionsBatch\(\{\s*nowIso,\s*limit: ARCHIVE_EVENT_BATCH_SIZE,\s*\}\)/);
+  assert.match(store, /rpc\("archive_expired_promotions_batch"/);
+  assert.match(store, /input_limit: input\.limit/);
+  assert.match(store, /const slugs: string\[\] = Array\.isArray\(row\.archived_event_slugs\)/);
+  assert.match(store, /const archivedSlides = Number\(row\.archived_slide_count \?\? 0\)/);
+  for (const source of [route, store]) {
+    assert.doesNotMatch(source, /\.from\("promotion_events"\)\s*\.select\("slug"\)\s*\.lt/);
+    assert.doesNotMatch(source, /\.from\("promotion_events"\)\s*\.update\(\{ is_active: false \}\)/);
+    assert.doesNotMatch(source, /\.from\("promotion_slides"\)\s*\.update\(\{ is_active: false \}\)/);
+  }
+  assert.doesNotMatch(route, /\.from\(/);
 });

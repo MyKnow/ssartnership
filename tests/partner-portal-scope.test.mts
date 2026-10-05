@@ -7,11 +7,11 @@ import {
   getPartnerCompanyIdFromPathname,
   getPartnerCompanyIdFromSearchParams,
   getPartnerPasswordChangeHref,
-} from "../src/lib/partner-portal-paths.ts";
+} from "../src/lib/partner-auth/portal-paths.ts";
 import {
   isPartnerPortalCompanyAllowed,
   normalizePartnerPortalCompanyIds,
-} from "../src/lib/partner-portal-scope.ts";
+} from "../src/lib/partner-auth/portal-scope.ts";
 import type { PartnerSession } from "../src/lib/partner-session.ts";
 
 function createSession(companyIds: string[]): PartnerSession {

@@ -131,7 +131,7 @@ test("loadHomePartnerDirectory keeps global popularity ordering while preloading
     }),
   );
   const popularityRequests: string[][] = [];
-  const memberStateRequests: string[][] = [];
+  const favoriteRequests: Array<string | null> = [];
 
   const directory = await loadHomePartnerDirectory(
     {
@@ -153,9 +153,9 @@ test("loadHomePartnerDirectory keeps global popularity ordering while preloading
           }]),
         );
       },
-      getMemberState: async ({ partnerIds }) => {
-        memberStateRequests.push(partnerIds);
-        return { loadedFavoritePartnerIds: partnerIds, partnerFavoriteStateById: {} };
+      getMemberFavoritePartnerIds: async (currentUserId) => {
+        favoriteRequests.push(currentUserId);
+        return new Set(["partner-30", "partner-24", "partner-2"]);
       },
     },
   );
@@ -164,11 +164,89 @@ test("loadHomePartnerDirectory keeps global popularity ordering while preloading
   assert.equal(popularityRequests[0].includes("partner-29"), true);
   assert.equal(directory.displayPartnerIds.includes("partner-29"), false);
   assert.equal(directory.displayPartnerIds[0], "partner-30");
-  assert.equal(memberStateRequests[0].length, HOME_PARTNER_STATE_BATCH_LIMIT);
-  assert.deepEqual(memberStateRequests[0], directory.displayPartnerIds.slice(0, 24));
-  assert.equal(memberStateRequests[0][0], "partner-30");
-  assert.equal(memberStateRequests[0].includes("partner-24"), false);
-  assert.deepEqual(directory.partnerState.loadedFavoritePartnerIds, memberStateRequests[0]);
+  assert.deepEqual(favoriteRequests, ["member-1"]);
+  const loaded = directory.partnerState.loadedFavoritePartnerIds;
+  assert.equal(loaded.length, HOME_PARTNER_STATE_BATCH_LIMIT);
+  assert.deepEqual(loaded, directory.displayPartnerIds.slice(0, 24));
+  assert.equal(loaded[0], "partner-30");
+  assert.equal(loaded.includes("partner-24"), false);
+  assert.deepEqual(directory.partnerState.partnerFavoriteStateById, {
+    "partner-30": true,
+    "partner-2": true,
+  });
+});
+
+test("loadHomePartnerDirectory loads favorites in parallel with popularity ranking", async () => {
+  const { loadHomePartnerDirectory } = await homePartnerDirectoryModulePromise;
+  const partners = [createPartner({ id: "partner-1", name: "제휴처 1" })];
+  const events: string[] = [];
+  let resolvePopularity: (value: Record<string, never>) => void = () => {};
+
+  const loading = loadHomePartnerDirectory(
+    { viewerAuthenticated: true, currentUserId: "member-1" },
+    {
+      getCategories: async () => [],
+      getPartners: async () => partners,
+      getPublicDirectoryPartners: async () => partners,
+      getPopularityByPartnerId: () => {
+        events.push("popularity:start");
+        return new Promise((resolve) => {
+          resolvePopularity = resolve;
+        });
+      },
+      getMemberFavoritePartnerIds: async () => {
+        events.push("favorites:start");
+        return new Set(["partner-1"]);
+      },
+    },
+  );
+
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(events.sort(), ["favorites:start", "popularity:start"]);
+  resolvePopularity({});
+  const directory = await loading;
+  assert.deepEqual(directory.partnerState.partnerFavoriteStateById, { "partner-1": true });
+});
+
+test("loadHomePartnerDirectory strips heavy detail fields for signed-in viewers", async () => {
+  const { loadHomePartnerDirectory } = await homePartnerDirectoryModulePromise;
+  const partners = [
+    createPartner({
+      id: "partner-1",
+      name: "역삼 헬스",
+      thumbnail: "https://img.example.com/fallback.png",
+      images: ["https://img.example.com/fallback.png", "https://img.example.com/2.png"],
+      conditions: ["학생증 제시"],
+      benefits: ["PT 10% 할인"],
+      benefitItems: [{ id: "benefit-1", title: "PT 10% 할인", maxApplyCount: null }],
+      detailDescription: "상세 페이지에서만 보여 주는 긴 소개",
+      branchScopeNote: "지점별 운영 메모",
+    }),
+  ];
+
+  const directory = await loadHomePartnerDirectory(
+    { viewerAuthenticated: true, currentUserId: "member-1" },
+    {
+      getCategories: async () => [],
+      getPartners: async () => partners,
+      getPublicDirectoryPartners: async () => {
+        throw new Error("signed-in viewers keep the full row thumbnail fallback");
+      },
+      getPopularityByPartnerId: async () => ({}),
+      getMemberFavoritePartnerIds: async () => new Set<string>(),
+    },
+  );
+
+  const [partner] = directory.partners;
+  assert.equal(partner.thumbnail, "https://img.example.com/fallback.png");
+  assert.deepEqual(partner.images, []);
+  assert.deepEqual(partner.benefitItems, []);
+  assert.deepEqual(partner.conditions, []);
+  assert.deepEqual(partner.benefits, ["PT 10% 할인"]);
+  assert.match(partner.directorySearchText ?? "", /학생증 제시/);
+  // Same card payload as guests: detail-only text never reaches the client.
+  assert.equal("detailDescription" in partner, false);
+  assert.equal("branchScopeNote" in partner, false);
 });
 
 test("loadHomePartnerDirectory uses the lean public directory loader for logged out viewers", async () => {
@@ -192,10 +270,7 @@ test("loadHomePartnerDirectory uses the lean public directory loader for logged 
         return [];
       },
       getPopularityByPartnerId: async () => ({}),
-      getMemberState: async () => ({
-        loadedFavoritePartnerIds: [],
-        partnerFavoriteStateById: {},
-      }),
+      getMemberFavoritePartnerIds: async () => new Set<string>(),
     },
   );
 

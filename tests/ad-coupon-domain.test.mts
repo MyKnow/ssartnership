@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  compareAvailableCoupons,
+  getAvailableCouponUsage,
+  selectAvailableCouponsForMember,
+  type AvailableCouponSource,
   getKstPeriodKey,
   getMemberIssueCountSnapshot,
   getCouponIssueWindow,
@@ -119,6 +123,178 @@ describe("ad coupon domain", () => {
     assert.equal(
       await verifyCouponVerificationPassword("2021", stored),
       false,
+    );
+  });
+});
+
+const SELECTION_NOW = new Date("2026-07-21T03:00:00.000Z");
+
+function createAvailabilityCoupon(overrides: Partial<AvailableCouponSource> = {}): AvailableCouponSource {
+  return {
+    id: "coupon-1",
+    status: "active",
+    startsAt: "2026-07-01T00:00:00.000Z",
+    endsAt: "2026-07-31T14:59:59.000Z",
+    downloadStartsAt: "2026-07-01T00:00:00.000Z",
+    downloadEndsAt: "2026-07-31T14:59:59.000Z",
+    usageLimit: null,
+    usedCount: 0,
+    perMemberLimit: 1,
+    dailyIssueLimit: null,
+    weeklyIssueLimit: null,
+    monthlyIssueLimit: null,
+    perMemberDailyIssueLimit: null,
+    perMemberWeeklyIssueLimit: null,
+    perMemberMonthlyIssueLimit: null,
+    createdAt: "2026-07-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+describe("member coupon availability selection", () => {
+  it("returns remaining uses and drops coupons whose member or global uses are exhausted", () => {
+    assert.deepEqual(
+      getAvailableCouponUsage(createAvailabilityCoupon({ perMemberLimit: 3, usageLimit: 10, usedCount: 4 }), 1),
+      {
+        coupon: createAvailabilityCoupon({ perMemberLimit: 3, usageLimit: 10, usedCount: 4 }),
+        memberUsedCount: 1,
+        remainingMemberUses: 2,
+        remainingGlobalUses: 6,
+      },
+    );
+    assert.equal(getAvailableCouponUsage(createAvailabilityCoupon({ perMemberLimit: 1 }), 1), null);
+    assert.equal(
+      getAvailableCouponUsage(createAvailabilityCoupon({ usageLimit: 5, usedCount: 5 }), 0),
+      null,
+    );
+    assert.equal(
+      getAvailableCouponUsage(createAvailabilityCoupon(), 0)?.remainingGlobalUses,
+      null,
+    );
+  });
+
+  it("filters by download window, coupon status, and campaign state", () => {
+    const selected = selectAvailableCouponsForMember({
+      candidates: [
+        { coupon: createAvailabilityCoupon({ id: "open" }), memberUsedCount: 0 },
+        {
+          coupon: createAvailabilityCoupon({ id: "not-yet", downloadStartsAt: "2026-07-22T00:00:00.000Z" }),
+          memberUsedCount: 0,
+        },
+        {
+          coupon: createAvailabilityCoupon({ id: "closed", downloadEndsAt: "2026-07-20T00:00:00.000Z" }),
+          memberUsedCount: 0,
+        },
+        { coupon: createAvailabilityCoupon({ id: "paused", status: "paused" }), memberUsedCount: 0 },
+        {
+          coupon: createAvailabilityCoupon({ id: "campaign-ended" }),
+          campaign: { status: "ended", startsAt: null, endsAt: null },
+          memberUsedCount: 0,
+        },
+        {
+          coupon: createAvailabilityCoupon({ id: "campaign-active" }),
+          campaign: { status: "active", startsAt: "2026-07-01T00:00:00.000Z", endsAt: "2026-08-01T00:00:00.000Z" },
+          memberUsedCount: 0,
+        },
+      ],
+      couponIssueRecords: [],
+      memberIssueRecords: [],
+      now: SELECTION_NOW,
+    });
+
+    assert.deepEqual(
+      selected.map((item) => item.coupon.id).sort(),
+      ["campaign-active", "open"],
+    );
+  });
+
+  it("applies coupon-wide and member issue limits by KST period", () => {
+    const coupon = createAvailabilityCoupon({
+      id: "limited",
+      dailyIssueLimit: 2,
+      perMemberWeeklyIssueLimit: 1,
+      perMemberLimit: 5,
+    });
+    const otherCoupon = createAvailabilityCoupon({ id: "other", perMemberLimit: 5 });
+    const todayIssues = [
+      { couponId: "limited", issuedAt: "2026-07-21T00:10:00.000Z" },
+      { couponId: "limited", issuedAt: "2026-07-21T01:10:00.000Z" },
+    ];
+
+    const dailyReached = selectAvailableCouponsForMember({
+      candidates: [
+        { coupon, memberUsedCount: 0 },
+        { coupon: otherCoupon, memberUsedCount: 0 },
+      ],
+      couponIssueRecords: todayIssues,
+      memberIssueRecords: [],
+      now: SELECTION_NOW,
+    });
+    assert.deepEqual(dailyReached.map((item) => item.coupon.id), ["other"]);
+
+    const yesterdayIssues = [
+      { couponId: "limited", issuedAt: "2026-07-20T00:10:00.000Z" },
+    ];
+    const memberWeeklyReached = selectAvailableCouponsForMember({
+      candidates: [{ coupon, memberUsedCount: 0 }],
+      couponIssueRecords: yesterdayIssues,
+      memberIssueRecords: yesterdayIssues,
+      now: SELECTION_NOW,
+    });
+    assert.deepEqual(memberWeeklyReached, []);
+
+    const anotherMemberIssued = selectAvailableCouponsForMember({
+      candidates: [{ coupon, memberUsedCount: 0 }],
+      couponIssueRecords: yesterdayIssues,
+      memberIssueRecords: [],
+      now: SELECTION_NOW,
+    });
+    assert.deepEqual(anotherMemberIssued.map((item) => item.coupon.id), ["limited"]);
+  });
+
+  it("sorts by earliest end time, keeps invalid end dates last, and breaks ties by newest", () => {
+    const selected = selectAvailableCouponsForMember({
+      candidates: [
+        {
+          coupon: createAvailabilityCoupon({ id: "invalid-end", endsAt: "not-a-date" }),
+          memberUsedCount: 0,
+        },
+        {
+          coupon: createAvailabilityCoupon({ id: "late", endsAt: "2026-08-31T00:00:00.000Z" }),
+          memberUsedCount: 0,
+        },
+        {
+          coupon: createAvailabilityCoupon({
+            id: "soon-old",
+            endsAt: "2026-07-25T00:00:00.000Z",
+            createdAt: "2026-07-01T00:00:00.000Z",
+          }),
+          memberUsedCount: 0,
+        },
+        {
+          coupon: createAvailabilityCoupon({
+            id: "soon-new",
+            endsAt: "2026-07-25T00:00:00.000Z",
+            createdAt: "2026-07-10T00:00:00.000Z",
+          }),
+          memberUsedCount: 0,
+        },
+      ],
+      couponIssueRecords: [],
+      memberIssueRecords: [],
+      now: SELECTION_NOW,
+    });
+
+    assert.deepEqual(
+      selected.map((item) => item.coupon.id),
+      ["soon-new", "soon-old", "late", "invalid-end"],
+    );
+    assert.equal(
+      compareAvailableCoupons(
+        { coupon: { endsAt: "x", createdAt: "a" } },
+        { coupon: { endsAt: "2026-01-01T00:00:00.000Z", createdAt: "a" } },
+      ) > 0,
+      true,
     );
   });
 });

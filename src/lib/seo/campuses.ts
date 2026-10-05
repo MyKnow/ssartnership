@@ -1,4 +1,5 @@
 import {
+  CAMPUS_DIRECTORY,
   type CampusSlug,
   getCampusBySlug,
   getCampusPageHref,
@@ -16,6 +17,25 @@ export type CampusSeoPartner = {
   category: string;
   location: string;
 };
+
+/**
+ * A campus landing page is a search result only when it lists at least one
+ * public partner; an empty campus page would be a thin "coming soon" page.
+ */
+export function isCampusIndexable(partnerCount: number) {
+  return partnerCount > 0;
+}
+
+/** Campuses the sitemap may list, using the same rule as the page robots. */
+export function getIndexableCampusSlugs(
+  partners: ReadonlyArray<{ campusSlugs: readonly string[] }>,
+): CampusSlug[] {
+  return CAMPUS_DIRECTORY.map((campus) => campus.slug).filter((slug) =>
+    isCampusIndexable(
+      partners.filter((partner) => partner.campusSlugs.includes(slug)).length,
+    ),
+  );
+}
 
 function uniqueStrings(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
@@ -36,7 +56,7 @@ export function buildCampusSeoMetadata(input: {
     `${campus.fullLabel}에서 이용할 수 있는 SSAFY 제휴 혜택을 확인하세요.`,
     input.partnerCount > 0
       ? `${input.partnerCount}개의 공개 제휴가 준비되어 있습니다.`
-      : "현재 공개된 제휴를 빠르게 확인할 수 있습니다.",
+      : "현재 공개 제휴를 준비 중입니다.",
     input.categoryLabels.length > 0
       ? `${input.categoryLabels.slice(0, 3).join(", ")} 카테고리 중심으로 살펴볼 수 있습니다.`
       : campus.description,
@@ -54,7 +74,13 @@ export function buildCampusSeoMetadata(input: {
     ...input.categoryLabels.map((label) => `${campus.label} ${label} 제휴`),
   ]);
 
-  return { campus, title, description, keywords };
+  return {
+    campus,
+    title,
+    description,
+    keywords,
+    indexable: isCampusIndexable(input.partnerCount),
+  };
 }
 
 export function buildCampusStructuredData(input: {

@@ -1,7 +1,7 @@
 ---
 title: 자체 호스팅 공개 edge 복구 명세
 type: feature-spec
-status: active
+status: current
 authority: normative
 issue: https://github.com/MyKnow/ssartnership/issues/478
 ---

@@ -4,6 +4,7 @@ import SiteHeader from "@/components/SiteHeader";
 import ShowcaseGuideSection from "@/components/project-showcase/ShowcaseGuideSection";
 import ShowcaseProjectCard from "@/components/project-showcase/ShowcaseProjectCard";
 import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { getHeaderSession } from "@/lib/header-session";
 import {
@@ -16,7 +17,9 @@ import {
 import { formatShowcaseDateTime, formatShowcasePeriod } from "@/lib/project-showcase/format";
 import { SHOWCASE_PHASE_LABELS, SHOWCASE_PRIZES, SHOWCASE_TYPE_LABELS } from "@/lib/project-showcase/labels";
 import { SHOWCASE_PROJECT_TYPES } from "@/lib/project-showcase/types";
+import { createCanonicalAlternates, createPageOpenGraph } from "@/lib/seo";
 import { getSignedUserSession } from "@/lib/user-auth";
+import { SEARCH_INPUT_ATTRIBUTES } from "@/components/ui/input-attributes";
 
 export const dynamic = "force-dynamic";
 
@@ -47,11 +50,13 @@ const TIMELINE_INDEX: Partial<Record<ShowcasePhase, number>> = {
 export const metadata: Metadata = {
   title: "내 프로젝트를 소개합니다! | SSAFY 프로젝트 쇼케이스",
   description: "SSAFY 구성원이 직접 개발·배포한 웹·앱·게임·임베디드 프로젝트를 소개하고 함께 체험해 보세요.",
-  openGraph: {
+  alternates: createCanonicalAlternates(EVENT_PATH),
+  openGraph: createPageOpenGraph({
+    path: EVENT_PATH,
     title: "내 프로젝트를 소개합니다!",
     description: "SSAFY 구성원이 만든 서비스를 소개하고 함께 체험해 보세요.",
     images: [{ url: "/ads/project-showcase-banner.png", width: 1915, height: 821, alt: "SSAFY 프로젝트 쇼케이스" }],
-  },
+  }),
 };
 
 function firstParam(value: string | string[] | undefined) {
@@ -234,7 +239,7 @@ export default async function ProjectShowcasePage({
             <form action={EVENT_PATH} className="mb-5 grid gap-2 rounded-2xl border border-border bg-surface p-3 sm:grid-cols-[minmax(0,1fr)_150px_150px_auto] sm:items-center">
               {previewMode ? <input type="hidden" name="preview" value="experience" /> : null}
               <label className="sr-only" htmlFor="showcase-search">프로젝트 검색</label>
-              <input id="showcase-search" name="q" type="search" defaultValue={query} placeholder="서비스 이름, 팀명, 설명 검색" className="min-h-11 rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary" />
+              <input id="showcase-search" name="q" {...SEARCH_INPUT_ATTRIBUTES} defaultValue={query} placeholder="서비스 이름, 팀명, 설명 검색" className="min-h-11 rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary" />
               <label className="sr-only" htmlFor="showcase-type">프로젝트 유형</label>
               <select id="showcase-type" name="type" defaultValue={selectedType} className="min-h-11 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary">
                 <option value="">전체 유형</option>
@@ -252,10 +257,10 @@ export default async function ProjectShowcasePage({
                 {projects.map((project) => <ShowcaseProjectCard key={project.id} project={project} completed={completed.has(project.id)} previewMode={previewMode} />)}
               </div>
             ) : (
-              <div className="rounded-3xl border border-dashed border-border bg-surface px-5 py-14 text-center">
-                <p className="text-lg font-semibold text-foreground">{query || selectedType ? "조건에 맞는 프로젝트가 없어요" : "공개된 프로젝트가 아직 없어요"}</p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">{query || selectedType ? "검색어나 유형을 바꿔 다시 찾아보세요." : "운영진이 확인을 마친 프로젝트부터 공개돼요."}</p>
-              </div>
+              <EmptyState
+                title={query || selectedType ? "조건에 맞는 프로젝트가 없어요" : "공개된 프로젝트가 아직 없어요"}
+                description={query || selectedType ? "검색어나 유형을 바꿔 다시 찾아보세요." : "운영진이 확인을 마친 프로젝트부터 공개돼요."}
+              />
             )}
           </section>
         ) : null}

@@ -8,11 +8,27 @@ const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const CONTROL_CHARACTER_REGEX = /[\u0000-\u001F\u007F]/;
 
-export const PASSWORD_POLICY_MESSAGE =
-  "비밀번호는 8~64자, 영문/숫자/특수문자를 모두 포함해야 합니다.";
+const PASSWORD_FORBIDDEN_CHARACTER_REGEX = /[\u0000-\u001F\u007F-\u009F]/;
 
+export const PASSWORD_POLICY_MESSAGE =
+  "비밀번호는 8~64자, 영문/숫자/특수문자를 모두 포함해야 하며 앞뒤 공백은 사용할 수 없습니다.";
+
+/**
+ * FE 제출 전 검증과 BE route/server action 검증이 함께 쓰는 비밀번호 정책.
+ * 로그인·변경 경로 일부가 입력을 trim하므로, 저장 시점에 앞뒤 공백을 허용하면
+ * 같은 비밀번호로 다시 로그인하지 못한다. 제어문자도 입력 장치마다 달라 거부한다.
+ */
 export function isValidPasswordPolicy(value: string) {
+  if (typeof value !== "string") {
+    return false;
+  }
   if (value.length < 8 || value.length > 64) {
+    return false;
+  }
+  if (value !== value.trim()) {
+    return false;
+  }
+  if (PASSWORD_FORBIDDEN_CHARACTER_REGEX.test(value)) {
     return false;
   }
   const hasLetter = /[A-Za-z]/.test(value);
@@ -77,7 +93,7 @@ export function validateAdminPasswordInput(value: string) {
   if (value.length > 256) {
     return "비밀번호 형식이 올바르지 않습니다.";
   }
-  if (CONTROL_CHARACTER_REGEX.test(value)) {
+  if (hasControlCharacters(value)) {
     return "비밀번호 형식이 올바르지 않습니다.";
   }
   return null;
@@ -215,4 +231,39 @@ export function sanitizePartnerLinkValue(value?: string | null) {
     return null;
   }
   return trimmed;
+}
+
+const FOUR_DIGIT_PIN_REGEX = /^\d{4}$/;
+const SIX_DIGIT_CODE_REGEX = /^\d{6}$/;
+
+/** 제휴처 확인 PIN 자릿수. 입력 `maxLength`와 서버 검증이 함께 참조한다. */
+export const FOUR_DIGIT_PIN_LENGTH = 4;
+/**
+ * PIN 입력의 HTML `pattern` 값(브라우저 제출 전 제약). 판정 규칙은 `isFourDigitPin`과 같다.
+ * 브라우저는 이 값을 `^(?:…)$`로 감싸 전체 일치로 검사한다.
+ */
+export const FOUR_DIGIT_PIN_INPUT_PATTERN = `[0-9]{${FOUR_DIGIT_PIN_LENGTH}}`;
+/** 이메일·Mattermost 인증 코드 자릿수. 입력 `maxLength`와 서버 검증이 함께 참조한다. */
+export const SIX_DIGIT_CODE_LENGTH = 6;
+
+/**
+ * 숫자 4자리 PIN(제휴처 확인 PIN, 쿠폰 현장 확인 PIN) 판정.
+ * FE 제출 전 검증과 BE route/server action 검증이 같은 함수를 쓴다.
+ * 앞뒤 공백을 허용하지 않으므로 trim이 필요한 경계는 호출 전에 정규화한다.
+ */
+export function isFourDigitPin(value: unknown): value is string {
+  return typeof value === "string" && FOUR_DIGIT_PIN_REGEX.test(value);
+}
+
+/**
+ * 숫자 6자리 인증 코드(이메일·Mattermost·수료생 인증) 판정.
+ * 앞뒤 공백은 허용하지 않으므로 호출 전에 trim/공백 제거를 마친다.
+ */
+export function isSixDigitCode(value: unknown): value is string {
+  return typeof value === "string" && SIX_DIGIT_CODE_REGEX.test(value);
+}
+
+/** C0 제어문자(U+0000~U+001F)와 DEL(U+007F)이 하나라도 있으면 true. */
+export function hasControlCharacters(value: string) {
+  return CONTROL_CHARACTER_REGEX.test(value);
 }

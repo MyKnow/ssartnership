@@ -18,12 +18,9 @@ import {
   revalidatePartnerCompanyData,
   revalidatePartnerPortalPaths,
 } from "./shared-helpers";
+import { readString } from "@/lib/form-data";
 
 const ADMIN_BRAND_PLANS_PATH = "/admin/partners?tab=plans";
-
-function getString(formData: FormData, key: string) {
-  return String(formData.get(key) ?? "").trim();
-}
 
 function parsePlanTier(value: string): PartnerCompanyPlanTier {
   if (!isPartnerCompanyPlanTier(value)) {
@@ -69,7 +66,7 @@ export async function updatePartnerBrandPlanAction(formData: FormData) {
     redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, "admin_global_scope_required", {
       action: "partner_brand_plan_update",
       targetType: "partner_brand",
-      targetId: getString(formData, "partnerId") || null,
+      targetId: readString(formData, "partnerId") || null,
       properties: { stage: "scope" },
     });
   }
@@ -83,13 +80,13 @@ export async function updatePartnerBrandPlanAction(formData: FormData) {
     note: string;
   };
   try {
-    const partnerId = getString(formData, "partnerId");
+    const partnerId = readString(formData, "partnerId");
     if (!partnerId) {
       throw new Error("partner_company_plan_invalid_request");
     }
-    const nextPlanTier = parsePlanTier(getString(formData, "planTier"));
-    const planStartedAtInput = getString(formData, "planStartedAt");
-    const planExpiresAtInput = getString(formData, "planExpiresAt");
+    const nextPlanTier = parsePlanTier(readString(formData, "planTier"));
+    const planStartedAtInput = readString(formData, "planStartedAt");
+    const planExpiresAtInput = readString(formData, "planExpiresAt");
     if (
       nextPlanTier !== "basic" &&
       !isPartnerPlanWindowOrderValid({
@@ -101,14 +98,14 @@ export async function updatePartnerBrandPlanAction(formData: FormData) {
     }
     payload = {
       partnerId,
-      expectedPlanTier: parsePlanTier(getString(formData, "expectedPlanTier")),
+      expectedPlanTier: parsePlanTier(readString(formData, "expectedPlanTier")),
       expectedPlanUpdatedAt: parseNullableIsoTimestamp(
-        getString(formData, "expectedPlanUpdatedAt"),
+        readString(formData, "expectedPlanUpdatedAt"),
       ),
       nextPlanTier,
       planStartedAt: parseNullableKstDate(planStartedAtInput),
       planExpiresAt: parseNullableKstDate(planExpiresAtInput, true),
-      note: parseNote(getString(formData, "note")),
+      note: parseNote(readString(formData, "note")),
     };
   } catch (error) {
     redirectAdminActionError(
@@ -117,7 +114,7 @@ export async function updatePartnerBrandPlanAction(formData: FormData) {
       {
         action: "partner_brand_plan_update",
         targetType: "partner_brand",
-        targetId: getString(formData, "partnerId") || null,
+        targetId: readString(formData, "partnerId") || null,
         properties: { stage: "parse" },
       },
     );
@@ -172,11 +169,11 @@ export async function confirmPartnerPlanBankTransferPaymentAction(formData: Form
     redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, "admin_global_scope_required", {
       action: "partner_plan_bank_transfer_confirmed",
       targetType: "partner_plan_upgrade_request",
-      targetId: getString(formData, "requestId") || null,
+      targetId: readString(formData, "requestId") || null,
       properties: { stage: "scope" },
     });
   }
-  const requestId = getString(formData, "requestId");
+  const requestId = readString(formData, "requestId");
   if (!requestId) {
     redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, "partner_company_plan_missing_request", {
       action: "partner_plan_bank_transfer_confirmed",
@@ -187,7 +184,7 @@ export async function confirmPartnerPlanBankTransferPaymentAction(formData: Form
 
   let taxDocumentStatus: "pending_issue" | "issued";
   try {
-    taxDocumentStatus = parseTaxDocumentStatus(getString(formData, "taxDocumentStatus"));
+    taxDocumentStatus = parseTaxDocumentStatus(readString(formData, "taxDocumentStatus"));
   } catch (error) {
     redirectAdminActionError(
       ADMIN_BRAND_PLANS_PATH,
@@ -248,11 +245,11 @@ async function reviewPartnerPlanRequestAction(
     redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, "admin_global_scope_required", {
       action: `partner_plan_upgrade_${nextStatus}`,
       targetType: "partner_plan_upgrade_request",
-      targetId: getString(formData, "requestId") || null,
+      targetId: readString(formData, "requestId") || null,
       properties: { stage: "scope", status: nextStatus },
     });
   }
-  const requestId = getString(formData, "requestId");
+  const requestId = readString(formData, "requestId");
   if (!requestId) {
     redirectAdminActionError(ADMIN_BRAND_PLANS_PATH, "partner_company_plan_missing_request", {
       action: `partner_plan_upgrade_${nextStatus}`,
@@ -265,7 +262,7 @@ async function reviewPartnerPlanRequestAction(
       requestId,
       adminId: adminSession.adminId,
       nextStatus,
-      adminNote: getString(formData, "adminNote"),
+      adminNote: readString(formData, "adminNote"),
     });
   } catch (error) {
     const message = getSafeAdminActionErrorCode(

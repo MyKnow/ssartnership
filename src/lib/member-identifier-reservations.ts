@@ -4,16 +4,13 @@ import {
   type MemberIdentifierReservationInput,
 } from "@/lib/member-domain";
 import { findMmUserDirectoryEntryByUserId } from "@/lib/mm-directory";
+import { readSessionSecret } from "@/lib/session-secrets";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export function getMemberIdentifierReservationSecret() {
-  const secret =
-    process.env.MEMBER_IDENTIFIER_RESERVATION_HMAC_SECRET
-    ?? process.env.USER_SESSION_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error("회원 식별자 예약용 HMAC 비밀값이 필요합니다.");
-  }
-  return secret;
+  return readSessionSecret("member-identifier-reservation", {
+    errorMessage: "회원 식별자 예약용 HMAC 비밀값이 필요합니다.",
+  });
 }
 
 export function buildReservedMemberIdentifierHashes(

@@ -1,3 +1,4 @@
+import Checkbox from "@/components/ui/Checkbox";
 import Badge from "@/components/ui/Badge";
 import Input from "@/components/ui/Input";
 import SubmitButton from "@/components/ui/SubmitButton";
@@ -5,7 +6,7 @@ import Surface from "@/components/ui/Surface";
 import type { AdminFormAction } from "@/components/admin/admin-form-actions";
 import FieldGroup from "@/components/admin/partner-account-manager/FieldGroup";
 import { formatPartnerAccountDateTime } from "@/components/admin/partner-account-manager/helpers";
-import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
+import type { AdminPartnerAccount } from "@/lib/admin-partner-account-types";
 
 export default function PartnerAccountForm({
   account,
@@ -76,8 +77,7 @@ export default function PartnerAccountForm({
         <div className="md:col-span-2 grid gap-3 rounded-2xl border border-border/70 bg-surface-muted/70 p-4 sm:grid-cols-2">
           <label className="flex items-center gap-3 text-sm font-medium text-foreground">
             <input type="hidden" name="isActive" value="false" />
-            <input
-              type="checkbox"
+            <Checkbox
               name="isActive"
               value="true"
               defaultChecked={account.is_active !== false}
@@ -87,8 +87,7 @@ export default function PartnerAccountForm({
           </label>
           <label className="flex items-center gap-3 text-sm font-medium text-foreground">
             <input type="hidden" name="mustChangePassword" value="false" />
-            <input
-              type="checkbox"
+            <Checkbox
               name="mustChangePassword"
               value="true"
               defaultChecked={Boolean(account.must_change_password)}

@@ -24,14 +24,14 @@ page route의 기계 판독 기준은 `src/lib/mock/scenarios/route-inventory.ts
 
 | 영역 | 경로 | 역할 |
 | --- | --- | --- |
-| Root | `src/app/layout.tsx` | 전역 metadata, theme, toast, PWA provider, Vercel Analytics/Speed Insights |
+| Root | `src/app/layout.tsx` | 전역 metadata, theme, toast, PWA provider, 자체 호스팅 Web Vitals 수집 |
 | Public site | `src/app/(site)` | 홈, 캠퍼스, 제휴 상세, 이벤트, 제안, 인증 카드, 알림, 쿠폰 |
 | Auth | `src/app/auth` | 회원 로그인, Mattermost DM 가입/재설정, 이메일 복구, 정책 동의, 비밀번호 재설정/변경 |
 | Admin | `src/app/admin` | 관리자 로그인, setup, protected 운영 화면 |
 | Partner | `src/app/partner` | 파트너 로그인, setup, dashboard, 파트너사/제휴처/플랜/알림/지원 |
 | Legal | `src/app/legal/[kind]` | 약관/개인정보/마케팅 문서 버전 조회 |
 | API | `src/app/api` | 인증, 알림, 제휴, 리뷰, Push, cron, image proxy, 로그 |
-| SEO/runtime files | `src/app/sitemap.ts`, `robots.ts`, `manifest.ts`, `rss.xml/route.ts`, `icon.tsx` | 검색엔진, PWA, RSS, 아이콘 |
+| SEO/runtime files | `src/app/sitemap.ts`, `robots.ts`, `manifest.ts`, `rss.xml/route.ts`; 아이콘·공유 이미지는 `public/` 정적 파일 | 검색엔진, PWA, RSS, 아이콘 |
 
 ## Public site routes
 
@@ -125,10 +125,11 @@ page route의 기계 판독 기준은 `src/lib/mock/scenarios/route-inventory.ts
 | Route | Source | 목적 |
 | --- | --- | --- |
 | `/legal/[kind]` | `legal/[kind]/page.tsx` | `service`, `privacy`, `marketing` 정책 문서 버전 조회 |
-| `/sitemap.xml` | `sitemap.ts` | 홈, 캠퍼스, 공개 제휴 상세 sitemap |
-| `/robots.txt` | `robots.ts` | `/admin`, `/api` 크롤링 차단 |
+| `/sitemap.xml` | `sitemap.ts` | 홈, 앱 설치, 쇼케이스 허브, 공개 제휴가 있는 캠퍼스, 공개 제휴 상세 sitemap |
+| `/robots.txt` | `robots.ts` | `/admin`, `/api`, `/auth`, `/partner/` 크롤링 차단(`/partners/*`, `/partner-registration`은 허용) |
 | `/manifest.webmanifest` | `manifest.ts` | PWA manifest |
-| `/rss.xml` | `rss.xml/route.ts` | RSS feed |
+| `/rss.xml` | `rss.xml/route.ts` | RSS feed(최근 등록 공개 제휴, 등록 시각 기준 pubDate) |
+| `/sw.js`, `/offline.html` | `public/` 정적 파일 | 서비스 워커(푸시, 내비게이션 실패 시 오프라인 안내)와 오프라인 안내 페이지 |
 
 ## Route handlers outside `/api`
 
@@ -139,7 +140,7 @@ page route의 기계 판독 기준은 `src/lib/mock/scenarios/route-inventory.ts
 | GET | `/rss.xml` | RSS XML 반환 |
 | GET | `/partner-registration/template` | 파트너사·제휴처 등록 템플릿 다운로드 |
 | GET | `/partner-registration/branches/template` | 지점 등록 템플릿 다운로드 |
-| GET | `/admin/event/signup-reward/rewards/export` | 이벤트 리워드 export |
+| GET | `/admin/event/[slug]/rewards/export` | 추첨 지원 이벤트(현재 `signup-reward`)의 추첨권 CSV export |
 | GET | `/admin/partners/new/template` | 관리자 제휴 생성 템플릿 다운로드 |
 
 ## Page route 분류
@@ -197,3 +198,5 @@ Query 호환 규칙으로 `/admin/partners?tab=requests`는 `/admin/partner-requ
 - 파트너 보호: `/partner`, `/partner/notifications`, `/partner/plans`, `/partner/support`, `/partner/companies/*`, `/partner/services/*`는 비로그인 시 `/partner/login`으로 이동한다.
 - 관리자 보호: `/admin`과 대부분의 `/admin/*` protected 화면은 비인증 상태에서 `/auth/login`으로 이동한다. 회원 세션이 있으면 `/admin/session`을 거쳐 관리자 세션 bridge를 시도한다.
 - `(site)` layout은 로그인된 회원에게 필수 약관 동의 또는 강제 비밀번호 변경이 필요하면 각각 `/auth/consent`, `/auth/change-password`로 보낸다.
+
+홈 목록에서 상세로 이동했다가 뒤로 돌아오면 같은 필터의 카드 로드 수와 스크롤 위치를 복원한다.

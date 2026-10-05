@@ -1,5 +1,11 @@
 "use client";
 
+import PlainImage from "@/components/ui/PlainImage";
+
+import Textarea from "@/components/ui/Textarea";
+
+import Input from "@/components/ui/Input";
+
 import { PhotoIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
@@ -10,7 +16,7 @@ import { submitShowcaseProject, updateShowcaseProject } from "@/app/(site)/event
 import { uploadImagesToStaging } from "@/lib/image-upload/client";
 import { prepareImageUploadSource } from "@/lib/image-upload/client-transform";
 import {
-  IMAGE_SOURCE_ACCEPT,
+  getImageSourceAccept,
   resolveImageTransformPolicy,
   validateImageUploadSource,
 } from "@/lib/image-upload/policy";
@@ -23,6 +29,7 @@ import {
 import {
   parseShowcaseProjectSubmission,
   SHOWCASE_SERVICE_URL_HINTS,
+  SHOWCASE_PROJECT_LIMITS,
 } from "@/lib/project-showcase/validation";
 
 const IMAGE_POLICY = resolveImageTransformPolicy("showcase-project", "image");
@@ -204,7 +211,7 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
               key={type}
               className={`cursor-pointer rounded-2xl border p-3 text-center transition-colors focus-within:ring-2 focus-within:ring-primary ${projectType === type ? "border-primary bg-primary/5" : "border-border bg-surface"}`}
             >
-              <input
+              <Input
                 className="sr-only"
                 type="radio"
                 name="projectTypeChoice"
@@ -223,25 +230,25 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
       <div className="grid gap-5">
         <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-project-title">
           서비스 이름
-          <input id="showcase-project-title" name="title" maxLength={100} defaultValue={project?.title} {...fieldProps("title", "showcase-project-title-error")} placeholder="서비스 이름을 입력해 주세요" />
+          <Input id="showcase-project-title" name="title" maxLength={SHOWCASE_PROJECT_LIMITS.titleMax} defaultValue={project?.title} {...fieldProps("title", "showcase-project-title-error")} placeholder="서비스 이름을 입력해 주세요" />
           <FieldError id="showcase-project-title-error" message={fieldError("title")} />
         </label>
         <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-project-team">
           팀명 (선택)
-          <input id="showcase-project-team" name="teamName" maxLength={60} defaultValue={project?.teamName ?? ""} {...fieldProps("teamName", "showcase-project-team-error")} />
+          <Input id="showcase-project-team" name="teamName" maxLength={SHOWCASE_PROJECT_LIMITS.teamNameMax} defaultValue={project?.teamName ?? ""} {...fieldProps("teamName", "showcase-project-team-error")} />
           <FieldError id="showcase-project-team-error" message={fieldError("teamName")} />
         </label>
         <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-project-summary">
           한 줄 소개
-          <input id="showcase-project-summary" name="summary" maxLength={240} defaultValue={project?.summary} {...fieldProps("summary", "showcase-project-summary-error")} placeholder="어떤 문제를 해결하는 서비스인지 알려 주세요" />
+          <Input id="showcase-project-summary" name="summary" maxLength={SHOWCASE_PROJECT_LIMITS.summaryMax} defaultValue={project?.summary} {...fieldProps("summary", "showcase-project-summary-error")} placeholder="어떤 문제를 해결하는 서비스인지 알려 주세요" />
           <FieldError id="showcase-project-summary-error" message={fieldError("summary")} />
         </label>
         <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-project-description">
           서비스 설명
-          <textarea
+          <Textarea
             id="showcase-project-description"
             name="description"
-            maxLength={8000}
+            maxLength={SHOWCASE_PROJECT_LIMITS.descriptionMax}
             rows={7}
             defaultValue={project?.description}
             {...fieldProps("description", "showcase-project-description-error", "py-3")}
@@ -251,12 +258,12 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
         </label>
         <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-project-url">
           {urlHint.label}
-          <input
+          <Input
             id="showcase-project-url"
             name="serviceUrl"
             type="url"
             inputMode="url"
-            maxLength={2048}
+            maxLength={SHOWCASE_PROJECT_LIMITS.serviceUrlMax}
             defaultValue={project?.serviceUrl}
             {...fieldProps("serviceUrl", "showcase-project-url-error")}
             placeholder={urlHint.placeholder}
@@ -276,8 +283,7 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
         <label className={`grid cursor-pointer gap-3 overflow-hidden rounded-2xl border border-dashed p-4${fieldError("imageUploadId") ? " border-danger bg-danger/5" : " border-border bg-surface-muted/50"} text-center focus-within:ring-2 focus-within:ring-primary`}>
           <span className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-xl bg-surface-muted">
             {previewUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={previewUrl} alt="대표 이미지 미리보기" className="h-full w-full object-cover" />
+              <PlainImage src={previewUrl} alt="대표 이미지 미리보기" className="h-full w-full object-cover" />
             ) : (
               <PhotoIcon className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
             )}
@@ -285,11 +291,11 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
           <span className="text-sm font-medium text-foreground">
             {file?.name ?? (project ? "이미지 바꾸기" : "이미지 파일 선택")}
           </span>
-          <input
+          <Input
             ref={imageInputRef}
             id="showcase-project-image"
             type="file"
-            accept={IMAGE_SOURCE_ACCEPT}
+            accept={getImageSourceAccept(IMAGE_POLICY)}
             className="sr-only"
             onChange={(changeEvent) => handleImageSelection(changeEvent.target.files?.[0])}
             aria-label="대표 홍보 이미지 선택"
@@ -308,7 +314,7 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
 
       <div className="grid gap-3 rounded-2xl border border-border bg-surface-muted/40 p-4">
         <label className="flex items-start gap-3 text-sm leading-6 text-foreground">
-          <input className="mt-1 h-4 w-4 shrink-0 accent-primary" type="checkbox" name="announcementConsent" value="true" defaultChecked={mode === "edit"} />
+          <Input className="mt-1 h-4 w-4 shrink-0 accent-primary" type="checkbox" name="announcementConsent" value="true" defaultChecked={mode === "edit"} />
           <span>(필수) 경품에 당첨되면 출품자 이름 일부를 가려(예: 정**) 공지하는 데 동의해요.</span>
         </label>
         <FieldError id="showcase-announcementConsent-error" message={fieldError("announcementConsent")} />
@@ -321,7 +327,13 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
       ) : null}
       {message ? <p className="text-sm text-muted-foreground" role="status">{message}</p> : null}
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <Button type="button" variant="secondary" onClick={() => router.back()} disabled={isPending}>돌아가기</Button>
+        <Button
+          href={project ? `/events/project-showcase/my/projects/${encodeURIComponent(project.id)}` : "/events/project-showcase"}
+          variant="secondary"
+          disabled={isPending}
+        >
+          돌아가기
+        </Button>
         <Button type="submit" disabled={isPending}>
           {isPending ? "제출 중…" : mode === "create" ? "출품하기" : "수정해서 다시 제출"}
         </Button>

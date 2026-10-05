@@ -32,7 +32,6 @@ const EXACT_HIGH_RISK_PATHS = new Set([
   "src/proxy.ts",
   "tsconfig.json",
   "tsconfig.typecheck.json",
-  "vercel.json",
   "vitest.config.ts",
 ]);
 
@@ -172,6 +171,7 @@ export function collectGitChanges({ base, head, includeWorkingTree = false } = {
 }
 
 function classifyPath(path) {
+  if (path.startsWith(".agents/skills/") && path.endsWith(".md")) return "standard";
   if (
     path.startsWith(".storybook/") ||
     path.startsWith("tests/visual/") ||
@@ -320,7 +320,6 @@ export function deriveExecutionPolicy({
     runSmoke,
     runRelease,
     runJob: runVerify || runSmoke || runRelease,
-    requiresVercel: true,
   };
 }
 

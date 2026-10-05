@@ -4,8 +4,7 @@ import ImageCropDialog from "@/components/media/ImageCropDialog";
 import { REVIEW_IMAGE_ASPECT_RATIO } from "@/lib/review-media";
 import { resolveImageTransformPolicy } from "@/lib/image-upload/policy";
 
-const REVIEW_IMAGE_OUTPUT_SIZE = 900;
-const REVIEW_IMAGE_OUTPUT_QUALITY = 0.68;
+const REVIEW_IMAGE_POLICY = resolveImageTransformPolicy("review", "image");
 
 export default function ReviewImageCropModal({
   open,
@@ -29,10 +28,9 @@ export default function ReviewImageCropModal({
       sourceUrl={sourceUrl}
       sourceFile={sourceFile}
       outputName={outputName}
-      outputWidth={REVIEW_IMAGE_OUTPUT_SIZE}
-      outputHeight={REVIEW_IMAGE_OUTPUT_SIZE}
-      quality={REVIEW_IMAGE_OUTPUT_QUALITY}
-      policy={resolveImageTransformPolicy("review", "image")}
+      outputWidth={REVIEW_IMAGE_POLICY.width}
+      outputHeight={REVIEW_IMAGE_POLICY.height}
+      policy={REVIEW_IMAGE_POLICY}
       onCancel={onCancel}
       onApply={onApply}
     />

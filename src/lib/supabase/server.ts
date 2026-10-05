@@ -2,10 +2,12 @@ import "server-only";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { resolveSupabaseFetchTimeouts, withSupabaseTimeout } from "./timeout";
 import { createSupabaseTransport } from "./transport";
 
+import { selectRuntimeDataAccess, RuntimeDataAccessUnavailableError } from "../runtime-data-access";
+
 let adminClient: SupabaseClient | null = null;
-const publicClients = new Map<number, SupabaseClient>();
 
 function getAdminEnv() {
   const supabaseUrl = process.env.SUPABASE_URL;
@@ -19,29 +21,28 @@ function getAdminEnv() {
   return { supabaseUrl, internalSupabaseUrl, serviceRoleKey };
 }
 
-function getPublicEnv() {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const internalSupabaseUrl = process.env.SUPABASE_INTERNAL_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl) {
-    throw new Error("SUPABASE_URL 환경 변수가 필요합니다.");
-  }
-
-  if (!anonKey) {
-    throw new Error("SUPABASE_ANON_KEY 환경 변수가 필요합니다.");
-  }
-
-  return { supabaseUrl, internalSupabaseUrl, key: anonKey };
+function createTimedSupabaseTransport(
+  supabaseUrl: string,
+  internalSupabaseUrl: string | undefined,
+) {
+  return withSupabaseTimeout(
+    createSupabaseTransport(supabaseUrl, internalSupabaseUrl),
+    resolveSupabaseFetchTimeouts(),
+  );
 }
 
 export function getSupabaseAdminClient() {
+  const selection = selectRuntimeDataAccess({ capability: "admin" });
+  const partnerSelection = selectRuntimeDataAccess({ capability: "admin", sourcePreference: "partner-portal" });
+  if (selection.source === "mock" && partnerSelection.source !== "supabase") {
+    throw new RuntimeDataAccessUnavailableError(selection);
+  }
   if (adminClient) {
     return adminClient;
   }
 
   const { supabaseUrl, internalSupabaseUrl, serviceRoleKey } = getAdminEnv();
-  const transport = createSupabaseTransport(supabaseUrl, internalSupabaseUrl);
+  const transport = createTimedSupabaseTransport(supabaseUrl, internalSupabaseUrl);
   adminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: {
       persistSession: false,
@@ -55,28 +56,4 @@ export function getSupabaseAdminClient() {
     },
   });
   return adminClient;
-}
-
-export function getSupabasePublicClient(revalidateSeconds = 300) {
-  const cachedClient = publicClients.get(revalidateSeconds);
-  if (cachedClient) {
-    return cachedClient;
-  }
-
-  const { supabaseUrl, internalSupabaseUrl, key } = getPublicEnv();
-  const transport = createSupabaseTransport(supabaseUrl, internalSupabaseUrl);
-  const publicClient = createClient(supabaseUrl, key, {
-    auth: {
-      persistSession: false,
-    },
-    global: {
-      fetch: (input, init) =>
-        transport(input, {
-          ...init,
-          next: { revalidate: revalidateSeconds },
-        }),
-    },
-  });
-  publicClients.set(revalidateSeconds, publicClient);
-  return publicClient;
 }

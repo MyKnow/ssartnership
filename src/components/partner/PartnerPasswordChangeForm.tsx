@@ -7,6 +7,7 @@ import FormMessage from "@/components/ui/FormMessage";
 import PasswordInput from "@/components/ui/PasswordInput";
 import Surface from "@/components/ui/Surface";
 import {
+  fieldA11yProps,
   focusField,
   getFieldErrorClass,
 } from "@/components/ui/form-field-state";
@@ -176,7 +177,7 @@ export default function PartnerPasswordChangeForm({
               placeholder="현재 비밀번호"
               autoComplete="current-password"
               disabled={pending}
-              aria-invalid={Boolean(fieldErrors.currentPassword) || undefined}
+              {...fieldA11yProps("partner-password-currentPassword", fieldErrors.currentPassword)}
               className={getFieldErrorClass(
                 Boolean(fieldErrors.currentPassword),
               )}
@@ -219,7 +220,7 @@ export default function PartnerPasswordChangeForm({
               placeholder="영문/숫자/특수문자 포함 8자 이상"
               autoComplete="new-password"
               disabled={pending}
-              aria-invalid={Boolean(fieldErrors.nextPassword) || undefined}
+              {...fieldA11yProps("partner-password-nextPassword", fieldErrors.nextPassword)}
               className={getFieldErrorClass(Boolean(fieldErrors.nextPassword))}
             />
             {fieldErrors.nextPassword ? (

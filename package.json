@@ -21,6 +21,8 @@
     "install:trusted": "node scripts/install-dependencies.mjs",
     "check:lockfile": "node scripts/check-lockfile.mjs",
     "check:docs": "node scripts/check-docs.mjs",
+    "check:alerts": "node scripts/check-alert-rules.mjs",
+    "check:env": "node scripts/check-env.mjs",
     "build": "node scripts/next.mjs build",
     "typecheck:ci": "node scripts/typecheck-ci.mjs",
     "storybook": "storybook dev -p 6006",
@@ -41,26 +43,22 @@
     "verify:change": "node scripts/verify-change.mjs",
     "verify:quick": "node scripts/run-package-scripts.mjs check:install-scripts check:cross-platform check:lockfile validate:migrations lint typecheck:ci test audit:security",
     "verify:promotion:smoke": "node scripts/run-package-scripts.mjs build test:e2e:smoke:ci",
-    "verify:release:post-quick": "node scripts/run-package-scripts.mjs build test:e2e:ci",
+    "verify:release:post-quick": "node scripts/run-package-scripts.mjs typegen:release build test:e2e:prod",
     "verify:release": "node scripts/run-package-scripts.mjs verify:quick verify:release:post-quick",
     "prepush": "npm run verify:change",
-    "sync:preview": "node scripts/supabase-sync-preview.mjs",
     "self-host:database": "node -- scripts/self-host-database/cli.mjs",
     "self-host:operations": "node -- scripts/self-host-operations/cli.mjs",
-    "self-host:receive": "node -- scripts/self-host-ci/receive-release.mjs",
-    "measure:admin:preview": "node scripts/admin-preview-performance.mjs",
-    "migrate:legacy-member-avatars": "node --import ./tests/alias-register.mjs --env-file-if-exists=.env.preview scripts/migrate-legacy-member-avatars.mjs",
-    "migrate:image-assets": "node --import ./tests/alias-register.mjs --env-file-if-exists=.env.preview scripts/migrate-image-assets.mts",
-    "rss:refresh": "node scripts/refresh-rss.mjs",
     "perf:lighthouse": "node scripts/run-package-scripts.mjs build perf:lighthouse:run",
     "perf:lighthouse:run": "node scripts/lighthouse-check.mjs",
+    "measure:client-bundle": "node scripts/measure-client-bundle.mjs",
     "test:mm-profile": "node --import ./tests/alias-register.mjs --test tests/mm-profile-csv.test.mts",
-    "test:partner-portal": "node --import ./tests/alias-register.mjs --test tests/partner-portal.mock.test.mts",
-    "test:ssafy-cycle": "node --import ./tests/alias-register.mjs --test tests/ssafy-cycle-simulation.test.mts",
     "validate:migrations": "node scripts/validate-supabase-migrations.mjs",
     "audit:security": "node scripts/security-audit.mjs",
     "bootstrap:super-admin": "node scripts/bootstrap-super-admin.mjs",
-    "release": "node scripts/release.mjs"
+    "release": "node scripts/release.mjs",
+    "typegen:release": "next typegen",
+    "test:e2e:prod": "node scripts/run-production-e2e.mjs",
+    "gen:database-types": "node scripts/generate-database-types.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1095.0",
@@ -68,11 +66,8 @@
     "@heroicons/react": "^2.2.0",
     "@supabase/supabase-js": "^2.99.0",
     "@types/qrcode": "^1.5.6",
-    "@vercel/analytics": "^2.0.1",
-    "@vercel/speed-insights": "^2.0.0",
     "archiver-core": "npm:archiver@8.0.0",
     "exceljs": "^4.4.0",
-    "jose": "^6.2.3",
     "jszip": "^3.10.1",
     "lucide-react": "^0.577.0",
     "marked": "^18.0.6",
@@ -83,17 +78,18 @@
     "pkijs": "3.4.1",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.10.38",
+    "pretendard": "^1.3.9",
     "qrcode": "^1.5.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-easy-crop": "^6.1.0",
-    "react-icons": "^5.6.0",
     "sanitize-html": "^2.17.7",
     "sharp": "^0.35.4",
     "web-push": "^3.6.7",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.59.1",
     "@storybook/addon-a11y": "10.6.0",
     "@storybook/addon-docs": "10.6.0",
@@ -116,11 +112,11 @@
     "lighthouse": "^13.4.1",
     "playwright": "^1.59.1",
     "postcss": "^8.5.23",
-    "pretendard": "^1.3.9",
     "storybook": "10.6.0",
     "tailwindcss": "^4",
     "typescript": "5.6.3",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "braces": "file:vendor/braces-depth-guard.tgz"
   },
   "overrides": {
     "@babel/core": "^7.29.7",
@@ -146,6 +142,8 @@
     "tmp": "^0.2.7",
     "uuid": "^11.1.1",
     "vite": "^8.0.16",
-    "ws": "^8.21.0"
-  }
+    "ws": "^8.21.0",
+    "braces": "$braces"
+  },
+  "license": "CC-BY-NC-4.0"
 }

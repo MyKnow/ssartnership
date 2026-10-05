@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import HomeContent from "@/components/HomeContent";
-import PromotionCarousel from "@/components/promotions/PromotionCarousel";
+import HomePromotionCarousel, {
+  HomePromotionCarouselFallback,
+} from "@/components/promotions/HomePromotionCarousel";
 import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
 import { HomePartnerExploreSkeleton } from "@/components/loading/SitePageSkeletons";
@@ -18,6 +20,7 @@ import {
 import {
   buildSiteUrl,
   createCanonicalAlternates,
+  createPageOpenGraph,
   serializeJsonLd,
 } from "@/lib/seo";
 import { getHeaderSession } from "@/lib/header-session";
@@ -26,7 +29,8 @@ import { getSignedUserSession } from "@/lib/user-auth";
 import { resolvePartnerAudienceFromMemberYear } from "@/lib/partner-audience";
 import { loadHomePartnerDirectoryState } from "@/lib/home-partner-directory";
 
-export const revalidate = 300;
+const HOME_CAROUSEL_CLASS_NAME =
+  "!mt-0 lg:!mt-5 lg:mx-auto lg:max-w-[min(var(--grid-wide),calc(100vw-1.5rem))] lg:px-8";
 
 export const metadata: Metadata = {
   title: SITE_TITLE,
@@ -38,28 +42,11 @@ export const metadata: Metadata = {
       "application/rss+xml": SITE_RSS_URL,
     },
   },
-  openGraph: {
+  openGraph: createPageOpenGraph({
+    path: "/",
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
-    url: "/",
-    siteName: SITE_NAME,
-    locale: "ko_KR",
-    type: "website",
-    images: [
-      {
-        url: "/icon-512.png",
-        width: 512,
-        height: 512,
-        alt: SITE_TITLE,
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: SITE_TITLE,
-    description: SITE_DESCRIPTION,
-    images: ["/icon-512.png"],
-  },
+  }),
   robots: {
     index: true,
     follow: true,
@@ -85,7 +72,9 @@ export default async function Home() {
     currentUserId: session?.userId ?? null,
     viewerAudience,
   });
-  const resolvedPromotionSlides = await getHomePromotionSlides({
+  // Slides stream behind their own Suspense boundary so the shell and the
+  // directory skeleton are not held back by the slide lookup.
+  const promotionSlidesPromise = getHomePromotionSlides({
     authenticated: Boolean(session?.userId),
     year: member?.generation ?? null,
     campus: member?.campus ?? null,
@@ -125,11 +114,16 @@ export default async function Home() {
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
       <main>
-        <PromotionCarousel
-          slides={resolvedPromotionSlides}
-          headingLevel="h1"
-          className="!mt-0 lg:!mt-5 lg:mx-auto lg:max-w-[min(var(--grid-wide),calc(100vw-1.5rem))] lg:px-8"
-        />
+        <Suspense
+          fallback={
+            <HomePromotionCarouselFallback className={HOME_CAROUSEL_CLASS_NAME} />
+          }
+        >
+          <HomePromotionCarousel
+            slidesPromise={promotionSlidesPromise}
+            className={HOME_CAROUSEL_CLASS_NAME}
+          />
+        </Suspense>
         <Container className="pb-16 pt-0" size="wide">
           <script
             type="application/ld+json"

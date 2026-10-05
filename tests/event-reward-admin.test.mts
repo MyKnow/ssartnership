@@ -510,3 +510,82 @@ test("winner form access only allows the winning signed-in member", async () => 
     true,
   );
 });
+
+test("event reward actions require an explicit supported event slug", async () => {
+  const {
+    EVENT_REWARD_DRAW_EVENT_SLUGS,
+    sendEventRewardWinnerNotifications,
+    sendEventRewardWinnerTestNotification,
+    supportsEventRewardDraw,
+  } = await eventRewardsModulePromise;
+
+  assert.deepEqual([...EVENT_REWARD_DRAW_EVENT_SLUGS], ["signup-reward"]);
+  assert.equal(supportsEventRewardDraw("signup-reward"), true);
+  assert.equal(supportsEventRewardDraw("review-reward"), false);
+  assert.equal(supportsEventRewardDraw(""), false);
+  assert.equal(supportsEventRewardDraw(null), false);
+
+  await assert.rejects(
+    sendEventRewardWinnerTestNotification(null, {
+      memberId: "member-test",
+      eventSlug: "",
+    }),
+    /추첨 대상 이벤트를 확인해 주세요/,
+  );
+  await assert.rejects(
+    sendEventRewardWinnerNotifications("draw-1", {
+      confirmationText: "알림 발송",
+      eventSlug: "review-reward",
+    }),
+    /추첨 대상 이벤트를 확인해 주세요/,
+  );
+});
+
+test("event reward admin surfaces derive the slug instead of defaulting to signup-reward", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const read = (path: string) =>
+    readFile(new URL(`../${path}`, import.meta.url), "utf8");
+  const [actions, rewards, page, section, exportRoute] = await Promise.all([
+    read("src/app/admin/(protected)/_actions/promotion-actions.ts"),
+    read("src/lib/promotions/event-rewards.ts"),
+    read("src/app/admin/(protected)/event/[slug]/page.tsx"),
+    read("src/components/admin/event-rewards/SignupRewardOverviewSection.tsx"),
+    read("src/app/admin/(protected)/event/[slug]/rewards/export/route.ts"),
+  ]);
+
+  assert.doesNotMatch(actions, /"signup-reward"/);
+  assert.match(actions, /requireEventRewardActionSlug\(formData\)/);
+  assert.equal(rewards.match(/"signup-reward"/g)?.length, 1);
+  assert.doesNotMatch(rewards, /\?\? "signup-reward"/);
+  assert.doesNotMatch(page, /"signup-reward"/);
+  assert.match(page, /supportsEventRewardDraw\(slug\)/);
+  assert.doesNotMatch(section, /signup-reward/);
+  assert.match(section, /name="slug" value=\{campaign\.slug\}/);
+  assert.match(section, /href=\{`\/admin\/event\/\$\{campaign\.slug\}\/rewards\/export`\}/);
+  assert.match(exportRoute, /params: Promise<\{ slug: string \}>/);
+  assert.match(exportRoute, /supportsEventRewardDraw\(slug\)/);
+  assert.doesNotMatch(exportRoute, /"signup-reward"/);
+});
+
+test("event reward winner send outcome copy covers partial and total delivery failure", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const read = (path: string) =>
+    readFile(new URL(`../${path}`, import.meta.url), "utf8");
+  const [actions, page] = await Promise.all([
+    read("src/app/admin/(protected)/_actions/promotion-actions.ts"),
+    read("src/app/admin/(protected)/event/[slug]/page.tsx"),
+  ]);
+
+  // Only a fully reached draw reports success; partial_failed and failed share
+  // the retry notice, so the notice must not claim that only some failed.
+  assert.match(
+    actions,
+    /result\.status === "sent" \? "winner-sent" : "winner-partial"/,
+  );
+  const partialNotice = page.match(
+    /status === "winner-partial"\) \{[\s\S]*?return "([^"]+)";/,
+  )?.[1];
+  assert.ok(partialNotice, "winner-partial notice should exist");
+  assert.doesNotMatch(partialNotice, /일부/);
+  assert.match(partialNotice, /미도달 당첨자에게 다시 보내 주세요/);
+});

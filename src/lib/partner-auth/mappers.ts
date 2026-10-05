@@ -1,7 +1,7 @@
 import type {
   PartnerPortalCompanySummary,
   PartnerPortalLoginResult,
-} from "../partner-portal.ts";
+} from "./portal.ts";
 import { normalizePartnerVisibility } from "../partner-visibility.ts";
 import type {
   PartnerPortalAccountRow,

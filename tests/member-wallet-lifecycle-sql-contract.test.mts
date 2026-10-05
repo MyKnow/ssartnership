@@ -15,8 +15,14 @@ function extractFunctionContract(sql: string, signature: string) {
   const start = sql.lastIndexOf(signature);
   assert.notEqual(start, -1, `${signature} must exist`);
   const tail = sql.slice(start);
-  const nextFunction = tail.indexOf("\ncreate or replace function", signature.length);
-  return (nextFunction === -1 ? tail : tail.slice(0, nextFunction)).trim();
+  // The contract is the definition through its service-role grant, so text the
+  // snapshot places after it (another function or a comment) is not compared.
+  const name = /function public\.([a-z_][a-z0-9_]*)\(/u.exec(signature)?.[1];
+  assert.ok(name, `${signature} must name a public function`);
+  const grant = tail.indexOf(`grant execute on function public.${name}(`);
+  assert.notEqual(grant, -1, `${name} must grant service_role`);
+  const grantEnd = tail.indexOf("\n", grant);
+  return (grantEnd === -1 ? tail : tail.slice(0, grantEnd)).trim();
 }
 
 test("soft delete revokes active Wallet credentials in the member transaction", () => {

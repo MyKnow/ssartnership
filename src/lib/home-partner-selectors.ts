@@ -1,0 +1,164 @@
+import type { Category, CategoryKey, Partner } from "./types.ts";
+import type { CampusSlug } from "./campuses.ts";
+import { doesPartnerMatchCampus } from "./campuses.ts";
+import { getPartnerAudienceLabel, type PartnerAudienceFilter } from "./partner-audience.ts";
+import {
+  getPartnerLockKind,
+  getPartnerVisibilityState,
+  type PartnerVisibilityState,
+} from "./partner-visibility.ts";
+import { compareEndDate } from "./partner-utils.ts";
+import {
+  calculatePartnerPopularityScore,
+  type PartnerPopularityMetrics,
+} from "@/lib/partner-popularity";
+
+export type HomePartnerSortOption = "popular" | "recent" | "endingSoon";
+
+const LOCK_ORDER = {
+  confidential: 0,
+  private: 1,
+} as const;
+
+export type HomePartnerViewModel = Partner & {
+  _index: number;
+  _visibilityState: PartnerVisibilityState;
+  _lockKind: "confidential" | "private" | null;
+  _isActive: boolean;
+  _isExpired: boolean;
+  _popularityScore: number;
+  _search: string;
+};
+
+export function createHomeCategoryMap(categories: Category[]) {
+  return new Map(
+    categories.map((category) => [
+      category.key,
+      { label: category.label, color: category.color },
+    ]),
+  );
+}
+
+export function normalizeHomePartners(
+  partners: Partner[],
+  viewerAuthenticated: boolean,
+  popularityByPartnerId: Record<string, PartnerPopularityMetrics | undefined> = {},
+): HomePartnerViewModel[] {
+  return partners.map((partner, index) => {
+    const visibilityState = getPartnerVisibilityState(
+      partner.visibility,
+      partner.period.start,
+      partner.period.end,
+    );
+    const popularityScore = calculatePartnerPopularityScore(
+      popularityByPartnerId[partner.id],
+    );
+
+    const lockKind =
+      visibilityState === "expired"
+        ? null
+        : getPartnerLockKind(partner.visibility, viewerAuthenticated);
+
+    return {
+      ...partner,
+      _index: index,
+      _visibilityState: visibilityState,
+      _lockKind: lockKind,
+      _isActive: visibilityState !== "expired",
+      _isExpired: visibilityState === "expired",
+      _popularityScore: popularityScore,
+      _search:
+        partner.directorySearchText ??
+        [
+          partner.name,
+          partner.location,
+          partner.reservationLink ?? "",
+          partner.inquiryLink ?? "",
+          partner.conditions.join(" "),
+          partner.benefits.join(" "),
+          partner.appliesTo.map((item) => getPartnerAudienceLabel(item)).join(" "),
+          (partner.tags ?? []).join(" "),
+        ]
+          .join(" ")
+          .toLowerCase(),
+    };
+  });
+}
+
+export function filterHomePartners({
+  partners,
+  activeCategory,
+  campusFilter,
+  appliesToFilter,
+  searchValue,
+  sortValue,
+}: {
+  partners: HomePartnerViewModel[];
+  activeCategory: CategoryKey | "all";
+  campusFilter: CampusSlug | "all";
+  appliesToFilter: PartnerAudienceFilter;
+  searchValue: string;
+  sortValue: HomePartnerSortOption;
+}) {
+  const query = searchValue.trim().toLowerCase();
+  const categoryFiltered =
+    activeCategory === "all"
+      ? partners
+      : partners.filter((partner) => partner.category === activeCategory);
+
+  const appliesFiltered =
+    appliesToFilter === "all"
+      ? categoryFiltered
+      : categoryFiltered.filter((partner) =>
+          partner.appliesTo.includes(appliesToFilter),
+        );
+
+  const campusFiltered =
+    campusFilter === "all"
+      ? appliesFiltered
+      : appliesFiltered.filter((partner) =>
+          doesPartnerMatchCampus(partner, campusFilter),
+        );
+
+  const activeFiltered = campusFiltered.filter((partner) => !partner._isExpired);
+  const searchFiltered = query
+    ? activeFiltered.filter((partner) => partner._search.includes(query))
+    : activeFiltered;
+  const visibleFiltered = searchFiltered.filter((partner) => !partner._lockKind);
+  const lockedFiltered = searchFiltered.filter((partner) => partner._lockKind);
+
+  const sortPartners = (items: typeof searchFiltered) =>
+    [...items].sort((a, b) => {
+      if (a._lockKind !== b._lockKind) {
+        return (
+          LOCK_ORDER[a._lockKind ?? "confidential"] -
+          LOCK_ORDER[b._lockKind ?? "confidential"]
+        );
+      }
+      if (a._isActive !== b._isActive) {
+        return a._isActive ? -1 : 1;
+      }
+      if (sortValue === "popular") {
+        const compare = b._popularityScore - a._popularityScore;
+        if (compare !== 0) {
+          return compare;
+        }
+      }
+      if (sortValue === "endingSoon") {
+        const compare = compareEndDate(a.period.end, b.period.end);
+        if (compare !== 0) {
+          return compare;
+        }
+      }
+      return a._index - b._index;
+    });
+
+  const visible = sortPartners(visibleFiltered);
+  const locked = sortPartners(lockedFiltered);
+
+  return {
+    visible,
+    locked,
+    display: [...visible, ...locked],
+  };
+}

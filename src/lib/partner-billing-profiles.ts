@@ -1,12 +1,15 @@
+import { getMockBillingProfiles, updateMockBillingProfiles } from "./mock/partner-billing-profiles";
 import { randomUUID } from "node:crypto";
 import {
   normalizePartnerBillingProfileInput,
+  PARTNER_BILLING_FIELD_LIMITS,
   type PartnerBillingProfile,
   type PartnerBillingProfileInput,
 } from "@/lib/partner-billing";
-import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 import { normalizePlanUpgradePayerName } from "@/lib/partner-plan-upgrades";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { isUuid } from "@/lib/uuid";
 
 const DEFAULT_BILLING_PROFILE_LABEL = "기본 세금계산서 정보";
 
@@ -65,9 +68,6 @@ type BillingProfileRow = {
   updated_at: string;
 };
 
-const globalScope = globalThis as typeof globalThis & {
-  __mockPartnerBillingProfiles?: PartnerBillingProfileRecord[];
-};
 
 function nowIso() {
   return new Date().toISOString();
@@ -75,8 +75,10 @@ function nowIso() {
 
 export function normalizePartnerBillingProfileLabel(value: string) {
   const normalized = value.trim() || DEFAULT_BILLING_PROFILE_LABEL;
-  if (normalized.length > 80) {
-    throw new Error("프로필 이름은 80자 이하로 입력해 주세요.");
+  if (normalized.length > PARTNER_BILLING_FIELD_LIMITS.profileLabel) {
+    throw new Error(
+      `프로필 이름은 ${PARTNER_BILLING_FIELD_LIMITS.profileLabel}자 이하로 입력해 주세요.`,
+    );
   }
   return normalized;
 }
@@ -146,46 +148,8 @@ export function isPartnerBillingProfileVisibleInCompanyScope(
   return profile.accountId === null && profile.companyId === input.companyId;
 }
 
-function createMockSeedProfiles() {
-  const createdAt = "2026-07-03T00:00:00.000Z";
-  return [
-    {
-      id: "mock-billing-profile-cafe-ssafy-default",
-      companyId: "mock-partner-company-cafe-ssafy",
-      accountId: "mock-partner-account-cafe-ssafy",
-      label: "카페 싸피 역삼본점",
-      payerName: "카페싸피",
-      businessRegistrationNumber: "2208162517",
-      businessName: "카페싸피",
-      representativeName: "김도연",
-      businessAddress: "서울 강남구 역삼로 123",
-      businessType: "음식점업",
-      businessItem: "커피",
-      taxInvoiceEmail: "tax@cafessafy.example",
-      taxDocumentType: "tax_invoice",
-      isDefault: true,
-      lastUsedAt: null,
-      archivedAt: null,
-      createdAt,
-      updatedAt: createdAt,
-    },
-  ] satisfies PartnerBillingProfileRecord[];
-}
 
-function getMockBillingProfiles() {
-  if (!globalScope.__mockPartnerBillingProfiles) {
-    globalScope.__mockPartnerBillingProfiles = createMockSeedProfiles();
-  }
-  return globalScope.__mockPartnerBillingProfiles;
-}
 
-function updateMockBillingProfiles(
-  updater: (
-    profiles: PartnerBillingProfileRecord[],
-  ) => PartnerBillingProfileRecord[],
-) {
-  globalScope.__mockPartnerBillingProfiles = updater(getMockBillingProfiles());
-}
 
 async function assertSupabaseAccountCompaniesAccess(input: {
   accountId: string;
@@ -226,6 +190,32 @@ async function assertSupabaseAccountCompanyAccess(input: {
     accountId: input.accountId,
     companyIds: [input.companyId],
   });
+}
+
+/**
+ * PostgREST `or` filter for the billing profiles visible to one account in a
+ * set of companies: the account's own profiles plus company-level profiles
+ * that predate per-account ownership (`account_id is null`, see
+ * 20260703174331). The ids are interpolated into filter syntax, so anything
+ * that is not a UUID is rejected instead of escaped.
+ */
+export function buildPartnerBillingProfileScopeFilter(
+  accountId: string,
+  companyIds: readonly string[],
+) {
+  const normalizedAccountId = accountId.trim();
+  const normalizedCompanyIds = [
+    ...new Set(companyIds.map((companyId) => companyId.trim())),
+  ];
+  if (
+    !isUuid(normalizedAccountId) ||
+    normalizedCompanyIds.length === 0 ||
+    !normalizedCompanyIds.every(isUuid)
+  ) {
+    throw new Error("파트너사 접근 권한이 없습니다.");
+  }
+
+  return `account_id.eq.${normalizedAccountId},and(account_id.is.null,company_id.in.(${normalizedCompanyIds.join(",")}))`;
 }
 
 export function toPartnerBillingProfileFormValues(
@@ -285,32 +275,17 @@ export async function getPartnerBillingProfilesForCompanies(input: {
   const supabase = getSupabaseAdminClient();
   const selectColumns =
     "id,company_id,account_id,label,payer_name,business_registration_number,business_name,representative_name,business_address,business_type,business_item,tax_invoice_email,tax_document_type,is_default,last_used_at,archived_at,created_at,updated_at";
-  const [accountProfilesResult, legacyCompanyProfilesResult] =
-    await Promise.all([
-      supabase
-        .from("partner_billing_profiles")
-        .select(selectColumns)
-        .eq("account_id", input.accountId)
-        .is("archived_at", null),
-      supabase
-        .from("partner_billing_profiles")
-        .select(selectColumns)
-        .in("company_id", companyIds)
-        .is("account_id", null)
-        .is("archived_at", null),
-    ]);
+  const { data, error } = await supabase
+    .from("partner_billing_profiles")
+    .select(selectColumns)
+    .or(buildPartnerBillingProfileScopeFilter(input.accountId, companyIds))
+    .is("archived_at", null);
 
-  if (accountProfilesResult.error) {
-    throw new Error(accountProfilesResult.error.message);
-  }
-  if (legacyCompanyProfilesResult.error) {
-    throw new Error(legacyCompanyProfilesResult.error.message);
+  if (error) {
+    throw new Error(error.message);
   }
 
-  const profileRows = [
-    ...((accountProfilesResult.data ?? []) as BillingProfileRow[]),
-    ...((legacyCompanyProfilesResult.data ?? []) as BillingProfileRow[]),
-  ];
+  const profileRows = (data ?? []) as BillingProfileRow[];
   const profilesById = new Map(
     profileRows.map((row) => [row.id, mapBillingProfileRow(row)]),
   );

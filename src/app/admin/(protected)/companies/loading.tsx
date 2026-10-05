@@ -1,5 +1,11 @@
 import { AdminCompaniesSkeleton } from "@/components/loading/AdminPageSkeletons";
+import RouteLoadingStatus from "@/components/loading/RouteLoadingStatus";
 
 export default function AdminCompaniesLoading() {
-  return <AdminCompaniesSkeleton />;
+  return (
+    <>
+      <RouteLoadingStatus />
+      <AdminCompaniesSkeleton />
+    </>
+  );
 }

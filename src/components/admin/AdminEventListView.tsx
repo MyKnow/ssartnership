@@ -1,7 +1,7 @@
 import Link from "next/link";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminOperationFlow from "@/components/admin/AdminOperationFlow";
-import Card from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
 import FormMessage from "@/components/ui/FormMessage";
 import StatsRow from "@/components/ui/StatsRow";
 
@@ -223,9 +223,10 @@ export default function AdminEventListView({
               ))}
             </div>
           ) : (
-            <Card tone="muted" className="text-sm text-muted-foreground">
-              해당 상태의 이벤트가 없습니다.
-            </Card>
+            <EmptyState
+              size="sm"
+              title={`${section.bucket} 상태의 이벤트가 없습니다.`}
+            />
           )}
         </section>
       ))}

@@ -241,7 +241,7 @@ export default function PartnerFilters({
           )}
         </>
       ) : (
-        <div className="flex min-w-0 flex-col gap-1">
+        <label className="flex min-w-0 flex-col gap-1">
           <span className="ui-caption">정렬</span>
           <Select
             value={sortValue}
@@ -256,7 +256,7 @@ export default function PartnerFilters({
               </option>
             ))}
           </Select>
-        </div>
+        </label>
       )}
     </Surface>
   );

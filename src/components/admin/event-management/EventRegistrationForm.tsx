@@ -1,5 +1,6 @@
-import Button from "@/components/ui/Button";
+import Checkbox from "@/components/ui/Checkbox";
 import Input from "@/components/ui/Input";
+import SubmitButton from "@/components/ui/SubmitButton";
 import type { ManagedEventCampaign } from "@/lib/promotions/events";
 import {
   DEFAULT_PROMOTION_AUDIENCES,
@@ -7,23 +8,7 @@ import {
   type EventCampaign,
   type PromotionAudience,
 } from "@/lib/promotions/catalog";
-
-function toDateTimeLocal(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-  const formatter = new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-  return formatter.format(date).replace(" ", "T");
-}
+import { formatKoreanDateTimeLocalValue } from "@/lib/datetime";
 
 function FieldLabel({
   label,
@@ -58,8 +43,8 @@ export default function EventRegistrationForm({
   submitLabel: string;
 }) {
   const isRegistered = Boolean(registration?.id);
-  const startsAt = toDateTimeLocal(registration?.startsAt ?? definition.startsAt);
-  const endsAt = toDateTimeLocal(registration?.endsAt ?? definition.endsAt);
+  const startsAt = formatKoreanDateTimeLocalValue(registration?.startsAt ?? definition.startsAt);
+  const endsAt = formatKoreanDateTimeLocalValue(registration?.endsAt ?? definition.endsAt);
   const audiences = getDefaultAudiences(registration);
   const pagePath = registration?.pagePath ?? `/events/${definition.slug}`;
 
@@ -74,8 +59,7 @@ export default function EventRegistrationForm({
         </FieldLabel>
         <FieldLabel label="공개 상태">
           <label className="flex h-11 items-center gap-2 rounded-input border border-border bg-surface px-4 text-sm font-medium text-foreground">
-            <input
-              type="checkbox"
+            <Checkbox
               name="isActive"
               defaultChecked={registration ? registration.isActive : true}
               className="h-4 w-4 accent-primary"
@@ -98,8 +82,7 @@ export default function EventRegistrationForm({
               key={option.key}
               className="flex items-start gap-3 rounded-[1rem] border border-border/70 bg-surface px-4 py-3 text-sm font-medium text-foreground"
             >
-              <input
-                type="checkbox"
+              <Checkbox
                 name="targetAudiences"
                 value={option.key}
                 defaultChecked={audiences.includes(option.key)}
@@ -124,7 +107,9 @@ export default function EventRegistrationForm({
       </div>
 
       <div className="flex justify-end">
-        <Button type="submit">{submitLabel}</Button>
+        <SubmitButton pendingText={isRegistered ? "저장 중" : "등록 중"}>
+          {submitLabel}
+        </SubmitButton>
       </div>
     </form>
   );

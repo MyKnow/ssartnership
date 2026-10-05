@@ -1,4 +1,4 @@
-import type { PartnerPortalRepository } from "../partner-portal.ts";
+import type { PartnerPortalRepository } from "../partner-auth/portal.ts";
 import {
   authenticateMockPartnerPortalLogin,
   changeMockPartnerPortalPassword,

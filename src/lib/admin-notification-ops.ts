@@ -6,43 +6,41 @@ import {
 } from "@/lib/notifications/shared";
 import { getPolicyDocumentByKind } from "@/lib/policy-documents.server";
 import { getActiveSubscriptionPushPreferences } from "@/lib/push/preferences";
-import { getPushEnv, isPushConfigured } from "@/lib/push/config";
+import { isPushConfigured } from "@/lib/push/config";
+import { getWebPush } from "@/lib/push/web-push-client";
 import { resolvePushAudience } from "@/lib/push/audience";
-import type {
-  PushAudience,
-  PushNotificationType,
-} from "@/lib/push";
+import type { PushNotificationType } from "@/lib/push";
 import type {
   PushPreferenceState,
   ResolvedPushAudience,
   StoredSubscription,
-  WebPushModule,
 } from "@/lib/push/types";
 import { getMmUserDirectoryEntriesByAccountIds } from "@/lib/mm-directory/identities";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import {
+  MEMBER_IDENTITY_SELECT,
+  type MemberIdentityRow,
+} from "@/lib/members/projections";
 import {
   collectPagedRows,
   collectPagedRowsByFilterChunks,
   collectRowsByFilterChunks,
 } from "@/lib/supabase/paging";
 import { getCampaignTemplateKey } from "@/lib/notification-templates/catalog";
+import { toMemberTemplateChannel } from "@/lib/notifications/channel";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
 import {
   NOTIFICATION_TEMPLATE_MAX_BODY_LENGTH,
   NOTIFICATION_TEMPLATE_MAX_TITLE_LENGTH,
   renderNotificationTemplate,
 } from "@/lib/notification-templates/template";
-import {
-  mergeNotificationTemplateVariables,
-  type NotificationTemplateContext,
-} from "@/lib/notification-templates/context";
+import { mergeNotificationTemplateVariables } from "@/lib/notification-templates/context";
 import {
   EMPTY_CHANNEL_RESULTS,
   absoluteUrl,
   computeOperationStatus,
   getNotificationTypeLabel,
   getPreviewReasonLabel,
-  getTypePreferenceEnabled,
   isAdminNotificationType,
   isMattermostConfigured,
   mergeExclusionReasons,
@@ -51,138 +49,42 @@ import {
   resolveMattermostSenderGenerationForMember,
 } from "@/lib/admin-notification-ops-utils";
 import { mattermostSenderRepository } from "@/lib/mattermost-senders/repository";
+import { resolveAdminNotificationMemberChannelReasons } from "@/lib/admin-notification-ops-eligibility";
 import {
   sendMattermostCampaignDeliveries,
   sendPushCampaignDeliveries,
 } from "@/lib/admin-notification-ops-delivery";
+import { logServerError } from "@/lib/server-log";
 
-export const ADMIN_NOTIFICATION_TYPES = [
-  "announcement",
-  "marketing",
-  "new_partner",
-  "expiring_partner",
-] as const;
+import {
+  ADMIN_NOTIFICATION_TYPES,
+  type AdminNotificationChannelPreview,
+  type AdminNotificationComposerInput,
+  type AdminNotificationEligibleMember,
+  type AdminNotificationOperationLog,
+  type AdminNotificationPreview,
+  type AdminNotificationPreviewReasonCode,
+  type AdminNotificationSendResult,
+  type AdminNotificationSource,
+  type AdminNotificationType,
+  type AutomaticNotificationRuleSummary,
+} from "@/lib/admin-notification-ops-types";
 
-export type AdminNotificationType = (typeof ADMIN_NOTIFICATION_TYPES)[number];
-
-export type AdminNotificationSource = "manual" | "automatic";
-
-export type AdminNotificationChannelSelection = Record<NotificationChannel, boolean>;
-
-export type AdminNotificationComposerInput = {
-  notificationType: AdminNotificationType;
-  title: string;
-  body: string;
-  url?: string | null;
-  audience: PushAudience;
-  channels: AdminNotificationChannelSelection;
-  confirmationText?: string | null;
-  idempotencyKey?: string | null;
-  templateContext?: NotificationTemplateContext;
-};
-
-export type AdminNotificationPreviewReasonCode =
-  | "type_disabled"
-  | "marketing_not_consented"
-  | "push_disabled"
-  | "no_push_subscription"
-  | "mm_disabled"
-  | "channel_unavailable";
-
-export type AdminNotificationPreviewReason = {
-  code: AdminNotificationPreviewReasonCode;
-  label: string;
-  count: number;
-};
-
-export type AdminNotificationEligibleMember = {
-  id: string;
-  name: string;
-  mmUsername: string;
-  year: number;
-  campus: string | null;
-  channels: NotificationChannel[];
-};
-
-export type AdminNotificationChannelPreview = {
-  channel: NotificationChannel;
-  label: string;
-  eligibleCount: number;
-  excludedCount: number;
-  reasons: AdminNotificationPreviewReason[];
-};
-
-export type AdminNotificationPreview = {
-  notificationType: AdminNotificationType;
-  selectedChannels: NotificationChannel[];
-  audienceScope: ResolvedPushAudience["scope"];
-  audienceLabel: string;
-  totalAudienceCount: number;
-  eligibleMemberCount: number;
-  eligibleMembers: AdminNotificationEligibleMember[];
-  destinationLabel: string;
-  channels: AdminNotificationChannelPreview[];
-  canSend: boolean;
-  highRisk: boolean;
-  requiresConfirmation: boolean;
-  confirmationPhrase: string;
-  validationMessage: string | null;
-};
-
-export type AdminNotificationSendResult = {
-  notificationId: string;
-  preview: AdminNotificationPreview;
-  channelResults: Record<
-    NotificationChannel,
-    {
-      targeted: number;
-      sent: number;
-      failed: number;
-      skipped: number;
-    }
-  >;
-  warnings: string[];
-  alreadyExists?: boolean;
-};
-
-export type AdminNotificationOperationLog = {
-  id: string;
-  notificationType: AdminNotificationType;
-  source: AdminNotificationSource;
-  selectedChannels: NotificationChannel[];
-  targetScope: ResolvedPushAudience["scope"];
-  targetLabel: string;
-  targetYear: number | null;
-  targetCampus: string | null;
-  targetMemberId: string | null;
-  title: string;
-  body: string;
-  url: string | null;
-  status: "pending" | "sent" | "partial_failed" | "failed" | "no_target";
-  totalAudienceCount: number;
-  marketing: boolean;
-  channelResults: Record<
-    NotificationChannel,
-    {
-      targeted: number;
-      sent: number;
-      failed: number;
-      skipped: number;
-    }
-  >;
-  exclusionReasons: AdminNotificationPreviewReason[];
-  createdAt: string;
-  completedAt: string | null;
-};
-
-export type AutomaticNotificationRuleSummary = {
-  notificationType: Extract<AdminNotificationType, "new_partner" | "expiring_partner">;
-  label: string;
-  lastRunAt: string | null;
-  recentCount: number;
-  failedCount: number;
-  failureSamples: string[];
-};
+export { ADMIN_NOTIFICATION_TYPES };
+export type {
+  AdminNotificationChannelPreview,
+  AdminNotificationChannelSelection,
+  AdminNotificationComposerInput,
+  AdminNotificationEligibleMember,
+  AdminNotificationOperationLog,
+  AdminNotificationPreview,
+  AdminNotificationPreviewReason,
+  AdminNotificationPreviewReasonCode,
+  AdminNotificationSendResult,
+  AdminNotificationSource,
+  AdminNotificationType,
+  AutomaticNotificationRuleSummary,
+} from "@/lib/admin-notification-ops-types";
 
 type AudienceMember = {
   id: string;
@@ -194,14 +96,6 @@ type AudienceMember = {
   isStaff: boolean;
   sourceYears: number[];
   senderGeneration: number | null;
-};
-
-type AudienceMemberRow = {
-  id: string;
-  mattermost_account_id: string | null;
-  display_name: string | null;
-  generation: number | null;
-  campus: string | null;
 };
 
 type AudiencePreferenceRow = {
@@ -306,22 +200,10 @@ type PushMessageLogRow = {
   completed_at: string | null;
 };
 
-let webPushPromise: Promise<WebPushModule> | null = null;
 const NOTIFICATION_CAMPAIGN_LEASE_SECONDS = 10 * 60;
 
 export function isMattermostNotificationConfigured() {
   return isMattermostConfigured();
-}
-
-async function getWebPush() {
-  if (!webPushPromise) {
-    webPushPromise = import("web-push").then((module) => {
-      const { publicKey, privateKey, subject } = getPushEnv();
-      module.setVapidDetails(subject, publicKey, privateKey);
-      return module;
-    });
-  }
-  return webPushPromise;
 }
 
 async function listAudienceMembers(resolvedAudience: ResolvedPushAudience) {
@@ -329,40 +211,38 @@ async function listAudienceMembers(resolvedAudience: ResolvedPushAudience) {
   const selectedMemberIds = resolvedAudience.memberIds;
   const memberRows = selectedMemberIds
     ? (
-        await collectRowsByFilterChunks<string, AudienceMemberRow>(
+        await collectRowsByFilterChunks<string, MemberIdentityRow>(
           selectedMemberIds,
           async (memberIdChunk) => {
             const { data, error } = await supabase
               .from("members")
-              .select(
-                "id,mattermost_account_id,display_name,generation,campus",
-              )
+              .select(MEMBER_IDENTITY_SELECT)
+              .is("deleted_at", null)
               .in("id", [...memberIdChunk]);
             if (error) {
               throw new Error("발송 대상을 불러오지 못했습니다.");
             }
             return {
-              rows: (data ?? []) as AudienceMemberRow[],
+              rows: (data ?? []) as MemberIdentityRow[],
               error: false,
             };
           },
         )
       ).rows
     : (
-        await collectPagedRows<AudienceMemberRow>(null, async (from, to) => {
+        await collectPagedRows<MemberIdentityRow>(null, async (from, to) => {
           const { data, error } = await supabase
             .from("members")
-            .select(
-              "id,mattermost_account_id,display_name,generation,campus",
-            )
-            .order("display_name", { ascending: true })
+            .select(MEMBER_IDENTITY_SELECT)
+            .is("deleted_at", null)
+            // PK 순서로만 페이지를 나누고 표시 순서는 아래 메모리 정렬이 정한다.
             .order("id", { ascending: true })
             .range(from, to);
           if (error) {
             throw new Error("발송 대상을 불러오지 못했습니다.");
           }
           return {
-            rows: (data ?? []) as AudienceMemberRow[],
+            rows: (data ?? []) as MemberIdentityRow[],
             error: false,
           };
         })
@@ -565,52 +445,25 @@ async function buildAudienceContext(
 
   for (const member of members) {
     const preference = getActiveSubscriptionPushPreferences(preferenceMap.get(member.id));
-    const hasCurrentMarketingConsent = Boolean(activeMarketingPolicy)
-      && marketingConsentedMemberIds.has(member.id);
-    const normalizedPreference = {
-      ...preference,
-      marketingEnabled: hasCurrentMarketingConsent,
-    };
-    const typeEnabled = getTypePreferenceEnabled(notificationType, normalizedPreference);
-    const marketingAllowed =
-      notificationType !== "marketing" || hasCurrentMarketingConsent;
-
     const activeSubscriptions = subscriptionsByMemberId.get(member.id) ?? [];
-    const channelReasons: Partial<Record<NotificationChannel, AdminNotificationPreviewReasonCode>> = {};
-
-    if (!typeEnabled) {
-      channelReasons.in_app = "type_disabled";
-      channelReasons.push = "type_disabled";
-      channelReasons.mm = "type_disabled";
-    } else if (!marketingAllowed) {
-      channelReasons.in_app = "marketing_not_consented";
-      channelReasons.push = "marketing_not_consented";
-      channelReasons.mm = "marketing_not_consented";
-    }
+    const channelReasons = resolveAdminNotificationMemberChannelReasons({
+      notificationType,
+      preference,
+      hasActiveMarketingPolicy: Boolean(activeMarketingPolicy),
+      hasCurrentMarketingPolicyConsent: marketingConsentedMemberIds.has(member.id),
+      activePushSubscriptionCount: activeSubscriptions.length,
+      hasMattermostUser: Boolean(member.mattermostUserId),
+    });
 
     if (!channelReasons.in_app) {
       eligibleMemberIds.in_app.push(member.id);
     }
-
     if (!channelReasons.push) {
-      if (!preference.enabled) {
-        channelReasons.push = "push_disabled";
-      } else if (activeSubscriptions.length === 0) {
-        channelReasons.push = "no_push_subscription";
-      } else {
-        eligibleMemberIds.push.push(member.id);
-        pushSubscriptions.push(...activeSubscriptions);
-      }
+      eligibleMemberIds.push.push(member.id);
+      pushSubscriptions.push(...activeSubscriptions);
     }
-
     if (!channelReasons.mm) {
-      if (!preference.mmEnabled) {
-        channelReasons.mm = "mm_disabled";
-      } else if (!member.mattermostUserId) {
-        channelReasons.mm = "channel_unavailable";
-      } else {
-        eligibleMemberIds.mm.push(member.id);
-      }
+      eligibleMemberIds.mm.push(member.id);
     }
 
     for (const channel of selectedChannels) {
@@ -764,7 +617,11 @@ export async function sendAdminNotificationCampaign(
   }
 
   const inAppTemplate = await resolveNotificationTemplate(
-    getCampaignTemplateKey("in_app", input.notificationType, source),
+    getCampaignTemplateKey(
+      toMemberTemplateChannel("in_app"),
+      input.notificationType,
+      source,
+    ),
   );
   const templateVariables = mergeNotificationTemplateVariables({
     context: input.templateContext,
@@ -931,10 +788,9 @@ export async function sendAdminNotificationCampaign(
   } catch (error) {
     const warning = "발송 결과 기록을 저장하지 못했습니다.";
     warnings.push(warning);
-    console.error(
-      `[admin-notification-ops] final metadata update failed for notification ${notification.id}`,
-      error,
-    );
+    logServerError("[admin-notification-ops] final metadata update failed", error, {
+      notificationId: notification.id,
+    });
   }
 
   return {
@@ -954,7 +810,7 @@ export async function getRecentAdminNotificationOperationLogs(limit = 50) {
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) {
-    console.error("[admin-notification-ops] notifications query failed", error.message);
+    logServerError("[admin-notification-ops] notifications query failed", error);
   } else {
     const rows = (notifications ?? []) as NotificationRow[];
     if (rows.length) {
@@ -973,10 +829,7 @@ export async function getRecentAdminNotificationOperationLogs(limit = 50) {
           .select("notification_id,channel,status")
           .in("notification_id", rowsNeedingDeliveryLookup);
         if (deliveryError) {
-          console.error(
-            "[admin-notification-ops] notification_deliveries query failed",
-            deliveryError.message,
-          );
+          logServerError("[admin-notification-ops] notification_deliveries query failed", deliveryError);
         }
 
         for (const delivery of (deliveries ?? []) as NotificationDeliveryRow[]) {
@@ -1049,7 +902,7 @@ export async function getRecentAdminNotificationOperationLogs(limit = 50) {
     .limit(limit);
 
   if (pushLogError) {
-    console.error("[admin-notification-ops] push_message_logs query failed", pushLogError.message);
+    logServerError("[admin-notification-ops] push_message_logs query failed", pushLogError);
     return [] as AdminNotificationOperationLog[];
   }
 

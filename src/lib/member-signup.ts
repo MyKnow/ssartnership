@@ -1,5 +1,6 @@
 import { validatePasswordPolicy } from "@/lib/validation";
 import { isUuid } from "@/lib/uuid";
+import { hasFieldErrors } from "@/lib/field-errors";
 
 export type MemberSignupCompleteInput = {
   password: string;
@@ -137,7 +138,7 @@ export function parseMemberSignupCompleteInput(input: unknown):
   ) {
     fieldErrors.profileImageUploadId = "프로필 사진 업로드 정보를 확인해 주세요.";
   }
-  return Object.keys(fieldErrors).length > 0
+  return hasFieldErrors(fieldErrors)
     ? { ok: false, fieldErrors }
     : { ok: true, data };
 }

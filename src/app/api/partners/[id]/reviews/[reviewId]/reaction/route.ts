@@ -8,7 +8,13 @@ import {
   RouteJsonBodyError,
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
-import { ensureVisibleReviewPartner, getReviewMemberSession } from "../../_shared";
+import {
+  ensureVisibleReviewPartner,
+  getReviewMemberSessionLookup,
+  reviewSessionUnavailableResponse,
+} from "../../_shared";
+import { logServerError } from "@/lib/server-log";
+import { memberApiSessionDeniedResponse } from "@/lib/member-api-session";
 
 export const runtime = "nodejs";
 
@@ -28,12 +34,19 @@ export async function PATCH(
   }
 
   const { id, reviewId } = await context.params;
-  const session = await getReviewMemberSession().catch(() => null);
+  const sessionLookup = await getReviewMemberSessionLookup();
+  if (!sessionLookup.ok) {
+    return reviewSessionUnavailableResponse();
+  }
+  const session = sessionLookup.session;
   if (!session?.userId) {
     return NextResponse.json(
       { ok: false, message: "로그인 후 리뷰에 반응할 수 있습니다." },
       { status: 401 },
     );
+  }
+  if (session.mustChangePassword) {
+    return memberApiSessionDeniedResponse("password_change_required");
   }
 
   const partner = await ensureVisibleReviewPartner(id, session.userId);
@@ -110,7 +123,7 @@ export async function PATCH(
     }
     return NextResponse.json({ ok: true, review });
   } catch (error) {
-    console.error("[partner-review-reaction] update failed", error);
+    logServerError("[partner-review-reaction] update failed", error);
     const safeError = getSafePublicRouteError(
       error,
       "리뷰 반응에 실패했습니다. 잠시 후 다시 시도해 주세요.",

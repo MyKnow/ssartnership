@@ -6,10 +6,9 @@ import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {test} from 'node:test';
 import {productionCronTimers, productionCronCalendar, loadProductionCronSchedules} from '../scripts/self-host-operations/production-cron.mjs';
-const catalog = readFileSync(new URL('../vercel.json',import.meta.url),'utf8');
 const source = readFileSync(new URL('../deploy/self-host-operations/production-cron/schedules.json',import.meta.url),'utf8');
 test('self-host schedules cover every approved non-Wallet job without catch-up execution',()=>{
- const timers=productionCronTimers(source,catalog);
+ const timers=productionCronTimers(source);
  assert.equal(timers.length,11);
  assert.ok(timers.every(t=>!t.name.includes('wallet') && t.content.includes('Persistent=false')));
  assert.ok(timers.find(t=>t.name==='rss')?.content.includes('*:02,17,32,47:00 UTC'));
@@ -24,7 +23,7 @@ test('calendar preserves hourly and daily boundaries and rejects unsupported sem
 test('unknown, missing, duplicate or excluded job stops the scheduler before installation',()=>{
  const entries=JSON.parse(source).crons;
  for (const crons of [entries.slice(1),[...entries,entries[0]],[...entries,{path:'/api/cron/reconcile-apple-wallet-passes',schedule:'0 0 * * *'}],entries.map((v: {path:string,schedule:string},i:number)=>i===0?{...v,path:'/api/cron/unknown'}:v)]) {
-  assert.throws(()=>loadProductionCronSchedules(JSON.stringify({crons}),catalog));
+  assert.throws(()=>loadProductionCronSchedules(JSON.stringify({...JSON.parse(source),crons})),/PRODUCTION_CRON_SCOPE_INVALID/);
  }
 });
 

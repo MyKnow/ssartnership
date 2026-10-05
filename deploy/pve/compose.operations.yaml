@@ -64,8 +64,10 @@ services:
     command: [--config.file=/etc/alertmanager/alertmanager.yml, --storage.path=/alertmanager, --cluster.listen-address=, --web.external-url=https://ssartnership-infra.myknow.xyz/infra/alertmanager/, --web.route-prefix=/]
     volumes:
       - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      # Both receivers authenticate to the single notifier with one relay
+      # token (notifier.mjs reads only OPS_ALERT_RELAY_TOKEN), so only that
+      # token is mounted.
       - /etc/myknow/secrets/ssartnership-production/monitoring/secrets/alert-relay-token:/run/production-alert-relay-token:ro
-      - /etc/myknow/secrets/ssartnership-original-preview/monitoring/secrets/alert-relay-token:/run/preview-alert-relay-token:ro
       - alertmanager-data:/alertmanager
   grafana:
     image: grafana/grafana:13.2.1@sha256:f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283

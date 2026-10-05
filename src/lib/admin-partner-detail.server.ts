@@ -5,6 +5,7 @@ import {
   getAdminReviewPageData,
   type AdminReviewFilters,
 } from "@/lib/admin-reviews";
+import { ADMIN_LIST_DEFAULT_PAGE_SIZE } from "@/lib/admin-ia";
 import { fetchPartnerReviewVisibilityCounts } from "@/lib/partner-counts";
 import { getPartnerMetricTimeseriesSnapshot } from "@/lib/partner-metric-timeseries";
 import { fetchRequestSummariesForPartner } from "@/lib/partner-change-requests/summary";
@@ -21,8 +22,8 @@ import type { CampusSlug } from "@/lib/campuses";
 import type { PartnerBenefitActionType } from "@/lib/partner-benefit-action";
 import type { PartnerBenefitVisibility } from "@/lib/partner-benefit-visibility";
 import type { PartnerVisibility } from "@/lib/types";
-import { isMissingPartnerPreviewExpiryColumnError } from "@/lib/partner-preview";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { logServerError } from "@/lib/server-log";
 
 type PartnerCompanyRow = {
   id: string;
@@ -128,26 +129,11 @@ export async function getAdminPartnerDetailCoreReadModel({
 }) {
   try {
     const supabase = getSupabaseAdminClient();
-    const previewTokenPromise = (async () => {
-      let previewTokenResult = await supabase
-        .from("partner_preview_tokens")
-        .select("created_at,expires_at,token_ciphertext,token_nonce,token_auth_tag,token_key_version")
-        .eq("partner_id", partnerId)
-        .maybeSingle();
-
-      if (
-        previewTokenResult.error &&
-        isMissingPartnerPreviewExpiryColumnError(previewTokenResult.error.message)
-      ) {
-        previewTokenResult = await supabase
-          .from("partner_preview_tokens")
-          .select("created_at,token_ciphertext,token_nonce,token_auth_tag,token_key_version")
-          .eq("partner_id", partnerId)
-          .maybeSingle();
-      }
-
-      return previewTokenResult;
-    })();
+    const previewTokenPromise = supabase
+      .from("partner_preview_tokens")
+      .select("created_at,expires_at,token_ciphertext,token_nonce,token_auth_tag,token_key_version")
+      .eq("partner_id", partnerId)
+      .maybeSingle();
     const [partnerResult, previewTokenResult] = await Promise.all([
       supabase
         .from("partners")
@@ -162,6 +148,10 @@ export async function getAdminPartnerDetailCoreReadModel({
     ]);
 
     if (partnerResult.error || previewTokenResult.error) {
+      console.error("[admin-partner-detail] core read model query failed", {
+        partnerError: partnerResult.error?.message ?? null,
+        previewTokenError: previewTokenResult.error?.message ?? null,
+      });
       return { status: "error" as const };
     }
     const partner = partnerResult.data as unknown as AdminPartnerDetailRow | null;
@@ -183,7 +173,7 @@ export async function getAdminPartnerDetailCoreReadModel({
       previewToken: previewTokenResult.data,
     };
   } catch (error) {
-    console.error("[admin-partner-detail] core read model failed", error);
+    logServerError("[admin-partner-detail] core read model failed", error);
     return { status: "error" as const };
   }
 }
@@ -244,6 +234,7 @@ export async function getAdminPartnerDetailOperationalReadModel({
       getAdminPartnerMetrics([partnerId]),
       getAdminReviewPageData(reviewFilters, {
         includeCounts: false,
+        includeFilterOptions: false,
         managedCampusSlugs: managedCampusSlugs ? [...managedCampusSlugs] : null,
         ...reviewPagination,
       }),
@@ -253,7 +244,7 @@ export async function getAdminPartnerDetailOperationalReadModel({
         partnerId,
         benefit: selectedUsageBenefit,
         page: parseUsagePage(usagePage),
-        pageSize: 25,
+        pageSize: ADMIN_LIST_DEFAULT_PAGE_SIZE,
       }),
       getPartnerMetricTimeseriesSnapshot(partnerId, core.partner.created_at),
       supabase.rpc("get_admin_partner_audit_logs", partnerAuditScope),
@@ -275,7 +266,7 @@ export async function getAdminPartnerDetailOperationalReadModel({
       partnerRequestHistory,
     };
   } catch (error) {
-    console.error("[admin-partner-detail] operational read model failed", error);
+    logServerError("[admin-partner-detail] operational read model failed", error);
     return { status: "error" as const };
   }
 }

@@ -31,11 +31,13 @@ test("공개 제휴처 상세는 대표 이미지를 반복하지 않고 갤러�
 test("대표 이미지는 공유 메타데이터에 유지하고 모든 원본 이미지는 갤러리에 남긴다", () => {
   const page = readRepoFile("src/app/(site)/partners/[id]/page.tsx");
   const repository = readRepoFile(
-    "src/lib/repositories/supabase/partner-repository.supabase.ts",
+    "src/lib/repositories/supabase/partner/mappers.ts",
   );
 
-  assert.match(page, /url: partner\.thumbnail \?\? "\/icon-512\.png"/);
-  assert.match(page, /images: \[partner\.thumbnail \?\? "\/icon-512\.png"\]/);
+  assert.match(page, /openGraph: createPageOpenGraph/);
+  assert.match(page, /images: partner\.thumbnail \? \[\{ url: partner\.thumbnail, alt: title \}\] : undefined/);
+  const seo = readRepoFile("src/lib/seo/index.ts");
+  assert.match(seo, /DEFAULT_OPEN_GRAPH_IMAGE/);
   assert.match(repository, /const galleryImages = row\.images \?\? \[\];/);
   assert.match(
     repository,

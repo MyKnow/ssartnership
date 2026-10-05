@@ -22,6 +22,33 @@ test("public ip checks block loopback and private ranges", async () => {
   assert.equal(isPublicIpAddress("ff02::1"), false);
 });
 
+test("public ip checks block IPv6 transition prefixes that embed IPv4 targets", async () => {
+  const { isPublicIpAddress } = await imageProxyModulePromise;
+
+  // NAT64 well-known(64:ff9b::/96)·local-use(64:ff9b:1::/48)
+  assert.equal(isPublicIpAddress("64:ff9b::7f00:1"), false);
+  assert.equal(isPublicIpAddress("64:ff9b::a00:1"), false);
+  assert.equal(isPublicIpAddress("64:ff9b::808:808"), false);
+  assert.equal(isPublicIpAddress("64:ff9b::192.168.0.1"), false);
+  assert.equal(isPublicIpAddress("64:ff9b:1::a00:1"), false);
+  // 6to4(2002::/16)
+  assert.equal(isPublicIpAddress("2002:7f00:1::1"), false);
+  assert.equal(isPublicIpAddress("2002:c0a8:1::"), false);
+  // Teredo(2001::/32)
+  assert.equal(isPublicIpAddress("2001:0:4136:e378:8000:63bf:3fff:fdd2"), false);
+  assert.equal(isPublicIpAddress("2001::1"), false);
+  // SIIT IPv4-translated(::ffff:0:0:0/96)는 내장 주소가 공개 IPv4여도 차단한다.
+  assert.equal(isPublicIpAddress("::ffff:0:7f00:1"), false);
+  assert.equal(isPublicIpAddress("::ffff:0:a00:1"), false);
+  assert.equal(isPublicIpAddress("::ffff:0:8.8.8.8"), false);
+  // IPv4-mapped(::ffff:0:0/96)는 기존처럼 내장 IPv4 기준으로 판정한다.
+  assert.equal(isPublicIpAddress("::ffff:127.0.0.1"), false);
+  assert.equal(isPublicIpAddress("::ffff:8.8.8.8"), true);
+  // 인접한 공개 대역은 그대로 허용한다.
+  assert.equal(isPublicIpAddress("2001:4860:4860::8844"), true);
+  assert.equal(isPublicIpAddress("64:ff9c::1"), true);
+});
+
 test("public ip checks allow routable public addresses", async () => {
   const { isPublicIpAddress } = await imageProxyModulePromise;
 
@@ -121,9 +148,30 @@ test("public image route applies the raster policy and disables MIME sniffing", 
     routeSource,
     /fetchPublicImage\(parsed,\s*\{[\s\S]*allowedContentTypes:\s*PUBLIC_RASTER_IMAGE_CONTENT_TYPES[\s\S]*\}\)/u,
   );
+  assert.match(
+    routeSource,
+    /maxBytes:\s*PUBLIC_IMAGE_PROXY_FETCH_LIMITS\.maxBytes[\s\S]*timeoutMs:\s*PUBLIC_IMAGE_PROXY_FETCH_LIMITS\.timeoutMs/u,
+  );
   assert.match(routeSource, /consumeImageProxyRequestQuota/u);
   assert.match(routeSource, /status:\s*429/u);
   assert.match(routeSource, /"Retry-After":\s*String\(quota\.retryAfterSeconds\)/u);
-  assert.match(routeSource, /status:\s*503/u);
   assert.match(routeSource, /"x-content-type-options":\s*"nosniff"/u);
+});
+
+test("public image proxy fetch limits stay within the server-wide image bounds", async () => {
+  const {
+    PUBLIC_IMAGE_PROXY_FETCH_LIMITS,
+    resolveImageFetchTimeoutMs,
+  } = await imageProxyModulePromise;
+  const { IMAGE_FETCH_TIMEOUT_MS, MAX_IMAGE_BYTES } = await import(
+    new URL("../src/lib/image-proxy/shared.ts", import.meta.url).href
+  );
+
+  assert.ok(PUBLIC_IMAGE_PROXY_FETCH_LIMITS.maxBytes <= MAX_IMAGE_BYTES);
+  assert.ok(PUBLIC_IMAGE_PROXY_FETCH_LIMITS.timeoutMs <= IMAGE_FETCH_TIMEOUT_MS);
+  assert.equal(resolveImageFetchTimeoutMs(undefined), IMAGE_FETCH_TIMEOUT_MS);
+  assert.equal(resolveImageFetchTimeoutMs(2_000), 2_000);
+  for (const invalid of [0, -1, 1.5, IMAGE_FETCH_TIMEOUT_MS + 1]) {
+    assert.throws(() => resolveImageFetchTimeoutMs(invalid), /Invalid image timeout/u);
+  }
 });

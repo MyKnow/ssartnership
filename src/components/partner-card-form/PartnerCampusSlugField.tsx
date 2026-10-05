@@ -1,5 +1,8 @@
 "use client";
 
+import Checkbox from "@/components/ui/Checkbox";
+
+
 import { useMemo, useState } from "react";
 import {
   CAMPUS_DIRECTORY,
@@ -64,19 +67,18 @@ export default function PartnerCampusSlugField({
 
   return (
     <FieldGroup label={label} error={error}>
-      <div className="rounded-[20px] border border-slate-200 bg-slate-50/70 p-4">
-        <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm">
-          <input
-            type="checkbox"
+      <div className="rounded-[20px] border border-border bg-surface-inset p-4">
+        <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-surface px-4 py-3 text-sm font-semibold text-foreground shadow-sm">
+          <Checkbox
             checked={allSelected}
             onChange={(event) =>
               updateSelectedSlugs(event.target.checked ? [...CAMPUS_SLUGS] : [])
             }
-            className="mt-1 h-4 w-4 rounded border-slate-300 text-[#234577] focus:ring-[#234577]"
+            className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary"
           />
           <span>
             전체 캠퍼스
-            <span className="mt-1 block text-xs font-medium text-slate-500">
+            <span className="mt-1 block text-xs font-medium text-muted-foreground">
               모든 캠퍼스 페이지에 이 제휴처를 노출합니다.
             </span>
           </span>
@@ -86,21 +88,20 @@ export default function PartnerCampusSlugField({
           {CAMPUS_DIRECTORY.map((campus) => (
             <label
               key={campus.slug}
-              className="flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700"
+              className="flex cursor-pointer items-center gap-2 rounded-2xl border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground"
             >
-              <input
-                type="checkbox"
+              <Checkbox
                 name={name}
                 value={campus.slug}
                 checked={selectedSlugs.includes(campus.slug)}
                 onChange={() => toggleCampus(campus.slug)}
-                className="h-4 w-4 rounded border-slate-300 text-[#234577] focus:ring-[#234577]"
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
               />
               {campus.fullLabel}
             </label>
           ))}
         </div>
-        <p className="mt-3 text-xs leading-relaxed text-slate-500">{description}</p>
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{description}</p>
       </div>
     </FieldGroup>
   );

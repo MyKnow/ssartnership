@@ -22,17 +22,18 @@ authority: normative
 - `PageSection`은 `section`의 접근 가능한 제목과 선택 설명·보조 액션을 묶는다.
 - shell 제목을 page `h1`으로 다시 반복하지 않는다.
 
+## BackLink / 뒤로 가기
+- 화면 단위 뒤로 가기는 `PageHeader backHref`(관리자는 `AdminShell backHref`)를 기본으로 쓰고, `PageHeader`를 쓰지 않는 이벤트 전용 헤더는 같은 표현의 `BackLink`를 사용한다. `← …로 돌아가기` 같은 인라인 텍스트 링크를 새로 만들지 않는다.
+- 뒤로 가기·폼 취소는 명시적인 상위 목적지 href로 이동한다. 공유 링크·알림에서 바로 들어온 경우 사이트 밖이나 무관한 화면으로 가지 않도록 `router.back()`을 쓰지 않는다.
+- 여러 출처에서 들어오는 공용 화면(약관 등)만 검증된 `returnTo`·같은 출처 referrer를 따르는 `BackButton`을 사용한다. 목록 query 문맥 보존이 필요하면 상위 href에 검증된 `returnTo`를 붙인다.
+
+## EmptyState
+- 목록·패널의 빈 상태는 `EmptyState`를 사용한다. 페이지 단위는 기본 `size="md"`, 카드 안 인라인 목록은 `size="sm"`을 쓴다.
+- 제목은 무엇이 비어 있는지 맥락을 담고(예: "조건에 맞는 발송 로그가 없습니다."), 맥락 없는 "데이터가 없습니다."는 쓰지 않는다. 설명은 사용자가 할 수 있는 다음 행동을 안내한다.
+
 ## AdvancedFilterDisclosure
 - 목록의 기본 필터 3~4개 바깥 조건을 접어 두되 적용 개수와 초기화 액션을 항상 보여준다.
 - 펼침 상태와 무관하게 필터 값은 URL query가 단일 기준이다.
-
-## CompactEntityRow / CollapsedList
-- 운영 목록의 핵심 식별자, 상태, 한두 개 메타, 상세 이동만 한 행에 둔다.
-- 혜택·태그·지점처럼 반복되는 값은 최대 노출 개수를 정하고 나머지는 `+N`으로 축약한다.
-
-## CompactStepper
-- 모바일 다단계 form은 `현재/전체 + 단계명`만 우선 표시하고 전체 단계 설명은 disclosure로 제공한다.
-- 이전/다음/제출 중 현재 primary CTA는 하나만 존재한다.
 
 ## FilterBar
 - 검색/정렬/상태 필터를 같은 surface 안에서 다룬다.
@@ -48,8 +49,8 @@ authority: normative
 ## ResponsiveGrid
 - 카드 목록, 요약 패널, 문서 샘플을 auto-fit grid로 배치한다.
 
-## MotionReveal
-- 목록/섹션 등장 애니메이션은 이 컴포넌트로 통일한다.
+## 등장 모션
+- 목록·섹션 등장 애니메이션 컴포넌트는 두지 않는다. `MotionReveal`은 이름과 달리 애니메이션이 없는 정적 래퍼이므로 새 코드에서 사용하지 않고, 기존 사용처 정리는 디자인 토큰 작업 단위가 맡는다. 모션 기준은 [Layout And Motion](./layout-and-motion.md#motion)을 따른다.
 
 ## CarouselSlideIndicators
 - 이미지 위에 겹치는 캐러셀 위치 표시는 `CarouselSlideIndicators`를 공유한다. 현재 항목은 긴 흰색 pill, 나머지는 낮은 대비의 원형 점으로 표시하고 `aria-pressed`를 함께 제공한다.
@@ -76,3 +77,15 @@ authority: normative
 - 회원 설정의 계정 정보는 연결 정보·보안·계정 그룹으로 나눈 설정형 리스트를 사용한다.
 - 각 행은 아이콘, 제목·보조 설명, 상태 badge, 우측 이동 또는 실행 피드백 순으로 구성하고 행 전체를 최소 44px의 조작 영역으로 제공한다.
 - 즉시 실행 행은 동작 라벨과 pending 상태를, 별도 화면 이동 행은 chevron을 사용한다. 회원 탈퇴는 일반 설정과 분리한 danger 그룹으로 표시한다.
+
+## 계획된 패턴(공용 컴포넌트 미구현)
+
+아래는 화면 계약이 요구하는 표현 규칙이다. 아직 같은 이름의 공용 컴포넌트는 없고 각 화면이 기존 primitive로 구현한다. 공용 컴포넌트로 만들 때 이 절을 위 현행 목록으로 옮긴다.
+
+### CompactEntityRow / CollapsedList
+- 운영 목록의 핵심 식별자, 상태, 한두 개 메타, 상세 이동만 한 행에 둔다.
+- 혜택·태그·지점처럼 반복되는 값은 최대 노출 개수를 정하고 나머지는 `+N`으로 축약한다.
+
+### CompactStepper
+- 모바일 다단계 form은 `현재/전체 + 단계명`만 우선 표시하고 전체 단계 설명은 disclosure로 제공한다.
+- 이전/다음/제출 중 현재 primary CTA는 하나만 존재한다.

@@ -27,13 +27,13 @@ import {
 import {
   logAdminAction,
   revalidateAdminAndPublicPaths,
-  revalidatePartnerData,
   redirectAdminActionError,
 } from "@/app/admin/(protected)/_actions/shared-helpers";
 import {
   parsePartnerCompanyPayloadOrRedirect,
   parsePartnerPayloadOrRedirect,
 } from "@/app/admin/(protected)/_actions/shared-parser-redirects";
+import { logServerError } from "@/lib/server-log";
 
 function getSafeAdminPartnerPath(value: FormDataEntryValue | null, fallback: string) {
   const candidate = typeof value === "string" ? value.trim() : "";
@@ -320,7 +320,7 @@ export async function updatePartnerAction(formData: FormData) {
   });
   const removedUrls = previousUrls.filter((url) => !nextUrls.includes(url));
   await deletePartnerMediaUrls(removedUrls).catch((cleanupError) => {
-    console.error("[admin-partner-update] stale media cleanup failed", cleanupError);
+    logServerError("[admin-partner-update] stale media cleanup failed", cleanupError);
   });
 
   const nextCompany = companyProvision?.company ?? previousCompany;
@@ -339,7 +339,7 @@ export async function updatePartnerAction(formData: FormData) {
     try {
       await clearNewPartnerNotificationSent(id);
     } catch (error) {
-      console.error("[partner-update] publication notification state reset failed", error);
+      logServerError("[partner-update] publication notification state reset failed", error);
     }
   }
 
@@ -358,7 +358,7 @@ export async function updatePartnerAction(formData: FormData) {
         mapUrl: payload.mapUrl,
       });
     } catch (error) {
-      console.error("[partner-update] public transition notification failed", error);
+      logServerError("[partner-update] public transition notification failed", error);
     }
   }
   const partnerAudit = buildAuditChangeSummary("제휴처", [
@@ -487,29 +487,26 @@ export async function updatePartnerAction(formData: FormData) {
     },
   ]);
 
+  // logAdminAction never rejects: insert failures are logged and counted by
+  // the activity-log sink, so no local try/catch is needed here.
   if (partnerAudit.changedFields.length > 0) {
-    try {
-      await logAdminAction("partner_update", {
-        targetType: "partner",
-        targetId: id,
-        properties: {
-          summary: partnerAudit.summary,
-          changedFields: partnerAudit.changedFields,
-          changes: partnerAudit.changes,
-          fieldChanges: partnerAudit.fieldChanges,
-          companyName: nextCompanyLabel,
-          categoryLabel: nextCategoryLabel,
-          visibility: payload.visibility,
-          benefitVisibility: payload.benefitVisibility,
-          benefitActionType: payload.benefitActionType,
-          hasBenefitActionLink: Boolean(payload.benefitActionLink),
-        },
-      });
-    } catch (error) {
-      console.error("[partner-update] audit log failed", error);
-    }
+    await logAdminAction("partner_update", {
+      targetType: "partner",
+      targetId: id,
+      properties: {
+        summary: partnerAudit.summary,
+        changedFields: partnerAudit.changedFields,
+        changes: partnerAudit.changes,
+        fieldChanges: partnerAudit.fieldChanges,
+        companyName: nextCompanyLabel,
+        categoryLabel: nextCategoryLabel,
+        visibility: payload.visibility,
+        benefitVisibility: payload.benefitVisibility,
+        benefitActionType: payload.benefitActionType,
+        hasBenefitActionLink: Boolean(payload.benefitActionLink),
+      },
+    });
   }
-  revalidatePartnerData();
   revalidateAdminAndPublicPaths(id);
   redirect(getUpdatedPartnerRedirectPath(redirectPath));
 }

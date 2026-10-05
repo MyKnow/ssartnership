@@ -7,6 +7,7 @@ import {
   DEFAULT_PUSH_PREFERENCES,
   getMemberPushPreferences,
 } from "@/lib/push";
+import { hasEffectiveMarketingConsent } from "@/lib/notifications/marketing-consent";
 import { wrapPushDbError } from "@/lib/push/config";
 import { getPushDeviceLabel } from "@/lib/push/device-label";
 import type { PushPreferenceState, PushSubscriptionDevice } from "@/lib/push";
@@ -129,11 +130,14 @@ export async function getMemberNotificationPreferences(memberId: string) {
   return {
     ...preferences,
     enabled: preferences.enabled && activePushSubscriptionCount > 0,
-    marketingEnabled: Boolean(
-      preferences.marketingEnabled
-      && activeMarketingPolicy
-      && consentVersions.marketing === activeMarketingPolicy.version,
-    ),
+    marketingEnabled: hasEffectiveMarketingConsent({
+      hasActiveMarketingPolicy: Boolean(activeMarketingPolicy),
+      hasCurrentPolicyConsent: Boolean(
+        activeMarketingPolicy &&
+          consentVersions.marketing === activeMarketingPolicy.version,
+      ),
+      marketingEnabled: preferences.marketingEnabled,
+    }),
   };
 }
 

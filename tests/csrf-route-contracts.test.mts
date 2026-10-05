@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 const STATE_CHANGING_CRON_GET_ROUTES = [
@@ -21,20 +21,23 @@ function read(relativePath: string) {
   return readFileSync(new URL(relativePath, import.meta.url), "utf8");
 }
 
-test("state-changing cron GET routes require the Vercel cron bearer secret only", () => {
-  const vercelConfig = JSON.parse(read("../vercel.json")) as {
+test("state-changing cron GET routes require the cron bearer secret only", () => {
+  const scheduleConfig = JSON.parse(
+    read("../deploy/self-host-operations/production-cron/schedules.json"),
+  ) as {
     crons?: Array<{ path?: string }>;
+    unscheduled?: Array<{ path?: string }>;
   };
   const configuredCronPaths = new Set(
-    (vercelConfig.crons ?? []).map((entry) => entry.path),
+    [...(scheduleConfig.crons ?? []), ...(scheduleConfig.unscheduled ?? [])].map(
+      (entry) => entry.path,
+    ),
   );
   const cronAccess = read("../src/lib/cron-route.ts");
 
   assert.match(cronAccess, /process\.env\.CRON_SECRET/);
-  assert.match(
-    cronAccess,
-    /request\.headers\.get\("authorization"\) === `Bearer \$\{secret\}`/,
-  );
+  assert.match(cronAccess, /timingSafeEqual\(provided, expected\)/);
+  assert.doesNotMatch(cronAccess, /=== `Bearer \$\{secret\}`/);
 
   for (const routeName of STATE_CHANGING_CRON_GET_ROUTES) {
     const relativePath = `../src/app/api/cron/${routeName}/route.ts`;
@@ -43,12 +46,12 @@ test("state-changing cron GET routes require the Vercel cron bearer secret only"
     assert.equal(
       configuredCronPaths.has(`/api/cron/${routeName}`),
       true,
-      `${relativePath} must remain registered as a Vercel cron path`,
+      `${relativePath} must remain registered in the self-hosted cron catalog`,
     );
     assert.match(
       source,
       /export async function GET\(request: NextRequest\)/,
-      `${relativePath} must keep Vercel cron GET compatibility`,
+      `${relativePath} must keep the cron GET entry point`,
     );
     assert.match(
       source,
@@ -164,11 +167,10 @@ test("partner logout is a same-origin POST exposed only through live POST forms"
     "successful POST logout must redirect with See Other",
   );
 
-  const actionLinks = read("../src/components/partner/PartnerPortalActionLinks.tsx");
   const shell = read("../src/components/partner/PartnerPortalShellView.tsx");
   const logoutButton = read("../src/components/partner/PartnerLogoutButton.tsx");
 
-  for (const source of [actionLinks, shell]) {
+  for (const source of [shell]) {
     assert.doesNotMatch(source, /href=[{\"']+\/partner\/logout/);
     assert.match(source, /PartnerLogoutButton/);
   }
@@ -185,21 +187,11 @@ test("partner logout is a same-origin POST exposed only through live POST forms"
   assert.match(logoutButton, /aria-live="polite"/);
 });
 
-test("관리자 엑셀 업로드 API는 same-origin multipart 요청만 허용한다", () => {
-  const route = read("../src/app/api/admin/ad-coupons/[couponId]/codes/route.ts");
-  const guardIndex = route.indexOf("if (!isTrustedSameOriginRequest(request, {");
-  const authIndex = route.indexOf('requireAdminPermission("home_ads", "update"');
-  const formDataIndex = route.indexOf("await request.formData()");
-
-  assert.match(route, /isTrustedSameOriginRequest/);
-  assert.match(route, /allowedContentTypes: \["multipart\/form-data"\]/);
-  assert.ok(guardIndex >= 0, "관리자 쿠폰 코드 업로드는 same-origin 검증이 필요합니다.");
-  assert.ok(
-    guardIndex < authIndex,
-    "same-origin 검증은 관리자 권한 확인 전에 실행되어야 합니다.",
-  );
-  assert.ok(
-    guardIndex < formDataIndex,
-    "same-origin 검증은 multipart body 파싱 전에 실행되어야 합니다.",
-  );
+test("호출처 없는 관리자 쿠폰 코드 업로드 API는 삭제되고 서버 액션 경로만 남는다", () => {
+  for (const path of [
+    "../src/app/api/admin/ad-coupons/[couponId]/codes/route.ts",
+    "../src/app/api/admin/ad-coupons/[couponId]/codes/template/route.ts",
+  ]) {
+    assert.equal(existsSync(new URL(path, import.meta.url)), false, path);
+  }
 });

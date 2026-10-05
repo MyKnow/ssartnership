@@ -17,11 +17,33 @@ import {
 
 test("현재 SSAFY 기수를 기준으로 선택지를 만든다", () => {
   assert.equal(GRADUATE_COHORT_RULE_VERSION, "ssafy-half-year-v1");
-  assert.deepEqual(getGraduateGenerationOptions(new Date(2018, 10, 1)), []);
-  assert.deepEqual(getGraduateGenerationOptions(new Date(2018, 11, 1)), [1]);
-  assert.deepEqual(getGraduateGenerationOptions(new Date(2019, 0, 1)), [1]);
-  assert.deepEqual(getGraduateGenerationOptions(new Date("2026-01-01")), Array.from({ length: 15 }, (_, index) => 15 - index));
-  assert.deepEqual(getGraduateGenerationOptions(new Date("2026-07-01")), Array.from({ length: 16 }, (_, index) => 16 - index));
+  assert.deepEqual(getGraduateGenerationOptions(new Date("2018-11-01T00:00:00+09:00")), []);
+  assert.deepEqual(getGraduateGenerationOptions(new Date("2018-12-01T00:00:00+09:00")), [1]);
+  assert.deepEqual(getGraduateGenerationOptions(new Date("2019-01-01T00:00:00+09:00")), [1]);
+  assert.deepEqual(getGraduateGenerationOptions(new Date("2026-01-01T00:00:00+09:00")), Array.from({ length: 15 }, (_, index) => 15 - index));
+  assert.deepEqual(getGraduateGenerationOptions(new Date("2026-07-01T00:00:00+09:00")), Array.from({ length: 16 }, (_, index) => 16 - index));
+});
+
+test("기수 선택지의 반기 경계는 서버·브라우저 시간대가 아니라 서울 날짜로 판단한다", () => {
+  // UTC 2026-06-30 15:30 = KST 2026-07-01 00:30 → 16기까지
+  const julyInSeoul = new Date("2026-06-30T15:30:00.000Z");
+  // UTC 2026-06-30 14:59 = KST 2026-06-30 23:59 → 15기까지
+  const juneInSeoul = new Date("2026-06-30T14:59:00.000Z");
+  // UTC 2018-11-30 15:00 = KST 2018-12-01 00:00 → 1기 모집 시작
+  const firstCohortInSeoul = new Date("2018-11-30T15:00:00.000Z");
+
+  for (const timeZone of ["UTC", "Asia/Seoul", "America/Los_Angeles"]) {
+    const previous = process.env.TZ;
+    process.env.TZ = timeZone;
+    try {
+      assert.equal(getGraduateGenerationOptions(julyInSeoul)[0], 16, timeZone);
+      assert.equal(getGraduateGenerationOptions(juneInSeoul)[0], 15, timeZone);
+      assert.deepEqual(getGraduateGenerationOptions(firstCohortInSeoul), [1], timeZone);
+    } finally {
+      if (previous === undefined) delete process.env.TZ;
+      else process.env.TZ = previous;
+    }
+  }
 });
 
 test("서버는 선택한 유효 기수를 저장한다", () => {

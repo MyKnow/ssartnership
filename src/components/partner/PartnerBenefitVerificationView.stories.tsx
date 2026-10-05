@@ -51,11 +51,13 @@ export const Default: Story = {
     await expect(canvas.getByText("카페 싸피 역삼점")).toBeVisible();
     await expect(canvas.getByText("아메리카노 1+1 및 디저트 20% 할인")).toBeVisible();
     const pinInput = canvasElement.querySelector<HTMLInputElement>(
-      'input[name="partnerBenefitPin"]',
+      'input[name="partnerBenefitCheckDigits"]',
     );
     await expect(pinInput).not.toBeNull();
+    await expect(pinInput).toHaveAttribute("type", "text");
     await expect(pinInput).toHaveAttribute("inputmode", "numeric");
     await expect(pinInput).toHaveAttribute("maxlength", "4");
+    await expect(pinInput).toHaveClass("pin-mask");
     await expect(
       canvas.getByRole("button", { name: "인증 카드와 혜택 확인" }),
     ).toBeVisible();
@@ -73,7 +75,7 @@ export const PinNotConfigured: Story = {
     await expect(canvas.getByText("카페 싸피 역삼점")).toBeVisible();
     await expect(canvas.getByText("아메리카노 1+1 및 디저트 20% 할인")).toBeVisible();
     await expect(
-      canvasElement.querySelector('input[name="partnerBenefitPin"]'),
+      canvasElement.querySelector('input[name="partnerBenefitCheckDigits"]'),
     ).toBeNull();
     await expect(
       canvas.queryByRole("button", { name: "인증 카드와 혜택 확인" }),

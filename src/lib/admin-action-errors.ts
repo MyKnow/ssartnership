@@ -1,4 +1,15 @@
-export const adminActionErrorMessages: Record<string, string> = {
+import type { AdminReviewQueueErrorCode } from "@/lib/admin-review-queue";
+import type { NotificationTemplateErrorCode } from "@/lib/notification-templates/admin-feedback";
+import type { PartnerFormErrorCode } from "@/lib/partner-form-errors";
+import { isAllowedKey, pickAllowedEntry } from "@/lib/safe-messages";
+
+/**
+ * 관리자 server action이 `?error=<code>`로 넘기는 공용 오류 코드와 안내 문구.
+ * 키가 곧 코드 타입(AdminActionErrorCode)이므로 존재하지 않는 코드를 redirect하면 타입 검사에서 실패한다.
+ * 화면 전용 코드는 그 화면의 메시지 맵(검토 큐, 알림 템플릿 등)이 소유하고
+ * `AdminRedirectErrorCode`(shared-helpers)에서 함께 허용한다.
+ */
+export const adminActionErrorMessages = {
   category_missing_fields: "카테고리 키와 라벨을 입력해 주세요.",
   category_invalid_key: "카테고리 키 형식을 확인해 주세요.",
   category_invalid_color: "카테고리 색상은 #RRGGBB 형식이어야 합니다.",
@@ -8,6 +19,8 @@ export const adminActionErrorMessages: Record<string, string> = {
   company_missing_name: "파트너사명을 입력해 주세요.",
   company_invalid_email: "담당자 이메일 형식이 올바르지 않습니다.",
   company_invalid_request: "파트너사 입력값을 확인해 주세요.",
+  company_has_billing_records:
+    "청구·결제 기록이 있는 파트너사는 삭제할 수 없습니다. 운영을 멈추려면 비활성화해 주세요.",
   partner_update_failed: "제휴처를 저장하지 못했습니다. 입력값과 권한을 확인한 뒤 다시 시도해 주세요.",
   cycle_missing_fields: "기준 기수, 기준 연도, 기준 월을 모두 입력해 주세요.",
   cycle_invalid_number: "기준값은 허용된 범위의 숫자로 입력해 주세요.",
@@ -58,6 +71,13 @@ export const adminActionErrorMessages: Record<string, string> = {
   partner_account_missing_id: "대상을 찾을 수 없습니다.",
   partner_account_invalid_email: "담당자 이메일 형식이 올바르지 않습니다.",
   partner_account_invalid_request: "파트너사 계정 입력값을 확인해 주세요.",
+  partner_account_inactive: "비활성화된 계정입니다. 먼저 계정을 활성화해 주세요.",
+  partner_account_setup_completed:
+    "이미 초기 설정을 마친 계정입니다. 비밀번호를 잊었다면 비밀번호 재설정을 안내해 주세요.",
+  partner_account_setup_link_failed:
+    "초기설정 URL을 발급하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  partner_account_setup_email_failed:
+    "초기설정 URL은 새로 발급했지만 메일을 보내지 못했습니다. 메일 발송 설정을 확인하거나 '초기설정 URL 재생성'으로 받은 링크를 직접 전달해 주세요.",
   partner_account_exists: "이미 존재하는 로그인 아이디입니다.",
   partner_account_create_uncertain:
     "파트너사 계정 생성 중 정리가 끝나지 않았을 수 있습니다. 계정 목록을 확인한 뒤 다시 시도해 주세요.",
@@ -76,6 +96,15 @@ export const adminActionErrorMessages: Record<string, string> = {
     "입금 확인이 완료된 청구는 반려할 수 없습니다.",
   partner_company_plan_state_changed:
     "제휴처 플랜이 변경되었습니다. 현재 상태를 확인한 뒤 다시 시도해 주세요.",
+  partner_company_plan_company_required:
+    "파트너사가 연결된 제휴처만 플랜을 변경할 수 있습니다.",
+  partner_company_plan_update_failed:
+    "플랜 변경을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  partner_company_plan_approval_failed:
+    "플랜 업그레이드 승인을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  partner_company_plan_invoice_cancelled: "취소된 청구서는 입금 확인할 수 없습니다.",
+  partner_company_plan_payment_confirm_failed:
+    "입금 확인 정보를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   review_invalid_request: "리뷰 입력값을 확인해 주세요.",
   review_not_found: "대상을 찾을 수 없습니다.",
   admin_usage_invalid_request: "혜택 적용 이력 입력값을 확인해 주세요.",
@@ -85,6 +114,86 @@ export const adminActionErrorMessages: Record<string, string> = {
   admin_usage_not_found: "혜택 적용 이력을 찾을 수 없습니다.",
   admin_usage_count_exceeded: "선택한 혜택의 최대 적용 횟수를 초과했습니다.",
   admin_usage_database_failed: "혜택 적용 이력을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+} as const satisfies Record<string, string>;
+
+export type AdminActionErrorCode = keyof typeof adminActionErrorMessages;
+
+export function isAdminActionErrorCode(value: unknown): value is AdminActionErrorCode {
+  return isAllowedKey(adminActionErrorMessages, value);
+}
+
+/** `?error=` 값이 공용 코드면 안내 문구를, 아니면 null을 돌려준다(prototype 키 차단). */
+export function getAdminActionErrorMessage(code: unknown): string | null {
+  return pickAllowedEntry<string>(adminActionErrorMessages, code);
+}
+
+/** 제휴처 상세의 쿠폰 섹션이 표시하는 `?error=` 코드와 문구. */
+export const adminPartnerCouponErrorMessages = {
+    ad_coupon_create_failed:
+      "쿠폰을 생성하지 못했습니다. 입력값과 제휴처 상태를 확인한 뒤 다시 시도해 주세요.",
+    ad_coupon_update_failed:
+      "쿠폰을 수정하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    ad_coupon_update_invalid_request: "쿠폰 수정 요청을 다시 확인해 주세요.",
+    ad_coupon_update_not_found:
+      "수정할 쿠폰을 찾지 못했습니다. 목록을 다시 확인해 주세요.",
+    ad_coupon_invalid_status_transition:
+      "허용되지 않는 쿠폰 상태 변경입니다. 종료된 쿠폰은 다시 열 수 없으니 복제해서 새 쿠폰으로 운영해 주세요.",
+    ad_coupon_state_changed:
+      "다른 관리자가 쿠폰 상태를 먼저 바꿨습니다. 현재 상태를 확인한 뒤 다시 저장해 주세요.",
+    ad_coupon_duplicate_failed:
+      "쿠폰을 복제하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    ad_coupon_duplicate_invalid_request: "쿠폰 복제 요청을 다시 확인해 주세요.",
+    ad_coupon_duplicate_not_found:
+      "복제할 쿠폰을 찾지 못했습니다. 목록을 다시 확인해 주세요.",
+    ad_coupon_delete_invalid_request: "쿠폰 삭제 요청을 다시 확인해 주세요.",
+    ad_coupon_delete_not_found:
+      "삭제할 쿠폰을 찾지 못했습니다. 목록을 다시 확인해 주세요.",
+    ad_coupon_delete_has_history:
+      "발급 또는 사용 이력이 있는 쿠폰은 삭제할 수 없습니다. 수정에서 상태를 종료로 변경해 주세요.",
+    ad_coupon_delete_active:
+      "활성 쿠폰은 회원이 받는 중일 수 있어 삭제할 수 없습니다. 수정에서 일시중지 또는 종료로 바꾼 뒤 삭제해 주세요.",
+    ad_coupon_delete_state_changed:
+      "확인하는 사이 쿠폰이 바뀌어 삭제하지 않았습니다. 현재 상태를 확인한 뒤 다시 시도해 주세요.",
+    ad_coupon_delete_failed:
+      "쿠폰을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  } as const satisfies Record<string, string>;
+
+export type AdminPartnerCouponErrorCode = keyof typeof adminPartnerCouponErrorMessages;
+
+/** 광고 관리 화면이 표시하는 캠페인 `?error=` 코드와 문구. */
+export const adminAdCampaignErrorMessages = {
+  ad_campaign_invalid_status_transition: "현재 상태에서는 요청한 상태로 변경할 수 없습니다.",
+  ad_campaign_state_changed: "확인하는 사이 상태가 바뀌었습니다. 현재 상태를 확인한 뒤 다시 시도해 주세요.",
+  ad_campaign_create_failed:
+    "광고 캠페인을 생성하지 못했습니다. 입력값과 권한을 확인한 뒤 다시 시도해 주세요.",
+  ad_campaign_invalid_request: "광고 캠페인 상태 변경 요청을 다시 확인해 주세요.",
+  ad_campaign_invalid_status: "광고 캠페인 상태 변경 요청을 다시 확인해 주세요.",
+  ad_campaign_update_failed:
+    "광고 캠페인 상태를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+} as const satisfies Record<string, string>;
+
+export type AdminAdCampaignErrorCode = keyof typeof adminAdCampaignErrorMessages;
+
+/**
+ * `redirectAdminActionError`가 받는 정적 코드. 공용 맵과 화면이 소유한 맵의 키를 합친 것이며,
+ * 어느 맵에도 없는 리터럴은 타입 검사에서 막힌다. 새 코드는 문구와 함께 해당 맵에 먼저 추가한다.
+ */
+export type AdminRedirectErrorCode =
+  | AdminActionErrorCode
+  | AdminPartnerCouponErrorCode
+  | AdminAdCampaignErrorCode
+  | AdminReviewQueueErrorCode
+  | PartnerFormErrorCode
+  | NotificationTemplateErrorCode;
+
+declare const dynamicAdminActionErrorCodeBrand: unique symbol;
+
+/**
+ * 서비스가 throw한 오류 메시지 중 코드 모양만 통과시킨 값. 정적 코드 집합에 없을 수 있으므로
+ * 화면은 자기 메시지 맵에 없는 코드를 일반 문구로 처리해야 한다(동적 코드 탈출구).
+ */
+export type DynamicAdminActionErrorCode = string & {
+  readonly [dynamicAdminActionErrorCodeBrand]: true;
 };
 
 const ADMIN_ACTION_ERROR_CODE_PATTERN = /^[a-z][a-z0-9_]{0,79}$/;
@@ -94,7 +203,12 @@ const ADMIN_ACTION_ERROR_CODE_PATTERN = /^[a-z][a-z0-9_]{0,79}$/;
  * provider/database message. Only code-shaped values are allowed to cross the
  * redirect boundary; pages still map unknown codes to their generic message.
  */
-export function getSafeAdminActionErrorCode(error: unknown, fallback: string) {
+export function getSafeAdminActionErrorCode<const Fallback extends string>(
+  error: unknown,
+  fallback: Fallback,
+): Fallback | DynamicAdminActionErrorCode {
   const candidate = error instanceof Error ? error.message.trim() : "";
-  return ADMIN_ACTION_ERROR_CODE_PATTERN.test(candidate) ? candidate : fallback;
+  return ADMIN_ACTION_ERROR_CODE_PATTERN.test(candidate)
+    ? (candidate as DynamicAdminActionErrorCode)
+    : fallback;
 }

@@ -1,3 +1,5 @@
+
+import PlainImage from "@/components/ui/PlainImage";
 import AdminReviewQueueHeader from "@/components/admin/AdminReviewQueueHeader";
 import AdminPaginationLink from "@/components/admin/AdminPaginationLink";
 import PartnerChipSections from "@/components/partner-card-form/PartnerChipSections";
@@ -5,6 +7,7 @@ import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { PHONE_INPUT_ATTRIBUTES } from "@/components/ui/input-attributes";
 import SubmitButton from "@/components/ui/SubmitButton";
 import Surface from "@/components/ui/Surface";
 import Textarea from "@/components/ui/Textarea";
@@ -15,13 +18,16 @@ import {
 } from "@/lib/admin-partner-file-import";
 import { PARTNER_BRANCH_SCOPE_OPTIONS } from "@/lib/partner-branch-registration";
 import {
+  getAllowedPartnerRegistrationStatusTransitions,
   isPartnerRegistrationRequestStatus,
+  isPartnerRegistrationTerminalStatus,
   PARTNER_REGISTRATION_QUEUE_SORT_OPTIONS,
   PARTNER_REGISTRATION_SOURCE_LABELS,
   PARTNER_REGISTRATION_SOURCE_OPTIONS,
   PARTNER_REGISTRATION_STATUS_LABELS,
   PARTNER_REGISTRATION_STATUS_OPTIONS,
   PARTNER_REGISTRATION_BENEFIT_ACTION_OPTIONS,
+  PARTNER_REGISTRATION_QUEUE_SEARCH_MAX_LENGTH,
   type PartnerRegistrationQueueSort,
   type PartnerRegistrationRequestStatus,
   type PartnerRegistrationSource,
@@ -34,6 +40,10 @@ import type { PartnerVisibility } from "@/lib/types";
 import type { AdminReviewQueueFeedback } from "@/lib/admin-review-queue";
 import type { AdminPartnerRegistrationRequestDataRow } from "@/lib/admin-partner-registration-queue";
 import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
+import {
+  FOUR_DIGIT_PIN_INPUT_PATTERN,
+  FOUR_DIGIT_PIN_LENGTH,
+} from "@/lib/validation";
 
 export type AdminPartnerRegistrationRow =
   AdminPartnerRegistrationRequestDataRow;
@@ -328,7 +338,7 @@ export default function AdminPartnerRegistrationsView({
               name="q"
               defaultValue={search}
               placeholder="제휴처명, 파트너사, 카테고리, 위치"
-              maxLength={100}
+              maxLength={PARTNER_REGISTRATION_QUEUE_SEARCH_MAX_LENGTH}
             />
           </label>
           <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
@@ -503,6 +513,7 @@ export default function AdminPartnerRegistrationsView({
           ) : null}
           {rows.map((row) => {
             const rowStatus = normalizeStatus(row.status);
+            const statusLocked = isPartnerRegistrationTerminalStatus(rowStatus);
             const attachmentCount = [
               row.thumbnail_url,
               ...(row.image_urls ?? []),
@@ -521,7 +532,7 @@ export default function AdminPartnerRegistrationsView({
               : "public";
             return (
               <details className="group min-w-0 rounded-card border border-border bg-surface-elevated shadow-flat" key={row.id}>
-                <summary className="flex min-w-0 cursor-pointer list-none items-start justify-between gap-4 p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
+                <summary className="flex min-w-0 cursor-pointer list-none items-start justify-between gap-4 rounded-card p-5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
                   <div className="flex min-w-0 flex-col gap-3">
                   <div className="min-w-0">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -619,8 +630,7 @@ export default function AdminPartnerRegistrationsView({
                               rel="noreferrer"
                               className="aspect-square min-w-0 overflow-hidden rounded-2xl border border-border bg-surface-muted"
                             >
-                              {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary admin review URL */}
-                              <img
+                              <PlainImage
                                 src={url}
                                 alt={`첨부 이미지 ${index + 1}`}
                                 className="h-full w-full object-cover"
@@ -745,7 +755,7 @@ export default function AdminPartnerRegistrationsView({
                         </label>
                         <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
                           제휴처 전화
-                          <Input name="brandPhone" defaultValue={row.brand_phone ?? ""} />
+                          <Input {...PHONE_INPUT_ATTRIBUTES} name="brandPhone" defaultValue={row.brand_phone ?? ""} />
                         </label>
                         <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
                           문의 링크 또는 연락처
@@ -769,6 +779,7 @@ export default function AdminPartnerRegistrationsView({
                         <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
                           담당자 전화
                           <Input
+                            {...PHONE_INPUT_ATTRIBUTES}
                             name="contactPhone"
                             defaultValue={row.contact_phone ?? ""}
                           />
@@ -798,8 +809,8 @@ export default function AdminPartnerRegistrationsView({
                               name="benefitVerificationPin"
                               type="password"
                               inputMode="numeric"
-                              pattern="[0-9]{4}"
-                              maxLength={4}
+                              pattern={FOUR_DIGIT_PIN_INPUT_PATTERN}
+                              maxLength={FOUR_DIGIT_PIN_LENGTH}
                               autoComplete="new-password"
                               placeholder={
                                 row.benefit_verification_pin_configured
@@ -864,20 +875,33 @@ export default function AdminPartnerRegistrationsView({
                     <input type="hidden" name="id" value={row.id} />
                     <input type="hidden" name="returnTo" value={returnTo} />
                     <div className="grid min-w-0 gap-3 sm:grid-cols-[12rem_12rem_minmax(0,1fr)]">
-                      <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
-                        처리 상태
-                        <select
-                          name="status"
-                          defaultValue={rowStatus}
-                          className="h-11 rounded-[1rem] border border-border bg-surface-control px-3 text-sm text-foreground"
-                        >
-                          {PARTNER_REGISTRATION_STATUS_OPTIONS.map((option) => (
-                            <option key={option} value={option}>
-                              {PARTNER_REGISTRATION_STATUS_LABELS[option]}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                      <div className="grid min-w-0 gap-2">
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          처리 상태
+                          <select
+                            name="status"
+                            defaultValue={rowStatus}
+                            aria-describedby={
+                              statusLocked ? `registration-status-locked-${row.id}` : undefined
+                            }
+                            className="h-11 rounded-[1rem] border border-border bg-surface-control px-3 text-sm text-foreground"
+                          >
+                            {getAllowedPartnerRegistrationStatusTransitions(rowStatus).map((option) => (
+                              <option key={option} value={option}>
+                                {PARTNER_REGISTRATION_STATUS_LABELS[option]}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        {statusLocked ? (
+                          <p
+                            id={`registration-status-locked-${row.id}`}
+                            className="text-xs leading-5 text-muted-foreground"
+                          >
+                            등록 완료 후에는 처리 상태를 되돌릴 수 없습니다.
+                          </p>
+                        ) : null}
+                      </div>
                       <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
                         공개 상태
                         <select

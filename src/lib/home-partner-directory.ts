@@ -2,16 +2,16 @@ import {
   filterHomePartners,
   normalizeHomePartners,
   type HomePartnerSortOption,
-} from "@/components/home-view/selectors";
+} from "@/lib/home-partner-selectors";
 import { unstable_rethrow } from "next/navigation";
 import type { PartnerAudienceFilter, PartnerAudienceKey } from "@/lib/partner-audience";
 import {
-  getHomePartnerMemberState,
+  buildHomePartnerMemberState,
+  getHomeMemberFavoritePartnerIds,
   getHomePartnerPopularityById,
-  normalizeHomePartnerStateIds,
-  type HomePartnerMemberState,
   type HomePartnerState,
 } from "@/lib/home-partner-state";
+import { toLeanPublicDirectoryPartner } from "@/lib/public-partner-directory";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import { partnerRepository } from "@/lib/repositories";
 import type { Category, CategoryKey, Partner } from "@/lib/types";
@@ -80,10 +80,10 @@ export type HomePartnerDirectoryDependencies = {
   getPopularityByPartnerId(
     partnerIds: string[],
   ): Promise<Record<string, PartnerPopularityMetrics>>;
-  getMemberState(input: {
-    partnerIds: string[];
-    currentUserId?: string | null;
-  }): Promise<HomePartnerMemberState>;
+  /** Every favorite partner id of the member (empty for guests). */
+  getMemberFavoritePartnerIds(
+    currentUserId: string | null,
+  ): Promise<Set<string>>;
 };
 
 const homePartnerDirectoryDependencies: HomePartnerDirectoryDependencies = {
@@ -91,7 +91,7 @@ const homePartnerDirectoryDependencies: HomePartnerDirectoryDependencies = {
   getPartners: (context) => partnerRepository.getPartners(context),
   getPublicDirectoryPartners: (context) => partnerRepository.getPublicDirectoryPartners(context),
   getPopularityByPartnerId: getHomePartnerPopularityById,
-  getMemberState: getHomePartnerMemberState,
+  getMemberFavoritePartnerIds: getHomeMemberFavoritePartnerIds,
 };
 
 type ErrorLike = {
@@ -236,6 +236,12 @@ export async function loadHomePartnerDirectory({
 }: LoadHomePartnerDirectoryInput,
 dependencies: HomePartnerDirectoryDependencies = homePartnerDirectoryDependencies,
 ): Promise<LoadedHomePartnerDirectory> {
+  // The member's favorites do not depend on ranking, so they load alongside
+  // the catalog and popularity instead of after them.
+  const favoritePartnerIdsPromise = dependencies.getMemberFavoritePartnerIds(
+    currentUserId,
+  );
+  favoritePartnerIdsPromise.catch(() => undefined);
   const [categories, partners] = await Promise.all([
     dependencies.getCategories(),
     viewerAuthenticated
@@ -248,31 +254,33 @@ dependencies: HomePartnerDirectoryDependencies = homePartnerDirectoryDependencie
           viewerAudience,
         }),
   ]);
-  const viewPartners = maskExpiredPartnerActions(partners);
+  // Signed-in viewers get the same lean card payload as guests: the full rows
+  // keep the thumbnail fallback, but gallery images, benefit ledgers and
+  // conditions never reach the client props (search text is precomputed).
+  const viewPartners = maskExpiredPartnerActions(
+    viewerAuthenticated ? partners.map(toLeanPublicDirectoryPartner) : partners,
+  );
   const resolvedQuery = normalizeHomePartnerDirectoryQuery(query);
   const popularityCandidates = buildHomePartnerDirectory({
     partners: viewPartners,
     viewerAuthenticated,
     popularityByPartnerId: {},
   });
-  const partnerPopularityById = await dependencies.getPopularityByPartnerId(
-    popularityCandidates.displayPartnerIds,
-  );
+  const [partnerPopularityById, favoritePartnerIds] = await Promise.all([
+    dependencies.getPopularityByPartnerId(popularityCandidates.displayPartnerIds),
+    favoritePartnerIdsPromise,
+  ]);
   const directory = buildHomePartnerDirectory({
     partners: viewPartners,
     viewerAuthenticated,
     popularityByPartnerId: partnerPopularityById,
     query: resolvedQuery,
   });
-  const preloadPartnerIds = normalizeHomePartnerStateIds(
-    directory.displayPartnerIds,
-  );
-  const memberState = await dependencies.getMemberState({
-    partnerIds: preloadPartnerIds,
-    currentUserId,
-  });
   const partnerState: HomePartnerState = {
-    ...memberState,
+    ...buildHomePartnerMemberState(
+      directory.displayPartnerIds,
+      favoritePartnerIds,
+    ),
     partnerPopularityById,
   };
 

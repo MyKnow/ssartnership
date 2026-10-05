@@ -1,6 +1,9 @@
 **
 !public/
 !public/**
+# Mock repository fixtures never ship in a real-data image.
+public/mock
+public/mock/**
 !.next/
 !.next/standalone/
 !.next/standalone/**

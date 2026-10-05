@@ -16,12 +16,12 @@ last_verified: 2026-08-29
 
 - [자체 호스팅 앱 빌드·실행·Cron 전환](./runbooks/self-hosting.md)
 - [자체 호스팅 DB·Storage·Preview](./runbooks/self-host-database.md)
+- [자체 호스팅 Production·Preview 격리와 데이터 사본](./runbooks/self-host-environments.md)
 - [자체 호스팅 백업·PITR·운영 관리](./runbooks/self-host-operations.md)
 - [자체 호스팅 외부 사본·관측·Web Vitals](./runbooks/self-host-observability.md)
 - [자체 호스팅 격리 CI·배포·유지보수](./runbooks/self-host-ci-maintenance.md)
 - [교차 플랫폼 개발환경](./runbooks/cross-platform-development.md)
 - [Storybook·Visual Baselines](./runbooks/storybook-visual-workflow.md)
-- [Vercel 계정 라우팅](./runbooks/vercel-account-routing.md)
 
 ## Audits
 
@@ -31,3 +31,5 @@ last_verified: 2026-08-29
 현재 릴리스 명령과 브랜치 흐름은 `AGENTS.md`, `package.json`, 저장소 스크립트가 최종 근거다. 감사 문서는 해당 시점 증거이며 현재 runbook으로 사용하지 않는다.
 
 - [신뢰성 판단과 복구 기준](./reliability.md)
+
+- [1인 운영 연속성과 사고 대응](./runbooks/operations-continuity.md)

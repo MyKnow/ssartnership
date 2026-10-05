@@ -11,7 +11,6 @@ function readRepoFile(pathname: string) {
 }
 
 const WORKFLOW_FILES = [
-  "admin-performance.yml",
   "cross-platform-development.yml",
   "public-readiness.yml",
   "self-host-public-health.yml",
@@ -154,7 +153,7 @@ test("local prepush shares the change classifier while explicit promotion gates 
   );
   assert.match(
     packageJson.scripts["verify:release:post-quick"],
-    /build test:e2e:ci/,
+    /typegen:release build test:e2e:prod/,
   );
   assert.match(
     packageJson.scripts["verify:promotion:smoke"],
@@ -266,7 +265,7 @@ test("Storybook interaction and visual baselines are explicit manual tools", () 
   assert.doesNotMatch(workflow, /git diff --name-only --diff-filter/);
   assert.match(
     preview,
-    /pretendard\/dist\/web\/variable\/pretendardvariable\.css/,
+    /pretendard\/dist\/web\/variable\/pretendardvariable-dynamic-subset\.css/,
   );
   assert.match(
     vitestConfig,

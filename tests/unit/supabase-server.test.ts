@@ -55,38 +55,62 @@ describe("supabase server clients", () => {
     );
   });
 
-  test("getSupabasePublicClient validates env and caches by ttl", async () => {
-    process.env.SUPABASE_URL = "https://example.supabase.co";
-    process.env.SUPABASE_ANON_KEY = "anon-key";
-
+  test("does not expose an anon-key public client factory", async () => {
     const supabaseServer = await import("../../src/lib/supabase/server");
-    const first = supabaseServer.getSupabasePublicClient();
-    const second = supabaseServer.getSupabasePublicClient();
-    const third = supabaseServer.getSupabasePublicClient(60);
-
-    expect(first).toBe(second);
-    expect(third).not.toBe(first);
-    expect(createClient).toHaveBeenCalledTimes(2);
-    expect(createClient).toHaveBeenNthCalledWith(
-      1,
-      "https://example.supabase.co",
-      "anon-key",
-      expect.objectContaining({
-        auth: { persistSession: false },
-        global: expect.objectContaining({
-          fetch: expect.any(Function),
-        }),
-      }),
-    );
+    expect("getSupabasePublicClient" in supabaseServer).toBe(false);
   });
 
-  test("getSupabasePublicClient throws when anon env is missing", async () => {
+  test("admin client attaches a request deadline to every SDK fetch", async () => {
     process.env.SUPABASE_URL = "https://example.supabase.co";
-    delete process.env.SUPABASE_ANON_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role";
+    process.env.SUPABASE_ANON_KEY = "anon-key";
+    delete process.env.SUPABASE_INTERNAL_URL;
+    delete process.env.SUPABASE_FETCH_TIMEOUT_MS;
+    delete process.env.SUPABASE_STORAGE_FETCH_TIMEOUT_MS;
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response("[]"));
+    vi.stubGlobal("fetch", fetchMock);
 
-    const supabaseServer = await import("../../src/lib/supabase/server");
-    expect(() => supabaseServer.getSupabasePublicClient()).toThrow(
-      "SUPABASE_ANON_KEY 환경 변수가 필요합니다.",
-    );
+    try {
+      const supabaseServer = await import("../../src/lib/supabase/server");
+      const admin = supabaseServer.getSupabaseAdminClient() as unknown as {
+        options: { global: { fetch: typeof fetch } };
+      };
+
+      await admin.options.global.fetch("https://example.supabase.co/rest/v1/partners");
+      await admin.options.global.fetch(
+        "https://example.supabase.co/storage/v1/object/public/partner-media/a.webp",
+      );
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const adminInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+      expect(adminInit.signal).toBeInstanceOf(AbortSignal);
+      expect(adminInit.signal?.aborted).toBe(false);
+      expect(adminInit.cache).toBe("no-store");
+      const publicInit = fetchMock.mock.calls[1]?.[1] as RequestInit & {
+        next?: unknown;
+      };
+      expect(publicInit.signal).toBeInstanceOf(AbortSignal);
+      expect(publicInit.cache).toBe("no-store");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test("an invalid timeout env keeps the default and reports only the env name", async () => {
+    process.env.SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role";
+    process.env.SUPABASE_FETCH_TIMEOUT_MS = "thirty-seconds";
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    try {
+      const supabaseServer = await import("../../src/lib/supabase/server");
+      supabaseServer.getSupabaseAdminClient();
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(warn.mock.calls[0])).toContain("SUPABASE_FETCH_TIMEOUT_MS");
+      expect(JSON.stringify(warn.mock.calls[0])).not.toContain("thirty-seconds");
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

@@ -1,4 +1,5 @@
 import { getAdminAccountById, type AdminAccount } from "@/lib/admin-accounts";
+import { isMemberAuthenticationRecent } from "@/lib/member-recent-auth";
 import { SITE_URL } from "@/lib/site";
 
 const ADMIN_BRIDGE_FALLBACK = "/admin";
@@ -48,6 +49,22 @@ export function sanitizeAdminReturnTo(
   } catch {
     return safeFallback;
   }
+}
+
+/**
+ * The admin session (12h by default) is minted from the member session (7d).
+ * Promotion to admin is a sensitive step like account deletion or binding an
+ * email, so it uses the same recent-auth rule: a credential check within the
+ * last 10 minutes. Re-entering the password through the member login is the
+ * proof otherwise, which also covers members without a password. Tokens
+ * issued before `authenticatedAt` existed, and future or non-finite times,
+ * fail closed.
+ */
+export function isMemberSessionFreshForAdminBridge(
+  session: { authenticatedAt?: number },
+  now = Date.now(),
+) {
+  return isMemberAuthenticationRecent(session.authenticatedAt, now);
 }
 
 export function isAdminAccountEligibleForSessionBridge(

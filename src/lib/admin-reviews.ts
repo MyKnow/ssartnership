@@ -13,6 +13,7 @@ import {
   aggregatePartnerReviewReactionStates,
   type PartnerReviewReactionRow,
 } from "@/lib/partner-review-reactions";
+import { isUuidFormat } from "@/lib/uuid";
 
 export type AdminReviewSort = "latest" | "oldest";
 export type AdminReviewStatusFilter = "all" | "visible" | "hidden";
@@ -181,12 +182,6 @@ type AdminReviewPartnerRow = {
       }[]
     | null;
 };
-
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
-}
 
 function getSingleRelation<T>(value: T | T[] | null | undefined): T | null {
   if (!value) {
@@ -430,7 +425,7 @@ async function fetchFilteredAdminReviewRows(
   let scopedPartnerIds: string[] | null = null;
 
   if (filters.companyId || managedCampusSlugs) {
-    if (!isUuid(filters.companyId)) {
+    if (!isUuidFormat(filters.companyId)) {
       if (filters.companyId) {
         return { reviews: [], totalCount: 0 };
       }
@@ -473,7 +468,7 @@ async function fetchFilteredAdminReviewRows(
   }
 
   if (filters.partnerId) {
-    if (!isUuid(filters.partnerId)) {
+    if (!isUuidFormat(filters.partnerId)) {
       return { reviews: [], totalCount: 0 };
     }
     if (scopedPartnerIds && !scopedPartnerIds.includes(filters.partnerId)) {
@@ -554,7 +549,7 @@ export async function getAdminReviewById(
   reviewId: string,
   managedCampusSlugs?: readonly string[] | null,
 ): Promise<AdminReviewRecord | null> {
-  if (!isUuid(reviewId)) {
+  if (!isUuidFormat(reviewId)) {
     return null;
   }
 
@@ -646,6 +641,13 @@ export async function getAdminReviewPageData(
   input: AdminReviewFilters,
   options?: {
     includeCounts?: boolean;
+    /**
+     * Load the company/partner filter options. A caller that renders only the
+     * review list (the partner detail page) passes `false` to skip the
+     * unbounded option queries; partners are still read when a member query
+     * needs partner-name matching or scoped counts need the partner ids.
+     */
+    includeFilterOptions?: boolean;
     managedCampusSlugs?: string[] | null;
     page?: number | string | null;
     pageSize?: number | string | null;
@@ -653,28 +655,42 @@ export async function getAdminReviewPageData(
 ): Promise<AdminReviewPageData> {
   const supabase = getSupabaseAdminClient();
   const includeCounts = options?.includeCounts ?? true;
+  const includeFilterOptions = options?.includeFilterOptions ?? true;
   const managedCampusSlugs = options?.managedCampusSlugs ?? null;
   const paginationInput = normalizeAdminReviewPagination({
     page: options?.page,
     pageSize: options?.pageSize,
   });
-  let companiesQuery = supabase
-    .from("partner_companies")
-    .select("id,name,slug,managed_campus_slugs")
-    .order("name", { ascending: true });
-  let partnersQuery = supabase
-    .from("partners")
-    .select("id,name,company_id,managed_campus_slugs,company:partner_companies(id,name,slug)")
-    .order("name", { ascending: true });
+  const normalizedMemberQuery = input.memberQuery.toLowerCase();
+  const needsPartnerRows =
+    includeFilterOptions ||
+    Boolean(normalizedMemberQuery) ||
+    (includeCounts && Boolean(managedCampusSlugs));
+  const loadCompanyOptions = async () => {
+    let companiesQuery = supabase
+      .from("partner_companies")
+      .select("id,name,slug,managed_campus_slugs")
+      .order("name", { ascending: true });
+    if (managedCampusSlugs) {
+      companiesQuery = companiesQuery.overlaps("managed_campus_slugs", managedCampusSlugs);
+    }
+    return companiesQuery;
+  };
+  const loadPartnerRows = async () => {
+    let partnersQuery = supabase
+      .from("partners")
+      .select("id,name,company_id,managed_campus_slugs,company:partner_companies(id,name,slug)")
+      .order("name", { ascending: true });
+    if (managedCampusSlugs) {
+      partnersQuery = partnersQuery.overlaps("managed_campus_slugs", managedCampusSlugs);
+    }
+    return partnersQuery;
+  };
 
-  if (managedCampusSlugs) {
-    companiesQuery = companiesQuery.overlaps("managed_campus_slugs", managedCampusSlugs);
-    partnersQuery = partnersQuery.overlaps("managed_campus_slugs", managedCampusSlugs);
-  }
-
+  const emptyOptionResult = { data: [] as unknown[] };
   const [companiesResult, partnersResult] = await Promise.all([
-    companiesQuery,
-    partnersQuery,
+    includeFilterOptions ? loadCompanyOptions() : emptyOptionResult,
+    needsPartnerRows ? loadPartnerRows() : emptyOptionResult,
   ]);
 
   const companies = (companiesResult.data ?? []) as AdminReviewCompanyOption[];
@@ -691,7 +707,6 @@ export async function getAdminReviewPageData(
     },
   );
 
-  const normalizedMemberQuery = input.memberQuery.toLowerCase();
   const partnerSearchIds = normalizedMemberQuery
     ? partners
         .filter((partner) => {

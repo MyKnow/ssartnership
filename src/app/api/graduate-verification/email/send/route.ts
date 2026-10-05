@@ -30,6 +30,7 @@ import {
   RouteJsonBodyError,
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
+import { expectNoError } from "@/lib/expect-no-error";
 
 export const runtime = "nodejs";
 
@@ -147,10 +148,13 @@ export async function POST(request: Request) {
     ],
     afterFailure: (diagnostic) => [
       async () => {
-        await supabase
-          .from("graduate_email_challenges")
-          .delete()
-          .eq("id", challenge.id);
+        await expectNoError(
+          supabase
+            .from("graduate_email_challenges")
+            .delete()
+            .eq("id", challenge.id),
+          "[graduate-email/send] challenge compensating delete failed",
+        );
       },
       () => recordGraduateEmailProviderFailure(rateLimitContext),
       () =>

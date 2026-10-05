@@ -1,16 +1,15 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { appendAdminReviewQueueQuery } from "@/lib/admin-review-queue";
 import { assertAdminCanAccessManagedCampuses } from "@/lib/admin-scope";
-import { inferCampusSlugsFromLocation, normalizeCampusSlugs } from "@/lib/campuses";
 import {
   sendAndRecordCampusScopedNewPartnerNotification,
 } from "@/lib/new-partner-notifications";
 import {
+  canTransitionPartnerRegistrationStatus,
   isPartnerRegistrationRequestStatus,
   type PartnerRegistrationRequestStatus,
 } from "@/lib/partner-registration";
@@ -18,12 +17,14 @@ import {
   hasPartnerRegistrationFieldErrors,
   validatePartnerRegistrationInput,
 } from "@/lib/partner-registration";
-import { loadPartnerRegistrationCategories } from "@/lib/partner-registration-submit.server";
 import {
-  DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
-  normalizeBenefitGroupKey,
-} from "@/lib/partner-branch-registration";
-import { persistPartnerBranchLinks } from "@/lib/partner-branch-links.server";
+  createPartnerFromPortalRegistrationRequest,
+  resolveRegistrationManagedCampusSlugs,
+  rollbackPartnerRegistrationRequestStatus,
+  type PartnerRegistrationRequestRow,
+  type RegistrationCompanyProvisioner,
+} from "@/lib/partner-registration-conversion.server";
+import { loadPartnerRegistrationCategories } from "@/lib/partner-registration-submit.server";
 import { resolvePartnerRegistrationCategory } from "@/lib/partner-registration";
 import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
 import { hashCouponVerificationPassword } from "@/lib/coupon-verification-password";
@@ -31,6 +32,7 @@ import {
   cleanupPartnerCompanyProvision,
   ensurePartnerCompanyRow,
 } from "@/app/admin/(protected)/_actions/partner-support/company-provision";
+import type { PartnerCompanyProvision } from "@/app/admin/(protected)/_actions/shared-types";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   getPartnerVisibilityState,
@@ -40,504 +42,17 @@ import {
   logAdminAction,
   redirectAdminActionError,
   revalidateAdminAndPublicPaths,
-  revalidatePartnerData,
 } from "@/app/admin/(protected)/_actions/shared-helpers";
 import { sanitizeReturnTo } from "@/lib/return-to";
+import type { PartnerVisibility } from "@/lib/types";
+import { isFourDigitPin } from "@/lib/validation";
 
-type RegistrationCompanyRelation =
-  | { managed_campus_slugs?: string[] | null }
-  | Array<{ managed_campus_slugs?: string[] | null }>
-  | null
-  | undefined;
-
-type PartnerRegistrationRequestRow = {
-  id: string;
-  status: string;
-  visibility?: string | null;
-  admin_note?: string | null;
-  reviewed_by_admin_id?: string | null;
-  reviewed_at?: string | null;
-  source?: string | null;
-  company_id?: string | null;
-  registration_mode?: string | null;
-  service_mode: string;
-  benefit_action_type: string;
-  benefit_items?: unknown;
-  benefit_verification_pin_hash?: string | null;
-  benefit_verification_pin_salt?: string | null;
-  branch_scope_type?: string | null;
-  branch_scope_note?: string | null;
-  brand_name: string;
-  category_id?: string | null;
-  category_label: string;
-  period_start?: string | null;
-  period_end?: string | null;
-  inquiry_link?: string | null;
-  detail_description?: string | null;
-  brand_phone?: string | null;
-  company_name: string;
-  contact_name: string;
-  contact_email: string;
-  contact_phone?: string | null;
-  company_description?: string | null;
-  benefits?: string[] | null;
-  conditions?: string[] | null;
-  tags?: string[] | null;
-  location: string;
-  map_url?: string | null;
-  site_link?: string | null;
-  benefit_action_link?: string | null;
-  thumbnail_url?: string | null;
-  image_urls?: string[] | null;
-  company?: RegistrationCompanyRelation;
-};
-
-type ConvertedPartnerRow = {
-  id: string;
-  name: string;
-  location: string;
-  campus_slugs?: string[] | null;
-  visibility?: string | null;
-  benefits?: string[] | null;
-  conditions?: string[] | null;
-  period_start?: string | null;
-  period_end?: string | null;
-  map_url?: string | null;
-};
-
-type RegistrationBenefitGroupRow = {
-  group_key: string;
-  label: string;
-  benefit_action_type?: string | null;
-  benefit_action_link?: string | null;
-  benefits?: string[] | null;
-  conditions?: string[] | null;
-  period_start?: string | null;
-  period_end?: string | null;
-  tags?: string[] | null;
-};
-
-type RegistrationBranchRow = {
-  benefit_group_key?: string | null;
-  branch_key: string;
-  branch_code?: string | null;
-  name: string;
-  address: string;
-  branch_type?: string | null;
-  campus_slugs?: string[] | null;
-  map_url?: string | null;
-  phone?: string | null;
-  memo?: string | null;
-};
-
-type RegistrationConversionResources = {
-  companyProvision: Awaited<ReturnType<typeof ensurePartnerCompanyRow>> | null;
-  createdBrandProfileId: string | null;
-  createdPartnerIds: string[];
-};
-
-function getRegistrationCompany(company: RegistrationCompanyRelation) {
-  return Array.isArray(company) ? (company[0] ?? null) : (company ?? null);
-}
-
-function resolveRegistrationManagedCampusSlugs(
-  request: PartnerRegistrationRequestRow,
-) {
-  const company = getRegistrationCompany(request.company);
-  return normalizeCampusSlugs(
-    company?.managed_campus_slugs ??
-      inferCampusSlugsFromLocation(request.location),
-  );
-}
-
-function normalizeRegistrationBenefitGroupKey(value?: string | null) {
-  return normalizeBenefitGroupKey(value, DEFAULT_PARTNER_BENEFIT_GROUP_KEY);
-}
-
-async function rollbackRegistrationConversionResources(
-  supabase: ReturnType<typeof getSupabaseAdminClient>,
-  resources: RegistrationConversionResources,
-) {
-  const cleanupFailures: Array<{
-    stage: string;
-    code?: string;
-    message: string;
-  }> = [];
-
-  if (resources.createdPartnerIds.length > 0) {
-    const { error } = await supabase
-      .from("partners")
-      .delete()
-      .in("id", resources.createdPartnerIds);
-    if (error) {
-      cleanupFailures.push({
-        stage: "partners",
-        code: error.code,
-        message: error.message,
-      });
-    }
-  }
-
-  if (resources.createdBrandProfileId) {
-    const { error } = await supabase
-      .from("partner_brand_profiles")
-      .delete()
-      .eq("id", resources.createdBrandProfileId);
-    if (error) {
-      cleanupFailures.push({
-        stage: "partner_brand_profile",
-        code: error.code,
-        message: error.message,
-      });
-    }
-  }
-
-  await cleanupPartnerCompanyProvision(supabase, resources.companyProvision).catch(
-    (error: unknown) => {
-      cleanupFailures.push({
-        stage: "partner_company_provision",
-        message:
-          error instanceof Error ? error.message : "unknown cleanup error",
-      });
-    },
-  );
-
-  if (cleanupFailures.length > 0) {
-    console.error(
-      "[partner-registration] conversion rollback failed",
-      cleanupFailures,
-    );
-    throw new Error("partner_registration_conversion_cleanup_failed");
-  }
-}
-
-async function findExistingConvertedPartner(
-  supabase: ReturnType<typeof getSupabaseAdminClient>,
-  request: PartnerRegistrationRequestRow,
-) {
-  let query = supabase
-    .from("partners")
-    .select("id,name,location,campus_slugs,visibility")
-    .eq("name", request.brand_name)
-    .eq("location", request.location)
-    .limit(1);
-
-  if (request.company_id) {
-    query = query.eq("company_id", request.company_id);
-  }
-
-  const { data, error } = await query.maybeSingle();
-  if (error) {
-    throw new Error(error.message);
-  }
-  return (data ?? null) as ConvertedPartnerRow | null;
-}
-
-async function createPartnerFromPortalRegistrationRequest({
-  supabase,
-  request,
-  campusSlugs,
-}: {
-  supabase: ReturnType<typeof getSupabaseAdminClient>;
-  request: PartnerRegistrationRequestRow;
-  campusSlugs: string[];
-}) {
-  if (!request.category_id) {
-    return { partners: [], created: false };
-  }
-
-  const normalizedCampusSlugs = normalizeCampusSlugs(campusSlugs);
-  if (normalizedCampusSlugs.length === 0) {
-    return { partners: [], created: false };
-  }
-
-  const resources: RegistrationConversionResources = {
-    companyProvision: null,
-    createdBrandProfileId: null,
-    createdPartnerIds: [],
-  };
-
-  try {
-    resources.companyProvision = request.company_id
-      ? null
-      : await ensurePartnerCompanyRow(
-          supabase,
-          {
-            companyId: null,
-            name: request.company_name,
-            description: request.company_description ?? null,
-            contactName: request.contact_name,
-            contactEmail: request.contact_email,
-            contactPhone: request.contact_phone ?? null,
-          },
-          true,
-          { managedCampusSlugs: normalizedCampusSlugs },
-        );
-    const companyId =
-      request.company_id ?? resources.companyProvision?.company?.id ?? null;
-    if (!companyId) {
-      return { partners: [], created: false };
-    }
-
-    const { data: existingProfile, error: profileLookupError } = await supabase
-      .from("partner_brand_profiles")
-      .select("id")
-      .eq("company_id", companyId)
-      .eq("name", request.brand_name)
-      .maybeSingle();
-    if (profileLookupError) {
-      throw new Error(profileLookupError.message);
-    }
-
-    let brandProfileId =
-      (existingProfile as { id?: string } | null)?.id ?? null;
-    if (!brandProfileId) {
-      const { data: createdProfile, error: profileCreateError } =
-        await supabase
-          .from("partner_brand_profiles")
-          .insert({
-            company_id: companyId,
-            name: request.brand_name,
-            category_id: request.category_id,
-            category_label: request.category_label,
-            description: request.detail_description ?? null,
-            inquiry_link: request.inquiry_link ?? null,
-            brand_phone: request.brand_phone ?? null,
-            thumbnail_url: request.thumbnail_url ?? null,
-            image_urls: request.image_urls ?? [],
-            tags: request.tags ?? [],
-          })
-          .select("id")
-          .single();
-      if (profileCreateError) {
-        throw new Error(profileCreateError.message);
-      }
-      brandProfileId = (createdProfile as { id: string }).id;
-      resources.createdBrandProfileId = brandProfileId;
-    }
-
-    const [groupResult, branchResult] = await Promise.all([
-      supabase
-        .from("partner_registration_benefit_groups")
-        .select("group_key,label,benefit_action_type,benefit_action_link,benefits,conditions,period_start,period_end,tags")
-        .eq("registration_request_id", request.id)
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("partner_registration_branches")
-        .select("benefit_group_key,branch_key,branch_code,name,address,branch_type,campus_slugs,map_url,phone,memo")
-        .eq("registration_request_id", request.id)
-        .order("created_at", { ascending: true }),
-    ]);
-    if (groupResult.error) {
-      throw new Error(groupResult.error.message);
-    }
-    if (branchResult.error) {
-      throw new Error(branchResult.error.message);
-    }
-
-    const groups = (groupResult.data ?? []) as RegistrationBenefitGroupRow[];
-    const safeGroups =
-      groups.length > 0
-        ? groups
-        : [
-            {
-              group_key: DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
-              label: DEFAULT_PARTNER_BENEFIT_GROUP_KEY,
-              benefit_action_type: request.benefit_action_type,
-              benefit_action_link: request.benefit_action_link,
-              benefits: request.benefits ?? [],
-              conditions: request.conditions ?? [],
-              period_start: request.period_start ?? null,
-              period_end: request.period_end ?? null,
-              tags: request.tags ?? [],
-            },
-          ];
-    const branches = (branchResult.data ?? []) as RegistrationBranchRow[];
-    const createdPartners: ConvertedPartnerRow[] = [];
-
-    for (const group of safeGroups) {
-      const normalizedGroupKey = normalizeRegistrationBenefitGroupKey(
-        group.group_key,
-      );
-      const groupBranches = branches.filter(
-        (branch) =>
-          normalizeRegistrationBenefitGroupKey(branch.benefit_group_key) ===
-          normalizedGroupKey,
-      );
-      const groupCampusSlugs = normalizeCampusSlugs(
-        groupBranches.flatMap((branch) => branch.campus_slugs ?? []),
-      );
-      const partnerCampusSlugs =
-        groupCampusSlugs.length > 0 ? groupCampusSlugs : normalizedCampusSlugs;
-      const locationSummary =
-        groupBranches.length === 0
-          ? request.location
-          : groupBranches.length === 1
-            ? groupBranches[0]!.address
-            : `${groupBranches[0]!.address} 외 ${groupBranches.length - 1}개 지점`;
-      const partnerName =
-        safeGroups.length === 1 ||
-        normalizedGroupKey === DEFAULT_PARTNER_BENEFIT_GROUP_KEY
-          ? request.brand_name
-          : `${request.brand_name} · ${group.label}`;
-      const existingPartner = await findExistingConvertedPartner(supabase, {
-        ...request,
-        company_id: companyId,
-        brand_name: partnerName,
-        location: locationSummary,
-      });
-      if (existingPartner) {
-        createdPartners.push(existingPartner);
-        continue;
-      }
-
-      const partnerId = randomUUID();
-      const benefitActionType =
-        group.benefit_action_type ?? request.benefit_action_type;
-      const benefitActionLink =
-        group.benefit_action_link ??
-        request.benefit_action_link ??
-        (benefitActionType === "external_link"
-          ? request.site_link ?? null
-          : null);
-      const { data, error } = await supabase
-        .from("partners")
-        .insert({
-          id: partnerId,
-          company_id: companyId,
-          brand_profile_id: brandProfileId,
-          name: partnerName,
-          category_id: request.category_id,
-          location: locationSummary,
-          detail_description: request.detail_description ?? null,
-          campus_slugs: partnerCampusSlugs,
-          managed_campus_slugs: partnerCampusSlugs,
-          map_url: groupBranches[0]?.map_url ?? request.map_url ?? null,
-          benefit_action_type: benefitActionType,
-          benefit_action_link: benefitActionLink,
-          reservation_link: null,
-          inquiry_link: request.inquiry_link ?? null,
-          period_start: group.period_start ?? request.period_start ?? null,
-          period_end: group.period_end ?? request.period_end ?? null,
-          conditions: group.conditions ?? request.conditions ?? [],
-          benefits: group.benefits ?? request.benefits ?? [],
-          applies_to: ["staff", "student", "graduate"],
-          thumbnail: request.thumbnail_url ?? null,
-          images: request.image_urls ?? [],
-          tags: group.tags ?? request.tags ?? [],
-          visibility: request.visibility ?? "public",
-          benefit_visibility: "public",
-          branch_scope_type:
-            request.service_mode === "online"
-              ? "online"
-              : request.branch_scope_type ?? "single_location",
-          branch_scope_note: request.branch_scope_note ?? null,
-          benefit_verification_pin_hash:
-            request.benefit_verification_pin_hash ?? null,
-          benefit_verification_pin_salt:
-            request.benefit_verification_pin_salt ?? null,
-        })
-        .select("id,name,location,campus_slugs,visibility,benefits,conditions,period_start,period_end,map_url")
-        .single();
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      const createdPartner = data as ConvertedPartnerRow;
-      createdPartners.push(createdPartner);
-      resources.createdPartnerIds.push(createdPartner.id);
-
-      const benefitItems = normalizePartnerBenefitItems(
-        request.benefit_items ??
-          (group.benefits ?? request.benefits ?? []).map((title, index) => ({
-            id: `registration-benefit-${index + 1}`,
-            title,
-          })),
-      );
-      if (benefitItems.length > 0) {
-        const { error: benefitError } = await supabase
-          .from("partner_benefits")
-          .insert(
-            benefitItems.map((benefit, displayOrder) => ({
-              partner_id: partnerId,
-              title: benefit.title,
-              max_apply_count: benefit.maxApplyCount ?? null,
-              display_order: displayOrder,
-            })),
-          );
-        if (benefitError) {
-          throw new Error(benefitError.message);
-        }
-      }
-
-      await persistPartnerBranchLinks({
-        supabase,
-        partnerId: createdPartner.id,
-        companyId,
-        brandProfileId,
-        source:
-          request.source === "partner_portal" ? "partner_portal" : "registration",
-        branches: groupBranches.map((branch) => ({
-          branchKey: branch.branch_key,
-          branchCode: branch.branch_code ?? null,
-          name: branch.name,
-          address: branch.address,
-          branchType: branch.branch_type ?? "unknown",
-          campusSlugs: branch.campus_slugs ?? [],
-          mapUrl: branch.map_url ?? null,
-          phone: branch.phone ?? null,
-          memo: branch.memo ?? null,
-        })),
-      });
-    }
-
-    return { partners: createdPartners, created: createdPartners.length > 0 };
-  } catch (error) {
-    try {
-      await rollbackRegistrationConversionResources(supabase, resources);
-    } catch (cleanupError) {
-      throw new Error("partner_registration_conversion_cleanup_failed", {
-        cause: { originalError: error, cleanupError },
-      });
-    }
-    throw error;
-  }
-}
-
-async function rollbackPartnerRegistrationRequestStatus({
-  supabase,
-  request,
-  requestedStatus,
-}: {
-  supabase: ReturnType<typeof getSupabaseAdminClient>;
-  request: PartnerRegistrationRequestRow;
-  requestedStatus: PartnerRegistrationRequestStatus;
-}) {
-  const previousStatus = isPartnerRegistrationRequestStatus(request.status)
-    ? request.status
-    : "pending";
-  const previousVisibility =
-    typeof request.visibility === "string" &&
-    isPartnerVisibility(request.visibility)
-      ? request.visibility
-      : "public";
-  const { data, error } = await supabase
-    .from("partner_registration_requests")
-    .update({
-      status: previousStatus,
-      visibility: previousVisibility,
-      admin_note: request.admin_note ?? null,
-      reviewed_by_admin_id: request.reviewed_by_admin_id ?? null,
-      reviewed_at: request.reviewed_at ?? null,
-    })
-    .eq("id", request.id)
-    .eq("status", requestedStatus)
-    .select("id")
-    .maybeSingle();
-
-  return !error && Boolean(data);
-}
+const registrationCompanyProvisioner = {
+  ensure: (supabase, input, options) =>
+    ensurePartnerCompanyRow(supabase, input, true, options),
+  cleanup: cleanupPartnerCompanyProvision,
+} satisfies RegistrationCompanyProvisioner<PartnerCompanyProvision>;
+import { logServerError } from "@/lib/server-log";
 
 export async function updatePartnerRegistrationRequestStatus(formData: FormData) {
   const returnTo = sanitizeReturnTo(
@@ -585,9 +100,22 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
     redirectAdminActionError(returnTo, "regional_admin_scope_denied");
   }
 
+  if (!canTransitionPartnerRegistrationStatus(previousStatus, status)) {
+    redirectAdminActionError(returnTo, "partner_form_status_locked", {
+      action: "partner_update",
+      targetType: "partner_registration_request",
+      targetId: registrationRequest.id,
+      properties: {
+        previousStatus,
+        requestedStatus: status,
+        stage: "status_transition",
+      },
+    });
+  }
+
   const payload: {
     status: PartnerRegistrationRequestStatus;
-    visibility: "public" | "confidential" | "private";
+    visibility: PartnerVisibility;
     admin_note: string | null;
     reviewed_by_admin_id?: string | null;
     reviewed_at?: string | null;
@@ -610,10 +138,7 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
     .select("id")
     .maybeSingle();
   if (updateError) {
-    console.error(
-      "[partner-registration] status update failed",
-      updateError.message,
-    );
+    logServerError("[partner-registration] status update failed", updateError);
     redirectAdminActionError(returnTo, "partner_form_invalid_request");
   }
 
@@ -622,16 +147,19 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
   }
 
   let convertedPartnerId: string | null = null;
+  let convertedPartnerIds: string[] = [];
   if (status === "converted" && previousStatus !== "converted") {
     try {
       const conversion = await createPartnerFromPortalRegistrationRequest({
         supabase,
         request: { ...registrationRequest, visibility },
         campusSlugs: managedCampusSlugs,
+        companyProvisioner: registrationCompanyProvisioner,
       });
       if (conversion.partners.length === 0) {
         throw new Error("등록 가능한 제휴처가 생성되지 않았습니다.");
       }
+      convertedPartnerIds = conversion.partners.map((partner) => partner.id);
       convertedPartnerId =
         conversion.partners.length === 1
           ? conversion.partners[0]?.id ?? null
@@ -675,7 +203,6 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
           });
         }
 
-        revalidatePartnerData();
         revalidateAdminAndPublicPaths(partner.id);
       }
     } catch (error) {
@@ -688,14 +215,20 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
         error instanceof Error
           ? error.message
           : "제휴처 등록 신청 승인 후처리에 실패했습니다.";
-      console.error("[partner-registration] converted follow-up failed", message);
+      logServerError("[partner-registration] converted follow-up failed", message);
       if (!rollbackSucceeded) {
-        console.error(
+        logServerError(
           "[partner-registration] converted status rollback failed",
         );
       }
       revalidatePath("/admin/partner-registrations");
-      redirectAdminActionError(returnTo, "partner_form_conversion_failed", {
+      // `converted` is terminal, so a request left in it by a failed restore
+      // cannot be reverted from the queue. Say so instead of claiming the
+      // restore succeeded, and keep the outcome in the audit record.
+      const conversionFailureCode = rollbackSucceeded
+        ? "partner_form_conversion_failed"
+        : "partner_form_conversion_status_unrestored";
+      redirectAdminActionError(returnTo, conversionFailureCode, {
         action: "partner_create",
         targetType: "partner_registration_request",
         targetId: registrationRequest.id,
@@ -703,10 +236,26 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
           previousStatus,
           requestedStatus: status,
           stage: "conversion_follow_up",
+          statusRestored: rollbackSucceeded,
         },
       });
     }
   }
+
+  await logAdminAction("partner_update", {
+    targetType: "partner_registration_request",
+    targetId: registrationRequest.id,
+    properties: {
+      source: "admin_partner_registration_queue",
+      changeType: "status",
+      previousStatus,
+      status,
+      previousVisibility: registrationRequest.visibility ?? null,
+      visibility,
+      adminNoteChanged: (registrationRequest.admin_note ?? "") !== adminNote,
+      convertedPartnerIds,
+    },
+  });
 
   revalidatePath("/admin/partner-registrations");
   if (convertedPartnerId) {
@@ -878,7 +427,7 @@ export async function updatePartnerRegistrationRequestDetails(formData: FormData
   const rawBenefitVerificationPin = String(
     formData.get("benefitVerificationPin") ?? "",
   ).trim();
-  if (rawBenefitVerificationPin && !/^\d{4}$/.test(rawBenefitVerificationPin)) {
+  if (rawBenefitVerificationPin && !isFourDigitPin(rawBenefitVerificationPin)) {
     redirectAdminActionError(returnTo, "partner_form_details_invalid");
   }
   let benefitVerificationPinUpdate: {
@@ -916,7 +465,7 @@ export async function updatePartnerRegistrationRequestDetails(formData: FormData
       })
       .eq("id", group.id);
     if (error) {
-      console.error("[partner-registration] details group update failed", error.message);
+      logServerError("[partner-registration] details group update failed", error);
       redirectAdminActionError(returnTo, "partner_form_details_invalid");
     }
   }
@@ -955,7 +504,7 @@ export async function updatePartnerRegistrationRequestDetails(formData: FormData
     })
     .eq("id", id);
   if (updateError) {
-    console.error("[partner-registration] details update failed", updateError.message);
+    logServerError("[partner-registration] details update failed", updateError);
     redirectAdminActionError(returnTo, "partner_form_details_invalid");
   }
 

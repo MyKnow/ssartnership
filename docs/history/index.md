@@ -12,6 +12,7 @@ last_verified: 2026-08-29
 
 - [SSAFY Verify 외부 API 위임 계획](./architecture/ssafy-verify-external-api-delegation.md) — Mattermost 직접 연동으로 superseded
 - [2026-07-14 dev → main 승격 체크리스트](./operations/2026-07-14-dev-main-promotion-checklist.md) — 시점 SHA와 Issue 상태가 만료된 체크리스트
+- [Vercel 계정 라우팅](./operations/vercel-account-routing.md) — PVE 자체 호스팅 이전으로 만료된 Vercel CLI 절차
 - [2026-08-13 TODO 스냅샷](./product/todo-2026-08-13.md) — 완료 이력과 레거시 정리 원본
 
 - [제품 개요 분리 전 원본](./2026-09-20-product-overview.md)

@@ -1,6 +1,8 @@
+import { isE2eMockMutationEnabled } from "@/lib/e2e-mutation-mode";
 import type { Category, Partner } from "@/lib/types";
 import type {
   AdminPartnerOption,
+  PartnerCategoryOption,
   PartnerRepository,
   PartnerViewContext,
   PublicPartnerSeoEntry,
@@ -9,7 +11,11 @@ import type {
 import { toLeanPublicDirectoryPartner } from "@/lib/public-partner-directory";
 import { canViewPartnerDetails } from "@/lib/partner-visibility";
 import { maskPartnerBenefitsForAccess } from "@/lib/partner-benefit-visibility";
-import { getCampusPartners, type CampusSlug } from "@/lib/campuses";
+import {
+  getCampusPartners,
+  resolvePartnerCampusSlugs,
+  type CampusSlug,
+} from "@/lib/campuses";
 
 const categories: Category[] = [
   {
@@ -38,7 +44,7 @@ const categories: Category[] = [
   },
 ];
 
-const partners: Partner[] = [
+const baselinePartners: Partner[] = [
   {
     id: "health-001",
     name: "바디라인 피트니스",
@@ -176,6 +182,17 @@ const partners: Partner[] = [
   },
 ];
 
+// Extra rows exist only inside the explicit local E2E fixture. They exercise
+// pagination/return-state behavior without changing the normal mock catalog.
+const partners: Partner[] = isE2eMockMutationEnabled()
+  ? [...baselinePartners, ...Array.from({ length: 24 }, (_, index): Partner => ({
+      ...baselinePartners[4]!,
+      id: `rf-home-fixture-${index + 1}`,
+      name: `목록 복귀 검증 공간 ${index + 1}`,
+      period: { start: "2026-01-01", end: "2099-12-31" },
+    }))]
+  : baselinePartners;
+
 export class MockPartnerRepository implements PartnerRepository {
   async listAdminPartnerOptions(): Promise<AdminPartnerOption[]> {
     return partners
@@ -189,12 +206,28 @@ export class MockPartnerRepository implements PartnerRepository {
     return categories;
   }
 
+  async getCategoryOptions(): Promise<PartnerCategoryOption[]> {
+    // Mock categories have no database id, so the stable key doubles as id.
+    return categories.map((category) => ({
+      id: category.key,
+      key: category.key,
+      label: category.label,
+    }));
+  }
+
   async getPublicPartnerSeoEntries(
     options: PublicPartnerSeoOptions = {},
   ): Promise<PublicPartnerSeoEntry[]> {
     const entries = partners
       .filter((partner) =>
         canViewPartnerDetails(partner.visibility, false, partner.period),
+      )
+      // Same order as the Supabase query (newest registration first) so the
+      // limited RSS projection picks the same partners.
+      .toSorted(
+        (left, right) =>
+          right.createdAt.localeCompare(left.createdAt) ||
+          left.id.localeCompare(right.id),
       )
       .map((partner) => ({
         id: partner.id,
@@ -203,10 +236,13 @@ export class MockPartnerRepository implements PartnerRepository {
           categories.find((category) => category.key === partner.category)
             ?.label ?? "제휴",
         location: partner.location,
+        // Mirrors getPublicDirectoryPartnersForCampus, which uses getCampusPartners.
+        campusSlugs: resolvePartnerCampusSlugs(partner),
         period: {
           start: partner.period.start || null,
           end: partner.period.end || null,
         },
+        createdAt: partner.createdAt || null,
       }));
     const limit = options.limit;
 

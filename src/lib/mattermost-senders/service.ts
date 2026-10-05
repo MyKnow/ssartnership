@@ -5,7 +5,9 @@ import {
 } from "@/lib/mattermost/client";
 import { getMattermostSenderKeyring } from "./config";
 import {
+  getMattermostSenderRuntimeHealthFailureCode,
   isMattermostSenderRuntimeFailureCode,
+  type MattermostSenderFailurePhase,
 } from "./health";
 import { mattermostSenderRepository } from "./repository";
 
@@ -71,19 +73,28 @@ export async function withActiveMattermostSenderForGeneration<T>(
   }
 
   const client = new MattermostClient();
+  const attempt: { phase: MattermostSenderFailurePhase } = {
+    phase: "authentication",
+  };
   try {
     return await client.withAuthenticatedSender(
       sender.credentials,
-      (session) => operation(session, sender),
+      (session) => {
+        attempt.phase = "operation";
+        return operation(session, sender);
+      },
     );
   } catch (error) {
-    if (
-      error instanceof MattermostApiError
-      && isMattermostSenderRuntimeFailureCode(error.code)
-    ) {
+    const healthFailureCode = error instanceof MattermostApiError
+      ? getMattermostSenderRuntimeHealthFailureCode({
+          code: error.code,
+          phase: attempt.phase,
+        })
+      : null;
+    if (healthFailureCode) {
       await mattermostSenderRepository.recordHealthFailure({
         senderId: sender.id,
-        errorCode: error.code,
+        errorCode: healthFailureCode,
       }).catch(() => undefined);
     }
     throw error;

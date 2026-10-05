@@ -134,7 +134,7 @@ test("가입 승인 상세의 반려 입력은 같은 화면 복구와 접근 �
   assert.match(detailSource, /<fieldset/);
   assert.match(detailSource, /<legend/);
   assert.match(detailSource, /htmlFor=\{rejectionReasonId\}/);
-  assert.match(detailSource, /반려 사유를 1~500자로 입력해 주세요/);
+  assert.match(detailSource, /반려 사유를 1~\{ADMIN_REVIEW_NOTE_MAX_LENGTH\}자로 입력해 주세요/);
   assert.match(detailSource, /aria-invalid=\{focusRejectReason \|\| undefined\}/);
   assert.match(detailSource, /autoFocus=\{focusRejectReason\}/);
   assert.doesNotMatch(detailSource, /<textarea name="reason"/);
@@ -162,7 +162,7 @@ test("프로필 사진 반려 입력은 실패한 카드로 복구하고 접근 
 
   assert.match(queueSource, /from "@\/components\/ui\/Textarea"/);
   assert.match(queueSource, /focusReasonTarget/);
-  assert.match(queueSource, /반려 사유를 1~500자로 입력해 주세요/);
+  assert.match(queueSource, /반려 사유를 1~\{ADMIN_REVIEW_NOTE_MAX_LENGTH\}자로 입력해 주세요/);
   assert.match(queueSource, /aria-invalid=\{isReasonInvalid \|\| undefined\}/);
   assert.match(queueSource, /autoFocus=\{isReasonInvalid\}/);
   assert.doesNotMatch(queueSource, /<input\s+id=\{`(?:replacement|current-photo)-reason-/);

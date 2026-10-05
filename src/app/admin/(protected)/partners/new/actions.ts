@@ -7,12 +7,22 @@ import {
 import { parseAdminPartnerXlsxDraft } from "@/lib/admin-partner-file-import.server";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { getManagedCampusFilterValues } from "@/lib/admin-scope";
+import { partnerRepository } from "@/lib/repositories";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 type PartnerCompanyRow = {
   id: string;
   name: string;
 };
+
+async function loadCategoryOptions() {
+  try {
+    return await partnerRepository.getCategoryOptions();
+  } catch (error) {
+    console.error("[admin-partner-file] category options load failed", error);
+    return null;
+  }
+}
 
 function normalizePartnerCompanies(value: unknown): PartnerCompanyRow[] {
   if (!value) {
@@ -51,15 +61,12 @@ export async function parseAdminPartnerXlsxFileAction(
   if (managedCampusFilter) {
     companiesQuery = companiesQuery.overlaps("managed_campus_slugs", managedCampusFilter);
   }
-  const [categoriesResult, companiesResult] = await Promise.all([
-    supabase
-      .from("categories")
-      .select("id,key,label")
-      .order("created_at", { ascending: true }),
+  const [categories, companiesResult] = await Promise.all([
+    loadCategoryOptions(),
     companiesQuery,
   ]);
 
-  if (categoriesResult.error || companiesResult.error) {
+  if (!categories || companiesResult.error) {
     return {
       ok: false,
       errors: ["템플릿 검증에 필요한 기준 데이터를 불러오지 못했습니다."],
@@ -69,7 +76,7 @@ export async function parseAdminPartnerXlsxFileAction(
   const buffer = Buffer.from(await file.arrayBuffer());
   return parseAdminPartnerXlsxDraft({
     fileBuffer: buffer,
-    categories: categoriesResult.data ?? [],
+    categories,
     companies: normalizePartnerCompanies(companiesResult.data),
   });
 }

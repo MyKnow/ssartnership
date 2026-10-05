@@ -9,11 +9,13 @@ import {
 import ImageCropDialog from "@/components/media/ImageCropDialog";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import { useToast } from "@/components/ui/Toast";
 import { getSafeAdminResponseMessage } from "@/lib/admin-safe-messages";
+import { formatKoreanLocaleDateTime } from "@/lib/datetime";
 import {
   MANUAL_MEMBER_IMPORT_CAMPUS_OPTIONS,
   getManualMemberImportGenerationOptions,
@@ -871,7 +873,11 @@ export default function AdminMemberManualAddPanel({
             <span className="text-sm text-muted-foreground">{rows.length} / {MANUAL_MEMBER_IMPORT_LIMITS.maxRows}명</span>
           </div>
           {rows.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-surface-inset px-4 py-6 text-sm text-muted-foreground">행 추가를 누르거나 회원 XLSX를 업로드해 초대할 회원을 입력해 주세요.</div>
+            <EmptyState
+              size="sm"
+              title="아직 초대할 회원 행이 없습니다."
+              description="행 추가를 누르거나 회원 XLSX를 업로드해 초대할 회원을 입력해 주세요."
+            />
           ) : (
             rows.map((row) => {
               const selectedPhoto = selectedPhotos.get(row.rowNumber);
@@ -1036,7 +1042,7 @@ export default function AdminMemberManualAddPanel({
           </div>
         </div>
         {error ? <FormMessage variant="error" className="whitespace-pre-line">{error}</FormMessage> : null}
-        {batch ? <FormMessage variant="muted">준비 완료 · {new Date(batch.expiresAt).toLocaleString("ko-KR")} 전까지 생성할 수 있습니다.</FormMessage> : null}
+        {batch ? <FormMessage variant="muted">준비 완료 · {formatKoreanLocaleDateTime(batch.expiresAt)} 전까지 생성할 수 있습니다.</FormMessage> : null}
       </div>
 
       {result ? (

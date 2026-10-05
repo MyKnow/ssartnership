@@ -1,23 +1,39 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import MemberRecentAuthField from "@/components/auth/MemberRecentAuthField";
 import Button from "@/components/ui/Button";
+import FormMessage from "@/components/ui/FormMessage";
 import Modal from "@/components/ui/Modal";
 import PageHeader from "@/components/ui/PageHeader";
 import Surface from "@/components/ui/Surface";
 import { useToast } from "@/components/ui/Toast";
+import { focusField } from "@/components/ui/form-field-state";
+import {
+  getMemberCurrentPasswordFieldError,
+  getMemberRecentAuthFeedback,
+  isMemberRecentAuthErrorCode,
+  type MemberRecentAuthRequirement,
+} from "@/lib/member-recent-auth";
 
 export default function MemberAccountDeletionView({
   settingsHref,
+  recentAuthRequirement = "none",
 }: {
   settingsHref: string;
+  recentAuthRequirement?: MemberRecentAuthRequirement;
 }) {
   const router = useRouter();
   const { notify } = useToast();
   const [confirmationOpen, setConfirmationOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [requirement, setRequirement] = useState(recentAuthRequirement);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const currentPasswordRef = useRef<HTMLInputElement>(null);
 
   const closeConfirmation = () => {
     if (!deleting) {
@@ -26,25 +42,48 @@ export default function MemberAccountDeletionView({
   };
 
   const deleteAccount = async () => {
-    if (deleting) {
+    if (deleting || requirement === "reauthentication") {
+      return;
+    }
+    const fieldError = getMemberCurrentPasswordFieldError(currentPassword, requirement);
+    if (fieldError) {
+      setPasswordError(fieldError);
+      focusField(currentPasswordRef);
       return;
     }
 
     setDeleting(true);
+    setPasswordError(null);
+    setFormError(null);
     try {
       const response = await fetch("/api/mm/delete", {
         method: "POST",
         credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          requirement === "password" ? { currentPassword } : {},
+        ),
       });
       if (!response.ok) {
-        notify("회원 탈퇴에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+        const data = (await response.json().catch(() => null)) as { error?: unknown } | null;
+        if (isMemberRecentAuthErrorCode(data?.error)) {
+          const feedback = getMemberRecentAuthFeedback(data.error);
+          if (feedback.requirement) setRequirement(feedback.requirement);
+          setPasswordError(feedback.fieldError ?? null);
+          setFormError(feedback.formError ?? null);
+          if (feedback.fieldError) {
+            window.setTimeout(() => focusField(currentPasswordRef), 0);
+          }
+          return;
+        }
+        notify("회원 탈퇴에 실패했습니다. 잠시 후 다시 시도해 주세요.", { tone: "error" });
         return;
       }
 
       notify("회원 탈퇴가 처리되었습니다.");
       router.replace("/");
     } catch {
-      notify("회원 탈퇴에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+      notify("회원 탈퇴에 실패했습니다. 잠시 후 다시 시도해 주세요.", { tone: "error" });
     } finally {
       setDeleting(false);
     }
@@ -109,6 +148,19 @@ export default function MemberAccountDeletionView({
         <p className="ui-body text-ko-pretty">
           개인 식별 정보와 프로필 사진은 30일 후 익명화됩니다. 계속하려면 아래 탈퇴 버튼을 선택해 주세요.
         </p>
+        <MemberRecentAuthField
+          id="member-delete-current-password"
+          requirement={requirement}
+          value={currentPassword}
+          onChange={(value) => {
+            setCurrentPassword(value);
+            setPasswordError(null);
+          }}
+          error={passwordError}
+          inputRef={currentPasswordRef}
+          disabled={deleting}
+        />
+        {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button variant="secondary" disabled={deleting} onClick={closeConfirmation}>
             취소
@@ -118,6 +170,7 @@ export default function MemberAccountDeletionView({
             onClick={() => void deleteAccount()}
             loading={deleting}
             loadingText="탈퇴 처리 중"
+            disabled={requirement === "reauthentication"}
           >
             회원 탈퇴
           </Button>

@@ -1,7 +1,7 @@
 "use client";
 
 import type { PushAudienceScope } from "@/lib/push";
-import type { AdminNotificationOperationLog, AdminNotificationType } from "@/lib/admin-notification-ops";
+import type { AdminNotificationOperationLog, AdminNotificationType } from "@/lib/admin-notification-ops-types";
 import { getNotificationChannelLabel, type NotificationChannel } from "@/lib/notifications/shared";
 import {
   formatOptionalSsafyYearLabel,

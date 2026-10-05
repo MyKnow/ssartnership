@@ -28,7 +28,9 @@ import {
   type PartnerRegistrationMode,
 } from "@/lib/partner-branch-registration";
 import {
-  IMAGE_SOURCE_ACCEPT,
+  RASTER_IMAGE_SOURCE_ACCEPT,
+  SVG_SOURCE_NOT_ALLOWED_MESSAGE,
+  isSvgImageSource,
   validateImageUploadSource,
 } from "@/lib/image-upload/policy";
 import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
@@ -278,9 +280,13 @@ export const PARTNER_REGISTRATION_QUEUE_SORT_OPTIONS = [
 export type PartnerRegistrationQueueSort =
   (typeof PARTNER_REGISTRATION_QUEUE_SORT_OPTIONS)[number]["value"];
 
+/** 관리자 제휴 신청 검토 큐 검색어 상한. 검색 입력 `maxLength`와 페이지의 쿼리 정규화가 함께 쓴다. */
+export const PARTNER_REGISTRATION_QUEUE_SEARCH_MAX_LENGTH = 100;
+
 export const PARTNER_REGISTRATION_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const PARTNER_REGISTRATION_GALLERY_MAX_FILES = 5;
-export const PARTNER_REGISTRATION_IMAGE_ACCEPT = IMAGE_SOURCE_ACCEPT;
+// 비로그인 게스트 업로드라 SVG 원본을 받지 않는다(partner-registration 이미지 정책과 같은 규칙).
+export const PARTNER_REGISTRATION_IMAGE_ACCEPT = RASTER_IMAGE_SOURCE_ACCEPT;
 
 export function isPartnerRegistrationRequestStatus(
   value: string,
@@ -288,6 +294,39 @@ export function isPartnerRegistrationRequestStatus(
   return PARTNER_REGISTRATION_STATUS_OPTIONS.includes(
     value as PartnerRegistrationRequestStatus,
   );
+}
+
+/**
+ * `converted` is terminal: the request already produced partner rows, so a
+ * reversal followed by a second conversion would create duplicate partners.
+ * Partner details are managed on the partner editor after conversion.
+ */
+export const PARTNER_REGISTRATION_TERMINAL_STATUSES = [
+  "converted",
+] as const satisfies PartnerRegistrationRequestStatus[];
+
+export function isPartnerRegistrationTerminalStatus(
+  status: PartnerRegistrationRequestStatus,
+) {
+  return (
+    PARTNER_REGISTRATION_TERMINAL_STATUSES as readonly PartnerRegistrationRequestStatus[]
+  ).includes(status);
+}
+
+/** Statuses an admin may save from `from`, including keeping the same status. */
+export function getAllowedPartnerRegistrationStatusTransitions(
+  from: PartnerRegistrationRequestStatus,
+): readonly PartnerRegistrationRequestStatus[] {
+  return isPartnerRegistrationTerminalStatus(from)
+    ? [from]
+    : PARTNER_REGISTRATION_STATUS_OPTIONS;
+}
+
+export function canTransitionPartnerRegistrationStatus(
+  from: PartnerRegistrationRequestStatus,
+  to: PartnerRegistrationRequestStatus,
+) {
+  return getAllowedPartnerRegistrationStatusTransitions(from).includes(to);
 }
 
 const maxLengthByField: Partial<Record<PartnerRegistrationFieldName, number>> = {
@@ -333,7 +372,7 @@ export function isPartnerRegistrationImageFile(file: File) {
     name: file.name,
     type: file.type,
     size: file.size,
-  }, { maxSourceBytes: PARTNER_REGISTRATION_IMAGE_MAX_BYTES });
+  }, { maxSourceBytes: PARTNER_REGISTRATION_IMAGE_MAX_BYTES, allowSvgSource: false });
 }
 
 export function validatePartnerRegistrationImageFile(file: File) {
@@ -342,6 +381,9 @@ export function validatePartnerRegistrationImageFile(file: File) {
   }
   if (file.size > PARTNER_REGISTRATION_IMAGE_MAX_BYTES) {
     return "이미지는 파일당 5MB 이하만 업로드할 수 있습니다.";
+  }
+  if (isSvgImageSource(file)) {
+    return SVG_SOURCE_NOT_ALLOWED_MESSAGE;
   }
   if (!isPartnerRegistrationImageFile(file)) {
     return "지원하는 이미지 파일만 업로드할 수 있습니다.";
@@ -534,7 +576,7 @@ export function validatePartnerRegistrationInput(
     number,
   ][]) {
     if (values[fieldName].length > maxLength) {
-      fieldErrors[fieldName] = `${maxLength.toLocaleString()}자 이하로 입력해 주세요.`;
+      fieldErrors[fieldName] = `${maxLength.toLocaleString("ko-KR")}자 이하로 입력해 주세요.`;
     }
   }
 

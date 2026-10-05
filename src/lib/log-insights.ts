@@ -1,4 +1,5 @@
 import { unstable_cache } from 'next/cache';
+import { ADMIN_READ_BURST_CACHE_SECONDS } from '@/lib/cache-ttl';
 import { createAdminLogsCsvStream } from './log-insights/csv';
 import { applyAdminLogsPrivacy } from './log-insights/privacy';
 import {
@@ -20,9 +21,9 @@ import {
   getAvailableLogNames,
   getSecurityStatusCounts,
   filterAndSortLogs,
-} from '@/components/admin/logs/selectors';
-import { getLogLabel } from '@/components/admin/logs/utils';
-import type { GroupFilter } from '@/components/admin/logs/types';
+} from '@/lib/log-insights/selectors';
+import { getLogLabel } from '@/lib/log-insights/utils';
+import type { GroupFilter } from '@/lib/log-insights/types';
 import type {
   AdminLogsAggregateData,
   AdminLogsAccessCapabilities,
@@ -44,8 +45,9 @@ import {
   LOG_PAGE_SIZE_OPTIONS,
   PAGE_MAX_LOG_ROWS_PER_GROUP,
 } from './log-insights/shared';
+import { formatCount } from "@/lib/number-format";
 
-const ADMIN_LOGS_READ_CACHE_REVALIDATE_SECONDS = 3;
+const ADMIN_LOGS_READ_CACHE_REVALIDATE_SECONDS = ADMIN_READ_BURST_CACHE_SECONDS;
 
 export type {
   AdminLogsCursor,
@@ -126,7 +128,7 @@ function resolvePartnerName(
 }
 
 function formatCountValue(count: number) {
-  return `${count.toLocaleString()}건`;
+  return `${formatCount(count)}건`;
 }
 
 function buildAggregateTopNamedItems(

@@ -6,11 +6,11 @@ import type {
   PartnerPortalSetupContext,
   PartnerPortalSetupInput,
   PartnerPortalSetupResult,
-} from "./partner-portal.ts";
+} from "./partner-auth/portal.ts";
 import {
   PartnerPortalSetupError,
   type PartnerPortalSetupErrorCode,
-} from "./partner-portal-errors.ts";
+} from "./partner-auth/portal-errors.ts";
 import { activePartnerPortalRepository } from "./partner-auth/repository.ts";
 
 export { listPartnerPortalDemoSetups } from "./partner-auth/repository.ts";
@@ -74,13 +74,13 @@ export function getPartnerPortalSetupErrorStatus(
   }
 }
 
-export { getPartnerPortalSetupErrorMessage } from "./partner-portal-errors.ts";
+export { getPartnerPortalSetupErrorMessage } from "./partner-auth/portal-errors.ts";
 export {
   PartnerPortalLoginError,
   type PartnerPortalLoginErrorCode,
   getPartnerPortalLoginErrorMessage,
   getPartnerPortalLoginErrorStatus,
-} from "./partner-portal-errors.ts";
+} from "./partner-auth/portal-errors.ts";
 export {
   PartnerPortalPasswordChangeError,
   PartnerPortalPasswordResetError,

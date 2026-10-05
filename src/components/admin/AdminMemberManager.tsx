@@ -31,7 +31,7 @@ import {
   type NotificationPreferenceFilterOption,
   type YearFilterOption,
   normalizeAdminMembers,
-} from "@/components/admin/member-manager/selectors";
+} from "@/lib/admin-member-selectors";
 
 export default function AdminMemberManager({
   members,
@@ -303,6 +303,7 @@ export default function AdminMemberManager({
               <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                 <Input
                   aria-label="회원 검색"
+                  enterKeyHint="search"
                   value={searchInputValue}
                   onChange={(event) => {
                     setSearchInputDraft({
@@ -569,7 +570,7 @@ export default function AdminMemberManager({
       </FilterBar>
 
       <p className="text-sm text-muted-foreground">
-        조건에 맞는 회원 {pagination.totalCount.toLocaleString()}명
+        조건에 맞는 회원 {pagination.totalCount.toLocaleString("ko-KR")}명
         {isPending ? " · 갱신 중" : ""}
       </p>
 

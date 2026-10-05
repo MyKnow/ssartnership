@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, fn, userEvent, waitFor, within } from "storybook/test";
-import type { AdminNotificationOperationLog } from "@/lib/admin-notification-ops";
+import type { AdminNotificationOperationLog } from "@/lib/admin-notification-ops-types";
 import { PushLogsSection } from "./PushLogsSection";
 import type { AdminPushManagerProps, SortOption } from "./types";
 

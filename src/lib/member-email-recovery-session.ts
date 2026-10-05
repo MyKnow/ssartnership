@@ -1,56 +1,32 @@
 import { cookies } from "next/headers";
-import { unstable_noStore as noStore } from "next/cache";
-import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "@/lib/hmac.js";
+import { signPayloadWith } from "@/lib/hmac.js";
+import {
+  buildSessionCookieOptions,
+  MEMBER_EMAIL_RECOVERY_COOKIE_NAME,
+} from "@/lib/session-cookies";
+import { readSessionSecret } from "@/lib/session-secrets";
+import {
+  MEMBER_EMAIL_RECOVERY_SESSION_TTL_MS,
+  parseMemberEmailRecoveryToken,
+  type MemberEmailRecoveryTokenPayload as MemberEmailRecoverySessionPayload,
+} from "@/lib/session-tokens";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
-const COOKIE_NAME = "member_email_recovery";
-export const MEMBER_EMAIL_RECOVERY_SESSION_TTL_MS = 15 * 60 * 1000;
-
-type MemberEmailRecoverySessionPayload = {
-  memberId: string;
-  authSessionVersion: number;
-  issuedAt: number;
-  expiresAt: number;
-};
+const COOKIE_NAME = MEMBER_EMAIL_RECOVERY_COOKIE_NAME;
+export { MEMBER_EMAIL_RECOVERY_SESSION_TTL_MS };
 
 function getSecret() {
-  const secret = process.env.USER_SESSION_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error("회원 복구 세션용 HMAC 비밀값이 필요합니다.");
-  }
-  return secret;
+  return readSessionSecret("member-email-recovery", {
+    errorMessage: "회원 복구 세션용 HMAC 비밀값이 필요합니다.",
+  });
 }
 
 function signPayload(payload: string) {
-  return `${payload}.${createHmacDigest(payload, getSecret(), "hex")}`;
+  return signPayloadWith(payload, getSecret(), "hex");
 }
 
 function parseSession(token: string) {
-  const signed = splitSignedToken(token);
-  if (!signed) return null;
-  const [payload, signature] = signed;
-  if (!payload || !signature || !verifyHmacDigest(payload, signature, getSecret(), "hex")) {
-    return null;
-  }
-  try {
-    const value = JSON.parse(payload) as MemberEmailRecoverySessionPayload;
-    if (
-      typeof value.memberId !== "string"
-      || !value.memberId
-      || !Number.isInteger(value.authSessionVersion)
-      || value.authSessionVersion < 1
-      || !Number.isSafeInteger(value.issuedAt)
-      || !Number.isSafeInteger(value.expiresAt)
-      || value.issuedAt > Date.now()
-      || value.expiresAt <= Date.now()
-      || value.expiresAt - value.issuedAt > MEMBER_EMAIL_RECOVERY_SESSION_TTL_MS
-    ) {
-      return null;
-    }
-    return value;
-  } catch {
-    return null;
-  }
+  return parseMemberEmailRecoveryToken(token, getSecret());
 }
 
 export async function setMemberEmailRecoverySession(input: {
@@ -65,17 +41,16 @@ export async function setMemberEmailRecoverySession(input: {
     expiresAt: now + MEMBER_EMAIL_RECOVERY_SESSION_TTL_MS,
   } satisfies MemberEmailRecoverySessionPayload);
   const store = await cookies();
-  store.set(COOKIE_NAME, signPayload(payload), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: Math.floor(MEMBER_EMAIL_RECOVERY_SESSION_TTL_MS / 1_000),
-    path: "/",
-  });
+  store.set(
+    COOKIE_NAME,
+    signPayload(payload),
+    buildSessionCookieOptions(
+      Math.floor(MEMBER_EMAIL_RECOVERY_SESSION_TTL_MS / 1_000),
+    ),
+  );
 }
 
 export async function getMemberEmailRecoverySession() {
-  noStore();
   const token = (await cookies()).get(COOKIE_NAME)?.value;
   const session = token ? parseSession(token) : null;
   if (!session) return null;

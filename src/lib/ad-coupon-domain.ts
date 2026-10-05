@@ -1,3 +1,5 @@
+import { isAdCouponDownloadable, type AdCampaignLike } from "@/lib/ad-packages";
+
 export type CouponQuota = {
   limit: number | null;
   issued: number;
@@ -214,4 +216,160 @@ export function normalizeCouponCodeRows(values: readonly unknown[]) {
   }
 
   return { codes, skipped };
+}
+
+/**
+ * Coupon fields the member availability rules read. Both the mock and the
+ * Supabase repository pass their mapped `AdCoupon`, so the rules below are the
+ * single source for limits, windows, campaign state and ordering.
+ */
+export type AvailableCouponSource = {
+  id: string;
+  status?: string | null;
+  startsAt?: string | null;
+  endsAt: string;
+  downloadStartsAt?: string | null;
+  downloadEndsAt?: string | null;
+  usageLimit: number | null;
+  usedCount: number;
+  perMemberLimit: number;
+  dailyIssueLimit: number | null;
+  weeklyIssueLimit: number | null;
+  monthlyIssueLimit: number | null;
+  perMemberDailyIssueLimit: number | null;
+  perMemberWeeklyIssueLimit: number | null;
+  perMemberMonthlyIssueLimit: number | null;
+  createdAt: string;
+};
+
+export type AvailableCouponUsage<TCoupon> = {
+  coupon: TCoupon;
+  memberUsedCount: number;
+  remainingMemberUses: number;
+  remainingGlobalUses: number | null;
+};
+
+export type AvailableCouponCandidate<TCoupon> = {
+  coupon: TCoupon;
+  campaign?: AdCampaignLike | null;
+  memberUsedCount: number;
+};
+
+/**
+ * Remaining per-member and global uses for a coupon, or `null` when either
+ * limit is exhausted.
+ */
+export function getAvailableCouponUsage<
+  TCoupon extends Pick<AvailableCouponSource, "perMemberLimit" | "usageLimit" | "usedCount">,
+>(coupon: TCoupon, memberUsedCount: number): AvailableCouponUsage<TCoupon> | null {
+  const remainingMemberUses = Math.max(0, coupon.perMemberLimit - memberUsedCount);
+  const remainingGlobalUses =
+    typeof coupon.usageLimit === "number"
+      ? Math.max(0, coupon.usageLimit - coupon.usedCount)
+      : null;
+
+  if (remainingMemberUses <= 0 || remainingGlobalUses === 0) {
+    return null;
+  }
+
+  return {
+    coupon,
+    memberUsedCount,
+    remainingMemberUses,
+    remainingGlobalUses,
+  };
+}
+
+function getSortTime(value: string) {
+  const time = new Date(value).getTime();
+  // An unparseable end date sorts last instead of failing the whole list.
+  return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
+}
+
+/** Earliest usage end first; newer coupons first when the end time ties. */
+export function compareAvailableCoupons(
+  left: { coupon: Pick<AvailableCouponSource, "endsAt" | "createdAt"> },
+  right: { coupon: Pick<AvailableCouponSource, "endsAt" | "createdAt"> },
+) {
+  const endDiff = getSortTime(left.coupon.endsAt) - getSortTime(right.coupon.endsAt);
+  if (endDiff !== 0) {
+    return endDiff;
+  }
+  return right.coupon.createdAt.localeCompare(left.coupon.createdAt);
+}
+
+function groupIssueRecordsByCoupon(records: readonly CouponIssueRecord[]) {
+  const grouped = new Map<string, CouponIssueRecord[]>();
+  for (const record of records) {
+    const bucket = grouped.get(record.couponId);
+    if (bucket) {
+      bucket.push(record);
+    } else {
+      grouped.set(record.couponId, [record]);
+    }
+  }
+  return grouped;
+}
+
+/**
+ * Selects the coupons a member can download now. Repositories only collect
+ * candidates (coupon + campaign + the member's redemption count) and issue
+ * history; this function applies, in order: the download window and campaign
+ * state, the coupon-wide daily/weekly/monthly issue limits, the member's
+ * issue limits, and the remaining per-member/global uses, then sorts.
+ *
+ * `couponIssueRecords` is every issue of the candidate coupons and
+ * `memberIssueRecords` only this member's issues.
+ */
+export function selectAvailableCouponsForMember<TCoupon extends AvailableCouponSource>(input: {
+  candidates: readonly AvailableCouponCandidate<TCoupon>[];
+  couponIssueRecords: readonly CouponIssueRecord[];
+  memberIssueRecords: readonly CouponIssueRecord[];
+  now?: Date;
+}): AvailableCouponUsage<TCoupon>[] {
+  const now = input.now ?? new Date();
+  const couponIssuesByCoupon = groupIssueRecordsByCoupon(input.couponIssueRecords);
+  const memberIssuesByCoupon = groupIssueRecordsByCoupon(input.memberIssueRecords);
+
+  return input.candidates
+    .filter(({ coupon, campaign }) =>
+      isAdCouponDownloadable({
+        coupon,
+        campaign,
+        now,
+      }),
+    )
+    .filter(({ coupon }) =>
+      !isMemberIssueLimitReached(
+        getCouponIssueCountSnapshot({
+          couponId: coupon.id,
+          limits: {
+            daily: coupon.dailyIssueLimit,
+            weekly: coupon.weeklyIssueLimit,
+            monthly: coupon.monthlyIssueLimit,
+          },
+          records: couponIssuesByCoupon.get(coupon.id) ?? [],
+          now,
+        }),
+      ),
+    )
+    .filter(({ coupon }) =>
+      !isMemberIssueLimitReached(
+        getCouponIssueCountSnapshot({
+          couponId: coupon.id,
+          limits: {
+            daily: coupon.perMemberDailyIssueLimit,
+            weekly: coupon.perMemberWeeklyIssueLimit,
+            monthly: coupon.perMemberMonthlyIssueLimit,
+          },
+          records: memberIssuesByCoupon.get(coupon.id) ?? [],
+          now,
+        }),
+      ),
+    )
+    .map(({ coupon, memberUsedCount }) =>
+      getAvailableCouponUsage(coupon, memberUsedCount),
+    )
+    .filter((item): item is AvailableCouponUsage<TCoupon> => Boolean(item))
+    .sort(compareAvailableCoupons);
 }

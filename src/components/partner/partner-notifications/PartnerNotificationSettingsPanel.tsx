@@ -1,5 +1,8 @@
 "use client";
 
+import Checkbox from "@/components/ui/Checkbox";
+
+
 import { useEffect, useRef, useState, useTransition } from "react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -7,9 +10,10 @@ import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import type { PartnerNotificationPreferenceState } from "@/lib/partner-notification-routing";
 import {
-  getServiceWorkerRegistration,
+  PushDeviceSetupError,
+  getPushSettingsClientError,
   parsePushSettingsJson,
-  urlBase64ToUint8Array,
+  subscribeCurrentBrowserPush,
 } from "@/components/push/push-settings/device";
 
 type PartnerNotificationSettingsPanelProps = {
@@ -82,11 +86,7 @@ export default function PartnerNotificationSettingsPanel({
           return;
         }
         setState(previousState);
-        setError(
-          `${label} 설정 저장 실패: ${
-            caught instanceof Error ? caught.message : "알림 설정 저장에 실패했습니다."
-          }`,
-        );
+        setError(getPushSettingsClientError(caught, `${label} 설정 저장`).message);
       } finally {
         if (mountedRef.current) {
           setPendingLabel(null);
@@ -101,18 +101,10 @@ export default function PartnerNotificationSettingsPanel({
     setPendingLabel("이 기기 푸시 구독");
     startTransition(async () => {
       try {
-        if (!canUsePush || !publicKey) {
-          throw new Error("이 브라우저에서는 푸시 알림을 사용할 수 없습니다.");
+        if (!canUsePush) {
+          throw new PushDeviceSetupError("push_unsupported");
         }
-        const permission = await Notification.requestPermission();
-        if (permission !== "granted") {
-          throw new Error("브라우저 알림 권한이 필요합니다.");
-        }
-        const registration = await getServiceWorkerRegistration();
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(publicKey),
-        });
+        const subscription = await subscribeCurrentBrowserPush(publicKey);
         const data = await postJson("/api/partner/push/subscribe", {
           subscription: subscription.toJSON(),
         });
@@ -127,7 +119,7 @@ export default function PartnerNotificationSettingsPanel({
         if (!mountedRef.current) {
           return;
         }
-        setError(caught instanceof Error ? caught.message : "푸시 구독에 실패했습니다.");
+        setError(getPushSettingsClientError(caught, "푸시 구독").message);
       } finally {
         if (mountedRef.current) {
           setPendingLabel(null);
@@ -164,8 +156,7 @@ export default function PartnerNotificationSettingsPanel({
         className="flex min-w-0 items-center justify-between gap-3 rounded-[1rem] border border-border bg-surface-inset px-4 py-3 text-sm font-medium text-foreground"
       >
         <span className="min-w-0 truncate">{toggle.label}</span>
-        <input
-          type="checkbox"
+        <Checkbox
           checked={Boolean(state[toggle.key])}
           disabled={isPending || !state.enabled}
           onChange={(event) =>
@@ -210,8 +201,7 @@ export default function PartnerNotificationSettingsPanel({
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <label className="flex min-w-0 items-center justify-between gap-3 rounded-[1rem] border border-border bg-surface-inset px-4 py-3 text-sm font-medium text-foreground">
           <span className="min-w-0 truncate">전체 알림</span>
-          <input
-            type="checkbox"
+          <Checkbox
             checked={state.enabled}
             disabled={isPending}
             onChange={(event) =>

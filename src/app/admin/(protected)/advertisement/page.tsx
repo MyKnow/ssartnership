@@ -25,6 +25,8 @@ import {
   parsePromotionSlideNumber,
 } from "@/lib/promotions/slide-validation";
 import { SITE_NAME } from "@/lib/site";
+import { pickAllowedEntry } from "@/lib/safe-messages";
+import { adminAdCampaignErrorMessages } from "@/lib/admin-action-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -53,14 +55,15 @@ function errorMessage(error?: string, slide?: string) {
   if (isPromotionSlideErrorCode(error)) {
     return formatPromotionSlideError(error, parsePromotionSlideNumber(slide));
   }
-  if (error === "ad_campaign_create_failed") {
-    return "광고 캠페인을 생성하지 못했습니다. 입력값과 권한을 확인한 뒤 다시 시도해 주세요.";
+  const campaignError = pickAllowedEntry<string>(adminAdCampaignErrorMessages, error);
+  if (campaignError) {
+    return campaignError;
   }
-  if (error === "ad_campaign_invalid_request" || error === "ad_campaign_invalid_status") {
-    return "광고 캠페인 상태 변경 요청을 다시 확인해 주세요.";
+  if (error === "ad_campaign_invalid_status_transition") {
+    return "허용되지 않는 캠페인 상태 변경입니다. 종료된 캠페인은 다시 열 수 없으니 새 캠페인으로 운영해 주세요.";
   }
-  if (error === "ad_campaign_update_failed") {
-    return "광고 캠페인 상태를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  if (error === "ad_campaign_state_changed") {
+    return "다른 관리자가 캠페인 상태를 먼저 바꿨습니다. 현재 상태를 확인한 뒤 다시 시도해 주세요.";
   }
   if (error === "promotion_slide_save_failed") {
     return "광고 카드를 저장하지 못했습니다. 입력한 내용은 그대로 두었으니 잠시 후 다시 시도해 주세요.";

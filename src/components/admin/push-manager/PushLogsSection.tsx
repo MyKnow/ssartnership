@@ -2,6 +2,7 @@
 
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
 import FilterBar from "@/components/ui/FilterBar";
 import Input from "@/components/ui/Input";
 import SectionHeading from "@/components/ui/SectionHeading";
@@ -10,7 +11,7 @@ import type { PushAudienceScope } from "@/lib/push";
 import type {
   AdminNotificationOperationLog,
   AdminNotificationType,
-} from "@/lib/admin-notification-ops";
+} from "@/lib/admin-notification-ops-types";
 import {
   audienceLabels,
   formatNotificationChannels,
@@ -166,9 +167,11 @@ export function PushLogsSection({
 
       <div className="grid min-w-0 gap-3">
         {filteredLogs.length === 0 ? (
-          <div className="min-w-0 overflow-hidden rounded-2xl border border-dashed border-border bg-surface-inset px-4 py-8 text-center text-sm text-muted-foreground">
-            조건에 맞는 발송 로그가 없습니다.
-          </div>
+          <EmptyState
+            title="조건에 맞는 발송 로그가 없습니다."
+            description="검색어나 유형·상태 필터를 바꿔 다시 확인해 주세요."
+            className="min-w-0"
+          />
         ) : (
           filteredLogs.map((log) => (
             <div

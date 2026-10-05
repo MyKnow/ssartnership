@@ -1,8 +1,8 @@
 ---
 title: 문서 이관 장부
 type: report
-status: active
-authority: descriptive
+status: completed
+authority: evidence
 ---
 
 # 문서 이관 장부
@@ -58,14 +58,14 @@ authority: descriptive
 | `docs/operations/runbooks/self-host-operations.md` | 기존 정본/시점 기록 유지 |
 | `docs/operations/runbooks/self-hosting.md` | 기존 정본/시점 기록 유지 |
 | `docs/operations/runbooks/storybook-visual-workflow.md` | 기존 정본/시점 기록 유지 |
-| `docs/operations/runbooks/vercel-account-routing.md` | 기존 정본/시점 기록 유지 |
+| `docs/operations/runbooks/vercel-account-routing.md` | 2026-10 `docs/history/operations/vercel-account-routing.md`로 이동(PVE 이전 후 만료) |
 | `docs/performance/audits/2026-04-10-project-wide.md` | 기존 정본/시점 기록 유지 |
 | `docs/performance/audits/2026-07-21-schema-api-async-ci.md` | 기존 정본/시점 기록 유지 |
 | `docs/performance/audits/2026-07-29-issue-181-final.md` | 기존 정본/시점 기록 유지 |
 | `docs/performance/baselines/2026-04-03-speed-insights.md` | 기존 정본/시점 기록 유지 |
 | `docs/performance/baselines/admin-console.md` | 기존 정본/시점 기록 유지 |
 | `docs/performance/index.md` | 기존 정본/시점 기록 유지 |
-| `docs/performance/measurements/speed-insights.md` | 기존 정본/시점 기록 유지 |
+| `docs/performance/measurements/web-vitals.md` | `speed-insights.md`를 자체 호스팅 Web Vitals·Lighthouse 절차로 재작성(RF-04) |
 | `docs/performance/reports/db-query-optimization.md` | 기존 정본/시점 기록 유지 |
 | `docs/plans/active/ssafy-verify-legacy-removal.md` | 기존 정본/시점 기록 유지 |
 | `docs/plans/completed/15-form-validation-benefit-visibility.md` | 기존 정본/시점 기록 유지 |

@@ -6,7 +6,7 @@ import {
   cleanupPartnerMediaOrThrow,
   deletePartnerMediaUrls,
 } from "@/lib/partner-media-storage";
-import { getPartnerSession } from "@/lib/partner-session";
+import { requirePartnerActionSession } from "@/lib/partner-action-session";
 import { PartnerChangeRequestError } from "@/lib/partner-change-request-errors";
 import {
   isPartnerBenefitActionType,
@@ -27,15 +27,10 @@ import {
   parseList,
   revalidatePartnerServicePaths,
 } from "./shared";
+import { logServerError } from "@/lib/server-log";
 
 export async function savePartnerImmediateChangesAction(formData: FormData) {
-  const session = await getPartnerSession();
-  if (!session) {
-    redirect("/partner/login");
-  }
-  if (session.mustChangePassword) {
-    redirect("/partner/change-password");
-  }
+  const session = await requirePartnerActionSession();
 
   const partnerId = String(formData.get("partnerId") || "").trim();
   const { companyId, companyIds } = getAuthorizedCompanyIdsForPartnerAction(
@@ -139,10 +134,7 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
         (url) => !result.currentMediaUrls.includes(url),
       ),
     ).catch((cleanupError) => {
-      console.error(
-        "[partner-immediate-update] stale media cleanup failed",
-        cleanupError,
-      );
+      logServerError("[partner-immediate-update] stale media cleanup failed", cleanupError);
     });
 
     await createAdminOperationalNotification({
@@ -168,10 +160,7 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
         partnerUrl: `/admin/partners/${encodeURIComponent(partnerId)}`,
       },
     }).catch((notificationError) => {
-      console.error(
-        "[partner-immediate-update] admin notification failed",
-        notificationError,
-      );
+      logServerError("[partner-immediate-update] admin notification failed", notificationError);
     });
   } catch (error) {
     if (media) {

@@ -333,6 +333,93 @@ export function findAdminNavItem(pathname: string) {
   return ADMIN_NAV_ITEMS.find((item) => isAdminNavActive(pathname, item.href)) ?? null;
 }
 
+export type AdminMobileNavLinkId = "home" | "tasks" | "members";
+
+export type AdminMobileNavEntry =
+  | {
+      kind: "link";
+      id: AdminMobileNavLinkId;
+      href: string;
+      /** Short label for the 5-slot bottom bar. */
+      label: string;
+      /** Full navigation label, exposed as a tooltip when it differs. */
+      fullLabel: string;
+      iconKey: AdminNavIconKey;
+    }
+  | { kind: "search"; id: "search"; label: string }
+  | { kind: "more"; id: "more"; label: string };
+
+const ADMIN_MOBILE_NAV_LINKS: ReadonlyArray<{
+  id: AdminMobileNavLinkId;
+  href: string;
+  label: string;
+}> = [
+  { id: "home", href: "/admin", label: "홈" },
+  { id: "tasks", href: "/admin/tasks", label: "작업함" },
+  { id: "members", href: "/admin/members", label: "회원" },
+];
+
+/**
+ * Mobile bottom navigation derived from the same permission-filtered groups as
+ * the sidebar, so hrefs and icons cannot drift from `ADMIN_NAV_GROUPS`.
+ * Home is always available; other links appear only when permitted.
+ */
+export function getAdminMobileNavigation(
+  groups: AdminNavGroup[],
+): AdminMobileNavEntry[] {
+  const itemsByHref = new Map(
+    groups.flatMap((group) => group.items).map((item) => [item.href, item]),
+  );
+  const link = (id: AdminMobileNavLinkId): AdminMobileNavEntry | null => {
+    const definition = ADMIN_MOBILE_NAV_LINKS.find((entry) => entry.id === id);
+    if (!definition) {
+      return null;
+    }
+    const item =
+      itemsByHref.get(definition.href) ??
+      (id === "home" ? ADMIN_NAV_ITEMS.find((entry) => entry.href === "/admin") : undefined);
+    if (!item) {
+      return null;
+    }
+    return {
+      kind: "link",
+      id,
+      href: definition.href,
+      label: definition.label,
+      fullLabel: item.label,
+      iconKey: item.iconKey,
+    };
+  };
+
+  return [
+    link("home"),
+    link("tasks"),
+    { kind: "search", id: "search", label: "검색" } as const,
+    link("members"),
+    { kind: "more", id: "more", label: "더보기" } as const,
+  ].filter((entry): entry is AdminMobileNavEntry => entry !== null);
+}
+
+export type AdminNotFoundRecovery = {
+  href: string;
+  label: string;
+};
+
+/**
+ * Picks the closest admin list to return to when a detail route calls
+ * `notFound()`, e.g. `/admin/members/<missing>` recovers to `/admin/members`.
+ */
+export function getAdminNotFoundRecovery(
+  requestPath: string | null | undefined,
+): AdminNotFoundRecovery {
+  const pathname = (requestPath ?? "").split(/[?#]/, 1)[0] ?? "";
+  const item = pathname.startsWith("/admin/") ? findAdminNavItem(pathname) : null;
+  if (!item || item.href === "/admin") {
+    return { href: "/admin", label: "관리 홈" };
+  }
+  return { href: item.href, label: item.label };
+}
+
 export function findAdminNavItems(query: string, groups: AdminNavGroup[]) {
   const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
   const items = groups.flatMap((group) => group.items);

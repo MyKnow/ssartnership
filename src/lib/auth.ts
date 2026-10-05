@@ -1,85 +1,38 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
+import { signPayloadWith } from "./hmac.js";
 import {
-  createHmacDigest,
-  splitSignedToken,
-  verifyHmacDigest,
-} from "./hmac.js";
+  ADMIN_SESSION_COOKIE_NAME,
+  buildSessionCookieOptions,
+} from "./session-cookies.ts";
+import { readSessionSecret } from "./session-secrets.ts";
+import {
+  parseAdminSessionToken as parseSignedAdminSessionToken,
+  type AdminSessionTokenPayload,
+} from "./session-tokens.ts";
 import { getAdminSessionTtlSeconds } from "./admin-security";
 import {
   authenticateAdminCredentials,
   getAdminAccountById,
   type AdminAccount,
 } from "./admin-accounts";
+import { getSignedUserSession } from "./user-auth.ts";
 
-const COOKIE_NAME = "admin_session";
+const COOKIE_NAME = ADMIN_SESSION_COOKIE_NAME;
 
-type AdminSessionPayload = {
-  issuedAt: number;
-  expiresAt: number;
-  adminId: string;
-  loginId: string;
-  permissionVersion: number;
-};
+type AdminSessionPayload = AdminSessionTokenPayload;
 
 function getSecret() {
-  const secret = process.env.ADMIN_SESSION_SECRET;
-  if (!secret) {
-    throw new Error("ADMIN_SESSION_SECRET 환경 변수가 필요합니다.");
-  }
-  if (secret.length < 32) {
-    throw new Error(
-      "ADMIN_SESSION_SECRET는 최소 32자 이상의 난수여야 합니다.",
-    );
-  }
-  return secret;
+  return readSessionSecret("admin-session");
 }
 
 function signPayload(payload: string) {
-  const secret = getSecret();
-  const signature = createHmacDigest(payload, secret, "hex");
-  return `${payload}.${signature}`;
+  return signPayloadWith(payload, getSecret(), "hex");
 }
 
 function parseAdminSessionToken(token: string): AdminSessionPayload | null {
-  const signedToken = splitSignedToken(token);
-  if (!signedToken) {
-    return null;
-  }
-  const [payload, signature] = signedToken;
-  if (!payload || !signature) {
-    return null;
-  }
-  if (!verifyHmacDigest(payload, signature, getSecret(), "hex")) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(payload) as Partial<AdminSessionPayload>;
-    if (
-      typeof parsed.issuedAt !== "number" ||
-      typeof parsed.expiresAt !== "number" ||
-      typeof parsed.adminId !== "string" ||
-      parsed.adminId.length === 0 ||
-      typeof parsed.loginId !== "string" ||
-      parsed.loginId.length === 0 ||
-      typeof parsed.permissionVersion !== "number"
-    ) {
-      return null;
-    }
-    if (!(parsed.expiresAt > Date.now() && parsed.issuedAt <= Date.now())) {
-      return null;
-    }
-    return {
-      issuedAt: parsed.issuedAt,
-      expiresAt: parsed.expiresAt,
-      adminId: parsed.adminId,
-      loginId: parsed.loginId,
-      permissionVersion: parsed.permissionVersion,
-    };
-  } catch {
-    return null;
-  }
+  return parseSignedAdminSessionToken(token, getSecret());
 }
 
 export async function setAdminSession(account: Pick<AdminAccount, "id" | "loginId" | "permissionVersion">) {
@@ -95,13 +48,7 @@ export async function setAdminSession(account: Pick<AdminAccount, "id" | "loginI
   });
   const token = signPayload(payload);
   const cookieStore = await cookies();
-  cookieStore.set(COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: ttlSeconds,
-    path: "/",
-  });
+  cookieStore.set(COOKIE_NAME, token, buildSessionCookieOptions(ttlSeconds));
 }
 
 export async function clearAdminSession() {
@@ -133,12 +80,20 @@ export const getAdminSession = cache(async (): Promise<AdminSession | null> => {
     if (!payload) {
       return null;
     }
-    const account = await getAdminAccountById(payload.adminId);
+    // Admin sessions are minted from the member session by /admin/session.
+    // Requiring that same member session to still be valid means a logout
+    // (which bumps auth_session_version) or a password change also ends the
+    // admin session on every device instead of leaving it alive for its TTL.
+    const [account, memberSession] = await Promise.all([
+      getAdminAccountById(payload.adminId),
+      getSignedUserSession(),
+    ]);
     if (
       !account ||
       !account.isActive ||
       account.mustChangePassword ||
-      account.permissionVersion !== payload.permissionVersion
+      account.permissionVersion !== payload.permissionVersion ||
+      memberSession?.userId !== payload.adminId
     ) {
       return null;
     }

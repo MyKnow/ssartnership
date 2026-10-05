@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { AdminNotificationOperationLog } from "../../src/lib/admin-notification-ops.ts";
+import type { AdminNotificationOperationLog } from "../../src/lib/admin-notification-ops-types.ts";
 
 type PushModule = typeof import("../../src/lib/push.ts");
 type PushSelectorModule = typeof import("../../src/components/admin/push-manager/selectors.ts");

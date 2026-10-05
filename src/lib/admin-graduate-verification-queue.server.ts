@@ -1,7 +1,7 @@
 import type {
   AdminGraduateSetupEmailRetry,
   AdminGraduateVerificationRequest,
-} from "@/components/admin/AdminGraduateVerificationQueue";
+} from "@/lib/admin-graduate-verification-types";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export type AdminGraduateQueuePagination = {

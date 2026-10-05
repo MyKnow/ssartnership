@@ -4,6 +4,8 @@ import { parseVitalSample, VITAL_NAMES, VITAL_ROUTES, createVitalIngressQuota } 
 import { alertDeliveryConfiguration, deliverOperationalAlert } from "./alert-delivery.mjs";
 
 export const ALERT_NAMES = new Set(["ServiceDown", "DatabaseUnavailable", "HostDiskLow", "HostMemoryLow", "BackupMissingOrStale", "BackupFailed", "ArchiveUnhealthy", "OperationsExporterStale", "RestoreDrillStale", "OffhostBackupStale", "OffhostBackupFailed", "AlertDeliveryUnavailable", "ProductionBackupCollectorStale", "ProductionBackupStale", "ProductionMacBackupStale", "ProductionPveBackupStale", "ProductionPveBackupPullStale", "SyntheticAlert"]);
+export const READY_DEPENDENCIES = Object.freeze(["gateway", "storage", "database"]);
+const READY_BODY_LIMIT = 4096;
 const BUCKETS = { CLS: [0.05, 0.1, 0.25, 0.5, 1, 5, 100], LCP: [500, 1000, 2500, 4000, 10000, 30000, 300000], INP: [50, 100, 200, 500, 1000, 5000, 300000] };
 
 export function summarizeAlerts(payload) {
@@ -43,6 +45,30 @@ export function createHistogramStore() {
   };
 }
 
+/** Maps an /api/ready body to fixed per-dependency 0/1 values; anything else is 0. */
+export function parseReadyPayload(payload) {
+  return Object.fromEntries(READY_DEPENDENCIES.map((dependency) => [dependency, payload?.checks?.[dependency]?.ok === true ? 1 : 0]));
+}
+
+/** Renders readiness gauges only after a probe completed, so a disabled probe never alarms. */
+export function renderReadyMetrics(ready) {
+  if (!ready.completed) return "";
+  const lines = READY_DEPENDENCIES.map((dependency) => `ssartnership_app_ready_success{dependency="${dependency}"} ${ready.values[dependency] === 1 ? 1 : 0}`);
+  lines.push(`ssartnership_app_ready_completed_seconds ${ready.completed}`);
+  return `${lines.join("\n")}\n`;
+}
+
+async function readBoundedJson(response, limit) {
+  const chunks = [];
+  let bytes = 0;
+  for await (const chunk of response.body ?? []) {
+    bytes += chunk.length;
+    if (bytes > limit) throw new Error("BODY_LIMIT");
+    chunks.push(chunk);
+  }
+  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
 function authenticated(header, token) {
   if (typeof token !== "string" || token.length < 32 || typeof header !== "string") return false;
   const expected = Buffer.from(`Bearer ${token}`);
@@ -61,13 +87,14 @@ async function readJson(request, limit) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
-/** @param {{ env?: Record<string, string | undefined>, deliver?: typeof fetch }} options */
-export function createTelemetryServer({ env = process.env, deliver = fetch } = {}) {
+/** @param {{ env?: Record<string, string | undefined>, deliver?: typeof fetch, fetchApp?: typeof fetch }} options */
+export function createTelemetryServer({ env = process.env, deliver = fetch, fetchApp = fetch } = {}) {
   const histogram = createHistogramStore();
   const quota = createVitalIngressQuota();
   const outcomes = { success: 0, failure: 0 };
   let lastDelivery = 0;
   const probe = { success: 0, duration: 0, completed: 0 };
+  const ready = { completed: 0, values: parseReadyPayload(null) };
   let probeTimer;
   let closing = false;
   const deliveryConfiguration = alertDeliveryConfiguration(env);
@@ -78,7 +105,7 @@ export function createTelemetryServer({ env = process.env, deliver = fetch } = {
       if (request.method === "GET" && request.url === "/health") return end(204);
       if (request.method === "GET" && request.url === "/metrics") {
         response.writeHead(200, { "Content-Type": "text/plain; version=0.0.4" });
-        response.end(`${histogram.render()}ssartnership_app_probe_success ${probe.success}\nssartnership_app_probe_duration_seconds ${probe.duration}\nssartnership_app_probe_completed_seconds ${probe.completed}\nssartnership_alert_receiver_configured ${Number(configured)}\nssartnership_alert_delivery_last_success_seconds ${lastDelivery}\nssartnership_alert_deliveries_total{result="success"} ${outcomes.success}\nssartnership_alert_deliveries_total{result="failure"} ${outcomes.failure}\n`);
+        response.end(`${histogram.render()}${renderReadyMetrics(ready)}ssartnership_app_probe_success ${probe.success}\nssartnership_app_probe_duration_seconds ${probe.duration}\nssartnership_app_probe_completed_seconds ${probe.completed}\nssartnership_alert_receiver_configured ${Number(configured)}\nssartnership_alert_delivery_last_success_seconds ${lastDelivery}\nssartnership_alert_deliveries_total{result="success"} ${outcomes.success}\nssartnership_alert_deliveries_total{result="failure"} ${outcomes.failure}\n`);
         return;
       }
       if (request.method !== "POST" || !["/vitals", "/alerts"].includes(request.url)) return end(404);
@@ -106,13 +133,23 @@ export function createTelemetryServer({ env = process.env, deliver = fetch } = {
   async function probeApp() {
     const started = performance.now();
     try {
-      const result = await fetch("http://app:3000/api/health", { redirect: "error", signal: AbortSignal.timeout(2000) });
+      const result = await fetchApp("http://app:3000/api/health", { redirect: "error", signal: AbortSignal.timeout(2000) });
       await result.body?.cancel();
       probe.success = result.status === 200 ? 1 : 0;
     } catch { probe.success = 0; }
     probe.duration = (performance.now() - started) / 1000;
     probe.completed = Math.floor(Date.now() / 1000);
+    await probeReady();
     if (!closing) probeTimer = setTimeout(probeApp, 30_000);
+  }
+  // Dependency readiness is a separate signal from liveness: a 503 body still
+  // carries per-dependency results, and a failed request marks every one down.
+  async function probeReady() {
+    try {
+      const result = await fetchApp("http://app:3000/api/ready", { redirect: "error", signal: AbortSignal.timeout(3000) });
+      ready.values = parseReadyPayload(await readBoundedJson(result, READY_BODY_LIMIT));
+    } catch { ready.values = parseReadyPayload(null); }
+    ready.completed = Math.floor(Date.now() / 1000);
   }
   server.once("listening", () => { if (env.OPS_APP_PROBE_ENABLED === "1") void probeApp(); });
   server.once("close", () => { closing = true; clearTimeout(probeTimer); });

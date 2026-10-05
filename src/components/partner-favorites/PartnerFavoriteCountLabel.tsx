@@ -6,10 +6,13 @@ import { cn } from "@/lib/cn";
 export default function PartnerFavoriteCountLabel({
   favoriteCount,
   reducedVerticalPadding = false,
+  size = "default",
   className,
 }: {
   favoriteCount?: number | null;
   reducedVerticalPadding?: boolean;
+  /** `compact`는 밀집 툴바용 32px 높이 표시(조작 요소가 아니라 히트 영역이 없다). */
+  size?: "default" | "compact";
   className?: string;
 }) {
   const count = typeof favoriteCount === "number" ? favoriteCount : 0;
@@ -17,8 +20,13 @@ export default function PartnerFavoriteCountLabel({
   return (
     <span
       className={cn(
-        "inline-flex min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-[12px] font-medium leading-none text-muted-foreground",
-        reducedVerticalPadding ? "h-9 py-1" : "h-11",
+        "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full font-medium leading-none text-muted-foreground",
+        size === "compact"
+          ? "h-8 px-2 text-[11px]"
+          : cn(
+              "min-w-11 px-3 text-[12px]",
+              reducedVerticalPadding ? "h-9 py-1" : "h-11",
+            ),
         className,
       )}
       aria-label={`즐겨찾기 ${count.toLocaleString("ko-KR")}개`}

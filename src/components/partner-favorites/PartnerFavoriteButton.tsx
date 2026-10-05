@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { StarIcon as StarOutlineIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
@@ -29,7 +28,6 @@ export default function PartnerFavoriteButton({
   reducedVerticalPadding?: boolean;
   className?: string;
 }) {
-  const router = useRouter();
   const { notify } = useToast();
   const [isFavorited, setIsFavorited] = useState(initialFavorited);
   const [count, setCount] = useState(favoriteCount ?? 0);
@@ -89,8 +87,9 @@ export default function PartnerFavoriteButton({
       if (typeof payload?.count === "number") {
         setCount(payload.count);
       }
+      // The response already carries the authoritative state and count, so the
+      // force-dynamic page is not re-rendered for a single toggle.
       notify(nextFavorited ? "즐겨찾기에 추가되었습니다." : "즐겨찾기가 해제되었습니다.");
-      router.refresh();
     } catch (error) {
       setIsFavorited(!nextFavorited);
       setCount((current) => Math.max(0, current + (nextFavorited ? -1 : 1)));
@@ -101,6 +100,7 @@ export default function PartnerFavoriteButton({
           networkUnavailable:
             "즐겨찾기를 처리하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
         }).message,
+        { tone: "error" },
       );
     } finally {
       setIsPending(false);

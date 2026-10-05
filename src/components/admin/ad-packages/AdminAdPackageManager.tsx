@@ -1,4 +1,6 @@
+import Checkbox from "@/components/ui/Checkbox";
 import Card from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
 import FormSubmitButton from "@/components/ui/FormSubmitButton";
 import Input from "@/components/ui/Input";
 import SectionHeading from "@/components/ui/SectionHeading";
@@ -9,12 +11,15 @@ import { AD_PACKAGE_FORM_LIMITS } from "@/lib/ad-package-validation";
 import {
   INITIAL_AD_CHANNELS,
   getAdPackageDefinition,
+  listAdCampaignStatusTransitions,
   listAdPackageDefinitions,
   type AdCampaignStatus,
   type InitialAdChannel,
 } from "@/lib/ad-packages";
 import type { AdCampaignWithStats } from "@/lib/repositories/ad-package-repository";
 import { cn } from "@/lib/cn";
+import { formatKoreanDateTime } from "@/lib/datetime";
+import { formatKoreanWon } from "@/lib/number-format";
 
 type PartnerOption = {
   id: string;
@@ -45,18 +50,16 @@ const statusBadgeClass: Record<AdCampaignStatus, string> = {
   ended: "bg-surface-inset text-muted-foreground",
 };
 
-function formatCurrency(value: number) {
-  return `${value.toLocaleString("ko-KR")}원`;
-}
+const PERIOD_FORMAT = {
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: true,
+} as const satisfies Intl.DateTimeFormatOptions;
 
 function formatPeriod(startsAt: string, endsAt: string) {
-  const formatter = new Intl.DateTimeFormat("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  return `${formatter.format(new Date(startsAt))} - ${formatter.format(new Date(endsAt))}`;
+  return `${formatKoreanDateTime(startsAt, PERIOD_FORMAT)} - ${formatKoreanDateTime(endsAt, PERIOD_FORMAT)}`;
 }
 
 function FieldLabel({
@@ -117,7 +120,7 @@ function PackageCatalog() {
           <p className="text-lg font-semibold text-foreground">
             {definition.monthlyPriceKrw === 0
               ? "무료"
-              : `월 ${formatCurrency(definition.monthlyPriceKrw)}`}
+              : `월 ${formatKoreanWon(definition.monthlyPriceKrw)}`}
           </p>
           <div className="flex flex-wrap gap-1.5">
             {definition.includedChannels.map((channel) => (
@@ -130,6 +133,43 @@ function PackageCatalog() {
             ))}
           </div>
         </Card>
+      ))}
+    </div>
+  );
+}
+
+function CampaignStatusActions({
+  campaignId,
+  status,
+  updateCampaignStatusAction,
+}: {
+  campaignId: string;
+  status: AdCampaignStatus;
+  updateCampaignStatusAction: ServerAction;
+}) {
+  // Only transitions the server accepts are offered; `ended` is terminal.
+  const nextStatuses = listAdCampaignStatusTransitions(status);
+  if (nextStatuses.length === 0) {
+    return (
+      <span className="text-xs font-medium text-muted-foreground">
+        종료된 캠페인
+      </span>
+    );
+  }
+  return (
+    <div className="flex flex-wrap gap-2">
+      {nextStatuses.map((nextStatus) => (
+        <form key={nextStatus} action={updateCampaignStatusAction}>
+          <input type="hidden" name="campaignId" value={campaignId} />
+          <input type="hidden" name="status" value={nextStatus} />
+          <FormSubmitButton
+            variant={nextStatus === "active" ? "soft" : "secondary"}
+            size="sm"
+            loadingText="변경 중"
+          >
+            {statusLabels[nextStatus]}
+          </FormSubmitButton>
+        </form>
       ))}
     </div>
   );
@@ -228,7 +268,7 @@ export default function AdminAdPackageManager({
                     {listAdPackageDefinitions().map((definition) => (
                       <option key={definition.tier} value={definition.tier}>
                         {definition.label} (
-                        {formatCurrency(definition.monthlyPriceKrw)})
+                        {formatKoreanWon(definition.monthlyPriceKrw)})
                       </option>
                     ))}
                   </Select>
@@ -289,8 +329,7 @@ export default function AdminAdPackageManager({
                       key={channel}
                       className="flex items-center gap-2 rounded-2xl border border-border bg-surface-inset px-3 py-2 text-sm text-foreground"
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         name="channels"
                         value={channel}
                         defaultChecked
@@ -323,9 +362,15 @@ export default function AdminAdPackageManager({
 
       <section className="grid gap-4" aria-label="광고 캠페인 목록">
         {campaigns.length === 0 ? (
-          <Card tone="muted" className="text-sm text-muted-foreground">
-            아직 등록된 광고 패키지가 없습니다.
-          </Card>
+          <EmptyState
+            size="sm"
+            title="아직 등록된 광고 캠페인이 없습니다."
+            description={
+              canCreate
+                ? "위의 캠페인 생성에서 제휴처와 패키지를 연결해 첫 캠페인을 등록해 주세요."
+                : undefined
+            }
+          />
         ) : (
           campaigns.map((campaign) => {
             const definition = getAdPackageDefinition(campaign.packageTier);
@@ -361,33 +406,11 @@ export default function AdminAdPackageManager({
                     ) : null}
                   </div>
                   {canUpdate ? (
-                    <div className="flex flex-wrap gap-2">
-                      {(["active", "paused", "ended"] as const).map(
-                        (status) => (
-                          <form
-                            key={status}
-                            action={updateCampaignStatusAction}
-                          >
-                            <input
-                              type="hidden"
-                              name="campaignId"
-                              value={campaign.id}
-                            />
-                            <input type="hidden" name="status" value={status} />
-                            <FormSubmitButton
-                              variant={
-                                status === "active" ? "soft" : "secondary"
-                              }
-                              size="sm"
-                              disabled={campaign.status === status}
-                              loadingText="변경 중"
-                            >
-                              {statusLabels[status]}
-                            </FormSubmitButton>
-                          </form>
-                        ),
-                      )}
-                    </div>
+                    <CampaignStatusActions
+                      campaignId={campaign.id}
+                      status={campaign.status}
+                      updateCampaignStatusAction={updateCampaignStatusAction}
+                    />
                   ) : (
                     <span className="text-xs font-medium text-muted-foreground">
                       조회 전용
@@ -399,7 +422,7 @@ export default function AdminAdPackageManager({
                   items={[
                     {
                       label: "월 과금",
-                      value: formatCurrency(campaign.monthlyPriceKrw),
+                      value: formatKoreanWon(campaign.monthlyPriceKrw),
                       hint: campaign.sponsorLabel || "스폰서 표기 없음",
                     },
                     {

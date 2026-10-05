@@ -1,5 +1,7 @@
 "use client";
 
+import PlainImage from "@/components/ui/PlainImage";
+
 import { useEffect, useId } from "react";
 import {
   ArrowDownIcon,
@@ -225,8 +227,7 @@ export default function MediaField({
                     className="relative overflow-hidden rounded-[0.95rem] border border-border bg-surface-muted"
                     style={{ aspectRatio: PARTNER_GALLERY_ASPECT_RATIO }}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- preview may use blob/object URL */}
-                    <img
+                    <PlainImage
                       src={item.kind === "existing" ? getCachedImageUrl(item.url) : item.url}
                       alt=""
                       loading="lazy"
@@ -284,8 +285,7 @@ export default function MediaField({
                     className="relative min-w-0 overflow-hidden rounded-[18px] border border-border bg-surface-muted"
                     style={{ aspectRatio: PARTNER_THUMBNAIL_ASPECT_RATIO }}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- preview may use blob/object URL */}
-                    <img
+                    <PlainImage
                       src={item.kind === "existing" ? getCachedImageUrl(item.url) : item.url}
                       alt=""
                       loading="lazy"

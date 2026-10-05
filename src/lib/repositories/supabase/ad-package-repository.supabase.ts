@@ -1,5 +1,12 @@
 import { createHash } from "node:crypto";
 import {
+  AD_CAMPAIGN_STATUSES,
+  AD_COUPON_STATE_CHANGED_ERROR,
+  AD_COUPON_STATUSES,
+  AdStatusTransitionError,
+  canDeleteAdCouponWithStatus,
+  canTransitionAdCampaignStatus,
+  canTransitionAdCouponStatus,
   getAdPackageDefinition,
   isAdCouponDownloadable,
   isAdCouponRedeemable,
@@ -10,9 +17,9 @@ import {
 } from "@/lib/ad-packages";
 import {
   assertValidAdCouponCodeBatch,
-  getCouponIssueCountSnapshot,
-  getMemberIssueCountSnapshot,
-  isMemberIssueLimitReached,
+  getAvailableCouponUsage,
+  selectAvailableCouponsForMember,
+  type CouponIssueRecord,
 } from "@/lib/ad-coupon-domain";
 import {
   hashCouponVerificationPassword,
@@ -30,6 +37,7 @@ import type {
   AvailableAdCoupon,
   CreateAdCampaignInput,
   CreateAdCouponInput,
+  DeleteAdCouponResult,
   DuplicateAdCouponInput,
   IssueAdCouponInput,
   IssueAdCouponResult,
@@ -41,9 +49,15 @@ import type {
   RedeemAdCouponIssueResult,
   RedeemAdCouponResult,
   UpdateAdCampaignStatusInput,
+  UpdateAdCampaignStatusResult,
   UpdateAdCouponInput,
 } from "@/lib/repositories/ad-package-repository";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import {
+  classifyIssueAdCouponError,
+  classifyRedeemAdCouponIssueError,
+} from "@/lib/ad-coupon-error-tokens";
+import { logServerError } from "@/lib/server-log";
 
 const AD_COUPON_CODE_WRITE_BATCH_SIZE = 1_000;
 
@@ -261,33 +275,6 @@ function mapRedemptionRow(row: RedemptionRow): AdCouponRedemption {
     sessionId: row.session_id,
     redemptionCode: row.redemption_code ?? "",
     createdAt: row.created_at,
-  };
-}
-
-function getTime(value: string) {
-  const time = new Date(value).getTime();
-  return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
-}
-
-function toAvailableCoupon(
-  coupon: AdCoupon,
-  memberUsedCount: number,
-): AvailableAdCoupon | null {
-  const remainingMemberUses = Math.max(0, coupon.perMemberLimit - memberUsedCount);
-  const remainingGlobalUses =
-    typeof coupon.usageLimit === "number"
-      ? Math.max(0, coupon.usageLimit - coupon.usedCount)
-      : null;
-
-  if (remainingMemberUses <= 0 || remainingGlobalUses === 0) {
-    return null;
-  }
-
-  return {
-    coupon,
-    memberUsedCount,
-    remainingMemberUses,
-    remainingGlobalUses,
   };
 }
 
@@ -719,32 +706,11 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
       redemptionRows.filter((row) => row.member_id === input.memberId),
       "coupon_id",
     );
-    const memberIssueRows = (memberIssueResult.data ?? []) as Array<{
-      coupon_id: string;
-      issued_at: string;
-    }>;
-    const memberIssueRecordsByCoupon = new Map<string, Array<{
-      couponId: string;
-      memberId: string;
-      issuedAt: string;
-    }>>();
-    for (const row of memberIssueRows) {
-      memberIssueRecordsByCoupon.set(row.coupon_id, [
-        ...(memberIssueRecordsByCoupon.get(row.coupon_id) ?? []),
-        {
-          couponId: row.coupon_id,
-          memberId: input.memberId,
-          issuedAt: row.issued_at,
-        },
-      ]);
-    }
-    const issueRecordsByCoupon = new Map<string, Array<{ couponId: string; issuedAt: string }>>();
-    for (const row of (issueResult.data ?? []) as Array<{ coupon_id: string; issued_at: string }>) {
-      issueRecordsByCoupon.set(row.coupon_id, [
-        ...(issueRecordsByCoupon.get(row.coupon_id) ?? []),
-        { couponId: row.coupon_id, issuedAt: row.issued_at },
-      ]);
-    }
+    const toIssueRecords = (data: unknown): CouponIssueRecord[] =>
+      ((data ?? []) as Array<{ coupon_id: string; issued_at: string }>).map((row) => ({
+        couponId: row.coupon_id,
+        issuedAt: row.issued_at,
+      }));
     const campaignsById = new Map(
       ((campaignResult.data ?? []) as AdCampaignRow[]).map((row) => [
         row.id,
@@ -752,62 +718,19 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
       ]),
     );
 
-    return rows
-      .map((row) => {
+    return selectAvailableCouponsForMember({
+      candidates: rows.map((row) => {
         const coupon = mapCouponRow(row, useCounts.get(row.id) ?? 0);
         return {
           coupon,
           campaign: coupon.campaignId ? campaignsById.get(coupon.campaignId) : null,
           memberUsedCount: memberUseCounts.get(coupon.id) ?? 0,
         };
-      })
-      .filter(({ coupon, campaign }) =>
-        isAdCouponDownloadable({
-          coupon,
-          campaign,
-          now,
-        }),
-      )
-      .filter(({ coupon }) =>
-        !isMemberIssueLimitReached(
-          getCouponIssueCountSnapshot({
-            couponId: coupon.id,
-            limits: {
-              daily: coupon.dailyIssueLimit,
-              weekly: coupon.weeklyIssueLimit,
-              monthly: coupon.monthlyIssueLimit,
-            },
-            records: issueRecordsByCoupon.get(coupon.id) ?? [],
-            now,
-          }),
-        ),
-      )
-      .filter(({ coupon }) =>
-        !isMemberIssueLimitReached(
-          getMemberIssueCountSnapshot({
-            couponId: coupon.id,
-            memberId: input.memberId,
-            limits: {
-              daily: coupon.perMemberDailyIssueLimit,
-              weekly: coupon.perMemberWeeklyIssueLimit,
-              monthly: coupon.perMemberMonthlyIssueLimit,
-            },
-            records: memberIssueRecordsByCoupon.get(coupon.id) ?? [],
-            now,
-          }),
-        ),
-      )
-      .map(({ coupon, memberUsedCount }) =>
-        toAvailableCoupon(coupon, memberUsedCount),
-      )
-      .filter((item): item is AvailableAdCoupon => Boolean(item))
-      .sort((left, right) => {
-        const endDiff = getTime(left.coupon.endsAt) - getTime(right.coupon.endsAt);
-        if (endDiff !== 0) {
-          return endDiff;
-        }
-        return right.coupon.createdAt.localeCompare(left.coupon.createdAt);
-      });
+      }),
+      couponIssueRecords: toIssueRecords(issueResult.data),
+      memberIssueRecords: toIssueRecords(memberIssueResult.data),
+      now,
+    });
   }
 
   async createCampaign(input: CreateAdCampaignInput): Promise<AdCampaign> {
@@ -840,15 +763,45 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
     return mapCampaignRow(data as AdCampaignRow);
   }
 
-  async updateCampaignStatus(input: UpdateAdCampaignStatusInput): Promise<void> {
+  async updateCampaignStatus(
+    input: UpdateAdCampaignStatusInput,
+  ): Promise<UpdateAdCampaignStatusResult> {
     const supabase = getSupabaseAdminClient();
-    const { error } = await supabase
+    const { data: currentRow, error: currentError } = await supabase
+      .from("ad_campaigns")
+      .select("status")
+      .eq("id", input.campaignId)
+      .maybeSingle();
+    if (currentError) {
+      throw new Error(currentError.message);
+    }
+    if (!currentRow) {
+      return { ok: false, reason: "not_found" };
+    }
+    const from = normalizeStatus(
+      (currentRow as { status: string | null }).status,
+      AD_CAMPAIGN_STATUSES,
+      "draft",
+    );
+    if (!canTransitionAdCampaignStatus(from, input.status)) {
+      return { ok: false, reason: "invalid_transition", from };
+    }
+    if (from === input.status) {
+      return { ok: true };
+    }
+    // Compare-and-set on the status that was validated above.
+    const { data, error } = await supabase
       .from("ad_campaigns")
       .update({ status: input.status })
-      .eq("id", input.campaignId);
+      .eq("id", input.campaignId)
+      .eq("status", from)
+      .select("id");
     if (error) {
       throw new Error(error.message);
     }
+    return (data ?? []).length > 0
+      ? { ok: true }
+      : { ok: false, reason: "state_changed", from };
   }
 
   async createCoupon(input: CreateAdCouponInput): Promise<AdCoupon> {
@@ -917,6 +870,15 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
       throw new Error("쿠폰을 찾을 수 없습니다.");
     }
     const existing = existingData as AdCouponRow;
+    // The action validated the transition against its own earlier read. Check
+    // it again against this read and write only while the status is still the
+    // same, so a concurrent edit (for example ending the coupon) cannot be
+    // overwritten into a transition the table forbids.
+    const currentStatus = normalizeStatus(existing.status, AD_COUPON_STATUSES, "draft");
+    const nextStatus = input.status ?? "draft";
+    if (!canTransitionAdCouponStatus(currentStatus, nextStatus)) {
+      throw new AdStatusTransitionError("coupon", currentStatus, nextStatus);
+    }
     const redemptionType = input.redemptionType ?? "onsite";
     let passwordHash = existing.onsite_password_hash;
     let passwordSalt = existing.onsite_password_salt;
@@ -946,7 +908,7 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
         redemption_type: redemptionType,
         discount_label: input.discountLabel ?? "",
         terms: input.terms ?? [],
-        status: input.status ?? "draft",
+        status: nextStatus,
         starts_at: input.startsAt,
         ends_at: input.endsAt,
         download_starts_at: input.downloadStartsAt ?? input.startsAt,
@@ -967,10 +929,15 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
       })
       .eq("id", input.couponId)
       .eq("partner_id", input.partnerId)
+      // Compare-and-set on the status the transition was checked against.
+      .eq("status", currentStatus)
       .select(AD_COUPON_SELECT)
-      .single();
+      .maybeSingle();
     if (error) {
       throw new Error(error.message);
+    }
+    if (!data) {
+      throw new Error(AD_COUPON_STATE_CHANGED_ERROR);
     }
     return mapCouponRow(data as AdCouponRow);
   }
@@ -1028,8 +995,28 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
     return mapCouponRow(data as AdCouponRow);
   }
 
-  async deleteCoupon(couponId: string) {
+  async deleteCoupon(couponId: string): Promise<DeleteAdCouponResult> {
     const supabase = getSupabaseAdminClient();
+    // Read the status and row version before counting history: an active
+    // coupon can still be issued (the issue RPC locks and re-checks only active
+    // coupons), and the issue/redemption foreign keys cascade. Only a
+    // non-active coupon with no history is deleted, and the delete is a
+    // compare-and-set on `updated_at` (bumped by a trigger on every update),
+    // so a "re-activate → issue → pause" between the count and the delete
+    // makes the delete match nothing instead of cascading the new issue.
+    const { data: couponData, error: couponError } = await supabase
+      .from("ad_coupons")
+      .select("status,updated_at")
+      .eq("id", couponId)
+      .maybeSingle();
+    if (couponError) {
+      throw new Error(couponError.message);
+    }
+    if (!couponData) {
+      throw new Error("쿠폰을 찾을 수 없습니다.");
+    }
+    const couponRow = couponData as { status: string | null; updated_at: string };
+    const status = normalizeStatus(couponRow.status, AD_COUPON_STATUSES, "draft");
     const [issueResult, redemptionResult] = await Promise.all([
       supabase
         .from("ad_coupon_issues")
@@ -1047,16 +1034,24 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
       throw new Error(redemptionResult.error.message);
     }
     if ((issueResult.count ?? 0) > 0 || (redemptionResult.count ?? 0) > 0) {
-      return { ok: false, reason: "usage_history" } as const;
+      return { ok: false, reason: "usage_history" };
     }
-    const { error } = await supabase
+    if (!canDeleteAdCouponWithStatus(status)) {
+      return { ok: false, reason: "active" };
+    }
+    const { data: deletedRows, error } = await supabase
       .from("ad_coupons")
       .delete()
-      .eq("id", couponId);
+      .eq("id", couponId)
+      .neq("status", "active")
+      .eq("updated_at", couponRow.updated_at)
+      .select("id");
     if (error) {
       throw new Error(error.message);
     }
-    return { ok: true } as const;
+    return (deletedRows ?? []).length > 0
+      ? { ok: true }
+      : { ok: false, reason: "state_changed" };
   }
 
   async issueCoupon(input: IssueAdCouponInput): Promise<IssueAdCouponResult> {
@@ -1067,17 +1062,10 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
       p_session_id: input.sessionId ?? null,
     });
     if (error) {
-      const reason = error.message.includes("not_found")
-        ? "not_found"
-        : error.message.includes("not_downloadable")
-          ? "inactive"
-          : error.message.includes("member_limit")
-            ? "member_limit"
-            : error.message.includes("member_daily_limit") || error.message.includes("member_weekly_limit") || error.message.includes("member_monthly_limit")
-              ? "member_limit"
-            : error.message.includes("usage_limit") || error.message.includes("code_unavailable") || error.message.includes("daily_limit") || error.message.includes("weekly_limit") || error.message.includes("monthly_limit")
-              ? error.message.includes("code_unavailable") ? "code_unavailable" : "usage_limit"
-              : "invalid";
+      const reason = classifyIssueAdCouponError(error.message);
+      if (reason === "invalid") {
+        logServerError("[ad-coupon] issue rpc failed with unclassified error", error);
+      }
       return { ok: false, reason, message: "현재 쿠폰을 다운로드할 수 없습니다." };
     }
     const issueRow = (Array.isArray(data) ? data[0] : data) as {
@@ -1098,7 +1086,7 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
       throw new Error(couponError.message);
     }
     const coupon = mapCouponRow(couponData as AdCouponRow);
-    const available = toAvailableCoupon(coupon, 0);
+    const available = getAvailableCouponUsage(coupon, 0);
     if (!available) {
       return { ok: false, reason: "usage_limit", message: "현재 쿠폰을 사용할 수 없습니다." };
     }
@@ -1147,7 +1135,7 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
         : issue.ad_coupons;
       if (!couponRow) return [];
       const coupon = mapCouponRow(couponRow);
-      const available = toAvailableCoupon(coupon, 0);
+      const available = getAvailableCouponUsage(coupon, 0);
       return available
         ? [{ ...available, issueId: issue.id, assignedCode: issue.assigned_code, issuedAt: issue.issued_at, usedAt: issue.used_at }]
         : [];
@@ -1268,19 +1256,10 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
       p_verified_onsite_password_hash: verifiedPasswordHash,
     });
     if (error) {
-      const reason = error.message.includes("expired")
-        ? "expired"
-        : error.message.includes("member_limit")
-          ? "member_limit"
-          : error.message.includes("usage_limit")
-            ? "usage_limit"
-            : error.message.includes("inactive")
-              ? "inactive"
-              : error.message.includes("not_found")
-                ? "not_found"
-                : error.message.includes("onsite_password")
-                  ? "onsite_password_invalid"
-                  : "invalid";
+      const reason = classifyRedeemAdCouponIssueError(error.message);
+      if (reason === "invalid") {
+        logServerError("[ad-coupon] redeem rpc failed with unclassified error", error);
+      }
       return {
         ok: false,
         reason,

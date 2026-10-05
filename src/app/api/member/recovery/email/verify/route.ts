@@ -16,6 +16,10 @@ import {
   isMemberEmailVerificationCodeFailure,
 } from "@/lib/member-email-verification-service";
 import { normalizeMemberEmail } from "@/lib/member-domain";
+import {
+  readPreviousMemberEmailState,
+  scheduleMemberEmailChangeNotice,
+} from "@/lib/member-email-change-notice.server";
 import { logMemberEmailSecurity } from "@/lib/member-email-security-log";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { setUserSession } from "@/lib/user-auth";
@@ -24,6 +28,7 @@ import {
   RouteJsonBodyError,
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
+import { isSixDigitCode } from "@/lib/validation";
 
 export const runtime = "nodejs";
 
@@ -65,7 +70,7 @@ export async function POST(request: Request) {
   }
   const email = normalizeMemberEmail(body?.email);
   const code = typeof body?.code === "string" ? body.code.trim() : "";
-  if (!email || !/^\d{6}$/.test(code)) {
+  if (!email || !isSixDigitCode(code)) {
     return NextResponse.json({ ok: false, message: "이메일과 6자리 인증 코드를 확인해 주세요." }, { status: 400 });
   }
   const rateLimitContext = {
@@ -107,6 +112,8 @@ export async function POST(request: Request) {
   if (!emailReservationHash) {
     return NextResponse.json({ ok: false, message: "이메일 주소를 확인해 주세요." }, { status: 400 });
   }
+
+  const previousEmailState = await readPreviousMemberEmailState(recovery.memberId);
 
   try {
     const completion = await completeMemberEmailRecovery({
@@ -150,6 +157,13 @@ export async function POST(request: Request) {
       stage: "verify",
       status: "success",
       actorId: recovery.memberId,
+    });
+    scheduleMemberEmailChangeNotice({
+      previous: previousEmailState,
+      nextEmailNormalized: email,
+      memberId: recovery.memberId,
+      flow: "recovery",
+      context,
     });
     return NextResponse.json({ ok: true, redirectTo: "/" });
   } catch {

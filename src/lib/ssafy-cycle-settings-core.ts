@@ -111,6 +111,29 @@ export function getConfiguredCurrentSsafyYear(
   return settings.manualCurrentYear ?? getCurrentSsafyYear(now, settings);
 }
 
+/**
+ * Early start opens the next cohort before its calendar start. The target is
+ * derived from the calendar cohort, never from an existing override, so
+ * repeating the action cannot stack (+2, +3, ...) on top of a previous early
+ * start.
+ */
+export function getSsafyCycleEarlyStartTargetYear(
+  settings: SsafyCycleSettings,
+  now: Date = new Date(),
+) {
+  return getCurrentSsafyYear(now, settings) + 1;
+}
+
+export function isSsafyCycleEarlyStartApplied(
+  settings: SsafyCycleSettings,
+  now: Date = new Date(),
+) {
+  return (
+    settings.manualCurrentYear !== null &&
+    settings.manualCurrentYear >= getSsafyCycleEarlyStartTargetYear(settings, now)
+  );
+}
+
 export function getConfiguredSelectableSsafyYears(
   settings: SsafyCycleSettings,
   now: Date = new Date(),

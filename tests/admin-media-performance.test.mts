@@ -12,9 +12,9 @@ test("회원 목록 아바타 조회는 읽기 요청에서 Mattermost 동기화
   );
 
   assert.doesNotMatch(source, /syncMemberMattermostProfile/);
-  assert.match(source, /\"cache-control\": \"private, no-cache\"/);
-  assert.match(source, /status: 304/);
-  assert.match(source, /if-none-match/);
+  // ETag·private, no-cache·304 판정은 공용 헬퍼가 맡는다(tests/member-profile-image-response.test.mts).
+  assert.match(source, /getMemberProfileImageRevalidation\(request, image\)/);
+  assert.match(source, /return revalidation\.notModified;/);
   assert.match(source, /getActiveMemberProfileImage\(id\)/);
 });
 

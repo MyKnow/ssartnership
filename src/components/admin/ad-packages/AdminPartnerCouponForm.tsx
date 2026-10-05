@@ -8,23 +8,20 @@ import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
 import { getPartnerPeriodEndAt, toDateTimeLocalInput } from "@/lib/ad-coupon-period";
 import {
+  AD_COUPON_STATUSES,
+  AD_STATUS_LABELS,
+  listAdCouponStatusOptions,
+} from "@/lib/ad-packages";
+import {
   AD_PACKAGE_FORM_LIMITS,
   getSafeAdCouponFormMessage,
   parseCreateAdCouponForm,
 } from "@/lib/ad-package-validation";
 import type { AdCampaignWithStats, AdCoupon } from "@/lib/repositories/ad-package-repository";
 import { cn } from "@/lib/cn";
+import { FOUR_DIGIT_PIN_INPUT_PATTERN, FOUR_DIGIT_PIN_LENGTH } from "@/lib/validation";
 
 type ServerAction = (formData: FormData) => void | Promise<void>;
-
-function toDateTimeLocal(date: Date) {
-  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
-  return kst.toISOString().slice(0, 16);
-}
-
-function formatDateTimeLocal(value: string) {
-  return toDateTimeLocal(new Date(value));
-}
 
 function FieldLabel({
   children,
@@ -63,12 +60,12 @@ function FormSection({
 function getDefaultValues(coupon?: AdCoupon, partnerPeriodEnd?: string | null) {
   if (coupon) {
     return {
-      startsAt: formatDateTimeLocal(coupon.startsAt),
-      endsAt: formatDateTimeLocal(coupon.endsAt),
-      downloadStartsAt: formatDateTimeLocal(coupon.downloadStartsAt),
-      downloadEndsAt: formatDateTimeLocal(coupon.downloadEndsAt),
-      usageStartsAt: formatDateTimeLocal(coupon.usageStartsAt),
-      usageEndsAt: formatDateTimeLocal(coupon.usageEndsAt),
+      startsAt: toDateTimeLocalInput(coupon.startsAt),
+      endsAt: toDateTimeLocalInput(coupon.endsAt),
+      downloadStartsAt: toDateTimeLocalInput(coupon.downloadStartsAt),
+      downloadEndsAt: toDateTimeLocalInput(coupon.downloadEndsAt),
+      usageStartsAt: toDateTimeLocalInput(coupon.usageStartsAt),
+      usageEndsAt: toDateTimeLocalInput(coupon.usageEndsAt),
       campaignId: coupon.campaignId ?? "",
       title: coupon.title,
       discountLabel: coupon.discountLabel,
@@ -91,7 +88,7 @@ function getDefaultValues(coupon?: AdCoupon, partnerPeriodEnd?: string | null) {
   }
 
   const now = new Date();
-  const startsAt = toDateTimeLocal(now);
+  const startsAt = toDateTimeLocalInput(now.toISOString());
   const endsAt = toDateTimeLocalInput(getPartnerPeriodEndAt(partnerPeriodEnd));
   return {
     startsAt,
@@ -146,6 +143,11 @@ export default function AdminPartnerCouponForm({
   const [redemptionType, setRedemptionType] = useState(defaults.redemptionType);
   const [formError, setFormError] = useState<string | null>(null);
   const formErrorId = `admin-coupon-form-error-${mode}-${coupon?.id ?? partnerId}`;
+  // Editing offers only the transitions the server accepts (ended is terminal).
+  const statusOptions =
+    mode === "edit" && coupon
+      ? listAdCouponStatusOptions(coupon.status)
+      : [...AD_COUPON_STATUSES];
 
   const handleNativeInvalid = () => {
     setFormError("입력값을 확인해 주세요.");
@@ -160,6 +162,7 @@ export default function AdminPartnerCouponForm({
       parseCreateAdCouponForm(new FormData(event.currentTarget), {
         allowExistingOnsitePassword: mode === "edit",
         partnerPeriodEnd,
+        currentStatus: mode === "edit" ? coupon?.status : null,
       });
       setFormError(null);
     } catch (error) {
@@ -290,8 +293,8 @@ export default function AdminPartnerCouponForm({
                     name="onsitePassword"
                     type="text"
                     inputMode="numeric"
-                    pattern="[0-9]{4}"
-                    maxLength={4}
+                    pattern={FOUR_DIGIT_PIN_INPUT_PATTERN}
+                    maxLength={FOUR_DIGIT_PIN_LENGTH}
                     autoComplete="off"
                     required={mode === "create"}
                     placeholder={mode === "edit" ? "변경 시 4자리 입력" : "4자리 숫자 입력"}
@@ -364,10 +367,11 @@ export default function AdminPartnerCouponForm({
             <FieldLabel>
               상태
               <Select name="status" defaultValue={defaults.status}>
-                <option value="draft">초안</option>
-                <option value="active">활성</option>
-                <option value="paused">일시중지</option>
-                <option value="ended">종료</option>
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {AD_STATUS_LABELS[status]}
+                  </option>
+                ))}
               </Select>
             </FieldLabel>
             <FieldLabel>

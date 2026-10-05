@@ -16,14 +16,9 @@ test("review reaction and filtered summary queries run in parallel", async () =>
     /const \[reactionStates, summary\] = await Promise\.all\(\[\s*getReviewReactionStates\([\s\S]*?getFilteredReviewSummary\(/,
   );
   assert.match(source, /rpc\("get_partner_review_summary"/);
-  assert.match(
+  assert.doesNotMatch(
     source,
-    /message\.includes\("get_partner_review_summary"\)[\s\S]*message\.includes\("schema cache"\)/,
-  );
-  assert.match(source, /async function getFilteredReviewSummaryFallback/);
-  assert.match(
-    source,
-    /\.select\("id", \{ count: "exact", head: true \}\)/,
+    /getFilteredReviewSummaryFallback|isMissingPartnerReviewSummaryRpc|schema cache/,
   );
   assert.doesNotMatch(source, /\.select\("rating"\)/);
 });

@@ -7,7 +7,7 @@ import {
   getPartnerInitialSetupBadge,
   hasIssuedPartnerInitialSetupLink,
 } from "@/components/admin/partner-account-manager/helpers";
-import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
+import type { AdminPartnerAccount } from "@/lib/admin-partner-account-types";
 
 export default function PartnerAccountHeader({
   account,

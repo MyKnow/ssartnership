@@ -1,3 +1,5 @@
+
+import PlainImage from "@/components/ui/PlainImage";
 import AdminMemberAccountManager from "@/components/admin/member-detail/AdminMemberAccountManager";
 import AdminMemberCommunicationPanel from "@/components/admin/member-detail/AdminMemberCommunicationPanel";
 import AdminMemberSecurityLogExplorer, {
@@ -15,8 +17,8 @@ import type {
   AdminMemberPolicyEvent,
   AdminMemberPolicyState,
 } from "@/lib/admin-member-detail";
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
-import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-images";
+import { formatOptionalKoreanDateTimeToMinute } from "@/lib/datetime";
+import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-photo";
 import type { MemberEmailLoginTransition } from "@/lib/member-email-login-transition";
 
 type FormAction = (formData: FormData) => void | Promise<void>;
@@ -73,7 +75,7 @@ export type AdminMemberDetailViewProps = {
 };
 
 function formatDate(value: string | null) {
-  return value ? formatKoreanDateTimeToMinute(value) : "-";
+  return formatOptionalKoreanDateTimeToMinute(value, "-");
 }
 
 export default function AdminMemberDetailView({
@@ -171,8 +173,7 @@ export default function AdminMemberDetailView({
             <div className="overflow-hidden rounded-[1.5rem] border border-border bg-surface-inset">
               <div className="aspect-square w-full">
                 {member.hasAvatar ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <PlainImage
                     src={member.avatarUrl}
                     alt={`${member.displayName} 프로필 사진`}
                     loading="eager"

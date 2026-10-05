@@ -168,7 +168,7 @@ test("partner registration template href normalizes selected options", async () 
   );
 });
 
-test("partner registration image validation accepts the common source formats and defers byte validation to staging", async () => {
+test("partner registration image validation accepts raster source formats, rejects guest SVG, and defers byte validation to staging", async () => {
   const { validatePartnerRegistrationImageFile } = await modulePromise;
 
   const webp = new File(["image"], "thumbnail.webp", { type: "image/webp" });
@@ -177,7 +177,8 @@ test("partner registration image validation accepts the common source formats an
   const pdf = new File(["document"], "guide.pdf", { type: "application/pdf" });
 
   assert.equal(validatePartnerRegistrationImageFile(webp), null);
-  assert.equal(validatePartnerRegistrationImageFile(svg), null);
+  // 비로그인 게스트 업로드는 librsvg 래스터라이저 표면을 열지 않는다.
+  assert.match(validatePartnerRegistrationImageFile(svg) ?? "", /SVG 이미지를 올릴 수 없습니다/);
   assert.equal(validatePartnerRegistrationImageFile(noExtension), null);
   assert.match(validatePartnerRegistrationImageFile(pdf) ?? "", /지원하는 이미지/);
 });

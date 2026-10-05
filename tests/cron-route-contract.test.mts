@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
+import { randomBytes } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
+  CRON_SECRET_MIN_LENGTH,
   ensureCronApiAccess,
   getCronErrorResponse,
+  isAuthorizedCronRequest,
 } from "../src/lib/cron-route.ts";
+import { REGISTERED_CRON_PATHS } from "../scripts/lib/self-host-cron.mjs";
 
 const root = new URL("..", import.meta.url);
 const cronRoot = new URL("src/app/api/cron/", root);
@@ -21,17 +25,32 @@ function getCronRouteNames() {
     .sort();
 }
 
-test("cron route matrix는 Vercel 등록 경로와 공용 보안 계약을 모두 사용한다", () => {
+test("cron route matrix는 schedules.json 등록 경로와 공용 보안 계약을 모두 사용한다", () => {
   const routeNames = getCronRouteNames();
-  const vercel = JSON.parse(
-    readFileSync(new URL("vercel.json", root), "utf8"),
-  ) as { crons?: Array<{ path?: string }> };
-  const configuredRouteNames = (vercel.crons ?? [])
-    .map((entry) => entry.path?.match(/^\/api\/cron\/([^/]+)$/)?.[1] ?? "")
+  const schedules = JSON.parse(
+    readFileSync(
+      new URL("deploy/self-host-operations/production-cron/schedules.json", root),
+      "utf8",
+    ),
+  ) as {
+    crons?: Array<{ path?: string }>;
+    unscheduled?: Array<{ path?: string }>;
+  };
+  const toRouteName = (entry: { path?: string }) =>
+    entry.path?.match(/^\/api\/cron\/([^/]+)$/)?.[1] ?? "";
+  const configuredRouteNames = [
+    ...(schedules.crons ?? []),
+    ...(schedules.unscheduled ?? []),
+  ]
+    .map(toRouteName)
     .filter(Boolean)
     .sort();
 
   assert.deepEqual(routeNames, configuredRouteNames);
+  assert.deepEqual(
+    [...REGISTERED_CRON_PATHS].map((path) => path.slice("/api/cron/".length)).sort(),
+    routeNames,
+  );
 
   for (const routeName of routeNames) {
     const source = readFileSync(
@@ -56,23 +75,47 @@ test("cron 인증은 설정된 bearer secret만 허용하고 실패 응답을 �
     assert.equal(missingSecret?.status, 401);
     assert.deepEqual(await missingSecret?.json(), { message: "Unauthorized" });
 
-    process.env.CRON_SECRET = "cron-test-secret";
+    process.env.CRON_SECRET = "short-cron-secret";
     assert.equal(
       ensureCronApiAccess(
         new Request("https://example.com/api/cron/rss", {
-          headers: { authorization: "Bearer wrong" },
+          headers: { authorization: "Bearer short-cron-secret" },
         }),
       )?.status,
       401,
+      "a configured secret below the runtime minimum must fail closed",
     );
+
+    const secret = randomBytes(CRON_SECRET_MIN_LENGTH).toString("hex");
+    process.env.CRON_SECRET = secret;
+    for (const authorization of [
+      "Bearer wrong",
+      `Bearer ${secret}x`,
+      `Bearer ${secret.slice(0, -1)}`,
+      `bearer ${secret}`,
+      secret,
+      "Bearer ",
+    ]) {
+      assert.equal(
+        ensureCronApiAccess(
+          new Request("https://example.com/api/cron/rss", {
+            headers: { authorization },
+          }),
+        )?.status,
+        401,
+        authorization,
+      );
+    }
     assert.equal(
       ensureCronApiAccess(
         new Request("https://example.com/api/cron/rss", {
-          headers: { authorization: "Bearer cron-test-secret" },
+          headers: { authorization: `Bearer ${secret}` },
         }),
       ),
       null,
     );
+    assert.equal(isAuthorizedCronRequest(null, secret), false);
+    assert.equal(isAuthorizedCronRequest(`Bearer ${secret}`, undefined), false);
   } finally {
     if (originalSecret === undefined) {
       delete process.env.CRON_SECRET;

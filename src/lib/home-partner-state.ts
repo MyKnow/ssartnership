@@ -4,6 +4,7 @@ import {
 } from "@/lib/admin-partner-metrics";
 import type { PartnerPopularityMetrics } from "@/lib/partner-popularity";
 import { partnerFavoriteRepository } from "@/lib/repositories";
+import { logServerError } from "@/lib/server-log";
 
 export const HOME_PARTNER_STATE_BATCH_LIMIT = 24;
 
@@ -54,7 +55,10 @@ export type HomePartnerPopularityDependencies = {
 
 const homePartnerPopularityDependencies: HomePartnerPopularityDependencies = {
   canUsePopularityMetrics,
-  getAdminPartnerMetrics,
+  // Public popularity reads only the metric rollup; a missing rollup sorts by
+  // zero views instead of scanning raw event logs on a page view.
+  getAdminPartnerMetrics: (partnerIds) =>
+    getAdminPartnerMetrics(partnerIds, { allowEventLogFallback: false }),
   getFavoriteCounts: (partnerIds) =>
     partnerFavoriteRepository.getFavoriteCounts(partnerIds),
 };
@@ -93,7 +97,7 @@ async function loadHomePartnerPopularity(
 
   const getFavoriteCountsFallback = () =>
     dependencies.getFavoriteCounts(partnerIds).catch((error) => {
-      console.error("[home-partner-state] favorite counts query failed", error);
+      logServerError("[home-partner-state] favorite counts query failed", error);
       return new Map<string, number>();
     });
   let favoriteCounts = new Map<string, number>();
@@ -108,10 +112,7 @@ async function loadHomePartnerPopularity(
         favoriteCounts = await getFavoriteCountsFallback();
       }
     } catch (error) {
-      console.error(
-        "[home-partner-state] popularity metrics query failed",
-        error,
-      );
+      logServerError("[home-partner-state] popularity metrics query failed", error);
       favoriteCounts = await getFavoriteCountsFallback();
     }
   } else {
@@ -147,32 +148,60 @@ export async function getHomePartnerPopularityById(
   return loadHomePartnerPopularity(normalizedIds, dependencies);
 }
 
+/**
+ * Member favorite state for the first preload batch of `partnerIds`, built
+ * from an already loaded favorite id set.
+ */
+export function buildHomePartnerMemberState(
+  partnerIds: string[],
+  favoritePartnerIds: ReadonlySet<string>,
+): HomePartnerMemberState {
+  const loadedFavoritePartnerIds = normalizeHomePartnerStateIds(partnerIds);
+  const partnerFavoriteStateById: Record<string, boolean> = {};
+  for (const partnerId of loadedFavoritePartnerIds) {
+    if (favoritePartnerIds.has(partnerId)) {
+      partnerFavoriteStateById[partnerId] = true;
+    }
+  }
+  return { loadedFavoritePartnerIds, partnerFavoriteStateById };
+}
+
+function logFavoriteStateFailure(error: unknown) {
+  logServerError("[home-partner-state] favorite state query failed", error);
+  return new Set<string>();
+}
+
+/**
+ * Every favorite of the member, independent of display order. A member keeps
+ * few favorites, so this read can run in parallel with popularity ranking
+ * instead of waiting for the ranked preload ids.
+ */
+export async function getHomeMemberFavoritePartnerIds(
+  currentUserId?: string | null,
+): Promise<Set<string>> {
+  if (!currentUserId) {
+    return new Set<string>();
+  }
+  return partnerFavoriteRepository
+    .getMemberFavoritePartnerIds(currentUserId)
+    .catch(logFavoriteStateFailure);
+}
+
 export async function getHomePartnerMemberState(input: {
   partnerIds: string[];
   currentUserId?: string | null;
 }): Promise<HomePartnerMemberState> {
   const partnerIds = normalizeHomePartnerStateIds(input.partnerIds);
-  const partnerFavoriteStateById: Record<string, boolean> = {};
   if (partnerIds.length === 0) {
-    return { loadedFavoritePartnerIds: [], partnerFavoriteStateById };
+    return { loadedFavoritePartnerIds: [], partnerFavoriteStateById: {} };
   }
   const favoritePartnerIds = input.currentUserId
     ? await partnerFavoriteRepository
         .getMemberFavoritePartnerIds(input.currentUserId, partnerIds)
-        .catch((error) => {
-          console.error("[home-partner-state] favorite state query failed", error);
-          return new Set<string>();
-        })
+        .catch(logFavoriteStateFailure)
     : new Set<string>();
 
-  for (const partnerId of favoritePartnerIds) {
-    partnerFavoriteStateById[partnerId] = true;
-  }
-
-  return {
-    loadedFavoritePartnerIds: partnerIds,
-    partnerFavoriteStateById,
-  };
+  return buildHomePartnerMemberState(partnerIds, favoritePartnerIds);
 }
 
 export async function getHomePartnerState(

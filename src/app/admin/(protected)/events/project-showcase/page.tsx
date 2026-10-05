@@ -1,3 +1,5 @@
+
+import PlainImage from "@/components/ui/PlainImage";
 import Link from "next/link";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminShell from "@/components/admin/AdminShell";
@@ -5,9 +7,11 @@ import ShowcaseEventSettingsForm from "@/components/admin/ShowcaseEventSettingsF
 import ShowcaseProjectReviewForm from "@/components/admin/ShowcaseProjectReviewForm";
 import ShowcaseAdminProjectDeleteButton from "@/components/admin/ShowcaseAdminProjectDeleteButton";
 import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { canAdmin } from "@/lib/admin-permissions";
 import { getShowcasePhase, projectShowcaseRepository } from "@/lib/project-showcase";
+import { isShowcaseEventSettled, SHOWCASE_SETTLED_LOCK_MESSAGE } from "@/lib/project-showcase/status";
 import { SHOWCASE_ADMIN_PHASE_LABELS, SHOWCASE_ADMIN_STATUS_LABELS, SHOWCASE_TYPE_LABELS } from "@/lib/project-showcase/labels";
 import { SHOWCASE_PROJECT_STATUSES, type ShowcaseProjectStatus } from "@/lib/project-showcase/types";
 
@@ -24,12 +28,15 @@ export default async function AdminProjectShowcasePage({
   const params = (await searchParams) ?? {};
   const rawStatus = typeof params.status === "string" ? params.status : "pending";
   const status: ShowcaseProjectStatus = SHOWCASE_PROJECT_STATUSES.find((value) => value === rawStatus) ?? "pending";
-  const [event, metrics, projects] = await Promise.all([
+  const [event, metrics, projects, drawState] = await Promise.all([
     projectShowcaseRepository.getEvent(),
     projectShowcaseRepository.getAdminMetrics(),
     projectShowcaseRepository.listAdminProjects(status),
+    projectShowcaseRepository.getDrawState(),
   ]);
+  const settled = isShowcaseEventSettled(drawState);
   const canUpdate = canAdmin(admin.account.permissions, "events", "update");
+  const canChangeProjects = canUpdate && !settled;
   const phase = getShowcasePhase(event);
 
   return (
@@ -46,7 +53,7 @@ export default async function AdminProjectShowcasePage({
           <Button href={`${ADMIN_PATH}/logs`} variant="secondary">로그·집계</Button>
           <Button href="/events/project-showcase?preview=experience" variant="secondary">체험 기간 미리보기</Button>
           <Button href="/events/project-showcase" variant="secondary">공개 페이지 보기</Button>
-          {canAdmin(admin.account.permissions, "events", "create") ? <Button href={`${ADMIN_PATH}/projects/new`} variant="secondary">출품작 등록</Button> : null}
+          {canAdmin(admin.account.permissions, "events", "create") && !settled ? <Button href={`${ADMIN_PATH}/projects/new`} variant="secondary">출품작 등록</Button> : null}
         </div>
 
         {event ? (
@@ -60,7 +67,9 @@ export default async function AdminProjectShowcasePage({
                 {event.isActive ? "활성" : "비활성"}
               </span>
             </div>
-            {canUpdate ? <ShowcaseEventSettingsForm event={event} /> : <p className="text-sm text-muted-foreground">일정을 바꾸려면 이벤트 수정 권한이 필요해요.</p>}
+            {canUpdate ? (
+              <ShowcaseEventSettingsForm event={event} lockedReason={settled ? SHOWCASE_SETTLED_LOCK_MESSAGE : null} />
+            ) : <p className="text-sm text-muted-foreground">일정을 바꾸려면 이벤트 수정 권한이 필요해요.</p>}
           </section>
         ) : (
           <section className="rounded-2xl border border-border bg-surface p-5 text-sm text-muted-foreground">쇼케이스 이벤트 설정을 찾을 수 없어요. 마이그레이션 적용 상태를 확인해 주세요.</section>
@@ -69,7 +78,7 @@ export default async function AdminProjectShowcasePage({
         <section className="grid gap-4" aria-labelledby="showcase-projects-heading">
           <div>
             <h2 id="showcase-projects-heading" className="text-lg font-bold text-foreground">출품작</h2>
-            <p className="mt-1 text-sm text-muted-foreground">승인한 출품만 체험 기간에 공개되고 출품 경품 추첨 대상이 돼요.</p>
+            <p className="mt-1 text-sm text-muted-foreground">승인한 출품만 체험 기간에 공개되고 출품 경품 추첨 대상이 돼요.{settled ? " 정산을 마쳐 출품작 등록·수정·검수·삭제를 닫았어요." : ""}</p>
           </div>
           <nav aria-label="출품 상태" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
             {SHOWCASE_PROJECT_STATUSES.map((value) => (
@@ -85,9 +94,10 @@ export default async function AdminProjectShowcasePage({
           </nav>
 
           {projects.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-surface p-8 text-center text-sm text-muted-foreground">
-              {SHOWCASE_ADMIN_STATUS_LABELS[status]} 상태의 출품작이 없어요.
-            </div>
+            <EmptyState
+              title={`${SHOWCASE_ADMIN_STATUS_LABELS[status]} 상태의 출품작이 없어요.`}
+              description="다른 상태 탭을 선택해 출품작을 확인해 주세요."
+            />
           ) : projects.map((project) => (
             <article key={project.id} className="grid gap-5 rounded-2xl border border-border bg-surface p-4 sm:p-6">
               <div className="flex flex-wrap items-center gap-2">
@@ -97,8 +107,7 @@ export default async function AdminProjectShowcasePage({
               </div>
               <div className="grid gap-4 sm:grid-cols-[170px_minmax(0,1fr)]">
                 <div className="aspect-video overflow-hidden rounded-xl bg-surface-muted">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={project.imageUrl} alt={`${project.title} 대표 이미지`} className="h-full w-full object-cover" />
+                  <PlainImage src={project.imageUrl} alt={`${project.title} 대표 이미지`} className="h-full w-full object-cover" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground">{project.summary}</p>
@@ -111,8 +120,8 @@ export default async function AdminProjectShowcasePage({
                   </p>
                 </div>
               </div>
-              {canUpdate ? <Button href={`${ADMIN_PATH}/projects/${encodeURIComponent(project.id)}/edit`} variant="secondary" className="justify-self-start">출품작 수정</Button> : null}
-              {canUpdate && project.status !== "withdrawn" ? (
+              {canChangeProjects ? <Button href={`${ADMIN_PATH}/projects/${encodeURIComponent(project.id)}/edit`} variant="secondary" className="justify-self-start">출품작 수정</Button> : null}
+              {canChangeProjects && project.status !== "withdrawn" ? (
                 <ShowcaseProjectReviewForm
                   projectId={project.id}
                   currentStatus={project.status}
@@ -122,7 +131,7 @@ export default async function AdminProjectShowcasePage({
               ) : project.reviewNote ? (
                 <p className="text-sm text-muted-foreground">검수 사유: {project.reviewNote}</p>
               ) : null}
-              {canAdmin(admin.account.permissions, "events", "delete") ? (
+              {canAdmin(admin.account.permissions, "events", "delete") && !settled ? (
                 <ShowcaseAdminProjectDeleteButton projectId={project.id} projectTitle={project.title} />
               ) : null}
             </article>

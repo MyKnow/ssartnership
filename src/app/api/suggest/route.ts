@@ -19,8 +19,9 @@ import {
   JsonRequestBodyError,
   readJsonRequestBodyWithinLimit,
 } from "@/lib/request-body-limit";
-import { getClientIp } from "@/lib/client-ip";
+import { getClientRateLimitIdentifier } from "@/lib/client-ip";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +32,7 @@ function errorResponse(message: string, status: number, code: string) {
 }
 
 function getClientIdentifier(request: Request) {
-  return getClientIp(request.headers) ?? "unknown";
+  return getClientRateLimitIdentifier(request.headers);
 }
 
 export async function POST(request: Request) {
@@ -149,7 +150,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("suggest email error", error);
+    logServerError("suggest email error", error);
     return errorResponse(
       "메일 전송에 실패했습니다. 잠시 후 다시 시도해 주세요.",
       503,

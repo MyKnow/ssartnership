@@ -1,15 +1,16 @@
 import AdminSectionHeading from "@/components/admin/AdminSectionHeading";
 import Badge from "@/components/ui/Badge";
+import EmptyState from "@/components/ui/EmptyState";
 import Surface from "@/components/ui/Surface";
 import type {
   AdminMemberNotificationPreferences,
   AdminMemberPolicyEvent,
   AdminMemberPolicyState,
 } from "@/lib/admin-member-detail";
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import { formatOptionalKoreanDateTimeToMinute } from "@/lib/datetime";
 
 function formatDate(value: string | null) {
-  return value ? formatKoreanDateTimeToMinute(value) : "-";
+  return formatOptionalKoreanDateTimeToMinute(value, "-");
 }
 
 function PreferenceItem({
@@ -168,9 +169,7 @@ export default function AdminMemberCommunicationPanel({
             ))}
           </ol>
         ) : (
-          <p className="rounded-2xl border border-dashed border-border bg-surface-inset px-4 py-5 text-sm text-muted-foreground">
-            저장된 동의 활동이 없습니다.
-          </p>
+          <EmptyState size="sm" title="저장된 동의 활동이 없습니다." />
         )}
       </section>
     </Surface>

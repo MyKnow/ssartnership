@@ -17,8 +17,10 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { localPromotionFixtures } from "@/lib/mock/promotions";
+import { SLOW_CHANGING_DATA_CACHE_SECONDS } from "@/lib/cache-ttl";
 import { projectShowcaseRepository } from "@/lib/project-showcase";
 import { getShowcasePhase, PROJECT_SHOWCASE_SLUG, type ShowcasePhase } from "@/lib/project-showcase/types";
+import { logServerError } from "@/lib/server-log";
 
 type PromotionEventRow = {
   id: string;
@@ -259,15 +261,6 @@ function canUseSupabase() {
   return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
-function isMissingPromotionSlideAdColumns(message: string) {
-  return (
-    message.includes("promotion_slides.ad_campaign_id") ||
-    message.includes("promotion_slides.sponsor_label") ||
-    message.includes("column ad_campaign_id does not exist") ||
-    message.includes("column sponsor_label does not exist")
-  );
-}
-
 function staticCampaigns() {
   return EVENT_CAMPAIGNS.map((campaign) => mapStaticCampaign(campaign));
 }
@@ -304,42 +297,17 @@ async function loadManagedPromotionSlides(options?: {
       if (options?.requireDatabase) {
         throw error;
       }
-      if (isMissingPromotionSlideAdColumns(error.message)) {
-        let legacyQuery = supabase
-          .from("promotion_slides")
-          .select(
-            "id,display_order,title,subtitle,image_src,image_alt,href,is_active,audiences,allowed_campuses,event_slug,created_at,updated_at",
-          )
-          .order("display_order", { ascending: true })
-          .order("created_at", { ascending: true });
-        if (!options?.includeInactive) {
-          legacyQuery = legacyQuery.eq("is_active", true);
-        }
-        const { data: legacyData, error: legacyError } = await legacyQuery;
-        if (!legacyError) {
-          return ((legacyData ?? []) as Omit<
-            PromotionSlideRow,
-            "ad_campaign_id" | "sponsor_label"
-          >[]).map((row) =>
-            mapSlideRow({
-              ...row,
-              ad_campaign_id: null,
-              sponsor_label: "",
-            }),
-          );
-        }
-      }
-      console.error("[promotions] promotion_slides query failed", error.message);
+      logServerError("[promotions] promotion_slides query failed", error.message);
       return staticSlides();
     }
     const slides = ((data ?? []) as PromotionSlideRow[]).map((row) => mapSlideRow(row));
     return slides;
   } catch (error) {
     if (options?.requireDatabase) {
-      console.error("[promotions] editable slides query failed", error);
+      logServerError("[promotions] editable slides query failed", error);
       throw new Error("promotion_slide_database_unavailable");
     }
-    console.error("[promotions] promotion_slides fallback", error);
+    logServerError("[promotions] promotion_slides fallback", error);
     return staticSlides();
   }
 }
@@ -499,9 +467,20 @@ const SHOWCASE_PROMOTED_PHASES: ReadonlySet<ShowcasePhase> = new Set([
   "announcement",
 ]);
 
+// The home carousel only needs the showcase schedule to decide visibility.
+// Cache the event row briefly so a home render does not wait on
+// `showcase_events`; schedule edits reach the carousel within this window.
+const getCachedShowcaseEventForHome = unstable_cache(
+  async () => projectShowcaseRepository.getEvent(),
+  ["promotions", "home-showcase-event"],
+  { revalidate: SLOW_CHANGING_DATA_CACHE_SECONDS },
+);
+
 async function getExternalEventVisibility(now: Date) {
   try {
-    const event = await projectShowcaseRepository.getEvent();
+    const event = canUseSupabase()
+      ? await getCachedShowcaseEventForHome()
+      : await projectShowcaseRepository.getEvent();
     return new Map([[PROJECT_SHOWCASE_SLUG, SHOWCASE_PROMOTED_PHASES.has(getShowcasePhase(event, now))]]);
   } catch {
     return new Map([[PROJECT_SHOWCASE_SLUG, false]]);
@@ -529,13 +508,13 @@ async function loadManagedEventCampaigns(options?: {
     }
     const { data, error } = await query;
     if (error) {
-      console.error("[promotions] promotion_events query failed", error.message);
+      logServerError("[promotions] promotion_events query failed", error);
       return staticCampaigns();
     }
     const campaigns = ((data ?? []) as PromotionEventRow[]).map((row) => mapRow(row));
     return campaigns.length > 0 ? campaigns : staticCampaigns();
   } catch (error) {
-    console.error("[promotions] promotion_events fallback", error);
+    logServerError("[promotions] promotion_events fallback", error);
     return staticCampaigns();
   }
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
-import { getSignedUserSession } from "@/lib/user-auth";
+import { requireMemberApiSession } from "@/lib/member-api-session";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { syncMemberMattermostProfile } from "@/lib/member-mattermost-profile-sync";
 import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
@@ -14,10 +14,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, updated: false }, { status: 403 });
   }
 
-  const session = await getSignedUserSession();
-  if (!session?.userId) {
-    return NextResponse.json({ ok: false, updated: false }, { status: 401 });
+  const auth = await requireMemberApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
 
   try {
     const syncResult = await syncMemberMattermostProfile(session.userId);

@@ -59,16 +59,16 @@ export const SignedInCancelLogout: Story = {
     initialSession: signedInSession,
   },
   play: async ({ canvasElement }) => {
-    const originalConfirm = window.confirm;
-    window.confirm = () => false;
     window.fetch = async () => Response.json({ ok: true });
 
     const canvas = within(canvasElement);
+    const body = within(document.body);
     await expect(canvas.getByRole("link", { name: "내 인증" })).toHaveAttribute("href", "/certification");
     await userEvent.click(canvas.getByRole("button", { name: "로그아웃" }));
+    const dialog = await body.findByRole("dialog", { name: "로그아웃하시겠습니까?" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "취소" }));
+    await expect(body.queryByRole("dialog")).not.toBeInTheDocument();
     await expect(canvas.getByRole("button", { name: "로그아웃" })).toBeInTheDocument();
-
-    window.confirm = originalConfirm;
   },
 };
 
@@ -77,16 +77,16 @@ export const SignedInConfirmLogout: Story = {
     initialSession: signedInSession,
   },
   play: async ({ canvasElement }) => {
-    const originalConfirm = window.confirm;
-    window.confirm = () => true;
     window.fetch = async () => Response.json({ ok: true });
 
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: "로그아웃" }));
+    const dialog = await within(document.body).findByRole("dialog", {
+      name: "로그아웃하시겠습니까?",
+    });
+    await userEvent.click(within(dialog).getByRole("button", { name: "로그아웃" }));
     await expect(await canvas.findByRole("link", { name: "로그인" })).toBeInTheDocument();
     await expect(canvas.getByRole("link", { name: "회원가입" })).toBeInTheDocument();
-
-    window.confirm = originalConfirm;
   },
 };
 

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { notificationRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
-import { getSignedUserSession } from "@/lib/user-auth";
+import { requireMemberApiSession } from "@/lib/member-api-session";
 import { getSafeNotificationRouteError } from "@/lib/notifications/safe-error";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -23,12 +24,16 @@ async function requireSession(request: NextRequest) {
     return { response: NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 }) };
   }
 
-  const session = await getSignedUserSession();
-  if (!session?.userId) {
-    return { response: NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 }) };
+  // Reading the inbox stays available during a forced password change;
+  // marking or deleting notifications does not.
+  const auth = await requireMemberApiSession({
+    allowPasswordChangeRequired: request.method === "GET",
+  });
+  if ("response" in auth) {
+    return { response: auth.response };
   }
 
-  return { userId: session.userId };
+  return { userId: auth.session.userId };
 }
 
 export async function GET(request: NextRequest) {
@@ -57,7 +62,7 @@ export async function GET(request: NextRequest) {
       hasMore: result.hasMore,
     });
   } catch (error) {
-    console.error("[member-notifications] list failed", error);
+    logServerError("[member-notifications] list failed", error);
     const safeError = getSafeNotificationRouteError(
       error,
       "알림을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -80,7 +85,7 @@ export async function PATCH(request: NextRequest) {
     const unreadCount = await notificationRepository.getUnreadNotificationCount(auth.userId);
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
-    console.error("[member-notifications] mark all read failed", error);
+    logServerError("[member-notifications] mark all read failed", error);
     const safeError = getSafeNotificationRouteError(
       error,
       "알림을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -103,7 +108,7 @@ export async function DELETE(request: NextRequest) {
     const unreadCount = await notificationRepository.getUnreadNotificationCount(auth.userId);
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
-    console.error("[member-notifications] delete all failed", error);
+    logServerError("[member-notifications] delete all failed", error);
     const safeError = getSafeNotificationRouteError(
       error,
       "알림을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.",

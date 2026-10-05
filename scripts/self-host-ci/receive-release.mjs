@@ -9,6 +9,7 @@ import { inflateRawSync } from "node:zlib";
 import { RELEASE_PROFILES, verifyRemoteJobs, verifyRemoteRelease } from "./github-contract.mjs";
 import { switchApplication } from "./deployment.mjs";
 import { readRootSchemaApproval, SCHEMA_APPROVAL_PROFILES, validateSchemaApproval, selectSchemaTree } from "./schema-approval.mjs";
+import { recordReceiverOutcome } from "./receiver-metrics.mjs";
 
 const API_ORIGIN = "https://api.github.com";
 const REPOSITORY = "MyKnow/ssartnership";
@@ -35,6 +36,7 @@ export const RECEIVER_PROFILES = Object.freeze({
       runtimeEnvFile: "/etc/myknow/secrets/ssartnership-original-preview/app.env",
       composeProject: "ssartnership-original-preview",
       healthOrigin: "http://127.0.0.1:3108",
+      metricsDirectory: "/etc/myknow/secrets/ssartnership-original-preview/monitoring/textfile",
     }),
   }),
   production: Object.freeze({
@@ -52,6 +54,7 @@ export const RECEIVER_PROFILES = Object.freeze({
       runtimeEnvFile: "/etc/myknow/secrets/ssartnership-production/app.env",
       composeProject: "ssartnership-production",
       healthOrigin: "http://127.0.0.1:3110",
+      metricsDirectory: "/etc/myknow/secrets/ssartnership-production/monitoring/textfile",
     }),
   }),
 });
@@ -465,6 +468,10 @@ if (isMainModule()) {
     process.stderr.write('{"error":"RECEIVER_PROFILE_INVALID"}\n');
     process.exitCode = 1;
   } else {
-    receiveRelease({ profile }).then((result) => process.stdout.write(`${JSON.stringify(result)}\n`)).catch((cause) => { process.stderr.write(`${JSON.stringify({ error: receiverFailureCode(cause) })}\n`); process.exitCode = 1; });
+    const record = (success) => recordReceiverOutcome({ directory: profile.config.metricsDirectory, success })
+      .catch(() => process.stderr.write('{"metrics":"RECEIVER_METRICS_FAILED"}\n'));
+    receiveRelease({ profile })
+      .then(async (result) => { process.stdout.write(`${JSON.stringify(result)}\n`); await record(true); })
+      .catch(async (cause) => { process.stderr.write(`${JSON.stringify({ error: receiverFailureCode(cause) })}\n`); process.exitCode = 1; await record(false); });
   }
 }

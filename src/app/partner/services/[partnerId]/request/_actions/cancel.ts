@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getServerActionLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { PartnerChangeRequestError } from "@/lib/partner-change-request-errors";
 import { cancelPartnerChangeRequest } from "@/lib/partner-change-requests";
-import { getPartnerSession } from "@/lib/partner-session";
+import { requirePartnerActionSession } from "@/lib/partner-action-session";
 import {
   getAuthorizedCompanyIdsForPartnerAction,
   getReturnUrl,
@@ -13,13 +13,7 @@ import {
 } from "./shared";
 
 export async function cancelPartnerChangeRequestActionImpl(formData: FormData) {
-  const session = await getPartnerSession();
-  if (!session) {
-    redirect("/partner/login");
-  }
-  if (session.mustChangePassword) {
-    redirect("/partner/change-password");
-  }
+  const session = await requirePartnerActionSession();
 
   const requestId = String(formData.get("requestId") || "").trim();
   const partnerId = String(formData.get("partnerId") || "").trim();

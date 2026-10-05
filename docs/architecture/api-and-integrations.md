@@ -3,118 +3,42 @@ title: 07. API와 외부 연동
 type: architecture
 status: current
 authority: descriptive
+last_verified: 2026-10-05
 ---
 
 # 07. API와 외부 연동
 
-작성 기준일: 2026-07-09
+route 목록의 정본은 `src/app/**/route.ts` 파일 자체다. 이 문서는 개별 route를 손으로 나열하지 않고 접두사별 책임과 보호 방식만 기록한다. 정확한 목록은 아래 명령으로 확인한다.
 
-## Internal API route map
+```bash
+find src/app -name route.ts | sed -E 's#^src/app##; s#/route\.ts$##; s#/\([^)]+\)##g' | sort
+```
 
-### Admin APIs
+## Route handler 지도
 
-| Method | Route | 목적 |
-| --- | --- | --- |
-| GET | `/api/admin/logs` | 관리자 로그 조회 |
-| GET | `/api/admin/logs/export` | 관리자 로그 export |
-| GET | `/api/admin/members/[id]/avatar` | 관리자 회원 avatar 조회 |
-| GET/PATCH/DELETE | `/api/admin/notifications` | 관리자 notification 목록/일괄 처리 |
-| PATCH/DELETE | `/api/admin/notifications/[id]` | 관리자 notification 단건 처리 |
-| GET/POST | `/api/admin/notifications/preferences` | 관리자 notification preference |
-| POST | `/api/admin/push/subscribe` | 관리자 push 구독 |
-| POST | `/api/admin/push/unsubscribe` | 관리자 push 구독 해제 |
+2026-10-05 `dev` 기준 route handler는 125개다(페이지 `page.tsx`는 제외).
 
-### Member/auth APIs
+| 접두사 | 개수 | 책임 | 보호 |
+| --- | --- | --- | --- |
+| `/api/admin/*` | 28 | 로그 조회·export, 회원 아바타·비밀번호 재설정·프로필 사진, 회원 가져오기, 가입 승인 신청 이미지, 수료생 인증 파일, 관리자 알림·푸시 구독, 알림 템플릿, 쿠폰 코드 업로드, 리뷰 moderation | 관리자 세션과 resource/action 권한 |
+| `/api/mm/*` | 13 | Mattermost DM 코드 발급·검증, 가입·가입 사진, 비밀번호 변경·재설정 완료, 동의, 탈퇴, 프로필 동기화, 인증 QR token, 아바타, 로그아웃. `/api/mm/login`은 화면에서 호출하지 않는 레거시 로그인 경로다. | 회원 세션 또는 짧은 인증 완료 세션, same-origin |
+| `/api/auth/login` | 1 | 회원 로그인(로그인 폼이 호출) | 레이트리밋, same-origin |
+| `/api/member/*`, `/api/member-password-action/*` | 7 | 이메일 등록·변경 코드, Mattermost 장애 시 이메일 복구 세션, 관리자 발급 비밀번호 설정·재설정 | 회원 세션 또는 단기 복구·작업 토큰 |
+| `/api/graduate-verification/*` | 9 | 수료생 신청·이메일 인증·업로드 서명·계정 설정·비밀번호 재설정·철회 | HttpOnly 신청 세션과 HMAC |
+| `/api/certification/*` | 4 | 인증 카드 사진 업로드 서명·확정, QR token 기반 아바타 | 회원 세션 또는 서명 token |
+| `/api/partners/*` | 6 | 즐겨찾기, 리뷰 CRUD·reaction, 혜택 사용 확인, 홈 상태 | 회원 세션(공개 읽기 제외) |
+| `/api/partner/*` | 10 | 협력사 비밀번호 변경·재설정, 초기 설정, 사업자 상태 조회, 리뷰 moderation, 알림·푸시 구독 | 협력사 세션 또는 초기 설정 token |
+| `/api/notifications/*`, `/api/push/*` | 10 | 회원 알림함·설정, 푸시 구독, 관리자 푸시 미리보기·발송·로그 삭제 | 회원 세션, 관리자 발송은 관리자 권한 |
+| `/api/coupons/*`, `/api/coupon-issues/*` | 2 | 쿠폰 발급과 발급 ID 기반 사용 확인. 쿠폰 ID를 직접 사용하는 레거시 경로는 폐기됐다. | 회원 세션 |
+| `/api/uploads/images/*` | 2 | 공용 이미지 업로드 서명·완료 | 업로드 세션과 quota |
+| `/api/wallet/*` | 6 | Apple Wallet 발급·폐기, Apple web service(기기 등록·변경 serial·pass·log), 공개 검증 아바타 | 회원 세션 또는 Apple 인증 token. 기능은 현재 비활성 |
+| `/api/cron/*` | 12 | 익명화, 로그·쇼케이스 개인정보 파기, 업로드·수료생 파일·수동 가져오기 정리, 프로모션 정리, 결제 상태, 만료 제휴 알림, Sender 상태, RSS, Wallet 조정 | `CRON_SECRET` Bearer |
+| `/api/events/product`, `/api/web-vitals` | 2 | 제품 이벤트와 Web Vitals 수집 | 크기·속도 제한, 계약 검증 |
+| `/api/image`, `/api/health`, `/api/suggest` | 3 | 이미지 프록시, liveness, 제휴 제안 | 공개(프록시는 내부망 차단, 제안은 레이트리밋) |
+| `/api/e2e/mock/reset`, `/auth/mock` | 2 | E2E·mock profile 전용 상태 초기화와 mock 로그인 | 명시적 mock·E2E 환경 변수 없으면 거절 |
+| 그 밖의 페이지 인접 route | 7 | `/admin/session`(회원 세션 기반 관리자 세션 bridge), `/partner/logout`, 관리자·등록 엑셀 템플릿과 이벤트 보상 export, `/rss.xml` | 각 화면의 세션 규칙 |
 
-| Method | Route | 목적 |
-| --- | --- | --- |
-| POST | `/api/mm/login` | 회원 로그인 |
-| POST | `/api/mm/logout` | 회원 로그아웃 |
-| POST | `/api/mm/change-password` | 회원 비밀번호 변경 |
-| POST | `/api/mm/consent` | 정책 동의 |
-| POST | `/api/mm/delete` | 회원 삭제/탈퇴 |
-| GET | `/api/mm/avatar` | 현재 회원 avatar |
-| GET | `/api/mm/certification-token` | 인증 QR token |
-| POST | `/api/mm/profile-sync` | 회원 프로필 동기화 |
-| POST | `/api/mm/reset-password/complete` | 비밀번호 재설정 완료 |
-| POST | `/api/mm/code/issue` | direct Mattermost DM 코드 발급 |
-| POST | `/api/mm/code/verify` | direct Mattermost DM 코드 검증 |
-| POST | `/api/mm/signup` | direct Mattermost 인증 가입 |
-| POST | `/api/member/recovery/start` | 기존 사이트 비밀번호로 15분 이메일 복구 세션 발급 |
-| POST | `/api/member/recovery/email/send` | 복구 세션의 이메일 코드 발송 |
-| POST | `/api/member/recovery/email/verify` | 복구 이메일 코드 검증 및 이메일 로그인 전환 |
-| GET | `/api/certification/avatar/[token]` | QR token 기반 avatar 조회 |
-| GET/POST/DELETE | `/api/wallet/apple/pass` | Apple Wallet `.pkpass` 발급/재다운로드/회원 요청 폐기 |
-
-### Public/member feature APIs
-
-| Method | Route | 목적 |
-| --- | --- | --- |
-| POST | `/api/events/product` | product analytics event 기록 |
-| GET | `/api/image` | image proxy/cache |
-| GET/PATCH/DELETE | `/api/notifications` | 회원 notification 목록/일괄 처리 |
-| PATCH/DELETE | `/api/notifications/[id]` | 회원 notification 단건 처리 |
-| POST | `/api/notifications/preferences` | 회원 notification preference |
-| POST | `/api/partners/[id]/favorite` | 제휴 즐겨찾기 토글 |
-| GET/POST | `/api/partners/[id]/reviews` | 리뷰 목록/생성 |
-| PATCH/DELETE | `/api/partners/[id]/reviews/[reviewId]` | 리뷰 수정/삭제 |
-| PATCH | `/api/partners/[id]/reviews/[reviewId]/reaction` | 리뷰 reaction |
-| POST | `/api/partners/[id]/reviews/uploads/sign` | 리뷰 이미지 업로드 sign |
-| POST | `/api/partners/[id]/reviews/uploads/cleanup` | 리뷰 이미지 cleanup |
-| GET | `/api/partners/home-state` | 홈 partner state |
-| POST | `/api/coupons/[couponId]/redeem` | 쿠폰 사용 |
-| POST | `/api/suggest` | 제휴 제안 제출 |
-| GET | `/wallet/verify/[token]` | Apple Wallet 공개 실시간 검증 페이지 |
-| GET | `/api/wallet/apple/avatar/[token]` | Apple Wallet 공개 검증용 승인 프로필 사진 스트리밍 |
-
-### Push APIs
-
-| Method | Route | 목적 |
-| --- | --- | --- |
-| POST | `/api/push/subscribe` | 회원 push 구독 |
-| POST | `/api/push/unsubscribe` | 회원 push 구독 해제 |
-| GET | `/api/push/subscriptions` | 회원 push 구독 목록 |
-| POST | `/api/push/preferences` | 회원 push preference |
-| POST | `/api/push/admin/preview` | 관리자 push preview |
-| POST | `/api/push/admin/broadcast` | 관리자 push broadcast |
-| DELETE | `/api/push/admin/logs/[id]` | push log 삭제 |
-
-### Apple Wallet web service APIs
-
-| Method | Route | 목적 |
-| --- | --- | --- |
-| GET | `/api/wallet/apple/v1/devices/[deviceId]/registrations/[passTypeId]` | Apple device library identifier 기준 변경된 serial 조회 |
-| POST/DELETE | `/api/wallet/apple/v1/devices/[deviceId]/registrations/[passTypeId]/[serialNumber]` | Apple Wallet 기기 등록/해제 |
-| GET | `/api/wallet/apple/v1/passes/[passTypeId]/[serialNumber]` | 최신 `.pkpass` 다운로드 |
-| POST | `/api/wallet/apple/v1/log` | Apple Wallet provider log 수신 |
-| GET | `/api/cron/reconcile-apple-wallet-passes` | 설치된 active pass의 자격·동의·snapshot 일일 재검사와 APNs 갱신 |
-
-### Partner APIs
-
-| Method | Route | 목적 |
-| --- | --- | --- |
-| POST | `/api/partner/change-password` | 협력사 비밀번호 변경 |
-| POST | `/api/partner/reset-password` | 협력사 비밀번호 재설정 |
-| GET/POST | `/api/partner/setup/[token]` | 초기 설정 context/complete |
-| POST | `/api/partner/billing/business-status` | 사업자 상태 조회 |
-| PATCH | `/api/partner/reviews/[reviewId]` | 협력사 리뷰 moderation |
-| GET/PATCH/DELETE | `/api/partner/notifications` | 협력사 notification 목록/일괄 처리 |
-| PATCH/DELETE | `/api/partner/notifications/[id]` | 협력사 notification 단건 처리 |
-| GET/POST | `/api/partner/notifications/preferences` | 협력사 notification preference |
-| POST | `/api/partner/push/subscribe` | 협력사 push 구독 |
-| POST | `/api/partner/push/unsubscribe` | 협력사 push 구독 해제 |
-
-### Cron APIs
-
-| Method | Route | 목적 |
-| --- | --- | --- |
-| GET | `/api/cron/archive-expired-promotions` | 만료 promotion archive |
-| GET | `/api/cron/member-sync` | 회원/디렉터리 동기화 |
-| GET | `/api/cron/partner-billing` | 협력사 billing batch |
-| GET | `/api/cron/push-expiring-partners` | 종료 예정 제휴 push |
-| GET | `/api/cron/rss` | RSS refresh |
-| GET | `/api/cron/purge-expired-operational-logs` | 1년 경과 운영·보안 원본 로그 정리 |
-| GET | `/api/cron/purge-showcase-personal-data` | 쇼케이스 정산 30일 후 학번·체험 기록의 회원 연결 파기 |
+Cron 실행 일정의 정본은 `deploy/self-host-operations/production-cron/schedules.json`이다. Wallet 조정 Cron은 기능과 함께 비활성이다.
 
 ## External integrations
 
@@ -123,7 +47,8 @@ authority: descriptive
 - PostgreSQL schema와 migration을 관리한다.
 - server side에서는 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`를 사용한다.
 - `NEXT_PUBLIC_SUPABASE_URL`은 image remote pattern 등 public 용도만 선택적으로 사용한다.
-- Preview sync는 production data를 preview로 복사하되 member password material과 legacy `members.avatar_base64`만 제거한다. `member_profile_images`와 private `member-profile-images` 객체는 유지해 Preview에서도 실제 프로필 사진을 표시한다.
+- 운영 DB·Storage는 PVE의 자체 호스팅 Supabase 구성(PostgreSQL·PostgREST·Storage·Kong)이다. 클라우드 Supabase는 운영 경로가 아니다.
+- Production→Preview 사본은 `scripts/self-host-environments/cli.mjs prepare-copy`가 격리 복원본에서 비밀번호·자격증명을 정제한 뒤 만든다. `member_profile_images`와 private `member-profile-images` 객체는 유지해 Preview에서도 실제 프로필 사진을 표시한다.
 - Apple Wallet pass와 device registration은 `member_wallet_passes`, `member_wallet_pass_revisions`, `apple_wallet_device_registrations`, `member_wallet_pass_operations` 및 service-role 전용 RPC(`issue_member_wallet_pass`, `revoke_member_wallet_pass`, `register_apple_wallet_device`, `unregister_apple_wallet_device`, `list_updated_apple_wallet_passes`)로 관리한다.
 
 ### Mattermost
@@ -132,6 +57,8 @@ authority: descriptive
 - `MM_BASE_URL`은 서버 전용이며 MM 세션 토큰은 요청 메모리에서만 유지한다.
 - 기수별 Sender credential은 `mattermost_sender_credentials`에 AES-256-GCM으로 저장한다. key env는 `MM_SENDER_CREDENTIALS_KEY_V1`, 활성 키 버전 env는 `MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION`이다.
 - Sender 후보는 운영 화면에서 테스트 DM 성공 뒤에만 active가 되며, team/channel은 `s{generation}public`과 `town-square` 상수로 계산한다.
+- 조회·로그인·DM 채널 생성 요청은 timeout 시 1회 재시도하고, DM 게시는 중복 발송을 막기 위해 재시도하지 않는다.
+- 런타임 Sender health는 로그인 단계 실패와 timeout·장애·rate limit·잘못된 응답만 반영한다. 로그인 뒤 대상 작업의 403과 요청 거부(400·422 등)는 대상별 문제라 Sender를 차단하지 않으며, Sender 자체 점검은 `mattermost-sender-health` cron이 맡는다.
 - 상세 기준은 [Mattermost 직접 연동 전환](../decisions/ADR-0001-direct-mattermost-integration.md)을 따른다.
 
 ### SMTP
@@ -146,6 +73,10 @@ authority: descriptive
 - VAPID 기반 browser push를 사용한다.
 - 주요 env: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
 - 회원, 관리자, 협력사 subscription table/API가 분리되어 있다.
+- 모든 발송은 `src/lib/push/web-push-client.ts`의 `sendWebPush`(구독 신뢰 검증 + 10초 소켓 타임아웃)를 거친다. 404/410과 신뢰 검증 실패만 구독을 비활성화하고 timeout·5xx는 구독을 유지한다.
+- 관리자·협력사 운영 알림 푸시는 `sendOperationalPushDeliveries` 하나를 대상별 설정(구독 테이블·소유자 컬럼·템플릿 키·delivery 테이블)으로 공유한다.
+- 브라우저 구독은 회원·관리자·협력사 설정 화면이 같은 헬퍼로 기존 구독을 재사용하고 VAPID 공개키가 바뀐 경우에만 교체한다.
+- 푸시 구독 이벤트 로그(`event_logs.target_id`)에는 endpoint URL을 남기지 않고 구독 UUID만 기록한다.
 
 ### Apple Wallet / APNs
 
@@ -156,7 +87,7 @@ authority: descriptive
 - Apple Wallet이 활성화되면 `NEXT_PUBLIC_SITE_URL`의 명시적인 공개 HTTPS origin이 필수며 fallback을 사용하지 않는다.
 - 공개 검증 경로(`/wallet/verify/[token]`, `/api/wallet/apple/avatar/[token]`)는 `no-store`, `noindex`와 opaque signed token을 사용하고 token 원문을 analytics 식별자나 로그 key로 남기지 않는다.
 - Apple device library identifier는 Wallet master key에서 용도 분리한 HMAC-SHA256 subkey로 hash한다. APNs push token도 별도의 암호화 subkey로 보호한 뒤 `apple_wallet_device_registrations`에 저장한다. master key 회전은 저장 token 재암호화와 기기 hash 재생성·재등록, 기존 패스 재발급 계획이 필요한 별도 작업이다.
-- Vercel cron은 설치된 active pass를 일일 재검사한다. 표시 정보만 달라졌고 자격·동의가 유효하면 새 snapshot revision을 저장하고, 자격 또는 동의가 무효하면 credential을 폐기한 뒤 APNs update를 보낸다. QR 검증은 cron 주기와 무관하게 현재 상태를 즉시 확인한다.
+- 일일 조정 Cron(`/api/cron/reconcile-apple-wallet-passes`)이 설치된 active pass를 재검사한다. Wallet 기능과 이 timer는 현재 비활성이다. 표시 정보만 달라졌고 자격·동의가 유효하면 새 snapshot revision을 저장하고, 자격 또는 동의가 무효하면 credential을 폐기한 뒤 APNs update를 보낸다. QR 검증은 cron 주기와 무관하게 현재 상태를 즉시 확인한다.
 - APNs가 일시 실패한 설치 pass는 active·revoked 상태 모두 다음 cron에서 재시도하며, 성공 상태의 revoked pass만 조정 큐에서 빠진다.
 - Apple의 `passesUpdatedSince` 목록 커서는 canonical pass의 `updated_at`만 사용한다. 기기 등록·해제 RPC가 registration과 pass 시각을 같은 트랜잭션에서 함께 갱신하므로 필터·정렬·응답 커서가 한 시계를 공유한다.
 
@@ -164,30 +95,18 @@ authority: descriptive
 
 - 협력사 결제/등록 과정에서 사업자 상태조회에 사용한다.
 - 주요 env: `NTS_BUSINESS_STATUS_SERVICE_KEY`
-- fallback env: `DATA_GO_KR_SERVICE_KEY`
+- fallback env: `DATA_GO_KR_SERVICE_KEY`(폐기 예정 별칭, 읽을 때 경고)
 - 상호/대표자/주소 자동 채움이 아니라 휴업/폐업 상태와 과세유형 확인 용도다.
 
-### Vercel
+### 배포·CI
 
-- Production은 `main`, Preview는 `dev` branch 기준이다.
-- Analytics와 Speed Insights가 root layout에 포함된다.
-- CI workflow는 lockfile, preview sync, public readiness, Storybook을 검증한다.
+- PVE 자체 호스팅이 유일한 운영 정본이다. `main`은 Production, `dev`는 원본 Preview 이미지로 배포된다([격리 CI·배포](../operations/runbooks/self-host-ci-maintenance.md)). Vercel 배포·Analytics·Speed Insights와 클라우드 Supabase 반출·Preview 동기화 도구는 RF-04(#537)에서 제거했다.
+- 브라우저 성능은 [자체 호스팅 Web Vitals·Lighthouse 측정](../performance/measurements/web-vitals.md)으로만 확인한다.
+- CI workflow는 change-aware public readiness, 교차 플랫폼 개발환경, 수동 Storybook, 자체 호스팅 이미지 발행과 공개 health 수동 확인을 담당한다.
 
 ## Environment variable groups
 
-| 그룹 | 주요 env |
-| --- | --- |
-| 관리자 | `ADMIN_ID`, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, `ADMIN_ALLOWED_IPS`, `ADMIN_BASIC_AUTH_USERNAME`, `ADMIN_BASIC_AUTH_PASSWORD` |
-| 회원 세션/QR | `USER_SESSION_SECRET`, `CERTIFICATION_QR_SECRET` |
-| 협력사 | `PARTNER_SESSION_SECRET`, billing bank envs |
-| Supabase | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, optional `NEXT_PUBLIC_SUPABASE_URL` |
-| Data source | `NEXT_PUBLIC_DATA_SOURCE`, `NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE` |
-| Preview sync | `PREVIEW_TEST_MEMBER_USERNAME`, `PREVIEW_TEST_MEMBER_PASSWORD` |
-| Mattermost | `MM_BASE_URL`, `MM_SENDER_CREDENTIALS_KEY_V1`, `MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION` |
-| SMTP | `SMTP_*`, `NAVER_SMTP_*`, `SUGGEST_NOTIFY_EMAIL` |
-| Web Push/Cron | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET` |
-| Apple Wallet | `APPLE_WALLET_ENABLED`, `APPLE_WALLET_TEAM_ID`, `APPLE_WALLET_PASS_TYPE_ID`, `APPLE_WALLET_ORGANIZATION_NAME`, `APPLE_WALLET_CERTIFICATE_BASE64`, `APPLE_WALLET_PRIVATE_KEY_BASE64`, `APPLE_WALLET_PRIVATE_KEY_PASSPHRASE`, `APPLE_WALLET_WWDR_CERTIFICATE_BASE64`, `APPLE_WALLET_DEVICE_TOKEN_ENCRYPTION_KEY_BASE64`, `NEXT_PUBLIC_SITE_URL` |
-| SEO | `NEXT_PUBLIC_SITE_URL` |
+환경 변수 목록·그룹·분류(필수/build/선택/플랫폼/호환/폐기 예정/개발)의 정본은 `scripts/lib/env-manifest.mjs`다. `npm run check:env`와 `tests/env-manifest.test.mts`가 매니페스트, `src/`·`next.config.ts`의 env 읽기, `.env.example`, `deploy/self-host/runtime.env.example`의 drift를 막는다. 주요 그룹은 Supabase, 세션·HMAC, 관리자 edge 보호, Mattermost Sender, Cron·Web Push, 공개 build 값, 파트너 청구·사업자 상태, 이메일, Apple Wallet, 자체 호스팅 Web Vitals다. 폐기 예정 별칭(`NAVER_SMTP_*`, `DATA_GO_KR_SERVICE_KEY`)은 읽을 때 경고만 남기고 예시 파일에 두지 않는다.
 
 ## API design constraints
 

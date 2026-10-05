@@ -47,6 +47,44 @@ export type AdminPermissionTemplate = {
   permissions: AdminPermissionMatrix;
 };
 
+const ALL_ACTIONS = ADMIN_PERMISSION_ACTIONS;
+
+/**
+ * Actions that at least one server guard actually checks for each resource.
+ * Every other bit is normalized to `false`, so a template or the admin
+ * accounts screen can never advertise a control that the code does not
+ * enforce. `tests/admin-permissions.test.mts` scans the guards and fails when
+ * this map and the enforced checks drift apart; add the guard and the bit
+ * together.
+ */
+export const ADMIN_PERMISSION_SUPPORTED_ACTIONS: Record<
+  AdminPermissionResource,
+  readonly AdminPermissionAction[]
+> = {
+  members: ALL_ACTIONS,
+  reviews: ["read", "update", "delete"],
+  logs: ["read"],
+  brands: ALL_ACTIONS,
+  companies: ALL_ACTIONS,
+  notifications: ["create", "read", "delete"],
+  home_ads: ALL_ACTIONS,
+  events: ALL_ACTIONS,
+  cycles: ["read", "update", "delete"],
+  admin_management: ALL_ACTIONS,
+  graduate_verifications: ["read", "update"],
+  profile_images: ["read", "update"],
+  mattermost_senders: ALL_ACTIONS,
+  member_signup_requests: ["read", "update"],
+  notification_templates: ["read", "update", "delete"],
+};
+
+export function isSupportedAdminPermission(
+  resource: AdminPermissionResource,
+  action: AdminPermissionAction,
+) {
+  return ADMIN_PERMISSION_SUPPORTED_ACTIONS[resource].includes(action);
+}
+
 const RESOURCE_LABELS: Record<AdminPermissionResource, string> = {
   members: "회원",
   reviews: "리뷰",
@@ -136,13 +174,12 @@ export function normalizeAdminPermissionMatrix(
       continue;
     }
     for (const action of ADMIN_PERMISSION_ACTIONS) {
-      matrix[resource][action] = resourceInput[action] === true;
+      // Unsupported bits (including log writes, which protect the audit
+      // trail) are never granted even if a stored row or form says so.
+      matrix[resource][action] =
+        resourceInput[action] === true && isSupportedAdminPermission(resource, action);
     }
   }
-
-  matrix.logs.create = false;
-  matrix.logs.update = false;
-  matrix.logs.delete = false;
 
   return matrix;
 }

@@ -7,9 +7,14 @@ import {
 } from "@/app/partner/plans/actions";
 import { getPartnerBillingProfiles } from "@/lib/partner-billing-profiles";
 import { getPartnerBankTransferAccount } from "@/lib/partner-billing-config";
+import {
+  PARTNER_PLAN_STATUS_MESSAGES,
+  resolvePartnerPlanErrorParam,
+  resolvePartnerPlanStatusParam,
+} from "@/lib/partner-plan-safe-messages";
 import { getPartnerPlanPortalData } from "@/lib/partner-plan-service";
-import { getPartnerPasswordChangeHref } from "@/lib/partner-portal-paths";
-import { assertPartnerPortalCompanyAccess } from "@/lib/partner-portal-scope";
+import { getPartnerPasswordChangeHref } from "@/lib/partner-auth/portal-paths";
+import { assertPartnerPortalCompanyAccess } from "@/lib/partner-auth/portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
 
@@ -28,7 +33,10 @@ export default async function PartnerCompanyPlansPage({
   searchParams,
 }: {
   params: Promise<{ companyId: string }>;
-  searchParams?: Promise<{ status?: string; error?: string }>;
+  searchParams?: Promise<{
+    status?: string | string[];
+    error?: string | string[];
+  }>;
 }) {
   const { companyId } = await params;
   const session = await getPartnerSession();
@@ -53,15 +61,9 @@ export default async function PartnerCompanyPlansPage({
     }),
   ]);
   const bankTransferAccount = getPartnerBankTransferAccount();
-  const statusMessage =
-    paramsData.status === "requested"
-      ? "업그레이드 요청이 접수되었습니다."
-      : paramsData.status === "cancelled"
-        ? "업그레이드 요청이 취소되었습니다."
-        : null;
-  const errorMessage = paramsData.error
-    ? decodeURIComponent(paramsData.error)
-    : null;
+  const status = resolvePartnerPlanStatusParam(paramsData.status);
+  const statusMessage = status ? PARTNER_PLAN_STATUS_MESSAGES[status] : null;
+  const errorMessage = resolvePartnerPlanErrorParam(paramsData.error);
 
   return (
     <PartnerPlanScreen

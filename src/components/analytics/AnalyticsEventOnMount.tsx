@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
-import type { ProductEventName } from '@/lib/event-catalog';
+import type { ClientProductEventName } from '@/lib/product-event-contract';
 import { trackProductEvent } from '@/lib/product-events';
 
 const recentEventKeys = new Map<string, number>();
@@ -15,7 +15,7 @@ export default function AnalyticsEventOnMount({
   path,
   dedupeKey,
 }: {
-  eventName: ProductEventName;
+  eventName: ClientProductEventName;
   targetType?: string | null;
   targetId?: string | null;
   properties?: Record<string, unknown> | null;

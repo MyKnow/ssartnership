@@ -8,9 +8,10 @@ import {
 } from "./partner-metric-rollups.ts";
 import { loadPartnerMetricAggregateRows } from "./partner-metric-loader.ts";
 import { listMockPartnerPortalSetupsInternal } from "./mock/partner-portal/store.ts";
-import { isPartnerPortalMock } from "./partner-portal.ts";
+import { isPartnerPortalMock } from "./partner-auth/portal.ts";
 import { getSupabaseAdminClient } from "./supabase/server.ts";
 import { fetchPartnerEngagementCounts } from "./partner-counts.ts";
+import { logServerError } from "./server-log.ts";
 
 const PARTNER_SERVICE_METRICS_WARNING_MESSAGE =
   "일부 제휴처 집계를 불러오지 못해 최신 수치가 0으로 표시될 수 있습니다.";
@@ -68,10 +69,7 @@ export async function getPartnerServiceMetrics(
       metricRowsResult.failure.stage === "rollup"
         ? "event query failed"
         : "fallback event query failed";
-    console.error(`[partner-service-metrics] ${queryLabel}`, {
-      partnerId,
-      message: metricRowsResult.failure.errorMessage,
-    });
+    logServerError(`[partner-service-metrics] ${queryLabel}`, metricRowsResult.failure.errorMessage, { partnerId });
   } else {
     const metricsByPartnerId = new Map([[partnerId, metrics]]);
     applyPartnerMetricRollupRows(metricsByPartnerId, metricRowsResult.rows);
@@ -79,10 +77,7 @@ export async function getPartnerServiceMetrics(
 
   if (engagementCounts.engagementErrorMessage) {
     markPartialFailure();
-    console.error("[partner-service-metrics] engagement query failed", {
-      partnerId,
-      message: engagementCounts.engagementErrorMessage,
-    });
+    logServerError("[partner-service-metrics] engagement query failed", engagementCounts.engagementErrorMessage, { partnerId });
   }
 
   metrics.reviewCount = engagementCounts.reviewCounts.get(partnerId) ?? 0;

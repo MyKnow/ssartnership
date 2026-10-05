@@ -82,7 +82,7 @@ test("계정 항목은 내 인증에서 분리된 설정 화면의 그룹형 리
     footerActions,
     /인증 카드에 표시할 본인 사진을 변경합니다\./,
   );
-  assert.match(footerActions, /이 기기에서 로그아웃합니다\./);
+  assert.match(footerActions, /이 계정으로 로그인된 모든 기기에서 로그아웃합니다\./);
   assert.match(footerActions, /혜택 이용을 포기하고 탈퇴합니다\./);
   assert.doesNotMatch(footerActions, /trailingLabel=/);
 });

@@ -1,3 +1,4 @@
+import { ADMIN_LIST_DEFAULT_PAGE_SIZE } from "@/lib/admin-ia";
 import { normalizeNotificationTargetUrl } from "@/lib/notifications/shared";
 
 export type AdminNotificationRelation = {
@@ -50,7 +51,8 @@ type BuildAdminNotificationListResultInput = {
   hasMore?: boolean;
 };
 
-const DEFAULT_PAGE_SIZE = 10;
+export const ADMIN_NOTIFICATION_PAGE_SIZE = ADMIN_LIST_DEFAULT_PAGE_SIZE;
+const DEFAULT_PAGE_SIZE = ADMIN_NOTIFICATION_PAGE_SIZE;
 const MAX_PAGE_SIZE = 20;
 const MAX_OFFSET = 1000;
 

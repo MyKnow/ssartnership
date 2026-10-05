@@ -19,6 +19,7 @@ import PartnerLogoutButton from "@/components/partner/PartnerLogoutButton";
 import PartnerPendingLink from "@/components/partner/PartnerPendingLink";
 import ThemeToggle from "@/components/ThemeToggle";
 import Container from "@/components/ui/Container";
+import InlineMessage from "@/components/ui/InlineMessage";
 import { cn } from "@/lib/cn";
 import {
   getCompanyScopedPortalHref,
@@ -27,12 +28,12 @@ import {
   getPartnerCompanyIdFromPathname,
   getPartnerPortalMobileNavigation,
   PARTNER_PASSWORD_CHANGE_PATH,
-} from "@/lib/partner-portal-paths";
+} from "@/lib/partner-auth/portal-paths";
 import {
   shouldShowPartnerPortalMobileNavigation,
   shouldUsePartnerPortalDashboardShell,
-} from "@/lib/partner-portal-layout";
-import type { PartnerPortalCompanyScope } from "@/lib/partner-portal-scope";
+} from "@/lib/partner-auth/portal-layout";
+import type { PartnerPortalCompanyScope } from "@/lib/partner-auth/portal-scope";
 import type { PartnerSession } from "@/lib/partner-session";
 import { TECH_SUPPORT_HREF } from "@/lib/support-mail";
 
@@ -40,8 +41,25 @@ type PartnerPortalShellViewProps = {
   children: React.ReactNode;
   session: PartnerSession | null;
   companies: PartnerPortalCompanyScope[];
+  /** Company summaries failed to load on the server; show a notice. */
+  companiesUnavailable?: boolean;
   isMock: boolean;
 };
+
+const COMPANIES_UNAVAILABLE_MESSAGE =
+  "회사 정보를 잠시 불러오지 못했습니다. 잠시 후 새로고침해 주세요.";
+
+function CompaniesUnavailableNotice() {
+  return (
+    <Container size="wide" className="pt-6 lg:pt-8">
+      <InlineMessage
+        tone="warning"
+        role="status"
+        description={COMPANIES_UNAVAILABLE_MESSAGE}
+      />
+    </Container>
+  );
+}
 
 const companyNavItems = [
   {
@@ -524,6 +542,7 @@ export default function PartnerPortalShellView({
   children,
   session,
   companies,
+  companiesUnavailable = false,
   isMock,
 }: PartnerPortalShellViewProps) {
   const pathname = usePathname();
@@ -542,6 +561,8 @@ export default function PartnerPortalShellView({
     pathname,
     hasSession: Boolean(session),
   });
+  const companiesNotice =
+    session && companiesUnavailable ? <CompaniesUnavailableNotice /> : null;
 
   if (!useDashboardShell || !session) {
     return (
@@ -580,7 +601,10 @@ export default function PartnerPortalShellView({
             </div>
           </Container>
         </div>
-        <main className="flex-1">{children}</main>
+        <main className="flex-1">
+          {companiesNotice}
+          {children}
+        </main>
         <SimpleFooter />
       </div>
     );
@@ -610,7 +634,10 @@ export default function PartnerPortalShellView({
           currentCompanyId={currentCompanyId}
           currentCompany={currentCompany}
         />
-        <main className="min-w-0">{children}</main>
+        <main className="min-w-0">
+          {companiesNotice}
+          {children}
+        </main>
       </div>
     </div>
   );

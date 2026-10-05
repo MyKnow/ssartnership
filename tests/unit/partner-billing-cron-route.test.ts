@@ -17,10 +17,12 @@ vi.mock("@/lib/partner-plan-service", () => ({
 import { GET } from "../../src/app/api/cron/partner-billing/route";
 
 const ORIGINAL_CRON_SECRET = process.env.CRON_SECRET;
+// The cron guard rejects secrets shorter than the runtime minimum (32).
+const TEST_CRON_SECRET = "test-cron-secret-at-least-32-characters";
 
 describe("partner billing cron route", () => {
   beforeEach(() => {
-    process.env.CRON_SECRET = "test-cron-secret";
+    process.env.CRON_SECRET = TEST_CRON_SECRET;
     revalidatePathMock.mockReset();
     runPartnerBillingOverdueDowngradesMock.mockReset();
   });
@@ -44,7 +46,7 @@ describe("partner billing cron route", () => {
     const response = await GET(
       new NextRequest("http://localhost/api/cron/partner-billing", {
         headers: {
-          authorization: "Bearer test-cron-secret",
+          authorization: `Bearer ${TEST_CRON_SECRET}`,
         },
       }),
     );
@@ -56,6 +58,12 @@ describe("partner billing cron route", () => {
       message: "Partner billing cron failed",
     });
     expect(JSON.stringify(body)).not.toContain(originalError.message);
-    expect(consoleErrorSpy).toHaveBeenCalledWith("[partner-billing-cron] failed", originalError);
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    const entry = JSON.parse(String(consoleErrorSpy.mock.calls[0]?.[0]));
+    expect(entry).toMatchObject({
+      level: "error",
+      event: "[partner-billing-cron] failed",
+      error: { name: "Error", message: originalError.message },
+    });
   });
 });

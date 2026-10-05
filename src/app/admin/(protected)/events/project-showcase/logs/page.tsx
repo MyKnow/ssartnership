@@ -1,7 +1,9 @@
 import Link from "next/link";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminShell from "@/components/admin/AdminShell";
+import EmptyState from "@/components/ui/EmptyState";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { ADMIN_LIST_DEFAULT_PAGE_SIZE } from "@/lib/admin-ia";
 import { projectShowcaseRepository } from "@/lib/project-showcase";
 import { SHOWCASE_ADMIN_STATUS_LABELS, SHOWCASE_TYPE_LABELS } from "@/lib/project-showcase/labels";
 import {
@@ -11,12 +13,13 @@ import {
   type ShowcaseAdminActivityType,
 } from "@/lib/project-showcase/repository";
 import { SHOWCASE_PROJECT_STATUSES, SHOWCASE_PROJECT_TYPES } from "@/lib/project-showcase/types";
+import { isUuidFormat } from "@/lib/uuid";
+import { formatKoreanMonthDayTime } from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
 
 const LOGS_PATH = "/admin/events/project-showcase/logs";
-const PAGE_SIZE = 50;
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const PAGE_SIZE = ADMIN_LIST_DEFAULT_PAGE_SIZE;
 
 const ACTIVITY_LABELS: Record<ShowcaseAdminActivityType, string> = {
   project_submitted: "프로젝트 출품",
@@ -37,7 +40,7 @@ function firstParam(value: string | string[] | undefined) {
 function parseActivityCursor(params: Record<string, string | string[] | undefined>): ShowcaseAdminActivityCursor | null {
   const occurredAt = firstParam(params.beforeAt);
   const id = firstParam(params.beforeId);
-  if (!occurredAt || !id || !UUID_PATTERN.test(id)) return null;
+  if (!occurredAt || !id || !isUuidFormat(id)) return null;
   const parsedDate = new Date(occurredAt);
   if (Number.isNaN(parsedDate.getTime())) return null;
   return { occurredAt: parsedDate.toISOString(), id };
@@ -82,16 +85,7 @@ function activitySummary(item: ShowcaseAdminActivityLog) {
 }
 
 function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "시간 정보 없음";
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  return formatKoreanMonthDayTime(value, { year: true }) || "시간 정보 없음";
 }
 
 function buildNextHref(type: ShowcaseAdminActivityType | null, cursor: ShowcaseAdminActivityCursor) {
@@ -213,9 +207,10 @@ export default async function AdminShowcaseLogsPage({
               </div>
 
               {activityPage.items.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border bg-surface p-8 text-center text-sm text-muted-foreground">
-                  조건에 맞는 이벤트 로그가 없어요.
-                </div>
+                <EmptyState
+                  title="조건에 맞는 이벤트 로그가 없어요."
+                  description="다른 활동 유형을 선택하거나 모든 활동으로 바꿔 확인해 주세요."
+                />
               ) : (
                 <div className="grid gap-3">
                   {activityPage.items.map((item) => (

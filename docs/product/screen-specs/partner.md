@@ -9,16 +9,16 @@ authority: normative
 
 작성 기준일: 2026-07-10
 
-파트너 모바일 1차 내비게이션은 `홈 · 제휴처 · 알림 · 더보기`다. 더보기에는 플랜, 계정, 지원, 로그아웃을 둔다. 데스크톱은 같은 목적지를 sidebar에 펼치며 회사명과 담당자 정보는 shell에서 한 번만 표시한다.
+파트너 모바일 1차 내비게이션은 `홈 · 제휴처 · 알림 · 더보기`다. 더보기에는 플랜, 계정, 지원, 로그아웃을 둔다. 데스크톱은 같은 목적지를 sidebar에 펼치며 회사명과 담당자 정보는 shell에서 한 번만 표시한다. shell이 연결 회사 정보를 불러오지 못해도 담당자 이름과 기본 메뉴로 계속 표시하고, 본문 위에 `회사 정보를 잠시 불러오지 못했습니다` 경고 안내를 보여 회사가 없는 계정처럼 보이지 않게 한다.
 
 <!-- screen-contract: partner.login -->
 ## `/partner/login` — 파트너 로그인
 
 - 목표·위계: 계정 로그인 → 재설정/초기 설정 문의 순이다.
 - 액션·흐름: primary는 로그인, 보조는 비밀번호 재설정이다. 포털 보호 화면에서 진입하고 회사 선택·대시보드·필수 비밀번호 변경으로 이탈한다.
-- 경계·상태: partner session과 공용 FE/BE 검증, rate limit을 사용한다. 기본, validation error, 인증 실패, 제출 중, 이미 로그인 상태를 제공한다.
+- 경계·상태: partner session과 공용 FE/BE 검증, rate limit을 사용한다. 기본, validation error, 인증 실패, 제출 중, 이미 로그인 상태와 server action 중 세션이 만료되어 돌아온 상태(`?error=session_expired`)를 제공한다. `?error=`는 정해진 코드만 문구로 바꾸고 그 밖의 값은 표시하지 않는다.
 - 반응형·분석: 단일 form column을 유지한다. `partner_login_attempt/result`만 기록하고 로그인 식별자·비밀번호는 로그에서 제외한다.
-- 수용 기준: 회사 scope를 세션에서 다시 확인하고 실패 후 입력 보존, 첫 오류 focus, 중복 제출 차단이 동작한다.
+- 수용 기준: 회사 scope를 세션에서 다시 확인하고 실패 후 입력 보존, 첫 오류 focus, 중복 제출 차단이 동작한다. 로그인 없이 포털 딥링크에 들어오면 원래 경로를 `returnTo`로 보존해 로그인 후 그 화면으로 돌아간다. `returnTo`는 `/partner` 아래 경로만 허용하고 로그인·로그아웃·재설정·초기 설정·비밀번호 변경 화면과 외부·프로토콜 상대 URL은 버린다(`src/lib/partner-auth/return-to.ts`). 로그인 실패 후에도 `returnTo`를 유지한다.
 
 <!-- screen-contract: partner.reset -->
 ## `/partner/reset` — 파트너 비밀번호 재설정
@@ -43,7 +43,7 @@ authority: normative
 
 - 목표·위계: 중요·미확인 알림 → 최신 알림 → 채널/종류 설정 순이다.
 - 액션·흐름: primary는 알림 목적지 열기, 보조는 읽음 처리와 설정 저장이다. 하단 메뉴·push에서 진입하고 `companyId` 맥락을 목적지에 보존한다.
-- 경계·상태: 로그인 계정이 접근 가능한 회사 audience만 API로 조회한다. 기본, 빈 상태, filter, 더보기, 읽음 처리 중, 일부 실패를 제공한다.
+- 경계·상태: 로그인 계정이 접근 가능한 회사 audience만 API로 조회한다. 기본, 빈 상태, filter, 더보기, 읽음 처리 중, 일부 실패를 제공한다. 저장 알림은 20건씩 `이전 알림 더 보기`로 이어 불러오고(`GET /api/partner/notifications?offset&limit`), 더 불러올 알림이 남은 상태의 filter는 "불러온 알림 기준" 안내와 더 보기 빈 상태를 보여 준다. 미확인 수는 불러온 페이지와 무관한 계정 전체 기준이며, 이전 페이지에 미확인이 남으면 전체 읽음을 제공한다.
 - 반응형·분석: 모바일 compact row, 넓은 화면 목록/설정 분할을 사용한다. `partner_notification_view/open/read`를 기록한다.
 - 수용 기준: 회사별 구 URL은 전역 화면으로 redirect되고 알림 링크가 권한 밖 회사나 외부 URL을 열지 않는다.
 
@@ -72,7 +72,7 @@ authority: normative
 - 액션·흐름: primary는 플랜 변경 요청이며 보조는 증빙 프로필 저장과 대시보드 복귀다. 더보기 또는 잠긴 지표 CTA에서 진입한다.
 - 경계·상태: 해당 company scope의 plan/billing domain만 사용한다. 기본, 잠긴 지표, 결제 대기, 미납, 승인/반려, validation error, 제출 중을 제공한다.
 - 반응형·분석: 모바일은 플랜 비교를 세로 배치하고 sticky CTA를 과도하게 중복하지 않는다. `partner_plan_view/upgrade_request`를 기록한다.
-- 수용 기준: 금액·상태를 서버 값과 일치시키고 중복 요청을 막으며 `/partner/plans`는 선택 company의 canonical 경로로 이동한다.
+- 수용 기준: 금액·상태를 서버 값과 일치시키고 중복 요청을 막으며 `/partner/plans`는 선택 company의 canonical 경로로 이동한다. `?status=`·`?error=`는 계약된 값·안내 문구 allowlist만 표시하고 그 밖의 값은 일반 오류 문구로 바꾼다.
 
 <!-- screen-contract: partner.service-detail -->
 ## `/partner/companies/[companyId]/services/[partnerId]` — 제휴처 운영 상세
@@ -96,5 +96,7 @@ authority: normative
 
 - `/partner`는 회사가 여러 개일 때만 선택 View를 렌더하고 하나면 dashboard로 이동한다.
 - `/partner/setup/[token]`, `/partner/change-password`는 유효 token/session에서만 렌더한다.
+- 비밀번호 변경이 필요한 세션은 어느 포털 화면에서든 `/partner/change-password?returnTo=`로 이동하고, 변경을 마치면 회사 대시보드보다 `returnTo`를 우선해 원래 화면으로 돌아간다. 변경 화면 자체는 복귀 목적지가 되지 않는다.
+- `/partner/login`과 `/partner/reset`은 서명 쿠키만 보고 포털로 되돌려 보내지 않는다. 두 화면이 세션을 DB 기준으로 다시 확인해 유효하면 포털(변경 대기 시 비밀번호 변경 화면)로 보내고, 무효화된 세션(다른 기기 재설정, 계정·회사 비활성)이면 그대로 렌더해 로그인 화면과 보호 화면 사이를 오가는 루프를 막는다.
 - 회사별 account/notifications/support 구 URL은 `companyId` query를 보존해 전역 canonical로 이동한다.
 - `/partner/plans`, `/partner/services/[partnerId]`, `/partner/services/[partnerId]/request`는 session scope로 canonical company route를 결정하며 모호하거나 권한이 없으면 `/partner`로 복구한다.

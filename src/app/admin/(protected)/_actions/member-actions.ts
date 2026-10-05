@@ -37,6 +37,7 @@ import {
   MemberEmailLoginTransitionError,
 } from "@/lib/member-email-login-transition";
 import { getMemberAuthCleanupKeys } from "@/lib/member-auth-security";
+import { deleteMemberRecord } from "@/lib/member-lifecycle";
 import { getMemberProfileSyncFailureCode } from "@/lib/member-profile-sync-errors";
 import { resolveMemberProfileSyncStatus } from "@/lib/member-profile-sync-status";
 import {
@@ -48,6 +49,9 @@ import {
   redirectAdminActionError,
   revalidateMemberPaths,
 } from "./shared-helpers";
+import { logServerError } from "@/lib/server-log";
+import { expectNoError } from "@/lib/expect-no-error";
+import { type AdminActionErrorCode } from "@/lib/admin-action-errors";
 
 export async function backfillMemberProfilesAction(formData: FormData) {
   const adminSession = await requireAdminPermission("members", "update", {
@@ -127,7 +131,7 @@ export async function backfillMemberProfilesAction(formData: FormData) {
         ? "partial"
         : "success";
   } catch (error) {
-    console.error("member backfill failed", error);
+    logServerError("member backfill failed", error);
     status = "error";
   }
 
@@ -212,8 +216,11 @@ export async function syncMemberProfileAction(formData: FormData) {
   );
 }
 
-function memberEmailLoginTransitionErrorCode(error: unknown) {
-  if (!(error instanceof MemberEmailLoginTransitionError)) {
+function memberEmailLoginTransitionErrorCode(error: unknown): AdminActionErrorCode {
+  if (
+    !(error instanceof MemberEmailLoginTransitionError)
+    || error.code === "operation_failed"
+  ) {
     return "member_email_transition_failed";
   }
   return `member_email_transition_${error.code}`;
@@ -530,10 +537,14 @@ export async function deleteMemberAction(formData: FormData) {
     directoryEntry?.mm_username,
   ].filter((identifier): identifier is string => Boolean(identifier));
   for (const identifier of new Set(cleanupIdentifiers)) {
-    await supabase
-      .from("password_reset_attempts")
-      .delete()
-      .eq("identifier", identifier);
+    await expectNoError(
+      supabase
+        .from("password_reset_attempts")
+        .delete()
+        .eq("identifier", identifier),
+      "[member-delete] password reset attempt cleanup failed",
+      { properties: { memberId: id } },
+    );
   }
 
   const memberAuthCleanupKeys = getMemberAuthCleanupKeys([
@@ -542,19 +553,23 @@ export async function deleteMemberAction(formData: FormData) {
     id,
   ]);
   if (memberAuthCleanupKeys.length > 0) {
-    await supabase
-      .from("member_auth_attempts")
-      .delete()
-      .in("identifier", memberAuthCleanupKeys);
+    await expectNoError(
+      supabase
+        .from("member_auth_attempts")
+        .delete()
+        .in("identifier", memberAuthCleanupKeys),
+      "[member-delete] auth attempt cleanup failed",
+      { properties: { memberId: id } },
+    );
   }
 
-  const { error } = await supabase.from("members").delete().eq("id", id);
-  if (error) {
+  const deletion = await deleteMemberRecord(id);
+  if (!deletion.ok) {
     redirectAdminActionError("/admin/members", "member_invalid_request", {
       action: "member_delete",
       targetType: "member",
       targetId: id,
-      properties: { errorCode: error.code },
+      properties: { errorCode: deletion.errorCode },
     });
   }
 

@@ -14,6 +14,11 @@ import { getShowcasePhase, projectShowcaseRepository } from "@/lib/project-showc
 import { buildShowcaseAnnouncement } from "@/lib/project-showcase/draw";
 import { formatShowcaseDateTime } from "@/lib/project-showcase/format";
 import { SHOWCASE_ADMIN_PHASE_LABELS, SHOWCASE_PRIZES } from "@/lib/project-showcase/labels";
+import {
+  getShowcaseSettlementBlocker,
+  isShowcaseSettlementOverdue,
+  SHOWCASE_SETTLEMENT_BLOCKER_MESSAGES,
+} from "@/lib/project-showcase/status";
 import type { ShowcaseCandidateGroup } from "@/lib/project-showcase/types";
 
 export const dynamic = "force-dynamic";
@@ -52,8 +57,13 @@ export default async function AdminShowcaseDrawPage() {
     if (group === "experiencer" && !state.submitterDrawn) return "출품 추첨을 먼저 실행해 주세요.";
     return null;
   };
-  const announcementStarted = phase === "announcement" || phase === "closed";
-  const settleReason = !canUpdate ? "이벤트 수정 권한이 필요해요." : state.settledAt ? null : !announcementStarted ? "결과 발표가 시작된 뒤 정산할 수 있어요." : null;
+  const settlementBlocker = getShowcaseSettlementBlocker(event, state);
+  const settleReason = !canUpdate
+    ? "이벤트 수정 권한이 필요해요."
+    : settlementBlocker && settlementBlocker !== "settled"
+      ? SHOWCASE_SETTLEMENT_BLOCKER_MESSAGES[settlementBlocker]
+      : null;
+  const settlementOverdue = isShowcaseSettlementOverdue(event, state);
 
   return (
     <AdminShell title="추첨·발표" backHref="/admin/events/project-showcase" backLabel="쇼케이스 운영">
@@ -164,6 +174,11 @@ export default async function AdminShowcaseDrawPage() {
         <section className="grid gap-3 rounded-2xl border border-border bg-surface p-5 sm:p-6" aria-labelledby="showcase-settle-heading">
           <h2 id="showcase-settle-heading" className="text-lg font-bold text-foreground">정산</h2>
           <p className="text-sm text-muted-foreground">모든 경품 발송과 정산을 마치면 기록해 주세요. 30일 뒤 매일 도는 예약 작업이 체험·피드백·관심·추첨 기록의 회원 연결을 파기해요.</p>
+          {settlementOverdue ? (
+            <p role="status" className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm font-medium text-foreground">
+              결과 발표가 시작됐지만 아직 정산을 기록하지 않았어요. 정산을 기록해야 30일 개인정보 파기 일정이 시작돼요.
+            </p>
+          ) : null}
           {state.settledAt ? (
             <p className="text-sm font-semibold text-foreground">정산 완료 · {formatShowcaseDateTime(state.settledAt, { withTime: true })}</p>
           ) : (

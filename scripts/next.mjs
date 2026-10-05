@@ -20,6 +20,12 @@ if (command === "start" && selected.profile !== "injected") {
   } catch (error) { process.stderr.write(`${error.message}\n`); process.exit(1); }
 }
 process.stdout.write(`[environment] ${command}: ${selected.loadedFiles[0] ?? "injected"}\n`);
+// Next 16 defaults to Turbopack, but this repository pins `next build --webpack`.
+// next.config.ts relies on webpack-only hooks: the fixture module boundary
+// (scripts/webpack-fixture-boundary.mjs), the self-host dev manifest writer
+// (scripts/webpack-atomic-manifests.mjs), and an asset/resource rule for the
+// @discourse/heic wasm decoder. Two tests also import next/dist/compiled/webpack.
+// Release conditions are tracked in docs/plans/tech-debt.md ("webpack 고정").
 const child = spawn(process.execPath, [
   fileURLToPath(new URL("../node_modules/next/dist/bin/next", import.meta.url)),
   command, ...(command === "build" ? ["--webpack"] : []), ...args,

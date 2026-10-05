@@ -25,6 +25,7 @@ import {
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import { AdminPartnersSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import { readFirstSearchParam } from "@/lib/search-params";
+import { pickAllowedEntry } from "@/lib/safe-messages";
 
 export const dynamic = "force-dynamic";
 
@@ -82,9 +83,10 @@ async function AdminPartnersContent({
   showHeader?: boolean;
 }) {
   const managedCampusFilter = getManagedCampusFilterValues(adminSession.account);
-  const partnerFormError = readFirstSearchParam(params.error)
-    ? adminPartnersErrorMessages[readFirstSearchParam(params.error) ?? ""]
-    : null;
+  const partnerFormError = pickAllowedEntry(
+    adminPartnersErrorMessages,
+    readFirstSearchParam(params.error),
+  );
 
   const requestedFilters = parseAdminPartnerListFilters({
     q: readFirstSearchParam(params.q),

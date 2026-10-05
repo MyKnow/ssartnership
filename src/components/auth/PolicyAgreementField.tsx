@@ -1,5 +1,8 @@
 "use client";
 
+import Checkbox from "@/components/ui/Checkbox";
+
+
 import type { Ref } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -45,10 +48,9 @@ export default function PolicyAgreementField({
           htmlFor={inputId}
           className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-2xl has-[:disabled]:cursor-not-allowed"
         >
-          <input
+          <Checkbox
             ref={inputRef}
             id={inputId}
-            type="checkbox"
             className="peer sr-only"
             checked={checked}
             onChange={(event) => onChange(event.target.checked)}

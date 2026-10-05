@@ -26,6 +26,15 @@ export function probeIngress(environment) {
   });
 }
 
+/**
+ * The independent HTTPS monitor runs outside this network, so the observer
+ * cannot discover it. The operator declares it in the private heartbeat env
+ * after configuring the external check (runbook: 외부 HTTP 감시).
+ */
+export function externalMonitorConfigured(env) {
+  return env.OPS_EXTERNAL_MONITOR_CONFIGURED === "1" ? 1 : 0;
+}
+
 export function createObserverServer({ env = process.env, deliver = fetch, probe = probeIngress } = {}) {
   const destination = heartbeatDestination(env.OPS_HEARTBEAT_URL);
   const probes = {};
@@ -56,7 +65,7 @@ export function createObserverServer({ env = process.env, deliver = fetch, probe
     if (req.method !== "GET" || !["/health", "/metrics"].includes(req.url)) { res.writeHead(404); return res.end(); }
     if (req.url === "/health") { res.writeHead(204); return res.end(); }
     res.writeHead(200, { "Content-Type": "text/plain; version=0.0.4" });
-    const lines = [`ssartnership_external_heartbeat_configured ${Number(Boolean(destination))}`, "ssartnership_external_monitor_configured 0", `ssartnership_external_heartbeat_last_success_seconds ${heartbeat.completed}`, `ssartnership_monitoring_engines_healthy ${heartbeat.monitoringHealthy}`];
+    const lines = [`ssartnership_external_heartbeat_configured ${Number(Boolean(destination))}`, `ssartnership_external_monitor_configured ${externalMonitorConfigured(env)}`, `ssartnership_external_heartbeat_last_success_seconds ${heartbeat.completed}`, `ssartnership_monitoring_engines_healthy ${heartbeat.monitoringHealthy}`];
     for (const [environment, value] of Object.entries(probes)) for (const [name, numeric] of Object.entries(value)) lines.push(`ssartnership_ingress_probe_${name}{environment="${environment}",vm="${environment === "production" ? "5200" : "5201"}"} ${numeric}`);
     res.end(`${lines.join("\n")}\n`);
   });

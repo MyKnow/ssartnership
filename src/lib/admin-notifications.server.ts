@@ -1,5 +1,6 @@
 import { revalidateTag, unstable_cache } from "next/cache";
 import {
+  ADMIN_NOTIFICATION_PAGE_SIZE,
   buildAdminNotificationListResult,
   type AdminNotificationRecipientRow,
   type AdminNotificationListResult,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/operational-notifications";
 import { getDefaultAdminNotificationPreferences } from "@/lib/partner-notification-routing";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { ADMIN_READ_BURST_CACHE_SECONDS } from "@/lib/cache-ttl";
 
 function createUnavailableAdminNotificationsReadModel() {
   return {
@@ -17,7 +19,7 @@ function createUnavailableAdminNotificationsReadModel() {
       unreadCount: 0,
       rows: [],
       offset: 0,
-      limit: 10,
+      limit: ADMIN_NOTIFICATION_PAGE_SIZE,
       hasMore: false,
     }),
     preferences: getDefaultAdminNotificationPreferences(),
@@ -26,8 +28,10 @@ function createUnavailableAdminNotificationsReadModel() {
   };
 }
 
-const ADMIN_NOTIFICATION_READ_CACHE_REVALIDATE_SECONDS = 3;
-const ADMIN_NOTIFICATION_SETTINGS_CACHE_REVALIDATE_SECONDS = 3;
+const ADMIN_NOTIFICATION_READ_CACHE_REVALIDATE_SECONDS =
+  ADMIN_READ_BURST_CACHE_SECONDS;
+const ADMIN_NOTIFICATION_SETTINGS_CACHE_REVALIDATE_SECONDS =
+  ADMIN_READ_BURST_CACHE_SECONDS;
 
 type AdminNotificationInboxReadModel = {
   notificationResult: AdminNotificationListResult;
@@ -141,7 +145,7 @@ async function getAdminNotificationInboxReadModelUncached({
 export async function getCachedAdminNotificationInboxReadModel({
   adminId,
   offset = 0,
-  limit = 10,
+  limit = ADMIN_NOTIFICATION_PAGE_SIZE,
   includeUnreadCount = true,
 }: {
   adminId: string;
@@ -190,7 +194,7 @@ export async function getAdminNotificationsReadModel(adminId: string) {
       getCachedAdminNotificationInboxReadModel({
         adminId,
         offset: 0,
-        limit: 10,
+        limit: ADMIN_NOTIFICATION_PAGE_SIZE,
         includeUnreadCount: true,
       }),
       getCachedAdminNotificationPreferences(adminId),

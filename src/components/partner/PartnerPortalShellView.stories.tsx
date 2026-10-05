@@ -79,3 +79,20 @@ export const MobileFourItemNavigation: Story = {
     );
   },
 };
+
+export const CompaniesUnavailable: Story = {
+  args: {
+    companies: [],
+    companiesUnavailable: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(
+      canvas.getByText(
+        "회사 정보를 잠시 불러오지 못했습니다. 잠시 후 새로고침해 주세요.",
+      ),
+    ).toBeVisible();
+    await expect(canvas.getByText("운영 홈")).toBeVisible();
+  },
+};

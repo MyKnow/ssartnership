@@ -8,9 +8,10 @@ import {
 } from "@/lib/partner-metric-rollups";
 import { loadPartnerMetricAggregateRows } from "@/lib/partner-metric-loader";
 import { listMockPartnerPortalSetupsInternal } from "@/lib/mock/partner-portal/store";
-import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { fetchPartnerEngagementCounts } from "@/lib/partner-counts";
+import { logServerError } from "@/lib/server-log";
 
 const PARTNER_ADMIN_METRICS_WARNING_MESSAGE =
   "일부 제휴처 집계를 불러오지 못해 최신 수치가 0으로 표시될 수 있습니다.";
@@ -38,6 +39,10 @@ function getMockMetrics(partnerId: string) {
 
 export async function getAdminPartnerMetrics(
   partnerIds: string[],
+  options?: {
+    /** See `PartnerMetricAggregateLoadOptions.allowEventLogFallback`. */
+    allowEventLogFallback?: boolean;
+  },
 ): Promise<AdminPartnerMetricsResult> {
   const uniquePartnerIds = [...new Set(partnerIds.map((value) => value.trim()).filter(Boolean))];
   if (uniquePartnerIds.length === 0) {
@@ -66,6 +71,7 @@ export async function getAdminPartnerMetrics(
       metricNames: PARTNER_METRIC_EVENT_NAMES,
       metricKinds: ["pv", "uv"],
       granularity: "total",
+      allowEventLogFallback: options?.allowEventLogFallback,
     }),
     fetchPartnerEngagementCounts(
       supabase,
@@ -79,17 +85,14 @@ export async function getAdminPartnerMetrics(
       metricRowsResult.failure.stage === "rollup"
         ? "event query failed"
         : "fallback event query failed";
-    console.error(
-      `[admin-partner-metrics] ${queryLabel}`,
-      metricRowsResult.failure.errorMessage,
-    );
+    logServerError(`[admin-partner-metrics] ${queryLabel}`, metricRowsResult.failure.errorMessage);
   } else {
     applyPartnerMetricRollupRows(metricsByPartnerId, metricRowsResult.rows);
   }
 
   if (engagementCounts.engagementErrorMessage) {
     hasPartialFailure = true;
-    console.error("[admin-partner-metrics] engagement query failed", engagementCounts.engagementErrorMessage);
+    logServerError("[admin-partner-metrics] engagement query failed", engagementCounts.engagementErrorMessage);
   } else {
     for (const [partnerId, reviewCount] of engagementCounts.reviewCounts) {
       const metrics = metricsByPartnerId.get(partnerId);

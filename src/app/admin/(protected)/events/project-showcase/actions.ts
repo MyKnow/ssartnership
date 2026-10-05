@@ -9,6 +9,7 @@ import { resolveImageTransformPolicy } from "@/lib/image-upload/policy";
 import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { projectShowcaseRepository } from "@/lib/project-showcase";
 import { ShowcaseDomainError, toShowcaseFailure } from "@/lib/project-showcase/errors";
+import { canTransitionShowcaseProjectStatus, isShowcaseEventSettled } from "@/lib/project-showcase/status";
 import {
   PROJECT_SHOWCASE_SLUG,
   SHOWCASE_VOID_REASONS,
@@ -22,17 +23,16 @@ import {
   parseShowcaseAdminProjectSubmission,
   parseShowcaseSchedule,
   SHOWCASE_SCHEDULE_FIELDS,
+  SHOWCASE_PROJECT_LIMITS,
 } from "@/lib/project-showcase/validation";
 import { removeShowcaseProjectImages } from "@/lib/project-showcase/storage.server";
 import { isUuid } from "@/lib/uuid";
+import { toDrawAuditLogProperties } from "@/lib/draw-audit";
+import { logServerError } from "@/lib/server-log";
+import { readString } from "@/lib/form-data";
 
 const EVENT_PATH = `/events/${PROJECT_SHOWCASE_SLUG}`;
 const ADMIN_PATH = "/admin/events/project-showcase";
-
-function readString(formData: FormData, key: string) {
-  const value = formData.get(key);
-  return typeof value === "string" ? value.trim() : "";
-}
 
 function isShowcaseAdminRecordId(value: string) {
   return isUuid(value) || (process.env.NEXT_PUBLIC_DATA_SOURCE === "mock" && /^[a-z0-9-]{1,128}$/iu.test(value));
@@ -56,7 +56,8 @@ export async function updateShowcaseSchedule(formData: FormData) {
     revalidatePath(ADMIN_PATH);
     return { ok: true as const, message: "이벤트 일정을 저장했어요." };
   } catch (error) {
-    console.error("[project-showcase/schedule]", error instanceof Error ? error.message : "unknown");
+    if (error instanceof ShowcaseDomainError) return toShowcaseFailure(error);
+    logServerError("[project-showcase/schedule]", error);
     return { ok: false as const, message: "이벤트 일정을 저장하지 못했어요.", field: null };
   }
 }
@@ -85,7 +86,7 @@ export async function reviewShowcaseProject(formData: FormData) {
     return { ok: true as const, message: "검수 결과를 저장했어요." };
   } catch (error) {
     if (!(error instanceof ShowcaseDomainError)) {
-      console.error("[project-showcase/review]", error instanceof Error ? error.message : "unknown");
+      logServerError("[project-showcase/review]", error);
     }
     return toShowcaseFailure(error);
   }
@@ -118,7 +119,7 @@ export async function updateShowcaseImmediateFeedback(projectId: string, allowed
     };
   } catch (error) {
     if (!(error instanceof ShowcaseDomainError)) {
-      console.error("[project-showcase/immediate-feedback]", error instanceof Error ? error.message : "unknown");
+      logServerError("[project-showcase/immediate-feedback]", error);
     }
     return toShowcaseFailure(error);
   }
@@ -178,14 +179,18 @@ function revalidateAdminProject(projectId?: string) {
 
 export async function searchShowcaseAdminOwners(query: unknown) {
   await requireAdminPermission("events", "create", { path: `${ADMIN_PATH}/projects/new` });
-  if (typeof query !== "string" || query.trim().length < 2 || query.trim().length > 50) {
+  if (
+    typeof query !== "string"
+    || query.trim().length < SHOWCASE_PROJECT_LIMITS.ownerSearchMin
+    || query.trim().length > SHOWCASE_PROJECT_LIMITS.ownerSearchMax
+  ) {
     return { ok: true as const, owners: [] };
   }
   try {
     const owners = await projectShowcaseRepository.searchAdminMembers(query.trim());
     return { ok: true as const, owners };
   } catch (error) {
-    console.error("[project-showcase/admin-owner-search]", error instanceof Error ? error.message : "unknown");
+    logServerError("[project-showcase/admin-owner-search]", error);
     return { ok: false as const, owners: [], message: "회원 검색을 처리하지 못했어요." };
   }
 }
@@ -198,6 +203,9 @@ export async function createAdminShowcaseProject(formData: FormData) {
   if (!parsed.success) return { ok: false as const, message: parsed.message, field: parsed.field };
   const event = await projectShowcaseRepository.getEvent();
   if (!event) return { ok: false as const, message: "쇼케이스 이벤트를 찾을 수 없어요.", field: null };
+  if (isShowcaseEventSettled(await projectShowcaseRepository.getDrawState())) {
+    return toShowcaseFailure(new ShowcaseDomainError("event_settled"));
+  }
   const ownerName = await projectShowcaseRepository.getMemberDisplayName(ownerMemberId);
   if (!ownerName) return { ok: false as const, message: "출품자로 선택한 회원을 찾을 수 없어요.", field: "ownerMemberId" };
   const projectId = randomUUID();
@@ -218,9 +226,8 @@ export async function createAdminShowcaseProject(formData: FormData) {
     revalidateAdminProject(projectId);
     return { ok: true as const, projectId, message: "출품작을 등록했어요." };
   } catch (error) {
-    if (!(error instanceof ShowcaseDomainError)) {
-      console.error("[project-showcase/admin-create]", error instanceof Error ? error.message : "unknown");
-    }
+    if (error instanceof ShowcaseDomainError && error.code !== "unknown") return toShowcaseFailure(error);
+    logServerError("[project-showcase/admin-create]", error);
     return { ok: false as const, message: "출품작을 등록하지 못했어요. 입력한 회원과 프로젝트 정보를 확인해 주세요.", field: null };
   }
 }
@@ -235,6 +242,12 @@ export async function updateAdminShowcaseProject(formData: FormData) {
   const existing = await projectShowcaseRepository.getAdminProject(projectId);
   if (!event || !existing || existing.eventId !== event.id) {
     return { ok: false as const, message: "수정할 출품작을 찾을 수 없어요.", field: null };
+  }
+  if (isShowcaseEventSettled(await projectShowcaseRepository.getDrawState())) {
+    return toShowcaseFailure(new ShowcaseDomainError("event_settled"));
+  }
+  if (!canTransitionShowcaseProjectStatus(existing.status, parsed.data.status)) {
+    return toShowcaseFailure(new ShowcaseDomainError("status_transition_invalid"));
   }
   try {
     const imageUrl = parsed.data.submission.imageUploadId
@@ -253,9 +266,8 @@ export async function updateAdminShowcaseProject(formData: FormData) {
     revalidateAdminProject(projectId);
     return { ok: true as const, projectId, message: "출품작을 수정했어요." };
   } catch (error) {
-    if (!(error instanceof ShowcaseDomainError)) {
-      console.error("[project-showcase/admin-update]", error instanceof Error ? error.message : "unknown");
-    }
+    if (error instanceof ShowcaseDomainError && error.code !== "unknown") return toShowcaseFailure(error);
+    logServerError("[project-showcase/admin-update]", error);
     return { ok: false as const, message: "출품작을 수정하지 못했어요. 입력한 내용을 확인해 주세요.", field: null };
   }
 }
@@ -273,7 +285,7 @@ export async function deleteAdminShowcaseProject(projectId: unknown) {
         await removeShowcaseProjectImages(projectId);
       } catch (error) {
         imageCleanupPending = true;
-        console.error("[project-showcase/admin-delete-image-cleanup]", error instanceof Error ? error.message : "unknown");
+        logServerError("[project-showcase/admin-delete-image-cleanup]", error);
       }
     }
     revalidateAdminProject(projectId);
@@ -285,9 +297,10 @@ export async function deleteAdminShowcaseProject(projectId: unknown) {
       title: deleted.title,
     };
   } catch (error) {
-    if (!(error instanceof ShowcaseDomainError)) {
-      console.error("[project-showcase/admin-delete]", error instanceof Error ? error.message : "unknown");
+    if (error instanceof ShowcaseDomainError && error.code !== "unknown") {
+      return { ok: false as const, message: toShowcaseFailure(error).message };
     }
+    logServerError("[project-showcase/admin-delete]", error);
     return { ok: false as const, message: "출품작과 연결된 기록을 삭제하지 못했어요." };
   }
 }
@@ -307,11 +320,12 @@ export async function setShowcaseFeedbackHidden(feedbackId: string, hidden: bool
       properties: { hidden },
     });
     revalidatePath(`${ADMIN_PATH}/feedback`);
-    revalidatePath(`${EVENT_PATH}/my`, "layout");
+    // Typed paths match the file path, so the (site) route group is required.
+    revalidatePath(`/(site)${EVENT_PATH}/my`, "layout");
     return { ok: true as const, message: hidden ? "피드백을 숨겼어요." : "피드백을 다시 공개했어요." };
   } catch (error) {
     if (!(error instanceof ShowcaseDomainError)) {
-      console.error("[project-showcase/feedback-visibility]", error instanceof Error ? error.message : "unknown");
+      logServerError("[project-showcase/feedback-visibility]", error);
     }
     return toShowcaseFailure(error);
   }
@@ -327,7 +341,7 @@ function revalidateDraw() {
 
 function drawFailure(scope: string, error: unknown) {
   if (!(error instanceof ShowcaseDomainError)) {
-    console.error(`[project-showcase/${scope}]`, error instanceof Error ? error.message : "unknown");
+    logServerError(`[project-showcase/${scope}]`, error);
   }
   return toShowcaseFailure(error);
 }
@@ -400,8 +414,7 @@ export async function runShowcaseDraw(group: ShowcaseCandidateGroup) {
       path: DRAW_PATH,
       properties: {
         candidate_group: group,
-        candidate_count: receipt.candidateCount,
-        ticket_count: receipt.ticketCount,
+        ...toDrawAuditLogProperties(receipt.audit),
         selected_count: receipt.selectedCount,
       },
     });
@@ -445,7 +458,12 @@ export async function redrawShowcaseWinner(winnerId: string) {
       targetType: "showcase_winner",
       targetId: winnerId,
       path: DRAW_PATH,
-      properties: { candidate_group: receipt.candidateGroup, candidate_count: receipt.candidateCount, selected_count: receipt.selectedCount, redraw: true },
+      properties: {
+        candidate_group: receipt.candidateGroup,
+        ...toDrawAuditLogProperties(receipt.audit),
+        selected_count: receipt.selectedCount,
+        redraw: true,
+      },
     });
     revalidateDraw();
     return {

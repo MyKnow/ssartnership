@@ -4,6 +4,7 @@ import { getAdminLogAccessPolicy, isAllowedLogGroup } from '@/lib/admin-log-acce
 import { conditionalJsonResponse } from '@/lib/conditional-json-response';
 import { getCachedAdminLogsPageData } from '@/lib/log-insights';
 import { withServerTiming } from '@/lib/server-timing';
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = 'nodejs';
 
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
 
       return conditionalJsonResponse(request, data);
     } catch (error) {
-      console.error('[admin-logs] page query failed', error);
+      logServerError('[admin-logs] page query failed', error);
       return NextResponse.json(
         { message: '로그를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.' },
         { status: 500 },

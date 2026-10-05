@@ -1,9 +1,10 @@
+import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import PartnerDashboardView from "@/components/partner/PartnerDashboardView";
 import { getPartnerPortalDashboard } from "@/lib/partner-dashboard";
-import { getPartnerPasswordChangeHref } from "@/lib/partner-portal-paths";
-import { assertPartnerPortalCompanyAccess } from "@/lib/partner-portal-scope";
+import { getPartnerPasswordChangeHref } from "@/lib/partner-auth/portal-paths";
+import { assertPartnerPortalCompanyAccess } from "@/lib/partner-auth/portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
 
@@ -38,5 +39,5 @@ export default async function PartnerCompanyDashboardPage({
 
   const dashboard = await getPartnerPortalDashboard([scope.id]);
 
-  return <PartnerDashboardView dashboard={dashboard} />;
+  return <PartnerDashboardView dashboard={dashboard} isMock={isPartnerPortalMock} />;
 }

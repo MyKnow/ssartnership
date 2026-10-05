@@ -1,11 +1,13 @@
 ---
 title: Production·Preview PVE 이전 작업 목록
 type: task-list
-status: active
-authority: normative
+status: completed
+authority: evidence
 ---
 
 # 작업과 증거
+
+> 종료 정리(2026-10-05): Issue #523은 2026-10-02에 종료됐고 변경은 #524·#525로 `main`에 반영됐다. 이 문서는 완료 증거이며 현재 운영 절차는 runbook을 따른다. 미체크로 남은 "독립 회선의 공개 HTTPS 검증 및 저장소 통합 절차"는 저장소 통합이 끝났고, 독립 회선 확인과 상시 외부 polling만 [기술 부채 원장](../../plans/tech-debt.md#종료-issue에서-이관한-잔여-항목)으로 옮겼다.
 
 - [x] Issue #523 생성, origin/dev `5e0d4bf8a171f2bc693982da2977d3debef104de`에서 `feat/523-pve-service-migration` 시작.
 - [x] PVE 장치 식별·공간·기존 게스트와 원본 앱·DB·Storage·백업 경계 확인.
