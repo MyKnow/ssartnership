@@ -87,9 +87,3 @@ export type PublicCacheVersionSnapshot = {
   rows: PublicCacheVersionRow[];
   lookupFailed: boolean;
 };
-
-export type PartnerCategoryOptionRow = {
-  id: string;
-  key: string | null;
-  label: string | null;
-};
