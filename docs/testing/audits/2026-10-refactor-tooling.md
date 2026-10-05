@@ -21,7 +21,11 @@ authority: evidence
 
 `gen:database-types`는 운영자가 준비한 local Supabase DB에서 public schema 타입을 생성하는 수동 명령이다. Production 연결·migration 적용을 수행하지 않고 생성 실패 시 기존 파일을 보존한다. CLI 버전과 적용 migration 목록을 실행 영수증에 기록한다.
 
-`database.generated.ts`의 초기 categories 부분은 `supabase/schema.sql`에서 만든 명시적인 bootstrap slice다. 실제 DB에서 생성한 파일로 가장하지 않는다. categories accessor 1곳에서만 이 타입을 적용해 읽기 결과 cast를 제거했다. 로컬 DB를 마련한 뒤 전체 생성 출력과 해당 snapshot의 차이를 검토하고 타입 파일을 교체해야 한다. 전면 repository 타입 적용은 범위 밖이다.
+2026-10-05에 실제 자체 호스팅 Preview의 210개 migration이 적용된 public schema에서 전체 타입을 생성해 초기 categories bootstrap slice를 교체했다. postgres-meta `v0.99.0`의 AMD64 이미지 `sha256:09b00cdd401f830cc8db5c7da14468e99d04a63900371b1ec06463674ac4877e`를 고정했고, 앱·DB 인증/접근 정책을 바꾸지 않았다. 네트워크 없는 생성 컨테이너가 운영자 전용 임시 Unix socket을 통해 기존 로컬 DB 접속을 사용했으며 `default_transaction_read_only=on`과 statement/lock timeout을 적용했다. 회원 행과 Production DB는 읽지 않았다. 임시 socket·환경 파일은 종료 시 제거했다.
+
+두 생성 결과는 byte 단위로 같았다. 출력은 261083 bytes, SHA256 `cc793b29c0c8199e46764c2176b831fe5176883e1e9016b274ca572651f8b002`다. 생성 타입의 112개 테이블과 1398개 Row 컬럼 이름을 실제 catalog와 독립 비교했고 누락이 없었다. 생성 전후 migration ledger·catalog·앱 identity도 같았다. pg_monitor 계정의 권한에 제한된 초기 결과에는 테이블 타입이 없었으므로 그 결과를 보존하고 거부했으며, 파일 형식이나 deterministic 여부만으로 전체 타입 생성 완료를 판정하지 않는다.
+
+categories accessor 1곳의 타입 적용은 유지한다. 다른 repository의 전면 타입 적용은 별도 범위다. 수동 `gen:database-types`는 준비된 로컬 DB를 대상으로 사용한다. 구문 오류·빈 테이블 타입·기존 테이블/컬럼 누락을 거부하고 실패 시 기존 타입과 타 작업의 임시 파일을 보존한다. 의도한 스키마 삭제도 자동으로 우회하지 않으며 관련 migration과 타입 차이를 먼저 검토한다. 재생성 때 generator 버전·적용 migration·테이블/컬럼 전체 coverage를 실행 영수증에 기록한다.
 
 ## 감사·라이선스·저장소
 
