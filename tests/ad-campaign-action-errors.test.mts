@@ -58,8 +58,18 @@ test("광고 캠페인 상태 변경은 전이 테이블 결과를 안전한 오
   assert.match(actions, /update = await adPackageRepository\.updateCampaignStatus\(/);
   assert.match(actions, /"ad_campaign_invalid_status_transition"/);
   assert.match(actions, /"ad_campaign_state_changed"/);
-  assert.match(page, /ad_campaign_invalid_status_transition/);
-  assert.match(page, /ad_campaign_state_changed/);
+  // The page resolves every campaign code through the shared map, so the
+  // terminal-status guidance lives there; a page-level branch for the same
+  // code would be unreachable behind `pickAllowedEntry`.
+  assert.match(
+    adminAdCampaignErrorMessages.ad_campaign_invalid_status_transition,
+    /종료된 캠페인은 다시 열 수 없으니 새 캠페인으로 운영해 주세요/,
+  );
+  assert.match(
+    adminAdCampaignErrorMessages.ad_campaign_state_changed,
+    /다른 관리자가 캠페인 상태를 먼저 바꿨습니다/,
+  );
+  assert.doesNotMatch(page, /error === "ad_campaign_/);
   assert.match(manager, /const nextStatuses = listAdCampaignStatusTransitions\(status\);/);
   assert.match(manager, /nextStatuses\.map\(/);
   assert.doesNotMatch(manager, /\(\["active", "paused", "ended"\] as const\)\.map/);

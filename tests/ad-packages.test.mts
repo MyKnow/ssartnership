@@ -4,7 +4,7 @@ import {
   AD_PACKAGE_TIERS,
   createEmptyAdPackageMetrics,
   getAdPackageDefinition,
-  isAdCouponRedeemable,
+  isAdCouponDownloadable,
   normalizeAdChannelsForTier,
   summarizeAdPackageMetrics,
   type AdCampaignLike,
@@ -45,7 +45,7 @@ describe("ad packages", () => {
     );
   });
 
-  it("checks coupon redeemability by campaign, dates, status, and limit", () => {
+  it("checks coupon downloadability by campaign, download window, and status", () => {
     const activeCampaign = {
       status: "active",
       startsAt: "2026-07-01T00:00:00.000Z",
@@ -55,33 +55,44 @@ describe("ad packages", () => {
       status: "active",
       startsAt: "2026-07-01T00:00:00.000Z",
       endsAt: "2026-07-31T23:59:59.000Z",
-      usageLimit: 10,
-      usedCount: 9,
-    } satisfies AdCouponLike;
+      downloadStartsAt: "2026-07-10T00:00:00.000Z",
+      downloadEndsAt: "2026-07-20T23:59:59.000Z",
+    } satisfies AdCouponLike & { downloadStartsAt: string; downloadEndsAt: string };
+    const now = new Date("2026-07-15T12:00:00.000Z");
 
     assert.equal(
-      isAdCouponRedeemable({
-        coupon: activeCoupon,
-        campaign: activeCampaign,
-        now: new Date("2026-07-15T12:00:00.000Z"),
-      }),
+      isAdCouponDownloadable({ coupon: activeCoupon, campaign: activeCampaign, now }),
       true,
     );
+    // The download window, not the usage period, bounds downloads.
     assert.equal(
-      isAdCouponRedeemable({
-        coupon: { ...activeCoupon, usedCount: 10 },
+      isAdCouponDownloadable({
+        coupon: activeCoupon,
         campaign: activeCampaign,
-        now: new Date("2026-07-15T12:00:00.000Z"),
+        now: new Date("2026-07-25T12:00:00.000Z"),
       }),
       false,
     );
     assert.equal(
-      isAdCouponRedeemable({
-        coupon: activeCoupon,
-        campaign: { ...activeCampaign, status: "paused" },
-        now: new Date("2026-07-15T12:00:00.000Z"),
+      isAdCouponDownloadable({
+        coupon: { ...activeCoupon, status: "paused" },
+        campaign: activeCampaign,
+        now,
       }),
       false,
+    );
+    assert.equal(
+      isAdCouponDownloadable({
+        coupon: activeCoupon,
+        campaign: { ...activeCampaign, status: "paused" },
+        now,
+      }),
+      false,
+    );
+    // A coupon without a campaign follows only its own status and window.
+    assert.equal(
+      isAdCouponDownloadable({ coupon: activeCoupon, campaign: null, now }),
+      true,
     );
   });
 

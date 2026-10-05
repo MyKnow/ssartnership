@@ -5,7 +5,6 @@ import {
   canTransitionAdCouponStatus,
   getAdPackageDefinition,
   isAdCouponDownloadable,
-  isAdCouponRedeemable,
   normalizeAdChannelsForTier,
   summarizeAdPackageMetrics,
   type AdPackageMetricEvent,
@@ -41,10 +40,8 @@ import type {
   ListAvailableCouponsForMemberInput,
   ListIssuedCouponsForMemberInput,
   PreparedAdminCampaigns,
-  RedeemAdCouponInput,
   RedeemAdCouponIssueInput,
   RedeemAdCouponIssueResult,
-  RedeemAdCouponResult,
   UpdateAdCampaignStatusInput,
   UpdateAdCampaignStatusResult,
   UpdateAdCouponInput,
@@ -72,10 +69,6 @@ function cloneCoupon(coupon: AdCoupon): AdCoupon {
     ...coupon,
     terms: [...coupon.terms],
   };
-}
-
-function cloneRedemption(redemption: AdCouponRedemption): AdCouponRedemption {
-  return { ...redemption };
 }
 
 function toAvailableCoupon(
@@ -783,84 +776,6 @@ export class MockAdPackageRepository implements AdPackageRepository {
       couponId: coupon.id,
       issueId: issue.id,
       assignedCode: issue.assignedCode,
-    };
-  }
-
-  async redeemCoupon(input: RedeemAdCouponInput): Promise<RedeemAdCouponResult> {
-    const coupon = this.coupons.find((item) => item.id === input.couponId);
-    if (!coupon) {
-      return {
-        ok: false,
-        reason: "not_found",
-        message: "쿠폰을 찾을 수 없습니다.",
-      };
-    }
-
-    const usedCount = this.countCouponRedemptions(coupon.id);
-    const campaign = this.campaigns.find((item) => item.id === coupon.campaignId);
-    const couponWithCount = { ...coupon, usedCount };
-    if (coupon.redemptionType === "onsite") {
-      return {
-        ok: false,
-        reason: "onsite_verification_required",
-        message: "현장형 쿠폰은 쿠폰함의 제휴처 확인 화면에서 사용해 주세요.",
-        coupon: cloneCoupon(couponWithCount),
-      };
-    }
-    if (!isAdCouponRedeemable({ coupon: couponWithCount, campaign })) {
-      return {
-        ok: false,
-        reason: usedCount >= (coupon.usageLimit ?? Number.POSITIVE_INFINITY)
-          ? "usage_limit"
-          : "inactive",
-        message: "현재 사용할 수 없는 쿠폰입니다.",
-        coupon: cloneCoupon(couponWithCount),
-      };
-    }
-
-    if (
-      input.memberId &&
-      this.redemptions.filter(
-        (redemption) =>
-          redemption.couponId === coupon.id &&
-          redemption.memberId === input.memberId,
-      ).length >= coupon.perMemberLimit
-    ) {
-      return {
-        ok: false,
-        reason: "member_limit",
-        message: "이미 사용할 수 있는 횟수를 모두 사용했습니다.",
-        coupon: cloneCoupon(couponWithCount),
-      };
-    }
-
-    const redemption: AdCouponRedemption = {
-      id: `redemption-${crypto.randomUUID()}`,
-      couponId: coupon.id,
-      campaignId: coupon.campaignId,
-      partnerId: coupon.partnerId,
-      memberId: input.memberId ?? null,
-      sessionId: input.sessionId ?? null,
-      redemptionCode: coupon.code,
-      createdAt: isoNow(),
-    };
-    this.redemptions = [redemption, ...this.redemptions];
-    this.events = [
-      {
-        eventName: "coupon_redeem",
-        campaignId: coupon.campaignId,
-        couponId: coupon.id,
-      },
-      ...this.events,
-    ];
-
-    return {
-      ok: true,
-      coupon: {
-        ...cloneCoupon(coupon),
-        usedCount: usedCount + 1,
-      },
-      redemption: cloneRedemption(redemption),
     };
   }
 

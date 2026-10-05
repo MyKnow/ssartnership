@@ -180,13 +180,6 @@ export type UpdateAdCampaignStatusInput = {
   status: AdCampaignStatus;
 };
 
-export type RedeemAdCouponInput = {
-  couponId: string;
-  memberId?: string | null;
-  sessionId?: string | null;
-  metadata?: Record<string, unknown> | null;
-};
-
 export type ListAvailableCouponsForMemberInput = {
   memberId: string;
   partnerIds: string[];
@@ -203,25 +196,6 @@ export type AvailableAdCoupon = {
   remainingMemberUses: number;
   remainingGlobalUses: number | null;
 };
-
-export type RedeemAdCouponResult =
-  | {
-      ok: true;
-      coupon: AdCoupon;
-      redemption: AdCouponRedemption;
-    }
-  | {
-      ok: false;
-      reason:
-        | "not_found"
-        | "inactive"
-        | "usage_limit"
-        | "member_limit"
-        | "onsite_verification_required"
-        | "invalid";
-      message: string;
-      coupon?: AdCoupon | null;
-    };
 
 export interface AdPackageRepository {
   /** Shares one base campaign read between eager options and deferred stats. */
@@ -261,7 +235,6 @@ export interface AdPackageRepository {
   issueCoupon(input: IssueAdCouponInput): Promise<IssueAdCouponResult>;
   listIssuedCouponsForMember(input: ListIssuedCouponsForMemberInput): Promise<AvailableAdCoupon[]>;
   addCouponCodes(input: AddAdCouponCodesInput): Promise<AddAdCouponCodesResult>;
-  redeemCoupon(input: RedeemAdCouponInput): Promise<RedeemAdCouponResult>;
   redeemCouponIssue(input: RedeemAdCouponIssueInput): Promise<RedeemAdCouponIssueResult>;
 }
 
