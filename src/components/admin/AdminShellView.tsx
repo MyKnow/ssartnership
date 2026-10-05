@@ -242,6 +242,7 @@ export default function AdminShellView({
 
       <nav
         aria-label="관리자 주요 탐색"
+        data-admin-mobile-navigation
         className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-surface-overlay/95 pb-safe-bottom shadow-floating backdrop-blur-xl md:hidden"
       >
           <Container size="dashboard" className="flex items-stretch">

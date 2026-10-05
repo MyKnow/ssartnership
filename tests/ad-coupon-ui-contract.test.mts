@@ -75,7 +75,10 @@ test("제휴처 수정 저장 CTA는 폼 안에서 고정 버튼을 렌더링한
   );
 
   assert.doesNotMatch(source, /<div className="pointer-events-auto flex/);
-  assert.match(source, /<div className="pointer-events-none fixed/);
+  assert.match(
+    source,
+    /<div\s+data-floating-submit-button="raised"\s+className="pointer-events-none fixed/,
+  );
   assert.match(source, /pointer-events-auto min-h-12 w-full max-w-sm/);
   assert.match(source, /bottom-safe-bottom-20/);
   assert.match(source, /md:right-\[5\.5rem\]/);
