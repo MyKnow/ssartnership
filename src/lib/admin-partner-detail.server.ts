@@ -244,6 +244,7 @@ export async function getAdminPartnerDetailOperationalReadModel({
       getAdminPartnerMetrics([partnerId]),
       getAdminReviewPageData(reviewFilters, {
         includeCounts: false,
+        includeFilterOptions: false,
         managedCampusSlugs: managedCampusSlugs ? [...managedCampusSlugs] : null,
         ...reviewPagination,
       }),

@@ -11,6 +11,7 @@ import {
 import { partnerRepository } from "@/lib/repositories";
 import { getHeaderSession } from "@/lib/header-session";
 import { getPartnerViewerContext } from "@/lib/partner-view-context";
+import { getSignedUserSession } from "@/lib/user-auth";
 import {
   getHomePartnerMemberState,
   getHomePartnerPopularityById,
@@ -117,9 +118,9 @@ export default async function CampusLandingPage({
 }: {
   params: Promise<{ campus: string }>;
 }) {
-  const [{ campus: rawCampus }, headerSession] = await Promise.all([
+  const [{ campus: rawCampus }, session] = await Promise.all([
     params,
-    getHeaderSession(),
+    getSignedUserSession(),
   ]);
 
   const campus = getCampusBySlug(rawCampus);
@@ -127,10 +128,18 @@ export default async function CampusLandingPage({
     notFound();
   }
 
-  const viewerContext = await getPartnerViewerContext(headerSession?.userId);
+  // One signed-session read feeds the header and the viewer audience; the
+  // unread count and categories overlap the audience snapshot.
+  const userId = session?.userId ?? null;
+  const headerSessionPromise = userId
+    ? getHeaderSession(userId)
+    : Promise.resolve(null);
+  const categoriesPromise = getCampusCategoriesCached();
+  const viewerContext = await getPartnerViewerContext(userId);
 
-  const [categories, partners] = await Promise.all([
-    getCampusCategoriesCached(),
+  const [headerSession, categories, partners] = await Promise.all([
+    headerSessionPromise,
+    categoriesPromise,
     viewerContext.authenticated
       ? getCampusPartnersCached(
           campus.slug,
@@ -168,7 +177,7 @@ export default async function CampusLandingPage({
   });
   const memberState = await getHomePartnerMemberState({
     partnerIds: rankedDirectory.displayPartnerIds,
-    currentUserId: headerSession?.userId ?? null,
+    currentUserId: userId,
   });
   const campusPartnerState = {
     ...memberState,
@@ -201,8 +210,8 @@ export default async function CampusLandingPage({
         publicPartnerCount={publicCampusPartners.length}
         categories={categories}
         partners={campusPartners}
-        viewerAuthenticated={Boolean(headerSession?.userId)}
-        currentUserId={headerSession?.userId ?? null}
+        viewerAuthenticated={Boolean(userId)}
+        currentUserId={userId}
         partnerPopularityById={campusPartnerState.partnerPopularityById}
         partnerFavoriteStateById={campusPartnerState.partnerFavoriteStateById}
         loadedFavoritePartnerIds={campusPartnerState.loadedFavoritePartnerIds}

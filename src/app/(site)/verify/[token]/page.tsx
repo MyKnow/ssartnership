@@ -42,7 +42,7 @@ export default async function CertificationVerifyPage({
 }: {
   params: Promise<{ token: string }>;
 }) {
-  const headerSession = await getHeaderSession();
+  const headerSessionPromise = getHeaderSession();
   const resolvedParams = await params;
   const rawToken = resolvedParams?.token
     ? decodeURIComponent(resolvedParams.token).trim()
@@ -50,17 +50,21 @@ export default async function CertificationVerifyPage({
   const verification = verifyCertificationQrToken(rawToken);
 
   let member: MemberCanonicalProfile | null = null;
+  // The viewer's header session and the token owner's profile are
+  // independent, so both reads run together.
+  const [headerSession, verifiedProfile] = await Promise.all([
+    headerSessionPromise,
+    verification.ok
+      ? getMemberCanonicalProfile(verification.payload.userId)
+      : Promise.resolve(null),
+  ]);
 
-  if (verification.ok) {
-    const profile = await getMemberCanonicalProfile(verification.payload.userId);
-
-    if (
-      profile?.id
-      && !profile.mustChangePassword
-      && profile.profilePhotoReviewStatus === "approved"
-    ) {
-      member = profile;
-    }
+  if (
+    verifiedProfile?.id
+    && !verifiedProfile.mustChangePassword
+    && verifiedProfile.profilePhotoReviewStatus === "approved"
+  ) {
+    member = verifiedProfile;
   }
 
   const isValid = verification.ok && Boolean(member);
