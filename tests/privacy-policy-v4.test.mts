@@ -83,6 +83,13 @@ test("처리방침은 자체 호스팅과 실제 외부 전송처를 고지하�
   const businessStatus = await readProjectFile("src/lib/nts-business-status.ts");
   assert.match(businessStatus, /api\.odcloud\.kr/u);
   assert.match(transfer, /국세청 사업자등록 상태 조회/u);
+  // Showcase winners give their student number through the Google Form the
+  // operator sends (spec AC-003a, AC-025), so that collection leaves the
+  // self-hosted environment and must be listed.
+  const showcaseDraw = await readProjectFile("src/lib/project-showcase/draw.ts");
+  assert.match(showcaseDraw, /구글폼/u);
+  assert.match(transfer, /Google LLC\(미국, Google Forms\): 쇼케이스 경품 수령 정보 수집/u);
+  assert.match(transfer, /쇼케이스 경품 수령 정보만 아래 구글폼으로 따로 받습니다/u);
   assert.match(transfer, /제3자에게 제공하지 않습니다/u);
 });
 
@@ -95,7 +102,7 @@ test("수집 항목은 이메일·수료생 인증·Wallet·쇼케이스·쿠폰
     "교육이수증(PDF)",
     "본인 사진",
     "Apple Wallet 회원 카드",
-    "학번 7자리",
+    "쇼케이스 경품 수령 정보",
     "쿠폰 발급·사용 기록",
     "동의할 때의 IP 주소와 user-agent",
     "제휴처 담당자 정보",
@@ -104,6 +111,19 @@ test("수집 항목은 이메일·수료생 인증·Wallet·쇼케이스·쿠폰
   ]) {
     assert.ok(items.includes(expected), `수집 항목에 ${expected}이(가) 없다`);
   }
+});
+
+test("쇼케이스 학번은 서비스에 저장하지 않는다는 스키마와 고지가 일치한다", async () => {
+  const [{ content }, retiredRoster] = await Promise.all([
+    readPolicy(),
+    readProjectFile("supabase/migrations/20260926203807_showcase_member_multiple_submissions.sql"),
+  ]);
+  // Issue #491 stopped collecting student numbers and team rosters in the service.
+  assert.match(retiredRoster, /add constraint showcase_registration_no_student_number check \(student_number is null\)/u);
+  assert.match(retiredRoster, /add constraint showcase_project_participants_retired check \(false\)/u);
+  assert.doesNotMatch(content, /학번 7자리/u);
+  assert.match(sectionOf(content, "2. 수집 항목"), /경품 수령 안내 구글폼에 직접 입력한 학번 등 수령에 필요한 정보\(서비스에는 저장하지 않습니다\)/u);
+  assert.doesNotMatch(sectionOf(content, "3. 보유 및 이용 기간"), /쇼케이스 학번/u);
 });
 
 test("보유 기간은 데이터 수명주기 결정표와 같은 값을 고지한다", async () => {
@@ -122,6 +142,18 @@ test("보유 기간은 데이터 수명주기 결정표와 같은 값을 고지�
     [/이미지 업로드 처리 기록: 만료 후 30일/u, /`expired` 행은 만료 후 30일/u],
     [/식별자 기록: 400일/u, /식별자 원장[^\n]*\| 400일/u],
     [/행사 정산 후 30일/u, /정산 기록 후 30일/u],
+    [
+      /쇼케이스 경품 수령 정보\(구글폼\): 경품 발송과 정산을 마치면 삭제하며, 늦어도 행사 정산 후 30일 안에 삭제/u,
+      /경품 수령 정보\(구글폼, 서비스 밖\) \| 경품 발송·정산을 마치면 삭제하고, 늦어도 정산 기록 후 30일 안에 지운다/u,
+    ],
+    [
+      /이벤트 추첨·당첨 기록: 탈퇴할 때까지 보관하며, 익명화할 때 당첨자 이름 등 표시 정보를 지웁니다/u,
+      /`event_reward_winners`\) \| 회원 유지 기간\. 익명화 때 이름·Mattermost 사용자명·캠퍼스 스냅샷을 지운다/u,
+    ],
+    [
+      /쿠폰 발급·사용 기록과 청구·결제·세금계산서 기록: 정산과 세무 증빙에 필요한 기간 동안 보관/u,
+      /`partner_tax_documents`\) \| 미정\.[^\n]*\| 자동 파기 없음[^\n]*\| 운영자 결정 필요 \|/u,
+    ],
     [/익명화할 때 IP 주소와 user-agent를 삭제/u, /익명화 때 IP·user-agent만 지우고/u],
     [/백업 사본이 만료될 때까지 최대 30일/u, /외부 사본 \| 기본 30일/u],
   ];
