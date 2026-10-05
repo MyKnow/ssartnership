@@ -13,6 +13,7 @@ export const CATALOG = {
   ExporterDown: ["지표 수집 중단", "수집 대상 접속 실패가 2분 지속"],
   AppHealthFailed: ["앱 상태 확인 실패", "내부 앱 상태 실패 또는 갱신 지연이 2분 지속"],
   DatabaseUnavailable: ["DB 접속 실패", "PostgreSQL 연결 실패가 1분 지속"],
+  AppDependencyUnavailable: ["앱 의존성 준비 실패", "앱에서 DB·gateway·Storage 중 하나에 연결하지 못한 상태가 2분 지속"],
   HostDiskLow: ["디스크 여유 부족", "디스크 여유 15% 미만이 5분 지속"],
   HostMemoryLow: ["메모리 여유 부족", "가용 메모리 10% 미만이 5분 지속"],
   HostCpuBusy: ["CPU 부하 지속", "CPU 사용률 90% 초과가 10분 지속"],

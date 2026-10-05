@@ -69,3 +69,25 @@ tests:
       - eval_time: 25m
         alertname: ServerErrorBurst
         exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: 'ssartnership_app_ready_success{job="telemetry",environment="production",vm="5200",dependency="database"}'
+        values: '1 1 0 0 0 0 1 1'
+      - series: 'ssartnership_app_ready_success{job="telemetry",environment="production",vm="5200",dependency="storage"}'
+        values: '1+0x7'
+      - series: 'ssartnership_app_ready_success{job="telemetry",environment="preview",vm="5201",dependency="gateway"}'
+        values: '0+0x7'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: AppDependencyUnavailable
+        exp_alerts:
+          - exp_labels: { job: telemetry, environment: preview, vm: "5201", dependency: gateway, severity: warning }
+      - eval_time: 5m
+        alertname: AppDependencyUnavailable
+        exp_alerts:
+          - exp_labels: { job: telemetry, environment: production, vm: "5200", dependency: database, severity: critical }
+          - exp_labels: { job: telemetry, environment: preview, vm: "5201", dependency: gateway, severity: warning }
+      - eval_time: 7m
+        alertname: AppDependencyUnavailable
+        exp_alerts:
+          - exp_labels: { job: telemetry, environment: preview, vm: "5201", dependency: gateway, severity: warning }
