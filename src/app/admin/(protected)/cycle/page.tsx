@@ -17,7 +17,7 @@ import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import { AdminCycleSkeletonContent } from "@/components/loading/AdminPageSkeletons";
 import Button from "@/components/ui/Button";
 import { requireAdminPermission } from "@/lib/admin-access";
-import { adminActionErrorMessages } from "@/lib/admin-action-errors";
+import { getAdminActionErrorMessage } from "@/lib/admin-action-errors";
 import { canManageMattermostSenders } from "@/lib/mattermost-senders/access";
 import { canAdmin } from "@/lib/admin-permissions";
 import { mattermostSenderRepository } from "@/lib/mattermost-senders/repository";
@@ -104,9 +104,7 @@ async function AdminCycleContent({
           session.account,
           "delete",
         )}
-        errorMessage={
-          params.error ? adminActionErrorMessages[params.error] : null
-        }
+        errorMessage={getAdminActionErrorMessage(params.error)}
         updateSettingsAction={updateSsafyCycleSettings}
         earlyStartAction={earlyStartSsafyCycle}
         restoreAction={restoreSsafyCycleSettings}

@@ -46,6 +46,7 @@ import {
 } from "./shared-parser-redirects";
 import { isUuidFormat } from "@/lib/uuid";
 import { readRawString } from "@/lib/form-data";
+import { type AdminActionErrorCode } from "@/lib/admin-action-errors";
 
 const MATTERMOST_SENDER_PATH = "/admin/cycle";
 
@@ -75,7 +76,7 @@ function getMattermostSenderErrorCode(error: unknown): MattermostSenderSafeError
 }
 
 function redirectMattermostSenderError(
-  code: string,
+  code: AdminActionErrorCode,
   action:
     | "mattermost_sender_candidate_save"
     | "mattermost_sender_test"
