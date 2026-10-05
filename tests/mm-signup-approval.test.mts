@@ -188,8 +188,9 @@ test("실패한 업로드 정리는 signed URL 만료 시각도 함께 닫는다
 
   assert.match(
     repository,
-    /failure_code: "discard_cleanup_pending",\s+signed_url_expires_at: now\.toISOString\(\),\s+expires_at: now\.toISOString\(\)/,
+    /failure_code: DISCARD_CLEANUP_PENDING_FAILURE_CODE,\s+signed_url_expires_at: now\.toISOString\(\),\s+expires_at: now\.toISOString\(\)/,
   );
+  assert.match(repository, /const DISCARD_CLEANUP_PENDING_FAILURE_CODE = "discard_cleanup_pending";/);
   assert.match(
     repository,
     /status: "expired",\s+failure_code: null,\s+signed_url_expires_at: now\.toISOString\(\),\s+expires_at: now\.toISOString\(\)/,
