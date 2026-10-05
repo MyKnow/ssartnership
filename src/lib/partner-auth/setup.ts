@@ -139,7 +139,8 @@ export async function completeSupabasePartnerPortalInitialSetup(
     .maybeSingle();
 
   if (error) {
-    logServerError("[partner-setup] completion update failed", error, { accountId: account.id
+    logServerError("[partner-setup] completion update failed", error, {
+      accountId: account.id,
     });
     throw error;
   }

@@ -285,12 +285,9 @@ export async function getPartnerBillingProfilesForCompanies(input: {
     throw new Error(error.message);
   }
 
-  const profileRows = (data ?? []) as BillingProfileRow[];
-  const profilesById = new Map(
-    profileRows.map((row) => [row.id, mapBillingProfileRow(row)]),
+  return sortBillingProfiles(
+    ((data ?? []) as BillingProfileRow[]).map(mapBillingProfileRow),
   );
-
-  return sortBillingProfiles([...profilesById.values()]);
 }
 
 export async function createPartnerBillingProfile(input: {
