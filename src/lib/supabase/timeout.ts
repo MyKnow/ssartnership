@@ -103,6 +103,12 @@ export function getSupabaseRequestTimeoutMs(
  * The timeout surfaces as a `TimeoutError` (`{ error }` from PostgREST and
  * Storage, a rejection elsewhere). It is a transient outcome; callers must not
  * treat it as "not found" or as a permanent rejection.
+ *
+ * Next (16.3 `dedupe-fetch`) shares identical GETs within one render only when
+ * `init` carries no signal. The private gateway transport hands Next a Request,
+ * which Next merges with `init`, so sharing still applies there; a direct
+ * connection without `SUPABASE_INTERNAL_URL` loses it. Reads repeated within a
+ * render belong in React `cache()` either way.
  */
 export function withSupabaseTimeout(
   fetchImpl: typeof fetch,
