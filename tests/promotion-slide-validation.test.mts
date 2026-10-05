@@ -57,11 +57,18 @@ test("저장 오류 코드는 안전한 redirect 코드로 통과하고 카드 �
 });
 
 test("광고 카드 저장은 promotion_events에 없는 이벤트 slug를 FK 컬럼에 쓰지 않는다", async () => {
-  const source = await readFile(
-    new URL("../src/app/admin/(protected)/_actions/promotion-actions.ts", import.meta.url),
-    "utf8",
-  );
-  assert.match(source, /from\("promotion_events"\)\s*\.select\("slug"\)\s*\.in\("slug", unique\)/);
+  const [source, store] = await Promise.all([
+    readFile(
+      new URL("../src/app/admin/(protected)/_actions/promotion-actions.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/lib/promotions/events-store.server.ts", import.meta.url),
+      "utf8",
+    ),
+  ]);
+  assert.match(store, /from\("promotion_events"\)\s*\.select\("slug"\)\s*\.in\("slug", unique\)/);
+  assert.match(source, /await listRegisteredPromotionEventSlugs\(/);
   assert.match(source, /slide\.eventSlug && registeredEventSlugs\.has\(slide\.eventSlug\)/);
   assert.doesNotMatch(source, /event_slug: slide\.eventSlug,/);
   assert.match(source, /validatePromotionSlide\(/);

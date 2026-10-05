@@ -37,12 +37,16 @@ test("Mattermost 세대별 디렉터리 수집은 입력 순서를 보존하며 
 
 test("만료 프로모션 정리는 한 번에 100건만 조회하고 내부 오류를 노출하지 않는다", () => {
   const source = read("../src/app/api/cron/archive-expired-promotions/route.ts");
+  const store = read("../src/lib/promotions/events-store.server.ts");
 
   assert.match(source, /const ARCHIVE_EVENT_BATCH_SIZE = 100;/);
-  assert.match(source, /input_limit: ARCHIVE_EVENT_BATCH_SIZE/);
-  assert.match(source, /rpc\("archive_expired_promotions_batch"/);
+  assert.match(source, /limit: ARCHIVE_EVENT_BATCH_SIZE/);
+  assert.match(store, /input_limit: input\.limit/);
+  assert.match(store, /rpc\("archive_expired_promotions_batch"/);
   assert.match(source, /getCronErrorResponse\("archive-expired-promotions"\)/);
-  assert.doesNotMatch(source, /message: \w+Error\.message/);
+  for (const text of [source, store]) {
+    assert.doesNotMatch(text, /message: \w+Error\.message/);
+  }
 });
 
 test("이미지 정규화와 수동 회원 사진 준비는 공용 제한 동시성 매퍼를 사용한다", () => {

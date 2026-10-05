@@ -5,6 +5,15 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { getAdminSession } from "@/lib/auth";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import {
+  deletePromotionEventRegistration,
+  findPromotionEventRegistrationTarget,
+  insertPromotionEventRegistration,
+  listRegisteredPromotionEventSlugs,
+  savePromotionEventRegistration,
+  type PromotionEventRegistrationRow,
+  type PromotionEventRegistrationTarget,
+} from "@/lib/promotions/events-store.server";
 import { getSafeAdminActionErrorCode } from "@/lib/admin-action-errors";
 import { AD_PACKAGE_FORM_LIMITS } from "@/lib/ad-package-validation";
 import {
@@ -169,7 +178,10 @@ function parseTargetAudiences(formData: FormData) {
   return audiences;
 }
 
-function parsePromotionEventRegistration(formData: FormData, slug: string) {
+function parsePromotionEventRegistration(
+  formData: FormData,
+  slug: string,
+): PromotionEventRegistrationRow {
   const normalizedSlug = normalizeSlug(slug);
   if (!normalizedSlug || normalizedSlug !== slug) {
     throw new Error("이벤트 슬러그를 확인해 주세요.");
@@ -322,25 +334,6 @@ function parsePromotionSlideDrafts(formData: FormData) {
   return slides;
 }
 
-async function listRegisteredPromotionEventSlugs(
-  supabase: ReturnType<typeof getSupabaseAdminClient>,
-  slugs: string[],
-) {
-  const unique = [...new Set(slugs)];
-  if (unique.length === 0) {
-    return new Set<string>();
-  }
-  const { data, error } = await supabase
-    .from("promotion_events")
-    .select("slug")
-    .in("slug", unique);
-  if (error) {
-    console.error("[admin-advertisement] event lookup failed", error);
-    throw new PromotionSlideSaveError(promotionSlideDatabaseErrorCode(error.code, "promotion_slide_event_lookup_failed"));
-  }
-  return new Set(((data ?? []) as Array<{ slug: string }>).map((row) => row.slug));
-}
-
 function revalidateAdvertisementPaths() {
   revalidateTag(PROMOTION_EVENTS_CACHE_TAG, "max");
   revalidateTag(PROMOTION_SLIDES_CACHE_TAG, "max");
@@ -353,25 +346,10 @@ function revalidateAdvertisementPaths() {
 export async function createPromotionEventAction(formData: FormData) {
   await requireAdminPermission("events", "create", { path: "/admin/event" });
   const slug = normalizeSlug(getString(formData, "slug"));
-  let payload: ReturnType<typeof parsePromotionEventRegistration>;
+  let payload: PromotionEventRegistrationRow;
   try {
     payload = parsePromotionEventRegistration(formData, slug);
-    const supabase = getSupabaseAdminClient();
-    const { data: existing, error: existingError } = await supabase
-      .from("promotion_events")
-      .select("id")
-      .eq("slug", slug)
-      .maybeSingle();
-    if (existingError) {
-      throw new Error(existingError.message);
-    }
-    if (existing) {
-      throw new Error("이미 등록된 이벤트입니다.");
-    }
-    const { error } = await supabase.from("promotion_events").insert(payload);
-    if (error) {
-      throw new Error(error.message);
-    }
+    await insertPromotionEventRegistration(payload);
   } catch (error) {
     redirectEventRegistrationError(slug, "admin_event_create_failed", error);
   }
@@ -392,38 +370,12 @@ export async function updatePromotionEventAction(formData: FormData) {
   await requireAdminPermission("events", "update", { path: "/admin/event" });
   const id = getString(formData, "id");
   const slug = normalizeSlug(getString(formData, "slug"));
-  let payload: ReturnType<typeof parsePromotionEventRegistration>;
-  let target: { id?: string | null; slug?: string | null } | null;
+  let payload: PromotionEventRegistrationRow;
+  let target: PromotionEventRegistrationTarget | null;
   try {
-    const supabase = getSupabaseAdminClient();
-    const { data: existing, error: existingError } = await supabase
-      .from("promotion_events")
-      .select("id,slug")
-      .eq("id", id)
-      .maybeSingle();
-    if (existingError) {
-      throw new Error(existingError.message);
-    }
-
-    const { data: existingBySlug, error: existingBySlugError } = existing?.slug
-      ? { data: null, error: null }
-      : await supabase
-          .from("promotion_events")
-          .select("id,slug")
-          .eq("slug", slug)
-          .maybeSingle();
-    if (existingBySlugError) {
-      throw new Error(existingBySlugError.message);
-    }
-
-    target = existing ?? existingBySlug;
+    target = await findPromotionEventRegistrationTarget({ id, slug });
     payload = parsePromotionEventRegistration(formData, target?.slug ?? slug);
-    const { error } = target?.id
-      ? await supabase.from("promotion_events").update(payload).eq("id", target.id)
-      : await supabase.from("promotion_events").insert(payload);
-    if (error) {
-      throw new Error(error.message);
-    }
+    await savePromotionEventRegistration(target, payload);
   } catch (error) {
     redirectEventRegistrationError(slug, "admin_event_update_failed", error);
   }
@@ -449,11 +401,7 @@ export async function deletePromotionEventAction(formData: FormData) {
     if (!id) {
       throw new Error("이벤트 식별자를 확인해 주세요.");
     }
-    const supabase = getSupabaseAdminClient();
-    const { error } = await supabase.from("promotion_events").delete().eq("id", id);
-    if (error) {
-      throw new Error(error.message);
-    }
+    await deletePromotionEventRegistration(id);
   } catch (error) {
     redirectEventRegistrationError(slug, "admin_event_delete_failed", error);
   }
