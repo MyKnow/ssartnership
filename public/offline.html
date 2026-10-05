@@ -92,16 +92,19 @@
         background: var(--primary-soft);
         color: var(--primary);
       }
+      /* Same wrapping as the app's global h1-h6 and p rules (globals.css). */
       h1 {
         margin: 20px 0 8px;
         font-size: 1.25rem;
         font-weight: 700;
         line-height: 1.4;
+        text-wrap: balance;
       }
       p {
         margin: 0;
         color: var(--muted-foreground);
         font-size: 0.9375rem;
+        text-wrap: pretty;
       }
       button {
         margin-top: 24px;
