@@ -29,7 +29,7 @@ authority: normative
 | 알림 발송 결과(`notification_deliveries`, `admin_notification_deliveries`, `partner_notification_deliveries`) | 확정된 결과(`sent`·`failed`·`skipped`) 생성 후 180일. 진행 중 캠페인은 제외 | 같은 purge | 기본값 |
 | 회원 알림함(`member_notifications`)과 캠페인 본문 | 회원 유지 기간. 발송 결과 정리와 무관하게 남긴다 | 회원 익명화 때 삭제 | 기본값 |
 | 이미지 업로드 세션(`image_upload_sessions`) | `expired` 행은 만료 후 30일. `attached` 행은 연결된 이미지를 쓰는 동안 유지 | 같은 purge | 기본값 |
-| 식별자 원장(`platform_active_identities`, `partner_metric_unique_visitors`) | 400일. 관리자 활동 지표가 읽는 최대 84일 창보다 길다 | 같은 purge | 기본값 |
+| 식별자 원장(`platform_active_identities`, `partner_metric_unique_visitors`) | 400일. 관리자 활동 지표가 읽는 최대 84일 창보다 길다. 기간 구분이 없는 전체·요일별 방문자 원장은 첫 방문 시각 기준으로 지우므로, 그 뒤 다시 방문한 사람은 파트너 전체·요일별 순방문자 수에 한 번 더 집계될 수 있다(통계 근사로 수용) | 같은 purge | 기본값 |
 | 집계(`partner_metric_rollups` 등) | 장기. 직접 식별자·IP·세션이 없는 통계만 남긴다 | 없음 | 확정 |
 | 탈퇴 회원 | 탈퇴 즉시 세션·푸시 구독 정리, 30일 뒤 익명화 | `anonymize_deleted_member()`, 매일 cron | 확정 |
 | 수료생 교육이수증 파일 | 검토 완료 후 30일 | `cleanup-graduate-verification-files` cron | 확정 |
