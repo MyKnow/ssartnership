@@ -7,6 +7,7 @@ import CertificationView from "@/components/certification/CertificationView";
 import { getProductSessionId } from "@/lib/product-events";
 import type { CohortCardTheme } from "@/lib/cohort-card-themes";
 import type { AvailableAdCoupon } from "@/lib/repositories/ad-package-repository";
+import { isFourDigitPin } from "@/lib/validation";
 
 type VerificationMember = {
   mattermostUsername?: string | null;
@@ -36,7 +37,7 @@ export default function CouponPartnerVerificationView({
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
   async function verifyCoupon() {
-    if (!item.issueId || !/^\d{4}$/.test(password)) {
+    if (!item.issueId || !isFourDigitPin(password)) {
       setMessage({ tone: "error", text: "제휴처 확인 PIN은 숫자 4자리로 입력해 주세요." });
       return;
     }

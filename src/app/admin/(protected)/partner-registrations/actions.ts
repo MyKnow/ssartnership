@@ -43,6 +43,7 @@ import {
   revalidatePartnerData,
 } from "@/app/admin/(protected)/_actions/shared-helpers";
 import { sanitizeReturnTo } from "@/lib/return-to";
+import { isFourDigitPin } from "@/lib/validation";
 
 type RegistrationCompanyRelation =
   | { managed_campus_slugs?: string[] | null }
@@ -878,7 +879,7 @@ export async function updatePartnerRegistrationRequestDetails(formData: FormData
   const rawBenefitVerificationPin = String(
     formData.get("benefitVerificationPin") ?? "",
   ).trim();
-  if (rawBenefitVerificationPin && !/^\d{4}$/.test(rawBenefitVerificationPin)) {
+  if (rawBenefitVerificationPin && !isFourDigitPin(rawBenefitVerificationPin)) {
     redirectAdminActionError(returnTo, "partner_form_details_invalid");
   }
   let benefitVerificationPinUpdate: {

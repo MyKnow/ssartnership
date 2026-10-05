@@ -15,7 +15,7 @@ import {
 } from "@/lib/graduate-verification-rate-limit";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
-import { isValidEmail } from "@/lib/validation";
+import { isSixDigitCode, isValidEmail } from "@/lib/validation";
 import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
 import {
   RouteJsonBodyError,
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
   const requestKind = body?.requestKind === undefined
     ? "graduate_signup"
     : parseGraduateVerificationRequestKind(body.requestKind);
-  if (!requestKind || !isValidEmail(email) || !/^\d{6}$/.test(code)) {
+  if (!requestKind || !isValidEmail(email) || !isSixDigitCode(code)) {
     return NextResponse.json({ ok: false, message: "이메일과 6자리 인증 코드를 확인해 주세요." }, { status: 400 });
   }
 

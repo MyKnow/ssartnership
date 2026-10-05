@@ -24,6 +24,7 @@ import {
   RouteJsonBodyError,
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
+import { isSixDigitCode } from "@/lib/validation";
 
 export const runtime = "nodejs";
 
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
   }
   const email = normalizeMemberEmail(body?.email);
   const code = typeof body?.code === "string" ? body.code.trim() : "";
-  if (!email || !/^\d{6}$/.test(code)) {
+  if (!email || !isSixDigitCode(code)) {
     return NextResponse.json({ ok: false, message: "이메일과 6자리 인증 코드를 확인해 주세요." }, { status: 400 });
   }
   const rateLimitContext = {

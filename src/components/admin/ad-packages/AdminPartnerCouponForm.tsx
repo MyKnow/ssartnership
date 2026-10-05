@@ -14,6 +14,7 @@ import {
 } from "@/lib/ad-package-validation";
 import type { AdCampaignWithStats, AdCoupon } from "@/lib/repositories/ad-package-repository";
 import { cn } from "@/lib/cn";
+import { FOUR_DIGIT_PIN_LENGTH } from "@/lib/validation";
 
 type ServerAction = (formData: FormData) => void | Promise<void>;
 
@@ -291,7 +292,7 @@ export default function AdminPartnerCouponForm({
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]{4}"
-                    maxLength={4}
+                    maxLength={FOUR_DIGIT_PIN_LENGTH}
                     autoComplete="off"
                     required={mode === "create"}
                     placeholder={mode === "edit" ? "변경 시 4자리 입력" : "4자리 숫자 입력"}

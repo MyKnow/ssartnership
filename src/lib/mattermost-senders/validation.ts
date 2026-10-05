@@ -1,6 +1,6 @@
+import { hasControlCharacters } from "@/lib/validation";
 import type { MattermostSenderCredentials } from "./crypto";
 
-const CONTROL_CHARACTER_REGEX = /[\u0000-\u001F\u007F]/;
 const MAX_LOGIN_ID_LENGTH = 256;
 const MAX_PASSWORD_LENGTH = 512;
 
@@ -37,14 +37,14 @@ export function parseMattermostSenderCredentialInput(
   if (
     !loginId
     || loginId.length > MAX_LOGIN_ID_LENGTH
-    || CONTROL_CHARACTER_REGEX.test(loginId)
+    || hasControlCharacters(loginId)
   ) {
     fieldErrors.loginId = "Mattermost 로그인 ID를 확인해 주세요.";
   }
   if (
     !password
     || password.length > MAX_PASSWORD_LENGTH
-    || CONTROL_CHARACTER_REGEX.test(password)
+    || hasControlCharacters(password)
   ) {
     fieldErrors.password = "Mattermost 비밀번호를 확인해 주세요.";
   }

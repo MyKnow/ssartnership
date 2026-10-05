@@ -10,6 +10,7 @@ import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useHydrated } from "@/hooks/useHydrated";
 import { normalizeMemberEmail } from "@/lib/member-domain";
+import { isSixDigitCode, SIX_DIGIT_CODE_LENGTH } from "@/lib/validation";
 
 type Step = "password" | "email" | "code";
 
@@ -99,7 +100,7 @@ export default function MemberEmailRecoveryForm() {
 
   async function verifyCode() {
     if (pending) return;
-    if (!/^\d{6}$/.test(code)) {
+    if (!isSixDigitCode(code)) {
       setFieldErrors({ code: "6자리 인증 코드를 입력해 주세요." });
       focusField(codeRef);
       return;
@@ -205,7 +206,7 @@ export default function MemberEmailRecoveryForm() {
                 ref={codeRef}
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                maxLength={6}
+                maxLength={SIX_DIGIT_CODE_LENGTH}
                 value={code}
                 onChange={(event) => {
                   setCode(event.target.value.replace(/\D/g, ""));

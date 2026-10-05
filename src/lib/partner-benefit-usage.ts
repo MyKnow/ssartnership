@@ -1,5 +1,6 @@
 import { getPartnerPeriodState } from "@/lib/partner-utils";
 import { getPartnerServiceMode } from "@/lib/partner-service-mode";
+import { isFourDigitPin } from "@/lib/validation";
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
@@ -25,7 +26,7 @@ function getKstDateString(now: Date) {
 }
 
 export function isPartnerBenefitUsePin(value: unknown): value is string {
-  return typeof value === "string" && /^\d{4}$/.test(value);
+  return isFourDigitPin(value);
 }
 
 function parsePositiveInteger(value: unknown) {

@@ -17,6 +17,7 @@ import {
 } from "@/lib/route-json-body";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { isMockDataSource } from "@/lib/mock/member";
+import { isFourDigitPin } from "@/lib/validation";
 
 export const runtime = "nodejs";
 
@@ -228,7 +229,7 @@ export async function POST(
     });
     return NextResponse.json({ ok: false, message: "혜택 정보를 확인해 주세요." }, { status: 400 });
   }
-  if (typeof body.pin !== "string" || !/^\d{4}$/.test(body.pin)) {
+  if (!isFourDigitPin(body.pin)) {
     scheduleAttemptLog(context, {
       actorId: session.userId,
       partnerId,
