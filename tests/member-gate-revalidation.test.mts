@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -29,13 +30,17 @@ test("회원 게이트 무효화는 동의·비밀번호 변경·인증 화면�
 });
 
 test("회원 인증 라우트는 게이트 무효화 헬퍼를 쓰고 효과 없는 홈 무효화를 하지 않는다", async () => {
-  const gateRoutes = [
+  const requiredGateRoutes = [
     "src/app/api/auth/login/route.ts",
-    "src/app/api/mm/login/route.ts",
     "src/app/api/mm/consent/route.ts",
     "src/app/api/mm/change-password/route.ts",
   ];
-  for (const path of gateRoutes) {
+  // The legacy Mattermost login API is being retired separately; keep checking
+  // it only while the route still exists.
+  const legacyGateRoutes = ["src/app/api/mm/login/route.ts"].filter((path) =>
+    existsSync(new URL(`../${path}`, import.meta.url)),
+  );
+  for (const path of [...requiredGateRoutes, ...legacyGateRoutes]) {
     const source = await read(path);
     assert.match(source, /revalidateMemberGatePaths\(\);/, path);
     assert.doesNotMatch(source, /revalidatePath\(/, path);
