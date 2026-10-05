@@ -29,6 +29,20 @@ Vercel Speed Insights·Analytics는 RF-04(#537)에서 제거했다. 브라우저
 3. 공용 Grafana `SSARTNERSHIP Operations` 대시보드(정본: `deploy/pve/grafana`)의 `LCP p75`·`INP p75`·`CLS p75`와 `최근 표본 수` 패널을 기록 표에 옮긴다.
 4. 검증 환경에서 전체 표본이 필요하면 `SELF_HOST_VITALS_SAMPLE_RATE=1`을 해당 환경에만 일시 적용하고, 측정 후 기본값으로 되돌린다.
 
+### 2026-10-05 실제 전송 관측
+
+sampling 0.1과 쿠키 없는 native keepalive fetch, LCP/INP/CLS의 세 필드 payload를 유지했다. 아래 숫자는 브라우저에서 보낸 건수와 collector의 histogram 증가량이며 성능 p75가 아니다.
+
+| 배포 | 브라우저·관측 방식 | 전송 | 수집 | 결과 |
+| --- | --- | ---: | ---: | --- |
+| PR #562 | headless-shell | 9 | 7 | 미도착 기록 보존 |
+| PR #562 | headless-shell, profile 유지 | 9 | 8 | profile 조기 종료만으로 원인을 설명할 수 없음 |
+| PR #562 | full Chromium | 9 | 9 | 해당 관측 창에서 전량 도착 |
+| 관측 이미지 별도 활성화 후 | full Chromium | 15 | 15 | 해당 관측 창에서 전량 도착 |
+| dev `ab82f89c` | full Chromium, 5개 sampled 문서 | 15 | 14 | LCP 5/5·INP 5/5·CLS 4/5 |
+
+최종 dev의 첫 관측은 41개 독립 context를 사용했다. 원래 15초 관측 창의 실패를 유지했고, profile 종료 후 읽기 전용 후속 확인에서도 CLS는 4건이었다. 같은 창의 edge 기록에는 다른 route도 섞여 POST 204 19건과 응답 전 취소 4건이 있다. 요청 ID를 수집하지 않아 누락된 단건과 특정 edge 요청을 연결할 수 없다. 해당 endpoint의 error/warn 기록은 없었으며 정확한 원인은 미해결이다. 이전 성공으로 마지막 실패를 대체하거나 브라우저 엔진만이 원인이라고 결론 내리지 않는다. [RF-12](https://github.com/MyKnow/ssartnership/issues/543)에서 추가 진단을 추적한다.
+
 ## 2. Lighthouse 실험실 측정
 
 `scripts/lighthouse-check.mjs`가 로컬 Production 빌드를 띄우고 sitemap의 공개 정적 경로를 Lighthouse performance 범주로 측정한다.
