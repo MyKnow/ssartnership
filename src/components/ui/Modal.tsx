@@ -1,29 +1,12 @@
 "use client";
 
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import { useEffect, useId, useRef } from "react";
+import { useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 import { FOCUS_RING_ON_OVERLAY_CLASS_NAME } from "@/components/ui/focus-ring";
-
-const focusableSelector = [
-  "a[href]",
-  "button:not([disabled]):not([tabindex='-1'])",
-  "input:not([disabled]):not([tabindex='-1'])",
-  "select:not([disabled]):not([tabindex='-1'])",
-  "textarea:not([disabled]):not([tabindex='-1'])",
-  "[tabindex]:not([tabindex='-1'])",
-].join(",");
-
-function getFocusableElements(container: HTMLElement) {
-  return Array.from(
-    container.querySelectorAll<HTMLElement>(focusableSelector),
-  ).filter(
-    (element) =>
-      !element.hasAttribute("hidden") &&
-      element.getAttribute("aria-hidden") !== "true",
-  );
-}
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 
 export default function Modal({
   open,
@@ -46,89 +29,11 @@ export default function Modal({
 }) {
   const portalRoot = typeof document === "undefined" ? null : document.body;
   const panelRef = useRef<HTMLDivElement>(null);
-  const openerRef = useRef<HTMLElement | null>(null);
-  const onCloseRef = useRef(onClose);
   const titleId = useId();
   const descriptionId = useId();
 
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    openerRef.current =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-    const frame = window.requestAnimationFrame(() => {
-      const panel = panelRef.current;
-      if (!panel) {
-        return;
-      }
-      const [firstFocusable] = getFocusableElements(panel);
-      (firstFocusable ?? panel).focus();
-    });
-
-    function handleKeyDown(event: KeyboardEvent) {
-      const panel = panelRef.current;
-      if (!panel) {
-        return;
-      }
-
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onCloseRef.current();
-        return;
-      }
-
-      if (event.key !== "Tab") {
-        return;
-      }
-
-      const focusableElements = getFocusableElements(panel);
-      if (focusableElements.length === 0) {
-        event.preventDefault();
-        panel.focus();
-        return;
-      }
-
-      const firstFocusable = focusableElements[0];
-      const lastFocusable = focusableElements[focusableElements.length - 1];
-      if (event.shiftKey && document.activeElement === firstFocusable) {
-        event.preventDefault();
-        lastFocusable.focus();
-      } else if (!event.shiftKey && document.activeElement === lastFocusable) {
-        event.preventDefault();
-        firstFocusable.focus();
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      document.removeEventListener("keydown", handleKeyDown);
-      if (openerRef.current?.isConnected) {
-        openerRef.current.focus();
-      }
-    };
-  }, [open]);
+  useBodyScrollLock(open);
+  useDialogFocus({ open, containerRef: panelRef, onClose });
 
   if (!portalRoot) {
     return null;
@@ -185,7 +90,7 @@ export default function Modal({
               <XMarkIcon className="h-5 w-5" aria-hidden="true" />
             </button>
           </div>
-          <div className={cn("mt-4 min-h-0 flex-1", bodyClassName)}>
+          <div className={cn("mt-4 min-h-0 flex-1 overscroll-contain", bodyClassName)}>
             {children}
           </div>
         </div>

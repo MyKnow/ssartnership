@@ -20,6 +20,7 @@ import Surface from "@/components/ui/Surface";
 import type { HeaderSession } from "@/lib/header-session";
 import { buildSettingsHref, isFocusedSiteFlow } from "@/lib/site-navigation";
 import { cn } from "@/lib/cn";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 const BROWSER_NAVIGATION_ITEMS = [
   { label: "홈", href: "/", Icon: HomeIcon, memberOnly: false },
@@ -108,17 +109,16 @@ export default function TabletMenu({
       );
     });
 
+  useBodyScrollLock(open);
+
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!open || !dialog) return;
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     // native dialog로 배경의 클릭과 포커스를 차단합니다.
     dialog.showModal();
     return () => {
       dialog.close();
-      document.body.style.overflow = previousOverflow;
       const opener = openerRef.current;
       const visibleTrigger = opener?.getClientRects().length ? opener :
         Array.from(document.querySelectorAll<HTMLButtonElement>(

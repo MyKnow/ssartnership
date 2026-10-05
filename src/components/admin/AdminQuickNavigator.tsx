@@ -18,6 +18,7 @@ import {
 } from "@heroicons/react/24/outline";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import {
   ADMIN_NAV_ICON_BY_KEY,
   findAdminNavItems,
@@ -123,6 +124,7 @@ export default function AdminQuickNavigatorProvider({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  useBodyScrollLock(open);
   const [query, setQuery] = useState("");
   const [activeItemIndex, setActiveItemIndex] = useState(-1);
   const [recentHrefs, setRecentHrefs] = useState<string[]>([]);
@@ -251,8 +253,6 @@ export default function AdminQuickNavigatorProvider({
       return;
     }
 
-    const previousBodyOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     inputRef.current?.focus();
 
     const getFocusableControls = () =>
@@ -296,7 +296,6 @@ export default function AdminQuickNavigatorProvider({
 
     window.addEventListener("keydown", onKeyDown);
     return () => {
-      document.body.style.overflow = previousBodyOverflow;
       window.removeEventListener("keydown", onKeyDown);
       openerRef.current?.focus();
     };
@@ -385,7 +384,7 @@ export default function AdminQuickNavigatorProvider({
                   </form>
                 </div>
 
-                <div className="min-h-0 overflow-y-auto p-3 sm:p-4">
+                <div className="min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-4">
                   {isRoutePending ? (
                     <p className="mb-3 text-sm font-medium text-muted-foreground" role="status" aria-live="polite">
                       {pendingDestination?.startsWith("/admin/search")

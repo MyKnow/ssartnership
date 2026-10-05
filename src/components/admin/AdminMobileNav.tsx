@@ -7,6 +7,7 @@ import { ChevronRightIcon } from "@heroicons/react/24/outline";
 import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { SITE_NAME } from "@/lib/site";
 import {
   type AdminNavGroup,
@@ -91,6 +92,7 @@ export default function AdminMobileNav({
   triggerContent?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  useBodyScrollLock(open);
   const pathname = usePathname();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -104,8 +106,6 @@ export default function AdminMobileNav({
     }
 
     const opener = menuButtonRef.current;
-    const previousBodyOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     closeButtonRef.current?.focus();
 
     const getFocusableControls = () =>
@@ -149,7 +149,6 @@ export default function AdminMobileNav({
     window.addEventListener("keydown", onKeyDown);
 
     return () => {
-      document.body.style.overflow = previousBodyOverflow;
       window.removeEventListener("keydown", onKeyDown);
       opener?.focus();
     };
@@ -251,7 +250,7 @@ export default function AdminMobileNav({
                     </div>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto px-5 py-5">
+                  <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-5">
                     <div className="flex flex-col gap-4">
                       {navGroups.map((group) => (
                         <DrawerSection

@@ -7,7 +7,10 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import InlineMessage from "@/components/ui/InlineMessage";
 import Input from "@/components/ui/Input";
+import Modal from "@/components/ui/Modal";
 import Select from "@/components/ui/Select";
+import { FOCUS_RING_ON_BACKGROUND_CLASS_NAME } from "@/components/ui/focus-ring";
+import { cn } from "@/lib/cn";
 import ImageCropDialog from "@/components/media/ImageCropDialog";
 import { useSingleImageUploadDraft } from "@/components/media/useSingleImageUploadDraft";
 import {
@@ -556,7 +559,7 @@ export default function GraduateVerificationApplicationView({
             <input ref={certificateInputRef} type="file" accept="application/pdf,.pdf" aria-label="교육이수증 PDF 파일 선택" className="sr-only" onChange={(event) => { handleCertificateChange(event.target.files?.[0] ?? null); event.target.value = ""; }} />
             <input ref={photoInputRef} type="file" accept={IMAGE_SOURCE_ACCEPT} aria-label="본인 사진 파일 선택" className="sr-only" onChange={(event) => { void handlePhotoChange(event.target.files?.[0] ?? null); event.target.value = ""; }} />
             {requiresCertificate ? <div className="grid min-w-0 gap-3 rounded-card border border-border bg-surface-inset p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><p className="font-semibold">교육이수증 PDF</p><p className="mt-1 text-sm text-muted-foreground">PDF(최대 10MB)</p>{certificateFile ? <p className="text-token mt-2 text-sm font-medium text-success">선택됨: {certificateFile.name}</p> : null}</div><Button variant="secondary" onClick={chooseCertificate}>{certificateFile ? "파일 바꾸기" : "PDF 선택"}</Button></div> : null}
-            {requiresProfileImage ? <div className="grid min-w-0 gap-3 rounded-card border border-border bg-surface-inset p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><p className="font-semibold">1:1 본인 사진</p><p className="mt-1 text-ko-pretty text-sm text-muted-foreground">얼굴이 분명하게 보이는 사진(최대 5MB)</p></div><div className="flex shrink-0 items-center gap-3">{photoPreviewUrl ? <button type="button" className="rounded-[1rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={() => setPhotoPreviewOpen(true)} aria-label="선택한 본인 사진 크게 보기"><Image src={photoPreviewUrl} alt="선택한 본인 사진 미리보기" width={84} height={84} unoptimized className="h-[84px] w-[84px] rounded-[1rem] border border-border object-cover" /></button> : null}<Button variant="secondary" onClick={choosePhoto} loading={photoSelecting} loadingText="사진 변환 중" disabled={pending}>{photoFile ? "사진 바꾸기" : "사진 선택"}</Button></div></div> : null}
+            {requiresProfileImage ? <div className="grid min-w-0 gap-3 rounded-card border border-border bg-surface-inset p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><p className="font-semibold">1:1 본인 사진</p><p className="mt-1 text-ko-pretty text-sm text-muted-foreground">얼굴이 분명하게 보이는 사진(최대 5MB)</p></div><div className="flex shrink-0 items-center gap-3">{photoPreviewUrl ? <button type="button" className={cn("rounded-[1rem]", FOCUS_RING_ON_BACKGROUND_CLASS_NAME)} onClick={() => setPhotoPreviewOpen(true)} aria-label="선택한 본인 사진 크게 보기"><Image src={photoPreviewUrl} alt="선택한 본인 사진 미리보기" width={84} height={84} unoptimized className="h-[84px] w-[84px] rounded-[1rem] border border-border object-cover" /></button> : null}<Button variant="secondary" onClick={choosePhoto} loading={photoSelecting} loadingText="사진 변환 중" disabled={pending}>{photoFile ? "사진 바꾸기" : "사진 선택"}</Button></div></div> : null}
             <label className="flex items-center justify-center gap-3 rounded-card border border-border bg-surface-control p-4 text-sm"><input type="checkbox" checked={consented} onChange={(event) => setConsented(event.target.checked)} className="h-5 w-5 shrink-0 accent-primary" /><span>교육이수증과 본인 사진을 수료생 인증 검토 및 인증 카드·유효 QR 검증 화면 표시 목적으로 처리하는 데 동의합니다.</span></label>
             <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 pt-2"><Button variant="ghost" onClick={() => setStep("details")}>이전</Button><Button onClick={submit} loading={pending} loadingText="제출 중" disabled={!canSubmit}>{isResubmission ? "보완 제출" : isExistingMemberRecovery ? "복구 신청 제출" : "수료생 인증 제출"}</Button></div>
           </section>
@@ -586,28 +589,14 @@ export default function GraduateVerificationApplicationView({
           onCancel={() => setCropOpen(false)}
           onApply={applyCroppedPhoto}
         />
-        {photoPreviewUrl && photoPreviewOpen ? (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 sm:p-6"
-            role="dialog"
-            aria-modal="true"
-            aria-label="선택한 본인 사진 확대"
+        {photoPreviewUrl ? (
+          <Modal
+            open={photoPreviewOpen}
+            title="선택한 본인 사진 확대"
+            onClose={() => setPhotoPreviewOpen(false)}
+            panelClassName="max-w-md"
           >
-            <button
-              type="button"
-              className="absolute inset-0"
-              onClick={() => setPhotoPreviewOpen(false)}
-              aria-label="선택한 본인 사진 확대 닫기"
-            />
-            <button
-              type="button"
-              className="absolute right-6 top-6 z-10 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white"
-              onClick={() => setPhotoPreviewOpen(false)}
-              aria-label="닫기"
-            >
-              ✕
-            </button>
-            <div className="relative z-10 aspect-square w-full max-w-md overflow-hidden rounded-3xl border border-white/15 bg-white/5 shadow-overlay">
+            <div className="relative aspect-square w-full overflow-hidden rounded-card border border-border bg-surface-inset">
               <Image
                 src={photoPreviewUrl}
                 alt="선택한 본인 사진 확대"
@@ -617,7 +606,7 @@ export default function GraduateVerificationApplicationView({
                 className="object-contain"
               />
             </div>
-          </div>
+          </Modal>
         ) : null}
       </Card>
     </div>

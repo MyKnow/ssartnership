@@ -6,6 +6,7 @@ import LightboxModal from "@/components/partner-image-carousel/LightboxModal";
 import { clampCarouselZoom, normalizeCarouselIndex } from "@/components/partner-image-carousel/helpers";
 import type { CarouselOffset } from "@/components/partner-image-carousel/types";
 import { getCachedImageUrl } from "@/lib/image-cache";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 export default function PartnerReviewLightbox({
   images,
@@ -31,17 +32,7 @@ export default function PartnerReviewLightbox({
     setOffset({ x: 0, y: 0 });
   }, [initialIndex]);
 
-  useEffect(() => {
-    if (!portalRoot) {
-      return;
-    }
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [portalRoot]);
+  useBodyScrollLock(Boolean(portalRoot));
 
   const normalizedIndex = useMemo(
     () => normalizeCarouselIndex(index, images.length),

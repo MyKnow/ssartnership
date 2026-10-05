@@ -12,6 +12,7 @@ import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { type ImageTransformPolicy } from "@/lib/image-upload/policy";
 
 const Cropper = dynamic(() => import("react-easy-crop"), { ssr: false });
@@ -132,20 +133,17 @@ export default function ImageCropDialog({
   const effectiveQuality = policy ? policy.quality / 100 : quality;
   const canApply = requiresServerFallback ? Boolean(sourceFile) : croppedAreaPixels !== null;
 
+  useBodyScrollLock(open && Boolean(portalRoot));
+
   useEffect(() => {
     if (!open || !portalRoot) {
       return;
     }
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     setCrop({ x: 0, y: 0 });
     setZoom(1);
     setCroppedAreaPixels(null);
     setError(null);
     setRequiresServerFallback(false);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
   }, [open, portalRoot, sourceFile, sourceUrl]);
 
   const exportFile = async () => {
@@ -210,7 +208,7 @@ export default function ImageCropDialog({
 
         <div
           data-testid="image-crop-dialog-content"
-          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-3 sm:px-5 sm:py-4"
+          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3 sm:px-5 sm:py-4"
         >
           <div className="grid min-h-0 gap-3 sm:gap-4">
             <div
