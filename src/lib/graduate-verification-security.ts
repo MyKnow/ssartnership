@@ -1,5 +1,4 @@
 import { cookies } from "next/headers";
-import { unstable_noStore as noStore } from "next/cache";
 import {
   createHmacDigest,
   splitSignedToken,
@@ -88,7 +87,6 @@ async function setGraduateChallengeSession(
 }
 
 async function getGraduateChallengeSession(cookieName: string) {
-  noStore();
   const store = await cookies();
   return parseApplicationSessionToken(store.get(cookieName)?.value);
 }

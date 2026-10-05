@@ -1,5 +1,4 @@
 import { cookies } from "next/headers";
-import { unstable_noStore as noStore } from "next/cache";
 import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "@/lib/hmac.js";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -75,7 +74,6 @@ export async function setMemberEmailRecoverySession(input: {
 }
 
 export async function getMemberEmailRecoverySession() {
-  noStore();
   const token = (await cookies()).get(COOKIE_NAME)?.value;
   const session = token ? parseSession(token) : null;
   if (!session) return null;

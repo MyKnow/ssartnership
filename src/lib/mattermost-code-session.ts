@@ -1,5 +1,4 @@
 import { cookies } from "next/headers";
-import { unstable_noStore as noStore } from "next/cache";
 import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "@/lib/hmac.js";
 import {
   normalizeMattermostSignupParseReason,
@@ -132,7 +131,6 @@ export async function setMattermostCodeSession(session: MattermostCodeSession) {
 export async function getMattermostCodeSession(
   purpose: MattermostCodeSessionPurpose,
 ) {
-  noStore();
   const store = await cookies();
   const session = verifySessionToken(store.get(COOKIE_NAME)?.value ?? "");
   return session?.purpose === purpose ? session : null;

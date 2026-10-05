@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { unstable_noStore as noStore } from "next/cache";
 import SiteHeader from "@/components/SiteHeader";
 import Container from "@/components/ui/Container";
 import ShellHeader from "@/components/ui/ShellHeader";
@@ -98,8 +97,6 @@ export default async function AppleWalletVerifyPage({
 }: {
   params: Promise<{ token: string }>;
 }) {
-  noStore();
-
   const headerSessionPromise = getHeaderSession();
   const resolvedParams = await params;
   const rawToken = decodeWalletPassTokenSegment(resolvedParams?.token);
