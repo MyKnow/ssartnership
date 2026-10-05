@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
+import postcss, { type Rule } from "postcss";
+import { optimize } from "@tailwindcss/node";
 import manifest from "@/app/manifest";
 import robots from "@/app/robots";
 import { CAMPUS_DIRECTORY } from "@/lib/campuses";
@@ -45,6 +47,48 @@ test("web app manifest uses shared colors, a stable id, and no orientation lock"
   assert.equal("orientation" in value, false);
   assert.deepEqual(value.categories, ["lifestyle", "shopping"]);
   assert.equal(value.lang, "ko-KR");
+});
+
+function readStandaloneOverscroll(css: string) {
+  const values: Array<{ selector: string; value: string }> = [];
+  postcss.parse(css).walkAtRules("media", (atRule) => {
+    if (atRule.params.replace(/\s+/g, "") !== "(display-mode:standalone)") return;
+    atRule.walkDecls("overscroll-behavior-y", (declaration) => {
+      const rule = declaration.parent;
+      const selector = rule?.type === "rule" ? (rule as Rule).selectors.join(",") : "";
+      values.push({ selector, value: declaration.value });
+    });
+  });
+  return values;
+}
+
+test("standalone app display blocks document pull-to-refresh only", () => {
+  // The manifest opens the installed app in standalone mode; the matching media
+  // query keeps an accidental pull from reloading the page and dropping input.
+  assert.equal(manifest().display, "standalone");
+  const expected = [{ selector: "html,body", value: "none" }];
+  assert.deepEqual(readStandaloneOverscroll(globalsCss), expected);
+
+  let block = "";
+  postcss.parse(globalsCss).walkAtRules("media", (atRule) => {
+    if (atRule.params.replace(/\s+/g, "") === "(display-mode:standalone)") block = atRule.toString();
+  });
+  const optimized = optimize(block, { minify: true }).code;
+  assert.deepEqual(readStandaloneOverscroll(optimized), expected, "production CSS keeps the rule");
+
+  // Ordinary browser tabs keep the native overscroll behavior.
+  const root = postcss.parse(globalsCss);
+  root.walkAtRules("media", (atRule) => {
+    if (atRule.params.replace(/\s+/g, "") === "(display-mode:standalone)") atRule.remove();
+  });
+  const outsideStandalone: string[] = [];
+  root.walkRules((rule) => {
+    if (!["html", "body"].includes(rule.selector)) return;
+    rule.walkDecls(/^overscroll-behavior/, (declaration) => {
+      outsideStandalone.push(declaration.prop);
+    });
+  });
+  assert.deepEqual(outsideStandalone, []);
 });
 
 test("manifest icons exist with the sizes they declare", () => {
