@@ -129,6 +129,8 @@ function isIpv4CompatibleIpv6Address(bytes: Uint8Array) {
  * - 64:ff9b:1::/48 NAT64 local-use prefix (RFC 8215)
  * - 2002::/16     6to4 (RFC 3056, RFC 7526으로 폐기)
  * - 2001::/32     Teredo (RFC 4380)
+ * - ::ffff:0:0:0/96 SIIT IPv4-translated (RFC 2765). 내장 IPv4로 평가하는
+ *   IPv4-mapped(`::ffff:0:0/96`)와 달리 대역째 차단한다.
  *
  * 이 판정은 이미지 프록시·프로필 사진 원격 fetch와 웹 푸시 endpoint 신뢰 검사가 함께
  * 쓴다. DNS64 resolver 뒤에서는 공개 호스트도 64:ff9b::로 해석돼 위 경로가 모두
@@ -140,6 +142,13 @@ function isIpv4TransitionIpv6Address(bytes: Uint8Array) {
   if (isNat64Prefix && bytes[4] === 0x00 && bytes[5] === 0x01) return true;
   if (bytes[0] === 0x20 && bytes[1] === 0x02) return true;
   if (bytes[0] === 0x20 && bytes[1] === 0x01 && bytes[2] === 0x00 && bytes[3] === 0x00) return true;
+  const isSiitPrefix =
+    bytes.slice(0, 8).every((value) => value === 0) &&
+    bytes[8] === 0xff &&
+    bytes[9] === 0xff &&
+    bytes[10] === 0x00 &&
+    bytes[11] === 0x00;
+  if (isSiitPrefix) return true;
   return false;
 }
 

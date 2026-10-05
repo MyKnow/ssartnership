@@ -37,6 +37,13 @@ test("public ip checks block IPv6 transition prefixes that embed IPv4 targets", 
   // Teredo(2001::/32)
   assert.equal(isPublicIpAddress("2001:0:4136:e378:8000:63bf:3fff:fdd2"), false);
   assert.equal(isPublicIpAddress("2001::1"), false);
+  // SIIT IPv4-translated(::ffff:0:0:0/96)는 내장 주소가 공개 IPv4여도 차단한다.
+  assert.equal(isPublicIpAddress("::ffff:0:7f00:1"), false);
+  assert.equal(isPublicIpAddress("::ffff:0:a00:1"), false);
+  assert.equal(isPublicIpAddress("::ffff:0:8.8.8.8"), false);
+  // IPv4-mapped(::ffff:0:0/96)는 기존처럼 내장 IPv4 기준으로 판정한다.
+  assert.equal(isPublicIpAddress("::ffff:127.0.0.1"), false);
+  assert.equal(isPublicIpAddress("::ffff:8.8.8.8"), true);
   // 인접한 공개 대역은 그대로 허용한다.
   assert.equal(isPublicIpAddress("2001:4860:4860::8844"), true);
   assert.equal(isPublicIpAddress("64:ff9c::1"), true);
