@@ -74,6 +74,8 @@ PVE 이전 뒤 Mac의 전용 백업 키는 Mac에 남기며 pinned PVE SSH의 `P
 
 SSH 세션에서 Keychain 접근이 macOS -25308로 거절되면 운영자가 로그인한 Mac의 GUI Terminal에서 동일한 복구 helper를 실행하고 접근 요청을 직접 허용한다. 키 자체나 비밀번호를 출력·전송하지 않으며 키 ACL을 넓히지 않는다. Keychain 앱 실행 허용과 실제 복구 키 읽기 성공은 별도 단계다.
 
+승인된 오프라인 키 사본을 사용하는 경우 [운영 연속성의 사본 가져오기 절차](./operations-continuity.md#보관-사본으로-복호화-준비)를 따른다. version 1 JSON을 `age -i`에 직접 넘기지 않고 같은 내보내기 도구의 `--import`로 비공개 identity 파일을 만든다. Production 복원 명령의 마지막 인자에 `offline-escrow`를 붙이고, 현재 Keychain 키를 사용했다면 `active-host`로 기록한다. 키 가져오기 성공과 암호문 복호화 성공, 격리 DB·Storage 복원 성공을 각각 확인한다.
+
 ### 온라인 백업 방식과 이메일 수신
 
 2026-09-10에 일일 중단 백업을 온라인 방식으로 전환했다. 2026-09-29 자체 호스팅 운영 주기 조정에서는 위 6시간 일정과 서버 28개 보관을 적용한다. `scripts/self-host-operations/production-online-backup.mjs capture`는 실행 중인 PostgreSQL 17의 `pg_basebackup`을 사용한다. WAL을 포함한 단일 archive가 완성되지 않으면 실패한다. 별도 tablespace 또는 unlogged 사용자 테이블이 있으면 실행 전에 거절한다. WAL 보존이 부족하여 backup 중 필요한 WAL이 제거돼도 성공으로 처리하지 않는다. 이 방식은 정기 스냅샷 복구 지점이며 연속 PITR 서비스가 아니다.
@@ -301,4 +303,3 @@ Web Vitals는 telemetry 컨테이너 메모리의 고정 histogram에만 누적�
 3. Production VM에 새 cron unit(`ReadWritePaths`에 textfile 디렉터리 추가)과 control 릴리스를 설치하고 `systemd-analyze verify` 후 daemon-reload한다. 첫 실행 뒤 textfile과 `ssartnership_production_cron_last_success_seconds`를 확인한다.
 4. 두 앱 VM의 수신기 unit을 교체하고 daemon-reload한다. 다음 timer 실행 뒤 `ssartnership_release_receiver_last_success_seconds`를 확인한다.
 5. 앱 배포 후 내부에서 `/api/ready`가 200이고 공개 주소에서는 404인지, `ssartnership_app_ready_success`가 세 의존성 모두 1인지 확인한다.
-

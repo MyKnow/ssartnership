@@ -52,4 +52,4 @@ Runbook은 대상 환경·필요 권한·선행 조건·부작용·성공·중�
 
 ## 복원 측정과 미승인 목표
 
-새 복원 영수증은 startedAt·finishedAt·durationSeconds·identitySource를 기록한다. 이 시간은 한 번의 격리 복원 측정이며 장애 인지·사본 확보·승인·사용자 확인 시간까지 포함한 RTO가 아니다. RPO는 복원한 사본의 마지막 보존 시각과 사고 시각을 별도로 대조해야 한다. 기존 영수증에 시작 시각이 없으면 시간을 추정하지 않는다. 목표 수치·승인은 아직 별도 결정이다. [운영 연속성](./runbooks/operations-continuity.md)에 측정·인계 형식을 둔다.
+Production 스냅샷의 `restore-production-backup.mjs` 영수증은 startedAt·finishedAt·durationSeconds·identitySource를 기록한다. 이 시간은 이미 복호화한 입력의 격리 복원 측정이며 장애 인지·키 가져오기·사본 확보·승인·사용자 확인 시간까지 포함한 RTO가 아니다. pgBackRest/Restic 복원이나 기존 `rehearse-pulled-recovery.mjs` 영수증이 같은 형식이라는 뜻은 아니다. RPO는 복원한 사본의 마지막 보존 시각과 사고 시각을 별도로 대조해야 한다. 기존 영수증에 시작 시각이 없으면 시간을 추정하지 않는다. 목표 수치·승인은 아직 별도 결정이다. [운영 연속성](./runbooks/operations-continuity.md)에 측정·인계 형식을 둔다.

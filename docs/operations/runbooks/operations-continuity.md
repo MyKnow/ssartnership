@@ -11,13 +11,32 @@ authority: normative
 
 ## 복구 키 오프라인 보관
 
-1. 기존 [백업 절차](./self-host-operations.md)의 age identity를 읽을 권한과 승인된 외부 보관 매체를 준비한다.
+1. 현재 [Production 암호문 백업과 Keychain custody](./self-host-observability.md#production-6시간-온라인-암호화-스냅샷)의 X25519 age identity를 읽을 권한과 승인된 외부 보관 매체를 준비한다. Keychain 접근은 운영자가 승인한 기존 복구 경로를 사용하며 ACL을 넓히지 않는다. 이 내보내기 도구는 이미 승인된 비공개 identity 파일만 받으며 Keychain에서 키를 자동 추출하지 않는다. pgBackRest/Restic overlay의 암호와는 다른 자료다.
 2. source 파일 0600, 목적 디렉터리 0700, 운영자 소유, 저장소 밖 절대·정규 경로를 확인한다. symlink나 기존 목적 파일이면 중단한다.
-3. `node scripts/self-host-operations/export-recovery-identity.mjs <source> <destination>`을 운영자 터미널에서 실행한다. 경로와 결과 파일은 공유 로그에 복사하지 않는다. 출력은 성공 여부·형식 버전만 포함한다. 결과 JSON은 비밀 자료다.
+3. `node scripts/self-host-operations/export-recovery-identity.mjs <source> <destination>`을 운영자 터미널에서 실행한다. 단일 X25519 identity의 Bech32 길이·체크섬·패딩을 검사한다. 다른 키 형식이나 손상된 키는 거부한다. 경로와 결과 파일은 공유 로그에 복사하지 않는다. 출력은 성공 여부·형식 버전만 포함한다. version 1 JSON은 암호화된 봉투가 아니라 키 원문을 담은 비밀 자료이므로 승인된 암호화 매체에만 보관한다.
 4. 매체 암호화·봉인·수신자·보관 위치를 비공개 인벤토리에 기록한다. 키 사본을 사용한 격리 복원 시험을 끝내기 전에는 보관 완료로 판정하지 않는다.
-5. 기존 [복원 절차](./self-host-operations.md)의 restore 스크립트 마지막 선택 인자로 `offline-escrow` 또는 `active-host`를 명시한다. 생략한 오래된 호출의 영수증은 `not-recorded`다. 출처 표시는 운영자의 보고이며 봉인이나 키 진위를 증명하지 않는다.
+5. 아래 사본 가져오기와 [Production 격리 복원](./self-host-observability.md#production-6시간-온라인-암호화-스냅샷)을 수행한다. `restore-production-backup.mjs <복원경로> <databaseSystemId> <키출처>`의 마지막 선택 인자는 실제 사용한 키에 따라 `offline-escrow` 또는 `active-host`다. 생략한 오래된 호출의 영수증은 `not-recorded`다. 출처 표시는 운영자의 보고이며 봉인이나 키 진위를 증명하지 않는다.
 
-스크립트는 덮어쓰지 않는다. 실패하면 실제 사본 생성 여부를 운영자가 확인한 뒤 새 목적 경로로 재실행한다. 어떤 경우에도 키를 표준 출력·이슈·채팅·Git에 붙이지 않는다.
+스크립트는 덮어쓰지 않는다. 실행 파일은 배포된 `control/current` 링크를 통해 실행할 수 있지만 키 source와 목적 디렉터리는 위 정규 경로 규칙을 지켜야 한다. export는 `{"exported":true,"version":1}`, import는 `{"imported":true,"version":1}` 영수증과 exit 0을 모두 확인한다. 영수증 없는 exit 0은 완료가 아니다. 실패하면 실제 사본 생성 여부를 운영자가 확인한 뒤 새 목적 경로로 재실행한다. 어떤 경우에도 키를 표준 출력·이슈·채팅·Git에 붙이지 않는다.
+
+실행 파일의 정규 경로 확인은 `export-recovery.mjs`, `export-recovery-identity.mjs`, `pull-recovery.mjs`, `rehearse-pulled-recovery.mjs`, `restore-production-backup.mjs`에 적용된다. 직접 경로와 `control/current` 실행은 같은 인자 검증·운영자 권한·입력 경로 규칙을 거친다. 이 실행 경로 지원이 키·백업 입력의 symlink를 허용하거나 실제 복구 완료를 증명하지는 않는다. 각 도구의 성공 영수증과 본문에 정한 사본·복원 결과를 별도로 확인한다.
+
+### 보관 사본으로 복호화 준비
+
+JSON은 `age -i` 입력 형식이 아니므로 `--import`로 단일 identity 파일을 만든다. 가져오기도 envelope 버전·필드·시각과 키 체크섬을 검사하며, source 0600·목적 디렉터리 0700·운영자 소유·저장소 밖 정규 경로와 기존 파일 거부 규칙이 동일하다. 운영자가 승인한 암호화 작업 매체나 격리 복원 호스트의 비공개 메모리 파일시스템을 사용한다. FileVault가 꺼진 Mac 일반 디스크에 키·DB·Storage 평문을 남기지 않는다.
+
+아래 경로 표기는 운영자가 비공개로 정한 값으로 바꾼다. shell 추적(`set -x`)을 켜지 않는다. 원본 봉인 사본과 기존 복원 경로는 덮어쓰지 않는다.
+
+```bash
+umask 077
+node scripts/self-host-operations/export-recovery-identity.mjs --import "<sealed-json>" "<private-working-directory>/identity.txt"
+age --decrypt --identity "<private-working-directory>/identity.txt" \
+  --output "<private-working-directory>/snapshot.tar" "<verified-ciphertext>"
+```
+
+실행 전 암호문의 bytes·SHA256·백업 ID를 성공 receipt와 대조하고 모든 출력 경로가 없는지 확인한다. 복호화는 검증한 기존 age CLI로 실행하며 키 문자열을 인자·파이프 출력으로 전달하지 않는다. 성공 exit code와 인증 복호화 완료가 있어야 다음 단계로 진행한다. 실패한 출력이나 파일 존재만으로 복구 가능 판정을 내리지 않는다.
+
+복호화된 바깥 tar는 `database.tar.gz`, `storage.tar`, `data.env`, `compose.json`, `app.env`, `manifest.json`의 정규 파일만 담아야 한다. 경로 이탈·링크·예상하지 않은 항목이 없음을 검토한 뒤 Production 복원 도구가 허용하는 새 root 전용 격리 경로에만 푼다. `databaseSystemId`를 receipt·manifest와 대조하고 위 `restore-production-backup.mjs`를 `offline-escrow`로 실행한다. 원본 DB·Storage mount와 외부 네트워크 없이 전체 행·파일 동등성이 확인되어야 실제 복원 완료다. 이번에 만든 작업용 identity와 평문은 종료 후 정확한 경로를 확인해 정리하고 봉인 원본은 보존한다. 파일 삭제만으로 매체의 안전한 소거를 증명하지 않는다.
 
 ## 경보별 첫 조치
 
