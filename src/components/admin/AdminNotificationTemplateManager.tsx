@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Badge from "@/components/ui/Badge";
 import FormMessage from "@/components/ui/FormMessage";
 import SubmitButton from "@/components/ui/SubmitButton";
 import Surface from "@/components/ui/Surface";
-import { renderEmailBody } from "@/lib/email-content";
 import type {
   NotificationTemplateAudience,
   NotificationTemplateBodyFormat,
@@ -17,7 +17,22 @@ import type {
   NotificationTemplateSummary,
   ResolvedNotificationTemplate,
 } from "@/lib/notification-templates/repository.server";
-import { renderNotificationTemplate } from "@/lib/notification-templates/template";
+import {
+  NOTIFICATION_TEMPLATE_SAMPLE_ERROR,
+  renderNotificationTemplateSample,
+} from "@/lib/notification-templates/sample";
+
+// 이메일 미리보기는 marked·sanitize-html을 끌어오므로 이메일 편집기를 열 때만 불러온다.
+const AdminEmailPreview = dynamic(
+  () => import("@/components/admin/AdminEmailPreview"),
+  {
+    loading: () => (
+      <p className="text-xs text-muted-foreground" role="status">
+        이메일 미리보기를 준비하는 중입니다.
+      </p>
+    ),
+  },
+);
 
 type FormAction = (formData: FormData) => void | Promise<void>;
 type TemplateStatusFilter =
@@ -62,39 +77,14 @@ const bodyFormatLabels: Record<NotificationTemplateBodyFormat, string> = {
   html: "제한된 HTML",
 };
 
-function getSampleValues(variables: ResolvedNotificationTemplate["variables"]) {
-  return Object.fromEntries(
-    variables.map((variable) => [
-      variable.name,
-      variable.example ?? `${variable.label} 예시`,
-    ]),
-  );
-}
-
 function renderSample(
   template: string,
   variables: ResolvedNotificationTemplate["variables"],
 ) {
-  try {
-    return renderNotificationTemplate(template, getSampleValues(variables));
-  } catch {
-    return "샘플 값을 완성할 수 없습니다. 필수 변수 계약을 확인해 주세요.";
-  }
-}
-
-function renderEmailSample(
-  template: string,
-  format: NotificationTemplateBodyFormat,
-  variables: ResolvedNotificationTemplate["variables"],
-) {
-  try {
-    return renderEmailBody(
-      renderNotificationTemplate(template, getSampleValues(variables)),
-      format,
-    );
-  } catch {
-    return null;
-  }
+  return (
+    renderNotificationTemplateSample(template, variables) ??
+    NOTIFICATION_TEMPLATE_SAMPLE_ERROR
+  );
 }
 
 function insertVariable(value: string, variableName: string) {
@@ -188,11 +178,6 @@ function TemplateEditor({
 
     return () => controller.abort();
   }, [detail, detailRequestKey, isOpen, template.channel, template.eventKey]);
-
-  const emailPreview =
-    detail?.channel === "email"
-      ? renderEmailSample(bodyTemplate, bodyFormat, template.variables)
-      : null;
 
   const canTestSend = Boolean(
     selectedTestRecipient &&
@@ -420,22 +405,12 @@ function TemplateEditor({
                 <span className="font-semibold text-foreground">제목:</span>{" "}
                 {renderSample(titleTemplate, template.variables)}
               </p>
-              {template.channel === "email" && emailPreview ? (
-                <div className="grid gap-2">
-                  <p className="font-semibold text-foreground">
-                    이메일 HTML 미리보기
-                  </p>
-                  <div
-                    className="min-w-0 overflow-x-auto rounded-xl border border-border bg-white p-3 text-slate-900 [&_a]:text-blue-700 [&_a]:underline"
-                    dangerouslySetInnerHTML={{ __html: emailPreview.html }}
-                  />
-                  <p className="whitespace-pre-wrap text-xs text-muted-foreground">
-                    <span className="font-semibold text-foreground">
-                      일반 텍스트 fallback:
-                    </span>{" "}
-                    {emailPreview.text}
-                  </p>
-                </div>
+              {detail.channel === "email" ? (
+                <AdminEmailPreview
+                  bodyTemplate={bodyTemplate}
+                  bodyFormat={bodyFormat}
+                  variables={template.variables}
+                />
               ) : (
                 <p className="whitespace-pre-wrap">
                   <span className="font-semibold text-foreground">내용:</span>{" "}

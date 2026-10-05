@@ -84,6 +84,10 @@ erDiagram
 
 Wallet QR 서명과 Apple `authenticationToken` 원문은 DB에 저장하지 않는다. `public_id`, Pass Type ID, 설치 수명 동안 불변인 32바이트 Wallet master key로 값을 결정적으로 만들되 QR 서명, ApplePass 인증, device library identifier hash, APNs token 암호화마다 HMAC-SHA256 context가 다른 subkey를 파생한다. `APPLE_WALLET_AUTH_SECRET*`는 Wallet 발급·검증 계약에 사용하지 않는다. Master key 회전은 단순 환경 변수 교체가 아니라 저장 APNs token 재암호화, device hash 재생성 또는 재등록, 기존 pass 폐기·재발급과 QR 교체를 포함하는 별도 migration이다.
 
+## 마케팅 수신 자격
+
+광고성(마케팅) 알림 수신 자격은 활성 마케팅 정책에 대한 `member_policy_consents` 행과 `push_preferences.marketing_enabled = true`를 함께 만족해야 한다. 철회는 `marketing_enabled`만 끄고 동의 행은 감사 증적으로 남기므로, 동의 행 존재만으로 판정하지 않는다. 판정 규칙은 `src/lib/notifications/marketing-consent.ts` 한 곳에 두고 관리자 캠페인 발송·회원 목록·이벤트 조건·회원 설정 화면이 같이 쓴다.
+
 ## RLS and indexes
 
 - 모든 `public` 테이블은 row level security가 enable되어 있고 `anon`·`authenticated`·`PUBLIC` 권한이 없다. 과거 `categories`, `partners`의 public read policy는 `20260831090039`에서 제거했다.

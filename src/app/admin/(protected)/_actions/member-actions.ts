@@ -37,6 +37,7 @@ import {
   MemberEmailLoginTransitionError,
 } from "@/lib/member-email-login-transition";
 import { getMemberAuthCleanupKeys } from "@/lib/member-auth-security";
+import { deleteMemberRecord } from "@/lib/member-lifecycle";
 import { getMemberProfileSyncFailureCode } from "@/lib/member-profile-sync-errors";
 import { resolveMemberProfileSyncStatus } from "@/lib/member-profile-sync-status";
 import {
@@ -548,13 +549,13 @@ export async function deleteMemberAction(formData: FormData) {
       .in("identifier", memberAuthCleanupKeys);
   }
 
-  const { error } = await supabase.from("members").delete().eq("id", id);
-  if (error) {
+  const deletion = await deleteMemberRecord(id);
+  if (!deletion.ok) {
     redirectAdminActionError("/admin/members", "member_invalid_request", {
       action: "member_delete",
       targetType: "member",
       targetId: id,
-      properties: { errorCode: error.code },
+      properties: { errorCode: deletion.errorCode },
     });
   }
 

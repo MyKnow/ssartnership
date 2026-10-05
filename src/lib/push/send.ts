@@ -1,5 +1,6 @@
 import { notificationRepository } from "@/lib/repositories";
 import { normalizeNotificationTargetUrl } from "@/lib/notifications/shared";
+import { toMemberTemplateChannel } from "@/lib/notifications/channel";
 import { getCampaignTemplateKey } from "@/lib/notification-templates/catalog";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
 import { renderNotificationTemplate } from "@/lib/notification-templates/template";
@@ -10,7 +11,12 @@ import {
   collectRowsByFilterChunks,
 } from "../supabase/paging.ts";
 import { forEachWithConcurrency } from "../async-concurrency.ts";
-import { getPushEnv, isPushConfigured, wrapPushDbError } from "./config.ts";
+import { isPushConfigured, wrapPushDbError } from "./config.ts";
+import {
+  getWebPush,
+  sendWebPush,
+  shouldDeactivatePushSubscription,
+} from "./web-push-client.ts";
 import { getDefaultPushAudience, resolvePushAudience } from "./audience.ts";
 import {
   createPushMessageLog,
@@ -20,12 +26,12 @@ import {
   markPushSuccess,
 } from "./logs.ts";
 import {
+  assertAudiencePushPayloadType,
   buildNotificationPayload,
   getPreferenceKey,
   sanitizeNotificationUrl,
 } from "./payloads.ts";
 import { getActiveSubscriptionPushPreferences } from "./preferences.ts";
-import { buildTrustedPushSubscriptionRequest } from "./subscription-trust.ts";
 import {
   PushError,
 } from "./types.ts";
@@ -36,10 +42,8 @@ import type {
   PushPayload,
   ResolvedPushAudience,
   StoredSubscription,
-  WebPushModule,
 } from "./types.ts";
 
-let webPushPromise: Promise<WebPushModule> | null = null;
 const PUSH_SEND_CONCURRENCY = 8;
 const PUSH_AUDIENCE_PAGE_SIZE = DEFAULT_SUPABASE_IN_FILTER_CHUNK_SIZE;
 
@@ -147,17 +151,6 @@ async function listPushPreferences(memberIds: string[]) {
   return result.rows;
 }
 
-async function getWebPush() {
-  if (!webPushPromise) {
-    webPushPromise = import("web-push").then((module) => {
-      const { publicKey, privateKey, subject } = getPushEnv();
-      module.setVapidDetails(subject, publicKey, privateKey);
-      return module;
-    });
-  }
-  return webPushPromise;
-}
-
 async function settlePushBookkeeping(
   tasks: Array<Promise<unknown>>,
   phase: "sent" | "failed",
@@ -178,15 +171,16 @@ export async function sendPushToAudience(
   rawPayload: PushPayload,
   options: PushSendOptions = {},
 ) {
+  assertAudiencePushPayloadType(rawPayload.type);
   if (!isPushConfigured()) {
     throw new PushError("config_missing", "Web Push 환경 변수가 설정되지 않았습니다.");
   }
 
   const template = await resolveNotificationTemplate(
-    getCampaignTemplateKey("push", rawPayload.type),
+    getCampaignTemplateKey(toMemberTemplateChannel("push"), rawPayload.type),
   );
   const inAppTemplate = await resolveNotificationTemplate(
-    getCampaignTemplateKey("in_app", rawPayload.type),
+    getCampaignTemplateKey(toMemberTemplateChannel("in_app"), rawPayload.type),
   );
   const templateVariables = {
     title: rawPayload.title,
@@ -348,14 +342,7 @@ export async function sendPushToAudience(
     await forEachWithConcurrency(targets, PUSH_SEND_CONCURRENCY, async (subscription) => {
       let providerError: unknown = null;
       try {
-        await webpush.sendNotification(
-          await buildTrustedPushSubscriptionRequest({
-            endpoint: subscription.endpoint,
-            p256dh: subscription.p256dh,
-            auth: subscription.auth,
-          }),
-          serialized,
-        );
+        await sendWebPush(webpush, subscription, serialized);
       } catch (error) {
         providerError = error;
       }
@@ -382,21 +369,11 @@ export async function sendPushToAudience(
       }
 
       failed += 1;
-      const statusCode =
-        typeof providerError === "object" &&
-        providerError &&
-        "statusCode" in providerError
-          ? Number((providerError as { statusCode?: number }).statusCode)
-          : null;
       const errorMessage =
         providerError instanceof Error
           ? providerError.message
           : "푸시 알림 전송에 실패했습니다.";
-      const deactivate =
-        (providerError instanceof PushError &&
-          providerError.code === "invalid_request") ||
-        statusCode === 404 ||
-        statusCode === 410;
+      const deactivate = shouldDeactivatePushSubscription(providerError);
       await settlePushBookkeeping([
         markPushFailure(subscription, errorMessage, deactivate),
         logPushDelivery({
@@ -482,14 +459,7 @@ export async function sendPushTemplateTest(input: {
     PUSH_SEND_CONCURRENCY,
     async (subscription) => {
       try {
-        await webpush.sendNotification(
-          await buildTrustedPushSubscriptionRequest({
-            endpoint: subscription.endpoint,
-            p256dh: subscription.p256dh,
-            auth: subscription.auth,
-          }),
-          serialized,
-        );
+        await sendWebPush(webpush, subscription, serialized);
         delivered += 1;
         await settlePushBookkeeping([
           markPushSuccess(subscription.id),
@@ -503,16 +473,7 @@ export async function sendPushTemplateTest(input: {
         ], "sent");
       } catch (error) {
         failed += 1;
-        const statusCode =
-          typeof error === "object" &&
-          error &&
-          "statusCode" in error
-            ? Number((error as { statusCode?: number }).statusCode)
-            : null;
-        const deactivate =
-          (error instanceof PushError && error.code === "invalid_request") ||
-          statusCode === 404 ||
-          statusCode === 410;
+        const deactivate = shouldDeactivatePushSubscription(error);
         await settlePushBookkeeping([
           markPushFailure(subscription, "템플릿 테스트 푸시 발송 실패", deactivate),
           logPushDelivery({

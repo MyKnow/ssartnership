@@ -57,6 +57,8 @@ Cron 실행 일정의 정본은 `deploy/self-host-operations/production-cron/sch
 - `MM_BASE_URL`은 서버 전용이며 MM 세션 토큰은 요청 메모리에서만 유지한다.
 - 기수별 Sender credential은 `mattermost_sender_credentials`에 AES-256-GCM으로 저장한다. key env는 `MM_SENDER_CREDENTIALS_KEY_V1`, 활성 키 버전 env는 `MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION`이다.
 - Sender 후보는 운영 화면에서 테스트 DM 성공 뒤에만 active가 되며, team/channel은 `s{generation}public`과 `town-square` 상수로 계산한다.
+- 조회·로그인·DM 채널 생성 요청은 timeout 시 1회 재시도하고, DM 게시는 중복 발송을 막기 위해 재시도하지 않는다.
+- 런타임 Sender health는 로그인 단계 실패와 timeout·장애·rate limit·잘못된 응답만 반영한다. 로그인 뒤 대상 작업의 403과 요청 거부(400·422 등)는 대상별 문제라 Sender를 차단하지 않으며, Sender 자체 점검은 `mattermost-sender-health` cron이 맡는다.
 - 상세 기준은 [Mattermost 직접 연동 전환](../decisions/ADR-0001-direct-mattermost-integration.md)을 따른다.
 
 ### SMTP
@@ -71,6 +73,10 @@ Cron 실행 일정의 정본은 `deploy/self-host-operations/production-cron/sch
 - VAPID 기반 browser push를 사용한다.
 - 주요 env: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
 - 회원, 관리자, 협력사 subscription table/API가 분리되어 있다.
+- 모든 발송은 `src/lib/push/web-push-client.ts`의 `sendWebPush`(구독 신뢰 검증 + 10초 소켓 타임아웃)를 거친다. 404/410과 신뢰 검증 실패만 구독을 비활성화하고 timeout·5xx는 구독을 유지한다.
+- 관리자·협력사 운영 알림 푸시는 `sendOperationalPushDeliveries` 하나를 대상별 설정(구독 테이블·소유자 컬럼·템플릿 키·delivery 테이블)으로 공유한다.
+- 브라우저 구독은 회원·관리자·협력사 설정 화면이 같은 헬퍼로 기존 구독을 재사용하고 VAPID 공개키가 바뀐 경우에만 교체한다.
+- 푸시 구독 이벤트 로그(`event_logs.target_id`)에는 endpoint URL을 남기지 않고 구독 UUID만 기록한다.
 
 ### Apple Wallet / APNs
 

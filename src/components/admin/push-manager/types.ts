@@ -4,7 +4,7 @@ import type {
   AdminNotificationPreview,
   AdminNotificationSendResult,
   AdminNotificationType,
-} from "@/lib/admin-notification-ops";
+} from "@/lib/admin-notification-ops-types";
 import type { NotificationChannel } from "@/lib/notifications/shared";
 
 export type PartnerOption = {

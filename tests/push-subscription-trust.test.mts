@@ -313,6 +313,7 @@ test("등록·전송 경계와 subscribe route가 shared trust helper를 사용�
     adminRouteSource,
     partnerRouteSource,
     safeErrorSource,
+    webPushClientSource,
   ] = await Promise.all([
     readFile(new URL("../src/lib/push/subscriptions.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/operational-notifications.ts", import.meta.url), "utf8"),
@@ -322,13 +323,20 @@ test("등록·전송 경계와 subscribe route가 shared trust helper를 사용�
     readFile(new URL("../src/app/api/admin/push/subscribe/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/app/api/partner/push/subscribe/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/notifications/safe-error.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/push/web-push-client.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(memberSubscriptionSource, /validateTrustedPushSubscription/);
   assert.match(operationalSource, /validateTrustedPushSubscription/);
-  assert.match(operationalSource, /buildTrustedPushSubscriptionRequest/);
-  assert.match(sendSource, /buildTrustedPushSubscriptionRequest/);
-  assert.match(adminOpsDeliverySource, /buildTrustedPushSubscriptionRequest/);
+  // 발송 경계는 web-push-client.ts의 sendWebPush 한 곳에서만 신뢰 검증 후 전송한다.
+  assert.match(
+    webPushClientSource,
+    /await buildTrustedPushSubscriptionRequest\(target\)[\s\S]*webpush\.sendNotification\(request, payload/,
+  );
+  for (const source of [operationalSource, sendSource, adminOpsDeliverySource]) {
+    assert.match(source, /sendWebPush\(webpush,/);
+    assert.doesNotMatch(source, /webpush\.sendNotification\(/);
+  }
   assert.match(memberRouteSource, /getSafeNotificationRouteError/);
   assert.match(adminRouteSource, /getSafeNotificationRouteError/);
   assert.match(partnerRouteSource, /getSafeNotificationRouteError/);

@@ -13,7 +13,7 @@ import type { PushAudienceScope } from "@/lib/push";
 import type {
   AdminNotificationOperationLog,
   AdminNotificationType,
-} from "@/lib/admin-notification-ops";
+} from "@/lib/admin-notification-ops-types";
 
 type Props = Pick<AdminPushManagerProps, "automaticSummaries" | "recentLogs">;
 type NotificationCenterProps = Props & {

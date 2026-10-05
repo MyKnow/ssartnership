@@ -18,15 +18,18 @@ import {
   markPushFailure,
   markPushSuccess,
 } from "@/lib/push/logs";
-import { buildTrustedPushSubscriptionRequest } from "@/lib/push/subscription-trust";
-import { PushError } from "@/lib/push/types";
+import {
+  sendWebPush,
+  shouldDeactivatePushSubscription,
+} from "@/lib/push/web-push-client";
 import type { ResolvedPushAudience, StoredSubscription, WebPushModule } from "@/lib/push/types";
 import type {
   AdminNotificationComposerInput,
   AdminNotificationSource,
   AdminNotificationType,
-} from "@/lib/admin-notification-ops";
+} from "@/lib/admin-notification-ops-types";
 import { getCampaignTemplateKey } from "@/lib/notification-templates/catalog";
+import { toMemberTemplateChannel } from "@/lib/notifications/channel";
 import { resolveNotificationTemplate } from "@/lib/notification-templates/repository.server";
 import { renderNotificationTemplate } from "@/lib/notification-templates/template";
 import {
@@ -344,7 +347,11 @@ async function sendMattermostCampaignDeliveriesDirect(params: {
   let sent = 0;
   let failed = 0;
   const template = await resolveNotificationTemplate(
-    getCampaignTemplateKey("mattermost", params.notificationType, params.source),
+    getCampaignTemplateKey(
+      toMemberTemplateChannel("mm"),
+      params.notificationType,
+      params.source,
+    ),
   );
   const categoryLabel = params.notificationType === "marketing" ? "광고" : "공지";
   const templateVariables = mergeNotificationTemplateVariables({
@@ -463,7 +470,11 @@ export async function sendPushCampaignDeliveries(params: {
   }
 
   const template = await resolveNotificationTemplate(
-    getCampaignTemplateKey("push", params.payload.type, params.source),
+    getCampaignTemplateKey(
+      toMemberTemplateChannel("push"),
+      params.payload.type,
+      params.source,
+    ),
   );
   const templateVariables = mergeNotificationTemplateVariables({
     context: params.templateContext,
@@ -507,14 +518,7 @@ export async function sendPushCampaignDeliveries(params: {
           leaseDurationSeconds: PUSH_DELIVERY_LEASE_SECONDS,
         },
         send: async () => {
-          await webpush.sendNotification(
-            await buildTrustedPushSubscriptionRequest({
-              endpoint: subscription.endpoint,
-              p256dh: subscription.p256dh,
-              auth: subscription.auth,
-            }),
-            serialized,
-          );
+          await sendWebPush(webpush, subscription, serialized);
         },
       });
 
@@ -529,17 +533,7 @@ export async function sendPushCampaignDeliveries(params: {
         if (attempt.ledgerWarning) {
           bookkeepingErrors.push(attempt.ledgerWarning);
         }
-        const statusCode =
-          typeof attempt.error === "object" &&
-          attempt.error &&
-          "statusCode" in attempt.error
-            ? Number((attempt.error as { statusCode?: number }).statusCode)
-            : null;
-        const deactivate =
-          (attempt.error instanceof PushError &&
-            attempt.error.code === "invalid_request") ||
-          statusCode === 404 ||
-          statusCode === 410;
+        const deactivate = shouldDeactivatePushSubscription(attempt.error);
         console.error("[admin-notification-ops] push delivery failed", {
           subscriptionId: subscription.id,
           memberId: subscription.member_id,

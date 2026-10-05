@@ -3,6 +3,7 @@ import type {
   PartnerNotificationCategory,
   PartnerNotificationEntry,
   PartnerNotificationStatus,
+  PartnerStoredNotificationPage,
 } from "@/lib/partner-notification-contract";
 
 export type PartnerNotificationPurpose = "action" | "information";
@@ -552,4 +553,87 @@ export function summarizePartnerNotificationUiModels(
       highPriorityCount: 0,
     },
   );
+}
+
+/**
+ * '더 보기'로 받은 저장 알림을 현재 목록에 합친다. 이미 있는 항목은 화면에서
+ * 바뀐 읽음 상태를 지키기 위해 기존 값을 유지하고, 서버와 같은 순서
+ * (createdAt, id 내림차순)로 정렬한다.
+ */
+export function mergePartnerNotificationEntries(
+  current: readonly PartnerNotificationEntry[],
+  incoming: readonly PartnerNotificationEntry[],
+) {
+  const byId = new Map(current.map((item) => [item.id, item] as const));
+  for (const item of incoming) {
+    if (!byId.has(item.id)) {
+      byId.set(item.id, item);
+    }
+  }
+  return [...byId.values()].sort(
+    (left, right) =>
+      right.createdAt.localeCompare(left.createdAt) ||
+      right.id.localeCompare(left.id),
+  );
+}
+
+/**
+ * 저장 알림 전체 미확인 수가 불러온 미확인 수보다 많으면, 아직 불러오지 않은
+ * 이전 페이지에 미확인 알림이 남아 있다.
+ */
+export function hasUnloadedUnreadPartnerNotifications(input: {
+  storedUnreadCount: number | null;
+  loadedUnreadCount: number;
+  hasMore: boolean;
+}) {
+  return (
+    input.hasMore &&
+    input.storedUnreadCount !== null &&
+    input.storedUnreadCount > input.loadedUnreadCount
+  );
+}
+
+/**
+ * 불러온 저장 알림을 삭제하면 서버 목록(최신순)이 삭제한 수만큼 앞으로 당겨진다.
+ * 다음 페이지 offset을 같은 수만큼 줄여야 '더 보기'가 그 수만큼 이전 알림을
+ * 건너뛰지 않는다. 당겨진 범위에서 겹치는 항목은 병합 단계에서 버린다.
+ */
+export function shiftPartnerStoredNotificationPageAfterDelete(
+  page: PartnerStoredNotificationPage,
+  deletedStoredCount: number,
+): PartnerStoredNotificationPage {
+  if (!Number.isFinite(deletedStoredCount) || deletedStoredCount <= 0) {
+    return page;
+  }
+  return {
+    ...page,
+    nextOffset: Math.max(0, page.nextOffset - Math.trunc(deletedStoredCount)),
+  };
+}
+
+/**
+ * '더 보기' 응답을 저장 알림 페이지 상태에 반영한다. 불러오는 동안 읽음 처리
+ * 응답으로 미확인 수를 이미 맞췄다면, 그보다 먼저 계산됐을 수 있는 목록 응답의
+ * 미확인 수로 되돌리지 않는다.
+ */
+export function applyPartnerStoredNotificationPageResponse(
+  page: PartnerStoredNotificationPage,
+  response: {
+    nextOffset?: number;
+    hasMore?: boolean;
+    unreadCount?: number | null;
+  },
+  options: { unreadCountSyncedDuringLoad: boolean },
+): PartnerStoredNotificationPage {
+  return {
+    nextOffset:
+      typeof response.nextOffset === "number" && Number.isFinite(response.nextOffset)
+        ? response.nextOffset
+        : page.nextOffset,
+    hasMore: Boolean(response.hasMore),
+    unreadCount:
+      !options.unreadCountSyncedDuringLoad && typeof response.unreadCount === "number"
+        ? response.unreadCount
+        : page.unreadCount,
+  };
 }

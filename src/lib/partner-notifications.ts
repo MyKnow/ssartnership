@@ -23,9 +23,11 @@ import {
   listPartnerStoredNotifications,
   type StoredPartnerNotificationRow,
 } from "@/lib/partner-notification-store";
-import type {
-  PartnerNotificationCenterData,
-  PartnerNotificationEntry,
+import {
+  PARTNER_NOTIFICATION_PAGE_SIZE,
+  type PartnerNotificationCenterData,
+  type PartnerNotificationEntry,
+  type PartnerStoredNotificationPage,
 } from "@/lib/partner-notification-contract";
 import { getPartnerScopedHrefFromLegacyTarget } from "@/lib/partner-auth/portal-paths";
 
@@ -156,20 +158,121 @@ function createStoredNotificationEntry(
 async function loadStoredNotificationEntries(
   accountId: string | null | undefined,
   companyMap: Map<string, PartnerCompanyRow>,
+  page: { offset?: number; limit?: number; companyId?: string | null } = {},
 ) {
+  const offset = page.offset ?? 0;
   if (!accountId) {
-    return { items: [] as PartnerNotificationEntry[], error: null as unknown };
+    return {
+      items: [] as PartnerNotificationEntry[],
+      error: null as unknown,
+      page: {
+        nextOffset: offset,
+        hasMore: false,
+        unreadCount: 0,
+      } satisfies PartnerStoredNotificationPage,
+    };
   }
 
-  const result = await listPartnerStoredNotifications({ accountId, limit: 30 }).then(
-    (value) => ({ rows: value.items, error: null as unknown }),
-    (error: unknown) => ({ rows: [] as StoredPartnerNotificationRow[], error }),
+  const result = await listPartnerStoredNotifications({
+    accountId,
+    companyId: page.companyId,
+    offset,
+    limit: page.limit ?? PARTNER_NOTIFICATION_PAGE_SIZE,
+  }).then(
+    (value) => ({
+      rows: value.items,
+      error: null as unknown,
+      page: {
+        nextOffset: value.nextOffset,
+        hasMore: value.hasMore,
+        unreadCount: value.unreadCount,
+      } satisfies PartnerStoredNotificationPage,
+    }),
+    (error: unknown) => ({
+      rows: [] as StoredPartnerNotificationRow[],
+      error,
+      page: {
+        nextOffset: offset,
+        hasMore: false,
+        unreadCount: null,
+      } satisfies PartnerStoredNotificationPage,
+    }),
   );
   return {
+    // 세션이 접근할 수 없는 파트너사 알림은 걸러내므로 한 페이지가 page.limit보다 적을 수 있다.
+    // nextOffset은 걸러내기 전 행 수 기준이라 다음 페이지가 겹치거나 빠지지 않는다.
     items: result.rows
       .map((row) => createStoredNotificationEntry(row, companyMap))
       .filter((item): item is PartnerNotificationEntry => Boolean(item)),
     error: result.error,
+    page: result.page,
+  };
+}
+
+function queryActivePartnerCompanies(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  companyIds: string[],
+) {
+  return supabase
+    .from("partner_companies")
+    .select("id,name,slug,description,is_active")
+    .eq("is_active", true)
+    .in("id", companyIds)
+    .order("created_at", { ascending: true });
+}
+
+async function loadPartnerCompanyMap(companyIds: string[]) {
+  if (isPartnerPortalMock) {
+    return new Map(
+      listMockPartnerPortalCompanySetups(companyIds).map(
+        (setup) => [setup.company.id, setup.company] as const,
+      ),
+    );
+  }
+
+  const { data, error } = await queryActivePartnerCompanies(
+    getSupabaseAdminClient(),
+    companyIds,
+  );
+  if (error) {
+    throw new Error("파트너사 정보를 불러오지 못했습니다.");
+  }
+  return new Map(
+    ((data ?? []) as PartnerCompanyRow[]).map(
+      (company) => [company.id, company] as const,
+    ),
+  );
+}
+
+/**
+ * 알림 센터 '더 보기'용 저장 알림 페이지. 첫 화면과 같은 규칙으로
+ * 세션이 접근할 수 있는 파트너사 알림만 화면 모델로 바꿔 돌려준다.
+ */
+export async function listPartnerNotificationCenterStoredEntries(input: {
+  accountId: string;
+  companyIds: string[];
+  companyId?: string | null;
+  offset: number;
+  limit: number;
+}) {
+  const companyIds = normalizeIds(input.companyIds);
+  const companyMap =
+    companyIds.length > 0
+      ? await loadPartnerCompanyMap(companyIds)
+      : new Map<string, PartnerCompanyRow>();
+  const result = await loadStoredNotificationEntries(input.accountId, companyMap, {
+    companyId: input.companyId,
+    offset: input.offset,
+    limit: input.limit,
+  });
+  if (result.error) {
+    throw result.error;
+  }
+  return {
+    items: result.items,
+    nextOffset: result.page.nextOffset,
+    hasMore: result.page.hasMore,
+    unreadCount: result.page.unreadCount ?? 0,
   };
 }
 
@@ -261,12 +364,7 @@ async function loadSupabasePartnerNotificationCenter(
   };
 
   const [companyResult, serviceResult, requestResult] = await Promise.all([
-    supabase
-      .from("partner_companies")
-      .select("id,name,slug,description,is_active")
-      .eq("is_active", true)
-      .in("id", companyIds)
-      .order("created_at", { ascending: true }),
+    queryActivePartnerCompanies(supabase, companyIds),
     supabase
       .from("partners")
       .select("id,company_id,name,location")
@@ -548,6 +646,7 @@ async function loadSupabasePartnerNotificationCenter(
     warningMessage: hasPartialFailure
       ? "일부 알림을 불러오지 못했습니다. 새로고침하면 최신 상태로 다시 시도합니다."
       : null,
+    storedPage: storedNotificationResult.page,
   };
 }
 
@@ -619,6 +718,7 @@ async function loadMockPartnerNotificationCenter(
     warningMessage: storedNotificationResult.error
       ? "일부 알림을 불러오지 못했습니다. 새로고침하면 최신 상태로 다시 시도합니다."
       : null,
+    storedPage: storedNotificationResult.page,
   };
 }
 

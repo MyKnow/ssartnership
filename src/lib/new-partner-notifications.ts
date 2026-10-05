@@ -174,8 +174,8 @@ export async function resolveNewPartnerPushAudience(
       const { data, error } = await supabase
         .from("members")
         .select("id,campus")
+        .is("deleted_at", null)
         .in("campus", targetCampusValues)
-        .order("display_name", { ascending: true })
         .order("id", { ascending: true })
         .range(from, to);
       if (error) {

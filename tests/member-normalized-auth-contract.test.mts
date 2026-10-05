@@ -4,6 +4,8 @@ import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { MEMBER_EVENT_CANDIDATE_SELECT } from "../src/lib/members/projections.ts";
+
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
 function readRepoFile(path: string) {
@@ -342,9 +344,10 @@ test("이벤트 보상 후보는 세대·MM 디렉터리·정책 consent ledger�
   assert.match(eventRewards, /getMmUserDirectoryEntriesByAccountIds/);
   assert.match(eventRewards, /\.from\("member_policy_consents"\)/);
   assert.match(eventRewards, /\.eq\("policy_document_id", policyDocumentId\)/);
-  assert.match(
-    eventRewards,
-    /\.select\("id,display_name,mattermost_account_id,generation,campus,created_at"\)/,
+  assert.match(eventRewards, /\.select\(MEMBER_EVENT_CANDIDATE_SELECT\)/);
+  assert.equal(
+    MEMBER_EVENT_CANDIDATE_SELECT,
+    "id,display_name,mattermost_account_id,generation,campus,created_at",
   );
   assert.match(eventRewards, /\.order\("generation", \{ ascending: false \}\)/);
   assert.doesNotMatch(

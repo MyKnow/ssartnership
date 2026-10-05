@@ -5,7 +5,7 @@ import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import type {
   AdminNotificationPreview,
   AdminNotificationType,
-} from "@/lib/admin-notification-ops";
+} from "@/lib/admin-notification-ops-types";
 import { PushComposerSection } from "./PushComposerSection";
 import { getMemberLabel } from "./constants";
 import type {

@@ -6,11 +6,11 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import type { AdminNotificationPreferenceState } from "@/lib/partner-notification-routing";
-import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
 import {
-  getServiceWorkerRegistration,
+  PushDeviceSetupError,
+  getPushSettingsClientError,
   parsePushSettingsJson,
-  urlBase64ToUint8Array,
+  subscribeCurrentBrowserPush,
 } from "@/components/push/push-settings/device";
 
 type AdminOperationalNotificationSettingsPanelProps = {
@@ -64,7 +64,7 @@ export default function AdminOperationalNotificationSettingsPanel({
         setMessage("알림 설정을 저장했습니다.");
       } catch (caught) {
         setState(previousState);
-        setError(getSafeAdminMessage(caught, "알림 설정 저장에 실패했습니다."));
+        setError(getPushSettingsClientError(caught, "알림 설정 저장").message);
       }
     });
   }
@@ -74,18 +74,10 @@ export default function AdminOperationalNotificationSettingsPanel({
     setMessage(null);
     startTransition(async () => {
       try {
-        if (!canUsePush || !publicKey) {
-          throw new Error("이 브라우저에서는 푸시 알림을 사용할 수 없습니다.");
+        if (!canUsePush) {
+          throw new PushDeviceSetupError("push_unsupported");
         }
-        const permission = await Notification.requestPermission();
-        if (permission !== "granted") {
-          throw new Error("브라우저 알림 권한이 필요합니다.");
-        }
-        const registration = await getServiceWorkerRegistration();
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(publicKey),
-        });
+        const subscription = await subscribeCurrentBrowserPush(publicKey);
         const data = await postJson("/api/admin/push/subscribe", {
           subscription: subscription.toJSON(),
         });
@@ -94,7 +86,7 @@ export default function AdminOperationalNotificationSettingsPanel({
         }
         setMessage("이 기기에서 푸시 알림을 받습니다.");
       } catch (caught) {
-        setError(getSafeAdminMessage(caught, "푸시 구독에 실패했습니다."));
+        setError(getPushSettingsClientError(caught, "푸시 구독").message);
       }
     });
   }

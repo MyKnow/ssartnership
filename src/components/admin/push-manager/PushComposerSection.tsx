@@ -20,7 +20,7 @@ import type {
   AdminNotificationEligibleMember,
   AdminNotificationType,
   AdminNotificationPreview,
-} from "@/lib/admin-notification-ops";
+} from "@/lib/admin-notification-ops-types";
 import type { PushAudienceScope } from "@/lib/push";
 import type { AdminPushManagerProps } from "./types";
 import { typeLabels } from "./constants";

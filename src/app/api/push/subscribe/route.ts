@@ -97,7 +97,8 @@ export async function POST(request: NextRequest) {
       actorType: "member",
       actorId: session.userId,
       targetType: "push_subscription",
-      targetId: body.subscription.endpoint ?? null,
+      // endpoint URL은 구독 자격이라 로그에 남기지 않는다(구독 id는 upsert 응답에 없다).
+      targetId: null,
       properties: {
         enabled: preferences.enabled,
         announcementEnabled: preferences.announcementEnabled,

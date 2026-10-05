@@ -6,6 +6,10 @@ import { renderResolvedNotificationEmailContent } from "@/lib/notification-email
 import { sendPushTemplateTest } from "@/lib/push/send";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
+  MEMBER_TEMPLATE_TEST_RECIPIENT_SELECT,
+  type MemberTemplateTestRecipientRow,
+} from "@/lib/members/projections";
+import {
   getNotificationTemplateDefinition,
   NOTIFICATION_TEMPLATE_CHANNELS,
   type NotificationTemplateBodyFormat,
@@ -22,16 +26,6 @@ import {
   validateNotificationTemplate,
 } from "./template";
 
-type MemberRow = {
-  id: string;
-  display_name: string | null;
-  email: string | null;
-  generation: number | null;
-  staff_source_generation: number | null;
-  mattermost_account_id: string | null;
-  deleted_at: string | null;
-};
-
 type TestRecipientRecord = NotificationTemplateTestRecipientProfile & {
   id: string;
   mmUserId: string | null;
@@ -40,22 +34,19 @@ type TestRecipientRecord = NotificationTemplateTestRecipientProfile & {
   hasPushSubscription: boolean;
 };
 
-const MEMBER_SELECT =
-  "id,display_name,email,generation,staff_source_generation,mattermost_account_id,deleted_at";
-
 function normalizeText(value: string | null | undefined, fallback: string) {
   const normalized = value?.trim();
   return normalized || fallback;
 }
 
-function normalizeGeneration(member: MemberRow) {
+function normalizeGeneration(member: MemberTemplateTestRecipientRow) {
   const generation = member.generation ?? 0;
   return Number.isSafeInteger(generation) && generation >= 0 ? generation : 0;
 }
 
 function normalizeSourceYears(
   directorySourceYears: number[] | null | undefined,
-  member: MemberRow,
+  member: MemberTemplateTestRecipientRow,
 ) {
   const values = [
     ...(directorySourceYears ?? []),
@@ -65,7 +56,7 @@ function normalizeSourceYears(
 }
 
 function toRecipientRecord(
-  member: MemberRow,
+  member: MemberTemplateTestRecipientRow,
   directory: {
     mm_user_id: string;
     mm_username: string;
@@ -118,7 +109,7 @@ async function getPushSubscriptionMemberIds(memberIds: string[]) {
 async function getMemberRows() {
   const { data, error } = await getSupabaseAdminClient()
     .from("members")
-    .select(MEMBER_SELECT)
+    .select(MEMBER_TEMPLATE_TEST_RECIPIENT_SELECT)
     .is("deleted_at", null)
     .order("display_name", { ascending: true })
     .limit(500);
@@ -126,7 +117,7 @@ async function getMemberRows() {
     throw new Error("테스트 수신 회원을 불러오지 못했습니다.");
   }
 
-  return (data ?? []) as MemberRow[];
+  return (data ?? []) as MemberTemplateTestRecipientRow[];
 }
 
 async function getRecipientRecords() {
@@ -205,7 +196,7 @@ async function getRecipientById(memberId: string) {
 
   const { data, error } = await getSupabaseAdminClient()
     .from("members")
-    .select(MEMBER_SELECT)
+    .select(MEMBER_TEMPLATE_TEST_RECIPIENT_SELECT)
     .eq("id", normalizedId)
     .is("deleted_at", null)
     .maybeSingle();
@@ -213,7 +204,7 @@ async function getRecipientById(memberId: string) {
     throw new Error("테스트 수신 회원을 찾을 수 없습니다.");
   }
 
-  const member = data as MemberRow;
+  const member = data as MemberTemplateTestRecipientRow;
   const directoryByAccountId = await getMmUserDirectoryEntriesByAccountIds(
     member.mattermost_account_id ? [member.mattermost_account_id] : [],
   );

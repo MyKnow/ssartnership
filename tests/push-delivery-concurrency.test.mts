@@ -23,10 +23,10 @@ test("push and operational notification senders use the bounded concurrency help
   assert.match(adminOps, /await forEachWithConcurrency\(\s*params\.subscriptions,\s*PUSH_SEND_CONCURRENCY,/);
 
   assert.match(operational, /import \{ forEachWithConcurrency \} from "@\/lib\/async-concurrency"/);
-  assert.match(operational, /await forEachWithConcurrency\(\s*data \?\? \[\],\s*OPERATIONAL_PUSH_CONCURRENCY,/);
+  assert.match(operational, /await forEachWithConcurrency\(\s*subscriptions,\s*OPERATIONAL_PUSH_CONCURRENCY,/);
   assert.match(operational, /await forEachWithConcurrency\(\s*recipientRows,\s*OPERATIONAL_DELIVERY_CONCURRENCY,/);
   assert.match(operational, /await forEachWithConcurrency\(\s*emailTargets,\s*OPERATIONAL_EMAIL_CONCURRENCY,/);
-  assert.match(operational, /await forEachWithConcurrency\(\s*input\.accountIds,\s*OPERATIONAL_DELIVERY_CONCURRENCY,/);
+  assert.match(operational, /await forEachWithConcurrency\(\s*input\.ownerIds,\s*OPERATIONAL_DELIVERY_CONCURRENCY,/);
 
   assert.match(pushOps, /import \{ forEachWithConcurrency \} from "\.\.\/async-concurrency\.ts"/);
   assert.match(pushOps, /await forEachWithConcurrency\(\s*partners,\s*EXPIRING_PARTNER_NOTIFICATION_CONCURRENCY,/);
