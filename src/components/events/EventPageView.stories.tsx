@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import EventPageView from "@/components/events/EventPageView";
 import { SIGNUP_REWARD_EVENT } from "@/lib/event-pages/signup-reward";
-import type { EventRewardSummary } from "@/lib/promotions/event-rewards";
+import type { EventRewardSummary } from "@/lib/promotions/event-rewards-types";
 
 const campaign = {
   ...SIGNUP_REWARD_EVENT,
