@@ -38,6 +38,10 @@ function getMockMetrics(partnerId: string) {
 
 export async function getAdminPartnerMetrics(
   partnerIds: string[],
+  options?: {
+    /** See `PartnerMetricAggregateLoadOptions.allowEventLogFallback`. */
+    allowEventLogFallback?: boolean;
+  },
 ): Promise<AdminPartnerMetricsResult> {
   const uniquePartnerIds = [...new Set(partnerIds.map((value) => value.trim()).filter(Boolean))];
   if (uniquePartnerIds.length === 0) {
@@ -66,6 +70,7 @@ export async function getAdminPartnerMetrics(
       metricNames: PARTNER_METRIC_EVENT_NAMES,
       metricKinds: ["pv", "uv"],
       granularity: "total",
+      allowEventLogFallback: options?.allowEventLogFallback,
     }),
     fetchPartnerEngagementCounts(
       supabase,

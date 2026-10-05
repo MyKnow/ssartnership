@@ -13,7 +13,8 @@ import { getHeaderSession } from "@/lib/header-session";
 import { getPartnerViewerContext } from "@/lib/partner-view-context";
 import { getSignedUserSession } from "@/lib/user-auth";
 import {
-  getHomePartnerMemberState,
+  buildHomePartnerMemberState,
+  getHomeMemberFavoritePartnerIds,
   getHomePartnerPopularityById,
 } from "@/lib/home-partner-state";
 import { buildHomePartnerDirectory } from "@/lib/home-partner-directory";
@@ -135,6 +136,7 @@ export default async function CampusLandingPage({
     ? getHeaderSession(userId)
     : Promise.resolve(null);
   const categoriesPromise = getCampusCategoriesCached();
+  const favoritePartnerIdsPromise = getHomeMemberFavoritePartnerIds(userId);
   const viewerContext = await getPartnerViewerContext(userId);
 
   const [headerSession, categories, partners] = await Promise.all([
@@ -167,18 +169,19 @@ export default async function CampusLandingPage({
     viewerAuthenticated: viewerContext.authenticated,
     popularityByPartnerId: {},
   });
-  const partnerPopularityById = await getHomePartnerPopularityById(
-    popularityCandidates.displayPartnerIds,
-  );
+  const [partnerPopularityById, favoritePartnerIds] = await Promise.all([
+    getHomePartnerPopularityById(popularityCandidates.displayPartnerIds),
+    favoritePartnerIdsPromise,
+  ]);
   const rankedDirectory = buildHomePartnerDirectory({
     partners: campusPartners,
     viewerAuthenticated: viewerContext.authenticated,
     popularityByPartnerId: partnerPopularityById,
   });
-  const memberState = await getHomePartnerMemberState({
-    partnerIds: rankedDirectory.displayPartnerIds,
-    currentUserId: userId,
-  });
+  const memberState = buildHomePartnerMemberState(
+    rankedDirectory.displayPartnerIds,
+    favoritePartnerIds,
+  );
   const campusPartnerState = {
     ...memberState,
     partnerPopularityById,
