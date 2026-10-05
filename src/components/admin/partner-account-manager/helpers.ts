@@ -1,3 +1,4 @@
+import { isPartnerSetupLinkExpired } from "@/lib/partner-auth/setup-link";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 
 type PartnerInitialSetupStateInput = {
@@ -21,11 +22,6 @@ export function buildPartnerInitialSetupUrl(token: string, siteUrl?: string) {
   ).toString();
 }
 
-function isFutureDate(value: string, now: Date) {
-  const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp) && timestamp > now.getTime();
-}
-
 export function hasIssuedPartnerInitialSetupLink(
   account: PartnerInitialSetupStateInput,
 ) {
@@ -34,6 +30,11 @@ export function hasIssuedPartnerInitialSetupLink(
   );
 }
 
+/**
+ * Same expiry rule as the setup page (`getPartnerSetupLinkState`): a link sent
+ * without a stored expiry is rejected there, so it must not look usable here
+ * and the operator should reissue it.
+ */
 export function hasUsablePartnerInitialSetupLink(
   account: PartnerInitialSetupStateInput,
   now = new Date(),
@@ -42,11 +43,10 @@ export function hasUsablePartnerInitialSetupLink(
     return false;
   }
 
-  if (account.initial_setup_expires_at) {
-    return isFutureDate(account.initial_setup_expires_at, now);
-  }
-
-  return Boolean(account.initial_setup_link_sent_at);
+  return !isPartnerSetupLinkExpired(
+    account.initial_setup_expires_at,
+    now.getTime(),
+  );
 }
 
 export function getPartnerInitialSetupBadge(
@@ -60,27 +60,24 @@ export function getPartnerInitialSetupBadge(
     };
   }
 
-  if (account.initial_setup_expires_at) {
-    const isAvailable = hasUsablePartnerInitialSetupLink(account, now);
+  if (!hasIssuedPartnerInitialSetupLink(account)) {
     return {
-      variant: isAvailable ? ("primary" as const) : ("warning" as const),
-      label: isAvailable
-        ? account.initial_setup_link_sent_at
-          ? "초기설정 URL 전송됨"
-          : "초기설정 URL 준비됨"
-        : "초기설정 URL 만료됨",
+      variant: "neutral" as const,
+      label: "초기설정 URL 미생성",
     };
   }
 
-  if (account.initial_setup_link_sent_at) {
+  if (!hasUsablePartnerInitialSetupLink(account, now)) {
     return {
-      variant: "primary" as const,
-      label: "초기설정 URL 전송됨",
+      variant: "warning" as const,
+      label: "초기설정 URL 만료됨",
     };
   }
 
   return {
-    variant: "neutral" as const,
-    label: "초기설정 URL 미생성",
+    variant: "primary" as const,
+    label: account.initial_setup_link_sent_at
+      ? "초기설정 URL 전송됨"
+      : "초기설정 URL 준비됨",
   };
 }
