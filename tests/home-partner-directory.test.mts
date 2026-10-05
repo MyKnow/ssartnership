@@ -307,23 +307,35 @@ test("loadHomePartnerDirectoryState converts an unavailable repository into a re
     );
 
     assert.deepEqual(result, { status: "unavailable" });
-    assert.deepEqual(errors, [
-      ["[home-partner-directory] directory unavailable", {
-        reasonCode: "directory_load_failed",
-        errorName: "TypeError",
-        errorMessage: "fetch failed; token=[redacted]",
-        causeName: "Error",
-        causeMessage: "connection to postgresql://[redacted]@db.supabase.co failed",
-        causeCode: "ENOTFOUND",
-      }],
-    ]);
-    assert.doesNotMatch(
-      JSON.stringify(errors),
-      /database-credential|database-password|preview_user/,
-    );
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0].length, 1, "failure is one structured JSON line");
+    const entry = JSON.parse(String(errors[0][0]));
+    assert.equal(entry.level, "error");
+    assert.equal(entry.event, "[home-partner-directory] directory unavailable");
+    assert.equal(entry.properties.reasonCode, "directory_load_failed");
+    assert.deepEqual(entry.error, { name: "TypeError", message: "fetch failed; token=[redacted]" });
+    assert.deepEqual(entry.properties.cause, { name: "Error", message: "connection to [url] failed", errorCode: "ENOTFOUND" });
+    assert.doesNotMatch(JSON.stringify(errors), /database-credential|database-password|preview_user/);
   } finally {
     console.error = originalError;
   }
+});
+
+test("home directory errors redact provider values in both error and cause", async (t) => {
+  const { loadHomePartnerDirectoryState } = await homePartnerDirectoryModulePromise;
+  const errors: unknown[][] = [];
+  t.mock.method(console, "error", (...args: unknown[]) => errors.push(args));
+  const message = "failed https://assets.invalid/photo?signature=fixture-signed customer@invalid.example Key (member_id)=(fixture-member)";
+  const result = await loadHomePartnerDirectoryState(
+    { viewerAuthenticated: false, currentUserId: null },
+    async () => { throw new Error(message, { cause: new Error(message) }); },
+  );
+  assert.deepEqual(result, { status: "unavailable" });
+  assert.equal(errors[0].length, 1);
+  const entry = JSON.parse(String(errors[0][0]));
+  assert.equal(entry.error.message, "failed [url] [email] Key (member_id)=([value])");
+  assert.equal(entry.properties.cause.message, entry.error.message);
+  assert.doesNotMatch(String(errors[0][0]), /fixture-signed|customer@|fixture-member/);
 });
 
 test("loadHomePartnerDirectoryState preserves Next.js control-flow errors", async () => {

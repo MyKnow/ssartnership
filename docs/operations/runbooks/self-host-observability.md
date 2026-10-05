@@ -243,6 +243,8 @@ Issue #543에서 "컨테이너가 살아 있다"만 보던 감시를 서버 오�
 
 서버 코드는 `src/lib/server-log.ts`의 `logServerError`/`logServerWarning`으로 한 줄 JSON을 stdout/stderr에 쓴다. 필드는 `level`, `event`(고정 라벨), `time`, `error{name, code, status, digest, message}`, `properties`다. raw error 객체, Supabase/PostgREST `details`·`hint`는 기록하지 않고 message의 이메일·토큰·URL·행 값·긴 숫자는 마스킹한다. `properties`는 공용 로그 정제기를 통과한다. 관리자 edge guard 차단 로그의 IP는 IPv4 /24, IPv6 /48 단위로만 남긴다. `tests/server-log-adoption.test.mts`가 raw error 객체나 `{ message: error.message }` 같은 provider message를 `console.error`·`console.warn`으로 직접 찍는 서버 코드의 재유입을 막는다.
 
+홈 제휴 목록처럼 오류 화면 대신 복구 가능한 상태를 반환하는 경로도 같은 JSON 형식을 쓴다. `error.message`와 정제된 `properties.cause.message`에서 URL·이메일·행 값과 `token=...` 같은 자격 증명 대입 값을 제거한다. 원인 코드에는 정제된 `properties.cause.errorCode`를 사용하며, raw provider 객체를 properties에 넣지 않는다. Next.js redirect 등 제어 흐름은 로깅 전에 다시 던진다.
+
 Docker `local` 로그 드라이버가 10MB×3으로 회전하므로 오래 보관해야 할 근거는 장애 기록으로 옮긴다. 운영 VM에서 최근 오류만 보려면 다음 한 줄을 사용한다.
 
 ```bash
@@ -289,6 +291,8 @@ GitHub Actions 예약 실행은 추가하지 않는다. 독립 회선의 외부 
 ### Web Vitals 보존
 
 Web Vitals는 telemetry 컨테이너 메모리의 고정 histogram에만 누적된다. telemetry 재시작·배포 시 누적값이 0부터 다시 시작하며, 집계된 시계열은 Prometheus 보존 기간(7일·2GB)이 지나면 사라진다. 원본 이벤트 저장소는 없다. 개선 전후 비교가 필요한 기준선은 7일 안에 대시보드의 p75와 표본 수를 [성능 지식 인덱스](../../performance/index.md)의 측정 기록으로 옮긴다. Vercel Speed Insights 기준선 문서는 폐기된 측정 경로의 시점 증거다.
+
+로컬 Docker 브라우저 검증은 [Web Vitals 측정 문서](../../performance/measurements/web-vitals.md#로컬-docker-전송-검증)를 따른다. native 호출·API 응답·collector 수신을 구분하며, 브라우저의 종료 취소 이벤트만으로 성공이나 누락을 판정하지 않는다.
 
 ### 적용 순서(운영자)
 

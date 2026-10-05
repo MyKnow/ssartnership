@@ -49,6 +49,18 @@ test("error messages redact echoed values, credentials, URLs and long numbers", 
   assert.equal(redactServerErrorMessage("line\nbreak\u0000"), "line break");
 });
 
+test("error messages redact credential assignments as well as bearer material", () => {
+  const assignments = [
+    ["token", "=", "fixture-token"], ["password", ":", "fixture-password"],
+    ["api_key", "=", '"fixture-api key"'], ["client-secret", "=", "'fixture-client secret'"],
+    ["authorization", "=", "Basic fixture-basic"], ["cookie", "=", "fixture-cookie"],
+  ].map((parts) => parts.join(""));
+  for (const assignment of assignments) {
+    assert.doesNotMatch(redactServerErrorMessage(`failed; ${assignment}; retry later`), /fixture-/);
+  }
+  assert.equal(redactServerErrorMessage(`fetch failed; ${assignments[0]}`), "fetch failed; token=[redacted]");
+});
+
 test("log entries are one sanitized JSON object with bounded event labels", () => {
   const entry = buildServerLogEntry(
     "error",

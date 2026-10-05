@@ -4,6 +4,7 @@ import {
   type HomePartnerSortOption,
 } from "@/lib/home-partner-selectors";
 import { unstable_rethrow } from "next/navigation";
+import { describeServerError, logServerError } from "@/lib/server-log";
 import type { PartnerAudienceFilter, PartnerAudienceKey } from "@/lib/partner-audience";
 import {
   buildHomePartnerMemberState,
@@ -94,63 +95,19 @@ const homePartnerDirectoryDependencies: HomePartnerDirectoryDependencies = {
   getMemberFavoritePartnerIds: getHomeMemberFavoritePartnerIds,
 };
 
-type ErrorLike = {
-  cause?: unknown;
-  code?: unknown;
-  message?: unknown;
-  name?: unknown;
-};
-
-const HOME_DIRECTORY_ERROR_MESSAGE_LIMIT = 512;
-const HOME_DIRECTORY_SECRET_VALUE_PATTERN =
-  /((?:api[-_]?key|authorization|client[-_]?secret|cookie|credential|password|private[-_]?key|secret|session|token)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^,;]+)/gi;
-const HOME_DIRECTORY_BEARER_VALUE_PATTERN = /(bearer\s+)[^\s,;]+/gi;
-const HOME_DIRECTORY_URL_CREDENTIAL_PATTERN =
-  /([a-z][a-z0-9+.-]*:\/\/)[^\s/:@]+:[^\s/@]+@/gi;
-
-function toErrorLike(error: unknown): ErrorLike {
-  return error && typeof error === "object" ? (error as ErrorLike) : {};
-}
-
-function normalizeDiagnosticText(value: unknown) {
-  if (typeof value !== "string" || !value.trim()) {
-    return undefined;
+function getHomeDirectoryErrorCause(error: unknown) {
+  try {
+    const cause = error && typeof error === "object" && "cause" in error
+      ? error.cause
+      : undefined;
+    const { code, ...summary } = describeServerError(cause);
+    // Properties treat generic `code` fields as sensitive. This is the
+    // allowlisted provider error code from describeServerError, not a user code.
+    return { ...summary, ...(code ? { errorCode: code } : {}) };
+  } catch {
+    // A provider's throwing getter must not break the recoverable page state.
+    return {};
   }
-
-  const redacted = value
-    .replace(HOME_DIRECTORY_SECRET_VALUE_PATTERN, "$1[redacted]")
-    .replace(HOME_DIRECTORY_BEARER_VALUE_PATTERN, "$1[redacted]")
-    .replace(HOME_DIRECTORY_URL_CREDENTIAL_PATTERN, "$1[redacted]@");
-  return redacted.length <= HOME_DIRECTORY_ERROR_MESSAGE_LIMIT
-    ? redacted
-    : `${redacted.slice(0, HOME_DIRECTORY_ERROR_MESSAGE_LIMIT - 1)}…`;
-}
-
-function normalizeDiagnosticCode(value: unknown) {
-  return typeof value === "string" && /^[a-z0-9._-]{1,80}$/i.test(value)
-    ? value
-    : undefined;
-}
-
-function getHomeDirectoryErrorDiagnostics(error: unknown) {
-  const candidate = toErrorLike(error);
-  const cause = toErrorLike(candidate.cause);
-  const errorName = normalizeDiagnosticText(candidate.name);
-  const errorMessage = normalizeDiagnosticText(candidate.message);
-  const errorCode = normalizeDiagnosticCode(candidate.code);
-  const causeName = normalizeDiagnosticText(cause.name);
-  const causeMessage = normalizeDiagnosticText(cause.message);
-  const causeCode = normalizeDiagnosticCode(cause.code);
-
-  return {
-    reasonCode: "directory_load_failed",
-    ...(errorName ? { errorName } : {}),
-    ...(errorMessage ? { errorMessage } : {}),
-    ...(errorCode ? { errorCode } : {}),
-    ...(causeName ? { causeName } : {}),
-    ...(causeMessage ? { causeMessage } : {}),
-    ...(causeCode ? { causeCode } : {}),
-  };
 }
 
 function maskExpiredPartnerActions(partners: Partner[]) {
@@ -303,10 +260,10 @@ export async function loadHomePartnerDirectoryState(
     };
   } catch (error) {
     unstable_rethrow(error);
-    console.error(
-      "[home-partner-directory] directory unavailable",
-      getHomeDirectoryErrorDiagnostics(error),
-    );
+    logServerError("[home-partner-directory] directory unavailable", error, {
+      reasonCode: "directory_load_failed",
+      cause: getHomeDirectoryErrorCause(error),
+    });
     return { status: "unavailable" };
   }
 }
