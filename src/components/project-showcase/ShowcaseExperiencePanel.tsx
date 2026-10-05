@@ -21,6 +21,12 @@ import {
   parseShowcaseRegistration,
   SHOWCASE_FEEDBACK_MAX_LENGTH,
 } from "@/lib/project-showcase/validation";
+import {
+  closePendingExperienceTab,
+  navigatePendingExperienceTab,
+  openPendingExperienceTab,
+  type PendingExperienceTab,
+} from "./experience-tab";
 
 const INPUT_CLASS = "min-h-11 w-full min-w-0 rounded-xl border border-border bg-background px-3 text-base outline-none focus-visible:ring-2 focus-visible:ring-primary";
 
@@ -36,11 +42,12 @@ type Props = {
   previewMode?: boolean;
 };
 
+const EXPERIENCE_START_FAILED_MESSAGE = "체험 시작을 기록하지 못했어요. 잠시 후 다시 시도해 주세요.";
+const POPUP_BLOCKED_MESSAGE = "브라우저가 새 탭 열기를 막았어요. 아래 ‘서비스 열기’를 눌러 체험을 이어가 주세요.";
+
 /** Opens a tab synchronously (before awaiting the server) so popup blockers allow it. */
 function openPendingTab() {
-  const tab = window.open("about:blank", "_blank");
-  if (tab) tab.opener = null;
-  return tab;
+  return openPendingExperienceTab((url, target) => window.open(url, target));
 }
 
 export default function ShowcaseExperiencePanel({
@@ -63,6 +70,7 @@ export default function ShowcaseExperiencePanel({
   const clockOffsetRef = useRef(0);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [blockedDestination, setBlockedDestination] = useState<string | null>(null);
   const feedbackRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -90,7 +98,7 @@ export default function ShowcaseExperiencePanel({
     focus?.focus();
   }
 
-  async function beginExperience(tab: Window | null) {
+  async function beginExperience(tab: PendingExperienceTab | null) {
     if (previewMode) {
       const startedAt = new Date(Date.now() + clockOffsetRef.current).toISOString();
       setState((current) => ({ ...current, registered: true, startedAt }));
@@ -99,9 +107,16 @@ export default function ShowcaseExperiencePanel({
       return;
     }
 
-    const result = await startShowcaseExperience(projectId);
+    let result: Awaited<ReturnType<typeof startShowcaseExperience>>;
+    try {
+      result = await startShowcaseExperience(projectId);
+    } catch {
+      closePendingExperienceTab(tab);
+      fail(EXPERIENCE_START_FAILED_MESSAGE);
+      return;
+    }
     if (!result.ok) {
-      tab?.close();
+      closePendingExperienceTab(tab);
       fail(result.message);
       return;
     }
@@ -112,8 +127,10 @@ export default function ShowcaseExperiencePanel({
     setMessage(allowImmediateFeedback
       ? "링크 클릭을 체험으로 기록했어요. 바로 피드백을 남길 수 있어요."
       : "체험을 시작했어요. 1분 뒤 이곳에서 한 줄 피드백을 남기면 추첨권 1장을 받아요.");
-    if (tab) tab.location.assign(result.destination);
-    else window.open(result.destination, "_blank", "noopener,noreferrer");
+    // Retrying window.open() here would hit the same popup blocker, so a
+    // blocked tab falls back to a link the member can tap.
+    const navigation = navigatePendingExperienceTab(tab, result.destination);
+    setBlockedDestination(navigation === "blocked" ? result.destination : null);
   }
 
   function handleRegister(submitEvent: FormEvent<HTMLFormElement>) {
@@ -132,9 +149,16 @@ export default function ShowcaseExperiencePanel({
     const tab = previewMode ? null : openPendingTab();
     startTransition(async () => {
       if (!previewMode) {
-        const result = await registerShowcaseParticipant(input);
+        let result: Awaited<ReturnType<typeof registerShowcaseParticipant>>;
+        try {
+          result = await registerShowcaseParticipant(input);
+        } catch {
+          closePendingExperienceTab(tab);
+          fail(EXPERIENCE_START_FAILED_MESSAGE);
+          return;
+        }
         if (!result.ok) {
-          tab?.close();
+          closePendingExperienceTab(tab);
           fail(result.message, formRef.current?.querySelector<HTMLElement>('[name="announcementConsent"]'));
           return;
         }
@@ -264,6 +288,20 @@ export default function ShowcaseExperiencePanel({
           <p className="text-xs leading-5 text-muted-foreground">피드백은 작성자 정보 없이 출품자에게 전달돼요.</p>
         </form>
       )}
+      {blockedDestination ? (
+        <div className="grid gap-2 rounded-xl border border-border bg-surface-inset px-4 py-3" role="status">
+          <p className="text-sm leading-6 text-foreground">{POPUP_BLOCKED_MESSAGE}</p>
+          <a
+            href={blockedDestination}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setBlockedDestination(null)}
+            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            서비스 열기
+          </a>
+        </div>
+      ) : null}
       {interestButton}
       {error ? <FormMessage variant="error">{error}</FormMessage> : null}
       {message ? <p className="text-sm leading-6 text-muted-foreground" role="status">{message}</p> : null}
