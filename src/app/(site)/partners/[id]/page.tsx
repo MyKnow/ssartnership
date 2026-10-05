@@ -7,7 +7,7 @@ import { getHeaderSession } from "@/lib/header-session";
 import Container from "@/components/ui/Container";
 import { SITE_NAME } from "@/lib/site";
 import { readRouteParam } from "@/lib/route-params";
-import { createCanonicalAlternates, serializeJsonLd } from "@/lib/seo";
+import { createCanonicalAlternates, createPageOpenGraph, serializeJsonLd } from "@/lib/seo";
 import { getPartnerViewerContext } from "@/lib/partner-view-context";
 import { getSignedUserSession } from "@/lib/user-auth";
 import PartnerDetailContactSection from "./_page/PartnerDetailContactSection";
@@ -86,28 +86,14 @@ export async function generateMetadata({
     alternates: {
       ...createCanonicalAlternates(canonicalPath),
     },
-    openGraph: {
+    // Uploaded thumbnails have no stored dimensions, so none are declared.
+    openGraph: createPageOpenGraph({
+      path: canonicalPath,
       title,
       description,
-      url: canonicalPath,
-      siteName: SITE_NAME,
-      locale: "ko_KR",
       type: "article",
-      images: [
-        {
-          url: partner.thumbnail ?? "/icon-512.png",
-          width: 512,
-          height: 512,
-          alt: title,
-        },
-      ],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: [partner.thumbnail ?? "/icon-512.png"],
-    },
+      images: partner.thumbnail ? [{ url: partner.thumbnail, alt: title }] : undefined,
+    }),
     robots: {
       index: true,
       follow: true,

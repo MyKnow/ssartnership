@@ -14,6 +14,7 @@ import {
   getPartnerPasswordChangeGateHref,
   getPartnerRequestReturnTo,
 } from "@/lib/partner-auth/return-to";
+import { isPwaShellPath } from "@/lib/pwa-shell";
 import { buildTrustedRedirectUrl } from "@/lib/request-guards";
 import { logServerWarning, maskIpAddressForLog } from "@/lib/server-log";
 import {
@@ -144,7 +145,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/icon") ||
     pathname.startsWith("/sitemap") ||
-    pathname.startsWith("/robots")
+    pathname.startsWith("/robots") ||
+    isPwaShellPath(pathname)
   ) {
     return nextWithRequestUrl(request);
   }

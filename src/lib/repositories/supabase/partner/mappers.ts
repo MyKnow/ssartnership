@@ -252,6 +252,8 @@ export function mapPublicPartnerSeoEntry(
     name: row.name,
     categoryLabel: category?.label ?? "제휴",
     location: row.location,
+    campusSlugs: normalizeCampusSlugs(row.campus_slugs ?? []),
+    createdAt: row.created_at ?? null,
     period: {
       start: row.period_start,
       end: row.period_end,

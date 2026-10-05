@@ -37,6 +37,33 @@ test("seo helpers normalize canonical paths and omit unstable sitemap metadata b
   assert.equal(getSitemapLocation().endsWith("/sitemap.xml"), true);
 });
 
+test("page Open Graph blocks carry their own URL, site defaults, and an image", async () => {
+  const { createPageOpenGraph, DEFAULT_OPEN_GRAPH_IMAGE } = await seoModulePromise;
+
+  assert.deepStrictEqual(
+    createPageOpenGraph({ path: "install", title: "앱 설치", description: "설치 안내" }),
+    {
+      title: "앱 설치",
+      description: "설치 안내",
+      url: "/install",
+      siteName: "싸트너십",
+      locale: "ko_KR",
+      type: "website",
+      images: [DEFAULT_OPEN_GRAPH_IMAGE],
+    },
+  );
+
+  const withImage = createPageOpenGraph({
+    path: "/events/project-showcase/projects/p-1",
+    type: "article",
+    images: [{ url: "", alt: "빈 이미지" }, { url: "/project.png", alt: "프로젝트" }],
+  });
+  assert.equal(withImage.url, "/events/project-showcase/projects/p-1");
+  assert.equal("title" in withImage, false);
+  assert.deepStrictEqual(withImage.images, [{ url: "/project.png", alt: "프로젝트" }]);
+  assert.equal((withImage as { type?: string }).type, "article");
+});
+
 test("push ops helpers filter visible expiring partners and merge delivery totals", async () => {
   const {
     filterExpiringPartnersForPush,

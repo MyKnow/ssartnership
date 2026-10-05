@@ -13,10 +13,14 @@ export type PublicPartnerSeoEntry = {
   name: string;
   categoryLabel: string;
   location: string;
+  /** Campuses whose landing page lists this partner (same rule as that page). */
+  campusSlugs: CampusSlug[];
   period: {
     start: string | null;
     end: string | null;
   };
+  /** When the partner was registered; the RSS item date. Null when unknown. */
+  createdAt: string | null;
 };
 
 export type PublicPartnerSeoOptions = {

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import ShowcaseProjectForm from "@/components/project-showcase/ShowcaseProjectForm";
@@ -8,6 +9,11 @@ import { getSignedUserSession } from "@/lib/user-auth";
 import BackLink from "@/components/ui/BackLink";
 
 export const dynamic = "force-dynamic";
+
+// Member-only participation screens are never search results.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function EditMyShowcaseProjectPage({
   params,

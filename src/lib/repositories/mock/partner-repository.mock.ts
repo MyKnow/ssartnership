@@ -10,7 +10,11 @@ import type {
 import { toLeanPublicDirectoryPartner } from "@/lib/public-partner-directory";
 import { canViewPartnerDetails } from "@/lib/partner-visibility";
 import { maskPartnerBenefitsForAccess } from "@/lib/partner-benefit-visibility";
-import { getCampusPartners, type CampusSlug } from "@/lib/campuses";
+import {
+  getCampusPartners,
+  resolvePartnerCampusSlugs,
+  type CampusSlug,
+} from "@/lib/campuses";
 
 const categories: Category[] = [
   {
@@ -206,6 +210,13 @@ export class MockPartnerRepository implements PartnerRepository {
       .filter((partner) =>
         canViewPartnerDetails(partner.visibility, false, partner.period),
       )
+      // Same order as the Supabase query (newest registration first) so the
+      // limited RSS projection picks the same partners.
+      .toSorted(
+        (left, right) =>
+          right.createdAt.localeCompare(left.createdAt) ||
+          left.id.localeCompare(right.id),
+      )
       .map((partner) => ({
         id: partner.id,
         name: partner.name,
@@ -213,10 +224,13 @@ export class MockPartnerRepository implements PartnerRepository {
           categories.find((category) => category.key === partner.category)
             ?.label ?? "제휴",
         location: partner.location,
+        // Mirrors getPublicDirectoryPartnersForCampus, which uses getCampusPartners.
+        campusSlugs: resolvePartnerCampusSlugs(partner),
         period: {
           start: partner.period.start || null,
           end: partner.period.end || null,
         },
+        createdAt: partner.createdAt || null,
       }));
     const limit = options.limit;
 

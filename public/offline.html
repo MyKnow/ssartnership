@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f7fb" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#07101d" />
+    <title>오프라인 | 싸트너십</title>
+    <!--
+      Served by public/sw.js when a navigation fails without a network.
+      Keep it self-contained: no external CSS, fonts, scripts, or images.
+    -->
+    <script>
+      try {
+        var theme = localStorage.getItem("theme");
+        var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        if (theme === "dark" || (theme === "system" && prefersDark)) {
+          document.documentElement.classList.add("dark");
+        }
+      } catch (error) {
+        // Storage can be unavailable; the light theme is the app default.
+      }
+    </script>
+    <style>
+      :root {
+        color-scheme: light;
+        --background: #f4f7fb;
+        --surface: #ffffff;
+        --border: rgba(191, 203, 220, 0.8);
+        --foreground: #152033;
+        --muted-foreground: #53657e;
+        --primary: #213b68;
+        --primary-emphasis: #172d53;
+        --primary-foreground: #f7fbff;
+        --primary-soft: #e6edf8;
+      }
+      html.dark {
+        color-scheme: dark;
+        --background: #07101d;
+        --surface: #0f1b2e;
+        --border: rgba(58, 76, 105, 0.76);
+        --foreground: #eef5ff;
+        --muted-foreground: #9fb0c9;
+        --primary: #d7e4ff;
+        --primary-emphasis: #f2f7ff;
+        --primary-foreground: #07101d;
+        --primary-soft: rgba(44, 67, 106, 0.42);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: var(--background);
+        color: var(--foreground);
+        overscroll-behavior-y: none;
+      }
+      body {
+        display: flex;
+        min-height: 100vh;
+        min-height: 100dvh;
+        align-items: center;
+        justify-content: center;
+        padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+          max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+        font-family: "Pretendard Variable", "Pretendard", "Noto Sans KR", -apple-system,
+          BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+        line-height: 1.6;
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        width: 100%;
+        max-width: 26rem;
+        border: 1px solid var(--border);
+        border-radius: 1.5rem;
+        background: var(--surface);
+        padding: 32px 24px;
+        text-align: center;
+      }
+      .icon {
+        display: inline-flex;
+        width: 56px;
+        height: 56px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: var(--primary-soft);
+        color: var(--primary);
+      }
+      h1 {
+        margin: 20px 0 8px;
+        font-size: 1.25rem;
+        font-weight: 700;
+        line-height: 1.4;
+      }
+      p {
+        margin: 0;
+        color: var(--muted-foreground);
+        font-size: 0.9375rem;
+      }
+      button {
+        margin-top: 24px;
+        min-height: 48px;
+        width: 100%;
+        border: 0;
+        border-radius: 1rem;
+        background: var(--primary);
+        color: var(--primary-foreground);
+        font: inherit;
+        font-size: 1rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button:hover {
+        background: var(--primary-emphasis);
+      }
+      button:focus-visible {
+        outline: 3px solid var(--primary);
+        outline-offset: 3px;
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        button {
+          transition: background-color 150ms ease;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main aria-labelledby="offline-title">
+      <span class="icon" aria-hidden="true">
+        <!-- Heroicons 24/outline signal-slash (MIT) -->
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m3 3 8.735 8.735m0 0a.374.374 0 1 1 .53.53m-.53-.53.53.53m0 0L21 21M14.652 9.348a3.75 3.75 0 0 1 0 5.304m2.121-7.425a6.75 6.75 0 0 1 0 9.546m2.121-11.667c3.808 3.807 3.808 9.98 0 13.788m-9.546-4.242a3.733 3.733 0 0 1-1.06-2.122m-1.061 4.243a6.75 6.75 0 0 1-1.625-6.929m-.496 9.05c-3.068-3.067-3.664-7.67-1.79-11.334M12 12h.008v.008H12V12Z" />
+        </svg>
+      </span>
+      <h1 id="offline-title">인터넷에 연결되어 있지 않습니다</h1>
+      <p>연결 상태를 확인한 뒤 다시 시도해 주세요. 연결되면 보던 화면을 자동으로 다시 불러옵니다.</p>
+      <button type="button" id="offline-retry">다시 시도</button>
+    </main>
+    <script>
+      (function () {
+        var button = document.getElementById("offline-retry");
+        function retry() {
+          window.location.reload();
+        }
+        if (button) {
+          button.addEventListener("click", retry);
+        }
+        window.addEventListener("online", retry);
+      })();
+    </script>
+  </body>
+</html>

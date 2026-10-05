@@ -202,5 +202,11 @@ export const SITE_URL =
   );
 export const SITE_RSS_URL = "/rss.xml";
 
+// Browser chrome and installed-app colors. They mirror the `--background`
+// tokens in src/app/globals.css (light and dark) and are shared by the root
+// viewport and the web app manifest.
+export const SITE_THEME_COLOR_LIGHT = "#f4f7fb";
+export const SITE_THEME_COLOR_DARK = "#07101d";
+
 export const GITHUB_URL = "https://github.com/MyKnow";
 export const BUG_REPORT_EMAIL = "myknow@ssafy.com";

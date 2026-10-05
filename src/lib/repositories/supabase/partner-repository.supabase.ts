@@ -46,7 +46,7 @@ const PARTNER_SELECT_COLUMNS =
 const PUBLIC_DIRECTORY_SELECT_COLUMNS =
   "id,name,category_id,created_at,location,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,partner_benefits(id,title,max_apply_count,display_order),applies_to,tags,visibility,benefit_visibility,branch_scope_type,categories(key)";
 const PUBLIC_PARTNER_SEO_SELECT_COLUMNS =
-  "id,name,location,period_start,period_end,categories(label)";
+  "id,name,location,campus_slugs,period_start,period_end,created_at,categories(label)";
 
 const getCachedPublicCacheVersionSnapshot = unstable_cache(
   async (): Promise<PublicCacheVersionSnapshot> => {

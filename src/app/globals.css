@@ -197,6 +197,18 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/*
+ * 설치형 앱에서 당겨서 새로고침이 실수로 일어나면 페이지가 다시 열려 작성 중인 입력이
+ * 사라집니다. standalone 화면에서만 문서 끝의 당김·튕김을 막고, 일반 브라우저 탭의
+ * 동작은 그대로 둡니다.
+ */
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+
 /* 브라우저의 보이는 영역과 홈 인디케이터 위에 설치 안내를 배치합니다. */
 .pwa-visit-recommendation {
   bottom: calc(max(env(safe-area-inset-bottom, 0px), var(--pwa-viewport-bottom, 0px)) + 1rem);

@@ -57,6 +57,8 @@ export type CategoryRow = {
 };
 
 export type PublicPartnerSeoRow = {
+  campus_slugs?: string[] | null;
+  created_at?: string | null;
   id: string;
   name: string;
   location: string;

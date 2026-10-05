@@ -77,6 +77,21 @@ test("campus helpers infer campus slugs and summarize partner counts", async () 
   );
 });
 
+test("campus indexability follows the public partner count", async () => {
+  const { getIndexableCampusSlugs, isCampusIndexable } = await campusSeoModulePromise;
+
+  assert.equal(isCampusIndexable(0), false);
+  assert.equal(isCampusIndexable(1), true);
+  assert.deepStrictEqual(
+    getIndexableCampusSlugs([
+      { campusSlugs: ["gumi"] },
+      { campusSlugs: ["seoul", "gumi"] },
+      { campusSlugs: [] },
+    ]),
+    ["seoul", "gumi"],
+  );
+});
+
 test("campus seo helpers include campus and category context", async () => {
   const { buildCampusSeoMetadata, buildCampusStructuredData } =
     await campusSeoModulePromise;
@@ -99,6 +114,16 @@ test("campus seo helpers include campus and category context", async () => {
     metadata?.keywords.includes("구미 카페 제휴"),
     true,
   );
+
+  assert.equal(metadata?.indexable, true);
+
+  const emptyMetadata = buildCampusSeoMetadata({
+    campusSlug: "gwangju",
+    partnerCount: 0,
+    categoryLabels: [],
+  });
+  assert.equal(emptyMetadata?.indexable, false);
+  assert.equal(emptyMetadata?.description.includes("현재 공개 제휴를 준비 중입니다."), true);
 
   const structuredData = buildCampusStructuredData({
     campusSlug: "gumi",

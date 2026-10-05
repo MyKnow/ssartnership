@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import RoutePageViewTracker from "@/components/analytics/RoutePageViewTracker";
 import PartnerPortalShellView from "@/components/partner/PartnerPortalShellView";
@@ -5,6 +6,11 @@ import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 import { getPartnerPortalCompanySummaries } from "@/lib/partner-auth/portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { loadPartnerShellCompanies } from "@/lib/partner-shell-companies";
+
+// The partner portal is private; every page below it stays out of search.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function PartnerLayout({
   children,
