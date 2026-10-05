@@ -13,6 +13,8 @@ export type PublicPartnerSeoEntry = {
   name: string;
   categoryLabel: string;
   location: string;
+  /** Campuses whose landing page lists this partner (same rule as that page). */
+  campusSlugs: CampusSlug[];
   period: {
     start: string | null;
     end: string | null;

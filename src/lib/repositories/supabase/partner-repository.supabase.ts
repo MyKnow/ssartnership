@@ -80,6 +80,7 @@ type PublicPartnerSeoRow = {
   id: string;
   name: string;
   location: string;
+  campus_slugs?: string[] | null;
   period_start: string | null;
   period_end: string | null;
   categories?:
@@ -111,7 +112,7 @@ const PARTNER_SELECT_COLUMNS =
 const PUBLIC_DIRECTORY_SELECT_COLUMNS =
   "id,name,category_id,created_at,location,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,partner_benefits(id,title,max_apply_count,display_order),applies_to,tags,visibility,benefit_visibility,branch_scope_type,categories(key)";
 const PUBLIC_PARTNER_SEO_SELECT_COLUMNS =
-  "id,name,location,period_start,period_end,categories(label)";
+  "id,name,location,campus_slugs,period_start,period_end,categories(label)";
 
 function normalizeDate(value: string | null | undefined) {
   return value ?? "미정";
@@ -510,6 +511,8 @@ function mapPublicPartnerSeoEntry(
     name: row.name,
     categoryLabel: category?.label ?? "제휴",
     location: row.location,
+    // Campus pages filter on the stored slugs only (`contains("campus_slugs")`).
+    campusSlugs: normalizeCampusSlugs(row.campus_slugs ?? []),
     period: {
       start: row.period_start,
       end: row.period_end,

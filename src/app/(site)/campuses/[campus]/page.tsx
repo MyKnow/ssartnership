@@ -103,6 +103,10 @@ export async function generateMetadata({
       title: metadata.title,
       description: metadata.description,
     }),
+    robots: {
+      index: metadata.indexable,
+      follow: true,
+    },
   };
 }
 

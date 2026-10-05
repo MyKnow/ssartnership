@@ -9,7 +9,11 @@ import type {
 import { toLeanPublicDirectoryPartner } from "@/lib/public-partner-directory";
 import { canViewPartnerDetails } from "@/lib/partner-visibility";
 import { maskPartnerBenefitsForAccess } from "@/lib/partner-benefit-visibility";
-import { getCampusPartners, type CampusSlug } from "@/lib/campuses";
+import {
+  getCampusPartners,
+  resolvePartnerCampusSlugs,
+  type CampusSlug,
+} from "@/lib/campuses";
 
 const categories: Category[] = [
   {
@@ -203,6 +207,8 @@ export class MockPartnerRepository implements PartnerRepository {
           categories.find((category) => category.key === partner.category)
             ?.label ?? "제휴",
         location: partner.location,
+        // Mirrors getPublicDirectoryPartnersForCampus, which uses getCampusPartners.
+        campusSlugs: resolvePartnerCampusSlugs(partner),
         period: {
           start: partner.period.start || null,
           end: partner.period.end || null,

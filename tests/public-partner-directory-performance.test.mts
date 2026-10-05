@@ -87,7 +87,7 @@ test("Supabase SEO projection filters active public partners before applying lim
   const seoProjection = seoProjectionMatch[1];
   assert.match(
     seoProjection,
-    /id,name,location,period_start,period_end,categories\(label\)/,
+    /^id,name,location,campus_slugs,period_start,period_end,categories\(label\)$/,
   );
   assert.doesNotMatch(
     seoProjection,
