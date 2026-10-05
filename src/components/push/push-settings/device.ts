@@ -184,6 +184,10 @@ export async function getOrCreatePushSubscription(vapidPublicKey: string) {
 
 /** 관리자·파트너 알림 패널용: 권한 확인 후 이 브라우저 구독을 확보한다. */
 export async function subscribeCurrentBrowserPush(vapidPublicKey: string) {
+  // 구독할 수 없는 환경(미지원 브라우저·공개키 없음)이면 권한 창을 띄우기 전에 멈춘다.
+  if (!vapidPublicKey || !isPushSubscriptionSupported()) {
+    throw new PushDeviceSetupError("push_unsupported");
+  }
   assertPushNotificationPermissionGranted(
     await requestPushNotificationPermission(),
   );

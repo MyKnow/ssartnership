@@ -348,8 +348,23 @@ test("권한 거부와 미지원 브라우저는 고정된 안전 문구로 실�
       subscribeCurrentBrowserPush(VAPID_PUBLIC_KEY),
       /이 브라우저에서는 푸시 알림을 사용할 수 없습니다\./,
     );
+    assert.equal(unsupported.permissionRequests, 0, "미지원 브라우저에서는 권한을 묻지 않는다");
   } finally {
     unsupported.restore();
+  }
+
+  // 공개키가 없으면 구독할 수 없으므로 권한 창을 띄우기 전에 멈춘다(기존 패널 동작 유지).
+  const missingKey = installBrowser({ existing: null });
+  try {
+    await assert.rejects(subscribeCurrentBrowserPush(""), (error: unknown) => {
+      assert.ok(error instanceof PushDeviceSetupError);
+      assert.equal((error as { code?: string }).code, "push_unsupported");
+      return true;
+    });
+    assert.equal(missingKey.permissionRequests, 0);
+    assert.equal(missingKey.subscribeCalls.length, 0);
+  } finally {
+    missingKey.restore();
   }
 });
 
