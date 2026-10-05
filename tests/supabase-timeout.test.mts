@@ -232,3 +232,26 @@ test("the Supabase SDK returns a transient error object when the deadline fires"
     await server.close();
   }
 });
+
+test("Storage SDK calls surface the deadline as a transient StorageUnknownError", async () => {
+  const server = await startServer(hang);
+  const client = createClient(server.origin, "local-test-key", {
+    auth: { persistSession: false },
+    global: { fetch: withSupabaseTimeout(fetch, { defaultMs: 5_000, storageMs: 100 }) },
+  });
+  const startedAt = Date.now();
+  try {
+    const { data, error } = await client.storage.from("review-media").download("a.webp");
+    assert.equal(data, null);
+    assert.ok(error);
+    assert.equal(error.name, "StorageUnknownError");
+    assert.equal(
+      (error as { originalError?: { name?: unknown } }).originalError?.name,
+      "TimeoutError",
+    );
+    assert.doesNotMatch(error.message, /not[ _-]?found|does not exist/iu);
+    assert.ok(Date.now() - startedAt < 2_000);
+  } finally {
+    await server.close();
+  }
+});
