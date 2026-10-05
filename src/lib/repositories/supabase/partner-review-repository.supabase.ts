@@ -11,6 +11,7 @@ import {
   aggregatePartnerReviewReactionStates,
   type PartnerReviewReactionRow,
 } from "@/lib/partner-review-reactions";
+import { logServerError } from "@/lib/server-log";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type {
   CreatePartnerReviewInput,
@@ -113,10 +114,7 @@ async function getFilteredReviewSummary(
   if (error) {
     // get_partner_review_summary ships with 20260831083528; a missing RPC is a
     // deployment error and is not replaced by per-rating count queries.
-    console.error("[partner-reviews] summary rpc failed", {
-      partnerId,
-      message: error.message,
-    });
+    logServerError("[partner-reviews] summary rpc failed", error, { partnerId });
     throw new Error(error.message);
   }
 

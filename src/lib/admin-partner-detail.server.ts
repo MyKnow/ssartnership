@@ -148,10 +148,17 @@ export async function getAdminPartnerDetailCoreReadModel({
     ]);
 
     if (partnerResult.error || previewTokenResult.error) {
-      console.error("[admin-partner-detail] core read model query failed", {
-        partnerError: partnerResult.error?.message ?? null,
-        previewTokenError: previewTokenResult.error?.message ?? null,
-      });
+      for (const [query, error] of [
+        ["partners", partnerResult.error],
+        ["partner_preview_tokens", previewTokenResult.error],
+      ] as const) {
+        if (error) {
+          logServerError("[admin-partner-detail] core read model query failed", error, {
+            partnerId,
+            query,
+          });
+        }
+      }
       return { status: "error" as const };
     }
     const partner = partnerResult.data as unknown as AdminPartnerDetailRow | null;
