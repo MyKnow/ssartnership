@@ -3,7 +3,9 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  PARTNER_ACCOUNT_DETAIL_SELECT,
   PARTNER_ACCOUNT_SELECT,
+  PARTNER_ACCOUNT_SETUP_SELECT,
   PARTNER_COMPANY_SELECT,
   buildNewPartnerAccountInsert,
   normalizePartnerAccountRow,
@@ -104,7 +106,17 @@ test("관리자 파트너사·계정 쓰기 경로는 공용 행 계약을 재�
 });
 
 test("관리자 계정 조회는 비밀번호 해시와 솔트를 읽지 않는다", async () => {
-  assert.doesNotMatch(PARTNER_ACCOUNT_SELECT, /password_(hash|salt)/);
+  for (const projection of [
+    PARTNER_ACCOUNT_SELECT,
+    PARTNER_ACCOUNT_SETUP_SELECT,
+    PARTNER_ACCOUNT_DETAIL_SELECT,
+  ]) {
+    assert.doesNotMatch(projection, /password_(hash|salt)/);
+  }
+  assert.equal(
+    PARTNER_ACCOUNT_DETAIL_SELECT,
+    "id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_expires_at,last_login_at,created_at,updated_at",
+  );
   const normalized = normalizePartnerAccountRow({
     id: "account-1",
     login_id: "owner@example.com",
@@ -126,6 +138,6 @@ test("관리자 계정 조회는 비밀번호 해시와 솔트를 읽지 않는�
   );
   for (const source of sources) {
     assert.doesNotMatch(source, /select\([^)]*password_(hash|salt)/);
-    assert.match(source, /PARTNER_ACCOUNT_SELECT|buildNewPartnerAccountInsert/);
+    assert.match(source, /PARTNER_ACCOUNT_(DETAIL_|SETUP_)?SELECT/);
   }
 });

@@ -10,11 +10,15 @@ export const PARTNER_COMPANY_SELECT =
   "id,name,slug,description,is_active,managed_campus_slugs";
 
 /**
- * Admin projection for partner accounts. Password material is deliberately
+ * Admin projections for partner accounts. Password material is deliberately
  * excluded: admin actions never need to read `password_hash`/`password_salt`.
+ * Each path keeps the column set it already read; only the secret columns
+ * were dropped, so no path starts depending on a new column.
  */
 export const PARTNER_ACCOUNT_SELECT =
-  "id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_expires_at,last_login_at,created_at,updated_at";
+  "id,login_id,display_name,email,must_change_password,is_active,email_verified_at,initial_setup_completed_at";
+export const PARTNER_ACCOUNT_SETUP_SELECT = `${PARTNER_ACCOUNT_SELECT},initial_setup_link_sent_at,initial_setup_expires_at`;
+export const PARTNER_ACCOUNT_DETAIL_SELECT = `${PARTNER_ACCOUNT_SETUP_SELECT},last_login_at,created_at,updated_at`;
 
 export type PartnerCompanyRow = {
   id: string;

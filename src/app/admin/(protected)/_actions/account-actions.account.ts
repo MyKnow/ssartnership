@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSafeAdminActionErrorCode } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
 import {
-  PARTNER_ACCOUNT_SELECT,
+  PARTNER_ACCOUNT_SETUP_SELECT,
   buildNewPartnerAccountInsert,
 } from "@/lib/partner-admin/company-account-rows";
 import { issuePartnerAccountInitialSetupLink } from "./partner-support/setup-link";
@@ -130,7 +130,7 @@ export async function createPartnerAccountAction(formData: FormData) {
         now: new Date().toISOString(),
       }),
     )
-    .select(PARTNER_ACCOUNT_SELECT)
+    .select(PARTNER_ACCOUNT_SETUP_SELECT)
     .single();
 
   if (createError || !createdAccount) {

@@ -76,7 +76,7 @@ export async function issuePartnerAccountInitialSetupLink(
 ) {
   const { data: account, error: accountError } = await supabase
     .from("partner_accounts")
-    .select(PARTNER_ACCOUNT_SELECT)
+    .select(`${PARTNER_ACCOUNT_SELECT},initial_setup_link_sent_at,updated_at`)
     .eq("id", accountId)
     .maybeSingle();
 

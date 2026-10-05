@@ -1,5 +1,5 @@
 import {
-  PARTNER_ACCOUNT_SELECT,
+  PARTNER_ACCOUNT_DETAIL_SELECT,
   PARTNER_COMPANY_SELECT,
 } from "@/lib/partner-admin/company-account-rows";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -20,7 +20,7 @@ export async function loadPartnerAccountOrRedirect(accountId: string) {
   const supabase = getPartnerAccountSupabase();
   const { data: account, error } = await supabase
     .from("partner_accounts")
-    .select(PARTNER_ACCOUNT_SELECT)
+    .select(PARTNER_ACCOUNT_DETAIL_SELECT)
     .eq("id", accountId)
     .maybeSingle();
 
