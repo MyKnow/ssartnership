@@ -16,7 +16,9 @@ authority: normative
 현재 기준:
 
 - Next.js App Router 기반 server rendering과 client component를 혼합한다.
-- public partner/category 조회는 `unstable_cache`와 `public_cache_versions` 기반 versioned cache를 사용한다.
+- public partner/category 조회는 `unstable_cache`와 `public_cache_versions` 기반 versioned cache를 사용한다. 캐시 태그는 `src/lib/cache-tags.ts`, revalidate 창은 `src/lib/cache-ttl.ts`의 상수만 쓰고 값(태그 문자열·초)은 캐시 계약이므로 바꾸지 않는다.
+- 요청 안에서 같은 데이터를 여러 번 읽는 경계(회원 대상 스냅샷, 파트너 포털 회사 요약, 쇼케이스 이벤트·공개 프로젝트, 회원 게이트 정책 버전)는 React `cache()`로 요청 단위 메모이즈한다. 회원 게이트는 정책 본문 없이 활성 버전만 읽고, 서명 세션의 동의 스냅샷이 최신이면 동의 이력을 읽지 않는다.
+- 공개 홈·캠퍼스 인기도는 지표 롤업만 읽고 `event_logs` 원본 재집계 fallback을 쓰지 않는다. 롤업이 비어 있으면 조회수 0으로 정렬한다.
 - 홈 page는 `revalidate = 300`으로 선언되어 있으나 `(site)` layout은 세션 강제 처리 때문에 dynamic이다.
 - selector 분리 작업이 진행되어 홈, 관리자 회원, 관리자 로그의 검색/필터/정렬 계산은 pure selector로 이동되어 있다.
 - partner metric은 event log 원본을 기반으로 rollup table과 unique visitor table에 집계된다.
