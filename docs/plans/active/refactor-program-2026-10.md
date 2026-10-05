@@ -83,3 +83,15 @@ RF-14/16/17/18의 중단된 미커밋 변경을 포함해 독립 통합 브랜�
 통합 PR은 #530~#555를 `Refs`로 연결하고, high 등급의 첫 원격 release 및 Windows/macOS 계약 검사를 확인한 뒤 merge commit으로 `dev`에 반영한다. 병합 SHA의 Public Readiness와 Preview image 첫 실행도 별도로 검증한다. 라이브 DDL·권한·키·호스트 변경은 기존 결정 D2와 단위 Issue의 운영자 경계를 유지하고, `main` 승격과 이슈 종료는 이번 전달 범위에 포함하지 않는다.
 
 첫 PR 검증에서 Vercel의 남은 Git 연결이 삭제된 자동 배포 차단 설정을 대신하지 못하는 사실을 확인했다. RF-04의 Cron 정본은 `schedules.json`에 유지하고, `vercel.json`에는 모든 Git 자동 배포를 끄는 boolean 설정만 보존한다. 이 파일은 실행·빌드·Cron·복구 경로를 제공하지 않는 폐기 공급자 차단 장치이며 삭제를 막는 계약 테스트로 보호한다. 외부 프로젝트 중지 상태와 계정 설정은 변경하지 않는다.
+
+## 비지갑 후속 통합과 운영 검증
+
+2026-10-05 사용자가 Wallet을 제외한 나머지 작업을 진행하도록 요청했다. 중단된 원본 작업 폴더 24개와 원래 checkout의 미커밋 변경을 보존한 상태로 RF-09/12/13/14/16/17/18/20/24의 후속 커밋 32개를 [PR #561](https://github.com/MyKnow/ssartnership/pull/561)에서 `dev`로 통합했다. 로컬 전체 release와 첫 원격 CI, 병합 SHA의 이미지 발행, 실제 Preview 앱 identity를 각각 확인했다. 이름 동기화와 재동의 후 사진 인증 이동 수정은 [PR #558](https://github.com/MyKnow/ssartnership/pull/558), [PR #560](https://github.com/MyKnow/ssartnership/pull/560)에 포함돼 있다.
+
+[PR #562](https://github.com/MyKnow/ssartnership/pull/562)는 익명 Web Vitals의 navigation 전송을 쿠키 없는 keepalive fetch로 바꿨다. 실제 sampling과 세 필드 계약을 유지한 full Chromium 검증에서 세 문서의 LCP/INP/CLS 9건이 모두 수집됐다. 별도 headless-shell 검증에서는 9건 중 7건과 8건만 도착했으며, 이 실패 기록과 브라우저별 best-effort 전송 한계를 유지한다. CI 성공으로 실제 지표 수집 완료를 대체하지 않는다.
+
+운영자 범위에서는 공용 edge·관측 설정, 51개 대시보드 패널과 경보 규칙, 기존 예약 작업 11개의 지표, 두 배포 수신기의 지표·종료 코드 처리를 적용하고 독립 확인했다. Preview 관측 컨테이너는 검증된 immutable 이미지로 별도 활성화했으며 gateway·Storage·DB 준비 상태 3개를 확인했다. 자동 수신기는 기존 app-only 계약을 유지하므로 이미지 발행·앱 배포·관측 컨테이너 활성화는 별도 증거다. 실제 앱 컴포넌트의 오류 상태와 공개 Preview를 모바일·태블릿·데스크톱에서 확인했고, 관리 대시보드의 브라우저 렌더 검증은 인증 가능한 브라우저 연결 부족으로 API·생성물 검증까지만 완료했다.
+
+전체 public DB 타입은 [PR #563](https://github.com/MyKnow/ssartnership/pull/563)에서 실제 Preview catalog로 생성·대조한다. 생성 근거와 누락 거부 규칙은 [개발 도구 평가](../../testing/audits/2026-10-refactor-tooling.md#데이터-타입-파일럿)가 정본이다. 이 PR의 `dev` 병합과 실제 Preview 적용은 별도 전달 경계다.
+
+Production 앱·DB는 기존 revision과 208개 migration을 유지하고 Preview는 210개 migration을 사용한다. `main` 승격, 그 뒤의 레거시 시크릿 정리, 접근 권한이 없는 폐기 공급자 설정, 오프라인 복구 키 보관·인계, 실제 독립 회선 감시와 운영 기간이 필요한 임계값 재검토는 완료로 표시하지 않는다. Wallet 기능·키·예약 작업은 진행 범위에서 제외한다.
