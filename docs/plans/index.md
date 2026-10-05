@@ -3,7 +3,7 @@ title: 실행 계획 인덱스
 type: index
 status: current
 authority: normative
-last_verified: 2026-08-29
+last_verified: 2026-10-05
 ---
 
 # 실행 계획 인덱스
@@ -11,7 +11,7 @@ last_verified: 2026-08-29
 ## Active
 
 - [2026-10 리팩토링·개선 프로그램](./active/refactor-program-2026-10.md) — 기본 결정과 진행 규칙, Issue #530
-- [SSAFY Verify 레거시 삭제 준비](./active/ssafy-verify-legacy-removal.md)
+- [SSAFY Verify 레거시 삭제 준비](./active/ssafy-verify-legacy-removal.md) — HOLD(운영자 승인 대기). 감사 Issue #309는 종료됐고, 삭제 실행은 승인 뒤 별도 Issue로 진행한다.
 
 ## Completed
 

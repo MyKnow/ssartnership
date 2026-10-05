@@ -127,7 +127,7 @@ authority: normative
 - planned work는 typed branch에서 시작하고 PR은 `dev` 대상으로 만든다.
 - `npm run release`가 기본 release path다.
 - GitHub Actions: `Public Readiness`(변경 위험 등급별 검증), `Self-host Preview Images`·`Self-host Production Images`(이미지 게시), 수동 `Storybook and Visual Baselines` 등. 현재 목록은 `.github/workflows/`가 정본이다.
-- Cloud Supabase Preview는 frozen 복구 기준선이며 Actions의 migration/sync 대상이 아니다(Issue #484). 자체 호스팅 Preview/Production DDL은 운영자가 검증 후 작성하는 `schema-approval.json`으로만 배포가 허용된다.
+- Cloud Supabase Preview는 동결된 이전 원본일 뿐 복구 경로가 아니며([리팩토링 기본 결정 D1](../plans/active/refactor-program-2026-10.md#기본-결정)), Actions의 migration/sync 대상도 아니다(Issue #484). 자체 호스팅 Preview/Production DDL은 운영자가 검증 후 작성하는 `schema-approval.json`으로만 배포가 허용된다.
 - migration은 forward-only, 실제 현재 시각 prefix, lexicographic order를 지켜야 한다.
 
 ## Observability
