@@ -106,3 +106,14 @@ test("실패를 알리는 notify 호출은 error 톤을 명시한다", async () 
 
   assert.deepEqual(missing, []);
 });
+
+test("관리자 알림 발송 요약은 실패 건이 있으면 error 톤으로 알린다", async () => {
+  const source = await readFile(
+    new URL("../src/components/admin/push-manager/useAdminPushManager.ts", import.meta.url),
+    "utf8",
+  );
+  const summary = collectNotifyCalls(source).find((call) => call.includes("알림 발송 완료"));
+
+  assert.ok(summary, "발송 요약 notify 호출을 찾지 못했습니다.");
+  assert.match(summary, /totalFailed > 0 \? \{ tone: "error" \} : undefined/);
+});
