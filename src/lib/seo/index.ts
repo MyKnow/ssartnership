@@ -8,11 +8,14 @@ export type SeoOpenGraphImage = {
   alt?: string;
 };
 
-/** Share card used when a page has no image of its own. */
+/**
+ * 1200x630 share card used when a page has no image of its own. Regenerate it
+ * with `node scripts/generate-share-assets.mjs`.
+ */
 export const DEFAULT_OPEN_GRAPH_IMAGE = {
-  url: "/icon-512.png",
-  width: 512,
-  height: 512,
+  url: "/og-default.png",
+  width: 1200,
+  height: 630,
   alt: SITE_TITLE,
 } as const satisfies SeoOpenGraphImage;
 

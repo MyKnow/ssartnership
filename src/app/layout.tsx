@@ -9,7 +9,7 @@ import {
   SITE_RSS_URL,
   SITE_TITLE,
 } from "@/lib/site";
-import { getMetadataBase } from "@/lib/seo";
+import { DEFAULT_OPEN_GRAPH_IMAGE, getMetadataBase } from "@/lib/seo";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import PwaProvider from "@/components/PwaProvider";
@@ -43,26 +43,17 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: SITE_NAME,
   },
+  // Title and description are left out on purpose: Next.js fills og:title,
+  // og:description, and the Twitter card from each page's own metadata, so
+  // pages without an openGraph block do not advertise the home page text.
   openGraph: {
-    title: SITE_TITLE,
-    description: SITE_DESCRIPTION,
     siteName: SITE_NAME,
     locale: "ko_KR",
     type: "website",
-    images: [
-      {
-        url: "/icon-512.png",
-        width: 512,
-        height: 512,
-        alt: SITE_TITLE,
-      },
-    ],
+    images: [DEFAULT_OPEN_GRAPH_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
-    title: SITE_TITLE,
-    description: SITE_DESCRIPTION,
-    images: ["/icon-512.png"],
   },
   keywords: SITE_KEYWORDS,
   applicationName: SITE_NAME,

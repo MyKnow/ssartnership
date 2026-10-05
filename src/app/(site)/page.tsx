@@ -18,6 +18,7 @@ import {
 import {
   buildSiteUrl,
   createCanonicalAlternates,
+  createPageOpenGraph,
   serializeJsonLd,
 } from "@/lib/seo";
 import { getHeaderSession } from "@/lib/header-session";
@@ -38,28 +39,11 @@ export const metadata: Metadata = {
       "application/rss+xml": SITE_RSS_URL,
     },
   },
-  openGraph: {
+  openGraph: createPageOpenGraph({
+    path: "/",
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
-    url: "/",
-    siteName: SITE_NAME,
-    locale: "ko_KR",
-    type: "website",
-    images: [
-      {
-        url: "/icon-512.png",
-        width: 512,
-        height: 512,
-        alt: SITE_TITLE,
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: SITE_TITLE,
-    description: SITE_DESCRIPTION,
-    images: ["/icon-512.png"],
-  },
+  }),
   robots: {
     index: true,
     follow: true,

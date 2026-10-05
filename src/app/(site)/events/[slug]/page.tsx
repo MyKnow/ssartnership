@@ -9,7 +9,7 @@ import {
   isPromotionCampaignVisible,
 } from "@/lib/promotions/events";
 import { getEventRewardSummary } from "@/lib/promotions/event-rewards";
-import { buildSiteUrl, createCanonicalAlternates } from "@/lib/seo";
+import { buildSiteUrl, createCanonicalAlternates, createPageOpenGraph } from "@/lib/seo";
 import { SITE_NAME } from "@/lib/site";
 import { getSignedUserSession } from "@/lib/user-auth";
 
@@ -38,28 +38,15 @@ export async function generateMetadata({
     title: `${campaign.title} | ${SITE_NAME}`,
     description: campaign.description,
     alternates: createCanonicalAlternates(canonicalPath),
-    openGraph: {
+    // Crawlers reject the SVG hero, so share cards use its 1200x630 raster.
+    openGraph: createPageOpenGraph({
+      path: canonicalPath,
       title: campaign.title,
       description: campaign.description,
-      url: canonicalPath,
-      siteName: SITE_NAME,
-      locale: "ko_KR",
-      type: "website",
-      images: [
-        {
-          url: campaign.heroImageSrc,
-          width: 1200,
-          height: 514,
-          alt: campaign.heroImageAlt,
-        },
-      ],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: campaign.title,
-      description: campaign.description,
-      images: [campaign.heroImageSrc],
-    },
+      images: definition.shareImageSrc
+        ? [{ url: definition.shareImageSrc, width: 1200, height: 630, alt: campaign.heroImageAlt }]
+        : undefined,
+    }),
     robots: {
       index: visible,
       follow: true,

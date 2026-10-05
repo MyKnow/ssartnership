@@ -20,7 +20,7 @@ import type { PartnerAudienceKey } from "@/lib/partner-audience";
 import { isWithinPeriod } from "@/lib/partner-utils";
 import { canViewPartnerDetails } from "@/lib/partner-visibility";
 import { buildCampusSeoMetadata, buildCampusStructuredData } from "@/lib/seo/campuses";
-import { createCanonicalAlternates } from "@/lib/seo";
+import { createCanonicalAlternates, createPageOpenGraph } from "@/lib/seo";
 
 const getCampusCategoriesCached = cache(() => partnerRepository.getCategories());
 const getCampusPartnersCached = cache(
@@ -98,17 +98,11 @@ export async function generateMetadata({
     description: metadata.description,
     keywords: metadata.keywords,
     alternates: createCanonicalAlternates(canonicalPath),
-    openGraph: {
+    openGraph: createPageOpenGraph({
+      path: canonicalPath,
       title: metadata.title,
       description: metadata.description,
-      url: canonicalPath,
-      type: "website",
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: metadata.title,
-      description: metadata.description,
-    },
+    }),
   };
 }
 
