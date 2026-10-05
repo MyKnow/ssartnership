@@ -13,6 +13,8 @@ authority: normative
 - 위험 액션은 `danger`
 - 정보 강조용 정적 액션은 `soft`
 - 선택된 조작 요소(active tab/filter/nav)는 `primary-soft`가 아니라 `bg-primary text-primary-foreground border-primary` 계열로 표시한다.
+- 크기는 `sm / md / lg / icon`이 모두 44px 최소 터치 영역을 가진다. 밀집 툴바(알림함 일괄 처리 등)는 `size="compact"`로 시각 32px + 투명 의사요소 44px 히트 영역을 쓰고, `!h-8 !min-h-0` 같은 `!` 오버라이드로 줄이지 않는다.
+- 아이콘 전용 보조 액션은 `IconActionButton`(시각 32px, 히트 영역 44px)을 `IconActionGroup` 안에서 쓴다. 그룹 기본 간격 12px은 인접 히트 영역이 겹치지 않게 하는 값이다.
 - `primary-soft text-primary`는 badge, info message, soft CTA처럼 선택 상태가 아닌 낮은 강조에만 사용한다.
 
 ## Inputs

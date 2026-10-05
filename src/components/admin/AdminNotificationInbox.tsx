@@ -317,11 +317,11 @@ export default function AdminNotificationInbox({
           ) : null}
         </div>
         {state.items.length > 0 ? (
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-3">
             <Button
               variant="secondary"
-              size="sm"
-              className="!h-8 !min-h-8 !min-w-0 rounded-full border-success/20 bg-success/10 px-3 text-xs font-semibold text-success shadow-raised hover:border-success/30 hover:bg-success/15"
+              size="compact"
+              className="border-success/20 bg-success/10 text-success shadow-raised hover:border-success/30 hover:bg-success/15"
               onClick={() => {
                 void markAllAsRead();
               }}
@@ -335,8 +335,8 @@ export default function AdminNotificationInbox({
             </Button>
             <Button
               variant="danger"
-              size="sm"
-              className="!h-8 !min-h-8 !min-w-0 rounded-full px-3 text-xs font-semibold shadow-raised"
+              size="compact"
+              className="shadow-raised"
               onClick={() => {
                 setDeleteAllConfirmOpen(true);
               }}
