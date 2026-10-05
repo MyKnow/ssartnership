@@ -48,27 +48,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (!isMemberSessionFreshForAdminBridge(memberSession)) {
-    // Promotion to admin needs a recent credential check instead of riding
-    // the 7-day member session. Clearing the member cookie also prevents a
-    // redirect loop through the logged-in /auth/login redirect.
-    await Promise.all([clearUserSession(), clearAdminSession()]);
-    await logAuthSecurity({
-      ...context,
-      eventName: "admin_access",
-      status: "blocked",
-      actorType: "member",
-      actorId: memberSession.userId,
-      properties: {
-        reason: "reauthentication_required",
-        stage: "session_bridge",
-      },
-    });
-    const loginUrl = buildTrustedRedirectUrl("/auth/login", request.url);
-    loginUrl.searchParams.set("returnTo", returnTo);
-    return NextResponse.redirect(loginUrl);
-  }
-
   const adminAccount = await resolveAdminAccountFromUserSession(memberSession.userId);
   if (!adminAccount) {
     await logAuthSecurity({
@@ -85,6 +64,29 @@ export async function GET(request: NextRequest) {
     const deniedUrl = buildTrustedRedirectUrl("/admin/denied", request.url);
     deniedUrl.searchParams.set("returnTo", returnTo);
     return NextResponse.redirect(deniedUrl);
+  }
+
+  if (!isMemberSessionFreshForAdminBridge(memberSession)) {
+    // Promotion to admin needs a recent credential check instead of riding
+    // the 7-day member session. Clearing the member cookie also prevents a
+    // redirect loop through the logged-in /auth/login redirect. Non-admin
+    // members were already sent to /admin/denied above, so following an
+    // /admin link never signs an ordinary member out.
+    await Promise.all([clearUserSession(), clearAdminSession()]);
+    await logAuthSecurity({
+      ...context,
+      eventName: "admin_access",
+      status: "blocked",
+      actorType: "member",
+      actorId: memberSession.userId,
+      properties: {
+        reason: "reauthentication_required",
+        stage: "session_bridge",
+      },
+    });
+    const loginUrl = buildTrustedRedirectUrl("/auth/login", request.url);
+    loginUrl.searchParams.set("returnTo", returnTo);
+    return NextResponse.redirect(loginUrl);
   }
 
   await setAdminSession(adminAccount);

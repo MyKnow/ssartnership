@@ -89,10 +89,14 @@ test("관리자 세션 브리지는 최근 10분 안의 회원 자격 확인만 
 test("관리자 세션 브리지 route는 오래된 회원 세션을 지우고 재로그인으로 보낸다", async () => {
   const { readFileSync } = await import("node:fs");
   const source = readFileSync(new URL("../src/app/admin/session/route.ts", import.meta.url), "utf8");
+  const notAdminIndex = source.indexOf('reason: "not_admin"');
   const ageGateIndex = source.indexOf("isMemberSessionFreshForAdminBridge(memberSession)");
   const mintIndex = source.indexOf("await setAdminSession(adminAccount)");
 
   assert.ok(ageGateIndex > 0 && ageGateIndex < mintIndex);
+  // Ordinary members who follow an /admin link go to /admin/denied before the
+  // age gate, so the re-login branch never clears a non-admin member session.
+  assert.ok(notAdminIndex > 0 && notAdminIndex < ageGateIndex);
   assert.match(source, /clearUserSession\(\), clearAdminSession\(\)/);
   assert.match(source, /reason: "reauthentication_required"/);
 });
