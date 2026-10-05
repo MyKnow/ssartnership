@@ -59,7 +59,7 @@ public header는 브랜드와 계정·알림·쿠폰·테마·전체 메뉴처�
 
 ## Admin UI composition
 
-- shell/navigation: `AdminShell`, `AdminShellView`, `AdminMobileNav`, `admin-navigation.ts`.
+- shell/navigation: `AdminShell`, `AdminShellView`, `AdminMobileNav`, `admin-navigation.ts`. 모바일 하단 탐색(홈·작업함·검색·회원·더보기)은 `getAdminMobileNavigation`이 권한 필터된 `ADMIN_NAV_GROUPS`에서 만들어 사이드바와 같은 href·아이콘을 쓰며, `AdminShellView`에 항목 문자열을 하드코딩하지 않는다.
 - partner management: `AdminPartnerManager`, `AdminPartnerWorkspace`, partner manager filters/list/item, media editor, file import, account manager.
 - company management: `AdminCompanyManager`, `AdminCompanyWorkspace`, `AdminCompanyPlanManager`.
 - member management: `AdminMemberManager`, `AdminMemberListItem`, manual add panel, member trend chart, member security log explorer.
