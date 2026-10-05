@@ -68,7 +68,6 @@ describe("partner preview links", () => {
     const {
       PARTNER_PREVIEW_TOKEN_TTL_MS,
       createPartnerPreviewExpiresAt,
-      isMissingPartnerPreviewExpiryColumnError,
       isPartnerPreviewLinkActive,
       resolvePartnerPreviewExpiresAt,
     } = await modulePromise;
@@ -99,16 +98,6 @@ describe("partner preview links", () => {
         new Date("2026-09-02T00:00:00.000Z"),
         createdAt,
       ),
-      false,
-    );
-    assert.equal(
-      isMissingPartnerPreviewExpiryColumnError(
-        "Could not find the 'expires_at' column of 'partner_preview_tokens' in the schema cache",
-      ),
-      true,
-    );
-    assert.equal(
-      isMissingPartnerPreviewExpiryColumnError("new row for relation violates check constraint"),
       false,
     );
   });
@@ -166,6 +155,11 @@ describe("partner preview links", () => {
   });
 
   it("does not retry admin preview writes or reads without expires_at", async () => {
+    // expires_at is `not null` since 20260830215837, so the missing-column
+    // helper is gone and a schema error surfaces as a read/write failure.
+    const previewModule = await modulePromise;
+    assert.equal("isMissingPartnerPreviewExpiryColumnError" in previewModule, false);
+
     const [actionSource, detailSource] = await Promise.all([
       readFile(
         new URL(
