@@ -259,17 +259,13 @@ async function getAdminPartnerListReadModelUnbounded({
   const privateCount = partners.filter((partner) => partner.visibility === "private").length;
   const planExpiryReferenceTime = Date.now();
   const planBrands = partners.map((partner) => {
-    const planTier = normalizePartnerCompanyPlanTier(
-      (partner as { plan_tier?: string | null }).plan_tier,
-    );
+    const planTier = normalizePartnerCompanyPlanTier(partner.plan_tier);
     const planWindow = resolvePartnerBrandPlanWindow({
       planTier,
-      periodStart: (partner as { period_start?: string | null }).period_start ?? null,
-      periodEnd: (partner as { period_end?: string | null }).period_end ?? null,
-      planStartedAt:
-        (partner as { plan_started_at?: string | null }).plan_started_at ?? null,
-      planExpiresAt:
-        (partner as { plan_expires_at?: string | null }).plan_expires_at ?? null,
+      periodStart: partner.period_start ?? null,
+      periodEnd: partner.period_end ?? null,
+      planStartedAt: partner.plan_started_at ?? null,
+      planExpiresAt: partner.plan_expires_at ?? null,
     });
 
     return {
@@ -288,8 +284,7 @@ async function getAdminPartnerListReadModelUnbounded({
         planExpiresAt: planWindow.planExpiresAt,
         now: planExpiryReferenceTime,
       }),
-      planUpdatedAt:
-        (partner as { plan_updated_at?: string | null }).plan_updated_at ?? null,
+      planUpdatedAt: partner.plan_updated_at ?? null,
     };
   });
   const mappedPlanRequests = (
