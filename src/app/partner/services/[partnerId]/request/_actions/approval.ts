@@ -19,6 +19,7 @@ import {
   parseList,
   revalidatePartnerServicePaths,
 } from "./shared";
+import { logServerError } from "@/lib/server-log";
 
 export async function submitPartnerChangeRequestAction(formData: FormData) {
   const session = await getPartnerSession();
@@ -162,10 +163,7 @@ export async function submitPartnerChangeRequestAction(formData: FormData) {
         requestUrl: "/admin/partner-requests",
       },
     }).catch((notificationError) => {
-      console.error(
-        "[partner-change-request] admin notification failed",
-        notificationError,
-      );
+      logServerError("[partner-change-request] admin notification failed", notificationError);
     });
   } catch (error) {
     if (error instanceof PartnerChangeRequestError) {

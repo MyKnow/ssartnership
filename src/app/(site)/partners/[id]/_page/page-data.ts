@@ -26,6 +26,7 @@ import type {
 } from "@/lib/repositories/ad-package-repository";
 import type { Category, Partner } from "@/lib/types";
 import type { PartnerAudienceKey } from "@/lib/partner-audience";
+import { logServerError } from "@/lib/server-log";
 
 const getCategoriesCached = cache(async () => partnerRepository.getCategories());
 
@@ -51,7 +52,7 @@ const getFavoriteCountsSafe = cache(async (partnerIds: string[]) => {
   try {
     return await partnerFavoriteRepository.getFavoriteCounts(partnerIds);
   } catch (error) {
-    console.error("[partner-detail] favorite count fetch failed", error);
+    logServerError("[partner-detail] favorite count fetch failed", error);
     return new Map<string, number>();
   }
 });
@@ -71,7 +72,7 @@ const getActiveCouponsSafe = cache(async (partnerId: string) => {
     if (isMissingAdCouponSchemaError(error)) {
       return [] as AdCoupon[];
     }
-    console.error("[partner-detail] ad coupon fetch failed", error);
+    logServerError("[partner-detail] ad coupon fetch failed", error);
     return [] as AdCoupon[];
   }
 });
@@ -86,7 +87,7 @@ const getIssuedCouponsSafe = cache(async (memberId: string, partnerId: string) =
     if (isMissingAdCouponSchemaError(error)) {
       return [] as AvailableAdCoupon[];
     }
-    console.error("[partner-detail] issued coupon fetch failed", error);
+    logServerError("[partner-detail] issued coupon fetch failed", error);
     return [] as AvailableAdCoupon[];
   }
 });
@@ -221,7 +222,7 @@ export async function getPartnerDetailPageData(
         };
       }
     } catch (error) {
-      console.error("[partner-detail] canonical benefit items lookup failed", error);
+      logServerError("[partner-detail] canonical benefit items lookup failed", error);
     }
   }
 

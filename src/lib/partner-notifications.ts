@@ -28,6 +28,7 @@ import type {
   PartnerNotificationEntry,
 } from "@/lib/partner-notification-contract";
 import { getPartnerScopedHrefFromLegacyTarget } from "@/lib/partner-portal-paths";
+import { logServerError } from "@/lib/server-log";
 
 type PartnerCompanyRow = {
   id: string;
@@ -173,7 +174,6 @@ async function loadStoredNotificationEntries(
   };
 }
 
-
 async function queryAuditLogs(params: {
   supabase: ReturnType<typeof getSupabaseAdminClient>;
   targetType: string;
@@ -282,24 +282,15 @@ async function loadSupabasePartnerNotificationCenter(
 
   if (companyResult.error) {
     markPartialFailure();
-    console.error(
-      "[partner-notifications] company query failed",
-      companyResult.error.message,
-    );
+    logServerError("[partner-notifications] company query failed", companyResult.error);
   }
   if (serviceResult.error) {
     markPartialFailure();
-    console.error(
-      "[partner-notifications] service query failed",
-      serviceResult.error.message,
-    );
+    logServerError("[partner-notifications] service query failed", serviceResult.error);
   }
   if (requestResult.error) {
     markPartialFailure();
-    console.error(
-      "[partner-notifications] change request query failed",
-      requestResult.error.message,
-    );
+    logServerError("[partner-notifications] change request query failed", requestResult.error);
   }
 
   const companies = (companyResult.error ? [] : companyResult.data ?? []) as PartnerCompanyRow[];
@@ -321,10 +312,7 @@ async function loadSupabasePartnerNotificationCenter(
 
   if (reviewResult.error) {
     markPartialFailure();
-    console.error(
-      "[partner-notifications] review query failed",
-      reviewResult.error.message,
-    );
+    logServerError("[partner-notifications] review query failed", reviewResult.error);
   }
 
   const reviews = (reviewResult.error ? [] : reviewResult.data ?? []) as PartnerReviewRow[];
@@ -421,7 +409,7 @@ async function loadSupabasePartnerNotificationCenter(
   ]) {
     if (result.error) {
       markPartialFailure();
-      console.error("[partner-notifications] audit query failed", result.error);
+      logServerError("[partner-notifications] audit query failed", result.error);
     }
   }
 
@@ -530,10 +518,7 @@ async function loadSupabasePartnerNotificationCenter(
 
   if (storedNotificationResult.error) {
     markPartialFailure();
-    console.error(
-      "[partner-notifications] stored notification query failed",
-      storedNotificationResult.error,
-    );
+    logServerError("[partner-notifications] stored notification query failed", storedNotificationResult.error);
   }
 
   const items = sortEntries([

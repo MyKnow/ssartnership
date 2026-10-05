@@ -4,6 +4,7 @@ import {
   extractPartnerMediaStoragePath,
   PARTNER_MEDIA_BUCKET,
 } from "@/lib/partner-media";
+import { logServerError } from "@/lib/server-log";
 
 export function buildPartnerMediaStoragePath(
   partnerId: string,
@@ -49,7 +50,7 @@ export async function cleanupPartnerMediaOrThrow(input: {
   try {
     await deletePartnerMediaUrls(input.urls);
   } catch (cleanupError) {
-    console.error(`[${input.logContext}] attached media cleanup failed`, cleanupError);
+    logServerError(`[${input.logContext}] attached media cleanup failed`, cleanupError);
     throw new Error("partner_media_cleanup_failed", {
       cause: { originalError: input.originalError, cleanupError },
     });

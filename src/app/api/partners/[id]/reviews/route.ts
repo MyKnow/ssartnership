@@ -17,6 +17,7 @@ import {
   readPartnerReviewSubmission,
   resolveReviewMediaPayload,
 } from "./_shared";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -180,7 +181,7 @@ export async function POST(
       return NextResponse.json({ ok: true, review: retriedReview, summary, idempotent: true });
     }
     await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);
-    console.error("[partner-reviews] create failed", error);
+    logServerError("[partner-reviews] create failed", error);
     const safeError = getSafePublicRouteError(
       error,
       "리뷰 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.",

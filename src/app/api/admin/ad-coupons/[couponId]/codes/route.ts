@@ -4,6 +4,7 @@ import { parseCouponCodeWorkbook } from "@/lib/ad-coupon-code-import.server";
 import { adPackageRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { withServerTiming } from "@/lib/server-timing";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -31,7 +32,7 @@ export async function POST(
       const result = await timing.measure("mutation", () => adPackageRepository.addCouponCodes({ couponId, codes }));
       return NextResponse.json({ ok: true, ...result });
     } catch (error) {
-      console.error("[admin-ad-coupon-codes] upload failed", error);
+      logServerError("[admin-ad-coupon-codes] upload failed", error);
       return NextResponse.json(
         { ok: false, message: "코드 업로드에 실패했습니다. 파일과 쿠폰 상태를 확인한 뒤 다시 시도해 주세요." },
         { status: 400 },

@@ -33,6 +33,7 @@ import {
   isValidPartnerPreviewToken,
 } from "@/lib/partner-preview";
 import { getKstDateString } from "@/lib/partner-utils";
+import { logServerError } from "@/lib/server-log";
 
 type PartnerRow = {
   id: string;
@@ -139,10 +140,7 @@ const getCachedPublicCacheVersionSnapshot = unstable_cache(
       .in("scope", ["partners", "categories"]);
 
     if (error) {
-      console.error(
-        "[partner-repository] public cache version lookup failed",
-        error.message,
-      );
+      logServerError("[partner-repository] public cache version lookup failed", error);
       return { rows: [], lookupFailed: true };
     }
 

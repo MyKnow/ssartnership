@@ -38,6 +38,7 @@ import type {
   StoredSubscription,
   WebPushModule,
 } from "./types.ts";
+import { logServerError } from "@/lib/server-log";
 
 let webPushPromise: Promise<WebPushModule> | null = null;
 const PUSH_SEND_CONCURRENCY = 8;
@@ -167,10 +168,7 @@ async function settlePushBookkeeping(
     if (result.status !== "rejected") {
       continue;
     }
-    console.error(
-      `[push] ${phase} delivery bookkeeping failed`,
-      result.reason instanceof Error ? result.reason.message : "unknown_error",
-    );
+    logServerError(`[push] ${phase} delivery bookkeeping failed`, result.reason);
   }
 }
 

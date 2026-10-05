@@ -16,6 +16,7 @@ import {
 } from "@/lib/notifications/safe-error";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { withServerTiming } from "@/lib/server-timing";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -108,7 +109,7 @@ export async function PATCH(request: NextRequest) {
     });
   } catch (error) {
     if (shouldLogNotificationRouteError(error)) {
-      console.error("[admin-notifications] mark read failed", error);
+      logServerError("[admin-notifications] mark read failed", error);
     }
     const safeError = getSafeNotificationRouteError(
       error,
@@ -138,7 +139,7 @@ export async function DELETE(request: NextRequest) {
     });
   } catch (error) {
     if (shouldLogNotificationRouteError(error)) {
-      console.error("[admin-notifications] delete failed", error);
+      logServerError("[admin-notifications] delete failed", error);
     }
     const safeError = getSafeNotificationRouteError(
       error,

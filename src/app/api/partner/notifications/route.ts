@@ -17,6 +17,7 @@ import {
   normalizePartnerNotificationIds,
 } from "@/lib/partner-notification-input";
 import { readRouteJsonBodyWithinLimit } from "@/lib/route-json-body";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -91,7 +92,7 @@ export async function GET(request: NextRequest) {
       items: result.items,
     });
   } catch (error) {
-    console.error("[partner-notifications] list failed", error);
+    logServerError("[partner-notifications] list failed", error);
     const safeError = getSafeNotificationRouteError(
       error,
       "알림을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -118,7 +119,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
     if (shouldLogNotificationRouteError(error)) {
-      console.error("[partner-notifications] mark read failed", error);
+      logServerError("[partner-notifications] mark read failed", error);
     }
     const safeError = getSafeNotificationRouteError(
       error,
@@ -146,7 +147,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
     if (shouldLogNotificationRouteError(error)) {
-      console.error("[partner-notifications] delete failed", error);
+      logServerError("[partner-notifications] delete failed", error);
     }
     const safeError = getSafeNotificationRouteError(
       error,

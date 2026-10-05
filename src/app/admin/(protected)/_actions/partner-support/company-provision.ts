@@ -13,6 +13,7 @@ import {
   toPartnerAccountLoginId,
 } from "./shared";
 import { buildPartnerCompanySlug } from "./slug";
+import { logServerError } from "@/lib/server-log";
 
 type CleanupQueryResult = {
   error: { code?: string; message: string } | null;
@@ -27,11 +28,7 @@ async function runPartnerCompanyCleanup(
     return true;
   }
 
-  console.error("[partner-company-provision] cleanup failed", {
-    stage,
-    code: error.code ?? null,
-    message: error.message,
-  });
+  logServerError("[partner-company-provision] cleanup failed", error, { stage });
   return false;
 }
 

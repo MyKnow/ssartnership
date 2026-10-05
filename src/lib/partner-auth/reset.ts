@@ -10,6 +10,7 @@ import {
   omitPartnerAuthSessionVersion,
 } from "./accounts.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
+import { logServerError } from "../server-log.ts";
 
 type PreparedPartnerPortalPasswordReset = PartnerPortalPasswordResetResult & {
   passwordRecord: ReturnType<typeof hashPassword>;
@@ -202,22 +203,14 @@ async function deliverCommittedPartnerPortalPasswordReset(
       rollbackSucceeded =
         await rollbackSupabasePartnerPortalPasswordReset(reset);
     } catch (rollbackError) {
-      console.error("[partner-reset] temporary password rollback failed", {
+      logServerError("[partner-reset] temporary password rollback failed", rollbackError, {
         accountId: reset.account.id,
-        message:
-          rollbackError instanceof Error
-            ? rollbackError.message
-            : "unknown_rollback_error",
       });
     }
 
-    console.error("[partner-reset] temporary password delivery failed", {
+    logServerError("[partner-reset] temporary password delivery failed", deliveryError, {
       accountId: reset.account.id,
       rollbackSucceeded,
-      message:
-        deliveryError instanceof Error
-          ? deliveryError.message
-          : "unknown_delivery_error",
     });
     throw new PartnerPortalPasswordResetError(
       "send_failed",

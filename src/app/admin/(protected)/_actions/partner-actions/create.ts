@@ -48,6 +48,7 @@ import { getPartnerVisibilityState } from "@/lib/partner-visibility";
 import { hashCouponVerificationPassword } from "@/lib/coupon-verification-password";
 import { rollbackCreatedPartnerPersistence } from "@/lib/partner-create-rollback";
 import { resolvePartnerCreateInsertOutcome } from "@/lib/partner-create-idempotency";
+import { logServerError } from "@/lib/server-log";
 
 type AdminPartnerBranchPayload = {
   branchScopeType: PartnerBranchScopeType;
@@ -519,7 +520,7 @@ async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
         mapUrl: payload.mapUrl,
       });
     } catch (pushError) {
-      console.error("new partner push failed", pushError);
+      logServerError("new partner push failed", pushError);
     }
   }
 

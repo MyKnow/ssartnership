@@ -36,6 +36,7 @@ import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { PARTNER_MEDIA_BUCKET } from "@/lib/partner-media";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { loadXlsxWorkbookWithinResourceLimits } from "@/lib/xlsx-resource-limits.server";
+import { logServerError } from "@/lib/server-log";
 
 export type PartnerRegistrationMediaPayload = {
   thumbnailUrl: string | null;
@@ -128,10 +129,7 @@ async function rollbackCreatedPartnerRegistrationRequest(input: {
     result.status === "rejected" ? [result.reason] : [],
   );
   if (cleanupErrors.length > 0) {
-    console.error(
-      "[partner-registration] created request rollback failed",
-      cleanupErrors,
-    );
+    for (const cleanupError of cleanupErrors) logServerError("[partner-registration] created request rollback failed", cleanupError);
     throw new Error("partner_registration_cleanup_failed", {
       cause: { originalError: input.originalError, cleanupErrors },
     });
@@ -425,18 +423,15 @@ export async function insertPartnerRegistrationRequest({
         === (context.requestedByPartnerAccountId ?? null),
     );
     if (existingRequestError || !hasSameScope) {
-      console.error(
+      logServerError(
         "[partner-registration] request idempotency lookup failed",
-        existingRequestError?.message ?? insertResult.error.message,
+        existingRequestError ?? insertResult.error,
       );
       throw new Error("신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
     }
     persistedRequestId = existing?.id ?? "";
   } else if (insertResult.error) {
-    console.error(
-      "[partner-registration] request insert failed",
-      insertResult.error.message,
-    );
+    logServerError("[partner-registration] request insert failed", insertResult.error);
     return rethrowAfterPartnerMediaCleanup({
       urls: media.uploadedUrls,
       originalError: new Error("신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요."),
@@ -463,10 +458,7 @@ export async function insertPartnerRegistrationRequest({
         originalError: benefitGroupResult.error,
       });
     }
-    console.error(
-      "[partner-registration] benefit group insert failed",
-      benefitGroupResult.error.message,
-    );
+    logServerError("[partner-registration] benefit group insert failed", benefitGroupResult.error);
     throw new Error("신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
   }
 
@@ -499,10 +491,7 @@ export async function insertPartnerRegistrationRequest({
           originalError: branchResult.error,
         });
       }
-      console.error(
-        "[partner-registration] branch insert failed",
-        branchResult.error.message,
-      );
+      logServerError("[partner-registration] branch insert failed", branchResult.error);
       throw new Error("지점 목록을 저장하지 못했습니다. 입력값을 확인해 주세요.");
     }
   }

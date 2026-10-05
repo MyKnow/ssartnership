@@ -37,6 +37,7 @@ import {
   mergeNotificationTemplateVariables,
   type NotificationTemplateContext,
 } from "@/lib/notification-templates/context";
+import { logServerError } from "@/lib/server-log";
 
 type DeliveryStatus = "pending" | "sent" | "failed" | "skipped";
 
@@ -429,10 +430,7 @@ async function recordAdminDelivery(input: {
       delivered_at: input.status === "sent" ? new Date().toISOString() : null,
     });
   if (error) {
-    console.error(
-      "[operational-notifications] admin delivery log failed",
-      error.message,
-    );
+    logServerError("[operational-notifications] admin delivery log failed", error);
   }
 }
 
@@ -455,10 +453,7 @@ async function recordPartnerDelivery(input: {
       delivered_at: input.status === "sent" ? new Date().toISOString() : null,
     });
   if (error) {
-    console.error(
-      "[operational-notifications] partner delivery log failed",
-      error.message,
-    );
+    logServerError("[operational-notifications] partner delivery log failed", error);
   }
 }
 
@@ -493,10 +488,7 @@ async function markOperationalPushResult(input: {
     )
     .eq("id", input.id);
   if (error) {
-    console.error(
-      "[operational-notifications] push result update failed",
-      error.message,
-    );
+    logServerError("[operational-notifications] push result update failed", error);
   }
 }
 
@@ -650,10 +642,7 @@ export async function createAdminOperationalNotification(input: {
         error instanceof Error
           ? error.message
           : "관리자 푸시 발송 준비에 실패했습니다.";
-      console.error(
-        "[operational-notifications] admin push preparation failed",
-        errorMessage,
-      );
+      logServerError("[operational-notifications] admin push preparation failed", errorMessage);
       await forEachWithConcurrency(
         pushTargetAdminIds,
         OPERATIONAL_DELIVERY_CONCURRENCY,
@@ -1029,10 +1018,7 @@ export async function createPartnerOperationalNotification(input: {
         error instanceof Error
           ? error.message
           : "파트너 푸시 발송 준비에 실패했습니다.";
-      console.error(
-        "[operational-notifications] partner push preparation failed",
-        errorMessage,
-      );
+      logServerError("[operational-notifications] partner push preparation failed", errorMessage);
       await forEachWithConcurrency(
         pushTargetAccountIds,
         OPERATIONAL_DELIVERY_CONCURRENCY,

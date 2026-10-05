@@ -8,6 +8,7 @@ import {
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
 import { getSignedUserSession } from "@/lib/user-auth";
+import { logServerError } from "@/lib/server-log";
 
 function safeDecodeSegment(value: string) {
   try {
@@ -93,7 +94,7 @@ export async function POST(
     );
     return NextResponse.json({ favorite: payload.favorite });
   } catch (error) {
-    console.error("[partner-favorite] update failed", error);
+    logServerError("[partner-favorite] update failed", error);
     const safeError = getSafePublicRouteError(
       error,
       "즐겨찾기를 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",

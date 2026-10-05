@@ -17,6 +17,7 @@ import {
 } from "@/lib/route-json-body";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { isMockDataSource } from "@/lib/mock/member";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -355,7 +356,7 @@ export async function POST(
       );
     }
 
-    console.error("[partner-benefit-use] failed", error);
+    logServerError("[partner-benefit-use] failed", error);
     scheduleAttemptLog(context, {
       actorId: session.userId,
       partnerId,

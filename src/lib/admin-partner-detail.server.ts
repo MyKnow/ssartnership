@@ -23,6 +23,7 @@ import type { PartnerBenefitVisibility } from "@/lib/partner-benefit-visibility"
 import type { PartnerVisibility } from "@/lib/types";
 import { isMissingPartnerPreviewExpiryColumnError } from "@/lib/partner-preview";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { logServerError } from "@/lib/server-log";
 
 type PartnerCompanyRow = {
   id: string;
@@ -183,7 +184,7 @@ export async function getAdminPartnerDetailCoreReadModel({
       previewToken: previewTokenResult.data,
     };
   } catch (error) {
-    console.error("[admin-partner-detail] core read model failed", error);
+    logServerError("[admin-partner-detail] core read model failed", error);
     return { status: "error" as const };
   }
 }
@@ -275,7 +276,7 @@ export async function getAdminPartnerDetailOperationalReadModel({
       partnerRequestHistory,
     };
   } catch (error) {
-    console.error("[admin-partner-detail] operational read model failed", error);
+    logServerError("[admin-partner-detail] operational read model failed", error);
     return { status: "error" as const };
   }
 }

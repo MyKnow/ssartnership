@@ -13,6 +13,7 @@ import {
 } from "@/lib/partner-portal-paths";
 import { isPartnerPortalCompanyAllowed } from "@/lib/partner-portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
+import { logServerError } from "@/lib/server-log";
 
 function getString(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -85,11 +86,7 @@ export async function createPartnerBillingProfileAction(formData: FormData) {
       },
     });
   } catch (error) {
-    console.error("[partner-account] billing profile create failed", {
-      accountId: session.accountId,
-      companyId,
-      error,
-    });
+    logServerError("[partner-account] billing profile create failed", error, { accountId: session.accountId, companyId });
     redirectAccountInfoError(companyId, "profile_create_failed");
   }
 
@@ -110,12 +107,7 @@ export async function setDefaultPartnerBillingProfileAction(formData: FormData) 
       profileId,
     });
   } catch (error) {
-    console.error("[partner-account] default billing profile failed", {
-      accountId: session.accountId,
-      companyId,
-      profileId,
-      error,
-    });
+    logServerError("[partner-account] default billing profile failed", error, { accountId: session.accountId, companyId, profileId });
     redirectAccountInfoError(companyId, "profile_default_failed");
   }
 
@@ -136,12 +128,7 @@ export async function archivePartnerBillingProfileAction(formData: FormData) {
       profileId,
     });
   } catch (error) {
-    console.error("[partner-account] billing profile archive failed", {
-      accountId: session.accountId,
-      companyId,
-      profileId,
-      error,
-    });
+    logServerError("[partner-account] billing profile archive failed", error, { accountId: session.accountId, companyId, profileId });
     redirectAccountInfoError(companyId, "profile_archive_failed");
   }
 

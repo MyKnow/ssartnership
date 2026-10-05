@@ -9,6 +9,7 @@ import {
   getSafeNotificationRouteError,
 } from "@/lib/notifications/safe-error";
 import { isValidPartnerNotificationId } from "@/lib/partner-notification-input";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -44,7 +45,7 @@ export async function PATCH(
       summary: { unreadCount: result.unreadCount },
     });
   } catch (error) {
-    console.error("[partner-notification] mark read failed", error);
+    logServerError("[partner-notification] mark read failed", error);
     const safeError = getSafeNotificationRouteError(
       error,
       "알림을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -88,7 +89,7 @@ export async function DELETE(
       summary: { unreadCount: result.unreadCount },
     });
   } catch (error) {
-    console.error("[partner-notification] delete failed", error);
+    logServerError("[partner-notification] delete failed", error);
     const safeError = getSafeNotificationRouteError(
       error,
       "알림을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.",

@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { CAMPUS_DIRECTORY, getCampusPageHref } from "@/lib/campuses";
 import { partnerRepository } from "@/lib/repositories";
 import { createSitemapEntry } from "@/lib/seo";
+import { logServerError } from "@/lib/server-log";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ),
     );
   } catch (error) {
-    console.error("[sitemap] failed to load partner URLs", error);
+    logServerError("[sitemap] failed to load partner URLs", error);
   }
 
   return entries;

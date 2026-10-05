@@ -43,6 +43,7 @@ import {
   revalidatePartnerData,
 } from "@/app/admin/(protected)/_actions/shared-helpers";
 import { sanitizeReturnTo } from "@/lib/return-to";
+import { logServerError } from "@/lib/server-log";
 
 type RegistrationCompanyRelation =
   | { managed_campus_slugs?: string[] | null }
@@ -203,10 +204,7 @@ async function rollbackRegistrationConversionResources(
   );
 
   if (cleanupFailures.length > 0) {
-    console.error(
-      "[partner-registration] conversion rollback failed",
-      cleanupFailures,
-    );
+    for (const failure of cleanupFailures) logServerError("[partner-registration] conversion rollback failed", failure, { stage: failure.stage });
     throw new Error("partner_registration_conversion_cleanup_failed");
   }
 }
@@ -610,10 +608,7 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
     .select("id")
     .maybeSingle();
   if (updateError) {
-    console.error(
-      "[partner-registration] status update failed",
-      updateError.message,
-    );
+    logServerError("[partner-registration] status update failed", updateError);
     redirectAdminActionError(returnTo, "partner_form_invalid_request");
   }
 
@@ -688,7 +683,7 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
         error instanceof Error
           ? error.message
           : "제휴처 등록 신청 승인 후처리에 실패했습니다.";
-      console.error("[partner-registration] converted follow-up failed", message);
+      logServerError("[partner-registration] converted follow-up failed", message);
       if (!rollbackSucceeded) {
         console.error(
           "[partner-registration] converted status rollback failed",
@@ -916,7 +911,7 @@ export async function updatePartnerRegistrationRequestDetails(formData: FormData
       })
       .eq("id", group.id);
     if (error) {
-      console.error("[partner-registration] details group update failed", error.message);
+      logServerError("[partner-registration] details group update failed", error);
       redirectAdminActionError(returnTo, "partner_form_details_invalid");
     }
   }
@@ -955,7 +950,7 @@ export async function updatePartnerRegistrationRequestDetails(formData: FormData
     })
     .eq("id", id);
   if (updateError) {
-    console.error("[partner-registration] details update failed", updateError.message);
+    logServerError("[partner-registration] details update failed", updateError);
     redirectAdminActionError(returnTo, "partner_form_details_invalid");
   }
 

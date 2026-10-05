@@ -48,6 +48,7 @@ import {
   redirectAdminActionError,
   revalidateMemberPaths,
 } from "./shared-helpers";
+import { logServerError } from "@/lib/server-log";
 
 export async function backfillMemberProfilesAction(formData: FormData) {
   const adminSession = await requireAdminPermission("members", "update", {
@@ -127,7 +128,7 @@ export async function backfillMemberProfilesAction(formData: FormData) {
         ? "partial"
         : "success";
   } catch (error) {
-    console.error("member backfill failed", error);
+    logServerError("member backfill failed", error);
     status = "error";
   }
 

@@ -9,6 +9,7 @@ import {
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
 import { ensureVisibleReviewPartner, getReviewMemberSession } from "../../_shared";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -110,7 +111,7 @@ export async function PATCH(
     }
     return NextResponse.json({ ok: true, review });
   } catch (error) {
-    console.error("[partner-review-reaction] update failed", error);
+    logServerError("[partner-review-reaction] update failed", error);
     const safeError = getSafePublicRouteError(
       error,
       "리뷰 반응에 실패했습니다. 잠시 후 다시 시도해 주세요.",

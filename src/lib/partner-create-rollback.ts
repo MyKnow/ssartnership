@@ -1,3 +1,5 @@
+import { logServerError } from "@/lib/server-log";
+
 type PartnerCreateCleanupResult = {
   error: { code?: string; message: string } | null;
 };
@@ -28,11 +30,7 @@ export async function rollbackCreatedPartnerPersistence(input: {
       continue;
     }
     failures.push({ stage: operation.stage, error });
-    console.error("[partner-create] rollback failed", {
-      stage: operation.stage,
-      code: error.code ?? null,
-      message: error.message,
-    });
+    logServerError("[partner-create] rollback failed", error, { stage: operation.stage });
   }
 
   if (failures.length > 0) {

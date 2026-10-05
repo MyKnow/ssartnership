@@ -19,6 +19,7 @@ import {
   loadPartnerAccountOrRedirect,
   loadScopedPartnerCompanyOrRedirect,
 } from "./account-actions.shared";
+import { logServerError } from "@/lib/server-log";
 
 export async function updatePartnerAccountAction(formData: FormData) {
   const adminSession = await requireAdminPermission("companies", "update", {
@@ -183,7 +184,7 @@ export async function createPartnerAccountAction(formData: FormData) {
     try {
       await cleanup();
     } catch (cleanupError) {
-      console.error("[admin] partner account cleanup failed", cleanupError);
+      logServerError("[admin] partner account cleanup failed", cleanupError);
       redirectAdminActionError(
         "/admin/companies?tab=accounts",
         "partner_account_create_uncertain",
@@ -200,7 +201,7 @@ export async function createPartnerAccountAction(formData: FormData) {
         },
       );
     }
-    console.error("[admin] partner account create failed", error);
+    logServerError("[admin] partner account create failed", error);
     redirectAdminActionError(
       "/admin/companies?tab=accounts",
       "partner_account_invalid_request",

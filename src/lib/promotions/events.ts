@@ -19,6 +19,7 @@ import { cache } from "react";
 import { localPromotionFixtures } from "@/lib/mock/promotions";
 import { projectShowcaseRepository } from "@/lib/project-showcase";
 import { getShowcasePhase, PROJECT_SHOWCASE_SLUG, type ShowcasePhase } from "@/lib/project-showcase/types";
+import { logServerError } from "@/lib/server-log";
 
 type PromotionEventRow = {
   id: string;
@@ -329,17 +330,17 @@ async function loadManagedPromotionSlides(options?: {
           );
         }
       }
-      console.error("[promotions] promotion_slides query failed", error.message);
+      logServerError("[promotions] promotion_slides query failed", error);
       return staticSlides();
     }
     const slides = ((data ?? []) as PromotionSlideRow[]).map((row) => mapSlideRow(row));
     return slides;
   } catch (error) {
     if (options?.requireDatabase) {
-      console.error("[promotions] editable slides query failed", error);
+      logServerError("[promotions] editable slides query failed", error);
       throw new Error("promotion_slide_database_unavailable");
     }
-    console.error("[promotions] promotion_slides fallback", error);
+    logServerError("[promotions] promotion_slides fallback", error);
     return staticSlides();
   }
 }
@@ -529,13 +530,13 @@ async function loadManagedEventCampaigns(options?: {
     }
     const { data, error } = await query;
     if (error) {
-      console.error("[promotions] promotion_events query failed", error.message);
+      logServerError("[promotions] promotion_events query failed", error);
       return staticCampaigns();
     }
     const campaigns = ((data ?? []) as PromotionEventRow[]).map((row) => mapRow(row));
     return campaigns.length > 0 ? campaigns : staticCampaigns();
   } catch (error) {
-    console.error("[promotions] promotion_events fallback", error);
+    logServerError("[promotions] promotion_events fallback", error);
     return staticCampaigns();
   }
 }

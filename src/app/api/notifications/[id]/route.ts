@@ -3,6 +3,7 @@ import { notificationRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { getSafeNotificationRouteError } from "@/lib/notifications/safe-error";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -38,7 +39,7 @@ export async function PATCH(
     );
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
-    console.error("[member-notification] mark read failed", error);
+    logServerError("[member-notification] mark read failed", error);
     const safeError = getSafeNotificationRouteError(
       error,
       "알림을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -82,7 +83,7 @@ export async function DELETE(
     );
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
-    console.error("[member-notification] delete failed", error);
+    logServerError("[member-notification] delete failed", error);
     const safeError = getSafeNotificationRouteError(
       error,
       "알림을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.",

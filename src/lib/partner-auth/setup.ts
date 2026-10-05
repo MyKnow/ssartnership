@@ -21,6 +21,7 @@ import {
   resolvePartnerSetupSchemaCapabilitiesFromError,
 } from "./setup-schema.ts";
 import { getPartnerSetupLinkState } from "./setup-link.ts";
+import { logServerError } from "../server-log.ts";
 
 const INITIAL_SETUP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -91,14 +92,6 @@ function buildPartnerSetupCompletionPayloadCandidates(
       }),
     },
   ];
-}
-
-function maskPartnerSetupToken(token: string) {
-  if (token.length <= 12) {
-    return token;
-  }
-
-  return `${token.slice(0, 6)}...${token.slice(-6)}`;
 }
 
 function resolveSetupExpiry(account: {
@@ -295,14 +288,11 @@ export async function completeSupabasePartnerPortalInitialSetup(
       );
     }
 
-    console.error("[partner-setup] completion update failed", {
+    // details/hint echo row values; the summary keeps only name, code and a
+    // redacted message.
+    logServerError("[partner-setup] completion update failed", attempt.error, {
       accountId: account.id,
-      token: maskPartnerSetupToken(input.token),
       candidate: candidate.label,
-      errorMessage: attempt.error.message,
-      errorCode: "code" in attempt.error ? attempt.error.code : undefined,
-      errorDetails: "details" in attempt.error ? attempt.error.details : undefined,
-      errorHint: "hint" in attempt.error ? attempt.error.hint : undefined,
     });
 
     if (!hasMissingPartnerSetupSchemaColumnError(attempt.error.message)) {

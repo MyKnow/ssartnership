@@ -27,6 +27,7 @@ import {
   parseList,
   revalidatePartnerServicePaths,
 } from "./shared";
+import { logServerError } from "@/lib/server-log";
 
 export async function savePartnerImmediateChangesAction(formData: FormData) {
   const session = await getPartnerSession();
@@ -139,10 +140,7 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
         (url) => !result.currentMediaUrls.includes(url),
       ),
     ).catch((cleanupError) => {
-      console.error(
-        "[partner-immediate-update] stale media cleanup failed",
-        cleanupError,
-      );
+      logServerError("[partner-immediate-update] stale media cleanup failed", cleanupError);
     });
 
     await createAdminOperationalNotification({
@@ -168,10 +166,7 @@ export async function savePartnerImmediateChangesAction(formData: FormData) {
         partnerUrl: `/admin/partners/${encodeURIComponent(partnerId)}`,
       },
     }).catch((notificationError) => {
-      console.error(
-        "[partner-immediate-update] admin notification failed",
-        notificationError,
-      );
+      logServerError("[partner-immediate-update] admin notification failed", notificationError);
     });
   } catch (error) {
     if (media) {

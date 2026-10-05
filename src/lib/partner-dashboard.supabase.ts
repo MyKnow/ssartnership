@@ -17,6 +17,7 @@ import {
 } from "./partner-dashboard.ts";
 import { normalizePartnerVisibility } from "./partner-visibility.ts";
 import { normalizePartnerCompanyPlanTier } from "./partner-company-plans.ts";
+import { logServerError } from "./server-log.ts";
 
 type PartnerCompanyRow = {
   id: string;
@@ -153,24 +154,15 @@ export async function getSupabasePartnerPortalDashboard(
 
   if (companyResult.error) {
     markPartialFailure();
-    console.error(
-      "[partner-dashboard] company query failed",
-      companyResult.error.message,
-    );
+    logServerError("[partner-dashboard] company query failed", companyResult.error);
   }
   if (serviceResult.error) {
     markPartialFailure();
-    console.error(
-      "[partner-dashboard] service query failed",
-      serviceResult.error.message,
-    );
+    logServerError("[partner-dashboard] service query failed", serviceResult.error);
   }
   if (changeRequestResult.error) {
     markPartialFailure();
-    console.error(
-      "[partner-dashboard] change request query failed",
-      changeRequestResult.error.message,
-    );
+    logServerError("[partner-dashboard] change request query failed", changeRequestResult.error);
   }
 
   const companyRows = (companyResult.error ? [] : companyResult.data ?? []) as PartnerCompanyRow[];
@@ -200,7 +192,7 @@ export async function getSupabasePartnerPortalDashboard(
 
   if (engagementCounts.engagementErrorMessage) {
     markPartialFailure();
-    console.error("[partner-dashboard] engagement metric query failed", engagementCounts.engagementErrorMessage);
+    logServerError("[partner-dashboard] engagement metric query failed", engagementCounts.engagementErrorMessage);
   }
 
   const metricRowsResult = await loadPartnerMetricAggregateRows(supabase, {
@@ -226,10 +218,7 @@ export async function getSupabasePartnerPortalDashboard(
       metricRowsResult.failure.stage === "rollup"
         ? "event metric query failed"
         : "fallback event metric query failed";
-    console.error(
-      `[partner-dashboard] ${queryLabel}`,
-      metricRowsResult.failure.errorMessage,
-    );
+    logServerError(`[partner-dashboard] ${queryLabel}`, metricRowsResult.failure.errorMessage);
   } else {
     applyPartnerMetricRollupRows(metricsByServiceId, metricRowsResult.rows);
   }
