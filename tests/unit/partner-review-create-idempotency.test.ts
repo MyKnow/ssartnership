@@ -193,6 +193,65 @@ describe("POST /api/partners/[id]/reviews idempotency", () => {
     expect(deleteReviewMediaUrlsMock).toHaveBeenCalledWith(["https://cdn.test/a.webp"]);
   });
 
+  test("저장 리뷰 확인이 실패하면 결과를 모르므로 연결한 파일을 지우지 않는다", async () => {
+    // The lookup failing is not "no review": a duplicate request may already
+    // have stored a review that references these deterministic paths.
+    resolveAttaching(["https://cdn.test/a.webp"], new Error("media"));
+    getReviewMediaInputFieldErrorsMock.mockReturnValue({ images: "다시 업로드해 주세요." });
+    getPartnerReviewByIdMock
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(
+        new Error("TimeoutError: The operation was aborted due to timeout"),
+      );
+
+    const result = await postReview();
+
+    expect(result.status).toBe(400);
+    expect(result.body).toEqual({ ok: false, fieldErrors: { images: "다시 업로드해 주세요." } });
+    expect(deleteReviewMediaUrlsMock).not.toHaveBeenCalled();
+  });
+
+  test("리뷰 저장이 상한에 걸려 결과를 모르면 연결한 파일을 지우지 않는다", async () => {
+    // The client deadline does not cancel the INSERT inside the database, so
+    // a review that is not visible yet may still commit with these images.
+    resolveAttaching(["https://cdn.test/a.webp", "https://cdn.test/b.webp"]);
+    createPartnerReviewMock.mockRejectedValue(
+      new Error("TimeoutError: The operation was aborted due to timeout"),
+    );
+    getPartnerReviewByIdMock.mockResolvedValue(null);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      const result = await postReview();
+
+      expect(result.status).toBe(503);
+      expect(result.body).toMatchObject({ ok: false });
+      expect(createPartnerReviewMock).toHaveBeenCalledTimes(1);
+      expect(deleteReviewMediaUrlsMock).not.toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  test("다른 리뷰가 같은 id를 차지해 저장이 거절되면 이 요청의 파일은 정리한다", async () => {
+    resolveAttaching(["https://cdn.test/a.webp"]);
+    createPartnerReviewMock.mockRejectedValue(new Error("duplicate key"));
+    getPartnerReviewByIdMock
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ ...storedReview([]), memberId: "member-2" });
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      const result = await postReview();
+
+      expect(result.status).toBe(503);
+      expect(deleteReviewMediaUrlsMock).toHaveBeenCalledTimes(1);
+      expect(deleteReviewMediaUrlsMock).toHaveBeenCalledWith(["https://cdn.test/a.webp"]);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   test("다른 회원의 리뷰와 충돌하면 저장된 리뷰를 노출하지 않는다", async () => {
     resolveAttaching([]);
     createPartnerReviewMock.mockRejectedValue(new Error("duplicate key"));
