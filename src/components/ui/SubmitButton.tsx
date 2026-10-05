@@ -2,13 +2,20 @@
 
 import { useFormStatus } from "react-dom";
 import Button from "@/components/ui/Button";
-import Spinner from "@/components/ui/Spinner";
 import type { ButtonVariant } from "@/components/ui/Button";
 
+export const DEFAULT_SUBMIT_PENDING_TEXT = "처리 중";
+
+/**
+ * Form submit button that reads the parent form's pending state. Loading UI,
+ * `disabled`, and `aria-busy` are delegated to `Button`, so a pending form
+ * cannot be submitted twice by repeated clicks.
+ */
 export default function SubmitButton({
   children,
   pendingText,
   variant,
+  size,
   className,
   form,
   formAction,
@@ -19,6 +26,7 @@ export default function SubmitButton({
   children: React.ReactNode;
   pendingText?: string;
   variant?: ButtonVariant;
+  size?: "sm" | "md" | "lg";
   className?: string;
   form?: string;
   formAction?: React.ButtonHTMLAttributes<HTMLButtonElement>["formAction"];
@@ -32,17 +40,17 @@ export default function SubmitButton({
     <Button
       type="submit"
       variant={variant}
+      size={size}
       className={className}
-      disabled={pending || disabled}
+      disabled={disabled}
+      loading={pending}
+      loadingText={pendingText ?? DEFAULT_SUBMIT_PENDING_TEXT}
       form={form}
       formAction={formAction}
       name={name}
       value={value}
     >
-      <span className="inline-flex items-center gap-2">
-        {pending ? <Spinner /> : null}
-        {pending ? pendingText ?? "처리 중" : children}
-      </span>
+      {children}
     </Button>
   );
 }

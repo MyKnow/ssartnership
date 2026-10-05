@@ -1,5 +1,5 @@
-import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import SubmitButton from "@/components/ui/SubmitButton";
 import type { ManagedEventCampaign } from "@/lib/promotions/events";
 import {
   DEFAULT_PROMOTION_AUDIENCES,
@@ -124,7 +124,9 @@ export default function EventRegistrationForm({
       </div>
 
       <div className="flex justify-end">
-        <Button type="submit">{submitLabel}</Button>
+        <SubmitButton pendingText={isRegistered ? "저장 중" : "등록 중"}>
+          {submitLabel}
+        </SubmitButton>
       </div>
     </form>
   );
