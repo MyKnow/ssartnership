@@ -69,7 +69,16 @@ test("actual Next proxy redirects use the public origin and preserve protected r
     assert.equal(location.pathname, "/auth/login");
     assert.equal(location.searchParams.get("returnTo"), "/admin/members?page=2");
     const partner = await proxy(new NextRequest("https://0.0.0.0:3000/partner/reviews?page=2"));
-    assert.equal(partner.headers.get("location"), publicOrigin + "/partner/login?page=2");
+    assert.equal(
+      partner.headers.get("location"),
+      publicOrigin + "/partner/login?returnTo=%2Fpartner%2Freviews%3Fpage%3D2",
+    );
+    const partnerHome = await proxy(new NextRequest("https://0.0.0.0:3000/partner"));
+    assert.equal(partnerHome.headers.get("location"), publicOrigin + "/partner/login");
+    const partnerLogin = await proxy(
+      new NextRequest("https://0.0.0.0:3000/partner/login?returnTo=https%3A%2F%2Fevil.example"),
+    );
+    assert.equal(partnerLogin.headers.get("location"), null, "anonymous login page renders");
   } finally {
     for (const name of names) { if (before[name] === undefined) delete process.env[name]; else process.env[name] = before[name]; }
   }

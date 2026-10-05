@@ -1,12 +1,12 @@
 import {
   createUnavailableDataAccessProxy,
   selectRuntimeDataAccess,
-} from "./runtime-data-access.ts";
+} from "../runtime-data-access.ts";
 
 export {
   PartnerPortalSetupError,
   type PartnerPortalSetupErrorCode,
-} from "./partner-portal-errors.ts";
+} from "./portal-errors.ts";
 
 export type PartnerPortalServiceSummary = {
   id: string;

@@ -1,6 +1,6 @@
 import { createNotificationStorageError } from "@/lib/notifications/safe-error";
 import { listMockPartnerPortalSetupsInternal } from "@/lib/mock/partner-portal/store";
-import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 type StoredPartnerNotificationRelation = {

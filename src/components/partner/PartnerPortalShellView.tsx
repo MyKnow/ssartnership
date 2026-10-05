@@ -27,12 +27,12 @@ import {
   getPartnerCompanyIdFromPathname,
   getPartnerPortalMobileNavigation,
   PARTNER_PASSWORD_CHANGE_PATH,
-} from "@/lib/partner-portal-paths";
+} from "@/lib/partner-auth/portal-paths";
 import {
   shouldShowPartnerPortalMobileNavigation,
   shouldUsePartnerPortalDashboardShell,
-} from "@/lib/partner-portal-layout";
-import type { PartnerPortalCompanyScope } from "@/lib/partner-portal-scope";
+} from "@/lib/partner-auth/portal-layout";
+import type { PartnerPortalCompanyScope } from "@/lib/partner-auth/portal-scope";
 import type { PartnerSession } from "@/lib/partner-session";
 import { TECH_SUPPORT_HREF } from "@/lib/support-mail";
 

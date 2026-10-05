@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import {
   getCompanyScopedPortalHref,
   getPartnerPasswordChangeHref,
-} from "@/lib/partner-portal-paths";
-import { getPartnerPortalCompanySummaries } from "@/lib/partner-portal-scope";
+} from "@/lib/partner-auth/portal-paths";
+import { getPartnerPortalCompanySummaries } from "@/lib/partner-auth/portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { SITE_NAME } from "@/lib/site";
 import { readFirstSearchParam } from "@/lib/search-params";

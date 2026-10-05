@@ -3,7 +3,7 @@ import {
   listPartnerChangeRequests,
   type PartnerChangeRequestPage,
 } from "@/lib/partner-change-requests";
-import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 function emptyPartnerChangeRequestPage(page: number, pageSize: number): PartnerChangeRequestPage {

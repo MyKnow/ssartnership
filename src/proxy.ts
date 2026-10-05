@@ -9,6 +9,11 @@ import {
   shouldChallengeAdminBasicAuth,
 } from "@/lib/admin-security";
 import { getMemberRequiredGateRedirect } from "@/lib/member-required-gates";
+import {
+  getPartnerLoginHref,
+  getPartnerPasswordChangeGateHref,
+  getPartnerRequestReturnTo,
+} from "@/lib/partner-auth/return-to";
 import { buildTrustedRedirectUrl } from "@/lib/request-guards";
 import {
   ADMIN_SESSION_COOKIE_NAME,
@@ -172,33 +177,31 @@ export async function proxy(request: NextRequest) {
       ? verifyPartnerToken(partnerToken)
       : null;
 
+    // Login and reset re-check the cookie against the database and send a live
+    // session on themselves (to the password gate while a change is pending).
+    // Redirecting them here on the signed cookie alone would loop with the
+    // protected pages, which send a revoked session (password reset on another
+    // device, deactivated account or company) back to the login page.
+    if (isPartnerLoginPath || pathname === "/partner/reset") {
+      return nextWithRequestUrl(request);
+    }
+
+    const partnerReturnTo = getPartnerRequestReturnTo(
+      pathname,
+      request.nextUrl.search,
+    );
+
     if (
       partnerPayload?.mustChangePassword &&
       pathname !== "/partner/change-password" &&
       pathname !== "/partner/logout"
     ) {
-      const url = buildTrustedRedirectUrl(currentPath, request.url);
-      url.pathname = "/partner/change-password";
-      return NextResponse.redirect(url);
-    }
-
-    if (isPartnerLoginPath) {
-      if (partnerPayload) {
-        const url = buildTrustedRedirectUrl(currentPath, request.url);
-        url.pathname =
-          partnerPayload.mustChangePassword ? "/partner/change-password" : "/partner";
-        return NextResponse.redirect(url);
-      }
-      return nextWithRequestUrl(request);
-    }
-
-    if (pathname === "/partner/reset") {
-      if (partnerPayload) {
-        const url = buildTrustedRedirectUrl(currentPath, request.url);
-        url.pathname = "/partner";
-        return NextResponse.redirect(url);
-      }
-      return nextWithRequestUrl(request);
+      return NextResponse.redirect(
+        buildTrustedRedirectUrl(
+          getPartnerPasswordChangeGateHref(partnerReturnTo),
+          request.url,
+        ),
+      );
     }
 
     if (isPartnerSetupPath) {
@@ -210,9 +213,11 @@ export async function proxy(request: NextRequest) {
       return nextWithRequestUrl(request);
     }
     if (!partnerPayload && !isPartnerLogoutPath) {
-      const url = buildTrustedRedirectUrl(currentPath, request.url);
-      url.pathname = "/partner/login";
-      return NextResponse.redirect(url);
+      // Keep the deep link as a sanitized returnTo instead of leaking its
+      // query string onto the login page.
+      return NextResponse.redirect(
+        buildTrustedRedirectUrl(getPartnerLoginHref(partnerReturnTo), request.url),
+      );
     }
   }
 

@@ -4,9 +4,10 @@ import {
   type PartnerBillingProfile,
   type PartnerBillingProfileInput,
 } from "@/lib/partner-billing";
-import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 import { normalizePlanUpgradePayerName } from "@/lib/partner-plan-upgrades";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { isUuid } from "@/lib/uuid";
 
 const DEFAULT_BILLING_PROFILE_LABEL = "기본 세금계산서 정보";
 
@@ -228,6 +229,32 @@ async function assertSupabaseAccountCompanyAccess(input: {
   });
 }
 
+/**
+ * PostgREST `or` filter for the billing profiles visible to one account in a
+ * set of companies: the account's own profiles plus company-level profiles
+ * that predate per-account ownership (`account_id is null`, see
+ * 20260703174331). The ids are interpolated into filter syntax, so anything
+ * that is not a UUID is rejected instead of escaped.
+ */
+export function buildPartnerBillingProfileScopeFilter(
+  accountId: string,
+  companyIds: readonly string[],
+) {
+  const normalizedAccountId = accountId.trim();
+  const normalizedCompanyIds = [
+    ...new Set(companyIds.map((companyId) => companyId.trim())),
+  ];
+  if (
+    !isUuid(normalizedAccountId) ||
+    normalizedCompanyIds.length === 0 ||
+    !normalizedCompanyIds.every(isUuid)
+  ) {
+    throw new Error("파트너사 접근 권한이 없습니다.");
+  }
+
+  return `account_id.eq.${normalizedAccountId},and(account_id.is.null,company_id.in.(${normalizedCompanyIds.join(",")}))`;
+}
+
 export function toPartnerBillingProfileFormValues(
   profile: PartnerBillingProfileRecord,
 ): PartnerBillingProfileFormValues {
@@ -285,32 +312,17 @@ export async function getPartnerBillingProfilesForCompanies(input: {
   const supabase = getSupabaseAdminClient();
   const selectColumns =
     "id,company_id,account_id,label,payer_name,business_registration_number,business_name,representative_name,business_address,business_type,business_item,tax_invoice_email,tax_document_type,is_default,last_used_at,archived_at,created_at,updated_at";
-  const [accountProfilesResult, legacyCompanyProfilesResult] =
-    await Promise.all([
-      supabase
-        .from("partner_billing_profiles")
-        .select(selectColumns)
-        .eq("account_id", input.accountId)
-        .is("archived_at", null),
-      supabase
-        .from("partner_billing_profiles")
-        .select(selectColumns)
-        .in("company_id", companyIds)
-        .is("account_id", null)
-        .is("archived_at", null),
-    ]);
+  const { data, error } = await supabase
+    .from("partner_billing_profiles")
+    .select(selectColumns)
+    .or(buildPartnerBillingProfileScopeFilter(input.accountId, companyIds))
+    .is("archived_at", null);
 
-  if (accountProfilesResult.error) {
-    throw new Error(accountProfilesResult.error.message);
-  }
-  if (legacyCompanyProfilesResult.error) {
-    throw new Error(legacyCompanyProfilesResult.error.message);
+  if (error) {
+    throw new Error(error.message);
   }
 
-  const profileRows = [
-    ...((accountProfilesResult.data ?? []) as BillingProfileRow[]),
-    ...((legacyCompanyProfilesResult.data ?? []) as BillingProfileRow[]),
-  ];
+  const profileRows = (data ?? []) as BillingProfileRow[];
   const profilesById = new Map(
     profileRows.map((row) => [row.id, mapBillingProfileRow(row)]),
   );

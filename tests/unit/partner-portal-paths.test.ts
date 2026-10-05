@@ -11,7 +11,7 @@ import {
   getPartnerPasswordChangeHref,
   getPartnerPortalMobileNavigation,
   getPartnerScopedHrefFromLegacyTarget,
-} from "@/lib/partner-portal-paths";
+} from "@/lib/partner-auth/portal-paths";
 
 describe("partner portal canonical paths", () => {
   it("builds global and company-scoped destinations", () => {

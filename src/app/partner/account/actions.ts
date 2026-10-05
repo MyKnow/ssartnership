@@ -10,8 +10,8 @@ import type { PartnerBillingActionErrorCode } from "@/lib/partner-billing-action
 import {
   appendPartnerPortalSearchParam,
   getPartnerGlobalPortalHref,
-} from "@/lib/partner-portal-paths";
-import { isPartnerPortalCompanyAllowed } from "@/lib/partner-portal-scope";
+} from "@/lib/partner-auth/portal-paths";
+import { isPartnerPortalCompanyAllowed } from "@/lib/partner-auth/portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 
 function getString(formData: FormData, key: string) {

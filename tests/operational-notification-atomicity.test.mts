@@ -81,7 +81,7 @@ const mockModules = new Map<string, string>([
       return { publicKey: "test", privateKey: "test", subject: "mailto:test@example.com" };
     }`,
   ],
-  ["@/lib/partner-portal", "export const isPartnerPortalMock = false;"],
+  ["@/lib/partner-auth/portal", "export const isPartnerPortalMock = false;"],
 ]);
 
 registerHooks({

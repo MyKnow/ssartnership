@@ -3,7 +3,7 @@ import {
   deletePartnerStoredNotifications,
   markPartnerStoredNotificationsRead,
 } from "@/lib/partner-notification-store";
-import { getPartnerSession } from "@/lib/partner-session";
+import { requirePartnerApiSession } from "@/lib/partner-auth/api-session";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
   getSafeNotificationRouteError,
@@ -23,10 +23,11 @@ export async function PATCH(
   ) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
-  const session = await getPartnerSession();
-  if (!session) {
-    return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requirePartnerApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
   const { id } = await params;
   if (!isValidPartnerNotificationId(id)) {
     return NextResponse.json({ message: "알림 ID 형식을 확인해 주세요." }, { status: 400 });
@@ -67,10 +68,11 @@ export async function DELETE(
   ) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
-  const session = await getPartnerSession();
-  if (!session) {
-    return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requirePartnerApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
   const { id } = await params;
   if (!isValidPartnerNotificationId(id)) {
     return NextResponse.json({ message: "알림 ID 형식을 확인해 주세요." }, { status: 400 });

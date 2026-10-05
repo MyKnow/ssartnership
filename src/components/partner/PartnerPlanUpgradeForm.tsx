@@ -20,7 +20,7 @@ import {
   formatPartnerPlanMonthlyPrice,
   getPartnerPlanChannelLabel,
 } from "@/lib/partner-plan-ui";
-import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
+import { getCompanyScopedPortalHref } from "@/lib/partner-auth/portal-paths";
 import type { PartnerPlanFormAction } from "@/components/partner/PartnerPlanManagementView";
 
 type PartnerPlanUpgradeFormProps = {

@@ -8,7 +8,7 @@ import {
 } from "./partner-metric-rollups.ts";
 import { loadPartnerMetricAggregateRows } from "./partner-metric-loader.ts";
 import { listMockPartnerPortalSetupsInternal } from "./mock/partner-portal/store.ts";
-import { isPartnerPortalMock } from "./partner-portal.ts";
+import { isPartnerPortalMock } from "./partner-auth/portal.ts";
 import { getSupabaseAdminClient } from "./supabase/server.ts";
 import { fetchPartnerEngagementCounts } from "./partner-counts.ts";
 

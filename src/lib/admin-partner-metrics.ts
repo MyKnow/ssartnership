@@ -8,7 +8,7 @@ import {
 } from "@/lib/partner-metric-rollups";
 import { loadPartnerMetricAggregateRows } from "@/lib/partner-metric-loader";
 import { listMockPartnerPortalSetupsInternal } from "@/lib/mock/partner-portal/store";
-import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { fetchPartnerEngagementCounts } from "@/lib/partner-counts";
 

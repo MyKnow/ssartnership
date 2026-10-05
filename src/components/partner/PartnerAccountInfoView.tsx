@@ -20,7 +20,7 @@ import PartnerFormPendingNotice from "@/components/partner/PartnerFormPendingNot
 import PartnerPasswordChangeForm from "@/components/partner/PartnerPasswordChangeForm";
 import type { PartnerBillingProfileRecord } from "@/lib/partner-billing-profiles";
 import { cn } from "@/lib/cn";
-import { getPartnerGlobalPortalHref } from "@/lib/partner-portal-paths";
+import { getPartnerGlobalPortalHref } from "@/lib/partner-auth/portal-paths";
 
 type BusinessStatusState =
   | { status: "idle" }

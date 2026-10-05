@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isPartnerPortalCompanyAllowed } from "@/lib/partner-portal-scope";
+import { isPartnerPortalCompanyAllowed } from "@/lib/partner-auth/portal-scope";
 import {
   deletePartnerStoredNotifications,
   listPartnerStoredNotifications,
   markPartnerStoredNotificationsRead,
 } from "@/lib/partner-notification-store";
-import { getPartnerSession } from "@/lib/partner-session";
+import { requirePartnerApiSession } from "@/lib/partner-auth/api-session";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
   NotificationRequestError,
@@ -33,17 +33,12 @@ async function requirePartnerNotificationSession(request: NextRequest) {
     return { response: getInvalidRequestResponse() };
   }
 
-  const session = await getPartnerSession();
-  if (!session) {
-    return {
-      response: NextResponse.json(
-        { message: "로그인이 필요합니다." },
-        { status: 401 },
-      ),
-    };
+  const auth = await requirePartnerApiSession();
+  if ("response" in auth) {
+    return auth;
   }
 
-  return { accountId: session.accountId, session };
+  return { accountId: auth.session.accountId, session: auth.session };
 }
 
 async function parseNotificationIds(request: NextRequest) {
@@ -67,10 +62,11 @@ async function parseNotificationIds(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const session = await getPartnerSession();
-  if (!session) {
-    return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requirePartnerApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
   const companyId = request.nextUrl.searchParams.get("companyId")?.trim() ?? "";
   if (companyId && !isPartnerPortalCompanyAllowed(session, companyId)) {
     return NextResponse.json({ message: "권한이 없습니다." }, { status: 403 });

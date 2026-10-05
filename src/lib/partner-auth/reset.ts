@@ -1,13 +1,12 @@
-import type { PartnerPortalPasswordResetResult } from "../partner-portal.ts";
+import type { PartnerPortalPasswordResetResult } from "./portal.ts";
 import { PartnerPortalPasswordResetError } from "../partner-password-errors.ts";
 import { generateTempPassword, hashPassword } from "../password.ts";
 import { sendPartnerPortalTemporaryPasswordEmail } from "../partner-email.ts";
 import { toPartnerPortalAccountSummary } from "./mappers.ts";
 import {
   findSupabasePartnerPortalAccount,
-  isMissingPartnerAuthSessionVersionColumnError,
+  getPartnerAccountAuthSessionVersion,
   normalizeSupabasePartnerLoginId,
-  omitPartnerAuthSessionVersion,
 } from "./accounts.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 
@@ -26,7 +25,6 @@ type PreparedPartnerPortalPasswordReset = PartnerPortalPasswordResetResult & {
 type CommittedPartnerPortalPasswordReset = PreparedPartnerPortalPasswordReset & {
   committedAt: string;
   committedAuthSessionVersion: number;
-  usedAuthSessionVersion: boolean;
 };
 
 export async function prepareSupabasePartnerPortalPasswordReset(
@@ -63,7 +61,7 @@ export async function prepareSupabasePartnerPortalPasswordReset(
     previousAccountState: {
       passwordHash: account.password_hash ?? null,
       passwordSalt: account.password_salt ?? null,
-      authSessionVersion: Math.max(1, Number(account.auth_session_version ?? 1)),
+      authSessionVersion: getPartnerAccountAuthSessionVersion(account),
       mustChangePassword: Boolean(account.must_change_password),
       emailVerifiedAt: account.email_verified_at ?? null,
       updatedAt: account.updated_at ?? null,
@@ -79,41 +77,30 @@ export async function commitSupabasePartnerPortalPasswordReset(
   const committedAt = new Date().toISOString();
   const committedAuthSessionVersion =
     reset.previousAccountState.authSessionVersion + 1;
-  const supabase = getSupabaseAdminClient();
-  const payloadWithVersion = {
-    password_hash: reset.passwordRecord.hash,
-    password_salt: reset.passwordRecord.salt,
-    auth_session_version: committedAuthSessionVersion,
-    must_change_password: true,
-    email_verified_at: committedAt,
-    updated_at: committedAt,
-  };
-  const attemptCommit = async (payload: Record<string, unknown>) => {
-    const commitQuery = supabase
-      .from("partner_accounts")
-      .update(payload)
-      .eq("id", reset.account.id);
+  const commitQuery = getSupabaseAdminClient()
+    .from("partner_accounts")
+    .update({
+      password_hash: reset.passwordRecord.hash,
+      password_salt: reset.passwordRecord.salt,
+      auth_session_version: committedAuthSessionVersion,
+      must_change_password: true,
+      email_verified_at: committedAt,
+      updated_at: committedAt,
+    })
+    .eq("id", reset.account.id);
 
-    return (reset.previousAccountState.updatedAt
-      ? commitQuery.eq("updated_at", reset.previousAccountState.updatedAt)
-      : commitQuery.is("updated_at", null))
-      .select("id")
-      .maybeSingle();
-  };
+  const { data, error } = await (reset.previousAccountState.updatedAt
+    ? commitQuery.eq("updated_at", reset.previousAccountState.updatedAt)
+    : commitQuery.is("updated_at", null))
+    .select("id")
+    .maybeSingle();
 
-  let usedAuthSessionVersion = true;
-  let { data, error } = await attemptCommit(payloadWithVersion);
-
-  if (
-    error &&
-    isMissingPartnerAuthSessionVersionColumnError(error.message)
-  ) {
-    usedAuthSessionVersion = false;
-    ({ data, error } = await attemptCommit(
-      omitPartnerAuthSessionVersion(payloadWithVersion),
-    ));
+  if (error) {
+    console.error("[partner-reset] temporary password commit failed", {
+      accountId: reset.account.id,
+      message: error.message,
+    });
   }
-
   if (error || !data?.id) {
     throw new PartnerPortalPasswordResetError(
       "send_failed",
@@ -140,7 +127,6 @@ export async function commitSupabasePartnerPortalPasswordReset(
     emailSentTo: reset.emailSentTo,
     committedAt,
     committedAuthSessionVersion,
-    usedAuthSessionVersion,
   };
 }
 
@@ -149,35 +135,23 @@ export async function rollbackSupabasePartnerPortalPasswordReset(
 ) {
   const supabase = getSupabaseAdminClient();
   const rollbackAt = new Date().toISOString();
-  const rollbackQuery = supabase
+  const { data, error } = await supabase
     .from("partner_accounts")
-    .update(
-      reset.usedAuthSessionVersion
-        ? {
-            password_hash: reset.previousAccountState.passwordHash,
-            password_salt: reset.previousAccountState.passwordSalt,
-            auth_session_version: reset.previousAccountState.authSessionVersion,
-            must_change_password: reset.previousAccountState.mustChangePassword,
-            email_verified_at: reset.previousAccountState.emailVerifiedAt,
-            updated_at: rollbackAt,
-          }
-        : {
-            password_hash: reset.previousAccountState.passwordHash,
-            password_salt: reset.previousAccountState.passwordSalt,
-            must_change_password: reset.previousAccountState.mustChangePassword,
-            email_verified_at: reset.previousAccountState.emailVerifiedAt,
-            updated_at: rollbackAt,
-          },
-    )
+    .update({
+      password_hash: reset.previousAccountState.passwordHash,
+      password_salt: reset.previousAccountState.passwordSalt,
+      auth_session_version: reset.previousAccountState.authSessionVersion,
+      must_change_password: reset.previousAccountState.mustChangePassword,
+      email_verified_at: reset.previousAccountState.emailVerifiedAt,
+      updated_at: rollbackAt,
+    })
     .eq("id", reset.account.id)
     .eq("password_hash", reset.passwordRecord.hash)
     .eq("password_salt", reset.passwordRecord.salt)
-    .eq("updated_at", reset.committedAt);
-  const guardedRollbackQuery = reset.usedAuthSessionVersion
-    ? rollbackQuery.eq("auth_session_version", reset.committedAuthSessionVersion)
-    : rollbackQuery;
-
-  const { data, error } = await guardedRollbackQuery.select("id").maybeSingle();
+    .eq("updated_at", reset.committedAt)
+    .eq("auth_session_version", reset.committedAuthSessionVersion)
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     throw error;

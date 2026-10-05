@@ -51,7 +51,7 @@ export default defineConfig({
         "src/lib/e2e-mutation-mode.ts",
         "src/lib/home-directory-state.ts",
         "src/lib/partner-billing-action-errors.ts",
-        "src/lib/partner-portal-paths.ts",
+        "src/lib/partner-auth/portal-paths.ts",
       ],
       thresholds: {
         statements: 80,

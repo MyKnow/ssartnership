@@ -15,20 +15,15 @@ test("partner reset commits before delivery and rolls back failed deliveries", a
   assert.match(route, /const result = await requestPartnerPortalPasswordReset\(normalizedEmail\);/);
 
   assert.match(accounts, /auth_session_version/);
-  assert.match(accounts, /isMissingPartnerAuthSessionVersionColumnError/);
-  assert.match(
-    resetService,
-    /isMissingPartnerAuthSessionVersionColumnError\(error\.message\)/,
-  );
+  assert.doesNotMatch(accounts, /isMissingPartnerAuthSessionVersionColumnError/);
+  assert.doesNotMatch(resetService, /omitPartnerAuthSessionVersion|usedAuthSessionVersion/);
   assert.match(resetService, /auth_session_version: committedAuthSessionVersion/);
   assert.match(resetService, /auth_session_version: reset\.previousAccountState\.authSessionVersion/);
-  assert.match(resetService, /omitPartnerAuthSessionVersion\(payloadWithVersion\)/);
   assert.match(resetService, /await sendPartnerPortalTemporaryPasswordEmail\(/);
   assert.match(resetService, /await rollbackSupabasePartnerPortalPasswordReset\(reset\)/);
   assert.match(resetService, /throw new PartnerPortalPasswordResetError\(\s*"send_failed",/);
   assert.match(resetService, /\.eq\("password_hash", reset\.passwordRecord\.hash\)/);
   assert.match(resetService, /\.eq\("password_salt", reset\.passwordRecord\.salt\)/);
-  assert.match(resetService, /reset\.usedAuthSessionVersion/);
-  assert.match(resetService, /rollbackQuery\.eq\("auth_session_version", reset\.committedAuthSessionVersion\)/);
+  assert.match(resetService, /\.eq\("auth_session_version", reset\.committedAuthSessionVersion\)/);
   assert.match(resetService, /\.eq\("updated_at", reset\.committedAt\)/);
 });

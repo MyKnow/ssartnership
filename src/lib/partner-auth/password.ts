@@ -1,13 +1,13 @@
-import type { PartnerPortalPasswordChangeResult } from "../partner-portal.ts";
+import type { PartnerPortalPasswordChangeResult } from "./portal.ts";
 import { PartnerPortalPasswordChangeError } from "../partner-password-errors.ts";
 import { hashPassword, isValidPassword, verifyPassword } from "../password.ts";
 import { toPartnerPortalAccountSummary } from "./mappers.ts";
 import { getSupabasePartnerPortalCompanyIds } from "./company.ts";
 import type { PartnerPortalAccountRow } from "./types.ts";
 import {
+  PARTNER_ACCOUNT_SELECT,
+  getPartnerAccountAuthSessionVersion,
   getSupabasePartnerPortalAccountById,
-  isMissingPartnerAuthSessionVersionColumnError,
-  omitPartnerAuthSessionVersion,
 } from "./accounts.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 
@@ -54,50 +54,28 @@ export async function changeSupabasePartnerPortalPassword(input: {
 
   const nextPasswordRecord = hashPassword(input.nextPassword);
   const now = new Date().toISOString();
-  const payloadWithVersion = {
-    password_hash: nextPasswordRecord.hash,
-    password_salt: nextPasswordRecord.salt,
-    auth_session_version: Math.max(1, Number(account.auth_session_version ?? 1)) + 1,
-    must_change_password: false,
-    updated_at: now,
-  };
-  const selectWithoutVersion =
-    "id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at,updated_at";
-  const selectWithVersion = `${selectWithoutVersion},auth_session_version`;
-  const attemptUpdate = async (payload: Record<string, unknown>, select: string) => {
-    const updateQuery = getSupabaseAdminClient()
-      .from("partner_accounts")
-      .update(payload)
-      .eq("id", account.id);
+  const updateQuery = getSupabaseAdminClient()
+    .from("partner_accounts")
+    .update({
+      password_hash: nextPasswordRecord.hash,
+      password_salt: nextPasswordRecord.salt,
+      auth_session_version: getPartnerAccountAuthSessionVersion(account) + 1,
+      must_change_password: false,
+      updated_at: now,
+    })
+    .eq("id", account.id);
 
-    const response = await (account.updated_at
-      ? updateQuery.eq("updated_at", account.updated_at)
-      : updateQuery.is("updated_at", null))
-      .select(select)
-      .maybeSingle();
+  const { data, error: updateError } = await (account.updated_at
+    ? updateQuery.eq("updated_at", account.updated_at)
+    : updateQuery.is("updated_at", null))
+    .select(PARTNER_ACCOUNT_SELECT)
+    .maybeSingle();
+  const updatedAccount = data as PartnerPortalAccountRow | null;
 
-    return response as {
-      data: PartnerPortalAccountRow | null;
-      error: { message: string } | null;
-    };
-  };
-
-  let { data: updatedAccount, error: updateError } = await attemptUpdate(
-    payloadWithVersion,
-    selectWithVersion,
-  );
-
-  if (
-    updateError &&
-    isMissingPartnerAuthSessionVersionColumnError(updateError.message)
-  ) {
-    ({ data: updatedAccount, error: updateError } = await attemptUpdate(
-      omitPartnerAuthSessionVersion(payloadWithVersion),
-      selectWithoutVersion,
-    ));
+  if (updateError) {
+    throw updateError;
   }
-
-  if (updateError || !updatedAccount?.id) {
+  if (!updatedAccount?.id) {
     throw new PartnerPortalPasswordChangeError(
       "unauthorized",
       "로그인 후 다시 시도해 주세요.",

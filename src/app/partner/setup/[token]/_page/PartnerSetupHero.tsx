@@ -1,7 +1,7 @@
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import type { AwaitedPartnerSetupContext } from "@/app/partner/setup/[token]/_page/types";
-import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 
 export default function PartnerSetupHero({
   context,

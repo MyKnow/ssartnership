@@ -45,9 +45,9 @@ import {
 } from "./shared";
 import { getManualMemberImportDuplicateKind } from "./duplicate";
 
-// New import batches use the common image-upload staging bucket. This legacy
-// bucket remains readable only while already-created batches are completed.
-export const MANUAL_MEMBER_IMPORT_STAGING_BUCKET = "manual-member-import-staging";
+// New import batches use the common image-upload staging bucket. Rows created
+// before that switch still carry their own `staging_bucket`, which is read
+// from the row instead of a constant.
 const IMPORT_TTL_MS = 24 * 60 * 60 * 1000;
 const PASSWORD_ACTION_TTL_MS = 24 * 60 * 60 * 1000;
 const PROCESSING_LEASE_MS = 15 * 60 * 1000;

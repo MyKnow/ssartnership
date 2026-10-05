@@ -29,7 +29,7 @@ import {
   getCompanyScopedPartnerServiceEditHref,
   getCompanyScopedPartnerServiceHref,
   getCompanyScopedPortalHref,
-} from "@/lib/partner-portal-paths";
+} from "@/lib/partner-auth/portal-paths";
 import type { PartnerServiceDetailViewProps } from "@/components/partner/partner-service-detail-view/types";
 import PartnerCouponPanel from "@/components/partner/partner-service-detail-view/PartnerCouponPanel";
 import PartnerBenefitUsageHistory from "@/components/partner/PartnerBenefitUsageHistory";

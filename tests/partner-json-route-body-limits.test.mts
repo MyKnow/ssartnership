@@ -249,7 +249,7 @@ test("본문 제한은 기존 same-origin·인증·quota 순서를 보존한다"
     },
     {
       path: "src/app/api/partner/reviews/[reviewId]/route.ts",
-      before: ["isTrustedSameOriginRequest", "getPartnerSession"],
+      before: ["isTrustedSameOriginRequest", "requirePartnerApiSession"],
     },
     {
       path: "src/app/api/partners/[id]/benefit-use/route.ts",

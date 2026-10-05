@@ -14,7 +14,11 @@ import {
 } from "@/lib/partner-auth-security";
 import { setPartnerSession } from "@/lib/partner-session";
 import { normalizePartnerLoginId } from "@/lib/partner-utils";
-import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
+import {
+  resolvePartnerPostLoginHref,
+  sanitizePartnerReturnTo,
+} from "@/lib/partner-auth/return-to";
 import { isValidEmail } from "@/lib/validation";
 import { buildPartnerLoginErrorRedirect } from "./shared";
 
@@ -29,6 +33,7 @@ async function redirectPartnerLoginFailure({
   context,
   throttleContext,
   loginId,
+  returnTo,
   errorCode,
   reason,
   blockedDelay = false,
@@ -38,6 +43,7 @@ async function redirectPartnerLoginFailure({
   context: Awaited<ReturnType<typeof getServerActionLogContext>>;
   throttleContext: ReturnType<typeof createThrottleContext>;
   loginId: string;
+  returnTo: string | null;
   errorCode: string;
   reason: string;
   blockedDelay?: boolean;
@@ -63,7 +69,7 @@ async function redirectPartnerLoginFailure({
   }
 
   await delayPartnerAuthAttempt("login", blockedDelay);
-  redirect(buildPartnerLoginErrorRedirect(errorCode, loginId));
+  redirect(buildPartnerLoginErrorRedirect(errorCode, loginId, returnTo));
 }
 
 export async function loginAction(formData: FormData) {
@@ -71,6 +77,7 @@ export async function loginAction(formData: FormData) {
   const rawLoginId = String(formData.get("loginId") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const loginId = normalizePartnerLoginId(rawLoginId);
+  const returnTo = sanitizePartnerReturnTo(formData.get("returnTo"));
   const throttleContext = {
     ...createThrottleContext(loginId),
     ipAddress: context.ipAddress ?? null,
@@ -89,13 +96,14 @@ export async function loginAction(formData: FormData) {
       properties: { reason: blockedState.code },
     });
     await delayPartnerAuthAttempt("login", true);
-    redirect(buildPartnerLoginErrorRedirect("server_error", loginId));
+    redirect(buildPartnerLoginErrorRedirect("server_error", loginId, returnTo));
   }
   if (blockedState.blocked) {
     return redirectPartnerLoginFailure({
       context,
       throttleContext,
       loginId,
+      returnTo,
       errorCode: "blocked",
       reason: "rate_limit",
       blockedDelay: true,
@@ -112,6 +120,7 @@ export async function loginAction(formData: FormData) {
       context,
       throttleContext,
       loginId,
+      returnTo,
       errorCode: "invalid_request",
       reason: "missing_fields",
     });
@@ -122,6 +131,7 @@ export async function loginAction(formData: FormData) {
       context,
       throttleContext,
       loginId,
+      returnTo,
       errorCode: "invalid_email",
       reason: "invalid_email",
     });
@@ -154,15 +164,17 @@ export async function loginAction(formData: FormData) {
       },
     });
 
-    successRedirectPath = result.account.mustChangePassword
-      ? "/partner/change-password"
-      : "/partner";
+    successRedirectPath = resolvePartnerPostLoginHref({
+      mustChangePassword: result.account.mustChangePassword,
+      returnTo,
+    });
   } catch (error) {
     if (error instanceof PartnerPortalLoginError) {
       return redirectPartnerLoginFailure({
         context,
         throttleContext,
         loginId,
+        returnTo,
         errorCode: "invalid_credentials",
         reason: error.code,
       });
@@ -183,7 +195,7 @@ export async function loginAction(formData: FormData) {
       () => undefined,
     );
     await delayPartnerAuthAttempt("login", true);
-    redirect(buildPartnerLoginErrorRedirect("server_error", loginId));
+    redirect(buildPartnerLoginErrorRedirect("server_error", loginId, returnTo));
   }
 
   redirect(successRedirectPath);

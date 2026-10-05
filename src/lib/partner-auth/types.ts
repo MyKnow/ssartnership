@@ -10,7 +10,6 @@ export type PartnerPortalAccountRow = {
   is_active?: boolean | null;
   email_verified_at?: string | null;
   initial_setup_completed_at?: string | null;
-  initial_setup_token?: string | null;
   initial_setup_token_hash?: string | null;
   initial_setup_link_sent_at?: string | null;
   initial_setup_expires_at?: string | null;

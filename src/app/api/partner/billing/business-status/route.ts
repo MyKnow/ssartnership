@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { lookupNtsBusinessStatus } from "@/lib/nts-business-status";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
-import { isPartnerPortalCompanyAllowed } from "@/lib/partner-portal-scope";
-import { getPartnerSession } from "@/lib/partner-session";
+import { isPartnerPortalCompanyAllowed } from "@/lib/partner-auth/portal-scope";
+import { requirePartnerApiSession } from "@/lib/partner-auth/api-session";
 import {
   PartnerPortalRouteBodyError,
   readPartnerPortalJsonBody,
@@ -20,10 +20,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 403 });
   }
 
-  const session = await getPartnerSession();
-  if (!session || session.mustChangePassword) {
-    return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+  const auth = await requirePartnerApiSession();
+  if ("response" in auth) {
+    return auth.response;
   }
+  const { session } = auth;
 
   let body: Record<string, unknown>;
   try {
