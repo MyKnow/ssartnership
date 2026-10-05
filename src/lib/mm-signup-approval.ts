@@ -1,5 +1,6 @@
 import { parseSsafyProfileFromUser, type ParsedProfile } from "@/lib/mm-profile";
 import { normalizeManualMemberImportCampus } from "@/lib/member-manual-import/options";
+import { hasFieldErrors } from "@/lib/field-errors";
 
 export const MATTERMOST_SIGNUP_MODES = ["direct", "approval"] as const;
 export type MattermostSignupMode = (typeof MATTERMOST_SIGNUP_MODES)[number];
@@ -117,7 +118,7 @@ export function parseMattermostSignupApprovalDecision(
     fieldErrors.campus = "캠퍼스를 선택해 주세요.";
   }
 
-  if (Object.keys(fieldErrors).length > 0 || generation === null) {
+  if (hasFieldErrors(fieldErrors) || generation === null) {
     return { ok: false, fieldErrors };
   }
 

@@ -4,6 +4,7 @@ import {
   type ReviewMediaManifestEntry,
 } from "@/lib/review-media";
 import { isUuidFormat } from "@/lib/uuid";
+import { hasFieldErrors } from "@/lib/field-errors";
 
 export type ReviewFieldName = "rating" | "title" | "body" | "images";
 
@@ -132,7 +133,7 @@ export function parseReviewSubmissionRequest(
     ...normalized,
     imageCount: imagesManifest.images.length,
   });
-  if (Object.keys(fieldErrors).length > 0) {
+  if (hasFieldErrors(fieldErrors)) {
     return { ok: false, reason: "invalid_fields", fieldErrors };
   }
 

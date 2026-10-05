@@ -1,5 +1,6 @@
 import { hasControlCharacters } from "@/lib/validation";
 import type { MattermostSenderCredentials } from "./crypto";
+import { hasFieldErrors } from "@/lib/field-errors";
 
 const MAX_LOGIN_ID_LENGTH = 256;
 const MAX_PASSWORD_LENGTH = 512;
@@ -49,7 +50,7 @@ export function parseMattermostSenderCredentialInput(
     fieldErrors.password = "Mattermost 비밀번호를 확인해 주세요.";
   }
 
-  if (Object.keys(fieldErrors).length > 0) {
+  if (hasFieldErrors(fieldErrors)) {
     return { ok: false, fieldErrors };
   }
 

@@ -16,6 +16,7 @@ import type {
 import { getPartnerPeriodEndAt } from "@/lib/ad-coupon-period";
 import { normalizeCouponVerificationPassword } from "@/lib/coupon-verification-password";
 import { sanitizeHttpUrl } from "@/lib/validation";
+import { readString } from "@/lib/form-data";
 
 export const AD_PACKAGE_FORM_LIMITS = {
   titleMax: 80,
@@ -57,12 +58,8 @@ const issuanceTypes = new Set<AdCouponIssuanceType>([
   "partner_code_pool",
 ]);
 
-function getString(formData: FormData, key: string) {
-  return String(formData.get(key) ?? "").trim();
-}
-
 function requireString(formData: FormData, key: string, message: string) {
-  const value = getString(formData, key);
+  const value = readString(formData, key);
   if (!value) {
     throw new Error(message);
   }
@@ -176,12 +173,12 @@ export function parseCreateAdCampaignForm(
     "캠페인명은 80자 이하로 입력해 주세요.",
   );
   const description = limitLength(
-    getString(formData, "description"),
+    readString(formData, "description"),
     AD_PACKAGE_FORM_LIMITS.descriptionMax,
     "캠페인 설명은 240자 이하로 입력해 주세요.",
   );
   const sponsorLabel = limitLength(
-    getString(formData, "sponsorLabel"),
+    readString(formData, "sponsorLabel"),
     AD_PACKAGE_FORM_LIMITS.sponsorLabelMax,
     "스폰서 표기는 60자 이하로 입력해 주세요.",
   );
@@ -207,16 +204,16 @@ export function parseCreateAdCampaignForm(
     title,
     description,
     sponsorLabel,
-    status: parseStatus(getString(formData, "status"), campaignStatuses, "draft"),
+    status: parseStatus(readString(formData, "status"), campaignStatuses, "draft"),
     startsAt,
     endsAt,
     channels,
     monthlyPriceKrw: parseNonNegativeInteger(
-      getString(formData, "monthlyPriceKrw"),
+      readString(formData, "monthlyPriceKrw"),
       definition.monthlyPriceKrw,
     ),
     notes: limitLength(
-      getString(formData, "notes"),
+      readString(formData, "notes"),
       AD_PACKAGE_FORM_LIMITS.notesMax,
       "운영 메모는 500자 이하로 입력해 주세요.",
     ),
@@ -231,14 +228,14 @@ export function parseCreateAdCouponForm(
   },
 ): CreateAdCouponInput {
   const partnerId = requireString(formData, "partnerId", "제휴처를 선택해 주세요.");
-  const campaignId = getString(formData, "campaignId") || null;
+  const campaignId = readString(formData, "campaignId") || null;
   const title = limitLength(
     requireString(formData, "title", "쿠폰명을 입력해 주세요."),
     AD_PACKAGE_FORM_LIMITS.titleMax,
     "쿠폰명은 80자 이하로 입력해 주세요.",
   );
   const partnerPeriodEndAt = getPartnerPeriodEndAt(options?.partnerPeriodEnd);
-  const rawEndsAt = getString(formData, "endsAt");
+  const rawEndsAt = readString(formData, "endsAt");
   if (!rawEndsAt && !partnerPeriodEndAt) {
     throw new Error("제휴처 기간 종료일이 없어 전체 유효 종료 시각을 입력해 주세요.");
   }
@@ -253,36 +250,36 @@ export function parseCreateAdCouponForm(
   );
   assertPeriod(startsAt, endsAt);
   const downloadStartsAt = parseOptionalDateTimeLocal(
-    getString(formData, "downloadStartsAt"),
+    readString(formData, "downloadStartsAt"),
     startsAt,
   );
   const downloadEndsAt = parseOptionalDateTimeLocal(
-    getString(formData, "downloadEndsAt"),
+    readString(formData, "downloadEndsAt"),
     partnerPeriodEndAt ?? endsAt,
     { endOfMinute: true },
   );
   const usageStartsAt = parseOptionalDateTimeLocal(
-    getString(formData, "usageStartsAt"),
+    readString(formData, "usageStartsAt"),
     startsAt,
   );
   const usageEndsAt = parseOptionalDateTimeLocal(
-    getString(formData, "usageEndsAt"),
+    readString(formData, "usageEndsAt"),
     partnerPeriodEndAt ?? endsAt,
     { endOfMinute: true },
   );
   assertPeriod(downloadStartsAt, downloadEndsAt);
   assertPeriod(usageStartsAt, usageEndsAt);
   const issuanceType = parseStatus(
-    getString(formData, "issuanceType"),
+    readString(formData, "issuanceType"),
     issuanceTypes,
     "service",
   );
   const redemptionType = parseStatus(
-    getString(formData, "redemptionType"),
+    readString(formData, "redemptionType"),
     redemptionTypes,
     "onsite",
   );
-  const externalUrl = getString(formData, "externalUrl");
+  const externalUrl = readString(formData, "externalUrl");
   const safeExternalUrl = externalUrl ? sanitizeHttpUrl(externalUrl) : "";
   if (externalUrl && !safeExternalUrl) {
     throw new Error("외부 쿠폰 링크 형식을 확인해 주세요.");
@@ -293,7 +290,7 @@ export function parseCreateAdCouponForm(
   if (redemptionType !== "external" && externalUrl) {
     throw new Error("외부 링크는 외부 링크형 쿠폰에만 설정할 수 있습니다.");
   }
-  const rawOnsitePassword = getString(formData, "onsitePassword");
+  const rawOnsitePassword = readString(formData, "onsitePassword");
   const onsitePassword = normalizeCouponVerificationPassword(rawOnsitePassword);
   if (
     redemptionType === "onsite" &&
@@ -311,44 +308,44 @@ export function parseCreateAdCouponForm(
     partnerId,
     title,
     description: limitLength(
-      getString(formData, "description"),
+      readString(formData, "description"),
       AD_PACKAGE_FORM_LIMITS.descriptionMax,
       "쿠폰 설명은 240자 이하로 입력해 주세요.",
     ),
     code: limitLength(
-      getString(formData, "code"),
+      readString(formData, "code"),
       AD_PACKAGE_FORM_LIMITS.codeMax,
       "쿠폰 코드는 120자 이하로 입력해 주세요.",
     ),
     issuanceType,
     redemptionType,
     discountLabel: limitLength(
-      getString(formData, "discountLabel"),
+      readString(formData, "discountLabel"),
       AD_PACKAGE_FORM_LIMITS.discountLabelMax,
       "할인 표기는 80자 이하로 입력해 주세요.",
     ),
-    terms: parseTerms(getString(formData, "terms")),
-    status: parseStatus(getString(formData, "status"), couponStatuses, "draft"),
+    terms: parseTerms(readString(formData, "terms")),
+    status: parseStatus(readString(formData, "status"), couponStatuses, "draft"),
     startsAt,
     endsAt,
     downloadStartsAt,
     downloadEndsAt,
     usageStartsAt,
     usageEndsAt,
-    usageLimit: parseNullableLimit(getString(formData, "usageLimit")),
-    dailyIssueLimit: parseNullableLimit(getString(formData, "dailyIssueLimit")),
-    weeklyIssueLimit: parseNullableLimit(getString(formData, "weeklyIssueLimit")),
-    monthlyIssueLimit: parseNullableLimit(getString(formData, "monthlyIssueLimit")),
+    usageLimit: parseNullableLimit(readString(formData, "usageLimit")),
+    dailyIssueLimit: parseNullableLimit(readString(formData, "dailyIssueLimit")),
+    weeklyIssueLimit: parseNullableLimit(readString(formData, "weeklyIssueLimit")),
+    monthlyIssueLimit: parseNullableLimit(readString(formData, "monthlyIssueLimit")),
     perMemberDailyIssueLimit: parseNullableLimit(
-      getString(formData, "perMemberDailyIssueLimit"),
+      readString(formData, "perMemberDailyIssueLimit"),
     ),
     perMemberWeeklyIssueLimit: parseNullableLimit(
-      getString(formData, "perMemberWeeklyIssueLimit"),
+      readString(formData, "perMemberWeeklyIssueLimit"),
     ),
     perMemberMonthlyIssueLimit: parseNullableLimit(
-      getString(formData, "perMemberMonthlyIssueLimit"),
+      readString(formData, "perMemberMonthlyIssueLimit"),
     ),
-    perMemberLimit: parsePositiveInteger(getString(formData, "perMemberLimit"), 1),
+    perMemberLimit: parsePositiveInteger(readString(formData, "perMemberLimit"), 1),
     onsitePassword,
     externalUrl: redemptionType === "external" ? safeExternalUrl ?? "" : "",
   };

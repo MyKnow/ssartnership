@@ -18,10 +18,7 @@ import { normalizeCouponCodeRows } from "@/lib/ad-coupon-domain";
 import { isUuid } from "@/lib/uuid";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { logAdminAction, redirectAdminActionError } from "./shared-helpers";
-
-function getString(formData: FormData, key: string) {
-  return String(formData.get(key) ?? "").trim();
-}
+import { readString } from "@/lib/form-data";
 
 function redirectAdvertisement(status: string): never {
   redirect(`/admin/advertisement?status=${encodeURIComponent(status)}`);
@@ -101,7 +98,7 @@ async function assertCampaignBelongsToPartner(
 }
 
 function requireCouponId(formData: FormData) {
-  const couponId = getString(formData, "couponId");
+  const couponId = readString(formData, "couponId");
   if (!isUuid(couponId)) {
     throw new Error("쿠폰 정보를 확인해 주세요.");
   }
@@ -154,13 +151,13 @@ export async function createAdCampaignAction(formData: FormData) {
 export async function updateAdCampaignStatusAction(formData: FormData) {
   const fallbackPath = "/admin/advertisement";
   await requireAdminPermission("home_ads", "update", { path: fallbackPath });
-  const campaignId = getString(formData, "campaignId");
+  const campaignId = readString(formData, "campaignId");
   if (!campaignId) {
     redirectAdminActionError(fallbackPath, "ad_campaign_invalid_request");
   }
   let status: AdCampaignStatus;
   try {
-    status = parseCampaignStatus(getString(formData, "status"));
+    status = parseCampaignStatus(readString(formData, "status"));
     await adPackageRepository.updateCampaignStatus({ campaignId, status });
   } catch (error) {
     redirectAdminActionError(
@@ -188,7 +185,7 @@ export async function updateAdCampaignStatusAction(formData: FormData) {
 }
 
 export async function createAdCouponAction(formData: FormData) {
-  const partnerId = getString(formData, "partnerId");
+  const partnerId = readString(formData, "partnerId");
   const session = await requireAdminPermission("home_ads", "create", { path: "/admin/partners" });
   const detailPath = getCouponDetailPath(partnerId);
   let coupon: Awaited<ReturnType<typeof adPackageRepository.createCoupon>>;
@@ -235,7 +232,7 @@ export async function createAdCouponAction(formData: FormData) {
 }
 
 export async function updateAdCouponAction(formData: FormData) {
-  const submittedPartnerId = getString(formData, "partnerId");
+  const submittedPartnerId = readString(formData, "partnerId");
   const fallbackPath = getCouponDetailPath(submittedPartnerId);
   let couponId: string;
   try {
@@ -313,7 +310,7 @@ export async function updateAdCouponAction(formData: FormData) {
 }
 
 export async function duplicateAdCouponAction(formData: FormData) {
-  const submittedPartnerId = getString(formData, "partnerId");
+  const submittedPartnerId = readString(formData, "partnerId");
   const fallbackPath = getCouponDetailPath(submittedPartnerId);
   let couponId: string;
   try {
@@ -364,7 +361,7 @@ export async function duplicateAdCouponAction(formData: FormData) {
 }
 
 export async function deleteAdCouponAction(formData: FormData) {
-  const submittedPartnerId = getString(formData, "partnerId");
+  const submittedPartnerId = readString(formData, "partnerId");
   const fallbackPath = isUuid(submittedPartnerId)
     ? `/admin/partners/${encodeURIComponent(submittedPartnerId)}`
     : "/admin/partners";

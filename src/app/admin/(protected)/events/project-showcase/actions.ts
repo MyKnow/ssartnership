@@ -26,14 +26,10 @@ import {
 } from "@/lib/project-showcase/validation";
 import { removeShowcaseProjectImages } from "@/lib/project-showcase/storage.server";
 import { isUuid } from "@/lib/uuid";
+import { readString } from "@/lib/form-data";
 
 const EVENT_PATH = `/events/${PROJECT_SHOWCASE_SLUG}`;
 const ADMIN_PATH = "/admin/events/project-showcase";
-
-function readString(formData: FormData, key: string) {
-  const value = formData.get(key);
-  return typeof value === "string" ? value.trim() : "";
-}
 
 function isShowcaseAdminRecordId(value: string) {
   return isUuid(value) || (process.env.NEXT_PUBLIC_DATA_SOURCE === "mock" && /^[a-z0-9-]{1,128}$/iu.test(value));

@@ -5,6 +5,7 @@ import {
   validateMemberYear,
   validatePasswordPolicy,
 } from "@/lib/validation";
+import { hasFieldErrors } from "@/lib/field-errors";
 
 export const DIRECT_MEMBER_LOGIN_ID_PREFIX = "manual-";
 
@@ -179,7 +180,7 @@ export function validateDirectMemberCreateInput(
     fieldErrors.temporaryPasswordConfirmation = "비밀번호가 일치하지 않습니다.";
   }
 
-  if (Object.keys(fieldErrors).length > 0 || !manualLoginId.value || generation === null) {
+  if (hasFieldErrors(fieldErrors) || !manualLoginId.value || generation === null) {
     return { ok: false, fieldErrors };
   }
 

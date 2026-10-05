@@ -38,6 +38,7 @@ import {
   type PartnerRegistrationFormState,
 } from "@/lib/partner-registration";
 import type { PartnerServiceMode } from "@/lib/partner-service-mode";
+import { firstInvalidField, hasFieldErrors } from "@/lib/field-errors";
 
 type BranchEntryMode = "single" | "multi";
 
@@ -198,18 +199,14 @@ export function usePartnerRegistrationController({
     currentStepIndex === PARTNER_REGISTRATION_STEPS.length - 1;
 
   useEffect(() => {
-    const firstInvalid = PARTNER_REGISTRATION_FIELD_ORDER.find(
-      (fieldName) => fieldErrors[fieldName],
-    );
+    const firstInvalid = firstInvalidField(fieldErrors, PARTNER_REGISTRATION_FIELD_ORDER);
     if (firstInvalid) {
       scrollToElement(fieldRefs.current[firstInvalid]);
     }
   }, [fieldErrors]);
 
   function focusFirstStepError(errors: PartnerRegistrationFieldErrors) {
-    const firstInvalid = PARTNER_REGISTRATION_FIELD_ORDER.find(
-      (fieldName) => errors[fieldName],
-    );
+    const firstInvalid = firstInvalidField(errors, PARTNER_REGISTRATION_FIELD_ORDER);
     if (firstInvalid) {
       scrollToElement(fieldRefs.current[firstInvalid]);
     }
@@ -226,7 +223,7 @@ export function usePartnerRegistrationController({
       activeStep,
       validation.fieldErrors,
     );
-    if (Object.keys(stepErrors).length === 0) {
+    if (!hasFieldErrors(stepErrors)) {
       setClientFieldErrors({});
       return true;
     }
@@ -287,15 +284,13 @@ export function usePartnerRegistrationController({
     const validation = validatePartnerRegistrationInput(
       new FormData(event.currentTarget),
     );
-    if (Object.keys(validation.fieldErrors).length === 0) {
+    if (!hasFieldErrors(validation.fieldErrors)) {
       setClientFieldErrors({});
       return true;
     }
     event.preventDefault();
     setClientFieldErrors(validation.fieldErrors);
-    const firstInvalid = PARTNER_REGISTRATION_FIELD_ORDER.find(
-      (fieldName) => validation.fieldErrors[fieldName],
-    );
+    const firstInvalid = firstInvalidField(validation.fieldErrors, PARTNER_REGISTRATION_FIELD_ORDER);
     const targetStep = PARTNER_REGISTRATION_STEPS.find((step) =>
       step.fields.some((fieldName) => fieldName === firstInvalid),
     );

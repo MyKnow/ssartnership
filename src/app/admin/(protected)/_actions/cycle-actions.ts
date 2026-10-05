@@ -45,13 +45,9 @@ import {
   parseSsafyCycleSettingsPayloadOrRedirect,
 } from "./shared-parser-redirects";
 import { isUuidFormat } from "@/lib/uuid";
+import { readRawString } from "@/lib/form-data";
 
 const MATTERMOST_SENDER_PATH = "/admin/cycle";
-
-function getFormString(formData: FormData, key: string) {
-  const value = formData.get(key);
-  return typeof value === "string" ? value : "";
-}
 
 function createMattermostSenderAuditContext(
   adminId: string,
@@ -192,9 +188,9 @@ export async function saveMattermostSenderCandidateAction(formData: FormData) {
     path: MATTERMOST_SENDER_PATH,
   });
   const parsed = parseMattermostSenderCredentialInput({
-    generation: getFormString(formData, "generation"),
-    loginId: getFormString(formData, "loginId"),
-    password: getFormString(formData, "password"),
+    generation: readRawString(formData, "generation"),
+    loginId: readRawString(formData, "loginId"),
+    password: readRawString(formData, "password"),
   });
   if (!parsed.ok) {
     redirectMattermostSenderError(
@@ -249,7 +245,7 @@ export async function testMattermostSenderCandidateAction(formData: FormData) {
   const session = await requireMattermostSenderAdmin("update", {
     path: MATTERMOST_SENDER_PATH,
   });
-  const candidateId = getFormString(formData, "candidateId");
+  const candidateId = readRawString(formData, "candidateId");
   if (!isUuidFormat(candidateId)) {
     redirectMattermostSenderError(
       "mattermost_sender_invalid_request",
@@ -388,7 +384,7 @@ export async function disableMattermostSenderAction(formData: FormData) {
   const session = await requireMattermostSenderAdmin("delete", {
     path: MATTERMOST_SENDER_PATH,
   });
-  const candidateId = getFormString(formData, "candidateId");
+  const candidateId = readRawString(formData, "candidateId");
   if (!isUuidFormat(candidateId)) {
     redirectMattermostSenderError(
       "mattermost_sender_invalid_request",
@@ -415,7 +411,7 @@ export async function disableMattermostSenderAction(formData: FormData) {
   }
 
   const expectedConfirmation = `${sender.generation}기 비활성화`;
-  if (getFormString(formData, "confirmationText").trim() !== expectedConfirmation) {
+  if (readRawString(formData, "confirmationText").trim() !== expectedConfirmation) {
     redirectMattermostSenderError(
       "mattermost_sender_disable_confirmation_invalid",
       "mattermost_sender_disable",
