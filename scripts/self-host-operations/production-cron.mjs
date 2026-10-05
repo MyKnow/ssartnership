@@ -1,16 +1,22 @@
 import { readFileSync, realpathSync } from 'node:fs';
 import { parseEnv } from 'node:util';
 import { fileURLToPath } from 'node:url';
-import { loadCronSchedules, invokeSelfHostCron, getSafeCronErrorCode } from '../lib/self-host-cron.mjs';
-import { recordProductionCronOutcome } from './production-cron-metrics.mjs';
+import { loadCronScheduleCatalog, invokeSelfHostCron, getSafeCronErrorCode } from '../lib/self-host-cron.mjs';
+import { recordProductionCronOutcome } from "./production-cron-metrics.mjs";
 
-export function loadProductionCronSchedules(source, catalogSource) {
-  const entries = loadCronSchedules(source);
-  const approved = loadCronSchedules(catalogSource).filter(entry => !entry.path.includes('wallet'));
-  if (entries.length !== approved.length || entries.some(entry => !approved.some(item => item.path === entry.path))) {
+export const PRODUCTION_CRON_SCHEDULES_URL = new URL('../../deploy/self-host-operations/production-cron/schedules.json', import.meta.url);
+
+/**
+ * `schedules.json` is the single source of truth: every registered cron route
+ * is either scheduled or listed under `unscheduled` with a reason. A missing,
+ * unknown, duplicated or both-listed job stops installation.
+ */
+export function loadProductionCronSchedules(source) {
+  try {
+    return loadCronScheduleCatalog(source).scheduled;
+  } catch {
     throw new Error('PRODUCTION_CRON_SCOPE_INVALID');
   }
-  return entries;
 }
 
 /** Expand only the reviewed daily/hourly/stepped-minute subset, in UTC. */
@@ -25,9 +31,9 @@ export function productionCronCalendar(schedule) {
   return `*-*-* ${hour}:${minutes.join(',')}:00 UTC`;
 }
 
-/** @param {string} source @param {string} [catalogSource] @returns {Array<{name:string,content:string}>} */
-export function productionCronTimers(source, catalogSource = readFileSync(new URL('../../vercel.json', import.meta.url), 'utf8')) {
-  return loadProductionCronSchedules(source, catalogSource).map(({ path, schedule }) => {
+/** @param {string} source schedules.json text @returns {Array<{name:string,content:string}>} */
+export function productionCronTimers(source) {
+  return loadProductionCronSchedules(source).map(({ path, schedule }) => {
     const name = path.slice('/api/cron/'.length);
     return { name, content: `[Unit]\nDescription=SSARTNERSHIP Production ${name}\n[Timer]\nOnCalendar=${productionCronCalendar(schedule)}\nAccuracySec=1s\nPersistent=false\nUnit=ssartnership-production-cron@${name}.service\n[Install]\nWantedBy=timers.target\n` };
   });
@@ -36,10 +42,7 @@ export function productionCronTimers(source, catalogSource = readFileSync(new UR
 async function main() {
   if (process.getuid?.() !== 0 || process.argv.length !== 3 || !/^[-a-z0-9]+$/u.test(process.argv[2])) throw new Error();
   if (readFileSync('/etc/myknow/secrets/ssartnership-production/cron-owner','utf8').trim() !== 'home-production') throw new Error();
-  const entries = loadProductionCronSchedules(
-    readFileSync(new URL('../../deploy/self-host-operations/production-cron/schedules.json', import.meta.url), 'utf8'),
-    readFileSync(new URL('../../vercel.json', import.meta.url), 'utf8'),
-  );
+  const entries = loadProductionCronSchedules(readFileSync(PRODUCTION_CRON_SCHEDULES_URL, 'utf8'));
   const env = parseEnv(readFileSync('/etc/myknow/secrets/ssartnership-production/app.env','utf8'));
   const entry = entries.find(item => item.path === `/api/cron/${process.argv[2]}`);
   let success = false;

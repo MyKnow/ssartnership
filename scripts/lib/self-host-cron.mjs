@@ -63,12 +63,12 @@ export function isSaneCronSchedule(schedule) {
   ].every(Boolean);
 }
 
-export function parseCronSchedules(vercelConfig) {
-  if (!vercelConfig || typeof vercelConfig !== "object" || !Array.isArray(vercelConfig.crons)) {
+export function parseCronSchedules(scheduleConfig) {
+  if (!scheduleConfig || typeof scheduleConfig !== "object" || !Array.isArray(scheduleConfig.crons)) {
     fail("CRON_SCHEDULE_CONFIG_INVALID");
   }
 
-  const entries = vercelConfig.crons.map((entry) => {
+  const entries = scheduleConfig.crons.map((entry) => {
     if (
       !entry ||
       typeof entry !== "object" ||
@@ -87,6 +87,82 @@ export function parseCronSchedules(vercelConfig) {
   }
 
   return Object.freeze(entries);
+}
+
+/**
+ * Every `/api/cron/*` route handler. The production schedule file must place
+ * each path either in `crons` (scheduled) or `unscheduled` (with a reason), so a
+ * missing, unknown or duplicated job stops installation before any timer runs.
+ * `tests/cron-route-contract.test.mts` keeps this list equal to the route tree.
+ */
+export const REGISTERED_CRON_PATHS = Object.freeze([
+  "/api/cron/anonymize-deleted-members",
+  "/api/cron/archive-expired-promotions",
+  "/api/cron/cleanup-graduate-verification-files",
+  "/api/cron/cleanup-image-uploads",
+  "/api/cron/cleanup-manual-member-imports",
+  "/api/cron/mattermost-sender-health",
+  "/api/cron/partner-billing",
+  "/api/cron/purge-expired-operational-logs",
+  "/api/cron/purge-showcase-personal-data",
+  "/api/cron/push-expiring-partners",
+  "/api/cron/reconcile-apple-wallet-passes",
+  "/api/cron/rss",
+]);
+
+const UNSCHEDULED_REASON_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function parseUnscheduledCrons(value) {
+  if (value === undefined) return Object.freeze([]);
+  if (!Array.isArray(value)) fail("CRON_SCHEDULE_CONFIG_INVALID");
+
+  return Object.freeze(value.map((entry) => {
+    if (
+      !entry ||
+      typeof entry !== "object" ||
+      typeof entry.path !== "string" ||
+      !CRON_PATH_PATTERN.test(entry.path) ||
+      typeof entry.reason !== "string" ||
+      entry.reason.length > 64 ||
+      !UNSCHEDULED_REASON_PATTERN.test(entry.reason)
+    ) {
+      fail("CRON_SCHEDULE_CONFIG_INVALID");
+    }
+    return Object.freeze({ path: entry.path, reason: entry.reason });
+  }));
+}
+
+/**
+ * Parses the canonical schedule file and proves it accounts for every
+ * registered cron route exactly once.
+ */
+export function parseCronScheduleCatalog(config, registeredPaths = REGISTERED_CRON_PATHS) {
+  const scheduled = parseCronSchedules(config);
+  const unscheduled = parseUnscheduledCrons(config.unscheduled);
+  const paths = [...scheduled, ...unscheduled].map((entry) => entry.path);
+  const registered = new Set(registeredPaths);
+
+  if (
+    new Set(paths).size !== paths.length ||
+    paths.length !== registered.size ||
+    paths.some((path) => !registered.has(path))
+  ) {
+    fail("CRON_SCHEDULE_SCOPE_INVALID");
+  }
+
+  return Object.freeze({ scheduled, unscheduled });
+}
+
+export function loadCronScheduleCatalog(configSource, registeredPaths = REGISTERED_CRON_PATHS) {
+  if (typeof configSource !== "string") fail("CRON_SCHEDULE_CONFIG_INVALID");
+
+  let config;
+  try {
+    config = JSON.parse(configSource);
+  } catch {
+    fail("CRON_SCHEDULE_CONFIG_INVALID");
+  }
+  return parseCronScheduleCatalog(config, registeredPaths);
 }
 
 export function loadCronSchedules(configSource) {

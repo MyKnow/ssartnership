@@ -21,12 +21,17 @@ function read(relativePath: string) {
   return readFileSync(new URL(relativePath, import.meta.url), "utf8");
 }
 
-test("state-changing cron GET routes require the Vercel cron bearer secret only", () => {
-  const vercelConfig = JSON.parse(read("../vercel.json")) as {
+test("state-changing cron GET routes require the cron bearer secret only", () => {
+  const scheduleConfig = JSON.parse(
+    read("../deploy/self-host-operations/production-cron/schedules.json"),
+  ) as {
     crons?: Array<{ path?: string }>;
+    unscheduled?: Array<{ path?: string }>;
   };
   const configuredCronPaths = new Set(
-    (vercelConfig.crons ?? []).map((entry) => entry.path),
+    [...(scheduleConfig.crons ?? []), ...(scheduleConfig.unscheduled ?? [])].map(
+      (entry) => entry.path,
+    ),
   );
   const cronAccess = read("../src/lib/cron-route.ts");
 
@@ -41,12 +46,12 @@ test("state-changing cron GET routes require the Vercel cron bearer secret only"
     assert.equal(
       configuredCronPaths.has(`/api/cron/${routeName}`),
       true,
-      `${relativePath} must remain registered as a Vercel cron path`,
+      `${relativePath} must remain registered in the self-hosted cron catalog`,
     );
     assert.match(
       source,
       /export async function GET\(request: NextRequest\)/,
-      `${relativePath} must keep Vercel cron GET compatibility`,
+      `${relativePath} must keep the cron GET entry point`,
     );
     assert.match(
       source,

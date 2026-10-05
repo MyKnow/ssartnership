@@ -119,3 +119,5 @@ npm run release -- --version=none --lighthouse=skip --message="docs: 예시 메�
 
 CC BY-NC 4.0  
 비상업적 목적에 한해 사용 가능합니다.
+
+환경 변수 목록과 분류의 정본은 [env 매니페스트](scripts/lib/env-manifest.mjs)이며 `npm run check:env`로 두 예시 파일과 코드의 drift를 확인합니다.

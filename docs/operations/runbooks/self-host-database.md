@@ -39,7 +39,7 @@ node -- deploy/self-host/write-local-runtime-env.mjs --data-env-file .tmp/self-h
 
 ## Preview와 임시 환경
 
-현재 클라우드에는 별도 운영 프로젝트와 지속형 Preview 프로젝트가 있다. 두 환경의 분리를 그대로 유지하는 것이 우선이며, 임시 테스트 환경은 필요할 때 별도 Compose 프로젝트로 생성한다.
+운영과 지속형 Preview는 PVE 자체 호스팅에서 분리 운영한다. 두 환경의 분리를 그대로 유지하는 것이 우선이며, 임시 테스트 환경은 필요할 때 별도 Compose 프로젝트로 생성한다.
 
 ```bash
 npm run self-host:database -- init --env-file .tmp/self-host/preview.env --project ssartnership-preview --port 58001
@@ -48,7 +48,7 @@ npm run self-host:database -- migrate --env-file .tmp/self-host/preview.env
 npm run self-host:database -- down --env-file .tmp/self-host/preview.env
 ```
 
-독립 포트·난수 비밀·named volume을 사용하므로 종료 후에도 해당 환경의 데이터가 남는다. 기본 명령은 볼륨을 삭제하지 않는다. 불필요한 테스트 볼륨 정리는 정확한 환경과 복구 필요성을 확인한 별도 작업이다. 운영 자료 복제가 필요하면 기존 `sync:preview` sanitizer의 회원 비밀번호 hash/salt 제거 계약과 Storage 개인정보 범위를 적용한다. 현재 CLI는 운영 데이터를 자동 복사하지 않는다.
+독립 포트·난수 비밀·named volume을 사용하므로 종료 후에도 해당 환경의 데이터가 남는다. 기본 명령은 볼륨을 삭제하지 않는다. 불필요한 테스트 볼륨 정리는 정확한 환경과 복구 필요성을 확인한 별도 작업이다. 운영 자료 복제가 필요하면 [Production/Preview 격리와 데이터 복사](./self-host-environments.md)의 `prepare-copy`와 `sanitize.mjs` 계약(비밀 컬럼 센티넬 치환, 미검토 비밀 컬럼 fail-closed, 이메일 마스킹, 로그·시도·구독 테이블 비우기)과 Storage 범위를 적용한다. 폐기된 Cloud `sync:preview` sanitizer는 사용하지 않는다. 이 CLI는 운영 데이터를 자동 복사하지 않는다.
 
 ## 관리와 전환
 

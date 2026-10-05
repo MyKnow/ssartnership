@@ -80,21 +80,13 @@ test("관리자 권한은 admin_profiles와 MM 디렉터리만 기준으로 관�
   );
 });
 
-test("운영 bootstrap과 Preview seed도 정규화된 관리자 관계를 사용한다", () => {
+test("운영 bootstrap도 정규화된 관리자 관계를 사용한다", () => {
   const bootstrap = readRepoFile("scripts/bootstrap-super-admin.mjs");
-  const previewSync = readRepoFile("scripts/supabase-sync-preview.mjs");
 
   assert.match(bootstrap, /\.from\("mm_user_directory"\)/);
   assert.match(bootstrap, /\.eq\("mattermost_account_id", directory\.id\)/);
   assert.match(bootstrap, /\.from\("admin_profiles"\)/);
   assert.doesNotMatch(bootstrap, /admin_permission_id/);
-
-  assert.match(previewSync, /insert into public\.admin_profiles/);
-  assert.match(previewSync, /join public\.mm_user_directory directory/);
-  assert.doesNotMatch(
-    previewSync,
-    /update public\.members\s+set admin_permission_id/,
-  );
 });
 
 test("정책 동의는 회원 mirror 대신 consent ledger를 기준으로 판정한다", () => {

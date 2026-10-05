@@ -11,5 +11,8 @@
     {"path":"/api/cron/mattermost-sender-health","schedule":"1-59/5 * * * *"},
     {"path":"/api/cron/purge-expired-operational-logs","schedule":"50 18 * * *"},
     {"path":"/api/cron/purge-showcase-personal-data","schedule":"55 18 * * *"}
+  ],
+  "unscheduled": [
+    {"path":"/api/cron/reconcile-apple-wallet-passes","reason":"apple-wallet-disabled"}
   ]
 }

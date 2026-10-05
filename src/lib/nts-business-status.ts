@@ -1,3 +1,4 @@
+import { warnDeprecatedEnvironmentAlias } from "@/lib/env-deprecation";
 import { normalizeBusinessRegistrationNumber } from "@/lib/partner-billing";
 
 const NTS_BUSINESS_STATUS_ENDPOINT =
@@ -28,11 +29,13 @@ export type NtsBusinessStatusLookupResult =
     };
 
 function getNtsBusinessStatusServiceKey() {
-  return (
-    process.env.NTS_BUSINESS_STATUS_SERVICE_KEY ??
-    process.env.DATA_GO_KR_SERVICE_KEY ??
-    ""
-  ).trim();
+  const primary = process.env.NTS_BUSINESS_STATUS_SERVICE_KEY;
+  if (primary !== undefined) return primary.trim();
+
+  const legacy = process.env.DATA_GO_KR_SERVICE_KEY;
+  if (legacy === undefined) return "";
+  warnDeprecatedEnvironmentAlias("DATA_GO_KR_SERVICE_KEY");
+  return legacy.trim();
 }
 
 function getStringValue(value: unknown) {

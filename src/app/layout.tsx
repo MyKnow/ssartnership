@@ -12,8 +12,6 @@ import {
   SITE_TITLE,
 } from "@/lib/site";
 import { DEFAULT_OPEN_GRAPH_IMAGE, getMetadataBase } from "@/lib/seo";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import PwaProvider from "@/components/PwaProvider";
 import SelfHostedWebVitals from "@/components/SelfHostedWebVitals";
 import { shouldLoadSelfHostedTelemetry } from "@/lib/telemetry-mode";
@@ -78,9 +76,7 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-const shouldLoadVercelTelemetry = process.env.VERCEL === "1";
 const loadSelfHostedTelemetry = shouldLoadSelfHostedTelemetry({
-  VERCEL: process.env.VERCEL,
   NEXT_PUBLIC_DATA_SOURCE: process.env.NEXT_PUBLIC_DATA_SOURCE,
 });
 
@@ -99,12 +95,7 @@ export default function RootLayout({
             {children}
           </ToastProvider>
         </ThemeProvider>
-        {shouldLoadVercelTelemetry ? (
-          <>
-            <Analytics />
-            <SpeedInsights />
-          </>
-        ) : loadSelfHostedTelemetry ? <SelfHostedWebVitals /> : null}
+        {loadSelfHostedTelemetry ? <SelfHostedWebVitals /> : null}
       </body>
     </html>
   );

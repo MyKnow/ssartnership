@@ -145,7 +145,7 @@ test("push ops helpers filter visible expiring partners and merge delivery total
       audienceYear: null,
       audienceCampus: null,
       audienceMemberId: null,
-      destination: "https://ssartnership.vercel.app/partners/demo",
+      destination: "https://ssartnership.myknow.xyz/partners/demo",
       targeted: 10,
       delivered: 9,
       failed: 1,

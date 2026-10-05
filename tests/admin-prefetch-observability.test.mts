@@ -91,11 +91,7 @@ test("prefetch 계측은 요청·활용 단계를 분리하고 raw URL을 보내
   assert.match(shellSource, /onPointerLeave=\{\(\) => cancelHoverPrefetch/);
 });
 
-test("Preview 측정과 운영 로그는 prefetch 활용률 요약 RPC를 사용한다", async () => {
-  const scriptSource = await readFile(
-    new URL("../scripts/admin-preview-performance.mjs", import.meta.url),
-    "utf8",
-  );
+test("운영 로그는 prefetch 활용률 요약 RPC를 사용한다", async () => {
   const migrationSource = await readFile(
     new URL(
       "../supabase/migrations/20260728184935_add_admin_prefetch_summary.sql",
@@ -108,8 +104,6 @@ test("Preview 측정과 운영 로그는 prefetch 활용률 요약 RPC를 사용
     "utf8",
   );
 
-  assert.match(scriptSource, /get_admin_prefetch_summary/);
-  assert.match(scriptSource, /get_admin_prefetch_dimension_summary/);
   assert.match(migrationSource, /get_admin_prefetch_summary/);
   assert.match(migrationSource, /get_admin_prefetch_dimension_summary/);
   assert.match(pageSource, /getAdminPrefetchSummary/);

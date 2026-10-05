@@ -95,31 +95,18 @@ Cron 실행 일정의 정본은 `deploy/self-host-operations/production-cron/sch
 
 - 협력사 결제/등록 과정에서 사업자 상태조회에 사용한다.
 - 주요 env: `NTS_BUSINESS_STATUS_SERVICE_KEY`
-- fallback env: `DATA_GO_KR_SERVICE_KEY`
+- fallback env: `DATA_GO_KR_SERVICE_KEY`(폐기 예정 별칭, 읽을 때 경고)
 - 상호/대표자/주소 자동 채움이 아니라 휴업/폐업 상태와 과세유형 확인 용도다.
 
-### 자체 호스팅 배포
+### 배포·CI
 
-- Production은 `main`, Preview는 `dev` branch 기준이다. 각 branch의 이미지 workflow가 exact-SHA 이미지를 게시하고 환경별 수신기가 앱만 교체한다. 절차는 [격리 CI·배포·유지보수](../operations/runbooks/self-host-ci-maintenance.md)를 따른다.
-- 공개 사이트 Web Vitals는 `/api/web-vitals` 자체 수집 경로로 보낸다. Vercel Analytics·Speed Insights는 PVE 이전 뒤 로드되지 않는다.
-- CI workflow는 `Public Readiness`(위험 등급별 검증)와 이미지 게시 workflow가 중심이고 Storybook·Visual은 수동 workflow다.
+- PVE 자체 호스팅이 유일한 운영 정본이다. `main`은 Production, `dev`는 원본 Preview 이미지로 배포된다([격리 CI·배포](../operations/runbooks/self-host-ci-maintenance.md)). Vercel 배포·Analytics·Speed Insights와 클라우드 Supabase 반출·Preview 동기화 도구는 RF-04(#537)에서 제거했다.
+- 브라우저 성능은 [자체 호스팅 Web Vitals·Lighthouse 측정](../performance/measurements/web-vitals.md)으로만 확인한다.
+- CI workflow는 change-aware public readiness, 교차 플랫폼 개발환경, 수동 Storybook, 자체 호스팅 이미지 발행과 공개 health 수동 확인을 담당한다.
 
 ## Environment variable groups
 
-필수·선택 값과 오류 코드의 정본은 `deploy/self-host/runtime-env.mjs`, 예시는 `.env.example`과 `deploy/self-host/runtime.env.example`이다. 아래 표는 그룹 안내다.
-
-| 그룹 | 주요 env |
-| --- | --- |
-| 관리자 | `ADMIN_SESSION_SECRET`, `ADMIN_ALLOWED_IPS`, `ADMIN_BASIC_AUTH_USERNAME`, `ADMIN_BASIC_AUTH_PASSWORD`(관리자 계정과 비밀번호는 DB `admin_accounts`에 있다) |
-| 회원 세션/QR/HMAC | `USER_SESSION_SECRET`, `CERTIFICATION_QR_SECRET`, `MEMBER_IDENTIFIER_RESERVATION_HMAC_SECRET`, `MEMBER_EMAIL_VERIFICATION_HMAC_SECRET`, `GRADUATE_VERIFICATION_HMAC_SECRET` |
-| 협력사 | `PARTNER_SESSION_SECRET`, billing bank envs |
-| Supabase | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, 서버 내부 전송용 `SUPABASE_INTERNAL_URL`, optional `NEXT_PUBLIC_SUPABASE_URL` |
-| Data source·실행 모드 | `NEXT_PUBLIC_DATA_SOURCE`, `NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE`, `SELF_HOST_MODE` |
-| Mattermost | `MM_BASE_URL`, `MM_SENDER_CREDENTIALS_KEY_V1`, `MM_SENDER_CREDENTIALS_ACTIVE_KEY_VERSION` |
-| SMTP | `SMTP_*`, `NAVER_SMTP_*`, `SUGGEST_NOTIFY_EMAIL` |
-| Web Push/Cron | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET` |
-| Apple Wallet | `APPLE_WALLET_ENABLED`, `APPLE_WALLET_TEAM_ID`, `APPLE_WALLET_PASS_TYPE_ID`, `APPLE_WALLET_ORGANIZATION_NAME`, `APPLE_WALLET_CERTIFICATE_BASE64`, `APPLE_WALLET_PRIVATE_KEY_BASE64`, `APPLE_WALLET_PRIVATE_KEY_PASSPHRASE`, `APPLE_WALLET_WWDR_CERTIFICATE_BASE64`, `APPLE_WALLET_DEVICE_TOKEN_ENCRYPTION_KEY_BASE64`, `NEXT_PUBLIC_SITE_URL` |
-| SEO | `NEXT_PUBLIC_SITE_URL` |
+환경 변수 목록·그룹·분류(필수/build/선택/플랫폼/호환/폐기 예정/개발)의 정본은 `scripts/lib/env-manifest.mjs`다. `npm run check:env`와 `tests/env-manifest.test.mts`가 매니페스트, `src/`·`next.config.ts`의 env 읽기, `.env.example`, `deploy/self-host/runtime.env.example`의 drift를 막는다. 주요 그룹은 Supabase, 세션·HMAC, 관리자 edge 보호, Mattermost Sender, Cron·Web Push, 공개 build 값, 파트너 청구·사업자 상태, 이메일, Apple Wallet, 자체 호스팅 Web Vitals다. 폐기 예정 별칭(`NAVER_SMTP_*`, `DATA_GO_KR_SERVICE_KEY`)은 읽을 때 경고만 남기고 예시 파일에 두지 않는다.
 
 ## API design constraints
 

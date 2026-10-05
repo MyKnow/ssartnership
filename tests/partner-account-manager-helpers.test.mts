@@ -22,7 +22,7 @@ test("partner account helper builds initial setup URL with fallback host", async
 
   assert.equal(
     buildPartnerInitialSetupUrl("token-123"),
-    "https://ssartnership.vercel.app/partner/setup/token-123",
+    "https://ssartnership.myknow.xyz/partner/setup/token-123",
   );
   assert.equal(
     buildPartnerInitialSetupUrl("token-123", "https://ssartnership.myknow.xyz"),

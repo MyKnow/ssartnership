@@ -118,7 +118,7 @@ Secret 값은 진단 결과에 포함하지 않는다. 실패 결과는 변수 �
 | `npm run dev`, `doctor`, `bootstrap` | 브랜치와 무관하게 `.env.preview` |
 | `npm run build`, `npm start` — `main` | `.env.production` |
 | `npm run build`, `npm start` — `dev`, `feat/*` 등 다른 브랜치 | `.env.preview` |
-| CI·Vercel·자체 호스팅 빌드에서 두 data source를 명시적으로 주입 | 주입한 환경만 사용 |
+| CI(`CI=1`)·자체 호스팅 빌드(`SELF_HOST_BUILD=1`)에서 두 data source를 명시적으로 주입 | 주입한 환경만 사용 |
 | 두 data source가 명시적으로 `mock`인 검증 | 주입한 합성 환경만 사용 |
 
 `scripts/lib/project-environment.mjs`가 선택 계약의 최종 근거다. `NODE_ENV=production`은 최적화 모드이며 데이터 환경을 결정하지 않는다. 로컬 build/start에서 detached HEAD나 Git 조회 실패는 중단한다. 선택한 파일이 없으면 반대 환경이나 과거 `.env`로 대체하지 않는다. bootstrap은 파일이 없는 새 개발환경에만 외부 연결 없는 mock `.env.preview`를 생성한다. 두 실제 파일은 Git과 Docker context에서 제외하고 소유자 전용 권한으로 보관한다.
@@ -131,7 +131,7 @@ Next의 기본 dotenv 로더는 빌드 시 `.env.production`을 추가로 읽으
 
 최신 설정은 현재 자체 호스팅 서버의 해당 환경 `app.env`에서 가져온다. 폐기된 managed Supabase/Vercel 설정을 최신 원본으로 취급하지 않는다. Mac에서 사용할 파일에는 Compose 내부 `SUPABASE_INTERNAL_URL`을 그대로 복사하지 말고 검증된 공개 API 주소를 사용한다. localhost에서는 Preview 데이터와 세션 설정을 사용하되 사이트 origin은 실제 로컬 주소로 지정한다. 비밀을 출력하지 않고 각 환경에서 카테고리/공개 캐시 버전의 읽기 전용 요청으로 연결을 확인한다.
 
-bootstrap의 mock Secret은 machine에서 무작위로 생성하고 출력하지 않는다. Production credential을 mock profile에 복사하지 않는다. `.env`, `.env.local`, `.env.development`, `.env.development.local` 같은 추가 파일은 doctor와 bootstrap이 거부한다. 로컬 Vercel 도구와 일회성 이미지 migration도 명시적으로 `.env.preview`를 사용한다.
+bootstrap의 mock Secret은 machine에서 무작위로 생성하고 출력하지 않는다. Production credential을 mock profile에 복사하지 않는다. `.env`, `.env.local`, `.env.development`, `.env.development.local` 같은 추가 파일은 doctor와 bootstrap이 거부한다. 일회성 아바타 migration(`migrate:legacy-member-avatars`)도 명시적으로 `.env.preview`를 사용한다.
 
 doctor는 Preview 설정의 필수 변수, URL과 secret 형식을 검사한다. Production 검증 helper는 별도로 mock 충돌과 운영 필수값을 검사한다. 환경 파일은 Node dotenv 파서로 읽으며 shell 명령이나 `$VAR` 확장을 실행하지 않는다. 명시적인 프로세스 환경변수는 선택 파일보다 우선한다.
 

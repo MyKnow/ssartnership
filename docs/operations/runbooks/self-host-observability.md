@@ -9,7 +9,7 @@ authority: normative
 
 범위와 전환 게이트는 [데이터 계획](../../specs/self-host-database/plan.md), 기존 백업/PITR은 [운영 복구](./self-host-operations.md)를 따른다. 아래 도구는 운영자의 SSH 권한에서만 실행하며 공개 관리 API가 아니다. 실제 실행 여부는 [작업 목록](../../specs/self-host-database/tasks.md)에 별도로 기록한다.
 
-2026-10-02 PVE 이전 뒤 현재 Production 백업 생성·수집은 VM 5200, 두 환경 공용 감시는 VM 5202가 소유한다. 두 infra origin은 익명 요청에 Basic 인증 401을 반환하며 Preview 관리 로그인 후 공용 dashboard로 이동한다. 구성은 `deploy/pve/`를 사용하며 아래의 같은 호스트 monitoring overlay와 별도 Preview dashboard 설명으로 현재 설정을 덮어쓰지 않는다. 최종 백업·Mac/PVE custody·격리 복원·신규 감시 이력 및 미검증 경계는 [PVE 이전 작업 목록](../../specs/pve-service-migration/tasks.md)에 기록한다.
+2026-10-02 PVE 이전 뒤 현재 Production 백업 생성·수집은 VM 5200, 두 환경 공용 감시는 VM 5202가 소유한다. 감시 구성의 정본은 `deploy/pve/`이며 공용 대시보드는 `deploy/pve/grafana/build-dashboard.mjs`로만 생성한다(UID `ssartnership-operations`). `deploy/observability/`는 telemetry 이미지·알림 전달 모듈 같은 PVE 런타임 소스와 게스트 VM 로컬 보조 구성을 담으며, 그 Grafana 대시보드는 정본과 겹치지 않도록 UID `ssartnership-guest-local`의 비정본 보조 화면으로 분리했다(RF-04). 게스트 감시 블록의 삭제 여부는 운영자 결정 사항이다. 두 infra origin은 익명 요청에 Basic 인증 401을 반환하며 Preview 관리 로그인 후 공용 dashboard로 이동한다. 구성은 `deploy/pve/`를 사용하며 아래의 같은 호스트 monitoring overlay와 별도 Preview dashboard 설명으로 현재 설정을 덮어쓰지 않는다. 최종 백업·Mac/PVE custody·격리 복원·신규 감시 이력 및 미검증 경계는 [PVE 이전 작업 목록](../../specs/pve-service-migration/tasks.md)에 기록한다.
 
 공용 [SSARTNERSHIP Operations 대시보드](https://ssartnership-infra.myknow.xyz/infra/grafana/d/ssartnership-operations/ssartnership-operations)는 `SSARTNERSHIP` 폴더에 등록된다. Grafana 관리자 사용자의 홈 대시보드는 UID `ssartnership-operations`로 지정했다. 홈 지정이 없으면 기본 홈에 운영 대시보드가 보이지 않을 수 있으므로, 위 직접 주소나 Dashboards의 해당 폴더에서 연다. [Preferences API](https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/api-legacy/preferences/)의 `PATCH /api/user/preferences`로 `homeDashboardUID`만 변경하며 다른 사용자 설정은 보존한다. 2026-10-02 후속 개편에서 46개 패널로 확장했고, 사용자 요청에 따라 로그인된 외부 Chrome에서 화면과 환경 필터를 검증했다. 내장 브라우저의 Basic 인증 차단은 서버 인증을 완화하지 않고 외부 브라우저로 해결했다.
 
@@ -158,7 +158,7 @@ private monitoring env의 `OPS_ALERT_WEBHOOK_URL`에 운영자가 지정한 HTTP
 
 클라이언트는 원본 경로를 8개 고정 화면 분류로 바꾼다. `/api/web-vitals`는 설정 origin, JSON content type, 512-byte 실제 body 한도, 프로세스당 분당 1200개 전역 제한과 strict schema를 적용한다. 회원/IP/세션 ID를 rate-limit 저장소에 쌓지 않는다. 추가 키·URL·metric ID·entries·비정상 수치는 거절한다. 내부 collector는 별도 token으로 인증하고 고정 histogram만 보관한다. 원본 event 저장소가 없고 Prometheus의 7일 보존 정책이 집계 데이터에 적용된다. 익명 클라이언트 수치는 위조 가능하므로 보안 감사나 과금 근거로 사용하지 않는다. 단일 app/collector 기준의 quota이며 다중 replica 도입 시 공유 ingress 제한이 필요하다.
 
-Vercel 배포의 기존 Analytics/SpeedInsights와 제품 이벤트는 유지한다. 자체 호스팅의 웹 성능 수집은 비활성 기본값이며 monitoring overlay에서 활성화한다. 공개 GET 설정에는 활성 여부와 샘플링 비율만 들어간다. 수집 실패는 사용자 화면의 오류로 표출하지 않지만 endpoint 실패와 운영 metric으로 점검한다.
+Vercel Analytics/SpeedInsights는 제거했고(RF-04) 브라우저 성능은 이 수집 경로와 [Web Vitals·Lighthouse 측정 절차](../../performance/measurements/web-vitals.md)로만 확인한다. 제품 이벤트는 그대로 유지한다. 자체 호스팅의 웹 성능 수집은 비활성 기본값이며 monitoring overlay에서 활성화한다. 공개 GET 설정에는 활성 여부와 샘플링 비율만 들어간다. 수집 실패는 사용자 화면의 오류로 표출하지 않지만 endpoint 실패와 운영 metric으로 점검한다.
 
 
 ## 복원된 원본 환경의 모니터링 경계
