@@ -16,14 +16,10 @@ import {
 } from "@/lib/project-showcase/validation";
 import { getSignedUserSession } from "@/lib/user-auth";
 import { logServerError } from "@/lib/server-log";
+import { readString } from "@/lib/form-data";
 
 const EVENT_PATH = `/events/${PROJECT_SHOWCASE_SLUG}`;
 const ADMIN_PATH = "/admin/events/project-showcase";
-
-function readString(formData: FormData, key: string) {
-  const value = formData.get(key);
-  return typeof value === "string" ? value.trim() : "";
-}
 
 function parseSubmissionForm(formData: FormData, requireImage: boolean) {
   return parseShowcaseProjectSubmission({

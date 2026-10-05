@@ -6,8 +6,7 @@ import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { GRADUATE_CERTIFICATES_BUCKET } from "@/lib/graduate-verification-storage";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { withServerTiming } from "@/lib/server-timing";
-
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+import { isUuidFormat } from "@/lib/uuid";
 
 export const runtime = "nodejs";
 
@@ -16,7 +15,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ req
     const denied = await timing.measure("auth", () => ensureAdminApiPermission(request, "graduate_verifications", "read"));
     if (denied) return denied;
     const { requestId } = await context.params;
-    if (!UUID_PATTERN.test(requestId)) {
+    if (!isUuidFormat(requestId)) {
       return NextResponse.json({ message: "잘못된 요청입니다." }, { status: 400 });
     }
     const supabase = getSupabaseAdminClient();

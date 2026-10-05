@@ -18,6 +18,7 @@ import {
   MattermostSenderUnavailableError,
   withActiveMattermostSenderForGeneration,
 } from "@/lib/mattermost-senders/service";
+import { isSixDigitCode } from "@/lib/validation";
 
 export type MattermostVerificationPurpose = "signup" | "reset_password";
 
@@ -315,7 +316,7 @@ export async function consumeMattermostVerificationCode(input: {
 }) {
   const challenge = typeof input.challenge === "string" ? input.challenge : "";
   const code = typeof input.code === "string" ? input.code.trim() : "";
-  if (!challenge || !/^\d{6}$/.test(code)) {
+  if (!challenge || !isSixDigitCode(code)) {
     return null;
   }
   const { data, error } = await getSupabaseAdminClient().rpc(

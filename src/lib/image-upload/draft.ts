@@ -1,3 +1,4 @@
+import { isUuid, isUuidFormat } from "@/lib/uuid";
 export const IMAGE_UPLOAD_DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
 
 export type ImageUploadDraftManifest = {
@@ -30,7 +31,6 @@ export type ImageUploadSubmissionKey = {
 };
 
 const SENSITIVE_KEY_PATTERN = /(password|certificate|secret|token|file)/i;
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function isImageUploadDraftValue(value: unknown): value is ImageUploadDraftValue {
   return value === null
@@ -122,7 +122,7 @@ export function createImageUploadSubmissionKey({
   id: string;
   now?: number;
 }): ImageUploadSubmissionKey {
-  if (!formKey.trim() || !UUID_PATTERN.test(id.trim())) {
+  if (!formKey.trim() || !isUuid(id)) {
     throw new Error("유효한 이미지 업로드 제출 키가 필요합니다.");
   }
   return {
@@ -144,7 +144,7 @@ export function readImageUploadSubmissionKey(
     || typeof key.formKey !== "string"
     || !key.formKey.trim()
     || typeof key.id !== "string"
-    || !UUID_PATTERN.test(key.id)
+    || !isUuidFormat(key.id)
     || typeof key.expiresAt !== "number"
     || key.expiresAt <= now
   ) {

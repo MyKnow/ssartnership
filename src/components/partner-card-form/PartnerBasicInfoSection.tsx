@@ -24,6 +24,7 @@ import type {
   PartnerCardFormField,
   PartnerCardFormValues,
 } from "@/components/partner-card-form/types";
+import { FOUR_DIGIT_PIN_LENGTH } from "@/lib/validation";
 
 export default function PartnerBasicInfoSection({
   partner,
@@ -282,12 +283,12 @@ export default function PartnerBasicInfoSection({
               type="password"
               inputMode="numeric"
               pattern="[0-9]{4}"
-              maxLength={4}
+              maxLength={FOUR_DIGIT_PIN_LENGTH}
               autoComplete="new-password"
               value={values.benefitVerificationPinValue}
               onChange={(event) =>
                 setters.setBenefitVerificationPinValue(
-                  event.target.value.replace(/\D/g, "").slice(0, 4),
+                  event.target.value.replace(/\D/g, "").slice(0, FOUR_DIGIT_PIN_LENGTH),
                 )
               }
               autoFocus={focusField === "benefitVerificationPin"}
@@ -371,7 +372,7 @@ export default function PartnerBasicInfoSection({
           />
           <p className="mt-2 text-xs leading-5 text-muted-foreground">
             상세 페이지에만 표시됩니다. 최대{" "}
-            {PARTNER_DETAIL_DESCRIPTION_MAX_LENGTH.toLocaleString()}자까지 입력할 수 있습니다.
+            {PARTNER_DETAIL_DESCRIPTION_MAX_LENGTH.toLocaleString("ko-KR")}자까지 입력할 수 있습니다.
           </p>
         </FieldGroup>
 

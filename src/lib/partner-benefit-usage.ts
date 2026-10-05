@@ -1,7 +1,7 @@
 import { getPartnerPeriodState } from "@/lib/partner-utils";
 import { getPartnerServiceMode } from "@/lib/partner-service-mode";
-
-const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+import { isFourDigitPin } from "@/lib/validation";
+import { getKstDateString } from "@/lib/datetime";
 
 // NULL means that the partner did not configure a business limit. The
 // database column remains an integer, so this is the physical upper bound
@@ -16,16 +16,8 @@ export type PartnerBenefitUsageAvailabilityInput = {
   now?: Date;
 };
 
-function getKstDateString(now: Date) {
-  const kst = new Date(now.getTime() + KST_OFFSET_MS);
-  const year = kst.getUTCFullYear();
-  const month = String(kst.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(kst.getUTCDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 export function isPartnerBenefitUsePin(value: unknown): value is string {
-  return typeof value === "string" && /^\d{4}$/.test(value);
+  return isFourDigitPin(value);
 }
 
 function parsePositiveInteger(value: unknown) {
@@ -94,7 +86,7 @@ export function isPartnerBenefitUseAvailable({
   }
 
   return (
-    getPartnerPeriodState(periodStart, periodEnd, getKstDateString(now)) ===
+    getPartnerPeriodState(periodStart, periodEnd, getKstDateString(0, now)) ===
     "active"
   );
 }

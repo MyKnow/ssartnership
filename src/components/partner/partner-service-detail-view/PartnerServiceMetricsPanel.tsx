@@ -11,10 +11,7 @@ import {
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
 import type { PartnerReviewSummary } from "@/lib/partner-reviews";
-
-function formatCount(value: number) {
-  return value.toLocaleString("ko-KR");
-}
+import { formatCount } from "@/lib/number-format";
 
 export default function PartnerServiceMetricsPanel({
   metrics,

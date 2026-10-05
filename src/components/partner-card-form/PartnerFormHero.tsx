@@ -7,6 +7,7 @@ import {
   getPartnerVisibilityState,
 } from "@/lib/partner-visibility";
 import type { PartnerCardFormMode } from "@/components/partner-card-form/types";
+import type { PartnerVisibility } from "@/lib/types";
 
 export default function PartnerFormHero({
   mode,
@@ -15,7 +16,7 @@ export default function PartnerFormHero({
   periodEnd,
 }: {
   mode: PartnerCardFormMode;
-  visibilityValue: "public" | "confidential" | "private";
+  visibilityValue: PartnerVisibility;
   periodStart: string;
   periodEnd: string;
 }) {

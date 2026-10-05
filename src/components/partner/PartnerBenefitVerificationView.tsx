@@ -12,6 +12,7 @@ import {
 import { getProductSessionId } from "@/lib/product-events";
 import { createClientUuid } from "@/lib/client-uuid";
 import type { CohortCardTheme } from "@/lib/cohort-card-themes";
+import { isFourDigitPin } from "@/lib/validation";
 
 type VerificationMember = {
   mattermostUsername?: string | null;
@@ -58,7 +59,7 @@ export default function PartnerBenefitVerificationView({
   } | null>(null);
 
   async function confirmBenefitUse() {
-    if (!/^\d{4}$/.test(pin)) {
+    if (!isFourDigitPin(pin)) {
       setMessage({
         tone: "error",
         text: "제휴처 확인 PIN은 숫자 4자리로 입력해 주세요.",

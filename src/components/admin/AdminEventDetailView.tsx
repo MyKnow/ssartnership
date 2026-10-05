@@ -11,6 +11,7 @@ import StatsRow from "@/components/ui/StatsRow";
 import Surface from "@/components/ui/Surface";
 import type { EventCampaign } from "@/lib/promotions/catalog";
 import type { ManagedEventCampaign } from "@/lib/promotions/events";
+import { formatKoreanMonthDayTime } from "@/lib/datetime";
 
 type FormAction = (formData: FormData) => Promise<void>;
 
@@ -63,17 +64,7 @@ async function DeferredRewardContent({
 }
 
 function formatEventDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  return formatKoreanMonthDayTime(value) || value;
 }
 
 export default function AdminEventDetailView({

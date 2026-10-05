@@ -11,7 +11,7 @@ import {
   createCategory,
   updateCategory,
 } from "@/app/admin/(protected)/actions";
-import { adminActionErrorMessages } from "@/lib/admin-action-errors";
+import { getAdminActionErrorMessage } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { canAdmin } from "@/lib/admin-permissions";
 import { getAdminCategoryReadModel } from "@/lib/admin-category-read-model.server";
@@ -29,9 +29,7 @@ async function AdminCategoriesContent({
   params: { error?: string };
   showHeader?: boolean;
 }) {
-  const errorMessage = params.error
-    ? adminActionErrorMessages[params.error] ?? null
-    : null;
+  const errorMessage = getAdminActionErrorMessage(params.error);
   const categoryReadModel = await getAdminCategoryReadModel();
   const { categories, usageCountById } = categoryReadModel;
   const describedCount = categories.filter((category) =>

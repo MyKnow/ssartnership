@@ -14,6 +14,7 @@ import {
   type DirectMemberCreateFormState,
 } from "@/lib/member-direct-create";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
+import { firstInvalidField } from "@/lib/field-errors";
 
 const FIELD_ORDER: DirectMemberCreateField[] = [
   "loginId",
@@ -23,10 +24,6 @@ const FIELD_ORDER: DirectMemberCreateField[] = [
   "temporaryPassword",
   "temporaryPasswordConfirmation",
 ];
-
-function getFirstInvalidField(fieldErrors: DirectMemberCreateFieldErrors) {
-  return FIELD_ORDER.find((field) => Boolean(fieldErrors[field]));
-}
 
 export default function AdminMemberDirectCreatePanel({
   action,
@@ -80,7 +77,7 @@ export default function AdminMemberDirectCreatePanel({
       return;
     }
     const nextFieldErrors = state.fieldErrors ?? {};
-    focusField(fieldRefs[getFirstInvalidField(nextFieldErrors) ?? "loginId"]);
+    focusField(fieldRefs[firstInvalidField(nextFieldErrors, FIELD_ORDER) ?? "loginId"]);
   }, [state, fieldRefs]);
 
   function clearFieldError(field: DirectMemberCreateField) {
@@ -113,7 +110,7 @@ export default function AdminMemberDirectCreatePanel({
           event.preventDefault();
           setClientFieldErrors(validation.fieldErrors);
           setEditedFields({});
-          focusField(fieldRefs[getFirstInvalidField(validation.fieldErrors) ?? "loginId"]);
+          focusField(fieldRefs[firstInvalidField(validation.fieldErrors, FIELD_ORDER) ?? "loginId"]);
         }}
       >
         <div className="grid gap-4 sm:grid-cols-2">

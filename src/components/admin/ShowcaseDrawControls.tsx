@@ -18,7 +18,7 @@ import {
   type ShowcaseCandidateGroup,
   type ShowcaseVoidReason,
 } from "@/lib/project-showcase/types";
-import { parseShowcaseExclusionReason } from "@/lib/project-showcase/validation";
+import { parseShowcaseExclusionReason, SHOWCASE_PROJECT_LIMITS } from "@/lib/project-showcase/validation";
 
 type ActionResult = { ok: boolean; message: string };
 
@@ -89,7 +89,7 @@ export function ShowcaseCandidateExclusionControl({
       <input
         ref={reasonRef}
         id={`showcase-exclude-${targetId}`}
-        maxLength={500}
+        maxLength={SHOWCASE_PROJECT_LIMITS.exclusionReasonMax}
         disabled={disabled}
         placeholder="제외 사유 (외부인, 중복 계정, 허위 기록 등)"
         className="min-h-9 min-w-0 rounded-lg border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"

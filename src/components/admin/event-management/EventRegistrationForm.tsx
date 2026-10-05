@@ -7,23 +7,7 @@ import {
   type EventCampaign,
   type PromotionAudience,
 } from "@/lib/promotions/catalog";
-
-function toDateTimeLocal(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-  const formatter = new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-  return formatter.format(date).replace(" ", "T");
-}
+import { formatKoreanDateTimeLocalValue } from "@/lib/datetime";
 
 function FieldLabel({
   label,
@@ -58,8 +42,8 @@ export default function EventRegistrationForm({
   submitLabel: string;
 }) {
   const isRegistered = Boolean(registration?.id);
-  const startsAt = toDateTimeLocal(registration?.startsAt ?? definition.startsAt);
-  const endsAt = toDateTimeLocal(registration?.endsAt ?? definition.endsAt);
+  const startsAt = formatKoreanDateTimeLocalValue(registration?.startsAt ?? definition.startsAt);
+  const endsAt = formatKoreanDateTimeLocalValue(registration?.endsAt ?? definition.endsAt);
   const audiences = getDefaultAudiences(registration);
   const pagePath = registration?.pagePath ?? `/events/${definition.slug}`;
 

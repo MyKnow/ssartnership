@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+import { adminPartnerCouponErrorMessages } from "@/lib/admin-action-errors";
+
 test("쿠폰 다운로드와 관리자 CRUD 버튼은 제출 중 상태를 표시한다", async () => {
   const [detail, form, manager, actions, partnerDetail] = await Promise.all([
     readFile(new URL("../src/app/(site)/partners/[id]/_page/PartnerDetailCoupons.tsx", import.meta.url), "utf8"),
@@ -36,10 +38,15 @@ test("쿠폰 다운로드와 관리자 CRUD 버튼은 제출 중 상태를 표�
   assert.match(actions, /ad_coupon_create_failed/);
   assert.match(actions, /ad_coupon_update_failed/);
   assert.match(actions, /ad_coupon_duplicate_failed/);
-  assert.match(partnerDetail, /ad_coupon_delete_has_history/);
-  assert.match(partnerDetail, /ad_coupon_create_failed/);
-  assert.match(partnerDetail, /ad_coupon_update_failed/);
-  assert.match(partnerDetail, /ad_coupon_duplicate_failed/);
+  assert.match(partnerDetail, /pickAllowedEntry<string>\(\s*adminPartnerCouponErrorMessages,/);
+  for (const code of [
+    "ad_coupon_delete_has_history",
+    "ad_coupon_create_failed",
+    "ad_coupon_update_failed",
+    "ad_coupon_duplicate_failed",
+  ]) {
+    assert.ok(Object.hasOwn(adminPartnerCouponErrorMessages, code), code);
+  }
   assert.doesNotMatch(manager, /제휴처를 바꾸지 않고 현재 상세 페이지의 쿠폰만 등록합니다/);
   assert.doesNotMatch(form, /from "@\/components\/ui\/Card"/);
 });

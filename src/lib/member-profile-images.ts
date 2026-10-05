@@ -2,10 +2,14 @@ import { randomUUID } from "node:crypto";
 import net from "node:net";
 import { cache } from "react";
 import { fetchPublicImage, isPublicIpAddress } from "@/lib/image-proxy";
-import { MAX_GRADUATE_PROFILE_IMAGE_BYTES } from "@/lib/graduate-verification";
+import {
+  MAX_GRADUATE_PROFILE_IMAGE_BYTES,
+  type MemberProfileImageStatus,
+} from "@/lib/graduate-verification";
 import { normalizeMattermostProfileImage } from "@/lib/graduate-verification-files";
 import { storeMemberProfileImage } from "@/lib/graduate-verification-storage";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-photo";
 import { sanitizeHttpUrl } from "@/lib/validation";
 import { IMAGE_SOURCE_MIME_TYPES } from "@/lib/image-upload/policy";
 import {
@@ -16,15 +20,15 @@ import {
 
 const ALLOWED_IMAGE_CONTENT_TYPES = new Set<string>(IMAGE_SOURCE_MIME_TYPES);
 
-const REVIEWABLE_IMAGE_STATUSES = ["pending", "approved", "rejected"] as const;
+const REVIEWABLE_IMAGE_STATUSES = [
+  "pending",
+  "approved",
+  "rejected",
+] as const satisfies readonly MemberProfileImageStatus[];
 const MAX_MEMBER_PROFILE_IMAGE_URL_LENGTH = 2_000;
 
 export const MAX_MEMBER_PROFILE_IMAGE_SOURCE_BYTES =
   MAX_GRADUATE_PROFILE_IMAGE_BYTES;
-
-type MemberProfileImageStatus =
-  | (typeof REVIEWABLE_IMAGE_STATUSES)[number]
-  | "superseded";
 
 type ExistingProfileImage = {
   id: string;
@@ -45,11 +49,6 @@ type MemberProfileImageRow = {
 };
 
 export type MemberProfileImageSource = "legacy" | "mattermost";
-export type MemberProfilePhotoReviewStatus =
-  | "missing"
-  | "approved"
-  | "pending"
-  | "rejected";
 type StoredMemberProfilePhotoReviewStatus = Exclude<
   MemberProfilePhotoReviewStatus,
   "missing"

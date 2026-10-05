@@ -3,6 +3,8 @@ import {
   type ReviewMediaManifest,
   type ReviewMediaManifestEntry,
 } from "@/lib/review-media";
+import { isUuidFormat } from "@/lib/uuid";
+import { hasFieldErrors } from "@/lib/field-errors";
 
 export type ReviewFieldName = "rating" | "title" | "body" | "images";
 
@@ -33,8 +35,6 @@ export type ReviewSubmissionParseResult =
       fieldErrors: ReviewFieldErrors;
     };
 
-const REVIEW_ID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const INVALID_REVIEW_MEDIA_MESSAGE = "리뷰 사진 형식을 확인해 주세요.";
 
 function asRecord(value: unknown) {
@@ -45,7 +45,7 @@ function asRecord(value: unknown) {
 
 function normalizeReviewId(value: unknown) {
   const reviewId = typeof value === "string" ? value.trim() : "";
-  return REVIEW_ID_PATTERN.test(reviewId) ? reviewId : null;
+  return isUuidFormat(reviewId) ? reviewId : null;
 }
 
 export function normalizeReviewDraftInput(input: {
@@ -60,6 +60,17 @@ export function normalizeReviewDraftInput(input: {
   };
 }
 
+/**
+ * 리뷰 입력 규칙. 회원 작성 폼·리뷰 API(작성/수정)·관리자 수정 폼과 관리자 액션이 함께 참조한다.
+ * 관리자 수정은 운영상 축약이 필요할 수 있어 상한만 강제한다.
+ */
+export const REVIEW_TEXT_LIMITS = {
+  titleMax: 80,
+  bodyMin: 10,
+  bodyMax: 2000,
+  imagesMax: 5,
+} as const;
+
 export function validateReviewDraftInput(input: {
   rating: number;
   title: string;
@@ -73,18 +84,18 @@ export function validateReviewDraftInput(input: {
   }
   if (!input.title) {
     fieldErrors.title = "제목을 입력해 주세요.";
-  } else if (input.title.length > 80) {
-    fieldErrors.title = "제목은 80자 이내로 입력해 주세요.";
+  } else if (input.title.length > REVIEW_TEXT_LIMITS.titleMax) {
+    fieldErrors.title = `제목은 ${REVIEW_TEXT_LIMITS.titleMax}자 이내로 입력해 주세요.`;
   }
   if (!input.body) {
     fieldErrors.body = "리뷰 내용을 입력해 주세요.";
-  } else if (input.body.length < 10) {
-    fieldErrors.body = "리뷰 내용은 10자 이상 입력해 주세요.";
-  } else if (input.body.length > 2000) {
-    fieldErrors.body = "리뷰 내용은 2000자 이내로 입력해 주세요.";
+  } else if (input.body.length < REVIEW_TEXT_LIMITS.bodyMin) {
+    fieldErrors.body = `리뷰 내용은 ${REVIEW_TEXT_LIMITS.bodyMin}자 이상 입력해 주세요.`;
+  } else if (input.body.length > REVIEW_TEXT_LIMITS.bodyMax) {
+    fieldErrors.body = `리뷰 내용은 ${REVIEW_TEXT_LIMITS.bodyMax}자 이내로 입력해 주세요.`;
   }
-  if ((input.imageCount ?? 0) > 5) {
-    fieldErrors.images = "리뷰 사진은 최대 5장까지 업로드할 수 있습니다.";
+  if ((input.imageCount ?? 0) > REVIEW_TEXT_LIMITS.imagesMax) {
+    fieldErrors.images = `리뷰 사진은 최대 ${REVIEW_TEXT_LIMITS.imagesMax}장까지 업로드할 수 있습니다.`;
   }
 
   return fieldErrors;
@@ -133,7 +144,7 @@ export function parseReviewSubmissionRequest(
     ...normalized,
     imageCount: imagesManifest.images.length,
   });
-  if (Object.keys(fieldErrors).length > 0) {
+  if (hasFieldErrors(fieldErrors)) {
     return { ok: false, reason: "invalid_fields", fieldErrors };
   }
 

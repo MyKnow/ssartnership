@@ -4,6 +4,7 @@ import {
   EmailProviderError,
 } from "@/lib/email-delivery";
 import { SmtpConfigError } from "@/lib/smtp";
+import { isUuidFormat } from "@/lib/uuid";
 
 export const GRADUATE_EMAIL_DELIVERY_ERROR_CODES = [
   "smtp_missing_env",
@@ -35,8 +36,6 @@ export type GraduateEmailDeliveryDiagnostic = Readonly<{
 
 type BestEffortTask = () => unknown | Promise<unknown>;
 
-const REQUEST_ID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SMTP_CONNECTION_ERROR_CODES = new Set([
   "EAI_AGAIN",
   "ECONNECTION",
@@ -147,7 +146,7 @@ export function getGraduateEmailDeliveryDiagnostic(
 ): GraduateEmailDeliveryDiagnostic {
   return {
     requestId:
-      typeof requestId === "string" && REQUEST_ID_PATTERN.test(requestId)
+      typeof requestId === "string" && isUuidFormat(requestId)
         ? requestId
         : null,
     errorCode: classifyGraduateEmailDeliveryError(error),

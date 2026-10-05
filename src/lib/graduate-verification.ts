@@ -1,5 +1,6 @@
 import { isValidEmail } from "@/lib/validation";
 import { CAMPUS_DIRECTORY } from "@/lib/campuses";
+import { getSeoulDateParts } from "@/lib/ssafy-year";
 
 export const GRADUATE_COHORT_RULE_VERSION = "ssafy-half-year-v1" as const;
 
@@ -96,15 +97,17 @@ const TRANSITIONS: Record<GraduateVerificationStatus, readonly GraduateVerificat
 const RESUBMISSION_TARGET_SET = new Set<string>(GRADUATE_RESUBMISSION_TARGETS);
 const GRADUATE_CAMPUS_SET = new Set<string>(GRADUATE_CAMPUS_OPTIONS);
 
-/** Returns selectable SSAFY generations, newest first. */
+/**
+ * Returns selectable SSAFY generations, newest first (1..current).
+ * The half-year boundary is evaluated on the Asia/Seoul calendar so a UTC
+ * server or a browser abroad shows the same options as Korea at midnight.
+ */
 export function getGraduateGenerationOptions(now = new Date()) {
-  if (now.getFullYear() === 2018 && now.getMonth() === 11) return [1];
+  const { year, month } = getSeoulDateParts(now);
+  if (year === 2018 && month === 12) return [1];
   const currentGeneration = Math.min(
     99,
-    Math.max(
-      0,
-      (now.getFullYear() - 2019) * 2 + (now.getMonth() + 1 >= 7 ? 2 : 1),
-    ),
+    Math.max(0, (year - 2019) * 2 + (month >= 7 ? 2 : 1)),
   );
   return Array.from({ length: currentGeneration }, (_, index) => currentGeneration - index);
 }
@@ -146,9 +149,16 @@ export function normalizeGraduateDocumentNumber(value: string) {
     .replace(/[\s-]+/g, "");
 }
 
+/** 수료증 문서 번호 길이 상한. 관리자 승인 입력 `maxLength`와 서버 검증이 함께 참조한다. */
+export const GRADUATE_DOCUMENT_NUMBER_MAX_LENGTH = 160;
+const GRADUATE_DOCUMENT_NUMBER_PATTERN = new RegExp(
+  `^[\\p{L}\\p{N}._/]{3,${GRADUATE_DOCUMENT_NUMBER_MAX_LENGTH}}$`,
+  "u",
+);
+
 export function validateGraduateDocumentNumber(value: string) {
   const normalized = normalizeGraduateDocumentNumber(value);
-  if (!/^[\p{L}\p{N}._/]{3,160}$/u.test(normalized)) {
+  if (!GRADUATE_DOCUMENT_NUMBER_PATTERN.test(normalized)) {
     return null;
   }
   return normalized;

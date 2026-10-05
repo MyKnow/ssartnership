@@ -7,10 +7,10 @@ import type {
   AdminMemberPolicyEvent,
   AdminMemberPolicyState,
 } from "@/lib/admin-member-detail";
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import { formatOptionalKoreanDateTimeToMinute } from "@/lib/datetime";
 
 function formatDate(value: string | null) {
-  return value ? formatKoreanDateTimeToMinute(value) : "-";
+  return formatOptionalKoreanDateTimeToMinute(value, "-");
 }
 
 function PreferenceItem({

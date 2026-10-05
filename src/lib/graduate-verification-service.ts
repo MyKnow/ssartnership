@@ -37,6 +37,7 @@ import { generateOpaqueToken, hashOpaqueToken } from "@/lib/password";
 import { hasReservedMemberIdentifier } from "@/lib/member-identifier-reservations";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { expectNoError } from "@/lib/expect-no-error";
+import { ADMIN_REVIEW_NOTE_MAX_LENGTH } from "@/lib/admin-review-queue";
 
 type GraduateChallengeRow = {
   id: string;
@@ -680,8 +681,8 @@ export async function requestGraduateVerificationResubmission(input: {
 }) {
   const targets = getGraduateResubmissionTargets(input.targets);
   const note = input.note?.trim() || null;
-  if (note && note.length > 500) {
-    throw new Error("보완 요청 사유는 500자 이하로 입력해 주세요.");
+  if (note && note.length > ADMIN_REVIEW_NOTE_MAX_LENGTH) {
+    throw new Error(`보완 요청 사유는 ${ADMIN_REVIEW_NOTE_MAX_LENGTH}자 이하로 입력해 주세요.`);
   }
   await markGraduateVerificationInReview({
     requestId: input.requestId,
@@ -987,8 +988,8 @@ export async function rejectGraduateVerificationRequest(input: {
   reason: string;
 }) {
   const reason = input.reason.trim();
-  if (!reason || reason.length > 500) {
-    throw new Error("반려 사유를 1~500자로 입력해 주세요.");
+  if (!reason || reason.length > ADMIN_REVIEW_NOTE_MAX_LENGTH) {
+    throw new Error(`반려 사유를 1~${ADMIN_REVIEW_NOTE_MAX_LENGTH}자로 입력해 주세요.`);
   }
   await markGraduateVerificationInReview({
     requestId: input.requestId,
@@ -1074,8 +1075,8 @@ export async function rejectMemberProfileImageReplacement(input: {
   reason: string;
 }) {
   const reason = input.reason.trim();
-  if (!reason || reason.length > 500) {
-    throw new Error("반려 사유를 1~500자로 입력해 주세요.");
+  if (!reason || reason.length > ADMIN_REVIEW_NOTE_MAX_LENGTH) {
+    throw new Error(`반려 사유를 1~${ADMIN_REVIEW_NOTE_MAX_LENGTH}자로 입력해 주세요.`);
   }
   const { data, error } = await getSupabaseAdminClient().rpc(
     "reject_member_profile_image_replacement",
@@ -1097,8 +1098,8 @@ export async function rejectMemberActiveProfilePhoto(input: {
   reason: string;
 }) {
   const reason = input.reason.trim();
-  if (!reason || reason.length > 500) {
-    throw new Error("반려 사유는 1~500자로 입력해 주세요.");
+  if (!reason || reason.length > ADMIN_REVIEW_NOTE_MAX_LENGTH) {
+    throw new Error(`반려 사유는 1~${ADMIN_REVIEW_NOTE_MAX_LENGTH}자로 입력해 주세요.`);
   }
   const { data, error } = await getSupabaseAdminClient().rpc(
     "reject_member_active_profile_photo",

@@ -19,17 +19,9 @@ import {
 } from "@/lib/ad-package-validation";
 import type { AdCampaignWithStats, AdCoupon } from "@/lib/repositories/ad-package-repository";
 import { cn } from "@/lib/cn";
+import { FOUR_DIGIT_PIN_LENGTH } from "@/lib/validation";
 
 type ServerAction = (formData: FormData) => void | Promise<void>;
-
-function toDateTimeLocal(date: Date) {
-  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
-  return kst.toISOString().slice(0, 16);
-}
-
-function formatDateTimeLocal(value: string) {
-  return toDateTimeLocal(new Date(value));
-}
 
 function FieldLabel({
   children,
@@ -68,12 +60,12 @@ function FormSection({
 function getDefaultValues(coupon?: AdCoupon, partnerPeriodEnd?: string | null) {
   if (coupon) {
     return {
-      startsAt: formatDateTimeLocal(coupon.startsAt),
-      endsAt: formatDateTimeLocal(coupon.endsAt),
-      downloadStartsAt: formatDateTimeLocal(coupon.downloadStartsAt),
-      downloadEndsAt: formatDateTimeLocal(coupon.downloadEndsAt),
-      usageStartsAt: formatDateTimeLocal(coupon.usageStartsAt),
-      usageEndsAt: formatDateTimeLocal(coupon.usageEndsAt),
+      startsAt: toDateTimeLocalInput(coupon.startsAt),
+      endsAt: toDateTimeLocalInput(coupon.endsAt),
+      downloadStartsAt: toDateTimeLocalInput(coupon.downloadStartsAt),
+      downloadEndsAt: toDateTimeLocalInput(coupon.downloadEndsAt),
+      usageStartsAt: toDateTimeLocalInput(coupon.usageStartsAt),
+      usageEndsAt: toDateTimeLocalInput(coupon.usageEndsAt),
       campaignId: coupon.campaignId ?? "",
       title: coupon.title,
       discountLabel: coupon.discountLabel,
@@ -96,7 +88,7 @@ function getDefaultValues(coupon?: AdCoupon, partnerPeriodEnd?: string | null) {
   }
 
   const now = new Date();
-  const startsAt = toDateTimeLocal(now);
+  const startsAt = toDateTimeLocalInput(now.toISOString());
   const endsAt = toDateTimeLocalInput(getPartnerPeriodEndAt(partnerPeriodEnd));
   return {
     startsAt,
@@ -302,7 +294,7 @@ export default function AdminPartnerCouponForm({
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]{4}"
-                    maxLength={4}
+                    maxLength={FOUR_DIGIT_PIN_LENGTH}
                     autoComplete="off"
                     required={mode === "create"}
                     placeholder={mode === "edit" ? "변경 시 4자리 입력" : "4자리 숫자 입력"}

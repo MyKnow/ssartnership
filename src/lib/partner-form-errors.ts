@@ -1,5 +1,7 @@
-export const partnerFormErrorMessages: Record<string, string> = {
+export const partnerFormErrorMessages = {
   partner_form_missing_required: "제휴처명, 카테고리, 지점 위치를 입력해 주세요.",
+  partner_form_invalid_submission:
+    "제출 정보를 확인하지 못했습니다. 화면을 새로고침한 뒤 다시 시도해 주세요.",
   partner_form_missing_name: "제휴처명을 입력해 주세요.",
   partner_form_missing_category: "카테고리를 선택해 주세요.",
   partner_form_missing_location: "위치를 입력해 주세요.",
@@ -23,4 +25,7 @@ export const partnerFormErrorMessages: Record<string, string> = {
   partner_company_missing_email: "담당자 이메일을 입력해 주세요.",
   partner_company_invalid_email: "담당자 이메일 형식이 올바르지 않습니다.",
   partner_company_invalid_request: "파트너사 입력값을 확인해 주세요.",
-};
+} as const satisfies Record<string, string>;
+
+/** 제휴처 폼 검증이 쓰는 `?error=`·필드 오류 코드. */
+export type PartnerFormErrorCode = keyof typeof partnerFormErrorMessages;

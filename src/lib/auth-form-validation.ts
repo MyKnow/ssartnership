@@ -1,19 +1,13 @@
 import { PASSWORD_POLICY_MESSAGE, validatePasswordPolicy } from "@/lib/validation";
+import { firstInvalidField, hasFieldErrors, type FieldErrors } from "@/lib/field-errors";
 
 export type AuthPasswordPairField = "password" | "confirmPassword";
 export type AuthPasswordChangeField = "currentPassword" | "nextPassword";
 
 export type AuthFieldValidationResult<Field extends string> = {
-  fieldErrors: Partial<Record<Field, string>>;
+  fieldErrors: FieldErrors<Field>;
   firstInvalidField: Field | null;
 };
-
-function firstFieldWithError<Field extends string>(
-  fieldErrors: Partial<Record<Field, string>>,
-  order: Field[],
-) {
-  return order.find((field) => Boolean(fieldErrors[field])) ?? null;
-}
 
 export function validateAuthPasswordPairDraft({
   password,
@@ -33,10 +27,10 @@ export function validateAuthPasswordPairDraft({
   if (!confirmPassword) {
     fieldErrors.confirmPassword = "비밀번호 확인을 입력해 주세요.";
   }
-  if (Object.keys(fieldErrors).length > 0) {
+  if (hasFieldErrors(fieldErrors)) {
     return {
       fieldErrors,
-      firstInvalidField: firstFieldWithError(fieldErrors, [
+      firstInvalidField: firstInvalidField(fieldErrors, [
         "password",
         "confirmPassword",
       ]),
@@ -60,7 +54,7 @@ export function validateAuthPasswordPairDraft({
 
   return {
     fieldErrors,
-    firstInvalidField: firstFieldWithError(fieldErrors, [
+    firstInvalidField: firstInvalidField(fieldErrors, [
       "password",
       "confirmPassword",
     ]),
@@ -94,7 +88,7 @@ export function validateAuthPasswordChangeDraft({
 
   return {
     fieldErrors,
-    firstInvalidField: firstFieldWithError(fieldErrors, [
+    firstInvalidField: firstInvalidField(fieldErrors, [
       "currentPassword",
       "nextPassword",
     ]),

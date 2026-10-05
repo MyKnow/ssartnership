@@ -567,7 +567,7 @@ export function validatePartnerRegistrationInput(
     number,
   ][]) {
     if (values[fieldName].length > maxLength) {
-      fieldErrors[fieldName] = `${maxLength.toLocaleString()}자 이하로 입력해 주세요.`;
+      fieldErrors[fieldName] = `${maxLength.toLocaleString("ko-KR")}자 이하로 입력해 주세요.`;
     }
   }
 

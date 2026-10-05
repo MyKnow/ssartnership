@@ -9,6 +9,8 @@ import {
   recordPartnerBenefitUsage,
 } from "@/lib/partner-benefit-usage-service";
 import { buildPartnerBenefitUseLogProperties } from "@/lib/partner-benefit-use-logging";
+import { isUuidFormat } from "@/lib/uuid";
+import { isFourDigitPin } from "@/lib/validation";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
 import {
@@ -21,9 +23,6 @@ import { readRouteParam } from "@/lib/route-params";
 import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
-
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type BenefitUseRequestBody = {
   benefitId?: unknown;
@@ -172,7 +171,7 @@ export async function POST(
   const { session } = auth;
 
   const partnerId = readRouteParam((await params).id);
-  if (!UUID_PATTERN.test(partnerId) && !(isMockDataSource() && isSafeMockPartnerId(partnerId))) {
+  if (!isUuidFormat(partnerId) && !(isMockDataSource() && isSafeMockPartnerId(partnerId))) {
     return NextResponse.json({ ok: false, message: "제휴처 정보를 확인할 수 없습니다." }, { status: 400 });
   }
 
@@ -223,7 +222,7 @@ export async function POST(
     });
     return NextResponse.json({ ok: false, message: "혜택 정보를 확인해 주세요." }, { status: 400 });
   }
-  if (typeof body.pin !== "string" || !/^\d{4}$/.test(body.pin)) {
+  if (!isFourDigitPin(body.pin)) {
     scheduleAttemptLog(context, {
       actorId: session.userId,
       partnerId,
@@ -235,7 +234,7 @@ export async function POST(
     });
     return NextResponse.json({ ok: false, message: "제휴처 확인 PIN은 숫자 4자리로 입력해 주세요." }, { status: 400 });
   }
-  if (typeof body.idempotencyKey !== "string" || !UUID_PATTERN.test(body.idempotencyKey)) {
+  if (!isUuidFormat(body.idempotencyKey)) {
     scheduleAttemptLog(context, {
       actorId: session.userId,
       partnerId,

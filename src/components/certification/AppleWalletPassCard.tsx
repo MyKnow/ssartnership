@@ -7,6 +7,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import { cn } from "@/lib/cn";
+import { formatKoreanDateTime } from "@/lib/datetime";
 
 export type AppleWalletPassStatus =
   | "not_issued"
@@ -94,18 +95,16 @@ const STATUS_CONFIG: Record<AppleWalletPassStatus, StatusConfig> = {
 };
 
 function formatIssuedAt(value: string) {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
-  return new Intl.DateTimeFormat("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(parsed);
+  return (
+    formatKoreanDateTime(value, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }) || null
+  );
 }
 
 function buildPrimaryButtonLabel(status: AppleWalletPassStatus) {

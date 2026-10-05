@@ -11,6 +11,7 @@ import { cn } from "@/lib/cn";
 import type { PartnerPlanUpgradeCharge } from "@/lib/partner-billing";
 import type { PartnerBillingProfileRecord } from "@/lib/partner-billing-profiles";
 import type { PartnerBankTransferAccount } from "@/lib/partner-billing-config";
+import { PARTNER_PLAN_UPGRADE_MEMO_MAX_LENGTH } from "@/lib/partner-plan-upgrades";
 import type {
   PartnerCompanyPlanDefinition,
   PartnerCompanyPlanTier,
@@ -290,7 +291,7 @@ export default function PartnerPlanUpgradeForm({
         <Textarea
           name="memo"
           rows={3}
-          maxLength={1000}
+          maxLength={PARTNER_PLAN_UPGRADE_MEMO_MAX_LENGTH}
           placeholder="입금 일시, 계약 조건, 세금계산서 요청 등"
         />
       </label>

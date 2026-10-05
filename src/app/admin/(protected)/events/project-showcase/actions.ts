@@ -23,19 +23,16 @@ import {
   parseShowcaseAdminProjectSubmission,
   parseShowcaseSchedule,
   SHOWCASE_SCHEDULE_FIELDS,
+  SHOWCASE_PROJECT_LIMITS,
 } from "@/lib/project-showcase/validation";
 import { removeShowcaseProjectImages } from "@/lib/project-showcase/storage.server";
 import { isUuid } from "@/lib/uuid";
 import { toDrawAuditLogProperties } from "@/lib/draw-audit";
 import { logServerError } from "@/lib/server-log";
+import { readString } from "@/lib/form-data";
 
 const EVENT_PATH = `/events/${PROJECT_SHOWCASE_SLUG}`;
 const ADMIN_PATH = "/admin/events/project-showcase";
-
-function readString(formData: FormData, key: string) {
-  const value = formData.get(key);
-  return typeof value === "string" ? value.trim() : "";
-}
 
 function isShowcaseAdminRecordId(value: string) {
   return isUuid(value) || (process.env.NEXT_PUBLIC_DATA_SOURCE === "mock" && /^[a-z0-9-]{1,128}$/iu.test(value));
@@ -182,7 +179,11 @@ function revalidateAdminProject(projectId?: string) {
 
 export async function searchShowcaseAdminOwners(query: unknown) {
   await requireAdminPermission("events", "create", { path: `${ADMIN_PATH}/projects/new` });
-  if (typeof query !== "string" || query.trim().length < 2 || query.trim().length > 50) {
+  if (
+    typeof query !== "string"
+    || query.trim().length < SHOWCASE_PROJECT_LIMITS.ownerSearchMin
+    || query.trim().length > SHOWCASE_PROJECT_LIMITS.ownerSearchMax
+  ) {
     return { ok: true as const, owners: [] };
   }
   try {

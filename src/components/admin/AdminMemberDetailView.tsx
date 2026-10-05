@@ -15,8 +15,8 @@ import type {
   AdminMemberPolicyEvent,
   AdminMemberPolicyState,
 } from "@/lib/admin-member-detail";
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
-import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-images";
+import { formatOptionalKoreanDateTimeToMinute } from "@/lib/datetime";
+import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-photo";
 import type { MemberEmailLoginTransition } from "@/lib/member-email-login-transition";
 
 type FormAction = (formData: FormData) => void | Promise<void>;
@@ -73,7 +73,7 @@ export type AdminMemberDetailViewProps = {
 };
 
 function formatDate(value: string | null) {
-  return value ? formatKoreanDateTimeToMinute(value) : "-";
+  return formatOptionalKoreanDateTimeToMinute(value, "-");
 }
 
 export default function AdminMemberDetailView({

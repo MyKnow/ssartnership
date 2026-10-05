@@ -11,6 +11,7 @@ import {
   buildAdminMutationAuditProperties,
   type AdminMutationAuditOutcome,
 } from "@/lib/admin-mutation-audit";
+import { type AdminRedirectErrorCode, type DynamicAdminActionErrorCode } from "@/lib/admin-action-errors";
 
 export async function logAdminAction(
   action: Parameters<typeof logAdminAudit>[0]["action"],
@@ -137,9 +138,13 @@ export function revalidateCyclePaths() {
   revalidatePath("/certification");
 }
 
+/**
+ * 관리자 server action 실패를 `?error=<code>`로 돌려보낸다(쿼리 규약은 docs 참고).
+ * `code`는 메시지 맵에 등록된 정적 코드이거나 getSafeAdminActionErrorCode가 거른 동적 코드여야 한다.
+ */
 export function redirectAdminActionError(
   path: string,
-  code: string,
+  code: AdminRedirectErrorCode | DynamicAdminActionErrorCode,
   audit?: {
     action: Parameters<typeof logAdminAudit>[0]["action"];
     targetType?: string | null;

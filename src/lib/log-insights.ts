@@ -45,6 +45,7 @@ import {
   LOG_PAGE_SIZE_OPTIONS,
   PAGE_MAX_LOG_ROWS_PER_GROUP,
 } from './log-insights/shared';
+import { formatCount } from "@/lib/number-format";
 
 const ADMIN_LOGS_READ_CACHE_REVALIDATE_SECONDS = ADMIN_READ_BURST_CACHE_SECONDS;
 
@@ -127,7 +128,7 @@ function resolvePartnerName(
 }
 
 function formatCountValue(count: number) {
-  return `${count.toLocaleString()}건`;
+  return `${formatCount(count)}건`;
 }
 
 function buildAggregateTopNamedItems(

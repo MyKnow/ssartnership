@@ -23,7 +23,8 @@ import {
   IMAGE_SOURCE_ACCEPT,
   resolveImageTransformPolicy,
 } from "@/lib/image-upload/policy";
-import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-images";
+import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-photo";
+import { ADMIN_REVIEW_NOTE_MAX_LENGTH } from "@/lib/admin-review-queue";
 
 type FormAction = (formData: FormData) => void | Promise<void>;
 
@@ -292,7 +293,7 @@ export default function AdminMemberProfilePhotoPanel({
                   <input type="hidden" name="imageId" value={pendingImageId} />
                   <input type="hidden" name="memberId" value={memberId} />
                   <label className="sr-only" htmlFor={`member-photo-reject-${pendingImageId}`}>반려 사유</label>
-                  <input id={`member-photo-reject-${pendingImageId}`} name="reason" required maxLength={500} className="h-11 rounded-[1rem] border border-border bg-surface px-3 text-sm" placeholder="반려 사유" />
+                  <input id={`member-photo-reject-${pendingImageId}`} name="reason" required maxLength={ADMIN_REVIEW_NOTE_MAX_LENGTH} className="h-11 rounded-[1rem] border border-border bg-surface px-3 text-sm" placeholder="반려 사유" />
                   <SubmitButton variant="danger" pendingText="반려 중">새 사진 반려</SubmitButton>
                 </form>
               </div>
@@ -303,7 +304,7 @@ export default function AdminMemberProfilePhotoPanel({
             <form action={rejectCurrentAction} className="grid gap-2 rounded-2xl border border-danger/30 bg-danger/5 p-3">
               <input type="hidden" name="memberId" value={memberId} />
               <label className="text-sm font-medium" htmlFor={`member-current-photo-reject-${memberId}`}>현재 사진 반려 사유</label>
-              <input id={`member-current-photo-reject-${memberId}`} name="reason" required maxLength={500} className="h-11 rounded-[1rem] border border-border bg-surface px-3 text-sm" placeholder="사진 반려 사유" />
+              <input id={`member-current-photo-reject-${memberId}`} name="reason" required maxLength={ADMIN_REVIEW_NOTE_MAX_LENGTH} className="h-11 rounded-[1rem] border border-border bg-surface px-3 text-sm" placeholder="사진 반려 사유" />
               <SubmitButton variant="danger" pendingText="반려 중">현재 사진 반려 및 인증 중지</SubmitButton>
             </form>
           ) : null}

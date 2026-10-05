@@ -46,6 +46,7 @@ import {
 } from "@/lib/promotion-slide-storage-server";
 import { resolveImageUploadActorForServerAction } from "@/lib/image-upload/auth.server";
 import { resolveImageTransformPolicy } from "@/lib/image-upload/policy";
+import { isUuidFormat } from "@/lib/uuid";
 import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { PROMOTION_SLIDES_BUCKET } from "@/lib/promotion-slide-storage";
 import { logAdminAction } from "./shared-helpers";
@@ -304,7 +305,7 @@ function parsePromotionSlideDrafts(formData: FormData) {
     const uploadId = typeof record.uploadId === "string" ? record.uploadId.trim() : "";
     if (
       uploadId
-      && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(uploadId)
+      && !isUuidFormat(uploadId)
     ) {
       throw new PromotionSlideSaveError("promotion_slide_upload_invalid", slideNumber);
     }

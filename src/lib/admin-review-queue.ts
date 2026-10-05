@@ -1,4 +1,12 @@
+import { pickAllowedEntry } from "@/lib/safe-messages";
+
 export type AdminReviewQueueFeedbackTone = "info" | "success" | "danger";
+
+/**
+ * 관리자 검토(반려·보완 요청) 사유 길이 상한. 검토 화면 입력 `maxLength`와
+ * server action·서비스 검증이 함께 참조한다.
+ */
+export const ADMIN_REVIEW_NOTE_MAX_LENGTH = 500;
 
 export type AdminReviewQueueFeedback = {
   tone: AdminReviewQueueFeedbackTone;
@@ -39,7 +47,7 @@ const SUCCESS_MESSAGES: Record<string, AdminReviewQueueFeedback> = {
   },
 };
 
-const ERROR_MESSAGES: Record<string, AdminReviewQueueFeedback> = {
+const ERROR_MESSAGES = {
   invalid_fields: {
     tone: "danger",
     title: "입력을 확인해 주세요",
@@ -48,7 +56,7 @@ const ERROR_MESSAGES: Record<string, AdminReviewQueueFeedback> = {
   invalid_reason: {
     tone: "danger",
     title: "반려 사유를 확인해 주세요",
-    description: "반려 사유를 1~500자로 입력해 주세요.",
+    description: `반려 사유를 1~${ADMIN_REVIEW_NOTE_MAX_LENGTH}자로 입력해 주세요.`,
   },
   approval_failed: {
     tone: "danger",
@@ -128,7 +136,10 @@ const ERROR_MESSAGES: Record<string, AdminReviewQueueFeedback> = {
     title: "접근 범위를 확인해 주세요",
     description: "현재 관리자에게 허용된 지역의 항목만 처리할 수 있습니다.",
   },
-};
+} satisfies Record<string, AdminReviewQueueFeedback>;
+
+/** 검토 큐 화면이 소유한 `?error=` 코드. */
+export type AdminReviewQueueErrorCode = keyof typeof ERROR_MESSAGES;
 
 const GENERIC_ERROR: AdminReviewQueueFeedback = {
   tone: "danger",
@@ -140,9 +151,9 @@ export function getAdminReviewQueueFeedback({
   error,
   success,
 }: FeedbackQuery): AdminReviewQueueFeedback | null {
-  if (success) return SUCCESS_MESSAGES[success] ?? null;
+  if (success) return pickAllowedEntry(SUCCESS_MESSAGES, success);
   if (!error) return null;
-  return ERROR_MESSAGES[error] ?? GENERIC_ERROR;
+  return pickAllowedEntry<AdminReviewQueueFeedback>(ERROR_MESSAGES, error) ?? GENERIC_ERROR;
 }
 
 export function appendAdminReviewQueueQuery(

@@ -1,4 +1,5 @@
 import { sanitizeHttpUrl } from "@/lib/validation";
+import { isUuidFormat } from "@/lib/uuid";
 
 export const IMAGE_SOURCE_MIME_TYPES = [
   "image/jpeg",
@@ -280,8 +281,6 @@ type ExistingImageManifestReference = {
   url?: string;
 };
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 function parseManifestItem(value: unknown): ImageUploadManifestItem | null {
   if (!value || typeof value !== "object") {
     return null;
@@ -291,7 +290,7 @@ function parseManifestItem(value: unknown): ImageUploadManifestItem | null {
     const url = sanitizeHttpUrl(typeof item.url === "string" ? item.url : undefined);
     return url ? { kind: "existing", url } : null;
   }
-  if (item.kind === "upload" && typeof item.uploadId === "string" && UUID_PATTERN.test(item.uploadId)) {
+  if (item.kind === "upload" && isUuidFormat(item.uploadId)) {
     return { kind: "upload", uploadId: item.uploadId };
   }
   return null;

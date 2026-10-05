@@ -51,6 +51,7 @@ import {
 } from "./shared-helpers";
 import { logServerError } from "@/lib/server-log";
 import { expectNoError } from "@/lib/expect-no-error";
+import { type AdminActionErrorCode } from "@/lib/admin-action-errors";
 
 export async function backfillMemberProfilesAction(formData: FormData) {
   const adminSession = await requireAdminPermission("members", "update", {
@@ -215,8 +216,11 @@ export async function syncMemberProfileAction(formData: FormData) {
   );
 }
 
-function memberEmailLoginTransitionErrorCode(error: unknown) {
-  if (!(error instanceof MemberEmailLoginTransitionError)) {
+function memberEmailLoginTransitionErrorCode(error: unknown): AdminActionErrorCode {
+  if (
+    !(error instanceof MemberEmailLoginTransitionError)
+    || error.code === "operation_failed"
+  ) {
     return "member_email_transition_failed";
   }
   return `member_email_transition_${error.code}`;

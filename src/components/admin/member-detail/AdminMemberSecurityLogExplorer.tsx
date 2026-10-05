@@ -9,7 +9,7 @@ import Input from "@/components/ui/Input";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Select from "@/components/ui/Select";
 import { ADMIN_LIST_DEFAULT_PAGE_SIZE } from "@/lib/admin-ia";
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import { formatOptionalKoreanDateTimeToMinute } from "@/lib/datetime";
 
 export type AdminMemberSecurityLog = {
   id: string;
@@ -27,10 +27,7 @@ type SortFilter = "newest" | "oldest" | "event" | "ip";
 const PAGE_SIZE_OPTIONS = [10, ADMIN_LIST_DEFAULT_PAGE_SIZE, 50, 100] as const;
 
 function formatDate(value?: string | null) {
-  if (!value) {
-    return "-";
-  }
-  return formatKoreanDateTimeToMinute(value);
+  return formatOptionalKoreanDateTimeToMinute(value, "-");
 }
 
 function getStatusBadgeClass(status: string | null) {
@@ -212,8 +209,8 @@ export default function AdminMemberSecurityLogExplorer({
           description="로그 조회와 같은 방식으로 이벤트, 상태, 경로, 검색어를 조합해 이 회원의 보안 활동을 탐색합니다."
         />
         <Badge className="w-fit bg-surface text-muted-foreground">
-          현재 페이지 필터 {filteredLogs.length.toLocaleString()}건 / 전체{" "}
-          {(pagination?.totalCount ?? logs.length).toLocaleString()}건
+          현재 페이지 필터 {filteredLogs.length.toLocaleString("ko-KR")}건 / 전체{" "}
+          {(pagination?.totalCount ?? logs.length).toLocaleString("ko-KR")}건
         </Badge>
       </div>
 

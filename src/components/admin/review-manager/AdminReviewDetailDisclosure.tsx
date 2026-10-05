@@ -11,6 +11,7 @@ import type {
 } from "@/lib/admin-reviews";
 import { formatPartnerReviewDate } from "@/components/partner-reviews/helpers";
 import AdminReviewImageGallery from "./AdminReviewImageGallery";
+import { REVIEW_TEXT_LIMITS } from "@/lib/review-validation";
 
 type AdminReviewFormAction = (
   formData: FormData,
@@ -135,7 +136,7 @@ export default function AdminReviewDetailDisclosure({
                   </label>
                   <label className="grid gap-2 text-sm font-medium text-foreground">
                     제목
-                    <Input name="title" defaultValue={detail.title} maxLength={80} />
+                    <Input name="title" defaultValue={detail.title} maxLength={REVIEW_TEXT_LIMITS.titleMax} />
                   </label>
                 </div>
                 <label className="grid gap-2 text-sm font-medium text-foreground">
@@ -144,7 +145,7 @@ export default function AdminReviewDetailDisclosure({
                     name="body"
                     defaultValue={detail.body}
                     rows={4}
-                    maxLength={1000}
+                    maxLength={REVIEW_TEXT_LIMITS.bodyMax}
                   />
                 </label>
                 <div className="flex justify-end">

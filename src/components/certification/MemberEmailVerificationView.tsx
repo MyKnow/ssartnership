@@ -24,7 +24,7 @@ import {
   isMemberRecentAuthErrorCode,
   type MemberRecentAuthRequirement,
 } from "@/lib/member-recent-auth";
-import { isValidEmail } from "@/lib/validation";
+import { isSixDigitCode, isValidEmail, SIX_DIGIT_CODE_LENGTH } from "@/lib/validation";
 
 type MemberEmailResponse = {
   ok?: boolean;
@@ -85,7 +85,7 @@ export default function MemberEmailVerificationView({
     resendAvailableAt,
     now,
   );
-  const hasCompleteCode = /^\d{6}$/.test(code);
+  const hasCompleteCode = isSixDigitCode(code);
   const hasValidEmail = isValidEmail(email.trim().toLowerCase());
   const currentStep = lockedEmail ? 2 : 1;
 
@@ -227,7 +227,7 @@ export default function MemberEmailVerificationView({
       );
       return;
     }
-    if (!/^\d{6}$/.test(code)) {
+    if (!isSixDigitCode(code)) {
       setErrorMessage("6자리 인증 코드를 확인해 주세요.");
       codeInputRef.current?.focus();
       return;
@@ -366,7 +366,7 @@ export default function MemberEmailVerificationView({
                   className="min-w-0 flex-1"
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  maxLength={6}
+                  maxLength={SIX_DIGIT_CODE_LENGTH}
                   value={code}
                   onChange={(event) => {
                     setCode(event.target.value.replace(/\D/g, ""));

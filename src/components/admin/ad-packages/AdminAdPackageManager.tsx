@@ -16,6 +16,8 @@ import {
 } from "@/lib/ad-packages";
 import type { AdCampaignWithStats } from "@/lib/repositories/ad-package-repository";
 import { cn } from "@/lib/cn";
+import { formatKoreanDateTime } from "@/lib/datetime";
+import { formatKoreanWon } from "@/lib/number-format";
 
 type PartnerOption = {
   id: string;
@@ -46,18 +48,16 @@ const statusBadgeClass: Record<AdCampaignStatus, string> = {
   ended: "bg-surface-inset text-muted-foreground",
 };
 
-function formatCurrency(value: number) {
-  return `${value.toLocaleString("ko-KR")}원`;
-}
+const PERIOD_FORMAT = {
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: true,
+} as const satisfies Intl.DateTimeFormatOptions;
 
 function formatPeriod(startsAt: string, endsAt: string) {
-  const formatter = new Intl.DateTimeFormat("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  return `${formatter.format(new Date(startsAt))} - ${formatter.format(new Date(endsAt))}`;
+  return `${formatKoreanDateTime(startsAt, PERIOD_FORMAT)} - ${formatKoreanDateTime(endsAt, PERIOD_FORMAT)}`;
 }
 
 function FieldLabel({
@@ -118,7 +118,7 @@ function PackageCatalog() {
           <p className="text-lg font-semibold text-foreground">
             {definition.monthlyPriceKrw === 0
               ? "무료"
-              : `월 ${formatCurrency(definition.monthlyPriceKrw)}`}
+              : `월 ${formatKoreanWon(definition.monthlyPriceKrw)}`}
           </p>
           <div className="flex flex-wrap gap-1.5">
             {definition.includedChannels.map((channel) => (
@@ -266,7 +266,7 @@ export default function AdminAdPackageManager({
                     {listAdPackageDefinitions().map((definition) => (
                       <option key={definition.tier} value={definition.tier}>
                         {definition.label} (
-                        {formatCurrency(definition.monthlyPriceKrw)})
+                        {formatKoreanWon(definition.monthlyPriceKrw)})
                       </option>
                     ))}
                   </Select>
@@ -415,7 +415,7 @@ export default function AdminAdPackageManager({
                   items={[
                     {
                       label: "월 과금",
-                      value: formatCurrency(campaign.monthlyPriceKrw),
+                      value: formatKoreanWon(campaign.monthlyPriceKrw),
                       hint: campaign.sponsorLabel || "스폰서 표기 없음",
                     },
                     {

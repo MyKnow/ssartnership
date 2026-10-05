@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useEffect, useRef } from "react";
 import type { AdminMember } from "@/components/admin/member-manager/selectors";
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import { formatOptionalKoreanDateTimeToMinute } from "@/lib/datetime";
 import { parseSsafyProfile } from "@/lib/mm-profile";
 import {
   formatSsafyMemberLifecycleLabel,
@@ -12,14 +12,7 @@ import {
 } from "@/lib/ssafy-year";
 
 function formatDateTime(value?: string | null) {
-  if (!value) {
-    return "-";
-  }
-
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime())
-    ? "-"
-    : formatKoreanDateTimeToMinute(parsed);
+  return formatOptionalKoreanDateTimeToMinute(value, "-");
 }
 
 export default function AdminMemberListItem({

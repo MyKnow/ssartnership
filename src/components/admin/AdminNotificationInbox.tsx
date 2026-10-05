@@ -18,7 +18,7 @@ import {
   type AdminNotificationListResult,
 } from "@/lib/admin-notification-inbox";
 import { cn } from "@/lib/cn";
-import { formatKoreanDateTime } from "@/lib/datetime";
+import { formatKoreanMonthDayTime } from "@/lib/datetime";
 import { getSafeAdminMessage } from "@/lib/admin-safe-messages";
 
 type AdminNotificationInboxProps = {
@@ -27,12 +27,7 @@ type AdminNotificationInboxProps = {
 };
 
 function formatNotificationDate(value: string) {
-  return formatKoreanDateTime(value, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatKoreanMonthDayTime(value, { hour12: false });
 }
 
 async function parseAdminNotificationResponse(response: Response) {

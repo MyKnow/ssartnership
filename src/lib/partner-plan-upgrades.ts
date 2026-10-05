@@ -3,6 +3,10 @@ import {
   normalizePartnerCompanyPlanTier,
   type PartnerCompanyPlanTier,
 } from "@/lib/partner-company-plans";
+import { PARTNER_BILLING_FIELD_LIMITS } from "@/lib/partner-billing";
+
+/** 업그레이드 요청 메모 길이 상한. 요청 폼 `maxLength`와 서버 정규화가 함께 참조한다. */
+export const PARTNER_PLAN_UPGRADE_MEMO_MAX_LENGTH = 1_000;
 
 export const PARTNER_PLAN_UPGRADE_REQUEST_STATUSES = [
   "pending",
@@ -84,16 +88,20 @@ export function normalizePlanUpgradePayerName(value: string) {
   if (!normalized) {
     throw new Error("입금자명을 입력해 주세요.");
   }
-  if (normalized.length > 80) {
-    throw new Error("입금자명은 80자 이하로 입력해 주세요.");
+  if (normalized.length > PARTNER_BILLING_FIELD_LIMITS.payerName) {
+    throw new Error(
+      `입금자명은 ${PARTNER_BILLING_FIELD_LIMITS.payerName}자 이하로 입력해 주세요.`,
+    );
   }
   return normalized;
 }
 
 export function normalizePlanUpgradeMemo(value: string) {
   const normalized = value.trim();
-  if (normalized.length > 1_000) {
-    throw new Error("요청 메모는 1,000자 이하로 입력해 주세요.");
+  if (normalized.length > PARTNER_PLAN_UPGRADE_MEMO_MAX_LENGTH) {
+    throw new Error(
+      `요청 메모는 ${PARTNER_PLAN_UPGRADE_MEMO_MAX_LENGTH.toLocaleString("ko-KR")}자 이하로 입력해 주세요.`,
+    );
   }
   return normalized;
 }

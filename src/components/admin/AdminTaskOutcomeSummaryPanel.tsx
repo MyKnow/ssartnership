@@ -4,9 +4,10 @@ import {
   ADMIN_TASK_OUTCOME_MIN_SAMPLE_COUNT,
   type AdminTaskOutcomeSummaryMetric,
 } from "@/lib/admin-task-outcome";
+import { formatPercent } from "@/lib/number-format";
 
 function formatPercentage(value: number | null) {
-  return value === null ? "–" : `${value.toFixed(1)}%`;
+  return value === null ? "–" : formatPercent(value, 1);
 }
 
 function formatMilliseconds(value: number | null) {
