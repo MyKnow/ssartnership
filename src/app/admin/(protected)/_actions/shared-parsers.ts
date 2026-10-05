@@ -15,6 +15,7 @@ import {
 } from "../../../../lib/partner-benefit-action.ts";
 import { normalizePartnerDetailDescription } from "../../../../lib/partner-detail-description.ts";
 import {
+  buildLegacyPartnerBenefitItems,
   normalizePartnerBenefitItems,
   partnerBenefitItemsToTitles,
 } from "../../../../lib/partner-benefit-items.ts";
@@ -55,9 +56,7 @@ function parsePartnerBenefitItems(formData: FormData, legacyBenefits: string) {
   if (typeof rawItems === "string" && rawItems.trim()) {
     return normalizePartnerBenefitItems(JSON.parse(rawItems));
   }
-  return normalizePartnerBenefitItems(
-    parseList(legacyBenefits).map((title, index) => ({ id: `legacy-benefit-${index + 1}`, title })),
-  );
+  return buildLegacyPartnerBenefitItems(parseList(legacyBenefits));
 }
 
 function parseOptionalUrl(value: string) {

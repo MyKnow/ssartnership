@@ -1,6 +1,6 @@
 import type { Category, Partner } from "@/lib/types";
 import {
-  normalizePartnerBenefitItems,
+  buildLegacyPartnerBenefitItems,
   partnerBenefitItemsToTitles,
 } from "@/lib/partner-benefit-items";
 import { normalizePartnerAudience } from "@/lib/partner-audience";
@@ -68,10 +68,7 @@ export function getPartnerBenefitItems(row: PartnerRow) {
           maxApplyCount: benefit.max_apply_count,
           displayOrder: benefit.display_order ?? undefined,
         }))
-    : normalizePartnerBenefitItems((row.benefits ?? []).map((title, index) => ({
-        id: `legacy-benefit-${row.id}-${index + 1}`,
-        title,
-      })));
+    : buildLegacyPartnerBenefitItems(row.benefits ?? [], row.id);
 }
 
 export function toVisiblePartner(row: PartnerRow, categoryKey: string): Partner {

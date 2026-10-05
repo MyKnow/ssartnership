@@ -8,6 +8,7 @@ import {
   normalizeBenefitUseInquiry,
 } from "@/lib/partner-links";
 import { isWithinPeriod } from "@/lib/partner-utils";
+import { isLegacyPartnerBenefitId } from "@/lib/partner-benefit-items";
 import {
   adPackageRepository,
   partnerBenefitUsageRepository,
@@ -123,7 +124,7 @@ function getCategoryLabel(categories: Category[], partner: Partner) {
 function hasCanonicalBenefitItems(partner: Partner) {
   const items = partner.benefitItems ?? [];
   return items.length > 0 && items.every(
-    (item) => !item.id.startsWith("legacy-benefit-"),
+    (item) => !isLegacyPartnerBenefitId(item.id),
   );
 }
 

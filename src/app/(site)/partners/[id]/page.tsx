@@ -26,7 +26,7 @@ import {
   getPartnerDetailBenefitMode,
   resolvePartnerDetailBenefitUseAction,
 } from "@/lib/partner-detail-benefit-action";
-import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
+import { buildLegacyPartnerBenefitItems } from "@/lib/partner-benefit-items";
 import type { OfflinePartnerBenefitAction } from "@/components/partner/PartnerBenefitUseAction";
 
 export const dynamic = "force-dynamic";
@@ -239,12 +239,7 @@ export default async function PartnerDetailPage({
           partnerName: partner.name,
           benefitItems: partner.benefitItems?.length
             ? partner.benefitItems
-            : normalizePartnerBenefitItems(
-                partner.benefits.map((title, index) => ({
-                  id: `legacy-benefit-${partner.id}-${index + 1}`,
-                  title,
-                })),
-              ),
+            : buildLegacyPartnerBenefitItems(partner.benefits, partner.id),
           returnTo: partnerReturnTo,
           requiresLogin: !viewerContext.authenticated,
         }

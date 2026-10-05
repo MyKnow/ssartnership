@@ -4,7 +4,7 @@ import { normalizePartnerCompanyPlanTier } from "../partner-company-plans.ts";
 import { resolvePartnerCampusSlugs } from "../campuses.ts";
 import { sanitizePartnerLinkValue } from "../validation.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
-import { normalizePartnerBenefitItems } from "../partner-benefit-items.ts";
+import { buildLegacyPartnerBenefitItems } from "../partner-benefit-items.ts";
 import {
   extractCategoryColor,
   extractCategoryLabel,
@@ -108,10 +108,7 @@ export async function getSupabaseRequestContext(
           maxApplyCount: benefit.max_apply_count,
           displayOrder: benefit.display_order ?? undefined,
         }))
-      : normalizePartnerBenefitItems((row.benefits ?? []).map((title, index) => ({
-          id: `legacy-benefit-${row.id}-${index + 1}`,
-          title,
-        }))),
+      : buildLegacyPartnerBenefitItems(row.benefits ?? [], row.id),
     reservationLink: sanitizePartnerLinkValue(row.reservation_link ?? undefined),
     inquiryLink: sanitizePartnerLinkValue(row.inquiry_link ?? undefined),
     currentConditions: normalizeTextList(row.conditions),

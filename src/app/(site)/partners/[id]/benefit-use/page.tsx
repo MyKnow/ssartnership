@@ -14,8 +14,8 @@ import {
   normalizePartnerBenefitUseCount,
 } from "@/lib/partner-benefit-usage";
 import {
+  buildLegacyPartnerBenefitItems,
   getEffectivePartnerBenefitMaxApplyCount,
-  normalizePartnerBenefitItems,
   resolvePartnerBenefitById,
 } from "@/lib/partner-benefit-items";
 import {
@@ -131,10 +131,7 @@ export default async function PartnerBenefitUsePage({
     ? verificationContext.benefitItems
     : partner.benefitItems?.length
       ? partner.benefitItems
-      : normalizePartnerBenefitItems(partner.benefits.map((title, index) => ({
-          id: `legacy-benefit-${partner.id}-${index + 1}`,
-          title,
-        })));
+      : buildLegacyPartnerBenefitItems(partner.benefits, partner.id);
   const selectedBenefit = resolvePartnerBenefitById(benefitItems, rawBenefitId, partner.id) ??
     benefitItems.find((item) => item.title === benefit) ?? null;
   const useCount = normalizePartnerBenefitUseCount(

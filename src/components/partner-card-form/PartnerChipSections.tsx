@@ -2,7 +2,10 @@ import Card from "@/components/ui/Card";
 import SectionHeading from "@/components/ui/SectionHeading";
 import TokenChipField from "@/components/admin/TokenChipField";
 import PartnerBenefitItemsField from "@/components/partner-card-form/PartnerBenefitItemsField";
-import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
+import {
+  buildLegacyPartnerBenefitItems,
+  normalizePartnerBenefitItems,
+} from "@/lib/partner-benefit-items";
 import type { PartnerCardDraftSnapshot } from "@/lib/partner-card-form/draft";
 import { removeCouponOnlyDefaults } from "@/lib/partner-coupon-only";
 import type { PartnerCardFormValues } from "@/components/partner-card-form/types";
@@ -23,7 +26,7 @@ export default function PartnerChipSections({
     ? normalizePartnerBenefitItems(restoredDraftValues.benefits.map((title, index) => ({ id: `draft-benefit-${index + 1}`, title })))
     : partner.benefitItems?.length
       ? partner.benefitItems
-      : normalizePartnerBenefitItems(removeCouponOnlyDefaults(partner.benefits).map((title, index) => ({ id: `legacy-benefit-${index + 1}`, title })));
+      : buildLegacyPartnerBenefitItems(removeCouponOnlyDefaults(partner.benefits));
   const tags = restoredDraftValues?.tags ?? partner.tags ?? [];
 
   return (
