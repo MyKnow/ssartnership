@@ -59,8 +59,12 @@ test("쿠폰 상태 변경과 삭제는 FE·BE가 같은 전이·삭제 규칙�
   assert.match(actions, /currentStatus: existing\.status/);
   assert.match(actions, /error instanceof AdStatusTransitionError/);
   assert.match(actions, /"ad_coupon_delete_active"/);
+  assert.match(actions, /deletion\.reason === "state_changed"\s*\?\s*"ad_coupon_delete_state_changed"/);
   assert.match(partnerDetail, /ad_coupon_invalid_status_transition/);
   assert.match(partnerDetail, /ad_coupon_delete_active/);
+  // Compare-and-set conflicts from the repository surface as their own codes.
+  assert.match(partnerDetail, /ad_coupon_state_changed:/);
+  assert.match(partnerDetail, /ad_coupon_delete_state_changed:/);
   assert.match(manager, /canDeleteAdCouponWithStatus\(coupon\.status\)/);
   assert.match(manager, /활성 쿠폰은 삭제할 수 없습니다\./);
 });

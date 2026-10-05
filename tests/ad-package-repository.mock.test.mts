@@ -376,6 +376,36 @@ describe("mock ad package repository", () => {
     assert.deepEqual(await repository.deleteCoupon(coupon.id), { ok: true });
   });
 
+  it("applies the coupon status transition table on update (ended is terminal)", async () => {
+    const repository = new MockAdPackageRepository();
+    const coupon = await repository.createCoupon({
+      partnerId: "restaurant-001",
+      title: "종료 후 재활성 차단",
+      redemptionType: "code",
+      status: "active",
+      startsAt: "2026-07-01T00:00:00.000Z",
+      endsAt: "2026-07-31T23:59:59.000Z",
+    });
+    const updateWithStatus = (status: "active" | "ended") =>
+      repository.updateCoupon({
+        couponId: coupon.id,
+        partnerId: coupon.partnerId,
+        campaignId: coupon.campaignId,
+        title: coupon.title,
+        redemptionType: coupon.redemptionType,
+        status,
+        startsAt: coupon.startsAt,
+        endsAt: coupon.endsAt,
+      });
+
+    assert.equal((await updateWithStatus("ended")).status, "ended");
+    await assert.rejects(updateWithStatus("active"), {
+      name: "AdStatusTransitionError",
+      code: "ad_coupon_invalid_status_transition",
+    });
+    assert.equal((await repository.getAdminCouponById(coupon.id))?.status, "ended");
+  });
+
   it("applies the campaign status transition table", async () => {
     const repository = new MockAdPackageRepository();
     const campaign = await repository.createCampaign({

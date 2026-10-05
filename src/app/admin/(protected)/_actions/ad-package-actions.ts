@@ -442,7 +442,9 @@ export async function deleteAdCouponAction(formData: FormData) {
       detailPath,
       deletion.reason === "active"
         ? "ad_coupon_delete_active"
-        : "ad_coupon_delete_has_history",
+        : deletion.reason === "state_changed"
+          ? "ad_coupon_delete_state_changed"
+          : "ad_coupon_delete_has_history",
       {
         action: "ad_coupon_delete",
         targetType: "ad_coupon",

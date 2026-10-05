@@ -146,6 +146,13 @@ export class AdStatusTransitionError extends Error {
   }
 }
 
+/**
+ * Error code, thrown as the `Error` message, when a coupon changed between the
+ * read that validated its status transition and the compare-and-set write.
+ * The admin reloads the coupon and tries again.
+ */
+export const AD_COUPON_STATE_CHANGED_ERROR = "ad_coupon_state_changed";
+
 export const AD_COUPON_ISSUANCE_TYPES = [
   "service",
   "partner_code_pool",

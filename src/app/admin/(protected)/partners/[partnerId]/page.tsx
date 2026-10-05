@@ -93,6 +93,8 @@ async function AdminPartnerDetailContent({
       "수정할 쿠폰을 찾지 못했습니다. 목록을 다시 확인해 주세요.",
     ad_coupon_invalid_status_transition:
       "허용되지 않는 쿠폰 상태 변경입니다. 종료된 쿠폰은 다시 열 수 없으니 복제해서 새 쿠폰으로 운영해 주세요.",
+    ad_coupon_state_changed:
+      "다른 관리자가 쿠폰 상태를 먼저 바꿨습니다. 현재 상태를 확인한 뒤 다시 저장해 주세요.",
     ad_coupon_duplicate_failed:
       "쿠폰을 복제하지 못했습니다. 잠시 후 다시 시도해 주세요.",
     ad_coupon_duplicate_invalid_request: "쿠폰 복제 요청을 다시 확인해 주세요.",
@@ -105,6 +107,8 @@ async function AdminPartnerDetailContent({
       "발급 또는 사용 이력이 있는 쿠폰은 삭제할 수 없습니다. 수정에서 상태를 종료로 변경해 주세요.",
     ad_coupon_delete_active:
       "활성 쿠폰은 회원이 받는 중일 수 있어 삭제할 수 없습니다. 수정에서 일시중지 또는 종료로 바꾼 뒤 삭제해 주세요.",
+    ad_coupon_delete_state_changed:
+      "확인하는 사이 쿠폰이 바뀌어 삭제하지 않았습니다. 현재 상태를 확인한 뒤 다시 시도해 주세요.",
     ad_coupon_delete_failed:
       "쿠폰을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   };

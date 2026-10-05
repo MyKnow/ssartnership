@@ -1,6 +1,8 @@
 import {
+  AdStatusTransitionError,
   canDeleteAdCouponWithStatus,
   canTransitionAdCampaignStatus,
+  canTransitionAdCouponStatus,
   getAdPackageDefinition,
   isAdCouponDownloadable,
   isAdCouponRedeemable,
@@ -454,6 +456,11 @@ export class MockAdPackageRepository implements AdPackageRepository {
         throw new Error("같은 제휴처의 캠페인만 연결할 수 있습니다.");
       }
     }
+    // Same transition table as the Supabase repository (ended is terminal).
+    const nextStatus = input.status ?? "draft";
+    if (!canTransitionAdCouponStatus(existing.status, nextStatus)) {
+      throw new AdStatusTransitionError("coupon", existing.status, nextStatus);
+    }
 
     const redemptionType = input.redemptionType ?? existing.redemptionType;
     if (redemptionType === "onsite" && !input.onsitePassword && !this.couponPasswords.has(existing.id)) {
@@ -478,7 +485,7 @@ export class MockAdPackageRepository implements AdPackageRepository {
       redemptionType,
       discountLabel: input.discountLabel ?? "",
       terms: [...(input.terms ?? [])],
-      status: input.status ?? "draft",
+      status: nextStatus,
       startsAt: input.startsAt,
       endsAt: input.endsAt,
       downloadStartsAt: input.downloadStartsAt ?? input.startsAt,
