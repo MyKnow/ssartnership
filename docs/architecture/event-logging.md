@@ -147,6 +147,15 @@ direct Mattermost 흐름은 `auth_security_logs.properties`에 안정적인 상�
 - 기본 조회를 위해 `created_at`, `event_name`, `actor_id`, `target_id` 인덱스 유지
 - 상세 집계는 원본 로그를 기준으로 이후 별도 집계 테이블 또는 뷰로 확장
 
+## 쓰기 비용
+
+2026-10-05 평가다. `event_logs` 1건 insert가 갱신하는 대상은 다음과 같다.
+
+- 인덱스: PK와 migrations가 만든 보조 인덱스 13개다. 이 중 10개는 이벤트 이름·경로 조건이 있는 부분 인덱스라 조건에 맞는 행만 갱신한다. 일반 제품 이벤트는 PK, 전체 인덱스 3개(`created_at, id`, `event_name, created_at`, `actor_type, created_at`)와 조건에 맞는 부분 인덱스(`event_id` 고유 인덱스 등)만 갱신한다. `schema.sql` 스냅샷에는 `event_logs_path_idx`, `event_logs_session_id_idx` 같은 초기 인덱스도 남아 있으므로 운영 DB에 실제로 있는지 확인해야 한다.
+- 트리거 2개: `platform_activity_from_event_logs`가 활동 식별자 원장을, `partner_metric_rollups_from_event_logs`가 파트너 지표 이벤트일 때 합계·기간별 롤업과 방문자 원장(`partner_metric_unique_visitors`)을 갱신한다. 관리자·파트너 actor 이벤트는 롤업 함수가 바로 반환한다.
+
+현재 규모(월 수만 건)에서는 구조를 바꾸지 않는다. 인덱스 삭제는 운영 DB의 `pg_stat_user_indexes.idx_scan`을 2주 간격으로 두 번 수집해 쓰이지 않음을 확인한 뒤에만 하고, 그 전에는 삭제 migration을 만들지 않는다. 삭제 후보는 위 초기 인덱스 두 개다. insert 지연, WAL 증가, 월 insert 급증이 관측되면 다시 평가한다.
+
 ## 보존 및 파기 정책
 
 - `event_logs`, `admin_audit_logs`, `auth_security_logs`, `push_message_logs`, `push_delivery_logs`의 원본은 생성일로부터 1년간 보존한다.
