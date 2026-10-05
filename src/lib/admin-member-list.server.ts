@@ -14,12 +14,18 @@ import {
 } from "@/lib/admin-search-query";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { unstable_cache } from "next/cache";
+import {
+  ADMIN_READ_BURST_CACHE_SECONDS,
+  SLOW_CHANGING_DATA_CACHE_SECONDS,
+} from "@/lib/cache-ttl";
 
 export const ADMIN_MEMBER_TREND_SAMPLE_LIMIT = 5_000;
 export const ADMIN_MEMBER_READ_MODEL_TIMEOUT_MS = 5_000;
 export const ADMIN_MEMBER_OPTIONAL_READ_MODEL_TIMEOUT_MS = 750;
-export const ADMIN_MEMBER_OPTIONS_CACHE_REVALIDATE_SECONDS = 60;
-export const ADMIN_MEMBER_POLICY_CACHE_REVALIDATE_SECONDS = 3;
+export const ADMIN_MEMBER_OPTIONS_CACHE_REVALIDATE_SECONDS =
+  SLOW_CHANGING_DATA_CACHE_SECONDS;
+export const ADMIN_MEMBER_POLICY_CACHE_REVALIDATE_SECONDS =
+  ADMIN_READ_BURST_CACHE_SECONDS;
 
 type MemberPolicyConsentRow = {
   member_id: string | null;

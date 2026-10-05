@@ -56,7 +56,10 @@ test("개인 수신자 검색은 권한 검증된 제한 API와 안전한 입력
   assert.match(route, /listAdminPushRecipientOptions/);
   assert.match(searchService, /MAX_RECIPIENT_LIMIT = 50/);
   assert.match(searchService, /unstable_cache/);
-  assert.match(searchService, /INITIAL_RECIPIENT_CACHE_SECONDS = 3/);
+  assert.match(
+    searchService,
+    /INITIAL_RECIPIENT_CACHE_SECONDS = ADMIN_READ_BURST_CACHE_SECONDS/,
+  );
   assert.match(searchService, /admin-push-initial-recipient-options/);
   assert.match(searchService, /ilike/);
   assert.match(

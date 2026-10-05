@@ -39,11 +39,12 @@ test("공개 캐시 태그와 TTL 상수는 기존 캐시 계약 값을 그대�
   assert.equal(ttl.PUBLIC_CACHE_VERSION_SNAPSHOT_SECONDS, 30);
 });
 
-test("관리자·파트너 무효화 헬퍼는 공개 캐시 태그 리터럴 대신 공용 상수를 사용한다", () => {
+test("관리자·파트너 무효화 헬퍼와 categories 태그 리더는 공개 캐시 태그 리터럴 대신 공용 상수를 사용한다", () => {
   for (const path of [
     "../src/app/admin/(protected)/_actions/shared-helpers.ts",
     "../src/app/partner/services/[partnerId]/request/_actions/shared.ts",
     "../src/lib/repositories/supabase/partner-repository.supabase.ts",
+    "../src/lib/admin-partner-list.server.ts",
   ]) {
     const source = readFileSync(new URL(path, import.meta.url), "utf8");
     assert.doesNotMatch(source, /revalidateTag\("(?:partners|categories|ssafy-cycle-settings)"/);
