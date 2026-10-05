@@ -2,6 +2,7 @@ import {
   createUnavailableDataAccessProxy,
   selectRuntimeDataAccess,
 } from "./runtime-data-access.ts";
+import type { PartnerVisibility } from "./types.ts";
 
 export {
   PartnerPortalSetupError,
@@ -14,7 +15,7 @@ export type PartnerPortalServiceSummary = {
   location: string;
   categoryLabel: string;
   branchScopeType?: string | null;
-  visibility: "public" | "confidential" | "private";
+  visibility: PartnerVisibility;
 };
 
 export type PartnerPortalCompanySummary = {
