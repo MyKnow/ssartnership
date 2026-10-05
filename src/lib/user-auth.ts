@@ -1,5 +1,4 @@
 import { cookies } from "next/headers";
-import { unstable_noStore as noStore } from "next/cache";
 import { cache } from "react";
 import {
   evaluateRequiredPolicyVersionStatus,
@@ -138,7 +137,6 @@ function verifyToken(token: string) {
 }
 
 async function getRawSignedUserSession() {
-  noStore();
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
   if (!token) {
@@ -322,7 +320,6 @@ export async function clearUserSession() {
 }
 
 export const getUserSession = cache(async () => {
-  noStore();
   const session = (await getSignedUserSession()) as SignedUserSession | null;
   if (!session?.userId) {
     return null;

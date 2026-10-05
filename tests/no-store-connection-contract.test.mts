@@ -16,14 +16,29 @@ function listSourceFiles(directory: string): string[] {
   });
 }
 
-test("legacy unstable_noStore is not reintroduced outside the session module owned by the auth unit", () => {
+test("legacy unstable_noStore is not reintroduced anywhere in src", () => {
   const offenders = listSourceFiles(srcRoot)
     .filter((path) => readFileSync(path, "utf8").includes("unstable_noStore"))
     .map((path) => relative(srcRoot, path));
 
-  // user-auth.ts keeps its two calls until the session-boundary work replaces
-  // them; every other dynamic opt-out uses a request API or connection().
-  assert.deepEqual(offenders, ["lib/user-auth.ts"]);
+  // Dynamic opt-outs use a request API (cookies(), headers()) or connection().
+  assert.deepEqual(offenders, []);
+});
+
+test("member session readers stay dynamic through cookies() without noStore", () => {
+  const source = readFileSync(
+    new URL("../src/lib/user-auth.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    source,
+    /async function getRawSignedUserSession\(\) \{\s*const store = await cookies\(\);/,
+  );
+  assert.match(
+    source,
+    /export const getUserSession = cache\(async \(\) => \{\s*const session = \(await getSignedUserSession\(\)\)/,
+  );
 });
 
 test("Apple Wallet pass handlers wait for a real request with connection()", () => {
