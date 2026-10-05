@@ -1,3 +1,5 @@
+import { hasRpcErrorToken as hasToken } from "../rpc-error-tokens.ts";
+
 /**
  * RPC `raise exception` tokens for member Wallet passes. Classify by the
  * whole token, never by a fragment such as "not_found" or "revoked" that
@@ -15,10 +17,6 @@ export type WalletPassRepositoryErrorKind =
   | "revoked"
   | "idempotency_conflict"
   | "repository_error";
-
-function hasToken(message: string, token: string) {
-  return new RegExp(`(?:^|[^a-z0-9_])${token}(?:$|[^a-z0-9_])`, "u").test(message);
-}
 
 export function classifyWalletPassRepositoryError(error: unknown): WalletPassRepositoryErrorKind {
   const message = error instanceof Error ? error.message : "";
