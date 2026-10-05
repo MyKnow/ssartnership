@@ -16,6 +16,11 @@ Type=oneshot
 RemainAfterExit=yes
 Restart=on-failure
 RestartSec=5
+# Retry without passing through the failed state (systemd 254+). In the
+# default mode the first failure already fails docker.service's pending start
+# job as a dependency failure, so a later successful retry would leave Docker
+# stopped until the next boot.
+RestartMode=direct
 User=root
 UMask=0077
 EnvironmentFile=/etc/myknow/secrets/ssartnership-pve-relay.env

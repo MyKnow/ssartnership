@@ -58,6 +58,8 @@ test("the relay firewall waits for routed networking and retries a bounded numbe
   assert.match(serviceSection, /^RemainAfterExit=yes$/mu);
   assert.match(serviceSection, /^Restart=on-failure$/mu);
   assert.match(serviceSection, /^RestartSec=5$/mu);
+  // A retry must not fail Docker's pending start job through the failed state.
+  assert.match(serviceSection, /^RestartMode=direct$/mu);
   // Docker still refuses to start without the rules (fail closed).
   assert.match(read("deploy/pve/docker-relay.conf"), /^Requires=ssartnership-relay-firewall\.service$/mu);
 });

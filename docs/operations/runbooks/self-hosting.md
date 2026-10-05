@@ -109,7 +109,7 @@ Storage SDK의 signed/public URL과 공개 이미지 프록시는 [데이터 실
 - `read_only`: 다른 서비스와 달리 app은 아직 적용하지 않는다. 코드상 쓰기 경로는 `.next/cache`(볼륨)와 `/tmp`뿐이지만, 정적으로 판정된 ISR route가 생기면 Next가 `.next/server`에 재생성 결과를 쓰고 실패 경고를 반복한다. 종료 처리의 파일 쓰기 여부도 아직 실측하지 않았다. Preview에서 `read_only: true`와 `tmpfs: /tmp`로 기동·종료 시간·로그의 `EROFS`를 확인한 뒤 적용한다.
 - 운영 이미지는 `public/mock` fixture를 포함하지 않는다(mock 저장소만 참조). 로컬 mock smoke용 루트 Dockerfile은 mock 빌드일 때만 남긴다.
 
-relay 방화벽 unit은 `network-online.target` 뒤에 실행하고 실패하면 5초 간격으로 2분 동안 최대 10회 재시도한다. Docker는 이 unit을 `Requires=`하므로 규칙 없이 relay 포트를 열지 않는다. 호스트 적용 전 `systemd-analyze verify`와 VM 재부팅 리허설로 Docker·relay·app 기동 순서를 확인한다.
+relay 방화벽 unit은 `network-online.target` 뒤에 실행하고 실패하면 5초 간격으로 2분 동안 최대 10회 재시도한다. Docker는 이 unit을 `Requires=`하므로 규칙 없이 relay 포트를 열지 않는다. 재시도는 `RestartMode=direct`(systemd 254 이상)로 실패 상태를 거치지 않는다. 기본 모드에서는 첫 실패가 대기 중인 Docker 시작 작업을 의존성 실패로 끝내므로, 이후 재시도가 성공해도 다음 부팅까지 Docker가 시작되지 않는다. 호스트 적용 전 `systemctl --version`(254 이상)과 `systemd-analyze verify`를 확인하고, VM 재부팅 리허설로 Docker·relay·app 기동 순서와 재시도 뒤 Docker 기동을 확인한다.
 
 ## 공개 edge와 TLS
 
@@ -163,7 +163,7 @@ Production 홈 서버 전환에서는 `vercel.json`의 `git.deploymentEnabled=fa
 node scripts/self-host-cron.mjs --list
 ```
 
-단발 호출은 운영 쓰기가 생길 수 있다. `SELF_HOST_CRON_BASE_URL`과 `CRON_SECRET`을 보안 환경에서 주입한 상태에서 등록된 한 경로만 지정한다. 공개 origin의 `/api/cron`은 edge가 404로 막으므로 base URL은 해당 앱 VM의 loopback 앱 포트를 쓴다(`npm run rss:refresh`도 `RSS_REFRESH_URL`로 같은 주소를 지정한다). 정확한 명령은 CLI의 사용법과 맞춰 검증한다. 로컬 smoke에서는 실행하지 않는다.
+단발 호출은 운영 쓰기가 생길 수 있다. `SELF_HOST_CRON_BASE_URL`과 `CRON_SECRET`을 보안 환경에서 주입한 상태에서 등록된 한 경로만 지정한다. 공개 origin의 `/api/cron`은 edge가 404로 막으므로 base URL은 해당 앱 VM의 loopback 앱 포트를 쓴다. 다른 수동 호출 스크립트도 공개 URL 대신 같은 loopback 주소를 지정한다. 정확한 명령은 CLI의 사용법과 맞춰 검증한다. 로컬 smoke에서는 실행하지 않는다.
 
 ```bash
 node scripts/self-host-cron.mjs --run /api/cron/rss
