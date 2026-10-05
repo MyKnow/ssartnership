@@ -34,6 +34,10 @@ describe("coupon API result contract", () => {
       ),
       false,
     );
+    // The repository no longer offers the count→check→insert coupon-id path
+    // either; every redemption goes through the locking issue RPC.
+    assert.doesNotMatch(repositorySource, /async redeemCoupon\(/);
+    assert.match(repositorySource, /supabase\.rpc\("redeem_ad_coupon_issue"/);
   });
 
   it("returns conflict status for member and global quota exhaustion", () => {

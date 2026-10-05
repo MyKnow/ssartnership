@@ -9,7 +9,6 @@ import {
   canTransitionAdCouponStatus,
   getAdPackageDefinition,
   isAdCouponDownloadable,
-  isAdCouponRedeemable,
   normalizeAdChannelsForTier,
   normalizeAdPackageTier,
   type AdPackageMetrics,
@@ -30,7 +29,6 @@ import type {
   AdCampaign,
   AdCampaignWithStats,
   AdCoupon,
-  AdCouponRedemption,
   AddAdCouponCodesInput,
   AddAdCouponCodesResult,
   AdPackageRepository,
@@ -44,10 +42,8 @@ import type {
   ListAvailableCouponsForMemberInput,
   ListIssuedCouponsForMemberInput,
   PreparedAdminCampaigns,
-  RedeemAdCouponInput,
   RedeemAdCouponIssueInput,
   RedeemAdCouponIssueResult,
-  RedeemAdCouponResult,
   UpdateAdCampaignStatusInput,
   UpdateAdCampaignStatusResult,
   UpdateAdCouponInput,
@@ -118,17 +114,6 @@ type AdCouponRow = {
   created_at: string;
   updated_at: string;
   partners?: PartnerJoin;
-};
-
-type RedemptionRow = {
-  id: string;
-  coupon_id: string;
-  campaign_id: string | null;
-  partner_id: string;
-  member_id: string | null;
-  session_id: string | null;
-  redemption_code: string | null;
-  created_at: string;
 };
 
 type CouponIssueRow = {
@@ -262,19 +247,6 @@ function mapCouponRow(row: AdCouponRow, usedCount = 0): AdCoupon {
     externalUrl: row.external_url ?? "",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-  };
-}
-
-function mapRedemptionRow(row: RedemptionRow): AdCouponRedemption {
-  return {
-    id: row.id,
-    couponId: row.coupon_id,
-    campaignId: row.campaign_id,
-    partnerId: row.partner_id,
-    memberId: row.member_id,
-    sessionId: row.session_id,
-    redemptionCode: row.redemption_code ?? "",
-    createdAt: row.created_at,
   };
 }
 
@@ -1286,131 +1258,6 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
       couponId: row.coupon_id,
       issueId: row.issue_id,
       assignedCode: row.assigned_code ?? null,
-    };
-  }
-
-  async redeemCoupon(input: RedeemAdCouponInput): Promise<RedeemAdCouponResult> {
-    const supabase = getSupabaseAdminClient();
-    const { data, error } = await supabase
-      .from("ad_coupons")
-      .select(AD_COUPON_SELECT)
-      .eq("id", input.couponId)
-      .maybeSingle();
-    if (error) {
-      throw new Error(error.message);
-    }
-    if (!data) {
-      return {
-        ok: false,
-        reason: "not_found",
-        message: "쿠폰을 찾을 수 없습니다.",
-      };
-    }
-
-    const row = data as AdCouponRow;
-    const [redemptionResult, campaignResult, memberResult] = await Promise.all([
-      supabase
-        .from("ad_coupon_redemptions")
-        .select("id,member_id")
-        .eq("coupon_id", row.id)
-        .eq("status", "redeemed"),
-      row.campaign_id
-        ? supabase
-            .from("ad_campaigns")
-            .select(
-              "id,partner_id,package_tier,title,description,sponsor_label,status,starts_at,ends_at,channels,monthly_price_krw,notes,created_at,updated_at,partners(name)",
-            )
-            .eq("id", row.campaign_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-      input.memberId
-        ? supabase.from("members").select("id").eq("id", input.memberId).maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-    ]);
-    if (redemptionResult.error) {
-      throw new Error(redemptionResult.error.message);
-    }
-    if (campaignResult.error) {
-      throw new Error(campaignResult.error.message);
-    }
-    if (memberResult.error) {
-      throw new Error(memberResult.error.message);
-    }
-    if (input.memberId && !memberResult.data) {
-      return {
-        ok: false,
-        reason: "invalid",
-        message: "회원 정보를 확인할 수 없습니다.",
-      };
-    }
-
-    const redeemedRows = (redemptionResult.data ?? []) as Array<{
-      id: string;
-      member_id: string | null;
-    }>;
-    const coupon = mapCouponRow(row, redeemedRows.length);
-    const campaign = campaignResult.data
-      ? mapCampaignRow(campaignResult.data as AdCampaignRow)
-      : null;
-    if (coupon.redemptionType === "onsite") {
-      return {
-        ok: false,
-        reason: "onsite_verification_required",
-        message: "현장형 쿠폰은 쿠폰함의 제휴처 확인 화면에서 사용해 주세요.",
-        coupon,
-      };
-    }
-    if (!isAdCouponRedeemable({ coupon, campaign })) {
-      return {
-        ok: false,
-        reason:
-          coupon.usageLimit !== null && coupon.usedCount >= coupon.usageLimit
-            ? "usage_limit"
-            : "inactive",
-        message: "현재 사용할 수 없는 쿠폰입니다.",
-        coupon,
-      };
-    }
-
-    if (
-      input.memberId &&
-      redeemedRows.filter((item) => item.member_id === input.memberId).length >=
-        coupon.perMemberLimit
-    ) {
-      return {
-        ok: false,
-        reason: "member_limit",
-        message: "이미 사용할 수 있는 횟수를 모두 사용했습니다.",
-        coupon,
-      };
-    }
-
-    const { data: inserted, error: insertError } = await supabase
-      .from("ad_coupon_redemptions")
-      .insert({
-        coupon_id: coupon.id,
-        campaign_id: coupon.campaignId,
-        partner_id: coupon.partnerId,
-        member_id: input.memberId ?? null,
-        session_id: input.sessionId ?? null,
-        redemption_code: coupon.code,
-        metadata: input.metadata ?? {},
-      })
-      .select(
-        "id,coupon_id,campaign_id,partner_id,member_id,session_id,redemption_code,created_at",
-      )
-      .single();
-    if (insertError) {
-      throw new Error(insertError.message);
-    }
-
-    return {
-      ok: true,
-      coupon: {
-        ...coupon,
-        usedCount: coupon.usedCount + 1,
-      },
-      redemption: mapRedemptionRow(inserted as RedemptionRow),
     };
   }
 }
