@@ -149,11 +149,16 @@ export async function getAdminPartnerDetailCoreReadModel({
 
     if (partnerResult.error || previewTokenResult.error) {
       // One sanitized line per failed query; provider messages are redacted.
-      if (partnerResult.error) {
-        logServerError("[admin-partner-detail] core read model query failed", partnerResult.error, { query: "partner" });
-      }
-      if (previewTokenResult.error) {
-        logServerError("[admin-partner-detail] core read model query failed", previewTokenResult.error, { query: "preview_token" });
+      for (const [query, error] of [
+        ["partners", partnerResult.error],
+        ["partner_preview_tokens", previewTokenResult.error],
+      ] as const) {
+        if (error) {
+          logServerError("[admin-partner-detail] core read model query failed", error, {
+            partnerId,
+            query,
+          });
+        }
       }
       return { status: "error" as const };
     }

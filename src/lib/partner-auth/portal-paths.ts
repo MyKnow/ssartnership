@@ -113,28 +113,6 @@ export function getPartnerPasswordChangeHref(companyId: string | null | undefine
   return `${PARTNER_PASSWORD_CHANGE_PATH}?companyId=${encodeURIComponent(normalizedCompanyId)}`;
 }
 
-export function getPartnerSessionExpiredLoginHref() {
-  return `${PARTNER_LOGIN_PATH}?error=${PARTNER_SESSION_EXPIRED_ERROR_CODE}`;
-}
-
-/**
- * 파트너 server action의 세션 가드 이동 경로를 결정한다.
- * 세션이 없으면 만료 안내 코드와 함께 로그인으로, 비밀번호 변경이 필요하면
- * 변경 화면으로 보내고, 통과하면 null을 돌려준다.
- */
-export function resolvePartnerActionSessionRedirect(
-  session: { mustChangePassword: boolean } | null | undefined,
-  companyId?: string | null,
-) {
-  if (!session) {
-    return getPartnerSessionExpiredLoginHref();
-  }
-  if (session.mustChangePassword) {
-    return getPartnerPasswordChangeHref(companyId);
-  }
-  return null;
-}
-
 export function getPartnerScopedHrefFromLegacyTarget(
   targetUrl: string | null | undefined,
   companyId: string | null | undefined,

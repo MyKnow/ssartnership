@@ -20,18 +20,6 @@ export function createPartnerPreviewExpiresAt(now = new Date()) {
   return new Date(now.getTime() + PARTNER_PREVIEW_TOKEN_TTL_MS).toISOString();
 }
 
-/**
- * @deprecated `partner_preview_tokens.expires_at` is `not null` since
- * 20260830215837. Only the public catalog repository still calls this until
- * its own cleanup removes the last missing-column retry; do not add callers.
- */
-export function isMissingPartnerPreviewExpiryColumnError(errorMessage: string) {
-  return (
-    errorMessage.includes("Could not find the 'expires_at' column") ||
-    errorMessage.includes('column "expires_at" does not exist')
-  );
-}
-
 export function resolvePartnerPreviewExpiresAt(
   expiresAt?: string | null,
   createdAt?: string | null,

@@ -2,7 +2,10 @@ import {
   getPartnerPortalLoginErrorMessage,
   type PartnerPortalLoginErrorCode,
 } from "@/lib/partner-auth";
-import { PARTNER_SESSION_EXPIRED_ERROR_CODE } from "@/lib/partner-auth/portal-paths";
+import {
+  PARTNER_LOGIN_PATH,
+  PARTNER_SESSION_EXPIRED_ERROR_CODE,
+} from "@/lib/partner-auth/portal-paths";
 export { readFirstSearchParamOrEmpty as readSearchParam } from "@/lib/search-params";
 
 export type PartnerLoginSearchParams = {
@@ -65,7 +68,7 @@ export function buildPartnerLoginErrorRedirect(
   loginId?: string | null,
   returnTo?: string | null,
 ) {
-  return `/partner/login?error=${encodeURIComponent(errorCode)}${
+  return `${PARTNER_LOGIN_PATH}?error=${encodeURIComponent(errorCode)}${
     loginId ? `&loginId=${encodeURIComponent(loginId)}` : ""
   }${returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ""}`;
 }

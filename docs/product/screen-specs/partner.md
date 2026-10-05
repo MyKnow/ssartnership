@@ -18,7 +18,7 @@ authority: normative
 - 액션·흐름: primary는 로그인, 보조는 비밀번호 재설정이다. 포털 보호 화면에서 진입하고 회사 선택·대시보드·필수 비밀번호 변경으로 이탈한다.
 - 경계·상태: partner session과 공용 FE/BE 검증, rate limit을 사용한다. 기본, validation error, 인증 실패, 제출 중, 이미 로그인 상태와 server action 중 세션이 만료되어 돌아온 상태(`?error=session_expired`)를 제공한다. `?error=`는 정해진 코드만 문구로 바꾸고 그 밖의 값은 표시하지 않는다.
 - 반응형·분석: 단일 form column을 유지한다. `partner_login_attempt/result`만 기록하고 로그인 식별자·비밀번호는 로그에서 제외한다.
-- 수용 기준: 회사 scope를 세션에서 다시 확인하고 실패 후 입력 보존, 첫 오류 focus, 중복 제출 차단이 동작한다. 로그인 없이 포털 딥링크에 들어오면 원래 경로를 `returnTo`로 보존해 로그인 후 그 화면으로 돌아간다. `returnTo`는 `/partner` 아래 경로만 허용하고 로그인·로그아웃·재설정·초기 설정·비밀번호 변경 화면과 외부·프로토콜 상대 URL은 버린다(`src/lib/partner-auth/return-to.ts`). 로그인 실패 후에도 `returnTo`를 유지한다.
+- 수용 기준: 회사 scope를 세션에서 다시 확인하고 실패 후 입력 보존, 첫 오류 focus, 중복 제출 차단이 동작한다. 로그인 없이 포털 딥링크에 들어오면 원래 경로를 `returnTo`로 보존해 로그인 후 그 화면으로 돌아간다. `returnTo`는 `/partner` 아래 경로만 허용하고 로그인·로그아웃·재설정·초기 설정·비밀번호 변경 화면과 외부·프로토콜 상대 URL은 버린다(`src/lib/partner-auth/return-to.ts`). 로그인 실패 후에도 `returnTo`를 유지한다. server action 중 세션이 만료되어 돌아온 경우(`?error=session_expired`)도 action을 제출한 화면을 `returnTo`로 실어 다시 로그인하면 그 화면으로 돌아간다. 제출 화면은 proxy가 전달한 요청 경로로 정하고, 이전 action의 결과 배너(`status`·`success`·`error`)는 복귀 주소에서 뺀다. 로그인 쿠키가 없거나 만료된 server action 요청은 proxy가 로그인으로 307 이동시키지 않고 action의 세션 가드에 맡긴다. 307로 보내면 브라우저가 action을 로그인 화면에 다시 보내 로그인 화면 대신 오류가 보인다.
 
 <!-- screen-contract: partner.reset -->
 ## `/partner/reset` — 파트너 비밀번호 재설정
@@ -96,7 +96,7 @@ authority: normative
 
 - `/partner`는 회사가 여러 개일 때만 선택 View를 렌더하고 하나면 dashboard로 이동한다.
 - `/partner/setup/[token]`, `/partner/change-password`는 유효 token/session에서만 렌더한다.
-- 비밀번호 변경이 필요한 세션은 어느 포털 화면에서든 `/partner/change-password?returnTo=`로 이동하고, 변경을 마치면 회사 대시보드보다 `returnTo`를 우선해 원래 화면으로 돌아간다. 변경 화면 자체는 복귀 목적지가 되지 않는다.
+- 비밀번호 변경이 필요한 세션은 어느 포털 화면에서든, server action을 제출한 경우에도 `/partner/change-password?returnTo=`로 이동하고, 변경을 마치면 회사 대시보드보다 `returnTo`를 우선해 원래 화면으로 돌아간다. 변경 화면 자체는 복귀 목적지가 되지 않는다.
 - `/partner/login`과 `/partner/reset`은 서명 쿠키만 보고 포털로 되돌려 보내지 않는다. 두 화면이 세션을 DB 기준으로 다시 확인해 유효하면 포털(변경 대기 시 비밀번호 변경 화면)로 보내고, 무효화된 세션(다른 기기 재설정, 계정·회사 비활성)이면 그대로 렌더해 로그인 화면과 보호 화면 사이를 오가는 루프를 막는다.
 - 회사별 account/notifications/support 구 URL은 `companyId` query를 보존해 전역 canonical로 이동한다.
 - `/partner/plans`, `/partner/services/[partnerId]`, `/partner/services/[partnerId]/request`는 session scope로 canonical company route를 결정하며 모호하거나 권한이 없으면 `/partner`로 복구한다.
