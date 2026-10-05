@@ -71,10 +71,12 @@ test("쇼케이스 대표 이미지는 프록시 URL과 레이아웃 폭 sizes�
     assert.match(source, /\bfill\b/);
     assert.doesNotMatch(source, /<img\b/);
     assert.doesNotMatch(source, /no-img-element/);
+    // Next.js 16에서 `priority`는 deprecated다. 첫 화면 hero는 같은 동작인 `preload`를 쓴다.
+    assert.doesNotMatch(source, /\bpriority\b/);
   }
   assert.match(card, /sizes=\{SHOWCASE_PROJECT_CARD_IMAGE_SIZES\}/);
-  assert.doesNotMatch(card, /\bpriority\b/);
-  assert.match(detail, /priority\s+sizes=\{SHOWCASE_PROJECT_HERO_IMAGE_SIZES\}/);
+  assert.doesNotMatch(card, /\bpreload\b/);
+  assert.match(detail, /preload\s+sizes=\{SHOWCASE_PROJECT_HERO_IMAGE_SIZES\}/);
   assert.match(myDetail, /sizes=\{SHOWCASE_PROJECT_HERO_IMAGE_SIZES\}/);
   assert.match(
     sizes,
