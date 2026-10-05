@@ -39,8 +39,8 @@ npm run perf:lighthouse
 npm run perf:lighthouse:run
 ```
 
-- 기본 대상은 `http://127.0.0.1:3333/`, 기본 form factor는 desktop, 기본 통과 기준은 85점이다.
-- `LIGHTHOUSE_FORM_FACTOR=mobile`, `LIGHTHOUSE_MIN_SCORE`로 기기·기준을 바꾼다. 이 스크립트는 항상 로컬 `npm run start` 서버를 띄우므로 운영 주소 측정용이 아니다.
+- 기본 대상은 `http://127.0.0.1:3333/`, 기본 form factor는 desktop, 기본 통과 기준은 85점(`LIGHTHOUSE_MIN_SCORE=0.85`)이다.
+- `LIGHTHOUSE_FORM_FACTOR=mobile`, `LIGHTHOUSE_MIN_SCORE`(0~1 비율, 예: `0.9`)로 기기·기준을 바꾼다. 이 스크립트는 항상 로컬 `npm run start` 서버를 띄우므로 운영 주소 측정용이 아니다.
 - 운영 공개 주소의 spot check는 저장소에 고정된 Lighthouse로 한 경로씩 수동 실행한다. 관리자·API·인증 필요 경로는 측정하지 않는다.
 
 ```bash

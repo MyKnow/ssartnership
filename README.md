@@ -521,7 +521,7 @@ npm run release
 | 명령 | 언제 | 내용 |
 | --- | --- | --- |
 | `npm run verify:change` (`prepush`) | 모든 push 전 | 실제 merge-base diff를 GitHub와 같은 위험 tier(docs·development·ui·standard·high)로 분류해 필요한 검사만 실행 |
-| `npm run verify:quick` | high tier·의존성·CI 변경 | 설치 스크립트·교차 플랫폼·lockfile·migration·lint·typecheck·Node/unit 테스트·보안 audit |
+| `npm run verify:quick` | `standard`·`high` tier(의존성·CI·migration·인증 경계 변경 포함)에서 `verify:change`가 자동 실행 | 설치 스크립트·교차 플랫폼·lockfile·migration·lint·typecheck·Node/unit 테스트·보안 audit |
 | `npm run verify:release` | `dev` → `main` 승격 전 | quick 전체 + Production build + 재시도 없는 전체 E2E |
 | `npm run check:docs` / `check:env` / `check:lockfile` | 문서·env·의존성 변경 시 | 문서 메타데이터·링크, env 매니페스트 drift, canonical lockfile |
 | `npm run test:node` / `test:unit` | 집중 확인 | Node 계약·도메인 테스트 / Vitest unit |

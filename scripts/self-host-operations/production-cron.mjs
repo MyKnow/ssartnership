@@ -30,7 +30,7 @@ export function productionCronCalendar(schedule) {
   return `*-*-* ${hour}:${minutes.join(',')}:00 UTC`;
 }
 
-/** @param {string} source @param {string} [catalogSource] @returns {Array<{name:string,content:string}>} */
+/** @param {string} source schedules.json text @returns {Array<{name:string,content:string}>} */
 export function productionCronTimers(source) {
   return loadProductionCronSchedules(source).map(({ path, schedule }) => {
     const name = path.slice('/api/cron/'.length);
