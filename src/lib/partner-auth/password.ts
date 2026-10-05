@@ -5,7 +5,7 @@ import { toPartnerPortalAccountSummary } from "./mappers.ts";
 import { getSupabasePartnerPortalCompanyIds } from "./company.ts";
 import type { PartnerPortalAccountRow } from "./types.ts";
 import {
-  PARTNER_ACCOUNT_SELECT,
+  PARTNER_AUTH_ACCOUNT_SELECT,
   getPartnerAccountAuthSessionVersion,
   getSupabasePartnerPortalAccountById,
 } from "./accounts.ts";
@@ -68,7 +68,7 @@ export async function changeSupabasePartnerPortalPassword(input: {
   const { data, error: updateError } = await (account.updated_at
     ? updateQuery.eq("updated_at", account.updated_at)
     : updateQuery.is("updated_at", null))
-    .select(PARTNER_ACCOUNT_SELECT)
+    .select(PARTNER_AUTH_ACCOUNT_SELECT)
     .maybeSingle();
   const updatedAccount = data as PartnerPortalAccountRow | null;
 
