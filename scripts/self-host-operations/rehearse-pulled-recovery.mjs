@@ -2,6 +2,7 @@
 import { randomUUID } from "node:crypto";
 import { lstat, readFile, writeFile, mkdir, realpath, statfs } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { openRecoveryPayload } from "../self-host-ci/recovery-envelope.mjs";
 import { sha256File } from "../self-host-ci/lib.mjs";
 import { runOperatorCommand } from "../self-host-ci/deployment.mjs";
@@ -72,7 +73,7 @@ export async function rehearsePulledRecovery(bundleDirectory, keyReferenceFile, 
   await writeFile(path.join(stateDirectory, "receipt.json"), `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600, flag: "wx" });
   return receipt;
 }
-if (process.argv[1] && import.meta.url === new URL(process.argv[1], "file:").href) {
+if (process.argv[1] && process.argv[1] !== "-" && import.meta.url === pathToFileURL(await realpath(process.argv[1])).href) {
   try { console.log(JSON.stringify(await rehearsePulledRecovery(...process.argv.slice(2)))); }
   catch { console.error('{"error":"RECOVERY_REHEARSAL_FAILED"}'); process.exitCode = 1; }
 }

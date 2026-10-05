@@ -7,6 +7,7 @@ import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import path from "node:path";
 import os from "node:os";
+import { pathToFileURL } from "node:url";
 import { createKeychainRecipient } from "./keychain.mjs";
 
 const wrapper = path.join(os.homedir(), "coding", "myknow-server", "scripts", "ssh-codex-bootstrap.sh");
@@ -48,7 +49,7 @@ export async function pullRecovery(destination, keyDirectory) {
   } catch (error) { child.kill("SIGTERM"); await exited.catch(() => {}); throw error; }
   finally { clearTimeout(timer); }
 }
-if (process.argv[1] && import.meta.url === new URL(process.argv[1], "file:").href) {
+if (process.argv[1] && process.argv[1] !== "-" && import.meta.url === pathToFileURL(await realpath(process.argv[1])).href) {
   try { console.log(JSON.stringify(await pullRecovery(...process.argv.slice(2)))); }
   catch { console.error('{"error":"RECOVERY_PULL_FAILED"}'); process.exitCode = 1; }
 }

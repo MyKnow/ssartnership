@@ -1,7 +1,8 @@
-import { readFile, writeFile, readdir, lstat } from 'node:fs/promises';
+import { readFile, writeFile, readdir, lstat, realpath } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { verifyReferencedStorage } from './production-online-backup.mjs';
 export function assertRestoreDatabaseIdentity(expected, actual) {
   if (typeof expected !== 'string' || !/^[1-9][0-9]{0,19}$/u.test(expected) || expected !== actual) throw Error('PRODUCTION_RESTORE_IDENTITY_MISMATCH');
@@ -81,6 +82,6 @@ try{
 finally{if(started){try{run('docker',['stop','--time','30',name]);run('docker',['rm',name]);}catch{console.error('{"error":"ORIGINAL_RESTORE_CONTAINER_CLEANUP_FAILED"}');process.exitCode=1;}}}
 }
 
-if (process.argv[1] && (process.argv[1] === '-' || import.meta.url === new URL(process.argv[1], 'file:').href)) {
+if (process.argv[1] && (process.argv[1] === '-' || import.meta.url === pathToFileURL(await realpath(process.argv[1])).href)) {
   await restoreProductionBackup(process.argv[2], process.argv[3], process.argv[4]);
 }
