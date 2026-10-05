@@ -13,7 +13,6 @@ import {
   getPartnerLoginHref,
   getPartnerPasswordChangeGateHref,
   getPartnerRequestReturnTo,
-  PARTNER_PORTAL_HOME_PATH,
 } from "@/lib/partner-auth/return-to";
 import { buildTrustedRedirectUrl } from "@/lib/request-guards";
 import {
@@ -346,6 +345,15 @@ export async function proxy(request: NextRequest) {
       ? await verifyPartnerToken(partnerToken)
       : null;
 
+    // Login and reset re-check the cookie against the database and send a live
+    // session on themselves (to the password gate while a change is pending).
+    // Redirecting them here on the signed cookie alone would loop with the
+    // protected pages, which send a revoked session (password reset on another
+    // device, deactivated account or company) back to the login page.
+    if (isPartnerLoginPath || pathname === "/partner/reset") {
+      return nextWithRequestUrl(request);
+    }
+
     const partnerReturnTo = getPartnerRequestReturnTo(
       pathname,
       request.nextUrl.search,
@@ -362,27 +370,6 @@ export async function proxy(request: NextRequest) {
           request.url,
         ),
       );
-    }
-
-    if (isPartnerLoginPath) {
-      if (partnerPayload) {
-        return NextResponse.redirect(
-          buildTrustedRedirectUrl(
-            partnerReturnTo ?? PARTNER_PORTAL_HOME_PATH,
-            request.url,
-          ),
-        );
-      }
-      return nextWithRequestUrl(request);
-    }
-
-    if (pathname === "/partner/reset") {
-      if (partnerPayload) {
-        const url = buildTrustedRedirectUrl(currentPath, request.url);
-        url.pathname = "/partner";
-        return NextResponse.redirect(url);
-      }
-      return nextWithRequestUrl(request);
     }
 
     if (isPartnerSetupPath) {

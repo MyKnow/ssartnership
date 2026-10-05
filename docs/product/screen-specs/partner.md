@@ -97,5 +97,6 @@ authority: normative
 - `/partner`는 회사가 여러 개일 때만 선택 View를 렌더하고 하나면 dashboard로 이동한다.
 - `/partner/setup/[token]`, `/partner/change-password`는 유효 token/session에서만 렌더한다.
 - 비밀번호 변경이 필요한 세션은 어느 포털 화면에서든 `/partner/change-password?returnTo=`로 이동하고, 변경을 마치면 회사 대시보드보다 `returnTo`를 우선해 원래 화면으로 돌아간다. 변경 화면 자체는 복귀 목적지가 되지 않는다.
+- `/partner/login`과 `/partner/reset`은 서명 쿠키만 보고 포털로 되돌려 보내지 않는다. 두 화면이 세션을 DB 기준으로 다시 확인해 유효하면 포털(변경 대기 시 비밀번호 변경 화면)로 보내고, 무효화된 세션(다른 기기 재설정, 계정·회사 비활성)이면 그대로 렌더해 로그인 화면과 보호 화면 사이를 오가는 루프를 막는다.
 - 회사별 account/notifications/support 구 URL은 `companyId` query를 보존해 전역 canonical로 이동한다.
 - `/partner/plans`, `/partner/services/[partnerId]`, `/partner/services/[partnerId]/request`는 session scope로 canonical company route를 결정하며 모호하거나 권한이 없으면 `/partner`로 복구한다.
