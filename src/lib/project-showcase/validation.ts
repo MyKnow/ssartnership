@@ -9,7 +9,29 @@ import {
 
 const ALLOWED_DEMO_VIDEO_HOSTS = new Set(["youtube.com", "youtu.be", "m.youtube.com", "vimeo.com", "player.vimeo.com"]);
 
-const httpsUrlSchema = z.string().trim().min(1, "체험 주소를 입력해 주세요.").max(2048).refine((value) => {
+/**
+ * 출품·검수·제외 입력 길이 규칙. 출품 폼·관리자 폼의 `maxLength`와 아래 서버 스키마가
+ * 같은 값을 참조한다(FE는 UX용 사전 차단, BE 스키마가 신뢰 경계).
+ */
+export const SHOWCASE_PROJECT_LIMITS = {
+  titleMin: 2,
+  titleMax: 100,
+  teamNameMax: 60,
+  summaryMin: 5,
+  summaryMax: 240,
+  descriptionMin: 20,
+  descriptionMax: 8000,
+  serviceUrlMax: 2048,
+  reviewNoteMax: 2000,
+  exclusionReasonMin: 2,
+  exclusionReasonMax: 500,
+  ownerSearchMin: 2,
+  ownerSearchMax: 50,
+} as const;
+
+const LIMITS = SHOWCASE_PROJECT_LIMITS;
+
+const httpsUrlSchema = z.string().trim().min(1, "체험 주소를 입력해 주세요.").max(LIMITS.serviceUrlMax).refine((value) => {
   try {
     return new URL(value).protocol === "https:";
   } catch {
@@ -29,10 +51,10 @@ export function isSupportedDemoVideoUrl(value: string) {
 
 export const showcaseProjectSubmissionSchema = z.object({
   projectType: z.enum(SHOWCASE_PROJECT_TYPES, "프로젝트 유형을 선택해 주세요."),
-  title: z.string().trim().min(2, "서비스 이름을 2자 이상 입력해 주세요.").max(100, "서비스 이름은 100자 이하로 입력해 주세요."),
-  teamName: z.string().trim().max(60, "팀명은 60자 이하로 입력해 주세요.").transform((value) => value || null),
-  summary: z.string().trim().min(5, "한 줄 소개를 5자 이상 입력해 주세요.").max(240, "한 줄 소개는 240자 이하로 입력해 주세요."),
-  description: z.string().trim().min(20, "서비스 설명을 20자 이상 입력해 주세요.").max(8000, "서비스 설명은 8000자 이하로 입력해 주세요."),
+  title: z.string().trim().min(LIMITS.titleMin, `서비스 이름을 ${LIMITS.titleMin}자 이상 입력해 주세요.`).max(LIMITS.titleMax, `서비스 이름은 ${LIMITS.titleMax}자 이하로 입력해 주세요.`),
+  teamName: z.string().trim().max(LIMITS.teamNameMax, `팀명은 ${LIMITS.teamNameMax}자 이하로 입력해 주세요.`).transform((value) => value || null),
+  summary: z.string().trim().min(LIMITS.summaryMin, `한 줄 소개를 ${LIMITS.summaryMin}자 이상 입력해 주세요.`).max(LIMITS.summaryMax, `한 줄 소개는 ${LIMITS.summaryMax}자 이하로 입력해 주세요.`),
+  description: z.string().trim().min(LIMITS.descriptionMin, `서비스 설명을 ${LIMITS.descriptionMin}자 이상 입력해 주세요.`).max(LIMITS.descriptionMax, `서비스 설명은 ${LIMITS.descriptionMax}자 이하로 입력해 주세요.`),
   serviceUrl: httpsUrlSchema,
   imageUploadId: z.string().uuid("대표 이미지를 선택해 주세요.").nullable(),
   announcementConsent: z.literal(true, "당첨 시 이름 일부를 가려 공지하는 데 동의해 주세요."),
@@ -166,8 +188,8 @@ export function parseShowcaseReview(input: { status: string; reviewNote: string 
   const status = SHOWCASE_REVIEW_STATUSES.find((value) => value === input.status);
   if (!status) return { success: false, message: "검수 결과를 다시 선택해 주세요.", field: null };
   const reviewNote = input.reviewNote.trim();
-  if (reviewNote.length > 2000) {
-    return { success: false, message: "검수 사유는 2000자 이하로 입력해 주세요.", field: "reviewNote" };
+  if (reviewNote.length > LIMITS.reviewNoteMax) {
+    return { success: false, message: `검수 사유는 ${LIMITS.reviewNoteMax}자 이하로 입력해 주세요.`, field: "reviewNote" };
   }
   if ((status === "changes_requested" || status === "rejected") && !reviewNote) {
     return { success: false, message: "수정 요청이나 반려는 출품자에게 보여 줄 사유를 입력해 주세요.", field: "reviewNote" };
@@ -229,8 +251,8 @@ export function parseShowcaseAdminProjectSubmission(
   }
   const reviewNote = typeof input.reviewNote === "string" ? input.reviewNote.trim() : "";
   const noteLength = Array.from(reviewNote).length;
-  if (noteLength > 2000) {
-    return { success: false, message: "검수 사유는 2000자 이하로 입력해 주세요.", field: "reviewNote" };
+  if (noteLength > LIMITS.reviewNoteMax) {
+    return { success: false, message: `검수 사유는 ${LIMITS.reviewNoteMax}자 이하로 입력해 주세요.`, field: "reviewNote" };
   }
   if ((input.status === "changes_requested" || input.status === "rejected") && noteLength === 0) {
     return { success: false, message: "수정 요청이나 반려는 출품자에게 보여 줄 사유를 입력해 주세요.", field: "reviewNote" };
@@ -290,8 +312,8 @@ export function parseShowcaseFeedback(value: unknown): ShowcaseValidationResult<
 export function parseShowcaseExclusionReason(value: unknown): ShowcaseValidationResult<{ reason: string }> {
   const reason = typeof value === "string" ? value.trim() : "";
   const length = Array.from(reason).length;
-  if (length < 2 || length > 500) {
-    return { success: false, message: "제외 사유를 2자 이상 500자 이하로 입력해 주세요.", field: "reason" };
+  if (length < LIMITS.exclusionReasonMin || length > LIMITS.exclusionReasonMax) {
+    return { success: false, message: `제외 사유를 ${LIMITS.exclusionReasonMin}자 이상 ${LIMITS.exclusionReasonMax}자 이하로 입력해 주세요.`, field: "reason" };
   }
   return { success: true, data: { reason } };
 }

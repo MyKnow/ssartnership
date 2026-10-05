@@ -5,7 +5,7 @@ import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import { reviewShowcaseProject, updateShowcaseImmediateFeedback } from "@/app/admin/(protected)/events/project-showcase/actions";
 import type { ShowcaseProjectStatus, ShowcaseReviewStatus } from "@/lib/project-showcase/types";
-import { parseShowcaseReview, SHOWCASE_DUPLICATE_PROJECT_REASON } from "@/lib/project-showcase/validation";
+import { parseShowcaseReview, SHOWCASE_DUPLICATE_PROJECT_REASON, SHOWCASE_PROJECT_LIMITS } from "@/lib/project-showcase/validation";
 
 const ACTIONS: Array<{ status: ShowcaseReviewStatus; label: string; variant: "primary" | "secondary" | "danger" }> = [
   { status: "approved", label: "승인", variant: "primary" },
@@ -105,7 +105,7 @@ export default function ShowcaseProjectReviewForm({
         <textarea
           ref={noteRef}
           id={`showcase-review-note-${projectId}`}
-          maxLength={2000}
+          maxLength={SHOWCASE_PROJECT_LIMITS.reviewNoteMax}
           rows={2}
           defaultValue={currentNote ?? ""}
           className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary"

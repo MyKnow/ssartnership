@@ -12,6 +12,10 @@ import type {
   NotificationTemplateChannel,
   NotificationTemplateSource,
 } from "@/lib/notification-templates/catalog";
+import {
+  NOTIFICATION_TEMPLATE_MAX_BODY_LENGTH,
+  NOTIFICATION_TEMPLATE_MAX_TITLE_LENGTH,
+} from "@/lib/notification-templates/template";
 import type { NotificationTemplateTestRecipientOption } from "@/lib/notification-templates/test-delivery";
 import type {
   NotificationTemplateSummary,
@@ -319,7 +323,7 @@ function TemplateEditor({
               onChange={(event) => setTitleTemplate(event.target.value)}
               readOnly={!canUpdate}
               className="min-h-11 w-full min-w-0 rounded-2xl border border-border bg-surface-control px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-              maxLength={2000}
+              maxLength={NOTIFICATION_TEMPLATE_MAX_TITLE_LENGTH}
               required
             />
           </label>
@@ -331,7 +335,7 @@ function TemplateEditor({
               onChange={(event) => setBodyTemplate(event.target.value)}
               readOnly={!canUpdate}
               className="min-h-36 w-full min-w-0 resize-y rounded-2xl border border-border bg-surface-control px-3 py-3 text-sm leading-6 text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-              maxLength={20000}
+              maxLength={NOTIFICATION_TEMPLATE_MAX_BODY_LENGTH}
               required
             />
           </label>

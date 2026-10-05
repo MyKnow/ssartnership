@@ -11,7 +11,10 @@ import Input from "@/components/ui/Input";
 import SubmitButton from "@/components/ui/SubmitButton";
 import Surface from "@/components/ui/Surface";
 import Textarea from "@/components/ui/Textarea";
-import type { AdminReviewQueueFeedback } from "@/lib/admin-review-queue";
+import {
+  ADMIN_REVIEW_NOTE_MAX_LENGTH,
+  type AdminReviewQueueFeedback,
+} from "@/lib/admin-review-queue";
 
 export type AdminGraduateVerificationRequest = {
   id: string;
@@ -392,7 +395,7 @@ function GraduateVerificationDecisionCard({
                     <Textarea
                       id={resubmissionNoteId}
                       name="note"
-                      maxLength={500}
+                      maxLength={ADMIN_REVIEW_NOTE_MAX_LENGTH}
                       aria-describedby={resubmissionNoteHelpId}
                       placeholder="예: 수료증의 기수가 신청 내용과 다릅니다."
                     />
@@ -400,7 +403,7 @@ function GraduateVerificationDecisionCard({
                       id={resubmissionNoteHelpId}
                       className="text-xs leading-5 text-muted-foreground"
                     >
-                      최대 500자까지 입력할 수 있습니다. 개인정보나 내부 운영
+                      최대 {ADMIN_REVIEW_NOTE_MAX_LENGTH}자까지 입력할 수 있습니다. 개인정보나 내부 운영
                       메모는 적지 마세요.
                     </p>
                   </div>
@@ -439,7 +442,7 @@ function GraduateVerificationDecisionCard({
                       id={rejectionReasonId}
                       name="reason"
                       required
-                      maxLength={500}
+                      maxLength={ADMIN_REVIEW_NOTE_MAX_LENGTH}
                       aria-describedby={rejectionReasonHelpId}
                       placeholder="반려 사유를 입력하세요"
                     />
@@ -447,7 +450,7 @@ function GraduateVerificationDecisionCard({
                       id={rejectionReasonHelpId}
                       className="text-xs leading-5 text-muted-foreground"
                     >
-                      1자 이상 500자 이하로 입력하세요. 회원이 이해할 수 있는
+                      1자 이상 {ADMIN_REVIEW_NOTE_MAX_LENGTH}자 이하로 입력하세요. 회원이 이해할 수 있는
                       표현을 사용하세요.
                     </p>
                   </div>

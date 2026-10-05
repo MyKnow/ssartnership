@@ -12,7 +12,10 @@ import Textarea from "@/components/ui/Textarea";
 import type { MattermostSignupApprovalRequestSummary } from "@/lib/mm-signup-approval";
 import { MANUAL_MEMBER_IMPORT_CAMPUS_OPTIONS } from "@/lib/member-manual-import/options";
 import { formatSsafyYearLabel, getCurrentSsafyYear } from "@/lib/ssafy-year";
-import type { AdminReviewQueueFeedback } from "@/lib/admin-review-queue";
+import {
+  ADMIN_REVIEW_NOTE_MAX_LENGTH,
+  type AdminReviewQueueFeedback,
+} from "@/lib/admin-review-queue";
 
 const PARSE_REASON_LABELS: Record<string, string> = {
   campus_ambiguous: "캠퍼스가 여러 개로 감지됨",
@@ -202,7 +205,7 @@ export default function AdminMemberSignupApprovalDetail({
                   id={rejectionReasonId}
                   name="reason"
                   required
-                  maxLength={500}
+                  maxLength={ADMIN_REVIEW_NOTE_MAX_LENGTH}
                   autoFocus={focusRejectReason}
                   aria-invalid={focusRejectReason || undefined}
                   aria-describedby={rejectionReasonDescribedBy}
@@ -212,7 +215,7 @@ export default function AdminMemberSignupApprovalDetail({
                   id={rejectionReasonHelpId}
                   className="text-xs leading-5 text-muted-foreground"
                 >
-                  반려 사유를 1~500자로 입력해 주세요. 개인정보나 내부 운영 메모는 적지 마세요.
+                  반려 사유를 1~{ADMIN_REVIEW_NOTE_MAX_LENGTH}자로 입력해 주세요. 개인정보나 내부 운영 메모는 적지 마세요.
                 </p>
                 {focusRejectReason ? (
                   <p
@@ -220,7 +223,7 @@ export default function AdminMemberSignupApprovalDetail({
                     className="text-sm font-medium text-danger"
                     role="alert"
                   >
-                    반려 사유를 1~500자로 입력해 주세요.
+                    반려 사유를 1~{ADMIN_REVIEW_NOTE_MAX_LENGTH}자로 입력해 주세요.
                   </p>
                 ) : null}
                 <div>

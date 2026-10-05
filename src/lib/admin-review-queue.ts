@@ -1,5 +1,11 @@
 export type AdminReviewQueueFeedbackTone = "info" | "success" | "danger";
 
+/**
+ * 관리자 검토(반려·보완 요청) 사유 길이 상한. 검토 화면 입력 `maxLength`와
+ * server action·서비스 검증이 함께 참조한다.
+ */
+export const ADMIN_REVIEW_NOTE_MAX_LENGTH = 500;
+
 export type AdminReviewQueueFeedback = {
   tone: AdminReviewQueueFeedbackTone;
   title: string;
@@ -48,7 +54,7 @@ const ERROR_MESSAGES: Record<string, AdminReviewQueueFeedback> = {
   invalid_reason: {
     tone: "danger",
     title: "반려 사유를 확인해 주세요",
-    description: "반려 사유를 1~500자로 입력해 주세요.",
+    description: `반려 사유를 1~${ADMIN_REVIEW_NOTE_MAX_LENGTH}자로 입력해 주세요.`,
   },
   approval_failed: {
     tone: "danger",

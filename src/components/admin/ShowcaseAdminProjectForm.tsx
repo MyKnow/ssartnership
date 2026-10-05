@@ -32,6 +32,7 @@ import type { ShowcaseAdminMemberOption, ShowcaseAdminProject } from "@/lib/proj
 import {
   parseShowcaseAdminProjectSubmission,
   SHOWCASE_SERVICE_URL_HINTS,
+  SHOWCASE_PROJECT_LIMITS,
 } from "@/lib/project-showcase/validation";
 
 const IMAGE_POLICY = resolveImageTransformPolicy("showcase-project", "image");
@@ -219,7 +220,7 @@ export default function ShowcaseAdminProjectForm({ mode, project }: ShowcaseAdmi
                   name="ownerSearch"
                   value={ownerQuery}
                   onChange={(event) => setOwnerQuery(event.target.value)}
-                  maxLength={50}
+                  maxLength={SHOWCASE_PROJECT_LIMITS.ownerSearchMax}
                   className={INPUT_CLASS}
                   placeholder="회원 이름을 두 글자 이상 입력해 주세요"
                 />
@@ -270,16 +271,16 @@ export default function ShowcaseAdminProjectForm({ mode, project }: ShowcaseAdmi
       </fieldset>
 
       <div className="grid gap-4">
-        <Field label="서비스 이름" name="title" maxLength={100} defaultValue={project?.title ?? ""} />
-        <Field label="팀명 (선택)" name="teamName" maxLength={60} defaultValue={project?.teamName ?? ""} />
-        <Field label="한 줄 소개" name="summary" maxLength={240} defaultValue={project?.summary ?? ""} />
+        <Field label="서비스 이름" name="title" maxLength={SHOWCASE_PROJECT_LIMITS.titleMax} defaultValue={project?.title ?? ""} />
+        <Field label="팀명 (선택)" name="teamName" maxLength={SHOWCASE_PROJECT_LIMITS.teamNameMax} defaultValue={project?.teamName ?? ""} />
+        <Field label="한 줄 소개" name="summary" maxLength={SHOWCASE_PROJECT_LIMITS.summaryMax} defaultValue={project?.summary ?? ""} />
         <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-admin-description">
           서비스 설명
-          <textarea id="showcase-admin-description" name="description" maxLength={8000} rows={7} required defaultValue={project?.description ?? ""} className={`${INPUT_CLASS} py-3`} placeholder="주요 기능, 이용 방법, 만든 계기 등을 적어 주세요 (20자 이상)" />
+          <textarea id="showcase-admin-description" name="description" maxLength={SHOWCASE_PROJECT_LIMITS.descriptionMax} rows={7} required defaultValue={project?.description ?? ""} className={`${INPUT_CLASS} py-3`} placeholder="주요 기능, 이용 방법, 만든 계기 등을 적어 주세요 (20자 이상)" />
         </label>
         <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-admin-service-url">
           {urlHint.label}
-          <input id="showcase-admin-service-url" name="serviceUrl" type="url" inputMode="url" maxLength={2048} required defaultValue={project?.serviceUrl ?? ""} className={INPUT_CLASS} placeholder={urlHint.placeholder} />
+          <input id="showcase-admin-service-url" name="serviceUrl" type="url" inputMode="url" maxLength={SHOWCASE_PROJECT_LIMITS.serviceUrlMax} required defaultValue={project?.serviceUrl ?? ""} className={INPUT_CLASS} placeholder={urlHint.placeholder} />
         </label>
       </div>
 
@@ -309,7 +310,7 @@ export default function ShowcaseAdminProjectForm({ mode, project }: ShowcaseAdmi
 
       <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-admin-review-note">
         검수 사유 <span className="text-xs font-normal text-muted-foreground">수정 요청·반려 시 필수, 출품자에게 보여요</span>
-        <textarea id="showcase-admin-review-note" name="reviewNote" maxLength={2000} rows={3} defaultValue={project?.reviewNote ?? ""} className={`${INPUT_CLASS} py-3`} placeholder="판단 근거나 수정이 필요한 부분을 적어 주세요." />
+        <textarea id="showcase-admin-review-note" name="reviewNote" maxLength={SHOWCASE_PROJECT_LIMITS.reviewNoteMax} rows={3} defaultValue={project?.reviewNote ?? ""} className={`${INPUT_CLASS} py-3`} placeholder="판단 근거나 수정이 필요한 부분을 적어 주세요." />
       </label>
 
       <div className="grid gap-3">

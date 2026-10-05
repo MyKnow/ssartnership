@@ -23,6 +23,7 @@ import {
 import {
   parseShowcaseProjectSubmission,
   SHOWCASE_SERVICE_URL_HINTS,
+  SHOWCASE_PROJECT_LIMITS,
 } from "@/lib/project-showcase/validation";
 
 const IMAGE_POLICY = resolveImageTransformPolicy("showcase-project", "image");
@@ -223,17 +224,17 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
       <div className="grid gap-5">
         <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-project-title">
           서비스 이름
-          <input id="showcase-project-title" name="title" maxLength={100} defaultValue={project?.title} {...fieldProps("title", "showcase-project-title-error")} placeholder="서비스 이름을 입력해 주세요" />
+          <input id="showcase-project-title" name="title" maxLength={SHOWCASE_PROJECT_LIMITS.titleMax} defaultValue={project?.title} {...fieldProps("title", "showcase-project-title-error")} placeholder="서비스 이름을 입력해 주세요" />
           <FieldError id="showcase-project-title-error" message={fieldError("title")} />
         </label>
         <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-project-team">
           팀명 (선택)
-          <input id="showcase-project-team" name="teamName" maxLength={60} defaultValue={project?.teamName ?? ""} {...fieldProps("teamName", "showcase-project-team-error")} />
+          <input id="showcase-project-team" name="teamName" maxLength={SHOWCASE_PROJECT_LIMITS.teamNameMax} defaultValue={project?.teamName ?? ""} {...fieldProps("teamName", "showcase-project-team-error")} />
           <FieldError id="showcase-project-team-error" message={fieldError("teamName")} />
         </label>
         <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-project-summary">
           한 줄 소개
-          <input id="showcase-project-summary" name="summary" maxLength={240} defaultValue={project?.summary} {...fieldProps("summary", "showcase-project-summary-error")} placeholder="어떤 문제를 해결하는 서비스인지 알려 주세요" />
+          <input id="showcase-project-summary" name="summary" maxLength={SHOWCASE_PROJECT_LIMITS.summaryMax} defaultValue={project?.summary} {...fieldProps("summary", "showcase-project-summary-error")} placeholder="어떤 문제를 해결하는 서비스인지 알려 주세요" />
           <FieldError id="showcase-project-summary-error" message={fieldError("summary")} />
         </label>
         <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-project-description">
@@ -241,7 +242,7 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
           <textarea
             id="showcase-project-description"
             name="description"
-            maxLength={8000}
+            maxLength={SHOWCASE_PROJECT_LIMITS.descriptionMax}
             rows={7}
             defaultValue={project?.description}
             {...fieldProps("description", "showcase-project-description-error", "py-3")}
@@ -256,7 +257,7 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
             name="serviceUrl"
             type="url"
             inputMode="url"
-            maxLength={2048}
+            maxLength={SHOWCASE_PROJECT_LIMITS.serviceUrlMax}
             defaultValue={project?.serviceUrl}
             {...fieldProps("serviceUrl", "showcase-project-url-error")}
             placeholder={urlHint.placeholder}

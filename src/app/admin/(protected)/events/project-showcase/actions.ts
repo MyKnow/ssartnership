@@ -22,6 +22,7 @@ import {
   parseShowcaseAdminProjectSubmission,
   parseShowcaseSchedule,
   SHOWCASE_SCHEDULE_FIELDS,
+  SHOWCASE_PROJECT_LIMITS,
 } from "@/lib/project-showcase/validation";
 import { removeShowcaseProjectImages } from "@/lib/project-showcase/storage.server";
 import { isUuid } from "@/lib/uuid";
@@ -178,7 +179,11 @@ function revalidateAdminProject(projectId?: string) {
 
 export async function searchShowcaseAdminOwners(query: unknown) {
   await requireAdminPermission("events", "create", { path: `${ADMIN_PATH}/projects/new` });
-  if (typeof query !== "string" || query.trim().length < 2 || query.trim().length > 50) {
+  if (
+    typeof query !== "string"
+    || query.trim().length < SHOWCASE_PROJECT_LIMITS.ownerSearchMin
+    || query.trim().length > SHOWCASE_PROJECT_LIMITS.ownerSearchMax
+  ) {
     return { ok: true as const, owners: [] };
   }
   try {

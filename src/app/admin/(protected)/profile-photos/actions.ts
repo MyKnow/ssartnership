@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { appendAdminReviewQueueQuery } from "@/lib/admin-review-queue";
+import { ADMIN_REVIEW_NOTE_MAX_LENGTH, appendAdminReviewQueueQuery } from "@/lib/admin-review-queue";
 import {
   logAdminAction,
   redirectAdminActionError,
@@ -37,7 +37,7 @@ function getRequiredReason(
   reasonFieldId: string,
 ) {
   const reason = String(formData.get("reason") ?? "").trim();
-  if (!reason || reason.length > 500) {
+  if (!reason || reason.length > ADMIN_REVIEW_NOTE_MAX_LENGTH) {
     redirectAdminActionError(
       appendAdminReviewQueueQuery(returnTo, { focus: reasonFieldId }),
       "invalid_reason",

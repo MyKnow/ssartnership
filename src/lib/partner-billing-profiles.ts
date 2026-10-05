@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   normalizePartnerBillingProfileInput,
+  PARTNER_BILLING_FIELD_LIMITS,
   type PartnerBillingProfile,
   type PartnerBillingProfileInput,
 } from "@/lib/partner-billing";
@@ -75,8 +76,10 @@ function nowIso() {
 
 export function normalizePartnerBillingProfileLabel(value: string) {
   const normalized = value.trim() || DEFAULT_BILLING_PROFILE_LABEL;
-  if (normalized.length > 80) {
-    throw new Error("프로필 이름은 80자 이하로 입력해 주세요.");
+  if (normalized.length > PARTNER_BILLING_FIELD_LIMITS.profileLabel) {
+    throw new Error(
+      `프로필 이름은 ${PARTNER_BILLING_FIELD_LIMITS.profileLabel}자 이하로 입력해 주세요.`,
+    );
   }
   return normalized;
 }

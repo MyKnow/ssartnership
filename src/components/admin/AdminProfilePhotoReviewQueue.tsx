@@ -7,7 +7,10 @@ import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import SubmitButton from "@/components/ui/SubmitButton";
 import Surface from "@/components/ui/Surface";
 import Textarea from "@/components/ui/Textarea";
-import type { AdminReviewQueueFeedback } from "@/lib/admin-review-queue";
+import {
+  ADMIN_REVIEW_NOTE_MAX_LENGTH,
+  type AdminReviewQueueFeedback,
+} from "@/lib/admin-review-queue";
 import DeferredImagePreview from "@/components/admin/DeferredImagePreview";
 
 export type AdminProfilePhotoReplacement = {
@@ -75,19 +78,19 @@ function RejectionReasonField({
         id={id}
         name="reason"
         required
-        maxLength={500}
+        maxLength={ADMIN_REVIEW_NOTE_MAX_LENGTH}
         autoFocus={isReasonInvalid}
         aria-invalid={isReasonInvalid || undefined}
         aria-describedby={describedBy}
         placeholder={placeholder}
       />
       <p id={helpId} className="text-xs leading-5 text-muted-foreground">
-        반려 사유를 1~500자로 입력해 주세요. 개인정보나 내부 운영 메모는 적지
+        반려 사유를 1~{ADMIN_REVIEW_NOTE_MAX_LENGTH}자로 입력해 주세요. 개인정보나 내부 운영 메모는 적지
         마세요.
       </p>
       {isReasonInvalid ? (
         <p id={errorId} className="text-sm font-medium text-danger" role="alert">
-          반려 사유를 1~500자로 입력해 주세요.
+          반려 사유를 1~{ADMIN_REVIEW_NOTE_MAX_LENGTH}자로 입력해 주세요.
         </p>
       ) : null}
     </fieldset>
