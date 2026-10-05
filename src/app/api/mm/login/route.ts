@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
+import { revalidateMemberGatePaths } from "@/lib/member-gate-revalidation";
 import { clearAdminSession } from "@/lib/auth";
 import { setUserSession } from "@/lib/user-auth";
 import { verifyPassword } from "@/lib/password";
@@ -176,10 +176,7 @@ export async function POST(request: Request) {
       freshAuthentication: true,
     });
     await clearAdminSession();
-    revalidatePath("/");
-    revalidatePath("/auth/consent");
-    revalidatePath("/auth/change-password");
-    revalidatePath("/certification");
+    revalidateMemberGatePaths();
     await recordMemberAuthAttempt("login", throttleContext, true);
 
     await logAuthSecurity({

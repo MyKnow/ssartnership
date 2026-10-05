@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
 import {
   getActiveRequiredPolicies,
@@ -299,7 +298,6 @@ export async function POST(request: Request) {
       actorId: inserted.id,
       properties: { source: "mattermost_code", generation: verification.subjectGeneration },
     });
-    revalidatePath("/");
     return NextResponse.json({ ok: true, redirectTo: sanitizeReturnTo(
       typeof body === "object" && body && !Array.isArray(body)
         ? (body as Record<string, unknown>).returnTo as string | undefined
