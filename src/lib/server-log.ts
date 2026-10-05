@@ -26,6 +26,8 @@ const SAFE_CODE = /^[A-Za-z0-9_.:-]{1,64}$/u;
 const SAFE_DIGEST = /^[A-Za-z0-9_-]{1,64}$/u;
 
 const MESSAGE_REDACTIONS: ReadonlyArray<readonly [RegExp, string]> = [
+  // Credential assignments can appear outside URLs or bearer headers.
+  [/((?:api[-_]?key|authorization|client[-_]?secret|cookie|credential|password|private[-_]?key|secret|session|token)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^,;]+)/giu, "$1[redacted]"],
   // Credentials and bearer material.
   [/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/giu, "$1 [redacted]"],
   [/\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?/gu, "[token]"],
