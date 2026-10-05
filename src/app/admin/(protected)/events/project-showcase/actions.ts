@@ -25,6 +25,7 @@ import {
 } from "@/lib/project-showcase/validation";
 import { removeShowcaseProjectImages } from "@/lib/project-showcase/storage.server";
 import { isUuid } from "@/lib/uuid";
+import { toDrawAuditLogProperties } from "@/lib/draw-audit";
 
 const EVENT_PATH = `/events/${PROJECT_SHOWCASE_SLUG}`;
 const ADMIN_PATH = "/admin/events/project-showcase";
@@ -400,8 +401,7 @@ export async function runShowcaseDraw(group: ShowcaseCandidateGroup) {
       path: DRAW_PATH,
       properties: {
         candidate_group: group,
-        candidate_count: receipt.candidateCount,
-        ticket_count: receipt.ticketCount,
+        ...toDrawAuditLogProperties(receipt.audit),
         selected_count: receipt.selectedCount,
       },
     });
@@ -445,7 +445,12 @@ export async function redrawShowcaseWinner(winnerId: string) {
       targetType: "showcase_winner",
       targetId: winnerId,
       path: DRAW_PATH,
-      properties: { candidate_group: receipt.candidateGroup, candidate_count: receipt.candidateCount, selected_count: receipt.selectedCount, redraw: true },
+      properties: {
+        candidate_group: receipt.candidateGroup,
+        ...toDrawAuditLogProperties(receipt.audit),
+        selected_count: receipt.selectedCount,
+        redraw: true,
+      },
     });
     revalidateDraw();
     return {

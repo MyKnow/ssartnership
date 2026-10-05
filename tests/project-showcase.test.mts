@@ -710,6 +710,11 @@ describe("mock Repository 추첨·정산 규칙", () => {
     const bounds: number[] = [];
     const receipt = await repository.runDraw({ group: "submitter", adminId: "admin", random: (max) => { bounds.push(max); return 0; } });
     assert.deepEqual({ people: receipt.candidateCount, tickets: receipt.ticketCount, winners: receipt.selectedCount }, { people: 2, tickets: 3, winners: 2 });
+    assert.deepEqual(
+      { source: receipt.audit.seedSource, algorithm: receipt.audit.algorithm, people: receipt.audit.candidateCount, tickets: receipt.audit.ticketCount },
+      { source: "csprng", algorithm: "csprng-project-ticket-v1", people: 2, tickets: 3 },
+    );
+    assert.match(receipt.audit.candidateSnapshotSha256, /^[0-9a-f]{64}$/);
     assert.deepEqual(bounds, [3, 1]);
     assert.equal(store.winners.filter((winner) => winner.memberId === OWNER).length, 1);
     await repository.runDraw({ group: "experiencer", adminId: "admin" });

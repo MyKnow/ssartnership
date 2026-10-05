@@ -1,5 +1,7 @@
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
+  buildShowcaseExperiencerDrawAudit,
+  buildShowcaseSubmitterDrawAudit,
   sampleShowcaseProjects,
   sampleShowcaseWeighted,
   secureRandomInt,
@@ -643,6 +645,7 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
       return {
         candidateCount: new Set(eligible.map((candidate) => candidate.memberId)).size,
         ticketCount: eligible.length,
+        audit: buildShowcaseSubmitterDrawAudit(eligible),
         winners: chosen.map((candidate) => ({
           member_id: candidate.memberId,
           project_id: candidate.projectId,
@@ -656,6 +659,7 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
     return {
       candidateCount: eligible.length,
       ticketCount: eligible.reduce((total, candidate) => total + candidate.tickets, 0),
+      audit: buildShowcaseExperiencerDrawAudit(eligible),
       winners: chosen.map((candidate) => ({
         member_id: candidate.memberId,
         project_id: null,
@@ -682,7 +686,7 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
       p_winners: selection.winners,
     });
     if (error) throwDomain(error, "추첨 결과를 저장하지 못했습니다.");
-    return { candidateGroup: input.group, candidateCount: selection.candidateCount, ticketCount: selection.ticketCount, selectedCount: selection.winners.length };
+    return { candidateGroup: input.group, candidateCount: selection.candidateCount, ticketCount: selection.ticketCount, selectedCount: selection.winners.length, audit: selection.audit };
   }
 
   async voidWinner(input: { winnerId: string; adminId: string; reason: ShowcaseVoidReason }) {
@@ -719,7 +723,7 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
       p_winners: selection.winners,
     });
     if (result.error) throwDomain(result.error, "재추첨 결과를 저장하지 못했습니다.");
-    return { candidateGroup: group, candidateCount: selection.candidateCount, ticketCount: selection.ticketCount, selectedCount: selection.winners.length };
+    return { candidateGroup: group, candidateCount: selection.candidateCount, ticketCount: selection.ticketCount, selectedCount: selection.winners.length, audit: selection.audit };
   }
 
   async setWinnerDelivered(input: { winnerId: string; adminId: string; delivered: boolean }) {

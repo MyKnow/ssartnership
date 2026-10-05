@@ -10,6 +10,11 @@ import {
   type AdminNotificationComposerInput,
 } from "@/lib/admin-notification-ops";
 import { toCsvCell } from "@/lib/csv";
+import {
+  buildDrawAuditSummary,
+  type DrawAuditSummary,
+  type DrawSeedSource,
+} from "@/lib/draw-audit";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type { EventCampaign, EventConditionKey } from "@/lib/promotions/catalog";
 import {
@@ -656,6 +661,26 @@ export function createEventRewardDrawPlan(
   };
 }
 
+export const EVENT_REWARD_DRAW_ALGORITHM = "sha256-seeded-weighted-v1";
+
+/**
+ * Audit summary shared with the showcase draw (see draw-audit). The candidate
+ * snapshot follows createEventRewardDrawPlan's candidate order, so the stored
+ * seed plus this digest are enough to verify a reproduced draw.
+ */
+export function buildEventRewardDrawAudit(
+  overview: EventRewardAdminOverview,
+  seedSource: Extract<DrawSeedSource, "admin" | "generated">,
+): DrawAuditSummary {
+  return buildDrawAuditSummary({
+    algorithm: EVENT_REWARD_DRAW_ALGORITHM,
+    seedSource,
+    entries: overview.members
+      .filter((member) => member.totalTickets > 0)
+      .map((member) => ({ id: member.id, weight: member.totalTickets })),
+  });
+}
+
 export function canViewEventRewardWinnerForm(params: {
   memberId?: string | null;
   winnerMemberIds: readonly string[];
@@ -906,6 +931,7 @@ export async function persistEventRewardDraw(
     googleFormUrl: string;
     createdByAdminId?: string | null;
     finalizedAt: string;
+    audit?: DrawAuditSummary;
   },
 ) {
   const { campaign, plan } = params;
@@ -932,6 +958,7 @@ export async function persistEventRewardDraw(
         campaignTitle: campaign.title,
         campaignStartsAt: campaign.startsAt,
         campaignEndsAt: campaign.endsAt,
+        ...(params.audit ? { audit: params.audit } : {}),
       },
     })
     .select(EVENT_REWARD_DRAW_SELECT)
@@ -993,6 +1020,7 @@ export async function persistEventRewardDraw(
 export async function createStoredEventRewardDraw(params: {
   campaign: EventCampaign;
   request: EventRewardDrawRequest;
+  seedSource: Extract<DrawSeedSource, "admin" | "generated">;
   createdByAdminId?: string | null;
 }) {
   const overview = await getEventRewardAdminOverview(params.campaign);
@@ -1000,13 +1028,16 @@ export async function createStoredEventRewardDraw(params: {
     winnerCount: params.request.winnerCount,
     seed: params.request.seed,
   });
-  return persistEventRewardDraw(getSupabaseAdminClient(), {
+  const audit = buildEventRewardDrawAudit(overview, params.seedSource);
+  const draw = await persistEventRewardDraw(getSupabaseAdminClient(), {
     campaign: params.campaign,
     plan,
     googleFormUrl: params.request.googleFormUrl,
     createdByAdminId: params.createdByAdminId,
     finalizedAt: new Date().toISOString(),
+    audit,
   });
+  return { ...draw, audit };
 }
 
 function drawNotificationStatus(params: {

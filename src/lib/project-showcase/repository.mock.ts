@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { MOCK_MEMBER_ID } from "@/lib/mock/member";
 import {
+  buildShowcaseExperiencerDrawAudit,
+  buildShowcaseSubmitterDrawAudit,
   sampleShowcaseProjects,
   sampleShowcaseWeighted,
   secureRandomInt,
@@ -324,11 +326,13 @@ function recordDraw(
   const drawId = randomUUID();
   let candidateCount = 0;
   let ticketCount = 0;
+  let audit: ShowcaseDrawReceipt["audit"];
   let chosen: Array<{ memberId: string; displayName: string; projectTitle: string | null }> = [];
   if (group === "submitter") {
     const eligible = submitterPool(store).filter((item) => item.memberId && !item.exclusion && !item.alreadyWon);
     candidateCount = new Set(eligible.map((item) => item.memberId)).size;
     ticketCount = eligible.length;
+    audit = buildShowcaseSubmitterDrawAudit(eligible);
     chosen = sampleShowcaseProjects(eligible, requested, random).map((item) => ({
       memberId: item.memberId, displayName: item.ownerDisplayName, projectTitle: item.projectTitle,
     }));
@@ -336,6 +340,7 @@ function recordDraw(
     const eligible = experiencerPool(store).filter((item) => !item.exclusion && !item.alreadyWon);
     candidateCount = eligible.length;
     ticketCount = eligible.reduce((total, item) => total + item.tickets, 0);
+    audit = buildShowcaseExperiencerDrawAudit(eligible);
     chosen = sampleShowcaseWeighted(eligible.map((item) => ({ ...item, weight: item.tickets })), requested, random).map((item) => ({
       memberId: item.memberId, displayName: item.displayName, projectTitle: null,
     }));
@@ -364,7 +369,7 @@ function recordDraw(
     actorType: "admin",
     details: { candidateGroup: group, candidateCount, selectedCount: chosen.length },
   });
-  return { candidateGroup: group, candidateCount, ticketCount, selectedCount: chosen.length };
+  return { candidateGroup: group, candidateCount, ticketCount, selectedCount: chosen.length, audit };
 }
 
 function sortWinners<T extends { candidateGroup: ShowcaseCandidateGroup; position: number; createdAt: string }>(winners: T[]) {

@@ -26,6 +26,7 @@ import {
   validatePromotionSlide,
 } from "@/lib/promotions/slide-validation";
 import { getEventPageDefinition } from "@/lib/event-pages";
+import { toDrawAuditLogProperties } from "@/lib/draw-audit";
 import {
   createStoredEventRewardDraw,
   EventRewardSafeError,
@@ -616,6 +617,7 @@ export async function createEventRewardDrawAction(formData: FormData) {
     draw = await createStoredEventRewardDraw({
       campaign,
       request: request.value,
+      seedSource: seed ? "admin" : "generated",
       createdByAdminId: adminSession?.adminId ?? null,
     });
   } catch (error) {
@@ -639,6 +641,7 @@ export async function createEventRewardDrawAction(formData: FormData) {
       winnerCount: draw.winnerCount,
       candidateCount: draw.candidateCount,
       totalTickets: draw.totalTickets,
+      ...toDrawAuditLogProperties(draw.audit),
     },
   });
   revalidatePromotionEventSurfaces();
