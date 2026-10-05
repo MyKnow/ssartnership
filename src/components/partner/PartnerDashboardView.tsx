@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCount } from "@/lib/number-format";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import Container from "@/components/ui/Container";
@@ -37,10 +38,6 @@ const partnerPortalDataSource =
   process.env.NEXT_PUBLIC_DATA_SOURCE ??
   "supabase";
 const isPartnerPortalMock = partnerPortalDataSource !== "supabase";
-
-function formatCount(value: number) {
-  return value.toLocaleString("ko-KR");
-}
 
 function ServiceMetric({
   label,

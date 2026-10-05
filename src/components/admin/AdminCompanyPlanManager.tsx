@@ -24,6 +24,7 @@ import {
   rejectPartnerPlanUpgradeRequest,
   updatePartnerBrandPlan,
 } from "@/app/admin/(protected)/actions";
+import { formatKoreanWon } from "@/lib/number-format";
 
 export type AdminBrandPlanBrand = {
   id: string;
@@ -79,10 +80,6 @@ function toDateInputValue(value?: string | null) {
     return "";
   }
   return date.toISOString().slice(0, 10);
-}
-
-function formatCurrency(value: number) {
-  return `${value.toLocaleString("ko-KR")}원`;
 }
 
 function getStatusBadgeVariant(status: AdminCompanyPlanRequest["status"]) {
@@ -172,7 +169,7 @@ export default function AdminCompanyPlanManager({
                 <Badge variant="neutral">제휴처 {count}개</Badge>
               </div>
               <p className="text-lg font-semibold text-foreground">
-                {definition.monthlyPriceKrw === 0 ? "무료" : `월 ${formatCurrency(definition.monthlyPriceKrw)}`}
+                {definition.monthlyPriceKrw === 0 ? "무료" : `월 ${formatKoreanWon(definition.monthlyPriceKrw)}`}
               </p>
             </Card>
           );
@@ -217,7 +214,7 @@ export default function AdminCompanyPlanManager({
                       </div>
                     </div>
                     <p className="text-sm font-semibold text-foreground">
-                      {formatCurrency(billing?.totalAmountKrw ?? request.paymentAmountKrw)}
+                      {formatKoreanWon(billing?.totalAmountKrw ?? request.paymentAmountKrw)}
                     </p>
                   </div>
 
@@ -227,7 +224,7 @@ export default function AdminCompanyPlanManager({
                     <p><span className="font-semibold text-foreground">납부기한</span><br />{formatPartnerPlanDateTime(billing?.dueAt)}</p>
                     <p>
                       <span className="font-semibold text-foreground">공급가액 / VAT</span><br />
-                      {billing ? `${formatCurrency(billing.supplyAmountKrw)} / ${formatCurrency(billing.vatAmountKrw)}` : "미생성"}
+                      {billing ? `${formatKoreanWon(billing.supplyAmountKrw)} / ${formatKoreanWon(billing.vatAmountKrw)}` : "미생성"}
                     </p>
                     <p>
                       <span className="font-semibold text-foreground">청구 기간</span><br />

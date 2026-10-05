@@ -569,7 +569,7 @@ export default function AdminMemberManager({
       </FilterBar>
 
       <p className="text-sm text-muted-foreground">
-        조건에 맞는 회원 {pagination.totalCount.toLocaleString()}명
+        조건에 맞는 회원 {pagination.totalCount.toLocaleString("ko-KR")}명
         {isPending ? " · 갱신 중" : ""}
       </p>
 

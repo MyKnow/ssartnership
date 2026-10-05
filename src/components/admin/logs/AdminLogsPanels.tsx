@@ -217,21 +217,21 @@ export function ActivityChart({
           items: [
             {
               label: '전체',
-              value: `${(point.values.total ?? 0).toLocaleString()}건`,
+              value: `${(point.values.total ?? 0).toLocaleString("ko-KR")}건`,
             },
             ...(allowedGroups.includes('product') ? [{
               label: '사용자 이벤트',
-              value: `${(point.values.product ?? 0).toLocaleString()}건`,
+              value: `${(point.values.product ?? 0).toLocaleString("ko-KR")}건`,
               valueClassName: 'text-sky-700 dark:text-sky-300',
             }] : []),
             ...(allowedGroups.includes('audit') ? [{
               label: '관리자 감사',
-              value: `${(point.values.audit ?? 0).toLocaleString()}건`,
+              value: `${(point.values.audit ?? 0).toLocaleString("ko-KR")}건`,
               valueClassName: 'text-violet-700 dark:text-violet-300',
             }] : []),
             ...(allowedGroups.includes('security') ? [{
               label: '인증·보안',
-              value: `${(point.values.security ?? 0).toLocaleString()}건`,
+              value: `${(point.values.security ?? 0).toLocaleString("ko-KR")}건`,
               valueClassName: 'text-amber-700 dark:text-amber-300',
             }] : []),
           ],
@@ -252,7 +252,7 @@ export function ActivityChart({
               {bucket.label}
             </p>
             <p className="mt-2 text-lg font-semibold text-foreground">
-              {bucket.total.toLocaleString()}
+              {bucket.total.toLocaleString("ko-KR")}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">{bucket.rangeLabel}</p>
           </button>

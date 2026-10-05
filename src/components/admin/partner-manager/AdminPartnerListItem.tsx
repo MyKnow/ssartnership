@@ -28,7 +28,7 @@ function MetricPill({
       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
         {label}
       </p>
-      <p className="mt-1 text-sm font-semibold text-foreground">{value.toLocaleString()}</p>
+      <p className="mt-1 text-sm font-semibold text-foreground">{value.toLocaleString("ko-KR")}</p>
     </div>
   );
 }

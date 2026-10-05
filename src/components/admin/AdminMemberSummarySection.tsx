@@ -28,12 +28,12 @@ export default async function AdminMemberSummarySection({
     <>
       <StatsRow
         items={[
-          { label: "전체 회원", value: `${totalCount.toLocaleString()}명`, hint: "현재 필터 기준 결과 수" },
-          { label: "현재 페이지", value: `${currentPageCount.toLocaleString()}명`, hint: `${page} / ${totalPages} 페이지` },
-          { label: "비밀번호 변경 필요", value: `${mustChangePasswordCount.toLocaleString()}명`, hint: "현재 페이지 기준" },
+          { label: "전체 회원", value: `${totalCount.toLocaleString("ko-KR")}명`, hint: "현재 필터 기준 결과 수" },
+          { label: "현재 페이지", value: `${currentPageCount.toLocaleString("ko-KR")}명`, hint: `${page} / ${totalPages} 페이지` },
+          { label: "비밀번호 변경 필요", value: `${mustChangePasswordCount.toLocaleString("ko-KR")}명`, hint: "현재 페이지 기준" },
           {
             label: "정책 확인 필요",
-            value: result.hasError ? "확인 불가" : `${result.pendingPolicyCount.toLocaleString()}명`,
+            value: result.hasError ? "확인 불가" : `${result.pendingPolicyCount.toLocaleString("ko-KR")}명`,
             hint: result.hasError
               ? "잠시 후 다시 확인해 주세요"
               : `최근 갱신 ${formatSummaryDate(result.latestUpdatedAt)}`,

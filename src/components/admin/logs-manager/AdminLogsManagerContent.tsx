@@ -93,7 +93,7 @@ export default function AdminLogsManagerContent({
           logs.data.truncated.limitPerGroup !== null ? (
             <FormMessage variant="error">
               조회 범위의 로그가 많아 그룹별 최근{" "}
-              {logs.data.truncated.limitPerGroup.toLocaleString()}건만
+              {logs.data.truncated.limitPerGroup.toLocaleString("ko-KR")}건만
               불러왔습니다. 권한이 있는 경우 CSV 다운로드에서 더 넓은 원본을
               확인할 수 있습니다.
             </FormMessage>
@@ -145,27 +145,27 @@ export default function AdminLogsManagerContent({
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             title="전체 로그"
-            value={`${logs.totalLogs.toLocaleString()}건`}
+            value={`${logs.totalLogs.toLocaleString("ko-KR")}건`}
             description="현재 조회 범위 안에서 적재된 전체 로그 수입니다."
           />
           {logs.readGroups.includes("product") ? (
             <MetricCard
               title="사용자 이벤트"
-              value={`${logs.data.counts.product.toLocaleString()}건`}
+              value={`${logs.data.counts.product.toLocaleString("ko-KR")}건`}
               description="페이지 조회, 클릭, 검색, 푸시 설정 등 제품 로그입니다."
             />
           ) : null}
           {logs.readGroups.includes("audit") ? (
             <MetricCard
               title="관리자 감사"
-              value={`${logs.data.counts.audit.toLocaleString()}건`}
+              value={`${logs.data.counts.audit.toLocaleString("ko-KR")}건`}
               description="관리자 CRUD와 푸시 발송/삭제 같은 조작 이력입니다."
             />
           ) : null}
           {logs.readGroups.includes("security") ? (
             <MetricCard
               title="인증·보안"
-              value={`${logs.data.counts.security.toLocaleString()}건`}
+              value={`${logs.data.counts.security.toLocaleString("ko-KR")}건`}
               description="로그인, 회원가입 인증, 비밀번호/탈퇴 관련 로그입니다."
             />
           ) : null}

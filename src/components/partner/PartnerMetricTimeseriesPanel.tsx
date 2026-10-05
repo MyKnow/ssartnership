@@ -10,6 +10,7 @@ import type {
   PartnerMetricTimeseriesSnapshot,
   PartnerMetricTimeseriesGranularity,
 } from "@/lib/partner-metric-timeseries";
+import { formatCount } from "@/lib/number-format";
 
 const TAB_OPTIONS: ReadonlyArray<{
   value: PartnerMetricTimeseriesGranularity;
@@ -69,10 +70,6 @@ function formatAverage(value: number) {
         minimumFractionDigits: 1,
         maximumFractionDigits: 1,
       });
-}
-
-function formatCount(value: number) {
-  return value.toLocaleString("ko-KR");
 }
 
 export default function PartnerMetricTimeseriesPanel({

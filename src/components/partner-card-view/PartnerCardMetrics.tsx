@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { formatCount } from "@/lib/number-format";
 
 export type PartnerCardMetricItem = {
   label: ReactNode;
@@ -21,10 +22,6 @@ export function PartnerCardMetricLabel({
       <span className="sr-only">{label}</span>
     </span>
   );
-}
-
-function formatCount(value: number) {
-  return value.toLocaleString("ko-KR");
 }
 
 export default function PartnerCardMetrics({

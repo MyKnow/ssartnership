@@ -372,7 +372,7 @@ export default function PartnerBasicInfoSection({
           />
           <p className="mt-2 text-xs leading-5 text-muted-foreground">
             상세 페이지에만 표시됩니다. 최대{" "}
-            {PARTNER_DETAIL_DESCRIPTION_MAX_LENGTH.toLocaleString()}자까지 입력할 수 있습니다.
+            {PARTNER_DETAIL_DESCRIPTION_MAX_LENGTH.toLocaleString("ko-KR")}자까지 입력할 수 있습니다.
           </p>
         </FieldGroup>
 

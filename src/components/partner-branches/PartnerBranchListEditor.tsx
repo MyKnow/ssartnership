@@ -403,7 +403,7 @@ export default function PartnerBranchListEditor({
       const parsedRows = await parseBranchXlsxFile(file);
       onChange(parsedRows);
       setExtraBenefitGroupCodes([]);
-      setXlsxMessage(`${parsedRows.length.toLocaleString()}개 지점을 리스트에 채웠습니다.`);
+      setXlsxMessage(`${parsedRows.length.toLocaleString("ko-KR")}개 지점을 리스트에 채웠습니다.`);
       input.value = "";
     } catch (uploadError) {
       setXlsxError(
@@ -678,7 +678,7 @@ export default function PartnerBranchListEditor({
 
       <div className="flex min-w-0 flex-col gap-2 border-t border-border/70 pt-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs leading-5 text-muted-foreground">
-          입력된 지점 {filledRows.length.toLocaleString()}개
+          입력된 지점 {filledRows.length.toLocaleString("ko-KR")}개
         </p>
         <Button type="button" variant="soft" size="sm" onClick={() => addRow()}>
           <PlusIcon className="h-4 w-4" />

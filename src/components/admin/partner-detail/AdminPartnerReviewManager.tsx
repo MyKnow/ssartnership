@@ -67,17 +67,17 @@ export default function AdminPartnerReviewManager({
         items={[
           {
             label: "전체 리뷰",
-            value: `${counts.totalCount.toLocaleString()}건`,
+            value: `${counts.totalCount.toLocaleString("ko-KR")}건`,
             hint: "삭제 제외",
           },
           {
             label: "공개 리뷰",
-            value: `${counts.visibleCount.toLocaleString()}건`,
+            value: `${counts.visibleCount.toLocaleString("ko-KR")}건`,
             hint: "상세 노출",
           },
           {
             label: "비공개 리뷰",
-            value: `${counts.hiddenCount.toLocaleString()}건`,
+            value: `${counts.hiddenCount.toLocaleString("ko-KR")}건`,
             hint: "관리자 보관",
           },
         ]}

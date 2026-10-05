@@ -64,7 +64,7 @@ export default async function EventWinnerFormPage({
               </p>
             </div>
             <div className="rounded-[1rem] border border-border/70 bg-surface-inset px-4 py-3 text-sm text-muted-foreground">
-              보유 추첨권 {guide.ticketCount.toLocaleString()}장 기준으로 추첨되었습니다.
+              보유 추첨권 {guide.ticketCount.toLocaleString("ko-KR")}장 기준으로 추첨되었습니다.
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button href={guide.googleFormUrl} target="_blank" className="w-full sm:w-auto">
