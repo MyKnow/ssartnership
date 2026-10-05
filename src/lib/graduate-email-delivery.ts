@@ -47,6 +47,11 @@ const SMTP_CONNECTION_ERROR_CODES = new Set([
   "ENOTFOUND",
   "ESOCKET",
   "ETIMEDOUT",
+  // nodemailer reports every DNS resolution failure, an expired dnsTimeout
+  // included, as EDNS and overwrites the resolver's own code (ETIMEOUT,
+  // ENOTFOUND). Transient, not a rejection.
+  "EDNS",
+  "ETIMEOUT",
 ]);
 const SMTP_TLS_ERROR_CODES = new Set([
   "CERT_HAS_EXPIRED",

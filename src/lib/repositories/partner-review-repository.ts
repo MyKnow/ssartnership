@@ -40,6 +40,11 @@ export type UpdatePartnerReviewInput = {
 export type SetPartnerReviewReactionInput = {
   reviewId: string;
   memberId: string;
+  /**
+   * The member's desired final reaction (`null` clears it). Setting is
+   * idempotent: repeating or racing the same request converges on one row
+   * instead of toggling or failing on the unique constraint.
+   */
   reaction: PartnerReviewReaction | null;
 };
 

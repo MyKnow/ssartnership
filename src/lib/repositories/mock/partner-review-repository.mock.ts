@@ -270,9 +270,9 @@ export class MockPartnerReviewRepository implements PartnerReviewRepository {
       (reaction) =>
         reaction.reviewId === input.reviewId && reaction.memberId === input.memberId,
     );
-    const currentReaction = currentIndex >= 0 ? getStore().reactions[currentIndex] : null;
 
-    if (!input.reaction || currentReaction?.reaction === input.reaction) {
+    // Same contract as Supabase: `reaction` is the desired final state.
+    if (!input.reaction) {
       if (currentIndex >= 0) {
         getStore().reactions.splice(currentIndex, 1);
       }

@@ -146,12 +146,25 @@ export async function readPartnerReviewSubmission(request: Request): Promise<
   };
 }
 
+export type ResolveReviewMediaOptions = {
+  /**
+   * Receives each URL as soon as this call attaches it. Passing it hands
+   * failure cleanup to the caller: the helper then leaves partial attachments
+   * in place. Review creation needs this because a duplicate request with the
+   * same reviewId attaches to the same deterministic paths, so deleting before
+   * checking for an already stored review could remove the winner's images.
+   * Pass an empty array.
+   */
+  attachedUrls?: string[];
+};
+
 export async function resolveReviewMediaPayload(
   manifest: ReviewMediaManifest,
   partnerId: string,
   reviewId: string,
   memberId: string,
   allowedExistingUrls: readonly string[] = [],
+  options: ResolveReviewMediaOptions = {},
 ) {
   const entries = manifest.images;
   try {
@@ -166,7 +179,8 @@ export async function resolveReviewMediaPayload(
   }
 
   const images: string[] = [];
-  const uploadedUrls: string[] = [];
+  const callerOwnsCleanup = options.attachedUrls !== undefined;
+  const uploadedUrls: string[] = options.attachedUrls ?? [];
   const attachUpload = async (uploadId: string, imageIndex: number) => {
     const attached = await getImageUploadRepository().attach({
       actor: { kind: "member", id: memberId },
@@ -203,7 +217,9 @@ export async function resolveReviewMediaPayload(
       uploadedUrls.push(uploadedUrl);
     }
   } catch (error) {
-    await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);
+    if (!callerOwnsCleanup) {
+      await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);
+    }
     throw error;
   }
 

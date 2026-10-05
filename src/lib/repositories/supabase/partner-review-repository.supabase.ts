@@ -362,48 +362,32 @@ export class SupabasePartnerReviewRepository implements PartnerReviewRepository 
       throw new Error("리뷰를 찾을 수 없습니다.");
     }
 
-    const { data: existingReaction, error: existingReactionError } = await supabase
-      .from("partner_review_reactions")
-      .select("id,reaction")
-      .eq("review_id", input.reviewId)
-      .eq("member_id", input.memberId)
-      .maybeSingle();
-
-    if (existingReactionError) {
-      throw new Error(existingReactionError.message);
-    }
-
-    if (!input.reaction || existingReaction?.reaction === input.reaction) {
-      if (existingReaction) {
-        const { error } = await supabase
-          .from("partner_review_reactions")
-          .delete()
-          .eq("id", existingReaction.id);
-
-        if (error) {
-          throw new Error(error.message);
-        }
-      }
-    } else if (existingReaction) {
+    // Write the desired final state in one statement. A read-then-insert
+    // sequence lets a double tap or a retried request race into the
+    // (review_id, member_id) unique constraint and surface as a failure even
+    // though the member's reaction was stored.
+    if (input.reaction) {
       const { error } = await supabase
         .from("partner_review_reactions")
-        .update({
-          reaction: input.reaction,
-          updated_at: now,
-        })
-        .eq("id", existingReaction.id);
+        .upsert(
+          {
+            review_id: input.reviewId,
+            member_id: input.memberId,
+            reaction: input.reaction,
+            updated_at: now,
+          },
+          { onConflict: "review_id,member_id" },
+        );
 
       if (error) {
         throw new Error(error.message);
       }
     } else {
-      const { error } = await supabase.from("partner_review_reactions").insert({
-        review_id: input.reviewId,
-        member_id: input.memberId,
-        reaction: input.reaction,
-        created_at: now,
-        updated_at: now,
-      });
+      const { error } = await supabase
+        .from("partner_review_reactions")
+        .delete()
+        .eq("review_id", input.reviewId)
+        .eq("member_id", input.memberId);
 
       if (error) {
         throw new Error(error.message);

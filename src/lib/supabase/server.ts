@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { resolveSupabaseFetchTimeouts, withSupabaseTimeout } from "./timeout";
 import { createSupabaseTransport } from "./transport";
 
 let adminClient: SupabaseClient | null = null;
@@ -18,13 +19,23 @@ function getAdminEnv() {
   return { supabaseUrl, internalSupabaseUrl, serviceRoleKey };
 }
 
+function createTimedSupabaseTransport(
+  supabaseUrl: string,
+  internalSupabaseUrl: string | undefined,
+) {
+  return withSupabaseTimeout(
+    createSupabaseTransport(supabaseUrl, internalSupabaseUrl),
+    resolveSupabaseFetchTimeouts(),
+  );
+}
+
 export function getSupabaseAdminClient() {
   if (adminClient) {
     return adminClient;
   }
 
   const { supabaseUrl, internalSupabaseUrl, serviceRoleKey } = getAdminEnv();
-  const transport = createSupabaseTransport(supabaseUrl, internalSupabaseUrl);
+  const transport = createTimedSupabaseTransport(supabaseUrl, internalSupabaseUrl);
   adminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: {
       persistSession: false,
