@@ -4,7 +4,7 @@ import Badge from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
 import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import { formatOptionalKoreanDateTimeToMinute } from "@/lib/datetime";
 import type { AdminFormAction } from "@/components/admin/admin-form-actions";
 import type {
   AdminPartnerAccount,
@@ -45,11 +45,7 @@ function FieldGroup({
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) {
-    return "없음";
-  }
-
-  return formatKoreanDateTimeToMinute(value);
+  return formatOptionalKoreanDateTimeToMinute(value, "없음");
 }
 
 export default function CompanyAccountConnections({

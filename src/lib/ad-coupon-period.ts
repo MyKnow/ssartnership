@@ -1,3 +1,4 @@
+import { formatKoreanDateTimeLocalValue } from "@/lib/datetime";
 const DATE_ONLY_PATTERN = /^(\d{4}-\d{2}-\d{2})/;
 
 /**
@@ -20,10 +21,5 @@ export function toDateTimeLocalInput(value?: string | null) {
   if (!value) {
     return "";
   }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
-  return kst.toISOString().slice(0, 16);
+  return formatKoreanDateTimeLocalValue(value);
 }

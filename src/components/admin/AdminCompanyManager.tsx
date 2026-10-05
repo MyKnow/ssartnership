@@ -8,7 +8,7 @@ import SubmitButton from "@/components/ui/SubmitButton";
 import Surface from "@/components/ui/Surface";
 import Textarea from "@/components/ui/Textarea";
 import { cn } from "@/lib/cn";
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import { formatOptionalKoreanDateTimeToMinute } from "@/lib/datetime";
 import type { AdminCompanyFormActions } from "@/components/admin/admin-form-actions";
 
 type AdminCompany = {
@@ -48,11 +48,7 @@ function FieldGroup({
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) {
-    return "없음";
-  }
-
-  return formatKoreanDateTimeToMinute(value);
+  return formatOptionalKoreanDateTimeToMinute(value, "없음");
 }
 
 export default function AdminCompanyManager({

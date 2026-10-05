@@ -3,7 +3,7 @@ import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import SectionHeading from "@/components/ui/SectionHeading";
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import { formatKoreanDateTimeLocalValue, formatKoreanDateTimeToMinute } from "@/lib/datetime";
 import type { PartnerBenefit } from "@/lib/partner-benefit-items";
 import type { PartnerBenefitUsageHistoryPage } from "@/lib/repositories/partner-benefit-usage-repository";
 
@@ -15,14 +15,6 @@ type AdminUsageActions = {
   update: UsageAction;
   delete: UsageAction;
 };
-
-function formatDateTimeInput(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-  return date.toLocaleString("sv-SE", { timeZone: "Asia/Seoul" }).slice(0, 16).replace(" ", "T");
-}
 
 export default function PartnerBenefitUsageHistory({
   benefits,
@@ -102,7 +94,7 @@ export default function PartnerBenefitUsageHistory({
             </label>
             <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
               적용 시각
-              <input name="verifiedAt" type="datetime-local" defaultValue={formatDateTimeInput(new Date().toISOString())} required className="h-10 rounded-xl border border-border bg-surface px-3 text-sm text-foreground" />
+              <input name="verifiedAt" type="datetime-local" defaultValue={formatKoreanDateTimeLocalValue(new Date().toISOString())} required className="h-10 rounded-xl border border-border bg-surface px-3 text-sm text-foreground" />
             </label>
             <button type="submit" className="h-10 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground">추가</button>
           </form>
@@ -174,7 +166,7 @@ export default function PartnerBenefitUsageHistory({
                   </label>
                   <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
                     적용 시각
-                    <input name="verifiedAt" type="datetime-local" defaultValue={formatDateTimeInput(usage.verifiedAt)} required className="h-10 rounded-xl border border-border bg-surface px-3 text-sm text-foreground" />
+                    <input name="verifiedAt" type="datetime-local" defaultValue={formatKoreanDateTimeLocalValue(usage.verifiedAt)} required className="h-10 rounded-xl border border-border bg-surface px-3 text-sm text-foreground" />
                   </label>
                   <button type="submit" className="h-10 rounded-xl border border-primary px-4 text-sm font-semibold text-primary hover:bg-primary-soft">저장</button>
                 </form>

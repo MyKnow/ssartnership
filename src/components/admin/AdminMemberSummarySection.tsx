@@ -1,17 +1,10 @@
 import InlineMessage from "@/components/ui/InlineMessage";
 import StatsRow from "@/components/ui/StatsRow";
 import type { AdminMemberSummaryReadModel } from "@/lib/admin-member-list.server";
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import { formatOptionalKoreanDateTimeToMinute } from "@/lib/datetime";
 
 function formatSummaryDate(value: string | null) {
-  if (!value) {
-    return "-";
-  }
-
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime())
-    ? "-"
-    : formatKoreanDateTimeToMinute(parsed);
+  return formatOptionalKoreanDateTimeToMinute(value, "-");
 }
 
 export default async function AdminMemberSummarySection({

@@ -12,6 +12,7 @@ import {
 } from "@/lib/project-showcase/repository";
 import { SHOWCASE_PROJECT_STATUSES, SHOWCASE_PROJECT_TYPES } from "@/lib/project-showcase/types";
 import { isUuidFormat } from "@/lib/uuid";
+import { formatKoreanMonthDayTime } from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
 
@@ -82,16 +83,7 @@ function activitySummary(item: ShowcaseAdminActivityLog) {
 }
 
 function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "시간 정보 없음";
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  return formatKoreanMonthDayTime(value, { year: true }) || "시간 정보 없음";
 }
 
 function buildNextHref(type: ShowcaseAdminActivityType | null, cursor: ShowcaseAdminActivityCursor) {

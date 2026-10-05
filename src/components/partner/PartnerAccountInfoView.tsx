@@ -19,6 +19,7 @@ import SubmitButton from "@/components/ui/SubmitButton";
 import PartnerFormPendingNotice from "@/components/partner/PartnerFormPendingNotice";
 import PartnerPasswordChangeForm from "@/components/partner/PartnerPasswordChangeForm";
 import { PARTNER_BILLING_FIELD_LIMITS } from "@/lib/partner-billing";
+import { formatKoreanDateTime } from "@/lib/datetime";
 import type { PartnerBillingProfileRecord } from "@/lib/partner-billing-profiles";
 import { cn } from "@/lib/cn";
 import { getPartnerGlobalPortalHref } from "@/lib/partner-portal-paths";
@@ -71,10 +72,11 @@ function getProfileDescription(profile: PartnerBillingProfileRecord) {
 }
 
 function formatBusinessStatusCheckedAt(date: Date) {
-  return new Intl.DateTimeFormat("ko-KR", {
+  return formatKoreanDateTime(date, {
     hour: "2-digit",
     minute: "2-digit",
-  }).format(date);
+    hour12: true,
+  });
 }
 
 function getBusinessStatusTone(

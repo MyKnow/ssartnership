@@ -5,21 +5,14 @@ import ShowcaseFeedbackVisibilityButton from "@/components/admin/ShowcaseFeedbac
 import { requireAdminPermission } from "@/lib/admin-access";
 import { canAdmin } from "@/lib/admin-permissions";
 import { projectShowcaseRepository } from "@/lib/project-showcase";
+import { formatKoreanMonthDayTime } from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
 
 const FEEDBACK_PATH = "/admin/events/project-showcase/feedback";
 
 function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  return formatKoreanMonthDayTime(value);
 }
 
 export default async function AdminShowcaseFeedbackPage({

@@ -8,7 +8,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import Input from "@/components/ui/Input";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Select from "@/components/ui/Select";
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import { formatOptionalKoreanDateTimeToMinute } from "@/lib/datetime";
 
 export type AdminMemberSecurityLog = {
   id: string;
@@ -26,10 +26,7 @@ type SortFilter = "newest" | "oldest" | "event" | "ip";
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 
 function formatDate(value?: string | null) {
-  if (!value) {
-    return "-";
-  }
-  return formatKoreanDateTimeToMinute(value);
+  return formatOptionalKoreanDateTimeToMinute(value, "-");
 }
 
 function getStatusBadgeClass(status: string | null) {

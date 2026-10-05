@@ -17,7 +17,7 @@ import {
   type NotificationListResult,
 } from "@/lib/notifications/shared";
 import { cn } from "@/lib/cn";
-import { formatKoreanDateTime } from "@/lib/datetime";
+import { formatKoreanMonthDayTime } from "@/lib/datetime";
 import {
   getNotificationClientError,
   requestNotificationJson,
@@ -31,12 +31,7 @@ type NotificationInboxProps = {
 };
 
 function formatNotificationDate(value: string) {
-  return formatKoreanDateTime(value, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatKoreanMonthDayTime(value, { hour12: false });
 }
 
 type MemberNotificationApiResponse = {

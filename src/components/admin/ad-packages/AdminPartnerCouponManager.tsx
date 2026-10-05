@@ -11,6 +11,7 @@ import type {
 } from "@/lib/repositories/ad-package-repository";
 import { cn } from "@/lib/cn";
 import AdminPartnerCouponForm from "./AdminPartnerCouponForm";
+import { formatKoreanDateTime } from "@/lib/datetime";
 
 type ServerAction = (formData: FormData) => void | Promise<void>;
 
@@ -29,10 +30,11 @@ const statusBadgeClass: Record<AdCouponStatus, string> = {
 };
 
 function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("ko-KR", {
+  return formatKoreanDateTime(value, {
     dateStyle: "short",
     timeStyle: "short",
-  }).format(new Date(value));
+    hour12: true,
+  });
 }
 
 function formatIssueLimit(value: number | null) {
