@@ -31,13 +31,21 @@ ENV NODE_ENV=production \
 # build ARG, ENV instruction, layer, or generated client bundle.
 RUN node deploy/self-host/write-build-env-manifest.mjs /app/.self-host-build/build-env.json
 RUN npm run build
+# Mock partner/member fixtures are referenced only by the mock repositories.
+# Keep them for the local mock smoke image and leave them out of real images.
+RUN if [ "${NEXT_PUBLIC_DATA_SOURCE}" != "mock" ]; then rm -rf public/mock; fi
 
 FROM base AS runner
+# Korean local time for server-rendered dates, and a keep-alive that outlives
+# the relay Caddy's 2m idle upstream connections. Compose pins both values.
 ENV NODE_ENV=production \
     PORT=3000 \
-    HOSTNAME=0.0.0.0
+    HOSTNAME=0.0.0.0 \
+    TZ=Asia/Seoul \
+    KEEP_ALIVE_TIMEOUT=130000
 RUN groupadd --system --gid 1001 nextjs \
-    && useradd --system --uid 1001 --gid nextjs --create-home nextjs
+    && useradd --system --uid 1001 --gid nextjs --create-home nextjs \
+    && install -d -o nextjs -g nextjs -m 0755 /app/.next /app/.next/cache
 COPY --from=builder --chown=nextjs:nextjs /app/public ./public
 COPY --from=builder --chown=nextjs:nextjs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nextjs /app/.next/static ./.next/static

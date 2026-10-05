@@ -49,7 +49,28 @@ function buildSupabaseRemotePattern(): RemotePattern | null {
 }
 
 const supabaseRemotePattern = buildSupabaseRemotePattern();
+// SELF_HOST_BUILD=1 is set only for the deployable image build (the CI gate
+// and the root Dockerfile). Local `next dev`/`next start` and the E2E fixture
+// build keep Next's default server output.
 const selfHostBuild = process.env.SELF_HOST_BUILD === "1";
+
+// Uploads are stored under per-upload Storage paths (uploadId), so optimized
+// variants can live for a month on the persistent `.next/cache` volume.
+// Replacing a file under `public/` at the same path, or an external image the
+// /api/image proxy relays changing at the same URL, needs a new name or a
+// manual purge of `.next/cache/images` (see the self-hosting runbook).
+const IMAGE_MINIMUM_CACHE_TTL_SECONDS = 31 * 24 * 60 * 60;
+// The largest stored source is 2100px wide (promotion slides), so the 3840px
+// default only re-encodes the same pixels. Small widths cover the 96-448px
+// card, thumbnail and avatar slots at 1x-3x density.
+const IMAGE_DEVICE_SIZES = [640, 750, 828, 1080, 1200, 1920, 2048];
+const IMAGE_SIZES = [64, 96, 128, 256, 384];
+// Without a bound Next lets the optimized-image LRU use half of the free disk
+// measured at startup, and the first image request after every start reads
+// the whole cache to rebuild that LRU. The persistent volume shares the VM
+// disk with the database and Storage, so bound both the disk share and the
+// startup scan; least recently used variants are evicted first.
+const IMAGE_DISK_CACHE_MAX_BYTES = 512 * 1024 * 1024;
 const fixtureBuild = fixtureBuildProfile(process.env);
 if (fixtureBuild) {
   assertNoFixtureDotenv(projectRoot);
@@ -64,9 +85,12 @@ if (process.env.NODE_ENV === "production") {
 }
 
 const nextConfig: NextConfig = {
-  // Self-hosted images use Next's portable standalone server. The flag keeps
-  // Vercel's existing build and tracing behavior unchanged.
+  // The deployable image runs Next's portable standalone server.
   output: selfHostBuild ? "standalone" : undefined,
+  // In the deployed image the edge Caddy already encodes responses with
+  // zstd/gzip, so the single app process skips a second gzip pass. Direct
+  // loopback consumers (receiver health, cron, telemetry) need no compression.
+  compress: !selfHostBuild,
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
   // The mobile search island occupies the framework indicator's default
   // bottom-left position. Keep local QA aligned with the shipped navigation.
@@ -84,11 +108,9 @@ const nextConfig: NextConfig = {
   experimental: {
     // Bound the additional test build inside the unchanged 5 GiB Mac gate.
     ...(fixtureBuild ? { cpus: 2 } : {}),
-    optimizePackageImports: [
-      "@heroicons/react",
-      "lucide-react",
-      "react-icons",
-    ],
+    // Icon packages are not listed in optimizePackageImports: Next already
+    // optimizes the heroicons, lucide-react and react-icons entry points this
+    // app imports by default.
     serverActions: {
       bodySizeLimit: "4mb",
     },
@@ -114,6 +136,10 @@ const nextConfig: NextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: IMAGE_MINIMUM_CACHE_TTL_SECONDS,
+    deviceSizes: IMAGE_DEVICE_SIZES,
+    imageSizes: IMAGE_SIZES,
+    maximumDiskCacheSize: IMAGE_DISK_CACHE_MAX_BYTES,
     remotePatterns: supabaseRemotePattern ? [supabaseRemotePattern] : undefined,
     localPatterns: [
       {

@@ -221,6 +221,22 @@ timer는 `OnUnitActiveSec=5min`과 최대 60초 분산 지연으로 동작한다
 
 원본 Cloud는 삭제하지 않은 frozen 복구 기준선이다. 홈 서버 쓰기 이후의 복귀에는 변경분 조정이 필요하며 CONNECT grant와 DNS만 되돌리는 절차를 정상 rollback으로 사용하지 않는다. 원본의 수동 외부 cold backup/복원 성공은 상시 WAL/PITR·정기 외부 사본·독립 지역 복구의 완료 근거가 아니다. 운영 이미지 정리도 별도 보존 정책이 필요한 단계이며 `docker system prune` 또는 volume 삭제를 자동 수신기에 추가하지 않는다.
 
+## 수동 롤백과 이미지 보존
+
+두 workflow는 배포 manifest(`release.json`) artifact를 공개 저장소의 최대치인 90일 동안 보존한다. 수신기는 매 poll에서 현재 branch head의 artifact를 다시 검증하므로, 마지막 릴리스 artifact가 만료되면 실행 중인 app은 그대로지만 수신기는 승인 실패로 끝난다. 그 전에 새 커밋을 릴리스하거나, 만료됐다면 timer를 멈추고 새 릴리스로 회복한다. 저장소 설정의 artifact 보존 기간이 90일보다 짧지 않은지도 확인한다.
+
+자동 복귀는 직전 app 이미지만 대상으로 한다. 더 이전 릴리스나 배포 후 발견한 회귀를 되돌릴 때는 다음 순서를 따른다.
+
+1. 해당 환경의 수신기 timer를 `disable --now`로 멈춘다. 멈추지 않으면 다음 poll이 현재 branch head를 다시 적용한다.
+2. 수신기 release 디렉터리의 `<이전 SHA>/release.json`에서 `component`가 `app`인 immutable reference를 확인하고, 로컬 이미지가 있으면 `docker image inspect --format '{{.Id}}'`로 ID를 얻는다. 없으면 같은 digest reference로 pull한 뒤 ID와 revision label을 확인한다.
+3. 수신기와 같은 Compose project·runtime env·Compose 파일로 `SELF_HOST_IMAGE=<sha256 ID>`와 현재 telemetry 이미지 ID를 지정해 `up -d --no-deps --no-build --pull never app`을 실행한다. 다른 서비스와 데이터 볼륨은 재생성하지 않는다.
+4. loopback의 `/api/health`·`/auth/login` 200과 공개 health, 로그인 흐름을 확인한다.
+5. 원인 커밋을 branch에서 revert해 새 릴리스를 만든 다음에만 timer를 다시 켠다. revert 전에 켜면 회귀한 릴리스가 다시 배포된다.
+
+수신기는 DDL을 적용하거나 되돌리지 않는다. 롤백 대상 이미지는 현재 schema와 호환되어야 하며(추가 후 제거 순서의 migration), 호환되지 않으면 DB 복구 판단이 먼저다.
+
+운영 VM에서 `docker image prune -a`, `docker system prune -a`, `docker volume prune`, `docker compose down -v`를 실행하지 않는다. 실행 중이 아닌 이전 릴리스 이미지가 모두 지워져 수동 롤백과 수신기의 자동 복귀가 깨지고, 데이터·캐시 볼륨도 함께 사라질 수 있다. 디스크 정리가 필요하면 최근 릴리스 manifest가 참조하는 digest를 제외한 이미지만 명시적 ID로 `docker image rm`한다.
+
 ## 테스트 정리와 수신기 호환성
 
 Issue #474는 비핵심 검사를 삭제하고 `github-contract.mjs`의 최소 개수를 76개로 조정한다. 실제 발견된 테스트 ID 전체와 결과의 일치, retry/skip/error 0 조건은 그대로 유지한다. 개수만으로 전체 실행을 증명하지 않는다. 기존 103개 기준의 운영 수신기는 새 manifest를 거부하므로 dev/main 통합 전 검증한 제어 소스 버전으로 교체한다. 이전 root-owned 제어 디렉터리와 symlink 대상을 보존하며 DB·비밀·schema 승인·Compose 설정을 변경하지 않는다.

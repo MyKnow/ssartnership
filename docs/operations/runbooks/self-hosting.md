@@ -14,7 +14,7 @@ issue: https://github.com/MyKnow/ssartnership/issues/435
 
 2026-10-02 공개 전환 후 Production의 앱·DB·Storage·수신기·Cron·온라인 백업은 VM 5200, 원본 Preview는 VM 5201, 공용 Caddy·Prometheus·Grafana·Alertmanager와 edge 복구 timer는 VM 5202에서 실행한다. 주소·자원·전환 및 복구 증거와 남은 검증은 [PVE 이전 작업 목록](../../specs/pve-service-migration/tasks.md)을 기준으로 한다. 노트북의 원본 쓰기 작업을 다시 켜지 않는다.
 
-현재 공개 구성은 `deploy/pve/compose.operations.yaml`과 `edge.Caddyfile`, 앱의 private 연결은 `compose.relay.yaml`이다. 아래의 같은 호스트 edge overlay 예시는 기존 배치에 대한 구성 절차다. 현재 운영 VM의 복합 설정을 그 템플릿으로 덮어쓰지 않는다. 관리 SSH는 pinned PVE 경유 경로를 사용하며, 해당 역할의 VM 안에서만 운영 unit을 실행한다. MALMOA는 아래 직접 연결 절차를 따른다. ClayFarm과 전용 노트북 relay는 아래 종료 절차로 제거했으며, 현재 공개 서비스는 노트북을 경유하지 않는다.
+현재 공개 구성은 `deploy/pve/compose.operations.yaml`과 `edge.Caddyfile`, 앱의 private 연결은 `compose.relay.yaml`이다. 노트북 시대의 같은 호스트 edge overlay 템플릿(`deploy/self-host/Caddyfile`·`Caddyfile.production`·`compose.edge.yaml`)은 [Issue #531](https://github.com/MyKnow/ssartnership/issues/531)에서 삭제했으며 공개 edge의 단일 정본은 `deploy/pve/edge.Caddyfile`이다. 관리 SSH는 pinned PVE 경유 경로를 사용하며, 해당 역할의 VM 안에서만 운영 unit을 실행한다. MALMOA는 아래 직접 연결 절차를 따른다. ClayFarm과 전용 노트북 relay는 아래 종료 절차로 제거했으며, 현재 공개 서비스는 노트북을 경유하지 않는다.
 
 ### MALMOA의 PVE 직접 연결
 
@@ -84,16 +84,54 @@ SELF_HOST_IMAGE=registry.example.com/ssartnership@sha256:REVIEWED_DIGEST docker 
 
 Storage SDK의 signed/public URL과 공개 이미지 프록시는 [데이터 실행 절차](./self-host-database.md)에 따라 검증한다. 공개 origin과 내부 전송 주소를 설정한 것만으로 실제 업로드·다운로드 검증을 완료 처리하지 않는다.
 
+## 배포 창과 앱 런타임 기본값
+
+이 절의 값은 `deploy/pve/relay.Caddyfile`·`relay-firewall.service`, `deploy/self-host/compose.production.yaml`·`compose.original-preview.yaml`, 두 Dockerfile, `deploy/self-host/runtime-env.mjs`, `next.config.ts`가 정본이며 `tests/self-host-deploy-window.test.mts`·`tests/self-host-runtime-defaults.test.mts`가 서로의 관계를 고정한다.
+
+| 항목 | 값 | 이유 |
+| --- | --- | --- |
+| relay 앱 upstream 재시도 | `lb_try_duration 20s`, `lb_try_interval 250ms` | 수신기가 app 컨테이너를 재생성하는 동안 새 요청을 502 대신 대기시킨다. 실제 장애에서는 20초 뒤 실패한다. |
+| app `stop_grace_period` | 15초 | Next는 SIGTERM에서 진행 중 요청을 마무리한다. 유예+기동(약 5초)이 relay 재시도 창 안에 있어야 한다. |
+| relay upstream keepalive | `keepalive 2m` | Caddy가 유휴 연결을 재사용하는 최대 시간이다. |
+| `KEEP_ALIVE_TIMEOUT` | `130000` (이미지 기본값, Compose 고정) | Node 기본 5초가 relay의 2분보다 짧으면 이미 닫힌 socket 재사용으로 간헐 502가 난다. 시작 검증은 120000 이하·600000 초과·숫자가 아닌 값을 거절한다. |
+| `TZ` | `Asia/Seoul` (이미지 기본값, Compose 고정) | 서버 렌더링 날짜·월 기준 규칙이 한국 시간을 가정한다. 다른 값은 시작 검증이 거절한다. |
+| Next `compress` | 배포 이미지(`SELF_HOST_BUILD=1`)에서 끔 | edge Caddy가 `encode zstd gzip`을 수행하므로 단일 앱 프로세스의 gzip을 중복하지 않는다. 수신기 health·Cron·telemetry의 loopback 호출은 압축이 필요 없다. 로컬 `next start`는 기본값을 유지한다. |
+| `.next/cache` | 환경별 named volume(`production-app-next-cache`, `original-app-next-cache`) | 최적화 이미지가 배포 뒤에도 남아 재인코딩 burst를 줄인다. |
+| 이미지 최적화 | `minimumCacheTTL` 31일, `deviceSizes` 최대 2048, `imageSizes` 64~384 | 저장 이미지는 업로드마다 다른 경로이고 가장 넓은 원본은 2100px이다. 3840px 변형은 같은 픽셀을 다시 인코딩할 뿐이다. |
+| 이미지 디스크 캐시 상한 | `maximumDiskCacheSize` 512MiB | 상한이 없으면 Next는 시작 시점 여유 디스크의 절반까지 쓰고, 시작 후 첫 이미지 요청이 캐시 전체를 읽어 LRU를 다시 만든다. 볼륨이 DB·Storage와 같은 VM 디스크를 쓰므로 고정 상한을 두고, 넘치면 가장 오래 쓰지 않은 변형부터 지운다. |
+
+데이터 캐시는 의도적으로 영속하지 않는다. Next 16.3.8의 `revalidateTag` 무효화 기록은 프로세스 메모리에만 있고 `unstable_cache` key에는 빌드 정보가 없다. 이전 프로세스가 쓴 data entry를 다시 읽으면 무효화된 값이나 이전 코드의 모양이 돌아올 수 있으므로 `start.sh`는 매 시작마다 `.next/cache/fetch-cache`만 비운다. ISR 페이지 산출물은 `.next/server`에 쓰이며 이 볼륨과 무관하다.
+
+볼륨은 처음 만들어질 때 이미지의 `/app/.next/cache`(uid 1001 소유)를 복사한다. 이 디렉터리가 없는 이전 이미지로 먼저 볼륨이 생기면 root 소유가 되어 캐시가 쓰이지 않고 `start.sh`가 경고를 남긴다. 그때는 app을 멈춘 뒤 해당 볼륨만 지우고 새 이미지로 다시 올린다. `public/` 아래 이미지를 같은 경로로 교체하거나 `/api/image`가 중계하는 외부 이미지가 같은 주소에서 바뀌면 최대 31일 동안 이전 최적화본이 남는다. 파일 이름(주소)을 바꾸거나 app 컨테이너에서 `.next/cache/images`만 비운다. 최적화 이미지 캐시는 512MiB 상한 안에서 유지된다. 배포 직후에도 같은 이미지가 반복해서 재인코딩되면 `du -sh /app/.next/cache/images`로 상한 도달 여부를 보고 `next.config.ts`의 상한을 다시 정한다.
+
+컨테이너 하드닝 평가(2026-10-05):
+
+- 힙 상한: 같은 Node 24.18.1 base image를 `--memory 768m`으로 실행하면 V8 `heap_size_limit`이 432MiB로 cgroup 한도를 따른다. OOMKilled 기록이 확인되기 전에는 `NODE_OPTIONS=--max-old-space-size`를 추가하지 않는다. sharp/libvips의 native 메모리는 V8 힙 밖에 있으므로 메모리 경보는 컨테이너 RSS 기준으로 본다.
+- `read_only`: 다른 서비스와 달리 app은 아직 적용하지 않는다. 코드상 쓰기 경로는 `.next/cache`(볼륨)와 `/tmp`뿐이지만, 정적으로 판정된 ISR route가 생기면 Next가 `.next/server`에 재생성 결과를 쓰고 실패 경고를 반복한다. 종료 처리의 파일 쓰기 여부도 아직 실측하지 않았다. Preview에서 `read_only: true`와 `tmpfs: /tmp`로 기동·종료 시간·로그의 `EROFS`를 확인한 뒤 적용한다.
+- 운영 이미지는 `public/mock` fixture를 포함하지 않는다(mock 저장소만 참조). 로컬 mock smoke용 루트 Dockerfile은 mock 빌드일 때만 남긴다.
+
+relay 방화벽 unit은 `network-online.target` 뒤에 실행하고 실패하면 5초 간격으로 2분 동안 최대 10회 재시도한다. Docker는 이 unit을 `Requires=`하므로 규칙 없이 relay 포트를 열지 않는다. 재시도는 `RestartMode=direct`(systemd 254 이상)로 실패 상태를 거치지 않는다. 기본 모드에서는 첫 실패가 대기 중인 Docker 시작 작업을 의존성 실패로 끝내므로, 이후 재시도가 성공해도 다음 부팅까지 Docker가 시작되지 않는다. 호스트 적용 전 `systemctl --version`(254 이상)과 `systemd-analyze verify`를 확인하고, VM 재부팅 리허설로 Docker·relay·app 기동 순서와 재시도 뒤 Docker 기동을 확인한다.
+
 ## 공개 edge와 TLS
 
-공개 edge는 별도 Caddy Compose overlay로 고정한다. Caddy는 기존 Preview edge network에서만 `app:3000`과 `gateway:8000`을 향해 프록시하고, Docker socket·관리 API·데이터 network에는 접근하지 않는다. Caddyfile의 `ssartnership-dev.myknow.xyz`와 `ssartnership-api-dev.myknow.xyz`는 실제 DNS가 홈 서버를 가리키고 방화벽 포워딩을 검증한 뒤에만 인증서를 발급한다.
+공개 edge는 운영 VM 5202의 `deploy/pve/compose.operations.yaml` Caddy 하나다. 앱 두 origin(`ssartnership.myknow.xyz`, `ssartnership-dev.myknow.xyz`)과 API 두 origin은 같은 snippet을 사용하며, 각 앱 VM의 relay(`deploy/pve/compose.relay.yaml`)로 전달한다. Caddy는 Docker socket·관리 API(`admin off`)·데이터 network에 접근하지 않는다. 계약은 `tests/self-host-pve-edge.test.mts`와 `tests/self-host-infra-access.test.mts`가 고정한다.
+
+- 클라이언트 IP: edge에는 `trusted_proxies`가 없으므로 Caddy가 클라이언트가 보낸 `X-Forwarded-For`를 버리고 연결 주소로 다시 쓴다. 기본 관리 대상이 아닌 `X-Real-IP`는 `{remote_host}`로 덮어쓴다. relay는 `trusted_proxies static {$OPS_VM_IP}/32`와 `trusted_proxies_strict`로 이 edge 한 홉만 신뢰하므로 앱은 `클라이언트, edge` 순서의 값을 받는다. 앱은 `SELF_HOST_MODE=real`일 때만 첫 값을 IP 형식 검증 후 신뢰한다(앱 쪽 해석은 신뢰 프록시 IP 작업 단위가 소유). 임의 forwarded IP를 신뢰하도록 앱이나 relay를 완화하지 않는다.
+- 내부 전용 경로: 앱 origin의 `/api/cron`, `/api/cron/*`, `/api/ready`, `/api/ready/*`는 edge가 404로 응답한다. Cron은 앱 VM의 loopback 포트로, readiness는 비공개 probe로만 호출한다.
+- 보안 헤더: 네 공개 origin과 두 infra origin은 응답에 HSTS가 없을 때 `max-age=63072000; includeSubDomains`를 붙인다. 앱 페이지는 Next가 보내는 HSTS를 그대로 사용하므로 header가 중복되지 않는다.
+- 접근 로그: 네 공개 origin은 JSON 접근 로그를 stdout으로 남기며 Docker local driver가 크기 제한으로 회전한다. 기록 전에 클라이언트 주소를 IPv4 /24·IPv6 /48로 가리고 Cookie·Authorization·Proxy-Authorization·`apikey`·Referer·Set-Cookie·Location 헤더, 클라이언트가 보낸 `X-Forwarded-For`·`X-Real-IP`, query string, 일회성 token 경로 조각을 제거한다. 새 `[token]` route를 추가하면 계약 테스트가 로그 필터 누락을 실패로 알린다. 확인은 `docker logs`로 한다.
+- 지표: 전역 `metrics`를 켜고 `http://:9180/metrics`에서만 노출한다. 이 listener는 사설 대역이 아닌 출발지를 403으로 거절하고, Compose는 80/443만 게시한다. host label은 임의 Host header로 지표 종류가 늘지 않도록 끈다. Prometheus scrape job과 경보 규칙은 관측 구성에서 따로 추가한다.
+- 이전 준비 게이트: PVE 이전 리허설에서 쓰던 `PVE_PUBLIC_SERVICES_READY` 503 snippet은 공개 전환 이후 제거했다. 환경 변수가 빠져도 공개 origin이 503으로 닫히지 않는다. 다시 점검 창이 필요하면 Caddyfile에 임시 응답을 추가하고 validate 후 reload한다.
+- HTTP 캐시: edge에는 HTTP 응답 캐시가 없다. `s-maxage`는 공유 캐시를 기대하는 값이 아니며 이미지 재사용은 앱 컨테이너의 `.next/cache` 볼륨이 담당한다.
+
+변경 전 운영 VM에서 현재 파일을 보존하고 설정만 검사한다. Compose 변수는 운영 VM의 env 파일에서 읽는다.
 
 ```bash
-docker compose -p ssartnership-edge -f deploy/self-host/compose.edge.yaml config --quiet
-docker compose -p ssartnership-edge -f deploy/self-host/compose.edge.yaml run --rm --entrypoint caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+docker compose -p ssartnership-edge -f deploy/pve/compose.operations.yaml config --quiet
+docker compose -p ssartnership-edge -f deploy/pve/compose.operations.yaml run --rm --entrypoint caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 ```
 
-`config --quiet`와 Caddy validate는 공개 변경 없이 설정만 검사한다. 공개 전환 전 원본 Preview의 외부 암호화 백업/복구 드릴, 원본 쓰기 중지와 최종 동등성, DNS 수정 권한, 방화벽 전달 경로 및 기존 DNS 복구값을 확보한다. 합성 환경의 백업은 원본 Preview 복구 증거를 대신하지 않는다. 승인된 전환 창에서 edge를 시작하고 두 DNS 레코드를 홈 서버로 연결한 뒤 실제 TLS 발급과 외부 probe를 검증한다. 발급 전에 TLS 성공을 선행 조건으로 요구하지 않는다. 두 origin의 HTTPS redirect, 정상 Host/protocol 전달, `/api/health`, 로그인, Storage 업로드·다운로드를 확인하고 인증서 갱신 상태도 운영 점검에 포함한다. 실패하면 기존 DNS를 복원하고 Caddy를 중지한다. 전환 중 홈 서버에 새 쓰기가 있었다면 원본을 재개하기 전에 데이터 차이를 확인한다.
+`config --quiet`와 Caddy validate는 공개 변경 없이 설정만 검사한다. 적용은 bind mount된 단일 파일을 제자리에서 갱신하고 Caddy 2.11.4에 USR1을 보내 reload한다. 이후 두 앱의 `/api/health`, 로그인, API Storage 다운로드, infra의 401, 앱 origin `/api/cron`의 404를 외부에서 확인한다. 인증서 만료 시각은 observer의 TLS probe 지표로 확인한다. 실패하면 보존한 Caddyfile을 복원하고 다시 reload한다.
 
 ### 부팅 뒤 공개 edge 자동 복구
 
@@ -126,7 +164,7 @@ Production 홈 서버 전환에서는 `vercel.json`의 `git.deploymentEnabled=fa
 node scripts/self-host-cron.mjs --list
 ```
 
-단발 호출은 운영 쓰기가 생길 수 있다. `SELF_HOST_CRON_BASE_URL`과 `CRON_SECRET`을 보안 환경에서 주입한 상태에서 등록된 한 경로만 지정한다. 정확한 명령은 CLI의 사용법과 맞춰 검증한다. 로컬 smoke에서는 실행하지 않는다.
+단발 호출은 운영 쓰기가 생길 수 있다. `SELF_HOST_CRON_BASE_URL`과 `CRON_SECRET`을 보안 환경에서 주입한 상태에서 등록된 한 경로만 지정한다. 공개 origin의 `/api/cron`은 edge가 404로 막으므로 base URL은 해당 앱 VM의 loopback 앱 포트를 쓴다. 다른 수동 호출 스크립트도 공개 URL 대신 같은 loopback 주소를 지정한다. 정확한 명령은 CLI의 사용법과 맞춰 검증한다. 로컬 smoke에서는 실행하지 않는다.
 
 ```bash
 node scripts/self-host-cron.mjs --run /api/cron/rss

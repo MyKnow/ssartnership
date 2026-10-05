@@ -2,8 +2,12 @@
 # build and the retry-free full E2E suite. Package that SAME compiled output.
 FROM node:24.18.1-bookworm-slim@sha256:235600a8101ab264e117b1768e925532262668dc9b581ef1dd7d96ced463b8e7
 WORKDIR /app
-ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0 NEXT_TELEMETRY_DISABLED=1
-RUN groupadd --system --gid 1001 nextjs && useradd --system --uid 1001 --gid nextjs --create-home nextjs
+# Korean local time for server-rendered dates, and a keep-alive that outlives
+# the relay Caddy's 2m idle upstream connections. Compose pins both values.
+ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0 NEXT_TELEMETRY_DISABLED=1 TZ=Asia/Seoul KEEP_ALIVE_TIMEOUT=130000
+# A new named cache volume copies this nextjs-owned directory on first use.
+RUN groupadd --system --gid 1001 nextjs && useradd --system --uid 1001 --gid nextjs --create-home nextjs \
+    && install -d -o nextjs -g nextjs -m 0755 /app/.next /app/.next/cache
 COPY --chown=nextjs:nextjs public ./public
 COPY --chown=nextjs:nextjs .next/standalone ./
 COPY --chown=nextjs:nextjs .next/static ./.next/static
