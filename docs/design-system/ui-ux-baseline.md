@@ -112,7 +112,7 @@ public header는 브랜드와 계정·알림·쿠폰·테마·전체 메뉴처�
 - 관리자 페이지는 `AdminShell`을 페이지마다 렌더하므로 관리자 route `loading.tsx`도 `AdminRouteSkeleton` 또는 셸을 포함한 `Admin*Skeleton`을 사용해 사이드바·모바일 헤더·하단 탐색을 유지한다. route loading 스켈레톤이 끝나면 페이지가 셸과 헤더를 먼저 스트리밍하고 데이터 영역만 `*SkeletonContent showHeader={false}` Suspense fallback으로 대체하는 2단계 스트리밍은 의도된 동작이다.
 - list empty는 `EmptyState` 또는 domain-specific empty panel로 표현한다.
 - app error는 `AppErrorScreen`과 route/global error surface를 사용한다. 루트 `error.tsx`·`global-error.tsx`는 `layout="page"`(기본값)로 화면 전체를 대체하고, 공개 `(site)`·파트너 그룹 `error.tsx`는 `layout="embedded"`로 그룹 셸(하단 탐색·Footer·파트너 포털 셸) 안에서 렌더해 복귀 동선을 유지한다. 그룹 layout 자체의 예외는 루트 경계가 받는다.
-- 상세 페이지에서 존재하지 않는 partner는 `not-found.tsx`로 분리되어 있다.
+- `notFound()`는 호출한 영역의 셸 안에서 404를 보여 준다. 공개 제휴처 상세는 `(site)/partners/[id]/not-found.tsx`(헤더만 렌더하고 Footer는 `(site)` layout이 담당), 관리자는 `admin/(protected)/not-found.tsx`(AdminShell과 요청 경로가 속한 관리 목록 복귀), 파트너는 `partner/not-found.tsx`(파트너 포털 셸과 파트너 홈 복귀)를 사용한다. 어떤 라우트에도 맞지 않는 URL은 루트 `not-found.tsx`가 처리하며, 404 kicker는 `404`로 통일한다.
 
 ## Storybook 추적 기준
 

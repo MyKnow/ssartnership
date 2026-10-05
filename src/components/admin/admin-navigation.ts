@@ -333,6 +333,26 @@ export function findAdminNavItem(pathname: string) {
   return ADMIN_NAV_ITEMS.find((item) => isAdminNavActive(pathname, item.href)) ?? null;
 }
 
+export type AdminNotFoundRecovery = {
+  href: string;
+  label: string;
+};
+
+/**
+ * Picks the closest admin list to return to when a detail route calls
+ * `notFound()`, e.g. `/admin/members/<missing>` recovers to `/admin/members`.
+ */
+export function getAdminNotFoundRecovery(
+  requestPath: string | null | undefined,
+): AdminNotFoundRecovery {
+  const pathname = (requestPath ?? "").split(/[?#]/, 1)[0] ?? "";
+  const item = pathname.startsWith("/admin/") ? findAdminNavItem(pathname) : null;
+  if (!item || item.href === "/admin") {
+    return { href: "/admin", label: "관리 홈" };
+  }
+  return { href: item.href, label: item.label };
+}
+
 export function findAdminNavItems(query: string, groups: AdminNavGroup[]) {
   const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
   const items = groups.flatMap((group) => group.items);
