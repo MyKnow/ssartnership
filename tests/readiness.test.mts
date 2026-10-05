@@ -92,6 +92,16 @@ test("readiness route is separate from liveness and never cached", () => {
   const health = readFileSync(new URL("../src/app/api/health/route.ts", import.meta.url), "utf8");
   assert.match(route, /status: result\.ok \? 200 : 503/u);
   assert.match(route, /"Cache-Control": "no-store"/u);
-  assert.match(route, /abortSignal\(signal\)/u);
   assert.doesNotMatch(health, /supabase|getSupabase/iu);
+  // The database probe lives with the Supabase adapters (raw `.from()` stays
+  // out of route files) and is aborted by the bounded readiness deadline.
+  assert.match(route, /database: probeDatabaseReadiness/u);
+  assert.doesNotMatch(route, /\.from\(/u);
+  const probe = readFileSync(
+    new URL("../src/lib/repositories/supabase/database-readiness.supabase.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(probe, /\.select\("\*", \{ head: true \}\)/u);
+  assert.match(probe, /abortSignal\(signal\)/u);
+  assert.doesNotMatch(probe, /\.(?:insert|update|upsert|delete)\(/u);
 });

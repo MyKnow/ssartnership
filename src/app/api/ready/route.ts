@@ -5,8 +5,8 @@ import {
   createReadinessCache,
   type ReadinessResult,
 } from "@/lib/readiness";
+import { probeDatabaseReadiness } from "@/lib/repositories/supabase/database-readiness.supabase";
 import { logServerWarning } from "@/lib/server-log";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,14 +24,7 @@ async function runReadiness(): Promise<ReadinessResult> {
   });
   const result = await checkReadiness({
     ...http,
-    async database(signal) {
-      const { error } = await getSupabaseAdminClient()
-        .from("public_cache_versions")
-        .select("*", { head: true })
-        .limit(1)
-        .abortSignal(signal);
-      return !error;
-    },
+    database: probeDatabaseReadiness,
   });
   if (!result.ok) {
     logServerWarning("[ready] dependency unavailable", {
