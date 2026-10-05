@@ -193,7 +193,8 @@ export function isPartnerPlanWindowOrderValid(input: {
 }
 
 /**
- * Plan expiry policy (refactor default decision 12): a paid plan
+ * Plan expiry policy (refactor program default decision "파트너 플랜 만료":
+ * manual grace, see docs/plans/active/refactor-program-2026-10.md): a paid plan
  * (Partner/Boost) is never demoted automatically when `plan_expires_at`
  * passes. The stored tier stays effective as a manual grace period until an
  * admin reviews the contract and changes the plan, so expiry is read-only
