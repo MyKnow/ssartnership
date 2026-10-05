@@ -39,6 +39,6 @@ authority: normative
 - 다이얼로그는 `ui/Modal`을 우선 쓴다. 전체 화면 라이트박스·바닥 시트처럼 Modal 레이아웃이 맞지 않을 때만 직접 구현하고, 그때도 `useDialogFocus`(초기 포커스·Tab 순환·Escape·opener 복원)와 `useBodyScrollLock`(겹침 안전 ref-count 잠금)을 쓴다. 컨테이너에는 `role="dialog" aria-modal="true"`, 제목 연결(`aria-labelledby` 또는 `aria-label`), `tabIndex={-1}`을 둔다.
 - 오버레이 안의 스크롤 영역에는 `overscroll-contain`을 붙여 배경 페이지로 스크롤이 이어지지 않게 한다.
 - 삭제·로그아웃처럼 되돌릴 수 없거나 세션을 끊는 작업의 확인은 네이티브 `window.confirm` 대신 `ConfirmDialog`(제목 질문형, 결과 설명, 취소·확인 순서, 파괴적 작업은 `danger`)를 쓴다. 다시 켤 수 있는 설정 변경에는 확인 단계를 두지 않는다.
-- 네이티브 `<dialog>` 메뉴 안에서 연 `Modal`은 그 dialog의 top layer에 붙는다. 메뉴는 `hasOpenManagedDialog()`로 겹친 모달이 열려 있을 때 자체 Escape·Tab 처리를 건너뛴다.
+- 네이티브 `<dialog>` 메뉴 안에서 연 `Modal`은 그 dialog의 top layer에 붙는다. 메뉴는 `hasOpenManagedDialog()`로 겹친 모달이 열려 있을 때 자체 Escape·Tab 처리를 건너뛴다. body에 portal로 붙는 자체 구현 메뉴(관리자 모바일 메뉴 등)는 Modal(`z-50`)보다 낮은 레이어에 두고, `event.defaultPrevented || hasOpenManagedDialog()`이면 키 처리를 건너뛴다.
 - 문맥 안내/주의는 `InlineMessage`
 - Toast는 일시적 확인용이며 자동 소멸과 함께 우측 닫기 버튼으로 즉시 제거할 수 있어야 한다. 표면은 semantic toast glass token, blur, 얇은 highlight로 구성하고 라이트·다크 모드에서 문구 대비를 유지한다.

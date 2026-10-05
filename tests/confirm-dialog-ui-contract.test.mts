@@ -51,6 +51,15 @@ test("네이티브 dialog 메뉴 안에서 연 모달은 top layer에 붙고 메
   assert.match(menu, /if \(!hasOpenManagedDialog\(\)\) closePanel\(\);/);
   assert.match(menu, /if \(hasOpenManagedDialog\(\)\) \{/);
 
+  // 관리자 모바일 메뉴(portal drawer)도 그 안에서 연 로그아웃 확인 모달을 가리거나 키를 가로채지 않는다.
+  const adminDrawer = read("components/admin/AdminMobileNav.tsx");
+  assert.match(adminDrawer, /<AdminLogoutButton/);
+  assert.match(adminDrawer, /if \(event\.defaultPrevented \|\| hasOpenManagedDialog\(\)\) \{\s*return;/);
+  const drawerLayer = adminDrawer.match(/fixed inset-0 isolate z-\[(\d+)\]/);
+  assert.ok(drawerLayer, "관리자 메뉴 레이어");
+  assert.ok(Number(drawerLayer[1]) < 50, "관리자 메뉴는 Modal(z-50) 아래 레이어");
+  assert.match(modal, /className="fixed inset-0 z-50 /);
+
   const token = Symbol("confirm");
   assert.equal(hasOpenManagedDialog(), false);
   dialogStack.push(token);

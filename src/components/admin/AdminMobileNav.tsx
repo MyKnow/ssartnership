@@ -8,6 +8,7 @@ import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { hasOpenManagedDialog } from "@/lib/dialog-focus";
 import { SITE_NAME } from "@/lib/site";
 import {
   type AdminNavGroup,
@@ -116,6 +117,12 @@ export default function AdminMobileNav({
       ).filter((element) => element.getAttribute("aria-hidden") !== "true");
 
     const onKeyDown = (event: KeyboardEvent) => {
+      // 메뉴 안에서 연 확인 모달(로그아웃 등)이 Escape·Tab을 먼저 처리한다.
+      // Escape는 모달이 닫히며 스택에서 빠지므로 defaultPrevented로도 확인한다.
+      if (event.defaultPrevented || hasOpenManagedDialog()) {
+        return;
+      }
+
       if (event.key === "Escape") {
         event.preventDefault();
         setOpen(false);
@@ -188,7 +195,8 @@ export default function AdminMobileNav({
 
       {open && typeof document !== "undefined"
         ? createPortal(
-            <div className="fixed inset-0 isolate z-[70] md:hidden">
+            // 관리자 헤더·하단 nav(z-40)·플로팅 제출(z-[45]) 위, 메뉴에서 연 Modal(z-50)·Toast(z-[60]) 아래.
+            <div className="fixed inset-0 isolate z-[48] md:hidden">
               <button
                 type="button"
                 className="absolute inset-0 z-0 bg-black/55"
