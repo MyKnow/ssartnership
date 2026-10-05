@@ -157,6 +157,32 @@ describe("mock Repository 종료 상태 가드", () => {
     await expectCode(repository.deleteAdminProject({ projectId: project.id, adminId: "admin" }), "event_settled");
     assert.equal((await repository.getAdminProject(project.id))?.status, "approved");
   });
+
+  test("정산 기록이 있으면 모집·체험 기간이라도 회원 참여를 받지 않는다", async () => {
+    const now = Date.now();
+    store.settledAt = new Date(now - DAY).toISOString();
+    Object.assign(store.event, {
+      isActive: true,
+      submissionStartAt: new Date(now - 3 * DAY).toISOString(),
+      submissionEndAt: new Date(now - 2 * DAY).toISOString(),
+      experienceStartAt: new Date(now - DAY).toISOString(),
+      experienceEndAt: new Date(now + DAY).toISOString(),
+      announcementStartAt: new Date(now + 2 * DAY).toISOString(),
+    });
+    await expectCode(repository.registerParticipant({ memberId: OWNER }), "experience_closed");
+
+    Object.assign(store.event, {
+      submissionStartAt: new Date(now - DAY).toISOString(),
+      submissionEndAt: new Date(now + DAY).toISOString(),
+      experienceStartAt: new Date(now + 2 * DAY).toISOString(),
+      experienceEndAt: new Date(now + 3 * DAY).toISOString(),
+      announcementStartAt: new Date(now + 4 * DAY).toISOString(),
+    });
+    const owned = store.projects.find((project) => project.ownerMemberId && project.status !== "withdrawn");
+    assert.ok(owned?.ownerMemberId);
+    await expectCode(repository.withdrawProject({ projectId: owned.id, ownerMemberId: owned.ownerMemberId }), "submission_closed");
+    assert.notEqual(owned.status, "withdrawn");
+  });
 });
 
 test("SQL은 정산 뒤 체험·출품 재개와 출품 변경을 막고 파기 실행을 감사 기록에 남긴다", async () => {
