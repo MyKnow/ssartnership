@@ -162,8 +162,11 @@ export type AdminPartnerCouponErrorCode = keyof typeof adminPartnerCouponErrorMe
 
 /** 광고 관리 화면이 표시하는 캠페인 `?error=` 코드와 문구. */
 export const adminAdCampaignErrorMessages = {
-  ad_campaign_invalid_status_transition: "현재 상태에서는 요청한 상태로 변경할 수 없습니다.",
-  ad_campaign_state_changed: "확인하는 사이 상태가 바뀌었습니다. 현재 상태를 확인한 뒤 다시 시도해 주세요.",
+  // 전이 테이블(AD_CAMPAIGN_STATUS_TRANSITIONS) 거절과 조건부 갱신 충돌. 쿠폰 맵과 같은 안내를 유지한다.
+  ad_campaign_invalid_status_transition:
+    "허용되지 않는 캠페인 상태 변경입니다. 종료된 캠페인은 다시 열 수 없으니 새 캠페인으로 운영해 주세요.",
+  ad_campaign_state_changed:
+    "다른 관리자가 캠페인 상태를 먼저 바꿨습니다. 현재 상태를 확인한 뒤 다시 시도해 주세요.",
   ad_campaign_create_failed:
     "광고 캠페인을 생성하지 못했습니다. 입력값과 권한을 확인한 뒤 다시 시도해 주세요.",
   ad_campaign_invalid_request: "광고 캠페인 상태 변경 요청을 다시 확인해 주세요.",
@@ -174,6 +177,18 @@ export const adminAdCampaignErrorMessages = {
 
 export type AdminAdCampaignErrorCode = keyof typeof adminAdCampaignErrorMessages;
 
+/** 관리자 이벤트 상세 화면이 표시하는 이벤트 등록·수정·삭제 `?error=` 코드와 문구. */
+export const adminEventErrorMessages = {
+  admin_event_create_failed:
+    "이벤트를 등록하지 못했습니다. 입력값과 운영 권한을 확인한 뒤 다시 시도해 주세요.",
+  admin_event_update_failed: "이벤트를 수정하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  admin_event_delete_failed: "이벤트를 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  admin_event_reward_unsupported:
+    "이 이벤트는 추첨권 추첨을 지원하지 않습니다. 이벤트를 다시 선택해 주세요.",
+} as const satisfies Record<string, string>;
+
+export type AdminEventErrorCode = keyof typeof adminEventErrorMessages;
+
 /**
  * `redirectAdminActionError`가 받는 정적 코드. 공용 맵과 화면이 소유한 맵의 키를 합친 것이며,
  * 어느 맵에도 없는 리터럴은 타입 검사에서 막힌다. 새 코드는 문구와 함께 해당 맵에 먼저 추가한다.
@@ -182,6 +197,7 @@ export type AdminRedirectErrorCode =
   | AdminActionErrorCode
   | AdminPartnerCouponErrorCode
   | AdminAdCampaignErrorCode
+  | AdminEventErrorCode
   | AdminReviewQueueErrorCode
   | PartnerFormErrorCode
   | NotificationTemplateErrorCode;

@@ -89,8 +89,10 @@ authority: normative
 
 현재 기준:
 
-- `manifest.ts`는 `id: "/"`, `display: "standalone"`과 라이트 테마 색을 background·theme 색으로 쓰고, 화면 방향을 고정하지 않는다. 다크 테마 색은 root viewport의 media query로 제공한다. 아이콘은 `public/`의 192·512 PNG(512는 maskable 겸용)와 16/32/48 프레임 `favicon.ico`다.
-- `public/sw.js`는 푸시 알림과, 같은 출처 GET 내비게이션의 network-first만 처리한다. 네트워크 요청이 실패하면 설치 시 버전 캐시에 받아 둔 `public/offline.html`을 보여 주고, 데이터 응답은 캐시하지 않는다. `/admin`, `/api/` 내비게이션은 가로채지 않는다. `offline.html`을 바꾸면 `sw.js`의 `CACHE_VERSION`을 올린다.
+- `manifest.ts`는 `id: "/"`, `display: "standalone"`과 라이트 테마 색을 background·theme 색으로 쓰고, 화면 방향을 고정하지 않는다. 다크 테마 색은 root viewport의 media query로 제공한다. manifest 아이콘은 `public/`의 192·512 PNG(512는 maskable 겸용)다.
+- 브라우저·홈 화면 아이콘은 root metadata의 `icon.svg`, 192·512 PNG, 16/32/48 프레임 `favicon.ico`, `apple-touch-icon.png`(180×180)다. 파일 기반 아이콘(`src/app/**/icon.*`, `apple-icon.*`)은 이 설정을 덮어쓰므로 두지 않는다(`tests/metadata-routes.test.mts`).
+- 서비스 워커 자동 등록은 Production 빌드의 Supabase 모드에서만 한다(`PwaProvider`). 푸시 설정을 켤 때는 환경과 관계없이 등록한다. mock E2E에는 자동 등록이 없으므로 오프라인 폴백과 push 처리는 `tests/service-worker.test.mts`가 `sw.js`를 직접 실행해 검증한다.
+- `public/sw.js`는 푸시 알림과, 같은 출처 GET 내비게이션의 network-first만 처리한다. 네트워크 요청이 실패하면 설치 시 버전 캐시에 받아 둔 `public/offline.html`을 보여 주고, 데이터 응답은 캐시하지 않는다. `/admin`, `/api/` 내비게이션은 가로채지 않는다. 설치된 앱은 `sw.js`가 바뀌어야 새 오프라인 페이지를 받으므로 `offline.html`을 바꾸면 `sw.js`의 `CACHE_VERSION`을 올리고 테스트의 버전별 페이지 지문을 추가한다.
 - `/sw.js`는 `Cache-Control: no-cache, no-store, must-revalidate`로 제공한다. `sw.js`, `offline.html`, `manifest.webmanifest`는 회원 게이트 리다이렉트를 거치지 않는다(`src/lib/pwa-shell.ts`).
 - standalone 화면에서는 `html`, `body`의 `overscroll-behavior-y: none`으로 당겨서 새로고침을 막아 작성 중인 입력을 지킨다. 일반 브라우저 탭은 기본 동작을 유지한다.
 

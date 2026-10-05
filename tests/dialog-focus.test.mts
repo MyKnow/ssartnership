@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 import {
   DIALOG_FOCUSABLE_SELECTOR,
@@ -67,6 +67,7 @@ test("수동 다이얼로그는 공용 포커스 훅으로 초기 포커스·순
     "src/components/certification/CertificationView.tsx",
     "src/components/partner/PartnerBenefitUseAction.tsx",
     "src/components/partner-image-carousel/LightboxModal.tsx",
+    "src/components/media/ImageCropDialog.tsx",
   ]) {
     const source = read(path);
     assert.match(source, /useDialogFocus\(\{/, `${path}: useDialogFocus 사용`);
@@ -81,6 +82,39 @@ test("수동 다이얼로그는 공용 포커스 훅으로 초기 포커스·순
   const qr = read("src/components/certification/CertificationQrButton.tsx");
   assert.match(qr, /aria-labelledby=\{dialogTitleId\}/);
   assert.match(qr, /<h2 id=\{dialogTitleId\}/);
+
+  // 이미지 편집은 취소 버튼과 같은 onCancel로 Escape를 닫고, 제목으로 dialog 이름을 준다.
+  const crop = read("src/components/media/ImageCropDialog.tsx");
+  assert.match(
+    crop,
+    /useDialogFocus\(\{ open: dialogOpen, containerRef: panelRef, onClose: onCancel \}\)/,
+  );
+  assert.match(
+    crop,
+    /ref=\{panelRef\}\s+role="dialog"\s+aria-modal="true"\s+aria-labelledby=\{titleId\}\s+tabIndex=\{-1\}/,
+  );
+  assert.match(crop, /<h2\s+id=\{titleId\}/);
+});
+
+test("관리자 로그 CSV 다운로드는 수동 오버레이 대신 ui/Modal을 쓴다", () => {
+  const source = read("src/components/admin/logs/AdminLogsPanels.tsx");
+  assert.match(source, /import Modal from '@\/components\/ui\/Modal';/);
+  assert.match(source, /<Modal\s+open=\{open\}\s+title="CSV 다운로드"/);
+  assert.doesNotMatch(source, /fixed inset-0/);
+});
+
+test("화면 전체를 덮는 오버레이는 dialog 의미를 가진다", () => {
+  // 새 오버레이는 ui/Modal을 쓰거나, 직접 구현할 때 role="dialog"(또는 네이티브 <dialog>)와
+  // useDialogFocus를 함께 둔다(docs/design-system/elements.md Feedback 규칙).
+  const sourceRoot = new URL("../src/", import.meta.url);
+  const offenders = readdirSync(sourceRoot, { recursive: true, encoding: "utf8" })
+    .filter((file) => file.endsWith(".tsx") && !file.endsWith(".stories.tsx"))
+    .filter((file) => {
+      const source = readFileSync(new URL(file, sourceRoot), "utf8");
+      return /\bfixed inset-0\b/.test(source) && !/role="dialog"|<dialog\b/.test(source);
+    });
+
+  assert.deepEqual(offenders, []);
 });
 
 test("수료생 사진 미리보기는 수동 dialog 대신 ui/Modal을 쓴다", () => {

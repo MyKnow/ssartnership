@@ -14,10 +14,7 @@ import {
 import { isPartnerPortalCompanyAllowed } from "@/lib/partner-auth/portal-scope";
 import { requirePartnerActionSession } from "@/lib/partner-action-session";
 import { logServerError } from "@/lib/server-log";
-
-function getString(formData: FormData, key: string) {
-  return String(formData.get(key) ?? "").trim();
-}
+import { readString } from "@/lib/form-data";
 
 function getAccountPath(companyId: string) {
   return getPartnerGlobalPortalHref("account", companyId);
@@ -48,7 +45,7 @@ function redirectAccountInfoError(
 async function readAuthorizedSessionCompany(formData: FormData) {
   const session = await requirePartnerActionSession();
 
-  const companyId = getString(formData, "companyId");
+  const companyId = readString(formData, "companyId");
   if (!companyId || !isPartnerPortalCompanyAllowed(session, companyId)) {
     redirectAccountInfoError(companyId, "access_denied");
   }
@@ -64,18 +61,18 @@ export async function createPartnerBillingProfileAction(formData: FormData) {
       accountId: session.accountId,
       companyId,
       form: {
-        label: getString(formData, "label"),
-        payerName: getString(formData, "payerName"),
-        businessRegistrationNumber: getString(
+        label: readString(formData, "label"),
+        payerName: readString(formData, "payerName"),
+        businessRegistrationNumber: readString(
           formData,
           "businessRegistrationNumber",
         ),
-        businessName: getString(formData, "businessName"),
-        representativeName: getString(formData, "representativeName"),
-        businessAddress: getString(formData, "businessAddress"),
-        businessType: getString(formData, "businessType"),
-        businessItem: getString(formData, "businessItem"),
-        taxInvoiceEmail: getString(formData, "taxInvoiceEmail"),
+        businessName: readString(formData, "businessName"),
+        representativeName: readString(formData, "representativeName"),
+        businessAddress: readString(formData, "businessAddress"),
+        businessType: readString(formData, "businessType"),
+        businessItem: readString(formData, "businessItem"),
+        taxInvoiceEmail: readString(formData, "taxInvoiceEmail"),
         isDefault: formData.get("isDefault") === "on",
       },
     });
@@ -89,7 +86,7 @@ export async function createPartnerBillingProfileAction(formData: FormData) {
 
 export async function setDefaultPartnerBillingProfileAction(formData: FormData) {
   const { session, companyId } = await readAuthorizedSessionCompany(formData);
-  const profileId = getString(formData, "profileId");
+  const profileId = readString(formData, "profileId");
   if (!profileId) {
     redirectAccountInfoError(companyId, "profile_not_found");
   }
@@ -110,7 +107,7 @@ export async function setDefaultPartnerBillingProfileAction(formData: FormData) 
 
 export async function archivePartnerBillingProfileAction(formData: FormData) {
   const { session, companyId } = await readAuthorizedSessionCompany(formData);
-  const profileId = getString(formData, "profileId");
+  const profileId = readString(formData, "profileId");
   if (!profileId) {
     redirectAccountInfoError(companyId, "profile_not_found");
   }

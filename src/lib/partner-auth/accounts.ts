@@ -8,12 +8,16 @@ import type { PartnerPortalAccountRow } from "./types.ts";
  * (20260830215816) and the hashed initial setup columns (20260420000000,
  * 20260501012004) are part of the forward-only schema, so a missing column is
  * a deployment error that must surface instead of being retried away.
+ *
+ * This auth projection includes password material. Admin account screens and
+ * actions use the narrower projections in `partner-admin/company-account-rows.ts`
+ * instead, so the two are named apart to keep an import from picking the wrong one.
  */
-export const PARTNER_ACCOUNT_SELECT =
+export const PARTNER_AUTH_ACCOUNT_SELECT =
   "id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at,updated_at,auth_session_version";
 
-export const PARTNER_SETUP_ACCOUNT_SELECT =
-  `${PARTNER_ACCOUNT_SELECT},initial_setup_token_hash,initial_setup_link_sent_at,initial_setup_expires_at`;
+export const PARTNER_AUTH_SETUP_ACCOUNT_SELECT =
+  `${PARTNER_AUTH_ACCOUNT_SELECT},initial_setup_token_hash,initial_setup_link_sent_at,initial_setup_expires_at`;
 
 type PartnerAccountQueryResult = PromiseLike<{
   data: unknown;
@@ -35,7 +39,7 @@ export async function findSupabasePartnerPortalAccount(
   const byLoginId = await readPartnerAccountRow(
     supabase
       .from("partner_accounts")
-      .select(PARTNER_ACCOUNT_SELECT)
+      .select(PARTNER_AUTH_ACCOUNT_SELECT)
       .eq("login_id", loginIdOrEmail)
       .maybeSingle(),
   );
@@ -47,7 +51,7 @@ export async function findSupabasePartnerPortalAccount(
   return readPartnerAccountRow(
     supabase
       .from("partner_accounts")
-      .select(PARTNER_ACCOUNT_SELECT)
+      .select(PARTNER_AUTH_ACCOUNT_SELECT)
       .eq("email", loginIdOrEmail)
       .maybeSingle(),
   );
@@ -68,7 +72,7 @@ export async function findSupabasePartnerPortalSetupAccount(
   return readPartnerAccountRow(
     getSupabaseAdminClient()
       .from("partner_accounts")
-      .select(PARTNER_SETUP_ACCOUNT_SELECT)
+      .select(PARTNER_AUTH_SETUP_ACCOUNT_SELECT)
       .eq("initial_setup_token_hash", hashOpaqueToken(token))
       .maybeSingle(),
   );
@@ -78,7 +82,7 @@ export async function getSupabasePartnerPortalAccountById(accountId: string) {
   return readPartnerAccountRow(
     getSupabaseAdminClient()
       .from("partner_accounts")
-      .select(PARTNER_ACCOUNT_SELECT)
+      .select(PARTNER_AUTH_ACCOUNT_SELECT)
       .eq("id", accountId)
       .maybeSingle(),
   );

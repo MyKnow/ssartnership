@@ -322,34 +322,6 @@ export function isAdCampaignActive(
   return isActiveWindow(campaign.startsAt, campaign.endsAt, now);
 }
 
-export function isAdCouponRedeemable({
-  coupon,
-  campaign,
-  now = new Date(),
-}: {
-  coupon: AdCouponLike;
-  campaign?: AdCampaignLike | null;
-  now?: Date;
-}) {
-  if (coupon.status !== "active") {
-    return false;
-  }
-  if (!isActiveWindow(coupon.usageStartsAt ?? coupon.startsAt, coupon.usageEndsAt ?? coupon.endsAt, now)) {
-    return false;
-  }
-  if (!isAdCampaignActive(campaign, now)) {
-    return false;
-  }
-  if (
-    typeof coupon.usageLimit === "number" &&
-    coupon.usageLimit >= 0 &&
-    (coupon.usedCount ?? 0) >= coupon.usageLimit
-  ) {
-    return false;
-  }
-  return true;
-}
-
 export function isAdCouponDownloadable({
   coupon,
   campaign,

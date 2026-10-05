@@ -12,6 +12,10 @@ export const DEFAULT_SUBMIT_PENDING_TEXT = "처리 중";
  * Action form via `useFormStatus`, or a GET filter `NavigationForm` until the
  * next route renders. Loading UI, `disabled`, and `aria-busy` are delegated to
  * `Button`, so a pending form cannot be submitted twice by repeated clicks.
+ *
+ * Render it inside the form it submits. `useFormStatus` only reads an ancestor
+ * form, so a button tied to a form through the `form` attribute from outside
+ * never becomes busy; wrap the layout in a `contents` form instead.
  */
 export default function SubmitButton({
   children,

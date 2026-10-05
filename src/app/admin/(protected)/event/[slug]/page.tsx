@@ -33,6 +33,8 @@ import {
   type ManagedEventCampaign,
 } from "@/lib/promotions/events";
 import { logServerError } from "@/lib/server-log";
+import { adminEventErrorMessages } from "@/lib/admin-action-errors";
+import { pickAllowedEntry } from "@/lib/safe-messages";
 
 export const dynamic = "force-dynamic";
 
@@ -66,19 +68,7 @@ function statusMessage(status?: string) {
 }
 
 function errorMessage(error?: string) {
-  if (error === "admin_event_create_failed") {
-    return "이벤트를 등록하지 못했습니다. 입력값과 운영 권한을 확인한 뒤 다시 시도해 주세요.";
-  }
-  if (error === "admin_event_update_failed") {
-    return "이벤트를 수정하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-  }
-  if (error === "admin_event_delete_failed") {
-    return "이벤트를 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-  }
-  if (error === "admin_event_reward_unsupported") {
-    return "이 이벤트는 추첨권 추첨을 지원하지 않습니다. 이벤트를 다시 선택해 주세요.";
-  }
-  return null;
+  return pickAllowedEntry(adminEventErrorMessages, error);
 }
 
 function getEventState(campaign: ManagedEventCampaign | null) {

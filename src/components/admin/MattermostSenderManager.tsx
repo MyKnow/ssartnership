@@ -14,6 +14,7 @@ import type {
 } from "@/lib/mattermost-senders/types";
 import type { MattermostSenderHealthStatus } from "@/lib/mattermost-senders/health";
 import { formatSsafyYearLabel } from "@/lib/ssafy-year";
+import { formatKoreanDateTimeLocalValue } from "@/lib/datetime";
 import {
   parseMattermostSenderCredentialInput,
   type MattermostSenderCredentialFieldErrors,
@@ -53,9 +54,10 @@ const HEALTH_VARIANTS: Record<
   blocked: "danger",
 };
 
+// DB 시각은 UTC 문자열로 오므로 잘라 쓰지 않고 KST "YYYY-MM-DD HH:mm"으로 바꾼다.
 function formatTimestamp(value: string | null) {
   if (!value) return "—";
-  return value.slice(0, 16).replace("T", " ");
+  return formatKoreanDateTimeLocalValue(value).replace("T", " ") || "—";
 }
 
 function formatLastTest(sender: MattermostSenderMetadata) {

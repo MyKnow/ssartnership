@@ -144,7 +144,8 @@ mock 데이터 모드는 기본 E2E(`playwright.config.ts`), Storybook, `npm run
 - `revalidatePath(pattern, "page" | "layout")`는 route group을 포함한 파일 경로(`/(site)/events/[slug]`)로 매칭되므로 group을 빼면 아무 페이지도 무효화하지 않는다. `tests/revalidate-typed-path-contract.test.mts`가 실제 route 파일과의 일치를 고정한다.
 - partner Supabase repository는 `unstable_cache`와 `public_cache_versions`를 함께 사용한다.
 - `public_cache_versions`는 partners/categories scope 변경 시 cache key를 바꾸는 기준이다.
-- sitemap은 dynamic이며 partner 목록 조회 실패 시 홈/캠퍼스 entry만 반환하는 fail-soft 구조다.
+- sitemap은 dynamic이며 partner 목록 조회 실패 시 정적 경로(홈·앱 설치·쇼케이스 허브)와 모든 캠퍼스 entry만 반환하는 fail-soft 구조다. 조회에 성공하면 공개 제휴가 없는 캠퍼스는 캠퍼스 페이지 noindex와 같은 규칙으로 빠진다.
+- 서비스 워커(`public/sw.js`)는 버전 캐시에 오프라인 안내 페이지만 두고 데이터 응답은 캐시하지 않는다. 기준은 [PWA/installed app](../requirements/non-functional.md#pwainstalled-app)을 따른다.
 - image proxy/cache helper는 외부/스토리지 이미지 응답과 blur/cache 최적화를 보조한다.
 
 ## Event/logging architecture

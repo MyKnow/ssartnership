@@ -164,8 +164,6 @@ export function AdminCohortCardThemeManager({
       <div className="grid gap-3">
         {themeYears.map((year) => {
           const theme = themeMap.get(year) ?? null;
-          const updateFormId = `cohort-card-theme-update-${year}`;
-          const deleteFormId = `cohort-card-theme-delete-${year}`;
 
           return (
             <div
@@ -184,13 +182,11 @@ export function AdminCohortCardThemeManager({
                 {theme ? <ThemeSwatches theme={theme} /> : null}
               </div>
 
+              {/* 저장·삭제 버튼은 useFormStatus가 제출 중 상태를 받도록 각자 form 안에 둔다.
+                  두 form 모두 contents라 입력 6칸과 버튼 2칸이 같은 그리드 줄에 놓인다. */}
               <div className="grid gap-3 lg:grid-cols-[7rem_minmax(0,1fr)_repeat(4,minmax(5rem,6.5rem))_auto_auto] lg:items-end">
                 {canUpdate ? (
-                  <form
-                    id={updateFormId}
-                    action={upsertAction}
-                    className="contents"
-                  >
+                  <form action={upsertAction} className="contents">
                     <label className="grid min-w-0 gap-2 text-sm font-medium text-foreground">
                       기수
                       <Input
@@ -232,32 +228,26 @@ export function AdminCohortCardThemeManager({
                       name="accentColor"
                       value={getThemeValue(theme, "accentColor")}
                     />
+                    <SubmitButton
+                      variant="ghost"
+                      pendingText="저장 중"
+                      className="w-full lg:w-auto"
+                    >
+                      저장
+                    </SubmitButton>
                   </form>
                 ) : null}
                 {canDelete ? (
-                  <form id={deleteFormId} action={deleteAction}>
+                  <form action={deleteAction} className="contents">
                     <input type="hidden" name="cohortYear" value={year} />
+                    <SubmitButton
+                      variant="danger"
+                      pendingText="삭제 중"
+                      className="w-full lg:w-auto"
+                    >
+                      삭제
+                    </SubmitButton>
                   </form>
-                ) : null}
-                {canUpdate ? (
-                  <SubmitButton
-                    form={updateFormId}
-                    variant="ghost"
-                    pendingText="저장 중"
-                    className="w-full lg:w-auto"
-                  >
-                    저장
-                  </SubmitButton>
-                ) : null}
-                {canDelete ? (
-                  <SubmitButton
-                    form={deleteFormId}
-                    variant="danger"
-                    pendingText="삭제 중"
-                    className="w-full lg:w-auto"
-                  >
-                    삭제
-                  </SubmitButton>
                 ) : null}
               </div>
             </div>

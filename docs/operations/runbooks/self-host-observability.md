@@ -239,7 +239,7 @@ Issue #543에서 "컨테이너가 살아 있다"만 보던 감시를 서버 오�
 
 ### 서버 로그 형식
 
-서버 코드는 `src/lib/server-log.ts`의 `logServerError`/`logServerWarning`으로 한 줄 JSON을 stdout/stderr에 쓴다. 필드는 `level`, `event`(고정 라벨), `time`, `error{name, code, status, digest, message}`, `properties`다. raw error 객체, Supabase/PostgREST `details`·`hint`는 기록하지 않고 message의 이메일·토큰·URL·행 값·긴 숫자는 마스킹한다. `properties`는 공용 로그 정제기를 통과한다. 관리자 edge guard 차단 로그의 IP는 IPv4 /24, IPv6 /48 단위로만 남긴다. `tests/server-log-adoption.test.mts`가 raw error를 `console.error`로 직접 찍는 서버 코드의 재유입을 막는다.
+서버 코드는 `src/lib/server-log.ts`의 `logServerError`/`logServerWarning`으로 한 줄 JSON을 stdout/stderr에 쓴다. 필드는 `level`, `event`(고정 라벨), `time`, `error{name, code, status, digest, message}`, `properties`다. raw error 객체, Supabase/PostgREST `details`·`hint`는 기록하지 않고 message의 이메일·토큰·URL·행 값·긴 숫자는 마스킹한다. `properties`는 공용 로그 정제기를 통과한다. 관리자 edge guard 차단 로그의 IP는 IPv4 /24, IPv6 /48 단위로만 남긴다. `tests/server-log-adoption.test.mts`가 raw error 객체나 `{ message: error.message }` 같은 provider message를 `console.error`·`console.warn`으로 직접 찍는 서버 코드의 재유입을 막는다.
 
 Docker `local` 로그 드라이버가 10MB×3으로 회전하므로 오래 보관해야 할 근거는 장애 기록으로 옮긴다. 운영 VM에서 최근 오류만 보려면 다음 한 줄을 사용한다.
 
@@ -247,7 +247,7 @@ Docker `local` 로그 드라이버가 10MB×3으로 회전하므로 오래 보�
 docker logs --since 1h ssartnership-production-app-1 2>&1 | grep '"level":"error"'
 ```
 
-Next.js가 잡은 모든 서버 오류(render·route·action·proxy)는 `src/instrumentation.ts`의 `onRequestError`가 `"[request-error] unhandled server error"` 한 줄로 남긴다. 경로는 route 패턴(`/admin/(protected)/members/[memberId]/page`)과 고정 route group으로만 기록한다. 사용자 오류 화면의 "오류 코드"는 Next.js digest이며 같은 줄의 `error.digest`와 대조한다. 세 오류 경계(`app/error.tsx`, `app/global-error.tsx`, `admin/(protected)/error.tsx`)는 같은 digest 블록을 표시하고 원본 message는 렌더링하지 않는다.
+Next.js가 잡은 모든 서버 오류(render·route·action·proxy)는 `src/instrumentation.ts`의 `onRequestError`가 `"[request-error] unhandled server error"` 한 줄로 남긴다. 경로는 route 패턴(`/admin/(protected)/members/[memberId]/page`)과 고정 route group으로만 기록한다. 사용자 오류 화면의 "오류 코드"는 Next.js digest이며 같은 줄의 `error.digest`와 대조한다. 다섯 오류 경계(`app/error.tsx`, `app/global-error.tsx`, `app/(site)/error.tsx`, `app/partner/error.tsx`, `admin/(protected)/error.tsx`)는 같은 digest 블록을 표시하고 원본 message는 렌더링하지 않는다.
 
 ### 준비 상태(readiness)
 

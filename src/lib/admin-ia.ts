@@ -1,4 +1,5 @@
 import { normalizeAdminSearchQuery } from "@/lib/admin-search-query";
+import type { PartnerVisibility } from "@/lib/types";
 
 /**
  * Default row count for admin row lists (UI/UX baseline: "목록은 기본 20행").
@@ -34,11 +35,7 @@ export type AdminReviewQueuePageSize =
 
 export const DEFAULT_ADMIN_REVIEW_QUEUE_PAGE_SIZE: AdminReviewQueuePageSize = 12;
 
-export type AdminPartnerVisibilityFilter =
-  | "all"
-  | "public"
-  | "confidential"
-  | "private";
+export type AdminPartnerVisibilityFilter = "all" | PartnerVisibility;
 
 export type AdminPartnerSort = "recent" | "endingSoon";
 

@@ -2,6 +2,7 @@ import { PARTNER_ACCOUNT_SELECT } from "@/lib/partner-admin/company-account-rows
 import { SITE_URL } from "@/lib/site";
 import { generateOpaqueToken, hashOpaqueToken } from "@/lib/password";
 import { normalizePartnerLoginId } from "@/lib/partner-utils";
+import { logServerError } from "@/lib/server-log";
 import { isValidEmail } from "@/lib/validation";
 import type { AdminSupabaseClient } from "../shared-types";
 
@@ -40,10 +41,7 @@ async function updateInitialSetupState(
     .eq("id", accountId);
 
   if (error) {
-    console.error("[partner-setup-link] issue update failed", {
-      accountId,
-      message: error.message,
-    });
+    logServerError("[partner-setup-link] issue update failed", error, { accountId });
     throw new Error("partner_account_setup_link_failed");
   }
 
@@ -63,10 +61,7 @@ export async function issuePartnerAccountInitialSetupLink(
   // Errors carry admin action error codes (see admin-action-errors.ts) so the
   // caller can tell the operator what to fix instead of a generic input error.
   if (accountError) {
-    console.error("[partner-setup-link] account lookup failed", {
-      accountId,
-      message: accountError.message,
-    });
+    logServerError("[partner-setup-link] account lookup failed", accountError, { accountId });
     throw new Error("partner_account_setup_link_failed");
   }
   if (!account) {

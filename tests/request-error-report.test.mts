@@ -80,7 +80,13 @@ test("instrumentation hook reports only in the Node.js runtime and swallows repo
 });
 
 test("every error boundary shows the digest without rendering the raw message", () => {
-  for (const file of ["../src/app/error.tsx", "../src/app/global-error.tsx", "../src/app/admin/(protected)/error.tsx"]) {
+  for (const file of [
+    "../src/app/error.tsx",
+    "../src/app/global-error.tsx",
+    "../src/app/(site)/error.tsx",
+    "../src/app/partner/error.tsx",
+    "../src/app/admin/(protected)/error.tsx",
+  ]) {
     const source = readFileSync(new URL(file, import.meta.url), "utf8");
     assert.match(source, /digest/u, file);
     assert.doesNotMatch(source, /error\.message/u, file);

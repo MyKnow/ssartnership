@@ -50,6 +50,11 @@ function nextWithRequestUrl(request: NextRequest) {
   });
 }
 
+/** A Server Action call from the client router (Next sends the action id header). */
+function isServerActionRequest(request: NextRequest) {
+  return request.method === "POST" && request.headers.has("next-action");
+}
+
 function verifyToken(token: string) {
   return parseUserSessionToken(token, findSessionSecret("user-session"));
 }
@@ -216,6 +221,15 @@ export async function proxy(request: NextRequest) {
       return nextWithRequestUrl(request);
     }
     if (!partnerPayload && !isPartnerLogoutPath) {
+      // A server action answers a missing session itself: every partner
+      // action reads the session (`requirePartnerActionSession` redirects to
+      // the login page with the expiry notice and the submitting screen as
+      // returnTo, which the client router follows). A 307 here would make the
+      // browser re-post the action to the login page, and the client would
+      // fail on the non-action response instead of showing the login page.
+      if (isServerActionRequest(request)) {
+        return nextWithRequestUrl(request);
+      }
       // Keep the deep link as a sanitized returnTo instead of leaking its
       // query string onto the login page.
       return NextResponse.redirect(

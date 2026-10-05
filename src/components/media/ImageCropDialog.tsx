@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Area } from "react-easy-crop";
 import {
@@ -13,6 +13,7 @@ import FormMessage from "@/components/ui/FormMessage";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { encodeCanvasAsIntermediateWebp } from "@/lib/image-upload/client-webp";
 import { type ImageTransformPolicy } from "@/lib/image-upload/policy";
 
@@ -129,8 +130,13 @@ export default function ImageCropDialog({
   const effectiveAspectRatio = policy?.aspectRatio ?? aspectRatio;
   const effectiveQuality = policy ? policy.quality / 100 : quality;
   const canApply = requiresServerFallback ? Boolean(sourceFile) : croppedAreaPixels !== null;
+  const panelRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const dialogOpen = open && Boolean(portalRoot);
 
-  useBodyScrollLock(open && Boolean(portalRoot));
+  useBodyScrollLock(dialogOpen);
+  // 취소 버튼과 같은 계약: Escape는 onCancel, 닫히면 편집을 연 요소로 포커스를 돌린다.
+  useDialogFocus({ open: dialogOpen, containerRef: panelRef, onClose: onCancel });
 
   useEffect(() => {
     if (!open || !portalRoot) {
@@ -191,9 +197,17 @@ export default function ImageCropDialog({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-x-hidden overflow-y-auto bg-black/70 px-2 py-2 backdrop-blur-sm sm:items-center sm:px-4 sm:py-6">
-      <div className="my-auto flex max-h-[calc(100dvh-1rem)] w-full max-w-5xl min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-white/10 bg-surface-overlay shadow-overlay sm:max-h-[calc(100dvh-3rem)] sm:rounded-[1.75rem]">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="my-auto flex max-h-[calc(100dvh-1rem)] w-full max-w-5xl min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-white/10 bg-surface-overlay shadow-overlay focus:outline-hidden sm:max-h-[calc(100dvh-3rem)] sm:rounded-[1.75rem]"
+      >
         <div className="flex min-w-0 shrink-0 items-center justify-between gap-3 border-b border-border/70 px-4 py-3 sm:px-5 sm:py-4">
           <h2
+            id={titleId}
             data-testid="image-crop-dialog-title"
             className="min-w-0 text-ko-title text-base font-semibold text-foreground"
           >

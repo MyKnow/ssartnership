@@ -28,6 +28,7 @@ import {
   updatePartnerBrandPlan,
 } from "@/app/admin/(protected)/actions";
 import { formatKoreanWon } from "@/lib/number-format";
+import { formatKoreanIsoDate } from "@/lib/datetime";
 
 export type AdminBrandPlanBrand = {
   id: string;
@@ -76,15 +77,9 @@ export type AdminCompanyPlanEvent = {
   createdAt: string;
 };
 
+// 플랜 기간은 KST 00:00/23:59:59로 저장되므로 UTC 날짜로 자르면 시작일이 하루 앞당겨진다.
 function toDateInputValue(value?: string | null) {
-  if (!value) {
-    return "";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-  return date.toISOString().slice(0, 10);
+  return value ? formatKoreanIsoDate(value) : "";
 }
 
 function getStatusBadgeVariant(status: AdminCompanyPlanRequest["status"]) {

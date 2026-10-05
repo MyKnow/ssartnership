@@ -23,14 +23,6 @@ test("숫자·통화·퍼센트 표기는 ko-KR 구분 기호로 고정된다", 
   assert.equal(formatPercent(5, 1), "5.0%");
 });
 
-// RF-10이 이 화면의 집계 섹션을 컴포넌트로 옮기는 중이라 충돌을 피하려고 일시 제외한다.
-// 두 번째 경로는 RF-10 브랜치에서 섹션이 옮겨 가는 위치다(이 브랜치에는 아직 없다).
-// 통합 시 옮겨진 컴포넌트를 formatCount·formatKoreanMonthDayTime으로 바꾸고 이 예외를 지운다.
-const NO_ARG_LOCALE_EXCEPTIONS = new Set([
-  "app/admin/(protected)/event/[slug]/page.tsx",
-  "components/admin/event-rewards/SignupRewardOverviewSection.tsx",
-]);
-
 function listSourceFiles(directory: URL): URL[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const child = new URL(`${entry.name}${entry.isDirectory() ? "/" : ""}`, directory);
@@ -46,7 +38,7 @@ test("런타임 기본 로케일에 기대는 무인자 toLocaleString()과 로�
     const relative = decodeURIComponent(file.href.slice(sourceRoot.href.length));
     if (relative === "lib/number-format.ts") continue;
     const source = readFileSync(file, "utf8");
-    if (!NO_ARG_LOCALE_EXCEPTIONS.has(relative) && /\.toLocaleString\(\)/u.test(source)) {
+    if (/\.toLocaleString\(\)/u.test(source)) {
       offenders.push(`${relative}: toLocaleString()`);
     }
     if (/^function format(?:Count|Currency|Percent)\(/mu.test(source)) {

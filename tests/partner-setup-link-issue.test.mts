@@ -106,6 +106,34 @@ test("초기설정 URL 발급 실패는 운영자가 조치할 수 있는 관리
   }
 });
 
+test("초기설정 URL 발급 실패는 provider 문구를 정제한 한 줄 서버 로그로 남긴다", async () => {
+  const lines: unknown[] = [];
+  const originalConsoleError = console.error;
+  console.error = (line: unknown) => {
+    lines.push(line);
+  };
+  try {
+    const { run } = await issueWith({
+      account: buildAccount(),
+      updateError: {
+        message:
+          "duplicate key value violates unique constraint: Key (login_id)=(partner@example.com) already exists",
+      },
+    });
+    await assert.rejects(run(), /partner_account_setup_link_failed/);
+  } finally {
+    console.error = originalConsoleError;
+  }
+
+  assert.equal(lines.length, 1);
+  const entry = JSON.parse(String(lines[0]));
+  assert.equal(entry.level, "error");
+  assert.equal(entry.event, "[partner-setup-link] issue update failed");
+  assert.deepEqual(entry.properties, { accountId: "account-1" });
+  assert.match(entry.error.message, /duplicate key value/);
+  assert.doesNotMatch(JSON.stringify(entry), /partner@example\.com/);
+});
+
 test("초기설정 URL 발급은 hash·만료만 저장하고 평문 토큰 컬럼을 쓰지 않는다", async () => {
   const { fake, run } = await issueWith({ account: buildAccount() });
   const before = Date.now();
@@ -135,6 +163,10 @@ test("초기설정 URL 메일 발송 실패는 입력 오류가 아니라 발송
     source,
     /sendPartnerPortalInitialSetupEmail\([\s\S]*?\} catch \(error\) \{[\s\S]*?"partner_account_setup_email_failed"/,
   );
+  // Mail provider errors can echo the recipient or the setup URL, so they go
+  // through the sanitized server log instead of a raw console line.
+  assert.match(source, /logServerError\("\[admin\] partner initial setup email failed", error,/);
+  assert.doesNotMatch(source, /console\.error/);
   assert.match(source, /getSafeAdminActionErrorCode\(error, "partner_account_setup_link_failed"\)/);
   assert.match(adminActionErrorMessages.partner_account_setup_email_failed, /메일을 보내지 못했습니다/);
 });

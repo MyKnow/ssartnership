@@ -8,18 +8,12 @@ import FormMessage from "@/components/ui/FormMessage";
 import { updateShowcaseSchedule } from "@/app/admin/(protected)/events/project-showcase/actions";
 import type { ShowcaseEvent } from "@/lib/project-showcase/types";
 import { parseShowcaseSchedule } from "@/lib/project-showcase/validation";
+import { formatKoreanDateTimeLocalValue } from "@/lib/datetime";
 
 const INPUT_CLASS = "min-h-11 rounded-xl border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary";
 
 function toDateTimeLocal(value: string | null) {
-  if (!value) return "";
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-  }).formatToParts(new Date(value));
-  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${byType.year}-${byType.month}-${byType.day}T${byType.hour}:${byType.minute}`;
+  return value ? formatKoreanDateTimeLocalValue(value) : "";
 }
 
 const PERIODS = [

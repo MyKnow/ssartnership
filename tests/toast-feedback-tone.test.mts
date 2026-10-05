@@ -117,3 +117,17 @@ test("관리자 알림 발송 요약은 실패 건이 있으면 error 톤으로 
   assert.ok(summary, "발송 요약 notify 호출을 찾지 못했습니다.");
   assert.match(summary, /totalFailed > 0 \? \{ tone: "error" \} : undefined/);
 });
+
+test("회원 가져오기 완료 안내는 실패 행이 있으면 error 톤으로 알린다", async () => {
+  const source = await readFile(
+    new URL("../src/components/admin/AdminMemberManualAddPanel.tsx", import.meta.url),
+    "utf8",
+  );
+  const summary = collectNotifyCalls(source).find((call) =>
+    call.includes("회원 가져오기를 처리했습니다."),
+  );
+
+  assert.ok(summary, "회원 가져오기 완료 notify 호출을 찾지 못했습니다.");
+  assert.match(summary, /실패한 \$\{nextResult\.failed\}건은 가져오기 결과에서 확인해 주세요\./);
+  assert.match(summary, /nextResult\.failed > 0 \? \{ tone: "error" \} : undefined/);
+});

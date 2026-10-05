@@ -194,19 +194,19 @@ const resetModulePromise = import("../src/lib/partner-auth/reset.ts");
 const sessionAccessModulePromise = import("../src/lib/partner-session-access.ts");
 
 test("초기 설정 토큰은 hash 컬럼 단일 조회로 찾고, 모르는 토큰은 null이다", async () => {
-  const { findSupabasePartnerPortalSetupAccount, PARTNER_SETUP_ACCOUNT_SELECT } =
+  const { findSupabasePartnerPortalSetupAccount, PARTNER_AUTH_SETUP_ACCOUNT_SELECT } =
     await accountsModulePromise;
   const calls = installSupabase(() => ({ data: null }));
 
   assert.equal(await findSupabasePartnerPortalSetupAccount("unknown-token"), null);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].table, "partner_accounts");
-  assert.equal(calls[0].columns, PARTNER_SETUP_ACCOUNT_SELECT);
+  assert.equal(calls[0].columns, PARTNER_AUTH_SETUP_ACCOUNT_SELECT);
   assert.deepEqual(calls[0].filters, [
     { kind: "eq", column: "initial_setup_token_hash", value: sha256("unknown-token") },
   ]);
 
-  const columns = PARTNER_SETUP_ACCOUNT_SELECT.split(",");
+  const columns = PARTNER_AUTH_SETUP_ACCOUNT_SELECT.split(",");
   for (const column of [
     "initial_setup_token_hash",
     "initial_setup_expires_at",
@@ -330,15 +330,15 @@ test("초기 설정 완료 갱신의 스키마 오류는 payload를 바꿔 재�
 });
 
 test("세션 버전 컬럼 오류는 계정 조회에서 축소 select로 재시도하지 않는다", async () => {
-  const { getSupabasePartnerPortalAccountById, findSupabasePartnerPortalAccount, PARTNER_ACCOUNT_SELECT } =
+  const { getSupabasePartnerPortalAccountById, findSupabasePartnerPortalAccount, PARTNER_AUTH_ACCOUNT_SELECT } =
     await accountsModulePromise;
   const calls = installSupabase(() => ({ error: missingVersionColumnError }));
 
   await assert.rejects(getSupabasePartnerPortalAccountById("account-1"));
   await assert.rejects(findSupabasePartnerPortalAccount("partner@example.com"));
   assert.equal(calls.length, 2);
-  assert.ok(calls.every((call) => call.columns === PARTNER_ACCOUNT_SELECT));
-  assert.ok(PARTNER_ACCOUNT_SELECT.split(",").includes("auth_session_version"));
+  assert.ok(calls.every((call) => call.columns === PARTNER_AUTH_ACCOUNT_SELECT));
+  assert.ok(PARTNER_AUTH_ACCOUNT_SELECT.split(",").includes("auth_session_version"));
 });
 
 test("비밀번호 변경은 세션 버전을 함께 올리고 DB 오류를 그대로 전파한다", async () => {

@@ -40,6 +40,7 @@ export const Default: Story = {
   play: async () => {
     const body = within(document.body);
     await expect(await body.findByText("이미지 편집")).toBeInTheDocument();
+    await expect(body.getByRole("dialog", { name: "이미지 편집" })).toBeInTheDocument();
     await expect(body.getByTestId("image-crop-frame")).toBeVisible();
     await expect(body.queryByTestId("image-crop-tools")).not.toBeInTheDocument();
   },

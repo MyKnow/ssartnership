@@ -8,16 +8,20 @@ import {
   formatKoreanDateTimeLocalValue,
   formatKoreanDateTimeToMinute,
   formatKoreanDateTimeToSecond,
+  formatKoreanIsoDate,
   formatKoreanLocaleDateTime,
   formatKoreanMediumDateTime,
   formatKoreanMonthDayTime,
   formatOptionalKoreanDateTimeToMinute,
+  getKstDateParts,
   getKstDateString,
   KOREA_TIME_ZONE,
   parseKoreanDateTimeLocalValue,
   toIsoFromKoreanDateTimeLocalValue,
 } from "@/lib/datetime";
 import { toDateTimeLocalInput } from "@/lib/ad-coupon-period";
+import { getKstPeriodKey } from "@/lib/ad-coupon-domain";
+import { getSeoulDateParts } from "@/lib/ssafy-year";
 import { getKstDateString as getPartnerKstDateString } from "@/lib/partner-utils";
 import { getKstDateString as getPushKstDateString } from "@/lib/push/ops";
 
@@ -62,6 +66,10 @@ function snapshot() {
     localValue: formatKoreanDateTimeLocalValue(KST_MIDNIGHT_EDGE),
     couponLocalValue: toDateTimeLocalInput(KST_MIDNIGHT_EDGE),
     kstDate: getKstDateString(0, new Date(KST_MIDNIGHT_EDGE)),
+    kstParts: getKstDateParts(KST_MIDNIGHT_EDGE),
+    isoDate: formatKoreanIsoDate(KST_MIDNIGHT_EDGE),
+    seoulParts: getSeoulDateParts(new Date(KST_MIDNIGHT_EDGE)),
+    couponDailyKey: getKstPeriodKey(KST_MIDNIGHT_EDGE, "daily"),
   };
 }
 
@@ -80,6 +88,10 @@ const EXPECTED = {
   localValue: "2026-10-05T00:30",
   couponLocalValue: "2026-10-05T00:30",
   kstDate: "2026-10-05",
+  kstParts: { year: 2026, month: 10, day: 5 },
+  isoDate: "2026-10-05",
+  seoulParts: { year: 2026, month: 10 },
+  couponDailyKey: "2026-10-05",
 };
 
 test("KST 포맷터는 런타임 TZ가 UTC든 Asia/Seoul이든 같은 표기를 낸다", () => {
@@ -122,6 +134,36 @@ test("잘못된 날짜와 빈 값은 포맷터마다 정해진 대체값을 쓴�
   assert.equal(formatOptionalKoreanDateTimeToMinute("", "-"), "-");
   assert.equal(formatOptionalKoreanDateTimeToMinute("not-a-date", "-"), "-");
   assert.equal(formatOptionalKoreanDateTimeToMinute(KST_AFTERNOON, "-"), "2026. 10. 5. 15:05");
+  const invalidParts = getKstDateParts("invalid");
+  assert.ok(Number.isNaN(invalidParts.year) && Number.isNaN(invalidParts.month) && Number.isNaN(invalidParts.day));
+  assert.equal(getKstPeriodKey("invalid", "daily"), "invalid");
+  assert.equal(formatKoreanIsoDate("invalid"), "");
+});
+
+test("formatKoreanIsoDate는 KST 00:00·23:59:59로 저장한 기간 값을 같은 날짜로 되돌린다", () => {
+  // 관리자 플랜 기간은 `${date}T00:00:00+09:00`·`T23:59:59+09:00`으로 저장되고 DB는 UTC 문자열로 돌려준다.
+  assert.equal(formatKoreanIsoDate("2026-10-04T15:00:00+00:00"), "2026-10-05");
+  assert.equal(formatKoreanIsoDate("2026-10-05T00:00:00+09:00"), "2026-10-05");
+  assert.equal(formatKoreanIsoDate("2026-10-31T14:59:59+00:00"), "2026-10-31");
+  assert.equal(formatKoreanIsoDate("2026-10-05"), "2026-10-05");
+  assert.equal(
+    withTimeZone("UTC", () => formatKoreanDateTimeLocalValue("2026-10-04T15:30:00+00:00").replace("T", " ")),
+    "2026-10-05 00:30",
+  );
+});
+
+test("타임스탬프 문자열을 잘라 UTC 날짜·시각을 보여 주던 화면은 KST 공용 헬퍼를 쓴다", () => {
+  const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+  const planManager = read("src/components/admin/AdminCompanyPlanManager.tsx");
+  const couponPanel = read("src/components/partner/partner-service-detail-view/PartnerCouponPanel.tsx");
+  const senderManager = read("src/components/admin/MattermostSenderManager.tsx");
+
+  assert.doesNotMatch(planManager, /toISOString\(\)\.slice\(0, 10\)/);
+  assert.match(planManager, /formatKoreanIsoDate\(value\)/);
+  assert.doesNotMatch(couponPanel, /usage(?:Starts|Ends)At\.slice\(/);
+  assert.match(couponPanel, /formatKoreanIsoDate\(coupon\.usageStartsAt\)/);
+  assert.doesNotMatch(senderManager, /value\.slice\(0, 16\)/);
+  assert.match(senderManager, /formatKoreanDateTimeLocalValue\(value\)/);
 });
 
 test("getKstDateString은 KST 날짜 경계와 일 단위 이동을 계산하고 기존 경로와 같은 구현을 쓴다", () => {
@@ -185,6 +227,18 @@ test("날짜 객체를 toLocale*String으로 직접 포맷하지 않고 KST 고�
         (/\.toLocale(?:Date|Time)String\(/u.test(source) ||
           /\bDate\([^()]*\)\.toLocaleString\(/u.test(source)),
     )
+    .map(({ relative }) => relative);
+  assert.deepEqual(offenders, []);
+});
+
+test("Intl.DateTimeFormat은 datetime.ts 안에서만 만들고 화면·도메인은 KST 공용 헬퍼를 쓴다", () => {
+  const sourceRoot = new URL("../src/", import.meta.url);
+  const offenders = listSourceFiles(sourceRoot)
+    .map((file) => ({
+      relative: decodeURIComponent(file.href.slice(sourceRoot.href.length)),
+      source: readFileSync(file, "utf8"),
+    }))
+    .filter(({ relative, source }) => relative !== "lib/datetime.ts" && /\bIntl\.DateTimeFormat\(/u.test(source))
     .map(({ relative }) => relative);
   assert.deepEqual(offenders, []);
 });
