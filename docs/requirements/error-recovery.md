@@ -15,6 +15,7 @@ last_verified: 2026-10-05
 - 복구 가능한 실패는 사용자 입력과 현재 작업 문맥을 유지한다.
 - validation, unauthorized, forbidden, not-found, conflict, rate-limit, retryable provider failure를 안전한 코드로 구분한다.
 - raw error, stack trace, provider 원문, secret 또는 내부 식별자를 사용자 메시지에 노출하지 않는다.
+- 클라이언트 `requestJson`은 안전한 서버 오류 문구를 유지하고 네트워크·응답 파싱 실패는 호출처의 안내 문구로 바꾼다. 요청 또는 응답 본문 수신 중 발생한 `AbortError`는 같은 오류 객체로 전달한다. 이메일 계정 복구 실패는 `FormMessage`의 error/alert로, 다음 단계 안내는 info로 구분한다.
 - 긴 작업과 파괴적 작업의 실패는 사라지는 toast만 사용하지 않고 inline 상태와 재시도 또는 복구 행동을 남긴다.
 - `500`은 입력 오류나 예상 가능한 외부 실패가 아니라 복구할 수 없는 내부 예외에 한정한다.
 
@@ -25,6 +26,7 @@ FE 제출 전 검증과 BE 신뢰 경계 검증은 아래 공용 모듈의 같�
 | 규칙 | 공용 위치 |
 | --- | --- |
 | 숫자 4자리 PIN, 숫자 6자리 인증 코드, 제어문자 | `src/lib/validation.ts`의 `isFourDigitPin`·`isSixDigitCode`·`hasControlCharacters`와 자릿수 상수 |
+| 기수 | `src/lib/validation.ts`의 `parseMemberYearValue`·`validateMemberYear`. 앞뒤 공백 제거 후 전체가 십진 숫자인 0~99 정수만 허용하며 소수·지수·숫자 뒤 문자열을 부분 파싱하지 않는다. 소비자가 요구하는 1 이상 같은 추가 제약은 별도로 유지한다 |
 | UUID | `src/lib/uuid.ts`의 `isUuid`(앞뒤 공백 허용)·`isUuidFormat`(정확 일치), 버전 1~8 |
 | 입력 길이 상한 | 도메인 규칙 모듈의 상수(예: `SHOWCASE_PROJECT_LIMITS`, `PARTNER_BILLING_FIELD_LIMITS`, `REVIEW_TEXT_LIMITS`, `ADMIN_REVIEW_NOTE_MAX_LENGTH`, `NOTIFICATION_TEMPLATE_MAX_*`). 폼 `maxLength`는 상수를 참조한다 |
 | 필드 오류와 첫 오류 필드 | `src/lib/field-errors.ts`의 `FieldErrors`·`hasFieldErrors`·`firstInvalidField` |

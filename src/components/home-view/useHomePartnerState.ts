@@ -1,10 +1,9 @@
 "use client";
-import { useEffect, type Dispatch, type SetStateAction } from "react";
-import { mergeFavoriteState, mergeLoadedPartnerIds } from "./state-merge";
-export function useHomePartnerState({ currentUserId, displayPartnerIds, loadedFavoritePartnerIdSet, setLocalFavoriteStateById, setLoadedFavoritePartnerIdSet }: {
+import { useEffect, type Dispatch } from "react";
+import type { HomePartnerStateAction } from "./state-merge";
+export function useHomePartnerState({ currentUserId, displayPartnerIds, loadedFavoritePartnerIdSet, dispatch }: {
   currentUserId: string | null; displayPartnerIds: string[]; loadedFavoritePartnerIdSet: Set<string>;
-  setLocalFavoriteStateById: Dispatch<SetStateAction<Record<string, boolean | undefined>>>;
-  setLoadedFavoritePartnerIdSet: Dispatch<SetStateAction<Set<string>>>;
+  dispatch: Dispatch<HomePartnerStateAction>;
 }) {
   useEffect(() => {
     if (!currentUserId) {
@@ -40,8 +39,7 @@ export function useHomePartnerState({ currentUserId, displayPartnerIds, loadedFa
         };
       })
       .then((state) => {
-        setLocalFavoriteStateById((current) => mergeFavoriteState(current, state));
-        setLoadedFavoritePartnerIdSet((current) => mergeLoadedPartnerIds(current, state));
+        if (!abortController.signal.aborted) dispatch({ type: "hydrate", response: state });
       })
       .catch((error) => {
         if (abortController.signal.aborted) {
@@ -51,6 +49,6 @@ export function useHomePartnerState({ currentUserId, displayPartnerIds, loadedFa
       });
 
     return () => abortController.abort();
-  }, [currentUserId, displayPartnerIds, loadedFavoritePartnerIdSet, setLocalFavoriteStateById, setLoadedFavoritePartnerIdSet]);
+  }, [currentUserId, displayPartnerIds, loadedFavoritePartnerIdSet, dispatch]);
 
 }

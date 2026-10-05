@@ -112,10 +112,10 @@ export function validateCategoryKey(value: string) {
 
 export function parseMemberYearValue(value?: string | number | null) {
   const normalized = String(value ?? "").trim();
-  if (!normalized) {
+  if (!/^\d+$/.test(normalized)) {
     return null;
   }
-  const parsed = Number.parseInt(normalized, 10);
+  const parsed = Number(normalized);
   if (!Number.isInteger(parsed) || parsed < 0 || parsed > 99) {
     return null;
   }
