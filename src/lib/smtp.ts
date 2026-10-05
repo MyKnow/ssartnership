@@ -200,7 +200,11 @@ export function getSmtpConfig(
 }
 
 export type SmtpTimeouts = Readonly<{
-  /** DNS 질의 1회 상한. resolver가 재시도하므로 총 대기는 몇 배가 될 수 있다. */
+  /**
+   * DNS 질의 시도 1회 상한. Node resolver는 기본 4회 시도하며 시도마다 대기를
+   * 두 배로 늘리므로, 응답하지 않는 DNS 서버 앞에서는 IPv4·IPv6 해석이 각각
+   * 이 값의 약 15배까지 걸릴 수 있다. 해석 실패는 `EDNS`로 보고된다.
+   */
   dnsTimeoutMs: number;
   /** TCP(및 implicit TLS) 연결 수립 상한. */
   connectionTimeoutMs: number;

@@ -28,7 +28,9 @@ test("downstream call budgets fit inside the cron client and public proxy budget
     ["Supabase REST/RPC/Auth", DEFAULT_SUPABASE_FETCH_TIMEOUT_MS],
     ["Supabase Storage", DEFAULT_SUPABASE_STORAGE_FETCH_TIMEOUT_MS],
     [
-      "SMTP DNS + connect + greeting",
+      // One resolver try. The Node resolver's own retries are not configurable
+      // through nodemailer; reliability.md records that worst case.
+      "SMTP DNS try + connect + greeting",
       SMTP_TIMEOUTS.dnsTimeoutMs
         + SMTP_TIMEOUTS.connectionTimeoutMs
         + SMTP_TIMEOUTS.greetingTimeoutMs,

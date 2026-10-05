@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import dns from "node:dns";
 import { createServer, type Server, type Socket } from "node:net";
 import { type AddressInfo } from "node:net";
+import os from "node:os";
 import test from "node:test";
 
 import { classifyGraduateEmailDeliveryError } from "@/lib/graduate-email-delivery";
@@ -151,8 +153,81 @@ test("a server that stalls after the greeting is cut by the idle socket timeout"
   }
 });
 
+test("a DNS resolver timeout surfaces as EDNS and each resolver is built with dnsTimeout", async () => {
+  // nodemailer reads dns.Resolver and dns.lookup from the shared module object
+  // at call time, so a stalled resolver can be modelled without real DNS.
+  const dnsModule = dns as unknown as { Resolver: unknown; lookup: unknown };
+  const originalResolver = dnsModule.Resolver;
+  const originalLookup = dnsModule.lookup;
+  const resolverOptions: Array<{ timeout?: unknown }> = [];
+  const timedOut = (syscall: string) =>
+    Object.assign(new Error(`${syscall} ETIMEOUT`), { code: "ETIMEOUT" });
+  dnsModule.Resolver = class StalledResolver {
+    constructor(options: { timeout?: unknown }) {
+      resolverOptions.push(options);
+    }
+    resolve4(_hostname: string, callback: (error: Error) => void) {
+      setImmediate(() => callback(timedOut("queryA")));
+    }
+    resolve6(_hostname: string, callback: (error: Error) => void) {
+      setImmediate(() => callback(timedOut("queryAaaa")));
+    }
+  };
+  dnsModule.lookup = (
+    hostname: string,
+    _options: unknown,
+    callback: (error: Error) => void,
+  ) => {
+    setImmediate(() =>
+      callback(
+        Object.assign(new Error(`getaddrinfo EAI_AGAIN ${hostname}`), {
+          code: "EAI_AGAIN",
+        }),
+      ),
+    );
+  };
+  const transport = createSmtpTransport(
+    { ...localConfig(587), host: "stalled-dns.smtp.example.test" },
+    shortTimeouts,
+  );
+  try {
+    await assert.rejects(
+      transport.sendMail({
+        from: "sender@example.test",
+        to: "receiver@example.test",
+        subject: "인증 안내",
+        text: "테스트",
+      }),
+      (error: unknown) => {
+        assert.equal((error as { code?: unknown }).code, "EDNS");
+        assert.equal(
+          classifyGraduateEmailDeliveryError(error),
+          "smtp_connection_failed",
+        );
+        return true;
+      },
+    );
+  } finally {
+    transport.close();
+    dnsModule.Resolver = originalResolver;
+    dnsModule.lookup = originalLookup;
+  }
+
+  // nodemailer skips the resolver for an address family the host has no
+  // external interface for, so only a host with one must have built one.
+  const hasExternalInterface = Object.values(os.networkInterfaces())
+    .flat()
+    .some((address) => address && !address.internal);
+  if (hasExternalInterface) {
+    assert.ok(resolverOptions.length > 0, "the stalled resolver must be consulted");
+  }
+  for (const options of resolverOptions) {
+    assert.equal(options.timeout, shortTimeouts.dnsTimeoutMs);
+  }
+});
+
 test("DNS and socket timeouts are classified as transient connection failures", () => {
-  for (const code of ["ETIMEDOUT", "ETIMEOUT"]) {
+  for (const code of ["ETIMEDOUT", "EDNS", "ETIMEOUT"]) {
     assert.equal(
       classifyGraduateEmailDeliveryError(
         Object.assign(new Error("timeout"), { code }),
