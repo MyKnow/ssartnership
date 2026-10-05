@@ -13,8 +13,8 @@ import {
 } from "@/lib/partner-registration";
 import {
   getCompanyScopedPortalHref,
-} from "@/lib/partner-portal-paths";
-import { assertPartnerPortalCompanyAccess } from "@/lib/partner-portal-scope";
+} from "@/lib/partner-auth/portal-paths";
+import { assertPartnerPortalCompanyAccess } from "@/lib/partner-auth/portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 import { readFormIdempotencyKey } from "@/lib/form-idempotency";
 import {

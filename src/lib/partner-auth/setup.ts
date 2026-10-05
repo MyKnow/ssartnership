@@ -2,8 +2,8 @@ import type {
   PartnerPortalSetupContext,
   PartnerPortalSetupInput,
   PartnerPortalSetupResult,
-} from "../partner-portal.ts";
-import { PartnerPortalSetupError } from "../partner-portal-errors.ts";
+} from "./portal.ts";
+import { PartnerPortalSetupError } from "./portal-errors.ts";
 import { hashPassword, isValidPassword } from "../password.ts";
 import { toPartnerPortalAccountSummary } from "./mappers.ts";
 import { getSupabasePartnerPortalCompanyIds, getSupabasePartnerPortalSetupCompany } from "./company.ts";

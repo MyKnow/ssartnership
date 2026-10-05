@@ -22,7 +22,7 @@ vi.mock("@/lib/request-guards", () => ({
   isTrustedSameOriginRequest: isTrustedSameOriginRequestMock,
 }));
 
-vi.mock("@/lib/partner-portal-scope", () => ({
+vi.mock("@/lib/partner-auth/portal-scope", () => ({
   isPartnerPortalCompanyAllowed: isCompanyAllowedMock,
 }));
 

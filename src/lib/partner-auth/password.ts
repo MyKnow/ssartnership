@@ -1,4 +1,4 @@
-import type { PartnerPortalPasswordChangeResult } from "../partner-portal.ts";
+import type { PartnerPortalPasswordChangeResult } from "./portal.ts";
 import { PartnerPortalPasswordChangeError } from "../partner-password-errors.ts";
 import { hashPassword, isValidPassword, verifyPassword } from "../password.ts";
 import { toPartnerPortalAccountSummary } from "./mappers.ts";

@@ -1,5 +1,5 @@
 import { revalidatePath, revalidateTag } from "next/cache";
-import { getCompanyScopedPartnerServiceHref } from "@/lib/partner-portal-paths";
+import { getCompanyScopedPartnerServiceHref } from "@/lib/partner-auth/portal-paths";
 import type { PartnerSession } from "@/lib/partner-session";
 
 export function parseList(value: string) {

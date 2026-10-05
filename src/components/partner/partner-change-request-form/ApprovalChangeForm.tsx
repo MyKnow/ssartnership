@@ -19,7 +19,7 @@ import type {
 import { cn } from "@/lib/cn";
 import { partnerFormErrorMessages } from "@/lib/partner-form-errors";
 import { PARTNER_DETAIL_DESCRIPTION_MAX_LENGTH } from "@/lib/partner-detail-description";
-import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
+import { getCompanyScopedPortalHref } from "@/lib/partner-auth/portal-paths";
 import { FieldGroup } from "./FieldGroup";
 import FloatingSubmitButton from "./FloatingSubmitButton";
 

@@ -1,4 +1,4 @@
-import type { PartnerPortalPasswordResetResult } from "../partner-portal.ts";
+import type { PartnerPortalPasswordResetResult } from "./portal.ts";
 import { PartnerPortalPasswordResetError } from "../partner-password-errors.ts";
 import { generateTempPassword, hashPassword } from "../password.ts";
 import { sendPartnerPortalTemporaryPasswordEmail } from "../partner-email.ts";

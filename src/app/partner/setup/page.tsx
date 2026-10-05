@@ -6,7 +6,7 @@ import Container from "@/components/ui/Container";
 import EmptyState from "@/components/ui/EmptyState";
 import { notFound } from "next/navigation";
 import { listPartnerPortalDemoSetups } from "@/lib/partner-auth";
-import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 import { SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {

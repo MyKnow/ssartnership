@@ -26,7 +26,7 @@ import {
 import type { SubscriptionInput, WebPushModule } from "@/lib/push/types";
 import { PushError } from "@/lib/push/types";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 import {
   getAdminOperationalTemplateKey,
   getPartnerOperationalTemplateKey,

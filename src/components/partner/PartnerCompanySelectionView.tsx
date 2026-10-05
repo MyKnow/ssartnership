@@ -6,8 +6,8 @@ import Container from "@/components/ui/Container";
 import EmptyState from "@/components/ui/EmptyState";
 import MotionReveal from "@/components/ui/MotionReveal";
 import ShellHeader from "@/components/ui/ShellHeader";
-import type { PartnerPortalCompanyScope } from "@/lib/partner-portal-scope";
-import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
+import type { PartnerPortalCompanyScope } from "@/lib/partner-auth/portal-scope";
+import { getCompanyScopedPortalHref } from "@/lib/partner-auth/portal-paths";
 import type { PartnerSession } from "@/lib/partner-session";
 
 export default function PartnerCompanySelectionView({

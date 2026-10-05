@@ -1,4 +1,4 @@
-import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 import type { PartnerSession } from "@/lib/partner-session";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { listMockPartnerPortalCompanySetups } from "@/lib/mock/partner-portal/store";

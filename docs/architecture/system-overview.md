@@ -81,7 +81,7 @@ Browser
 | 인증/세션 | `user-auth.ts`, `auth.ts`, `partner-session.ts`, `partner-auth/*`, `request-guards.ts` |
 | Mattermost 직접 연동 | `mattermost/client.ts`, `mattermost-senders/*`, `mm-directory/*`, `mm-member-sync/*`, `mattermost-code-verification.ts` |
 | 제휴 | `partner-visibility.ts`, `partner-benefit-visibility.ts`, `partner-audience.ts`, `partner-utils.ts`, `home-partner-*` |
-| 협력사 포털 | `partner-portal*.ts`, `partner-change-requests/*`, `partner-dashboard*`, `partner-plan-*`, `partner-billing*` |
+| 협력사 포털 | `partner-auth/portal*.ts`(경로·회사 범위·레이아웃·지표 접근), `partner-change-requests/*`, `partner-dashboard*`, `partner-plan-*`, `partner-billing*` |
 | 리뷰 | `partner-reviews.ts`, `review-validation.ts`, `review-media*.ts`, review repository |
 | 알림/Push | `notifications/shared.ts`, `notification-preferences.ts`, `push/*`, `admin-notification-*`, `partner-notifications*` |
 | 로그/메트릭 | `activity-logs.ts`, `log-insights/*`, `partner-metric-*`, `product-events.ts` |

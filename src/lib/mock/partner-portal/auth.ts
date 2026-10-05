@@ -8,8 +8,8 @@ import type {
   PartnerPortalLoginResult,
   PartnerPortalPasswordChangeResult,
   PartnerPortalPasswordResetResult,
-} from "../../partner-portal.ts";
-import { PartnerPortalLoginError } from "../../partner-portal-errors.ts";
+} from "../../partner-auth/portal.ts";
+import { PartnerPortalLoginError } from "../../partner-auth/portal-errors.ts";
 import {
   PartnerPortalPasswordChangeError,
   PartnerPortalPasswordResetError,

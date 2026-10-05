@@ -1,4 +1,4 @@
-import { isPartnerPortalMock } from "./partner-portal.ts";
+import { isPartnerPortalMock } from "./partner-auth/portal.ts";
 import {
   findMockPartnerPortalAccountById,
   listMockPartnerPortalCompanySetups,

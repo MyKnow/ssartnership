@@ -4,7 +4,7 @@ import {
   type PartnerBillingProfile,
   type PartnerBillingProfileInput,
 } from "@/lib/partner-billing";
-import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 import { normalizePlanUpgradePayerName } from "@/lib/partner-plan-upgrades";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/uuid";

@@ -14,7 +14,7 @@ import {
 } from "@/lib/partner-auth-security";
 import { setPartnerSession } from "@/lib/partner-session";
 import { normalizePartnerLoginId } from "@/lib/partner-utils";
-import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 import {
   resolvePartnerPostLoginHref,
   sanitizePartnerReturnTo,

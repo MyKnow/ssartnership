@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import RoutePageViewTracker from "@/components/analytics/RoutePageViewTracker";
 import PartnerPortalShellView from "@/components/partner/PartnerPortalShellView";
-import { isPartnerPortalMock } from "@/lib/partner-portal";
-import { getPartnerPortalCompanySummaries } from "@/lib/partner-portal-scope";
+import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
+import { getPartnerPortalCompanySummaries } from "@/lib/partner-auth/portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 
 export default async function PartnerLayout({

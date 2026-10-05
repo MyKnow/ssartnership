@@ -14,8 +14,8 @@ import {
 } from "@/lib/partner-billing";
 import { resolvePartnerBillingProfileForPlanRequest } from "@/lib/partner-billing-profiles";
 import { listMockPartnerPortalCompanySetups } from "@/lib/mock/partner-portal/store";
-import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
-import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { getCompanyScopedPortalHref } from "@/lib/partner-auth/portal-paths";
+import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 import { normalizePartnerVisibility } from "@/lib/partner-visibility";
 import type { PartnerVisibility } from "@/lib/types";
 import {

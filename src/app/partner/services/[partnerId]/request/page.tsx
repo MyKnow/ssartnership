@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { getCompanyScopedPartnerServiceEditHref } from "@/lib/partner-portal-paths";
-import { resolvePartnerPortalCompanyIdForService } from "@/lib/partner-portal-scope";
+import { getCompanyScopedPartnerServiceEditHref } from "@/lib/partner-auth/portal-paths";
+import { resolvePartnerPortalCompanyIdForService } from "@/lib/partner-auth/portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 
 export const dynamic = "force-dynamic";

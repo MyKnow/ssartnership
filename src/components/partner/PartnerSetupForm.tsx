@@ -9,10 +9,10 @@ import PasswordInput from "@/components/ui/PasswordInput";
 import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
 import { validateAuthPasswordPairDraft } from "@/lib/auth-form-validation";
-import type { PartnerPortalSetupContext } from "@/lib/partner-portal";
+import type { PartnerPortalSetupContext } from "@/lib/partner-auth/portal";
 import {
   getPartnerPortalSetupErrorMessage,
-} from "@/lib/partner-portal-errors";
+} from "@/lib/partner-auth/portal-errors";
 import { PASSWORD_POLICY_MESSAGE } from "@/lib/validation";
 import {
   copyPasswordToClipboard,

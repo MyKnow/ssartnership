@@ -2,8 +2,8 @@ import { notFound, permanentRedirect, redirect } from "next/navigation";
 import {
   getPartnerGlobalPortalHref,
   getPartnerPasswordChangeHref,
-} from "@/lib/partner-portal-paths";
-import { assertPartnerPortalCompanyAccess } from "@/lib/partner-portal-scope";
+} from "@/lib/partner-auth/portal-paths";
+import { assertPartnerPortalCompanyAccess } from "@/lib/partner-auth/portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 
 export const dynamic = "force-dynamic";

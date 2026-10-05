@@ -30,7 +30,7 @@ import { getPartnerBranchScopeLabel } from "@/lib/partner-branch-registration";
 import {
   getCompanyScopedPartnerServiceHref,
   getCompanyScopedPartnerServiceNewHref,
-} from "@/lib/partner-portal-paths";
+} from "@/lib/partner-auth/portal-paths";
 
 const partnerPortalDataSource =
   process.env.NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE ??

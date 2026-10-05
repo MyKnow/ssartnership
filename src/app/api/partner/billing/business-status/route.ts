@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { lookupNtsBusinessStatus } from "@/lib/nts-business-status";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
-import { isPartnerPortalCompanyAllowed } from "@/lib/partner-portal-scope";
+import { isPartnerPortalCompanyAllowed } from "@/lib/partner-auth/portal-scope";
 import { requirePartnerApiSession } from "@/lib/partner-auth/api-session";
 import {
   PartnerPortalRouteBodyError,

@@ -7,8 +7,8 @@ import PartnerPasswordChangeForm from "@/components/partner/PartnerPasswordChang
 import {
   getCompanyScopedPortalHref,
   getPartnerGlobalPortalHref,
-} from "@/lib/partner-portal-paths";
-import { getPartnerPortalCompanySummaries } from "@/lib/partner-portal-scope";
+} from "@/lib/partner-auth/portal-paths";
+import { getPartnerPortalCompanySummaries } from "@/lib/partner-auth/portal-scope";
 import {
   getPartnerLoginHref,
   sanitizePartnerReturnTo,

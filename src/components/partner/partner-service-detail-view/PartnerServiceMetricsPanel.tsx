@@ -4,7 +4,7 @@ import FormMessage from "@/components/ui/FormMessage";
 import StatsRow from "@/components/ui/StatsRow";
 import PartnerPendingButtonLink from "@/components/partner/PartnerPendingButtonLink";
 import SectionTitle from "@/components/partner/partner-service-detail-view/SectionTitle";
-import { getPartnerPortalMetricAccessItems } from "@/lib/partner-portal-metric-access";
+import { getPartnerPortalMetricAccessItems } from "@/lib/partner-auth/portal-metric-access";
 import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
 import {
   canAccessPartnerMetric,

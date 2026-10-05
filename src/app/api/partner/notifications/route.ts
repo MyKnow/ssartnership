@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isPartnerPortalCompanyAllowed } from "@/lib/partner-portal-scope";
+import { isPartnerPortalCompanyAllowed } from "@/lib/partner-auth/portal-scope";
 import {
   deletePartnerStoredNotifications,
   listPartnerStoredNotifications,

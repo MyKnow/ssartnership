@@ -1,4 +1,4 @@
-import { PARTNER_PASSWORD_CHANGE_PATH } from "../partner-portal-paths.ts";
+import { PARTNER_PASSWORD_CHANGE_PATH } from "./portal-paths.ts";
 
 /**
  * Keeps a partner deep link across login and a forced password change.

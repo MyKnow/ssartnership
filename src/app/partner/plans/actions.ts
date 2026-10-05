@@ -6,8 +6,8 @@ import {
   createPartnerPlanUpgradeRequest,
 } from "@/lib/partner-plan-service";
 import { getSafePartnerPlanActionMessage } from "@/lib/partner-plan-safe-messages";
-import { getCompanyScopedPortalHref } from "@/lib/partner-portal-paths";
-import { isPartnerPortalCompanyAllowed } from "@/lib/partner-portal-scope";
+import { getCompanyScopedPortalHref } from "@/lib/partner-auth/portal-paths";
+import { isPartnerPortalCompanyAllowed } from "@/lib/partner-auth/portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
 
 const PARTNER_PLANS_PATH = "/partner/plans";

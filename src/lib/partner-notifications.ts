@@ -1,4 +1,4 @@
-import { isPartnerPortalMock } from "@/lib/partner-portal";
+import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 import { partnerReviewRepository } from "@/lib/repositories";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
@@ -27,7 +27,7 @@ import type {
   PartnerNotificationCenterData,
   PartnerNotificationEntry,
 } from "@/lib/partner-notification-contract";
-import { getPartnerScopedHrefFromLegacyTarget } from "@/lib/partner-portal-paths";
+import { getPartnerScopedHrefFromLegacyTarget } from "@/lib/partner-auth/portal-paths";
 
 type PartnerCompanyRow = {
   id: string;

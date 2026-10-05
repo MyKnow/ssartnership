@@ -17,7 +17,7 @@ import {
   releaseOperationalNotificationDedupe,
 } from "@/lib/operational-notifications";
 import { createExpiringPartnershipDedupeKey } from "@/lib/partner-notification-routing";
-import { getCompanyScopedPartnerServiceHref } from "@/lib/partner-portal-paths";
+import { getCompanyScopedPartnerServiceHref } from "@/lib/partner-auth/portal-paths";
 import type { DeliveryResult, PushAudience, PushPayload } from "./types.ts";
 import { normalizePartnerVisibility } from "../partner-visibility.ts";
 
