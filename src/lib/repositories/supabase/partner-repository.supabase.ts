@@ -18,6 +18,8 @@ import {
   isValidPartnerPreviewToken,
 } from "@/lib/partner-preview";
 import { getKstDateString } from "@/lib/partner-utils";
+import { CATEGORIES_CACHE_TAG, PARTNERS_CACHE_TAG } from "@/lib/cache-tags";
+import { PUBLIC_CACHE_VERSION_SNAPSHOT_SECONDS } from "@/lib/cache-ttl";
 import {
   canViewPartnerDetailRow,
   mapCategoryRow,
@@ -67,8 +69,8 @@ const getCachedPublicCacheVersionSnapshot = unstable_cache(
   },
   ["partner-repository", "public-cache-version-snapshot"],
   {
-    revalidate: 30,
-    tags: ["partners", "categories"],
+    revalidate: PUBLIC_CACHE_VERSION_SNAPSHOT_SECONDS,
+    tags: [PARTNERS_CACHE_TAG, CATEGORIES_CACHE_TAG],
   },
 );
 
@@ -118,7 +120,7 @@ const getCachedCategories = unstable_cache(
   ["partner-repository", "categories", "versioned"],
   {
     revalidate: false,
-    tags: ["categories"],
+    tags: [CATEGORIES_CACHE_TAG],
   },
 );
 
@@ -140,7 +142,7 @@ const getCachedPartnerRows = unstable_cache(
   ["partner-repository", "partners", "versioned"],
   {
     revalidate: false,
-    tags: ["partners"],
+    tags: [PARTNERS_CACHE_TAG],
   },
 );
 
@@ -162,7 +164,7 @@ const getCachedPublicDirectoryPartnerRows = unstable_cache(
   ["partner-repository", "partners", "public-directory", "versioned"],
   {
     revalidate: false,
-    tags: ["partners"],
+    tags: [PARTNERS_CACHE_TAG],
   },
 );
 
@@ -185,7 +187,7 @@ const getCachedPartnerRowsForCampus = unstable_cache(
   ["partner-repository", "partners", "campus", "versioned"],
   {
     revalidate: false,
-    tags: ["partners"],
+    tags: [PARTNERS_CACHE_TAG],
   },
 );
 
@@ -208,7 +210,7 @@ const getCachedPublicDirectoryPartnerRowsForCampus = unstable_cache(
   ["partner-repository", "partners", "public-directory", "campus", "versioned"],
   {
     revalidate: false,
-    tags: ["partners"],
+    tags: [PARTNERS_CACHE_TAG],
   },
 );
 
@@ -239,7 +241,7 @@ const getCachedPublicPartnerSeoRows = unstable_cache(
   ["partner-repository", "partners", "public-seo", "versioned"],
   {
     revalidate: false,
-    tags: ["partners"],
+    tags: [PARTNERS_CACHE_TAG],
   },
 );
 
@@ -269,7 +271,7 @@ const getCachedPartnerRowById = unstable_cache(
   ["partner-repository", "partner-by-id", "versioned"],
   {
     revalidate: false,
-    tags: ["partners"],
+    tags: [PARTNERS_CACHE_TAG],
   },
 );
 

@@ -110,7 +110,7 @@ test("Supabase SEO projection filters active public partners before applying lim
   assert.match(supabaseRepositorySource, /async getPublicPartnerSeoEntries/);
   assert.match(
     supabaseRepositorySource,
-    /\["partner-repository", "partners", "public-seo", "versioned"\],\s*\{\s*revalidate: false,\s*tags: \["partners"\]/,
+    /\["partner-repository", "partners", "public-seo", "versioned"\],\s*\{\s*revalidate: false,\s*tags: \[PARTNERS_CACHE_TAG\]/,
   );
 });
 

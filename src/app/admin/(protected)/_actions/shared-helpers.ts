@@ -1,6 +1,11 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
+import {
+  CATEGORIES_CACHE_TAG,
+  PARTNERS_CACHE_TAG,
+  SSAFY_CYCLE_SETTINGS_CACHE_TAG,
+} from "@/lib/cache-tags";
 import { getServerActionLogContext, logAdminAudit } from "../../../../lib/activity-logs.ts";
 import {
   buildAdminMutationAuditProperties,
@@ -52,7 +57,7 @@ export function scheduleAdminActionFailureLog(
 }
 
 export function revalidateAdminAndPublicPaths(partnerId?: string) {
-  revalidateTag("partners", "max");
+  revalidateTag(PARTNERS_CACHE_TAG, "max");
   revalidatePath("/");
   revalidatePath("/admin");
   revalidatePath("/admin/partner-requests");
@@ -72,12 +77,12 @@ export function revalidatePartnerPortalPaths(partnerId?: string) {
 }
 
 export function revalidateCategoryData() {
-  revalidateTag("categories", "max");
+  revalidateTag(CATEGORIES_CACHE_TAG, "max");
   revalidatePath("/admin/categories");
 }
 
 export function revalidatePartnerData() {
-  revalidateTag("partners", "max");
+  revalidateTag(PARTNERS_CACHE_TAG, "max");
 }
 
 export function revalidatePartnerAccountData() {
@@ -86,7 +91,7 @@ export function revalidatePartnerAccountData() {
 }
 
 export function revalidatePartnerCompanyData() {
-  revalidateTag("partners", "max");
+  revalidateTag(PARTNERS_CACHE_TAG, "max");
   revalidatePath("/");
   revalidatePath("/admin");
   revalidatePath("/admin/companies");
@@ -115,7 +120,7 @@ export function revalidateMemberPaths() {
 }
 
 export function revalidateCyclePaths() {
-  revalidateTag("ssafy-cycle-settings", "max");
+  revalidateTag(SSAFY_CYCLE_SETTINGS_CACHE_TAG, "max");
   revalidatePath("/admin");
   revalidatePath("/admin/cycle");
   revalidatePath("/admin/members");
