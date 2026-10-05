@@ -23,8 +23,10 @@ import { canAdmin } from "@/lib/admin-permissions";
 import { mattermostSenderRepository } from "@/lib/mattermost-senders/repository";
 import { listCohortCardThemes } from "@/lib/cohort-card-themes.server";
 import {
+  getSsafyCycleEarlyStartTargetYear,
   getSsafyCycleOverview,
   getSsafyCycleSettings,
+  isSsafyCycleEarlyStartApplied,
 } from "@/lib/ssafy-cycle-settings";
 import { getCurrentSsafySemester } from "@/lib/ssafy-year";
 import { SITE_NAME } from "@/lib/site";
@@ -85,6 +87,8 @@ async function AdminCycleContent({
     <AdminCycleView
         settings={settings}
         overview={getSsafyCycleOverview(settings)}
+        earlyStartTargetYear={getSsafyCycleEarlyStartTargetYear(settings)}
+        earlyStartApplied={isSsafyCycleEarlyStartApplied(settings)}
         themes={themes}
         currentSemester={getCurrentSsafySemester()}
         initialTimestamp={new Date().toISOString()}

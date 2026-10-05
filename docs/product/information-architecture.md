@@ -139,7 +139,7 @@ page route의 기계 판독 기준은 `src/lib/mock/scenarios/route-inventory.ts
 | GET | `/rss.xml` | RSS XML 반환 |
 | GET | `/partner-registration/template` | 파트너사·제휴처 등록 템플릿 다운로드 |
 | GET | `/partner-registration/branches/template` | 지점 등록 템플릿 다운로드 |
-| GET | `/admin/event/signup-reward/rewards/export` | 이벤트 리워드 export |
+| GET | `/admin/event/[slug]/rewards/export` | 추첨 지원 이벤트(현재 `signup-reward`)의 추첨권 CSV export |
 | GET | `/admin/partners/new/template` | 관리자 제휴 생성 템플릿 다운로드 |
 
 ## Page route 분류

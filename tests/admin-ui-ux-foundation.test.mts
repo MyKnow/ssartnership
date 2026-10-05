@@ -338,7 +338,7 @@ test("관리자 운영 표는 모바일에서 카드 표현으로 전환하고 �
     await Promise.all([
       readFile(
         new URL(
-          "../src/app/admin/(protected)/event/[slug]/page.tsx",
+          "../src/components/admin/event-rewards/SignupRewardOverviewSection.tsx",
           import.meta.url,
         ),
         "utf8",

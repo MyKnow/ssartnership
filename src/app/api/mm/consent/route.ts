@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import { getRequestLogContext, logAuthSecurity } from "@/lib/activity-logs";
+import { revalidateMemberGatePaths } from "@/lib/member-gate-revalidation";
 import { getUserSession, setUserSession } from "@/lib/user-auth";
 import {
   getActiveRequiredPolicies,
@@ -124,10 +124,7 @@ export async function POST(request: Request) {
         privacyVersion: activePolicies.privacy.version,
       },
     });
-    revalidatePath("/");
-    revalidatePath("/auth/consent");
-    revalidatePath("/auth/change-password");
-    revalidatePath("/certification");
+    revalidateMemberGatePaths();
 
     return NextResponse.json({
       ok: true,

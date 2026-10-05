@@ -28,8 +28,6 @@ import { getSignedUserSession } from "@/lib/user-auth";
 import { resolvePartnerAudienceFromMemberYear } from "@/lib/partner-audience";
 import { loadHomePartnerDirectoryState } from "@/lib/home-partner-directory";
 
-export const revalidate = 300;
-
 const HOME_CAROUSEL_CLASS_NAME =
   "!mt-0 lg:!mt-5 lg:mx-auto lg:max-w-[min(var(--grid-wide),calc(100vw-1.5rem))] lg:px-8";
 

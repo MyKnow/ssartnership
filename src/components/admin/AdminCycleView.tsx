@@ -29,6 +29,8 @@ import {
 function statusMessage(status?: string | null) {
   if (status === "updated") return "기준값을 저장했습니다.";
   if (status === "early-started") return "조기 시작이 적용되었습니다.";
+  if (status === "early-start-already")
+    return "이미 다음 기수로 조기 시작이 적용되어 있어 변경하지 않았습니다.";
   if (status === "restored") return "자동 계산으로 복구했습니다.";
   if (status === "theme-saved") return "기수별 카드 색상을 저장했습니다.";
   if (status === "theme-deleted") return "기수별 카드 색상을 삭제했습니다.";
@@ -44,6 +46,8 @@ function statusMessage(status?: string | null) {
 export default function AdminCycleView({
   settings,
   overview,
+  earlyStartTargetYear,
+  earlyStartApplied = false,
   themes,
   currentSemester,
   initialTimestamp,
@@ -69,6 +73,8 @@ export default function AdminCycleView({
 }: {
   settings: SsafyCycleSettings;
   overview: SsafyCycleOverview;
+  earlyStartTargetYear?: number;
+  earlyStartApplied?: boolean;
   themes: CohortCardTheme[];
   currentSemester: 1 | 2;
   initialTimestamp: string;
@@ -272,14 +278,22 @@ export default function AdminCycleView({
                 <SubmitButton pendingText="저장 중">기준값 저장</SubmitButton>
               </form>
               <div className="grid gap-3 sm:grid-cols-2">
-                <form action={earlyStartAction}>
+                <form action={earlyStartAction} className="grid gap-1.5">
                   <SubmitButton
                     variant="ghost"
                     pendingText="적용 중"
                     className="w-full"
+                    disabled={earlyStartApplied}
                   >
                     조기 시작
                   </SubmitButton>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    {earlyStartApplied
+                      ? "다음 기수 조기 시작이 이미 적용되어 있습니다."
+                      : earlyStartTargetYear
+                        ? `${formatSsafyYearLabel(earlyStartTargetYear)}로 앞당겨 시작합니다.`
+                        : "다음 기수로 앞당겨 시작합니다."}
+                  </p>
                 </form>
                 <form action={restoreAction}>
                   <SubmitButton

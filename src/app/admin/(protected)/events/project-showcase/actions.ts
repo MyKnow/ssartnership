@@ -26,6 +26,7 @@ import {
 } from "@/lib/project-showcase/validation";
 import { removeShowcaseProjectImages } from "@/lib/project-showcase/storage.server";
 import { isUuid } from "@/lib/uuid";
+import { toDrawAuditLogProperties } from "@/lib/draw-audit";
 
 const EVENT_PATH = `/events/${PROJECT_SHOWCASE_SLUG}`;
 const ADMIN_PATH = "/admin/events/project-showcase";
@@ -317,7 +318,8 @@ export async function setShowcaseFeedbackHidden(feedbackId: string, hidden: bool
       properties: { hidden },
     });
     revalidatePath(`${ADMIN_PATH}/feedback`);
-    revalidatePath(`${EVENT_PATH}/my`, "layout");
+    // Typed paths match the file path, so the (site) route group is required.
+    revalidatePath(`/(site)${EVENT_PATH}/my`, "layout");
     return { ok: true as const, message: hidden ? "피드백을 숨겼어요." : "피드백을 다시 공개했어요." };
   } catch (error) {
     if (!(error instanceof ShowcaseDomainError)) {
@@ -410,8 +412,7 @@ export async function runShowcaseDraw(group: ShowcaseCandidateGroup) {
       path: DRAW_PATH,
       properties: {
         candidate_group: group,
-        candidate_count: receipt.candidateCount,
-        ticket_count: receipt.ticketCount,
+        ...toDrawAuditLogProperties(receipt.audit),
         selected_count: receipt.selectedCount,
       },
     });
@@ -455,7 +456,12 @@ export async function redrawShowcaseWinner(winnerId: string) {
       targetType: "showcase_winner",
       targetId: winnerId,
       path: DRAW_PATH,
-      properties: { candidate_group: receipt.candidateGroup, candidate_count: receipt.candidateCount, selected_count: receipt.selectedCount, redraw: true },
+      properties: {
+        candidate_group: receipt.candidateGroup,
+        ...toDrawAuditLogProperties(receipt.audit),
+        selected_count: receipt.selectedCount,
+        redraw: true,
+      },
     });
     revalidateDraw();
     return {

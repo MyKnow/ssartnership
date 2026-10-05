@@ -44,7 +44,6 @@ export function revalidatePartnerServicePaths(partnerId: string, companyId?: str
   revalidatePath("/partner");
   revalidatePath("/admin");
   revalidatePath("/admin/partners");
-  revalidatePath("/partners/[id]", "page");
   revalidatePath(`/partners/${partnerId}`);
   revalidatePath(`/partner/services/${encodeURIComponent(partnerId)}`);
   revalidatePath(`/partner/services/${encodeURIComponent(partnerId)}/request`);

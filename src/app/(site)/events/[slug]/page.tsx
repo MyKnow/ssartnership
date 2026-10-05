@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import EventPageView from "@/components/events/EventPageView";
 import SiteHeader from "@/components/SiteHeader";
 import { getHeaderSession } from "@/lib/header-session";
-import { getEventPageDefinition, listEventPageDefinitions } from "@/lib/event-pages";
+import { getEventPageDefinition } from "@/lib/event-pages";
 import {
   getManagedEventCampaign,
   isPromotionCampaignVisible,
@@ -12,12 +12,6 @@ import { getEventRewardSummary } from "@/lib/promotions/event-rewards";
 import { buildSiteUrl, createCanonicalAlternates } from "@/lib/seo";
 import { SITE_NAME } from "@/lib/site";
 import { getSignedUserSession } from "@/lib/user-auth";
-
-export const revalidate = 300;
-
-export function generateStaticParams() {
-  return listEventPageDefinitions().map((campaign) => ({ slug: campaign.slug }));
-}
 
 export async function generateMetadata({
   params,

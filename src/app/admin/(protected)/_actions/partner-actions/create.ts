@@ -32,7 +32,6 @@ import {
 import {
   logAdminAction,
   revalidateAdminAndPublicPaths,
-  revalidatePartnerData,
 } from "@/app/admin/(protected)/_actions/shared-helpers";
 import {
   parsePartnerCompanyPayload,
@@ -461,7 +460,6 @@ async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
   } = record;
 
   if (!created) {
-    revalidatePartnerData();
     revalidateAdminAndPublicPaths(partnerId);
     return;
   }
@@ -526,7 +524,6 @@ async function finalizeCreatedPartner(record: CreatedPartnerRecord) {
     }
   }
 
-  revalidatePartnerData();
   revalidateAdminAndPublicPaths(partnerId);
 }
 

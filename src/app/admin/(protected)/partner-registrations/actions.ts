@@ -42,7 +42,6 @@ import {
   logAdminAction,
   redirectAdminActionError,
   revalidateAdminAndPublicPaths,
-  revalidatePartnerData,
 } from "@/app/admin/(protected)/_actions/shared-helpers";
 import { sanitizeReturnTo } from "@/lib/return-to";
 import type { PartnerVisibility } from "@/lib/types";
@@ -205,7 +204,6 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
           });
         }
 
-        revalidatePartnerData();
         revalidateAdminAndPublicPaths(partner.id);
       }
     } catch (error) {
