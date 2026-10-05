@@ -31,6 +31,7 @@ import {
   createAdminOperationalNotification,
   createPartnerOperationalNotification,
 } from "@/lib/operational-notifications";
+import { mapPartnerPlanRpcError } from "@/lib/partner-plan-rpc-errors";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export type PartnerBrandPlanRecord = {
@@ -194,11 +195,6 @@ type PlanEventRow = {
   brand?: { id: string; name: string } | { id: string; name: string }[] | null;
 };
 
-type SupabaseMutationError = {
-  code?: string | null;
-  message?: string | null;
-};
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -212,109 +208,6 @@ function getAtomicRpcRow<T>(
     throw new Error(fallbackMessage);
   }
   return payload[key] as T;
-}
-
-function getCreateUpgradeBillingErrorMessage(error: SupabaseMutationError) {
-  const message = error.message ?? "";
-  if (
-    error.code === "23505" &&
-    message.includes("partner_plan_upgrade_requests_pending_partner_idx")
-  ) {
-    return "이미 처리 대기 중인 업그레이드 요청이 있습니다.";
-  }
-  if (message.includes("partner_plan_billing_access_denied")) {
-    return "파트너사 접근 권한이 없습니다.";
-  }
-  if (message.includes("partner_plan_billing_partner_not_found")) {
-    return "제휴처를 찾을 수 없습니다.";
-  }
-  if (message.includes("partner_plan_billing_profile_not_found")) {
-    return "프로필 탭에서 입금자와 세금계산서 정보를 먼저 저장해 주세요.";
-  }
-  if (
-    message.includes("partner_plan_billing_state_changed") ||
-    message.includes("partner_plan_billing_profile_changed")
-  ) {
-    return "플랜 또는 청구 정보가 변경되었습니다. 새로고침 후 다시 시도해 주세요.";
-  }
-  if (message.includes("partner_plan_billing_invalid_request")) {
-    return "플랜 청구 정보를 확인해 주세요.";
-  }
-  return "플랜 업그레이드 요청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-}
-
-function getConfirmBankTransferErrorMessage(error: SupabaseMutationError) {
-  const message = error.message ?? "";
-  if (message.includes("partner_plan_payment_request_state_conflict")) {
-    return "처리 대기 중인 업그레이드 요청만 입금 확인할 수 있습니다.";
-  }
-  if (message.includes("partner_plan_payment_invoice_not_found")) {
-    return "청구서를 찾을 수 없습니다.";
-  }
-  if (message.includes("partner_plan_payment_invoice_cancelled")) {
-    return "취소된 청구서는 입금 확인할 수 없습니다.";
-  }
-  return "입금 확인 정보를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-}
-
-function getCancelUpgradeBillingErrorMessage(
-  error: SupabaseMutationError,
-  action: "취소" | "반려",
-) {
-  const message = error.message ?? "";
-  if (message.includes("partner_plan_cancel_request_state_conflict")) {
-    return action === "반려"
-      ? "partner_company_plan_processed"
-      : "이미 처리된 업그레이드 요청입니다.";
-  }
-  if (message.includes("partner_plan_cancel_paid_invoice_conflict")) {
-    return action === "반려"
-      ? "partner_company_plan_rejection_paid"
-      : "입금 확인이 완료된 청구는 취소할 수 없습니다.";
-  }
-  return action === "반려"
-    ? "partner_company_plan_invalid_request"
-    : "업그레이드 요청을 취소하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-}
-
-function getApproveUpgradeBillingErrorMessage(error: SupabaseMutationError) {
-  const message = error.message ?? "";
-  if (message.includes("partner_plan_approval_request_state_conflict")) {
-    return "partner_company_plan_processed";
-  }
-  if (message.includes("partner_plan_approval_invoice_not_found")) {
-    return "partner_company_plan_invoice_missing";
-  }
-  if (message.includes("partner_plan_approval_invoice_unpaid_conflict")) {
-    return "partner_company_plan_payment_unconfirmed";
-  }
-  if (message.includes("partner_plan_approval_partner_not_found")) {
-    return "partner_company_plan_partner_missing";
-  }
-  if (message.includes("partner_plan_approval_partner_state_conflict")) {
-    return "partner_company_plan_state_changed";
-  }
-  return "플랜 업그레이드 승인을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-}
-
-function getAdminPlanUpdateErrorMessage(error: SupabaseMutationError) {
-  const message = error.message ?? "";
-  if (
-    message.includes("partner_plan_admin_update_partner_not_found") ||
-    message.includes("partner_plan_admin_update_company_required")
-  ) {
-    return "파트너사가 연결된 제휴처만 플랜을 변경할 수 있습니다.";
-  }
-  if (message.includes("partner_plan_admin_update_state_changed")) {
-    return "partner_company_plan_state_changed";
-  }
-  if (message.includes("partner_plan_admin_update_pending_request")) {
-    return "partner_company_plan_pending_exists";
-  }
-  if (message.includes("partner_plan_admin_update_invalid_window")) {
-    return "partner_company_plan_invalid_request";
-  }
-  return "플랜 변경을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
 }
 
 function getSingleRelation<T>(value: T | T[] | null | undefined): T | null {
@@ -723,7 +616,7 @@ export async function createPartnerPlanUpgradeRequest(input: {
     },
   );
   if (error) {
-    throw new Error(getCreateUpgradeBillingErrorMessage(error));
+    throw new Error(mapPartnerPlanRpcError("createUpgradeBilling", error));
   }
 
   const requestRow = getAtomicRpcRow<UpgradeRequestRow>(
@@ -827,7 +720,7 @@ export async function confirmPartnerPlanBankTransferPayment(input: {
     },
   );
   if (error) {
-    throw new Error(getConfirmBankTransferErrorMessage(error));
+    throw new Error(mapPartnerPlanRpcError("adminConfirmBankTransfer", error));
   }
 
   return mapBillingInvoice(
@@ -882,7 +775,9 @@ export async function cancelPartnerPlanUpgradeRequest(input: {
     },
   );
   if (cancelError) {
-    throw new Error(getCancelUpgradeBillingErrorMessage(cancelError, "취소"));
+    throw new Error(
+      mapPartnerPlanRpcError("partnerCancelUpgradeBilling", cancelError),
+    );
   }
 }
 
@@ -898,7 +793,7 @@ export async function updatePartnerBrandPlanByAdmin(input: {
 }) {
   const brand = await loadBrandPlanOrThrow(input.partnerId);
   if (!brand.companyId) {
-    throw new Error("파트너사가 연결된 제휴처만 플랜을 변경할 수 있습니다.");
+    throw new Error("partner_company_plan_company_required");
   }
   const now = new Date().toISOString();
   const planWindow = resolvePartnerBrandPlanWindow({
@@ -924,7 +819,7 @@ export async function updatePartnerBrandPlanByAdmin(input: {
     p_updated_at: now,
   });
   if (error) {
-    throw new Error(getAdminPlanUpdateErrorMessage(error));
+    throw new Error(mapPartnerPlanRpcError("adminPlanUpdate", error));
   }
 
   await createPartnerOperationalNotification({
@@ -994,7 +889,9 @@ export async function reviewPartnerPlanUpgradeRequest(input: {
       },
     );
     if (approvalError) {
-      throw new Error(getApproveUpgradeBillingErrorMessage(approvalError));
+      throw new Error(
+        mapPartnerPlanRpcError("adminApproveUpgrade", approvalError),
+      );
     }
     approvedBillingInvoice = mapBillingInvoice(
       getAtomicRpcRow<BillingInvoiceRow>(
@@ -1015,7 +912,9 @@ export async function reviewPartnerPlanUpgradeRequest(input: {
       },
     );
     if (cancelError) {
-      throw new Error(getCancelUpgradeBillingErrorMessage(cancelError, "반려"));
+      throw new Error(
+        mapPartnerPlanRpcError("adminRejectUpgradeBilling", cancelError),
+      );
     }
   }
 

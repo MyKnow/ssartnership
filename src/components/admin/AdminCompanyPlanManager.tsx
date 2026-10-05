@@ -8,13 +8,16 @@ import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
 import Textarea from "@/components/ui/Textarea";
 import AdminPlanWindowFields from "@/components/admin/AdminPlanWindowFields";
+import InlineMessage from "@/components/ui/InlineMessage";
 import {
   PARTNER_COMPANY_PLAN_DEFINITIONS,
   type PartnerCompanyPlanTier,
+  type PartnerPlanExpiryState,
 } from "@/lib/partner-company-plans";
 import type { PartnerBillingInvoiceRecord } from "@/lib/partner-plan-service";
 import {
   formatPartnerPlanDateTime,
+  getAdminPartnerPlanExpiryBadge,
   getPartnerPlanBadgeLabel,
   getPartnerPlanBadgeVariant,
 } from "@/lib/partner-plan-ui";
@@ -36,6 +39,8 @@ export type AdminBrandPlanBrand = {
   planTier: PartnerCompanyPlanTier;
   planStartedAt: string | null;
   planExpiresAt: string | null;
+  /** Read-only expiry state; expired paid plans are not demoted automatically. */
+  planExpiry: PartnerPlanExpiryState;
   planUpdatedAt: string | null;
 };
 
@@ -156,6 +161,9 @@ export default function AdminCompanyPlanManager({
   events: AdminCompanyPlanEvent[];
 }) {
   const pendingRequests = requests.filter((request) => request.status === "pending");
+  const expiredPaidPlanCount = brands.filter(
+    (brand) => brand.planExpiry.requiresManualReview,
+  ).length;
 
   return (
     <div className="grid gap-5">
@@ -277,17 +285,28 @@ export default function AdminCompanyPlanManager({
       <section className="grid gap-4">
         <SectionHeading
           title="제휴처별 플랜"
-          description="Basic은 제휴기간과 동일하게 적용되고, Partner/Boost는 별도 계약 기간을 입력합니다."
+          description="Basic은 제휴기간과 동일하게 적용되고, Partner/Boost는 별도 계약 기간을 입력합니다. 만료된 유료 플랜은 자동으로 낮추지 않습니다."
         />
+        {expiredPaidPlanCount > 0 ? (
+          <InlineMessage
+            tone="warning"
+            title={`만료 후 유지 중인 유료 플랜 ${expiredPaidPlanCount}개`}
+            description="계약과 입금 상태를 확인한 뒤 플랜을 연장하거나 Basic으로 직접 변경해 주세요."
+          />
+        ) : null}
         <div className="grid gap-3">
           {brands.map((brand) => {
             const formId = `brand-plan-${brand.id}`;
+            const expiryBadge = getAdminPartnerPlanExpiryBadge(brand.planExpiry);
             return (
               <Card key={brand.id} tone="default" padding="md" className="grid gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <PlanBadge tier={brand.planTier} />
+                      {expiryBadge ? (
+                        <Badge variant={expiryBadge.tone}>{expiryBadge.label}</Badge>
+                      ) : null}
                       <Badge variant="neutral">{brand.companyName}</Badge>
                       {brand.periodStart || brand.periodEnd ? (
                         <Badge variant="neutral">

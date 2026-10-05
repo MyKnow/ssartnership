@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import { getSafeAdminActionErrorCode } from "@/lib/admin-action-errors";
 import { requireAdminPermission } from "@/lib/admin-access";
-import { generateTempPassword, hashPassword } from "@/lib/password";
+import {
+  PARTNER_ACCOUNT_SETUP_SELECT,
+  buildNewPartnerAccountInsert,
+} from "@/lib/partner-admin/company-account-rows";
 import { issuePartnerAccountInitialSetupLink } from "./partner-support/setup-link";
 import {
   parsePartnerAccountCreatePayload,
@@ -117,29 +120,17 @@ export async function createPartnerAccountAction(formData: FormData) {
     payload.companyId,
     adminSession.account,
   );
-  const passwordRecord = hashPassword(generateTempPassword(12));
-  const now = new Date().toISOString();
-
   const { data: createdAccount, error: createError } = await supabase
     .from("partner_accounts")
-    .insert({
-      login_id: payload.loginId,
-      display_name: payload.displayName,
-      email: payload.loginId,
-      password_hash: passwordRecord.hash,
-      password_salt: passwordRecord.salt,
-      must_change_password: true,
-      is_active: payload.isActive,
-      email_verified_at: null,
-      initial_setup_completed_at: null,
-      initial_setup_link_sent_at: null,
-      initial_setup_expires_at: null,
-      created_at: now,
-      updated_at: now,
-    })
-    .select(
-      "id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_expires_at",
+    .insert(
+      buildNewPartnerAccountInsert({
+        loginId: payload.loginId,
+        displayName: payload.displayName,
+        isActive: payload.isActive,
+        now: new Date().toISOString(),
+      }),
     )
+    .select(PARTNER_ACCOUNT_SETUP_SELECT)
     .single();
 
   if (createError || !createdAccount) {

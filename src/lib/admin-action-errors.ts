@@ -85,6 +85,15 @@ export const adminActionErrorMessages: Record<string, string> = {
     "입금 확인이 완료된 청구는 반려할 수 없습니다.",
   partner_company_plan_state_changed:
     "제휴처 플랜이 변경되었습니다. 현재 상태를 확인한 뒤 다시 시도해 주세요.",
+  partner_company_plan_company_required:
+    "파트너사가 연결된 제휴처만 플랜을 변경할 수 있습니다.",
+  partner_company_plan_update_failed:
+    "플랜 변경을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  partner_company_plan_approval_failed:
+    "플랜 업그레이드 승인을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  partner_company_plan_invoice_cancelled: "취소된 청구서는 입금 확인할 수 없습니다.",
+  partner_company_plan_payment_confirm_failed:
+    "입금 확인 정보를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   review_invalid_request: "리뷰 입력값을 확인해 주세요.",
   review_not_found: "대상을 찾을 수 없습니다.",
   admin_usage_invalid_request: "혜택 적용 이력 입력값을 확인해 주세요.",

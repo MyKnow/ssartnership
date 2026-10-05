@@ -1,14 +1,18 @@
-import { generateTempPassword, hashPassword } from "@/lib/password";
-import type {
-  AdminSupabaseClient,
-  PartnerAccountRow,
-  PartnerCompanyInput,
-  PartnerCompanyProvision,
-  PartnerCompanyRow,
-} from "../shared-types";
 import {
+  PARTNER_ACCOUNT_SELECT,
+  PARTNER_COMPANY_SELECT,
+  buildNewPartnerAccountInsert,
   normalizePartnerAccountRow,
   normalizePartnerCompanyRow,
+  type PartnerAccountRow,
+  type PartnerCompanyRow,
+} from "@/lib/partner-admin/company-account-rows";
+import type {
+  AdminSupabaseClient,
+  PartnerCompanyInput,
+  PartnerCompanyProvision,
+} from "../shared-types";
+import {
   toPartnerAccountDisplayName,
   toPartnerAccountLoginId,
 } from "./shared";
@@ -97,7 +101,7 @@ export async function ensurePartnerCompanyRow(
     if (hasCompanySelection) {
       const { data, error } = await supabase
         .from("partner_companies")
-        .select("id,name,slug,description,is_active,managed_campus_slugs")
+        .select(PARTNER_COMPANY_SELECT)
         .eq("id", companyInput.companyId)
         .maybeSingle();
 
@@ -138,7 +142,7 @@ export async function ensurePartnerCompanyRow(
         is_active: true,
         managed_campus_slugs: options.managedCampusSlugs ?? [],
       })
-      .select("id,name,slug,description,is_active,managed_campus_slugs")
+      .select(PARTNER_COMPANY_SELECT)
       .single();
 
     if (error) {
@@ -173,7 +177,7 @@ export async function ensurePartnerCompanyRow(
 
     const { data: existingAccount, error: accountLookupError } = await supabase
       .from("partner_accounts")
-      .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at")
+      .select(PARTNER_ACCOUNT_SELECT)
       .eq("login_id", loginId)
       .maybeSingle();
 
@@ -195,7 +199,7 @@ export async function ensurePartnerCompanyRow(
           is_active: true,
         })
         .eq("id", existingAccount.id)
-        .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at")
+        .select(PARTNER_ACCOUNT_SELECT)
         .single();
 
       if (updateError) {
@@ -216,21 +220,17 @@ export async function ensurePartnerCompanyRow(
         }
       });
     } else {
-      const passwordRecord = hashPassword(generateTempPassword(12));
       const { data: createdAccountRow, error: createAccountError } = await supabase
         .from("partner_accounts")
-        .insert({
-          login_id: loginId,
-          display_name: displayName,
-          email: loginId,
-          password_hash: passwordRecord.hash,
-          password_salt: passwordRecord.salt,
-          must_change_password: true,
-          is_active: true,
-          email_verified_at: null,
-          initial_setup_completed_at: null,
-        })
-        .select("id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at")
+        .insert(
+          buildNewPartnerAccountInsert({
+            loginId,
+            displayName,
+            isActive: true,
+            now: new Date().toISOString(),
+          }),
+        )
+        .select(PARTNER_ACCOUNT_SELECT)
         .single();
 
       if (createAccountError) {

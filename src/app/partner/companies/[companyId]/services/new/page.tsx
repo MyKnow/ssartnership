@@ -5,6 +5,7 @@ import { createPartnerPortalBrandRegistrationRequestAction } from "@/app/partner
 import { getPartnerPasswordChangeHref } from "@/lib/partner-auth/portal-paths";
 import { assertPartnerPortalCompanyAccess } from "@/lib/partner-auth/portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
+import { partnerRepository } from "@/lib/repositories";
 import { SITE_NAME } from "@/lib/site";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -49,11 +50,8 @@ export default async function PartnerCompanyServiceNewPage({
     notFound();
   }
 
-  const [categoriesResult, brandProfilesResult, accountEmail] = await Promise.all([
-    getSupabaseAdminClient()
-      .from("categories")
-      .select("id,key,label")
-      .order("created_at", { ascending: true }),
+  const [categories, brandProfilesResult, accountEmail] = await Promise.all([
+    partnerRepository.getCategoryOptions(),
     getSupabaseAdminClient()
       .from("partner_brand_profiles")
       .select("id,name,category_label,description,inquiry_link,brand_phone")
@@ -62,9 +60,6 @@ export default async function PartnerCompanyServiceNewPage({
       .limit(30),
     getPartnerAccountEmail(session.accountId),
   ]);
-  if (categoriesResult.error) {
-    throw new Error(`category load failed: ${categoriesResult.error.message}`);
-  }
   if (brandProfilesResult.error) {
     throw new Error(`brand profile load failed: ${brandProfilesResult.error.message}`);
   }
@@ -78,7 +73,7 @@ export default async function PartnerCompanyServiceNewPage({
       companyDescription={scope.description}
       displayName={session.displayName}
       contactEmail={accountEmail || fallbackEmail}
-      categories={categoriesResult.data ?? []}
+      categories={categories}
       brandProfiles={(brandProfilesResult.data ?? []).map((profile) => ({
         id: profile.id,
         name: profile.name,

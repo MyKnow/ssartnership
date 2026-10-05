@@ -1,3 +1,4 @@
+import { PARTNER_ACCOUNT_SELECT } from "@/lib/partner-admin/company-account-rows";
 import { SITE_URL } from "@/lib/site";
 import { generateOpaqueToken, hashOpaqueToken } from "@/lib/password";
 import { normalizePartnerLoginId } from "@/lib/partner-utils";
@@ -55,9 +56,7 @@ export async function issuePartnerAccountInitialSetupLink(
 ) {
   const { data: account, error: accountError } = await supabase
     .from("partner_accounts")
-    .select(
-      "id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,updated_at",
-    )
+    .select(`${PARTNER_ACCOUNT_SELECT},initial_setup_link_sent_at,updated_at`)
     .eq("id", accountId)
     .maybeSingle();
 

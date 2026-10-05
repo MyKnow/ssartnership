@@ -10,6 +10,7 @@ import { normalizePartnerBenefitActionType } from "@/lib/partner-benefit-action"
 import { toLeanPublicDirectoryPartner } from "@/lib/public-partner-directory";
 import type {
   AdminPartnerOption,
+  PartnerCategoryOption,
   PartnerRepository,
   PartnerViewContext,
   PublicPartnerSeoEntry,
@@ -91,6 +92,12 @@ type PublicPartnerSeoRow = {
 type AdminPartnerOptionRow = {
   id: string;
   name: string;
+};
+
+type PartnerCategoryOptionRow = {
+  id: string;
+  key: string | null;
+  label: string | null;
 };
 
 type PublicCacheScope = "partners" | "categories";
@@ -574,6 +581,23 @@ export class SupabasePartnerRepository implements PartnerRepository {
     }
 
     return (data ?? []) as AdminPartnerOptionRow[];
+  }
+
+  async getCategoryOptions(): Promise<PartnerCategoryOption[]> {
+    const { data, error } = await getSupabaseAdminClient()
+      .from("categories")
+      .select("id,key,label")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return ((data ?? []) as PartnerCategoryOptionRow[]).map((row) => ({
+      id: row.id,
+      key: row.key ?? "",
+      label: row.label ?? "",
+    }));
   }
 
   async getCategories(): Promise<Category[]> {

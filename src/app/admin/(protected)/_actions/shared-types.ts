@@ -4,6 +4,10 @@ import type { PartnerBenefitActionType } from "../../../../lib/partner-benefit-a
 import type { PartnerServiceMode } from "../../../../lib/partner-service-mode.ts";
 import type { PartnerVisibility } from "../../../../lib/types.ts";
 import type { PartnerBenefitDraft } from "../../../../lib/partner-benefit-items.ts";
+import type {
+  PartnerAccountRow,
+  PartnerCompanyRow,
+} from "../../../../lib/partner-admin/company-account-rows.ts";
 
 export type AdminSupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getSupabaseAdminClient>;
 
@@ -58,33 +62,6 @@ export type PartnerAccountCreateInput = {
   displayName: string;
   companyId: string;
   isActive: boolean;
-};
-
-export type PartnerCompanyRow = {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string | null;
-  is_active?: boolean | null;
-  managed_campus_slugs?: string[] | null;
-};
-
-export type PartnerAccountRow = {
-  id: string;
-  login_id: string;
-  display_name: string;
-  email?: string | null;
-  password_hash?: string | null;
-  password_salt?: string | null;
-  must_change_password?: boolean | null;
-  is_active?: boolean | null;
-  email_verified_at?: string | null;
-  initial_setup_completed_at?: string | null;
-  initial_setup_link_sent_at?: string | null;
-  initial_setup_expires_at?: string | null;
-  last_login_at?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
 };
 
 export type PartnerCompanyProvision = {

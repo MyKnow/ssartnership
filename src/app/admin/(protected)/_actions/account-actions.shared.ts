@@ -1,3 +1,7 @@
+import {
+  PARTNER_ACCOUNT_DETAIL_SELECT,
+  PARTNER_COMPANY_SELECT,
+} from "@/lib/partner-admin/company-account-rows";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   assertAdminCanAccessManagedCampuses,
@@ -16,9 +20,7 @@ export async function loadPartnerAccountOrRedirect(accountId: string) {
   const supabase = getPartnerAccountSupabase();
   const { data: account, error } = await supabase
     .from("partner_accounts")
-    .select(
-      "id,login_id,display_name,email,password_hash,password_salt,must_change_password,is_active,email_verified_at,initial_setup_completed_at,initial_setup_link_sent_at,initial_setup_expires_at,last_login_at,created_at,updated_at",
-    )
+    .select(PARTNER_ACCOUNT_DETAIL_SELECT)
     .eq("id", accountId)
     .maybeSingle();
 
@@ -37,7 +39,7 @@ export async function loadPartnerCompanyOrRedirect(companyId: string) {
   const supabase = getPartnerAccountSupabase();
   const { data: company, error } = await supabase
     .from("partner_companies")
-    .select("id,name,slug,description,is_active,managed_campus_slugs")
+    .select(PARTNER_COMPANY_SELECT)
     .eq("id", companyId)
     .maybeSingle();
 

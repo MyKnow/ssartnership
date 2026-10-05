@@ -15,7 +15,9 @@ import {
 } from "@/lib/admin-partner-file-import";
 import { PARTNER_BRANCH_SCOPE_OPTIONS } from "@/lib/partner-branch-registration";
 import {
+  getAllowedPartnerRegistrationStatusTransitions,
   isPartnerRegistrationRequestStatus,
+  isPartnerRegistrationTerminalStatus,
   PARTNER_REGISTRATION_QUEUE_SORT_OPTIONS,
   PARTNER_REGISTRATION_SOURCE_LABELS,
   PARTNER_REGISTRATION_SOURCE_OPTIONS,
@@ -503,6 +505,7 @@ export default function AdminPartnerRegistrationsView({
           ) : null}
           {rows.map((row) => {
             const rowStatus = normalizeStatus(row.status);
+            const statusLocked = isPartnerRegistrationTerminalStatus(rowStatus);
             const attachmentCount = [
               row.thumbnail_url,
               ...(row.image_urls ?? []),
@@ -864,20 +867,33 @@ export default function AdminPartnerRegistrationsView({
                     <input type="hidden" name="id" value={row.id} />
                     <input type="hidden" name="returnTo" value={returnTo} />
                     <div className="grid min-w-0 gap-3 sm:grid-cols-[12rem_12rem_minmax(0,1fr)]">
-                      <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
-                        처리 상태
-                        <select
-                          name="status"
-                          defaultValue={rowStatus}
-                          className="h-11 rounded-[1rem] border border-border bg-surface-control px-3 text-sm text-foreground"
-                        >
-                          {PARTNER_REGISTRATION_STATUS_OPTIONS.map((option) => (
-                            <option key={option} value={option}>
-                              {PARTNER_REGISTRATION_STATUS_LABELS[option]}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                      <div className="grid min-w-0 gap-2">
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
+                          처리 상태
+                          <select
+                            name="status"
+                            defaultValue={rowStatus}
+                            aria-describedby={
+                              statusLocked ? `registration-status-locked-${row.id}` : undefined
+                            }
+                            className="h-11 rounded-[1rem] border border-border bg-surface-control px-3 text-sm text-foreground"
+                          >
+                            {getAllowedPartnerRegistrationStatusTransitions(rowStatus).map((option) => (
+                              <option key={option} value={option}>
+                                {PARTNER_REGISTRATION_STATUS_LABELS[option]}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        {statusLocked ? (
+                          <p
+                            id={`registration-status-locked-${row.id}`}
+                            className="text-xs leading-5 text-muted-foreground"
+                          >
+                            등록 완료 후에는 처리 상태를 되돌릴 수 없습니다.
+                          </p>
+                        ) : null}
+                      </div>
                       <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
                         공개 상태
                         <select

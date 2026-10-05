@@ -55,17 +55,17 @@ export function filterAndSortAdminPartners({
   const query = searchValue.trim().toLowerCase();
 
   const normalized = partners.map((partner, index) => {
-    const categoryKey = categoryKeyById.get(partner.category_id) ?? "unknown";
+    const categoryKey = categoryKeyById.get(partner.categoryId) ?? "unknown";
     const conditions = partner.conditions ?? [];
     const benefits = partner.benefits ?? [];
-    const appliesTo = normalizePartnerAudience(partner.applies_to);
+    const appliesTo = normalizePartnerAudience(partner.appliesTo);
     const tags = partner.tags ?? [];
 
     return {
       ...partner,
       _index: index,
       _categoryKey: categoryKey,
-      _isActive: isWithinPeriod(partner.period_start, partner.period_end),
+      _isActive: isWithinPeriod(partner.periodStart, partner.periodEnd),
       _popularityScore: calculatePartnerPopularityScore({
         favoriteCount: partner.metrics?.favoriteCount,
         detailViews: partner.metrics?.detailViews,
@@ -75,13 +75,13 @@ export function filterAndSortAdminPartners({
         partner.name,
         partner.company?.name ?? "",
         partner.location,
-        partner.benefit_action_link ?? "",
-        partner.reservation_link ?? "",
-        partner.inquiry_link ?? "",
+        partner.benefitActionLink ?? "",
+        partner.reservationLink ?? "",
+        partner.inquiryLink ?? "",
         conditions.join(" "),
-        partner.benefit_action_link,
-        partner.reservation_link,
-        partner.inquiry_link,
+        partner.benefitActionLink,
+        partner.reservationLink,
+        partner.inquiryLink,
         benefits.join(" "),
         appliesTo.map((item) => getPartnerAudienceLabel(item)).join(" "),
         tags.join(" "),
@@ -116,7 +116,7 @@ export function filterAndSortAdminPartners({
       }
     }
     if (sortValue === "endingSoon") {
-      const compare = compareEndDate(a.period_end, b.period_end);
+      const compare = compareEndDate(a.periodEnd, b.periodEnd);
       if (compare !== 0) {
         return compare;
       }

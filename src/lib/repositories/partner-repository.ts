@@ -28,8 +28,20 @@ export type AdminPartnerOption = {
   name: string;
 };
 
+/** Category id/key/label projection used by forms and XLSX templates. */
+export type PartnerCategoryOption = {
+  id: string;
+  key: string;
+  label: string;
+};
+
 export interface PartnerRepository {
   getCategories(): Promise<Category[]>;
+  /**
+   * Uncached id/key/label options in creation order. Write paths resolve the
+   * stored category id from these, so they must not wait on the public cache.
+   */
+  getCategoryOptions(): Promise<PartnerCategoryOption[]>;
   /** Returns only the fields required by admin partner selectors. */
   listAdminPartnerOptions(): Promise<AdminPartnerOption[]>;
   getPartners(context?: PartnerViewContext): Promise<Partner[]>;

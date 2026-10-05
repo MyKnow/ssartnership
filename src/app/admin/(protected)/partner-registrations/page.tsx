@@ -52,7 +52,7 @@ function buildPartnerRegistrationHref({
   status: string | null;
   search: string;
   source: PartnerRegistrationSource | null;
-  visibility: "public" | "confidential" | "private" | null;
+  visibility: PartnerVisibility | null;
   sort: PartnerRegistrationQueueSort;
   page: number;
   pageSize: number;
