@@ -143,6 +143,9 @@ describe("partner returnTo wiring", () => {
     assert.match(screen, /<input type="hidden" name="returnTo" value=\{returnTo\} \/>/);
     assert.match(changePassword, /sanitizePartnerReturnTo\(getSingleSearchParam\(params\.returnTo\)\)/);
     assert.match(changePassword, /returnTo \?\?\s*\(returnCompanyId/);
+    // The forced-change copy must not promise the dashboard when the deep
+    // link wins.
+    assert.match(changePassword, /\? returnTo\s*\? "[^"]*원래 열려던 화면으로 이동합니다\."/);
     assert.match(proxy, /getPartnerLoginHref\(partnerReturnTo\)/);
     assert.match(proxy, /getPartnerPasswordChangeGateHref\(partnerReturnTo\)/);
   });

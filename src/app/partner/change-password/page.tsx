@@ -71,8 +71,12 @@ export default async function PartnerPasswordChangePage({
   const heroTitle = mustChangePassword
     ? "포털 이용 전 비밀번호를 설정합니다."
     : "비밀번호를 변경합니다.";
+  // Name the actual post-change destination: the preserved deep link when
+  // there is one, otherwise the dashboard.
   const heroDescription = mustChangePassword
-    ? "임시 비밀번호 상태에서는 다른 포털 화면으로 이동할 수 없습니다. 변경을 완료하면 대시보드로 이동합니다."
+    ? returnTo
+      ? "임시 비밀번호 상태에서는 다른 포털 화면으로 이동할 수 없습니다. 변경을 완료하면 원래 열려던 화면으로 이동합니다."
+      : "임시 비밀번호 상태에서는 다른 포털 화면으로 이동할 수 없습니다. 변경을 완료하면 대시보드로 이동합니다."
     : "계정 보안을 위해 현재 비밀번호를 확인한 뒤 새 비밀번호로 변경합니다. 완료 후 이전 파트너사 화면으로 돌아갑니다.";
   const formDescription = mustChangePassword
     ? "임시 비밀번호로 로그인한 경우, 변경을 완료해야 다른 페이지를 이용할 수 있습니다."
