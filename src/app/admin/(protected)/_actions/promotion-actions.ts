@@ -13,7 +13,10 @@ import {
   type PromotionEventRegistrationRow,
   type PromotionEventRegistrationTarget,
 } from "@/lib/promotions/events-store.server";
-import { getSafeAdminActionErrorCode } from "@/lib/admin-action-errors";
+import {
+  getSafeAdminActionErrorCode,
+  type AdminRedirectErrorCode,
+} from "@/lib/admin-action-errors";
 import { AD_PACKAGE_FORM_LIMITS } from "@/lib/ad-package-validation";
 import {
   DEFAULT_PROMOTION_AUDIENCES,
@@ -49,7 +52,7 @@ import { resolveImageTransformPolicy } from "@/lib/image-upload/policy";
 import { isUuidFormat } from "@/lib/uuid";
 import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { PROMOTION_SLIDES_BUCKET } from "@/lib/promotion-slide-storage";
-import { logAdminAction } from "./shared-helpers";
+import { logAdminAction, redirectAdminActionError } from "./shared-helpers";
 import { logServerError } from "@/lib/server-log";
 import { readString } from "@/lib/form-data";
 
@@ -103,13 +106,17 @@ function adminEventUrl(
   return `/admin/event/${slug}${query ? `?${query}` : ""}`;
 }
 
-function redirectEventRegistrationError(slug: string, fallback: string, error?: unknown): never {
+function redirectEventRegistrationError(
+  slug: string,
+  fallback: AdminRedirectErrorCode,
+  error?: unknown,
+): never {
   const safeSlug = normalizeSlug(slug);
   const path = safeSlug ? `/admin/event/${encodeURIComponent(safeSlug)}` : "/admin/event";
   const code = error
     ? getSafeAdminActionErrorCode(error, fallback)
     : fallback;
-  redirect(`${path}?error=${encodeURIComponent(code)}`);
+  redirectAdminActionError(path, code);
 }
 
 function redirectAdvertisementError(fallback: string, error?: unknown): never {
