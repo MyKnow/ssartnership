@@ -156,7 +156,7 @@ private monitoring env의 `OPS_ALERT_WEBHOOK_URL`에 운영자가 지정한 HTTP
 
 자체 호스팅에서 [Next.js useReportWebVitals](https://nextjs.org/docs/app/api-reference/functions/use-report-web-vitals)로 LCP/INP/CLS를 수집한다. 프레임워크에 포함된 web-vitals를 재사용하며 추가 외부 telemetry 서비스에 보내지 않는다. 기본 샘플링은 페이지 로드의 10%, DNT=1은 수집하지 않는다. 검증 환경에서만 `SELF_HOST_VITALS_SAMPLE_RATE=1`로 전체 표본을 사용한다.
 
-클라이언트는 원본 경로를 8개 고정 화면 분류로 바꾸고 `fetch`의 `keepalive`로 POST한다. 페이지 이동 시 마지막 CLS 전송을 유지하며 `credentials: omit`으로 쿠키를 보내지 않는다. 전송 실패를 재시도하거나 화면 이동을 막지 않는다. `/api/web-vitals`는 설정 origin, JSON content type, 512-byte 실제 body 한도, 프로세스당 분당 1200개 전역 제한과 strict schema를 적용한다. 회원/IP/세션 ID를 rate-limit 저장소에 쌓지 않는다. 추가 키·URL·metric ID·entries·비정상 수치는 거절한다. 내부 collector는 별도 token으로 인증하고 고정 histogram만 보관한다. 원본 event 저장소가 없고 Prometheus의 7일 보존 정책이 집계 데이터에 적용된다. 익명 클라이언트 수치는 위조 가능하므로 보안 감사나 과금 근거로 사용하지 않는다. 단일 app/collector 기준의 quota이며 다중 replica 도입 시 공유 ingress 제한이 필요하다.
+클라이언트는 원본 경로를 8개 고정 화면 분류로 바꾸고 `fetch`의 `keepalive`로 POST한다. 페이지 이동 중에도 브라우저가 마지막 지표 전송을 계속하도록 요청하며 `credentials: omit`으로 쿠키를 보내지 않는다. 수집은 best-effort이고 브라우저의 전송 완료나 collector 도착을 보장하지 않는다. 전송 실패를 재시도하거나 화면 이동을 막지 않는다. `/api/web-vitals`는 설정 origin, JSON content type, 512-byte 실제 body 한도, 프로세스당 분당 1200개 전역 제한과 strict schema를 적용한다. 회원/IP/세션 ID를 rate-limit 저장소에 쌓지 않는다. 추가 키·URL·metric ID·entries·비정상 수치는 거절한다. 내부 collector는 별도 token으로 인증하고 고정 histogram만 보관한다. 원본 event 저장소가 없고 Prometheus의 7일 보존 정책이 집계 데이터에 적용된다. 익명 클라이언트 수치는 위조 가능하므로 보안 감사나 과금 근거로 사용하지 않는다. 단일 app/collector 기준의 quota이며 다중 replica 도입 시 공유 ingress 제한이 필요하다.
 
 Vercel Analytics/SpeedInsights는 제거했고(RF-04) 브라우저 성능은 이 수집 경로와 [Web Vitals·Lighthouse 측정 절차](../../performance/measurements/web-vitals.md)로만 확인한다. 제품 이벤트는 그대로 유지한다. 자체 호스팅의 웹 성능 수집은 비활성 기본값이며 monitoring overlay에서 활성화한다. 공개 GET 설정에는 활성 여부와 샘플링 비율만 들어간다. 수집 실패는 사용자 화면의 오류로 표출하지 않지만 endpoint 실패와 운영 metric으로 점검한다.
 
@@ -173,6 +173,8 @@ Preview 외부 알림은 해당 환경의 root 전용 monitoring env에 기존 �
 
 
 ## PVE 공용 감시와 운영자 알림
+
+Grafana 13.2.1의 실제 51개 패널 조회에서 384 MiB 상한에 도달해 OOM·exit 137·재시작과 502를 확인했다. [Issue #564](https://github.com/MyKnow/ssartnership/issues/564)의 수정 상한은 768 MiB다. [공식 설치 문서](https://grafana.com/docs/grafana/latest/setup-grafana/installation/)의 메모리 최소 권고 512 MB를 넘겨 질의·bundled plugin 여유를 확보한다. 기존 공용 VM 2 GiB와 이미지·인증·데이터는 유지한다. 모든 Compose 서비스의 메모리 상한 합계는 1632 MiB여서 OS 등에 416 MiB를 남기며, 실행 가능한 자원 예산 검사가 최소치와 전체 여유를 보호한다. 실제 적용 후 세 viewport·환경 필터·전체 행의 질의와 반복 새로고침을 확인했다. 독립 자원 확인에서 OOM/재시작 증가는 없었고, peak 약 629 MiB와 VM 가용 약 833 MiB를 측정했다. 자원 검사는 이 관측을 올림한 640 MiB workload에 64 MiB의 여유를 더해 보호한다. 재점검할 때도 화면과 Docker 이벤트·VM 가용 메모리를 함께 확인한다.
 
 PVE 이전 이후의 활성 구성은 `deploy/pve/compose.operations.yaml`이다. 이전 노트북 overlay와 구분하며 실제 적용된 VM 경계는 [PVE 이전 명세](../../specs/pve-service-migration/spec.md)를 따른다. 공용 VM 5202에서 Prometheus → Alertmanager → `notifier.mjs`가 실행된다. Production·Preview telemetry는 앱 probe와 Web Vitals만 수집하며 활성 monitoring env 및 container에서 `OPS_ALERT_*` 발송 설정을 제거한다. 다음 receiver 실행이 이 설정을 복구하지 않도록 환경별 private monitoring env도 같이 정리한다. VAPID는 기존 앱의 기능에 계속 필요하지만 notifier는 앱·DB를 호출하지 않고 별도 private 사본으로 발송한다.
 

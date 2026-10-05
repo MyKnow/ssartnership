@@ -90,8 +90,12 @@ RF-14/16/17/18의 중단된 미커밋 변경을 포함해 독립 통합 브랜�
 
 [PR #562](https://github.com/MyKnow/ssartnership/pull/562)는 익명 Web Vitals의 navigation 전송을 쿠키 없는 keepalive fetch로 바꿨다. 실제 sampling과 세 필드 계약을 유지한 full Chromium 검증에서 세 문서의 LCP/INP/CLS 9건이 모두 수집됐다. 별도 headless-shell 검증에서는 9건 중 7건과 8건만 도착했으며, 이 실패 기록과 브라우저별 best-effort 전송 한계를 유지한다. CI 성공으로 실제 지표 수집 완료를 대체하지 않는다.
 
-운영자 범위에서는 공용 edge·관측 설정, 51개 대시보드 패널과 경보 규칙, 기존 예약 작업 11개의 지표, 두 배포 수신기의 지표·종료 코드 처리를 적용하고 독립 확인했다. Preview 관측 컨테이너는 검증된 immutable 이미지로 별도 활성화했으며 gateway·Storage·DB 준비 상태 3개를 확인했다. 자동 수신기는 기존 app-only 계약을 유지하므로 이미지 발행·앱 배포·관측 컨테이너 활성화는 별도 증거다. 실제 앱 컴포넌트의 오류 상태와 공개 Preview를 모바일·태블릿·데스크톱에서 확인했고, 관리 대시보드의 브라우저 렌더 검증은 인증 가능한 브라우저 연결 부족으로 API·생성물 검증까지만 완료했다.
+운영자 범위에서는 공용 edge·관측 설정, 51개 대시보드 패널과 경보 규칙, 기존 예약 작업 11개의 지표, 두 배포 수신기의 지표·종료 코드 처리를 적용하고 독립 확인했다. Preview 관측 컨테이너는 검증된 immutable 이미지로 별도 활성화했으며 gateway·Storage·DB 준비 상태 3개를 확인했다. 자동 수신기는 기존 app-only 계약을 유지하므로 이미지 발행·앱 배포·관측 컨테이너 활성화는 별도 증거다. 실제 앱 컴포넌트의 오류 상태와 공개 Preview를 모바일·태블릿·데스크톱에서 확인했고, 관리 대시보드는 당시 인증 가능한 브라우저 연결이 없어 API·생성물까지만 검증했다. 이후 실제 화면 검증 결과는 아래 Issue #564 항목에 기록한다.
 
-전체 public DB 타입은 [PR #563](https://github.com/MyKnow/ssartnership/pull/563)에서 실제 Preview catalog로 생성·대조한다. 생성 근거와 누락 거부 규칙은 [개발 도구 평가](../../testing/audits/2026-10-refactor-tooling.md#데이터-타입-파일럿)가 정본이다. 이 PR의 `dev` 병합과 실제 Preview 적용은 별도 전달 경계다.
+전체 public DB 타입은 [PR #563](https://github.com/MyKnow/ssartnership/pull/563)에서 실제 Preview catalog의 112테이블·1398 Row 컬럼으로 생성·대조했고, `dev` 병합 SHA `ab82f89c`의 첫 CI·이미지·실제 Preview 앱과 관측 이미지까지 확인했다. 생성 근거와 누락 거부 규칙은 [개발 도구 평가](../../testing/audits/2026-10-refactor-tooling.md#데이터-타입-파일럿)가 정본이다. 타입 생성은 DB·데이터·권한을 변경하지 않았다.
+
+최종 dev의 실제 Web Vitals 첫 관측은 15건 중 14건(LCP 5/5·INP 5/5·CLS 4/5)이었다. profile 종료 뒤에도 부족한 한 건은 도착하지 않았다. 이전 전량 도착 관측을 마지막 결과로 대체하지 않으며 정확한 원인은 미해결이다. 모든 관측과 한계는 [성능 측정 기록](../../performance/measurements/web-vitals.md#2026-10-05-실제-전송-관측)에 보존한다.
+
+2026-10-05 인증 가능한 Chrome 연결 뒤 실제 공용 Grafana를 확인하면서 384 MiB 상한에 따른 OOM·exit 137·재시작과 일부 패널의 502를 재현했다. [Issue #564](https://github.com/MyKnow/ssartnership/issues/564)에서 기존 2 GiB VM 안의 자원 예산을 검증하고 Grafana 한도만 768 MiB로 갱신했다. 컨테이너 재생성 없이 동일 이미지·인증·저장소·다른 서비스와 공개 앱 health를 유지했다. 실제 51개 패널·환경 필터와 360/820/1440px에서 패널 오류와 수평 overflow 없이 확인했다. 첫 화면 실패는 보존하고 운영 적용과 dev 전달은 별도로 판정한다.
 
 Production 앱·DB는 기존 revision과 208개 migration을 유지하고 Preview는 210개 migration을 사용한다. `main` 승격, 그 뒤의 레거시 시크릿 정리, 접근 권한이 없는 폐기 공급자 설정, 오프라인 복구 키 보관·인계, 실제 독립 회선 감시와 운영 기간이 필요한 임계값 재검토는 완료로 표시하지 않는다. Wallet 기능·키·예약 작업은 진행 범위에서 제외한다.

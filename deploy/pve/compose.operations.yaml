@@ -75,7 +75,9 @@ services:
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
-    mem_limit: 384m
+    # Actual 51-panel queries exhausted 384 MiB. Keep query/plugin headroom
+    # inside the existing 2 GiB operations VM; see its resource-budget test.
+    mem_limit: 768m
     cpus: 0.5
     pids_limit: 128
     logging: *logs
