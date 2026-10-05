@@ -1,4 +1,8 @@
-import { PARTNER_LOGIN_PATH, PARTNER_PASSWORD_CHANGE_PATH } from "./portal-paths.ts";
+import {
+  PARTNER_LOGIN_PATH,
+  PARTNER_PASSWORD_CHANGE_PATH,
+  PARTNER_SESSION_EXPIRED_ERROR_CODE,
+} from "./portal-paths.ts";
 
 /**
  * Keeps a partner deep link across login and a forced password change.
@@ -122,4 +126,81 @@ export function resolvePartnerPostLoginHref(input: {
     return getPartnerPasswordChangeGateHref(input.returnTo);
   }
   return sanitizePartnerReturnTo(input.returnTo) ?? PARTNER_PORTAL_HOME_PATH;
+}
+
+/**
+ * One-shot result banners that partner server actions put on the screen they
+ * redirect to. The screen an action is submitted from can still carry the
+ * previous action's banner, which must not greet the partner again after the
+ * new submission failed on an expired session.
+ */
+const PARTNER_ACTION_FEEDBACK_PARAMS = ["status", "success", "error"] as const;
+
+function withoutPartnerActionFeedback(path: string) {
+  const url = new URL(path, PARTNER_RETURN_TO_BASE_ORIGIN);
+  for (const param of PARTNER_ACTION_FEEDBACK_PARAMS) {
+    if (url.searchParams.has(param)) {
+      url.searchParams.delete(param);
+    }
+  }
+  return `${url.pathname}${url.search}`;
+}
+
+/**
+ * The portal screen a server action was submitted from, read from the
+ * proxy-forwarded request path (`pathname + search`): server actions post to
+ * the page they were rendered on. A post that reached the login page forwards
+ * that page's own `returnTo`. Feedback banners are dropped.
+ */
+export function getPartnerActionReturnTo(requestPath: unknown): string | null {
+  if (typeof requestPath !== "string" || !requestPath.startsWith("/")) {
+    return null;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(requestPath, PARTNER_RETURN_TO_BASE_ORIGIN);
+  } catch {
+    return null;
+  }
+  if (parsed.origin !== PARTNER_RETURN_TO_BASE_ORIGIN) {
+    return null;
+  }
+
+  const destination = getPartnerRequestReturnTo(parsed.pathname, parsed.search);
+  return destination ? withoutPartnerActionFeedback(destination) : null;
+}
+
+/**
+ * The login page after a server action found no usable session: the expiry
+ * notice plus, when known, the screen to come back to after signing in again.
+ */
+export function getPartnerSessionExpiredLoginHref(returnTo?: unknown) {
+  const params = new URLSearchParams({ error: PARTNER_SESSION_EXPIRED_ERROR_CODE });
+  const safeReturnTo = sanitizePartnerReturnTo(returnTo);
+  if (safeReturnTo && safeReturnTo !== PARTNER_PORTAL_HOME_PATH) {
+    params.set(PARTNER_RETURN_TO_PARAM, safeReturnTo);
+  }
+  return `${PARTNER_LOGIN_PATH}?${params.toString()}`;
+}
+
+/**
+ * Where a partner server action sends a session that cannot act, or null when
+ * the action may proceed. An expired or revoked session goes to the login page
+ * with the expiry notice, a pending forced password change to its gate. Both
+ * carry the screen the action was submitted from (`requestPath`), so signing
+ * in again or finishing the change returns there.
+ */
+export function resolvePartnerActionSessionRedirect(
+  session: { mustChangePassword: boolean } | null | undefined,
+  requestPath?: string | null,
+): string | null {
+  if (session && !session.mustChangePassword) {
+    return null;
+  }
+
+  const returnTo = getPartnerActionReturnTo(requestPath);
+  return session
+    ? getPartnerPasswordChangeGateHref(returnTo)
+    : getPartnerSessionExpiredLoginHref(returnTo);
 }

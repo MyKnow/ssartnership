@@ -2,14 +2,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import {
-  PARTNER_LOGIN_PATH,
-  getPartnerSessionExpiredLoginHref,
-} from "../src/lib/partner-auth/portal-paths.ts";
+import { PARTNER_LOGIN_PATH } from "../src/lib/partner-auth/portal-paths.ts";
 import {
   getPartnerLoginHref,
   getPartnerPasswordChangeGateHref,
   getPartnerRequestReturnTo,
+  getPartnerSessionExpiredLoginHref,
   resolvePartnerPostLoginHref,
   sanitizePartnerReturnTo,
 } from "../src/lib/partner-auth/return-to.ts";
@@ -148,6 +146,15 @@ describe("partner login path", () => {
     assert.equal(
       new URL(getPartnerSessionExpiredLoginHref(), "https://partner.example").pathname,
       PARTNER_LOGIN_PATH,
+    );
+    assert.equal(
+      new URL(getPartnerSessionExpiredLoginHref("/partner/plans"), "https://partner.example")
+        .searchParams.get("returnTo"),
+      "/partner/plans",
+    );
+    assert.equal(
+      getPartnerSessionExpiredLoginHref("https://evil.example/partner"),
+      "/partner/login?error=session_expired",
     );
     assert.equal(
       buildPartnerLoginErrorRedirect("server_error", "partner@example.com", "/partner/plans"),
