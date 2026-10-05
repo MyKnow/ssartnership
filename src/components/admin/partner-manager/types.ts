@@ -1,6 +1,5 @@
+import type { AdminPartnerListItem } from "@/lib/admin-partner-list-item";
 import type { CategoryKey, PartnerVisibility } from "@/lib/types";
-import type { PartnerBenefitVisibility } from "@/lib/partner-benefit-visibility";
-import type { PartnerBenefitActionType } from "@/lib/partner-benefit-action";
 import type { PartnerPortalServiceMetrics } from "@/lib/partner-dashboard";
 
 export type AdminCategory = {
@@ -11,36 +10,17 @@ export type AdminCategory = {
   color?: string | null;
 };
 
-export type AdminPartner = {
-  id: string;
-  name: string;
-  category_id: string;
-  company_id?: string | null;
-  visibility: PartnerVisibility;
-  benefit_visibility?: PartnerBenefitVisibility | null;
-  location: string;
-  map_url?: string | null;
-  benefit_action_type?: PartnerBenefitActionType | null;
-  benefit_action_link?: string | null;
-  reservation_link?: string | null;
-  inquiry_link?: string | null;
-  period_start?: string | null;
-  period_end?: string | null;
+/**
+ * Admin list row as rendered by the partner manager: the read model's
+ * camelCase list item plus optional fields the list does not load by default.
+ */
+export type AdminPartner = AdminPartnerListItem & {
+  benefitActionLink?: string | null;
+  reservationLink?: string | null;
+  inquiryLink?: string | null;
   conditions?: string[] | null;
   benefits?: string[] | null;
-  applies_to?: string[] | null;
-  thumbnail?: string | null;
-  images?: string[] | null;
   tags?: string[] | null;
-  company?:
-    | {
-        id: string;
-        name: string;
-        slug: string;
-        description?: string | null;
-        is_active?: boolean | null;
-      }
-    | null;
   metrics?: PartnerPortalServiceMetrics | null;
 };
 

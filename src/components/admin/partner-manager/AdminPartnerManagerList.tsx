@@ -30,7 +30,7 @@ export default function AdminPartnerManagerList({
         <AdminPartnerListItem
           key={partner.id}
           partner={partner}
-          category={categories.find((category) => category.id === partner.category_id) ?? null}
+          category={categories.find((category) => category.id === partner.categoryId) ?? null}
         />
       ))}
     </div>
