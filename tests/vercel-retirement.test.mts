@@ -31,6 +31,16 @@ function trackedFiles(prefixes: string[]) {
     .filter((path) => path && existsSync(new URL(`../${path}`, import.meta.url)));
 }
 
+test("폐기 공급자의 Git 자동 배포는 모든 브랜치에서 차단하고 런타임·cron 설정을 되살리지 않는다", () => {
+  const configurationPath = new URL("../vercel.json", import.meta.url);
+  assert.ok(existsSync(configurationPath), "keep the deployment stop while the external Git integration is connected");
+  const configuration = JSON.parse(readFileSync(configurationPath, "utf8"));
+
+  assert.equal(configuration.git?.deploymentEnabled, false);
+  assert.deepEqual(Object.keys(configuration.git), ["deploymentEnabled"]);
+  assert.deepEqual(Object.keys(configuration).sort(), ["$schema", "git"]);
+});
+
 test("런타임·스크립트·배포·워크플로에는 승인된 제거 대상 외 Vercel 분기가 없다", () => {
   const offenders = trackedFiles(["src", "scripts", "deploy", ".github", "next.config.ts", "Dockerfile"])
     .filter((path) => /\.(?:[cm]?[jt]sx?|ya?ml|json|Caddyfile|conf|service|sh|py)$|Dockerfile$/u.test(path))

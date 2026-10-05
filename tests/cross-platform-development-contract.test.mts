@@ -166,9 +166,11 @@ test("trusted installer가 공식 platform binary를 직접 검증한다", async
   assert.doesNotMatch(policy, /[A-Za-z]:\\\\/);
 });
 
-test("폐기된 Vercel 배포 설정과 계정 라우팅 도구는 다시 추가하지 않는다", () => {
+test("폐기된 Vercel은 Git 배포 차단만 유지하고 계정 라우팅 도구는 다시 추가하지 않는다", async () => {
+  const gitStop = JSON.parse(await readRepoFile("vercel.json"));
+  assert.deepEqual(gitStop.git, { deploymentEnabled: false });
+  assert.deepEqual(Object.keys(gitStop).sort(), ["$schema", "git"]);
   for (const retiredPath of [
-    "vercel.json",
     "scripts/vercel-ssartnership.mjs",
     "docs/operations/runbooks/vercel-account-routing.md",
   ]) {

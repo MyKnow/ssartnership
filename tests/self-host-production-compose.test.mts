@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 const require=createRequire(import.meta.url);
 const {load}=require('js-yaml');
 test('self-hosted cron schedule is the only cron catalog after Vercel retirement',()=>{
- assert.equal(existsSync(new URL('../vercel.json',import.meta.url)),false);
+ const retiredProvider=JSON.parse(readFileSync(new URL('../vercel.json',import.meta.url),'utf8'));
+ assert.deepEqual(retiredProvider.git,{deploymentEnabled:false});
+ assert.deepEqual(Object.keys(retiredProvider).sort(),['$schema','git']);
  const config=JSON.parse(readFileSync(new URL('../deploy/self-host-operations/production-cron/schedules.json',import.meta.url),'utf8'));
  assert.equal(config.crons.length+config.unscheduled.length,12);
  assert.equal(new Set([...config.crons,...config.unscheduled].map((entry:{path:string})=>entry.path)).size,12);
