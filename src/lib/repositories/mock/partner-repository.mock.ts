@@ -1,3 +1,4 @@
+import { isE2eMockMutationEnabled } from "@/lib/e2e-mutation-mode";
 import type { Category, Partner } from "@/lib/types";
 import type {
   AdminPartnerOption,
@@ -43,7 +44,7 @@ const categories: Category[] = [
   },
 ];
 
-const partners: Partner[] = [
+const baselinePartners: Partner[] = [
   {
     id: "health-001",
     name: "바디라인 피트니스",
@@ -180,6 +181,17 @@ const partners: Partner[] = [
     tags: ["스터디룸", "프로젝터"],
   },
 ];
+
+// Extra rows exist only inside the explicit local E2E fixture. They exercise
+// pagination/return-state behavior without changing the normal mock catalog.
+const partners: Partner[] = isE2eMockMutationEnabled()
+  ? [...baselinePartners, ...Array.from({ length: 24 }, (_, index): Partner => ({
+      ...baselinePartners[4]!,
+      id: `rf-home-fixture-${index + 1}`,
+      name: `목록 복귀 검증 공간 ${index + 1}`,
+      period: { start: "2026-01-01", end: "2099-12-31" },
+    }))]
+  : baselinePartners;
 
 export class MockPartnerRepository implements PartnerRepository {
   async listAdminPartnerOptions(): Promise<AdminPartnerOption[]> {

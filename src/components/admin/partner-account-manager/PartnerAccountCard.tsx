@@ -7,7 +7,7 @@ import {
   formatPartnerAccountDateTime,
   getPartnerInitialSetupBadge,
 } from "@/components/admin/partner-account-manager/helpers";
-import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
+import type { AdminPartnerAccount } from "@/lib/admin-partner-account-types";
 import type { AdminCompanyFormActions } from "@/components/admin/admin-form-actions";
 
 export default function PartnerAccountCard({

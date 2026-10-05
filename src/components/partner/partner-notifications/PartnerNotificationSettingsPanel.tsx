@@ -1,5 +1,8 @@
 "use client";
 
+import Checkbox from "@/components/ui/Checkbox";
+
+
 import { useEffect, useRef, useState, useTransition } from "react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -153,8 +156,7 @@ export default function PartnerNotificationSettingsPanel({
         className="flex min-w-0 items-center justify-between gap-3 rounded-[1rem] border border-border bg-surface-inset px-4 py-3 text-sm font-medium text-foreground"
       >
         <span className="min-w-0 truncate">{toggle.label}</span>
-        <input
-          type="checkbox"
+        <Checkbox
           checked={Boolean(state[toggle.key])}
           disabled={isPending || !state.enabled}
           onChange={(event) =>
@@ -199,8 +201,7 @@ export default function PartnerNotificationSettingsPanel({
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <label className="flex min-w-0 items-center justify-between gap-3 rounded-[1rem] border border-border bg-surface-inset px-4 py-3 text-sm font-medium text-foreground">
           <span className="min-w-0 truncate">전체 알림</span>
-          <input
-            type="checkbox"
+          <Checkbox
             checked={state.enabled}
             disabled={isPending}
             onChange={(event) =>

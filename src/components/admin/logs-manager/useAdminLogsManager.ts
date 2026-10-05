@@ -8,12 +8,12 @@ import {
 } from '@/lib/admin-safe-messages';
 import {
   buildUnifiedLogs,
-} from '@/components/admin/logs/selectors';
+} from '@/lib/log-insights/selectors';
 import {
   toDateTimeLocalValue,
   toIsoFromLocalValue,
-} from '@/components/admin/logs/utils';
-import type { GroupFilter, NormalizedLog, SortFilter, StatusFilter } from '@/components/admin/logs/types';
+} from '@/lib/log-insights/utils';
+import type { GroupFilter, NormalizedLog, SortFilter, StatusFilter } from '@/lib/log-insights/types';
 import type {
   AdminLogsPageData,
   GetAdminLogsPageDataOptions,

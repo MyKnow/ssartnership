@@ -21,6 +21,7 @@ export default function SubmitButton({
   className,
   form,
   formAction,
+  formNoValidate,
   disabled,
   name,
   value,
@@ -32,6 +33,7 @@ export default function SubmitButton({
   className?: string;
   form?: string;
   formAction?: React.ButtonHTMLAttributes<HTMLButtonElement>["formAction"];
+  formNoValidate?: boolean;
   disabled?: boolean;
   name?: string;
   value?: string;
@@ -51,6 +53,7 @@ export default function SubmitButton({
       loadingText={pendingText ?? DEFAULT_SUBMIT_PENDING_TEXT}
       form={form}
       formAction={formAction}
+      formNoValidate={formNoValidate}
       name={name}
       value={value}
     >

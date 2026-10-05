@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { NormalizedLog } from "./types";
-import { formatDateTime, getPropertyEntries } from "./utils";
+import type { NormalizedLog } from "../../../lib/log-insights/types";
+import { formatDateTime, getPropertyEntries } from "../../../lib/log-insights/utils";
 
 type LogDetailResponse = {
   properties: Record<string, unknown> | null;

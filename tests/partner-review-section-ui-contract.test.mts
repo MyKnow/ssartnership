@@ -66,7 +66,7 @@ test("파트너 리뷰는 단일 컨테이너 안에서 리뷰 항목만 Divider
   assert.match(section, /리뷰 반응 처리 중 네트워크 오류/);
 
   const imageFilterHandler = section.match(
-    /type="checkbox"[\s\S]*?onChange=\{\(event\) => \{([\s\S]*?)\n\s*\}\}/,
+    /<Checkbox[\s\S]*?onChange=\{\(event\) => \{([\s\S]*?)\n\s*\}\}/,
   )?.[1];
   assert.ok(imageFilterHandler);
   assert.doesNotMatch(imageFilterHandler, /setOnlyWithImages\(/);

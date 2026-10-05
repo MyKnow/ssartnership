@@ -19,7 +19,7 @@ import {
 } from "@/lib/ad-package-validation";
 import type { AdCampaignWithStats, AdCoupon } from "@/lib/repositories/ad-package-repository";
 import { cn } from "@/lib/cn";
-import { FOUR_DIGIT_PIN_LENGTH } from "@/lib/validation";
+import { FOUR_DIGIT_PIN_INPUT_PATTERN, FOUR_DIGIT_PIN_LENGTH } from "@/lib/validation";
 
 type ServerAction = (formData: FormData) => void | Promise<void>;
 
@@ -293,7 +293,7 @@ export default function AdminPartnerCouponForm({
                     name="onsitePassword"
                     type="text"
                     inputMode="numeric"
-                    pattern="[0-9]{4}"
+                    pattern={FOUR_DIGIT_PIN_INPUT_PATTERN}
                     maxLength={FOUR_DIGIT_PIN_LENGTH}
                     autoComplete="off"
                     required={mode === "create"}

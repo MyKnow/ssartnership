@@ -2,7 +2,7 @@ import {
   filterHomePartners,
   normalizeHomePartners,
   type HomePartnerSortOption,
-} from "@/components/home-view/selectors";
+} from "@/lib/home-partner-selectors";
 import { unstable_rethrow } from "next/navigation";
 import type { PartnerAudienceFilter, PartnerAudienceKey } from "@/lib/partner-audience";
 import {

@@ -5,7 +5,7 @@ import { Sparkles } from "lucide-react";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
 import PasswordInput from "@/components/ui/PasswordInput";
-import { focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
+import { fieldA11yProps, focusField, getFieldErrorClass } from "@/components/ui/form-field-state";
 import { useToast } from "@/components/ui/Toast";
 import { validateAuthPasswordPairDraft } from "@/lib/auth-form-validation";
 import {
@@ -157,11 +157,11 @@ export default function ResetPasswordCompleteForm({
             }}
             placeholder="영문/숫자/특수문자 포함 8자 이상"
             disabled={pending}
-            aria-invalid={Boolean(fieldErrors.password) || undefined}
+            {...fieldA11yProps("member-reset-password", fieldErrors.password)}
             className={getFieldErrorClass(Boolean(fieldErrors.password))}
           />
           {fieldErrors.password ? (
-            <FormMessage variant="error">{fieldErrors.password}</FormMessage>
+            <FormMessage id="member-reset-password-error" variant="error">{fieldErrors.password}</FormMessage>
           ) : null}
         </label>
 
@@ -178,11 +178,11 @@ export default function ResetPasswordCompleteForm({
             }}
             placeholder="다시 입력해 주세요"
             disabled={pending}
-            aria-invalid={Boolean(fieldErrors.confirmPassword) || undefined}
+            {...fieldA11yProps("member-reset-confirmPassword", fieldErrors.confirmPassword)}
             className={getFieldErrorClass(Boolean(fieldErrors.confirmPassword))}
           />
           {fieldErrors.confirmPassword ? (
-            <FormMessage variant="error">{fieldErrors.confirmPassword}</FormMessage>
+            <FormMessage id="member-reset-confirmPassword-error" variant="error">{fieldErrors.confirmPassword}</FormMessage>
           ) : null}
         </label>
 

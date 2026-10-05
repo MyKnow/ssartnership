@@ -1,3 +1,4 @@
+import Checkbox from "@/components/ui/Checkbox";
 import Input from "@/components/ui/Input";
 import SubmitButton from "@/components/ui/SubmitButton";
 import type { ManagedEventCampaign } from "@/lib/promotions/events";
@@ -58,8 +59,7 @@ export default function EventRegistrationForm({
         </FieldLabel>
         <FieldLabel label="공개 상태">
           <label className="flex h-11 items-center gap-2 rounded-input border border-border bg-surface px-4 text-sm font-medium text-foreground">
-            <input
-              type="checkbox"
+            <Checkbox
               name="isActive"
               defaultChecked={registration ? registration.isActive : true}
               className="h-4 w-4 accent-primary"
@@ -82,8 +82,7 @@ export default function EventRegistrationForm({
               key={option.key}
               className="flex items-start gap-3 rounded-[1rem] border border-border/70 bg-surface px-4 py-3 text-sm font-medium text-foreground"
             >
-              <input
-                type="checkbox"
+              <Checkbox
                 name="targetAudiences"
                 value={option.key}
                 defaultChecked={audiences.includes(option.key)}

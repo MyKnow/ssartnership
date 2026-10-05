@@ -21,9 +21,9 @@ import {
   getAvailableLogNames,
   getSecurityStatusCounts,
   filterAndSortLogs,
-} from '@/components/admin/logs/selectors';
-import { getLogLabel } from '@/components/admin/logs/utils';
-import type { GroupFilter } from '@/components/admin/logs/types';
+} from '@/lib/log-insights/selectors';
+import { getLogLabel } from '@/lib/log-insights/utils';
+import type { GroupFilter } from '@/lib/log-insights/types';
 import type {
   AdminLogsAggregateData,
   AdminLogsAccessCapabilities,

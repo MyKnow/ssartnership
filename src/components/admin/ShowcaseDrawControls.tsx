@@ -1,5 +1,8 @@
 "use client";
 
+import Checkbox from "@/components/ui/Checkbox";
+
+
 import { useRef, useState, useTransition } from "react";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
@@ -160,8 +163,7 @@ export function ShowcaseWinnerControls({ winner, disabled }: { winner: ShowcaseA
   return (
     <div className="grid gap-2">
       <label className="flex items-center gap-2 text-sm text-foreground">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={delivered}
           disabled={disabled || isPending}
           onChange={(changeEvent) => {

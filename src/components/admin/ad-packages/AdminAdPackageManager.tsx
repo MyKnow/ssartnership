@@ -1,4 +1,6 @@
+import Checkbox from "@/components/ui/Checkbox";
 import Card from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
 import FormSubmitButton from "@/components/ui/FormSubmitButton";
 import Input from "@/components/ui/Input";
 import SectionHeading from "@/components/ui/SectionHeading";
@@ -327,8 +329,7 @@ export default function AdminAdPackageManager({
                       key={channel}
                       className="flex items-center gap-2 rounded-2xl border border-border bg-surface-inset px-3 py-2 text-sm text-foreground"
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         name="channels"
                         value={channel}
                         defaultChecked
@@ -361,9 +362,15 @@ export default function AdminAdPackageManager({
 
       <section className="grid gap-4" aria-label="광고 캠페인 목록">
         {campaigns.length === 0 ? (
-          <Card tone="muted" className="text-sm text-muted-foreground">
-            아직 등록된 광고 패키지가 없습니다.
-          </Card>
+          <EmptyState
+            size="sm"
+            title="아직 등록된 광고 캠페인이 없습니다."
+            description={
+              canCreate
+                ? "위의 캠페인 생성에서 제휴처와 패키지를 연결해 첫 캠페인을 등록해 주세요."
+                : undefined
+            }
+          />
         ) : (
           campaigns.map((campaign) => {
             const definition = getAdPackageDefinition(campaign.packageTier);

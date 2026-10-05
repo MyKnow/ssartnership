@@ -5,7 +5,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import SectionHeading from "@/components/ui/SectionHeading";
 import { buildPartnerChangeRequestDiffItems } from "@/components/partner-change-request-ui/buildDiffItems";
 import { cn } from "@/lib/cn";
-import { formatDateTime, getLogLabel } from "@/components/admin/logs/utils";
+import { formatDateTime, getLogLabel } from "@/lib/log-insights/utils";
 import type { PartnerChangeRequestSummary } from "@/lib/partner-change-requests";
 
 type PartnerAuditLog = {

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { existsSync } from "node:fs";
 
 const root = new URL("..", import.meta.url);
 
@@ -10,13 +11,13 @@ function read(path: string) {
 }
 
 function trackedSourceFiles() {
-  return execFileSync("git", ["ls-files", "src/**/*.tsx", "src/**/*.ts"], {
+  return execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "src/**/*.tsx", "src/**/*.ts"], {
     cwd: root,
     encoding: "utf8",
   })
     .trim()
     .split("\n")
-    .filter((file) => file && !file.endsWith(".stories.tsx"));
+    .filter((file) => file && !file.endsWith(".stories.tsx") && existsSync(new URL(`../${file}`, import.meta.url)));
 }
 
 test("뒤로 가기는 명시적 상위 목적지로 이동하고 router.back()·인라인 화살표 링크를 쓰지 않는다", async () => {
@@ -104,4 +105,45 @@ test("쇼케이스·푸시 발송 로그 목록의 빈 상태는 ad hoc 점선 �
 
   const myPage = await read("src/app/(site)/events/project-showcase/my/page.tsx");
   assert.equal([...myPage.matchAll(/<EmptyState\s/g)].length, 2);
+});
+
+const AD_HOC_EMPTY_STATES_PENDING_INTEGRATION: string[] = [];
+
+test("목록 빈 상태를 점선 상자·muted Card로 직접 그리지 않는다(래칫)", async () => {
+  const adHocEmptyStatePatterns = [
+    /<(div|p|section|li)\b[^>]*className="[^"]*border-dashed[^"]*"[^>]*>\s*(<(p|span)[^>]*>)?\s*[^<{]*(없습니다|없어요)/,
+    /<Card\b[^>]*tone="muted"[^>]*>\s*[^<{]*(없습니다|없어요)/,
+  ];
+  const offenders: string[] = [];
+  for (const file of trackedSourceFiles()) {
+    if (!file.endsWith(".tsx")) continue;
+    const source = await read(file);
+    if (adHocEmptyStatePatterns.some((pattern) => pattern.test(source))) {
+      offenders.push(file);
+    }
+  }
+
+  assert.deepEqual(
+    offenders.sort(),
+    AD_HOC_EMPTY_STATES_PENDING_INTEGRATION,
+    "목록·패널 빈 상태는 EmptyState(카드 안은 size=\"sm\")를 쓰고, 허용 목록은 옮겨진 빈 상태를 고친 뒤 줄입니다.",
+  );
+});
+
+test("이벤트 상태별 목록·광고 캠페인·제휴처 쿠폰 목록의 빈 상태는 EmptyState를 쓴다", async () => {
+  const [eventList, adPackages, partnerCoupons] = await Promise.all([
+    read("src/components/admin/AdminEventListView.tsx"),
+    read("src/components/admin/ad-packages/AdminAdPackageManager.tsx"),
+    read("src/components/admin/ad-packages/AdminPartnerCouponManager.tsx"),
+  ]);
+
+  assert.match(
+    eventList,
+    /<EmptyState\s+size="sm"\s+title=\{`\$\{section\.bucket\} 상태의 이벤트가 없습니다\.`\}/,
+  );
+  assert.match(adPackages, /<EmptyState\s+size="sm"\s+title="아직 등록된 광고 캠페인이 없습니다\."/);
+  assert.match(
+    partnerCoupons,
+    /<EmptyState\s+size="sm"\s+title="아직 이 제휴처에 등록된 쿠폰이 없습니다\."/,
+  );
 });

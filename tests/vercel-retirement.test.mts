@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -23,12 +23,12 @@ const PENDING_VERCEL_REFERENCES = new Set([
 ]);
 
 function trackedFiles(prefixes: string[]) {
-  return execFileSync("git", ["ls-files", "-z", "--", ...prefixes], {
+  return execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", ...prefixes], {
     cwd: repositoryRoot,
     encoding: "utf8",
   })
     .split("\0")
-    .filter(Boolean);
+    .filter((path) => path && existsSync(new URL(`../${path}`, import.meta.url)));
 }
 
 test("런타임·스크립트·배포·워크플로에는 승인된 제거 대상 외 Vercel 분기가 없다", () => {

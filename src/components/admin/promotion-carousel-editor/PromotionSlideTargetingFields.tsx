@@ -1,3 +1,4 @@
+import Checkbox from "@/components/ui/Checkbox";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
@@ -172,8 +173,7 @@ export default function PromotionSlideTargetingFields({
             <CheckIcon className="size-4 text-muted-foreground" />
             활성 여부
           </span>
-          <input
-            type="checkbox"
+          <Checkbox
             checked={slide.isActive}
             onChange={(event) =>
               onUpdate((current) => ({
@@ -208,13 +208,12 @@ export default function PromotionSlideTargetingFields({
                 )}
               >
                 <span className="flex items-center gap-2 font-medium">
-                  <input
+                  <Checkbox
                     id={
                       optionIndex === 0
                         ? promotionSlideFieldId(slide.id, "audiences")
                         : undefined
                     }
-                    type="checkbox"
                     checked={checked}
                     onChange={(event) =>
                       onUpdate((current) => ({
@@ -255,8 +254,7 @@ export default function PromotionSlideTargetingFields({
                 key={campus.slug}
                 className="flex items-center gap-2 rounded-[1rem] border border-border/70 bg-surface px-3 py-2 text-sm text-foreground"
               >
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={checked}
                   onChange={(event) =>
                     onUpdate((current) => ({

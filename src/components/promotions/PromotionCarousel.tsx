@@ -1,5 +1,7 @@
 "use client";
 
+import PlainImage from "@/components/ui/PlainImage";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   PauseIcon,
@@ -187,8 +189,7 @@ export default function PromotionCarousel({
                   </span>
                 ) : null}
                 {isInlineImageSrc(slide.imageSrc) ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- live preview and blob URLs need plain img
-                  <img
+                  <PlainImage
                     src={slide.imageSrc}
                     alt={slide.imageAlt}
                     className="h-full w-full object-cover"

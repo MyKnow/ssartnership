@@ -8,7 +8,7 @@ import {
   type PreviousMemberEmailState,
 } from "@/lib/member-email-change-notice";
 import { logMemberEmailSecurity } from "@/lib/member-email-security-log";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { readMemberEmailNoticeState } from "@/lib/repositories/supabase/member-security-repository.supabase";
 
 type MemberEmailChangeNoticeLogContext = Parameters<
   typeof logMemberEmailSecurity
@@ -22,20 +22,7 @@ export async function readPreviousMemberEmailState(
   memberId: string,
 ): Promise<PreviousMemberEmailState | null> {
   try {
-    const { data, error } = await getSupabaseAdminClient()
-      .from("members")
-      .select("email_normalized,email_verified_at,display_name")
-      .eq("id", memberId)
-      .is("deleted_at", null)
-      .maybeSingle();
-    if (error || !data) {
-      return null;
-    }
-    return {
-      emailNormalized: data.email_normalized ?? null,
-      emailVerifiedAt: data.email_verified_at ?? null,
-      displayName: data.display_name ?? null,
-    };
+    return await readMemberEmailNoticeState(memberId);
   } catch {
     return null;
   }

@@ -134,21 +134,6 @@ function scheduleAttemptLog(
       ...(input.reasonCode ? { reasonCode: input.reasonCode } : {}),
     },
   });
-  if (input.result === "failure") {
-    scheduleProductEventLog({
-      ...context,
-      actorType: "member",
-      actorId: input.actorId,
-      sessionId: input.sessionId,
-      eventName: "partner_benefit_use_failure",
-      targetType: "partner",
-      targetId: input.partnerId,
-      properties: {
-        reasonCode: input.reasonCode ?? "unknown",
-        ...benefitProperties,
-      },
-    });
-  }
 }
 
 export async function POST(
@@ -290,24 +275,6 @@ export async function POST(
       benefitId: result.benefitId,
       benefit: result.benefitSnapshot,
       useCount: result.useCount,
-    });
-    scheduleProductEventLog({
-      ...context,
-      actorType: "member",
-      actorId: session.userId,
-      sessionId,
-      eventName: "partner_benefit_use_success",
-      targetType: "partner",
-      targetId: partnerId,
-      properties: {
-        benefitLength: result.benefitSnapshot.length,
-        ...buildPartnerBenefitUseLogProperties({
-          benefitId: result.benefitId,
-          benefit: result.benefitSnapshot,
-          useCount: result.useCount,
-        }),
-        verificationMethod: "pin",
-      },
     });
     if (result.isNew) {
       scheduleProductEventLog({

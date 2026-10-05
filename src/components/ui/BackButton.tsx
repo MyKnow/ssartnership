@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeftIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 import Button from "@/components/ui/Button";
@@ -35,7 +35,7 @@ export default function BackButton({
       ariaLabel="뒤로 가기"
       className="w-fit border-strong bg-surface-elevated shadow-raised hover:bg-surface-overlay"
     >
-      <ChevronLeft size={16} />
+      <ChevronLeftIcon className="h-4 w-4" aria-hidden="true" />
       뒤로 가기
     </Button>
   );

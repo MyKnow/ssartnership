@@ -1,3 +1,4 @@
+import Checkbox from "@/components/ui/Checkbox";
 import Badge from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
 import Select from "@/components/ui/Select";
@@ -5,7 +6,7 @@ import SubmitButton from "@/components/ui/SubmitButton";
 import Surface from "@/components/ui/Surface";
 import type { AdminFormAction } from "@/components/admin/admin-form-actions";
 import FieldGroup from "@/components/admin/partner-account-manager/FieldGroup";
-import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
+import type { AdminPartnerAccount } from "@/lib/admin-partner-account-types";
 
 type AdminCompany = {
   id: string;
@@ -116,8 +117,7 @@ export default function PartnerAccountLinks({
         <FieldGroup label="연결 상태">
           <div className="flex h-11 items-center gap-3 rounded-[1rem] border border-border/70 bg-surface-muted/70 px-3.5 text-sm font-medium text-foreground">
             <input type="hidden" name="isActive" value="false" />
-            <input
-              type="checkbox"
+            <Checkbox
               name="isActive"
               value="true"
               defaultChecked
@@ -193,8 +193,7 @@ export default function PartnerAccountLinks({
                 <FieldGroup label="연결 상태">
                   <div className="flex items-center gap-3 text-sm font-medium text-foreground">
                     <input type="hidden" name="isActive" value="false" />
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       name="isActive"
                       value="true"
                       defaultChecked={link.is_active !== false}

@@ -31,7 +31,7 @@ import {
   type NotificationPreferenceFilterOption,
   type YearFilterOption,
   normalizeAdminMembers,
-} from "@/components/admin/member-manager/selectors";
+} from "@/lib/admin-member-selectors";
 
 export default function AdminMemberManager({
   members,

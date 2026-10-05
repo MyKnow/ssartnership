@@ -1,3 +1,4 @@
+import Checkbox from "@/components/ui/Checkbox";
 import Button from "@/components/ui/Button";
 import FilterBar from "@/components/ui/FilterBar";
 import Input from "@/components/ui/Input";
@@ -110,8 +111,7 @@ export default function AdminReviewFilters({
         </div>
 
         <label className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-          <input
-            type="checkbox"
+          <Checkbox
             name="imagesOnly"
             value="true"
             defaultChecked={filters.imagesOnly}

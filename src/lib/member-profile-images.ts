@@ -1,3 +1,4 @@
+import { PROFILE_IMAGE_RETENTION_DAYS } from "@/lib/repositories/supabase/member-profile-image-records.supabase";
 import { randomUUID } from "node:crypto";
 import net from "node:net";
 import { cache } from "react";
@@ -515,7 +516,7 @@ export async function discardMemberProfileImage(input: {
     .update({
       status: "superseded",
       delete_after: new Date(
-        Date.now() + 30 * 24 * 60 * 60 * 1000,
+        Date.now() + PROFILE_IMAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000,
       ).toISOString(),
       updated_at: input.updatedAt ?? new Date().toISOString(),
     })
@@ -560,7 +561,7 @@ export async function activateMemberProfileImage(input: {
     .update({
       status: "superseded",
       delete_after: new Date(
-        Date.now() + 30 * 24 * 60 * 60 * 1000,
+        Date.now() + PROFILE_IMAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000,
       ).toISOString(),
       updated_at: updatedAt,
     })

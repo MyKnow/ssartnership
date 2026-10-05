@@ -1,3 +1,5 @@
+
+import PlainImage from "@/components/ui/PlainImage";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -173,8 +175,7 @@ export default function PromotionSlideCard({
               imageInvalid ? "border-danger/60" : "border-border/70",
             )}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element -- live preview can use blob/object URLs */}
-            <img
+            <PlainImage
               src={previewSrc}
               alt={slide.imageAlt || slide.title || "광고 카드 이미지"}
               className="h-full w-full object-contain"

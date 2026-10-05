@@ -89,10 +89,6 @@ export function revalidateCategoryData() {
   revalidatePath("/admin/categories");
 }
 
-export function revalidatePartnerData() {
-  updateTag(PARTNERS_CACHE_TAG);
-}
-
 export function revalidatePartnerAccountData() {
   revalidatePath("/admin");
   revalidatePath("/admin/companies");

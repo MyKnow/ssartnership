@@ -28,6 +28,8 @@
   --primary-foreground: #f7fbff;
   --focus-ring: #213b68;
   --accent: #1ea6d7;
+  --info: #075985;
+  --info-soft: #e0f2fe;
   --success: #0b665f;
   --warning: #92400e;
   --danger: #a12f49;
@@ -36,12 +38,12 @@
   --hero-to: #2c4b7e;
   --hero-foreground: #f8fbff;
   --hero-muted: rgba(230, 238, 252, 0.82);
-  --radius-control: 1rem;
-  --radius-input: 1rem;
-  --radius-card: 1.5rem;
-  --radius-panel: 1.875rem;
-  --radius-overlay: 2.25rem;
-  --radius-pill: 999px;
+  --shape-radius-control: 1rem;
+  --shape-radius-input: 1rem;
+  --shape-radius-card: 1.5rem;
+  --shape-radius-panel: 1.875rem;
+  --shape-radius-overlay: 2.25rem;
+  --shape-radius-pill: 999px;
   --shadow-flat: 0 1px 2px rgba(17, 24, 39, 0.04);
   --shadow-raised:
     0 20px 48px rgba(24, 36, 61, 0.09),
@@ -92,6 +94,8 @@ html.dark {
   --primary-foreground: #07101d;
   --focus-ring: #d7e4ff;
   --accent: #6fd3ff;
+  --info: #7dd3fc;
+  --info-soft: #0c2d43;
   --success: #34d399;
   --warning: #fbbf24;
   --danger: #fb7185;
@@ -126,6 +130,18 @@ html.dark {
 }
 
 @theme inline {
+  --radius-pill: var(--shape-radius-pill);
+
+  --radius-overlay: var(--shape-radius-overlay);
+
+  --radius-panel: var(--shape-radius-panel);
+
+  --radius-card: var(--shape-radius-card);
+
+  --radius-input: var(--shape-radius-input);
+
+  --radius-control: var(--shape-radius-control);
+
   --color-background: var(--background);
   --color-background-muted: var(--background-muted);
   --color-surface: var(--surface);
@@ -146,6 +162,8 @@ html.dark {
   --color-primary-foreground: var(--primary-foreground);
   --color-ring: var(--focus-ring);
   --color-accent: var(--accent);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
@@ -185,7 +203,7 @@ html.dark {
 }
 
 body {
-  min-height: 100vh;
+  min-height: 100dvh;
   background:
     radial-gradient(circle at top right, rgba(30, 166, 215, 0.08), transparent 24%),
     radial-gradient(circle at bottom left, rgba(33, 59, 104, 0.08), transparent 30%),
@@ -366,7 +384,7 @@ body:has([data-floating-submit-button="raised"]) [data-toast-viewport] {
     border: 1px solid var(--border);
     background: var(--surface);
     box-shadow: var(--shadow-flat);
-    border-radius: var(--radius-panel);
+    border-radius: var(--shape-radius-panel);
     backdrop-filter: blur(14px);
   }
 
@@ -374,14 +392,14 @@ body:has([data-floating-submit-button="raised"]) [data-toast-viewport] {
     border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
     background: var(--surface-inset);
     box-shadow: none;
-    border-radius: var(--radius-panel);
+    border-radius: var(--shape-radius-panel);
   }
 
   .ui-panel-elevated {
     border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
     background: var(--surface-elevated);
     box-shadow: var(--shadow-raised);
-    border-radius: var(--radius-panel);
+    border-radius: var(--shape-radius-panel);
     backdrop-filter: blur(18px);
   }
 
@@ -411,7 +429,7 @@ body:has([data-floating-submit-button="raised"]) [data-toast-viewport] {
 
   .category-chip-preview-light,
   .category-chip-preview-dark {
-    border-radius: var(--radius-control);
+    border-radius: var(--shape-radius-control);
   }
 
   .category-chip-preview-light {
@@ -443,22 +461,6 @@ body:has([data-floating-submit-button="raised"]) [data-toast-viewport] {
     border: 1px solid var(--border);
     background: var(--surface-control);
     box-shadow: var(--shadow-flat);
-  }
-
-  .rounded-input {
-    border-radius: var(--radius-input);
-  }
-
-  .rounded-card {
-    border-radius: var(--radius-card);
-  }
-
-  .rounded-panel {
-    border-radius: var(--radius-panel);
-  }
-
-  .rounded-overlay {
-    border-radius: var(--radius-overlay);
   }
 
   .shadow-flat {

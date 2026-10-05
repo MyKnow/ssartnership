@@ -157,11 +157,13 @@ const REVIEW_POLICY = definePolicy({
   allowSvgSource: false,
 });
 
+export const PROFILE_IMAGE_EDGE_PX = 640;
+
 const PROFILE_POLICY = definePolicy({
   purpose: "profile",
   role: "profile",
-  width: 640,
-  height: 640,
+  width: PROFILE_IMAGE_EDGE_PX,
+  height: PROFILE_IMAGE_EDGE_PX,
   aspectRatio: 1,
   quality: 82,
   maxSourceBytes: 5 * MEBIBYTE,

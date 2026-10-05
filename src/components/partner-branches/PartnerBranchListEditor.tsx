@@ -59,7 +59,7 @@ function BranchRowField({
         <span className="truncate text-xs font-semibold text-foreground">{label}</span>
         <span
           className={cn(
-            "inline-flex h-5 shrink-0 items-center rounded-full border px-1.5 text-[10px] font-semibold leading-none tracking-normal",
+            "inline-flex h-5 shrink-0 items-center rounded-full border px-1.5 text-xs font-semibold leading-none tracking-normal",
             required
               ? "border-danger/20 bg-danger/10 text-danger"
               : "border-border bg-surface-control text-muted-foreground",

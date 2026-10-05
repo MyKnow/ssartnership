@@ -1,4 +1,5 @@
 import Button from "@/components/ui/Button";
+import SubmitButton from "@/components/ui/SubmitButton";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
 import StatsRow from "@/components/ui/StatsRow";
@@ -243,13 +244,13 @@ export default function SignupRewardOverviewSection({
               </select>
             </label>
             <div className="flex justify-end">
-              <Button
-                type="submit"
+              <SubmitButton
+                pendingText="발송 중"
                 variant="secondary"
                 disabled={testRecipientOptions.length === 0}
               >
                 테스트 발송
-              </Button>
+              </SubmitButton>
             </div>
           </form>
         ) : (
@@ -400,7 +401,7 @@ export default function SignupRewardOverviewSection({
                   />
                 </label>
                 <div className="flex justify-end">
-                  <Button type="submit">발송 확인</Button>
+                  <SubmitButton pendingText="발송 중">발송 확인</SubmitButton>
                 </div>
               </form>
             ) : draw.sentAt ? (
@@ -465,15 +466,15 @@ export default function SignupRewardOverviewSection({
               </label>
               <input type="hidden" name="slug" value={campaign.slug} />
               <div className="flex flex-wrap justify-end gap-2">
-                <Button
-                  type="submit"
+                <SubmitButton
+                  pendingText="추첨 중"
                   variant="secondary"
                   formAction={previewEventRewardDrawAction}
                   formNoValidate
                 >
                   테스트 추첨
-                </Button>
-                {canCreate ? <Button type="submit">추첨 확정</Button> : null}
+                </SubmitButton>
+                {canCreate ? <SubmitButton pendingText="확정 중">추첨 확정</SubmitButton> : null}
               </div>
             </form>
 

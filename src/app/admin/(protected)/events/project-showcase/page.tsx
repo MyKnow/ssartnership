@@ -1,3 +1,5 @@
+
+import PlainImage from "@/components/ui/PlainImage";
 import Link from "next/link";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminShell from "@/components/admin/AdminShell";
@@ -105,8 +107,7 @@ export default async function AdminProjectShowcasePage({
               </div>
               <div className="grid gap-4 sm:grid-cols-[170px_minmax(0,1fr)]">
                 <div className="aspect-video overflow-hidden rounded-xl bg-surface-muted">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={project.imageUrl} alt={`${project.title} 대표 이미지`} className="h-full w-full object-cover" />
+                  <PlainImage src={project.imageUrl} alt={`${project.title} 대표 이미지`} className="h-full w-full object-cover" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground">{project.summary}</p>

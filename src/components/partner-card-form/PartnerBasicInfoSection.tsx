@@ -24,7 +24,7 @@ import type {
   PartnerCardFormField,
   PartnerCardFormValues,
 } from "@/components/partner-card-form/types";
-import { FOUR_DIGIT_PIN_LENGTH } from "@/lib/validation";
+import { FOUR_DIGIT_PIN_INPUT_PATTERN, FOUR_DIGIT_PIN_LENGTH } from "@/lib/validation";
 
 export default function PartnerBasicInfoSection({
   partner,
@@ -282,7 +282,7 @@ export default function PartnerBasicInfoSection({
               name="benefitVerificationPin"
               type="password"
               inputMode="numeric"
-              pattern="[0-9]{4}"
+              pattern={FOUR_DIGIT_PIN_INPUT_PATTERN}
               maxLength={FOUR_DIGIT_PIN_LENGTH}
               autoComplete="new-password"
               value={values.benefitVerificationPinValue}

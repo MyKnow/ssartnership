@@ -1,9 +1,11 @@
 "use client";
 
+import PlainImage from "@/components/ui/PlainImage";
+
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useEffect, useRef } from "react";
-import type { AdminMember } from "@/components/admin/member-manager/selectors";
+import type { AdminMember } from "@/lib/admin-member-selectors";
 import { formatOptionalKoreanDateTimeToMinute } from "@/lib/datetime";
 import { parseSsafyProfile } from "@/lib/mm-profile";
 import {
@@ -87,8 +89,7 @@ export default function AdminMemberListItem({
         className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface-muted text-lg font-semibold text-foreground"
       >
         {member.hasProfileImage && avatarInView && !avatarFailed ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <PlainImage
             src={avatarUrl}
             alt=""
             loading="lazy"

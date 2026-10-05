@@ -1,5 +1,8 @@
 "use client";
 
+import Checkbox from "@/components/ui/Checkbox";
+
+
 import { useRouter } from "next/navigation";
 import {
   useEffect,
@@ -324,8 +327,7 @@ export default function LoginForm({
 
       <div className="flex min-w-0 items-center justify-between gap-3">
         <label className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-muted-foreground">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={autoLogin}
             onChange={(event) => setAutoLogin(event.target.checked)}
             className="h-5 w-5 rounded border-border bg-surface-control text-primary accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"

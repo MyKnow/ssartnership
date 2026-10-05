@@ -75,7 +75,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const CafeSsafyMixedPlans: Story = {
-  args: {
+  args: { isMock: true,
     dashboard: cafeSsafyScenario.dashboard,
   },
   parameters: {
@@ -87,7 +87,7 @@ export const CafeSsafyMixedPlans: Story = {
 };
 
 export const Empty: Story = {
-  args: {
+  args: { isMock: true,
     dashboard: emptyScenario.dashboard,
   },
   parameters: {
@@ -99,7 +99,7 @@ export const Empty: Story = {
 };
 
 export const PendingReview: Story = {
-  args: {
+  args: { isMock: true,
     dashboard: pendingReviewScenario.dashboard,
   },
   parameters: {
@@ -111,7 +111,7 @@ export const PendingReview: Story = {
 };
 
 export const LongKoreanMobile: Story = {
-  args: {
+  args: { isMock: true,
     dashboard: longKoreanDashboard,
   },
   parameters: {
@@ -124,7 +124,7 @@ export const LongKoreanMobile: Story = {
 };
 
 export const RejectedReview: Story = {
-  args: {
+  args: { isMock: true,
     dashboard: rejectedDashboard,
   },
   parameters: {

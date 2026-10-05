@@ -130,7 +130,7 @@ export default async function ShowcaseProjectDetailPage({
               src={getCachedImageUrl(project.imageUrl)}
               alt={`${project.title} 대표 이미지`}
               fill
-              priority
+              preload
               sizes={SHOWCASE_PROJECT_HERO_IMAGE_SIZES}
               className="object-cover"
             />

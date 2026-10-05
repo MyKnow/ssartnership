@@ -5,6 +5,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { resolveSupabaseFetchTimeouts, withSupabaseTimeout } from "./timeout";
 import { createSupabaseTransport } from "./transport";
 
+import { selectRuntimeDataAccess, RuntimeDataAccessUnavailableError } from "../runtime-data-access";
+
 let adminClient: SupabaseClient | null = null;
 
 function getAdminEnv() {
@@ -30,6 +32,11 @@ function createTimedSupabaseTransport(
 }
 
 export function getSupabaseAdminClient() {
+  const selection = selectRuntimeDataAccess({ capability: "admin" });
+  const partnerSelection = selectRuntimeDataAccess({ capability: "admin", sourcePreference: "partner-portal" });
+  if (selection.source === "mock" && partnerSelection.source !== "supabase") {
+    throw new RuntimeDataAccessUnavailableError(selection);
+  }
   if (adminClient) {
     return adminClient;
   }

@@ -1,3 +1,4 @@
+import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import PartnerDashboardView from "@/components/partner/PartnerDashboardView";
@@ -38,5 +39,5 @@ export default async function PartnerCompanyDashboardPage({
 
   const dashboard = await getPartnerPortalDashboard([scope.id]);
 
-  return <PartnerDashboardView dashboard={dashboard} />;
+  return <PartnerDashboardView dashboard={dashboard} isMock={isPartnerPortalMock} />;
 }

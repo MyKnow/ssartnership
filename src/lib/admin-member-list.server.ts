@@ -5,7 +5,7 @@ import type {
   MemberSortOption,
   NotificationPreferenceFilterOption,
   YearFilterOption,
-} from "@/components/admin/member-manager/selectors";
+} from "@/lib/admin-member-selectors";
 import type { AdminMemberPageSize } from "@/lib/admin-ia";
 import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
 import { getEffectiveMarketingConsentMemberIds } from "@/lib/notifications/marketing-consent";

@@ -1,3 +1,5 @@
+
+import PlainImage from "@/components/ui/PlainImage";
 import AdminMemberAccountManager from "@/components/admin/member-detail/AdminMemberAccountManager";
 import AdminMemberCommunicationPanel from "@/components/admin/member-detail/AdminMemberCommunicationPanel";
 import AdminMemberSecurityLogExplorer, {
@@ -171,8 +173,7 @@ export default function AdminMemberDetailView({
             <div className="overflow-hidden rounded-[1.5rem] border border-border bg-surface-inset">
               <div className="aspect-square w-full">
                 {member.hasAvatar ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <PlainImage
                     src={member.avatarUrl}
                     alt={`${member.displayName} 프로필 사진`}
                     loading="eager"

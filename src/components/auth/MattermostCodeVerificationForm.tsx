@@ -1,5 +1,7 @@
 "use client";
 
+import { useNow } from "@/hooks/useNow";
+
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
@@ -70,7 +72,7 @@ export default function MattermostCodeVerificationForm({
   const [code, setCode] = useState("");
   const [challenge, setChallenge] = useState<string | null>(null);
   const [codeExpiresAt, setCodeExpiresAt] = useState<number | null>(null);
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useNow(Boolean(codeExpiresAt));
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<"username" | "generation", string>>>({});
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -98,12 +100,6 @@ export default function MattermostCodeVerificationForm({
     ? "인증 코드가 만료되었습니다."
     : `인증 코드 만료까지 ${formatMattermostCodeRemainingTime(codeRemainingSeconds)} 남음`;
 
-  useEffect(() => {
-    if (!codeExpiresAt) return;
-
-    const intervalId = window.setInterval(() => setNow(Date.now()), 1_000);
-    return () => window.clearInterval(intervalId);
-  }, [codeExpiresAt]);
 
   function focusFirstField(nextErrors: Partial<Record<"username" | "generation", string>>) {
     if (nextErrors.generation) {

@@ -12,7 +12,11 @@ import {
 import { getProductSessionId } from "@/lib/product-events";
 import { createClientUuid } from "@/lib/client-uuid";
 import type { CohortCardTheme } from "@/lib/cohort-card-themes";
-import { isFourDigitPin } from "@/lib/validation";
+import {
+  FOUR_DIGIT_PIN_INPUT_PATTERN,
+  FOUR_DIGIT_PIN_LENGTH,
+  isFourDigitPin,
+} from "@/lib/validation";
 
 type VerificationMember = {
   mattermostUsername?: string | null;
@@ -151,8 +155,8 @@ export default function PartnerBenefitVerificationView({
                 name="partnerBenefitCheckDigits"
                 type="text"
                 inputMode="numeric"
-                pattern="[0-9]{4}"
-                maxLength={4}
+                pattern={FOUR_DIGIT_PIN_INPUT_PATTERN}
+                maxLength={FOUR_DIGIT_PIN_LENGTH}
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"
@@ -162,7 +166,7 @@ export default function PartnerBenefitVerificationView({
                 data-form-type="other"
                 value={pin}
                 disabled={isCompleted}
-                onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))}
+                onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, FOUR_DIGIT_PIN_LENGTH))}
                 placeholder="4자리 PIN 입력"
                 className="pin-mask h-12 w-full rounded-2xl border border-border bg-surface-control px-3 text-base text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
               />

@@ -159,7 +159,7 @@ test("토큰 서명 모듈은 자체 비밀값 정책 대신 공용 레지스트
     "src/lib/certification-qr.ts",
     "src/lib/member-email-verification.ts",
     "src/lib/member-identifier-reservations.ts",
-    "src/lib/member-manual-import/service.server.ts",
+    "src/lib/member-manual-import/password-actions.server.ts",
     "src/lib/partner-session.ts",
   ];
   for (const path of modules) {

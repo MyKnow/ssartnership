@@ -24,16 +24,7 @@ NEXT_PUBLIC_SITE_URL="https://ssartnership.myknow.xyz" \
 npm run bootstrap:super-admin
 ```
 
-스크립트는 `admin_accounts.login_id = 'myknow'` 계정을 활성화하고 super admin 권한을 부여한다. 기존 DB 계정이 있으면 비밀번호와 초기설정 상태는 건드리지 않는다. 계정이 아직 DB에 없을 때만 `myknow` 계정을 만들고 `/admin/setup/[token]` 초기설정 링크를 출력한다. 토큰은 평문으로 저장하지 않고 SHA-256 hash만 DB에 저장하며 7일 뒤 만료된다.
-
-다른 계정을 대상으로 승격해야 할 때만 아래 값을 명시한다.
-
-```bash
-ADMIN_BOOTSTRAP_LOGIN_ID="other-admin" \
-ADMIN_BOOTSTRAP_DISPLAY_NAME="다른 관리자" \
-ADMIN_BOOTSTRAP_EMAIL="other@example.com" \
-npm run bootstrap:super-admin
-```
+스크립트는 허용된 기존 운영 회원을 `mm_user_directory`와 `members`에서 확인한 뒤 `admin_profiles`에 super_admin 권한을 생성·갱신한다. 기존 회원을 찾지 못하면 중단하고 다른 로그인 ID의 임의 승격을 거부한다. 회원 비밀번호, 별도 `admin_accounts`, 초기 설정 토큰이나 링크를 만들지 않는다. 신규 운영자 인계는 [연속성 절차](../operations/runbooks/operations-continuity.md)에 따라 승인·권한·접근 철회를 별도로 처리한다.
 
 ## 관리자 세션 수명
 

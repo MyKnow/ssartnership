@@ -4,6 +4,7 @@ import { useReportWebVitals } from "next/web-vitals";
 import { trackProductEvent } from "@/lib/product-events";
 import {
   isAdminWebVitalName,
+  isAdminWebVitalTargetMetric,
   toAdminWebVitalProperties,
 } from "@/lib/admin-performance";
 import { getCurrentAdminViewport } from "@/lib/admin-viewport";
@@ -19,7 +20,8 @@ function reportAdminWebVital(metric: {
   if (
     typeof window === "undefined" ||
     !window.location.pathname.startsWith("/admin") ||
-    !isAdminWebVitalName(metric.name)
+    !isAdminWebVitalName(metric.name) ||
+    !isAdminWebVitalTargetMetric(metric.name)
   ) {
     return;
   }

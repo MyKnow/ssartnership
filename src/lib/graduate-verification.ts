@@ -120,6 +120,9 @@ export type GraduateEducationDetails = {
 
 export type GraduateEducationFieldErrors = Partial<Record<"legalName" | "generation" | "campus", string>>;
 
+/** 수료생 인증 신청 이름(실명) 길이 상한. 신청 화면 `maxLength`와 서버 검증이 함께 참조한다. */
+export const GRADUATE_LEGAL_NAME_MAX_LENGTH = 100;
+
 export function validateGraduateEducationDetails(
   input: GraduateEducationDetails,
   now = new Date(),
@@ -129,7 +132,9 @@ export function validateGraduateEducationDetails(
   const campus = typeof input.campus === "string" ? input.campus.trim() : "";
   const validGenerations = new Set(getGraduateGenerationOptions(now));
   const fieldErrors: GraduateEducationFieldErrors = {};
-  if (legalName.length < 1 || legalName.length > 100) fieldErrors.legalName = "이름은 1~100자로 입력해 주세요.";
+  if (legalName.length < 1 || legalName.length > GRADUATE_LEGAL_NAME_MAX_LENGTH) {
+    fieldErrors.legalName = `이름은 1~${GRADUATE_LEGAL_NAME_MAX_LENGTH}자로 입력해 주세요.`;
+  }
   if (typeof generation !== "number" || !Number.isInteger(generation) || !validGenerations.has(generation)) fieldErrors.generation = "기수를 선택해 주세요.";
   if (!GRADUATE_CAMPUS_SET.has(campus)) fieldErrors.campus = "캠퍼스를 선택해 주세요.";
   const message = fieldErrors.legalName ?? fieldErrors.generation ?? fieldErrors.campus;

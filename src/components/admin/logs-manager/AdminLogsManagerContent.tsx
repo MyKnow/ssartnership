@@ -14,7 +14,7 @@ import {
   SecurityStatusCard,
 } from "@/components/admin/logs/AdminLogsPanels";
 import { AdminLogsExplorer } from "@/components/admin/logs/AdminLogsExplorer";
-import { RANGE_PRESET_OPTIONS } from "@/components/admin/logs/utils";
+import { RANGE_PRESET_OPTIONS } from "@/lib/log-insights/utils";
 import type {
   AdminLogsPageData,
   GetAdminLogsPageDataOptions,

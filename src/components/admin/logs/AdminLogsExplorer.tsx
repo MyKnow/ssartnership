@@ -5,12 +5,12 @@ import EmptyState from '@/components/ui/EmptyState';
 import Input from '@/components/ui/Input';
 import SectionHeading from '@/components/ui/SectionHeading';
 import Select from '@/components/ui/Select';
-import type { GroupFilter, NormalizedLog, SortFilter, StatusFilter } from './types';
+import type { GroupFilter, NormalizedLog, SortFilter, StatusFilter } from '../../../lib/log-insights/types';
 import {
   formatDateTime,
   getGroupBadgeClass,
   getStatusBadgeClass,
-} from './utils';
+} from '../../../lib/log-insights/utils';
 import AdminLogDetailDisclosure from './AdminLogDetailDisclosure';
 
 export function AdminLogsExplorer({

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 import { AdminLogsExplorer } from "./AdminLogsExplorer";
-import type { GroupFilter, NormalizedLog, SortFilter, StatusFilter } from "./types";
+import type { GroupFilter, NormalizedLog, SortFilter, StatusFilter } from "../../../lib/log-insights/types";
 
 const baseLogs: NormalizedLog[] = [
   {

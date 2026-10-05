@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/cn";
 import { FOCUS_RING_ON_BACKGROUND_CLASS_NAME } from "@/components/ui/focus-ring";
 
@@ -34,7 +34,7 @@ const PasswordInput = forwardRef<
         className="absolute right-0 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         aria-label={visible ? "비밀번호 숨기기" : "비밀번호 보기"}
       >
-        {visible ? <EyeOff size={16} /> : <Eye size={16} />}
+        {visible ? <EyeSlashIcon className="h-4 w-4" aria-hidden="true" /> : <EyeIcon className="h-4 w-4" aria-hidden="true" />}
       </button>
     </div>
   );

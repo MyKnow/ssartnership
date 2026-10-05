@@ -390,7 +390,7 @@ export default function NotificationInbox({
                     <Badge
                       variant={item.isUnread ? "primary" : "neutral"}
                       className={cn(
-                        "px-2 py-0.5 text-[10px]",
+                        "px-2 py-0.5 text-xs",
                         item.isUnread
                           ? "border-primary/20 bg-primary-soft text-primary"
                           : "border-border/70 bg-surface-muted text-muted-foreground",

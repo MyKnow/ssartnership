@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 import { ADMIN_REVIEW_NOTE_MAX_LENGTH } from "@/lib/admin-review-queue";
@@ -184,4 +184,65 @@ test("수료증 문서 번호 상한은 승인 입력과 서버 검증이 같은
     readSource("src/components/admin/AdminGraduateVerificationQueue.tsx"),
     /maxLength=\{GRADUATE_DOCUMENT_NUMBER_MAX_LENGTH\}/,
   );
+});
+
+test("수료생 인증 이름·인증 코드·제휴 신청 검색어 상한은 화면과 서버가 같은 상수를 쓴다", async () => {
+  const { GRADUATE_LEGAL_NAME_MAX_LENGTH, validateGraduateEducationDetails } = await import(
+    "@/lib/graduate-verification"
+  );
+  const { PARTNER_REGISTRATION_QUEUE_SEARCH_MAX_LENGTH } = await import("@/lib/partner-registration");
+  const { SIX_DIGIT_CODE_LENGTH } = await import("@/lib/validation");
+
+  assert.equal(GRADUATE_LEGAL_NAME_MAX_LENGTH, 100);
+  assert.equal(PARTNER_REGISTRATION_QUEUE_SEARCH_MAX_LENGTH, 100);
+  assert.equal(SIX_DIGIT_CODE_LENGTH, 6);
+
+  const now = new Date("2026-10-05T06:00:00.000Z");
+  const details = { generation: 1, campus: "서울" };
+  assert.equal(
+    validateGraduateEducationDetails({ ...details, legalName: ` ${"가".repeat(100)} ` }, now).ok,
+    true,
+  );
+  const tooLong = validateGraduateEducationDetails({ ...details, legalName: "가".repeat(101) }, now);
+  assert.equal(tooLong.ok ? null : tooLong.fieldErrors.legalName, "이름은 1~100자로 입력해 주세요.");
+
+  const application = readSource("src/components/graduate-verification/GraduateVerificationApplicationView.tsx");
+  assert.match(application, /maxLength=\{GRADUATE_LEGAL_NAME_MAX_LENGTH\}/);
+  assert.match(application, /maxLength=\{SIX_DIGIT_CODE_LENGTH\}/);
+  assert.match(
+    readSource("src/components/admin/AdminPartnerRegistrationsView.tsx"),
+    /maxLength=\{PARTNER_REGISTRATION_QUEUE_SEARCH_MAX_LENGTH\}/,
+  );
+  assert.match(
+    readSource("src/app/admin/(protected)/partner-registrations/page.tsx"),
+    /slice\(0, PARTNER_REGISTRATION_QUEUE_SEARCH_MAX_LENGTH\)/,
+  );
+});
+
+// 서버에 같은 상한 규칙이 아직 없는 FE 전용 상한. 관리자 알림 작성기의 제목 60자·내용 160자는
+// 서버 공용 경로가 자동 발송(신규 제휴·만료 예정·이벤트 당첨)과 템플릿 상한(2000/20000)을 공유하고,
+// 기존 알림을 불러와 다시 보내는 흐름이 있어 서버 거부 규칙을 새로 정하는 결정이 필요하다.
+const MAX_LENGTH_LITERAL_EXCEPTIONS = new Map([
+  ["components/admin/push-manager/PushComposerSection.tsx", 2],
+]);
+
+function listSourceFiles(directory: URL): URL[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const child = new URL(`${entry.name}${entry.isDirectory() ? "/" : ""}`, directory);
+    if (entry.isDirectory()) return listSourceFiles(child);
+    return /\.(?:ts|tsx)$/u.test(entry.name) && !/\.stories\.tsx$/u.test(entry.name) ? [child] : [];
+  });
+}
+
+test("폼 maxLength는 숫자 리터럴 대신 서버 검증과 공유하는 상수를 참조한다", () => {
+  const sourceRoot = new URL("../src/", import.meta.url);
+  const offenders: string[] = [];
+  for (const file of listSourceFiles(sourceRoot)) {
+    const relative = decodeURIComponent(file.href.slice(sourceRoot.href.length));
+    const count = readFileSync(file, "utf8").match(/maxLength=(?:\{\s*\d[\d_]*\s*\}|"\d+")/gu)?.length ?? 0;
+    if (count > (MAX_LENGTH_LITERAL_EXCEPTIONS.get(relative) ?? 0)) {
+      offenders.push(`${relative}: ${count}`);
+    }
+  }
+  assert.deepEqual(offenders, []);
 });

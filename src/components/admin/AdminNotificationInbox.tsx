@@ -359,7 +359,7 @@ export default function AdminNotificationInbox({
                   "group relative grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 px-4 py-3.5 outline-none transition-colors hover:bg-surface-muted/70 focus-visible:bg-surface-muted/70 sm:px-5 sm:py-4",
                   item.isUnread
                     ? "bg-surface shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]"
-                    : "bg-[color-mix(in_srgb,var(--surface)_28%,var(--background)_72%)] opacity-[0.74]",
+                    : "bg-[color-mix(in_srgb,var(--surface)_28%,var(--background)_72%)]",
                   isBusy ? "pointer-events-none opacity-70" : null,
                 )}
               >
@@ -389,10 +389,10 @@ export default function AdminNotificationInbox({
                     <Badge
                       variant={item.isUnread ? "primary" : "neutral"}
                       className={cn(
-                        "px-2 py-0.5 text-[10px]",
+                        "px-2 py-0.5 text-xs",
                         item.isUnread
                           ? "border-primary/20 bg-primary-soft text-primary"
-                          : "border-border/40 bg-surface-muted/55 text-muted-foreground/75",
+                          : "border-border/40 bg-surface-muted/55 text-muted-foreground",
                       )}
                     >
                       {getAdminNotificationTypeLabel(item.type)}
@@ -402,7 +402,7 @@ export default function AdminNotificationInbox({
                         "text-xs text-muted-foreground",
                         item.isUnread
                           ? "text-foreground-soft"
-                          : "text-muted-foreground/65",
+                          : "text-muted-foreground",
                       )}
                     >
                       {formatNotificationDate(item.createdAt)}
@@ -414,7 +414,7 @@ export default function AdminNotificationInbox({
                         "text-sm font-semibold leading-6 text-foreground sm:text-[15px]",
                         item.isUnread
                           ? "text-foreground"
-                          : "text-foreground-soft/75",
+                          : "text-foreground-soft",
                       )}
                     >
                       {item.title}
@@ -424,7 +424,7 @@ export default function AdminNotificationInbox({
                         "line-clamp-2 text-sm leading-5 text-muted-foreground sm:leading-6",
                         item.isUnread
                           ? "text-muted-foreground"
-                          : "text-muted-foreground/60",
+                          : "text-muted-foreground",
                       )}
                     >
                       {item.body}

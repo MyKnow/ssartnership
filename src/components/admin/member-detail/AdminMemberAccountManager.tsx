@@ -1,5 +1,8 @@
 "use client";
 
+import Checkbox from "@/components/ui/Checkbox";
+
+
 import { useRef, useState } from "react";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
@@ -217,7 +220,7 @@ export default function AdminMemberAccountManager({
                 링크 수신은 이메일 소유만 증명하며 회원 신원 확인을 대신하지 않습니다. 기존 인증 이메일이 있는 회원은 같은 주소만 사용할 수 있습니다.
               </p>
               <label className="flex items-start gap-2 text-sm leading-5 text-foreground">
-                <input type="checkbox" name="identityVerified" value="true" required className="mt-1 size-4" />
+                <Checkbox name="identityVerified" value="true" required className="mt-1 size-4" />
                 <span>대상 회원의 신원을 별도 확인했고, 입력한 이메일 소유자를 확인했습니다.</span>
               </label>
               <SubmitButton pendingText="링크 발송 중" className="w-full">

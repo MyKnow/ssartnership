@@ -27,7 +27,7 @@ test("공용 ConfirmDialog는 Modal 위에 취소·확인을 두고 처리 중�
 
 test("로그아웃·출품작 삭제·알림 일괄 삭제는 ConfirmDialog를 거친다", () => {
   for (const [path, title] of [
-    ["components/auth/UserMenu.tsx", /title="로그아웃하시겠습니까\?"/],
+    ["components/auth/UserMenu.tsx", /title="모든 기기에서 로그아웃하시겠습니까\?"/],
     ["components/admin/ShowcaseAdminProjectDeleteButton.tsx", /출품작을 완전히 삭제할까요\?/],
     [
       "components/partner/partner-notifications/PartnerNotificationCenter.tsx",

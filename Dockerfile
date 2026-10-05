@@ -8,7 +8,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 FROM base AS dependencies
 COPY package.json package-lock.json .npmrc ./
 COPY scripts/check-install-scripts.mjs scripts/install-dependencies.mjs ./scripts/
-COPY vendor/archiver-cjs-compat ./vendor/archiver-cjs-compat
+COPY vendor ./vendor
 # This script validates the reviewed npm policy, disables all dependency
 # lifecycle scripts, and verifies the platform-specific esbuild binary.
 RUN npm run install:trusted

@@ -212,7 +212,7 @@ export default function TimeseriesLineChart({
                   x={coords.padding.left - 10}
                   y={y + 4}
                   textAnchor="end"
-                  className="fill-muted-foreground text-[10px] font-medium"
+                  className="fill-muted-foreground text-xs font-medium"
                 >
                   {formatAxisValue(tickValue)}
                 </text>
@@ -281,7 +281,7 @@ export default function TimeseriesLineChart({
                     x={point.x}
                     y={height - 18}
                     textAnchor="middle"
-                    className="fill-muted-foreground text-[10px] font-medium"
+                    className="fill-muted-foreground text-xs font-medium"
                   >
                     {point.label}
                   </text>

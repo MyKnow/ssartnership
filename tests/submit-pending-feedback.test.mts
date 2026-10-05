@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { existsSync } from "node:fs";
 
 const navigationFormHrefModulePromise = import(
   new URL("../src/components/ui/navigation-form-href.ts", import.meta.url).href
@@ -127,4 +129,92 @@ test("GET 폼 이동 주소는 브라우저 GET 제출과 같은 query를 만든
     "/admin/partners/p-1?rating=5",
   );
   assert.equal(buildGetFormHref("/admin/reviews", []), "/admin/reviews");
+});
+
+function findTagEnd(source: string, start: number) {
+  let depth = 0;
+  for (let index = start; index < source.length; index += 1) {
+    const character = source[index];
+    if (character === "{") depth += 1;
+    else if (character === "}") depth -= 1;
+    else if (character === ">" && depth === 0) return index;
+  }
+  return -1;
+}
+
+function readAttributeExpression(tag: string, name: string) {
+  const match = new RegExp(`\\s${name}=\\{`).exec(tag);
+  if (!match) return null;
+  const start = match.index + match[0].length;
+  let depth = 1;
+  for (let index = start; index < tag.length; index += 1) {
+    if (tag[index] === "{") depth += 1;
+    else if (tag[index] === "}" && (depth -= 1) === 0) {
+      return tag.slice(start, index).trim();
+    }
+  }
+  return null;
+}
+
+const PENDING_DISABLED_PATTERN =
+  /\bdisabled=\{[^}]*\b(pending|isPending|submitting|isSubmitting|saving|isSaving|loading|isLoading)\b/;
+
+/**
+ * Server Action 폼 안의 plain submit 버튼(`<Button|button type="submit">`) 중
+ * `loading` 또는 pending 기반 `disabled`가 없는 것을 `파일#action` 형태로 모은다.
+ * SubmitButton·AdminConfirmSubmitButton·FloatingSubmitButton·FormSubmitButton은
+ * 내부에서 pending을 처리하므로 소스에 `type="submit"`이 드러나지 않는다.
+ */
+async function collectUnprotectedServerActionForms() {
+  const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "src/**/*.tsx"], {
+    cwd: new URL("..", import.meta.url),
+    encoding: "utf8",
+  })
+    .trim()
+    .split("\n")
+    .filter((file) => file && !file.endsWith(".stories.tsx") && existsSync(new URL(`../${file}`, import.meta.url)));
+  const offenders = new Set<string>();
+
+  for (const file of files) {
+    const source = await read(file);
+    for (const form of source.matchAll(/<form\b/g)) {
+      const openEnd = findTagEnd(source, form.index);
+      if (openEnd === -1) continue;
+      const openTag = source.slice(form.index, openEnd + 1);
+      if (/\smethod="get"/i.test(openTag)) continue;
+      const action = readAttributeExpression(openTag, "action");
+      // 문자열·경로 상수 action은 GET 이동 폼이라 대상이 아니다.
+      if (!action || /^[A-Z][A-Z0-9_]*$/.test(action) || /["'`]/.test(action)) continue;
+      const closeIndex = source.indexOf("</form>", openEnd);
+      const body = source.slice(openEnd + 1, closeIndex === -1 ? source.length : closeIndex);
+      for (const button of body.matchAll(/<(button|Button)\b/g)) {
+        const tag = body.slice(button.index, findTagEnd(body, button.index) + 1);
+        if (!/\stype="submit"/.test(tag)) continue;
+        if (/\sloading=\{/.test(tag) || PENDING_DISABLED_PATTERN.test(tag)) continue;
+        offenders.add(`${file}#${action}`);
+      }
+    }
+  }
+  return [...offenders].sort();
+}
+
+const SERVER_ACTION_FORMS_PENDING_INTEGRATION: string[] = [];
+
+test("Server Action 폼의 제출 버튼은 pending 동안 다시 제출할 수 없다(래칫)", async () => {
+  assert.deepEqual(
+    await collectUnprotectedServerActionForms(),
+    SERVER_ACTION_FORMS_PENDING_INTEGRATION,
+    "Server Action 폼에는 SubmitButton(비가역 삭제는 AdminConfirmSubmitButton)을 쓰고, 허용 목록은 옮겨진 폼을 고친 뒤 줄입니다.",
+  );
+});
+
+test("홈 광고 편집 저장 버튼은 저장 중 다시 제출할 수 없다", async () => {
+  const source = await read(
+    "src/components/admin/promotion-carousel-editor/PromotionCarouselEditor.tsx",
+  );
+
+  assert.match(
+    source,
+    /data-floating-submit-button="raised"[\s\S]*?<SubmitButton[\s\S]*?disabled=\{!canSave\}[\s\S]*?pendingText="저장 중"[\s\S]*?저장\s*<\/SubmitButton>/,
+  );
 });

@@ -48,7 +48,7 @@ export default function PartnerCardMetrics({
           key={`${index}-${item.value}`}
           className="min-w-0 rounded-2xl border border-border/70 bg-surface-inset px-3 py-2 shadow-none"
         >
-          <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             {item.label}
           </dt>
           <dd className="mt-1 text-sm font-semibold leading-none text-foreground">

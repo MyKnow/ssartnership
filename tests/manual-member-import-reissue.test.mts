@@ -7,11 +7,11 @@ const read = (path: string) => readFile(new URL(path, root), "utf8");
 
 test("전송 결과 미확인 행은 관리자 확인 뒤에만 새 초기 설정 링크를 발급한다", async () => {
   const [service, route, panel, catalog, logLabels, reissueMigration, completionMigration] = await Promise.all([
-    read("src/lib/member-manual-import/service.server.ts"),
+    Promise.all([read("src/lib/member-manual-import/service.server.ts"), read("src/lib/member-manual-import/password-actions.server.ts")]).then((sources) => sources.join("\n")),
     read("src/app/api/admin/member-imports/[batchId]/rows/[rowNumber]/reissue-setup/route.ts"),
     read("src/components/admin/AdminMemberManualAddPanel.tsx"),
     read("src/lib/event-catalog.ts"),
-    read("src/components/admin/logs/utils.ts"),
+    read("src/lib/event-labels.ts"),
     read("supabase/migrations/20260715004318_add_manual_member_reissue_setup_guard.sql"),
     read("supabase/migrations/20260715004800_align_manual_setup_token_lock_order.sql"),
   ]);

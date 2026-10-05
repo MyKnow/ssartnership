@@ -1,3 +1,4 @@
+import Checkbox from "@/components/ui/Checkbox";
 import type { ReactNode } from 'react';
 import AdminTimeseriesChart from '@/components/admin/AdminTimeseriesChart';
 import Badge from '@/components/ui/Badge';
@@ -85,7 +86,7 @@ export function SecurityStatusCard({
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Success
           </p>
-          <p className="mt-2 text-2xl font-semibold text-emerald-600 dark:text-emerald-300">
+          <p className="mt-2 text-2xl font-semibold text-success text-success">
             {success}
           </p>
         </div>
@@ -99,7 +100,7 @@ export function SecurityStatusCard({
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Blocked
           </p>
-          <p className="mt-2 text-2xl font-semibold text-amber-600 dark:text-amber-300">
+          <p className="mt-2 text-2xl font-semibold text-warning text-warning">
             {blocked}
           </p>
         </div>
@@ -159,7 +160,7 @@ export function ActivityChart({
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs">
         {allowedGroups.includes('product') ? (
-          <Badge className="bg-sky-500/15 text-sky-700 dark:text-sky-300">
+          <Badge className="bg-info/15 text-info text-info">
             사용자 이벤트
           </Badge>
         ) : null}
@@ -169,7 +170,7 @@ export function ActivityChart({
           </Badge>
         ) : null}
         {allowedGroups.includes('security') ? (
-          <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300">
+          <Badge className="bg-warning/15 text-warning text-warning">
             인증·보안
           </Badge>
         ) : null}
@@ -198,7 +199,7 @@ export function ActivityChart({
           ...(allowedGroups.includes('product') ? [{
             key: 'product',
             label: '사용자 이벤트',
-            lineClassName: 'text-sky-500',
+            lineClassName: 'text-info',
             dotClassName: 'fill-sky-500',
           }] : []),
           ...(allowedGroups.includes('audit') ? [{
@@ -210,7 +211,7 @@ export function ActivityChart({
           ...(allowedGroups.includes('security') ? [{
             key: 'security',
             label: '인증·보안',
-            lineClassName: 'text-amber-500',
+            lineClassName: 'text-warning',
             dotClassName: 'fill-amber-500',
           }] : []),
         ]}
@@ -225,7 +226,7 @@ export function ActivityChart({
             ...(allowedGroups.includes('product') ? [{
               label: '사용자 이벤트',
               value: `${(point.values.product ?? 0).toLocaleString("ko-KR")}건`,
-              valueClassName: 'text-sky-700 dark:text-sky-300',
+              valueClassName: 'text-info text-info',
             }] : []),
             ...(allowedGroups.includes('audit') ? [{
               label: '관리자 감사',
@@ -235,7 +236,7 @@ export function ActivityChart({
             ...(allowedGroups.includes('security') ? [{
               label: '인증·보안',
               value: `${(point.values.security ?? 0).toLocaleString("ko-KR")}건`,
-              valueClassName: 'text-amber-700 dark:text-amber-300',
+              valueClassName: 'text-warning text-warning',
             }] : []),
           ],
         })}
@@ -366,8 +367,7 @@ export function ExportDialog({
                   key={group}
                   className="flex items-center gap-3 rounded-2xl border border-border bg-surface-inset px-4 py-3 text-sm text-foreground"
                 >
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={exportGroups[group]}
                     onChange={() => onToggleGroup(group)}
                     className="h-4 w-4 rounded border-border text-primary focus:ring-primary"

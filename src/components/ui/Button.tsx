@@ -53,6 +53,10 @@ const variants = {
 
 export type ButtonVariant = keyof typeof variants;
 
+export function buttonClassName({ variant = "primary", size = "md", disabled = false, className }: { variant?: ButtonVariant; size?: keyof typeof sizes; disabled?: boolean; className?: string } = {}) {
+  return cn(base, disabled ? "cursor-default" : "cursor-pointer", disabled ? variants[variant].disabled : variants[variant].enabled, sizes[size], disabled ? "opacity-60" : null, className);
+}
+
 type ButtonProps = {
   children: React.ReactNode;
   variant?: ButtonVariant;
@@ -122,14 +126,7 @@ export default function Button({
 }: ButtonProps) {
   const isDisabled = Boolean(disabled || loading);
   const safeRel = buildLinkRel(target, rel);
-  const classes = cn(
-    base,
-    isDisabled ? "cursor-default" : "cursor-pointer",
-    isDisabled ? variants[variant].disabled : variants[variant].enabled,
-    sizes[size],
-    isDisabled ? "opacity-60" : null,
-    className,
-  );
+  const classes = buttonClassName({ variant, size, disabled: isDisabled, className });
   const content = (
     <span className="inline-flex items-center gap-3">
       {loading ? <Spinner /> : null}

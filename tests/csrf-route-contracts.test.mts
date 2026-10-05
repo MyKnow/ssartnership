@@ -167,11 +167,10 @@ test("partner logout is a same-origin POST exposed only through live POST forms"
     "successful POST logout must redirect with See Other",
   );
 
-  const actionLinks = read("../src/components/partner/PartnerPortalActionLinks.tsx");
   const shell = read("../src/components/partner/PartnerPortalShellView.tsx");
   const logoutButton = read("../src/components/partner/PartnerLogoutButton.tsx");
 
-  for (const source of [actionLinks, shell]) {
+  for (const source of [shell]) {
     assert.doesNotMatch(source, /href=[{\"']+\/partner\/logout/);
     assert.match(source, /PartnerLogoutButton/);
   }

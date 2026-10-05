@@ -1,3 +1,4 @@
+import Checkbox from "@/components/ui/Checkbox";
 import AdminPaginationLink from "@/components/admin/AdminPaginationLink";
 import AdminReviewCard from "@/components/admin/review-manager/AdminReviewCard";
 import Button from "@/components/ui/Button";
@@ -144,8 +145,7 @@ export default function AdminPartnerReviewManager({
           </div>
 
           <label className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-            <input
-              type="checkbox"
+            <Checkbox
               name="imagesOnly"
               value="true"
               defaultChecked={filters.imagesOnly}

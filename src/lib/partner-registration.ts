@@ -280,6 +280,9 @@ export const PARTNER_REGISTRATION_QUEUE_SORT_OPTIONS = [
 export type PartnerRegistrationQueueSort =
   (typeof PARTNER_REGISTRATION_QUEUE_SORT_OPTIONS)[number]["value"];
 
+/** 관리자 제휴 신청 검토 큐 검색어 상한. 검색 입력 `maxLength`와 페이지의 쿼리 정규화가 함께 쓴다. */
+export const PARTNER_REGISTRATION_QUEUE_SEARCH_MAX_LENGTH = 100;
+
 export const PARTNER_REGISTRATION_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const PARTNER_REGISTRATION_GALLERY_MAX_FILES = 5;
 // 비로그인 게스트 업로드라 SVG 원본을 받지 않는다(partner-registration 이미지 정책과 같은 규칙).

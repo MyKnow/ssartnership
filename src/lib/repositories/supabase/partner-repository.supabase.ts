@@ -1,3 +1,4 @@
+import { getSupabaseCategoriesClient } from "@/lib/supabase/categories-client";
 import type { Category, Partner } from "@/lib/types";
 import { cache } from "react";
 import type { CampusSlug } from "@/lib/campuses";
@@ -32,7 +33,6 @@ import {
 import type {
   AdminPartnerOptionRow,
   CategoryRow,
-  PartnerCategoryOptionRow,
   PartnerRow,
   PublicCacheScope,
   PublicCacheVersionRow,
@@ -104,7 +104,7 @@ async function getPublicCacheVersionKey(scopes: PublicCacheScope[]) {
 const getCachedCategories = unstable_cache(
   async (versionKey: string): Promise<CategoryRow[]> => {
     void versionKey;
-    const supabase = getSupabaseAdminClient();
+    const supabase = getSupabaseCategoriesClient();
     const { data, error } = await supabase
       .from("categories")
       .select("key,label,description,color")
@@ -114,7 +114,7 @@ const getCachedCategories = unstable_cache(
       throw new Error(error.message);
     }
 
-    return (data ?? []) as CategoryRow[];
+    return data ?? [];
   },
   ["partner-repository", "categories", "versioned"],
   {
@@ -327,7 +327,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
   }
 
   async getCategoryOptions(): Promise<PartnerCategoryOption[]> {
-    const { data, error } = await getSupabaseAdminClient()
+    const { data, error } = await getSupabaseCategoriesClient()
       .from("categories")
       .select("id,key,label")
       .order("created_at", { ascending: true });
@@ -336,7 +336,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
       throw new Error(error.message);
     }
 
-    return ((data ?? []) as PartnerCategoryOptionRow[]).map((row) => ({
+    return (data ?? []).map((row) => ({
       id: row.id,
       key: row.key ?? "",
       label: row.label ?? "",

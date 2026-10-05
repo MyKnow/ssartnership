@@ -238,6 +238,11 @@ const SIX_DIGIT_CODE_REGEX = /^\d{6}$/;
 
 /** 제휴처 확인 PIN 자릿수. 입력 `maxLength`와 서버 검증이 함께 참조한다. */
 export const FOUR_DIGIT_PIN_LENGTH = 4;
+/**
+ * PIN 입력의 HTML `pattern` 값(브라우저 제출 전 제약). 판정 규칙은 `isFourDigitPin`과 같다.
+ * 브라우저는 이 값을 `^(?:…)$`로 감싸 전체 일치로 검사한다.
+ */
+export const FOUR_DIGIT_PIN_INPUT_PATTERN = `[0-9]{${FOUR_DIGIT_PIN_LENGTH}}`;
 /** 이메일·Mattermost 인증 코드 자릿수. 입력 `maxLength`와 서버 검증이 함께 참조한다. */
 export const SIX_DIGIT_CODE_LENGTH = 6;
 

@@ -1,5 +1,3 @@
-"use client";
-
 import { Eye } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";

@@ -15,6 +15,7 @@ import { parseAdminReviewQueuePagination } from "@/lib/admin-ia";
 import { listAdminPartnerRegistrationRequestPage } from "@/lib/admin-partner-registration-queue";
 import {
   isPartnerRegistrationRequestStatus,
+  PARTNER_REGISTRATION_QUEUE_SEARCH_MAX_LENGTH,
   PARTNER_REGISTRATION_QUEUE_SORT_OPTIONS,
   PARTNER_REGISTRATION_SOURCE_OPTIONS,
   type PartnerRegistrationQueueSort,
@@ -100,7 +101,9 @@ async function AdminPartnerRegistrationsContent({
     statusValue && isPartnerRegistrationRequestStatus(statusValue)
       ? statusValue
       : null;
-  const search = (readFirstSearchParam(params.q) ?? "").trim().slice(0, 100);
+  const search = (readFirstSearchParam(params.q) ?? "")
+    .trim()
+    .slice(0, PARTNER_REGISTRATION_QUEUE_SEARCH_MAX_LENGTH);
   const sourceValue = readFirstSearchParam(params.source);
   const source = PARTNER_REGISTRATION_SOURCE_OPTIONS.includes(
     sourceValue as PartnerRegistrationSource,

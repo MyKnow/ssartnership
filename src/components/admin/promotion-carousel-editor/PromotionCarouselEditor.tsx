@@ -7,6 +7,7 @@ import FormMessage from "@/components/ui/FormMessage";
 import MediaCropModal from "@/components/admin/partner-media-editor/MediaCropModal";
 import { uploadImagesToStaging } from "@/lib/image-upload/client";
 import type { ManagedPromotionSlide } from "@/lib/promotions/events";
+import SubmitButton from "@/components/ui/SubmitButton";
 import {
   formatPromotionSlideError,
   validatePromotionSlide,
@@ -272,14 +273,14 @@ export default function PromotionCarouselEditor({
             data-floating-submit-button="raised"
             className="fixed bottom-safe-bottom-20 left-5 z-[45] md:left-auto md:right-[5.5rem]"
           >
-            <Button
-              type="submit"
+            <SubmitButton
               variant="primary"
               className="rounded-full px-6 shadow-floating"
               disabled={!canSave}
+              pendingText="저장 중"
             >
               저장
-            </Button>
+            </SubmitButton>
           </div>
         ) : null}
       </form>

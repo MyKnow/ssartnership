@@ -87,7 +87,7 @@ test("표준 개발 명령과 교차 플랫폼 정책이 repository contract에 
   assert.equal(scripts.dev, "node scripts/dev.mjs");
   assert.equal(scripts.build, "node scripts/next.mjs build");
   assert.equal(scripts.start, "node scripts/next.mjs start");
-  assert.match(scripts["migrate:legacy-member-avatars"], /--env-file-if-exists=\.env\.preview/u);
+  assert.equal(scripts["migrate:legacy-member-avatars"], undefined);
   for (const retiredScript of [
     "migrate:image-assets",
     "measure:admin:preview",

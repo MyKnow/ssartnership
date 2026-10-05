@@ -1,3 +1,5 @@
+
+import PlainImage from "@/components/ui/PlainImage";
 import AdminReviewQueueHeader from "@/components/admin/AdminReviewQueueHeader";
 import AdminPaginationLink from "@/components/admin/AdminPaginationLink";
 import PartnerChipSections from "@/components/partner-card-form/PartnerChipSections";
@@ -25,6 +27,7 @@ import {
   PARTNER_REGISTRATION_STATUS_LABELS,
   PARTNER_REGISTRATION_STATUS_OPTIONS,
   PARTNER_REGISTRATION_BENEFIT_ACTION_OPTIONS,
+  PARTNER_REGISTRATION_QUEUE_SEARCH_MAX_LENGTH,
   type PartnerRegistrationQueueSort,
   type PartnerRegistrationRequestStatus,
   type PartnerRegistrationSource,
@@ -37,6 +40,10 @@ import type { PartnerVisibility } from "@/lib/types";
 import type { AdminReviewQueueFeedback } from "@/lib/admin-review-queue";
 import type { AdminPartnerRegistrationRequestDataRow } from "@/lib/admin-partner-registration-queue";
 import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
+import {
+  FOUR_DIGIT_PIN_INPUT_PATTERN,
+  FOUR_DIGIT_PIN_LENGTH,
+} from "@/lib/validation";
 
 export type AdminPartnerRegistrationRow =
   AdminPartnerRegistrationRequestDataRow;
@@ -331,7 +338,7 @@ export default function AdminPartnerRegistrationsView({
               name="q"
               defaultValue={search}
               placeholder="제휴처명, 파트너사, 카테고리, 위치"
-              maxLength={100}
+              maxLength={PARTNER_REGISTRATION_QUEUE_SEARCH_MAX_LENGTH}
             />
           </label>
           <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
@@ -623,8 +630,7 @@ export default function AdminPartnerRegistrationsView({
                               rel="noreferrer"
                               className="aspect-square min-w-0 overflow-hidden rounded-2xl border border-border bg-surface-muted"
                             >
-                              {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary admin review URL */}
-                              <img
+                              <PlainImage
                                 src={url}
                                 alt={`첨부 이미지 ${index + 1}`}
                                 className="h-full w-full object-cover"
@@ -803,8 +809,8 @@ export default function AdminPartnerRegistrationsView({
                               name="benefitVerificationPin"
                               type="password"
                               inputMode="numeric"
-                              pattern="[0-9]{4}"
-                              maxLength={4}
+                              pattern={FOUR_DIGIT_PIN_INPUT_PATTERN}
+                              maxLength={FOUR_DIGIT_PIN_LENGTH}
                               autoComplete="new-password"
                               placeholder={
                                 row.benefit_verification_pin_configured

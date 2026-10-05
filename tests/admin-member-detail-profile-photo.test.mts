@@ -23,7 +23,7 @@ test("관리자 사진 직접 변경 API는 공통 이미지 staging과 동일 �
   const [panel, submitRoute, service, imageUploadClient] = await Promise.all([
     read("src/components/admin/member-detail/AdminMemberProfilePhotoPanel.tsx"),
     read("src/app/api/admin/members/[id]/profile-photo/route.ts"),
-    read("src/lib/graduate-verification-service.ts"),
+    read("src/lib/member-profile-image-service.ts"),
     read("src/lib/image-upload/client.ts"),
   ]);
 

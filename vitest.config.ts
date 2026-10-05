@@ -44,7 +44,6 @@ export default defineConfig({
       reportsDirectory: path.join(dirname, ".tmp", "coverage", "unit"),
       include: [
         "src/components/partner-registration/registration-steps.ts",
-        "src/lib/admin-dashboard-scope.ts",
         "src/lib/admin-ia.ts",
         "src/lib/admin-member-detail.ts",
         "src/lib/content-budget.ts",

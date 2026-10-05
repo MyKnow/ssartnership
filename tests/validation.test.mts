@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
+  FOUR_DIGIT_PIN_INPUT_PATTERN,
   FOUR_DIGIT_PIN_LENGTH,
   SIX_DIGIT_CODE_LENGTH,
   hasControlCharacters,
@@ -30,6 +31,15 @@ test("isFourDigitPin은 정확히 ASCII 숫자 4자리만 허용한다", () => {
   }
   for (const value of [1234, null, undefined, ["1234"], { pin: "1234" }]) {
     assert.equal(isFourDigitPin(value), false, String(value));
+  }
+});
+
+test("PIN 입력 pattern 속성은 isFourDigitPin과 같은 값만 통과시킨다", () => {
+  assert.equal(FOUR_DIGIT_PIN_INPUT_PATTERN, "[0-9]{4}");
+  // 브라우저는 pattern 값을 ^(?:…)$로 감싸 v 플래그로 컴파일한다.
+  const browserPattern = new RegExp(`^(?:${FOUR_DIGIT_PIN_INPUT_PATTERN})$`, "v");
+  for (const value of ["0000", "1234", "", "123", "12345", "12a4", " 1234", "1234 ", "１２３４", "-123"]) {
+    assert.equal(browserPattern.test(value), isFourDigitPin(value), JSON.stringify(value));
   }
 });
 
@@ -125,6 +135,15 @@ test("PIN·6자리 코드·제어문자 판정은 공용 helper 밖에서 정규
         || source.includes("const CONTROL_CHARACTER_REGEX");
     })
     .map((file) => file.href.slice(sourceRoot.href.length));
+
+  assert.deepEqual(offenders, []);
+});
+
+test("PIN 입력 pattern은 숫자 패턴 리터럴을 다시 쓰지 않고 공용 상수를 참조한다", () => {
+  const sourceRoot = new URL("../src/", import.meta.url);
+  const offenders = listSourceFiles(sourceRoot)
+    .filter((file) => /pattern="\[0-9\]\{\d+\}"|pattern=\{"\[0-9\]/u.test(readFileSync(file, "utf8")))
+    .map((file) => decodeURIComponent(file.href.slice(sourceRoot.href.length)));
 
   assert.deepEqual(offenders, []);
 });

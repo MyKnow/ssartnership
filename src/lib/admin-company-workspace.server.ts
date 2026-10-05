@@ -1,4 +1,4 @@
-import type { AdminPartnerAccount } from "@/components/admin/partner-account-manager/types";
+import type { AdminPartnerAccount } from "@/lib/admin-partner-account-types";
 import type {
   AdminCompanyAccountSummary,
   AdminCompanyTab,

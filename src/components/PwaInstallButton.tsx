@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { ArrowDownTrayIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
+import { subscribePwaInstall, getPwaInstallSnapshot, getPwaInstallServerSnapshot, promptPwaInstall } from "@/lib/pwa-install-store";
 import { trackProductEvent } from "@/lib/product-events";
 import {
   buildPwaInstallGuideHref,
@@ -10,11 +11,6 @@ import {
 import Button from "@/components/ui/Button";
 import type { ButtonVariant } from "@/components/ui/Button";
 import { usePwaStandaloneMode } from "@/hooks/usePwaStandaloneMode";
-
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
-};
 
 function subscribeClient() {
   return () => {};
@@ -38,38 +34,8 @@ export default function PwaInstallButton({
     () => true,
     () => false,
   );
-  const [deferredPrompt, setDeferredPrompt] =
-    useState<BeforeInstallPromptEvent | null>(null);
-  const [appInstalled, setAppInstalled] = useState(false);
-  const [pending, setPending] = useState(false);
+  const { prompt: deferredPrompt, installed: appInstalled, pending } = useSyncExternalStore(subscribePwaInstall, getPwaInstallSnapshot, getPwaInstallServerSnapshot);
   const standalone = usePwaStandaloneMode();
-
-  useEffect(() => {
-    if (!isClient) {
-      return;
-    }
-
-    const onBeforeInstallPrompt = (event: Event) => {
-      if (getBrowserPwaInstallPlatform() !== "other") {
-        return;
-      }
-      event.preventDefault();
-      setDeferredPrompt(event as BeforeInstallPromptEvent);
-    };
-
-    const onInstalled = () => {
-      setAppInstalled(true);
-      setDeferredPrompt(null);
-    };
-
-    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
-    window.addEventListener("appinstalled", onInstalled);
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
-      window.removeEventListener("appinstalled", onInstalled);
-    };
-  }, [isClient]);
 
   if (!isClient) {
     return null;
@@ -106,14 +72,7 @@ export default function PwaInstallButton({
       return;
     }
 
-    setPending(true);
-    try {
-      await deferredPrompt.prompt();
-      await deferredPrompt.userChoice;
-      setDeferredPrompt(null);
-    } finally {
-      setPending(false);
-    }
+    await promptPwaInstall();
   };
 
   return (

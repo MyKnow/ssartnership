@@ -18,7 +18,7 @@ import {
   verifyMockMemberCredentials,
 } from "@/lib/mock/member";
 import { verifyPassword } from "@/lib/password";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { readMemberPasswordRecord } from "@/lib/repositories/supabase/member-security-repository.supabase";
 
 type RecentAuthSession = {
   userId: string;
@@ -31,18 +31,7 @@ async function loadMemberPassword(memberId: string): Promise<MemberPasswordRecor
   if (isMockMemberAuthEnabled()) {
     return null;
   }
-  const { data, error } = await getSupabaseAdminClient()
-    .from("members")
-    .select("password_hash,password_salt")
-    .eq("id", memberId)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (error) {
-    throw error;
-  }
-  return data?.password_hash && data.password_salt
-    ? { hash: data.password_hash, salt: data.password_salt }
-    : null;
+  return readMemberPasswordRecord(memberId);
 }
 
 function memberHasPassword(password: MemberPasswordRecord) {

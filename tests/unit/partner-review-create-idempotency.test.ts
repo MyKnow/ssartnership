@@ -7,6 +7,7 @@ const {
   getPartnerReviewSummaryMock,
   getReviewMediaInputFieldErrorsMock,
   resolveReviewMediaPayloadMock,
+  getReviewMemberSessionLookupMock,
 } = vi.hoisted(() => ({
   createPartnerReviewMock: vi.fn(),
   deleteReviewMediaUrlsMock: vi.fn(),
@@ -14,6 +15,7 @@ const {
   getPartnerReviewSummaryMock: vi.fn(),
   getReviewMediaInputFieldErrorsMock: vi.fn(),
   resolveReviewMediaPayloadMock: vi.fn(),
+  getReviewMemberSessionLookupMock: vi.fn(),
 }));
 
 const reviewId = "11111111-1111-4111-8111-111111111111";
@@ -39,7 +41,8 @@ vi.mock("../../src/app/api/partners/[id]/reviews/_shared", () => ({
   ensurePartnerReviewModerationAccess: vi.fn(),
   ensureVisibleReviewPartner: vi.fn(async () => ({ id: "partner-1" })),
   getReviewMediaInputFieldErrors: getReviewMediaInputFieldErrorsMock,
-  getReviewMemberSession: vi.fn(async () => ({ userId: "member-1" })),
+  getReviewMemberSessionLookup: getReviewMemberSessionLookupMock,
+  reviewSessionUnavailableResponse: () => Response.json({ ok: false, message: "로그인 상태를 확인하지 못했습니다." }, { status: 503 }),
   isReviewImageUploadUnavailable: () => false,
   parseReviewListParams: vi.fn(),
   readPartnerReviewSubmission: vi.fn(async () => ({
@@ -99,12 +102,20 @@ async function postReview() {
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
+  getReviewMemberSessionLookupMock.mockResolvedValue({ ok: true, session: { userId: "member-1" } });
   getPartnerReviewSummaryMock.mockResolvedValue({ totalCount: 1 });
   deleteReviewMediaUrlsMock.mockResolvedValue(undefined);
   getReviewMediaInputFieldErrorsMock.mockReturnValue(null);
 });
 
 describe("POST /api/partners/[id]/reviews idempotency", () => {
+  test("세션 조회가 실패하면 503을 반환하고 파일 연결·리뷰 저장을 시작하지 않는다", async () => {
+    getReviewMemberSessionLookupMock.mockResolvedValue({ ok: false });
+    expect((await postReview()).status).toBe(503);
+    expect(resolveReviewMediaPayloadMock).not.toHaveBeenCalled();
+    expect(createPartnerReviewMock).not.toHaveBeenCalled();
+    expect(deleteReviewMediaUrlsMock).not.toHaveBeenCalled();
+  });
   test("PK 충돌로 진 중복 요청은 저장된 리뷰를 돌려주고 참조되지 않는 업로드만 정리한다", async () => {
     resolveAttaching(["https://cdn.test/a.webp", "https://cdn.test/b.webp"]);
     createPartnerReviewMock.mockRejectedValue(

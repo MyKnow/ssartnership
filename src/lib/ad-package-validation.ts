@@ -307,7 +307,7 @@ export function parseCreateAdCouponForm(
     throw new Error("현장 확인 비밀번호는 현장 확인형 쿠폰에만 설정할 수 있습니다.");
   }
 
-  const status = parseStatus(getString(formData, "status"), couponStatuses, "draft");
+  const status = parseStatus(readString(formData, "status"), couponStatuses, "draft");
   if (options?.currentStatus && !canTransitionAdCouponStatus(options.currentStatus, status)) {
     throw new AdStatusTransitionError("coupon", options.currentStatus, status);
   }

@@ -26,7 +26,10 @@ const eslintConfig = defineConfig([
     "test-results/**",
     "playwright-results.xml",
   ]),
+  // Vendored upstream CommonJS syntax is part of its pinned package contract.
+  { files: ["vendor/braces-depth-guard/**/*.js"], rules: { "@typescript-eslint/no-require-imports": "off" } },
   ...storybook.configs["flat/recommended"],
+  { files: ["src/lib/**/*.{ts,tsx}"], rules: { "no-restricted-imports": ["error", { patterns: [{ group: ["@/components/*", "**/components/**"], message: "Domain/read-model code must not import UI components." }] }] } },
   {
     // Server code: an unawaited promise or a swallowed rejection hides a
     // failure from the structured server log. Measured 0 floating promises

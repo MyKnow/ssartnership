@@ -125,10 +125,11 @@ page route의 기계 판독 기준은 `src/lib/mock/scenarios/route-inventory.ts
 | Route | Source | 목적 |
 | --- | --- | --- |
 | `/legal/[kind]` | `legal/[kind]/page.tsx` | `service`, `privacy`, `marketing` 정책 문서 버전 조회 |
-| `/sitemap.xml` | `sitemap.ts` | 홈, 캠퍼스, 공개 제휴 상세 sitemap |
-| `/robots.txt` | `robots.ts` | `/admin`, `/api` 크롤링 차단 |
+| `/sitemap.xml` | `sitemap.ts` | 홈, 앱 설치, 쇼케이스 허브, 공개 제휴가 있는 캠퍼스, 공개 제휴 상세 sitemap |
+| `/robots.txt` | `robots.ts` | `/admin`, `/api`, `/auth`, `/partner/` 크롤링 차단(`/partners/*`, `/partner-registration`은 허용) |
 | `/manifest.webmanifest` | `manifest.ts` | PWA manifest |
-| `/rss.xml` | `rss.xml/route.ts` | RSS feed |
+| `/rss.xml` | `rss.xml/route.ts` | RSS feed(최근 등록 공개 제휴, 등록 시각 기준 pubDate) |
+| `/sw.js`, `/offline.html` | `public/` 정적 파일 | 서비스 워커(푸시, 내비게이션 실패 시 오프라인 안내)와 오프라인 안내 페이지 |
 
 ## Route handlers outside `/api`
 
@@ -197,3 +198,5 @@ Query 호환 규칙으로 `/admin/partners?tab=requests`는 `/admin/partner-requ
 - 파트너 보호: `/partner`, `/partner/notifications`, `/partner/plans`, `/partner/support`, `/partner/companies/*`, `/partner/services/*`는 비로그인 시 `/partner/login`으로 이동한다.
 - 관리자 보호: `/admin`과 대부분의 `/admin/*` protected 화면은 비인증 상태에서 `/auth/login`으로 이동한다. 회원 세션이 있으면 `/admin/session`을 거쳐 관리자 세션 bridge를 시도한다.
 - `(site)` layout은 로그인된 회원에게 필수 약관 동의 또는 강제 비밀번호 변경이 필요하면 각각 `/auth/consent`, `/auth/change-password`로 보낸다.
+
+홈 목록에서 상세로 이동했다가 뒤로 돌아오면 같은 필터의 카드 로드 수와 스크롤 위치를 복원한다.

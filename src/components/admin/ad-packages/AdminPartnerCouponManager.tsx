@@ -1,5 +1,6 @@
 import { ChevronDownIcon } from "@heroicons/react/24/outline";
 import Card from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
 import FormSubmitButton from "@/components/ui/FormSubmitButton";
 import InlineMessage from "@/components/ui/InlineMessage";
 import SectionHeading from "@/components/ui/SectionHeading";
@@ -238,9 +239,15 @@ export default function AdminPartnerCouponManager({
 
       <section className="grid min-w-0 gap-4" aria-label={`${partnerName} 쿠폰 목록`}>
         {coupons.length === 0 ? (
-          <Card tone="muted" className="text-sm text-muted-foreground">
-            아직 이 제휴처에 등록된 쿠폰이 없습니다.
-          </Card>
+          <EmptyState
+            size="sm"
+            title="아직 이 제휴처에 등록된 쿠폰이 없습니다."
+            description={
+              canCreateCoupon
+                ? "위의 쿠폰 생성을 펼쳐 첫 쿠폰을 등록해 주세요."
+                : undefined
+            }
+          />
         ) : (
           coupons.map((coupon) => (
             <Card key={coupon.id} tone="default" className="grid min-w-0 gap-4 overflow-hidden">

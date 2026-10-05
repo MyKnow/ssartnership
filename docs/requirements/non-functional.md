@@ -68,12 +68,15 @@ authority: normative
 
 현재 기준:
 
-- root metadata는 title, description, Open Graph, Twitter, keywords, manifest, RSS alternate를 포함한다.
-- `site.ts`는 브랜드/캠퍼스/부트캠프/삼성/제휴/탐색 keyword 집합을 관리한다.
-- `sitemap.ts`는 홈, 캠퍼스, 공개 접근 가능한 partner 상세를 포함한다.
-- `robots.ts`는 `/admin`, `/api`를 모든 user agent에 disallow한다.
+- root metadata는 title, description, keywords, manifest, RSS alternate와 기본 공유 이미지(`public/og-default.png`, 1200×630)를 쓰는 Open Graph·Twitter 카드를 포함한다. root는 canonical과 `og:url`을 선언하지 않는다. 하위 segment가 상속해 홈을 정본으로 가리키지 않게 하기 위해서다.
+- 색인 대상 페이지는 자기 경로의 canonical(`createCanonicalAlternates`)과 `og:url`을 선언하고, 나머지 페이지는 `robots.index=false`로 둔다. `tests/seo-canonical-contract.test.mts`가 `(site)` 페이지 전체에서 둘 중 하나를 확인한다.
+- 페이지가 `openGraph`를 선언하면 상위 값을 병합하지 않고 대체하므로 `createPageOpenGraph`로 사이트 기본값과 이미지를 함께 채운다. 크롤러가 SVG를 공유 이미지로 쓰지 않으므로 이벤트 hero는 1200×630 PNG(`shareImageSrc`)를 따로 지정한다. 공유 이미지는 `node scripts/generate-share-assets.mjs`로 다시 만든다.
+- `site.ts`는 브랜드/캠퍼스/부트캠프/삼성/제휴/탐색 keyword 집합과 viewport·manifest가 함께 쓰는 테마 색(`SITE_THEME_COLOR_LIGHT`, `SITE_THEME_COLOR_DARK`)을 관리한다.
+- `sitemap.ts`는 홈, `/install`, `/events/project-showcase`, 공개 제휴가 1건 이상인 캠퍼스, 공개 접근 가능한 partner 상세를 포함한다. 제휴 목록을 불러오지 못하면 캠퍼스를 모두 유지하고 partner URL만 생략한다.
+- `robots.ts`는 `src/lib/seo/robots.ts`의 공용 목록으로 `/admin`, `/api`, `/auth`, `/partner/`(파트너 포털)를 모든 user agent에 disallow한다. 공개 제휴 상세 `/partners/*`와 `/partner-registration`은 허용한다. 파트너 포털 layout은 noindex다.
+- 공개 제휴가 없는 캠퍼스 페이지, 체험 기간이 아닐 때의 쇼케이스 프로젝트 상세, 회원 전용 쇼케이스 화면은 noindex다.
 - partner/campus SEO helper가 canonical URL 조립을 담당한다.
-- RSS feed는 `/rss.xml`로 제공된다.
+- RSS feed는 `/rss.xml`로 제공된다. 최근 등록된 공개 제휴 20건을 내보내고, 항목 `pubDate`는 제휴 등록 시각(`partners.created_at`)이다. 날짜를 모르는 항목은 `pubDate`를 생략하며 요청 시각으로 날짜를 만들지 않는다.
 
 리팩토링 시 보존할 것:
 
@@ -81,6 +84,15 @@ authority: normative
 - sitemap partner entry의 공개 범위/기간 필터.
 - `Yeti`, `Googlebot`, `*`에 대한 robots 정책.
 - JSON-LD WebSite/Organization/ItemList 구조.
+
+## PWA/installed app
+
+현재 기준:
+
+- `manifest.ts`는 `id: "/"`, `display: "standalone"`과 라이트 테마 색을 background·theme 색으로 쓰고, 화면 방향을 고정하지 않는다. 다크 테마 색은 root viewport의 media query로 제공한다. 아이콘은 `public/`의 192·512 PNG(512는 maskable 겸용)와 16/32/48 프레임 `favicon.ico`다.
+- `public/sw.js`는 푸시 알림과, 같은 출처 GET 내비게이션의 network-first만 처리한다. 네트워크 요청이 실패하면 설치 시 버전 캐시에 받아 둔 `public/offline.html`을 보여 주고, 데이터 응답은 캐시하지 않는다. `/admin`, `/api/` 내비게이션은 가로채지 않는다. `offline.html`을 바꾸면 `sw.js`의 `CACHE_VERSION`을 올린다.
+- `/sw.js`는 `Cache-Control: no-cache, no-store, must-revalidate`로 제공한다. `sw.js`, `offline.html`, `manifest.webmanifest`는 회원 게이트 리다이렉트를 거치지 않는다(`src/lib/pwa-shell.ts`).
+- standalone 화면에서는 `html`, `body`의 `overscroll-behavior-y: none`으로 당겨서 새로고침을 막아 작성 중인 입력을 지킨다. 일반 브라우저 탭은 기본 동작을 유지한다.
 
 ## Accessibility
 

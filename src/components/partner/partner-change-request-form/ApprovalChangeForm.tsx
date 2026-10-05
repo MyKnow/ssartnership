@@ -1,5 +1,8 @@
 "use client";
 
+import Checkbox from "@/components/ui/Checkbox";
+
+
 import { type FormEvent, useState } from "react";
 import Badge from "@/components/ui/Badge";
 import FormSection from "@/components/ui/FormSection";
@@ -212,9 +215,8 @@ export function ApprovalChangeForm({
                       포털 노출 대상을 선택합니다.
                     </p>
                   </div>
-                  <input
+                  <Checkbox
                     id={id}
-                    type="checkbox"
                     name="appliesTo"
                     value={option.value}
                     defaultChecked={defaultChecked}

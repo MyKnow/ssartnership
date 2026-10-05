@@ -1,3 +1,6 @@
+import type { AdminGraduateVerificationRequest, AdminGraduateSetupEmailRetry, QueuePaginationState } from "@/lib/admin-graduate-verification-types";
+export type { AdminGraduateVerificationRequest, AdminGraduateSetupEmailRetry, QueuePaginationState } from "@/lib/admin-graduate-verification-types";
+import Checkbox from "@/components/ui/Checkbox";
 import { Suspense } from "react";
 import AdminGraduateVerificationMediaViewer from "@/components/admin/AdminGraduateVerificationMediaViewer";
 import AdminPaginationLink from "@/components/admin/AdminPaginationLink";
@@ -17,26 +20,9 @@ import {
 } from "@/lib/admin-review-queue";
 import { GRADUATE_DOCUMENT_NUMBER_MAX_LENGTH } from "@/lib/graduate-verification";
 
-export type AdminGraduateVerificationRequest = {
-  id: string;
-  email: string;
-  legal_name: string;
-  inferred_generation: number | null;
-  inferred_cohort?: number | null;
-  campus: string | null;
-  request_kind: "graduate_signup" | "existing_member_recovery";
-  recovery_member_id: string | null;
-  status: string;
-  profile_image_id: string | null;
-  created_at: string;
-};
 
-export type AdminGraduateSetupEmailRetry = {
-  id: string;
-  email: string;
-  legal_name: string;
-  setup_email_last_error_at: string | null;
-};
+
+
 
 type QueueActions = {
   startReview: (formData: FormData) => Promise<void>;
@@ -46,11 +32,7 @@ type QueueActions = {
   resendSetupEmail: (formData: FormData) => Promise<void>;
 };
 
-export type QueuePaginationState = {
-  totalCount: number;
-  page: number;
-  pageSize: number;
-};
+
 
 type SetupEmailRetryQueue = {
   setupEmailRetries: AdminGraduateSetupEmailRetry[];
@@ -376,8 +358,7 @@ function GraduateVerificationDecisionCard({
                         key={target.value}
                         className="flex min-h-11 items-center gap-2 rounded-control border border-border bg-surface-control px-3 text-sm font-medium text-foreground"
                       >
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           name="target"
                           value={target.value}
                           className="size-5 shrink-0 accent-primary"

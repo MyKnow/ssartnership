@@ -51,6 +51,9 @@ export const ENVIRONMENT_VARIABLES = Object.freeze([
   { name: "SUPABASE_SERVICE_ROLE_KEY", tier: "required", secret: true, group: "supabase" },
   { name: "SUPABASE_INTERNAL_URL", tier: "optional", secret: false, group: "supabase", note: "server SDK 전송만 내부 gateway로 보낸다" },
 
+  { name: "SUPABASE_FETCH_TIMEOUT_MS", tier: "optional", secret: false, group: "supabase", note: "SDK 요청 제한 시간. 기본 30000ms" },
+  { name: "SUPABASE_STORAGE_FETCH_TIMEOUT_MS", tier: "optional", secret: false, group: "supabase", note: "Storage 요청 제한 시간. 기본 60000ms" },
+
   // Sessions and HMAC secrets
   { name: "ADMIN_SESSION_SECRET", tier: "required", secret: true, group: "session" },
   { name: "USER_SESSION_SECRET", tier: "required", secret: true, group: "session" },
@@ -123,6 +126,7 @@ export const ENVIRONMENT_VARIABLES = Object.freeze([
   { name: "SELF_HOST_VITALS_SAMPLE_RATE", tier: "optional", secret: false, group: "observability" },
 
   // Injected by the platform or build tooling
+  { name: "NEXT_RUNTIME", tier: "platform", secret: false, group: "platform", note: "Next.js가 nodejs/edge 런타임을 지정한다" },
   { name: "NODE_ENV", tier: "platform", secret: false, group: "platform" },
   { name: "SELF_HOST_MODE", tier: "platform", secret: false, group: "platform", note: "Compose가 real로 고정" },
   { name: "SELF_HOST_VITALS_ENABLED", tier: "platform", secret: false, group: "platform", note: "monitoring overlay가 설정" },

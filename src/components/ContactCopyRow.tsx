@@ -1,7 +1,7 @@
 "use client";
 
 import Button from "@/components/ui/Button";
-import type { ProductEventName } from "@/lib/event-catalog";
+import type { ClientProductEventName } from "@/lib/product-event-contract";
 import { trackProductEvent } from "@/lib/product-events";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
@@ -35,7 +35,7 @@ export default function ContactCopyRow({
   href: string;
   label: string;
   rawValue: string;
-  eventName?: ProductEventName;
+  eventName?: ClientProductEventName;
   targetType?: string;
   targetId?: string | null;
   compact?: boolean;

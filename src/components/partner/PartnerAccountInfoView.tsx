@@ -1,5 +1,8 @@
 "use client";
 
+import Checkbox from "@/components/ui/Checkbox";
+
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
@@ -314,8 +317,7 @@ function BillingProfileCreateForm({
         </div>
 
         <label className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
-          <input
-            type="checkbox"
+          <Checkbox
             name="isDefault"
             className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20"
           />

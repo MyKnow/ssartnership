@@ -166,3 +166,9 @@ direct Mattermost 흐름은 `auth_security_logs.properties`에 안정적인 상�
 - 보안 사고·분쟁·법령상 보존 사유가 발생하면 `log_retention_holds`에 대상 로그 그룹과 기간, 사유, 만료 시각을 등록한 뒤 원본을 예외 보존한다.
 - 파기 작업은 서비스 역할 전용 Supabase RPC로 수행하며, 파기 결과 자체는 `admin_audit_logs`에 건수만 남긴다.
 - 보존기간 이후에도 원본이 필요한 경우에는 사건별 hold로 관리하고, 무기한 보존을 기본값으로 두지 않는다.
+
+## 2026-10 분석 정합
+
+관리자·파트너 본인 actor는 SQL 롤업과 TS 폴백에서 동일하게 제외한다. 제품·감사·보안 카탈로그의 한국어 라벨은 event-labels에 모으고 클라이언트 emit은 ClientProductEventName으로 제한한다. 혜택 인증 결과는 pin_attempt의 result로 구분하고 성공/실패 emit을 중복 전송하지 않는다. 공개 Web Vitals의 CLS는 실제 사용되어 유지하고 관리자 INP/LCP/TTFB 외 emit을 줄인다.
+
+RF-21에 적힌 partner-funnel.ts는 dev 기준과 통합 소스에 존재하지 않고 퍼널 비율 소비 경로도 확인되지 않았다. 따라서 임의의 분모나 새 지표를 만들지 않았다. 실제 퍼널 기능이 생기면 이벤트·분모·기간·운영자 제외를 명시한 별도 계약으로 추가한다.

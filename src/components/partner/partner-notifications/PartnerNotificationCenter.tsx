@@ -532,6 +532,7 @@ export default function PartnerNotificationCenter({
     } catch (error) {
       notify(
         getNotificationClientError(error, "이전 알림을 더 불러오지 못했습니다.").message,
+        { tone: "error" },
       );
     } finally {
       setLoadingMore(false);
@@ -563,7 +564,7 @@ export default function PartnerNotificationCenter({
     } catch (error) {
       setItems(snapshot);
       setStoredPage(snapshotPage);
-      notify(getNotificationClientError(error, "전체 읽음 처리에 실패했습니다.").message);
+      notify(getNotificationClientError(error, "전체 읽음 처리에 실패했습니다.").message, { tone: "error" });
     } finally {
       setPendingBulkAction(null);
     }

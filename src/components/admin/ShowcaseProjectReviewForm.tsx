@@ -1,5 +1,9 @@
 "use client";
 
+import Textarea from "@/components/ui/Textarea";
+
+import Input from "@/components/ui/Input";
+
 import { useRef, useState, useTransition } from "react";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
@@ -83,7 +87,7 @@ export default function ShowcaseProjectReviewForm({
           </p>
         </div>
         <label className="flex items-start gap-2 text-sm font-medium text-foreground">
-          <input
+          <Input
             type="checkbox"
             checked={immediateAllowed}
             onChange={(event) => setImmediateAllowed(event.currentTarget.checked)}
@@ -102,7 +106,7 @@ export default function ShowcaseProjectReviewForm({
       </section>
       <label className="grid gap-2 text-sm font-medium text-foreground" htmlFor={`showcase-review-note-${projectId}`}>
         검수 사유 <span className="text-xs font-normal text-muted-foreground">출품자에게 보여요 · 수정 요청과 반려는 필수</span>
-        <textarea
+        <Textarea
           ref={noteRef}
           id={`showcase-review-note-${projectId}`}
           maxLength={SHOWCASE_PROJECT_LIMITS.reviewNoteMax}

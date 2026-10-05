@@ -1,5 +1,8 @@
 "use client";
 
+import Checkbox from "@/components/ui/Checkbox";
+
+
 import dynamic from "next/dynamic";
 import { Fragment, startTransition, useEffect, useRef, useState } from "react";
 import Button from "@/components/ui/Button";
@@ -585,8 +588,7 @@ export default function PartnerReviewSection({
                   </label>
 
                   <label className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-surface-control px-3 text-sm font-medium text-foreground has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={onlyWithImages}
                       disabled={listBusy}
                       onChange={(event) => {

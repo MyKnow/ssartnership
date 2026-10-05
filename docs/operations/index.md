@@ -31,3 +31,5 @@ last_verified: 2026-08-29
 현재 릴리스 명령과 브랜치 흐름은 `AGENTS.md`, `package.json`, 저장소 스크립트가 최종 근거다. 감사 문서는 해당 시점 증거이며 현재 runbook으로 사용하지 않는다.
 
 - [신뢰성 판단과 복구 기준](./reliability.md)
+
+- [1인 운영 연속성과 사고 대응](./runbooks/operations-continuity.md)

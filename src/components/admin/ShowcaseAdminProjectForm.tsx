@@ -1,5 +1,13 @@
 "use client";
 
+import PlainImage from "@/components/ui/PlainImage";
+
+import Textarea from "@/components/ui/Textarea";
+
+import Select from "@/components/ui/Select";
+
+import Input from "@/components/ui/Input";
+
 import { PhotoIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
@@ -224,7 +232,7 @@ export default function ShowcaseAdminProjectForm({ mode, project, lockedReason =
             <>
               <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                 <label className="sr-only" htmlFor="showcase-admin-owner-search">회원 이름 검색</label>
-                <input
+                <Input
                   id="showcase-admin-owner-search"
                   name="ownerSearch"
                   value={ownerQuery}
@@ -268,7 +276,7 @@ export default function ShowcaseAdminProjectForm({ mode, project, lockedReason =
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {SHOWCASE_PROJECT_TYPES.map((type) => (
             <label key={type} className={`cursor-pointer rounded-xl border p-3 text-center focus-within:ring-2 focus-within:ring-primary ${projectType === type ? "border-primary bg-primary/5" : "border-border bg-background"}`}>
-              <input className="sr-only" type="radio" name="projectTypeChoice" value={type} checked={projectType === type} onChange={() => {
+              <Input className="sr-only" type="radio" name="projectTypeChoice" value={type} checked={projectType === type} onChange={() => {
                 setProjectType(type);
                 if (mode === "create") setAllowImmediateFeedback(type === "app" || type === "game");
               }} />
@@ -285,23 +293,23 @@ export default function ShowcaseAdminProjectForm({ mode, project, lockedReason =
         <Field label="한 줄 소개" name="summary" maxLength={SHOWCASE_PROJECT_LIMITS.summaryMax} defaultValue={project?.summary ?? ""} />
         <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-admin-description">
           서비스 설명
-          <textarea id="showcase-admin-description" name="description" maxLength={SHOWCASE_PROJECT_LIMITS.descriptionMax} rows={7} required defaultValue={project?.description ?? ""} className={`${INPUT_CLASS} py-3`} placeholder="주요 기능, 이용 방법, 만든 계기 등을 적어 주세요 (20자 이상)" />
+          <Textarea id="showcase-admin-description" name="description" maxLength={SHOWCASE_PROJECT_LIMITS.descriptionMax} rows={7} required defaultValue={project?.description ?? ""} className={`${INPUT_CLASS} py-3`} placeholder="주요 기능, 이용 방법, 만든 계기 등을 적어 주세요 (20자 이상)" />
         </label>
         <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-admin-service-url">
           {urlHint.label}
-          <input id="showcase-admin-service-url" name="serviceUrl" type="url" inputMode="url" maxLength={SHOWCASE_PROJECT_LIMITS.serviceUrlMax} required defaultValue={project?.serviceUrl ?? ""} className={INPUT_CLASS} placeholder={urlHint.placeholder} />
+          <Input id="showcase-admin-service-url" name="serviceUrl" type="url" inputMode="url" maxLength={SHOWCASE_PROJECT_LIMITS.serviceUrlMax} required defaultValue={project?.serviceUrl ?? ""} className={INPUT_CLASS} placeholder={urlHint.placeholder} />
         </label>
       </div>
 
       <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-admin-status">
         출품 상태
-        <select id="showcase-admin-status" name="status" defaultValue={project?.status ?? "pending"} className={INPUT_CLASS}>
+        <Select id="showcase-admin-status" name="status" defaultValue={project?.status ?? "pending"} className={INPUT_CLASS}>
           {statusOptions.map((status) => <option key={status} value={status}>{SHOWCASE_ADMIN_STATUS_LABELS[status]}</option>)}
-        </select>
+        </Select>
       </label>
 
       <label className="flex items-start gap-3 rounded-xl border border-border bg-surface-muted/40 p-4 text-sm leading-6 text-foreground">
-        <input
+        <Input
           type="checkbox"
           name="allowImmediateFeedback"
           value="true"
@@ -319,7 +327,7 @@ export default function ShowcaseAdminProjectForm({ mode, project, lockedReason =
 
       <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-admin-review-note">
         검수 사유 <span className="text-xs font-normal text-muted-foreground">수정 요청·반려 시 필수, 출품자에게 보여요</span>
-        <textarea id="showcase-admin-review-note" name="reviewNote" maxLength={SHOWCASE_PROJECT_LIMITS.reviewNoteMax} rows={3} defaultValue={project?.reviewNote ?? ""} className={`${INPUT_CLASS} py-3`} placeholder="판단 근거나 수정이 필요한 부분을 적어 주세요." />
+        <Textarea id="showcase-admin-review-note" name="reviewNote" maxLength={SHOWCASE_PROJECT_LIMITS.reviewNoteMax} rows={3} defaultValue={project?.reviewNote ?? ""} className={`${INPUT_CLASS} py-3`} placeholder="판단 근거나 수정이 필요한 부분을 적어 주세요." />
       </label>
 
       <div className="grid gap-3">
@@ -330,18 +338,17 @@ export default function ShowcaseAdminProjectForm({ mode, project, lockedReason =
         <label className="grid cursor-pointer gap-3 overflow-hidden rounded-xl border border-dashed border-border bg-surface-muted/40 p-3 text-center focus-within:ring-2 focus-within:ring-primary">
           <span className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg bg-surface-muted">
             {previewUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={previewUrl} alt="대표 이미지 미리보기" className="h-full w-full object-cover" />
+              <PlainImage src={previewUrl} alt="대표 이미지 미리보기" className="h-full w-full object-cover" />
             ) : <PhotoIcon className="h-8 w-8 text-muted-foreground" aria-hidden="true" />}
           </span>
           <span className="text-sm font-medium text-foreground">{imageFile?.name ?? (project ? "이미지 바꾸기" : "이미지 파일 선택")}</span>
-          <input ref={imageInputRef} name="imageUploadId" type="file" accept={getImageSourceAccept(IMAGE_POLICY)} className="sr-only" onChange={(event) => handleImageSelection(event.target.files?.[0])} aria-label="대표 홍보 이미지 선택" />
+          <Input ref={imageInputRef} name="imageUploadId" type="file" accept={getImageSourceAccept(IMAGE_POLICY)} className="sr-only" onChange={(event) => handleImageSelection(event.target.files?.[0])} aria-label="대표 홍보 이미지 선택" />
         </label>
       </div>
 
       {mode === "create" ? (
         <label className="flex items-start gap-3 rounded-xl border border-border bg-surface-muted/40 p-4 text-sm leading-6 text-foreground">
-          <input className="mt-1 h-4 w-4 shrink-0 accent-primary" type="checkbox" name="announcementConsent" value="true" />
+          <Input className="mt-1 h-4 w-4 shrink-0 accent-primary" type="checkbox" name="announcementConsent" value="true" />
           <span>출품자가 당첨 시 이름 일부를 가려 공지하는 데 동의한 것을 확인했어요.</span>
         </label>
       ) : null}
@@ -376,7 +383,7 @@ function Field({ label, name, maxLength, defaultValue }: { label: string; name: 
   return (
     <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor={id}>
       {label}
-      <input id={id} name={name} maxLength={maxLength} required={name !== "teamName"} defaultValue={defaultValue} className={INPUT_CLASS} />
+      <Input id={id} name={name} maxLength={maxLength} required={name !== "teamName"} defaultValue={defaultValue} className={INPUT_CLASS} />
     </label>
   );
 }

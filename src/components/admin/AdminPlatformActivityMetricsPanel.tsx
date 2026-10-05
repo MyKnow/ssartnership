@@ -123,7 +123,7 @@ export default function AdminPlatformActivityMetricsPanel({
           <div className="grid min-w-0 gap-3" role="group" aria-label="최근 12주 로그인 회원 활동 잔디">
             <div className="grid min-w-0 grid-cols-[1.5rem_minmax(0,1fr)] gap-2">
               <span aria-hidden="true" />
-              <div className="grid grid-flow-col grid-rows-1 auto-cols-max gap-1 text-[10px] leading-4 text-muted-foreground sm:gap-1.5 xl:gap-2">
+              <div className="grid grid-flow-col grid-rows-1 auto-cols-max gap-1 text-xs leading-4 text-muted-foreground sm:gap-1.5 xl:gap-2">
                 {activityHeatmap.map((week) => (
                   <span key={week.key} className="w-3 text-center sm:w-4 xl:w-5">
                     {week.monthLabel}
@@ -132,7 +132,7 @@ export default function AdminPlatformActivityMetricsPanel({
               </div>
             </div>
             <div className="grid min-w-0 grid-cols-[1.5rem_minmax(0,1fr)] gap-2">
-              <div className="grid grid-rows-7 gap-1 text-[10px] leading-4 text-muted-foreground sm:gap-1.5 xl:gap-2">
+              <div className="grid grid-rows-7 gap-1 text-xs leading-4 text-muted-foreground sm:gap-1.5 xl:gap-2">
                 {WEEKDAY_LABELS.map((label, index) => (
                   <span key={`${label}-${index}`} className="flex h-3 items-center sm:h-4 xl:h-5">
                     {label}

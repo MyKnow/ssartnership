@@ -217,6 +217,8 @@ describe("partner repository mappers", () => {
         name: "역삼 식당",
         categoryLabel: "음식",
         location: "역삼",
+        campusSlugs: [],
+        createdAt: null,
         period: { start: null, end: "2026-12-31" },
       },
     );

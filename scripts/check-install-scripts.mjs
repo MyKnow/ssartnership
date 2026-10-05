@@ -40,6 +40,19 @@ const expectedVendorDigests = {
   "index.cjs": "b134f0e3fc2341c955a372e7641b192aaff2acc8a9befb4f60d0a382ba9c0323",
   "package.json": "5529d14c75bcb148726dbff0cf37a5267f125305895584d9c051b3ec317a8f18",
 };
+const reviewedBracesSourceDigests = {
+  "LICENSE": "35bdd8a44339719441900fb50fbefc5e2dca1ca662cbaed7a687de842c8b70f2",
+  "index.js": "332ea07c7b006361aad12aa994ca75dc1db8e8382b884909e2f38f10b85c88a4",
+  "lib/compile.js": "b5b1f87cbb9b845c924142c739c17a2b7dc0232d6fcc43ad20970f33553774e1",
+  "lib/constants.js": "c18ac5adb57308f1ce42a28552da3a31f5d83709743ebd9a636336813a744d4b",
+  "lib/expand.js": "2ea630c4dd691545d3ec98b2618eb9db11f639deea7733c41483e94c5989c682",
+  "lib/parse.js": "9c49fd639fc8ccda00996643a3dcbb0277a9d3ca5ea0dd0bbe377ed6d426929c",
+  "lib/stringify.js": "553a681bba4d13ef238ee1df84eefb0091179c8836ab1c402c5245778cf79696",
+  "lib/utils.js": "b5a7596aa67730412b3c029ef09e84e6b67b8e445cffd35d1d295549c89066c7",
+  "package.json": "9f1088ab0000e0c5c91c93642443a9cd635fd887a480d937b2117a11d1cb14eb"
+};
+const reviewedBracesArchiveSha256 = "424408b94ac3fbb63f942fbc49397995f4e1386d366882bea04dfa7203925b73";
+const reviewedBracesIntegrity = "sha512-rqTBcBRIvFepMkTYlXQRGZVJc4uMbK2nZzIvuV7AWYYAwfMTE90V0cTGTVYhERPlQkIwLoIRZZnp3eM4l0yJLQ==";
 const pinnedPlatformPackages = {
   "@esbuild/darwin-arm64":
     "sha512-TZbWkQY7kvTAXbXUT7uVACR5cMHsDiSz9z7ZKAX/RTq/WJEk3QyRr0wZpNhBDX+/0CtdqUIJlOiodQcta6tY3Q==",
@@ -190,6 +203,7 @@ export function validateStaticInstallPolicy({
   const dependencySources = collectDependencySources(dependencySections);
   const nonRegistrySources = dependencySources.filter(({ path, value }) =>
     !(path === "overrides.archiver" && value === "file:vendor/archiver-cjs-compat")
+      && !(path === "devDependencies.braces" && value === "file:vendor/braces-depth-guard.tgz")
       && !isReviewedRegistryDependencySpec(value, {
         allowOverrideReference: path.startsWith("overrides."),
       }));
@@ -203,6 +217,9 @@ export function validateStaticInstallPolicy({
     throw new Error("an unreviewed non-registry dependency source was added.");
   }
 
+  if (packageJson.devDependencies?.braces !== "file:vendor/braces-depth-guard.tgz" || packageJson.overrides?.braces !== "$braces") throw new Error("reviewed braces override changed");
+  const bracesEntry = packageLock.packages?.["node_modules/braces"];
+  if (bracesEntry?.version !== "3.0.3-depth-guard.0" || bracesEntry?.resolved !== "file:vendor/braces-depth-guard.tgz" || bracesEntry?.integrity !== reviewedBracesIntegrity || bracesEntry?.dev !== true) throw new Error("reviewed braces identity changed");
   const packageEntries = Object.entries(packageLock.packages ?? {});
   const namedRegistryEntries = packageEntries
     .filter(([path, entry]) => path !== "" && typeof entry?.name === "string")
@@ -256,6 +273,7 @@ export function validateStaticInstallPolicy({
   }
   const registryEntriesWithoutIdentity = packageEntries.filter(([path, entry]) =>
     path !== ""
+      && path !== "node_modules/braces"
       && typeof entry?.version === "string"
       && entry.link !== true
       && entry.inBundle !== true
@@ -472,6 +490,11 @@ export function checkInstallScriptPolicy({
     throw new Error("the reviewed local archiver file inventory changed.");
   }
 
+  const bracesRoot = resolve(repositoryRoot, "vendor/braces-depth-guard");
+  for (const [file, digest] of Object.entries(reviewedBracesSourceDigests)) {
+    if (sha256(resolve(bracesRoot, file)) !== digest) throw new Error("reviewed braces source changed");
+  }
+  if (sha256(resolve(repositoryRoot, "vendor/braces-depth-guard.tgz")) !== reviewedBracesArchiveSha256) throw new Error("reviewed braces archive changed");
   validateStaticInstallPolicy({
     packageJson,
     packageLock,

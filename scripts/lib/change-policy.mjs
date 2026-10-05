@@ -171,6 +171,7 @@ export function collectGitChanges({ base, head, includeWorkingTree = false } = {
 }
 
 function classifyPath(path) {
+  if (path.startsWith(".agents/skills/") && path.endsWith(".md")) return "standard";
   if (
     path.startsWith(".storybook/") ||
     path.startsWith("tests/visual/") ||

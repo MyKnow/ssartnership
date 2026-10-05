@@ -60,3 +60,13 @@ authority: normative
 - 수직 리듬은 `gap-4 / 6 / 8 / 10 / 12` 위주로 제한한다.
 - 작은 화면에서 불필요한 그룹 padding 증가를 피한다.
 - 카드 내부 padding은 `md` 이상에서만 커진다.
+
+## 토큰과 문구 유지
+
+반경은 shape-radius 값과 @theme의 radius alias로 제공한다. info/info-soft는 라이트·다크 상태 안내에 사용한다. 소형 label은 12px 이상을 기준으로 하고 이전 11px 예외·그림자·임의 반경·important·viewport height는 디자인 계약 테스트의 검토된 예산을 넘지 않는다. 이관한 상태색 파일에는 원시 팔레트를 다시 추가하지 않는다.
+
+한국어 제목·버튼·설명은 text-ko-title/text-ko/text-ko-pretty의 keep-all과 overflow-wrap 규칙을 과업에 맞게 선택한다. URL·코드·긴 식별자까지 keep-all을 강제하지 않는다. 모바일 높이는 dvh/svh를 우선하며 잔존 vh는 계약 예산으로 관리한다. body 그라데이션은 배경/표면 토큰을 바탕으로 한 현행 장식이고 별도의 상호작용 상태를 표현하지 않는다.
+
+PlainImage는 blob 미리보기·알 수 없는 운영 URL의 native image 경계다. 공개 카탈로그 이미지에는 기존 Next 이미지 최적화를 유지한다. MotionReveal의 no-op 컴포넌트는 정적 div로 인라인해 box 구조를 보존했다. react-easy-crop CSS는 접두가 붙은 cropper class에만 적용되며 전역 reset을 추가하지 않는다. 아이콘 테마 토글과 명시적 라이트/다크 선택기는 서로 다른 화면 계약이라 모두 유지한다.
+
+문구는 수행할 동작과 회복 방법을 한국어로 구체적으로 적는다. 사용자 화면에 구현 계층·공급자 오류·추적 식별자를 노출하지 않는다.

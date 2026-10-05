@@ -119,7 +119,7 @@ test("수동 초기 설정과 이메일 재설정은 토큰 해시만 서버에 
   const [complete, reset, service] = await Promise.all([
     read("src/app/api/member-password-action/complete/route.ts"),
     read("src/app/api/member-password-action/reset/route.ts"),
-    read("src/lib/member-manual-import/service.server.ts"),
+    read("src/lib/member-manual-import/password-actions.server.ts"),
   ]);
   assert.match(complete, /hashOpaqueToken\(token\)/);
   assert.match(complete, /completeManualMemberPasswordAction/);

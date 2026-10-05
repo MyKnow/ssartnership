@@ -1,5 +1,7 @@
 "use client";
 
+import Input from "@/components/ui/Input";
+
 import { useRef, useState, useTransition, type FormEvent } from "react";
 import Button from "@/components/ui/Button";
 import FormMessage from "@/components/ui/FormMessage";
@@ -80,7 +82,7 @@ export default function ShowcaseEventSettingsForm({
             {[period.start, period.end].map((name) => (
               <label key={name} className="grid gap-1.5 text-xs font-medium text-muted-foreground" htmlFor={`showcase-${name}`}>
                 {name === period.start ? "시작" : name === "announcementEndAt" ? "종료 (선택)" : "종료"}
-                <input id={`showcase-${name}`} type="datetime-local" name={name} defaultValue={toDateTimeLocal(event[name])} className={INPUT_CLASS} />
+                <Input id={`showcase-${name}`} type="datetime-local" name={name} defaultValue={toDateTimeLocal(event[name])} className={INPUT_CLASS} />
               </label>
             ))}
           </fieldset>
@@ -89,15 +91,15 @@ export default function ShowcaseEventSettingsForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium text-foreground" htmlFor="showcase-submitter-count">
           출품 경품 수량 (명)
-          <input id="showcase-submitter-count" name="submitterSelectionCount" type="number" inputMode="numeric" min={0} max={500} defaultValue={event.submitterSelectionCount} className={INPUT_CLASS} />
+          <Input id="showcase-submitter-count" name="submitterSelectionCount" type="number" inputMode="numeric" min={0} max={500} defaultValue={event.submitterSelectionCount} className={INPUT_CLASS} />
         </label>
         <label className="grid gap-2 text-sm font-medium text-foreground" htmlFor="showcase-experiencer-count">
           체험 경품 수량 (명)
-          <input id="showcase-experiencer-count" name="experiencerSelectionCount" type="number" inputMode="numeric" min={0} max={500} defaultValue={event.experiencerSelectionCount} className={INPUT_CLASS} />
+          <Input id="showcase-experiencer-count" name="experiencerSelectionCount" type="number" inputMode="numeric" min={0} max={500} defaultValue={event.experiencerSelectionCount} className={INPUT_CLASS} />
         </label>
       </div>
       <label className="flex items-start gap-3 text-sm leading-6 text-foreground">
-        <input type="checkbox" name="isActive" value="true" defaultChecked={event.isActive} className="mt-1 h-4 w-4 accent-primary" />
+        <Input type="checkbox" name="isActive" value="true" defaultChecked={event.isActive} className="mt-1 h-4 w-4 accent-primary" />
         <span>이벤트 활성화 · 끄면 날짜와 관계없이 출품과 체험이 모두 중단돼요.</span>
       </label>
       <div className="grid gap-3">

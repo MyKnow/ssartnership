@@ -153,7 +153,7 @@ test("local prepush shares the change classifier while explicit promotion gates 
   );
   assert.match(
     packageJson.scripts["verify:release:post-quick"],
-    /build test:e2e:ci/,
+    /typegen:release build test:e2e:prod/,
   );
   assert.match(
     packageJson.scripts["verify:promotion:smoke"],

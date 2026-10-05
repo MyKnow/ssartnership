@@ -27,6 +27,10 @@ export function looksLikeMarkupImageSource(source: Buffer) {
   return head.startsWith("<");
 }
 
+export function isGzipCompressedImageSource(source: Buffer) {
+  return source.length >= 2 && source[0] === 0x1f && source[1] === 0x8b;
+}
+
 const SUPPORTED_INPUT_FORMATS = new Set([
   "jpeg",
   "png",
@@ -209,6 +213,10 @@ export async function normalizeImageBuffer({
 }): Promise<NormalizedImageBuffer> {
   if (!source.length || source.length > policy.maxSourceBytes) {
     throw new Error("이미지 파일 용량을 확인해 주세요.");
+  }
+  // SVGZ reaches librsvg before format validation; reject compressed sources before parsing.
+  if (isGzipCompressedImageSource(source)) {
+    throw new Error(SVG_SOURCE_REJECTED_MESSAGE);
   }
   if (
     policy.allowSvgSource === false

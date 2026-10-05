@@ -16,7 +16,9 @@ test("cleanup summaries fail when any private-file deletion failed", () => {
 
 test("graduate file cleanup cron reports partial failure as a 5xx, not ok:true", () => {
   const route = read("src/app/api/cron/cleanup-graduate-verification-files/route.ts");
-  assert.equal(route.match(/failed \+= 1;/gu)?.length, 3);
+  const retention = read("src/lib/graduate-verification-retention.server.ts");
+  assert.equal(retention.match(/failed \+= 1;/gu)?.length, 3);
+  assert.match(route, /await purgeExpiredGraduateVerificationFiles/);
   assert.match(route, /if \(!summary\.ok\) \{[\s\S]*?logServerError\([\s\S]*?return getCronErrorResponse\("cleanup-graduate-verification-files"\);/u);
   assert.doesNotMatch(route, /storage_path[^\n]*logServerError|logServerError[^\n]*storage_path/u);
 });

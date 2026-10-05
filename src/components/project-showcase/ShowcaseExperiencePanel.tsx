@@ -1,5 +1,8 @@
 "use client";
 
+import Checkbox from "@/components/ui/Checkbox";
+
+
 import { HeartIcon as HeartOutlineIcon } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
 import { useRouter } from "next/navigation";
@@ -252,7 +255,7 @@ export default function ShowcaseExperiencePanel({
         <form ref={formRef} onSubmit={handleRegister} className="grid gap-3" noValidate>
           <p className="text-sm font-semibold text-foreground">처음 체험하기 전에 참여 등록을 한 번 해 주세요.</p>
           <label className="flex items-start gap-2 text-xs leading-5 text-foreground">
-            <input type="checkbox" name="announcementConsent" value="true" className="mt-0.5 h-4 w-4 shrink-0 accent-primary" />
+            <Checkbox name="announcementConsent" value="true" className="mt-0.5 h-4 w-4 shrink-0 accent-primary" />
             <span>(필수) 당첨되면 이름 일부를 가려(예: 정**) 공지하는 데 동의해요.</span>
           </label>
           <Button type="submit" disabled={isPending}>{isPending ? "처리 중…" : "참여 등록하고 체험 시작"}</Button>

@@ -162,6 +162,8 @@ export type AdminPartnerCouponErrorCode = keyof typeof adminPartnerCouponErrorMe
 
 /** 광고 관리 화면이 표시하는 캠페인 `?error=` 코드와 문구. */
 export const adminAdCampaignErrorMessages = {
+  ad_campaign_invalid_status_transition: "현재 상태에서는 요청한 상태로 변경할 수 없습니다.",
+  ad_campaign_state_changed: "확인하는 사이 상태가 바뀌었습니다. 현재 상태를 확인한 뒤 다시 시도해 주세요.",
   ad_campaign_create_failed:
     "광고 캠페인을 생성하지 못했습니다. 입력값과 권한을 확인한 뒤 다시 시도해 주세요.",
   ad_campaign_invalid_request: "광고 캠페인 상태 변경 요청을 다시 확인해 주세요.",

@@ -1,4 +1,6 @@
 "use client";
+import type { AdminMemberSecurityLog } from "@/lib/admin-member-security-log";
+export type { AdminMemberSecurityLog } from "@/lib/admin-member-security-log";
 
 import { useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -11,16 +13,7 @@ import Select from "@/components/ui/Select";
 import { ADMIN_LIST_DEFAULT_PAGE_SIZE } from "@/lib/admin-ia";
 import { formatOptionalKoreanDateTimeToMinute } from "@/lib/datetime";
 
-export type AdminMemberSecurityLog = {
-  id: string;
-  eventName: string;
-  status: string | null;
-  identifier: string | null;
-  path: string | null;
-  ipAddress: string | null;
-  properties: Record<string, unknown> | null;
-  createdAt: string;
-};
+
 
 type SortFilter = "newest" | "oldest" | "event" | "ip";
 
@@ -33,11 +26,11 @@ function formatDate(value?: string | null) {
 function getStatusBadgeClass(status: string | null) {
   switch (status) {
     case "success":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-200";
+      return "border-success/20 bg-success/10 text-success border-success/30 bg-success/10 text-success";
     case "failure":
-      return "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-rose-200";
+      return "border-danger/20 bg-danger/10 text-danger border-danger/30 bg-danger/10 text-danger";
     case "blocked":
-      return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200";
+      return "border-warning/20 bg-warning/10 text-warning border-warning/30 bg-warning/10 text-warning";
     default:
       return "border-border bg-surface-muted text-muted-foreground";
   }

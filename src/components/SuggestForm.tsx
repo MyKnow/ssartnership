@@ -43,7 +43,7 @@ function SuggestField({
             *
           </span>
         ) : (
-          <Badge className="!border-border/70 !bg-surface-muted/60 !px-2 !py-0.5 !text-[10px] !font-medium !tracking-normal !text-muted-foreground">
+          <Badge className="!border-border/70 !bg-surface-muted/60 !px-2 !py-0.5 !text-xs !font-medium !tracking-normal !text-muted-foreground">
             선택
           </Badge>
         )}

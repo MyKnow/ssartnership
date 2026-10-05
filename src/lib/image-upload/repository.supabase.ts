@@ -1,3 +1,4 @@
+import { buildStagingPath, buildProcessedPath } from "./storage-paths";
 import { randomUUID } from "node:crypto";
 import { expectNoError } from "@/lib/expect-no-error";
 import {
@@ -127,19 +128,6 @@ type ReserveImageUploadSessionRow = {
 
 function asSessionRow(value: unknown): ImageUploadSessionRow {
   return value as ImageUploadSessionRow;
-}
-
-function getSafeFileExtension(name: string) {
-  const suffix = name.trim().toLowerCase().match(/\.([a-z0-9]{1,8})$/)?.[1];
-  return suffix ? `.${suffix}` : ".source";
-}
-
-function buildStagingPath(id: string, fileName: string) {
-  return `staging/${id}${getSafeFileExtension(fileName)}`;
-}
-
-function buildProcessedPath(id: string) {
-  return `processed/${id}.webp`;
 }
 
 function getSessionStoragePaths(session: Pick<ImageUploadSessionRow, "storage_path" | "source_storage_path">) {

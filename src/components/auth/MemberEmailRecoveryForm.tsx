@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { requestJson, isJsonRecord } from "@/lib/client-request";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
@@ -57,13 +58,14 @@ export default function MemberEmailRecoveryForm() {
     setPending(true);
     resetMessage();
     try {
-      const response = await fetch("/api/member/recovery/start", {
+      await requestJson("/api/member/recovery/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier, password }),
+      }, {
+        fallbackMessage: "복구 세션을 시작하지 못했습니다.",
+        parse: (value) => isJsonRecord(value) ? value : null,
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message ?? "복구 세션을 시작하지 못했습니다.");
       setPassword("");
       setStep("email");
       setMessage("15분 안에 이메일을 등록하고 인증해 주세요.");
@@ -85,13 +87,14 @@ export default function MemberEmailRecoveryForm() {
     setPending(true);
     resetMessage();
     try {
-      const response = await fetch("/api/member/recovery/email/send", {
+      const data = await requestJson("/api/member/recovery/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: normalizedEmail }),
+      }, {
+        fallbackMessage: "인증 코드를 보내지 못했습니다.",
+        parse: (value) => isJsonRecord(value) ? value : null,
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message ?? "인증 코드를 보내지 못했습니다.");
       if (data.alreadyVerified) {
         router.replace(getRecoveryCompletionHref());
         router.refresh();
@@ -117,13 +120,14 @@ export default function MemberEmailRecoveryForm() {
     setPending(true);
     resetMessage();
     try {
-      const response = await fetch("/api/member/recovery/email/verify", {
+      const data = await requestJson("/api/member/recovery/email/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code }),
+      }, {
+        fallbackMessage: "이메일 인증을 완료하지 못했습니다.",
+        parse: (value) => isJsonRecord(value) ? value : null,
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message ?? "이메일 인증을 완료하지 못했습니다.");
       router.replace(getRecoveryCompletionHref());
       router.refresh();
     } catch (error) {
