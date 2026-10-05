@@ -245,7 +245,7 @@ test("기존 사용자 지정 문구는 삭제하지 않고 새 계약과 맞지
 });
 
 test("반려와 계정 전달 경로는 알림 템플릿을 사용한다", async () => {
-  const [graduateService, manualImport, manualAdd, cycleActions, suggestionRoute, memberEmail, partnerEmail] =
+  const [graduateService, manualImport, cycleActions, suggestionRoute, memberEmail, partnerEmail] =
     await Promise.all([
       readFile(
         new URL("../src/lib/graduate-verification-service.ts", import.meta.url),
@@ -253,10 +253,6 @@ test("반려와 계정 전달 경로는 알림 템플릿을 사용한다", async
       ),
       readFile(
         new URL("../src/lib/member-manual-import/service.server.ts", import.meta.url),
-        "utf8",
-      ),
-      readFile(
-        new URL("../src/lib/member-manual-add/provision.ts", import.meta.url),
         "utf8",
       ),
       readFile(
@@ -273,7 +269,6 @@ test("반려와 계정 전달 경로는 알림 템플릿을 사용한다", async
   assert.match(graduateService, /rejection_email_last_error_at/);
   assert.match(manualImport, /email\.manual_member_setup/);
   assert.match(manualImport, /mattermost\.manual_member_setup/);
-  assert.match(manualAdd, /mattermost\.manual_member_temporary_password/);
   assert.match(cycleActions, /mattermost\.sender_test/);
   assert.match(suggestionRoute, /email\.partner_suggestion_received/);
   assert.match(memberEmail, /renderResolvedNotificationEmailContent/);

@@ -446,24 +446,19 @@ test("회원 mock도 canonical 뷰 모델을 사용한다", () => {
   assert.doesNotMatch(mockReviewRepository, /member\?\.display_name|member\?\.year/);
 });
 
-test("수동 회원 추가와 롤백은 디렉터리 FK·세대 필드만 저장한다", () => {
+test("활성 회원 가져오기는 디렉터리 FK·세대 필드로 원자적 생성을 요청한다", () => {
   const lookup = readRepoFile("src/lib/member-manual-add/lookup.ts");
-  const provision = readRepoFile("src/lib/member-manual-add/provision.ts");
-  const rollback = readRepoFile("src/lib/member-manual-add/rollback.ts");
+  const manualImport = readRepoFile("src/lib/member-manual-import/service.server.ts");
 
   assert.match(lookup, /findMmUserDirectoryEntryByUserId/);
   assert.match(lookup, /\.eq\("mattermost_account_id", directory\.id\)/);
   assert.doesNotMatch(lookup, /\.from\("members"\)[\s\S]{0,400}\.eq\("mm_user_id"/);
 
-  assert.match(provision, /mattermost_account_id/);
-  assert.match(provision, /staff_source_generation/);
-  assert.match(provision, /resolveManualMemberResolution/);
-  assert.match(provision, /withActiveMattermostSenderForGeneration/);
-  assert.doesNotMatch(provision, /avatar_base64|avatar_content_type|avatar_url/);
-
-  assert.match(rollback, /mattermost_account_id/);
-  assert.doesNotMatch(
-    rollback,
-    /mm_user_id|mm_username|avatar_base64|avatar_content_type|avatar_url|\byear:/,
-  );
+  assert.match(manualImport, /\.rpc\(\s*"checkpoint_manual_member_import_member"/);
+  assert.match(manualImport, /p_mattermost_account_id: input\.mattermostAccountId/);
+  assert.match(manualImport, /p_generation: input\.row\.generation/);
+  assert.match(manualImport, /p_staff_source_generation: input\.staffSourceGeneration/);
+  assert.match(manualImport, /resolveManualMemberResolution/);
+  assert.match(manualImport, /withActiveMattermostSenderForGeneration/);
+  assert.doesNotMatch(manualImport, /avatar_base64|avatar_content_type|avatar_url/);
 });
