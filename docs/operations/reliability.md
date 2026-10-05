@@ -34,8 +34,8 @@ Runbook은 대상 환경·필요 권한·선행 조건·부작용·성공·중�
 | Resend·Mattermost·사업자 상태조회·이미지 프록시·APNs | 각 10초 | 각 클라이언트 모듈 |
 | Web Vitals 수집기 | 2초 | `src/app/api/web-vitals/route.ts` |
 
-- Supabase 상한은 서버 SDK 클라이언트(`getSupabaseAdminClient`, `getSupabasePublicClient`)의 공용 fetch에 걸린다. 쿼리의 `.abortSignal()`이나 Request의 signal은 `AbortSignal.any`로 결합되어 먼저 발생한 쪽이 요청을 끊는다.
-- 예외: `getSupabasePublicClient`의 Next 데이터 캐시가 만료 항목을 다시 받아오는 재검증 요청(백그라운드 갱신·정적 재생성)에는 Next가 signal을 넘기지 않아 이 상한이 걸리지 않는다. 캐시 항목이 없어 처음 받아오는 요청과 admin 클라이언트(`cache: "no-store"`) 요청에는 상한이 걸린다.
+- Supabase 상한은 `src/lib/supabase/server.ts`가 만드는 서버 SDK 클라이언트의 공용 fetch에 걸린다. 쿼리의 `.abortSignal()`이나 Request의 signal은 `AbortSignal.any`로 결합되어 먼저 발생한 쪽이 요청을 끊는다.
+- 예외: Next 데이터 캐시(`next.revalidate`)를 쓰는 fetch가 만료 항목을 다시 받아오는 재검증 요청(백그라운드 갱신·정적 재생성)에는 Next가 signal을 넘기지 않아 이 상한이 걸리지 않는다. 현재 서버 SDK 호출은 모두 admin 클라이언트(`cache: "no-store"`)를 거치므로 해당하지 않는다. 데이터 캐시를 쓰는 SDK 클라이언트를 다시 쓰게 되면 이 예외를 함께 검토한다.
 - Next는 `init`에 signal이 있는 요청을 렌더 단위 GET 중복 제거에서 뺀다. 내부 gateway(`SUPABASE_INTERNAL_URL`) 경로는 Next가 Request로 합쳐 중복 제거가 유지되지만, gateway 없이 직접 연결하면 같은 렌더의 동일 조회가 각각 DB로 간다. 한 렌더에서 반복되는 조회는 fetch 중복 제거에 기대지 말고 React `cache()`로 감싼다.
 - 두 Supabase env는 1초~300초 정수 밀리초만 받는다. 잘못된 값은 무시하고 기본값을 쓰며, 서버 로그에는 env 이름만 남긴다.
 - SMTP DNS 상한은 질의 시도 1회 기준이다. Node resolver는 기본 4회 시도하며 시도마다 대기를 두 배로 늘리므로, DNS 서버가 아예 응답하지 않으면 IPv4·IPv6 해석이 각각 약 75초까지 걸릴 수 있다. nodemailer 옵션에는 시도 횟수 설정이 없다.
