@@ -566,3 +566,26 @@ test("event reward admin surfaces derive the slug instead of defaulting to signu
   assert.match(exportRoute, /supportsEventRewardDraw\(slug\)/);
   assert.doesNotMatch(exportRoute, /"signup-reward"/);
 });
+
+test("event reward winner send outcome copy covers partial and total delivery failure", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const read = (path: string) =>
+    readFile(new URL(`../${path}`, import.meta.url), "utf8");
+  const [actions, page] = await Promise.all([
+    read("src/app/admin/(protected)/_actions/promotion-actions.ts"),
+    read("src/app/admin/(protected)/event/[slug]/page.tsx"),
+  ]);
+
+  // Only a fully reached draw reports success; partial_failed and failed share
+  // the retry notice, so the notice must not claim that only some failed.
+  assert.match(
+    actions,
+    /result\.status === "sent" \? "winner-sent" : "winner-partial"/,
+  );
+  const partialNotice = page.match(
+    /status === "winner-partial"\) \{[\s\S]*?return "([^"]+)";/,
+  )?.[1];
+  assert.ok(partialNotice, "winner-partial notice should exist");
+  assert.doesNotMatch(partialNotice, /일부/);
+  assert.match(partialNotice, /미도달 당첨자에게 다시 보내 주세요/);
+});
