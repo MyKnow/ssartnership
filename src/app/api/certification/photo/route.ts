@@ -14,10 +14,9 @@ import {
   RouteJsonBodyError,
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
+import { isUuidFormat } from "@/lib/uuid";
 
 export const runtime = "nodejs";
-
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function POST(request: Request) {
   if (!isTrustedSameOriginRequest(request, { allowedContentTypes: ["application/json"] })) {
@@ -66,7 +65,7 @@ export async function POST(request: Request) {
     }
   }
   const uploadId = typeof body?.uploadId === "string" ? body.uploadId.trim() : "";
-  if (!UUID_PATTERN.test(uploadId) || body?.uploadSource !== "common") {
+  if (!isUuidFormat(uploadId) || body?.uploadSource !== "common") {
     await recordGraduateVerificationAttempt({ ...rateLimitContext, success: false });
     return NextResponse.json({ ok: false, message: "사진 업로드를 확인해 주세요." }, { status: 400 });
   }

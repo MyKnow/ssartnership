@@ -13,6 +13,7 @@ import {
   aggregatePartnerReviewReactionStates,
   type PartnerReviewReactionRow,
 } from "@/lib/partner-review-reactions";
+import { isUuidFormat } from "@/lib/uuid";
 
 export type AdminReviewSort = "latest" | "oldest";
 export type AdminReviewStatusFilter = "all" | "visible" | "hidden";
@@ -181,12 +182,6 @@ type AdminReviewPartnerRow = {
       }[]
     | null;
 };
-
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
-}
 
 function getSingleRelation<T>(value: T | T[] | null | undefined): T | null {
   if (!value) {
@@ -430,7 +425,7 @@ async function fetchFilteredAdminReviewRows(
   let scopedPartnerIds: string[] | null = null;
 
   if (filters.companyId || managedCampusSlugs) {
-    if (!isUuid(filters.companyId)) {
+    if (!isUuidFormat(filters.companyId)) {
       if (filters.companyId) {
         return { reviews: [], totalCount: 0 };
       }
@@ -473,7 +468,7 @@ async function fetchFilteredAdminReviewRows(
   }
 
   if (filters.partnerId) {
-    if (!isUuid(filters.partnerId)) {
+    if (!isUuidFormat(filters.partnerId)) {
       return { reviews: [], totalCount: 0 };
     }
     if (scopedPartnerIds && !scopedPartnerIds.includes(filters.partnerId)) {
@@ -554,7 +549,7 @@ export async function getAdminReviewById(
   reviewId: string,
   managedCampusSlugs?: readonly string[] | null,
 ): Promise<AdminReviewRecord | null> {
-  if (!isUuid(reviewId)) {
+  if (!isUuidFormat(reviewId)) {
     return null;
   }
 

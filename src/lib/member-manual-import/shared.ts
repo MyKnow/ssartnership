@@ -12,6 +12,7 @@ import {
   MANUAL_MEMBER_IMPORT_CAMPUS_LABELS,
   normalizeManualMemberImportCampus,
 } from "./options";
+import { isUuidFormat } from "@/lib/uuid";
 
 export const MANUAL_MEMBER_IMPORT_HEADERS = [
   "기수",
@@ -265,7 +266,6 @@ const MANUAL_MEMBER_IMAGE_POLICY = resolveImageTransformPolicy(
   "manual-member-import",
   "profile",
 );
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function validateManualMemberImportPhotoManifest(
   rows: readonly Pick<ManualMemberImportRow, "rowNumber" | "photoFilename">[],
@@ -306,7 +306,7 @@ export function validateManualMemberImportPhotoManifest(
       errors.push(getRowError(null, "photo_unreferenced", "XLSX에서 참조하지 않는 사진 파일이 있습니다."));
     }
     if (file.uploadId !== undefined) {
-      if (!UUID_PATTERN.test(file.uploadId)) {
+      if (!isUuidFormat(file.uploadId)) {
         errors.push(getRowError(referenceByFilename.get(normalizedFilename) ?? null, "photo_upload_invalid", "사진 업로드 정보를 확인해 주세요."));
       }
       continue;

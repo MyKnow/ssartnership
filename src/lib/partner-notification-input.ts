@@ -1,13 +1,11 @@
 import { NotificationRequestError } from "@/lib/notifications/safe-error";
+import { isUuidFormat } from "@/lib/uuid";
 
 export const MAX_PARTNER_NOTIFICATION_MUTATION_IDS = 100;
 export const MAX_PARTNER_NOTIFICATION_BODY_BYTES = 16 * 1024;
 
-const uuidPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 export function isValidPartnerNotificationId(value: string) {
-  return uuidPattern.test(value);
+  return isUuidFormat(value);
 }
 
 export function normalizePartnerNotificationIds(value: unknown): string[] | null {

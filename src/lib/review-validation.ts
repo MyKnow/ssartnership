@@ -3,6 +3,7 @@ import {
   type ReviewMediaManifest,
   type ReviewMediaManifestEntry,
 } from "@/lib/review-media";
+import { isUuidFormat } from "@/lib/uuid";
 
 export type ReviewFieldName = "rating" | "title" | "body" | "images";
 
@@ -33,8 +34,6 @@ export type ReviewSubmissionParseResult =
       fieldErrors: ReviewFieldErrors;
     };
 
-const REVIEW_ID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const INVALID_REVIEW_MEDIA_MESSAGE = "리뷰 사진 형식을 확인해 주세요.";
 
 function asRecord(value: unknown) {
@@ -45,7 +44,7 @@ function asRecord(value: unknown) {
 
 function normalizeReviewId(value: unknown) {
   const reviewId = typeof value === "string" ? value.trim() : "";
-  return REVIEW_ID_PATTERN.test(reviewId) ? reviewId : null;
+  return isUuidFormat(reviewId) ? reviewId : null;
 }
 
 export function normalizeReviewDraftInput(input: {
