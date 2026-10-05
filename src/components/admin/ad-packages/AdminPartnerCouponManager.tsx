@@ -4,7 +4,10 @@ import FormSubmitButton from "@/components/ui/FormSubmitButton";
 import InlineMessage from "@/components/ui/InlineMessage";
 import SectionHeading from "@/components/ui/SectionHeading";
 import StatsRow from "@/components/ui/StatsRow";
-import type { AdCouponStatus } from "@/lib/ad-packages";
+import {
+  canDeleteAdCouponWithStatus,
+  type AdCouponStatus,
+} from "@/lib/ad-packages";
 import type {
   AdCampaignWithStats,
   AdCoupon,
@@ -82,6 +85,9 @@ function CouponManagementActions({
   }
   const deleteBlockedByHistory =
     coupon.issuedCount > 0 || coupon.usedCount > 0;
+  // Same rule as the server: an active coupon may be downloading right now.
+  const deleteBlockedByStatus =
+    !deleteBlockedByHistory && !canDeleteAdCouponWithStatus(coupon.status);
 
   return (
     <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
@@ -120,7 +126,17 @@ function CouponManagementActions({
             : "상태를 종료하려면 수정 권한이 필요합니다."}
         </p>
       ) : null}
-      {canDeleteCoupon && deleteCouponAction && !deleteBlockedByHistory ? (
+      {canDeleteCoupon && deleteCouponAction && deleteBlockedByStatus ? (
+        <p className="basis-full text-ko-pretty text-sm text-muted-foreground sm:text-right">
+          활성 쿠폰은 삭제할 수 없습니다. {canUpdateCoupon
+            ? "수정에서 일시중지 또는 종료로 바꾼 뒤 삭제하세요."
+            : "상태를 바꾸려면 수정 권한이 필요합니다."}
+        </p>
+      ) : null}
+      {canDeleteCoupon &&
+      deleteCouponAction &&
+      !deleteBlockedByHistory &&
+      !deleteBlockedByStatus ? (
         <form action={deleteCouponAction}>
           <input type="hidden" name="partnerId" value={partnerId} readOnly />
           <input type="hidden" name="couponId" value={coupon.id} readOnly />

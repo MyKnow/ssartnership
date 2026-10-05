@@ -44,6 +44,108 @@ export const AD_COUPON_STATUSES = [
 
 export type AdCouponStatus = (typeof AD_COUPON_STATUSES)[number];
 
+export const AD_STATUS_LABELS = {
+  draft: "초안",
+  active: "활성",
+  paused: "일시중지",
+  ended: "종료",
+} as const satisfies Record<AdCampaignStatus & AdCouponStatus, string>;
+
+/**
+ * Allowed status changes for ad campaigns and coupons (same lifecycle).
+ * `ended` is terminal: a finished campaign or coupon is duplicated or
+ * recreated instead of reactivated, so its issue and redemption history keeps
+ * one lifecycle. Keeping the current status is always allowed.
+ */
+export const AD_CAMPAIGN_STATUS_TRANSITIONS = {
+  draft: ["active", "ended"],
+  active: ["paused", "ended"],
+  paused: ["active", "ended"],
+  ended: [],
+} as const satisfies Record<AdCampaignStatus, readonly AdCampaignStatus[]>;
+
+export const AD_COUPON_STATUS_TRANSITIONS = {
+  draft: ["active", "ended"],
+  active: ["paused", "ended"],
+  paused: ["active", "ended"],
+  ended: [],
+} as const satisfies Record<AdCouponStatus, readonly AdCouponStatus[]>;
+
+/**
+ * Coupons a member can still download (`active`) are never hard-deleted:
+ * the issue RPC locks and re-checks an active coupon, so deleting only a
+ * non-active coupon keeps a concurrent download from being cascaded away.
+ */
+export const AD_COUPON_DELETABLE_STATUSES = ["draft", "paused", "ended"] as const;
+
+export function canTransitionAdCampaignStatus(
+  from: AdCampaignStatus,
+  to: AdCampaignStatus,
+) {
+  return (
+    from === to ||
+    (AD_CAMPAIGN_STATUS_TRANSITIONS[from] as readonly AdCampaignStatus[]).includes(to)
+  );
+}
+
+export function canTransitionAdCouponStatus(
+  from: AdCouponStatus,
+  to: AdCouponStatus,
+) {
+  return (
+    from === to ||
+    (AD_COUPON_STATUS_TRANSITIONS[from] as readonly AdCouponStatus[]).includes(to)
+  );
+}
+
+/** Next campaign statuses an admin can choose, excluding the current one. */
+export function listAdCampaignStatusTransitions(
+  from: AdCampaignStatus,
+): AdCampaignStatus[] {
+  return [...AD_CAMPAIGN_STATUS_TRANSITIONS[from]];
+}
+
+/** Coupon status options for an edit form: the current status first. */
+export function listAdCouponStatusOptions(
+  current: AdCouponStatus,
+): AdCouponStatus[] {
+  return [current, ...AD_COUPON_STATUS_TRANSITIONS[current]];
+}
+
+export function canDeleteAdCouponWithStatus(status: AdCouponStatus) {
+  return (AD_COUPON_DELETABLE_STATUSES as readonly AdCouponStatus[]).includes(status);
+}
+
+/** Safe Korean message for a rejected status change (FE and BE share it). */
+export function getAdStatusTransitionMessage(
+  subject: "campaign" | "coupon",
+  from: AdCampaignStatus | AdCouponStatus,
+  to: AdCampaignStatus | AdCouponStatus,
+) {
+  const noun = subject === "campaign" ? "캠페인" : "쿠폰";
+  if (from === "ended") {
+    return `종료된 ${noun}은 다시 열 수 없습니다. 새 ${noun}으로 운영해 주세요.`;
+  }
+  return `${AD_STATUS_LABELS[from]} 상태의 ${noun}은 ${AD_STATUS_LABELS[to]} 상태로 바꿀 수 없습니다.`;
+}
+
+export class AdStatusTransitionError extends Error {
+  readonly code: "ad_campaign_invalid_status_transition" | "ad_coupon_invalid_status_transition";
+
+  constructor(
+    subject: "campaign" | "coupon",
+    from: AdCampaignStatus | AdCouponStatus,
+    to: AdCampaignStatus | AdCouponStatus,
+  ) {
+    super(getAdStatusTransitionMessage(subject, from, to));
+    this.name = "AdStatusTransitionError";
+    this.code =
+      subject === "campaign"
+        ? "ad_campaign_invalid_status_transition"
+        : "ad_coupon_invalid_status_transition";
+  }
+}
+
 export const AD_COUPON_ISSUANCE_TYPES = [
   "service",
   "partner_code_pool",

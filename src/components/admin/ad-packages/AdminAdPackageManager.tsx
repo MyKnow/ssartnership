@@ -9,6 +9,7 @@ import { AD_PACKAGE_FORM_LIMITS } from "@/lib/ad-package-validation";
 import {
   INITIAL_AD_CHANNELS,
   getAdPackageDefinition,
+  listAdCampaignStatusTransitions,
   listAdPackageDefinitions,
   type AdCampaignStatus,
   type InitialAdChannel,
@@ -130,6 +131,43 @@ function PackageCatalog() {
             ))}
           </div>
         </Card>
+      ))}
+    </div>
+  );
+}
+
+function CampaignStatusActions({
+  campaignId,
+  status,
+  updateCampaignStatusAction,
+}: {
+  campaignId: string;
+  status: AdCampaignStatus;
+  updateCampaignStatusAction: ServerAction;
+}) {
+  // Only transitions the server accepts are offered; `ended` is terminal.
+  const nextStatuses = listAdCampaignStatusTransitions(status);
+  if (nextStatuses.length === 0) {
+    return (
+      <span className="text-xs font-medium text-muted-foreground">
+        종료된 캠페인
+      </span>
+    );
+  }
+  return (
+    <div className="flex flex-wrap gap-2">
+      {nextStatuses.map((nextStatus) => (
+        <form key={nextStatus} action={updateCampaignStatusAction}>
+          <input type="hidden" name="campaignId" value={campaignId} />
+          <input type="hidden" name="status" value={nextStatus} />
+          <FormSubmitButton
+            variant={nextStatus === "active" ? "soft" : "secondary"}
+            size="sm"
+            loadingText="변경 중"
+          >
+            {statusLabels[nextStatus]}
+          </FormSubmitButton>
+        </form>
       ))}
     </div>
   );
@@ -361,33 +399,11 @@ export default function AdminAdPackageManager({
                     ) : null}
                   </div>
                   {canUpdate ? (
-                    <div className="flex flex-wrap gap-2">
-                      {(["active", "paused", "ended"] as const).map(
-                        (status) => (
-                          <form
-                            key={status}
-                            action={updateCampaignStatusAction}
-                          >
-                            <input
-                              type="hidden"
-                              name="campaignId"
-                              value={campaign.id}
-                            />
-                            <input type="hidden" name="status" value={status} />
-                            <FormSubmitButton
-                              variant={
-                                status === "active" ? "soft" : "secondary"
-                              }
-                              size="sm"
-                              disabled={campaign.status === status}
-                              loadingText="변경 중"
-                            >
-                              {statusLabels[status]}
-                            </FormSubmitButton>
-                          </form>
-                        ),
-                      )}
-                    </div>
+                    <CampaignStatusActions
+                      campaignId={campaign.id}
+                      status={campaign.status}
+                      updateCampaignStatusAction={updateCampaignStatusAction}
+                    />
                   ) : (
                     <span className="text-xs font-medium text-muted-foreground">
                       조회 전용

@@ -26,3 +26,32 @@ test("광고 캠페인 액션은 예상 가능한 오류를 안전한 화면 상
   assert.match(page, /ad_campaign_create_failed/);
   assert.match(page, /ad_campaign_update_failed/);
 });
+
+test("광고 캠페인 상태 변경은 전이 테이블 결과를 안전한 오류 코드로 복귀시킨다", async () => {
+  const [actions, page, manager] = await Promise.all([
+    readFile(
+      new URL(
+        "../src/app/admin/(protected)/_actions/ad-package-actions.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/app/admin/(protected)/advertisement/page.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/components/admin/ad-packages/AdminAdPackageManager.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(actions, /update = await adPackageRepository\.updateCampaignStatus\(/);
+  assert.match(actions, /"ad_campaign_invalid_status_transition"/);
+  assert.match(actions, /"ad_campaign_state_changed"/);
+  assert.match(page, /ad_campaign_invalid_status_transition/);
+  assert.match(page, /ad_campaign_state_changed/);
+  assert.match(manager, /const nextStatuses = listAdCampaignStatusTransitions\(status\);/);
+  assert.match(manager, /nextStatuses\.map\(/);
+  assert.doesNotMatch(manager, /\(\["active", "paused", "ended"\] as const\)\.map/);
+});

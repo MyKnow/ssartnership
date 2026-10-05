@@ -112,3 +112,44 @@ describe("ad packages", () => {
     );
   });
 });
+
+describe("ad campaign and coupon status transitions", () => {
+  it("keeps ended terminal and allows only the documented transitions", async () => {
+    const {
+      AD_CAMPAIGN_STATUSES,
+      AD_CAMPAIGN_STATUS_TRANSITIONS,
+      AD_COUPON_STATUS_TRANSITIONS,
+      canDeleteAdCouponWithStatus,
+      canTransitionAdCampaignStatus,
+      canTransitionAdCouponStatus,
+      listAdCampaignStatusTransitions,
+      listAdCouponStatusOptions,
+    } = await import("../src/lib/ad-packages.ts");
+
+    assert.deepEqual(AD_CAMPAIGN_STATUS_TRANSITIONS, AD_COUPON_STATUS_TRANSITIONS);
+    const allowed = new Set([
+      "draft>active",
+      "draft>ended",
+      "active>paused",
+      "active>ended",
+      "paused>active",
+      "paused>ended",
+    ]);
+    for (const from of AD_CAMPAIGN_STATUSES) {
+      for (const to of AD_CAMPAIGN_STATUSES) {
+        const expected = from === to || allowed.has(`${from}>${to}`);
+        assert.equal(canTransitionAdCampaignStatus(from, to), expected, `${from}>${to}`);
+        assert.equal(canTransitionAdCouponStatus(from, to), expected, `${from}>${to}`);
+      }
+    }
+
+    assert.deepEqual(listAdCampaignStatusTransitions("ended"), []);
+    assert.deepEqual(listAdCampaignStatusTransitions("paused"), ["active", "ended"]);
+    assert.deepEqual(listAdCouponStatusOptions("active"), ["active", "paused", "ended"]);
+    assert.deepEqual(listAdCouponStatusOptions("ended"), ["ended"]);
+    assert.equal(canDeleteAdCouponWithStatus("active"), false);
+    assert.equal(canDeleteAdCouponWithStatus("draft"), true);
+    assert.equal(canDeleteAdCouponWithStatus("paused"), true);
+    assert.equal(canDeleteAdCouponWithStatus("ended"), true);
+  });
+});

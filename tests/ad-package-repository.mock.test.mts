@@ -348,6 +348,62 @@ describe("mock ad package repository", () => {
     });
   });
 
+  it("refuses to delete an active coupon without history until it is paused or ended", async () => {
+    const repository = new MockAdPackageRepository();
+    const coupon = await repository.createCoupon({
+      partnerId: "restaurant-001",
+      title: "활성 삭제 차단",
+      redemptionType: "code",
+      status: "active",
+      startsAt: "2026-07-01T00:00:00.000Z",
+      endsAt: "2026-07-31T23:59:59.000Z",
+    });
+
+    assert.deepEqual(await repository.deleteCoupon(coupon.id), {
+      ok: false,
+      reason: "active",
+    });
+    await repository.updateCoupon({
+      couponId: coupon.id,
+      partnerId: coupon.partnerId,
+      campaignId: coupon.campaignId,
+      title: coupon.title,
+      redemptionType: coupon.redemptionType,
+      status: "paused",
+      startsAt: coupon.startsAt,
+      endsAt: coupon.endsAt,
+    });
+    assert.deepEqual(await repository.deleteCoupon(coupon.id), { ok: true });
+  });
+
+  it("applies the campaign status transition table", async () => {
+    const repository = new MockAdPackageRepository();
+    const campaign = await repository.createCampaign({
+      partnerId: "restaurant-001",
+      packageTier: "basic",
+      title: "전이 테스트",
+      startsAt: "2026-07-01T00:00:00.000Z",
+      endsAt: "2026-07-31T23:59:59.000Z",
+    });
+
+    assert.deepEqual(
+      await repository.updateCampaignStatus({ campaignId: campaign.id, status: "active" }),
+      { ok: true },
+    );
+    assert.deepEqual(
+      await repository.updateCampaignStatus({ campaignId: campaign.id, status: "ended" }),
+      { ok: true },
+    );
+    assert.deepEqual(
+      await repository.updateCampaignStatus({ campaignId: campaign.id, status: "active" }),
+      { ok: false, reason: "invalid_transition", from: "ended" },
+    );
+    assert.deepEqual(
+      await repository.updateCampaignStatus({ campaignId: "missing", status: "active" }),
+      { ok: false, reason: "not_found" },
+    );
+  });
+
   it("lists active coupons for a partner", async () => {
     const repository = new MockAdPackageRepository();
     const coupons = await repository.listActiveCouponsForPartner("restaurant-001", {

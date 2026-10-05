@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
 import {
+  AD_CAMPAIGN_STATUSES,
+  AD_COUPON_STATUSES,
+  canDeleteAdCouponWithStatus,
+  canTransitionAdCampaignStatus,
   getAdPackageDefinition,
   isAdCouponDownloadable,
   isAdCouponRedeemable,
@@ -30,6 +34,7 @@ import type {
   AvailableAdCoupon,
   CreateAdCampaignInput,
   CreateAdCouponInput,
+  DeleteAdCouponResult,
   DuplicateAdCouponInput,
   IssueAdCouponInput,
   IssueAdCouponResult,
@@ -41,6 +46,7 @@ import type {
   RedeemAdCouponIssueResult,
   RedeemAdCouponResult,
   UpdateAdCampaignStatusInput,
+  UpdateAdCampaignStatusResult,
   UpdateAdCouponInput,
 } from "@/lib/repositories/ad-package-repository";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -749,15 +755,45 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
     return mapCampaignRow(data as AdCampaignRow);
   }
 
-  async updateCampaignStatus(input: UpdateAdCampaignStatusInput): Promise<void> {
+  async updateCampaignStatus(
+    input: UpdateAdCampaignStatusInput,
+  ): Promise<UpdateAdCampaignStatusResult> {
     const supabase = getSupabaseAdminClient();
-    const { error } = await supabase
+    const { data: currentRow, error: currentError } = await supabase
+      .from("ad_campaigns")
+      .select("status")
+      .eq("id", input.campaignId)
+      .maybeSingle();
+    if (currentError) {
+      throw new Error(currentError.message);
+    }
+    if (!currentRow) {
+      return { ok: false, reason: "not_found" };
+    }
+    const from = normalizeStatus(
+      (currentRow as { status: string | null }).status,
+      AD_CAMPAIGN_STATUSES,
+      "draft",
+    );
+    if (!canTransitionAdCampaignStatus(from, input.status)) {
+      return { ok: false, reason: "invalid_transition", from };
+    }
+    if (from === input.status) {
+      return { ok: true };
+    }
+    // Compare-and-set on the status that was validated above.
+    const { data, error } = await supabase
       .from("ad_campaigns")
       .update({ status: input.status })
-      .eq("id", input.campaignId);
+      .eq("id", input.campaignId)
+      .eq("status", from)
+      .select("id");
     if (error) {
       throw new Error(error.message);
     }
+    return (data ?? []).length > 0
+      ? { ok: true }
+      : { ok: false, reason: "state_changed", from };
   }
 
   async createCoupon(input: CreateAdCouponInput): Promise<AdCoupon> {
@@ -937,8 +973,28 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
     return mapCouponRow(data as AdCouponRow);
   }
 
-  async deleteCoupon(couponId: string) {
+  async deleteCoupon(couponId: string): Promise<DeleteAdCouponResult> {
     const supabase = getSupabaseAdminClient();
+    // Read the status before counting history: an active coupon can still be
+    // issued (the issue RPC locks and re-checks only active coupons), and the
+    // issue/redemption foreign keys cascade, so only a non-active coupon with
+    // no history is deleted, and the delete re-checks the status atomically.
+    const { data: couponRow, error: couponError } = await supabase
+      .from("ad_coupons")
+      .select("status")
+      .eq("id", couponId)
+      .maybeSingle();
+    if (couponError) {
+      throw new Error(couponError.message);
+    }
+    if (!couponRow) {
+      throw new Error("쿠폰을 찾을 수 없습니다.");
+    }
+    const status = normalizeStatus(
+      (couponRow as { status: string | null }).status,
+      AD_COUPON_STATUSES,
+      "draft",
+    );
     const [issueResult, redemptionResult] = await Promise.all([
       supabase
         .from("ad_coupon_issues")
@@ -956,16 +1012,23 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
       throw new Error(redemptionResult.error.message);
     }
     if ((issueResult.count ?? 0) > 0 || (redemptionResult.count ?? 0) > 0) {
-      return { ok: false, reason: "usage_history" } as const;
+      return { ok: false, reason: "usage_history" };
     }
-    const { error } = await supabase
+    if (!canDeleteAdCouponWithStatus(status)) {
+      return { ok: false, reason: "active" };
+    }
+    const { data: deletedRows, error } = await supabase
       .from("ad_coupons")
       .delete()
-      .eq("id", couponId);
+      .eq("id", couponId)
+      .neq("status", "active")
+      .select("id");
     if (error) {
       throw new Error(error.message);
     }
-    return { ok: true } as const;
+    return (deletedRows ?? []).length > 0
+      ? { ok: true }
+      : { ok: false, reason: "active" };
   }
 
   async issueCoupon(input: IssueAdCouponInput): Promise<IssueAdCouponResult> {

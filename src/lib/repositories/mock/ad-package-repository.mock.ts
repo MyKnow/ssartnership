@@ -1,4 +1,6 @@
 import {
+  canDeleteAdCouponWithStatus,
+  canTransitionAdCampaignStatus,
   getAdPackageDefinition,
   isAdCouponDownloadable,
   isAdCouponRedeemable,
@@ -30,6 +32,7 @@ import type {
   AvailableAdCoupon,
   CreateAdCampaignInput,
   CreateAdCouponInput,
+  DeleteAdCouponResult,
   DuplicateAdCouponInput,
   IssueAdCouponInput,
   IssueAdCouponResult,
@@ -41,6 +44,7 @@ import type {
   RedeemAdCouponIssueResult,
   RedeemAdCouponResult,
   UpdateAdCampaignStatusInput,
+  UpdateAdCampaignStatusResult,
   UpdateAdCouponInput,
 } from "@/lib/repositories/ad-package-repository";
 
@@ -359,13 +363,26 @@ export class MockAdPackageRepository implements AdPackageRepository {
     return cloneCampaign(campaign);
   }
 
-  async updateCampaignStatus(input: UpdateAdCampaignStatusInput): Promise<void> {
+  async updateCampaignStatus(
+    input: UpdateAdCampaignStatusInput,
+  ): Promise<UpdateAdCampaignStatusResult> {
+    const current = this.campaigns.find((campaign) => campaign.id === input.campaignId);
+    if (!current) {
+      return { ok: false, reason: "not_found" };
+    }
+    if (!canTransitionAdCampaignStatus(current.status, input.status)) {
+      return { ok: false, reason: "invalid_transition", from: current.status };
+    }
+    if (current.status === input.status) {
+      return { ok: true };
+    }
     const now = isoNow();
     this.campaigns = this.campaigns.map((campaign) =>
       campaign.id === input.campaignId
         ? { ...campaign, status: input.status, updatedAt: now }
         : campaign,
     );
+    return { ok: true };
   }
 
   async createCoupon(input: CreateAdCouponInput): Promise<AdCoupon> {
@@ -517,20 +534,24 @@ export class MockAdPackageRepository implements AdPackageRepository {
     return cloneCoupon(duplicate);
   }
 
-  async deleteCoupon(couponId: string) {
-    if (!this.coupons.some((coupon) => coupon.id === couponId)) {
+  async deleteCoupon(couponId: string): Promise<DeleteAdCouponResult> {
+    const coupon = this.coupons.find((item) => item.id === couponId);
+    if (!coupon) {
       throw new Error("쿠폰을 찾을 수 없습니다.");
     }
     if (
       this.issues.some((issue) => issue.couponId === couponId) ||
       this.redemptions.some((redemption) => redemption.couponId === couponId)
     ) {
-      return { ok: false, reason: "usage_history" } as const;
+      return { ok: false, reason: "usage_history" };
+    }
+    if (!canDeleteAdCouponWithStatus(coupon.status)) {
+      return { ok: false, reason: "active" };
     }
     this.coupons = this.coupons.filter((coupon) => coupon.id !== couponId);
     this.couponCodes.delete(couponId);
     this.couponPasswords.delete(couponId);
-    return { ok: true } as const;
+    return { ok: true };
   }
 
   async issueCoupon(input: IssueAdCouponInput): Promise<IssueAdCouponResult> {

@@ -81,3 +81,48 @@ describe("issue_ad_coupon SQL contract", () => {
     );
   });
 });
+
+describe("ad coupon deletion and campaign status writes", () => {
+  const repositorySource = readFileSync(
+    new URL("../src/lib/repositories/supabase/ad-package-repository.supabase.ts", import.meta.url),
+    "utf8",
+  );
+  const issueRpc = readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8");
+
+  it("relies on the issue RPC locking and re-checking only active coupons", () => {
+    const rpcBody = issueRpc.slice(
+      issueRpc.indexOf("create or replace function public.issue_ad_coupon("),
+      issueRpc.indexOf("create or replace function public.redeem_ad_coupon_issue("),
+    );
+    assert.match(rpcBody, /where coupons\.id = p_coupon_id\s+for update;/);
+    assert.match(rpcBody, /if coupon_row\.status <> 'active'/);
+  });
+
+  it("deletes only a non-active coupon without history and re-checks the status in the delete", () => {
+    const deleteSource = repositorySource.slice(
+      repositorySource.indexOf("async deleteCoupon("),
+      repositorySource.indexOf("async issueCoupon("),
+    );
+    const statusRead = deleteSource.indexOf('.select("status")');
+    const historyCount = deleteSource.indexOf('.from("ad_coupon_issues")');
+    assert.ok(statusRead >= 0 && historyCount > statusRead);
+    assert.match(deleteSource, /canDeleteAdCouponWithStatus\(status\)/);
+    assert.match(
+      deleteSource,
+      /\.delete\(\)\s*\.eq\("id", couponId\)\s*\.neq\("status", "active"\)\s*\.select\("id"\)/,
+    );
+  });
+
+  it("updates campaign status with a validated compare-and-set", () => {
+    const updateSource = repositorySource.slice(
+      repositorySource.indexOf("async updateCampaignStatus("),
+      repositorySource.indexOf("async createCoupon("),
+    );
+    assert.match(updateSource, /canTransitionAdCampaignStatus\(from, input\.status\)/);
+    assert.match(
+      updateSource,
+      /\.update\(\{ status: input\.status \}\)\s*\.eq\("id", input\.campaignId\)\s*\.eq\("status", from\)/,
+    );
+    assert.match(updateSource, /reason: "state_changed"/);
+  });
+});
