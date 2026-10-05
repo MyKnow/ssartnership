@@ -8,6 +8,7 @@ import { parseAdminPartnerXlsxDraft } from "@/lib/admin-partner-file-import.serv
 import { requireAdminPermission } from "@/lib/admin-access";
 import { getManagedCampusFilterValues } from "@/lib/admin-scope";
 import { partnerRepository } from "@/lib/repositories";
+import { logServerError } from "@/lib/server-log";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 type PartnerCompanyRow = {
@@ -19,7 +20,7 @@ async function loadCategoryOptions() {
   try {
     return await partnerRepository.getCategoryOptions();
   } catch (error) {
-    console.error("[admin-partner-file] category options load failed", error);
+    logServerError("[admin-partner-file] category options load failed", error);
     return null;
   }
 }

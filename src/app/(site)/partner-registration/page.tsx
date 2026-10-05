@@ -10,6 +10,7 @@ import Container from "@/components/ui/Container";
 import ShellHeader from "@/components/ui/ShellHeader";
 import { getHeaderSession } from "@/lib/header-session";
 import { partnerRepository } from "@/lib/repositories";
+import { logServerError } from "@/lib/server-log";
 import { SITE_NAME } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ async function loadRegistrationCategories() {
     return await partnerRepository.getCategoryOptions();
   } catch (error) {
     // Keep rendering the registration form when options are unavailable.
-    console.error("[partner-registration] category options load failed", error);
+    logServerError("[partner-registration] category options load failed", error);
     return [];
   }
 }

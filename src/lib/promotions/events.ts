@@ -297,7 +297,7 @@ async function loadManagedPromotionSlides(options?: {
       if (options?.requireDatabase) {
         throw error;
       }
-      logServerError("[promotions] promotion_slides query failed", error.message);
+      logServerError("[promotions] promotion_slides query failed", error);
       return staticSlides();
     }
     const slides = ((data ?? []) as PromotionSlideRow[]).map((row) => mapSlideRow(row));

@@ -258,10 +258,18 @@ describe("SupabasePartnerReviewRepository", () => {
     expect(
       from.mock.calls.filter(([table]) => table === "partner_reviews"),
     ).toHaveLength(1);
-    expect(consoleError).toHaveBeenCalledWith(
-      "[partner-reviews] summary rpc failed",
-      expect.objectContaining({ partnerId: "partner-1" }),
-    );
+    // One structured JSON line: the identifier stays in properties and the
+    // provider message is summarized by the server log helper.
+    const summaryLog = consoleError.mock.calls
+      .map(([line]) => (typeof line === "string" ? line : ""))
+      .find((line) => line.includes("[partner-reviews] summary rpc failed"));
+    expect(summaryLog).toBeDefined();
+    expect(JSON.parse(summaryLog ?? "{}")).toMatchObject({
+      level: "error",
+      event: "[partner-reviews] summary rpc failed",
+      error: { message: expect.stringContaining("get_partner_review_summary") },
+      properties: { partnerId: "partner-1" },
+    });
     consoleError.mockRestore();
   });
 });

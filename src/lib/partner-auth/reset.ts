@@ -97,9 +97,8 @@ export async function commitSupabasePartnerPortalPasswordReset(
     .maybeSingle();
 
   if (error) {
-    console.error("[partner-reset] temporary password commit failed", {
+    logServerError("[partner-reset] temporary password commit failed", error, {
       accountId: reset.account.id,
-      message: error.message,
     });
   }
   if (error || !data?.id) {
