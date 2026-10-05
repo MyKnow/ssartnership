@@ -145,6 +145,18 @@ export function getKstDateParts(value: DateLike = new Date()) {
   };
 }
 
+/**
+ * KST 기준 `YYYY-MM-DD`(date input 기본값, 짧은 날짜 표기). 타임스탬프 문자열을 잘라 쓰면
+ * UTC 날짜가 나와 KST 00:00~08:59 값이 하루 앞당겨진다. 잘못된 날짜는 빈 문자열이다.
+ */
+export function formatKoreanIsoDate(value: DateLike) {
+  const date = toDate(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return getKstDateString(0, date);
+}
+
 export function formatKoreanDateTimeLocalValue(value: DateLike) {
   const date = toDate(value);
   if (Number.isNaN(date.getTime())) {

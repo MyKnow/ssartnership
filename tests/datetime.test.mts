@@ -8,6 +8,7 @@ import {
   formatKoreanDateTimeLocalValue,
   formatKoreanDateTimeToMinute,
   formatKoreanDateTimeToSecond,
+  formatKoreanIsoDate,
   formatKoreanLocaleDateTime,
   formatKoreanMediumDateTime,
   formatKoreanMonthDayTime,
@@ -66,6 +67,7 @@ function snapshot() {
     couponLocalValue: toDateTimeLocalInput(KST_MIDNIGHT_EDGE),
     kstDate: getKstDateString(0, new Date(KST_MIDNIGHT_EDGE)),
     kstParts: getKstDateParts(KST_MIDNIGHT_EDGE),
+    isoDate: formatKoreanIsoDate(KST_MIDNIGHT_EDGE),
     seoulParts: getSeoulDateParts(new Date(KST_MIDNIGHT_EDGE)),
     couponDailyKey: getKstPeriodKey(KST_MIDNIGHT_EDGE, "daily"),
   };
@@ -87,6 +89,7 @@ const EXPECTED = {
   couponLocalValue: "2026-10-05T00:30",
   kstDate: "2026-10-05",
   kstParts: { year: 2026, month: 10, day: 5 },
+  isoDate: "2026-10-05",
   seoulParts: { year: 2026, month: 10 },
   couponDailyKey: "2026-10-05",
 };
@@ -134,6 +137,33 @@ test("잘못된 날짜와 빈 값은 포맷터마다 정해진 대체값을 쓴�
   const invalidParts = getKstDateParts("invalid");
   assert.ok(Number.isNaN(invalidParts.year) && Number.isNaN(invalidParts.month) && Number.isNaN(invalidParts.day));
   assert.equal(getKstPeriodKey("invalid", "daily"), "invalid");
+  assert.equal(formatKoreanIsoDate("invalid"), "");
+});
+
+test("formatKoreanIsoDate는 KST 00:00·23:59:59로 저장한 기간 값을 같은 날짜로 되돌린다", () => {
+  // 관리자 플랜 기간은 `${date}T00:00:00+09:00`·`T23:59:59+09:00`으로 저장되고 DB는 UTC 문자열로 돌려준다.
+  assert.equal(formatKoreanIsoDate("2026-10-04T15:00:00+00:00"), "2026-10-05");
+  assert.equal(formatKoreanIsoDate("2026-10-05T00:00:00+09:00"), "2026-10-05");
+  assert.equal(formatKoreanIsoDate("2026-10-31T14:59:59+00:00"), "2026-10-31");
+  assert.equal(formatKoreanIsoDate("2026-10-05"), "2026-10-05");
+  assert.equal(
+    withTimeZone("UTC", () => formatKoreanDateTimeLocalValue("2026-10-04T15:30:00+00:00").replace("T", " ")),
+    "2026-10-05 00:30",
+  );
+});
+
+test("타임스탬프 문자열을 잘라 UTC 날짜·시각을 보여 주던 화면은 KST 공용 헬퍼를 쓴다", () => {
+  const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+  const planManager = read("src/components/admin/AdminCompanyPlanManager.tsx");
+  const couponPanel = read("src/components/partner/partner-service-detail-view/PartnerCouponPanel.tsx");
+  const senderManager = read("src/components/admin/MattermostSenderManager.tsx");
+
+  assert.doesNotMatch(planManager, /toISOString\(\)\.slice\(0, 10\)/);
+  assert.match(planManager, /formatKoreanIsoDate\(value\)/);
+  assert.doesNotMatch(couponPanel, /usage(?:Starts|Ends)At\.slice\(/);
+  assert.match(couponPanel, /formatKoreanIsoDate\(coupon\.usageStartsAt\)/);
+  assert.doesNotMatch(senderManager, /value\.slice\(0, 16\)/);
+  assert.match(senderManager, /formatKoreanDateTimeLocalValue\(value\)/);
 });
 
 test("getKstDateString은 KST 날짜 경계와 일 단위 이동을 계산하고 기존 경로와 같은 구현을 쓴다", () => {
