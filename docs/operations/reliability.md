@@ -31,18 +31,22 @@ Runbook은 대상 환경·필요 권한·선행 조건·부작용·성공·중�
 | Supabase REST·RPC·Auth | 30초 (`SUPABASE_FETCH_TIMEOUT_MS`) | `src/lib/supabase/timeout.ts` |
 | Supabase Storage(`/storage/v1/`) | 60초 (`SUPABASE_STORAGE_FETCH_TIMEOUT_MS`) | `src/lib/supabase/timeout.ts` |
 | SMTP | DNS 질의 시도당 5초, 연결 10초, 인사 10초, 소켓 무응답 20초 | `src/lib/smtp.ts` |
+| Web Push 발송 | 소켓 무응답 10초 | `src/lib/push/web-push-client.ts` |
 | Resend·Mattermost·사업자 상태조회·이미지 프록시·APNs | 각 10초 | 각 클라이언트 모듈 |
 | Web Vitals 수집기 | 2초 | `src/app/api/web-vitals/route.ts` |
+| 준비 상태 점검(`/api/ready`, 비공개 telemetry 전용) | 의존성 3종 병렬 전체 1.5초, 호출하는 telemetry probe는 3초 | `src/lib/readiness.ts`, `deploy/observability/telemetry.mjs` |
 
 - Supabase 상한은 `src/lib/supabase/server.ts`가 만드는 서버 SDK 클라이언트의 공용 fetch에 걸린다. 쿼리의 `.abortSignal()`이나 Request의 signal은 `AbortSignal.any`로 결합되어 먼저 발생한 쪽이 요청을 끊는다.
 - 예외: Next 데이터 캐시(`next.revalidate`)를 쓰는 fetch가 만료 항목을 다시 받아오는 재검증 요청(백그라운드 갱신·정적 재생성)에는 Next가 signal을 넘기지 않아 이 상한이 걸리지 않는다. 현재 서버 SDK 호출은 모두 admin 클라이언트(`cache: "no-store"`)를 거치므로 해당하지 않는다. 데이터 캐시를 쓰는 SDK 클라이언트를 다시 쓰게 되면 이 예외를 함께 검토한다.
 - Next는 `init`에 signal이 있는 요청을 렌더 단위 GET 중복 제거에서 뺀다. 내부 gateway(`SUPABASE_INTERNAL_URL`) 경로는 Next가 Request로 합쳐 중복 제거가 유지되지만, gateway 없이 직접 연결하면 같은 렌더의 동일 조회가 각각 DB로 간다. 한 렌더에서 반복되는 조회는 fetch 중복 제거에 기대지 말고 React `cache()`로 감싼다.
 - 두 Supabase env는 1초~300초 정수 밀리초만 받는다. 잘못된 값은 무시하고 기본값을 쓰며, 서버 로그에는 env 이름만 남긴다.
+- 표의 10초 상한은 요청 1회 기준이다. Mattermost는 timeout 시 조회·로그인·DM 채널 생성 요청만 1회 다시 보내므로 한 호출이 약 20초까지 걸릴 수 있고, 메시지 게시는 다시 보내지 않는다([API·연동](../architecture/api-and-integrations.md)).
 - SMTP DNS 상한은 질의 시도 1회 기준이다. Node resolver는 기본 4회 시도하며 시도마다 대기를 두 배로 늘리므로, DNS 서버가 아예 응답하지 않으면 IPv4·IPv6 해석이 각각 약 75초까지 걸릴 수 있다. nodemailer 옵션에는 시도 횟수 설정이 없다.
-- 상한 초과는 일시 실패다. PostgREST는 메시지가 `TimeoutError:`로 시작하는 오류 객체를, Storage는 `originalError.name`이 `TimeoutError`인 `StorageUnknownError`를, SMTP는 연결·인사·무응답 초과에 `ETIMEDOUT`을, DNS 해석 실패(상한 초과 포함)에 `EDNS`를 돌려준다. 이를 "없음", 영구 거부, 구독·자격 비활성화로 분류하지 않는다.
+- 상한 초과는 일시 실패다. PostgREST는 메시지가 `TimeoutError:`로 시작하는 오류 객체를, Storage는 `originalError.name`이 `TimeoutError`인 `StorageUnknownError`를, SMTP는 연결·인사·무응답 초과에 `ETIMEDOUT`을, DNS 해석 실패(상한 초과 포함)에 `EDNS`를, Web Push는 `Socket timeout` 오류를 돌려준다. 이를 "없음", 영구 거부, 구독·자격 비활성화로 분류하지 않는다. Web Push 구독은 404/410과 신뢰 검증 실패에만 비활성화한다(`shouldDeactivatePushSubscription`).
 - 클라이언트 중단은 DB 안의 질의를 취소하지 않을 수 있다. 저장소는 역할별 `statement_timeout`을 설정하지 않으므로, DB 측 상한이 필요하면 측정 후 별도 migration으로 정한다.
 - 그래서 상한에 걸린 쓰기는 결과를 모르는 상태다. DB 안의 문장은 직후 조회가 "없음"이라고 답한 뒤에도 커밋될 수 있다. 되돌릴 수 없는 보상(업로드 파일 삭제 등)은 쓰기가 저장되지 않았음이 확인될 때(쓰기를 보내기 전에 실패했고 저장 여부 조회도 답한 경우, 또는 다른 행이 같은 키를 차지한 경우)만 하고, 그 밖에는 고아 파일을 남긴다. 리뷰 작성(`src/app/api/partners/[id]/reviews/route.ts`)이 이 규칙을 따른다.
 - 상한을 올리기 전에 해당 경로의 실제 최대 소요를 측정한다. 공개 요청 경로는 70초, 예약 작업은 60초 위로 올려도 효과가 없다.
+- 배포 창에서 relay가 새 앱 컨테이너를 기다리는 시간(`lb_try_duration`, 최대 20초)도 같은 70초 쓰기 상한 안에서 쓰인다. 그동안 들어온 요청은 앱 처리에 쓸 시간이 그만큼 줄어든다.
 
 ## 복원 측정과 미승인 목표
 
