@@ -14,7 +14,7 @@ import {
 import { uploadImagesToStaging } from "@/lib/image-upload/client";
 import { prepareImageUploadSource } from "@/lib/image-upload/client-transform";
 import {
-  IMAGE_SOURCE_ACCEPT,
+  getImageSourceAccept,
   resolveImageTransformPolicy,
   validateImageUploadSource,
 } from "@/lib/image-upload/policy";
@@ -325,7 +325,7 @@ export default function ShowcaseAdminProjectForm({ mode, project }: ShowcaseAdmi
             ) : <PhotoIcon className="h-8 w-8 text-muted-foreground" aria-hidden="true" />}
           </span>
           <span className="text-sm font-medium text-foreground">{imageFile?.name ?? (project ? "이미지 바꾸기" : "이미지 파일 선택")}</span>
-          <input ref={imageInputRef} name="imageUploadId" type="file" accept={IMAGE_SOURCE_ACCEPT} className="sr-only" onChange={(event) => handleImageSelection(event.target.files?.[0])} aria-label="대표 홍보 이미지 선택" />
+          <input ref={imageInputRef} name="imageUploadId" type="file" accept={getImageSourceAccept(IMAGE_POLICY)} className="sr-only" onChange={(event) => handleImageSelection(event.target.files?.[0])} aria-label="대표 홍보 이미지 선택" />
         </label>
       </div>
 
