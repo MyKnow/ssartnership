@@ -8,7 +8,11 @@ import {
   RouteJsonBodyError,
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
-import { ensureVisibleReviewPartner, getReviewMemberSession } from "../../_shared";
+import {
+  ensureVisibleReviewPartner,
+  getReviewMemberSessionLookup,
+  reviewSessionUnavailableResponse,
+} from "../../_shared";
 import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
@@ -29,7 +33,11 @@ export async function PATCH(
   }
 
   const { id, reviewId } = await context.params;
-  const session = await getReviewMemberSession().catch(() => null);
+  const sessionLookup = await getReviewMemberSessionLookup();
+  if (!sessionLookup.ok) {
+    return reviewSessionUnavailableResponse();
+  }
+  const session = sessionLookup.session;
   if (!session?.userId) {
     return NextResponse.json(
       { ok: false, message: "로그인 후 리뷰에 반응할 수 있습니다." },

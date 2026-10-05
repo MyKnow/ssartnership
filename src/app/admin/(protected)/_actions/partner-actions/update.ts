@@ -488,27 +488,25 @@ export async function updatePartnerAction(formData: FormData) {
     },
   ]);
 
+  // logAdminAction never rejects: insert failures are logged and counted by
+  // the activity-log sink, so no local try/catch is needed here.
   if (partnerAudit.changedFields.length > 0) {
-    try {
-      await logAdminAction("partner_update", {
-        targetType: "partner",
-        targetId: id,
-        properties: {
-          summary: partnerAudit.summary,
-          changedFields: partnerAudit.changedFields,
-          changes: partnerAudit.changes,
-          fieldChanges: partnerAudit.fieldChanges,
-          companyName: nextCompanyLabel,
-          categoryLabel: nextCategoryLabel,
-          visibility: payload.visibility,
-          benefitVisibility: payload.benefitVisibility,
-          benefitActionType: payload.benefitActionType,
-          hasBenefitActionLink: Boolean(payload.benefitActionLink),
-        },
-      });
-    } catch (error) {
-      logServerError("[partner-update] audit log failed", error);
-    }
+    await logAdminAction("partner_update", {
+      targetType: "partner",
+      targetId: id,
+      properties: {
+        summary: partnerAudit.summary,
+        changedFields: partnerAudit.changedFields,
+        changes: partnerAudit.changes,
+        fieldChanges: partnerAudit.fieldChanges,
+        companyName: nextCompanyLabel,
+        categoryLabel: nextCategoryLabel,
+        visibility: payload.visibility,
+        benefitVisibility: payload.benefitVisibility,
+        benefitActionType: payload.benefitActionType,
+        hasBenefitActionLink: Boolean(payload.benefitActionLink),
+      },
+    });
   }
   revalidatePartnerData();
   revalidateAdminAndPublicPaths(id);

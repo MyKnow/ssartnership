@@ -11,11 +11,12 @@ import {
   ensurePartnerReviewModerationAccess,
   ensureVisibleReviewPartner,
   getReviewMediaInputFieldErrors,
-  getReviewMemberSession,
+  getReviewMemberSessionLookup,
   isReviewImageUploadUnavailable,
   parseReviewListParams,
   readPartnerReviewSubmission,
   resolveReviewMediaPayload,
+  reviewSessionUnavailableResponse,
 } from "./_shared";
 import { logServerError } from "@/lib/server-log";
 
@@ -33,13 +34,19 @@ export async function GET(
   }
 
   const { id } = await context.params;
-  const session = await getReviewMemberSession().catch(() => null);
+  // A public listing degrades to anonymous when the member session cannot
+  // be read (the lookup already logged it); moderation needs a real answer.
+  const sessionLookup = await getReviewMemberSessionLookup();
+  const session = sessionLookup.ok ? sessionLookup.session : null;
   const { sort, offset, limit, rating, imagesOnly, includeHidden } = parseReviewListParams(request);
-  const partnerSession = includeHidden
-    ? await ensurePartnerReviewModerationAccess(id)
-    : null;
-  if (includeHidden && !partnerSession) {
-    return NextResponse.json({ message: "권한이 없습니다." }, { status: 403 });
+  if (includeHidden) {
+    const moderationAccess = await ensurePartnerReviewModerationAccess(id);
+    if (moderationAccess === "unavailable") {
+      return reviewSessionUnavailableResponse();
+    }
+    if (moderationAccess !== "allowed") {
+      return NextResponse.json({ message: "권한이 없습니다." }, { status: 403 });
+    }
   }
   if (!includeHidden) {
     const partner = await ensureVisibleReviewPartner(id, session?.userId ?? null);
@@ -77,7 +84,11 @@ export async function POST(
   }
 
   const { id } = await context.params;
-  const session = await getReviewMemberSession().catch(() => null);
+  const sessionLookup = await getReviewMemberSessionLookup();
+  if (!sessionLookup.ok) {
+    return reviewSessionUnavailableResponse();
+  }
+  const session = sessionLookup.session;
   if (!session?.userId) {
     return NextResponse.json(
       { ok: false, message: "로그인 후 리뷰를 작성할 수 있습니다." },

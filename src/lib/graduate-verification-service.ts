@@ -36,6 +36,7 @@ import {
 import { generateOpaqueToken, hashOpaqueToken } from "@/lib/password";
 import { hasReservedMemberIdentifier } from "@/lib/member-identifier-reservations";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { expectNoError } from "@/lib/expect-no-error";
 
 type GraduateChallengeRow = {
   id: string;
@@ -718,19 +719,27 @@ export async function requestGraduateVerificationResubmission(input: {
       note,
       requestKind: parseGraduateVerificationRequestKind(data.request_kind) ?? "graduate_signup",
     });
-    await supabase
-      .from("graduate_verification_requests")
-      .update({
-        resubmission_email_sent_at: new Date().toISOString(),
-        resubmission_email_last_error_at: null,
-      })
-      .eq("id", data.id);
+    await expectNoError(
+      supabase
+        .from("graduate_verification_requests")
+        .update({
+          resubmission_email_sent_at: new Date().toISOString(),
+          resubmission_email_last_error_at: null,
+        })
+        .eq("id", data.id),
+      "[graduate-verification] resubmission email state update failed",
+      { properties: { requestId: data.id } },
+    );
     return { targets, emailSent: true };
   } catch {
-    await supabase
-      .from("graduate_verification_requests")
-      .update({ resubmission_email_last_error_at: new Date().toISOString() })
-      .eq("id", data.id);
+    await expectNoError(
+      supabase
+        .from("graduate_verification_requests")
+        .update({ resubmission_email_last_error_at: new Date().toISOString() })
+        .eq("id", data.id),
+      "[graduate-verification] resubmission email error state update failed",
+      { properties: { requestId: data.id } },
+    );
     return { targets, emailSent: false };
   }
 }

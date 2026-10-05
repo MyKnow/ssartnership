@@ -9,10 +9,11 @@ import {
 import {
   ensureVisibleReviewPartner,
   getReviewMediaInputFieldErrors,
-  getReviewMemberSession,
+  getReviewMemberSessionLookup,
   isReviewImageUploadUnavailable,
   readPartnerReviewSubmission,
   resolveReviewMediaPayload,
+  reviewSessionUnavailableResponse,
 } from "../_shared";
 import { logServerError } from "@/lib/server-log";
 
@@ -34,7 +35,11 @@ export async function PATCH(
   }
 
   const { id, reviewId } = await context.params;
-  const session = await getReviewMemberSession().catch(() => null);
+  const sessionLookup = await getReviewMemberSessionLookup();
+  if (!sessionLookup.ok) {
+    return reviewSessionUnavailableResponse();
+  }
+  const session = sessionLookup.session;
   if (!session?.userId) {
     return NextResponse.json(
       { ok: false, message: "로그인 후 리뷰를 수정할 수 있습니다." },
@@ -158,7 +163,11 @@ export async function DELETE(
   }
 
   const { id, reviewId } = await context.params;
-  const session = await getReviewMemberSession().catch(() => null);
+  const sessionLookup = await getReviewMemberSessionLookup();
+  if (!sessionLookup.ok) {
+    return reviewSessionUnavailableResponse();
+  }
+  const session = sessionLookup.session;
   if (!session?.userId) {
     return NextResponse.json(
       { ok: false, message: "로그인 후 리뷰를 삭제할 수 있습니다." },
