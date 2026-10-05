@@ -1,9 +1,12 @@
+import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import ShowcaseWithdrawButton from "@/components/project-showcase/ShowcaseWithdrawButton";
+import { SHOWCASE_PROJECT_HERO_IMAGE_SIZES } from "@/components/project-showcase/image-sizes";
 import Button from "@/components/ui/Button";
 import { getHeaderSession } from "@/lib/header-session";
+import { getCachedImageUrl } from "@/lib/image-cache";
 import { getShowcasePhase, projectShowcaseRepository } from "@/lib/project-showcase";
 import { SHOWCASE_OWNER_STATUS_LABELS, SHOWCASE_TYPE_LABELS } from "@/lib/project-showcase/labels";
 import {
@@ -104,9 +107,14 @@ export default async function MyShowcaseProjectPage({
         ) : null}
 
         <article className="mt-6 overflow-hidden rounded-3xl border border-border bg-surface">
-          <div className="aspect-video w-full overflow-hidden bg-surface-muted">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={project.imageUrl} alt={`${project.title} 대표 이미지`} className="h-full w-full object-cover" />
+          <div className="relative aspect-video w-full overflow-hidden bg-surface-muted">
+            <Image
+              src={getCachedImageUrl(project.imageUrl)}
+              alt={`${project.title} 대표 이미지`}
+              fill
+              sizes={SHOWCASE_PROJECT_HERO_IMAGE_SIZES}
+              className="object-cover"
+            />
           </div>
           <div className="grid gap-6 p-5 sm:p-8">
             <div>
