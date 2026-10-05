@@ -75,6 +75,21 @@ test("혜택 이용 이력 관리자 폼 3개는 raw submit 버튼 대신 ui 제
   );
 });
 
+test("회원 상세 프로필 사진 승인·반려 폼은 제출 중 다시 제출할 수 없다", async () => {
+  const source = await read(
+    "src/components/admin/member-detail/AdminMemberProfilePhotoPanel.tsx",
+  );
+
+  for (const action of ["approveAction", "rejectReplacementAction", "rejectCurrentAction"]) {
+    assert.match(
+      source,
+      new RegExp(`<form action=\\{${action}\\}[\\s\\S]*?<SubmitButton [^>]*pendingText="[^"]+"[\\s\\S]*?</form>`),
+      action,
+    );
+  }
+  assert.doesNotMatch(source, /<Button [^>]*type="submit"/);
+});
+
 test("리뷰 필터 GET 폼은 transition 안에서 이동해 적용 중 상태를 보인다", async () => {
   const [navigationForm, ...sources] = await Promise.all([
     read("src/components/ui/NavigationForm.tsx"),

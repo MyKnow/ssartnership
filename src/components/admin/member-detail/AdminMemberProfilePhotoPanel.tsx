@@ -9,6 +9,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
+import SubmitButton from "@/components/ui/SubmitButton";
 import {
   getSafeAdminMessage,
   getSafeAdminResponseMessage,
@@ -285,14 +286,14 @@ export default function AdminMemberProfilePhotoPanel({
                 <form action={approveAction}>
                   <input type="hidden" name="imageId" value={pendingImageId} />
                   <input type="hidden" name="memberId" value={memberId} />
-                  <Button type="submit" className="w-full">사진 승인</Button>
+                  <SubmitButton className="w-full" pendingText="승인 중">사진 승인</SubmitButton>
                 </form>
                 <form action={rejectReplacementAction} className="grid gap-2">
                   <input type="hidden" name="imageId" value={pendingImageId} />
                   <input type="hidden" name="memberId" value={memberId} />
                   <label className="sr-only" htmlFor={`member-photo-reject-${pendingImageId}`}>반려 사유</label>
                   <input id={`member-photo-reject-${pendingImageId}`} name="reason" required maxLength={500} className="h-11 rounded-[1rem] border border-border bg-surface px-3 text-sm" placeholder="반려 사유" />
-                  <Button variant="danger" type="submit">새 사진 반려</Button>
+                  <SubmitButton variant="danger" pendingText="반려 중">새 사진 반려</SubmitButton>
                 </form>
               </div>
             </div>
@@ -303,7 +304,7 @@ export default function AdminMemberProfilePhotoPanel({
               <input type="hidden" name="memberId" value={memberId} />
               <label className="text-sm font-medium" htmlFor={`member-current-photo-reject-${memberId}`}>현재 사진 반려 사유</label>
               <input id={`member-current-photo-reject-${memberId}`} name="reason" required maxLength={500} className="h-11 rounded-[1rem] border border-border bg-surface px-3 text-sm" placeholder="사진 반려 사유" />
-              <Button variant="danger" type="submit">현재 사진 반려 및 인증 중지</Button>
+              <SubmitButton variant="danger" pendingText="반려 중">현재 사진 반려 및 인증 중지</SubmitButton>
             </form>
           ) : null}
         </>
