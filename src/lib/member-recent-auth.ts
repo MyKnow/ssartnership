@@ -4,6 +4,8 @@
  * (account deletion, binding a login/recovery email) require either a
  * credential check within the last 10 minutes or the current password.
  * Members without a password can only satisfy the rule by signing in again.
+ * The admin session bridge (`/admin/session`) uses the same window, with a
+ * fresh member login as its only proof.
  *
  * Client-safe: no secrets, no Node-only imports.
  */

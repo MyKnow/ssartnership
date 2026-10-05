@@ -77,7 +77,7 @@ Browser
 - 관리자 session은 account active, mustChangePassword, permissionVersion mismatch 시 무효 처리되고, 자신을 발급한 회원 session이 무효가 되면 함께 무효 처리된다.
 - 회원 로그아웃(`/api/mm/logout`)은 `members.auth_session_version`을 올려 그 계정의 모든 기기 session을 끝낸다.
 - 회원 쓰기 API는 `requireMemberApiSession()`으로 미로그인(401)과 비밀번호 변경 필요(403)를 함께 거부한다.
-- 민감 작업(회원 탈퇴, 로그인·복구 이메일 바인딩)은 최근 인증을 요구한다. `authenticatedAt`이 10분 이내이거나 현재 비밀번호를 확인해야 하며, 비밀번호가 없는 회원은 다시 로그인해야 한다. 규칙은 `src/lib/member-recent-auth.ts` 하나를 화면과 API가 함께 쓴다. `authenticatedAt`은 자격 확인 흐름(`freshAuthentication`)에서만 갱신되고 동의 갱신 같은 재발급은 이전 값을 유지한다.
+- 민감 작업(회원 탈퇴, 로그인·복구 이메일 바인딩, `/admin/session` 관리자 승격)은 최근 인증을 요구한다. `authenticatedAt`이 10분 이내이거나 현재 비밀번호를 확인해야 하며, 비밀번호가 없는 회원과 관리자 승격은 다시 로그인해야 한다. 규칙은 `src/lib/member-recent-auth.ts` 하나를 화면과 API가 함께 쓴다. `authenticatedAt`은 자격 확인 흐름(`freshAuthentication`)에서만 갱신되고 동의 갱신 같은 재발급은 이전 값을 유지한다.
 - 협력사 session은 companyIds가 비어 있거나 비정상 값이면 무효 처리된다.
 
 ## Domain service/helper 배치

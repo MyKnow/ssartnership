@@ -1,4 +1,5 @@
 import { getAdminAccountById, type AdminAccount } from "@/lib/admin-accounts";
+import { isMemberAuthenticationRecent } from "@/lib/member-recent-auth";
 import { SITE_URL } from "@/lib/site";
 
 const ADMIN_BRIDGE_FALLBACK = "/admin";
@@ -52,23 +53,18 @@ export function sanitizeAdminReturnTo(
 
 /**
  * The admin session (12h by default) is minted from the member session (7d).
- * Without an age limit the bridge would silently re-issue admin access for
- * the whole member session lifetime, so the member credential must itself be
- * no older than one admin session TTL. Future or non-finite timestamps fail
- * closed.
+ * Promotion to admin is a sensitive step like account deletion or binding an
+ * email, so it uses the same recent-auth rule: a credential check within the
+ * last 10 minutes. Re-entering the password through the member login is the
+ * proof otherwise, which also covers members without a password. Tokens
+ * issued before `authenticatedAt` existed, and future or non-finite times,
+ * fail closed.
  */
 export function isMemberSessionFreshForAdminBridge(
-  session: { issuedAt: number; authenticatedAt?: number },
-  ttlSeconds: number,
+  session: { authenticatedAt?: number },
   now = Date.now(),
 ) {
-  // Prefer the credential time; tokens issued before it existed fall back to
-  // the issue time, which is never earlier than the credential check.
-  const authenticatedAt = session.authenticatedAt ?? session.issuedAt;
-  if (!Number.isFinite(authenticatedAt) || authenticatedAt > now) {
-    return false;
-  }
-  return now - authenticatedAt <= ttlSeconds * 1000;
+  return isMemberAuthenticationRecent(session.authenticatedAt, now);
 }
 
 export function isAdminAccountEligibleForSessionBridge(

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logAuthSecurity, getRequestLogContext } from "@/lib/activity-logs";
-import { getAdminSessionTtlSeconds } from "@/lib/admin-security";
 import {
   isMemberSessionFreshForAdminBridge,
   resolveAdminAccountFromUserSession,
@@ -49,10 +48,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (!isMemberSessionFreshForAdminBridge(memberSession, getAdminSessionTtlSeconds())) {
-    // Re-authenticate instead of stretching admin access across the 7-day
-    // member session. Clearing the member cookie also prevents a redirect
-    // loop through the logged-in /auth/login redirect.
+  if (!isMemberSessionFreshForAdminBridge(memberSession)) {
+    // Promotion to admin needs a recent credential check instead of riding
+    // the 7-day member session. Clearing the member cookie also prevents a
+    // redirect loop through the logged-in /auth/login redirect.
     await Promise.all([clearUserSession(), clearAdminSession()]);
     await logAuthSecurity({
       ...context,

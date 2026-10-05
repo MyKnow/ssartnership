@@ -37,7 +37,7 @@ npm run bootstrap:super-admin
 
 ## 관리자 세션 수명
 
-- 관리자 세션은 회원 세션에서 `/admin/session` 브리지로만 발급된다. 브리지는 회원 세션이 관리자 세션 TTL보다 오래됐으면 재로그인을 요구한다([관리자 로그인 보안 강화](./admin-login-hardening.md)).
+- 관리자 세션은 회원 세션에서 `/admin/session` 브리지로만 발급된다. 브리지는 회원의 마지막 자격 확인이 10분보다 오래됐으면 재로그인을 요구한다(최근 인증 규칙)([관리자 로그인 보안 강화](./admin-login-hardening.md)).
 - 관리자 세션은 요청마다 자신을 발급한 회원 세션(같은 회원, 현재 `auth_session_version`)이 유효한지 함께 확인한다. 회원이 로그아웃하거나 비밀번호를 바꿔 `auth_session_version`이 올라가면 모든 기기의 관리자 세션도 즉시 무효가 된다.
 - 회원 로그아웃은 `auth_session_version`을 올려 그 계정의 모든 기기 세션을 끝낸다(운영 결정: 기기별 로그아웃 대신 전체 무효화).
 

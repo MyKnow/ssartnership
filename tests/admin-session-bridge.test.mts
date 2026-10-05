@@ -60,22 +60,36 @@ test("admin session bridge eligibility rejects inactive or password-change membe
   );
 });
 
-test("관리자 세션 브리지는 관리자 TTL보다 오래된 회원 인증을 재사용하지 않는다", async () => {
+test("관리자 세션 브리지는 최근 10분 안의 회원 자격 확인만 승격한다", async () => {
   const { isMemberSessionFreshForAdminBridge } = await bridgeModulePromise;
-  const ttlSeconds = 12 * 60 * 60;
+  const { MEMBER_RECENT_AUTH_WINDOW_MS } = await import(
+    new URL("../src/lib/member-recent-auth.ts", import.meta.url).href
+  ) as typeof import("../src/lib/member-recent-auth.ts");
   const now = Date.UTC(2026, 9, 5, 12);
 
-  assert.equal(isMemberSessionFreshForAdminBridge({ issuedAt: now - 1_000 }, ttlSeconds, now), true);
-  assert.equal(isMemberSessionFreshForAdminBridge({ issuedAt: now - ttlSeconds * 1000 }, ttlSeconds, now), true);
-  assert.equal(isMemberSessionFreshForAdminBridge({ issuedAt: now - ttlSeconds * 1000 - 1 }, ttlSeconds, now), false);
-  assert.equal(isMemberSessionFreshForAdminBridge({ issuedAt: now + 1 }, ttlSeconds, now), false);
-  assert.equal(isMemberSessionFreshForAdminBridge({ issuedAt: Number.NaN }, ttlSeconds, now), false);
+  assert.equal(MEMBER_RECENT_AUTH_WINDOW_MS, 10 * 60 * 1000);
+  assert.equal(isMemberSessionFreshForAdminBridge({ authenticatedAt: now - 1_000 }, now), true);
+  assert.equal(
+    isMemberSessionFreshForAdminBridge({ authenticatedAt: now - MEMBER_RECENT_AUTH_WINDOW_MS }, now),
+    true,
+  );
+  assert.equal(
+    isMemberSessionFreshForAdminBridge({ authenticatedAt: now - MEMBER_RECENT_AUTH_WINDOW_MS - 1 }, now),
+    false,
+  );
+  // A long-lived member session that was only re-issued (no credential
+  // check) carries an old authenticatedAt and must not mint admin access.
+  assert.equal(isMemberSessionFreshForAdminBridge({ authenticatedAt: now - 12 * 60 * 60 * 1000 }, now), false);
+  // Tokens minted before authenticatedAt existed fail closed.
+  assert.equal(isMemberSessionFreshForAdminBridge({}, now), false);
+  assert.equal(isMemberSessionFreshForAdminBridge({ authenticatedAt: now + 1 }, now), false);
+  assert.equal(isMemberSessionFreshForAdminBridge({ authenticatedAt: Number.NaN }, now), false);
 });
 
 test("관리자 세션 브리지 route는 오래된 회원 세션을 지우고 재로그인으로 보낸다", async () => {
   const { readFileSync } = await import("node:fs");
   const source = readFileSync(new URL("../src/app/admin/session/route.ts", import.meta.url), "utf8");
-  const ageGateIndex = source.indexOf("isMemberSessionFreshForAdminBridge(memberSession, getAdminSessionTtlSeconds())");
+  const ageGateIndex = source.indexOf("isMemberSessionFreshForAdminBridge(memberSession)");
   const mintIndex = source.indexOf("await setAdminSession(adminAccount)");
 
   assert.ok(ageGateIndex > 0 && ageGateIndex < mintIndex);
