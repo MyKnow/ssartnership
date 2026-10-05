@@ -21,7 +21,26 @@ test("every scheduled Production job has a supported expected interval", () => {
   assert.equal(productionCronIntervalSeconds("1-59/5 * * * *"), 300);
   assert.equal(productionCronIntervalSeconds("10 * * * *"), 3600);
   assert.equal(productionCronIntervalSeconds("40 18 * * *"), 86400);
-  for (const invalid of ["*/5 * * * *", "0 0 * * 1", "1-59/0 * * * *"]) assert.throws(() => productionCronIntervalSeconds(invalid));
+  // The longest real gap, not the step: a fixed hour waits a day, and a step
+  // that fits once per hour waits from the last run to the next hour's first.
+  assert.equal(productionCronIntervalSeconds("0-59/15 3 * * *"), 86400);
+  assert.equal(productionCronIntervalSeconds("50-59/15 * * * *"), 3600);
+  assert.equal(productionCronIntervalSeconds("0-59/7 * * * *"), 420);
+  for (const invalid of ["*/5 * * * *", "0 0 * * 1", "1-59/0 * * * *", "60 * * * *", "0 24 * * *"]) assert.throws(() => productionCronIntervalSeconds(invalid));
+});
+
+test("the expected interval matches the systemd calendar each schedule expands to", async () => {
+  const { productionCronCalendar } = await import("../scripts/self-host-operations/production-cron.mjs");
+  const { crons } = JSON.parse(read("deploy/self-host-operations/production-cron/schedules.json")) as { crons: Array<{ schedule: string }> };
+  for (const { schedule } of crons) {
+    const calendar = productionCronCalendar(schedule) as string;
+    const [, hour, minuteList] = /^\*-\*-\* (\*|\d{2}):([\d,]+):00 UTC$/u.exec(calendar) ?? [];
+    assert.ok(minuteList, calendar);
+    const minutes = minuteList.split(",").map(Number);
+    const gaps = minutes.map((minute, index) => (index + 1 < minutes.length ? minutes[index + 1] : minutes[0] + 60) - minute);
+    const expected = hour === "*" ? Math.max(...gaps) * 60 : 86400;
+    assert.equal(productionCronIntervalSeconds(schedule), expected, schedule);
+  }
 });
 
 test("metrics keep the last success across failures and use a non-reserved label", () => {

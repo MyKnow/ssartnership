@@ -9,16 +9,23 @@ export const PRODUCTION_CRON_TEXTFILE_DIR = '/etc/myknow/secrets/ssartnership-pr
 
 const JOB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
-/** Expected run interval for the reviewed daily/hourly/stepped-minute subset. */
+/**
+ * Longest expected gap between runs for the reviewed daily/hourly/
+ * stepped-minute subset (the same subset `productionCronCalendar` expands).
+ * A fixed hour waits up to a day even with stepped minutes, and a stepped
+ * schedule waits from its last minute of the hour to the next hour's first.
+ */
 export function productionCronIntervalSeconds(schedule) {
-  const match = /^(\d+|\d+-59\/(\d+)) (\d+|\*) \* \* \*$/u.exec(schedule);
+  const match = /^(\d+|\d+-59\/\d+) (\d+|\*) \* \* \*$/u.exec(schedule);
   if (!match) throw new Error('PRODUCTION_CRON_SCHEDULE_UNSUPPORTED');
-  if (match[2]) {
-    const step = Number(match[2]);
-    if (!Number.isInteger(step) || step < 1 || step > 59) throw new Error('PRODUCTION_CRON_SCHEDULE_UNSUPPORTED');
-    return step * 60;
+  const [start, step] = match[1].split('-59/').map(Number);
+  if (start > 59 || (step !== undefined && (!Number.isInteger(step) || step < 1 || step > 59)) || (match[2] !== '*' && Number(match[2]) > 23)) {
+    throw new Error('PRODUCTION_CRON_SCHEDULE_UNSUPPORTED');
   }
-  return match[3] === '*' ? 3600 : 86400;
+  if (match[2] !== '*') return 86400;
+  if (step === undefined) return 3600;
+  const lastMinute = start + Math.floor((59 - start) / step) * step;
+  return Math.max(step, 60 - (lastMinute - start)) * 60;
 }
 
 function assertJob(job) {
