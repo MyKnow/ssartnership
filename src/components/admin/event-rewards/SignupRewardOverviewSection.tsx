@@ -18,19 +18,11 @@ import {
   type EventRewardDrawPlan,
   type EventRewardStoredDraw,
 } from "@/lib/promotions/event-rewards";
+import { formatKoreanMonthDayTime } from "@/lib/datetime";
+import { formatCount } from "@/lib/number-format";
 
 function formatEventDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  return formatKoreanMonthDayTime(value) || value;
 }
 
 function rewardConditionLabel(
@@ -126,7 +118,7 @@ export default function SignupRewardOverviewSection({
   const testRecipientOptions = overview.members.map((member) => ({
     id: member.id,
     label: `${member.displayName || member.mmUsername} (@${member.mmUsername})`,
-    meta: `${member.year}기 · ${member.campus || "-"} · ${member.totalTickets.toLocaleString()}장`,
+    meta: `${member.year}기 · ${member.campus || "-"} · ${formatCount(member.totalTickets)}장`,
   }));
 
   return (
@@ -159,27 +151,27 @@ export default function SignupRewardOverviewSection({
         items={[
           {
             label: "대상 회원",
-            value: `${overview.memberCount.toLocaleString()}명`,
+            value: `${formatCount(overview.memberCount)}명`,
             hint: "전체 회원",
           },
           {
             label: "총 추첨권",
-            value: `${overview.totalTickets.toLocaleString()}장`,
+            value: `${formatCount(overview.totalTickets)}장`,
             hint: "현재 조건 기준",
           },
           {
             label: "리뷰 인정",
-            value: `${overview.reviewCount.toLocaleString()}개`,
+            value: `${formatCount(overview.reviewCount)}개`,
             hint: "이벤트 기간 visible 리뷰",
           },
           {
             label: "가입 완료",
-            value: `${(overview.conditionCounts.signup ?? 0).toLocaleString()}명`,
+            value: `${formatCount(overview.conditionCounts.signup ?? 0)}명`,
             hint: "종료 전 가입자",
           },
           {
             label: "확인가능 증가",
-            value: `${comparison.totalKnownTicketDelta.toLocaleString()}장`,
+            value: `${formatCount(comparison.totalKnownTicketDelta)}장`,
             hint: "before 복원 가능분 기준",
           },
         ]}
@@ -271,17 +263,17 @@ export default function SignupRewardOverviewSection({
               items={[
                 {
                   label: "당첨자",
-                  value: `${draw.winners.length.toLocaleString()}명`,
+                  value: `${formatCount(draw.winners.length)}명`,
                   hint: "확정 결과",
                 },
                 {
                   label: "후보",
-                  value: `${draw.candidateCount.toLocaleString()}명`,
+                  value: `${formatCount(draw.candidateCount)}명`,
                   hint: "추첨권 1장 이상",
                 },
                 {
                   label: "총 추첨권",
-                  value: `${draw.totalTickets.toLocaleString()}장`,
+                  value: `${formatCount(draw.totalTickets)}장`,
                   hint: "추첨 시점",
                 },
                 {
@@ -321,7 +313,7 @@ export default function SignupRewardOverviewSection({
                         {winner.year}기 · {winner.campus || "-"}
                       </td>
                       <td className="px-4 py-3 text-right font-semibold text-foreground">
-                        {winner.ticketCount.toLocaleString()}장
+                        {formatCount(winner.ticketCount)}장
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">
                         {eventRewardNotificationStatusLabel(winner.notificationStatus)}
@@ -363,7 +355,7 @@ export default function SignupRewardOverviewSection({
                     <div>
                       <dt className="text-xs text-muted-foreground">추첨권</dt>
                       <dd className="mt-1 font-semibold text-foreground">
-                        {winner.ticketCount.toLocaleString()}장
+                        {formatCount(winner.ticketCount)}장
                       </dd>
                     </div>
                   </dl>
@@ -384,7 +376,7 @@ export default function SignupRewardOverviewSection({
                   <p className="mt-1 text-xs text-primary/80">
                     {isRetry
                       ? "발송 기록을 확인해 이전에 MM·푸시로 안내가 닿지 않은 당첨자에게만 다시 보냅니다."
-                      : `당첨자 ${draw.winners.length.toLocaleString()}명에게 앱+MM+푸시 안내를 보냅니다.`}
+                      : `당첨자 ${formatCount(draw.winners.length)}명에게 앱+MM+푸시 안내를 보냅니다.`}
                   </p>
                 </div>
                 <label className="grid gap-2 text-sm font-medium text-primary">
@@ -510,17 +502,17 @@ export default function SignupRewardOverviewSection({
                   items={[
                     {
                       label: "미리보기 당첨자",
-                      value: `${drawPreview.winners.length.toLocaleString()}명`,
+                      value: `${formatCount(drawPreview.winners.length)}명`,
                       hint: "저장 안 됨",
                     },
                     {
                       label: "후보",
-                      value: `${drawPreview.candidateCount.toLocaleString()}명`,
+                      value: `${formatCount(drawPreview.candidateCount)}명`,
                       hint: "추첨권 1장 이상",
                     },
                     {
                       label: "총 추첨권",
-                      value: `${drawPreview.totalTickets.toLocaleString()}장`,
+                      value: `${formatCount(drawPreview.totalTickets)}장`,
                       hint: "현재 조건 기준",
                     },
                   ]}
@@ -554,7 +546,7 @@ export default function SignupRewardOverviewSection({
                             {winner.year}기 · {winner.campus || "-"}
                           </td>
                           <td className="px-4 py-3 text-right font-semibold text-foreground">
-                            {winner.ticketCount.toLocaleString()}장
+                            {formatCount(winner.ticketCount)}장
                           </td>
                         </tr>
                       ))}
@@ -588,7 +580,7 @@ export default function SignupRewardOverviewSection({
                         <div>
                           <dt className="text-xs text-muted-foreground">추첨권</dt>
                           <dd className="mt-1 font-semibold text-foreground">
-                            {winner.ticketCount.toLocaleString()}장
+                            {formatCount(winner.ticketCount)}장
                           </dd>
                         </div>
                       </dl>
@@ -644,7 +636,7 @@ export default function SignupRewardOverviewSection({
                     {member.year}기 · {member.campus || "-"}
                   </td>
                   <td className="px-4 py-3 text-right text-base font-semibold text-foreground">
-                    {member.totalTickets.toLocaleString()}장
+                    {formatCount(member.totalTickets)}장
                   </td>
                   <td className="px-4 py-3">
                     <RewardStatusPill
@@ -697,7 +689,7 @@ export default function SignupRewardOverviewSection({
               <div className="flex items-center justify-between gap-3 border-t border-border/70 pt-3">
                 <span className="text-sm text-muted-foreground">총 추첨권</span>
                 <span className="font-semibold text-foreground">
-                  {member.totalTickets.toLocaleString()}장
+                  {formatCount(member.totalTickets)}장
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
