@@ -19,6 +19,7 @@ import {
   validateCategoryKey,
   validateDateRange,
   validateMmUsername,
+  validateMemberYear,
 } from "@/lib/validation";
 
 test("isFourDigitPin은 정확히 ASCII 숫자 4자리만 허용한다", () => {
@@ -98,6 +99,17 @@ test("기수·날짜 범위 검증은 현행 경계를 유지한다", () => {
   assert.equal(validateDateRange("2026-02-29", null), "제휴 시작일 형식을 확인해 주세요.");
   assert.equal(validateDateRange("2028-02-29", "2028-03-01"), null);
   assert.equal(validateDateRange("2026-05-02", "2026-05-01"), "제휴 종료일은 시작일보다 빠를 수 없습니다.");
+});
+
+test("기수는 숫자 접두사가 아닌 전체 십진 정수 입력을 검증한다", () => {
+  for (const value of ["15.9", "15junk", "1e1", "0x10", "+15", "-0", "15\n1", "NaN", "Infinity", 15.9, Infinity, NaN]) {
+    assert.equal(parseMemberYearValue(value), null, String(value));
+    assert.ok(validateMemberYear(value), String(value));
+  }
+  for (const [value, expected] of [[" 15 ", 15], ["0", 0], ["99", 99], ["015", 15], [0, 0], [99, 99]] as const) {
+    assert.equal(parseMemberYearValue(value), expected);
+    assert.equal(validateMemberYear(value), null);
+  }
 });
 
 test("이메일·URL·색상·제휴 링크 정규화는 현행 결과를 유지한다", () => {

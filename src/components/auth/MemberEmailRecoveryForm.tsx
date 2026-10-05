@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { requestJson, isJsonRecord } from "@/lib/client-request";
+import { ClientRequestError, requestJson, isJsonRecord } from "@/lib/client-request";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
@@ -37,7 +37,7 @@ export default function MemberEmailRecoveryForm() {
   const [code, setCode] = useState("");
   const [pending, setPending] = useState(false);
   const hydrated = useHydrated();
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; tone: "info" | "error" } | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   function resetMessage() {
@@ -68,9 +68,9 @@ export default function MemberEmailRecoveryForm() {
       });
       setPassword("");
       setStep("email");
-      setMessage("15분 안에 이메일을 등록하고 인증해 주세요.");
+      setMessage({ text: "15분 안에 이메일을 등록하고 인증해 주세요.", tone: "info" });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "복구 세션을 시작하지 못했습니다.");
+      setMessage({ text: error instanceof ClientRequestError ? error.message : "복구 세션을 시작하지 못했습니다.", tone: "error" });
     } finally {
       setPending(false);
     }
@@ -102,9 +102,9 @@ export default function MemberEmailRecoveryForm() {
       }
       setEmail(normalizedEmail);
       setStep("code");
-      setMessage("이메일로 보낸 6자리 코드를 입력해 주세요.");
+      setMessage({ text: "이메일로 보낸 6자리 코드를 입력해 주세요.", tone: "info" });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "인증 코드를 보내지 못했습니다.");
+      setMessage({ text: error instanceof ClientRequestError ? error.message : "인증 코드를 보내지 못했습니다.", tone: "error" });
     } finally {
       setPending(false);
     }
@@ -120,7 +120,7 @@ export default function MemberEmailRecoveryForm() {
     setPending(true);
     resetMessage();
     try {
-      const data = await requestJson("/api/member/recovery/email/verify", {
+      await requestJson("/api/member/recovery/email/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code }),
@@ -131,7 +131,7 @@ export default function MemberEmailRecoveryForm() {
       router.replace(getRecoveryCompletionHref());
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "이메일 인증을 완료하지 못했습니다.");
+      setMessage({ text: error instanceof ClientRequestError ? error.message : "이메일 인증을 완료하지 못했습니다.", tone: "error" });
     } finally {
       setPending(false);
     }
@@ -257,7 +257,7 @@ export default function MemberEmailRecoveryForm() {
         </div>
       ) : null}
 
-      {message ? <FormMessage variant="info">{message}</FormMessage> : null}
+      {message ? <FormMessage variant={message.tone}>{message.text}</FormMessage> : null}
       <p className="text-sm text-muted-foreground">
         기존 비밀번호를 모르면 <Link className="font-medium underline underline-offset-4" href="/auth/signup/graduate?kind=recovery">기존 회원 복구 신청</Link>을 이용해 주세요.
       </p>

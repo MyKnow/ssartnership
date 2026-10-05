@@ -12,5 +12,7 @@ test("즐겨찾기 토글은 서버 응답으로 상태를 맞추고 force-dynam
   assert.doesNotMatch(source, /useRouter/);
   assert.match(source, /setIsFavorited\(Boolean\(payload\?\.favorite \?\? nextFavorited\)\)/);
   assert.match(source, /if \(typeof payload\?\.count === "number"\) \{\s*setCount\(payload\.count\);/);
-  assert.match(source, /onToggle\?\.\(!nextFavorited\)/);
+  assert.match(source, /onToggle\?\.\(!nextFavorited, previousCount\)/);
+  assert.match(source, /onToggle\?\.\(Boolean\(payload\?\.favorite \?\? nextFavorited\), payload\?\.count\)/);
+  assert.match(source, /disabled=\{isPending \|\| pending\}/);
 });

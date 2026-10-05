@@ -18,3 +18,21 @@ test("non-JSON responses use the fallback and abort errors keep their identity",
   t.mock.method(globalThis, "fetch", async () => { throw abort; });
   await assert.rejects(requestJson("https://example.test", {}, options), (error: unknown) => error === abort);
 });
+
+test("aborting a response body preserves the original AbortError", async (t) => {
+  const abort = new DOMException("body aborted", "AbortError");
+  const response = new Response("{}");
+  t.mock.method(response, "json", async () => { throw abort; });
+  t.mock.method(globalThis, "fetch", async () => response);
+  await assert.rejects(requestJson("https://example.test", {}, options), (error: unknown) => error === abort);
+});
+
+test("network and unexpected parser failures never expose raw error messages", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => { throw new TypeError("Failed to fetch: internal host"); });
+  await assert.rejects(requestJson("https://example.test", {}, options),
+    (error: unknown) => error instanceof ClientRequestError && error.message === options.fallbackMessage);
+  t.mock.method(globalThis, "fetch", async () => Response.json({}));
+  await assert.rejects(requestJson("https://example.test", {}, {
+    ...options, parse: () => { throw new Error("private parser diagnostic"); },
+  }), (error: unknown) => error instanceof ClientRequestError && error.message === options.fallbackMessage);
+});

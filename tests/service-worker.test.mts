@@ -26,9 +26,10 @@ type Listener = (event: Record<string, unknown>) => void;
 type WorkerOptions = {
   fetchImpl?: (request: Request) => Promise<Response>;
   initialCaches?: string[];
+  failCachePut?: boolean;
 };
 
-function createWorker({ fetchImpl, initialCaches = [] }: WorkerOptions = {}) {
+function createWorker({ fetchImpl, initialCaches = [], failCachePut = false }: WorkerOptions = {}) {
   const listeners = new Map<string, Listener>();
   const stores = new Map<string, Map<string, Response>>(
     initialCaches.map((name) => [name, new Map()]),
@@ -44,6 +45,7 @@ function createWorker({ fetchImpl, initialCaches = [] }: WorkerOptions = {}) {
       const store = stores.get(name)!;
       return {
         async put(key: string, response: Response) {
+          if (failCachePut) throw new Error("storage unavailable");
           store.set(key, response);
         },
       };
@@ -187,10 +189,65 @@ test("activate removes older app caches only and claims clients", async () => {
       "other-library-cache",
     ],
   });
+  worker.stores.get(offlineCacheName)!.set(OFFLINE_FALLBACK_PATH, offlineResponse());
   await worker.activate();
 
   assert.deepEqual([...worker.stores.keys()].sort(), ["other-library-cache", offlineCacheName]);
   assert.equal(worker.counts().claimCalls, 1);
+});
+
+test("an update keeps the last good fallback when its replacement cannot be precached", async () => {
+  for (const failure of ["network", "404", "redirect", "storage"] as const) {
+    const previousCache = "ssartnership-offline-v1";
+    const worker = createWorker({
+      initialCaches: [previousCache, "other-library-cache"],
+      failCachePut: failure === "storage",
+      fetchImpl: async (request) => {
+        if (new URL(request.url).pathname !== OFFLINE_FALLBACK_PATH || failure === "network") throw new TypeError("offline");
+        if (failure === "404") return new Response("missing", { status: 404 });
+        const response = offlineResponse();
+        if (failure === "redirect") Object.defineProperty(response, "redirected", { value: true });
+        return response;
+      },
+    });
+    worker.stores.get(previousCache)!.set(OFFLINE_FALLBACK_PATH, new Response("previous offline page"));
+    await worker.install();
+    await worker.activate();
+    assert.ok(worker.stores.has(previousCache), failure);
+    assert.ok(worker.stores.has("other-library-cache"), failure);
+    const response = await worker.dispatchFetch(navigation("/coupons"));
+    assert.equal(await response?.text(), "previous offline page", failure);
+  }
+});
+
+test("a successful update replaces the old fallback before retiring its cache", async () => {
+  const previousCache = "ssartnership-offline-v1";
+  const worker = createWorker({
+    initialCaches: [previousCache],
+    fetchImpl: async (request) => {
+      if (new URL(request.url).pathname === OFFLINE_FALLBACK_PATH) return offlineResponse();
+      throw new TypeError("offline");
+    },
+  });
+  worker.stores.get(previousCache)!.set(OFFLINE_FALLBACK_PATH, new Response("previous"));
+  await worker.install();
+  assert.ok(worker.stores.has(previousCache));
+  await worker.activate();
+  assert.equal(worker.stores.has(previousCache), false);
+  const response = await worker.dispatchFetch(navigation("/coupons"));
+  assert.equal(await response?.text(), "<h1>offline</h1>");
+});
+
+test("offline fallback ignores unrelated caches and prefers the current verified page", async () => {
+  const worker = createWorker({ initialCaches: ["other-library-cache", "ssartnership-data", offlineCacheName] });
+  worker.stores.get("other-library-cache")!.set(OFFLINE_FALLBACK_PATH, new Response("unrelated"));
+  worker.stores.get("ssartnership-data")!.set(OFFLINE_FALLBACK_PATH, new Response("not an offline cache"));
+  const failed = worker.dispatchFetch(navigation("/"));
+  assert.ok(failed);
+  await assert.rejects(failed, /Failed to fetch/);
+  worker.stores.get(offlineCacheName)!.set(OFFLINE_FALLBACK_PATH, offlineResponse());
+  const current = await worker.dispatchFetch(navigation("/"));
+  assert.equal(await current?.text(), "<h1>offline</h1>");
 });
 
 test("navigations are network-first and fall back to the offline page", async () => {

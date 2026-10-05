@@ -7,6 +7,7 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
 } from "react";
@@ -18,7 +19,7 @@ import PartnerActiveFilters from "@/components/partner-filters/PartnerActiveFilt
 import PartnerDirectoryToolbar from "@/components/partner-filters/PartnerDirectoryToolbar";
 import { useHomePartnerState } from "@/components/home-view/useHomePartnerState";
 import { useHomeSearchAnalytics } from "@/components/home-view/useHomeSearchAnalytics";
-import { homeDirectoryKey, isHomeHistoryReturn, parseHomeReturnState } from "@/components/home-view/state-merge";
+import { createHomePartnerState, homePartnerStateReducer, homeDirectoryKey, isHomeHistoryReturn, parseHomeReturnState } from "@/components/home-view/state-merge";
 import PartnerCardView from "@/components/PartnerCardView";
 import EmptyState from "@/components/ui/EmptyState";
 import HomeDirectorySectionHeader from "@/components/home-view/HomeDirectorySectionHeader";
@@ -81,15 +82,12 @@ export default function HomeView({
   });
   const [searchInputValue, setSearchInputValue] = useState(searchValue);
   const directoryHydrated = useHydrated();
-  const [localPopularityById, setLocalPopularityById] = useState<
-    Record<string, PartnerPopularityMetrics | undefined>
-  >(partnerPopularityById ?? {});
-  const [localFavoriteStateById, setLocalFavoriteStateById] = useState<
-    Record<string, boolean | undefined>
-  >(partnerFavoriteStateById ?? {});
-  const [loadedFavoritePartnerIdSet, setLoadedFavoritePartnerIdSet] = useState(
-    () => new Set(loadedFavoritePartnerIds ?? []),
+  const [partnerState, dispatchPartnerState] = useReducer(
+    homePartnerStateReducer,
+    { favorites: partnerFavoriteStateById, popularity: partnerPopularityById, loadedIds: loadedFavoritePartnerIds },
+    createHomePartnerState,
   );
+  const { favorites: localFavoriteStateById, popularity: localPopularityById, loadedIds: loadedFavoritePartnerIdSet } = partnerState;
   const deferredSearchValue = useDeferredValue(searchValue);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
   const { notify } = useToast();
@@ -316,7 +314,7 @@ export default function HomeView({
     return () => window.cancelAnimationFrame(animationFrame);
   }, []);
 
-  useHomePartnerState({ currentUserId, displayPartnerIds, loadedFavoritePartnerIdSet, setLocalFavoriteStateById, setLoadedFavoritePartnerIdSet });
+  useHomePartnerState({ currentUserId, displayPartnerIds, loadedFavoritePartnerIdSet, dispatch: dispatchPartnerState });
   useHomeSearchAnalytics({ activeCategory, campusFilter, appliesToFilter, deferredSearchValue, sortValue, visibleResultCount });
 
   const handleCategoryChange = (nextCategory: CategoryKey | "all") => {
@@ -385,24 +383,11 @@ export default function HomeView({
     commitSearchValue(searchInputValue);
   };
 
-  const handleFavoriteChange = (partnerId: string, nextFavorited: boolean) => {
-    setLocalPopularityById((current) => {
-      const currentMetrics = current[partnerId] ?? {
-        favoriteCount: 0,
-        reviewCount: 0,
-        detailViews: 0,
-      };
-      return {
-        ...current,
-        [partnerId]: {
-          ...currentMetrics,
-          favoriteCount: Math.max(
-            0,
-            (currentMetrics.favoriteCount ?? 0) + (nextFavorited ? 1 : -1),
-          ),
-        },
-      };
-    });
+  const handleFavoriteChange = (partnerId: string, nextFavorited: boolean, count?: number) => {
+    dispatchPartnerState({ type: "favorite", partnerId, favorite: nextFavorited, count });
+  };
+  const handleFavoritePendingChange = (partnerId: string, pending: boolean, outcome?: "success" | "failure") => {
+    dispatchPartnerState({ type: "pending", partnerId, pending, outcome });
   };
 
   return (
@@ -498,6 +483,8 @@ export default function HomeView({
                     metrics={localPopularityById?.[partner.id]}
                     onCategoryClick={handleCategoryChange}
                     onFavoriteChange={handleFavoriteChange}
+                    favoritePending={partnerState.pendingIds.has(partner.id)}
+                    onFavoritePendingChange={handleFavoritePendingChange}
                     variant={viewMode}
                   />
                 ))}

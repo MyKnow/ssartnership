@@ -26,6 +26,9 @@ async function precacheOfflinePage() {
 
 async function deleteStaleCaches() {
   try {
+    // A failed update must not delete the installed app's last working fallback.
+    const replacement = await caches.match(OFFLINE_URL, { cacheName: OFFLINE_CACHE });
+    if (!replacement?.ok || replacement.redirected) return;
     const keys = await caches.keys();
     await Promise.all(
       keys
@@ -35,6 +38,24 @@ async function deleteStaleCaches() {
   } catch {
     // A stale cache only wastes storage; activation continues.
   }
+}
+
+async function getOfflineFallback() {
+  try {
+    const current = await caches.match(OFFLINE_URL, { cacheName: OFFLINE_CACHE });
+    if (current?.ok && !current.redirected) return current;
+    // Only our versioned offline pages are eligible; never use cached app data.
+    const previousCaches = (await caches.keys()).filter(
+      (key) => key.startsWith(`${CACHE_PREFIX}offline-`) && key !== OFFLINE_CACHE,
+    );
+    for (const cacheName of previousCaches.reverse()) {
+      const previous = await caches.match(OFFLINE_URL, { cacheName });
+      if (previous?.ok && !previous.redirected) return previous;
+    }
+  } catch {
+    // Storage may be unavailable. Preserve the original network failure below.
+  }
+  return null;
 }
 
 function shouldHandleNavigation(request) {
@@ -48,7 +69,7 @@ async function networkFirstNavigation(request) {
   try {
     return await fetch(request);
   } catch (error) {
-    const cached = await caches.match(OFFLINE_URL, { cacheName: OFFLINE_CACHE });
+    const cached = await getOfflineFallback();
     if (cached) return cached;
     throw error;
   }
