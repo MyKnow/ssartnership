@@ -1,4 +1,5 @@
 import { isAdCouponDownloadable, type AdCampaignLike } from "@/lib/ad-packages";
+import { getKstDateParts } from "@/lib/datetime";
 
 export type CouponQuota = {
   limit: number | null;
@@ -62,21 +63,6 @@ function getTime(value: string | null | undefined) {
   }
   const time = new Date(value).getTime();
   return Number.isFinite(time) ? time : null;
-}
-
-function getKstDateParts(value: Date) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(value);
-  const getPart = (type: string) => Number(parts.find((part) => part.type === type)?.value);
-  return {
-    year: getPart("year"),
-    month: getPart("month"),
-    day: getPart("day"),
-  };
 }
 
 function pad(value: number) {

@@ -28,14 +28,14 @@ FE 제출 전 검증과 BE 신뢰 경계 검증은 아래 공용 모듈의 같�
 | UUID | `src/lib/uuid.ts`의 `isUuid`(앞뒤 공백 허용)·`isUuidFormat`(정확 일치), 버전 1~8 |
 | 입력 길이 상한 | 도메인 규칙 모듈의 상수(예: `SHOWCASE_PROJECT_LIMITS`, `PARTNER_BILLING_FIELD_LIMITS`, `REVIEW_TEXT_LIMITS`, `ADMIN_REVIEW_NOTE_MAX_LENGTH`, `NOTIFICATION_TEMPLATE_MAX_*`). 폼 `maxLength`는 상수를 참조한다 |
 | 필드 오류와 첫 오류 필드 | `src/lib/field-errors.ts`의 `FieldErrors`·`hasFieldErrors`·`firstInvalidField` |
-| FormData 문자열 읽기 | `src/lib/form-data.ts`의 `readString`(trim)·`readRawString`(원문) |
-| 날짜·시각 표기 | `src/lib/datetime.ts`. 모든 표기는 `Asia/Seoul`로 고정하고, 화면에서 `timeZone` 없는 `Intl.DateTimeFormat`이나 날짜 객체의 `toLocaleString()`·`toLocaleDateString()`을 직접 쓰지 않는다. 기존 `toLocaleString("ko-KR")` 표기는 `formatKoreanLocaleDateTime`으로 유지한다 |
+| FormData 문자열 읽기 | `src/lib/form-data.ts`의 `readString`(trim)·`readRawString`(원문). server action에 같은 모양의 로컬 helper를 다시 만들지 않는다 |
+| 날짜·시각 표기 | `src/lib/datetime.ts`. 모든 표기는 `Asia/Seoul`로 고정하고, `Intl.DateTimeFormat`은 이 모듈 안에서만 만든다. 화면·도메인에서 날짜 객체의 `toLocaleString()`·`toLocaleDateString()`을 직접 쓰지 않으며, 기존 `toLocaleString("ko-KR")` 표기는 `formatKoreanLocaleDateTime`으로 유지한다. KST 날짜 문자열(`YYYY-MM-DD`)은 `formatKoreanIsoDate`, 연·월·일 계산은 `getKstDateParts`를 쓰고 타임스탬프 문자열을 잘라 날짜로 쓰지 않는다(UTC 날짜가 나와 KST 00:00~08:59가 하루 앞당겨진다) |
 | 숫자·통화·퍼센트 표기 | `src/lib/number-format.ts`의 `formatCount`·`formatKoreanWon`·`formatPercent`. 로케일 인자 없는 `toLocaleString()`은 쓰지 않는다 |
 
 ## Server action 실패 피드백 쿼리 규약
 
-- 관리자 server action은 실패를 `redirectAdminActionError(path, code)`로 돌려보내고, 경로에 `?error=<snake_case 코드>`를 붙인다. 별도 결과 객체(ActionResult)로 전면 전환하지 않는다.
-- 코드는 문구와 함께 메시지 맵에 먼저 등록한다. 공용 맵은 `src/lib/admin-action-errors.ts`의 `adminActionErrorMessages`이고, 검토 큐·알림 템플릿·제휴처 쿠폰·광고 캠페인·제휴처 폼처럼 화면이 소유한 맵도 `AdminRedirectErrorCode` 타입에 포함된다. 어느 맵에도 없는 코드는 타입 검사와 `tests/admin-action-error-codes.test.mts`에서 실패한다.
+- 관리자 server action은 실패를 `redirectAdminActionError(path, code)`로 돌려보내고, 경로에 `?error=<snake_case 코드>`를 붙인다. 경로에 이미 쿼리(예: `returnTo`)가 있으면 헬퍼가 `&error=`로 붙이므로 `?error=`를 직접 이어 붙이지 않는다. 별도 결과 객체(ActionResult)로 전면 전환하지 않는다.
+- 코드는 문구와 함께 메시지 맵에 먼저 등록한다. 공용 맵은 `src/lib/admin-action-errors.ts`의 `adminActionErrorMessages`이고, 검토 큐·알림 템플릿·제휴처 쿠폰·광고 캠페인·이벤트·제휴처 폼처럼 화면이 소유한 맵도 `AdminRedirectErrorCode` 타입에 포함된다. 어느 맵에도 없는 코드는 타입 검사와 `tests/admin-action-error-codes.test.mts`에서 실패한다.
 - 서비스가 throw한 오류는 `getSafeAdminActionErrorCode(error, fallback)`로 코드 모양만 통과시킨다. 이 동적 코드는 화면 맵에 없을 수 있으므로 화면은 일반 안내 문구로 대체한다.
 - 화면은 `?error=` 값을 `pickAllowedEntry`·`getAdminActionErrorMessage`로 조회해 own property만 문구로 바꾼다. 쿼리 값을 그대로 렌더링하거나 `decodeURIComponent`로 다시 해석하지 않는다.
 - 성공 피드백은 각 화면이 이미 쓰는 키(`?success=`, `?status=`)를 유지하고 새 쿼리 키를 만들지 않는다.

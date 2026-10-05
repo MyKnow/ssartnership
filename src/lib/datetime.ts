@@ -133,6 +133,30 @@ export function getKstDateString(daysFromToday = 0, baseDate: Date = new Date())
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * KST 달력 기준 연·월·일 숫자(기간 키·기수 계산용). 잘못된 날짜면 각 값이 `NaN`이다.
+ */
+export function getKstDateParts(value: DateLike = new Date()) {
+  const kst = new Date(toDate(value).getTime() + KOREA_UTC_OFFSET_MS);
+  return {
+    year: kst.getUTCFullYear(),
+    month: kst.getUTCMonth() + 1,
+    day: kst.getUTCDate(),
+  };
+}
+
+/**
+ * KST 기준 `YYYY-MM-DD`(date input 기본값, 짧은 날짜 표기). 타임스탬프 문자열을 잘라 쓰면
+ * UTC 날짜가 나와 KST 00:00~08:59 값이 하루 앞당겨진다. 잘못된 날짜는 빈 문자열이다.
+ */
+export function formatKoreanIsoDate(value: DateLike) {
+  const date = toDate(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return getKstDateString(0, date);
+}
+
 export function formatKoreanDateTimeLocalValue(value: DateLike) {
   const date = toDate(value);
   if (Number.isNaN(date.getTime())) {

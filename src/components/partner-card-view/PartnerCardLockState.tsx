@@ -3,6 +3,7 @@ import { cn } from "@/lib/cn";
 import {
   getPartnerLockCopy,
   getPartnerVisibilityBadgeClass,
+  type PartnerLockKind,
 } from "@/lib/partner-visibility";
 import type { PartnerVisibility } from "@/lib/types";
 
@@ -11,7 +12,7 @@ export default function PartnerCardLockState({
   visibility,
   className,
 }: {
-  lockKind: "confidential" | "private";
+  lockKind: PartnerLockKind;
   visibility: PartnerVisibility;
   className?: string;
 }) {

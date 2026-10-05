@@ -1,4 +1,4 @@
-import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
+import { formatKoreanDateTimeToMinute, getKstDateString } from "@/lib/datetime";
 import type {
   PartnerNotificationCategory,
   PartnerNotificationEntry,
@@ -509,12 +509,7 @@ export function filterPartnerNotificationUiModels(
 }
 
 function getKoreanDateKey(value: Date) {
-  return new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(value);
+  return getKstDateString(0, value);
 }
 
 export function summarizePartnerNotificationUiModels(

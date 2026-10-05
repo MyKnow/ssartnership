@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   adminActionErrorMessages,
   adminAdCampaignErrorMessages,
+  adminEventErrorMessages,
   adminPartnerCouponErrorMessages,
   getAdminActionErrorMessage,
   getSafeAdminActionErrorCode,
@@ -24,6 +25,7 @@ function isKnownRedirectCode(code: string) {
     adminActionErrorMessages,
     adminPartnerCouponErrorMessages,
     adminAdCampaignErrorMessages,
+    adminEventErrorMessages,
     partnerFormErrorMessages,
   ].some((messages) => Object.hasOwn(messages, code))
     || getAdminReviewQueueFeedback({ error: code }) !== GENERIC_REVIEW_FEEDBACK
@@ -43,6 +45,7 @@ test("관리자 오류 코드 맵은 redirect 가능한 코드 모양과 한국�
     adminActionErrorMessages,
     adminPartnerCouponErrorMessages,
     adminAdCampaignErrorMessages,
+    adminEventErrorMessages,
     partnerFormErrorMessages,
   ]) {
     for (const [code, message] of Object.entries(messages)) {
@@ -101,4 +104,18 @@ test("관리자 server action이 redirect·fallback·throw하는 정적 코드�
   }
 
   assert.deepEqual([...unknownCodes], []);
+});
+
+test("관리자 화면·server action은 ?error= 쿼리를 직접 이어 붙이지 않고 redirectAdminActionError를 쓴다", () => {
+  const adminRoot = new URL("../src/app/admin/", import.meta.url);
+  const offenders = listSourceFiles(adminRoot)
+    .map((file) => ({
+      relative: decodeURIComponent(file.href.slice(adminRoot.href.length)),
+      source: readFileSync(file, "utf8"),
+    }))
+    // 경로에 이미 쿼리가 있으면 `?error=`가 앞 쿼리 값에 붙어 문구가 사라진다. 헬퍼는 구분자를 고른다.
+    .filter(({ source }) => /[?&]error=\$\{|["'`][?&]error=["'`]\s*\+/u.test(source))
+    .map(({ relative }) => relative);
+
+  assert.deepEqual(offenders, []);
 });
