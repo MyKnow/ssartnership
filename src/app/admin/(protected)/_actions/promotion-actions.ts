@@ -51,13 +51,10 @@ import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { PROMOTION_SLIDES_BUCKET } from "@/lib/promotion-slide-storage";
 import { logAdminAction } from "./shared-helpers";
 import { logServerError } from "@/lib/server-log";
-
-function getString(formData: FormData, key: string) {
-  return String(formData.get(key) ?? "").trim();
-}
+import { readString } from "@/lib/form-data";
 
 function getRequiredString(formData: FormData, key: string) {
-  const value = getString(formData, key);
+  const value = readString(formData, key);
   if (!value) {
     throw new Error("필수 입력값을 확인해 주세요.");
   }
@@ -79,7 +76,7 @@ function normalizeSlug(value: string) {
  * default event.
  */
 function requireEventRewardActionSlug(formData: FormData) {
-  const slug = normalizeSlug(getString(formData, "slug"));
+  const slug = normalizeSlug(readString(formData, "slug"));
   if (!slug || !supportsEventRewardDraw(slug)) {
     redirectEventRegistrationError(slug, "admin_event_reward_unsupported");
   }
@@ -263,7 +260,7 @@ function extractEventSlugFromHref(href: string) {
 }
 
 function parsePromotionSlideDrafts(formData: FormData) {
-  const raw = getString(formData, "slidesJson");
+  const raw = readString(formData, "slidesJson");
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -337,7 +334,7 @@ function parsePromotionSlideDrafts(formData: FormData) {
 
 export async function createPromotionEventAction(formData: FormData) {
   await requireAdminPermission("events", "create", { path: "/admin/event" });
-  const slug = normalizeSlug(getString(formData, "slug"));
+  const slug = normalizeSlug(readString(formData, "slug"));
   let payload: PromotionEventRegistrationRow;
   try {
     payload = parsePromotionEventRegistration(formData, slug);
@@ -360,8 +357,8 @@ export async function createPromotionEventAction(formData: FormData) {
 
 export async function updatePromotionEventAction(formData: FormData) {
   await requireAdminPermission("events", "update", { path: "/admin/event" });
-  const id = getString(formData, "id");
-  const slug = normalizeSlug(getString(formData, "slug"));
+  const id = readString(formData, "id");
+  const slug = normalizeSlug(readString(formData, "slug"));
   let payload: PromotionEventRegistrationRow;
   let target: PromotionEventRegistrationTarget | null;
   try {
@@ -387,8 +384,8 @@ export async function updatePromotionEventAction(formData: FormData) {
 
 export async function deletePromotionEventAction(formData: FormData) {
   await requireAdminPermission("events", "delete", { path: "/admin/event" });
-  const id = getString(formData, "id");
-  const slug = getString(formData, "slug") || id;
+  const id = readString(formData, "id");
+  const slug = readString(formData, "slug") || id;
   try {
     if (!id) {
       throw new Error("이벤트 식별자를 확인해 주세요.");
@@ -584,9 +581,9 @@ async function savePromotionSlidesMutation(formData: FormData) {
 export async function createEventRewardDrawAction(formData: FormData) {
   await requireAdminPermission("events", "create", { path: "/admin/event" });
   const slug = requireEventRewardActionSlug(formData);
-  const winnerCount = getString(formData, "winnerCount");
-  const seed = getString(formData, "seed");
-  const googleFormUrl = getString(formData, "googleFormUrl");
+  const winnerCount = readString(formData, "winnerCount");
+  const seed = readString(formData, "seed");
+  const googleFormUrl = readString(formData, "googleFormUrl");
   const definition = getEventPageDefinition(slug);
   if (!definition) {
     redirectEventRewardDrawError({
@@ -650,8 +647,8 @@ export async function createEventRewardDrawAction(formData: FormData) {
 export async function previewEventRewardDrawAction(formData: FormData) {
   await requireAdminPermission("events", "read", { path: "/admin/event" });
   const slug = requireEventRewardActionSlug(formData);
-  const winnerCount = getString(formData, "winnerCount");
-  const seed = getString(formData, "seed");
+  const winnerCount = readString(formData, "winnerCount");
+  const seed = readString(formData, "seed");
   const request = parseEventRewardDrawPreviewRequest({
     winnerCount,
     seed,
@@ -685,7 +682,7 @@ export async function previewEventRewardDrawAction(formData: FormData) {
 export async function sendEventRewardWinnerNotificationsAction(formData: FormData) {
   await requireAdminPermission("events", "update", { path: "/admin/event" });
   const slug = requireEventRewardActionSlug(formData);
-  const drawId = getString(formData, "drawId");
+  const drawId = readString(formData, "drawId");
   let result: Awaited<ReturnType<typeof sendEventRewardWinnerNotifications>>;
   try {
     if (!drawId) {
@@ -693,7 +690,7 @@ export async function sendEventRewardWinnerNotificationsAction(formData: FormDat
     }
     result = await sendEventRewardWinnerNotifications(drawId, {
       eventSlug: slug,
-      confirmationText: getString(formData, "confirmationText"),
+      confirmationText: readString(formData, "confirmationText"),
     });
   } catch (error) {
     redirectEventRewardDrawError({
@@ -724,8 +721,8 @@ export async function sendEventRewardWinnerNotificationsAction(formData: FormDat
 export async function sendEventRewardWinnerTestNotificationAction(formData: FormData) {
   await requireAdminPermission("events", "update", { path: "/admin/event" });
   const slug = requireEventRewardActionSlug(formData);
-  const drawId = getString(formData, "drawId") || null;
-  const memberId = getString(formData, "memberId");
+  const drawId = readString(formData, "drawId") || null;
+  const memberId = readString(formData, "memberId");
   let result: Awaited<ReturnType<typeof sendEventRewardWinnerTestNotification>>;
   try {
     if (!memberId) {
