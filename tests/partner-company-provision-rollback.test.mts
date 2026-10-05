@@ -25,6 +25,7 @@ test("기존 계정 연결 실패 시 갱신한 계정 값을 원복한다", asy
   function from(table: string) {
     let operation: Operation = "select";
     let values: Record<string, unknown> | null = null;
+    let returning = false;
 
     const execute = (single: boolean) => {
       let data: unknown = null;
@@ -53,13 +54,15 @@ test("기존 계정 연결 실패 시 갱신한 계정 값을 원복한다", asy
         error = { code: "23505", message: "duplicate link" };
       } else if (table === "partner_companies" && operation === "delete") {
         events.push("company:delete");
+        data = { id: "company-1" };
       }
 
-      return Promise.resolve({ data: single ? data : null, error });
+      return Promise.resolve({ data: single ? data : returning ? [data] : null, error, status: error ? 409 : operation === "insert" ? 201 : returning ? 200 : 204 });
     };
 
     const builder = {
       select() {
+        returning = true;
         return builder;
       },
       insert(input: Record<string, unknown>) {

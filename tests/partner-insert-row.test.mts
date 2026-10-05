@@ -63,7 +63,12 @@ test("등록 신청 전환 경로는 같은 빌더 컬럼 집합으로 제휴처
     let values: unknown = null;
     const respond = () => {
       if (table === "partner_brand_profiles" && operation === "insert") {
-        return Promise.resolve({ data: { id: "brand-1" }, error: null });
+        const row = values as { company_id: string; name: string };
+        return Promise.resolve({
+          data: { id: "brand-1", company_id: row.company_id, name: row.name },
+          error: null,
+          status: 201,
+        });
       }
       if (table === "partners" && operation === "insert") {
         insertedRows.push(values as Record<string, unknown>);
@@ -71,9 +76,10 @@ test("등록 신청 전환 경로는 같은 빌더 컬럼 집합으로 제휴처
         return Promise.resolve({
           data: { id: row.id, name: row.name, location: row.location },
           error: null,
+          status: 201,
         });
       }
-      return Promise.resolve({ data: null, error: null });
+      return Promise.resolve({ data: null, error: null, status: 200 });
     };
     const builder = {
       select: () => builder,
@@ -88,7 +94,7 @@ test("등록 신청 전환 경로는 같은 빌더 컬럼 집합으로 제휴처
       single: respond,
       maybeSingle: respond,
       then: (
-        onFulfilled: (value: { data: unknown; error: null }) => unknown,
+        onFulfilled: (value: { data: unknown; error: null; status: number }) => unknown,
         onRejected?: (reason: unknown) => unknown,
       ) => respond().then(onFulfilled, onRejected),
     };

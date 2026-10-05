@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   createPartnerFromPortalRegistrationRequest,
+  PartnerRegistrationConversionCleanupError,
   resolveRegistrationManagedCampusSlugs,
   rollbackPartnerRegistrationRequestStatus,
   type PartnerRegistrationRequestRow,
@@ -12,7 +13,7 @@ import {
 } from "../src/lib/partner-registration-conversion.server.ts";
 
 type QueryError = { code?: string; message: string };
-type QueryResponse = { data: unknown; error: QueryError | null };
+type QueryResponse = { data: unknown; error: QueryError | null; status: number };
 type QueryOperation = "select" | "insert" | "update" | "delete" | "upsert";
 type QueryCall = {
   table: string;
@@ -53,6 +54,7 @@ function createSupabaseStub(handler: QueryHandler) {
       return Promise.resolve({
         data: result.data ?? null,
         error: result.error ?? null,
+        status: result.status ?? (result.error ? 400 : call.operation === "insert" ? 201 : call.operation === "delete" ? 204 : 200),
       });
     };
     const builder: QueryBuilder = {
@@ -187,7 +189,7 @@ test("전환 성공 시 회사·브랜드·제휴처·혜택을 순서대로 만
   const { client, calls } = createSupabaseStub((call) => {
     events.push(`${call.table}:${call.operation}`);
     if (call.table === "partner_brand_profiles" && call.operation === "insert") {
-      return { data: { id: "brand-1" } };
+      return { data: { ...(call.values as Record<string, unknown>), id: "brand-1" } };
     }
     if (call.table === "partners" && call.operation === "insert") {
       const row = call.values as Record<string, unknown>;
@@ -206,6 +208,9 @@ test("전환 성공 시 회사·브랜드·제휴처·혜택을 순서대로 만
           map_url: row.map_url,
         },
       };
+    }
+    if (call.table === "partner_benefits" && call.operation === "insert") {
+      return { data: call.values };
     }
     return { data: null };
   });
@@ -327,7 +332,7 @@ test("두 번째 혜택 그룹 저장이 실패하면 이번 시도에서 만든
   const { client } = createSupabaseStub((call) => {
     events.push(`${call.table}:${call.operation}`);
     if (call.table === "partner_brand_profiles" && call.operation === "insert") {
-      return { data: { id: "brand-1" } };
+      return { data: { ...(call.values as Record<string, unknown>), id: "brand-1" } };
     }
     if (call.table === "partner_registration_benefit_groups") {
       return {
@@ -347,6 +352,11 @@ test("두 번째 혜택 그룹 저장이 실패하면 이번 시도에서 만든
     }
     if (call.operation === "delete") {
       deleteFilters.push(...call.filters);
+      const ids = call.filters.find(([column]) => column === "id")?.[1];
+      return { data: (Array.isArray(ids) ? ids : [ids]).map((id) => ({ id })), status: 200 };
+    }
+    if (call.table === "partner_benefits" && call.operation === "insert") {
+      return { data: call.values };
     }
     return { data: null };
   });
@@ -379,7 +389,7 @@ test("정리 쿼리가 실패하면 나머지 정리를 계속하고 정리 실�
   const { client } = createSupabaseStub((call) => {
     events.push(`${call.table}:${call.operation}`);
     if (call.table === "partner_brand_profiles" && call.operation === "insert") {
-      return { data: { id: "brand-1" } };
+      return { data: { ...(call.values as Record<string, unknown>), id: "brand-1" } };
     }
     if (call.table === "partners" && call.operation === "insert") {
       const row = call.values as Record<string, unknown>;
@@ -390,6 +400,9 @@ test("정리 쿼리가 실패하면 나머지 정리를 계속하고 정리 실�
     }
     if (call.table === "partners" && call.operation === "delete") {
       return { error: { code: "XX001", message: "partner delete failed" } };
+    }
+    if (call.table === "partner_brand_profiles" && call.operation === "delete") {
+      return { data: [{ id: "brand-1" }], status: 200 };
     }
     return { data: null };
   });
@@ -406,7 +419,7 @@ test("정리 쿼리가 실패하면 나머지 정리를 계속하고 정리 실�
         companyProvisioner: provisioner,
       }),
       (error: unknown) => {
-        assert.ok(error instanceof Error);
+        assert.ok(error instanceof PartnerRegistrationConversionCleanupError);
         assert.equal(error.message, "partner_registration_conversion_cleanup_failed");
         const cause = error.cause as { originalError: Error; cleanupError: Error };
         assert.equal(cause.originalError.message, "benefit insert failed");

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { awaitPartnerMutation, requirePartnerMutationReceipt, requirePartnerMutationRow } from "@/lib/partner-admin/mutation-outcome";
 
 const PARTNER_BRANCH_WRITE_BATCH_SIZE = 100;
 
@@ -103,7 +104,7 @@ async function ensureStoredBranchIds({
     const missingBranches = branches.filter(
       (branch) => !storedIds.has(branch.branchKey),
     );
-    const { error } = await supabase.from("partner_company_branches").insert(
+    const { data: insertedBranches, error } = await awaitPartnerMutation(supabase.from("partner_company_branches").insert(
       missingBranches.map((branch) => ({
         company_id: companyId,
         brand_profile_id: brandProfileId,
@@ -118,9 +119,15 @@ async function ensureStoredBranchIds({
         memo: branch.memo,
         is_active: true,
       })),
-    );
+    ).select("id,company_id,brand_profile_id,branch_key"), "company_branch_insert");
     if (error && error.code !== "23505") {
       throw new Error(error.message);
+    }
+    if (!error) {
+      requirePartnerMutationReceipt(insertedBranches, missingBranches.map((branch) => ({
+        company_id: companyId, brand_profile_id: brandProfileId, branch_key: branch.branchKey,
+      })), "company_branch_insert");
+      for (const row of insertedBranches ?? []) requirePartnerMutationRow(row, {}, "company_branch_insert");
     }
     storedIds = await loadStoredBranchIds({
       supabase,
@@ -166,18 +173,20 @@ export async function persistPartnerBranchLinks({
       brandProfileId,
       branches: batch,
     });
-    const { error } = await supabase.from("partner_offer_branches").upsert(
-      batch.map((branch) => ({
-        partner_id: partnerId,
-        branch_id: storedIds.get(branch.branchKey)!,
-        status: "active",
-        source,
-        memo: prepared.latestMemoByKey.get(branch.branchKey) ?? null,
-      })),
+    const linkRows = batch.map((branch) => ({
+      partner_id: partnerId,
+      branch_id: storedIds.get(branch.branchKey)!,
+      status: "active",
+      source,
+      memo: prepared.latestMemoByKey.get(branch.branchKey) ?? null,
+    }));
+    const { data: savedLinks, error } = await awaitPartnerMutation(supabase.from("partner_offer_branches").upsert(
+      linkRows,
       { onConflict: "partner_id,branch_id" },
-    );
+    ).select("partner_id,branch_id,status,source,memo"), "partner_branch_link_upsert");
     if (error) {
       throw new Error(error.message);
     }
+    requirePartnerMutationReceipt(savedLinks, linkRows, "partner_branch_link_upsert");
   }
 }

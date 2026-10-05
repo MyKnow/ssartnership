@@ -1,4 +1,11 @@
 import { logServerError } from "@/lib/server-log";
+import {
+  awaitPartnerMutation,
+  PartnerMutationCleanupError,
+  PartnerMutationOutcomeUnknownError,
+  requirePartnerMutationReceipt,
+  requirePartnerMutationRow,
+} from "@/lib/partner-admin/mutation-outcome";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -31,6 +38,14 @@ import type { getSupabaseAdminClient } from "@/lib/supabase/server";
 export type RegistrationConversionSupabaseClient = ReturnType<
   typeof getSupabaseAdminClient
 >;
+
+/** Partial conversion resources may remain; automatic retry is unsafe. */
+export class PartnerRegistrationConversionCleanupError extends PartnerMutationCleanupError {
+  constructor(cause: { originalError: unknown; cleanupError: unknown }) {
+    super("partner_registration_conversion_cleanup_failed", cause);
+    this.name = "PartnerRegistrationConversionCleanupError";
+  }
+}
 
 type RegistrationCompanyRelation =
   | { managed_campus_slugs?: string[] | null }
@@ -195,36 +210,43 @@ export async function rollbackRegistrationConversionResources<
   }> = [];
 
   if (resources.createdPartnerIds.length > 0) {
-    const { error } = await supabase
+    const { data, error } = await awaitPartnerMutation(supabase
       .from("partners")
       .delete()
-      .in("id", resources.createdPartnerIds);
+      .in("id", resources.createdPartnerIds)
+      .select("id"), "conversion_partner_cleanup");
     if (error) {
       cleanupFailures.push({
         stage: "partners",
         code: error.code,
         message: error.message,
       });
+    } else {
+      requirePartnerMutationReceipt(data, resources.createdPartnerIds.map((id) => ({ id })), "conversion_partner_cleanup");
     }
   }
 
   if (resources.createdBrandProfileId) {
-    const { error } = await supabase
+    const { data, error } = await awaitPartnerMutation(supabase
       .from("partner_brand_profiles")
       .delete()
-      .eq("id", resources.createdBrandProfileId);
+      .eq("id", resources.createdBrandProfileId)
+      .select("id"), "conversion_brand_cleanup");
     if (error) {
       cleanupFailures.push({
         stage: "partner_brand_profile",
         code: error.code,
         message: error.message,
       });
+    } else {
+      requirePartnerMutationReceipt(data, [{ id: resources.createdBrandProfileId }], "conversion_brand_cleanup");
     }
   }
 
   await companyProvisioner
     .cleanup(supabase, resources.companyProvision)
     .catch((error: unknown) => {
+      if (error instanceof PartnerMutationOutcomeUnknownError) throw error;
       cleanupFailures.push({
         stage: "partner_company_provision",
         message:
@@ -329,7 +351,7 @@ export async function createPartnerFromPortalRegistrationRequest<
       (existingProfile as { id?: string } | null)?.id ?? null;
     if (!brandProfileId) {
       const { data: createdProfile, error: profileCreateError } =
-        await supabase
+        await awaitPartnerMutation(supabase
           .from("partner_brand_profiles")
           .insert({
             company_id: companyId,
@@ -343,11 +365,12 @@ export async function createPartnerFromPortalRegistrationRequest<
             image_urls: request.image_urls ?? [],
             tags: request.tags ?? [],
           })
-          .select("id")
-          .single();
+          .select("id,company_id,name")
+          .single(), "conversion_brand_insert");
       if (profileCreateError) {
         throw new Error(profileCreateError.message);
       }
+      requirePartnerMutationRow(createdProfile, { company_id: companyId, name: request.brand_name }, "conversion_brand_insert");
       brandProfileId = (createdProfile as { id: string }).id;
       resources.createdBrandProfileId = brandProfileId;
     }
@@ -435,7 +458,7 @@ export async function createPartnerFromPortalRegistrationRequest<
         (benefitActionType === "external_link"
           ? request.site_link ?? null
           : null);
-      const { data, error } = await supabase
+      const { data, error } = await awaitPartnerMutation(supabase
         .from("partners")
         .insert(
           buildPartnerInsertRow({
@@ -475,11 +498,13 @@ export async function createPartnerFromPortalRegistrationRequest<
           }),
         )
         .select("id,name,location,campus_slugs,visibility,benefits,conditions,period_start,period_end,map_url")
-        .single();
+        .single(), "conversion_partner_insert");
 
       if (error) {
         throw new Error(error.message);
       }
+
+      requirePartnerMutationRow(data, { id: partnerId, name: partnerName, location: locationSummary }, "conversion_partner_insert");
 
       const createdPartner = data as ConvertedPartnerRow;
       createdPartners.push(createdPartner);
@@ -493,19 +518,20 @@ export async function createPartnerFromPortalRegistrationRequest<
           })),
       );
       if (benefitItems.length > 0) {
-        const { error: benefitError } = await supabase
+        const benefitRows = benefitItems.map((benefit, displayOrder) => ({
+          partner_id: partnerId,
+          title: benefit.title,
+          max_apply_count: benefit.maxApplyCount ?? null,
+          display_order: displayOrder,
+        }));
+        const { data: createdBenefitRows, error: benefitError } = await awaitPartnerMutation(supabase
           .from("partner_benefits")
-          .insert(
-            benefitItems.map((benefit, displayOrder) => ({
-              partner_id: partnerId,
-              title: benefit.title,
-              max_apply_count: benefit.maxApplyCount ?? null,
-              display_order: displayOrder,
-            })),
-          );
+          .insert(benefitRows)
+          .select("partner_id,title,max_apply_count,display_order"), "conversion_benefit_insert");
         if (benefitError) {
           throw new Error(benefitError.message);
         }
+        requirePartnerMutationReceipt(createdBenefitRows, benefitRows, "conversion_benefit_insert");
       }
 
       await persistPartnerBranchLinks({
@@ -531,6 +557,10 @@ export async function createPartnerFromPortalRegistrationRequest<
 
     return { partners: createdPartners, created: createdPartners.length > 0 };
   } catch (error) {
+    if (error instanceof PartnerMutationOutcomeUnknownError) throw error;
+    if (error instanceof PartnerMutationCleanupError) {
+      throw new PartnerRegistrationConversionCleanupError(error.cause);
+    }
     try {
       await rollbackRegistrationConversionResources(
         supabase,
@@ -538,8 +568,10 @@ export async function createPartnerFromPortalRegistrationRequest<
         companyProvisioner,
       );
     } catch (cleanupError) {
-      throw new Error("partner_registration_conversion_cleanup_failed", {
-        cause: { originalError: error, cleanupError },
+      if (cleanupError instanceof PartnerMutationOutcomeUnknownError) throw cleanupError;
+      throw new PartnerRegistrationConversionCleanupError({
+        originalError: error,
+        cleanupError,
       });
     }
     throw error;
@@ -581,5 +613,5 @@ export async function rollbackPartnerRegistrationRequestStatus({
     .select("id")
     .maybeSingle();
 
-  return !error && Boolean(data);
+  return !error && data !== null && typeof data === "object" && !Array.isArray(data) && data.id === request.id;
 }
