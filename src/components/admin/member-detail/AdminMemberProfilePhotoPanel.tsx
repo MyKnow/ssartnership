@@ -22,7 +22,7 @@ import {
   IMAGE_SOURCE_ACCEPT,
   resolveImageTransformPolicy,
 } from "@/lib/image-upload/policy";
-import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-images";
+import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-photo";
 import { ADMIN_REVIEW_NOTE_MAX_LENGTH } from "@/lib/admin-review-queue";
 
 type FormAction = (formData: FormData) => void | Promise<void>;

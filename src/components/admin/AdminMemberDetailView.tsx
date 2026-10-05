@@ -16,7 +16,7 @@ import type {
   AdminMemberPolicyState,
 } from "@/lib/admin-member-detail";
 import { formatOptionalKoreanDateTimeToMinute } from "@/lib/datetime";
-import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-images";
+import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-photo";
 import type { MemberEmailLoginTransition } from "@/lib/member-email-login-transition";
 
 type FormAction = (formData: FormData) => void | Promise<void>;
