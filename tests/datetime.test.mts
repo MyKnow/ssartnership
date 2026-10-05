@@ -12,12 +12,15 @@ import {
   formatKoreanMediumDateTime,
   formatKoreanMonthDayTime,
   formatOptionalKoreanDateTimeToMinute,
+  getKstDateParts,
   getKstDateString,
   KOREA_TIME_ZONE,
   parseKoreanDateTimeLocalValue,
   toIsoFromKoreanDateTimeLocalValue,
 } from "@/lib/datetime";
 import { toDateTimeLocalInput } from "@/lib/ad-coupon-period";
+import { getKstPeriodKey } from "@/lib/ad-coupon-domain";
+import { getSeoulDateParts } from "@/lib/ssafy-year";
 import { getKstDateString as getPartnerKstDateString } from "@/lib/partner-utils";
 import { getKstDateString as getPushKstDateString } from "@/lib/push/ops";
 
@@ -62,6 +65,9 @@ function snapshot() {
     localValue: formatKoreanDateTimeLocalValue(KST_MIDNIGHT_EDGE),
     couponLocalValue: toDateTimeLocalInput(KST_MIDNIGHT_EDGE),
     kstDate: getKstDateString(0, new Date(KST_MIDNIGHT_EDGE)),
+    kstParts: getKstDateParts(KST_MIDNIGHT_EDGE),
+    seoulParts: getSeoulDateParts(new Date(KST_MIDNIGHT_EDGE)),
+    couponDailyKey: getKstPeriodKey(KST_MIDNIGHT_EDGE, "daily"),
   };
 }
 
@@ -80,6 +86,9 @@ const EXPECTED = {
   localValue: "2026-10-05T00:30",
   couponLocalValue: "2026-10-05T00:30",
   kstDate: "2026-10-05",
+  kstParts: { year: 2026, month: 10, day: 5 },
+  seoulParts: { year: 2026, month: 10 },
+  couponDailyKey: "2026-10-05",
 };
 
 test("KST 포맷터는 런타임 TZ가 UTC든 Asia/Seoul이든 같은 표기를 낸다", () => {
@@ -122,6 +131,9 @@ test("잘못된 날짜와 빈 값은 포맷터마다 정해진 대체값을 쓴�
   assert.equal(formatOptionalKoreanDateTimeToMinute("", "-"), "-");
   assert.equal(formatOptionalKoreanDateTimeToMinute("not-a-date", "-"), "-");
   assert.equal(formatOptionalKoreanDateTimeToMinute(KST_AFTERNOON, "-"), "2026. 10. 5. 15:05");
+  const invalidParts = getKstDateParts("invalid");
+  assert.ok(Number.isNaN(invalidParts.year) && Number.isNaN(invalidParts.month) && Number.isNaN(invalidParts.day));
+  assert.equal(getKstPeriodKey("invalid", "daily"), "invalid");
 });
 
 test("getKstDateString은 KST 날짜 경계와 일 단위 이동을 계산하고 기존 경로와 같은 구현을 쓴다", () => {
@@ -185,6 +197,18 @@ test("날짜 객체를 toLocale*String으로 직접 포맷하지 않고 KST 고�
         (/\.toLocale(?:Date|Time)String\(/u.test(source) ||
           /\bDate\([^()]*\)\.toLocaleString\(/u.test(source)),
     )
+    .map(({ relative }) => relative);
+  assert.deepEqual(offenders, []);
+});
+
+test("Intl.DateTimeFormat은 datetime.ts 안에서만 만들고 화면·도메인은 KST 공용 헬퍼를 쓴다", () => {
+  const sourceRoot = new URL("../src/", import.meta.url);
+  const offenders = listSourceFiles(sourceRoot)
+    .map((file) => ({
+      relative: decodeURIComponent(file.href.slice(sourceRoot.href.length)),
+      source: readFileSync(file, "utf8"),
+    }))
+    .filter(({ relative, source }) => relative !== "lib/datetime.ts" && /\bIntl\.DateTimeFormat\(/u.test(source))
     .map(({ relative }) => relative);
   assert.deepEqual(offenders, []);
 });

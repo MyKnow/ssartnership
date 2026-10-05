@@ -40,6 +40,7 @@ import type { PartnerVisibility } from "@/lib/types";
 import type { AdminReviewQueueFeedback } from "@/lib/admin-review-queue";
 import type { AdminPartnerRegistrationRequestDataRow } from "@/lib/admin-partner-registration-queue";
 import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
+import { formatKoreanMediumDateTime } from "@/lib/datetime";
 import {
   FOUR_DIGIT_PIN_INPUT_PATTERN,
   FOUR_DIGIT_PIN_LENGTH,
@@ -50,11 +51,7 @@ export type AdminPartnerRegistrationRow =
 
 function formatDateTime(value?: string | null) {
   if (!value) return "-";
-  return new Intl.DateTimeFormat("ko-KR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Seoul",
-  }).format(new Date(value));
+  return formatKoreanMediumDateTime(value) || "-";
 }
 
 function normalizeStatus(value: string): PartnerRegistrationRequestStatus {
