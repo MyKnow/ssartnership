@@ -63,7 +63,7 @@ const mockModules = new Map<string, string>([
       return undefined;
     }`,
   ],
-  ["@/lib/partner-portal", "export const isPartnerPortalMock = false;"],
+  ["@/lib/partner-auth/portal", "export const isPartnerPortalMock = false;"],
   [
     "web-push",
     `export function setVapidDetails() {}
