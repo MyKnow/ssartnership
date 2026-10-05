@@ -21,6 +21,7 @@ type ResolvedNotificationEmailContentInput = Readonly<{
 
 export const DEFAULT_NOTIFICATION_EMAIL_EVENT_KEYS = [
   "email.member_email_verification_code",
+  "email.member_email_changed",
   "email.member_email_login_transition",
   "email.manual_member_setup",
   "email.manual_member_setup_reissue",
@@ -101,6 +102,33 @@ function renderMemberVerificationCode(variables: EmailVariables) {
         ],
       },
     ],
+  });
+}
+
+function renderMemberEmailChanged(variables: EmailVariables) {
+  const displayName = getDisplayName(variables, "회원");
+  const maskedNewEmail = getText(variables, "maskedNewEmail", "새 이메일");
+  return renderTransactionalEmail({
+    preheader: "계정의 로그인·복구 이메일이 변경되었습니다.",
+    kicker: "계정 보안",
+    title: ["로그인 이메일이", "변경되었습니다"],
+    lead: [
+      `${displayName}님, 계정의 로그인·복구 이메일이 ${maskedNewEmail} 주소로 변경되었습니다.`,
+      "이후 이메일 로그인과 계정 복구는 새 이메일로 진행됩니다.",
+    ],
+    panels: [
+      {
+        tone: "warning",
+        title: "본인이 변경하지 않았나요?",
+        body: [
+          "본인이 변경했다면 별도의 조치를 하지 않아도 됩니다. 본인이 변경하지 않았다면 이 메일에 답장해 운영자에게 바로 알려 주세요.",
+        ],
+      },
+    ],
+    action: {
+      label: "계정 설정 확인하기",
+      url: getActionUrl(variables, "settingsUrl"),
+    },
   });
 }
 
@@ -444,6 +472,8 @@ export function renderDefaultNotificationEmailContent(
   switch (eventKey as DefaultNotificationEmailEventKey) {
     case "email.member_email_verification_code":
       return renderMemberVerificationCode(variables);
+    case "email.member_email_changed":
+      return renderMemberEmailChanged(variables);
     case "email.member_email_login_transition":
       return renderMemberEmailLoginTransition(variables);
     case "email.manual_member_setup":

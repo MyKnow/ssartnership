@@ -426,6 +426,22 @@ const emailTemplates: NotificationTemplateDefinition[] = [
     variables: [siteName, code, { name: "expiresInMinutes", label: "코드 유효 시간(분)" }],
   }),
   defineTemplate({
+    eventKey: "email.member_email_changed",
+    label: "회원 로그인 이메일 변경 알림",
+    description: "로그인·복구 이메일이 다른 주소로 바뀌면 이전에 인증한 이메일로 보내는 보안 알림입니다.",
+    group: "회원·수료생 이메일",
+    channel: "email",
+    titleTemplate: "[{siteName}] 로그인 이메일이 변경되었습니다",
+    bodyTemplate:
+      "{displayName}님, 계정의 로그인·복구 이메일이 {maskedNewEmail} 주소로 변경되었습니다.\n\n본인이 변경했다면 별도의 조치를 하지 않아도 됩니다. 본인이 변경하지 않았다면 이 메일에 답장해 운영자에게 알려 주세요.\n\n계정 설정 확인하기\n{settingsUrl}",
+    variables: [
+      siteName,
+      displayName,
+      { name: "maskedNewEmail", label: "새 이메일(일부 가림)", example: "ne***@example.com" },
+      { name: "settingsUrl", label: "계정 설정 URL", example: "/settings" },
+    ],
+  }),
+  defineTemplate({
     eventKey: "email.graduate_application_code",
     label: "수료생 신규 인증 코드",
     description: "수료생 신규 인증 이메일의 인증 코드입니다.",

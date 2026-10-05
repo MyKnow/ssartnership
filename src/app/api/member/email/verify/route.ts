@@ -16,6 +16,10 @@ import {
   isMemberEmailVerificationCodeFailure,
 } from "@/lib/member-email-verification-service";
 import { normalizeMemberEmail } from "@/lib/member-domain";
+import {
+  readPreviousMemberEmailState,
+  scheduleMemberEmailChangeNotice,
+} from "@/lib/member-email-change-notice.server";
 import { logMemberEmailSecurity } from "@/lib/member-email-security-log";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { requireMemberApiSession } from "@/lib/member-api-session";
@@ -123,6 +127,10 @@ export async function POST(request: Request) {
     );
   }
 
+  // Read before the binding replaces it: a changed address notifies the
+  // previously verified one after the response.
+  const previousEmailState = await readPreviousMemberEmailState(session.userId);
+
   try {
     const completion = await completeMemberEmailVerification({
       memberId: session.userId,
@@ -177,6 +185,13 @@ export async function POST(request: Request) {
     stage: "verify",
     status: "success",
     actorId: session.userId,
+  });
+  scheduleMemberEmailChangeNotice({
+    previous: previousEmailState,
+    nextEmailNormalized: email,
+    memberId: session.userId,
+    flow: "verification",
+    context,
   });
   revalidatePath("/certification");
   revalidatePath("/certification/email");
