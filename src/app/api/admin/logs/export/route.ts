@@ -11,6 +11,7 @@ import {
   readRouteJsonBodyWithinLimit,
 } from '@/lib/route-json-body';
 import { withServerTiming } from '@/lib/server-timing';
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = 'nodejs';
 
@@ -144,7 +145,7 @@ export async function POST(request: NextRequest) {
       },
     });
     } catch (error) {
-      console.error('[admin-logs] export failed', error);
+      logServerError('[admin-logs] export failed', error);
       return NextResponse.json(
         { message: 'CSV 파일을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.' },
         { status: 500 },

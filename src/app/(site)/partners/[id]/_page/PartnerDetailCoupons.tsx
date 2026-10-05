@@ -8,6 +8,7 @@ import Card from "@/components/ui/Card";
 import Modal from "@/components/ui/Modal";
 import SectionHeading from "@/components/ui/SectionHeading";
 import { useToast } from "@/components/ui/Toast";
+import InlineMessage from "@/components/ui/InlineMessage";
 import {
   ClientSafeRequestError,
   getClientSafeRequestError,
@@ -29,6 +30,19 @@ type RedeemResponse = {
 
 type IssueResponse = { ok?: boolean; message?: string; issue?: AvailableAdCoupon };
 
+const COUPONS_UNAVAILABLE_MESSAGE =
+  "쿠폰 정보를 잠시 불러오지 못했습니다. 잠시 후 새로고침해 주세요.";
+
+function CouponsUnavailableNotice() {
+  return (
+    <InlineMessage
+      className="mt-4"
+      tone="warning"
+      description={COUPONS_UNAVAILABLE_MESSAGE}
+    />
+  );
+}
+
 function getLoginHref(returnTo: string) {
   return `/auth/login?returnTo=${encodeURIComponent(returnTo)}`;
 }
@@ -40,12 +54,15 @@ function getCouponVerificationHref(issueId: string, returnTo: string) {
 export default function PartnerDetailCoupons({
   coupons,
   initialIssuedCoupons,
+  unavailable = false,
   partnerId,
   currentUserId,
   returnTo,
 }: {
   coupons: AdCoupon[];
   initialIssuedCoupons: AvailableAdCoupon[];
+  /** A coupon lookup failed on the server; never render it as "no coupons". */
+  unavailable?: boolean;
   partnerId: string;
   currentUserId: string | null;
   returnTo: string;
@@ -91,7 +108,15 @@ export default function PartnerDetailCoupons({
   }, [coupons, partnerId]);
 
   if (coupons.length === 0) {
-    return null;
+    if (!unavailable) {
+      return null;
+    }
+    return (
+      <Card id="coupons" className="w-full scroll-mt-28 p-4 sm:p-5">
+        <SectionHeading title="쿠폰" />
+        <CouponsUnavailableNotice />
+      </Card>
+    );
   }
 
   async function copyCouponCode(coupon: AdCoupon) {
@@ -224,6 +249,7 @@ export default function PartnerDetailCoupons({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <SectionHeading title="쿠폰" />
       </div>
+      {unavailable ? <CouponsUnavailableNotice /> : null}
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         {coupons.map((coupon) => {

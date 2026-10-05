@@ -68,3 +68,15 @@ test("a firing delivery failure stops the watchdog even when rule evaluation is 
     assert.ok(requests[0].includes("/rules"));
   } finally { server.closeAllConnections(); await new Promise<void>(r => server.close(() => r())); }
 });
+
+test("external monitor status is the operator-declared flag, not a hardcoded value", async () => {
+  const { externalMonitorConfigured } = await import("../deploy/observability/observer.mjs");
+  assert.equal(externalMonitorConfigured({ OPS_EXTERNAL_MONITOR_CONFIGURED: "1" }), 1);
+  for (const value of [undefined, "", "0", "true", "yes"]) assert.equal(externalMonitorConfigured({ OPS_EXTERNAL_MONITOR_CONFIGURED: value }), 0);
+  const server = createObserverServer({ env: { NODE_ENV: "test", OPS_EXTERNAL_MONITOR_CONFIGURED: "1" }, probe: async () => ({ success: 1, expires: 0, duration: 0, completed: 1 }), deliver: async () => new Response(null, { status: 503 }) });
+  await new Promise<void>(r => server.listen(0, "127.0.0.1", r));
+  try {
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    assert.match(await (await fetch(`${origin}/metrics`)).text(), /^ssartnership_external_monitor_configured 1$/mu);
+  } finally { server.closeAllConnections(); await new Promise<void>(r => server.close(() => r())); }
+});

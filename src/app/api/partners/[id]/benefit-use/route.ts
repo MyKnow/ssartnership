@@ -18,6 +18,7 @@ import {
 import { requireMemberApiSession } from "@/lib/member-api-session";
 import { isMockDataSource } from "@/lib/mock/member";
 import { readRouteParam } from "@/lib/route-params";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -349,7 +350,7 @@ export async function POST(
       );
     }
 
-    console.error("[partner-benefit-use] failed", error);
+    logServerError("[partner-benefit-use] failed", error);
     scheduleAttemptLog(context, {
       actorId: session.userId,
       partnerId,

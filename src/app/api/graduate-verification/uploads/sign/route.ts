@@ -17,6 +17,7 @@ import {
   MAX_STANDARD_JSON_BODY_BYTES,
   readJsonRequestBodyWithinLimit,
 } from "@/lib/request-body-limit";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -106,9 +107,7 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    console.error("[graduate-verification/upload-sign] failed", {
-      error: error instanceof Error ? error.message : "unknown",
-    });
+    logServerError("[graduate-verification/upload-sign] failed", error);
     return NextResponse.json(
       {
         ok: false,

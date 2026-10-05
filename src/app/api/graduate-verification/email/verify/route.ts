@@ -14,6 +14,7 @@ import {
   recordGraduateVerificationAttempt,
 } from "@/lib/graduate-verification-rate-limit";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { expectNoError } from "@/lib/expect-no-error";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { isValidEmail } from "@/lib/validation";
 import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
@@ -98,10 +99,13 @@ export async function POST(request: Request) {
   );
   if (!codeMatches || !challenge?.id) {
     if (challenge?.id) {
-      await supabase
-        .from("graduate_email_challenges")
-        .update({ attempt_count: Math.min(10, Number(challenge.attempt_count ?? 0) + 1) })
-        .eq("id", challenge.id);
+      await expectNoError(
+        supabase
+          .from("graduate_email_challenges")
+          .update({ attempt_count: Math.min(10, Number(challenge.attempt_count ?? 0) + 1) })
+          .eq("id", challenge.id),
+        "[graduate-email/verify] attempt count update failed",
+      );
     }
     await recordGraduateVerificationAttempt({ ...rateLimitContext, success: false });
     await logAuthSecurity({

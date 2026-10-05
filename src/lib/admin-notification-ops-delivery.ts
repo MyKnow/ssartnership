@@ -36,6 +36,7 @@ import {
   mergeNotificationTemplateVariables,
   type NotificationTemplateContext,
 } from "@/lib/notification-templates/context";
+import { logServerError } from "@/lib/server-log";
 
 type AudienceMember = {
   id: string;
@@ -78,7 +79,10 @@ async function runBookkeepingTasks(
         memberId,
       );
       bookkeepingErrors.push(warning);
-      console.error(`[admin-notification-ops] ${warning}`, result.reason);
+      logServerError("[admin-notification-ops] delivery bookkeeping failed", result.reason, {
+        channel,
+        memberId,
+      });
     }
   }
 }
@@ -100,10 +104,7 @@ export async function finalizeSuccessfulPushDelivery(
       return "sent" as const;
     }
   } catch (error) {
-    console.error(
-      "[admin-notification-ops] push success transition failed",
-      { deliveryId, error },
-    );
+    logServerError("[admin-notification-ops] push success transition failed", error, { deliveryId });
   }
 
   try {
@@ -113,10 +114,7 @@ export async function finalizeSuccessfulPushDelivery(
       errorMessage: "provider_success_ledger_unknown",
     });
   } catch (error) {
-    console.error(
-      "[admin-notification-ops] push reconciliation transition failed",
-      { deliveryId, error },
-    );
+    logServerError("[admin-notification-ops] push reconciliation transition failed", error, { deliveryId });
   }
   return "needs_reconciliation" as const;
 }
@@ -150,10 +148,7 @@ export async function runPushDeliveryAttempt(
   try {
     claimedDelivery = await repository.claimNotificationDelivery(input.claim);
   } catch (error) {
-    console.error("[admin-notification-ops] push delivery claim failed", {
-      memberId,
-      error,
-    });
+    logServerError("[admin-notification-ops] push delivery claim failed", error, { memberId });
     return {
       outcome: "failed",
       warning: `푸시 발송 상태를 저장하지 못했습니다. (회원 ${memberId})`,
@@ -189,10 +184,7 @@ export async function runPushDeliveryAttempt(
       };
     }
   } catch (error) {
-    console.error("[admin-notification-ops] push delivery lease failed", {
-      memberId,
-      error,
-    });
+    logServerError("[admin-notification-ops] push delivery lease failed", error, { memberId });
     return {
       outcome: "failed",
       warning: `푸시 발송 상태를 저장하지 못했습니다. (회원 ${memberId})`,
@@ -225,10 +217,7 @@ export async function runPushDeliveryAttempt(
     } catch (error) {
       ledgerWarning =
         `푸시 실패 상태를 저장하지 못했습니다. (회원 ${memberId})`;
-      console.error(
-        "[admin-notification-ops] push failure transition failed",
-        { memberId, error },
-      );
+      logServerError("[admin-notification-ops] push failure transition failed", error, { memberId });
     }
     return {
       outcome: "provider_failed",
@@ -534,11 +523,7 @@ export async function sendPushCampaignDeliveries(params: {
           bookkeepingErrors.push(attempt.ledgerWarning);
         }
         const deactivate = shouldDeactivatePushSubscription(attempt.error);
-        console.error("[admin-notification-ops] push delivery failed", {
-          subscriptionId: subscription.id,
-          memberId: subscription.member_id,
-          error: attempt.error,
-        });
+        logServerError("[admin-notification-ops] push delivery failed", attempt.error, { subscriptionId: subscription.id, memberId: subscription.member_id });
         const safeErrorMessage = "푸시 알림 전송에 실패했습니다.";
         await runBookkeepingTasks(
           [

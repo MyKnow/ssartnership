@@ -53,6 +53,11 @@ import type {
   UpdateAdCouponInput,
 } from "@/lib/repositories/ad-package-repository";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import {
+  classifyIssueAdCouponError,
+  classifyRedeemAdCouponIssueError,
+} from "@/lib/ad-coupon-error-tokens";
+import { logServerError } from "@/lib/server-log";
 
 const AD_COUPON_CODE_WRITE_BATCH_SIZE = 1_000;
 
@@ -1057,17 +1062,10 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
       p_session_id: input.sessionId ?? null,
     });
     if (error) {
-      const reason = error.message.includes("not_found")
-        ? "not_found"
-        : error.message.includes("not_downloadable")
-          ? "inactive"
-          : error.message.includes("member_limit")
-            ? "member_limit"
-            : error.message.includes("member_daily_limit") || error.message.includes("member_weekly_limit") || error.message.includes("member_monthly_limit")
-              ? "member_limit"
-            : error.message.includes("usage_limit") || error.message.includes("code_unavailable") || error.message.includes("daily_limit") || error.message.includes("weekly_limit") || error.message.includes("monthly_limit")
-              ? error.message.includes("code_unavailable") ? "code_unavailable" : "usage_limit"
-              : "invalid";
+      const reason = classifyIssueAdCouponError(error.message);
+      if (reason === "invalid") {
+        logServerError("[ad-coupon] issue rpc failed with unclassified error", error);
+      }
       return { ok: false, reason, message: "현재 쿠폰을 다운로드할 수 없습니다." };
     }
     const issueRow = (Array.isArray(data) ? data[0] : data) as {
@@ -1258,19 +1256,10 @@ export class SupabaseAdPackageRepository implements AdPackageRepository {
       p_verified_onsite_password_hash: verifiedPasswordHash,
     });
     if (error) {
-      const reason = error.message.includes("expired")
-        ? "expired"
-        : error.message.includes("member_limit")
-          ? "member_limit"
-          : error.message.includes("usage_limit")
-            ? "usage_limit"
-            : error.message.includes("inactive")
-              ? "inactive"
-              : error.message.includes("not_found")
-                ? "not_found"
-                : error.message.includes("onsite_password")
-                  ? "onsite_password_invalid"
-                  : "invalid";
+      const reason = classifyRedeemAdCouponIssueError(error.message);
+      if (reason === "invalid") {
+        logServerError("[ad-coupon] redeem rpc failed with unclassified error", error);
+      }
       return {
         ok: false,
         reason,

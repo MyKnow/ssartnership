@@ -39,6 +39,7 @@ import type {
   PublicCacheVersionSnapshot,
   PublicPartnerSeoRow,
 } from "./partner/rows";
+import { logServerError } from "@/lib/server-log";
 
 const PARTNER_SELECT_COLUMNS =
   "id,name,category_id,created_at,updated_at,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,partner_benefits(id,title,max_apply_count,display_order),applies_to,images,tags,visibility,benefit_visibility,branch_scope_type,branch_scope_note,categories(key)";
@@ -56,10 +57,7 @@ const getCachedPublicCacheVersionSnapshot = unstable_cache(
       .in("scope", ["partners", "categories"]);
 
     if (error) {
-      console.error(
-        "[partner-repository] public cache version lookup failed",
-        error.message,
-      );
+      logServerError("[partner-repository] public cache version lookup failed", error);
       return { rows: [], lookupFailed: true };
     }
 

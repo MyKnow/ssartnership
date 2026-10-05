@@ -15,14 +15,7 @@ import {
 import type { PartnerPortalAccountRow } from "./types.ts";
 import { getSupabaseAdminClient } from "../supabase/server.ts";
 import { getPartnerSetupLinkState } from "./setup-link.ts";
-
-function maskPartnerSetupToken(token: string) {
-  if (token.length <= 12) {
-    return token;
-  }
-
-  return `${token.slice(0, 6)}...${token.slice(-6)}`;
-}
+import { logServerError } from "../server-log.ts";
 
 function getAccountSetupLinkState(account: PartnerPortalAccountRow) {
   return getPartnerSetupLinkState({
@@ -146,11 +139,7 @@ export async function completeSupabasePartnerPortalInitialSetup(
     .maybeSingle();
 
   if (error) {
-    console.error("[partner-setup] completion update failed", {
-      accountId: account.id,
-      token: maskPartnerSetupToken(input.token),
-      errorMessage: error.message,
-      errorCode: "code" in error ? error.code : undefined,
+    logServerError("[partner-setup] completion update failed", error, { accountId: account.id
     });
     throw error;
   }

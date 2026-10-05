@@ -16,6 +16,7 @@ import { shouldBypassActivityLogPersistence } from '@/lib/activity-log-runtime';
 import { getClientIp } from '@/lib/client-ip';
 import { normalizeUserAgentHeader } from '@/lib/request-header-values';
 import type { AuditActorType } from '@/lib/audit-rpc-context';
+import { logServerError } from '@/lib/server-log';
 
 type BaseLogContext = {
   path?: string | null;
@@ -74,6 +75,28 @@ function sanitizeAuthSecurityProperties(
   return redactAuthSecurityExceptionProperties(sanitized);
 }
 
+// Audit/security log writes are best-effort for the caller, so a failure is
+// otherwise invisible. Count failed rows per table for the process lifetime
+// and put the running total on every failure line.
+const logInsertFailureCounts = new Map<string, number>();
+
+function recordLogInsertFailure(
+  event: string,
+  table: string,
+  error: unknown,
+  properties: Record<string, unknown>,
+  rows = 1,
+) {
+  const failuresSinceStart = (logInsertFailureCounts.get(table) ?? 0) + rows;
+  logInsertFailureCounts.set(table, failuresSinceStart);
+  logServerError(event, error, { table, ...properties, failuresSinceStart });
+}
+
+/** Failed log rows per table since this server process started. */
+export function getActivityLogInsertFailureCounts(): Record<string, number> {
+  return Object.fromEntries(logInsertFailureCounts);
+}
+
 async function insertLog(table: string, payload: Record<string, unknown>) {
   if (shouldBypassActivityLogPersistence()) {
     return true;
@@ -82,17 +105,15 @@ async function insertLog(table: string, payload: Record<string, unknown>) {
     const supabase = getSupabaseAdminClient();
     const { error } = await supabase.from(table).insert(payload);
     if (error) {
-      console.error('[activity-log] log_insert_failed', {
-        table,
+      recordLogInsertFailure('[activity-log] log_insert_failed', table, error, {
         requestId: payload.request_id ?? null,
         reasonCode: 'insert_failed',
       });
       return false;
     }
     return true;
-  } catch {
-    console.error('[activity-log] log_insert_failed', {
-      table,
+  } catch (error) {
+    recordLogInsertFailure('[activity-log] log_insert_failed', table, error, {
       requestId: payload.request_id ?? null,
       reasonCode: 'insert_exception',
     });
@@ -110,20 +131,18 @@ async function insertLogs(table: string, payloads: readonly Record<string, unkno
   try {
     const { error } = await getSupabaseAdminClient().from(table).insert(payloads);
     if (error) {
-      console.error("[activity-log] bulk_log_insert_failed", {
-        table,
+      recordLogInsertFailure("[activity-log] bulk_log_insert_failed", table, error, {
         count: payloads.length,
         reasonCode: "insert_failed",
-      });
+      }, payloads.length);
       return false;
     }
     return true;
-  } catch {
-    console.error("[activity-log] bulk_log_insert_failed", {
-      table,
+  } catch (error) {
+    recordLogInsertFailure("[activity-log] bulk_log_insert_failed", table, error, {
       count: payloads.length,
       reasonCode: "insert_exception",
-    });
+    }, payloads.length);
     return false;
   }
 }

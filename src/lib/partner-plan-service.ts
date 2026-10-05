@@ -33,6 +33,7 @@ import {
 } from "@/lib/operational-notifications";
 import { mapPartnerPlanRpcError } from "@/lib/partner-plan-rpc-errors";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { logServerError } from "@/lib/server-log";
 
 export type PartnerBrandPlanRecord = {
   id: string;
@@ -677,7 +678,7 @@ export async function createPartnerPlanUpgradeRequest(input: {
         requestUrl: "/admin/partners?tab=plans",
       },
     }).catch((error) => {
-      console.error("[partner-plan-service] admin upgrade notification failed", error);
+      logServerError("[partner-plan-service] admin upgrade notification failed", error);
     }),
     createPartnerOperationalNotification({
       type: "plan_upgrade_requested",
@@ -696,7 +697,7 @@ export async function createPartnerPlanUpgradeRequest(input: {
         planUrl: getCompanyScopedPortalHref(brand.companyId, "plans"),
       },
     }).catch((error) => {
-      console.error("[partner-plan-service] partner upgrade notification failed", error);
+      logServerError("[partner-plan-service] partner upgrade notification failed", error);
     }),
   ]);
 
@@ -840,7 +841,7 @@ export async function updatePartnerBrandPlanByAdmin(input: {
       note: input.note || "",
     },
   }).catch((error) => {
-    console.error("[partner-plan-service] plan change notification failed", error);
+    logServerError("[partner-plan-service] plan change notification failed", error);
   });
 }
 
@@ -946,7 +947,7 @@ export async function reviewPartnerPlanUpgradeRequest(input: {
           planUrl: getCompanyScopedPortalHref(request.companyId, "plans"),
         },
   }).catch((notificationError) => {
-    console.error("[partner-plan-service] review notification failed", notificationError);
+    logServerError("[partner-plan-service] review notification failed", notificationError);
   });
 }
 
@@ -961,10 +962,7 @@ export async function runPartnerBillingOverdueDowngrades(now = new Date()) {
     },
   );
   if (error) {
-    console.error(
-      "[partner-plan-service] overdue downgrade transaction failed",
-      error,
-    );
+    logServerError("[partner-plan-service] overdue downgrade transaction failed", error);
     throw new Error("미납 플랜 자동 조정을 완료하지 못했습니다.");
   }
   if (!isRecord(data) || !Array.isArray(data.results)) {

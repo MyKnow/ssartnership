@@ -23,8 +23,8 @@ const redeemIssueRouteSource = readFileSync(
 
 describe("coupon API result contract", () => {
   it("maps the total global limit RPC error to usage_limit", () => {
-    assert.match(repositorySource, /error\.message\.includes\("usage_limit"\)/);
-    assert.match(repositorySource, /: "usage_limit"/);
+    assert.match(repositorySource, /classifyIssueAdCouponError\(error\.message\)/);
+    assert.match(repositorySource, /classifyRedeemAdCouponIssueError\(error\.message\)/);
   });
 
   it("keeps the legacy coupon-id redeem route deleted so redemption stays issue-based", () => {

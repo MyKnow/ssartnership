@@ -11,6 +11,7 @@ import { MAX_PUSH_SUBSCRIPTION_JSON_BODY_BYTES } from "@/lib/request-body-limit"
 import {
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, preferences });
   } catch (error) {
     if (shouldLogNotificationRouteError(error)) {
-      console.error("[partner-push-subscribe] request failed", error);
+      logServerError("[partner-push-subscribe] request failed", error);
     }
     const safeError = getSafeNotificationRouteError(
       error,

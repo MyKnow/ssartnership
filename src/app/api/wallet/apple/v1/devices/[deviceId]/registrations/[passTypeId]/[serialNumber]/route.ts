@@ -13,6 +13,7 @@ import {
   verifyAppleWalletPassAuthorization,
   verifyAppleWalletPassAuthorizationByPublicId,
 } from "@/lib/wallet/apple/web-service";
+import { classifyWalletPassRepositoryError } from "@/lib/wallet/wallet-pass-error-tokens";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,17 +38,22 @@ function logWalletDeviceEvent(
 }
 
 function mapRegistrationRepositoryError(error: unknown) {
-  const message = error instanceof Error ? error.message : "";
-  if (message.includes("not_found")) {
+  const kind = classifyWalletPassRepositoryError(error);
+  if (kind === "not_found") {
     return appleWalletJsonResponse({ message: "패스를 찾을 수 없습니다." }, 404);
   }
-  if (message.includes("revoked")) {
+  if (kind === "revoked") {
     return appleWalletJsonResponse({ message: "폐기된 패스입니다." }, 410);
   }
   return appleWalletJsonResponse(
     { message: "Apple Wallet 등록 요청을 처리하지 못했습니다." },
     500,
   );
+}
+
+function registrationFailureReason(error: unknown) {
+  const kind = classifyWalletPassRepositoryError(error);
+  return kind === "revoked" || kind === "not_found" ? kind : "repository_error";
 }
 
 async function loadAuthorizedPass(
@@ -211,12 +217,7 @@ export async function POST(
     logWalletDeviceEvent("wallet_pass_device_register", {
       registrationScope: "device_registration",
       outcome: "failed",
-      reasonCode:
-        error instanceof Error && error.message.includes("revoked")
-          ? "revoked"
-          : error instanceof Error && error.message.includes("not_found")
-            ? "not_found"
-            : "repository_error",
+      reasonCode: registrationFailureReason(error),
     });
     return mapRegistrationRepositoryError(error);
   }
@@ -274,12 +275,7 @@ export async function DELETE(
     logWalletDeviceEvent("wallet_pass_device_unregister", {
       registrationScope: "device_registration",
       outcome: "failed",
-      reasonCode:
-        error instanceof Error && error.message.includes("revoked")
-          ? "revoked"
-          : error instanceof Error && error.message.includes("not_found")
-            ? "not_found"
-            : "repository_error",
+      reasonCode: registrationFailureReason(error),
     });
     return mapRegistrationRepositoryError(error);
   }

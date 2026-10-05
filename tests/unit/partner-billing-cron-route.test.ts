@@ -58,6 +58,12 @@ describe("partner billing cron route", () => {
       message: "Partner billing cron failed",
     });
     expect(JSON.stringify(body)).not.toContain(originalError.message);
-    expect(consoleErrorSpy).toHaveBeenCalledWith("[partner-billing-cron] failed", originalError);
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    const entry = JSON.parse(String(consoleErrorSpy.mock.calls[0]?.[0]));
+    expect(entry).toMatchObject({
+      level: "error",
+      event: "[partner-billing-cron] failed",
+      error: { name: "Error", message: originalError.message },
+    });
   });
 });

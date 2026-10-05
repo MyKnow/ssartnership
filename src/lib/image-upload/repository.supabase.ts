@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { expectNoError } from "@/lib/expect-no-error";
 import {
   IMAGE_UPLOAD_SESSION_TTL_MS,
   IMAGE_UPLOAD_APPROVAL_SESSION_TTL_MS,
@@ -204,11 +205,15 @@ async function markFailed(
   code: string,
   statuses: Array<ImageUploadSessionRow["status"]>,
 ) {
-  await supabase
-    .from("image_upload_sessions")
-    .update({ status: "failed", failure_code: code })
-    .eq("id", id)
-    .in("status", statuses);
+  await expectNoError(
+    supabase
+      .from("image_upload_sessions")
+      .update({ status: "failed", failure_code: code })
+      .eq("id", id)
+      .in("status", statuses),
+    "[image-upload] failed status update failed",
+    { properties: { reasonCode: code } },
+  );
 }
 
 export class SupabaseImageUploadRepository implements ImageUploadRepository {
@@ -728,7 +733,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         .catch(() => undefined);
       return toAttachedImage(attachedSession);
     } catch (error) {
-      await markFailed(supabase, claimedSession.id, "attach_failed", ["attaching"]).catch(() => undefined);
+      await markFailed(supabase, claimedSession.id, "attach_failed", ["attaching"]);
       throw error instanceof Error
         ? error
         : new Error("이미지를 최종 보관소에 연결하지 못했습니다.");

@@ -11,6 +11,7 @@ import {
   AdminNotificationRouteBodyError,
   readAdminNotificationJsonBody,
 } from "@/lib/admin-notification-route-body";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
           { status: error.status },
         );
       }
-      console.error("[push-admin-broadcast] send failed", error);
+      logServerError("[push-admin-broadcast] send failed", error);
       const message = getSafeAdminMessage(
         error,
         "알림 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.",

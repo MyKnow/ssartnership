@@ -2,7 +2,7 @@ import {
   getPartnerPortalLoginErrorMessage,
   type PartnerPortalLoginErrorCode,
 } from "@/lib/partner-auth";
-import { PARTNER_SESSION_EXPIRED_ERROR_CODE } from "@/lib/partner-portal-paths";
+import { PARTNER_SESSION_EXPIRED_ERROR_CODE } from "@/lib/partner-auth/portal-paths";
 export { readFirstSearchParamOrEmpty as readSearchParam } from "@/lib/search-params";
 
 export type PartnerLoginSearchParams = {

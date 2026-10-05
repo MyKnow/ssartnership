@@ -1,3 +1,5 @@
+import { logServerError } from "@/lib/server-log";
+
 type MemberCleanupResult = {
   error: { code?: string; message: string } | null;
 };
@@ -19,11 +21,7 @@ export async function rollbackCreatedSignupMember(input: {
     return;
   }
 
-  console.error("[mm/signup] member rollback failed", {
-    memberId: input.memberId,
-    code: cleanupError.code ?? null,
-    message: cleanupError.message,
-  });
+  logServerError("[mm/signup] member rollback failed", cleanupError, { memberId: input.memberId });
   throw new Error("signup_member_cleanup_failed", {
     cause: { originalError: input.originalError, cleanupError },
   });

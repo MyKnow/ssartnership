@@ -6,7 +6,7 @@ import {
   PARTNER_SESSION_EXPIRED_ERROR_CODE,
   getPartnerSessionExpiredLoginHref,
   resolvePartnerActionSessionRedirect,
-} from "../src/lib/partner-portal-paths.ts";
+} from "../src/lib/partner-auth/portal-paths.ts";
 
 const PARTNER_ACTION_FILES = [
   "src/app/partner/account/actions.ts",

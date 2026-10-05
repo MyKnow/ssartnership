@@ -1,3 +1,4 @@
+import { logServerError } from "@/lib/server-log";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -232,10 +233,9 @@ export async function rollbackRegistrationConversionResources<
     });
 
   if (cleanupFailures.length > 0) {
-    console.error(
-      "[partner-registration] conversion rollback failed",
-      cleanupFailures,
-    );
+    logServerError("[partner-registration] conversion rollback failed", new Error("rollback_failed"), {
+      stages: cleanupFailures.map(({ stage }) => stage),
+    });
     throw new Error("partner_registration_conversion_cleanup_failed");
   }
 }

@@ -15,6 +15,7 @@ import {
   getPartnerRequestReturnTo,
 } from "@/lib/partner-auth/return-to";
 import { buildTrustedRedirectUrl } from "@/lib/request-guards";
+import { logServerWarning, maskIpAddressForLog } from "@/lib/server-log";
 import {
   ADMIN_SESSION_COOKIE_NAME,
   PARTNER_SESSION_COOKIE_NAME,
@@ -93,9 +94,9 @@ export async function proxy(request: NextRequest) {
     const clientIp = getForwardedClientIp(request.headers);
 
     if (!isAllowedAdminIp(clientIp)) {
-      console.warn("[admin-edge-guard] blocked by ip allowlist", {
+      logServerWarning("[admin-edge-guard] blocked by ip allowlist", {
         path: pathname,
-        ipAddress: clientIp,
+        ipAddress: maskIpAddressForLog(clientIp),
       });
       return new NextResponse("Forbidden", { status: 403 });
     }
@@ -108,9 +109,9 @@ export async function proxy(request: NextRequest) {
         hasUserSession: Boolean(userPayload),
       })
     ) {
-      console.warn("[admin-edge-guard] blocked by basic auth", {
+      logServerWarning("[admin-edge-guard] blocked by basic auth", {
         path: pathname,
-        ipAddress: clientIp,
+        ipAddress: maskIpAddressForLog(clientIp),
       });
       return new NextResponse("Authentication required", {
         status: 401,

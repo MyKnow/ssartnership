@@ -54,6 +54,7 @@ import {
   sendMattermostCampaignDeliveries,
   sendPushCampaignDeliveries,
 } from "@/lib/admin-notification-ops-delivery";
+import { logServerError } from "@/lib/server-log";
 
 import {
   ADMIN_NOTIFICATION_TYPES,
@@ -787,10 +788,9 @@ export async function sendAdminNotificationCampaign(
   } catch (error) {
     const warning = "발송 결과 기록을 저장하지 못했습니다.";
     warnings.push(warning);
-    console.error(
-      `[admin-notification-ops] final metadata update failed for notification ${notification.id}`,
-      error,
-    );
+    logServerError("[admin-notification-ops] final metadata update failed", error, {
+      notificationId: notification.id,
+    });
   }
 
   return {
@@ -810,7 +810,7 @@ export async function getRecentAdminNotificationOperationLogs(limit = 50) {
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) {
-    console.error("[admin-notification-ops] notifications query failed", error.message);
+    logServerError("[admin-notification-ops] notifications query failed", error);
   } else {
     const rows = (notifications ?? []) as NotificationRow[];
     if (rows.length) {
@@ -829,10 +829,7 @@ export async function getRecentAdminNotificationOperationLogs(limit = 50) {
           .select("notification_id,channel,status")
           .in("notification_id", rowsNeedingDeliveryLookup);
         if (deliveryError) {
-          console.error(
-            "[admin-notification-ops] notification_deliveries query failed",
-            deliveryError.message,
-          );
+          logServerError("[admin-notification-ops] notification_deliveries query failed", deliveryError);
         }
 
         for (const delivery of (deliveries ?? []) as NotificationDeliveryRow[]) {
@@ -905,7 +902,7 @@ export async function getRecentAdminNotificationOperationLogs(limit = 50) {
     .limit(limit);
 
   if (pushLogError) {
-    console.error("[admin-notification-ops] push_message_logs query failed", pushLogError.message);
+    logServerError("[admin-notification-ops] push_message_logs query failed", pushLogError);
     return [] as AdminNotificationOperationLog[];
   }
 

@@ -3,6 +3,7 @@ import { notificationRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { requireMemberApiSession } from "@/lib/member-api-session";
 import { getSafeNotificationRouteError } from "@/lib/notifications/safe-error";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -61,7 +62,7 @@ export async function GET(request: NextRequest) {
       hasMore: result.hasMore,
     });
   } catch (error) {
-    console.error("[member-notifications] list failed", error);
+    logServerError("[member-notifications] list failed", error);
     const safeError = getSafeNotificationRouteError(
       error,
       "알림을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -84,7 +85,7 @@ export async function PATCH(request: NextRequest) {
     const unreadCount = await notificationRepository.getUnreadNotificationCount(auth.userId);
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
-    console.error("[member-notifications] mark all read failed", error);
+    logServerError("[member-notifications] mark all read failed", error);
     const safeError = getSafeNotificationRouteError(
       error,
       "알림을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -107,7 +108,7 @@ export async function DELETE(request: NextRequest) {
     const unreadCount = await notificationRepository.getUnreadNotificationCount(auth.userId);
     return NextResponse.json({ ok: true, summary: { unreadCount } });
   } catch (error) {
-    console.error("[member-notifications] delete all failed", error);
+    logServerError("[member-notifications] delete all failed", error);
     const safeError = getSafeNotificationRouteError(
       error,
       "알림을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.",

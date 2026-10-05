@@ -96,6 +96,8 @@ For a new user-facing or admin-facing feature:
 - Avoid public env vars for server-only concerns.
 - Keep redirect return paths explicit and testable to avoid login/consent loops.
 - Cron routes and admin APIs should fail soft where possible and log enough context server-side.
+- Log server-side failures with `logServerError`/`logServerWarning` from `src/lib/server-log.ts` (one sanitized JSON line), never `console.error(label, error)` with a raw error or provider message. Wrap best-effort Supabase writes whose `{ error }` would otherwise be ignored with `expectNoError` from `src/lib/expect-no-error.ts`.
+- A cleanup cron that skips failed items must report the failure count with a 5xx (`getCronErrorResponse`) instead of `ok: true`; the self-host cron runner turns that into an operator notice.
 
 ## Supabase And Migrations
 

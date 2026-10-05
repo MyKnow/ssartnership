@@ -11,6 +11,7 @@ import { listMockPartnerPortalSetupsInternal } from "@/lib/mock/partner-portal/s
 import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { fetchPartnerEngagementCounts } from "@/lib/partner-counts";
+import { logServerError } from "@/lib/server-log";
 
 const PARTNER_ADMIN_METRICS_WARNING_MESSAGE =
   "일부 제휴처 집계를 불러오지 못해 최신 수치가 0으로 표시될 수 있습니다.";
@@ -84,17 +85,14 @@ export async function getAdminPartnerMetrics(
       metricRowsResult.failure.stage === "rollup"
         ? "event query failed"
         : "fallback event query failed";
-    console.error(
-      `[admin-partner-metrics] ${queryLabel}`,
-      metricRowsResult.failure.errorMessage,
-    );
+    logServerError(`[admin-partner-metrics] ${queryLabel}`, metricRowsResult.failure.errorMessage);
   } else {
     applyPartnerMetricRollupRows(metricsByPartnerId, metricRowsResult.rows);
   }
 
   if (engagementCounts.engagementErrorMessage) {
     hasPartialFailure = true;
-    console.error("[admin-partner-metrics] engagement query failed", engagementCounts.engagementErrorMessage);
+    logServerError("[admin-partner-metrics] engagement query failed", engagementCounts.engagementErrorMessage);
   } else {
     for (const [partnerId, reviewCount] of engagementCounts.reviewCounts) {
       const metrics = metricsByPartnerId.get(partnerId);

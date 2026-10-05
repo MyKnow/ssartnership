@@ -3,6 +3,7 @@ import { adPackageRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import { requireMemberApiSession } from "@/lib/member-api-session";
 import { readRouteParam } from "@/lib/route-params";
+import { logServerError } from "@/lib/server-log";
 
 function statusForReason(reason: string) {
   if (reason === "not_found") return 404;
@@ -47,7 +48,7 @@ export async function POST(
     }
     return NextResponse.json(result);
   } catch (error) {
-    console.error("[coupon-issue] failed", error);
+    logServerError("[coupon-issue] failed", error);
     return NextResponse.json({ ok: false, message: "쿠폰 다운로드에 실패했습니다." }, { status: 503 });
   }
 }

@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { forEachWithConcurrency } from "@/lib/async-concurrency";
+import {
+  summarizeCleanupResults,
+  type CleanupStageResult,
+} from "@/lib/cron-cleanup-results";
 import { ensureCronApiAccess, getCronErrorResponse } from "@/lib/cron-route";
 import { removeGraduateStoredObject } from "@/lib/graduate-verification-storage";
+import { logServerError } from "@/lib/server-log";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -26,7 +31,7 @@ type ProfileImageForDeletion = {
   storage_path: string;
 };
 
-async function deleteQuarantinedUploads(now: Date) {
+async function deleteQuarantinedUploads(now: Date): Promise<CleanupStageResult> {
   const supabase = getSupabaseAdminClient();
   const cutoff = new Date(now.getTime() - UNCONSUMED_UPLOAD_RETENTION_MS).toISOString();
   const { data, error } = await supabase
@@ -39,6 +44,7 @@ async function deleteQuarantinedUploads(now: Date) {
 
   const uploads = (data ?? []) as QuarantinedUpload[];
   let deleted = 0;
+  let failed = 0;
   await forEachWithConcurrency(uploads, CLEANUP_CONCURRENCY, async (upload) => {
     try {
       await removeGraduateStoredObject(upload.storage_bucket, upload.storage_path);
@@ -49,13 +55,14 @@ async function deleteQuarantinedUploads(now: Date) {
       if (deleteError) throw deleteError;
       deleted += 1;
     } catch {
-      // A later cron run retries the same private object. Avoid logging paths or other PII.
+      // A later cron run retries the same private object. Count it; never log paths or other PII.
+      failed += 1;
     }
   });
-  return deleted;
+  return { deleted, failed };
 }
 
-async function deleteExpiredCertificates(nowIso: string) {
+async function deleteExpiredCertificates(nowIso: string): Promise<CleanupStageResult> {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("graduate_verification_requests")
@@ -69,6 +76,7 @@ async function deleteExpiredCertificates(nowIso: string) {
 
   const requests = (data ?? []) as CertificateForDeletion[];
   let deleted = 0;
+  let failed = 0;
   await forEachWithConcurrency(requests, CLEANUP_CONCURRENCY, async (request) => {
     if (!request.certificate_storage_path) return;
     try {
@@ -82,12 +90,13 @@ async function deleteExpiredCertificates(nowIso: string) {
       deleted += 1;
     } catch {
       // Keep the record eligible for a safe retry without exposing a private path.
+      failed += 1;
     }
   });
-  return deleted;
+  return { deleted, failed };
 }
 
-async function deleteExpiredProfileImages(nowIso: string) {
+async function deleteExpiredProfileImages(nowIso: string): Promise<CleanupStageResult> {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("member_profile_images")
@@ -101,6 +110,7 @@ async function deleteExpiredProfileImages(nowIso: string) {
 
   const images = (data ?? []) as ProfileImageForDeletion[];
   let deleted = 0;
+  let failed = 0;
   await forEachWithConcurrency(images, CLEANUP_CONCURRENCY, async (image) => {
     try {
       await removeGraduateStoredObject("member-profile-images", image.storage_path);
@@ -113,9 +123,10 @@ async function deleteExpiredProfileImages(nowIso: string) {
       deleted += 1;
     } catch {
       // Keep the record eligible for a safe retry without exposing a private path.
+      failed += 1;
     }
   });
-  return deleted;
+  return { deleted, failed };
 }
 
 export async function GET(request: NextRequest) {
@@ -130,14 +141,28 @@ export async function GET(request: NextRequest) {
       deleteExpiredCertificates(nowIso),
       deleteExpiredProfileImages(nowIso),
     ]);
+    const results = { quarantinedUploads, certificates, profileImages };
+    const summary = summarizeCleanupResults(results);
+    if (!summary.ok) {
+      // Retention deletion is a privacy obligation: a partial run must fail
+      // the scheduled job so the operator is notified, not report ok:true.
+      logServerError("[cleanup-graduate-verification-files] deletion incomplete", undefined, {
+        failed: summary.failed,
+        quarantinedUploadsFailed: quarantinedUploads.failed,
+        certificatesFailed: certificates.failed,
+        profileImagesFailed: profileImages.failed,
+      });
+      return getCronErrorResponse("cleanup-graduate-verification-files");
+    }
     return NextResponse.json({
       ok: true,
-      quarantinedUploads,
-      certificates,
-      profileImages,
+      quarantinedUploads: quarantinedUploads.deleted,
+      certificates: certificates.deleted,
+      profileImages: profileImages.deleted,
       processedAt: nowIso,
     });
-  } catch {
+  } catch (error) {
+    logServerError("[cleanup-graduate-verification-files] cleanup failed", error);
     return getCronErrorResponse("cleanup-graduate-verification-files");
   }
 }

@@ -194,6 +194,7 @@ export default async function PartnerDetailPage({
     currentUserId,
     adCoupons,
     issuedAdCoupons,
+    couponsUnavailable,
     isPreview,
   } = pageData;
   const rawReturnTo = Array.isArray(resolvedSearchParams.returnTo)
@@ -324,6 +325,7 @@ export default async function PartnerDetailPage({
             <PartnerDetailCoupons
               coupons={adCoupons}
               initialIssuedCoupons={issuedAdCoupons}
+              unavailable={couponsUnavailable}
               partnerId={partner.id}
               currentUserId={currentUserId}
               returnTo={partnerReturnTo}

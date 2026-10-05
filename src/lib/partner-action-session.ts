@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import {
   getPartnerSessionExpiredLoginHref,
   resolvePartnerActionSessionRedirect,
-} from "@/lib/partner-portal-paths";
+} from "@/lib/partner-auth/portal-paths";
 import { getPartnerSession, type PartnerSession } from "@/lib/partner-session";
 
 /**

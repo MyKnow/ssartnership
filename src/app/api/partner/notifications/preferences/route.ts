@@ -13,6 +13,7 @@ import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
 import {
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -33,7 +34,7 @@ export async function GET() {
       ),
     });
   } catch (error) {
-    console.error("[partner-notification-preferences] read failed", error);
+    logServerError("[partner-notification-preferences] read failed", error);
     const safeError = getSafeNotificationRouteError(
       error,
       "알림 설정을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, preferences });
   } catch (error) {
     if (shouldLogNotificationRouteError(error)) {
-      console.error("[partner-notification-preferences] update failed", error);
+      logServerError("[partner-notification-preferences] update failed", error);
     }
     const safeError = getSafeNotificationRouteError(
       error,

@@ -8,6 +8,7 @@ import {
   readPartnerPortalJsonBody,
 } from "@/lib/partner-auth/route-body";
 import { consumePartnerBusinessStatusLookupQuota } from "@/lib/partner-business-status-rate-limit";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
     const result = await lookupNtsBusinessStatus(businessRegistrationNumber);
     return NextResponse.json(result);
   } catch (error) {
-    console.error("[partner-business-status] lookup failed", error);
+    logServerError("[partner-business-status] lookup failed", error);
     return NextResponse.json(
       { message: "사업자 상태조회를 처리하지 못했습니다. 잠시 후 다시 시도해 주세요." },
       { status: 503 },

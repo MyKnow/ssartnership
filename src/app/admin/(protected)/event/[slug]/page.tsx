@@ -32,6 +32,7 @@ import {
   listManagedEventCampaigns,
   type ManagedEventCampaign,
 } from "@/lib/promotions/events";
+import { logServerError } from "@/lib/server-log";
 
 export const dynamic = "force-dynamic";
 
@@ -131,7 +132,7 @@ async function getSignupRewardContent({
       getLatestEventRewardDrawWithWinners(campaign.slug),
     ]);
   } catch (error) {
-    console.error("[admin-event] reward overview query failed", error);
+    logServerError("[admin-event] reward overview query failed", error);
     rewardOverview = buildEventRewardAdminOverview(campaign, []);
     rewardWarningMessage =
       "추첨권 현황 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";

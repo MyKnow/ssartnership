@@ -4,6 +4,7 @@ import PartnerPortalShellView from "@/components/partner/PartnerPortalShellView"
 import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 import { getPartnerPortalCompanySummaries } from "@/lib/partner-auth/portal-scope";
 import { getPartnerSession } from "@/lib/partner-session";
+import { loadPartnerShellCompanies } from "@/lib/partner-shell-companies";
 
 export default async function PartnerLayout({
   children,
@@ -11,9 +12,14 @@ export default async function PartnerLayout({
   children: React.ReactNode;
 }) {
   const session = await getPartnerSession();
-  const companies = session
-    ? await getPartnerPortalCompanySummaries(session.companyIds).catch(() => [])
-    : [];
+  // A failed summary read keeps the shell usable without company navigation;
+  // the shell then shows an inline notice instead of looking company-less.
+  const { companies, unavailable: companiesUnavailable } = session
+    ? await loadPartnerShellCompanies(
+        session.companyIds,
+        getPartnerPortalCompanySummaries,
+      )
+    : { companies: [], unavailable: false };
 
   return (
     <>
@@ -23,6 +29,7 @@ export default async function PartnerLayout({
       <PartnerPortalShellView
         session={session}
         companies={companies}
+        companiesUnavailable={companiesUnavailable}
         isMock={isPartnerPortalMock}
       >
         {children}

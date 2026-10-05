@@ -4,6 +4,7 @@ import {
 } from "@/lib/admin-partner-metrics";
 import type { PartnerPopularityMetrics } from "@/lib/partner-popularity";
 import { partnerFavoriteRepository } from "@/lib/repositories";
+import { logServerError } from "@/lib/server-log";
 
 export const HOME_PARTNER_STATE_BATCH_LIMIT = 24;
 
@@ -96,7 +97,7 @@ async function loadHomePartnerPopularity(
 
   const getFavoriteCountsFallback = () =>
     dependencies.getFavoriteCounts(partnerIds).catch((error) => {
-      console.error("[home-partner-state] favorite counts query failed", error);
+      logServerError("[home-partner-state] favorite counts query failed", error);
       return new Map<string, number>();
     });
   let favoriteCounts = new Map<string, number>();
@@ -111,10 +112,7 @@ async function loadHomePartnerPopularity(
         favoriteCounts = await getFavoriteCountsFallback();
       }
     } catch (error) {
-      console.error(
-        "[home-partner-state] popularity metrics query failed",
-        error,
-      );
+      logServerError("[home-partner-state] popularity metrics query failed", error);
       favoriteCounts = await getFavoriteCountsFallback();
     }
   } else {
@@ -169,7 +167,7 @@ export function buildHomePartnerMemberState(
 }
 
 function logFavoriteStateFailure(error: unknown) {
-  console.error("[home-partner-state] favorite state query failed", error);
+  logServerError("[home-partner-state] favorite state query failed", error);
   return new Set<string>();
 }
 

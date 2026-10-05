@@ -49,6 +49,7 @@ import { resolveImageTransformPolicy } from "@/lib/image-upload/policy";
 import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { PROMOTION_SLIDES_BUCKET } from "@/lib/promotion-slide-storage";
 import { logAdminAction } from "./shared-helpers";
+import { logServerError } from "@/lib/server-log";
 
 function getString(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -409,7 +410,7 @@ export async function savePromotionSlidesAction(formData: FormData) {
   try {
     await savePromotionSlidesMutation(formData);
   } catch (error) {
-    console.error("[admin-advertisement] promotion slide save failed", error);
+    logServerError("[admin-advertisement] promotion slide save failed", error);
     redirectAdvertisementError("promotion_slide_save_failed", error);
   }
   redirect("/admin/advertisement?status=updated");
@@ -425,7 +426,7 @@ async function savePromotionSlidesMutation(formData: FormData) {
     .order("display_order", { ascending: true })
     .order("created_at", { ascending: true });
   if (existingError) {
-    console.error("[admin-advertisement] slide lookup failed", existingError);
+    logServerError("[admin-advertisement] slide lookup failed", existingError);
     throw new PromotionSlideSaveError(promotionSlideDatabaseErrorCode(existingError.code, "promotion_slide_database_read_failed"));
   }
 
@@ -499,10 +500,7 @@ async function savePromotionSlidesMutation(formData: FormData) {
         },
         resource: { type: "promotion_slide", id: slide.id },
       }).catch((error: unknown) => {
-        console.error("[admin-advertisement] promotion slide image attach failed", {
-          slideNumber,
-          error: error instanceof Error ? error.message : "unknown",
-        });
+        logServerError("[admin-advertisement] promotion slide image attach failed", error, { slideNumber });
         throw new PromotionSlideSaveError("promotion_slide_image_attach_failed", slideNumber);
       });
       imageSrc = attached.url ?? "";
@@ -548,7 +546,7 @@ async function savePromotionSlidesMutation(formData: FormData) {
     .from("promotion_slides")
     .upsert(nextRows, { onConflict: "id" });
   if (upsertError) {
-    console.error("[admin-advertisement] slide upsert failed", upsertError);
+    logServerError("[admin-advertisement] slide upsert failed", upsertError);
     throw new PromotionSlideSaveError(promotionSlideDatabaseErrorCode(upsertError.code, "promotion_slide_database_write_failed"));
   }
 
@@ -561,7 +559,7 @@ async function savePromotionSlidesMutation(formData: FormData) {
         removedRows.map((row) => row.id),
       );
     if (deleteError) {
-      console.error("[admin-advertisement] slide deletion failed", deleteError);
+      logServerError("[admin-advertisement] slide deletion failed", deleteError);
       throw new PromotionSlideSaveError("promotion_slide_delete_failed");
     }
   }
@@ -621,7 +619,7 @@ export async function createEventRewardDrawAction(formData: FormData) {
       createdByAdminId: adminSession?.adminId ?? null,
     });
   } catch (error) {
-    console.error("[admin-event] reward draw create failed", error);
+    logServerError("[admin-event] reward draw create failed", error);
     redirectEventRewardDrawError({
       slug,
       message: eventRewardActionErrorMessage(

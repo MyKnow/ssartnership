@@ -45,3 +45,116 @@ tests:
         alertname: PveDiskUnhealthy
         exp_alerts:
           - exp_labels: { environment: operations, vm: host, severity: critical }
+  - interval: 1m
+    input_series:
+      - series: 'caddy_http_request_duration_seconds_count{job="caddy",environment="operations",vm="5202",server="srv0",handler="reverse_proxy",method="GET",code="200"}'
+        values: '0+60x30'
+      - series: 'caddy_http_request_duration_seconds_count{job="caddy",environment="operations",vm="5202",server="srv0",handler="reverse_proxy",method="GET",code="502"}'
+        values: '0+0x10 0+12x20'
+      - series: 'caddy_http_request_duration_seconds_count{job="caddy",environment="operations",vm="5202",server="srv0",handler="static_response",method="GET",code="503"}'
+        values: '0+600x30'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: ServerErrorBurst
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: ServerErrorBurst
+        exp_alerts:
+          - exp_labels: { severity: warning, environment: operations, vm: "5202" }
+  - interval: 1m
+    input_series:
+      - series: 'caddy_http_request_duration_seconds_count{job="caddy",environment="operations",vm="5202",server="srv0",handler="reverse_proxy",method="GET",code="500"}'
+        values: '0+1x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: ServerErrorBurst
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: 'ssartnership_app_ready_success{job="telemetry",environment="production",vm="5200",dependency="database"}'
+        values: '1 1 0 0 0 0 1 1'
+      - series: 'ssartnership_app_ready_success{job="telemetry",environment="production",vm="5200",dependency="storage"}'
+        values: '1+0x7'
+      - series: 'ssartnership_app_ready_success{job="telemetry",environment="preview",vm="5201",dependency="gateway"}'
+        values: '0+0x7'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: AppDependencyUnavailable
+        exp_alerts:
+          - exp_labels: { job: telemetry, environment: preview, vm: "5201", dependency: gateway, severity: warning }
+      - eval_time: 5m
+        alertname: AppDependencyUnavailable
+        exp_alerts:
+          - exp_labels: { job: telemetry, environment: production, vm: "5200", dependency: database, severity: critical }
+          - exp_labels: { job: telemetry, environment: preview, vm: "5201", dependency: gateway, severity: warning }
+      - eval_time: 7m
+        alertname: AppDependencyUnavailable
+        exp_alerts:
+          - exp_labels: { job: telemetry, environment: preview, vm: "5201", dependency: gateway, severity: warning }
+  - interval: 5m
+    input_series:
+      - series: 'ssartnership_production_cron_last_success_seconds{job="node",environment="production",vm="5200",cron="rss"}'
+        values: '0+300x6 1800+0x30'
+      - series: 'ssartnership_production_cron_interval_seconds{job="node",environment="production",vm="5200",cron="rss"}'
+        values: '900+0x36'
+      - series: 'ssartnership_production_cron_last_success_seconds{job="node",environment="production",vm="5200",cron="anonymize-deleted-members"}'
+        values: '0+0x36'
+      - series: 'ssartnership_production_cron_interval_seconds{job="node",environment="production",vm="5200",cron="anonymize-deleted-members"}'
+        values: '86400+0x36'
+    alert_rule_test:
+      - eval_time: 50m
+        alertname: ProductionCronStale
+        exp_alerts: []
+      - eval_time: 90m
+        alertname: ProductionCronStale
+        exp_alerts:
+          - exp_labels: { job: node, environment: production, vm: "5200", cron: rss, severity: warning }
+  - interval: 5m
+    input_series:
+      - series: 'ssartnership_release_receiver_last_success_seconds{job="node",environment="production",vm="5200"}'
+        values: '0+300x6 1800+0x24'
+      - series: 'ssartnership_release_receiver_last_success_seconds{job="node",environment="preview",vm="5201"}'
+        values: '0+300x30'
+    alert_rule_test:
+      - eval_time: 80m
+        alertname: ReleaseReceiverStale
+        exp_alerts: []
+      - eval_time: 110m
+        alertname: ReleaseReceiverStale
+        exp_alerts:
+          - exp_labels: { job: node, environment: production, vm: "5200", severity: warning }
+  - interval: 1m
+    input_series:
+      - series: 'pg_stat_database_numbackends{job="postgres",environment="production",vm="5200",datname="postgres"}'
+        values: '50+0x20'
+      - series: 'pg_stat_database_numbackends{job="postgres",environment="production",vm="5200",datname="template1"}'
+        values: '40+0x20'
+      - series: 'pg_settings_max_connections{job="postgres",environment="production",vm="5200"}'
+        values: '100+0x20'
+      - series: 'pg_stat_database_numbackends{job="postgres",environment="preview",vm="5201",datname="postgres"}'
+        values: '10+0x20'
+      - series: 'pg_settings_max_connections{job="postgres",environment="preview",vm="5201"}'
+        values: '100+0x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: DatabaseConnectionsHigh
+        exp_alerts:
+          - exp_labels: { environment: production, vm: "5200", severity: warning }
+  - interval: 5m
+    input_series:
+      # +64 MiB per 5 minutes (about 18 GiB/day) against 20 GiB free:
+      # 14 days of that growth far exceeds the free space.
+      - series: 'pg_database_size_bytes{job="postgres",environment="production",vm="5200",datname="postgres"}'
+        values: '0+67108864x400'
+      - series: 'node_filesystem_avail_bytes{job="node",environment="production",vm="5200",mountpoint="/",fstype="ext4"}'
+        values: '21474836480+0x400'
+      # Flat size never forecasts exhaustion, even with little free space.
+      - series: 'pg_database_size_bytes{job="postgres",environment="preview",vm="5201",datname="postgres"}'
+        values: '1073741824+0x400'
+      - series: 'node_filesystem_avail_bytes{job="node",environment="preview",vm="5201",mountpoint="/",fstype="ext4"}'
+        values: '1073741824+0x400'
+    alert_rule_test:
+      - eval_time: 30h
+        alertname: DatabaseSizeForecast
+        exp_alerts:
+          - exp_labels: { environment: production, vm: "5200", severity: warning }

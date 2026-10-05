@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Button from "@/components/ui/Button";
+import ErrorDigest from "@/components/errors/ErrorDigest";
 import { BUG_REPORT_HREF, TECH_SUPPORT_HREF } from "@/lib/support-mail";
 
 type AppErrorScreenProps = {
@@ -59,14 +60,7 @@ export default function AppErrorScreen({
             <p className="text-sm leading-6 text-muted-foreground">{description}</p>
           </div>
 
-          {digest ? (
-            <div className="rounded-[1rem] border border-border/70 bg-surface-inset px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                오류 코드
-              </p>
-              <p className="mt-1 break-all font-mono text-xs text-foreground">{digest}</p>
-            </div>
-          ) : null}
+          <ErrorDigest digest={digest} />
 
           <div className="grid gap-2 rounded-[1rem] border border-border/70 bg-surface-inset px-4 py-3 text-sm text-muted-foreground">
             <p>{primaryAction.helper}</p>

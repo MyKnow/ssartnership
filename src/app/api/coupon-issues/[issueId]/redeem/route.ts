@@ -11,6 +11,7 @@ import {
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
 import { readRouteParam } from "@/lib/route-params";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -158,7 +159,7 @@ export async function POST(
       issueId: result.issueId,
     });
   } catch (error) {
-    console.error("[coupon-issue-redeem] failed", error);
+    logServerError("[coupon-issue-redeem] failed", error);
     return NextResponse.json(
       { ok: false, message: "쿠폰 사용 확인에 실패했습니다." },
       { status: 503 },

@@ -60,7 +60,7 @@ describe("supabase server clients", () => {
     expect("getSupabasePublicClient" in supabaseServer).toBe(false);
   });
 
-  test("admin and public clients attach a request deadline to every SDK fetch", async () => {
+  test("admin client attaches a request deadline to every SDK fetch", async () => {
     process.env.SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role";
     process.env.SUPABASE_ANON_KEY = "anon-key";
@@ -75,12 +75,9 @@ describe("supabase server clients", () => {
       const admin = supabaseServer.getSupabaseAdminClient() as unknown as {
         options: { global: { fetch: typeof fetch } };
       };
-      const publicClient = supabaseServer.getSupabasePublicClient(60) as unknown as {
-        options: { global: { fetch: typeof fetch } };
-      };
 
       await admin.options.global.fetch("https://example.supabase.co/rest/v1/partners");
-      await publicClient.options.global.fetch(
+      await admin.options.global.fetch(
         "https://example.supabase.co/storage/v1/object/public/partner-media/a.webp",
       );
 
@@ -93,7 +90,7 @@ describe("supabase server clients", () => {
         next?: unknown;
       };
       expect(publicInit.signal).toBeInstanceOf(AbortSignal);
-      expect(publicInit.next).toEqual({ revalidate: 60 });
+      expect(publicInit.cache).toBe("no-store");
     } finally {
       vi.unstubAllGlobals();
     }

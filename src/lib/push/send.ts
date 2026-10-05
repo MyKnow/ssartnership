@@ -43,6 +43,7 @@ import type {
   ResolvedPushAudience,
   StoredSubscription,
 } from "./types.ts";
+import { logServerError } from "@/lib/server-log";
 
 const PUSH_SEND_CONCURRENCY = 8;
 const PUSH_AUDIENCE_PAGE_SIZE = DEFAULT_SUPABASE_IN_FILTER_CHUNK_SIZE;
@@ -160,10 +161,7 @@ async function settlePushBookkeeping(
     if (result.status !== "rejected") {
       continue;
     }
-    console.error(
-      `[push] ${phase} delivery bookkeeping failed`,
-      result.reason instanceof Error ? result.reason.message : "unknown_error",
-    );
+    logServerError(`[push] ${phase} delivery bookkeeping failed`, result.reason);
   }
 }
 
