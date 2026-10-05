@@ -3,7 +3,7 @@ title: 기술 부채 원장
 type: tech-debt
 status: active
 authority: descriptive
-last_verified: 2026-10-05
+last_verified: 2026-10-06
 ---
 
 # 기술 부채 원장
@@ -87,7 +87,8 @@ Next가 webpack 지원 축소를 예고하면 위 조건과 무관하게 이 항
 | i18n 추출 | 단일 로케일 제품이다. 오류 메시지 매핑은 공용 검증 작업에서 다룬다. | 다국어 지원 요구가 생길 때 |
 | Storybook 스토리 자체의 유지비 축소 | 별도 결함 근거가 없다. 스토리 인벤토리는 mock 시나리오 정리에서 다룬다. | 스토리 유지가 기능 변경을 실제로 막을 때 |
 | React Compiler 사용 중 수동 `useMemo`/`useCallback` 제거 | 동작 영향이 없고 효과가 작다. | 해당 파일을 다른 이유로 수정할 때 |
-| 회원 수동 추가 provisioning의 순차 왕복 최적화 | 전제가 틀렸다. `src/lib/member-manual-add/provision.ts`의 `provisionManualMembers`는 호출처가 없는 죽은 코드이고, 활성 경로는 회원 가져오기 파이프라인뿐이다. 최적화하지 않고 죽은 코드 정리 작업에서 삭제 여부만 정한다. | 수동 추가 기능을 다시 화면에 연결할 때. 그때는 soft-delete 회원을 덮어쓰지 않는지도 함께 확인한다. |
+| 회원 수동 추가 provisioning의 순차 왕복 최적화 | 호출처가 없는 `provisionManualMembers`와 전용 rollback·payload 테스트를 제거했다. 활성 회원 가져오기 파이프라인의 정규화·알림 계약은 유지하며 해당 활성 경로를 테스트한다. | 수동 추가 기능을 다시 화면에 연결할 때. 그때는 soft-delete 회원을 덮어쓰지 않는지도 함께 확인한다. |
+| Storage bucket 상수의 전역 레지스트리화 | 업로드·프로필·리뷰 등 각 도메인이 자신의 bucket 계약을 소유한다. 이름이 같다는 이유만으로 서로 다른 수명·권한 경계를 하나의 전역 설정에 결합하지 않는다. | 여러 도메인이 실제로 함께 변경돼야 하는 공용 bucket 계약이 생길 때 |
 
 ### 성능·UX·운영
 
