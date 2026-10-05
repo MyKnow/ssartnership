@@ -89,6 +89,17 @@ test.describe("mobile browser and standalone PWA shell", () => {
     expect(documentWidth.scrollWidth).toBe(documentWidth.clientWidth);
   });
 
+  test("offline fallback page is served as-is with a retry action", async ({ page }) => {
+    // public/sw.js serves this page for failed navigations; it must not be gated.
+    const response = await page.goto("/offline.html");
+    expect(response?.status()).toBe(200);
+    expect(response?.url()).toMatch(/\/offline\.html$/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "인터넷에 연결되어 있지 않습니다" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "다시 시도" })).toBeVisible();
+  });
+
   test("standalone PWA keeps the app-like bottom navigation and suppresses browser prompts", async ({
     page,
   }) => {

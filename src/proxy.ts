@@ -9,6 +9,7 @@ import {
   shouldChallengeAdminBasicAuth,
 } from "@/lib/admin-security";
 import { getMemberRequiredGateRedirect } from "@/lib/member-required-gates";
+import { isPwaShellPath } from "@/lib/pwa-shell";
 import { buildTrustedRedirectUrl } from "@/lib/request-guards";
 import {
   buildForwardedRequestPath,
@@ -306,7 +307,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/icon") ||
     pathname.startsWith("/sitemap") ||
-    pathname.startsWith("/robots")
+    pathname.startsWith("/robots") ||
+    isPwaShellPath(pathname)
   ) {
     return nextWithRequestUrl(request);
   }
