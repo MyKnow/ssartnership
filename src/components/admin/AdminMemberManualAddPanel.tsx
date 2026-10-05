@@ -764,7 +764,13 @@ export default function AdminMemberManualAddPanel({
       if (nextResult.failed === 0) {
         void clearManualMemberImportDraft();
       }
-      notify("회원 가져오기를 처리했습니다.");
+      // 일부 행이 실패하면 2.5초 안내로 지나가지 않도록 오류 톤으로 알린다.
+      notify(
+        nextResult.failed > 0
+          ? `회원 가져오기를 처리했습니다. 실패한 ${nextResult.failed}건은 가져오기 결과에서 확인해 주세요.`
+          : "회원 가져오기를 처리했습니다.",
+        nextResult.failed > 0 ? { tone: "error" } : undefined,
+      );
     } catch {
       setError("회원 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {

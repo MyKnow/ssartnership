@@ -218,3 +218,57 @@ test("홈 광고 편집 저장 버튼은 저장 중 다시 제출할 수 없다"
     /data-floating-submit-button="raised"[\s\S]*?<SubmitButton[\s\S]*?disabled=\{!canSave\}[\s\S]*?pendingText="저장 중"[\s\S]*?저장\s*<\/SubmitButton>/,
   );
 });
+
+/**
+ * `form` 속성으로 바깥 form에 연결한 SubmitButton은 useFormStatus가 조상 form만 읽어
+ * 제출 중 상태를 받지 못한다. 같은 파일 안에서 `<form>` 밖에 놓인 `form=` SubmitButton을
+ * `파일:줄` 형태로 모은다.
+ */
+async function collectExternalFormSubmitButtons() {
+  const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "src/**/*.tsx"], {
+    cwd: new URL("..", import.meta.url),
+    encoding: "utf8",
+  })
+    .trim()
+    .split("\n")
+    .filter((file) => file && !file.endsWith(".stories.tsx") && existsSync(new URL(`../${file}`, import.meta.url)));
+  const offenders: string[] = [];
+
+  for (const file of files) {
+    const source = await read(file);
+    for (const button of source.matchAll(/<SubmitButton\b/g)) {
+      const tag = source.slice(button.index, findTagEnd(source, button.index) + 1);
+      if (!/\sform=[{"]/.test(tag)) continue;
+      const before = source.slice(0, button.index);
+      if (count(before, /<form\b/g) - count(before, /<\/form>/g) <= 0) {
+        offenders.push(`${file}:${before.split("\n").length}`);
+      }
+    }
+  }
+  return offenders.sort();
+}
+
+test("SubmitButton은 form 속성으로 바깥 form을 가리키지 않고 제출하는 form 안에 렌더한다", async () => {
+  assert.deepEqual(
+    await collectExternalFormSubmitButtons(),
+    [],
+    "form 밖 SubmitButton은 제출 중에도 비활성화되지 않습니다. 레이아웃은 contents form으로 감싸 버튼을 form 안에 두세요.",
+  );
+
+  const [categoryManager, themeManager] = await Promise.all([
+    read("src/components/admin/AdminCategoryManager.tsx"),
+    read("src/components/admin/cohort-card-themes/AdminCohortCardThemeManager.tsx"),
+  ]);
+  assert.match(
+    categoryManager,
+    /<form action=\{updateAction\} className="contents">[\s\S]*?<SubmitButton variant="ghost" pendingText="수정 중">[\s\S]*?<\/form>/,
+  );
+  assert.match(
+    themeManager,
+    /<form action=\{upsertAction\} className="contents">[\s\S]*?pendingText="저장 중"[\s\S]*?<\/form>/,
+  );
+  assert.match(
+    themeManager,
+    /<form action=\{deleteAction\} className="contents">[\s\S]*?pendingText="삭제 중"[\s\S]*?<\/form>/,
+  );
+});

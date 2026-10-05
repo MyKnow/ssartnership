@@ -247,7 +247,7 @@ Docker `local` 로그 드라이버가 10MB×3으로 회전하므로 오래 보�
 docker logs --since 1h ssartnership-production-app-1 2>&1 | grep '"level":"error"'
 ```
 
-Next.js가 잡은 모든 서버 오류(render·route·action·proxy)는 `src/instrumentation.ts`의 `onRequestError`가 `"[request-error] unhandled server error"` 한 줄로 남긴다. 경로는 route 패턴(`/admin/(protected)/members/[memberId]/page`)과 고정 route group으로만 기록한다. 사용자 오류 화면의 "오류 코드"는 Next.js digest이며 같은 줄의 `error.digest`와 대조한다. 세 오류 경계(`app/error.tsx`, `app/global-error.tsx`, `admin/(protected)/error.tsx`)는 같은 digest 블록을 표시하고 원본 message는 렌더링하지 않는다.
+Next.js가 잡은 모든 서버 오류(render·route·action·proxy)는 `src/instrumentation.ts`의 `onRequestError`가 `"[request-error] unhandled server error"` 한 줄로 남긴다. 경로는 route 패턴(`/admin/(protected)/members/[memberId]/page`)과 고정 route group으로만 기록한다. 사용자 오류 화면의 "오류 코드"는 Next.js digest이며 같은 줄의 `error.digest`와 대조한다. 다섯 오류 경계(`app/error.tsx`, `app/global-error.tsx`, `app/(site)/error.tsx`, `app/partner/error.tsx`, `admin/(protected)/error.tsx`)는 같은 digest 블록을 표시하고 원본 message는 렌더링하지 않는다.
 
 ### 준비 상태(readiness)
 

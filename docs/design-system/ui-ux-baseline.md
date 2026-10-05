@@ -88,7 +88,7 @@ public header는 브랜드와 계정·알림·쿠폰·테마·전체 메뉴처�
 - 첫 오류 필드에 focus를 이동하는 흐름을 우선한다.
 - 비밀번호/로그인/정책 동의/파트너 setup/reset/change-password form은 field error + inline form error 패턴으로 정리되어 있다.
 - server action/API 검증은 FE 검증의 대체가 아니라 신뢰 경계의 필수 방어선이다.
-- Server Action 폼의 제출 버튼은 `SubmitButton`을 사용해 제출 중 비활성·`aria-busy`·진행 문구를 제공하고 raw `<button type="submit">`을 두지 않는다. 삭제처럼 되돌릴 수 없는 관리자 제출은 `AdminConfirmSubmitButton`으로 확인 대화상자를 거친다. GET 필터 폼에 제출 중 상태가 필요하면 `NavigationForm`과 `SubmitButton`을 함께 쓴다. `NavigationForm`은 `useTransition` 안에서 `router.push`로 이동해 다음 화면이 렌더될 때까지 `SubmitButton`을 적용 중 상태로 두며, JavaScript가 없으면 기본 `method="get"` 제출로 동작한다. `useFormStatus`는 함수 action만 추적하므로 문자열 action 폼(`next/form` 포함)에서는 pending이 되지 않는다.
+- Server Action 폼의 제출 버튼은 `SubmitButton`을 사용해 제출 중 비활성·`aria-busy`·진행 문구를 제공하고 raw `<button type="submit">`을 두지 않는다. 삭제처럼 되돌릴 수 없는 관리자 제출은 `AdminConfirmSubmitButton`으로 확인 대화상자를 거친다. GET 필터 폼에 제출 중 상태가 필요하면 `NavigationForm`과 `SubmitButton`을 함께 쓴다. `NavigationForm`은 `useTransition` 안에서 `router.push`로 이동해 다음 화면이 렌더될 때까지 `SubmitButton`을 적용 중 상태로 두며, JavaScript가 없으면 기본 `method="get"` 제출로 동작한다. `useFormStatus`는 함수 action만 추적하므로 문자열 action 폼(`next/form` 포함)에서는 pending이 되지 않는다. `useFormStatus`는 조상 form만 읽으므로 `SubmitButton`은 제출하는 form 안에 둔다. `form` 속성으로 바깥에서 연결한 버튼은 제출 중에도 비활성화되지 않으니, 입력과 버튼이 다른 그리드 칸에 있으면 form을 `contents`로 감싼다.
 - toast는 저장 완료, 복사 완료, 비동기 성공/실패처럼 화면 상태와 독립적인 feedback에 사용한다. 실패 toast는 `tone: "error"`로 보내 assertive live region과 오류 톤을 사용한다.
 
 ## Responsive baseline
@@ -111,7 +111,7 @@ public header는 브랜드와 계정·알림·쿠폰·테마·전체 메뉴처�
 - route-specific `loading.tsx`와 shared skeleton을 함께 사용한다. 모든 `loading.tsx`는 `RouteLoadingStatus`(sr-only `role="status"`, "화면을 불러오는 중입니다.")를 정확히 한 번 렌더하고, 스켈레톤 블록과 페이지 내부 Suspense fallback은 live region을 만들지 않는다.
 - 관리자 페이지는 `AdminShell`을 페이지마다 렌더하므로 관리자 route `loading.tsx`도 `AdminRouteSkeleton` 또는 셸을 포함한 `Admin*Skeleton`을 사용해 사이드바·모바일 헤더·하단 탐색을 유지한다. route loading 스켈레톤이 끝나면 페이지가 셸과 헤더를 먼저 스트리밍하고 데이터 영역만 `*SkeletonContent showHeader={false}` Suspense fallback으로 대체하는 2단계 스트리밍은 의도된 동작이다.
 - list empty는 `EmptyState` 또는 domain-specific empty panel로 표현한다.
-- app error는 `AppErrorScreen`과 route/global error surface를 사용한다. 루트 `error.tsx`·`global-error.tsx`는 `layout="page"`(기본값)로 화면 전체를 대체하고, 공개 `(site)`·파트너 그룹 `error.tsx`는 `layout="embedded"`로 그룹 셸(하단 탐색·Footer·파트너 포털 셸) 안에서 렌더해 복귀 동선을 유지한다. 그룹 layout 자체의 예외는 루트 경계가 받는다.
+- app error는 `AppErrorScreen`과 route/global error surface를 사용한다. 루트 `error.tsx`·`global-error.tsx`는 `layout="page"`(기본값)로 화면 전체를 대체하고, 공개 `(site)`·파트너 그룹 `error.tsx`는 `layout="embedded"`로 그룹 셸(하단 탐색·Footer·파트너 포털 셸) 안에서 렌더해 복귀 동선을 유지한다. 그룹 layout 자체의 예외는 루트 경계가 받는다. 모든 오류 경계(루트·global·공개·파트너·관리자)의 `다시 시도`는 Next.js `retry()`로 해당 세그먼트를 다시 불러와 렌더한다. 다시 불러오지 않는 `reset()`은 서버 컴포넌트 예외를 그대로 다시 보여 주므로 쓰지 않는다. `global-error.tsx`는 루트 layout을 대체하는 별도 문서라 루트 layout의 전역 CSS를 받지 못하므로, 루트 layout과 같은 순서로 Pretendard CSS와 `globals.css`를 직접 불러오고 body도 루트 layout과 같은 클래스를 쓴다. ThemeProvider 밖이라 next-themes가 테마 클래스를 붙이지 못하므로, ThemeProvider와 같은 저장 키·기본값(`src/lib/theme-preference.ts`)으로 저장된 테마를 해석해 `html`에 직접 적용한다(`useStoredResolvedTheme`).
 - `notFound()`는 호출한 영역의 셸 안에서 404를 보여 준다. 공개 제휴처 상세는 `(site)/partners/[id]/not-found.tsx`(헤더만 렌더하고 Footer는 `(site)` layout이 담당), 관리자는 `admin/(protected)/not-found.tsx`(AdminShell과 요청 경로가 속한 관리 목록 복귀), 파트너는 `partner/not-found.tsx`(파트너 포털 셸과 파트너 홈 복귀)를 사용한다. 어떤 라우트에도 맞지 않는 URL은 루트 `not-found.tsx`가 처리하며, 404 kicker는 `404`로 통일한다.
 
 ## Storybook 추적 기준
