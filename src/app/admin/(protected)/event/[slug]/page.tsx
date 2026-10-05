@@ -54,6 +54,9 @@ function statusMessage(status?: string) {
   if (status === "winner-sent") {
     return "당첨 안내를 발송했습니다.";
   }
+  if (status === "winner-partial") {
+    return "일부 당첨자에게 안내하지 못했습니다. 발송 결과를 확인한 뒤 미도달 당첨자에게 다시 보내 주세요.";
+  }
   if (status === "winner-test-sent") {
     return "당첨 안내 테스트를 발송했습니다.";
   }

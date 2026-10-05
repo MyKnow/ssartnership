@@ -12,6 +12,14 @@ import {
 import { toCsvCell } from "@/lib/csv";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import type { EventCampaign, EventConditionKey } from "@/lib/promotions/catalog";
+import {
+  getEventRewardNotificationAttemptIds,
+  resolveEventRewardDrawDeliveryStatus,
+  selectEventRewardNotificationTargets,
+  summarizeEventRewardWinnerDeliveries,
+  type EventRewardDeliveryRecord,
+  type EventRewardWinnerDeliveryOutcome,
+} from "@/lib/promotions/event-reward-delivery";
 
 import type {
   EventRewardAdminMemberInput,
@@ -116,13 +124,31 @@ export function supportsEventRewardDraw(slug: string | null | undefined) {
   return EVENT_REWARD_DRAW_EVENT_SLUGS.some((candidate) => candidate === slug);
 }
 
+/**
+ * Reward failures whose message is written for admins and safe to show as-is.
+ * Other errors may carry database text and must be replaced by a fallback.
+ */
+export class EventRewardSafeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EventRewardSafeError";
+  }
+}
+
 function requireEventRewardSlug(eventSlug: string | null | undefined) {
   const slug = typeof eventSlug === "string" ? eventSlug.trim() : "";
   if (!supportsEventRewardDraw(slug)) {
-    throw new Error("추첨 대상 이벤트를 확인해 주세요.");
+    throw new EventRewardSafeError("추첨 대상 이벤트를 확인해 주세요.");
   }
   return slug;
 }
+
+const EVENT_REWARD_DRAW_SELECT =
+  "id,event_slug,status,seed,winner_count,candidate_count,total_tickets,google_form_url,guide_path,sent_notification_id,metadata,created_by_admin_id,created_at,finalized_at,sent_at,updated_at";
+const EVENT_REWARD_WINNER_SELECT =
+  "id,draw_id,event_slug,member_id,winner_rank,ticket_count,display_name,mm_username,year,campus,notification_status,notification_sent_at,notification_error,created_at,updated_at";
+
+type EventRewardSupabaseClient = ReturnType<typeof getSupabaseAdminClient>;
 
 function assertEventRewardQuerySucceeded(error: unknown, label: string) {
   if (!error) {
@@ -555,7 +581,7 @@ export function normalizeEventRewardWinnerNotificationRequest(input: {
   const confirmationText =
     typeof input.confirmationText === "string" ? input.confirmationText.trim() : "";
   if (confirmationText !== EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT) {
-    throw new Error(
+    throw new EventRewardSafeError(
       `확인 문구 '${EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT}'를 정확히 입력해 주세요.`,
     );
   }
@@ -567,7 +593,7 @@ export function normalizeEventRewardTestNotificationRequest(input: {
 }) {
   const memberId = typeof input.memberId === "string" ? input.memberId.trim() : "";
   if (!memberId) {
-    throw new Error("테스트 수신자를 선택해 주세요.");
+    throw new EventRewardSafeError("테스트 수신자를 선택해 주세요.");
   }
   return { memberId };
 }
@@ -838,9 +864,7 @@ export async function getLatestEventRewardDrawWithWinners(eventSlug: string) {
   const supabase = getSupabaseAdminClient();
   const { data: draw, error: drawError } = await supabase
     .from("event_reward_draws")
-    .select(
-      "id,event_slug,status,seed,winner_count,candidate_count,total_tickets,google_form_url,guide_path,sent_notification_id,metadata,created_by_admin_id,created_at,finalized_at,sent_at,updated_at",
-    )
+    .select(EVENT_REWARD_DRAW_SELECT)
     .eq("event_slug", eventSlug)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -855,13 +879,109 @@ export async function getLatestEventRewardDrawWithWinners(eventSlug: string) {
 
   const { data: winners, error: winnerError } = await supabase
     .from("event_reward_winners")
-    .select(
-      "id,draw_id,event_slug,member_id,winner_rank,ticket_count,display_name,mm_username,year,campus,notification_status,notification_sent_at,notification_error,created_at,updated_at",
-    )
+    .select(EVENT_REWARD_WINNER_SELECT)
     .eq("draw_id", draw.id)
     .order("winner_rank", { ascending: true });
   if (winnerError) {
     throw new Error(winnerError.message);
+  }
+
+  return mapDrawRow(
+    draw as EventRewardDrawRow,
+    (winners ?? []) as EventRewardWinnerRow[],
+  );
+}
+
+/**
+ * Stores a finalized draw and its winners. PostgREST cannot wrap both inserts
+ * in one transaction, so a failed winner insert deletes the draw again;
+ * otherwise the finalized row would hold the one-finalized-draw-per-event index
+ * and block every later draw for the event.
+ */
+export async function persistEventRewardDraw(
+  supabase: EventRewardSupabaseClient,
+  params: {
+    campaign: EventCampaign;
+    plan: EventRewardDrawPlan;
+    googleFormUrl: string;
+    createdByAdminId?: string | null;
+    finalizedAt: string;
+  },
+) {
+  const { campaign, plan } = params;
+  if (plan.winners.length === 0) {
+    throw new EventRewardSafeError(
+      "추첨권을 가진 후보가 없어 추첨을 확정할 수 없습니다.",
+    );
+  }
+  const guidePath = getEventRewardWinnerGuidePath(campaign.slug);
+  const { data: draw, error: drawError } = await supabase
+    .from("event_reward_draws")
+    .insert({
+      event_slug: campaign.slug,
+      status: "finalized",
+      seed: plan.seed,
+      winner_count: plan.winnerCount,
+      candidate_count: plan.candidateCount,
+      total_tickets: plan.totalTickets,
+      google_form_url: params.googleFormUrl,
+      guide_path: guidePath,
+      created_by_admin_id: params.createdByAdminId ?? null,
+      finalized_at: params.finalizedAt,
+      metadata: {
+        campaignTitle: campaign.title,
+        campaignStartsAt: campaign.startsAt,
+        campaignEndsAt: campaign.endsAt,
+      },
+    })
+    .select(EVENT_REWARD_DRAW_SELECT)
+    .single();
+
+  if (drawError) {
+    if (drawError.message.includes("event_reward_draws_one_finalized_per_event")) {
+      throw new EventRewardSafeError("이미 확정된 추첨이 있습니다.");
+    }
+    throw new Error(drawError.message);
+  }
+
+  const winnerRows = plan.winners.map((winner) => ({
+    draw_id: draw.id,
+    event_slug: campaign.slug,
+    member_id: winner.memberId,
+    winner_rank: winner.rank,
+    ticket_count: winner.ticketCount,
+    display_name: winner.displayName,
+    mm_username: winner.mmUsername,
+    year: winner.year,
+    campus: winner.campus,
+  }));
+
+  const { data: winners, error: winnerError } = await supabase
+    .from("event_reward_winners")
+    .insert(winnerRows)
+    .select(EVENT_REWARD_WINNER_SELECT);
+  if (winnerError) {
+    const { error: cleanupError } = await supabase
+      .from("event_reward_draws")
+      .delete()
+      .eq("id", draw.id);
+    if (cleanupError) {
+      console.error("[event-rewards] draw rollback failed after winner insert failure", {
+        drawId: draw.id,
+        winnerErrorCode: winnerError.code ?? null,
+        cleanupErrorCode: cleanupError.code ?? null,
+      });
+      throw new EventRewardSafeError(
+        "당첨자 저장에 실패했고 추첨 기록을 되돌리지 못했습니다. 운영 로그를 확인한 뒤 다시 시도해 주세요.",
+      );
+    }
+    console.error("[event-rewards] winner insert failed; draw rolled back", {
+      drawId: draw.id,
+      winnerErrorCode: winnerError.code ?? null,
+    });
+    throw new EventRewardSafeError(
+      "당첨자 저장에 실패해 추첨을 되돌렸습니다. 다시 확정해 주세요.",
+    );
   }
 
   return mapDrawRow(
@@ -880,66 +1000,13 @@ export async function createStoredEventRewardDraw(params: {
     winnerCount: params.request.winnerCount,
     seed: params.request.seed,
   });
-  const supabase = getSupabaseAdminClient();
-  const now = new Date().toISOString();
-  const guidePath = getEventRewardWinnerGuidePath(params.campaign.slug);
-  const { data: draw, error: drawError } = await supabase
-    .from("event_reward_draws")
-    .insert({
-      event_slug: params.campaign.slug,
-      status: "finalized",
-      seed: plan.seed,
-      winner_count: plan.winnerCount,
-      candidate_count: plan.candidateCount,
-      total_tickets: plan.totalTickets,
-      google_form_url: params.request.googleFormUrl,
-      guide_path: guidePath,
-      created_by_admin_id: params.createdByAdminId ?? null,
-      finalized_at: now,
-      metadata: {
-        campaignTitle: params.campaign.title,
-        campaignStartsAt: params.campaign.startsAt,
-        campaignEndsAt: params.campaign.endsAt,
-      },
-    })
-    .select(
-      "id,event_slug,status,seed,winner_count,candidate_count,total_tickets,google_form_url,guide_path,sent_notification_id,metadata,created_by_admin_id,created_at,finalized_at,sent_at,updated_at",
-    )
-    .single();
-
-  if (drawError) {
-    if (drawError.message.includes("event_reward_draws_one_finalized_per_event")) {
-      throw new Error("이미 확정된 추첨이 있습니다.");
-    }
-    throw new Error(drawError.message);
-  }
-
-  const winnerRows = plan.winners.map((winner) => ({
-    draw_id: draw.id,
-    event_slug: params.campaign.slug,
-    member_id: winner.memberId,
-    winner_rank: winner.rank,
-    ticket_count: winner.ticketCount,
-    display_name: winner.displayName,
-    mm_username: winner.mmUsername,
-    year: winner.year,
-    campus: winner.campus,
-  }));
-
-  const { data: winners, error: winnerError } = await supabase
-    .from("event_reward_winners")
-    .insert(winnerRows)
-    .select(
-      "id,draw_id,event_slug,member_id,winner_rank,ticket_count,display_name,mm_username,year,campus,notification_status,notification_sent_at,notification_error,created_at,updated_at",
-    );
-  if (winnerError) {
-    throw new Error(winnerError.message);
-  }
-
-  return mapDrawRow(
-    draw as EventRewardDrawRow,
-    (winners ?? []) as EventRewardWinnerRow[],
-  );
+  return persistEventRewardDraw(getSupabaseAdminClient(), {
+    campaign: params.campaign,
+    plan,
+    googleFormUrl: params.request.googleFormUrl,
+    createdByAdminId: params.createdByAdminId,
+    finalizedAt: new Date().toISOString(),
+  });
 }
 
 function drawNotificationStatus(params: {
@@ -987,7 +1054,7 @@ export function buildEventRewardWinnerNotificationInput(params: {
     new Set(params.memberIds.map((memberId) => memberId.trim()).filter(Boolean)),
   );
   if (memberIds.length === 0) {
-    throw new Error("발송 대상 당첨자를 찾을 수 없습니다.");
+    throw new EventRewardSafeError("발송 대상 당첨자를 찾을 수 없습니다.");
   }
 
   const title = params.testMode
@@ -1022,9 +1089,7 @@ async function getEventRewardDrawRowForNotification(
   const supabase = getSupabaseAdminClient();
   const { data: drawRow, error: drawError } = await supabase
     .from("event_reward_draws")
-    .select(
-      "id,event_slug,status,seed,winner_count,candidate_count,total_tickets,google_form_url,guide_path,sent_notification_id,metadata,created_by_admin_id,created_at,finalized_at,sent_at,updated_at",
-    )
+    .select(EVENT_REWARD_DRAW_SELECT)
     .eq("id", drawId)
     .eq("event_slug", eventSlug)
     .maybeSingle();
@@ -1032,9 +1097,81 @@ async function getEventRewardDrawRowForNotification(
     throw new Error(drawError.message);
   }
   if (!drawRow) {
-    throw new Error("추첨 결과를 찾을 수 없습니다.");
+    throw new EventRewardSafeError("추첨 결과를 찾을 수 없습니다.");
   }
   return { supabase, drawRow: drawRow as EventRewardDrawRow };
+}
+
+type EventRewardDeliveryRow = {
+  notification_id: string | null;
+  member_id: string | null;
+  channel: string | null;
+  status: string | null;
+};
+
+/** Returns null when the delivery ledger cannot be read, so callers fail closed. */
+async function fetchEventRewardDeliveryRecords(
+  supabase: EventRewardSupabaseClient,
+  notificationIds: readonly string[],
+  memberIds: readonly string[],
+): Promise<EventRewardDeliveryRecord[] | null> {
+  if (notificationIds.length === 0 || memberIds.length === 0) {
+    return [];
+  }
+  const result = await collectPagedRows<EventRewardDeliveryRow>(null, async (from, to) => {
+    const { data, error } = await supabase
+      .from("notification_deliveries")
+      .select("notification_id,member_id,channel,status")
+      .in("notification_id", [...notificationIds])
+      .in("member_id", [...memberIds])
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (error) {
+      console.error("[event-rewards] delivery ledger lookup failed", {
+        code: error.code ?? null,
+      });
+      return { rows: [], error: true };
+    }
+    return { rows: (data ?? []) as EventRewardDeliveryRow[], error: false };
+  });
+  if (result.partialFailure) {
+    return null;
+  }
+  return result.rows.flatMap((row) =>
+    row.notification_id && row.member_id && row.channel && row.status
+      ? [
+          {
+            notificationId: row.notification_id,
+            memberId: row.member_id,
+            channel: row.channel,
+            status: row.status,
+          },
+        ]
+      : [],
+  );
+}
+
+async function updateEventRewardWinnerNotificationRows(
+  supabase: EventRewardSupabaseClient,
+  drawId: string,
+  memberIds: readonly string[],
+  values: {
+    notification_status: EventRewardWinnerNotificationStatus;
+    notification_sent_at?: string | null;
+    notification_error: string | null;
+  },
+) {
+  if (memberIds.length === 0) {
+    return;
+  }
+  const { error } = await supabase
+    .from("event_reward_winners")
+    .update(values)
+    .eq("draw_id", drawId)
+    .in("member_id", [...memberIds]);
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 export async function sendEventRewardWinnerNotifications(
@@ -1053,14 +1190,12 @@ export async function sendEventRewardWinnerNotifications(
       drawRow.sent_at as string | null,
     )
   ) {
-    throw new Error("이미 당첨 안내를 발송했습니다.");
+    throw new EventRewardSafeError("이미 당첨 안내를 발송했습니다.");
   }
 
   const { data: winnerRows, error: winnerError } = await supabase
     .from("event_reward_winners")
-    .select(
-      "id,draw_id,event_slug,member_id,winner_rank,ticket_count,display_name,mm_username,year,campus,notification_status,notification_sent_at,notification_error,created_at,updated_at",
-    )
+    .select(EVENT_REWARD_WINNER_SELECT)
     .eq("draw_id", drawId)
     .order("winner_rank", { ascending: true });
   if (winnerError) {
@@ -1070,17 +1205,84 @@ export async function sendEventRewardWinnerNotifications(
   const winners = (winnerRows ?? []) as EventRewardWinnerRow[];
   const memberIds = winners.map((winner) => winner.member_id);
   if (memberIds.length === 0) {
-    throw new Error("당첨자가 없습니다.");
+    throw new EventRewardSafeError("당첨자가 없습니다.");
+  }
+
+  // A resend after a partial failure must not notify winners an earlier
+  // attempt already reached; read the per-member delivery ledger first and
+  // stop instead of resending to everyone when it cannot be read.
+  const previousAttemptIds = getEventRewardNotificationAttemptIds(drawRow);
+  let previousOutcomes: Map<string, EventRewardWinnerDeliveryOutcome> | null = null;
+  if (previousAttemptIds.length > 0) {
+    const previousRecords = await fetchEventRewardDeliveryRecords(
+      supabase,
+      previousAttemptIds,
+      memberIds,
+    );
+    if (!previousRecords) {
+      throw new EventRewardSafeError(
+        "이전 발송 이력을 확인하지 못해 재발송을 중단했습니다. 잠시 후 다시 시도해 주세요.",
+      );
+    }
+    previousOutcomes = summarizeEventRewardWinnerDeliveries(memberIds, previousRecords);
+  }
+  const targetMemberIds = selectEventRewardNotificationTargets(
+    memberIds,
+    previousOutcomes,
+  );
+  const attemptedAt = new Date().toISOString();
+  const mislabeledReachedMemberIds = previousOutcomes
+    ? winners
+        .filter(
+          (winner) =>
+            previousOutcomes.get(winner.member_id) === "reached"
+            && winner.notification_status !== "sent",
+        )
+        .map((winner) => winner.member_id)
+    : [];
+
+  if (targetMemberIds.length === 0) {
+    const { error: completeDrawError } = await supabase
+      .from("event_reward_draws")
+      .update({
+        status: "sent",
+        sent_at: attemptedAt,
+        metadata: {
+          ...(drawRow.metadata ?? {}),
+          notificationAttemptIds: previousAttemptIds,
+          lastNotificationAttemptedAt: attemptedAt,
+          lastNotificationTargetCount: 0,
+        },
+      })
+      .eq("id", drawId);
+    if (completeDrawError) {
+      throw new Error(completeDrawError.message);
+    }
+    await updateEventRewardWinnerNotificationRows(
+      supabase,
+      drawId,
+      mislabeledReachedMemberIds,
+      { notification_status: "sent", notification_error: null },
+    );
+    return {
+      status: "sent" as const,
+      notificationId: drawRow.sent_notification_id,
+      channelResults: null,
+      warnings: ["모든 당첨자에게 이미 안내가 전달되어 추가로 발송하지 않았습니다."],
+    };
   }
 
   const result = await sendAdminNotificationCampaign(
     buildEventRewardWinnerNotificationInput({
       guidePath: drawRow.guide_path,
-      memberIds,
+      memberIds: targetMemberIds,
       confirmationText: request.confirmationText,
     }),
   );
 
+  const attemptIds = Array.from(new Set([...previousAttemptIds, result.notificationId]));
+  const records = await fetchEventRewardDeliveryRecords(supabase, attemptIds, memberIds);
+  const outcomes = records ? summarizeEventRewardWinnerDeliveries(memberIds, records) : null;
   const aggregate = Object.values(result.channelResults).reduce(
     (accumulator, channel) => ({
       targeted: accumulator.targeted + channel.targeted,
@@ -1089,8 +1291,9 @@ export async function sendEventRewardWinnerNotifications(
     }),
     { targeted: 0, sent: 0, failed: 0 },
   );
-  const status = drawNotificationStatus(aggregate);
-  const attemptedAt = new Date().toISOString();
+  const status = outcomes
+    ? resolveEventRewardDrawDeliveryStatus(memberIds, outcomes)
+    : drawNotificationStatus(aggregate);
   const sentAt = resolveEventRewardNotificationSentAt(status, attemptedAt);
   const errorMessage = result.warnings.length > 0 ? result.warnings.join("\n") : null;
 
@@ -1104,6 +1307,8 @@ export async function sendEventRewardWinnerNotifications(
         ...(drawRow.metadata ?? {}),
         channelResults: result.channelResults,
         lastNotificationAttemptedAt: attemptedAt,
+        lastNotificationTargetCount: targetMemberIds.length,
+        notificationAttemptIds: attemptIds,
         warnings: result.warnings,
       },
     })
@@ -1112,16 +1317,37 @@ export async function sendEventRewardWinnerNotifications(
     throw new Error(updateDrawError.message);
   }
 
-  const { error: updateWinnerError } = await supabase
-    .from("event_reward_winners")
-    .update({
+  if (outcomes) {
+    const reachedNow = targetMemberIds.filter(
+      (memberId) => outcomes.get(memberId) === "reached",
+    );
+    const unreachedNow = targetMemberIds.filter(
+      (memberId) => outcomes.get(memberId) !== "reached",
+    );
+    await updateEventRewardWinnerNotificationRows(supabase, drawId, reachedNow, {
+      notification_status: "sent",
+      notification_sent_at: attemptedAt,
+      notification_error: null,
+    });
+    await updateEventRewardWinnerNotificationRows(supabase, drawId, unreachedNow, {
+      notification_status: "failed",
+      notification_sent_at: null,
+      notification_error: errorMessage ?? "외부 알림 채널로 안내하지 못했습니다.",
+    });
+    await updateEventRewardWinnerNotificationRows(
+      supabase,
+      drawId,
+      mislabeledReachedMemberIds,
+      { notification_status: "sent", notification_error: null },
+    );
+  } else {
+    // The ledger could not be read after sending; keep the aggregate status on
+    // the targeted winners so the admin still sees the attempt result.
+    await updateEventRewardWinnerNotificationRows(supabase, drawId, targetMemberIds, {
       notification_status: status,
       notification_sent_at: sentAt,
       notification_error: errorMessage,
-    })
-    .eq("draw_id", drawId);
-  if (updateWinnerError) {
-    throw new Error(updateWinnerError.message);
+    });
   }
 
   return {

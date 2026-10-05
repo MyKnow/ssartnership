@@ -28,6 +28,7 @@ import {
 import { getEventPageDefinition } from "@/lib/event-pages";
 import {
   createStoredEventRewardDraw,
+  EventRewardSafeError,
   parseEventRewardDrawPreviewRequest,
   parseEventRewardDrawRequest,
   sendEventRewardWinnerTestNotification,
@@ -82,8 +83,9 @@ function requireEventRewardActionSlug(formData: FormData) {
   return slug;
 }
 
-function eventRewardActionErrorMessage(_error: unknown, fallback: string) {
-  return fallback;
+/** Shows authored reward messages; anything else may carry database text. */
+function eventRewardActionErrorMessage(error: unknown, fallback: string) {
+  return error instanceof EventRewardSafeError ? error.message : fallback;
 }
 
 function adminEventUrl(
@@ -712,7 +714,9 @@ export async function sendEventRewardWinnerNotificationsAction(formData: FormDat
     },
   });
   revalidatePromotionEventSurfaces();
-  redirect(`/admin/event/${slug}?status=winner-sent`);
+  redirect(
+    `/admin/event/${slug}?status=${result.status === "sent" ? "winner-sent" : "winner-partial"}`,
+  );
 }
 
 export async function sendEventRewardWinnerTestNotificationAction(formData: FormData) {

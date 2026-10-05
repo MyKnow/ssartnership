@@ -120,6 +120,8 @@ export default function SignupRewardOverviewSection({
     { label: "푸시", value: `${overview.conditionCounts.push ?? 0}명` },
     { label: "마케팅", value: `${overview.conditionCounts.marketing ?? 0}명` },
   ];
+  const isRetry =
+    draw?.status === "partial_failed" || draw?.status === "failed";
   const testRecipientOptions = overview.members.map((member) => ({
     id: member.id,
     label: `${member.displayName || member.mmUsername} (@${member.mmUsername})`,
@@ -376,11 +378,12 @@ export default function SignupRewardOverviewSection({
                 <input type="hidden" name="drawId" value={draw.id} />
                 <div>
                   <p className="text-sm font-semibold text-primary">
-                    실제 발송
+                    {isRetry ? "미도달 당첨자 재발송" : "실제 발송"}
                   </p>
                   <p className="mt-1 text-xs text-primary/80">
-                    당첨자 {draw.winners.length.toLocaleString()}명에게
-                    앱+MM+푸시 안내를 보냅니다.
+                    {isRetry
+                      ? "발송 기록을 확인해 이전에 MM·푸시로 안내가 닿지 않은 당첨자에게만 다시 보냅니다."
+                      : `당첨자 ${draw.winners.length.toLocaleString()}명에게 앱+MM+푸시 안내를 보냅니다.`}
                   </p>
                 </div>
                 <label className="grid gap-2 text-sm font-medium text-primary">
