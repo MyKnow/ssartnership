@@ -54,7 +54,7 @@ npm run self-host:database -- down --env-file .tmp/self-host/preview.env
 
 환경 생성·마이그레이션·상태·백업은 신뢰된 로컬 사용자 또는 SSH 운영자가 실행한다. 공개 Management API나 Docker 소켓을 제공하지 않는다. CI는 운영 비밀 없이 이미지를 만들고, 배포 운영자는 검증한 digest와 해당 환경 비밀을 적용한다. 서버 runner·registry·배포 이벤트 연결은 실제 서버 접근 후 검증한다.
 
-홈 서버 ingress 전환 전에는 신뢰 proxy와 client IP 전달 계약을 반드시 구현·검증한다. 현재 `src/lib/client-ip.ts`는 Vercel 밖에서 IP를 알 수 없으므로 일부 제한이 공통 `unknown` 대상으로 묶인다. 임의 `X-Forwarded-For`를 믿거나 `VERCEL=1`로 위장하여 해결하지 않는다.
+client IP는 [클라이언트 IP 신뢰 계약](../../security/client-ip-trust.md)에 따라 `SELF_HOST_MODE=real`에서 엣지·relay 체인이 기록한 `X-Forwarded-For` 첫 값만 신뢰한다. ingress 구성을 바꿀 때는 이 계약의 배포 체인 전제와 계약 테스트를 함께 확인한다. 앱 포트를 relay 밖으로 게시하거나 엣지에 `trusted_proxies`를 추가해 임의 전달 헤더를 믿게 만들지 않는다.
 
 로컬 데이터 Compose의 기본 network는 `internal: true`다. DB·REST·Storage는 이 내부망만 사용하고, loopback 포트 연결이 필요한 앱·gateway에만 별도 `edge` network를 연결한다. `edge`는 외부 송신이 가능하므로 운영에서는 방화벽·egress 정책과 SMTP·Mattermost·push 목적지를 별도로 검증한다. 로컬 앱 파일의 `.test` 연동 값은 실제 발송 성공의 근거가 아니다.
 

@@ -120,17 +120,19 @@ export async function POST(
       );
     }
 
+    const logContext = getRequestLogContext(request);
     console.error("[partner-setup-route] unexpected setup failure", {
       route: "/api/partner/setup/[token]",
-      requestId:
-        request.headers.get("x-vercel-id") ??
-        request.headers.get("x-request-id") ??
-        null,
+      // 보안 로그와는 서버가 만든 requestId로 연결한다. 엣지·relay는 x-request-id를
+      // 만들지 않으므로 요청에 있는 값은 클라이언트가 보낸 참고값으로만 남긴다.
+      requestId: logContext.requestId,
+      upstreamRequestId:
+        request.headers.get("x-request-id")?.slice(0, 128) ?? null,
       reasonCode: "unexpected_setup_failure",
     });
 
     await logAuthSecurity({
-      ...getRequestLogContext(request),
+      ...logContext,
       eventName: "partner_initial_setup",
       status: "failure",
       actorType: "guest",

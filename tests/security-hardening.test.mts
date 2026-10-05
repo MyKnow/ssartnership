@@ -271,114 +271,167 @@ test("product event ingress throttle limits requests before their body is parsed
   resetProductEventThrottleForTests();
 });
 
-test("client IP trusts only Vercel's canonical forwarded header on Vercel", async () => {
-  const { getClientIp, getTrustedPlatformClientIp } = await clientIpModulePromise;
-  const originalVercel = process.env.VERCEL;
-
+async function withSelfHostMode<T>(
+  mode: string | undefined,
+  run: () => T | Promise<T>,
+  extra: Record<string, string | undefined> = {},
+) {
+  const names = ["SELF_HOST_MODE", "VERCEL", ...Object.keys(extra)];
+  const before = Object.fromEntries(names.map((name) => [name, process.env[name]]));
   try {
-    process.env.VERCEL = "1";
-
-    assert.equal(
-      getClientIp(
-        new Headers({
-          "x-vercel-forwarded-for": "203.0.113.12, 10.0.0.2",
-          "x-forwarded-for": "198.51.100.20",
-          "x-real-ip": "198.51.100.21",
-        }),
-      ),
-      "203.0.113.12",
-    );
-    assert.equal(
-      getClientIp(
-        new Headers({
-          "x-forwarded-for": "198.51.100.22",
-          "x-real-ip": "198.51.100.23",
-        }),
-      ),
-      null,
-    );
-    assert.equal(
-      getTrustedPlatformClientIp(
-        new Headers({
-          "x-vercel-forwarded-for": "203.0.113.12, 10.0.0.2",
-          "x-forwarded-for": "198.51.100.20",
-        }),
-      ),
-      "203.0.113.12",
-    );
-    assert.equal(
-      getTrustedPlatformClientIp(
-        new Headers({
-          "x-forwarded-for": "203.0.113.12",
-          "x-real-ip": "203.0.113.13",
-        }),
-      ),
-      null,
-    );
-
-    process.env.VERCEL = "";
-
-    assert.equal(
-      getClientIp(
-        new Headers({
-          "x-vercel-forwarded-for": "203.0.113.12",
-          "x-forwarded-for": "198.51.100.22",
-          "x-real-ip": "198.51.100.23",
-        }),
-      ),
-      null,
-    );
-    assert.equal(
-      getTrustedPlatformClientIp(
-        new Headers({
-          "x-vercel-forwarded-for": "203.0.113.12",
-        }),
-      ),
-      null,
-    );
+    if (mode === undefined) delete process.env.SELF_HOST_MODE;
+    else process.env.SELF_HOST_MODE = mode;
+    for (const [name, value] of Object.entries(extra)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+    return await run();
   } finally {
-    if (originalVercel === undefined) {
-      delete process.env.VERCEL;
-    } else {
-      process.env.VERCEL = originalVercel;
+    for (const name of names) {
+      if (before[name] === undefined) delete process.env[name];
+      else process.env[name] = before[name];
     }
   }
+}
+
+test("client IP trusts only the first x-forwarded-for value behind the self-host proxy chain", async () => {
+  const { getClientIp } = await clientIpModulePromise;
+
+  await withSelfHostMode("real", () => {
+    // relay Caddy가 엣지 홉을 이어 붙인 형태: "<client>, <edge hop>"
+    assert.equal(
+      getClientIp(new Headers({ "x-forwarded-for": "203.0.113.12, 10.0.0.2" })),
+      "203.0.113.12",
+    );
+    assert.equal(
+      getClientIp(new Headers({ "x-forwarded-for": " 2001:DB8::7 " })),
+      "2001:db8::7",
+    );
+    assert.equal(
+      getClientIp(new Headers({ "x-forwarded-for": "::ffff:198.51.100.4" })),
+      "198.51.100.4",
+    );
+    // 다른 전달 헤더와 플랫폼 전용 헤더는 신뢰하지 않는다.
+    assert.equal(
+      getClientIp(
+        new Headers({
+          "x-real-ip": "198.51.100.21",
+          "x-vercel-forwarded-for": "198.51.100.22",
+        }),
+      ),
+      null,
+    );
+    assert.equal(
+      getClientIp(
+        new Headers({
+          "x-forwarded-for": "198.51.100.20",
+          "x-real-ip": "203.0.113.99",
+        }),
+      ),
+      "198.51.100.20",
+    );
+    // 형식 검증과 128자 상한
+    for (const invalid of [
+      "",
+      " , 203.0.113.12",
+      "unknown",
+      "203.0.113.12:443",
+      "[2001:db8::1]",
+      "203.0.113.256",
+      "1".repeat(129),
+      `${"a".repeat(130)}, 203.0.113.12`,
+    ]) {
+      assert.equal(
+        getClientIp(new Headers({ "x-forwarded-for": invalid })),
+        null,
+        invalid,
+      );
+    }
+    assert.equal(getClientIp(new Headers()), null);
+  });
 });
 
-test("admin IP allowlist only trusts the Vercel platform header on Vercel", async () => {
-  const { getForwardedClientIp } = await adminSecurityModulePromise;
-  const originalVercel = process.env.VERCEL;
+test("client IP is never resolved outside the trusted self-host mode", async () => {
+  const { getClientIp, isTrustedClientIpMode } = await clientIpModulePromise;
+  const headers = new Headers({
+    "x-forwarded-for": "203.0.113.12",
+    "x-real-ip": "203.0.113.13",
+    "x-vercel-forwarded-for": "203.0.113.14",
+  });
 
-  try {
-    process.env.VERCEL = "1";
+  for (const mode of [undefined, "", "local-mock", "REAL", "true"]) {
+    await withSelfHostMode(mode, () => {
+      assert.equal(isTrustedClientIpMode(), false, String(mode));
+      assert.equal(getClientIp(headers), null, String(mode));
+    });
+  }
+  // 과거 플랫폼 플래그로 위장해도 열리지 않는다.
+  await withSelfHostMode(undefined, () => {
+    assert.equal(getClientIp(headers), null);
+  }, { VERCEL: "1" });
+});
+
+test("anonymous form rate-limit identifiers fall back to one conservative bucket only when the IP is unresolved", async () => {
+  const { getClientRateLimitIdentifier, UNRESOLVED_CLIENT_BUCKET } =
+    await clientIpModulePromise;
+
+  await withSelfHostMode("real", () => {
+    assert.equal(
+      getClientRateLimitIdentifier(new Headers({ "x-forwarded-for": "203.0.113.40" })),
+      "203.0.113.40",
+    );
+    assert.equal(
+      getClientRateLimitIdentifier(new Headers()),
+      UNRESOLVED_CLIENT_BUCKET,
+    );
+  });
+  await withSelfHostMode("local-mock", () => {
+    assert.equal(
+      getClientRateLimitIdentifier(new Headers({ "x-forwarded-for": "203.0.113.40" })),
+      UNRESOLVED_CLIENT_BUCKET,
+    );
+  });
+});
+
+test("admin IP allowlist follows the shared client IP contract", async () => {
+  const { getForwardedClientIp, isAllowedAdminIp } = await adminSecurityModulePromise;
+
+  await withSelfHostMode("real", () => {
     assert.equal(
       getForwardedClientIp(
         new Headers({
-          "x-vercel-forwarded-for": "203.0.113.30",
-          "x-forwarded-for": "198.51.100.30",
+          "x-forwarded-for": "203.0.113.30, 10.0.0.2",
+          "x-vercel-forwarded-for": "198.51.100.30",
         }),
       ),
       "203.0.113.30",
     );
-
-    process.env.VERCEL = "";
     assert.equal(
-      getForwardedClientIp(
-        new Headers({
-          "x-vercel-forwarded-for": "203.0.113.30",
-          "x-forwarded-for": "198.51.100.30",
-          "x-real-ip": "198.51.100.31",
-        }),
-      ),
+      getForwardedClientIp(new Headers({ "x-real-ip": "203.0.113.30" })),
       null,
     );
-  } finally {
-    if (originalVercel === undefined) {
-      delete process.env.VERCEL;
-    } else {
-      process.env.VERCEL = originalVercel;
-    }
-  }
+  });
+
+  await withSelfHostMode("local-mock", () => {
+    assert.equal(
+      getForwardedClientIp(new Headers({ "x-forwarded-for": "203.0.113.30" })),
+      null,
+    );
+  });
+
+  await withSelfHostMode("real", () => {
+    assert.equal(isAllowedAdminIp(null), true);
+  }, { ADMIN_ALLOWED_IPS: undefined });
+
+  await withSelfHostMode("real", () => {
+    assert.equal(isAllowedAdminIp("203.0.113.30"), true);
+    assert.equal(isAllowedAdminIp("::ffff:203.0.113.30"), true);
+    assert.equal(isAllowedAdminIp("2001:db8::30"), true);
+    assert.equal(isAllowedAdminIp("203.0.113.31"), false);
+    // 판정 불가(null)는 허용목록이 있으면 언제나 거부한다.
+    assert.equal(isAllowedAdminIp(null), false);
+    assert.equal(isAllowedAdminIp("not-an-ip"), false);
+  }, { ADMIN_ALLOWED_IPS: " 203.0.113.30 , 2001:DB8::30 " });
 });
 
 test("same-origin request guard requires matching origin or trusted referrer", async () => {

@@ -18,7 +18,7 @@ issue: https://github.com/MyKnow/ssartnership/issues/435
 
 ## 공개 경로와 데이터 경계
 
-로컬 앱 포트는 loopback에만 연다. 운영에서는 TLS reverse proxy가 정상 Host와 protocol을 전달하고 입력 크기·요청 제한을 적용한다. 현재 앱의 비Vercel client IP 처리를 우회하여 외부에서 보낸 forwarded 헤더를 신뢰하지 않는다. 홈 서버 ingress 구성과 신뢰 경계 검증은 실제 호스트 접근 후 진행한다.
+로컬 앱 포트는 loopback에만 연다. 운영에서는 TLS reverse proxy가 정상 Host와 protocol을 전달하고 입력 크기·요청 제한을 적용한다. client IP는 [클라이언트 IP 신뢰 계약](../../security/client-ip-trust.md)에 따라 엣지·relay 체인이 기록한 값만 신뢰하고, 외부에서 보낸 forwarded 헤더를 그대로 믿지 않는다.
 
 데이터 서비스 작업은 앱 이미지와 독립적으로 진행한다. 기존 Supabase API에 대한 강한 의존 때문에 SQL만 옮겨도 Storage, PostgREST, RPC, RLS 계약이 자동 대체되지 않는다. 최종 서비스 선택과 복원 시험 결과를 확인한 뒤 앱과 연결한다. managed Supabase를 유지하는 중간 실행은 전체 자체 호스팅 완료 조건을 충족하지 않는다.
 

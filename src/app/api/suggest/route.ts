@@ -19,7 +19,7 @@ import {
   JsonRequestBodyError,
   readJsonRequestBodyWithinLimit,
 } from "@/lib/request-body-limit";
-import { getClientIp } from "@/lib/client-ip";
+import { getClientRateLimitIdentifier } from "@/lib/client-ip";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 
 export const runtime = "nodejs";
@@ -31,7 +31,7 @@ function errorResponse(message: string, status: number, code: string) {
 }
 
 function getClientIdentifier(request: Request) {
-  return getClientIp(request.headers) ?? "unknown";
+  return getClientRateLimitIdentifier(request.headers);
 }
 
 export async function POST(request: Request) {

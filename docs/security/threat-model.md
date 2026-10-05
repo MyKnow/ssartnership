@@ -15,6 +15,7 @@ authority: normative
 | 외부 사이트의 쿠키 기반 변경 요청 | 같은 경계의 origin·CSRF 규칙 | [CSRF](../../tests/csrf-route-contracts.test.mts) | 새 route 추가 시 누락 검토 |
 | 업로드 위장·소유권 혼동·과다 사용 | [데이터 모델](../architecture/data-model.md)과 업로드 정책 | [업로드 정책](../../tests/image-upload-policy.test.mts), [quota](../../tests/image-upload-quota.test.mts) | 실제 Storage metadata 재확인 필요 |
 | 토큰 탈취·재사용·계정 추측 | [인증 화면](../product/screen-specs/auth.md), 보안 경계 | [회원 인증](../../tests/member-auth-security.test.mts), [게이트](../../tests/member-required-gates.test.mts) | 운영 비밀 회전은 별도 절차 |
+| 출처 IP 위조로 레이트리밋·허용목록 우회 | [클라이언트 IP 신뢰 계약](./client-ip-trust.md) | [앱 판정](../../tests/security-hardening.test.mts), [배포 체인](../../tests/client-ip-trust-contract.test.mts), [이미지 쿼터](../../tests/image-proxy-rate-limit.test.mts) | 공용 NAT 뒤 다수 사용자는 같은 IP 버킷을 공유, 이미지 옵티마이저 경유 요청은 IP 쿼터 없이 fetch 한도로만 바운드 |
 | 검증 안 된 이미지·다른 SHA 배포 | [CI·수신기](../operations/runbooks/self-host-ci-maintenance.md) | [릴리스 계약](../../tests/self-host-github-release.test.mts), [수신기](../../tests/self-host-release-receiver.test.mts) | 빌드 호스트 자체의 신뢰는 별도 경계 |
 
 새 외부 연동·개인정보·인증·업로드 변경 시 해당 행과 구현·검증 연결을 함께 검토한다. 비밀값·실회원 정보·미공개 공격 세부사항은 이 공개 문서에 기록하지 않는다.

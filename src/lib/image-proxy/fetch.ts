@@ -15,6 +15,7 @@ import {
 export type FetchPublicImageOptions = {
   allowedContentTypes?: readonly string[];
   maxBytes?: number;
+  timeoutMs?: number;
 };
 
 function resolveMaxBytes(value: number | undefined) {
@@ -23,6 +24,20 @@ function resolveMaxBytes(value: number | undefined) {
   }
   if (!Number.isSafeInteger(value) || value <= 0 || value > MAX_IMAGE_BYTES) {
     throw new ImageProxyError("Invalid image size limit", 500);
+  }
+  return value;
+}
+
+export function resolveImageFetchTimeoutMs(value: number | undefined) {
+  if (value === undefined) {
+    return IMAGE_FETCH_TIMEOUT_MS;
+  }
+  if (
+    !Number.isSafeInteger(value) ||
+    value <= 0 ||
+    value > IMAGE_FETCH_TIMEOUT_MS
+  ) {
+    throw new ImageProxyError("Invalid image timeout", 500);
   }
   return value;
 }
@@ -96,6 +111,7 @@ export async function fetchPublicImage(
   options: FetchPublicImageOptions = {},
 ) {
   const maxBytes = resolveMaxBytes(options.maxBytes);
+  const timeoutMs = resolveImageFetchTimeoutMs(options.timeoutMs);
   const internalTarget = resolveInternalPublicSupabaseImageTarget(target);
   const requestTarget = internalTarget ?? target;
   const resolvedAddress = internalTarget
@@ -116,8 +132,8 @@ export async function fetchPublicImage(
       "Accept-Encoding": "identity",
       Host: requestTarget.host,
     },
-    signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS),
-    timeout: IMAGE_FETCH_TIMEOUT_MS,
+    signal: AbortSignal.timeout(timeoutMs),
+    timeout: timeoutMs,
     ...(isHttps
       ? {
           servername: requestTarget.hostname,
