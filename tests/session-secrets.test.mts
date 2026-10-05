@@ -37,7 +37,6 @@ test("세션 비밀값 레지스트리는 운영 필수 비밀값에 USER_SESSIO
       .filter(([, keys]) => keys.length > 1)
       .map(([purpose, keys]) => [purpose, [...keys]]),
     [
-      ["partner-session", ["PARTNER_SESSION_SECRET", "USER_SESSION_SECRET"]],
       ["reset-password-completion", ["RESET_PASSWORD_SESSION_SECRET", "USER_SESSION_SECRET"]],
       ["manual-member-import-token", ["MANUAL_MEMBER_IMPORT_TOKEN_SECRET", "USER_SESSION_SECRET"]],
     ],
@@ -49,7 +48,7 @@ test("세션 비밀값 레지스트리는 운영 필수 비밀값에 USER_SESSIO
     runtimeEnvSource.indexOf("];", runtimeEnvSource.indexOf("const REAL_REQUIRED_ENV_NAMES")),
   );
   for (const [purpose, keys] of Object.entries(SESSION_SECRET_ENV_KEYS)) {
-    if (keys.length > 1 && purpose !== "partner-session") {
+    if (keys.length > 1) {
       assert.doesNotMatch(requiredBlock, new RegExp(`"${keys[0]}"`), `${purpose} fallback is only for optional keys`);
     }
     if (keys.length === 1) {
@@ -60,11 +59,19 @@ test("세션 비밀값 레지스트리는 운영 필수 비밀값에 USER_SESSIO
 
 test("세션 비밀값은 첫 정의값을 쓰고 길이 정책을 공통으로 적용한다", () => {
   const long = "a".repeat(SESSION_SECRET_MIN_LENGTH);
-  assert.equal(findSessionSecret("partner-session", { USER_SESSION_SECRET: long }), long);
   assert.equal(
-    findSessionSecret("partner-session", { PARTNER_SESSION_SECRET: "", USER_SESSION_SECRET: long }),
+    findSessionSecret("reset-password-completion", { USER_SESSION_SECRET: long }),
+    long,
+  );
+  assert.equal(
+    findSessionSecret("reset-password-completion", {
+      RESET_PASSWORD_SESSION_SECRET: "",
+      USER_SESSION_SECRET: long,
+    }),
     null,
   );
+  assert.equal(findSessionSecret("partner-session", { USER_SESSION_SECRET: long }), null);
+  assert.equal(findSessionSecret("partner-session", { PARTNER_SESSION_SECRET: long }), long);
   assert.equal(findSessionSecret("certification-qr", { USER_SESSION_SECRET: long }), null);
   assert.equal(findSessionSecret("user-session", { USER_SESSION_SECRET: "short" }), null);
 
@@ -153,6 +160,7 @@ test("토큰 서명 모듈은 자체 비밀값 정책 대신 공용 레지스트
     "src/lib/member-email-verification.ts",
     "src/lib/member-identifier-reservations.ts",
     "src/lib/member-manual-import/service.server.ts",
+    "src/lib/partner-session.ts",
   ];
   for (const path of modules) {
     const source = read(path);
@@ -166,6 +174,7 @@ test("토큰 서명 모듈은 자체 비밀값 정책 대신 공용 레지스트
     "src/lib/mattermost-code-session.ts",
     "src/lib/member-email-recovery-session.ts",
     "src/lib/reset-password-session.ts",
+    "src/lib/partner-session.ts",
   ]) {
     assert.match(read(path), /signPayloadWith\(/, path);
   }

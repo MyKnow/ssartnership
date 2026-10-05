@@ -1,95 +1,41 @@
 import { cookies } from "next/headers";
 import { cache } from "react";
-import { createHmacDigest, splitSignedToken, verifyHmacDigest } from "./hmac.js";
+import { signPayloadWith } from "./hmac.js";
 import {
   loadCurrentPartnerSessionAccess,
   revalidatePartnerSessionAccess,
 } from "./partner-session-access.ts";
+import {
+  buildSessionCookieOptions,
+  PARTNER_SESSION_COOKIE_NAME,
+} from "./session-cookies.ts";
+import { readSessionSecret } from "./session-secrets.ts";
+import {
+  parsePartnerSessionToken,
+  type PartnerSessionTokenPayload,
+} from "./session-tokens.ts";
 
-const COOKIE_NAME = "partner_session";
+const COOKIE_NAME = PARTNER_SESSION_COOKIE_NAME;
 const SESSION_TTL_DAYS = 7;
-const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
+const SESSION_TTL_SECONDS = SESSION_TTL_DAYS * 24 * 60 * 60;
+const SESSION_TTL_MS = SESSION_TTL_SECONDS * 1000;
 
-export type PartnerSession = {
-  accountId: string;
-  loginId: string;
-  displayName: string;
-  companyIds: string[];
-  authSessionVersion: number;
-  mustChangePassword: boolean;
-  issuedAt: number;
-  expiresAt: number;
-};
+export type PartnerSession = PartnerSessionTokenPayload;
 
 function getSecret() {
-  const secret = process.env.PARTNER_SESSION_SECRET ?? process.env.USER_SESSION_SECRET;
-  if (!secret) {
-    throw new Error("PARTNER_SESSION_SECRET 환경 변수가 필요합니다.");
-  }
-  if (secret.length < 32) {
-    throw new Error("PARTNER_SESSION_SECRET는 최소 32자 이상이어야 합니다.");
-  }
-  return secret;
+  return readSessionSecret("partner-session");
 }
 
 function signPayload(payload: string) {
-  const secret = getSecret();
-  const signature = createHmacDigest(payload, secret, "hex");
-  return `${payload}.${signature}`;
+  return signPayloadWith(payload, getSecret(), "hex");
 }
 
+/**
+ * Same parser as `src/proxy.ts`, so the partner portal redirect and the
+ * server authorization decision cannot disagree about a token.
+ */
 function verifyToken(token: string) {
-  const signedToken = splitSignedToken(token);
-  if (!signedToken) {
-    return null;
-  }
-  const [payload, signature] = signedToken;
-  if (!payload || !signature) {
-    return null;
-  }
-  if (!verifyHmacDigest(payload, signature, getSecret(), "hex")) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(payload) as Partial<PartnerSession>;
-    if (
-      typeof parsed.accountId !== "string" ||
-      typeof parsed.loginId !== "string" ||
-      typeof parsed.displayName !== "string" ||
-      !Array.isArray(parsed.companyIds) ||
-      (parsed.authSessionVersion !== undefined &&
-        (typeof parsed.authSessionVersion !== "number" ||
-          !Number.isInteger(parsed.authSessionVersion) ||
-          parsed.authSessionVersion < 1)) ||
-      (parsed.mustChangePassword !== undefined &&
-        typeof parsed.mustChangePassword !== "boolean") ||
-      typeof parsed.issuedAt !== "number" ||
-      typeof parsed.expiresAt !== "number"
-    ) {
-      return null;
-    }
-    if (parsed.expiresAt <= Date.now() || parsed.issuedAt > Date.now()) {
-      return null;
-    }
-    if (parsed.companyIds.some((companyId) => typeof companyId !== "string" || !companyId)) {
-      return null;
-    }
-    if (parsed.companyIds.length === 0) {
-      return null;
-    }
-    return {
-      accountId: parsed.accountId,
-      loginId: parsed.loginId,
-      displayName: parsed.displayName,
-      companyIds: parsed.companyIds,
-      authSessionVersion: parsed.authSessionVersion ?? 1,
-      mustChangePassword: Boolean(parsed.mustChangePassword),
-      issuedAt: parsed.issuedAt,
-      expiresAt: parsed.expiresAt,
-    };
-  } catch {
-    return null;
-  }
+  return parsePartnerSessionToken(token, getSecret());
 }
 
 export async function getSignedPartnerSession() {
@@ -131,13 +77,7 @@ export async function setPartnerSession(session: {
   });
   const token = signPayload(payload);
   const store = await cookies();
-  store.set(COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
-    path: "/",
-  });
+  store.set(COOKIE_NAME, token, buildSessionCookieOptions(SESSION_TTL_SECONDS));
 }
 
 export async function clearPartnerSession() {

@@ -25,19 +25,18 @@ export type SessionSecretPurpose =
 
 /**
  * The first defined variable wins (`??` semantics). Keys after the first are
- * legacy fallbacks onto `USER_SESSION_SECRET`:
- * - `partner-session`: removal belongs to the partner session cleanup and must
- *   change `src/lib/partner-session.ts` and `src/proxy.ts` together.
- * - `reset-password-completion`, `manual-member-import-token`: the dedicated
- *   variables are optional in production, so removing the fallback would
- *   rotate the effective key and void links that were already issued.
+ * legacy fallbacks onto `USER_SESSION_SECRET`, kept only for
+ * `reset-password-completion` and `manual-member-import-token`: their
+ * dedicated variables are optional in production, so removing the fallback
+ * would rotate the effective key and void links that were already issued.
  * Purposes whose dedicated variable is required by the self-hosted runtime
- * validation have no fallback. `tests/session-secrets.test.mts` pins this list.
+ * validation (including `partner-session`) have no fallback.
+ * `tests/session-secrets.test.mts` pins this list.
  */
 export const SESSION_SECRET_ENV_KEYS = {
   "user-session": ["USER_SESSION_SECRET"],
   "admin-session": ["ADMIN_SESSION_SECRET"],
-  "partner-session": ["PARTNER_SESSION_SECRET", "USER_SESSION_SECRET"],
+  "partner-session": ["PARTNER_SESSION_SECRET"],
   "member-email-recovery": ["USER_SESSION_SECRET"],
   "mattermost-code-session": ["USER_SESSION_SECRET"],
   "mattermost-code-verification": ["USER_SESSION_SECRET"],

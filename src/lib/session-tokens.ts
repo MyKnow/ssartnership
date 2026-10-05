@@ -207,10 +207,9 @@ export function parseAdminSessionToken(
 }
 
 /**
- * Mirrors the private parser in `src/lib/partner-session.ts`. Partner portal
- * session code belongs to the partner-auth cleanup unit; until it adopts this
- * function, `tests/session-token-parity.test.mts` pins both implementations
- * to the same golden-token verdicts.
+ * Used by both `src/lib/partner-session.ts` and `src/proxy.ts`. Tokens issued
+ * before `authSessionVersion` existed default to version 1, matching the
+ * account column default.
  */
 export function parsePartnerSessionToken(
   token: string,

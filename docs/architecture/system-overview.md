@@ -65,14 +65,14 @@ Browser
 | --- | --- | --- | --- | --- |
 | 회원 | `user_session` | `USER_SESSION_SECRET` | 7일 | userId, authSessionVersion, authenticationMethod, issuedAt, expiresAt, mustChangePassword, policy consent snapshot, authenticatedAt(선택) |
 | 관리자 | `admin_session` | `ADMIN_SESSION_SECRET` | admin security config | adminId, loginId, permissionVersion |
-| 협력사 | `partner_session` | `PARTNER_SESSION_SECRET` fallback `USER_SESSION_SECRET` | 7일 | accountId, loginId, displayName, companyIds, mustChangePassword |
+| 협력사 | `partner_session` | `PARTNER_SESSION_SECRET` | 7일 | accountId, loginId, displayName, companyIds, authSessionVersion, mustChangePassword |
 
 공통 원칙:
 
 - 모두 HMAC signed token을 httpOnly, sameSite=lax, production secure cookie로 저장한다.
 - 토큰 파서는 `src/lib/session-tokens.ts`, 비밀값 레지스트리와 길이 정책은 `src/lib/session-secrets.ts`, 쿠키 이름·기본 속성은 `src/lib/session-cookies.ts` 하나만 사용한다. `src/proxy.ts`도 같은 파서와 상수를 쓰므로 프록시 리디렉션과 서버 인가 판정이 갈라지지 않는다.
 - 토큰 wire 포맷(`<json>.<hex hmac>`)과 필드 이름은 고정한다. 바꾸면 배포만으로 전원 로그아웃된다. `tests/session-token-parity.test.mts`의 golden token이 이를 고정한다.
-- 운영 필수 전용 비밀값(QR, 식별자 예약, 이메일 인증 HMAC)은 `USER_SESSION_SECRET`으로 fallback하지 않는다. 남은 fallback은 레지스트리 주석과 `tests/session-secrets.test.mts`가 고정한다.
+- 운영 필수 전용 비밀값(협력사 세션, QR, 식별자 예약, 이메일 인증 HMAC)은 `USER_SESSION_SECRET`으로 fallback하지 않는다. 남은 fallback(운영 선택값인 MM 비밀번호 재설정 완료 토큰·수동 가입 설정 토큰)은 레지스트리 주석과 `tests/session-secrets.test.mts`가 고정한다.
 - token signature, raw secret, password 원문은 로그에 남기지 않는다.
 - 관리자 session은 account active, mustChangePassword, permissionVersion mismatch 시 무효 처리되고, 자신을 발급한 회원 session이 무효가 되면 함께 무효 처리된다.
 - 회원 로그아웃(`/api/mm/logout`)은 `members.auth_session_version`을 올려 그 계정의 모든 기기 session을 끝낸다.

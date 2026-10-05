@@ -22,6 +22,11 @@ const GOLDEN_USER_PAYLOAD =
 const GOLDEN_USER_TOKEN =
   `${GOLDEN_USER_PAYLOAD}.609891d8d5574dc56b5358bf5be48ef46e0bfc6f9a0b7059965bd0bd2617d195`;
 const GOLDEN_NOW = 1790000000000 + 60_000;
+const GOLDEN_PARTNER_PAYLOAD =
+  '{"accountId":"00000000-0000-4000-8000-0000000000aa","loginId":"partner@example.test","displayName":"골든 파트너","companyIds":["00000000-0000-4000-8000-0000000000bb"],"authSessionVersion":2,"mustChangePassword":false,"issuedAt":1790000000000,"expiresAt":1790604800000}';
+// Pinned byte-for-byte for the partner portal cookie (UTF-8 payload).
+const GOLDEN_PARTNER_TOKEN =
+  `${GOLDEN_PARTNER_PAYLOAD}.3da7d92be3c3d98f93ea424a73c5af95ca6e372683e00c5683632538a804614d`;
 
 function sign(payload: unknown, secret: string) {
   const serialized = typeof payload === "string" ? payload : JSON.stringify(payload);
@@ -122,6 +127,24 @@ test("golden 회원 세션 토큰은 고정된 wire 포맷 그대로 해석된�
     persistent: true,
   });
   assert.equal(sign(GOLDEN_USER_PAYLOAD, USER_SECRET), GOLDEN_USER_TOKEN);
+});
+
+test("golden 파트너 세션 토큰은 고정된 wire 포맷 그대로 해석된다", () => {
+  assert.deepEqual(
+    parsePartnerSessionToken(GOLDEN_PARTNER_TOKEN, PARTNER_SECRET, GOLDEN_NOW),
+    {
+      accountId: "00000000-0000-4000-8000-0000000000aa",
+      loginId: "partner@example.test",
+      displayName: "골든 파트너",
+      companyIds: ["00000000-0000-4000-8000-0000000000bb"],
+      authSessionVersion: 2,
+      mustChangePassword: false,
+      issuedAt: 1790000000000,
+      expiresAt: 1790604800000,
+    },
+  );
+  assert.equal(sign(GOLDEN_PARTNER_PAYLOAD, PARTNER_SECRET), GOLDEN_PARTNER_TOKEN);
+  assert.equal(parsePartnerSessionToken(GOLDEN_PARTNER_TOKEN, USER_SECRET, GOLDEN_NOW), null);
 });
 
 test("서명·수명·형식이 어긋난 회원 토큰은 같은 규칙으로 거부된다", () => {
@@ -236,5 +259,8 @@ test("proxy와 서버 세션 모듈은 같은 공용 파서를 사용하고 자�
 
   assert.match(read("src/lib/user-auth.ts"), /parseUserSessionToken\(token, /);
   assert.match(read("src/lib/auth.ts"), /parseSignedAdminSessionToken\(token, /);
+  const partnerSessionSource = read("src/lib/partner-session.ts");
+  assert.match(partnerSessionSource, /parsePartnerSessionToken\(token, /);
+  assert.doesNotMatch(partnerSessionSource, /JSON\.parse|verifyHmacDigest|splitSignedToken/);
   assert.match(read("src/lib/hmac.js"), /crypto\.timingSafeEqual/);
 });
