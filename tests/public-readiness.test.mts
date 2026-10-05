@@ -266,7 +266,7 @@ test("Storybook interaction and visual baselines are explicit manual tools", () 
   assert.doesNotMatch(workflow, /git diff --name-only --diff-filter/);
   assert.match(
     preview,
-    /pretendard\/dist\/web\/variable\/pretendardvariable\.css/,
+    /pretendard\/dist\/web\/variable\/pretendardvariable-dynamic-subset\.css/,
   );
   assert.match(
     vitestConfig,

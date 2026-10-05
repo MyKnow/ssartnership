@@ -15,6 +15,10 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import PwaProvider from "@/components/PwaProvider";
 import SelfHostedWebVitals from "@/components/SelfHostedWebVitals";
 import { shouldLoadSelfHostedTelemetry } from "@/lib/telemetry-mode";
+// Pretendard는 설치된 패키지의 unicode-range 분할(dynamic-subset) CSS를 번들해
+// `/_next/static/media`에서 자체 서빙한다. 외부 CDN 렌더 차단 요청을 만들지 않고,
+// 패밀리명 "Pretendard Variable"이 globals.css의 --font-sans 1순위와 일치한다.
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -94,12 +98,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" data-scroll-behavior="smooth" suppressHydrationWarning>
-      <head>
-        <link
-          rel="stylesheet"
-          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css"
-        />
-      </head>
       <body className="bg-background text-foreground antialiased">
         <ThemeProvider>
           <ToastProvider>
