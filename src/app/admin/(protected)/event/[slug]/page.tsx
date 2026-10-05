@@ -22,6 +22,7 @@ import {
   buildEventRewardAdminOverview,
   getEventRewardAdminOverview,
   getLatestEventRewardDrawWithWinners,
+  supportsEventRewardDraw,
   type EventRewardAdminOverview,
   type EventRewardDrawPlan,
   type EventRewardStoredDraw,
@@ -68,6 +69,9 @@ function errorMessage(error?: string) {
   }
   if (error === "admin_event_delete_failed") {
     return "이벤트를 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  }
+  if (error === "admin_event_reward_unsupported") {
+    return "이 이벤트는 추첨권 추첨을 지원하지 않습니다. 이벤트를 다시 선택해 주세요.";
   }
   return null;
 }
@@ -120,7 +124,7 @@ async function getSignupRewardContent({
   try {
     [rewardOverview, rewardDraw] = await Promise.all([
       getEventRewardAdminOverview(campaign),
-      getLatestEventRewardDrawWithWinners("signup-reward"),
+      getLatestEventRewardDrawWithWinners(campaign.slug),
     ]);
   } catch (error) {
     console.error("[admin-event] reward overview query failed", error);
@@ -183,7 +187,7 @@ async function AdminEventDetailContent({
   const message = statusMessage(paramsData.status);
   const actionErrorMessage = errorMessage(paramsData.error);
   const rewardContentPromise =
-    slug === "signup-reward"
+    supportsEventRewardDraw(slug)
       ? getSignupRewardContent({
           campaign,
           params: paramsData,

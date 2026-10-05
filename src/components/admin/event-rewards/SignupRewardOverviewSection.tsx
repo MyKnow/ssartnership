@@ -139,13 +139,13 @@ export default function SignupRewardOverviewSection({
           </p>
         </div>
         <Button
-          href="/admin/event/signup-reward/rewards/export"
+          href={`/admin/event/${campaign.slug}/rewards/export`}
           variant="secondary"
         >
           CSV 내보내기
         </Button>
         <Button
-          href="/admin/event/signup-reward/rewards/export?kind=comparison"
+          href={`/admin/event/${campaign.slug}/rewards/export?kind=comparison`}
           variant="secondary"
         >
           전후 비교 CSV
@@ -209,7 +209,7 @@ export default function SignupRewardOverviewSection({
             action={sendEventRewardWinnerTestNotificationAction}
             className="grid min-w-0 w-full max-w-full gap-3 rounded-[1rem] border border-border/70 bg-surface-inset p-4"
           >
-            <input type="hidden" name="slug" value="signup-reward" />
+            <input type="hidden" name="slug" value={campaign.slug} />
             {draw ? (
               <input type="hidden" name="drawId" value={draw.id} />
             ) : null}
@@ -372,7 +372,7 @@ export default function SignupRewardOverviewSection({
                 action={sendEventRewardWinnerNotificationsAction}
                 className="grid min-w-0 w-full max-w-full gap-3 rounded-[1rem] border border-primary/20 bg-primary-soft p-4"
               >
-                <input type="hidden" name="slug" value="signup-reward" />
+                <input type="hidden" name="slug" value={campaign.slug} />
                 <input type="hidden" name="drawId" value={draw.id} />
                 <div>
                   <p className="text-sm font-semibold text-primary">
@@ -460,7 +460,7 @@ export default function SignupRewardOverviewSection({
                   className="h-11 rounded-input border border-border bg-surface-control px-3 text-sm text-foreground"
                 />
               </label>
-              <input type="hidden" name="slug" value="signup-reward" />
+              <input type="hidden" name="slug" value={campaign.slug} />
               <div className="flex flex-wrap justify-end gap-2">
                 <Button
                   type="submit"

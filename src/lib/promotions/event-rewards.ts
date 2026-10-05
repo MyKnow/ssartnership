@@ -105,6 +105,25 @@ type EventRewardWinnerRow = {
 
 export const EVENT_REWARD_WINNER_NOTIFICATION_CONFIRMATION_TEXT = "알림 발송";
 
+/**
+ * Event pages whose tickets are drawn and notified from the admin console.
+ * Every reward action and export must name one of these slugs explicitly; there
+ * is no implicit default event.
+ */
+export const EVENT_REWARD_DRAW_EVENT_SLUGS = ["signup-reward"] as const;
+
+export function supportsEventRewardDraw(slug: string | null | undefined) {
+  return EVENT_REWARD_DRAW_EVENT_SLUGS.some((candidate) => candidate === slug);
+}
+
+function requireEventRewardSlug(eventSlug: string | null | undefined) {
+  const slug = typeof eventSlug === "string" ? eventSlug.trim() : "";
+  if (!supportsEventRewardDraw(slug)) {
+    throw new Error("추첨 대상 이벤트를 확인해 주세요.");
+  }
+  return slug;
+}
+
 function assertEventRewardQuerySucceeded(error: unknown, label: string) {
   if (!error) {
     return;
@@ -998,19 +1017,17 @@ export function buildEventRewardWinnerNotificationInput(params: {
 
 async function getEventRewardDrawRowForNotification(
   drawId: string,
-  eventSlug?: string,
+  eventSlug: string,
 ) {
   const supabase = getSupabaseAdminClient();
-  let query = supabase
+  const { data: drawRow, error: drawError } = await supabase
     .from("event_reward_draws")
     .select(
       "id,event_slug,status,seed,winner_count,candidate_count,total_tickets,google_form_url,guide_path,sent_notification_id,metadata,created_by_admin_id,created_at,finalized_at,sent_at,updated_at",
     )
-    .eq("id", drawId);
-  if (eventSlug) {
-    query = query.eq("event_slug", eventSlug);
-  }
-  const { data: drawRow, error: drawError } = await query.maybeSingle();
+    .eq("id", drawId)
+    .eq("event_slug", eventSlug)
+    .maybeSingle();
   if (drawError) {
     throw new Error(drawError.message);
   }
@@ -1022,12 +1039,13 @@ async function getEventRewardDrawRowForNotification(
 
 export async function sendEventRewardWinnerNotifications(
   drawId: string,
-  input: { confirmationText?: unknown; eventSlug?: string },
+  input: { confirmationText?: unknown; eventSlug: string },
 ) {
+  const eventSlug = requireEventRewardSlug(input.eventSlug);
   const request = normalizeEventRewardWinnerNotificationRequest(input);
   const { supabase, drawRow } = await getEventRewardDrawRowForNotification(
     drawId,
-    input.eventSlug,
+    eventSlug,
   );
   if (
     isEventRewardNotificationSendComplete(
@@ -1116,17 +1134,18 @@ export async function sendEventRewardWinnerNotifications(
 
 export async function sendEventRewardWinnerTestNotification(
   drawId: string | null,
-  input: { memberId?: unknown; eventSlug?: string },
+  input: { memberId?: unknown; eventSlug: string },
 ) {
+  const eventSlug = requireEventRewardSlug(input.eventSlug);
   const request = normalizeEventRewardTestNotificationRequest(input);
   const guidePath = drawId
     ? (
         await getEventRewardDrawRowForNotification(
           drawId,
-          input.eventSlug,
+          eventSlug,
         )
       ).drawRow.guide_path
-    : getEventRewardWinnerGuidePath(input.eventSlug ?? "signup-reward");
+    : getEventRewardWinnerGuidePath(eventSlug);
 
   const result = await sendAdminNotificationCampaign(
     buildEventRewardWinnerNotificationInput({

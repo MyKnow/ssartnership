@@ -32,6 +32,7 @@ import {
   parseEventRewardDrawRequest,
   sendEventRewardWinnerTestNotification,
   sendEventRewardWinnerNotifications,
+  supportsEventRewardDraw,
 } from "@/lib/promotions/event-rewards";
 import { getManagedEventCampaign } from "@/lib/promotions/events";
 import {
@@ -68,8 +69,17 @@ function normalizeSlug(value: string) {
     .replace(/^-|-$/g, "");
 }
 
-function eventRewardActionSlug(formData: FormData) {
-  return normalizeSlug(getString(formData, "slug")) || "signup-reward";
+/**
+ * Reward forms always post their event slug. A missing or unsupported slug is a
+ * stale or tampered request, so it is rejected instead of falling back to a
+ * default event.
+ */
+function requireEventRewardActionSlug(formData: FormData) {
+  const slug = normalizeSlug(getString(formData, "slug"));
+  if (!slug || !supportsEventRewardDraw(slug)) {
+    redirectEventRegistrationError(slug, "admin_event_reward_unsupported");
+  }
+  return slug;
 }
 
 function eventRewardActionErrorMessage(_error: unknown, fallback: string) {
@@ -571,7 +581,7 @@ async function savePromotionSlidesMutation(formData: FormData) {
 
 export async function createEventRewardDrawAction(formData: FormData) {
   await requireAdminPermission("events", "create", { path: "/admin/event" });
-  const slug = eventRewardActionSlug(formData);
+  const slug = requireEventRewardActionSlug(formData);
   const winnerCount = getString(formData, "winnerCount");
   const seed = getString(formData, "seed");
   const googleFormUrl = getString(formData, "googleFormUrl");
@@ -635,7 +645,7 @@ export async function createEventRewardDrawAction(formData: FormData) {
 
 export async function previewEventRewardDrawAction(formData: FormData) {
   await requireAdminPermission("events", "read", { path: "/admin/event" });
-  const slug = eventRewardActionSlug(formData);
+  const slug = requireEventRewardActionSlug(formData);
   const winnerCount = getString(formData, "winnerCount");
   const seed = getString(formData, "seed");
   const request = parseEventRewardDrawPreviewRequest({
@@ -670,11 +680,11 @@ export async function previewEventRewardDrawAction(formData: FormData) {
 
 export async function sendEventRewardWinnerNotificationsAction(formData: FormData) {
   await requireAdminPermission("events", "update", { path: "/admin/event" });
-  const slug = normalizeSlug(getString(formData, "slug"));
+  const slug = requireEventRewardActionSlug(formData);
   const drawId = getString(formData, "drawId");
   let result: Awaited<ReturnType<typeof sendEventRewardWinnerNotifications>>;
   try {
-    if (!slug || !drawId) {
+    if (!drawId) {
       throw new Error("당첨 안내 대상 정보를 확인해 주세요.");
     }
     result = await sendEventRewardWinnerNotifications(drawId, {
@@ -683,7 +693,7 @@ export async function sendEventRewardWinnerNotificationsAction(formData: FormDat
     });
   } catch (error) {
     redirectEventRewardDrawError({
-      slug: slug || "signup-reward",
+      slug,
       message: eventRewardActionErrorMessage(
         error,
         "당첨 안내를 발송하지 못했습니다. 발송 조건과 설정을 확인해 주세요.",
@@ -707,12 +717,12 @@ export async function sendEventRewardWinnerNotificationsAction(formData: FormDat
 
 export async function sendEventRewardWinnerTestNotificationAction(formData: FormData) {
   await requireAdminPermission("events", "update", { path: "/admin/event" });
-  const slug = normalizeSlug(getString(formData, "slug"));
+  const slug = requireEventRewardActionSlug(formData);
   const drawId = getString(formData, "drawId") || null;
   const memberId = getString(formData, "memberId");
   let result: Awaited<ReturnType<typeof sendEventRewardWinnerTestNotification>>;
   try {
-    if (!slug || !memberId) {
+    if (!memberId) {
       throw new Error("테스트 안내 대상 정보를 확인해 주세요.");
     }
     result = await sendEventRewardWinnerTestNotification(drawId, {
@@ -721,7 +731,7 @@ export async function sendEventRewardWinnerTestNotificationAction(formData: Form
     });
   } catch (error) {
     redirectEventRewardDrawError({
-      slug: slug || "signup-reward",
+      slug,
       message: eventRewardActionErrorMessage(
         error,
         "당첨 안내 테스트를 발송하지 못했습니다. 대상 회원과 설정을 확인해 주세요.",
