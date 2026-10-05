@@ -181,7 +181,7 @@ authority: normative
 - 응답성 경계: 목록 첫 응답은 찾기·상태 확인·상세 이동에 필요한 데이터만 기다리며, 즐겨찾기·조회·CTA·리뷰 집계 같은 보조 운영 지표는 상세 화면에서 필요할 때 확인한다.
 - 경계·상태: brands permission과 campus scope를 적용한다. `q`(제휴처명), `category`, `visibility`, `sort`, `page`, `pageSize`가 목록 URL의 단일 기준이며, page size는 12·24·48 중 하나다. filter가 바뀌면 page를 1로 되돌린다. 기본, 빈 결과, 다건, filter, pagination, loading, 오류를 제공한다.
 - 반응형·분석: 모바일 compact entity row, 데스크톱 dense list를 쓴다. 조회·상세 이동·생성을 기록한다.
-- 수용 기준: 서버가 현재 page만 조회하고, 범위를 벗어난 page는 현재 filter를 보존한 canonical URL로 정규화한다. 오류는 내부 DB 오류를 노출하지 않고 같은 filter에서 재시도할 수 있어야 한다. `tab=requests|categories|category` 구 query는 전용 canonical route로 이동하고 목록 화면에 해당 편집 UI를 중복 렌더하지 않는다. `tab=plans`는 플랜 기능 보존용 conditional legacy 상태로만 유지한다. 이 화면에서 Partner/Boost 플랜은 만료돼도 자동으로 Basic으로 낮추지 않고(수동 유예) 만료·만료 임박(30일 이내, 파트너 포털과 같은 기준)·만료일 미설정 상태와 만료 후 유지 중인 플랜 수를 표시해 관리자가 직접 변경하게 한다.
+- 수용 기준: 서버가 현재 page만 조회하고, 범위를 벗어난 page는 현재 filter를 보존한 canonical URL로 정규화한다. 오류는 내부 DB 오류를 노출하지 않고 같은 filter에서 재시도할 수 있어야 한다. `tab=requests|categories|category` 구 query는 전용 canonical route로 이동하고 목록 화면에 해당 편집 UI를 중복 렌더하지 않는다. `tab=plans`는 플랜 기능 보존용 conditional legacy 상태로만 유지한다. 이 화면에서 Partner/Boost 플랜은 만료돼도 자동으로 Basic으로 낮추지 않고(수동 유예) 만료·만료 임박(30일 이내, 파트너 포털과 같은 기준)·만료일 미설정 상태와 만료 후 유지 중인 플랜 수를 표시해 관리자가 직접 변경하게 한다. 이 수동 유예는 플랜 만료일에만 적용되며, 결제 기한과 유예 기간이 지난 미납 청구를 Basic으로 조정하는 청구 배치는 별도 규칙으로 유지한다.
 
 <!-- screen-contract: admin.partner-editor -->
 ## `/admin/partners/[partnerId]` — 제휴처 편집

@@ -199,6 +199,12 @@ export function isPartnerPlanWindowOrderValid(input: {
  * passes. The stored tier stays effective as a manual grace period until an
  * admin reviews the contract and changes the plan, so expiry is read-only
  * state for display and follow-up.
+ *
+ * This covers `plan_expires_at` only. The unpaid-invoice overdue adjustment
+ * (`process_partner_billing_overdue_downgrades`, run by
+ * `/api/cron/partner-billing`) is a separate billing rule and can still move a
+ * plan to Basic when a pending invoice stays unpaid past its due date and
+ * grace period.
  */
 export const PARTNER_PLAN_EXPIRY_POLICY = "manual_grace" as const;
 /** Shared "만료 임박" window for the admin plan list and the partner portal. */
