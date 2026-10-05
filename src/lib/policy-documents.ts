@@ -130,9 +130,42 @@ export function getMemberPolicyConsentVersionsFromRows(
   return versions;
 }
 
-export function evaluateRequiredPolicyStatus(
-  consentVersions: Partial<MemberPolicyConsentVersions> | null | undefined,
+/** Active version per required policy kind, without document bodies. */
+export type RequiredPolicyVersions = Record<RequiredPolicyKind, number>;
+
+export type PolicyConsentSnapshotLike = {
+  serviceVersion: number;
+  privacyVersion: number;
+};
+
+export function getRequiredPolicyVersions(
   activePolicies: RequiredPolicyMap,
+): RequiredPolicyVersions {
+  return {
+    service: activePolicies.service.version,
+    privacy: activePolicies.privacy.version,
+  };
+}
+
+/**
+ * The signed member session carries the required-policy versions accepted at
+ * sign-in or consent. When they still match the active versions the consent
+ * table does not need to be read for the gate.
+ */
+export function isPolicyConsentSnapshotFresh(
+  snapshot: PolicyConsentSnapshotLike | null | undefined,
+  activeVersions: RequiredPolicyVersions,
+) {
+  return Boolean(
+    snapshot &&
+      snapshot.serviceVersion === activeVersions.service &&
+      snapshot.privacyVersion === activeVersions.privacy,
+  );
+}
+
+export function evaluateRequiredPolicyVersionStatus(
+  consentVersions: Partial<MemberPolicyConsentVersions> | null | undefined,
+  activeVersions: RequiredPolicyVersions,
 ) {
   const acceptedVersions: Record<RequiredPolicyKind, number | null> = {
     service:
@@ -146,7 +179,7 @@ export function evaluateRequiredPolicyStatus(
   };
 
   const outdatedKinds = REQUIRED_POLICY_KINDS.filter(
-    (kind) => acceptedVersions[kind] !== activePolicies[kind].version,
+    (kind) => acceptedVersions[kind] !== activeVersions[kind],
   );
 
   return {
@@ -154,6 +187,16 @@ export function evaluateRequiredPolicyStatus(
     outdatedKinds,
     acceptedVersions,
   };
+}
+
+export function evaluateRequiredPolicyStatus(
+  consentVersions: Partial<MemberPolicyConsentVersions> | null | undefined,
+  activePolicies: RequiredPolicyMap,
+) {
+  return evaluateRequiredPolicyVersionStatus(
+    consentVersions,
+    getRequiredPolicyVersions(activePolicies),
+  );
 }
 
 export function getSelectedPolicyValidationError(

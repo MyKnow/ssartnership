@@ -314,6 +314,69 @@ describe("policy documents", () => {
     ]);
   });
 
+  test("loads only active required policy versions for the member gate", async () => {
+    const supabase = createSupabaseMock({
+      policyDocuments: [
+        createPolicyRow({ id: "service-v1", kind: "service", version: 1, is_active: false }),
+        createPolicyRow({ id: "service-v2", kind: "service", version: 2 }),
+        createPolicyRow({ id: "privacy-v4", kind: "privacy", version: 4 }),
+        createPolicyRow({ id: "marketing-v3", kind: "marketing", version: 3 }),
+      ],
+    });
+    const selections: string[] = [];
+    const originalFrom = supabase.from.bind(supabase);
+    supabase.from = ((table: string) => {
+      const builder = originalFrom(table) as { select: (...args: unknown[]) => unknown };
+      const originalSelect = builder.select.bind(builder);
+      builder.select = (...args: unknown[]) => {
+        selections.push(`${table}:${String(args[0])}`);
+        return originalSelect();
+      };
+      return builder;
+    }) as typeof supabase.from;
+    getSupabaseAdminClient.mockReturnValue(supabase);
+
+    const policies = await loadPolicyDocumentsModule({ useMockData: false });
+
+    await expect(policies.getActiveRequiredPolicyVersions()).resolves.toEqual({
+      service: 2,
+      privacy: 4,
+    });
+    expect(selections).toEqual(["policy_documents:kind,version"]);
+    expect(
+      policies.isPolicyConsentSnapshotFresh(
+        { serviceVersion: 2, privacyVersion: 4 },
+        { service: 2, privacy: 4 },
+      ),
+    ).toBe(true);
+    expect(
+      policies.isPolicyConsentSnapshotFresh(
+        { serviceVersion: 2, privacyVersion: 3 },
+        { service: 2, privacy: 4 },
+      ),
+    ).toBe(false);
+    expect(policies.isPolicyConsentSnapshotFresh(null, { service: 2, privacy: 4 })).toBe(false);
+    expect(
+      policies.evaluateRequiredPolicyVersionStatus(
+        { service: 2, privacy: 3, marketing: null },
+        { service: 2, privacy: 4 },
+      ),
+    ).toMatchObject({ requiresConsent: true, outdatedKinds: ["privacy"] });
+  });
+
+  test("rejects the gate version lookup when a required policy has no active version", async () => {
+    getSupabaseAdminClient.mockReturnValue(
+      createSupabaseMock({
+        policyDocuments: [createPolicyRow({ id: "service-v2", kind: "service", version: 2 })],
+      }),
+    );
+
+    const policies = await loadPolicyDocumentsModule({ useMockData: false });
+    await expect(policies.getActiveRequiredPolicyVersions()).rejects.toMatchObject({
+      code: "not_found",
+    });
+  });
+
   test("surfaces db and not-found errors while loading policies", async () => {
     getSupabaseAdminClient.mockReturnValue(
       createSupabaseMock({

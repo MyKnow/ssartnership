@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   getMockMemberById,
@@ -26,12 +27,14 @@ import {
   type PolicyKind,
   type PolicyReviewItem,
   type RequiredPolicyMap,
+  type RequiredPolicyVersions,
 } from "@/lib/policy-documents";
 
 export * from "@/lib/policy-documents";
 
 const POLICY_SELECT =
   "id,kind,version,title,summary,content,is_active,effective_at,created_at,updated_at";
+const POLICY_VERSION_SELECT = "kind,version";
 const MEMBER_POLICY_CONSENT_SELECT = "kind,version,agreed_at";
 
 export const policyDocumentDataAccess = selectRuntimeDataAccess({
@@ -186,6 +189,62 @@ export async function getActiveRequiredPolicies() {
   // 인증/동의 가드는 현재 활성 버전과 즉시 일치해야 하므로 캐시하지 않는다.
   return queryActiveRequiredPolicies();
 }
+
+async function queryActiveRequiredPolicyVersions(): Promise<RequiredPolicyVersions> {
+  assertPolicyDocumentDataAccessAvailable();
+  if (useMockPolicies) {
+    const policies = await queryActiveRequiredPolicies();
+    return {
+      service: policies.service.version,
+      privacy: policies.privacy.version,
+    };
+  }
+
+  const { data, error } = await getSupabaseAdminClient()
+    .from("policy_documents")
+    .select(POLICY_VERSION_SELECT)
+    .in("kind", [...REQUIRED_POLICY_KINDS])
+    .eq("is_active", true);
+
+  if (error) {
+    throw wrapPolicyDocumentDbError(
+      error,
+      "활성 정책 버전을 불러오지 못했습니다.",
+    );
+  }
+
+  const versions: Partial<RequiredPolicyVersions> = {};
+  for (const row of (data ?? []) as Array<{ kind: string; version: number }>) {
+    if (!isRequiredPolicyKind(row.kind) || typeof row.version !== "number") {
+      continue;
+    }
+    const previous = versions[row.kind];
+    if (previous === undefined || row.version > previous) {
+      versions[row.kind] = row.version;
+    }
+  }
+
+  for (const kind of REQUIRED_POLICY_KINDS) {
+    if (versions[kind] === undefined) {
+      throw new PolicyDocumentError(
+        "not_found",
+        `${getPolicyKindLabel(kind)}의 활성 버전이 없습니다.`,
+      );
+    }
+  }
+
+  return versions as RequiredPolicyVersions;
+}
+
+/**
+ * Active required-policy versions for the member gate. The layout runs on
+ * every page view, so it reads only `kind,version` (never the policy body)
+ * and memoizes per request. It still reads the database on each request, so
+ * a newly activated version applies immediately.
+ */
+export const getActiveRequiredPolicyVersions = cache(
+  queryActiveRequiredPolicyVersions,
+);
 
 async function queryPolicyDocumentByKind(
   kind: PolicyKind,

@@ -47,3 +47,34 @@ test("member profile photo state is memoized by member within one server request
     /export const getMemberProfilePhotoState = cache\(async \(memberId: string\) => \{[\s\S]*?getMemberProfilePhotoStates\(\[memberId\]\)[\s\S]*?\}\);/,
   );
 });
+
+test("member gate reads active policy versions without bodies and skips consent rows for a fresh snapshot", () => {
+  const source = readFileSync(
+    new URL("../src/lib/user-auth.ts", import.meta.url),
+    "utf8",
+  );
+  const getUserSessionSource = source.slice(
+    source.indexOf("export const getUserSession = cache"),
+  );
+
+  assert.match(getUserSessionSource, /getActiveRequiredPolicyVersions\(\)/);
+  assert.doesNotMatch(getUserSessionSource, /getActiveRequiredPolicies\(\)/);
+  assert.match(
+    getUserSessionSource,
+    /const eagerConsentVersionsPromise = policyConsentSnapshot\s*\?\s*null\s*:\s*getMemberPolicyConsentVersions\(session\.userId\)/,
+  );
+  assert.match(
+    getUserSessionSource,
+    /isPolicyConsentSnapshotFresh\([\s\S]*?\)\s*\?\s*false\s*:\s*evaluateRequiredPolicyVersionStatus\(/,
+  );
+
+  const policySource = readFileSync(
+    new URL("../src/lib/policy-documents.server.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(policySource, /const POLICY_VERSION_SELECT = "kind,version";/);
+  assert.match(
+    policySource,
+    /export const getActiveRequiredPolicyVersions = cache\(\s*queryActiveRequiredPolicyVersions,?\s*\)/,
+  );
+});
