@@ -123,3 +123,38 @@ tests:
         alertname: ReleaseReceiverStale
         exp_alerts:
           - exp_labels: { job: node, environment: production, vm: "5200", severity: warning }
+  - interval: 1m
+    input_series:
+      - series: 'pg_stat_database_numbackends{job="postgres",environment="production",vm="5200",datname="postgres"}'
+        values: '50+0x20'
+      - series: 'pg_stat_database_numbackends{job="postgres",environment="production",vm="5200",datname="template1"}'
+        values: '40+0x20'
+      - series: 'pg_settings_max_connections{job="postgres",environment="production",vm="5200"}'
+        values: '100+0x20'
+      - series: 'pg_stat_database_numbackends{job="postgres",environment="preview",vm="5201",datname="postgres"}'
+        values: '10+0x20'
+      - series: 'pg_settings_max_connections{job="postgres",environment="preview",vm="5201"}'
+        values: '100+0x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: DatabaseConnectionsHigh
+        exp_alerts:
+          - exp_labels: { environment: production, vm: "5200", severity: warning }
+  - interval: 5m
+    input_series:
+      # +64 MiB per 5 minutes (about 18 GiB/day) against 20 GiB free:
+      # 14 days of that growth far exceeds the free space.
+      - series: 'pg_database_size_bytes{job="postgres",environment="production",vm="5200",datname="postgres"}'
+        values: '0+67108864x400'
+      - series: 'node_filesystem_avail_bytes{job="node",environment="production",vm="5200",mountpoint="/",fstype="ext4"}'
+        values: '21474836480+0x400'
+      # Flat size never forecasts exhaustion, even with little free space.
+      - series: 'pg_database_size_bytes{job="postgres",environment="preview",vm="5201",datname="postgres"}'
+        values: '1073741824+0x400'
+      - series: 'node_filesystem_avail_bytes{job="node",environment="preview",vm="5201",mountpoint="/",fstype="ext4"}'
+        values: '1073741824+0x400'
+    alert_rule_test:
+      - eval_time: 30h
+        alertname: DatabaseSizeForecast
+        exp_alerts:
+          - exp_labels: { environment: production, vm: "5200", severity: warning }

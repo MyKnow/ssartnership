@@ -50,6 +50,24 @@ groups:
         expr: time() - ssartnership_release_receiver_last_success_seconds > 3600
         for: 10m
         labels: { severity: warning }
+      # postgres-exporter defaults: stat_database numbackends, pg_settings and
+      # database size. Verify the names against the live :9187 output when
+      # applying; a missing series keeps these rules silent, not firing.
+      - alert: DatabaseConnectionsHigh
+        expr: sum by (environment, vm) (pg_stat_database_numbackends) / on(environment, vm) max by (environment, vm) (pg_settings_max_connections) > 0.8
+        for: 10m
+        labels: { severity: warning }
+      # Growth over the last day projected 14 days ahead exceeds the free space
+      # on the VM root filesystem that holds the Docker data volume.
+      - alert: DatabaseSizeForecast
+        expr: >-
+          (
+            predict_linear(sum by (environment, vm) (pg_database_size_bytes)[1d:10m], 14 * 86400)
+            - sum by (environment, vm) (pg_database_size_bytes)
+          )
+          > on(environment, vm) max by (environment, vm) (node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay"})
+        for: 1h
+        labels: { severity: warning }
       - alert: HostDiskLow
         expr: node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes < 0.15
         for: 5m

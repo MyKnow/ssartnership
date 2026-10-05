@@ -21,6 +21,7 @@
     "install:trusted": "node scripts/install-dependencies.mjs",
     "check:lockfile": "node scripts/check-lockfile.mjs",
     "check:docs": "node scripts/check-docs.mjs",
+    "check:alerts": "node scripts/check-alert-rules.mjs",
     "build": "node scripts/next.mjs build",
     "typecheck:ci": "node scripts/typecheck-ci.mjs",
     "storybook": "storybook dev -p 6006",

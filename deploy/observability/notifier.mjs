@@ -14,6 +14,8 @@ export const CATALOG = {
   AppHealthFailed: ["앱 상태 확인 실패", "내부 앱 상태 실패 또는 갱신 지연이 2분 지속"],
   DatabaseUnavailable: ["DB 접속 실패", "PostgreSQL 연결 실패가 1분 지속"],
   AppDependencyUnavailable: ["앱 의존성 준비 실패", "앱에서 DB·gateway·Storage 중 하나에 연결하지 못한 상태가 2분 지속"],
+  DatabaseConnectionsHigh: ["DB 연결 수 과다", "DB 연결 수가 최대 연결의 80%를 10분 이상 초과"],
+  DatabaseSizeForecast: ["DB 용량 증가 경고", "최근 하루 증가 추세로 14일 안에 VM 루트 여유 공간을 넘을 것으로 예상"],
   HostDiskLow: ["디스크 여유 부족", "디스크 여유 15% 미만이 5분 지속"],
   HostMemoryLow: ["메모리 여유 부족", "가용 메모리 10% 미만이 5분 지속"],
   HostCpuBusy: ["CPU 부하 지속", "CPU 사용률 90% 초과가 10분 지속"],

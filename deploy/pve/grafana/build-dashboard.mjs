@@ -1,69 +1,95 @@
-import { writeFileSync } from "node:fs";
-const panels = [];
-let id = 1, y = 0;
-const ds = { type: "prometheus", uid: "prometheus" };
-function row(title) { panels.push({ id: id++, type: "row", title, collapsed: false, gridPos: { x: 0, y: y++, w: 24, h: 1 }, panels: [] }); }
-function panel(title, expr, unit = "short", { type = "timeseries", x = 0, width = 8, height = 7, legend = "{{environment}} · {{vm}}", mappings = [], thresholds } = {}) {
-  const p = { id: id++, title, type, datasource: ds, gridPos: { x, y, w: width, h: height }, targets: [{ refId: "A", expr, legendFormat: legend, instant: type === "stat" || type === "table", range: type === "timeseries" }], fieldConfig: { defaults: { unit, noValue: "데이터 없음", decimals: 2, mappings, thresholds: { mode: "absolute", steps: thresholds ?? [{ color: "green", value: null }] } }, overrides: [] }, options: type === "stat" ? { reduceOptions: { calcs: ["lastNotNull"], fields: "", values: false }, colorMode: "background", graphMode: "none", textMode: "auto", orientation: "auto" } : { tooltip: { mode: "multi" }, legend: { displayMode: "table", placement: "bottom", calcs: ["lastNotNull"] } } };
-  panels.push(p); return p;
+import { realpathSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+export const DASHBOARD_PATH = new URL("./dashboards/ssartnership.json", import.meta.url);
+
+/** Builds the provisioned Grafana dashboard. Pure and deterministic. */
+export function buildDashboard() {
+  const panels = [];
+  let id = 1, y = 0;
+  const ds = { type: "prometheus", uid: "prometheus" };
+  function row(title) { panels.push({ id: id++, type: "row", title, collapsed: false, gridPos: { x: 0, y: y++, w: 24, h: 1 }, panels: [] }); }
+  function panel(title, expr, unit = "short", { type = "timeseries", x = 0, width = 8, height = 7, legend = "{{environment}} · {{vm}}", mappings = [], thresholds } = {}) {
+    const p = { id: id++, title, type, datasource: ds, gridPos: { x, y, w: width, h: height }, targets: [{ refId: "A", expr, legendFormat: legend, instant: type === "stat" || type === "table", range: type === "timeseries" }], fieldConfig: { defaults: { unit, noValue: "데이터 없음", decimals: 2, mappings, thresholds: { mode: "absolute", steps: thresholds ?? [{ color: "green", value: null }] } }, overrides: [] }, options: type === "stat" ? { reduceOptions: { calcs: ["lastNotNull"], fields: "", values: false }, colorMode: "background", graphMode: "none", textMode: "auto", orientation: "auto" } : { tooltip: { mode: "multi" }, legend: { displayMode: "table", placement: "bottom", calcs: ["lastNotNull"] } } };
+    panels.push(p); return p;
+  }
+  const state = [{ type: "value", options: { "0": { text: "장애", color: "red" }, "1": { text: "정상", color: "green" } } }];
+  const configured = [{ type: "value", options: { "0": { text: "미연동", color: "gray" }, "1": { text: "연동됨", color: "green" } } }];
+  const env = 'environment=~"$environment"';
+  row("한눈에 보기 · 내부 상태 / 외부 상태를 구분");
+  for (const [i, e] of ["production", "preview"].entries()) panel(`${e === "production" ? "Production" : "Preview"} 내부 상태`, `min(up{environment="${e}",job=~"node|postgres|telemetry"}) * (count(up{environment="${e}",job=~"node|postgres|telemetry"}) == bool 3) * min(pg_up{environment="${e}"}) * min(ssartnership_app_probe_success{environment="${e}"}) * (max(time() - ssartnership_app_probe_completed_seconds{environment="${e}"}) < bool 90)`, "short", { type: "stat", x: i * 6, width: 6, height: 5, mappings: state });
+  panel("공용 감시 상태", 'min(up{environment="operations",job=~"prometheus|alertmanager|notifier|observer|node"}) * (count(up{environment="operations",job=~"prometheus|alertmanager|notifier|observer|node"}) == bool 5) * min(ssartnership_monitoring_engines_healthy) * (max(time() - myknow_pve_collected_seconds) < bool 300)', "short", { type: "stat", x: 12, width: 6, height: 5, mappings: state });
+  panel("발생 중인 경보", `count(ALERTS{alertstate="firing",${env}}) or vector(0)`, "short", { type: "stat", x: 18, width: 6, height: 5, thresholds: [{ color: "green", value: null }, { color: "red", value: 1 }] }).fieldConfig.defaults.decimals = 0; y += 5;
+  row("지금 조치할 항목");
+  const alerts = panel("활성 경보 · 심각도 / 환경 / VM / 조건", `ALERTS{alertstate="firing",${env}}`, "short", { type: "table", width: 24, height: 5 });
+  alerts.options = { showHeader: true }; alerts.transformations = [{ id: "labelsToFields", options: { mode: "columns" } }]; y += 5;
+  alerts.description = "상단의 공용 감시가 정상이고 경보 수가 0이면 빈 표는 활성 경보가 없음을 뜻합니다. 감시 상태가 장애이거나 데이터 없음이면 수집 상태를 먼저 확인하세요.";
+  row("서비스 · PostgreSQL");
+  panel("내부 앱 확인", `ssartnership_app_probe_success{${env}}`, "short", { x: 0, mappings: state });
+  panel("내부 앱 응답 시간", `ssartnership_app_probe_duration_seconds{${env}}`, "s", { x: 8 });
+  panel("DB 접속 수", `sum by (environment,vm) (pg_stat_database_numbackends{${env},datname="postgres"})`, "short", { x: 16 }); y += 7;
+  panel("Ingress TLS 확인 · 내부 회선", `ssartnership_ingress_probe_success{${env}}`, "short", { x: 0, mappings: state });
+  panel("Ingress HTTPS 응답 시간 · 내부 회선", `ssartnership_ingress_probe_duration{${env}}`, "s", { x: 8 });
+  panel("TLS 인증서 남은 기간", `(ssartnership_ingress_probe_expires{${env}} > 0) - time()`, "s", { x: 16 }); y += 7;
+  row("앱 준비 상태 · edge 오류 · 예약 작업 · 배포 수신기");
+  panel("앱 의존성 준비 상태", `ssartnership_app_ready_success{${env}}`, "short", { x: 0, mappings: state, legend: "{{environment}} · {{dependency}}" });
+  panel("DB 연결 사용률", `sum by (environment,vm) (pg_stat_database_numbackends{${env}}) / on(environment,vm) max by (environment,vm) (pg_settings_max_connections{${env}})`, "percentunit", { x: 8 });
+  panel("공개 edge 5xx 비율 · 5분", 'sum(rate(caddy_http_request_duration_seconds_count{job="caddy",handler="reverse_proxy",code=~"5.."}[5m])) / sum(rate(caddy_http_request_duration_seconds_count{job="caddy",handler="reverse_proxy"}[5m]))', "percentunit", { x: 16, legend: "edge" }); y += 7;
+  panel("운영 예약 작업 · 마지막 성공 경과", `time() - ssartnership_production_cron_last_success_seconds{${env}}`, "s", { x: 0, width: 12, legend: "{{cron}}" });
+  panel("배포 수신기 · 마지막 성공 경과", `time() - ssartnership_release_receiver_last_success_seconds{${env}}`, "s", { x: 12, width: 12 }); y += 7;
+  row("VM 자원 · 바이트와 비율을 함께 확인");
+  panel("CPU 사용률", `1 - avg by (environment,vm) (rate(node_cpu_seconds_total{${env},mode="idle"}[5m]))`, "percentunit", { x: 0 });
+  panel("가용 메모리", `node_memory_MemAvailable_bytes{${env}}`, "bytes", { x: 8 });
+  panel("메모리 여유 비율", `node_memory_MemAvailable_bytes{${env}} / node_memory_MemTotal_bytes{${env}}`, "percentunit", { x: 16 }); y += 7;
+  panel("파일시스템 여유 공간", `node_filesystem_avail_bytes{${env},fstype!~"tmpfs|overlay"}`, "bytes", { x: 0, width: 12, legend: "{{environment}} · VM {{vm}} · {{mountpoint}}" });
+  panel("파일시스템 여유 비율", `node_filesystem_avail_bytes{${env},fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{${env},fstype!~"tmpfs|overlay"}`, "percentunit", { x: 12, width: 12, legend: "{{environment}} · VM {{vm}} · {{mountpoint}}" }); y += 7;
+  row("물리 PVE · 같은 호스트에 있는 백업 디스크와 구분");
+  panel("PVE CPU 사용률", "myknow_pve_cpu_busy_ratio", "percentunit", { x: 0 });
+  panel("PVE 가용 메모리", "myknow_pve_memory_available_bytes", "bytes", { x: 8 });
+  panel("PVE 루트 여유 공간", "myknow_pve_root_available_bytes", "bytes", { x: 16 }); y += 7;
+  panel("Thin pool 데이터 사용률", "myknow_pve_thin_data_used_ratio", "percentunit", { x: 0, width: 6 });
+  panel("Thin pool 메타데이터 사용률", "myknow_pve_thin_metadata_used_ratio", "percentunit", { x: 6, width: 6 });
+  panel("시스템 NVMe SMART", "myknow_pve_system_disk_healthy", "short", { type: "stat", x: 12, width: 6, mappings: state });
+  panel("같은 호스트의 백업 SATA SMART", "myknow_pve_backup_disk_healthy", "short", { type: "stat", x: 18, width: 6, mappings: state }); y += 7;
+  row("Production 백업 · 스냅샷 방식 / 연속 PITR 아님");
+  const backup = [["최신 백업 경과", "time() - ssartnership_production_backup_created_seconds"], ["Mac 사본의 백업 경과", "time() - ssartnership_production_backup_mac_created_seconds"], ["같은 PVE 사본의 백업 경과", "time() - ssartnership_production_backup_pve_created_seconds"], ["PVE 사본 확인 경과", "time() - ssartnership_production_backup_pve_ack_seconds"], ["백업 지표 갱신 경과", "time() - ssartnership_production_backup_collected_seconds"], ["복원 검증 경과", "time() - ssartnership_production_restore_verified_seconds"]];
+  for (const [i, [title, query]] of backup.entries()) panel(title, query, "s", { type: "stat", x: (i % 3) * 8 });
+  // Second row after three stat panels.
+  for (const p of panels.slice(-3)) p.gridPos.y += 7;
+  y += 14;
+  panel("최근 백업 작업 결과", "ssartnership_production_backup_job_success", "short", { type: "stat", x: 0, mappings: state });
+  panel("백업 작업 종료 시각", "ssartnership_production_backup_job_finished_seconds * 1000", "dateTimeAsIso", { type: "stat", x: 8 });
+  panel("최근 복원 검증 시각", "ssartnership_production_restore_verified_seconds * 1000", "dateTimeAsIso", { type: "stat", x: 16 }); y += 7;
+  row("사용자 체감 성능 · 최근 15분 / 최소 5개 표본");
+  for (const [i, name] of ["LCP", "INP", "CLS"].entries()) {
+    const count = `sum by(environment) (increase(ssartnership_web_vital_count{${env},name="${name}"}[15m]))`;
+    const p = panel(`${name} p75`, `histogram_quantile(0.75, sum by (environment,le) (rate(ssartnership_web_vital_bucket{${env},name="${name}"}[15m]))) and on(environment) (${count} >= 5)`, name === "CLS" ? "short" : "ms", { x: i * 8 });
+    p.fieldConfig.defaults.noValue = "표본 부족 · 아래 표본 수 확인";
+  } y += 7;
+  for (const [i, name] of ["LCP", "INP", "CLS"].entries()) panel(`${name} 최근 표본 수`, `sum by(environment) (increase(ssartnership_web_vital_count{${env},name="${name}"}[15m]))`, "short", { type: "stat", x: i * 8 }); y += 7;
+  row("감시 · 알림 자체 상태");
+  panel("발송기 설정", "ssartnership_notifier_configured", "short", { type: "stat", x: 0, mappings: configured });
+  panel("운영자 PWA 푸시", "ssartnership_notifier_push_configured", "short", { type: "stat", x: 8, mappings: configured });
+  panel("운영자 푸시 구독 수", "ssartnership_notifier_push_subscriptions", "short", { type: "stat", x: 16 }); y += 7;
+  panel("최근 1시간 발송 결과 · 제공자 접수 기준", "sum by(channel,result)(increase(ssartnership_notifier_deliveries_total[1h]))", "short", { x: 0, width: 12, legend: "{{channel}} · {{result}}" });
+  panel("수집 대상 · 마지막 수집 경과", `time() - timestamp(up{${env}})`, "s", { x: 12, width: 12, legend: "{{job}} · {{vm}}" }); y += 7;
+  panel("PVE 호스트 수집 경과", "time() - myknow_pve_collected_seconds", "s", { type: "stat", x: 0 });
+  panel("외부 heartbeat 연동", "ssartnership_external_heartbeat_configured", "short", { type: "stat", x: 8, mappings: configured });
+  panel("독립 회선 HTTPS 감시", "ssartnership_external_monitor_configured", "short", { type: "stat", x: 16, mappings: configured });
+  return { uid: "ssartnership-operations", title: "SSARTNERSHIP Operations", schemaVersion: 39, version: 2, editable: false, timezone: "Asia/Seoul", refresh: "30s", time: { from: "now-6h", to: "now" }, tags: ["ssartnership", "pve", "operations"], links: [{ type: "link", title: "외부 생존 감시", url: "https://healthchecks.io/", targetBlank: true }], templating: { list: [{ name: "environment", label: "환경", type: "custom", query: "production,preview,operations", includeAll: true, allValue: ".*", multi: true, current: { text: "All", value: "$__all" }, options: [{ text: "All", value: "$__all", selected: true }, ...["production", "preview", "operations"].map(value => ({ text: value, value, selected: false }))] }] }, panels };
 }
-const state = [{ type: "value", options: { "0": { text: "장애", color: "red" }, "1": { text: "정상", color: "green" } } }];
-const configured = [{ type: "value", options: { "0": { text: "미연동", color: "gray" }, "1": { text: "연동됨", color: "green" } } }];
-const env = 'environment=~"$environment"';
-row("한눈에 보기 · 내부 상태 / 외부 상태를 구분");
-for (const [i, e] of ["production", "preview"].entries()) panel(`${e === "production" ? "Production" : "Preview"} 내부 상태`, `min(up{environment="${e}",job=~"node|postgres|telemetry"}) * (count(up{environment="${e}",job=~"node|postgres|telemetry"}) == bool 3) * min(pg_up{environment="${e}"}) * min(ssartnership_app_probe_success{environment="${e}"}) * (max(time() - ssartnership_app_probe_completed_seconds{environment="${e}"}) < bool 90)`, "short", { type: "stat", x: i * 6, width: 6, height: 5, mappings: state });
-panel("공용 감시 상태", 'min(up{environment="operations",job=~"prometheus|alertmanager|notifier|observer|node"}) * (count(up{environment="operations",job=~"prometheus|alertmanager|notifier|observer|node"}) == bool 5) * min(ssartnership_monitoring_engines_healthy) * (max(time() - myknow_pve_collected_seconds) < bool 300)', "short", { type: "stat", x: 12, width: 6, height: 5, mappings: state });
-panel("발생 중인 경보", `count(ALERTS{alertstate="firing",${env}}) or vector(0)`, "short", { type: "stat", x: 18, width: 6, height: 5, thresholds: [{ color: "green", value: null }, { color: "red", value: 1 }] }).fieldConfig.defaults.decimals = 0; y += 5;
-row("지금 조치할 항목");
-const alerts = panel("활성 경보 · 심각도 / 환경 / VM / 조건", `ALERTS{alertstate="firing",${env}}`, "short", { type: "table", width: 24, height: 5 });
-alerts.options = { showHeader: true }; alerts.transformations = [{ id: "labelsToFields", options: { mode: "columns" } }]; y += 5;
-alerts.description = "상단의 공용 감시가 정상이고 경보 수가 0이면 빈 표는 활성 경보가 없음을 뜻합니다. 감시 상태가 장애이거나 데이터 없음이면 수집 상태를 먼저 확인하세요.";
-row("서비스 · PostgreSQL");
-panel("내부 앱 확인", `ssartnership_app_probe_success{${env}}`, "short", { x: 0, mappings: state });
-panel("내부 앱 응답 시간", `ssartnership_app_probe_duration_seconds{${env}}`, "s", { x: 8 });
-panel("DB 접속 수", `sum by (environment,vm) (pg_stat_database_numbackends{${env},datname="postgres"})`, "short", { x: 16 }); y += 7;
-panel("Ingress TLS 확인 · 내부 회선", `ssartnership_ingress_probe_success{${env}}`, "short", { x: 0, mappings: state });
-panel("Ingress HTTPS 응답 시간 · 내부 회선", `ssartnership_ingress_probe_duration{${env}}`, "s", { x: 8 });
-panel("TLS 인증서 남은 기간", `(ssartnership_ingress_probe_expires{${env}} > 0) - time()`, "s", { x: 16 }); y += 7;
-row("VM 자원 · 바이트와 비율을 함께 확인");
-panel("CPU 사용률", `1 - avg by (environment,vm) (rate(node_cpu_seconds_total{${env},mode="idle"}[5m]))`, "percentunit", { x: 0 });
-panel("가용 메모리", `node_memory_MemAvailable_bytes{${env}}`, "bytes", { x: 8 });
-panel("메모리 여유 비율", `node_memory_MemAvailable_bytes{${env}} / node_memory_MemTotal_bytes{${env}}`, "percentunit", { x: 16 }); y += 7;
-panel("파일시스템 여유 공간", `node_filesystem_avail_bytes{${env},fstype!~"tmpfs|overlay"}`, "bytes", { x: 0, width: 12, legend: "{{environment}} · VM {{vm}} · {{mountpoint}}" });
-panel("파일시스템 여유 비율", `node_filesystem_avail_bytes{${env},fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{${env},fstype!~"tmpfs|overlay"}`, "percentunit", { x: 12, width: 12, legend: "{{environment}} · VM {{vm}} · {{mountpoint}}" }); y += 7;
-row("물리 PVE · 같은 호스트에 있는 백업 디스크와 구분");
-panel("PVE CPU 사용률", "myknow_pve_cpu_busy_ratio", "percentunit", { x: 0 });
-panel("PVE 가용 메모리", "myknow_pve_memory_available_bytes", "bytes", { x: 8 });
-panel("PVE 루트 여유 공간", "myknow_pve_root_available_bytes", "bytes", { x: 16 }); y += 7;
-panel("Thin pool 데이터 사용률", "myknow_pve_thin_data_used_ratio", "percentunit", { x: 0, width: 6 });
-panel("Thin pool 메타데이터 사용률", "myknow_pve_thin_metadata_used_ratio", "percentunit", { x: 6, width: 6 });
-panel("시스템 NVMe SMART", "myknow_pve_system_disk_healthy", "short", { type: "stat", x: 12, width: 6, mappings: state });
-panel("같은 호스트의 백업 SATA SMART", "myknow_pve_backup_disk_healthy", "short", { type: "stat", x: 18, width: 6, mappings: state }); y += 7;
-row("Production 백업 · 스냅샷 방식 / 연속 PITR 아님");
-const backup = [["최신 백업 경과", "time() - ssartnership_production_backup_created_seconds"], ["Mac 사본의 백업 경과", "time() - ssartnership_production_backup_mac_created_seconds"], ["같은 PVE 사본의 백업 경과", "time() - ssartnership_production_backup_pve_created_seconds"], ["PVE 사본 확인 경과", "time() - ssartnership_production_backup_pve_ack_seconds"], ["백업 지표 갱신 경과", "time() - ssartnership_production_backup_collected_seconds"], ["복원 검증 경과", "time() - ssartnership_production_restore_verified_seconds"]];
-for (const [i, [title, query]] of backup.entries()) panel(title, query, "s", { type: "stat", x: (i % 3) * 8 });
-// Second row after three stat panels.
-for (const p of panels.slice(-3)) p.gridPos.y += 7;
-y += 14;
-panel("최근 백업 작업 결과", "ssartnership_production_backup_job_success", "short", { type: "stat", x: 0, mappings: state });
-panel("백업 작업 종료 시각", "ssartnership_production_backup_job_finished_seconds * 1000", "dateTimeAsIso", { type: "stat", x: 8 });
-panel("최근 복원 검증 시각", "ssartnership_production_restore_verified_seconds * 1000", "dateTimeAsIso", { type: "stat", x: 16 }); y += 7;
-row("사용자 체감 성능 · 최근 15분 / 최소 5개 표본");
-for (const [i, name] of ["LCP", "INP", "CLS"].entries()) {
-  const count = `sum by(environment) (increase(ssartnership_web_vital_count{${env},name="${name}"}[15m]))`;
-  const p = panel(`${name} p75`, `histogram_quantile(0.75, sum by (environment,le) (rate(ssartnership_web_vital_bucket{${env},name="${name}"}[15m]))) and on(environment) (${count} >= 5)`, name === "CLS" ? "short" : "ms", { x: i * 8 });
-  p.fieldConfig.defaults.noValue = "표본 부족 · 아래 표본 수 확인";
-} y += 7;
-for (const [i, name] of ["LCP", "INP", "CLS"].entries()) panel(`${name} 최근 표본 수`, `sum by(environment) (increase(ssartnership_web_vital_count{${env},name="${name}"}[15m]))`, "short", { type: "stat", x: i * 8 }); y += 7;
-row("감시 · 알림 자체 상태");
-panel("발송기 설정", "ssartnership_notifier_configured", "short", { type: "stat", x: 0, mappings: configured });
-panel("운영자 PWA 푸시", "ssartnership_notifier_push_configured", "short", { type: "stat", x: 8, mappings: configured });
-panel("운영자 푸시 구독 수", "ssartnership_notifier_push_subscriptions", "short", { type: "stat", x: 16 }); y += 7;
-panel("최근 1시간 발송 결과 · 제공자 접수 기준", "sum by(channel,result)(increase(ssartnership_notifier_deliveries_total[1h]))", "short", { x: 0, width: 12, legend: "{{channel}} · {{result}}" });
-panel("수집 대상 · 마지막 수집 경과", `time() - timestamp(up{${env}})`, "s", { x: 12, width: 12, legend: "{{job}} · {{vm}}" }); y += 7;
-panel("PVE 호스트 수집 경과", "time() - myknow_pve_collected_seconds", "s", { type: "stat", x: 0 });
-panel("외부 heartbeat 연동", "ssartnership_external_heartbeat_configured", "short", { type: "stat", x: 8, mappings: configured });
-panel("독립 회선 HTTPS 감시", "ssartnership_external_monitor_configured", "short", { type: "stat", x: 16, mappings: configured });
-const dashboard = { uid: "ssartnership-operations", title: "SSARTNERSHIP Operations", schemaVersion: 39, version: 2, editable: false, timezone: "Asia/Seoul", refresh: "30s", time: { from: "now-6h", to: "now" }, tags: ["ssartnership", "pve", "operations"], links: [{ type: "link", title: "외부 생존 감시", url: "https://healthchecks.io/", targetBlank: true }], templating: { list: [{ name: "environment", label: "환경", type: "custom", query: "production,preview,operations", includeAll: true, allValue: ".*", multi: true, current: { text: "All", value: "$__all" }, options: [{ text: "All", value: "$__all", selected: true }, ...["production", "preview", "operations"].map(value => ({ text: value, value, selected: false }))] }] }, panels };
-writeFileSync(new URL("./dashboards/ssartnership.json", import.meta.url), `${JSON.stringify(dashboard, null, 2)}\n`);
-console.log(`Generated ${panels.filter(p => p.type !== "row").length} panels`);
+
+export function renderDashboard() {
+  return `${JSON.stringify(buildDashboard(), null, 2)}\n`;
+}
+
+function isMainModule() {
+  if (!process.argv[1]) return false;
+  try { return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
+}
+
+if (isMainModule()) {
+  const dashboard = buildDashboard();
+  writeFileSync(DASHBOARD_PATH, renderDashboard());
+  console.log(`Generated ${dashboard.panels.filter(p => p.type !== "row").length} panels`);
+}
