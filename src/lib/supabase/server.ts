@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { resolveSupabaseFetchTimeouts, withSupabaseTimeout } from "./timeout";
 import { createSupabaseTransport } from "./transport";
 
 let adminClient: SupabaseClient | null = null;
@@ -17,6 +18,16 @@ function getAdminEnv() {
   }
 
   return { supabaseUrl, internalSupabaseUrl, serviceRoleKey };
+}
+
+function createTimedSupabaseTransport(
+  supabaseUrl: string,
+  internalSupabaseUrl: string | undefined,
+) {
+  return withSupabaseTimeout(
+    createSupabaseTransport(supabaseUrl, internalSupabaseUrl),
+    resolveSupabaseFetchTimeouts(),
+  );
 }
 
 function getPublicEnv() {
@@ -41,7 +52,7 @@ export function getSupabaseAdminClient() {
   }
 
   const { supabaseUrl, internalSupabaseUrl, serviceRoleKey } = getAdminEnv();
-  const transport = createSupabaseTransport(supabaseUrl, internalSupabaseUrl);
+  const transport = createTimedSupabaseTransport(supabaseUrl, internalSupabaseUrl);
   adminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: {
       persistSession: false,
@@ -64,7 +75,7 @@ export function getSupabasePublicClient(revalidateSeconds = 300) {
   }
 
   const { supabaseUrl, internalSupabaseUrl, key } = getPublicEnv();
-  const transport = createSupabaseTransport(supabaseUrl, internalSupabaseUrl);
+  const transport = createTimedSupabaseTransport(supabaseUrl, internalSupabaseUrl);
   const publicClient = createClient(supabaseUrl, key, {
     auth: {
       persistSession: false,
