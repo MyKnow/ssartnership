@@ -28,6 +28,7 @@ import {
   filterPartnerNotificationUiModels,
   hasUnloadedUnreadPartnerNotifications,
   mergePartnerNotificationEntries,
+  shiftPartnerStoredNotificationPageAfterDelete,
   PARTNER_NOTIFICATION_PRIORITY_LABELS,
   PARTNER_NOTIFICATION_PURPOSE_LABELS,
   type PartnerNotificationPriority,
@@ -488,7 +489,8 @@ export default function PartnerNotificationCenter({
   }
 
   async function loadMoreStoredNotifications() {
-    if (loadingMore || !storedPage.hasMore) {
+    // 삭제가 진행 중이면 서버 목록의 위치가 바뀌는 중이라 다음 페이지를 읽지 않는다.
+    if (loadingMore || isMutationPending || !storedPage.hasMore) {
       return;
     }
 
@@ -586,11 +588,13 @@ export default function PartnerNotificationCenter({
 
   async function deleteNotification(model: PartnerNotificationUiModel) {
     const notificationId = model.item.notificationId;
-    if (!notificationId || pendingNotificationId || pendingBulkAction) {
+    if (!notificationId || pendingNotificationId || pendingBulkAction || loadingMore) {
       return;
     }
 
     const snapshot = items;
+    const deletedStoredCount =
+      snapshot.length - removeNotifications(snapshot, [notificationId]).length;
     setPendingNotificationId(notificationId);
     setItems((current) => removeNotifications(current, [notificationId]));
 
@@ -601,6 +605,9 @@ export default function PartnerNotificationCenter({
           method: "DELETE",
         },
         { requestFailureMessage: "알림 삭제에 실패했습니다." },
+      );
+      setStoredPage((current) =>
+        shiftPartnerStoredNotificationPageAfterDelete(current, deletedStoredCount),
       );
       syncStoredUnreadCount(response);
       notify("처리 필요 알림을 삭제했습니다.");
@@ -650,6 +657,7 @@ export default function PartnerNotificationCenter({
     if (
       pendingNotificationId ||
       pendingBulkAction ||
+      loadingMore ||
       visibleActionNotificationIds.length === 0
     ) {
       return;
@@ -660,6 +668,8 @@ export default function PartnerNotificationCenter({
     }
 
     const snapshot = items;
+    const deletedStoredCount =
+      snapshot.length - removeNotifications(snapshot, visibleActionNotificationIds).length;
     setPendingBulkAction("delete-action");
     setItems((current) => removeNotifications(current, visibleActionNotificationIds));
 
@@ -672,6 +682,9 @@ export default function PartnerNotificationCenter({
           body: JSON.stringify({ notificationIds: visibleActionNotificationIds }),
         },
         { requestFailureMessage: "처리 필요 알림 삭제에 실패했습니다." },
+      );
+      setStoredPage((current) =>
+        shiftPartnerStoredNotificationPageAfterDelete(current, deletedStoredCount),
       );
       syncStoredUnreadCount(response);
       notify("표시된 처리 필요 알림을 삭제했습니다.");
@@ -920,7 +933,9 @@ export default function PartnerNotificationCenter({
               loading={pendingBulkAction === "delete-action"}
               loadingText="삭제 중"
               disabled={
-                visibleActionNotificationIds.length === 0 || isMutationPending
+                visibleActionNotificationIds.length === 0 ||
+                isMutationPending ||
+                loadingMore
               }
               onClick={() => {
                 void deleteVisibleActionNotifications();
@@ -993,7 +1008,7 @@ export default function PartnerNotificationCenter({
                     variant="secondary"
                     loading={loadingMore}
                     loadingText="불러오는 중"
-                    disabled={loadingMore}
+                    disabled={loadingMore || isMutationPending}
                     onClick={() => {
                       void loadMoreStoredNotifications();
                     }}
@@ -1032,7 +1047,7 @@ export default function PartnerNotificationCenter({
                     className="w-full max-w-sm"
                     loading={loadingMore}
                     loadingText="불러오는 중"
-                    disabled={loadingMore}
+                    disabled={loadingMore || isMutationPending}
                     onClick={() => {
                       void loadMoreStoredNotifications();
                     }}

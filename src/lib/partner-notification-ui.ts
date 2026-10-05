@@ -3,6 +3,7 @@ import type {
   PartnerNotificationCategory,
   PartnerNotificationEntry,
   PartnerNotificationStatus,
+  PartnerStoredNotificationPage,
 } from "@/lib/partner-notification-contract";
 
 export type PartnerNotificationPurpose = "action" | "information";
@@ -590,4 +591,22 @@ export function hasUnloadedUnreadPartnerNotifications(input: {
     input.storedUnreadCount !== null &&
     input.storedUnreadCount > input.loadedUnreadCount
   );
+}
+
+/**
+ * 불러온 저장 알림을 삭제하면 서버 목록(최신순)이 삭제한 수만큼 앞으로 당겨진다.
+ * 다음 페이지 offset을 같은 수만큼 줄여야 '더 보기'가 그 수만큼 이전 알림을
+ * 건너뛰지 않는다. 당겨진 범위에서 겹치는 항목은 병합 단계에서 버린다.
+ */
+export function shiftPartnerStoredNotificationPageAfterDelete(
+  page: PartnerStoredNotificationPage,
+  deletedStoredCount: number,
+): PartnerStoredNotificationPage {
+  if (!Number.isFinite(deletedStoredCount) || deletedStoredCount <= 0) {
+    return page;
+  }
+  return {
+    ...page,
+    nextOffset: Math.max(0, page.nextOffset - Math.trunc(deletedStoredCount)),
+  };
 }

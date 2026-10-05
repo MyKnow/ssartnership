@@ -14,9 +14,13 @@ const {
 const {
   hasUnloadedUnreadPartnerNotifications,
   mergePartnerNotificationEntries,
+  shiftPartnerStoredNotificationPageAfterDelete,
 } = await import("../src/lib/partner-notification-ui.ts");
-const { listPartnerStoredNotifications, resetMockPartnerStoredNotificationStore } =
-  await import("../src/lib/partner-notification-store.ts");
+const {
+  deletePartnerStoredNotifications,
+  listPartnerStoredNotifications,
+  resetMockPartnerStoredNotificationStore,
+} = await import("../src/lib/partner-notification-store.ts");
 const { getPartnerNotificationCenter, listPartnerNotificationCenterStoredEntries } =
   await import("../src/lib/partner-notifications.ts");
 
@@ -195,6 +199,68 @@ test("알림 센터 첫 화면과 더 보기 API는 저장 알림을 겹치지 �
   resetMockPartnerStoredNotificationStore();
 });
 
+test("불러온 저장 알림을 삭제하면 다음 페이지 offset을 삭제 수만큼 당긴다", () => {
+  const page = { nextOffset: 20, hasMore: true, unreadCount: 5 };
+  assert.deepEqual(shiftPartnerStoredNotificationPageAfterDelete(page, 3), {
+    nextOffset: 17,
+    hasMore: true,
+    unreadCount: 5,
+  });
+  assert.equal(shiftPartnerStoredNotificationPageAfterDelete(page, 0), page);
+  assert.equal(shiftPartnerStoredNotificationPageAfterDelete(page, -2), page);
+  assert.equal(shiftPartnerStoredNotificationPageAfterDelete(page, Number.NaN), page);
+  assert.equal(
+    shiftPartnerStoredNotificationPageAfterDelete({ ...page, nextOffset: 2 }, 5).nextOffset,
+    0,
+  );
+});
+
+test("첫 페이지 알림을 삭제한 뒤 더 보기는 이전 알림을 건너뛰지 않는다", async () => {
+  resetMockPartnerStoredNotificationStore();
+  await listPartnerStoredNotifications({ accountId: CAFE_ACCOUNT_ID });
+  seedExtraCompanyNotifications(30);
+
+  const everyRow = (
+    await listPartnerStoredNotifications({ accountId: CAFE_ACCOUNT_ID, limit: 100 })
+  ).items;
+  const firstPage = await listPartnerStoredNotifications({ accountId: CAFE_ACCOUNT_ID });
+  assert.equal(firstPage.hasMore, true);
+
+  const deletedRows = firstPage.items.slice(0, 3);
+  const deletedNotificationIds = deletedRows.map((row) => {
+    const notification = Array.isArray(row.notification)
+      ? row.notification[0]
+      : row.notification;
+    assert.ok(notification?.id);
+    return notification.id;
+  });
+  await deletePartnerStoredNotifications({
+    accountId: CAFE_ACCOUNT_ID,
+    notificationIds: deletedNotificationIds,
+  });
+
+  let page = shiftPartnerStoredNotificationPageAfterDelete(
+    { nextOffset: firstPage.nextOffset, hasMore: firstPage.hasMore, unreadCount: null },
+    deletedRows.length,
+  );
+  const collected = new Set(
+    firstPage.items.slice(deletedRows.length).map((row) => row.id),
+  );
+  while (page.hasMore) {
+    const next = await listPartnerStoredNotifications({
+      accountId: CAFE_ACCOUNT_ID,
+      offset: page.nextOffset,
+    });
+    next.items.forEach((row) => collected.add(row.id));
+    page = { nextOffset: next.nextOffset, hasMore: next.hasMore, unreadCount: null };
+  }
+
+  const deletedIds = new Set(deletedRows.map((row) => row.id));
+  const expected = everyRow.filter((row) => !deletedIds.has(row.id)).map((row) => row.id);
+  assert.deepEqual([...collected].sort(), [...expected].sort());
+  resetMockPartnerStoredNotificationStore();
+});
+
 test("파트너 알림 GET·센터 UI는 같은 페이지 규칙과 더 보기를 사용한다", () => {
   const route = readSource("src/app/api/partner/notifications/route.ts");
   assert.match(route, /parsePartnerNotificationPageQuery\(\s*request\.nextUrl\.searchParams/);
@@ -210,6 +276,10 @@ test("파트너 알림 GET·센터 UI는 같은 페이지 규칙과 더 보기�
   assert.match(center, /PARTNER_NOTIFICATION_PARTIAL_FILTER_NOTICE/);
   assert.match(center, /이전 알림 더 보기/);
   assert.match(center, /syncStoredUnreadCount\(response\)/);
+  assert.match(
+    center,
+    /shiftPartnerStoredNotificationPageAfterDelete\(current, deletedStoredCount\)/,
+  );
 
   const store = readSource("src/lib/partner-notification-store.ts");
   assert.match(
