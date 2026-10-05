@@ -1,7 +1,7 @@
-import Form from "next/form";
 import Button from "@/components/ui/Button";
 import FilterBar from "@/components/ui/FilterBar";
 import Input from "@/components/ui/Input";
+import NavigationForm from "@/components/ui/NavigationForm";
 import Select from "@/components/ui/Select";
 import SubmitButton from "@/components/ui/SubmitButton";
 import {
@@ -23,7 +23,7 @@ export default function AdminReviewFilters({
   partners: AdminReviewPartnerOption[];
 }) {
   return (
-    <Form action="/admin/reviews" prefetch={false}>
+    <NavigationForm action="/admin/reviews">
       <FilterBar
         title="리뷰 필터"
         description="필요한 조건만 선택하세요."
@@ -124,6 +124,6 @@ export default function AdminReviewFilters({
           <SubmitButton pendingText="적용 중">적용</SubmitButton>
         </div>
       </FilterBar>
-    </Form>
+    </NavigationForm>
   );
 }

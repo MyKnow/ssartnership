@@ -3,13 +3,15 @@
 import { useFormStatus } from "react-dom";
 import Button from "@/components/ui/Button";
 import type { ButtonVariant } from "@/components/ui/Button";
+import { useNavigationFormPending } from "@/components/ui/NavigationForm";
 
 export const DEFAULT_SUBMIT_PENDING_TEXT = "처리 중";
 
 /**
- * Form submit button that reads the parent form's pending state. Loading UI,
- * `disabled`, and `aria-busy` are delegated to `Button`, so a pending form
- * cannot be submitted twice by repeated clicks.
+ * Form submit button that reads the parent form's pending state: a Server
+ * Action form via `useFormStatus`, or a GET filter `NavigationForm` until the
+ * next route renders. Loading UI, `disabled`, and `aria-busy` are delegated to
+ * `Button`, so a pending form cannot be submitted twice by repeated clicks.
  */
 export default function SubmitButton({
   children,
@@ -34,7 +36,9 @@ export default function SubmitButton({
   name?: string;
   value?: string;
 }) {
-  const { pending } = useFormStatus();
+  const { pending: actionPending } = useFormStatus();
+  const navigationPending = useNavigationFormPending();
+  const pending = actionPending || navigationPending;
 
   return (
     <Button

@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+const navigationFormHrefModulePromise = import(
+  new URL("../src/components/ui/navigation-form-href.ts", import.meta.url).href
+) as Promise<typeof import("../src/components/ui/navigation-form-href.ts")>;
+
 function read(path: string) {
   return readFile(new URL(`../${path}`, import.meta.url), "utf8");
 }
@@ -16,7 +20,9 @@ test("SubmitButton은 pending 표시·비활성·aria-busy를 Button loading에 
     read("src/components/ui/Button.tsx"),
   ]);
 
-  assert.match(submitButton, /const \{ pending \} = useFormStatus\(\);/);
+  assert.match(submitButton, /const \{ pending: actionPending \} = useFormStatus\(\);/);
+  assert.match(submitButton, /const navigationPending = useNavigationFormPending\(\);/);
+  assert.match(submitButton, /const pending = actionPending \|\| navigationPending;/);
   assert.match(submitButton, /loading=\{pending\}/);
   assert.match(
     submitButton,
@@ -69,16 +75,41 @@ test("혜택 이용 이력 관리자 폼 3개는 raw submit 버튼 대신 ui 제
   );
 });
 
-test("리뷰 필터 GET 폼은 next/form 클라이언트 탐색으로 적용 중 상태를 보인다", async () => {
-  const sources = await Promise.all([
+test("리뷰 필터 GET 폼은 transition 안에서 이동해 적용 중 상태를 보인다", async () => {
+  const [navigationForm, ...sources] = await Promise.all([
+    read("src/components/ui/NavigationForm.tsx"),
     read("src/components/admin/partner-detail/AdminPartnerReviewManager.tsx"),
     read("src/components/admin/review-manager/AdminReviewFilters.tsx"),
   ]);
 
+  // next/form은 문자열 action에서 router.push만 호출해 useFormStatus가 pending이 되지 않는다.
+  assert.match(navigationForm, /const \[pending, startTransition\] = useTransition\(\);/);
+  assert.match(navigationForm, /startTransition\(\(\) => \{\s*router\.push\(href\);\s*\}\);/);
+  assert.match(navigationForm, /<NavigationFormPendingContext\.Provider value=\{pending\}>/);
+  assert.match(navigationForm, /method="get"/);
+  assert.doesNotMatch(navigationForm, /from "next\/form"/);
+
   for (const source of sources) {
-    assert.match(source, /import Form from "next\/form";/);
-    assert.match(source, /<Form action=\{?[^>]+prefetch=\{false\}>/);
-    assert.doesNotMatch(source, /method="get"/);
+    assert.doesNotMatch(source, /from "next\/form"/);
+    assert.match(source, /<NavigationForm action=\{?[^>]+>/);
     assert.match(source, /<SubmitButton pendingText="적용 중">적용<\/SubmitButton>/);
   }
+});
+
+test("GET 폼 이동 주소는 브라우저 GET 제출과 같은 query를 만든다", async () => {
+  const { buildGetFormHref } = await navigationFormHrefModulePromise;
+
+  assert.equal(
+    buildGetFormHref("/admin/reviews", [
+      ["status", "hidden"],
+      ["memberQuery", "김 싸피&1"],
+      ["partnerId", ""],
+    ]),
+    "/admin/reviews?status=hidden&memberQuery=%EA%B9%80+%EC%8B%B8%ED%94%BC%261&partnerId=",
+  );
+  assert.equal(
+    buildGetFormHref("/admin/partners/p-1?tab=reviews#reviews", [["rating", "5"]]),
+    "/admin/partners/p-1?rating=5",
+  );
+  assert.equal(buildGetFormHref("/admin/reviews", []), "/admin/reviews");
 });
