@@ -5,6 +5,10 @@ import { getAdminSession } from "@/lib/auth";
 import { getRequestLogContext, logAdminAudit } from "@/lib/activity-logs";
 import { downloadPrivateMemberProfileImage } from "@/lib/graduate-verification-storage";
 import { getActiveMemberProfileImage } from "@/lib/member-profile-images";
+import {
+  createMemberProfileImageResponse,
+  getMemberProfileImageRevalidation,
+} from "@/lib/member-profile-image-response";
 import { withServerTiming } from "@/lib/server-timing";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -39,6 +43,12 @@ export async function GET(
       properties: { source: "private_profile_image" },
     });
 
+    // 감사 로그는 재검증(304) 요청에도 남긴다: 브라우저가 매 사용 전 서버에 확인하므로 열람 시점이 기록된다.
+    const revalidation = getMemberProfileImageRevalidation(request, image);
+    if (revalidation.notModified) {
+      return revalidation.notModified;
+    }
+
     const body = await timing.measure("storage", () => downloadPrivateMemberProfileImage(image.storagePath));
     if (!body) {
       return NextResponse.json(
@@ -47,13 +57,6 @@ export async function GET(
       );
     }
 
-    return new NextResponse(body, {
-      headers: {
-        "content-type": "image/webp",
-        "content-length": String(body.byteLength),
-        "cache-control": "private, no-store",
-        "x-content-type-options": "nosniff",
-      },
-    });
+    return createMemberProfileImageResponse(body, revalidation.headers);
   });
 }
