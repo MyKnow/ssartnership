@@ -34,12 +34,22 @@ export function revalidatePromotionSurfaces(
  * Event registrations, draws, and expiry also change every event page. The
  * dynamic route patterns cover each slug, so callers no longer add per-slug
  * literal paths next to the pattern.
+ *
+ * Next derives a page's implicit cache tags from its file path, route groups
+ * included (`/(site)/events/[slug]/page`), so a pattern without the group
+ * (`/events/[slug]`) matches no page. Keep these in sync with `src/app`.
  */
+export const PROMOTION_EVENT_PAGE_PATTERNS = [
+  "/admin/(protected)/event/[slug]",
+  "/(site)/events/[slug]",
+] as const;
+
 export function revalidatePromotionEventSurfaces(
   invalidator: PromotionCacheInvalidator = nextCacheInvalidator,
 ) {
   revalidatePromotionSurfaces(invalidator);
   invalidator.path("/admin/event");
-  invalidator.path("/admin/event/[slug]", "page");
-  invalidator.path("/events/[slug]", "page");
+  for (const pattern of PROMOTION_EVENT_PAGE_PATTERNS) {
+    invalidator.path(pattern, "page");
+  }
 }

@@ -66,8 +66,8 @@ test("promotion mutations invalidate raw cache tags through the shared helper", 
   assert.deepEqual(eventCalls, [
     ...slideCalls,
     "/admin/event",
-    "page:/admin/event/[slug]",
-    "page:/events/[slug]",
+    "page:/admin/(protected)/event/[slug]",
+    "page:/(site)/events/[slug]",
   ]);
   assert.equal(new Set(eventCalls).size, eventCalls.length);
 

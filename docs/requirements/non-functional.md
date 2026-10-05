@@ -17,7 +17,7 @@ authority: normative
 
 - Next.js App Router 기반 server rendering과 client component를 혼합한다.
 - public partner/category 조회는 `unstable_cache`와 `public_cache_versions` 기반 versioned cache를 사용한다.
-- 홈 page는 `revalidate = 300`으로 선언되어 있으나 `(site)` layout은 세션 강제 처리 때문에 dynamic이다.
+- `(site)` layout은 세션 강제 처리 때문에 dynamic이므로 공개 페이지는 page 단위 `revalidate`를 선언하지 않는다.
 - selector 분리 작업이 진행되어 홈, 관리자 회원, 관리자 로그의 검색/필터/정렬 계산은 pure selector로 이동되어 있다.
 - partner metric은 event log 원본을 기반으로 rollup table과 unique visitor table에 집계된다.
 - Lighthouse는 `npm run perf:lighthouse`로 production build 이후 실행한다.

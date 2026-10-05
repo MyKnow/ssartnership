@@ -308,7 +308,8 @@ export async function setShowcaseFeedbackHidden(feedbackId: string, hidden: bool
       properties: { hidden },
     });
     revalidatePath(`${ADMIN_PATH}/feedback`);
-    revalidatePath(`${EVENT_PATH}/my`, "layout");
+    // Typed paths match the file path, so the (site) route group is required.
+    revalidatePath(`/(site)${EVENT_PATH}/my`, "layout");
     return { ok: true as const, message: hidden ? "피드백을 숨겼어요." : "피드백을 다시 공개했어요." };
   } catch (error) {
     if (!(error instanceof ShowcaseDomainError)) {

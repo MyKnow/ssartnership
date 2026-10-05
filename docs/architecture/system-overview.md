@@ -90,8 +90,9 @@ Browser
 
 ## Caching and revalidation
 
-- 홈 page는 `revalidate = 300`으로 선언되어 있다.
-- `(site)` layout은 `dynamic = "force-dynamic"`으로 세션 상태를 매 요청 반영한다.
+- `(site)` layout은 `dynamic = "force-dynamic"`으로 세션 상태를 매 요청 반영한다. 하위 공개 페이지는 효과가 없는 page 단위 `revalidate`·`generateStaticParams`를 선언하지 않고, 공개 데이터 캐시는 아래 `unstable_cache` 계층이 담당한다.
+- 관리자 Server Action의 partners/categories 무효화 헬퍼(`_actions/shared-helpers.ts`)는 `updateTag`로 즉시 만료한다. Route Handler·cron은 `updateTag`를 쓸 수 없으므로 `revalidateTag(tag, "max")`를 유지한다.
+- `revalidatePath(pattern, "page" | "layout")`는 route group을 포함한 파일 경로(`/(site)/events/[slug]`)로 매칭되므로 group을 빼면 아무 페이지도 무효화하지 않는다. `tests/revalidate-typed-path-contract.test.mts`가 실제 route 파일과의 일치를 고정한다.
 - partner Supabase repository는 `unstable_cache`와 `public_cache_versions`를 함께 사용한다.
 - `public_cache_versions`는 partners/categories scope 변경 시 cache key를 바꾸는 기준이다.
 - sitemap은 dynamic이며 partner 목록 조회 실패 시 홈/캠퍼스 entry만 반환하는 fail-soft 구조다.
