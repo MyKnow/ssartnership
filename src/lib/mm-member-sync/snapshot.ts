@@ -5,6 +5,8 @@ import {
   type MattermostUserImage,
 } from "@/lib/mattermost/client";
 import { MemberProfileSyncError } from "@/lib/member-profile-sync-errors";
+import { parseSsafyProfile } from "@/lib/mm-profile";
+import { isPersonLikeName } from "@/lib/mm-profile/text";
 import type { MemberSyncSnapshot } from "./shared";
 
 type MattermostProfileSession = Pick<
@@ -17,7 +19,8 @@ export function getMattermostDisplayName(
 ) {
   const nickname = user.nickname.trim();
   if (nickname) {
-    return nickname;
+    const parsedName = parseSsafyProfile(nickname).displayName;
+    return parsedName && isPersonLikeName(parsedName) ? parsedName : nickname;
   }
 
   const fullName = [user.firstName, user.lastName]
