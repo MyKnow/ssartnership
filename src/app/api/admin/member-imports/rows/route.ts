@@ -3,6 +3,11 @@ import { ensureAdminApiPermission } from "@/lib/admin-access";
 import { MANUAL_MEMBER_IMPORT_LIMITS } from "@/lib/member-manual-import/shared";
 import { parseManualMemberImportWorkbook } from "@/lib/member-manual-import/xlsx.server";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
+import {
+  MULTIPART_FORM_OVERHEAD_BYTES,
+  MultipartRequestBodyError,
+  readMultipartFormDataWithinLimit,
+} from "@/lib/request-body-limit";
 import { withServerTiming } from "@/lib/server-timing";
 
 export const runtime = "nodejs";
@@ -19,7 +24,10 @@ export async function POST(request: NextRequest) {
     if (denied) return denied;
 
     try {
-      const formData = await request.formData();
+      const formData = await readMultipartFormDataWithinLimit(
+        request,
+        MANUAL_MEMBER_IMPORT_LIMITS.xlsxBytes + MULTIPART_FORM_OVERHEAD_BYTES,
+      );
       const file = formData.get("xlsx");
       if (!(file instanceof File)) {
         return NextResponse.json({ ok: false, errors: ["XLSX 파일을 선택해 주세요."] }, { status: 400 });
@@ -29,7 +37,10 @@ export async function POST(request: NextRequest) {
       }
       const rows = await timing.measure("query", async () => parseManualMemberImportWorkbook(Buffer.from(await file.arrayBuffer())));
       return NextResponse.json({ ok: true, rows });
-    } catch {
+    } catch (error) {
+      if (error instanceof MultipartRequestBodyError && error.code === "body_too_large") {
+        return NextResponse.json({ ok: false, errors: ["XLSX 파일은 1MB 이하만 업로드할 수 있습니다."] }, { status: 413 });
+      }
       return NextResponse.json({ ok: false, errors: ["XLSX 행을 읽지 못했습니다."] }, { status: 400 });
     }
   });

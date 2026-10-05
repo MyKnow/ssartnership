@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 import Button from "@/components/ui/Button";
+import { resolveBackHref } from "@/lib/return-to";
 
 export default function BackButton({
   fallbackHref = "/",
@@ -16,21 +17,12 @@ export default function BackButton({
       return fallbackHref;
     }
 
-    const queryReturnTo = new URLSearchParams(window.location.search).get("returnTo");
-    if (queryReturnTo && queryReturnTo.startsWith("/")) {
-      return queryReturnTo;
-    }
-
-    try {
-      const referrer = document.referrer ? new URL(document.referrer) : null;
-      if (referrer && referrer.origin === window.location.origin && referrer.pathname) {
-        return `${referrer.pathname}${referrer.search}${referrer.hash}`;
-      }
-    } catch {
-      // ignore malformed referrer URLs
-    }
-
-    return fallbackHref;
+    return resolveBackHref({
+      search: window.location.search,
+      referrer: document.referrer,
+      currentOrigin: window.location.origin,
+      fallbackHref,
+    });
   }, [fallbackHref]);
 
   return (

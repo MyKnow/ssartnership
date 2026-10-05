@@ -45,7 +45,7 @@ test("관리자 직접 회원 생성은 외부 계정명과 구분되지 않는 
       displayName: "이름을 입력해 주세요.",
       generation: "기수는 0~99 사이의 숫자로 입력해 주세요.",
       campus: "캠퍼스는 80자 이내로 입력해 주세요.",
-      temporaryPassword: "비밀번호는 8~64자, 영문/숫자/특수문자를 모두 포함해야 합니다.",
+      temporaryPassword: "비밀번호는 8~64자, 영문/숫자/특수문자를 모두 포함해야 하며 앞뒤 공백은 사용할 수 없습니다.",
       temporaryPasswordConfirmation: "비밀번호가 일치하지 않습니다.",
     },
   });

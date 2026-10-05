@@ -3,6 +3,7 @@ import { forEachWithConcurrency } from "@/lib/async-concurrency";
 import { listAdminAccounts } from "@/lib/admin-accounts";
 import { canAdmin } from "@/lib/admin-permissions";
 import { getPushDeviceLabel } from "@/lib/push/device-label";
+import { normalizeUserAgentHeader } from "@/lib/request-header-values";
 import {
   ADMIN_NOTIFICATION_CHANNELS,
   PARTNER_NOTIFICATION_CHANNELS,
@@ -286,7 +287,7 @@ export async function upsertOperationalPushSubscription(input: {
       p256dh: validated.p256dh,
       auth: validated.auth,
       expiration_time: validated.expirationTime,
-      user_agent: input.userAgent?.trim() || null,
+      user_agent: normalizeUserAgentHeader(input.userAgent),
       is_active: true,
       failure_reason: null,
       last_failure_at: null,

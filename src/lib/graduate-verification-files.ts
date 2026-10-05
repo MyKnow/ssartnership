@@ -1,5 +1,15 @@
 import { createHash } from "node:crypto";
-import { PDFDocument } from "pdf-lib";
+import {
+  PDFArray,
+  PDFDict,
+  PDFDocument,
+  PDFInvalidObject,
+  PDFName,
+  PDFRawStream,
+  PDFStream,
+  decodePDFRawStream,
+  type PDFObject,
+} from "pdf-lib";
 import sharp, { type Metadata } from "sharp";
 import {
   GRADUATE_PROFILE_IMAGE_SIZE,
@@ -16,9 +26,12 @@ import { normalizeImageUpload } from "@/lib/image-upload/transform.server";
 const PDF_MAGIC = Buffer.from("%PDF-");
 const PDF_SECURITY_MARKERS = {
   encrypted: /\/Encrypt\b/i,
-  javaScript: /\/(?:JavaScript|JS)\b/i,
+  javaScript: /\/(?:JavaScript|JS|Launch)\b/i,
   attachments: /\/(?:EmbeddedFiles?|Filespec)\b/i,
 } as const;
+const PDF_ACTIVE_CONTENT_NAMES = new Set(["javascript", "js", "launch"]);
+const PDF_ATTACHMENT_NAMES = new Set(["embeddedfile", "embeddedfiles", "filespec"]);
+const PDF_STRUCTURE_MAX_DEPTH = 64;
 
 const PROFILE_CONTENT_TYPES = new Set([
   "image/jpeg",
@@ -42,26 +55,172 @@ function hasPdfMagicBytes(source: Buffer) {
   return offset >= 0 && offset <= 32;
 }
 
-function getPdfSourceText(source: Buffer) {
-  return source.toString("latin1");
+function getPdfSourceText(source: Buffer | Uint8Array) {
+  return Buffer.from(source.buffer, source.byteOffset, source.byteLength).toString("latin1");
+}
+
+/**
+ * PDF 이름 객체의 `#xx` 이스케이프(`/J#61vaScript`)를 풀어 원문 정규식 우회를 막는다.
+ */
+export function decodePdfNameEscapes(text: string) {
+  return text.replace(/#([0-9A-Fa-f]{2})/g, (_match, hex: string) =>
+    String.fromCharCode(Number.parseInt(hex, 16)),
+  );
+}
+
+type PdfSecurityMarkers = {
+  isEncrypted: boolean;
+  hasJavaScript: boolean;
+  hasAttachments: boolean;
+};
+
+const PDF_STREAM_BODY_PATTERN = /\bstream(?:\r\n|\r|\n)[\s\S]*?\bendstream\b/g;
+
+/**
+ * 파일 원문 검사에서는 이미지·폰트 같은 stream 본문의 이진 데이터를 제외한다.
+ * 사전(dictionary)은 stream 밖이나 ObjStm 안에만 있으므로, ObjStm은 디코딩 후 따로 검사한다.
+ */
+export function stripPdfStreamBodies(text: string) {
+  return text.replace(PDF_STREAM_BODY_PATTERN, "stream endstream");
+}
+
+function scanPdfTextForSecurityMarkers(text: string): PdfSecurityMarkers {
+  const normalized = decodePdfNameEscapes(text);
+  return {
+    isEncrypted: PDF_SECURITY_MARKERS.encrypted.test(normalized),
+    hasJavaScript: PDF_SECURITY_MARKERS.javaScript.test(normalized),
+    hasAttachments: PDF_SECURITY_MARKERS.attachments.test(normalized),
+  };
+}
+
+function mergePdfSecurityMarkers(
+  left: PdfSecurityMarkers,
+  right: PdfSecurityMarkers,
+): PdfSecurityMarkers {
+  return {
+    isEncrypted: left.isEncrypted || right.isEncrypted,
+    hasJavaScript: left.hasJavaScript || right.hasJavaScript,
+    hasAttachments: left.hasAttachments || right.hasAttachments,
+  };
+}
+
+/**
+ * pdf-lib는 대문자 16진 이스케이프만 풀고 `#6a` 같은 소문자 이스케이프는 그대로 두므로,
+ * 이름 비교 전에 한 번 더 정규화한다.
+ */
+function getPdfNameText(name: PDFName) {
+  return decodePdfNameEscapes(name.decodeText());
+}
+
+function collectPdfObjectNames(
+  object: PDFObject | undefined,
+  names: Set<string>,
+  depth: number,
+): boolean {
+  if (!object) {
+    return true;
+  }
+  if (depth > PDF_STRUCTURE_MAX_DEPTH) {
+    return false;
+  }
+  if (object instanceof PDFName) {
+    names.add(getPdfNameText(object).toLowerCase());
+    return true;
+  }
+  if (object instanceof PDFStream) {
+    return collectPdfObjectNames(object.dict, names, depth + 1);
+  }
+  if (object instanceof PDFDict) {
+    for (const [key, value] of object.entries()) {
+      names.add(getPdfNameText(key).toLowerCase());
+      if (!collectPdfObjectNames(value, names, depth + 1)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  if (object instanceof PDFArray) {
+    for (const item of object.asArray()) {
+      if (!collectPdfObjectNames(item, names, depth + 1)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function isPdfObjectStream(stream: PDFRawStream) {
+  return stream.dict.entries().some(
+    ([key, value]) =>
+      getPdfNameText(key) === "Type"
+      && value instanceof PDFName
+      && getPdfNameText(value) === "ObjStm",
+  );
+}
+
+/**
+ * pdf-lib가 해석한 객체 그래프에서 위험 기능을 찾는다.
+ * 압축 객체 스트림(ObjStm) 안의 사전과 이스케이프된 이름도 디코딩된 형태로 검사하며,
+ * 해석하지 못한 객체 스트림이 남아 있으면 안전하다고 판단하지 않는다.
+ */
+function inspectParsedPdfStructure(document: PDFDocument) {
+  const names = new Set<string>();
+  let markers: PdfSecurityMarkers = {
+    isEncrypted: document.isEncrypted,
+    hasJavaScript: false,
+    hasAttachments: false,
+  };
+  let isStructureTrusted = true;
+
+  for (const [, object] of document.context.enumerateIndirectObjects()) {
+    if (!collectPdfObjectNames(object, names, 0)) {
+      isStructureTrusted = false;
+    }
+    if (object instanceof PDFInvalidObject) {
+      const invalidBytes = new Uint8Array(object.sizeInBytes());
+      object.copyBytesInto(invalidBytes, 0);
+      markers = mergePdfSecurityMarkers(
+        markers,
+        scanPdfTextForSecurityMarkers(getPdfSourceText(invalidBytes)),
+      );
+    }
+    if (object instanceof PDFRawStream && isPdfObjectStream(object)) {
+      try {
+        const decoded = decodePDFRawStream(object).decode();
+        markers = mergePdfSecurityMarkers(
+          markers,
+          scanPdfTextForSecurityMarkers(getPdfSourceText(decoded)),
+        );
+      } catch {
+        isStructureTrusted = false;
+      }
+    }
+  }
+
+  const hasName = (candidates: Set<string>) =>
+    [...candidates].some((candidate) => names.has(candidate));
+  markers = mergePdfSecurityMarkers(markers, {
+    isEncrypted: names.has("encrypt"),
+    hasJavaScript: hasName(PDF_ACTIVE_CONTENT_NAMES),
+    hasAttachments: hasName(PDF_ATTACHMENT_NAMES),
+  });
+
+  return { markers, isStructureTrusted };
 }
 
 export async function inspectGraduateCertificatePdf(
   source: Buffer,
 ): Promise<GraduateCertificateInspection> {
   const hasMagic = hasPdfMagicBytes(source);
-  const text = getPdfSourceText(source);
-  const isEncrypted = PDF_SECURITY_MARKERS.encrypted.test(text);
-  const hasJavaScript = PDF_SECURITY_MARKERS.javaScript.test(text);
-  const hasAttachments = PDF_SECURITY_MARKERS.attachments.test(text);
+  const rawMarkers = scanPdfTextForSecurityMarkers(
+    stripPdfStreamBodies(getPdfSourceText(source)),
+  );
 
   if (!hasMagic || source.length === 0 || source.length > MAX_GRADUATE_CERTIFICATE_BYTES) {
     return {
       hasPdfMagicBytes: hasMagic,
       pageCount: 0,
-      isEncrypted,
-      hasJavaScript,
-      hasAttachments,
+      ...rawMarkers,
       isParseable: false,
     };
   }
@@ -71,21 +230,19 @@ export async function inspectGraduateCertificatePdf(
       ignoreEncryption: false,
       updateMetadata: false,
     });
+    const pageCount = document.getPageCount();
+    const structure = inspectParsedPdfStructure(document);
     return {
       hasPdfMagicBytes: true,
-      pageCount: document.getPageCount(),
-      isEncrypted,
-      hasJavaScript,
-      hasAttachments,
-      isParseable: true,
+      pageCount,
+      ...mergePdfSecurityMarkers(rawMarkers, structure.markers),
+      isParseable: structure.isStructureTrusted,
     };
   } catch {
     return {
       hasPdfMagicBytes: true,
       pageCount: 0,
-      isEncrypted,
-      hasJavaScript,
-      hasAttachments,
+      ...rawMarkers,
       isParseable: false,
     };
   }

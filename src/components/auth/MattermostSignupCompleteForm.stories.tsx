@@ -130,7 +130,7 @@ export const InlineValidation: Story = {
     await userEvent.type(password, "passwordonly");
     await userEvent.tab();
     await expect(
-      canvas.getByText("비밀번호는 8~64자, 영문/숫자/특수문자를 모두 포함해야 합니다."),
+      canvas.getByText("비밀번호는 8~64자, 영문/숫자/특수문자를 모두 포함해야 하며 앞뒤 공백은 사용할 수 없습니다."),
     ).toBeInTheDocument();
 
     await userEvent.clear(password);

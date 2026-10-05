@@ -14,6 +14,7 @@ import { getSupabaseAdminClient } from '@/lib/supabase/server';
 import { sanitizeProductEventTargetId } from '@/lib/activity-log-targets';
 import { shouldBypassActivityLogPersistence } from '@/lib/activity-log-runtime';
 import { getClientIp } from '@/lib/client-ip';
+import { normalizeUserAgentHeader } from '@/lib/request-header-values';
 import type { AuditActorType } from '@/lib/audit-rpc-context';
 
 type BaseLogContext = {
@@ -148,7 +149,7 @@ export async function getServerActionLogContext(
   return {
     path: referrerPath ?? fallbackPath ?? null,
     referrer,
-    userAgent: headerStore.get('user-agent'),
+    userAgent: normalizeUserAgentHeader(headerStore.get('user-agent')),
     ipAddress: getClientIp(headerStore),
     host: headerStore.get('host'),
     requestId: randomUUID(),
@@ -160,7 +161,7 @@ export function getRequestLogContext(request: Request): BaseLogContext {
   return {
     path: getPathFromValue(request.url),
     referrer,
-    userAgent: request.headers.get('user-agent'),
+    userAgent: normalizeUserAgentHeader(request.headers.get('user-agent')),
     ipAddress: getClientIp(request.headers),
     host: request.headers.get('host'),
     requestId: randomUUID(),

@@ -43,7 +43,10 @@ export async function GET(request: NextRequest, context: { params: Promise<{ req
       headers: {
         "content-type": "application/pdf",
         "content-length": String(body.byteLength),
-        "content-disposition": "inline; filename=graduate-certificate.pdf",
+        // 관리자 화면은 fetch 후 pdf.js로 이미지 렌더링하므로, 직접 열람 시에는
+        // 브라우저 PDF 뷰어에서 실행하지 않고 내려받도록 한다.
+        "content-disposition": 'attachment; filename="graduate-certificate.pdf"',
+        "content-security-policy": "sandbox; default-src 'none'",
         "cache-control": "private, no-store",
         "x-content-type-options": "nosniff",
       },

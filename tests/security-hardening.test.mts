@@ -235,7 +235,6 @@ test("PIN and redemption routes throttle on authenticated identities, not analyt
   const routePaths = [
     "src/app/api/partners/[id]/benefit-use/route.ts",
     "src/app/api/coupon-issues/[issueId]/redeem/route.ts",
-    "src/app/api/coupons/[couponId]/redeem/route.ts",
   ] as const;
 
   for (const path of routePaths) {

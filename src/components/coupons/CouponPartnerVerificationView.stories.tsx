@@ -82,11 +82,14 @@ export const Default: Story = {
     await expect(canvas.getByTestId("certification-card-frame")).toBeVisible();
     await expect(canvas.getByText("제휴처")).toBeVisible();
     await expect(canvas.getByText("아메리카노 1+1 쿠폰")).toBeVisible();
-    const passwordInput = canvasElement.querySelector<HTMLInputElement>(
-      'input[name="onsitePassword"]',
+    const pinInput = canvasElement.querySelector<HTMLInputElement>(
+      'input[name="couponPartnerCheckDigits"]',
     );
-    await expect(passwordInput).not.toBeNull();
-    await expect(passwordInput).toHaveAttribute("type", "password");
+    await expect(pinInput).not.toBeNull();
+    await expect(pinInput).toHaveAttribute("type", "text");
+    await expect(pinInput).toHaveAttribute("inputmode", "numeric");
+    await expect(pinInput).toHaveAttribute("autocomplete", "off");
+    await expect(pinInput).toHaveClass("pin-mask");
     await expect(
       canvas.getByRole("button", { name: "인증 카드와 쿠폰 확인" }),
     ).toBeVisible();

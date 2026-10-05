@@ -17,6 +17,7 @@ import {
 } from "@/lib/route-json-body";
 import { requireMemberApiSession } from "@/lib/member-api-session";
 import { isMockDataSource } from "@/lib/mock/member";
+import { readRouteParam } from "@/lib/route-params";
 
 export const runtime = "nodejs";
 
@@ -31,14 +32,6 @@ type BenefitUseRequestBody = {
   useCount?: unknown;
   sessionId?: unknown;
 };
-
-function safeDecodeSegment(value: string) {
-  try {
-    return decodeURIComponent(value).trim();
-  } catch {
-    return "";
-  }
-}
 
 function isSafeMockPartnerId(value: string) {
   return value.length <= 120 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(value);
@@ -177,7 +170,7 @@ export async function POST(
   }
   const { session } = auth;
 
-  const partnerId = safeDecodeSegment((await params).id ?? "");
+  const partnerId = readRouteParam((await params).id);
   if (!UUID_PATTERN.test(partnerId) && !(isMockDataSource() && isSafeMockPartnerId(partnerId))) {
     return NextResponse.json({ ok: false, message: "제휴처 정보를 확인할 수 없습니다." }, { status: 400 });
   }

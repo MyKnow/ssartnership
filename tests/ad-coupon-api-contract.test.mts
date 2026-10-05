@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 const repositorySource = readFileSync(
@@ -25,6 +25,15 @@ describe("coupon API result contract", () => {
   it("maps the total global limit RPC error to usage_limit", () => {
     assert.match(repositorySource, /error\.message\.includes\("usage_limit"\)/);
     assert.match(repositorySource, /: "usage_limit"/);
+  });
+
+  it("keeps the legacy coupon-id redeem route deleted so redemption stays issue-based", () => {
+    assert.equal(
+      existsSync(
+        new URL("../src/app/api/coupons/[couponId]/redeem/route.ts", import.meta.url),
+      ),
+      false,
+    );
   });
 
   it("returns conflict status for member and global quota exhaustion", () => {

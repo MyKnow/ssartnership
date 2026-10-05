@@ -10,6 +10,7 @@ import {
   RouteJsonBodyError,
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
+import { readRouteParam } from "@/lib/route-params";
 
 export const runtime = "nodejs";
 
@@ -17,14 +18,6 @@ type RedeemRequestBody = {
   sessionId?: unknown;
   onsitePassword?: unknown;
 };
-
-function safeDecodeSegment(value: string) {
-  try {
-    return decodeURIComponent(value).trim();
-  } catch {
-    return "";
-  }
-}
 
 function normalizeSessionId(value: unknown) {
   if (typeof value !== "string") {
@@ -69,7 +62,7 @@ export async function POST(
   }
   const { session } = auth;
 
-  const issueId = safeDecodeSegment((await params).issueId ?? "");
+  const issueId = readRouteParam((await params).issueId, 128);
   if (!issueId || issueId.length > 128) {
     return NextResponse.json({ ok: false, message: "쿠폰 정보를 확인할 수 없습니다." }, { status: 400 });
   }

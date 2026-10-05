@@ -29,7 +29,7 @@ find src/app -name route.ts | sed -E 's#^src/app##; s#/route\.ts$##; s#/\([^)]+\
 | `/api/partners/*` | 6 | 즐겨찾기, 리뷰 CRUD·reaction, 혜택 사용 확인, 홈 상태 | 회원 세션(공개 읽기 제외) |
 | `/api/partner/*` | 10 | 협력사 비밀번호 변경·재설정, 초기 설정, 사업자 상태 조회, 리뷰 moderation, 알림·푸시 구독 | 협력사 세션 또는 초기 설정 token |
 | `/api/notifications/*`, `/api/push/*` | 10 | 회원 알림함·설정, 푸시 구독, 관리자 푸시 미리보기·발송·로그 삭제 | 회원 세션, 관리자 발송은 관리자 권한 |
-| `/api/coupons/*`, `/api/coupon-issues/*` | 3 | 쿠폰 발급과 사용. `/api/coupons/[couponId]/redeem`은 화면 호출처가 없는 레거시 사용 경로다. | 회원 세션 |
+| `/api/coupons/*`, `/api/coupon-issues/*` | 2 | 쿠폰 발급과 발급 ID 기반 사용 확인. 쿠폰 ID를 직접 사용하는 레거시 경로는 폐기됐다. | 회원 세션 |
 | `/api/uploads/images/*` | 2 | 공용 이미지 업로드 서명·완료 | 업로드 세션과 quota |
 | `/api/wallet/*` | 6 | Apple Wallet 발급·폐기, Apple web service(기기 등록·변경 serial·pass·log), 공개 검증 아바타 | 회원 세션 또는 Apple 인증 token. 기능은 현재 비활성 |
 | `/api/cron/*` | 12 | 익명화, 로그·쇼케이스 개인정보 파기, 업로드·수료생 파일·수동 가져오기 정리, 프로모션 정리, 결제 상태, 만료 제휴 알림, Sender 상태, RSS, Wallet 조정 | `CRON_SECRET` Bearer |

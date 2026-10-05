@@ -23,6 +23,7 @@ import {
   partnerRepository,
 } from "@/lib/repositories";
 import { sanitizeReturnTo } from "@/lib/return-to";
+import { readRouteParam } from "@/lib/route-params";
 import { SITE_NAME } from "@/lib/site";
 import { getSignedUserSession } from "@/lib/user-auth";
 
@@ -70,7 +71,7 @@ export default async function PartnerBenefitUsePage({
       returnTo?: string | string[];
     }>({}),
   ]);
-  const partnerId = decodeURIComponent(resolvedParams.id ?? "").trim();
+  const partnerId = readRouteParam(resolvedParams.id);
   const rawReturnTo = Array.isArray(resolvedSearchParams.returnTo)
     ? resolvedSearchParams.returnTo[0]
     : resolvedSearchParams.returnTo;

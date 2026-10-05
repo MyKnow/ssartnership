@@ -98,19 +98,25 @@ export default function CouponPartnerVerificationView({
           </p>
         </div>
         <label className="grid gap-2 text-sm font-medium text-foreground">
-          제휴처 확인 비밀번호
+          제휴처 확인 PIN
           <input
-            id="onsitePassword"
-            name="onsitePassword"
-            type="password"
+            id="couponPartnerCheckDigits"
+            name="couponPartnerCheckDigits"
+            type="text"
             inputMode="numeric"
             pattern="[0-9]{4}"
             maxLength={4}
             autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            data-1p-ignore="true"
+            data-lpignore="true"
+            data-form-type="other"
             value={password}
             onChange={(event) => setPassword(event.target.value.replace(/\D/g, "").slice(0, 4))}
             placeholder="4자리 PIN 입력"
-            className="h-12 w-full rounded-2xl border border-border bg-surface-control px-3 text-base text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className="pin-mask h-12 w-full rounded-2xl border border-border bg-surface-control px-3 text-base text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
           <span className="text-xs font-normal text-muted-foreground">
             제휴처에서 확인할 숫자 4자리 PIN입니다.
