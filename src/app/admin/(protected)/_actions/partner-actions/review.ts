@@ -13,7 +13,6 @@ import {
 import {
   redirectAdminActionError,
   revalidateAdminAndPublicPaths,
-  revalidatePartnerData,
   revalidatePartnerPortalPaths,
 } from "@/app/admin/(protected)/_actions/shared-helpers";
 import { createServerActionAuditContext } from "@/lib/audit-context";
@@ -84,7 +83,6 @@ export async function approvePartnerChangeRequestAction(formData: FormData) {
     ),
   });
 
-  revalidatePartnerData();
   revalidateAdminAndPublicPaths(request.partnerId);
   revalidatePartnerPortalPaths(request.partnerId);
   redirect(appendAdminReviewQueueQuery(returnTo, { success: "approved" }));
@@ -110,7 +108,6 @@ export async function rejectPartnerChangeRequestAction(formData: FormData) {
     ),
   });
 
-  revalidatePartnerData();
   revalidateAdminAndPublicPaths(request.partnerId);
   revalidatePartnerPortalPaths(request.partnerId);
   redirect(appendAdminReviewQueueQuery(returnTo, { success: "rejected" }));

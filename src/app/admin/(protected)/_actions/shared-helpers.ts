@@ -1,4 +1,4 @@
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath, revalidateTag, updateTag } from "next/cache";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { getServerActionLogContext, logAdminAudit } from "../../../../lib/activity-logs.ts";
@@ -51,8 +51,15 @@ export function scheduleAdminActionFailureLog(
   });
 }
 
+/*
+ * Partner and category helpers run only inside admin Server Actions (the
+ * "use server" barrel and partner-registrations/actions.ts), so they expire the
+ * public catalog tags with updateTag: the admin who saved sees fresh data on the
+ * next request instead of one stale-while-revalidate response. Route handlers
+ * and cron jobs must keep revalidateTag(tag, "max"); updateTag throws there.
+ */
 export function revalidateAdminAndPublicPaths(partnerId?: string) {
-  revalidateTag("partners", "max");
+  updateTag("partners");
   revalidatePath("/");
   revalidatePath("/admin");
   revalidatePath("/admin/partner-requests");
@@ -72,12 +79,8 @@ export function revalidatePartnerPortalPaths(partnerId?: string) {
 }
 
 export function revalidateCategoryData() {
-  revalidateTag("categories", "max");
+  updateTag("categories");
   revalidatePath("/admin/categories");
-}
-
-export function revalidatePartnerData() {
-  revalidateTag("partners", "max");
 }
 
 export function revalidatePartnerAccountData() {
@@ -86,7 +89,7 @@ export function revalidatePartnerAccountData() {
 }
 
 export function revalidatePartnerCompanyData() {
-  revalidateTag("partners", "max");
+  updateTag("partners");
   revalidatePath("/");
   revalidatePath("/admin");
   revalidatePath("/admin/companies");

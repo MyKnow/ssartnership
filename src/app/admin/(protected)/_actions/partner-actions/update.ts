@@ -27,7 +27,6 @@ import {
 import {
   logAdminAction,
   revalidateAdminAndPublicPaths,
-  revalidatePartnerData,
   redirectAdminActionError,
 } from "@/app/admin/(protected)/_actions/shared-helpers";
 import {
@@ -509,7 +508,6 @@ export async function updatePartnerAction(formData: FormData) {
       console.error("[partner-update] audit log failed", error);
     }
   }
-  revalidatePartnerData();
   revalidateAdminAndPublicPaths(id);
   redirect(getUpdatedPartnerRedirectPath(redirectPath));
 }
