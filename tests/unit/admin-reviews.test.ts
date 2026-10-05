@@ -482,6 +482,56 @@ describe("admin review helpers", () => {
     expect(result.pagination).toEqual({ page: 1, pageSize: 12, totalCount: 1 });
   });
 
+  test("getAdminReviewPageData skips filter option queries for list-only callers", async () => {
+    aggregatePartnerReviewReactionStates.mockReturnValue(new Map());
+    const supabase = createSupabaseMock({
+      companies: [{ id: "company-1", name: "분식컴퍼니", slug: "bunsik" }],
+      partners: [
+        {
+          id: "partner-1",
+          name: "분식랩",
+          company_id: "company-1",
+          company: { id: "company-1", name: "분식컴퍼니", slug: "bunsik" },
+        },
+      ],
+      reviews: [],
+    });
+    const fromSpy = vi.spyOn(supabase, "from");
+    getSupabaseAdminClient.mockReturnValue(supabase);
+
+    const adminReviews = await import("../../src/lib/admin-reviews");
+    const filters = {
+      sort: "latest" as const,
+      status: "all" as const,
+      companyId: "",
+      partnerId: "",
+      rating: "all" as const,
+      imagesOnly: false,
+      memberQuery: "",
+    };
+    const listOnly = await adminReviews.getAdminReviewPageData(filters, {
+      includeCounts: false,
+      includeFilterOptions: false,
+    });
+    const listOnlyTables = fromSpy.mock.calls.map(([table]) => table);
+
+    expect(listOnlyTables).not.toContain("partner_companies");
+    expect(listOnlyTables).not.toContain("partners");
+    expect(listOnly.companies).toEqual([]);
+    expect(listOnly.partners).toEqual([]);
+
+    fromSpy.mockClear();
+    const withMemberQuery = await adminReviews.getAdminReviewPageData(
+      { ...filters, memberQuery: "분식" },
+      { includeCounts: false, includeFilterOptions: false },
+    );
+    const memberQueryTables = fromSpy.mock.calls.map(([table]) => table);
+
+    expect(memberQueryTables).toContain("partners");
+    expect(memberQueryTables).not.toContain("partner_companies");
+    expect(withMemberQuery.partners.map((partner) => partner.id)).toEqual(["partner-1"]);
+  });
+
   test("getAdminReviewPageData returns no reviews for invalid partner ids", async () => {
     getSupabaseAdminClient.mockReturnValue(
       createSupabaseMock({

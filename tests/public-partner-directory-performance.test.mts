@@ -10,6 +10,10 @@ const supabaseRepositorySource = readFileSync(
   new URL("../src/lib/repositories/supabase/partner-repository.supabase.ts", import.meta.url),
   "utf8",
 );
+const supabaseMapperSource = readFileSync(
+  new URL("../src/lib/repositories/supabase/partner/mappers.ts", import.meta.url),
+  "utf8",
+);
 const mockRepositorySource = readFileSync(
   new URL("../src/lib/repositories/mock/partner-repository.mock.ts", import.meta.url),
   "utf8",
@@ -62,10 +66,14 @@ test("Supabase public directory projection keeps canonical benefit titles and om
   assert.match(supabaseRepositorySource, /async getPublicDirectoryPartners/);
   assert.match(
     supabaseRepositorySource,
+    /rows\.map\(\(item\) => mapPartnerForPublicDirectory\(item, context\)\)/,
+  );
+  assert.match(
+    supabaseMapperSource,
     /const summaryPartner = toVisiblePublicDirectorySummaryPartner\(row, categoryKey\);[\s\S]*const maskedPartner = maskPartnerBenefitsForAccess\(summaryPartner, context\);[\s\S]*return toLeanPublicDirectoryPartner\(maskedPartner\);/,
   );
   assert.match(
-    supabaseRepositorySource,
+    supabaseMapperSource,
     /import \{ toLeanPublicDirectoryPartner \} from "@\/lib\/public-partner-directory"/,
   );
   assert.match(
@@ -73,7 +81,7 @@ test("Supabase public directory projection keeps canonical benefit titles and om
     /function toLeanPublicDirectoryPartner\(partner: Partner\): Partner \{[\s\S]*conditions: \[],[\s\S]*benefits: partner\.benefits,[\s\S]*benefitItems: \[],[\s\S]*directorySearchText: buildPartnerDirectorySearchText\(partner\)/,
   );
   assert.match(
-    supabaseRepositorySource,
+    supabaseMapperSource,
     /const benefitItems = getPartnerBenefitItems\(row\);[\s\S]*benefits: partnerBenefitItemsToTitles\(benefitItems\)/,
   );
 });
@@ -102,7 +110,7 @@ test("Supabase SEO projection filters active public partners before applying lim
   assert.match(supabaseRepositorySource, /async getPublicPartnerSeoEntries/);
   assert.match(
     supabaseRepositorySource,
-    /\["partner-repository", "partners", "public-seo", "versioned"\],\s*\{\s*revalidate: false,\s*tags: \["partners"\]/,
+    /\["partner-repository", "partners", "public-seo", "versioned"\],\s*\{\s*revalidate: false,\s*tags: \[PARTNERS_CACHE_TAG\]/,
   );
 });
 

@@ -16,9 +16,12 @@ import { withAdminReadModelTimeout } from "@/lib/admin-read-model-timeout";
 import { getAdminSearchLikePattern } from "@/lib/admin-search-query";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { unstable_cache } from "next/cache";
+import { CATEGORIES_CACHE_TAG } from "@/lib/cache-tags";
+import { SLOW_CHANGING_DATA_CACHE_SECONDS } from "@/lib/cache-ttl";
 
 export const ADMIN_PARTNER_LIST_READ_MODEL_TIMEOUT_MS = 3_000;
-export const ADMIN_PARTNER_CATEGORIES_CACHE_REVALIDATE_SECONDS = 60;
+export const ADMIN_PARTNER_CATEGORIES_CACHE_REVALIDATE_SECONDS =
+  SLOW_CHANGING_DATA_CACHE_SECONDS;
 
 type PartnerCompanyRow = {
   id: string;
@@ -82,7 +85,7 @@ const getCachedAdminPartnerCategories = unstable_cache(
   ["admin-partner-categories"],
   {
     revalidate: ADMIN_PARTNER_CATEGORIES_CACHE_REVALIDATE_SECONDS,
-    tags: ["categories"],
+    tags: [CATEGORIES_CACHE_TAG],
   },
 );
 

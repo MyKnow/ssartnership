@@ -8,6 +8,7 @@ import {
   normalizeBenefitUseInquiry,
 } from "@/lib/partner-links";
 import { isWithinPeriod } from "@/lib/partner-utils";
+import { isLegacyPartnerBenefitId } from "@/lib/partner-benefit-items";
 import {
   adPackageRepository,
   partnerBenefitUsageRepository,
@@ -47,12 +48,15 @@ const getPartnerByIdRawCached = cache(async (id: string) =>
   partnerRepository.getPartnerByIdRaw(id),
 );
 
-const getFavoriteCountsSafe = cache(async (partnerIds: string[]) => {
+// React `cache` keys by argument identity, so memoize by the partner id
+// string; an array argument would be a new key on every call.
+const getFavoriteCountSafe = cache(async (partnerId: string) => {
   try {
-    return await partnerFavoriteRepository.getFavoriteCounts(partnerIds);
+    const counts = await partnerFavoriteRepository.getFavoriteCounts([partnerId]);
+    return counts.get(partnerId) ?? 0;
   } catch (error) {
     console.error("[partner-detail] favorite count fetch failed", error);
-    return new Map<string, number>();
+    return 0;
   }
 });
 
@@ -120,7 +124,7 @@ function getCategoryLabel(categories: Category[], partner: Partner) {
 function hasCanonicalBenefitItems(partner: Partner) {
   const items = partner.benefitItems ?? [];
   return items.length > 0 && items.every(
-    (item) => !item.id.startsWith("legacy-benefit-"),
+    (item) => !isLegacyPartnerBenefitId(item.id),
   );
 }
 
@@ -189,11 +193,11 @@ export async function getPartnerDetailPageData(
   viewerAudience?: PartnerAudienceKey | null,
   previewToken?: string | null,
 ): Promise<PartnerDetailPageData | PartnerDetailAccessGateData | null> {
-  const [categories, partner, favoriteIds, favoriteCounts] = await Promise.all([
+  const [categories, partner, favoriteIds, favoriteCount] = await Promise.all([
     getCategoriesCached(),
     getPartnerByIdCached(rawId, authenticated, viewerAudience, previewToken),
     currentUserId ? partnerFavoriteRepository.getMemberFavoritePartnerIds(currentUserId, [rawId]) : Promise.resolve(new Set<string>()),
-    getFavoriteCountsSafe([rawId]),
+    getFavoriteCountSafe(rawId),
   ]);
 
   if (!partner) {
@@ -268,7 +272,7 @@ export async function getPartnerDetailPageData(
   );
   const metrics = {
     ...createEmptyPartnerServiceMetrics(),
-    favoriteCount: favoriteCounts.get(rawId) ?? 0,
+    favoriteCount,
   };
 
   return {

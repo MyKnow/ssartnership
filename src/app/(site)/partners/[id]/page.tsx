@@ -8,6 +8,7 @@ import Container from "@/components/ui/Container";
 import { SITE_NAME } from "@/lib/site";
 import { createCanonicalAlternates, serializeJsonLd } from "@/lib/seo";
 import { getPartnerViewerContext } from "@/lib/partner-view-context";
+import { getSignedUserSession } from "@/lib/user-auth";
 import PartnerDetailContactSection from "./_page/PartnerDetailContactSection";
 import PartnerDetailAccessGate from "./_page/PartnerDetailAccessGate";
 import PartnerDetailCoupons from "./_page/PartnerDetailCoupons";
@@ -25,7 +26,7 @@ import {
   getPartnerDetailBenefitMode,
   resolvePartnerDetailBenefitUseAction,
 } from "@/lib/partner-detail-benefit-action";
-import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
+import { buildLegacyPartnerBenefitItems } from "@/lib/partner-benefit-items";
 import type { OfflinePartnerBenefitAction } from "@/components/partner/PartnerBenefitUseAction";
 
 export const dynamic = "force-dynamic";
@@ -128,9 +129,9 @@ export default async function PartnerDetailPage({
     preview?: string | string[];
   }>;
 }) {
-  const [headerSession, resolvedParams, resolvedSearchParams] =
+  const [session, resolvedParams, resolvedSearchParams] =
     await Promise.all([
-      getHeaderSession(),
+      getSignedUserSession(),
       params,
       searchParams ??
         Promise.resolve<{
@@ -147,14 +148,23 @@ export default async function PartnerDetailPage({
   const previewToken = Array.isArray(resolvedSearchParams.preview)
     ? resolvedSearchParams.preview[0]
     : resolvedSearchParams.preview;
-  const viewerContext = await getPartnerViewerContext(headerSession?.userId);
-  const pageData = await getPartnerDetailPageData(
-    rawId,
-    viewerContext.authenticated,
-    headerSession?.userId ?? null,
-    viewerContext.viewerAudience,
-    previewToken ?? null,
-  );
+  // One signed-session read feeds both the header and the viewer audience;
+  // the unread count overlaps the audience snapshot and the page data.
+  const userId = session?.userId ?? null;
+  const headerSessionPromise = userId
+    ? getHeaderSession(userId)
+    : Promise.resolve(null);
+  const viewerContext = await getPartnerViewerContext(userId);
+  const [headerSession, pageData] = await Promise.all([
+    headerSessionPromise,
+    getPartnerDetailPageData(
+      rawId,
+      viewerContext.authenticated,
+      userId,
+      viewerContext.viewerAudience,
+      previewToken ?? null,
+    ),
+  ]);
   if (!pageData) {
     notFound();
   }
@@ -229,12 +239,7 @@ export default async function PartnerDetailPage({
           partnerName: partner.name,
           benefitItems: partner.benefitItems?.length
             ? partner.benefitItems
-            : normalizePartnerBenefitItems(
-                partner.benefits.map((title, index) => ({
-                  id: `legacy-benefit-${partner.id}-${index + 1}`,
-                  title,
-                })),
-              ),
+            : buildLegacyPartnerBenefitItems(partner.benefits, partner.id),
           returnTo: partnerReturnTo,
           requiresLogin: !viewerContext.authenticated,
         }

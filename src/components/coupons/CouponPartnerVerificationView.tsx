@@ -26,14 +26,18 @@ export default function CouponPartnerVerificationView({
   item,
   member,
   cohortCardThemes,
+  partnerReturnHref,
 }: {
   item: AvailableAdCoupon;
   member: VerificationMember;
   cohortCardThemes: readonly CohortCardTheme[];
+  /** Sanitized same-origin path back to the partner the coupon came from. */
+  partnerReturnHref: string;
 }) {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [isRedeemed, setIsRedeemed] = useState(false);
 
   async function verifyCoupon() {
     if (!item.issueId || !/^\d{4}$/.test(password)) {
@@ -59,6 +63,7 @@ export default function CouponPartnerVerificationView({
       if (!response.ok || !payload?.ok) {
         throw new Error(payload?.message || "쿠폰 확인에 실패했습니다.");
       }
+      setIsRedeemed(true);
       setMessage({
         tone: "success",
         text: "인증 카드와 쿠폰이 확인되었습니다. 혜택을 적용해 주세요.",
@@ -116,17 +121,28 @@ export default function CouponPartnerVerificationView({
             {message.text}
           </p>
         ) : null}
-        <Button
-          type="button"
-          className="w-full justify-center"
-          loading={isSubmitting}
-          loadingText="확인 중"
-          onClick={() => {
-            void verifyCoupon();
-          }}
-        >
-          인증 카드와 쿠폰 확인
-        </Button>
+        {isRedeemed ? (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Button href="/coupons" variant="secondary" className="w-full justify-center">
+              쿠폰함으로
+            </Button>
+            <Button href={partnerReturnHref} className="w-full justify-center">
+              제휴처로 돌아가기
+            </Button>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            className="w-full justify-center"
+            loading={isSubmitting}
+            loadingText="확인 중"
+            onClick={() => {
+              void verifyCoupon();
+            }}
+          >
+            인증 카드와 쿠폰 확인
+          </Button>
+        )}
       </Card>
     </div>
   );

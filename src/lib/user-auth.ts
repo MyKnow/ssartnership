@@ -1,10 +1,10 @@
 import { cookies } from "next/headers";
-import { unstable_noStore as noStore } from "next/cache";
 import { cache } from "react";
 import {
-  evaluateRequiredPolicyStatus,
-  getActiveRequiredPolicies,
+  evaluateRequiredPolicyVersionStatus,
+  getActiveRequiredPolicyVersions,
   getMemberPolicyConsentVersions,
+  isPolicyConsentSnapshotFresh,
 } from "@/lib/policy-documents.server";
 import { getMemberProfilePhotoState } from "@/lib/member-profile-images";
 import { signPayloadWith } from "./hmac.js";
@@ -92,7 +92,6 @@ function resolveSessionAuthenticatedAt(
 }
 
 async function getRawSignedUserSession() {
-  noStore();
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
   if (!token) {
@@ -308,34 +307,40 @@ export async function revokeUserSessions(session: {
 }
 
 export const getUserSession = cache(async () => {
-  noStore();
   const session = (await getSignedUserSession()) as SignedUserSession | null;
   if (!session?.userId) {
     return null;
   }
 
-  const activePoliciesPromise = getActiveRequiredPolicies();
-  const consentVersionsPromise = getMemberPolicyConsentVersions(session.userId);
-  const photoStatePromise = getMemberProfilePhotoState(session.userId);
+  // The gate needs only the active versions, never the policy bodies. A fresh
+  // consent snapshot in the signed session skips the consent-table read; a
+  // session without a snapshot can never be fresh, so that read starts now.
+  const policyConsentSnapshot = session.policyConsentSnapshot ?? null;
+  const eagerConsentVersionsPromise = policyConsentSnapshot
+    ? null
+    : getMemberPolicyConsentVersions(session.userId);
+  eagerConsentVersionsPromise?.catch(() => undefined);
 
-  const [activePolicies, consentVersions, photoState] = await Promise.all([
-    activePoliciesPromise,
-    consentVersionsPromise,
-    photoStatePromise,
+  const [activePolicyVersions, photoState] = await Promise.all([
+    getActiveRequiredPolicyVersions(),
+    getMemberProfilePhotoState(session.userId),
   ]);
 
-  const policyStatus = evaluateRequiredPolicyStatus(
-    consentVersions,
-    activePolicies,
-  );
-  const consentSnapshotIsFresh =
-    session.policyConsentSnapshot?.serviceVersion === activePolicies.service.version &&
-    session.policyConsentSnapshot?.privacyVersion === activePolicies.privacy.version;
+  const requiresConsent = isPolicyConsentSnapshotFresh(
+    policyConsentSnapshot,
+    activePolicyVersions,
+  )
+    ? false
+    : evaluateRequiredPolicyVersionStatus(
+        await (eagerConsentVersionsPromise ??
+          getMemberPolicyConsentVersions(session.userId)),
+        activePolicyVersions,
+      ).requiresConsent;
 
   return {
     ...session,
     mustChangePassword: Boolean(session.mustChangePassword),
-    requiresConsent: consentSnapshotIsFresh ? false : policyStatus.requiresConsent,
+    requiresConsent,
     requiresEmailRegistration: Boolean(session.requiresEmailRegistration),
     requiresProfilePhotoUpdate: requiresMemberProfilePhotoUpdate(
       photoState.reviewStatus,

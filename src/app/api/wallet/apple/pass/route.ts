@@ -1,5 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
-import { unstable_noStore as noStore } from "next/cache";
+import { connection, NextRequest, NextResponse } from "next/server";
 import { getRequestLogContext, scheduleProductEventLog } from "@/lib/activity-logs";
 import { consumeProductEventQuota } from "@/lib/product-event-throttle";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
@@ -75,7 +74,8 @@ function mapWalletPassServiceError(error: unknown) {
 }
 
 async function requireSignedUserId() {
-  noStore();
+  // Every handler here is per-member and must only run for a real request.
+  await connection();
   const session = await getSignedUserSession();
   if (!session?.userId) {
     return { response: jsonMessage("로그인이 필요합니다.", 401) };
@@ -151,7 +151,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  noStore();
   if (
     !isTrustedSameOriginRequest(request, {
       expectedOrigin: request.nextUrl.origin,
@@ -221,7 +220,6 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  noStore();
   if (
     !isTrustedSameOriginRequest(request, {
       expectedOrigin: request.nextUrl.origin,

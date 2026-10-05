@@ -2,8 +2,10 @@ import type { AdminPushRecipientOption } from "@/lib/admin-push-recipient-search
 import { getAdminNotificationOverview } from "@/lib/admin-notification-ops";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { unstable_cache } from "next/cache";
+import { ADMIN_READ_BURST_CACHE_SECONDS } from "@/lib/cache-ttl";
 
-const ADMIN_PUSH_READ_MODEL_CACHE_REVALIDATE_SECONDS = 3;
+const ADMIN_PUSH_READ_MODEL_CACHE_REVALIDATE_SECONDS =
+  ADMIN_READ_BURST_CACHE_SECONDS;
 const ADMIN_PUSH_AUDIENCE_FACETS_CACHE_TAG = "admin-push-audience-facets";
 const ADMIN_PUSH_NOTIFICATION_OVERVIEW_CACHE_TAG =
   "admin-push-notification-overview";

@@ -1,13 +1,6 @@
 import type { Category, Partner } from "@/lib/types";
-import {
-  normalizePartnerBenefitItems,
-  partnerBenefitItemsToTitles,
-} from "@/lib/partner-benefit-items";
 import { cache } from "react";
-import { normalizePartnerAudience } from "@/lib/partner-audience";
-import { normalizeCampusSlugs, type CampusSlug } from "@/lib/campuses";
-import { normalizePartnerBenefitActionType } from "@/lib/partner-benefit-action";
-import { toLeanPublicDirectoryPartner } from "@/lib/public-partner-directory";
+import type { CampusSlug } from "@/lib/campuses";
 import type {
   AdminPartnerOption,
   PartnerCategoryOption,
@@ -18,100 +11,34 @@ import type {
 } from "@/lib/repositories/partner-repository";
 import { unstable_cache } from "next/cache";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
-import {
-  canViewPartnerDetails,
-  normalizePartnerVisibility,
-} from "@/lib/partner-visibility";
-import {
-  maskPartnerBenefitsForAccess,
-  normalizePartnerBenefitVisibility,
-} from "@/lib/partner-benefit-visibility";
 import { isUuid, normalizeUuidList } from "@/lib/uuid";
 import {
   hashPartnerPreviewToken,
-  isMissingPartnerPreviewExpiryColumnError,
   isPartnerPreviewLinkActive,
   isValidPartnerPreviewToken,
 } from "@/lib/partner-preview";
 import { getKstDateString } from "@/lib/partner-utils";
-
-type PartnerRow = {
-  id: string;
-  name: string;
-  category_id: string;
-  created_at: string;
-  updated_at?: string | null;
-  location: string;
-  detail_description?: string | null;
-  campus_slugs?: string[] | null;
-  thumbnail?: string | null;
-  map_url?: string | null;
-  benefit_action_type?: string | null;
-  benefit_action_link?: string | null;
-  reservation_link?: string | null;
-  inquiry_link?: string | null;
-  period_start?: string | null;
-  period_end?: string | null;
-  conditions?: string[] | null;
-  benefits?: string[] | null;
-  partner_benefits?: Array<{
-    id: string;
-    title: string;
-    max_apply_count: number | null;
-    display_order?: number | null;
-  }> | null;
-  applies_to?: string[] | null;
-  images?: string[] | null;
-  tags?: string[] | null;
-  visibility?: string | null;
-  benefit_visibility?: string | null;
-  branch_scope_type?: string | null;
-  branch_scope_note?: string | null;
-  categories?: { key?: string | null } | Array<{ key?: string | null }> | null;
-};
-
-type CategoryRow = {
-  key?: string | null;
-  label?: string | null;
-  description?: string | null;
-  color?: string | null;
-};
-
-type PublicPartnerSeoRow = {
-  id: string;
-  name: string;
-  location: string;
-  period_start: string | null;
-  period_end: string | null;
-  categories?:
-    | { label?: string | null }
-    | Array<{ label?: string | null }>
-    | null;
-};
-
-type AdminPartnerOptionRow = {
-  id: string;
-  name: string;
-};
-
-type PartnerCategoryOptionRow = {
-  id: string;
-  key: string | null;
-  label: string | null;
-};
-
-type PublicCacheScope = "partners" | "categories";
-
-type PublicCacheVersionRow = {
-  scope: string;
-  version: number | string | null;
-  updated_at: string | null;
-};
-
-type PublicCacheVersionSnapshot = {
-  rows: PublicCacheVersionRow[];
-  lookupFailed: boolean;
-};
+import { CATEGORIES_CACHE_TAG, PARTNERS_CACHE_TAG } from "@/lib/cache-tags";
+import { PUBLIC_CACHE_VERSION_SNAPSHOT_SECONDS } from "@/lib/cache-ttl";
+import {
+  canViewPartnerDetailRow,
+  mapCategoryRow,
+  mapPartnerForDetail,
+  mapPartnerForList,
+  mapPartnerForPublicDirectory,
+  mapPartnerRaw,
+  mapPublicPartnerSeoEntry,
+} from "./partner/mappers";
+import type {
+  AdminPartnerOptionRow,
+  CategoryRow,
+  PartnerCategoryOptionRow,
+  PartnerRow,
+  PublicCacheScope,
+  PublicCacheVersionRow,
+  PublicCacheVersionSnapshot,
+  PublicPartnerSeoRow,
+} from "./partner/rows";
 
 const PARTNER_SELECT_COLUMNS =
   "id,name,category_id,created_at,updated_at,location,detail_description,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,partner_benefits(id,title,max_apply_count,display_order),applies_to,images,tags,visibility,benefit_visibility,branch_scope_type,branch_scope_note,categories(key)";
@@ -119,23 +46,6 @@ const PUBLIC_DIRECTORY_SELECT_COLUMNS =
   "id,name,category_id,created_at,location,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,partner_benefits(id,title,max_apply_count,display_order),applies_to,tags,visibility,benefit_visibility,branch_scope_type,categories(key)";
 const PUBLIC_PARTNER_SEO_SELECT_COLUMNS =
   "id,name,location,period_start,period_end,categories(label)";
-
-function normalizeDate(value: string | null | undefined) {
-  return value ?? "미정";
-}
-
-function extractCategoryKey(categories: PartnerRow["categories"]) {
-  if (!categories) {
-    return undefined;
-  }
-  if (Array.isArray(categories)) {
-    return categories[0]?.key ?? undefined;
-  }
-  if (typeof categories === "object") {
-    return categories.key ?? undefined;
-  }
-  return undefined;
-}
 
 const getCachedPublicCacheVersionSnapshot = unstable_cache(
   async (): Promise<PublicCacheVersionSnapshot> => {
@@ -160,8 +70,8 @@ const getCachedPublicCacheVersionSnapshot = unstable_cache(
   },
   ["partner-repository", "public-cache-version-snapshot"],
   {
-    revalidate: 30,
-    tags: ["partners", "categories"],
+    revalidate: PUBLIC_CACHE_VERSION_SNAPSHOT_SECONDS,
+    tags: [PARTNERS_CACHE_TAG, CATEGORIES_CACHE_TAG],
   },
 );
 
@@ -211,7 +121,7 @@ const getCachedCategories = unstable_cache(
   ["partner-repository", "categories", "versioned"],
   {
     revalidate: false,
-    tags: ["categories"],
+    tags: [CATEGORIES_CACHE_TAG],
   },
 );
 
@@ -233,7 +143,7 @@ const getCachedPartnerRows = unstable_cache(
   ["partner-repository", "partners", "versioned"],
   {
     revalidate: false,
-    tags: ["partners"],
+    tags: [PARTNERS_CACHE_TAG],
   },
 );
 
@@ -255,7 +165,7 @@ const getCachedPublicDirectoryPartnerRows = unstable_cache(
   ["partner-repository", "partners", "public-directory", "versioned"],
   {
     revalidate: false,
-    tags: ["partners"],
+    tags: [PARTNERS_CACHE_TAG],
   },
 );
 
@@ -278,7 +188,7 @@ const getCachedPartnerRowsForCampus = unstable_cache(
   ["partner-repository", "partners", "campus", "versioned"],
   {
     revalidate: false,
-    tags: ["partners"],
+    tags: [PARTNERS_CACHE_TAG],
   },
 );
 
@@ -301,7 +211,7 @@ const getCachedPublicDirectoryPartnerRowsForCampus = unstable_cache(
   ["partner-repository", "partners", "public-directory", "campus", "versioned"],
   {
     revalidate: false,
-    tags: ["partners"],
+    tags: [PARTNERS_CACHE_TAG],
   },
 );
 
@@ -332,7 +242,7 @@ const getCachedPublicPartnerSeoRows = unstable_cache(
   ["partner-repository", "partners", "public-seo", "versioned"],
   {
     revalidate: false,
-    tags: ["partners"],
+    tags: [PARTNERS_CACHE_TAG],
   },
 );
 
@@ -362,167 +272,9 @@ const getCachedPartnerRowById = unstable_cache(
   ["partner-repository", "partner-by-id", "versioned"],
   {
     revalidate: false,
-    tags: ["partners"],
+    tags: [PARTNERS_CACHE_TAG],
   },
 );
-
-function getPartnerBenefitItems(row: PartnerRow) {
-  return row.partner_benefits?.length
-    ? row.partner_benefits
-        .slice()
-        .sort((left, right) => (left.display_order ?? 0) - (right.display_order ?? 0))
-        .map((benefit) => ({
-          id: benefit.id,
-          title: benefit.title,
-          maxApplyCount: benefit.max_apply_count,
-          displayOrder: benefit.display_order ?? undefined,
-        }))
-    : normalizePartnerBenefitItems((row.benefits ?? []).map((title, index) => ({
-        id: `legacy-benefit-${row.id}-${index + 1}`,
-        title,
-      })));
-}
-
-function toVisiblePartner(row: PartnerRow, categoryKey: string): Partner {
-  const galleryImages = row.images ?? [];
-  const thumbnail = row.thumbnail ?? row.images?.[0] ?? null;
-  const benefitItems = getPartnerBenefitItems(row);
-  return {
-    id: row.id,
-    name: row.name,
-    category: categoryKey,
-    visibility: normalizePartnerVisibility(row.visibility),
-    benefitVisibility: normalizePartnerBenefitVisibility(row.benefit_visibility),
-    createdAt: row.created_at,
-    location: row.location,
-    detailDescription: row.detail_description ?? null,
-    campusSlugs: normalizeCampusSlugs(row.campus_slugs ?? []),
-    thumbnail,
-    mapUrl: row.map_url ?? undefined,
-    benefitActionType: normalizePartnerBenefitActionType(
-      row.benefit_action_type,
-      row.benefit_action_link || row.reservation_link ? "external_link" : "none",
-    ),
-    benefitActionLink: row.benefit_action_link ?? undefined,
-    benefitItems,
-    reservationLink: row.reservation_link ?? undefined,
-    inquiryLink: row.inquiry_link ?? undefined,
-    period: {
-      start: normalizeDate(row.period_start),
-      end: normalizeDate(row.period_end),
-    },
-    conditions: row.conditions ?? [],
-    benefits: partnerBenefitItemsToTitles(benefitItems),
-    appliesTo: normalizePartnerAudience(row.applies_to),
-    images: galleryImages,
-    tags: row.tags ?? [],
-    branchScopeType: row.branch_scope_type ?? "single_location",
-    branchScopeNote: row.branch_scope_note ?? null,
-  };
-}
-
-function toLockedPartner(row: PartnerRow, categoryKey: string): Partner {
-  return {
-    id: row.id,
-    name: "",
-    category: categoryKey,
-    visibility: normalizePartnerVisibility(row.visibility),
-    benefitVisibility: normalizePartnerBenefitVisibility(row.benefit_visibility),
-    createdAt: row.created_at,
-    location: "",
-    campusSlugs: normalizeCampusSlugs(row.campus_slugs ?? []),
-    period: {
-      start: "",
-      end: "",
-    },
-    conditions: [],
-    benefits: [],
-    appliesTo: normalizePartnerAudience(row.applies_to),
-    thumbnail: null,
-    images: [],
-    tags: [],
-  };
-}
-
-function toVisiblePublicDirectorySummaryPartner(row: PartnerRow, categoryKey: string): Partner {
-  const appliesTo = normalizePartnerAudience(row.applies_to);
-  const benefitItems = getPartnerBenefitItems(row);
-  return {
-    id: row.id,
-    name: row.name,
-    category: categoryKey,
-    visibility: normalizePartnerVisibility(row.visibility),
-    benefitVisibility: normalizePartnerBenefitVisibility(row.benefit_visibility),
-    createdAt: row.created_at,
-    location: row.location,
-    campusSlugs: normalizeCampusSlugs(row.campus_slugs ?? []),
-    thumbnail: row.thumbnail ?? null,
-    mapUrl: row.map_url ?? undefined,
-    benefitActionType: normalizePartnerBenefitActionType(
-      row.benefit_action_type,
-      row.benefit_action_link || row.reservation_link ? "external_link" : "none",
-    ),
-    benefitActionLink: row.benefit_action_link ?? undefined,
-    reservationLink: row.reservation_link ?? undefined,
-    inquiryLink: row.inquiry_link ?? undefined,
-    period: {
-      start: normalizeDate(row.period_start),
-      end: normalizeDate(row.period_end),
-    },
-    conditions: row.conditions ?? [],
-    benefits: partnerBenefitItemsToTitles(benefitItems),
-    benefitItems,
-    appliesTo,
-    images: [],
-    tags: row.tags ?? [],
-    branchScopeType: row.branch_scope_type ?? "single_location",
-  };
-}
-
-function mapPartnerForList(
-  row: PartnerRow,
-  context: PartnerViewContext,
-): Partner {
-  const categoryKey = extractCategoryKey(row.categories) ?? "health";
-  const visibility = normalizePartnerVisibility(row.visibility);
-  if (canViewPartnerDetails(visibility, context.authenticated)) {
-    return maskPartnerBenefitsForAccess(toVisiblePartner(row, categoryKey), context);
-  }
-  return toLockedPartner(row, categoryKey);
-}
-
-function mapPartnerForPublicDirectory(
-  row: PartnerRow,
-  context: PartnerViewContext,
-): Partner {
-  const categoryKey = extractCategoryKey(row.categories) ?? "health";
-  const visibility = normalizePartnerVisibility(row.visibility);
-  if (canViewPartnerDetails(visibility, context.authenticated)) {
-    const summaryPartner = toVisiblePublicDirectorySummaryPartner(row, categoryKey);
-    const maskedPartner = maskPartnerBenefitsForAccess(summaryPartner, context);
-    return toLeanPublicDirectoryPartner(maskedPartner);
-  }
-  return toLockedPartner(row, categoryKey);
-}
-
-function mapPublicPartnerSeoEntry(
-  row: PublicPartnerSeoRow,
-): PublicPartnerSeoEntry {
-  const category = Array.isArray(row.categories)
-    ? row.categories[0]
-    : row.categories;
-
-  return {
-    id: row.id,
-    name: row.name,
-    categoryLabel: category?.label ?? "제휴",
-    location: row.location,
-    period: {
-      start: row.period_start,
-      end: row.period_end,
-    },
-  };
-}
 
 async function getPartnerRow(id: string) {
   const versionKey = await getPublicCacheVersionKey(["partners", "categories"]);
@@ -534,24 +286,17 @@ async function hasValidPreviewToken(id: string, token: string) {
     return false;
   }
 
+  // `partner_preview_tokens.expires_at` is not null since 20260830215837, so
+  // there is no missing-column retry: a schema error surfaces instead of
+  // silently accepting tokens without an expiry check.
   const nowIso = new Date().toISOString();
-  const supabase = getSupabaseAdminClient();
-  let { data, error } = await supabase
+  const { data, error } = await getSupabaseAdminClient()
     .from("partner_preview_tokens")
     .select("partner_id,created_at,expires_at")
     .eq("partner_id", id)
     .eq("token_hash", hashPartnerPreviewToken(token))
     .gt("expires_at", nowIso)
     .maybeSingle();
-
-  if (error && isMissingPartnerPreviewExpiryColumnError(error.message)) {
-    ({ data, error } = await supabase
-      .from("partner_preview_tokens")
-      .select("partner_id,created_at")
-      .eq("partner_id", id)
-      .eq("token_hash", hashPartnerPreviewToken(token))
-      .maybeSingle());
-  }
 
   if (error) {
     throw new Error(error.message);
@@ -560,7 +305,7 @@ async function hasValidPreviewToken(id: string, token: string) {
   return Boolean(
     data &&
       isPartnerPreviewLinkActive(
-        "expires_at" in data ? data.expires_at : null,
+        data.expires_at,
         new Date(nowIso),
         data.created_at ?? null,
       ),
@@ -603,12 +348,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
   async getCategories(): Promise<Category[]> {
     const versionKey = await getPublicCacheVersionKey(["categories"]);
     const data = await getCachedCategories(versionKey);
-    return data.map((item) => ({
-      key: item.key ?? "",
-      label: item.label ?? "",
-      description: item.description ?? "",
-      color: item.color ?? undefined,
-    }));
+    return data.map(mapCategoryRow);
   }
 
   async getPartners(
@@ -701,31 +441,11 @@ export class SupabasePartnerRepository implements PartnerRepository {
       return null;
     }
 
-    const visibility = normalizePartnerVisibility(row.visibility);
-    if (!previewToken) {
-      if (visibility === "private") {
-        return null;
-      }
-      if (visibility === "confidential" && !context.authenticated) {
-        return null;
-      }
-
-      if (
-        !canViewPartnerDetails(
-          visibility,
-          context.authenticated,
-          {
-            start: row.period_start,
-            end: row.period_end,
-          },
-        )
-      ) {
-        return null;
-      }
+    if (!previewToken && !canViewPartnerDetailRow(row, context)) {
+      return null;
     }
 
-    const categoryKey = extractCategoryKey(row.categories) ?? "health";
-    return maskPartnerBenefitsForAccess(toVisiblePartner(row, categoryKey), context);
+    return mapPartnerForDetail(row, context);
   }
 
   async getPartnerByIdRaw(id: string): Promise<Partner | null> {
@@ -733,8 +453,7 @@ export class SupabasePartnerRepository implements PartnerRepository {
     if (!row) {
       return null;
     }
-    const categoryKey = extractCategoryKey(row.categories) ?? "health";
-    return toVisiblePartner(row, categoryKey);
+    return mapPartnerRaw(row);
   }
 
   async partnerExists(id: string): Promise<boolean> {

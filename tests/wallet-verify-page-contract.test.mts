@@ -13,8 +13,8 @@ const avatarRouteSource = readFileSync(
 
 describe("apple wallet verify route contract", () => {
   it("marks the public verification page as dynamic and non-indexable without analytics", () => {
-    assert.match(pageSource, /unstable_noStore as noStore/);
-    assert.match(pageSource, /noStore\(\)/);
+    assert.match(pageSource, /export const dynamic = "force-dynamic"/);
+    assert.doesNotMatch(pageSource, /unstable_noStore|noStore\(\)/);
     assert.match(pageSource, /index:\s*false/);
     assert.match(pageSource, /follow:\s*false/);
     assert.match(pageSource, /referrer: "no-referrer"/);

@@ -201,7 +201,10 @@ test("작업함 큐 집계는 짧은 서버 캐시로 반복 RPC를 줄인다", 
   );
 
   assert.match(source, /unstable_cache/);
-  assert.match(source, /ADMIN_TASK_INBOX_CACHE_REVALIDATE_SECONDS = 3/);
+  assert.match(
+    source,
+    /ADMIN_TASK_INBOX_CACHE_REVALIDATE_SECONDS =\s*ADMIN_READ_BURST_CACHE_SECONDS/,
+  );
   assert.match(source, /getCachedAdminTaskInboxQueueCounts\(\{/);
 });
 

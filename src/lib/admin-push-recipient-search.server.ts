@@ -9,10 +9,11 @@ import {
 } from "@/lib/mock/member";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { unstable_cache } from "next/cache";
+import { ADMIN_READ_BURST_CACHE_SECONDS } from "@/lib/cache-ttl";
 
 const DEFAULT_RECIPIENT_LIMIT = 30;
 const MAX_RECIPIENT_LIMIT = 50;
-const INITIAL_RECIPIENT_CACHE_SECONDS = 3;
+const INITIAL_RECIPIENT_CACHE_SECONDS = ADMIN_READ_BURST_CACHE_SECONDS;
 
 export type AdminPushRecipientOption = {
   id: string;

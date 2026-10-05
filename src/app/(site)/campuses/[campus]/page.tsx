@@ -11,8 +11,10 @@ import {
 import { partnerRepository } from "@/lib/repositories";
 import { getHeaderSession } from "@/lib/header-session";
 import { getPartnerViewerContext } from "@/lib/partner-view-context";
+import { getSignedUserSession } from "@/lib/user-auth";
 import {
-  getHomePartnerMemberState,
+  buildHomePartnerMemberState,
+  getHomeMemberFavoritePartnerIds,
   getHomePartnerPopularityById,
 } from "@/lib/home-partner-state";
 import { buildHomePartnerDirectory } from "@/lib/home-partner-directory";
@@ -117,9 +119,9 @@ export default async function CampusLandingPage({
 }: {
   params: Promise<{ campus: string }>;
 }) {
-  const [{ campus: rawCampus }, headerSession] = await Promise.all([
+  const [{ campus: rawCampus }, session] = await Promise.all([
     params,
-    getHeaderSession(),
+    getSignedUserSession(),
   ]);
 
   const campus = getCampusBySlug(rawCampus);
@@ -127,10 +129,19 @@ export default async function CampusLandingPage({
     notFound();
   }
 
-  const viewerContext = await getPartnerViewerContext(headerSession?.userId);
+  // One signed-session read feeds the header and the viewer audience; the
+  // unread count and categories overlap the audience snapshot.
+  const userId = session?.userId ?? null;
+  const headerSessionPromise = userId
+    ? getHeaderSession(userId)
+    : Promise.resolve(null);
+  const categoriesPromise = getCampusCategoriesCached();
+  const favoritePartnerIdsPromise = getHomeMemberFavoritePartnerIds(userId);
+  const viewerContext = await getPartnerViewerContext(userId);
 
-  const [categories, partners] = await Promise.all([
-    getCampusCategoriesCached(),
+  const [headerSession, categories, partners] = await Promise.all([
+    headerSessionPromise,
+    categoriesPromise,
     viewerContext.authenticated
       ? getCampusPartnersCached(
           campus.slug,
@@ -158,18 +169,19 @@ export default async function CampusLandingPage({
     viewerAuthenticated: viewerContext.authenticated,
     popularityByPartnerId: {},
   });
-  const partnerPopularityById = await getHomePartnerPopularityById(
-    popularityCandidates.displayPartnerIds,
-  );
+  const [partnerPopularityById, favoritePartnerIds] = await Promise.all([
+    getHomePartnerPopularityById(popularityCandidates.displayPartnerIds),
+    favoritePartnerIdsPromise,
+  ]);
   const rankedDirectory = buildHomePartnerDirectory({
     partners: campusPartners,
     viewerAuthenticated: viewerContext.authenticated,
     popularityByPartnerId: partnerPopularityById,
   });
-  const memberState = await getHomePartnerMemberState({
-    partnerIds: rankedDirectory.displayPartnerIds,
-    currentUserId: headerSession?.userId ?? null,
-  });
+  const memberState = buildHomePartnerMemberState(
+    rankedDirectory.displayPartnerIds,
+    favoritePartnerIds,
+  );
   const campusPartnerState = {
     ...memberState,
     partnerPopularityById,
@@ -201,8 +213,8 @@ export default async function CampusLandingPage({
         publicPartnerCount={publicCampusPartners.length}
         categories={categories}
         partners={campusPartners}
-        viewerAuthenticated={Boolean(headerSession?.userId)}
-        currentUserId={headerSession?.userId ?? null}
+        viewerAuthenticated={Boolean(userId)}
+        currentUserId={userId}
         partnerPopularityById={campusPartnerState.partnerPopularityById}
         partnerFavoriteStateById={campusPartnerState.partnerFavoriteStateById}
         loadedFavoritePartnerIds={campusPartnerState.loadedFavoritePartnerIds}

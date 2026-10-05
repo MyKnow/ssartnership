@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { isPartnerPortalMock } from "@/lib/partner-auth/portal";
 import type { PartnerSession } from "@/lib/partner-session";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
@@ -113,17 +114,32 @@ async function getSupabasePartnerPortalCompanySummaries(
   }));
 }
 
-export async function getPartnerPortalCompanySummaries(companyIds: string[]) {
+// The partner layout and the page below it both resolve the session's company
+// summaries; memoize them per request by the normalized id list.
+const getPartnerPortalCompanySummariesByKey = cache(
+  async (companyIdsKey: string): Promise<PartnerPortalCompanyScope[]> => {
+    const uniqueCompanyIds = companyIdsKey.split(",");
+    if (isPartnerPortalMock) {
+      return listMockPartnerPortalCompanySetups(uniqueCompanyIds).map(toMockCompanyScope);
+    }
+
+    return getSupabasePartnerPortalCompanySummaries(uniqueCompanyIds);
+  },
+);
+
+export async function getPartnerPortalCompanySummaries(
+  companyIds: string[],
+): Promise<PartnerPortalCompanyScope[]> {
   const uniqueCompanyIds = normalizePartnerPortalCompanyIds(companyIds);
   if (uniqueCompanyIds.length === 0) {
     return [];
   }
 
-  if (isPartnerPortalMock) {
-    return listMockPartnerPortalCompanySetups(uniqueCompanyIds).map(toMockCompanyScope);
-  }
-
-  return getSupabasePartnerPortalCompanySummaries(uniqueCompanyIds);
+  // Callers receive their own array; the summary objects are shared and must
+  // be treated as read-only.
+  return [
+    ...(await getPartnerPortalCompanySummariesByKey(uniqueCompanyIds.join(","))),
+  ];
 }
 
 export async function assertPartnerPortalCompanyAccess(

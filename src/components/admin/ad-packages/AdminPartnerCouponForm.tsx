@@ -8,6 +8,11 @@ import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
 import { getPartnerPeriodEndAt, toDateTimeLocalInput } from "@/lib/ad-coupon-period";
 import {
+  AD_COUPON_STATUSES,
+  AD_STATUS_LABELS,
+  listAdCouponStatusOptions,
+} from "@/lib/ad-packages";
+import {
   AD_PACKAGE_FORM_LIMITS,
   getSafeAdCouponFormMessage,
   parseCreateAdCouponForm,
@@ -146,6 +151,11 @@ export default function AdminPartnerCouponForm({
   const [redemptionType, setRedemptionType] = useState(defaults.redemptionType);
   const [formError, setFormError] = useState<string | null>(null);
   const formErrorId = `admin-coupon-form-error-${mode}-${coupon?.id ?? partnerId}`;
+  // Editing offers only the transitions the server accepts (ended is terminal).
+  const statusOptions =
+    mode === "edit" && coupon
+      ? listAdCouponStatusOptions(coupon.status)
+      : [...AD_COUPON_STATUSES];
 
   const handleNativeInvalid = () => {
     setFormError("입력값을 확인해 주세요.");
@@ -160,6 +170,7 @@ export default function AdminPartnerCouponForm({
       parseCreateAdCouponForm(new FormData(event.currentTarget), {
         allowExistingOnsitePassword: mode === "edit",
         partnerPeriodEnd,
+        currentStatus: mode === "edit" ? coupon?.status : null,
       });
       setFormError(null);
     } catch (error) {
@@ -364,10 +375,11 @@ export default function AdminPartnerCouponForm({
             <FieldLabel>
               상태
               <Select name="status" defaultValue={defaults.status}>
-                <option value="draft">초안</option>
-                <option value="active">활성</option>
-                <option value="paused">일시중지</option>
-                <option value="ended">종료</option>
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {AD_STATUS_LABELS[status]}
+                  </option>
+                ))}
               </Select>
             </FieldLabel>
             <FieldLabel>

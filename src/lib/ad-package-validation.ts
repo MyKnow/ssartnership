@@ -1,4 +1,6 @@
 import {
+  AdStatusTransitionError,
+  canTransitionAdCouponStatus,
   getAdPackageDefinition,
   isAdPackageTier,
   normalizeAdChannelsForTier,
@@ -228,6 +230,8 @@ export function parseCreateAdCouponForm(
   options?: {
     allowExistingOnsitePassword?: boolean;
     partnerPeriodEnd?: string | null;
+    /** Stored status when editing; the submitted status must be a transition. */
+    currentStatus?: AdCouponStatus | null;
   },
 ): CreateAdCouponInput {
   const partnerId = requireString(formData, "partnerId", "제휴처를 선택해 주세요.");
@@ -306,6 +310,11 @@ export function parseCreateAdCouponForm(
     throw new Error("현장 확인 비밀번호는 현장 확인형 쿠폰에만 설정할 수 있습니다.");
   }
 
+  const status = parseStatus(getString(formData, "status"), couponStatuses, "draft");
+  if (options?.currentStatus && !canTransitionAdCouponStatus(options.currentStatus, status)) {
+    throw new AdStatusTransitionError("coupon", options.currentStatus, status);
+  }
+
   return {
     campaignId,
     partnerId,
@@ -328,7 +337,7 @@ export function parseCreateAdCouponForm(
       "할인 표기는 80자 이하로 입력해 주세요.",
     ),
     terms: parseTerms(getString(formData, "terms")),
-    status: parseStatus(getString(formData, "status"), couponStatuses, "draft"),
+    status,
     startsAt,
     endsAt,
     downloadStartsAt,
@@ -356,7 +365,10 @@ export function parseCreateAdCouponForm(
 
 export function parseUpdateAdCouponForm(
   formData: FormData,
-  options?: { partnerPeriodEnd?: string | null },
+  options?: {
+    partnerPeriodEnd?: string | null;
+    currentStatus?: AdCouponStatus | null;
+  },
 ): UpdateAdCouponInput {
   const couponId = requireString(formData, "couponId", "쿠폰을 찾을 수 없습니다.");
   return {
@@ -364,6 +376,7 @@ export function parseUpdateAdCouponForm(
     ...parseCreateAdCouponForm(formData, {
       allowExistingOnsitePassword: true,
       partnerPeriodEnd: options?.partnerPeriodEnd,
+      currentStatus: options?.currentStatus,
     }),
   };
 }

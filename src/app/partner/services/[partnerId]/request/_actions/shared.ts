@@ -1,4 +1,5 @@
 import { revalidatePath, revalidateTag } from "next/cache";
+import { PARTNERS_CACHE_TAG } from "@/lib/cache-tags";
 import { getCompanyScopedPartnerServiceHref } from "@/lib/partner-auth/portal-paths";
 import type { PartnerSession } from "@/lib/partner-session";
 
@@ -39,7 +40,7 @@ export function getAuthorizedCompanyIdsForPartnerAction(
 }
 
 export function revalidatePartnerServicePaths(partnerId: string, companyId?: string | null) {
-  revalidateTag("partners", "max");
+  revalidateTag(PARTNERS_CACHE_TAG, "max");
   revalidatePath("/partner");
   revalidatePath("/admin");
   revalidatePath("/admin/partners");

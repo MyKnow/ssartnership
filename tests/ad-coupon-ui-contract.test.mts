@@ -44,6 +44,31 @@ test("쿠폰 다운로드와 관리자 CRUD 버튼은 제출 중 상태를 표�
   assert.doesNotMatch(form, /from "@\/components\/ui\/Card"/);
 });
 
+test("쿠폰 상태 변경과 삭제는 FE·BE가 같은 전이·삭제 규칙을 쓴다", async () => {
+  const [form, manager, actions, partnerDetail, validation] = await Promise.all([
+    readFile(new URL("../src/components/admin/ad-packages/AdminPartnerCouponForm.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/components/admin/ad-packages/AdminPartnerCouponManager.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/admin/(protected)/_actions/ad-package-actions.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/app/admin/(protected)/partners/[partnerId]/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/ad-package-validation.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(form, /listAdCouponStatusOptions\(coupon\.status\)/);
+  assert.match(form, /currentStatus: mode === "edit" \? coupon\?\.status : null/);
+  assert.match(validation, /canTransitionAdCouponStatus\(options\.currentStatus, status\)/);
+  assert.match(actions, /currentStatus: existing\.status/);
+  assert.match(actions, /error instanceof AdStatusTransitionError/);
+  assert.match(actions, /"ad_coupon_delete_active"/);
+  assert.match(actions, /deletion\.reason === "state_changed"\s*\?\s*"ad_coupon_delete_state_changed"/);
+  assert.match(partnerDetail, /ad_coupon_invalid_status_transition/);
+  assert.match(partnerDetail, /ad_coupon_delete_active/);
+  // Compare-and-set conflicts from the repository surface as their own codes.
+  assert.match(partnerDetail, /ad_coupon_state_changed:/);
+  assert.match(partnerDetail, /ad_coupon_delete_state_changed:/);
+  assert.match(manager, /canDeleteAdCouponWithStatus\(coupon\.status\)/);
+  assert.match(manager, /활성 쿠폰은 삭제할 수 없습니다\./);
+});
+
 test("쿠폰 생성 UI는 발급·사용 방식에 맞는 필드만 렌더링한다", async () => {
   const source = await readFile(
     new URL("../src/components/admin/ad-packages/AdminPartnerCouponForm.tsx", import.meta.url),

@@ -1,4 +1,5 @@
 import { unstable_cache } from 'next/cache';
+import { ADMIN_READ_BURST_CACHE_SECONDS } from '@/lib/cache-ttl';
 import { createAdminLogsCsvStream } from './log-insights/csv';
 import { applyAdminLogsPrivacy } from './log-insights/privacy';
 import {
@@ -45,7 +46,7 @@ import {
   PAGE_MAX_LOG_ROWS_PER_GROUP,
 } from './log-insights/shared';
 
-const ADMIN_LOGS_READ_CACHE_REVALIDATE_SECONDS = 3;
+const ADMIN_LOGS_READ_CACHE_REVALIDATE_SECONDS = ADMIN_READ_BURST_CACHE_SECONDS;
 
 export type {
   AdminLogsCursor,

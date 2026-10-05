@@ -10,6 +10,7 @@ import {
 } from "@/lib/operational-notifications";
 import { getDefaultAdminNotificationPreferences } from "@/lib/partner-notification-routing";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { ADMIN_READ_BURST_CACHE_SECONDS } from "@/lib/cache-ttl";
 
 function createUnavailableAdminNotificationsReadModel() {
   return {
@@ -26,8 +27,10 @@ function createUnavailableAdminNotificationsReadModel() {
   };
 }
 
-const ADMIN_NOTIFICATION_READ_CACHE_REVALIDATE_SECONDS = 3;
-const ADMIN_NOTIFICATION_SETTINGS_CACHE_REVALIDATE_SECONDS = 3;
+const ADMIN_NOTIFICATION_READ_CACHE_REVALIDATE_SECONDS =
+  ADMIN_READ_BURST_CACHE_SECONDS;
+const ADMIN_NOTIFICATION_SETTINGS_CACHE_REVALIDATE_SECONDS =
+  ADMIN_READ_BURST_CACHE_SECONDS;
 
 type AdminNotificationInboxReadModel = {
   notificationResult: AdminNotificationListResult;

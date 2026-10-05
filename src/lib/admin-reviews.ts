@@ -646,6 +646,13 @@ export async function getAdminReviewPageData(
   input: AdminReviewFilters,
   options?: {
     includeCounts?: boolean;
+    /**
+     * Load the company/partner filter options. A caller that renders only the
+     * review list (the partner detail page) passes `false` to skip the
+     * unbounded option queries; partners are still read when a member query
+     * needs partner-name matching or scoped counts need the partner ids.
+     */
+    includeFilterOptions?: boolean;
     managedCampusSlugs?: string[] | null;
     page?: number | string | null;
     pageSize?: number | string | null;
@@ -653,28 +660,42 @@ export async function getAdminReviewPageData(
 ): Promise<AdminReviewPageData> {
   const supabase = getSupabaseAdminClient();
   const includeCounts = options?.includeCounts ?? true;
+  const includeFilterOptions = options?.includeFilterOptions ?? true;
   const managedCampusSlugs = options?.managedCampusSlugs ?? null;
   const paginationInput = normalizeAdminReviewPagination({
     page: options?.page,
     pageSize: options?.pageSize,
   });
-  let companiesQuery = supabase
-    .from("partner_companies")
-    .select("id,name,slug,managed_campus_slugs")
-    .order("name", { ascending: true });
-  let partnersQuery = supabase
-    .from("partners")
-    .select("id,name,company_id,managed_campus_slugs,company:partner_companies(id,name,slug)")
-    .order("name", { ascending: true });
+  const normalizedMemberQuery = input.memberQuery.toLowerCase();
+  const needsPartnerRows =
+    includeFilterOptions ||
+    Boolean(normalizedMemberQuery) ||
+    (includeCounts && Boolean(managedCampusSlugs));
+  const loadCompanyOptions = async () => {
+    let companiesQuery = supabase
+      .from("partner_companies")
+      .select("id,name,slug,managed_campus_slugs")
+      .order("name", { ascending: true });
+    if (managedCampusSlugs) {
+      companiesQuery = companiesQuery.overlaps("managed_campus_slugs", managedCampusSlugs);
+    }
+    return companiesQuery;
+  };
+  const loadPartnerRows = async () => {
+    let partnersQuery = supabase
+      .from("partners")
+      .select("id,name,company_id,managed_campus_slugs,company:partner_companies(id,name,slug)")
+      .order("name", { ascending: true });
+    if (managedCampusSlugs) {
+      partnersQuery = partnersQuery.overlaps("managed_campus_slugs", managedCampusSlugs);
+    }
+    return partnersQuery;
+  };
 
-  if (managedCampusSlugs) {
-    companiesQuery = companiesQuery.overlaps("managed_campus_slugs", managedCampusSlugs);
-    partnersQuery = partnersQuery.overlaps("managed_campus_slugs", managedCampusSlugs);
-  }
-
+  const emptyOptionResult = { data: [] as unknown[] };
   const [companiesResult, partnersResult] = await Promise.all([
-    companiesQuery,
-    partnersQuery,
+    includeFilterOptions ? loadCompanyOptions() : emptyOptionResult,
+    needsPartnerRows ? loadPartnerRows() : emptyOptionResult,
   ]);
 
   const companies = (companiesResult.data ?? []) as AdminReviewCompanyOption[];
@@ -691,7 +712,6 @@ export async function getAdminReviewPageData(
     },
   );
 
-  const normalizedMemberQuery = input.memberQuery.toLowerCase();
   const partnerSearchIds = normalizedMemberQuery
     ? partners
         .filter((partner) => {

@@ -17,6 +17,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { localPromotionFixtures } from "@/lib/mock/promotions";
+import { SLOW_CHANGING_DATA_CACHE_SECONDS } from "@/lib/cache-ttl";
 import { projectShowcaseRepository } from "@/lib/project-showcase";
 import { getShowcasePhase, PROJECT_SHOWCASE_SLUG, type ShowcasePhase } from "@/lib/project-showcase/types";
 
@@ -465,9 +466,20 @@ const SHOWCASE_PROMOTED_PHASES: ReadonlySet<ShowcasePhase> = new Set([
   "announcement",
 ]);
 
+// The home carousel only needs the showcase schedule to decide visibility.
+// Cache the event row briefly so a home render does not wait on
+// `showcase_events`; schedule edits reach the carousel within this window.
+const getCachedShowcaseEventForHome = unstable_cache(
+  async () => projectShowcaseRepository.getEvent(),
+  ["promotions", "home-showcase-event"],
+  { revalidate: SLOW_CHANGING_DATA_CACHE_SECONDS },
+);
+
 async function getExternalEventVisibility(now: Date) {
   try {
-    const event = await projectShowcaseRepository.getEvent();
+    const event = canUseSupabase()
+      ? await getCachedShowcaseEventForHome()
+      : await projectShowcaseRepository.getEvent();
     return new Map([[PROJECT_SHOWCASE_SLUG, SHOWCASE_PROMOTED_PHASES.has(getShowcasePhase(event, now))]]);
   } catch {
     return new Map([[PROJECT_SHOWCASE_SLUG, false]]);
