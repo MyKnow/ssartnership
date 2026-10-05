@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import Spinner from "@/components/ui/Spinner";
+import { FOCUS_RING_ON_BACKGROUND_CLASS_NAME } from "@/components/ui/focus-ring";
 
-const base =
-  "group inline-flex min-h-11 min-w-11 items-center justify-center gap-2 whitespace-nowrap border font-semibold leading-none transition-interactive duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+const base = cn(
+  "group inline-flex min-h-11 min-w-11 items-center justify-center gap-2 whitespace-nowrap border font-semibold leading-none transition-interactive duration-200 ease-out",
+  FOCUS_RING_ON_BACKGROUND_CLASS_NAME,
+);
 
 const sizes = {
   sm: "h-10 rounded-[0.95rem] px-4 text-sm",

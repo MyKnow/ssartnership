@@ -22,6 +22,13 @@ authority: normative
 - `primary / primary-emphasis / primary-soft`: 핵심 액션 색
 - `accent`: 브랜드 메타 강조
 - `success / warning / danger`: 상태색
+- `focus-ring`(`ring-ring`): 키보드 포커스 링 전용 솔리드 색. 라이트는 primary 네이비(`#213b68`), 다크는 `#d7e4ff` 계열로 배경 대비 3:1 이상을 유지한다.
+
+## Focus
+- 조작 요소의 키보드 포커스는 `src/components/ui/focus-ring.ts`의 공용 클래스(`focus-visible:ring-2 ring-ring ring-offset-2` + 표면별 오프셋 색)로 표현한다. Button, Input, Select, Textarea, PasswordInput, Modal 닫기 버튼이 이 계약을 쓴다.
+- 포커스 링에 `ring-primary/NN` 같은 반투명 색을 새로 쓰지 않는다. 라이트 모드에서 경계 대비가 약 1.3~1.7:1로 떨어져 사실상 보이지 않는다.
+- `outline-none` 대신 `outline-hidden`을 쓴다. 강제 색상 모드(Windows 고대비)에서 시스템 포커스 표시를 남긴다.
+- 링 오프셋 색은 컨트롤이 놓인 표면(`ring-offset-background`, `ring-offset-surface-overlay`)에 맞춘다. 칩·테이블 행처럼 밀집한 표면은 `ring-inset`을 쓴다.
 
 ## Typography
 - `ui-display`: 메인 히어로/강한 페이지 메시지. 36px~60px 범위와 매우 타이트한 line-height를 사용한다.

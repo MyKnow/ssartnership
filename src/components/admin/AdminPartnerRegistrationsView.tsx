@@ -521,7 +521,7 @@ export default function AdminPartnerRegistrationsView({
               : "public";
             return (
               <details className="group min-w-0 rounded-card border border-border bg-surface-elevated shadow-flat" key={row.id}>
-                <summary className="flex min-w-0 cursor-pointer list-none items-start justify-between gap-4 p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
+                <summary className="flex min-w-0 cursor-pointer list-none items-start justify-between gap-4 rounded-card p-5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
                   <div className="flex min-w-0 flex-col gap-3">
                   <div className="min-w-0">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">

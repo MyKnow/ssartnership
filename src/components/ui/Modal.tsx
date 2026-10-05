@@ -4,6 +4,7 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
 import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
+import { FOCUS_RING_ON_OVERLAY_CLASS_NAME } from "@/components/ui/focus-ring";
 
 const focusableSelector = [
   "a[href]",
@@ -176,7 +177,10 @@ export default function Modal({
               type="button"
               onClick={onClose}
               aria-label="모달 닫기"
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border/80 bg-surface-control text-foreground shadow-flat transition-interactive duration-200 ease-out hover:-translate-y-px hover:border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-overlay"
+              className={cn(
+                "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border/80 bg-surface-control text-foreground shadow-flat transition-interactive duration-200 ease-out hover:-translate-y-px hover:border-strong hover:bg-surface-elevated",
+                FOCUS_RING_ON_OVERLAY_CLASS_NAME,
+              )}
             >
               <XMarkIcon className="h-5 w-5" aria-hidden="true" />
             </button>

@@ -18,7 +18,7 @@ authority: normative
 ## Inputs
 - control radius 통일
 - background는 surface 계층을 따른다
-- focus는 border + ring으로 표현한다
+- focus는 border 강조와 공용 포커스 링(Foundations > Focus)으로 표현한다
 - disabled는 opacity가 아니라 contrast 감소로 표현한다
 
 ## Badges And Chips
