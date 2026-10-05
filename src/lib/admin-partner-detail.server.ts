@@ -5,6 +5,7 @@ import {
   getAdminReviewPageData,
   type AdminReviewFilters,
 } from "@/lib/admin-reviews";
+import { ADMIN_LIST_DEFAULT_PAGE_SIZE } from "@/lib/admin-ia";
 import { fetchPartnerReviewVisibilityCounts } from "@/lib/partner-counts";
 import { getPartnerMetricTimeseriesSnapshot } from "@/lib/partner-metric-timeseries";
 import { fetchRequestSummariesForPartner } from "@/lib/partner-change-requests/summary";
@@ -253,7 +254,7 @@ export async function getAdminPartnerDetailOperationalReadModel({
         partnerId,
         benefit: selectedUsageBenefit,
         page: parseUsagePage(usagePage),
-        pageSize: 25,
+        pageSize: ADMIN_LIST_DEFAULT_PAGE_SIZE,
       }),
       getPartnerMetricTimeseriesSnapshot(partnerId, core.partner.created_at),
       supabase.rpc("get_admin_partner_audit_logs", partnerAuditScope),

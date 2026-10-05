@@ -2,6 +2,7 @@ import Link from "next/link";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminShell from "@/components/admin/AdminShell";
 import { requireAdminPermission } from "@/lib/admin-access";
+import { ADMIN_LIST_DEFAULT_PAGE_SIZE } from "@/lib/admin-ia";
 import { projectShowcaseRepository } from "@/lib/project-showcase";
 import { SHOWCASE_ADMIN_STATUS_LABELS, SHOWCASE_TYPE_LABELS } from "@/lib/project-showcase/labels";
 import {
@@ -15,7 +16,7 @@ import { SHOWCASE_PROJECT_STATUSES, SHOWCASE_PROJECT_TYPES } from "@/lib/project
 export const dynamic = "force-dynamic";
 
 const LOGS_PATH = "/admin/events/project-showcase/logs";
-const PAGE_SIZE = 50;
+const PAGE_SIZE = ADMIN_LIST_DEFAULT_PAGE_SIZE;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const ACTIVITY_LABELS: Record<ShowcaseAdminActivityType, string> = {

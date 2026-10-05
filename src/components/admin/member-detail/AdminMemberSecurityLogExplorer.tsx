@@ -8,6 +8,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import Input from "@/components/ui/Input";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Select from "@/components/ui/Select";
+import { ADMIN_LIST_DEFAULT_PAGE_SIZE } from "@/lib/admin-ia";
 import { formatKoreanDateTimeToMinute } from "@/lib/datetime";
 
 export type AdminMemberSecurityLog = {
@@ -23,7 +24,7 @@ export type AdminMemberSecurityLog = {
 
 type SortFilter = "newest" | "oldest" | "event" | "ip";
 
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
+const PAGE_SIZE_OPTIONS = [10, ADMIN_LIST_DEFAULT_PAGE_SIZE, 50, 100] as const;
 
 function formatDate(value?: string | null) {
   if (!value) {
@@ -83,7 +84,9 @@ export default function AdminMemberSecurityLogExplorer({
   const [statusFilter, setStatusFilter] = useState("all");
   const [pathFilter, setPathFilter] = useState("all");
   const [sortFilter, setSortFilter] = useState<SortFilter>("newest");
-  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(25);
+  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(
+    ADMIN_LIST_DEFAULT_PAGE_SIZE,
+  );
   const [currentPage, setCurrentPage] = useState(1);
   const [requestedPagination, setRequestedPagination] = useState<{
     page: number;
@@ -182,7 +185,7 @@ export default function AdminMemberSecurityLogExplorer({
     } else {
       next.set("logPage", String(safePage));
     }
-    if (nextPageSize === 50) {
+    if (nextPageSize === ADMIN_LIST_DEFAULT_PAGE_SIZE) {
       next.delete("logPageSize");
     } else {
       next.set("logPageSize", String(nextPageSize));

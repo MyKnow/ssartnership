@@ -1,5 +1,6 @@
 import { revalidateTag, unstable_cache } from "next/cache";
 import {
+  ADMIN_NOTIFICATION_PAGE_SIZE,
   buildAdminNotificationListResult,
   type AdminNotificationRecipientRow,
   type AdminNotificationListResult,
@@ -17,7 +18,7 @@ function createUnavailableAdminNotificationsReadModel() {
       unreadCount: 0,
       rows: [],
       offset: 0,
-      limit: 10,
+      limit: ADMIN_NOTIFICATION_PAGE_SIZE,
       hasMore: false,
     }),
     preferences: getDefaultAdminNotificationPreferences(),
@@ -141,7 +142,7 @@ async function getAdminNotificationInboxReadModelUncached({
 export async function getCachedAdminNotificationInboxReadModel({
   adminId,
   offset = 0,
-  limit = 10,
+  limit = ADMIN_NOTIFICATION_PAGE_SIZE,
   includeUnreadCount = true,
 }: {
   adminId: string;
@@ -190,7 +191,7 @@ export async function getAdminNotificationsReadModel(adminId: string) {
       getCachedAdminNotificationInboxReadModel({
         adminId,
         offset: 0,
-        limit: 10,
+        limit: ADMIN_NOTIFICATION_PAGE_SIZE,
         includeUnreadCount: true,
       }),
       getCachedAdminNotificationPreferences(adminId),

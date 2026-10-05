@@ -12,6 +12,7 @@ import IconActionButton, {
 } from "@/components/ui/IconActionButton";
 import { useToast } from "@/components/ui/Toast";
 import {
+  ADMIN_NOTIFICATION_PAGE_SIZE,
   getAdminNotificationTypeLabel,
   type AdminNotificationInboxItem,
   type AdminNotificationListResult,
@@ -286,7 +287,7 @@ export default function AdminNotificationInbox({
     setLoadingMore(true);
     try {
       const response = await fetch(
-        `/api/admin/notifications?offset=${state.nextOffset}&limit=10&includeSummary=0`,
+        `/api/admin/notifications?offset=${state.nextOffset}&limit=${ADMIN_NOTIFICATION_PAGE_SIZE}&includeSummary=0`,
       );
       const data = await parseAdminNotificationResponse(response);
       setState((current) => ({
