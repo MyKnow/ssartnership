@@ -180,7 +180,7 @@ PVE 이전 이후의 활성 구성은 `deploy/pve/compose.operations.yaml`이다
 
 대상은 인프라 관리 계정의 운영자이며, 한 가지 행동은 장애의 환경·VM·원인을 확인하고 대응하는 것이다. Grafana의 기존 UI·provisioning·UID를 유지한다. Next.js/TDS 컴포넌트와 Storybook을 이 도구에 이식하지 않는 예외이며 앱 UI나 공개 공유 범위는 변경하지 않는다. 첫 행의 내부 상태와 경보 수 → 활성 경보 표 → 서비스/DB → VM/물리 호스트 → 백업 → 체감 성능 → 감시 자체 상태 순으로 읽는다. Grafana 고유 색상 역할은 정상 green, 장애 red, 미연동 gray이며 수치는 단위와 범례로 함께 표현한다. 많은 패널이 있으므로 자주 보지 않는 행은 사용자 화면에서 접어 사용한다.
 
-지표 소유자는 각 collector와 Prometheus다. VM/환경별 30초 scrape, 물리 호스트·backup outcome 1분 수집, 기존 snapshot collector 5분을 구분하며 시간대는 Asia/Seoul이다. 운영자가 보는 host/backup/notifier 전체 지표와 환경 필터를 따르는 서비스·VM·Vitals 지표를 구분한다. CPU는 비율, 메모리·디스크는 bytes와 비율, 응답 시간은 seconds, LCP/INP는 milliseconds, CLS는 무단위다. 물리 CPU는 `/proc/stat`의 1초 간격 차분이며 user/nice에 이미 포함된 guest를 중복 합산하지 않는다. 물리 가용 메모리는 `/proc/meminfo`의 `MemAvailable`을 사용하며 `MemFree`와 구분한다. 데이터 없음·미연동·표본 부족을 정상이나 0으로 대체하지 않는다. 활성 경보가 없는 경우에만 count를 0으로 표시한다. 빈 경보 표는 상단의 감시 상태와 경보 수를 함께 확인하며 패널 설명에 해석을 명시한다. 최소 5개 표본이 있는 최근 15분 Vitals p75를 표시하며 route별 p75를 다시 평균하지 않는다. `node deploy/pve/grafana/build-dashboard.mjs`로 동일 UID의 46개 패널·8개 행을 생성한다.
+지표 소유자는 각 collector와 Prometheus다. VM/환경별 30초 scrape, 물리 호스트·backup outcome 1분 수집, 기존 snapshot collector 5분을 구분하며 시간대는 Asia/Seoul이다. 운영자가 보는 host/backup/notifier 전체 지표와 환경 필터를 따르는 서비스·VM·Vitals 지표를 구분한다. CPU는 비율, 메모리·디스크는 bytes와 비율, 응답 시간은 seconds, LCP/INP는 milliseconds, CLS는 무단위다. 물리 CPU는 `/proc/stat`의 1초 간격 차분이며 user/nice에 이미 포함된 guest를 중복 합산하지 않는다. 물리 가용 메모리는 `/proc/meminfo`의 `MemAvailable`을 사용하며 `MemFree`와 구분한다. 데이터 없음·미연동·표본 부족을 정상이나 0으로 대체하지 않는다. 활성 경보가 없는 경우에만 count를 0으로 표시한다. 빈 경보 표는 상단의 감시 상태와 경보 수를 함께 확인하며 패널 설명에 해석을 명시한다. 최소 5개 표본이 있는 최근 15분 Vitals p75를 표시하며 route별 p75를 다시 평균하지 않는다. `node deploy/pve/grafana/build-dashboard.mjs`로 동일 UID의 51개 패널·9개 행을 생성한다. 생성기는 `buildDashboard()`를 export하며 `tests/pve-grafana-dashboard.test.mts`가 생성물과 커밋된 JSON의 일치와 결정성을 검사하므로, 생성기를 바꾸면 JSON을 다시 생성해 함께 커밋한다.
 
 Grafana 13.2의 Prometheus는 별도 bundled plugin이다. 고정 digest 이미지의 `/usr/share/grafana/data/plugins-bundled`를 `GF_PATHS_BUNDLED_PLUGINS`로 지정하고 `GF_PLUGINS_PREINSTALL_DISABLED=true`, `GF_PLUGINS_PREINSTALL_AUTO_UPDATE=false`로 시작 시 다운로드·갱신을 막는다. 분석용 update check를 끄는 설정만으로는 plugin 자동 설치가 꺼지지 않는다. root filesystem의 `read_only`와 plugin 서명 검증은 유지한다. `Datasource prometheus was not found`가 나타나면 datasource UID 존재만 확인하지 말고 plugin 경로·시작 로그·datasource health·실제 `/api/ds/query` 응답을 확인한다. 설정 의미는 [Grafana 공식 설정 문서](https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/)와 [13.2.1 plugin 설정 소스](https://github.com/grafana/grafana/blob/v13.2.1/pkg/setting/setting_plugins.go)를 따른다.
 
@@ -203,6 +203,11 @@ Ingress probe는 실제 hostname의 TLS를 검증하면서 LAN 주소에 연결�
 | 실제 백업 작업 실패 | 다음 평가 즉시 | warning 메일, 정상 작업 종료 시 복구 |
 | 알림 설정 누락·발송 실패 | 2분 | critical; 이 경보가 firing이면 외부 heartbeat도 중지 |
 | TLS 인증서 | 14일 미만, 10분 지속 | warning 메일 |
+| 앱 의존성(gateway·Storage·DB) 준비 실패 | 2분 | Production critical, Preview warning; 앱 자체 장애 중에는 억제 |
+| 공개 edge upstream 5xx 비율 | 5% 초과 + 요청 하한, 5분 | warning 메일(edge 공용) |
+| Production 예약 작업 성공 없음 | 예정 주기 3배, 10분 | warning 메일 |
+| 배포 수신기 성공 실행 없음 | 1시간, 10분 | warning 메일 |
+| DB 연결 수 / DB 용량 증가 추세 | 최대 연결 80% 10분 / 14일 예측 증가 > VM 루트 여유, 1시간 | warning 메일 |
 
 기본 group wait는 15초, group interval 1분, 반복 4시간이며 발생·복구를 모두 보낸다. 동일 환경·VM의 exporter 장애가 해당 앱/DB 원인 경보를 억제한다. 메시지는 고정된 경보명·환경·VM·조건·KST 시각·Grafana 링크만 포함한다. 임의 annotations/회원·경로·오류 본문을 전달하지 않는다. 발송 성공은 제공자 접수이며 실제 단말/수신함 도착과 별도로 확인한다.
 
@@ -214,7 +219,7 @@ Ingress probe는 실제 hostname의 TLS를 검증하면서 LAN 주소에 연결�
 
 Healthchecks.io에는 `SSARTNERSHIP PVE · 감시 엔진 생존`을 1분 period·2분 grace로 설정하고 계정의 Gmail 이메일 integration을 켠다. URL은 root 전용 `PVE_HEARTBEAT_ENV`에 저장하며 문서/로그/화면 증거에 노출하지 않는다. observer는 Prometheus 규칙 평가·Alertmanager·notifier 정상과 알림 전달 실패 경보가 없을 때만 내용 없는 HEAD 신호를 보낸다. 최근 성공 신호에서 약 3분 경과 시 외부 서비스가 알림을 담당한다. 운영자에 대한 통보는 Healthchecks가 자체 발송하므로 PVE·앱·DB가 정지해도 이 경로의 발송 서버는 살아 있다. 외부 서비스/메일 자체의 전달 보장은 별도다.
 
-observer의 Production·Preview TLS 검사는 실제 hostname/SNI/인증서 검증을 유지하고 LAN ingress로 직접 연결한다. 이 검사는 독립 회선에서 공개 DNS·WAN port forwarding을 검증하는 외부 HTTPS polling이 아니다. `ssartnership_external_monitor_configured=0` 및 대시보드의 미연동을 유지하며 외부 polling 서비스의 실측 결과를 확보하기 전 정상으로 표시하지 않는다.
+observer의 Production·Preview TLS 검사는 실제 hostname/SNI/인증서 검증을 유지하고 LAN ingress로 직접 연결한다. 이 검사는 독립 회선에서 공개 DNS·WAN port forwarding을 검증하는 외부 HTTPS polling이 아니다. `ssartnership_external_monitor_configured`는 운영자가 private heartbeat env에 선언한 `OPS_EXTERNAL_MONITOR_CONFIGURED=1`일 때만 1이다. 외부 polling 서비스를 아래 [외부 HTTP 감시](#외부-http-감시-설정) 절차로 설정하고 실패·회복 알림을 실측하기 전에는 선언하지 않으며, 대시보드는 그동안 미연동으로 표시한다.
 
 사용자가 승인한 PVE 호스트 수집은 `pve-host-metrics.service/timer`와 `/opt/myknow-monitoring/pve-host-metrics.py`다. systemd는 `ProtectSystem=strict`를 유지하며 `pvesh get`, SMART 검사, `lvs --nolocking --nohints` 보고만 실행한다. thin pool의 live kernel 통계를 숨기는 `--readonly` 옵션은 사용하지 않는다. 디스크·관리 계정·방화벽·호스트 DNS는 수정하지 않는다. `OPS_HOST_METRICS_URL`은 고정 HTTPS 주소이며 LAN IP에 연결하고 실제 hostname의 TLS를 검증한다. Caddy는 `/infra/host-metrics`의 요청을 PVE source IP `192.168.1.132`, POST, 4KB 및 전용 bearer token으로 제한하고 notifier의 숫자 allowlist·120초 timestamp 검증을 통과시킨다. 일반 관리 인증 경로는 유지한다.
 
@@ -227,3 +232,67 @@ Production의 `backup-status.service/timer`는 systemd 작업 결과와 검증�
 되돌릴 때 versioned rollback의 기존 Compose·Caddy·규칙·dashboard·private monitoring env를 복구하고 같은 검증/재적용 순서로 처리한다. host timer를 stop/disable하고 승인된 host 입력 경로를 제거하면 host 수집을 철회할 수 있다. Production backup outcome timer/drop-in을 철회할 때 기존 OnFailure 발송 경로와 자격 증명도 함께 복구하여 알림이 누락되지 않게 한다. backup snapshot/원본 데이터/사용자 관리 계정은 복귀 범위에서 삭제하지 않는다.
 
 검증은 12개 target과 모든 rule health, 숫자 지표의 신선도, 실제 source IP·token 거부, 두 앱 HTTPS, synthetic 발생/복구의 Alertmanager→발송기→제공자 접수, 재시도/중복 방지, Healthchecks 외부 실패·회복을 포함한다. Grafana API 쿼리 성공과 360/820/1440px 화면 증거는 구분한다. 브라우저가 Basic 인증 페이지를 차단하면 인증을 완화하지 않고 사용자 직접 로그인 후 화면 검증을 이어간다.
+
+## 오류 가시성·준비 상태·예약 작업 지표
+
+Issue #543에서 "컨테이너가 살아 있다"만 보던 감시를 서버 오류·의존성 장애·예약 작업 정체·배포 수신기 침묵까지 넓혔다. 로그 수집기(Loki 등)와 요청 상관 ID는 도입하지 않았다.
+
+### 서버 로그 형식
+
+서버 코드는 `src/lib/server-log.ts`의 `logServerError`/`logServerWarning`으로 한 줄 JSON을 stdout/stderr에 쓴다. 필드는 `level`, `event`(고정 라벨), `time`, `error{name, code, status, digest, message}`, `properties`다. raw error 객체, Supabase/PostgREST `details`·`hint`는 기록하지 않고 message의 이메일·토큰·URL·행 값·긴 숫자는 마스킹한다. `properties`는 공용 로그 정제기를 통과한다. 관리자 edge guard 차단 로그의 IP는 IPv4 /24, IPv6 /48 단위로만 남긴다. `tests/server-log-adoption.test.mts`가 raw error를 `console.error`로 직접 찍는 서버 코드의 재유입을 막는다.
+
+Docker `local` 로그 드라이버가 10MB×3으로 회전하므로 오래 보관해야 할 근거는 장애 기록으로 옮긴다. 운영 VM에서 최근 오류만 보려면 다음 한 줄을 사용한다.
+
+```bash
+docker logs --since 1h ssartnership-production-app-1 2>&1 | grep '"level":"error"'
+```
+
+Next.js가 잡은 모든 서버 오류(render·route·action·proxy)는 `src/instrumentation.ts`의 `onRequestError`가 `"[request-error] unhandled server error"` 한 줄로 남긴다. 경로는 route 패턴(`/admin/(protected)/members/[memberId]/page`)과 고정 route group으로만 기록한다. 사용자 오류 화면의 "오류 코드"는 Next.js digest이며 같은 줄의 `error.digest`와 대조한다. 세 오류 경계(`app/error.tsx`, `app/global-error.tsx`, `admin/(protected)/error.tsx`)는 같은 digest 블록을 표시하고 원본 message는 렌더링하지 않는다.
+
+### 준비 상태(readiness)
+
+`GET /api/ready`는 gateway(PostgREST 루트 HEAD), Storage(`/storage/v1/status`), DB(service role 단건 조회)를 병렬로 확인하고 1.5초 안에 `{ ok, checks }`를 200/503, `Cache-Control: no-store`로 반환한다. 5초 동안 결과를 병합해 DB 부하 증폭을 막는다. 공개 edge는 이 경로에 404를 반환하며 telemetry 컨테이너만 앱 내부 주소로 호출한다. Docker HEALTHCHECK와 공개 health 검증은 `/api/health`(liveness)를 유지한다. 의존성 장애가 컨테이너 재시작 루프가 되면 안 되기 때문이다.
+
+telemetry는 `OPS_APP_PROBE_ENABLED=1`일 때 30초마다 health 다음 ready를 확인하고 `ssartnership_app_ready_success{dependency}`를 노출한다. probe가 한 번도 완료되지 않으면 이 지표를 내보내지 않는다. 경보 `AppDependencyUnavailable`은 같은 환경·VM의 `AppHealthFailed` 또는 telemetry `ExporterDown`이 firing인 동안 억제된다.
+
+### edge 5xx
+
+운영 Prometheus는 edge Caddy의 내부 수집 listener(`caddy:9180/metrics`, 공개 미노출)를 scrape한다. host label이 없으므로 `ServerErrorBurst`는 공개 edge 전체의 reverse_proxy 응답 중 5xx 비율이다. 5%·요청 하한 0.05 req/s·5분은 기준선 측정 전의 잠정값이며, 2주 운영 후 실제 5xx 비율을 보고 조정한다.
+
+### 예약 작업과 배포 수신기 지표
+
+`production-cron.mjs`는 작업이 끝날 때마다 `production-cron-<job>.prom`(마지막 실행·결과·마지막 성공·예정 주기)을 Production monitoring textfile 디렉터리에 tmp+rename으로 기록한다. 지표 기록 실패는 작업 결과를 바꾸지 않는다. `ProductionCronStale`은 마지막 성공이 예정 주기의 3배보다 오래된 작업을 알린다. 개별 실패는 기존 unit의 `OnFailure` 통지(메일 또는 HTTPS webhook)가 즉시 알린다. 수료생 파일 파기처럼 항목 단위로 일부 실패한 작업은 `ok:true` 대신 5xx로 응답해 같은 통지 경로를 탄다.
+
+배포 수신기 unit은 `SuccessExitStatus=75`로 heavy lock 충돌(다른 백업·E2E 작업 실행 중)을 건너뛴 poll로 처리한다. 수신기는 실행마다 `release-receiver.prom`을 환경별 textfile 디렉터리에 기록하고 디렉터리가 없으면 생략한다. `ReleaseReceiverStale`은 1시간 동안 성공 실행이 없을 때 알린다. 스키마 승인 대기도 실패로 집계되므로 승인 지연이 길어지면 이 경보로 드러난다.
+
+### 경보 규칙 검사
+
+경보 규칙·Alertmanager·scrape 설정을 바꾸면 다음 명령으로 운영 VM과 같은 digest 고정 이미지의 promtool 규칙 테스트와 amtool 설정 검사를 네트워크 없이 실행한다. `npm run verify:change`도 해당 경로가 바뀌면 이 검사를 실행하므로 Docker가 필요하다.
+
+```bash
+npm run check:alerts
+```
+
+새 경보명을 추가하면 `deploy/observability/notifier.mjs`의 `CATALOG`에 고정 문구를 함께 추가한다. `tests/pve-alert-rules.test.mts`가 누락을 막는다. DB 경보의 postgres-exporter 지표명(`pg_stat_database_numbackends`, `pg_settings_max_connections`, `pg_database_size_bytes`)은 적용 전 각 VM의 exporter 출력에서 존재를 확인한다. 지표가 없으면 규칙은 조용히 비활성으로 남는다.
+
+### 외부 HTTP 감시 설정
+
+GitHub Actions 예약 실행은 추가하지 않는다. 독립 회선의 외부 모니터링 서비스에서 다음을 설정한다.
+
+1. Production `https://ssartnership.myknow.xyz/api/health`를 5분 간격 HTTP(S) 검사로 등록하고 200과 JSON 본문 `{"status":"ok"}`를 성공 조건으로 둔다. Preview는 선택 사항이다.
+2. 실패 2회 연속 시 운영자 이메일로 알리고 회복 알림도 켠다. 계정·수신처는 저장소에 기록하지 않는다.
+3. 공개 DNS를 일시적으로 바꾸지 말고, 존재하지 않는 경로를 대상으로 한 임시 검사로 실패·회복 알림이 실제로 도착하는지 확인한 뒤 임시 검사를 삭제한다.
+4. 확인 후 private heartbeat env에 `OPS_EXTERNAL_MONITOR_CONFIGURED=1`을 추가하고 observer만 재시작한다. 대시보드의 독립 회선 HTTPS 감시가 연동됨으로 바뀐다.
+
+### Web Vitals 보존
+
+Web Vitals는 telemetry 컨테이너 메모리의 고정 histogram에만 누적된다. telemetry 재시작·배포 시 누적값이 0부터 다시 시작하며, 집계된 시계열은 Prometheus 보존 기간(7일·2GB)이 지나면 사라진다. 원본 이벤트 저장소는 없다. 개선 전후 비교가 필요한 기준선은 7일 안에 대시보드의 p75와 표본 수를 [성능 지식 인덱스](../../performance/index.md)의 측정 기록으로 옮긴다. Vercel Speed Insights 기준선 문서는 폐기된 측정 경로의 시점 증거다.
+
+### 적용 순서(운영자)
+
+1. `deploy/pve/` 규칙·Alertmanager·Prometheus 설정과 dashboard JSON을 versioned 디렉터리에 준비하고 `npm run check:alerts`를 통과시킨다. edge Caddy의 내부 수집 listener가 먼저 적용되어 있어야 `caddy` scrape job이 `ExporterDown`을 일으키지 않는다.
+2. Prometheus·Alertmanager·notifier·observer를 위 [안전한 적용](#안전한-적용복귀검증) 절차로 재적용한다. Preview relay 토큰 mount는 Alertmanager가 사용하지 않으므로 Compose에서 제거됐다.
+3. Production VM에 새 cron unit(`ReadWritePaths`에 textfile 디렉터리 추가)과 control 릴리스를 설치하고 `systemd-analyze verify` 후 daemon-reload한다. 첫 실행 뒤 textfile과 `ssartnership_production_cron_last_success_seconds`를 확인한다.
+4. 두 앱 VM의 수신기 unit을 교체하고 daemon-reload한다. 다음 timer 실행 뒤 `ssartnership_release_receiver_last_success_seconds`를 확인한다.
+5. 앱 배포 후 내부에서 `/api/ready`가 200이고 공개 주소에서는 404인지, `ssartnership_app_ready_success`가 세 의존성 모두 1인지 확인한다.
+
