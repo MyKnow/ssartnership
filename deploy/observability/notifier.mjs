@@ -21,6 +21,7 @@ export const CATALOG = {
   IngressEndpointDown: ["Ingress HTTPS 접속 실패", "내부 회선의 HTTP 또는 TLS 확인 실패가 2분 지속"],
   CertificateExpiring: ["인증서 만료 임박", "TLS 인증서 유효 기간이 14일 미만"],
   ServerErrorBurst: ["공개 edge 5xx 증가", "공개 edge의 upstream 5xx 비율 5% 초과가 5분 지속"],
+  ProductionCronStale: ["운영 예약 작업 지연", "예약 작업 성공이 예정 주기의 3배 이상 없음"],
   ProductionBackupCollectorStale: ["백업 지표 갱신 지연", "백업 지표가 10분 이상 갱신되지 않음"],
   ProductionBackupStale: ["운영 백업 지연", "유효 백업이 없거나 8시간 이상 경과"],
   ProductionMacBackupStale: ["Mac 백업 복사본 지연", "복사본이 없거나 26시간 이상 경과"],

@@ -16,7 +16,8 @@ export async function notifyCronFailure(job) {
   const stat = await lstat(file);
   if (!stat.isFile() || stat.isSymbolicLink() || stat.uid !== 0 || (stat.mode & 0o077)) throw Error('ALERT_CONFIG_INVALID');
   const config = alertDeliveryConfiguration(parseEnv(await readFile(file, 'utf8')));
-  if (config?.kind !== 'email') throw Error('ALERT_CONFIG_INVALID');
+  // Same delivery contract as the operations notifier: e-mail or HTTPS webhook.
+  if (!config) throw Error('ALERT_CONFIG_INVALID');
   await deliverOperationalAlert(config, `[ssartnership] firing: ProductionCronFailed (${job})`, {
     groupKey: `production-cron-${job}`,
     alerts: [{ startsAt: new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000).toISOString(), endsAt: '' }],

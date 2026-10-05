@@ -91,3 +91,21 @@ tests:
         alertname: AppDependencyUnavailable
         exp_alerts:
           - exp_labels: { job: telemetry, environment: preview, vm: "5201", dependency: gateway, severity: warning }
+  - interval: 5m
+    input_series:
+      - series: 'ssartnership_production_cron_last_success_seconds{job="node",environment="production",vm="5200",cron="rss"}'
+        values: '0+300x6 1800+0x30'
+      - series: 'ssartnership_production_cron_interval_seconds{job="node",environment="production",vm="5200",cron="rss"}'
+        values: '900+0x36'
+      - series: 'ssartnership_production_cron_last_success_seconds{job="node",environment="production",vm="5200",cron="anonymize-deleted-members"}'
+        values: '0+0x36'
+      - series: 'ssartnership_production_cron_interval_seconds{job="node",environment="production",vm="5200",cron="anonymize-deleted-members"}'
+        values: '86400+0x36'
+    alert_rule_test:
+      - eval_time: 50m
+        alertname: ProductionCronStale
+        exp_alerts: []
+      - eval_time: 90m
+        alertname: ProductionCronStale
+        exp_alerts:
+          - exp_labels: { job: node, environment: production, vm: "5200", cron: rss, severity: warning }

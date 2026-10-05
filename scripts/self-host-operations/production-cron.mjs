@@ -2,6 +2,7 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { parseEnv } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { loadCronSchedules, invokeSelfHostCron, getSafeCronErrorCode } from '../lib/self-host-cron.mjs';
+import { recordProductionCronOutcome } from './production-cron-metrics.mjs';
 
 export function loadProductionCronSchedules(source, catalogSource) {
   const entries = loadCronSchedules(source);
@@ -40,8 +41,16 @@ async function main() {
     readFileSync(new URL('../../vercel.json', import.meta.url), 'utf8'),
   );
   const env = parseEnv(readFileSync('/etc/myknow/secrets/ssartnership-production/app.env','utf8'));
-  const result = await invokeSelfHostCron({ entries, path: `/api/cron/${process.argv[2]}`, baseUrl: 'http://127.0.0.1:3110', secret: env.CRON_SECRET });
-  console.log(JSON.stringify({ completed: true, path: result.path }));
+  const entry = entries.find(item => item.path === `/api/cron/${process.argv[2]}`);
+  let success = false;
+  try {
+    const result = await invokeSelfHostCron({ entries, path: `/api/cron/${process.argv[2]}`, baseUrl: 'http://127.0.0.1:3110', secret: env.CRON_SECRET });
+    success = true;
+    console.log(JSON.stringify({ completed: true, path: result.path }));
+  } finally {
+    // Completion metrics feed ProductionCronStale; they never change the job result.
+    if (entry) await recordProductionCronOutcome({ job: process.argv[2], schedule: entry.schedule, success }).catch(() => console.error('{"metrics":"PRODUCTION_CRON_METRICS_FAILED"}'));
+  }
 }
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch(error => { console.error(JSON.stringify({ error: getSafeCronErrorCode(error) })); process.exitCode = 1; });

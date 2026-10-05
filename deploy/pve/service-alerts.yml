@@ -36,6 +36,14 @@ groups:
         expr: pg_up{environment="preview"} == 0
         for: 1m
         labels: { severity: warning }
+      # Production cron completion (node-exporter textfile on the app VM).
+      # Stale means no success for three expected intervals: a stopped timer,
+      # a missing unit or repeated failures. Single failures already page via
+      # the unit's OnFailure notice.
+      - alert: ProductionCronStale
+        expr: time() - ssartnership_production_cron_last_success_seconds > 3 * ssartnership_production_cron_interval_seconds
+        for: 10m
+        labels: { severity: warning }
       - alert: HostDiskLow
         expr: node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes < 0.15
         for: 5m
