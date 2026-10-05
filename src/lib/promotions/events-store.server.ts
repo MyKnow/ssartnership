@@ -10,6 +10,7 @@ import {
   PromotionSlideSaveError,
   promotionSlideDatabaseErrorCode,
 } from "@/lib/promotions/slide-validation";
+import { logServerError } from "@/lib/server-log";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 type SupabaseAdminClient = ReturnType<typeof getSupabaseAdminClient>;
@@ -49,7 +50,7 @@ export async function listRegisteredPromotionEventSlugs(
     .select("slug")
     .in("slug", unique);
   if (error) {
-    console.error("[admin-advertisement] event lookup failed", error);
+    logServerError("[admin-advertisement] event lookup failed", error);
     throw new PromotionSlideSaveError(promotionSlideDatabaseErrorCode(error.code, "promotion_slide_event_lookup_failed"));
   }
   return new Set(((data ?? []) as Array<{ slug: string }>).map((row) => row.slug));

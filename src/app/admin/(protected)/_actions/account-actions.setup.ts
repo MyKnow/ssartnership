@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { getSafeAdminActionErrorCode } from "@/lib/admin-action-errors";
 import { sendPartnerPortalInitialSetupEmail } from "@/lib/partner-email";
+import { logServerError } from "@/lib/server-log";
 import { issuePartnerAccountInitialSetupLink } from "./partner-support/setup-link";
 import {
   logAdminAction,
@@ -83,9 +84,9 @@ export async function sendPartnerAccountInitialSetupUrlAction(formData: FormData
   } catch (error) {
     // The new link is already stored, so this is a delivery failure, not an
     // input error: tell the operator to fix mail or hand over a new URL.
-    console.error("[admin] partner initial setup email failed", {
+    // Delivery errors can echo the recipient address; the helper redacts it.
+    logServerError("[admin] partner initial setup email failed", error, {
       accountId: issued.account.id,
-      message: error instanceof Error ? error.message : "unknown_delivery_error",
     });
     redirectAdminActionError(
       "/admin/companies?tab=accounts",
@@ -103,9 +104,8 @@ export async function sendPartnerAccountInitialSetupUrlAction(formData: FormData
 
   if (sentAtError) {
     // The mail is already delivered; only the "sent" timestamp is missing.
-    console.error("[admin] partner initial setup sent-at update failed", {
+    logServerError("[admin] partner initial setup sent-at update failed", sentAtError, {
       accountId: issued.account.id,
-      message: sentAtError.message,
     });
   }
 

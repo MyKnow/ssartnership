@@ -239,7 +239,7 @@ Issue #543에서 "컨테이너가 살아 있다"만 보던 감시를 서버 오�
 
 ### 서버 로그 형식
 
-서버 코드는 `src/lib/server-log.ts`의 `logServerError`/`logServerWarning`으로 한 줄 JSON을 stdout/stderr에 쓴다. 필드는 `level`, `event`(고정 라벨), `time`, `error{name, code, status, digest, message}`, `properties`다. raw error 객체, Supabase/PostgREST `details`·`hint`는 기록하지 않고 message의 이메일·토큰·URL·행 값·긴 숫자는 마스킹한다. `properties`는 공용 로그 정제기를 통과한다. 관리자 edge guard 차단 로그의 IP는 IPv4 /24, IPv6 /48 단위로만 남긴다. `tests/server-log-adoption.test.mts`가 raw error를 `console.error`로 직접 찍는 서버 코드의 재유입을 막는다.
+서버 코드는 `src/lib/server-log.ts`의 `logServerError`/`logServerWarning`으로 한 줄 JSON을 stdout/stderr에 쓴다. 필드는 `level`, `event`(고정 라벨), `time`, `error{name, code, status, digest, message}`, `properties`다. raw error 객체, Supabase/PostgREST `details`·`hint`는 기록하지 않고 message의 이메일·토큰·URL·행 값·긴 숫자는 마스킹한다. `properties`는 공용 로그 정제기를 통과한다. 관리자 edge guard 차단 로그의 IP는 IPv4 /24, IPv6 /48 단위로만 남긴다. `tests/server-log-adoption.test.mts`가 raw error 객체나 `{ message: error.message }` 같은 provider message를 `console.error`·`console.warn`으로 직접 찍는 서버 코드의 재유입을 막는다.
 
 Docker `local` 로그 드라이버가 10MB×3으로 회전하므로 오래 보관해야 할 근거는 장애 기록으로 옮긴다. 운영 VM에서 최근 오류만 보려면 다음 한 줄을 사용한다.
 

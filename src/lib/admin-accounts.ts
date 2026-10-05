@@ -12,6 +12,7 @@ import {
   normalizeAdminManagedCampusSlugs,
 } from "@/lib/admin-scope";
 import { getMockAdminAccountById } from "@/lib/mock/admin";
+import { logServerError } from "@/lib/server-log";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
 export type AdminAccount = {
@@ -228,11 +229,7 @@ function logAdminAccountReadFailure(
   operation: string,
   error: { message: string; code?: string },
 ) {
-  console.error("[admin-accounts] read failed", {
-    operation,
-    code: error.code ?? null,
-    message: error.message,
-  });
+  logServerError("[admin-accounts] read failed", error, { operation });
 }
 
 /**

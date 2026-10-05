@@ -148,10 +148,13 @@ export async function getAdminPartnerDetailCoreReadModel({
     ]);
 
     if (partnerResult.error || previewTokenResult.error) {
-      console.error("[admin-partner-detail] core read model query failed", {
-        partnerError: partnerResult.error?.message ?? null,
-        previewTokenError: previewTokenResult.error?.message ?? null,
-      });
+      // One sanitized line per failed query; provider messages are redacted.
+      if (partnerResult.error) {
+        logServerError("[admin-partner-detail] core read model query failed", partnerResult.error, { query: "partner" });
+      }
+      if (previewTokenResult.error) {
+        logServerError("[admin-partner-detail] core read model query failed", previewTokenResult.error, { query: "preview_token" });
+      }
       return { status: "error" as const };
     }
     const partner = partnerResult.data as unknown as AdminPartnerDetailRow | null;
