@@ -83,6 +83,7 @@ type PublicPartnerSeoRow = {
   campus_slugs?: string[] | null;
   period_start: string | null;
   period_end: string | null;
+  created_at?: string | null;
   categories?:
     | { label?: string | null }
     | Array<{ label?: string | null }>
@@ -112,7 +113,7 @@ const PARTNER_SELECT_COLUMNS =
 const PUBLIC_DIRECTORY_SELECT_COLUMNS =
   "id,name,category_id,created_at,location,campus_slugs,thumbnail,map_url,benefit_action_type,benefit_action_link,reservation_link,inquiry_link,period_start,period_end,conditions,benefits,partner_benefits(id,title,max_apply_count,display_order),applies_to,tags,visibility,benefit_visibility,branch_scope_type,categories(key)";
 const PUBLIC_PARTNER_SEO_SELECT_COLUMNS =
-  "id,name,location,campus_slugs,period_start,period_end,categories(label)";
+  "id,name,location,campus_slugs,period_start,period_end,created_at,categories(label)";
 
 function normalizeDate(value: string | null | undefined) {
   return value ?? "미정";
@@ -517,6 +518,7 @@ function mapPublicPartnerSeoEntry(
       start: row.period_start,
       end: row.period_end,
     },
+    createdAt: row.created_at ?? null,
   };
 }
 

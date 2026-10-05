@@ -19,6 +19,8 @@ export type PublicPartnerSeoEntry = {
     start: string | null;
     end: string | null;
   };
+  /** When the partner was registered; the RSS item date. Null when unknown. */
+  createdAt: string | null;
 };
 
 export type PublicPartnerSeoOptions = {

@@ -200,6 +200,13 @@ export class MockPartnerRepository implements PartnerRepository {
       .filter((partner) =>
         canViewPartnerDetails(partner.visibility, false, partner.period),
       )
+      // Same order as the Supabase query (newest registration first) so the
+      // limited RSS projection picks the same partners.
+      .toSorted(
+        (left, right) =>
+          right.createdAt.localeCompare(left.createdAt) ||
+          left.id.localeCompare(right.id),
+      )
       .map((partner) => ({
         id: partner.id,
         name: partner.name,
@@ -213,6 +220,7 @@ export class MockPartnerRepository implements PartnerRepository {
           start: partner.period.start || null,
           end: partner.period.end || null,
         },
+        createdAt: partner.createdAt || null,
       }));
     const limit = options.limit;
 
