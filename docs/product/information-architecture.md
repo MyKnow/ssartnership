@@ -31,7 +31,7 @@ page route의 기계 판독 기준은 `src/lib/mock/scenarios/route-inventory.ts
 | Partner | `src/app/partner` | 파트너 로그인, setup, dashboard, 파트너사/제휴처/플랜/알림/지원 |
 | Legal | `src/app/legal/[kind]` | 약관/개인정보/마케팅 문서 버전 조회 |
 | API | `src/app/api` | 인증, 알림, 제휴, 리뷰, Push, cron, image proxy, 로그 |
-| SEO/runtime files | `src/app/sitemap.ts`, `robots.ts`, `manifest.ts`, `rss.xml/route.ts`, `icon.tsx` | 검색엔진, PWA, RSS, 아이콘 |
+| SEO/runtime files | `src/app/sitemap.ts`, `robots.ts`, `manifest.ts`, `rss.xml/route.ts`; 아이콘·공유 이미지는 `public/` 정적 파일 | 검색엔진, PWA, RSS, 아이콘 |
 
 ## Public site routes
 

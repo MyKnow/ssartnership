@@ -1,4 +1,4 @@
-// Regenerates the committed raster share assets from vector sources:
+// Regenerates the committed raster share assets and favicon from vector sources:
 //   node scripts/generate-share-assets.mjs
 // Outputs are deterministic for a given sharp/Pretendard version. Review the
 // images visually before committing; crawlers cache share cards aggressively.
@@ -21,6 +21,36 @@ export const EVENT_SHARE_IMAGES = [
   { source: "ads/review-reward.svg", output: "ads/review-reward-og.png" },
   { source: "ads/reward-event.svg", output: "ads/reward-event-og.png" },
 ];
+
+// Browsers pick the closest frame; three frames keep the file small.
+export const FAVICON_SIZES = [16, 32, 48];
+
+/** Packs PNG frames into an ICO container (PNG-in-ICO, supported since Vista). */
+export function buildIco(frames) {
+  const headerSize = 6;
+  const entrySize = 16;
+  const header = Buffer.alloc(headerSize + entrySize * frames.length);
+  header.writeUInt16LE(0, 0);
+  header.writeUInt16LE(1, 2);
+  header.writeUInt16LE(frames.length, 4);
+  let offset = header.length;
+  frames.forEach(({ size, png }, index) => {
+    if (!Number.isInteger(size) || size < 1 || size > 256) {
+      throw new Error(`favicon frame size ${size} is outside 1..256`);
+    }
+    const entry = headerSize + entrySize * index;
+    header.writeUInt8(size === 256 ? 0 : size, entry);
+    header.writeUInt8(size === 256 ? 0 : size, entry + 1);
+    header.writeUInt8(0, entry + 2);
+    header.writeUInt8(0, entry + 3);
+    header.writeUInt16LE(1, entry + 4);
+    header.writeUInt16LE(32, entry + 6);
+    header.writeUInt32LE(png.length, entry + 8);
+    header.writeUInt32LE(offset, entry + 12);
+    offset += png.length;
+  });
+  return Buffer.concat([header, ...frames.map((frame) => frame.png)]);
+}
 
 function escapeXml(value) {
   return value.replace(/[<>&"']/g, (character) => `&#${character.charCodeAt(0)};`);
@@ -121,12 +151,26 @@ async function renderEventShareImage(sharp, { source, output }) {
   return target;
 }
 
+async function renderFavicon(sharp) {
+  const iconSvg = await readFile(path.join(publicDir, "icon.svg"));
+  const frames = await Promise.all(
+    FAVICON_SIZES.map(async (size) => ({
+      size,
+      png: await sharp(iconSvg).resize(size, size).png({ compressionLevel: 9 }).toBuffer(),
+    })),
+  );
+  const output = path.join(publicDir, "favicon.ico");
+  await writeFile(output, buildIco(frames));
+  return output;
+}
+
 async function main() {
   const outputs = await withPretendardFontconfig(async () => {
     const { default: sharp } = await import("sharp");
     return [
       await renderDefaultShareImage(sharp),
       ...(await Promise.all(EVENT_SHARE_IMAGES.map((entry) => renderEventShareImage(sharp, entry)))),
+      await renderFavicon(sharp),
     ];
   });
   for (const output of outputs) {

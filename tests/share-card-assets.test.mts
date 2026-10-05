@@ -13,7 +13,9 @@ type ShareScriptModule = {
   OG_WIDTH: number;
   OG_HEIGHT: number;
   EVENT_SHARE_IMAGES: Array<{ source: string; output: string }>;
+  FAVICON_SIZES: number[];
   buildEventShareSvg(heroSvg: string): string;
+  buildIco(frames: Array<{ size: number; png: Buffer }>): Buffer;
 };
 
 const shareScriptPromise = import(
@@ -70,6 +72,28 @@ test("event share SVG letterboxes the hero and extends its full-bleed backdrop",
   assert.match(svg, /d="M0 -58H1200V572H0V-58Z"/);
   assert.match(svg, /<text>헤드라인<\/text>/);
   assert.throws(() => buildEventShareSvg('<svg width="800" height="400"></svg>'), /1200px wide/);
+});
+
+test("favicon packer writes a PNG-in-ICO directory with contiguous offsets", async () => {
+  const { buildIco, FAVICON_SIZES } = await shareScriptPromise;
+  assert.deepEqual(FAVICON_SIZES, [16, 32, 48]);
+  const frames = [
+    { size: 16, png: Buffer.from("aaaa") },
+    { size: 256, png: Buffer.from("bbbbbb") },
+  ];
+  const ico = buildIco(frames);
+
+  assert.equal(ico.readUInt16LE(0), 0);
+  assert.equal(ico.readUInt16LE(2), 1);
+  assert.equal(ico.readUInt16LE(4), 2);
+  assert.equal(ico.readUInt8(6), 16);
+  assert.equal(ico.readUInt8(6 + 16), 0, "256px frames are stored as 0");
+  assert.equal(ico.readUInt16LE(6 + 6), 32);
+  assert.equal(ico.readUInt32LE(6 + 8), 4);
+  assert.equal(ico.readUInt32LE(6 + 12), 38);
+  assert.equal(ico.readUInt32LE(6 + 16 + 12), 42);
+  assert.equal(ico.subarray(38).toString(), "aaaabbbbbb");
+  assert.throws(() => buildIco([{ size: 300, png: Buffer.alloc(1) }]), /outside 1\.\.256/);
 });
 
 test("pages do not advertise the square app icon as a large share card", () => {
