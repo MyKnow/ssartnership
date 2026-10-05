@@ -11,6 +11,7 @@ import {
   ADMIN_REVIEW_NOTE_MAX_LENGTH,
   type AdminReviewQueueFeedback,
 } from "@/lib/admin-review-queue";
+import { formatKoreanLocaleDateTime } from "@/lib/datetime";
 import DeferredImagePreview from "@/components/admin/DeferredImagePreview";
 
 export type AdminProfilePhotoReplacement = {
@@ -231,7 +232,7 @@ export default function AdminProfilePhotoReviewQueue({
                           <Badge variant="warning">검토 대기</Badge>
                         </div>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          제출일 {new Date(replacement.created_at).toLocaleString("ko-KR")}
+                          제출일 {formatKoreanLocaleDateTime(replacement.created_at)}
                         </p>
                         <p className="mt-3 text-sm text-muted-foreground">
                           한 사람의 얼굴이 명확하게 보이고 인증 카드에 적합한지

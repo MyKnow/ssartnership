@@ -29,7 +29,7 @@ FE 제출 전 검증과 BE 신뢰 경계 검증은 아래 공용 모듈의 같�
 | 입력 길이 상한 | 도메인 규칙 모듈의 상수(예: `SHOWCASE_PROJECT_LIMITS`, `PARTNER_BILLING_FIELD_LIMITS`, `REVIEW_TEXT_LIMITS`, `ADMIN_REVIEW_NOTE_MAX_LENGTH`, `NOTIFICATION_TEMPLATE_MAX_*`). 폼 `maxLength`는 상수를 참조한다 |
 | 필드 오류와 첫 오류 필드 | `src/lib/field-errors.ts`의 `FieldErrors`·`hasFieldErrors`·`firstInvalidField` |
 | FormData 문자열 읽기 | `src/lib/form-data.ts`의 `readString`(trim)·`readRawString`(원문) |
-| 날짜·시각 표기 | `src/lib/datetime.ts`. 모든 표기는 `Asia/Seoul`로 고정하고, 화면에서 `timeZone` 없는 `Intl.DateTimeFormat`을 만들지 않는다 |
+| 날짜·시각 표기 | `src/lib/datetime.ts`. 모든 표기는 `Asia/Seoul`로 고정하고, 화면에서 `timeZone` 없는 `Intl.DateTimeFormat`이나 날짜 객체의 `toLocaleString()`·`toLocaleDateString()`을 직접 쓰지 않는다. 기존 `toLocaleString("ko-KR")` 표기는 `formatKoreanLocaleDateTime`으로 유지한다 |
 | 숫자·통화·퍼센트 표기 | `src/lib/number-format.ts`의 `formatCount`·`formatKoreanWon`·`formatPercent`. 로케일 인자 없는 `toLocaleString()`은 쓰지 않는다 |
 
 ## Server action 실패 피드백 쿼리 규약

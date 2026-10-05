@@ -105,6 +105,22 @@ export function formatKoreanMediumDateTime(value: DateLike) {
 }
 
 /**
+ * `Date#toLocaleString("ko-KR")` 기본 표기("2026. 10. 5. 오후 3:05:00")를 KST로 고정한다.
+ * 기존 화면 표기를 그대로 두고 서버·브라우저 시간대 의존만 없앨 때 쓴다.
+ */
+export function formatKoreanLocaleDateTime(value: DateLike) {
+  return formatKoreanDateTime(value, {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+    hour12: true,
+  });
+}
+
+/**
  * KST 기준 `YYYY-MM-DD`. `daysFromToday`만큼 이동한 날짜를 돌려준다(제휴 기간·만료 알림 비교용).
  */
 export function getKstDateString(daysFromToday = 0, baseDate: Date = new Date()) {

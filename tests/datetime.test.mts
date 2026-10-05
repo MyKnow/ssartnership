@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -8,6 +8,7 @@ import {
   formatKoreanDateTimeLocalValue,
   formatKoreanDateTimeToMinute,
   formatKoreanDateTimeToSecond,
+  formatKoreanLocaleDateTime,
   formatKoreanMediumDateTime,
   formatKoreanMonthDayTime,
   formatOptionalKoreanDateTimeToMinute,
@@ -48,6 +49,8 @@ function snapshot() {
     monthDayTime24: formatKoreanMonthDayTime(KST_AFTERNOON, { hour12: false }),
     monthDayTimeYear: formatKoreanMonthDayTime(KST_AFTERNOON, { year: true }),
     medium: formatKoreanMediumDateTime(KST_AFTERNOON),
+    localeDefault: formatKoreanLocaleDateTime(KST_AFTERNOON),
+    localeDefaultMidnight: formatKoreanLocaleDateTime(KST_MIDNIGHT_EDGE),
     shortStyle: formatKoreanDateTime(KST_AFTERNOON, { dateStyle: "short", timeStyle: "short", hour12: true }),
     period: formatKoreanDateTime(KST_AFTERNOON, {
       month: "2-digit",
@@ -70,6 +73,8 @@ const EXPECTED = {
   monthDayTime24: "10월 5일 15:05",
   monthDayTimeYear: "2026년 10월 5일 오후 03:05",
   medium: "2026. 10. 5. 오후 3:05",
+  localeDefault: "2026. 10. 5. 오후 3:05:00",
+  localeDefaultMidnight: "2026. 10. 5. 오전 12:30:00",
   shortStyle: "26. 10. 5. 오후 3:05",
   period: "10. 05. 오후 03:05",
   localValue: "2026-10-05T00:30",
@@ -98,10 +103,18 @@ test("TZ 전환 하네스가 실제로 런타임 시간대를 바꾼다(timeZone
   assert.notEqual(unpinned("UTC"), unpinned("Asia/Seoul"));
 });
 
+test("formatKoreanLocaleDateTime은 서울 시간대의 Date#toLocaleString(\"ko-KR\") 표기를 그대로 유지한다", () => {
+  for (const value of [KST_AFTERNOON, KST_MIDNIGHT_EDGE, "2026-01-01T03:00:59.000Z"]) {
+    const expected = withTimeZone("Asia/Seoul", () => new Date(value).toLocaleString("ko-KR"));
+    assert.equal(withTimeZone("UTC", () => formatKoreanLocaleDateTime(value)), expected, value);
+  }
+});
+
 test("잘못된 날짜와 빈 값은 포맷터마다 정해진 대체값을 쓴다", () => {
   assert.equal(formatKoreanDate("invalid"), "");
   assert.equal(formatKoreanMonthDayTime("invalid"), "");
   assert.equal(formatKoreanMediumDateTime("invalid"), "");
+  assert.equal(formatKoreanLocaleDateTime("invalid"), "");
   assert.equal(formatKoreanDateTimeLocalValue("invalid"), "");
   assert.equal(toDateTimeLocalInput(null), "");
   assert.equal(formatOptionalKoreanDateTimeToMinute(null, "-"), "-");
@@ -142,9 +155,36 @@ test("timeZone 없이 ko-KR로 날짜를 포맷하던 화면은 공용 KST 포�
     "src/components/admin/AdminEventDetailView.tsx",
     "src/app/admin/(protected)/events/project-showcase/feedback/page.tsx",
     "src/app/admin/(protected)/events/project-showcase/logs/page.tsx",
+    "src/components/admin/AdminProfilePhotoReviewQueue.tsx",
+    "src/components/admin/AdminMemberManualAddPanel.tsx",
   ]) {
     const source = readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
     assert.doesNotMatch(source, /new Intl\.DateTimeFormat\(/, path);
     assert.match(source, /from "@\/lib\/datetime"/, path);
   }
+});
+
+function listSourceFiles(directory: URL): URL[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const child = new URL(`${entry.name}${entry.isDirectory() ? "/" : ""}`, directory);
+    if (entry.isDirectory()) return listSourceFiles(child);
+    return /\.(?:ts|tsx)$/u.test(entry.name) && !/\.stories\.tsx$/u.test(entry.name) ? [child] : [];
+  });
+}
+
+test("날짜 객체를 toLocale*String으로 직접 포맷하지 않고 KST 고정 공용 포맷터를 쓴다", () => {
+  const sourceRoot = new URL("../src/", import.meta.url);
+  const offenders = listSourceFiles(sourceRoot)
+    .map((file) => ({
+      relative: decodeURIComponent(file.href.slice(sourceRoot.href.length)),
+      source: readFileSync(file, "utf8"),
+    }))
+    .filter(
+      ({ relative, source }) =>
+        relative !== "lib/datetime.ts" &&
+        (/\.toLocale(?:Date|Time)String\(/u.test(source) ||
+          /\bDate\([^()]*\)\.toLocaleString\(/u.test(source)),
+    )
+    .map(({ relative }) => relative);
+  assert.deepEqual(offenders, []);
 });

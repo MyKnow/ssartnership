@@ -14,6 +14,7 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import { useToast } from "@/components/ui/Toast";
 import { getSafeAdminResponseMessage } from "@/lib/admin-safe-messages";
+import { formatKoreanLocaleDateTime } from "@/lib/datetime";
 import {
   MANUAL_MEMBER_IMPORT_CAMPUS_OPTIONS,
   getManualMemberImportGenerationOptions,
@@ -1036,7 +1037,7 @@ export default function AdminMemberManualAddPanel({
           </div>
         </div>
         {error ? <FormMessage variant="error" className="whitespace-pre-line">{error}</FormMessage> : null}
-        {batch ? <FormMessage variant="muted">준비 완료 · {new Date(batch.expiresAt).toLocaleString("ko-KR")} 전까지 생성할 수 있습니다.</FormMessage> : null}
+        {batch ? <FormMessage variant="muted">준비 완료 · {formatKoreanLocaleDateTime(batch.expiresAt)} 전까지 생성할 수 있습니다.</FormMessage> : null}
       </div>
 
       {result ? (
