@@ -151,6 +151,29 @@ export async function POST(
     });
     return NextResponse.json({ ok: true, review, summary });
   } catch (error) {
+    // The client-generated reviewId is the idempotency key. A duplicate
+    // submission that lost a race (primary key conflict, or an image the
+    // winning request already attached) answers with the stored review before
+    // any error is mapped, so a double tap never reports a failed save.
+    const storedReview = await partnerReviewRepository
+      .getPartnerReviewById(reviewId, session.userId)
+      .catch(() => null);
+    if (
+      storedReview
+      && storedReview.partnerId === id
+      && storedReview.memberId === session.userId
+    ) {
+      // Attachments resolve to deterministic per-review paths, so only files
+      // the stored review does not reference are this request's leftovers.
+      const leftoverUrls = uploadedUrls.filter(
+        (url) => !storedReview.images.includes(url),
+      );
+      if (leftoverUrls.length > 0) {
+        await deleteReviewMediaUrls(leftoverUrls).catch(() => undefined);
+      }
+      const summary = await partnerReviewRepository.getPartnerReviewSummary(id);
+      return NextResponse.json({ ok: true, review: storedReview, summary, idempotent: true });
+    }
     if (isReviewImageUploadUnavailable(error)) {
       return NextResponse.json(
         {
@@ -167,17 +190,6 @@ export async function POST(
         { ok: false, fieldErrors: mediaFieldErrors },
         { status: 400 },
       );
-    }
-    const retriedReview = await partnerReviewRepository
-      .getPartnerReviewById(reviewId, session.userId)
-      .catch(() => null);
-    if (
-      retriedReview
-      && retriedReview.partnerId === id
-      && retriedReview.memberId === session.userId
-    ) {
-      const summary = await partnerReviewRepository.getPartnerReviewSummary(id);
-      return NextResponse.json({ ok: true, review: retriedReview, summary, idempotent: true });
     }
     await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);
     console.error("[partner-reviews] create failed", error);
