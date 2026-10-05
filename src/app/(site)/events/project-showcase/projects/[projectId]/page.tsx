@@ -10,6 +10,7 @@ import { getShowcasePhase, projectShowcaseRepository } from "@/lib/project-showc
 import { formatShowcasePeriod } from "@/lib/project-showcase/format";
 import { SHOWCASE_TYPE_LABELS } from "@/lib/project-showcase/labels";
 import type { ShowcaseProjectType } from "@/lib/project-showcase/types";
+import { createCanonicalAlternates, createPageOpenGraph } from "@/lib/seo";
 import { getSignedUserSession } from "@/lib/user-auth";
 
 export const dynamic = "force-dynamic";
@@ -33,16 +34,21 @@ export async function generateMetadata({
   params: Promise<{ projectId: string }>;
 }): Promise<Metadata> {
   const { projectId } = await params;
+  // getPublicProject only resolves approved projects during the experience
+  // phase, so every other phase renders the closed notice with noindex.
   const project = await projectShowcaseRepository.getPublicProject(projectId);
-  if (!project) return { title: "내 프로젝트를 소개합니다!", robots: { index: false } };
+  if (!project) return { title: "내 프로젝트를 소개합니다!", robots: { index: false, follow: true } };
+  const projectPath = `${EVENT_PATH}/projects/${encodeURIComponent(project.id)}`;
   return {
     title: `${project.title} | 내 프로젝트를 소개합니다!`,
     description: project.summary,
-    openGraph: {
+    alternates: createCanonicalAlternates(projectPath),
+    openGraph: createPageOpenGraph({
+      path: projectPath,
       title: project.title,
       description: project.summary,
       images: [{ url: project.imageUrl, alt: project.title }],
-    },
+    }),
   };
 }
 

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
@@ -14,6 +15,11 @@ import {
 import { getSignedUserSession } from "@/lib/user-auth";
 
 export const dynamic = "force-dynamic";
+
+// Member-only participation screens are never search results.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 const STATUS_GUIDANCE: Record<ShowcaseProjectStatus, string> = {
   pending: "운영진이 개발 참여 여부와 링크 접속을 확인하고 있어요. 확인 전에는 내용을 수정할 수 있어요.",

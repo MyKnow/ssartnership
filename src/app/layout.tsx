@@ -9,7 +9,7 @@ import {
   SITE_RSS_URL,
   SITE_TITLE,
 } from "@/lib/site";
-import { createCanonicalAlternates, getMetadataBase } from "@/lib/seo";
+import { getMetadataBase } from "@/lib/seo";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import PwaProvider from "@/components/PwaProvider";
@@ -31,8 +31,9 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
   },
+  // Each indexable page declares its own canonical path. A root canonical would
+  // be inherited by every segment and point unrelated pages at the home page.
   alternates: {
-    ...createCanonicalAlternates("/"),
     types: {
       "application/rss+xml": SITE_RSS_URL,
     },
@@ -45,7 +46,6 @@ export const metadata: Metadata = {
   openGraph: {
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
-    url: "/",
     siteName: SITE_NAME,
     locale: "ko_KR",
     type: "website",

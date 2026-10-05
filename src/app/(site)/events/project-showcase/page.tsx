@@ -16,6 +16,7 @@ import {
 import { formatShowcaseDateTime, formatShowcasePeriod } from "@/lib/project-showcase/format";
 import { SHOWCASE_PHASE_LABELS, SHOWCASE_PRIZES, SHOWCASE_TYPE_LABELS } from "@/lib/project-showcase/labels";
 import { SHOWCASE_PROJECT_TYPES } from "@/lib/project-showcase/types";
+import { createCanonicalAlternates, createPageOpenGraph } from "@/lib/seo";
 import { getSignedUserSession } from "@/lib/user-auth";
 
 export const dynamic = "force-dynamic";
@@ -47,11 +48,13 @@ const TIMELINE_INDEX: Partial<Record<ShowcasePhase, number>> = {
 export const metadata: Metadata = {
   title: "내 프로젝트를 소개합니다! | SSAFY 프로젝트 쇼케이스",
   description: "SSAFY 구성원이 직접 개발·배포한 웹·앱·게임·임베디드 프로젝트를 소개하고 함께 체험해 보세요.",
-  openGraph: {
+  alternates: createCanonicalAlternates(EVENT_PATH),
+  openGraph: createPageOpenGraph({
+    path: EVENT_PATH,
     title: "내 프로젝트를 소개합니다!",
     description: "SSAFY 구성원이 만든 서비스를 소개하고 함께 체험해 보세요.",
     images: [{ url: "/ads/project-showcase-banner.png", width: 1915, height: 821, alt: "SSAFY 프로젝트 쇼케이스" }],
-  },
+  }),
 };
 
 function firstParam(value: string | string[] | undefined) {

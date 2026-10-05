@@ -1,5 +1,20 @@
-import type { MetadataRoute } from "next";
-import { SITE_URL } from "../site.ts";
+import type { Metadata, MetadataRoute } from "next";
+import { SITE_NAME, SITE_TITLE, SITE_URL } from "../site.ts";
+
+export type SeoOpenGraphImage = {
+  url: string;
+  width?: number;
+  height?: number;
+  alt?: string;
+};
+
+/** Share card used when a page has no image of its own. */
+export const DEFAULT_OPEN_GRAPH_IMAGE = {
+  url: "/icon-512.png",
+  width: 512,
+  height: 512,
+  alt: SITE_TITLE,
+} as const satisfies SeoOpenGraphImage;
 
 export function serializeJsonLd(value: unknown) {
   const serialized = JSON.stringify(value) ?? "null";
@@ -30,6 +45,30 @@ export function getMetadataBase() {
 export function createCanonicalAlternates(pathname = "/") {
   return {
     canonical: normalizeSeoPath(pathname),
+  };
+}
+
+/**
+ * Builds a page-level Open Graph block. Next.js replaces (not merges) a parent
+ * segment's `openGraph`, so every page that declares one must carry its own
+ * URL, site defaults, and an image.
+ */
+export function createPageOpenGraph(input: {
+  path: string;
+  title?: string;
+  description?: string;
+  images?: SeoOpenGraphImage[];
+  type?: "website" | "article";
+}): NonNullable<Metadata["openGraph"]> {
+  const images = input.images?.filter((image) => image.url.trim()) ?? [];
+  return {
+    ...(input.title ? { title: input.title } : {}),
+    ...(input.description ? { description: input.description } : {}),
+    url: normalizeSeoPath(input.path),
+    siteName: SITE_NAME,
+    locale: "ko_KR",
+    type: input.type ?? "website",
+    images: images.length > 0 ? images : [DEFAULT_OPEN_GRAPH_IMAGE],
   };
 }
 
