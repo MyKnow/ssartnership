@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import {
+  PARTNER_LOGIN_PATH,
+  getPartnerSessionExpiredLoginHref,
+} from "../src/lib/partner-auth/portal-paths.ts";
+import {
   getPartnerLoginHref,
   getPartnerPasswordChangeGateHref,
   getPartnerRequestReturnTo,
@@ -123,6 +127,31 @@ describe("partner login and password gate hrefs", () => {
     assert.equal(
       resolvePartnerPostLoginHref({ mustChangePassword: false, returnTo: "/admin" }),
       "/partner",
+    );
+  });
+});
+
+describe("partner login path", () => {
+  it("shares one login path across returnTo, session expiry and login error redirects", async () => {
+    const returnToModule = await import("../src/lib/partner-auth/return-to.ts");
+    const { buildPartnerLoginErrorRedirect } = await import(
+      "../src/app/partner/login/_actions/shared.ts"
+    );
+
+    assert.equal("PARTNER_LOGIN_PAGE_PATH" in returnToModule, false);
+    assert.equal(PARTNER_LOGIN_PATH, "/partner/login");
+    assert.equal(getPartnerLoginHref(), PARTNER_LOGIN_PATH);
+    assert.equal(
+      getPartnerRequestReturnTo(PARTNER_LOGIN_PATH, "?returnTo=%2Fpartner%2Fplans"),
+      "/partner/plans",
+    );
+    assert.equal(
+      new URL(getPartnerSessionExpiredLoginHref(), "https://partner.example").pathname,
+      PARTNER_LOGIN_PATH,
+    );
+    assert.equal(
+      buildPartnerLoginErrorRedirect("server_error", "partner@example.com", "/partner/plans"),
+      "/partner/login?error=server_error&loginId=partner%40example.com&returnTo=%2Fpartner%2Fplans",
     );
   });
 });

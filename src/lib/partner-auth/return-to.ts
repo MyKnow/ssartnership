@@ -1,4 +1,4 @@
-import { PARTNER_PASSWORD_CHANGE_PATH } from "./portal-paths.ts";
+import { PARTNER_LOGIN_PATH, PARTNER_PASSWORD_CHANGE_PATH } from "./portal-paths.ts";
 
 /**
  * Keeps a partner deep link across login and a forced password change.
@@ -11,13 +11,12 @@ import { PARTNER_PASSWORD_CHANGE_PATH } from "./portal-paths.ts";
  */
 
 export const PARTNER_PORTAL_HOME_PATH = "/partner";
-export const PARTNER_LOGIN_PAGE_PATH = "/partner/login";
 export const PARTNER_RETURN_TO_PARAM = "returnTo";
 
 const PARTNER_RETURN_TO_MAX_LENGTH = 1024;
 const PARTNER_RETURN_TO_BASE_ORIGIN = "https://partner-return-to.invalid";
 const PARTNER_RETURN_TO_EXCLUDED_PATHS = [
-  PARTNER_LOGIN_PAGE_PATH,
+  PARTNER_LOGIN_PATH,
   "/partner/logout",
   "/partner/reset",
   "/partner/setup",
@@ -86,7 +85,7 @@ function withPartnerReturnTo(path: string, returnTo: unknown) {
 
 /** `/partner/login`, carrying a valid original destination. */
 export function getPartnerLoginHref(returnTo?: unknown) {
-  return withPartnerReturnTo(PARTNER_LOGIN_PAGE_PATH, returnTo);
+  return withPartnerReturnTo(PARTNER_LOGIN_PATH, returnTo);
 }
 
 /** The forced password change gate, carrying a valid original destination. */
@@ -103,7 +102,7 @@ export function getPartnerRequestReturnTo(
   pathname: string,
   search: string,
 ): string | null {
-  if (pathname === PARTNER_LOGIN_PAGE_PATH) {
+  if (pathname === PARTNER_LOGIN_PATH) {
     return sanitizePartnerReturnTo(
       new URLSearchParams(search).get(PARTNER_RETURN_TO_PARAM),
     );
