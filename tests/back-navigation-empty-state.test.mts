@@ -72,3 +72,28 @@ test("빈 상태는 EmptyState 크기 변형을 쓰고 맥락 없는 '데이터�
     assert.match(await read(file), /<EmptyState[\s\S]*?size="sm"/, file);
   }
 });
+
+test("쇼케이스·푸시 발송 로그 목록의 빈 상태는 ad hoc 점선 상자 대신 EmptyState를 쓴다", async () => {
+  const files = [
+    "src/app/admin/(protected)/events/project-showcase/page.tsx",
+    "src/app/admin/(protected)/events/project-showcase/logs/page.tsx",
+    "src/app/admin/(protected)/events/project-showcase/feedback/page.tsx",
+    "src/app/(site)/events/project-showcase/page.tsx",
+    "src/app/(site)/events/project-showcase/my/page.tsx",
+    "src/components/admin/push-manager/PushLogsSection.tsx",
+  ];
+
+  for (const file of files) {
+    const source = await read(file);
+    assert.match(source, /import EmptyState from "@\/components\/ui\/EmptyState";/, file);
+    assert.match(source, /<EmptyState\s/, file);
+    assert.doesNotMatch(
+      source,
+      /<div className="[^"]*border-dashed[^"]*text-center[^"]*">/,
+      `${file}: 점선 빈 상태 상자를 직접 그립니다.`,
+    );
+  }
+
+  const myPage = await read("src/app/(site)/events/project-showcase/my/page.tsx");
+  assert.equal([...myPage.matchAll(/<EmptyState\s/g)].length, 2);
+});

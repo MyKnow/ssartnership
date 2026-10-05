@@ -2,6 +2,7 @@ import Link from "next/link";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminShell from "@/components/admin/AdminShell";
 import ShowcaseFeedbackVisibilityButton from "@/components/admin/ShowcaseFeedbackVisibilityButton";
+import EmptyState from "@/components/ui/EmptyState";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { canAdmin } from "@/lib/admin-permissions";
 import { projectShowcaseRepository } from "@/lib/project-showcase";
@@ -58,9 +59,14 @@ export default async function AdminShowcaseFeedbackPage({
         </nav>
 
         {feedback.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-surface p-8 text-center text-sm text-muted-foreground">
-            {hidden ? "숨긴 피드백이 없어요." : "아직 받은 피드백이 없어요."}
-          </div>
+          <EmptyState
+            title={hidden ? "숨긴 피드백이 없어요." : "아직 받은 피드백이 없어요."}
+            description={
+              hidden
+                ? "숨긴 피드백은 이 탭에 모여요."
+                : "체험한 회원이 피드백을 남기면 이곳에 표시돼요."
+            }
+          />
         ) : (
           <ul className="grid gap-3">
             {feedback.map((item) => (

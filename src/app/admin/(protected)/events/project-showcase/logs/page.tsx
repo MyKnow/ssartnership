@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import AdminShell from "@/components/admin/AdminShell";
+import EmptyState from "@/components/ui/EmptyState";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { ADMIN_LIST_DEFAULT_PAGE_SIZE } from "@/lib/admin-ia";
 import { projectShowcaseRepository } from "@/lib/project-showcase";
@@ -214,9 +215,10 @@ export default async function AdminShowcaseLogsPage({
               </div>
 
               {activityPage.items.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border bg-surface p-8 text-center text-sm text-muted-foreground">
-                  조건에 맞는 이벤트 로그가 없어요.
-                </div>
+                <EmptyState
+                  title="조건에 맞는 이벤트 로그가 없어요."
+                  description="다른 활동 유형을 선택하거나 모든 활동으로 바꿔 확인해 주세요."
+                />
               ) : (
                 <div className="grid gap-3">
                   {activityPage.items.map((item) => (

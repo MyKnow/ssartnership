@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
 import { getHeaderSession } from "@/lib/header-session";
 import { getShowcasePhase, projectShowcaseRepository } from "@/lib/project-showcase";
 import { formatShowcasePeriod } from "@/lib/project-showcase/format";
@@ -71,16 +72,19 @@ export default async function MyShowcaseParticipationPage() {
               </dl>
             </article>
           )) : (
-            <div className="rounded-2xl border border-dashed border-border bg-surface px-5 py-10 text-center">
-              <p className="font-semibold text-foreground">출품한 프로젝트가 없어요</p>
-              {phase === "submission" ? (
-                <div className="mt-4"><Button href="/events/project-showcase/projects/new">출품하기</Button></div>
-              ) : (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  모집 기간: {formatShowcasePeriod(event?.submissionStartAt ?? null, event?.submissionEndAt ?? null)}
-                </p>
-              )}
-            </div>
+            <EmptyState
+              title="출품한 프로젝트가 없어요"
+              description={
+                phase === "submission"
+                  ? undefined
+                  : `모집 기간: ${formatShowcasePeriod(event?.submissionStartAt ?? null, event?.submissionEndAt ?? null)}`
+              }
+              action={
+                phase === "submission" ? (
+                  <Button href="/events/project-showcase/projects/new">출품하기</Button>
+                ) : undefined
+              }
+            />
           )}
         </section>
 
@@ -144,12 +148,10 @@ export default async function MyShowcaseParticipationPage() {
               ))}
             </ul>
           ) : (
-            <div className="rounded-2xl border border-dashed border-border bg-surface px-5 py-8 text-center">
-              <p className="font-semibold text-foreground">{phase === "experience" ? "아직 체험한 프로젝트가 없어요" : "체험 기간에 참여할 수 있어요"}</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                체험 기간: {formatShowcasePeriod(event?.experienceStartAt ?? null, event?.experienceEndAt ?? null)}
-              </p>
-            </div>
+            <EmptyState
+              title={phase === "experience" ? "아직 체험한 프로젝트가 없어요" : "체험 기간에 참여할 수 있어요"}
+              description={`체험 기간: ${formatShowcasePeriod(event?.experienceStartAt ?? null, event?.experienceEndAt ?? null)}`}
+            />
           )}
         </section>
       </main>
