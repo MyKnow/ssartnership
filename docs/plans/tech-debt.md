@@ -63,7 +63,7 @@ Next가 webpack 지원 축소를 예고하면 위 조건과 무관하게 이 항
 
 | 항목 | 지금 허용하는 범위 | 전면 적용 재개 조건 | Issue |
 | --- | --- | --- | --- |
-| `src/lib` 평면 파일 디렉터리 재편(partner, admin, 알림, member, Mattermost, 텔레메트리, graduate 접두사) | partner portal 관련 6파일만 `src/lib/partner-auth/`로 이동(바깥 평면 파일에 의존하는 유일한 경계) | 배치 규칙([결정 D4](./active/refactor-program-2026-10.md#기본-결정))이 정착하고, 해당 도메인 기능 변경이 예정되며, 그 경로를 읽는 소스 계약 테스트를 먼저 재지정했을 때 | — |
+| `src/lib` 평면 파일 디렉터리 재편(partner, admin, 알림, member, Mattermost, 텔레메트리, graduate 접두사) | partner portal 관련 6파일만 `src/lib/partner-auth/`로 이동(바깥 평면 파일에 의존하는 유일한 경계) | 배치 규칙([결정 D4](./active/refactor-program-2026-10.md#기본-결정))이 정착하고, 해당 도메인 기능 변경이 예정되며, 그 경로를 읽는 소스 계약 테스트를 먼저 재지정했을 때. 재개 전에 서버 전용 표식(`.server.ts` 접미사와 `server-only` import 중 무엇을 경계로 삼을지)을 먼저 정한다. 기준 시점에 `src`의 `.server.ts` 35개 중 `server-only`를 import하는 파일은 4개뿐이라 어느 쪽도 일관된 경계가 아니다. | — |
 | `supabase gen types` 기반 Database 타입 | 수동 생성 스크립트와 생성 파일 커밋, 저장소 1개 파일럿 typed accessor | 운영 DB와 같은 마이그레이션 적용 결과를 CI 밖에서 재현할 수 있을 때. 전역 적용은 기존 `as XxxRow` 단언이 타입 오류로 깨질 수 있어 단계적으로 한다. | — |
 | route handler 공용 래퍼·API 응답 봉투 통일 | 새 라우트에만 `unauthorized()`·`forbidden()`·`payloadTooLarge()` 같은 상수 응답 적용 | 보안 경계 하드닝이 안착하고 가드 순서를 검사하는 소스 정규식 테스트를 동작 테스트로 바꾼 뒤 | — |
 | 공용 fake Supabase·mock/Supabase 계약 스위트 | 새 테스트에만 쓰는 작은 env·HTTP 테스트 헬퍼 | mock 지원 범위([결정 D6](./active/refactor-program-2026-10.md#기본-결정))가 바뀔 때 | — |

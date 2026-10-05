@@ -41,7 +41,7 @@ authority: normative
 - 카드 목록, 요약 패널, 문서 샘플을 auto-fit grid로 배치한다.
 
 ## 등장 모션
-- 목록·섹션 등장 애니메이션 컴포넌트는 두지 않는다. 기존 `MotionReveal`은 애니메이션 없는 래퍼이며 새 코드에서 사용하지 않는다. 모션 기준은 [Layout And Motion](./layout-and-motion.md#motion)을 따른다.
+- 목록·섹션 등장 애니메이션 컴포넌트는 두지 않는다. `MotionReveal`은 이름과 달리 애니메이션이 없는 정적 래퍼이므로 새 코드에서 사용하지 않고, 기존 사용처 정리는 디자인 토큰 작업 단위가 맡는다. 모션 기준은 [Layout And Motion](./layout-and-motion.md#motion)을 따른다.
 
 ## CarouselSlideIndicators
 - 이미지 위에 겹치는 캐러셀 위치 표시는 `CarouselSlideIndicators`를 공유한다. 현재 항목은 긴 흰색 pill, 나머지는 낮은 대비의 원형 점으로 표시하고 `aria-pressed`를 함께 제공한다.
