@@ -46,6 +46,13 @@ scrape_configs:
     static_configs:
       - targets: [notifier:9465]
         labels: { environment: operations, vm: host }
+  # Edge request metrics: the operations edge Caddy exposes them only on the
+  # internal monitoring listener (no host label, so arbitrary Host headers
+  # cannot grow cardinality). Apply together with the edge metrics listener.
+  - job_name: caddy
+    static_configs:
+      - targets: [caddy:9180]
+        labels: { environment: operations, vm: "5202" }
   - job_name: observer
     static_configs:
       - targets: [observer:9466]

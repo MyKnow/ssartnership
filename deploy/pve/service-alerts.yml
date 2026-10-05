@@ -65,3 +65,17 @@ groups:
         expr: ssartnership_ingress_probe_expires - time() < 1209600 and ssartnership_ingress_probe_expires > 0
         for: 10m
         labels: { severity: warning }
+      # Upstream 5xx share at the public edge. sum() drops target labels, so
+      # the shared edge identity is attached explicitly. The request floor
+      # (0.05 req/s, about 15 requests per 5 minutes) keeps a single failed
+      # request at night from paging; thresholds are provisional baselines.
+      - alert: ServerErrorBurst
+        expr: >-
+          (
+            sum(rate(caddy_http_request_duration_seconds_count{job="caddy",handler="reverse_proxy",code=~"5.."}[5m]))
+            / sum(rate(caddy_http_request_duration_seconds_count{job="caddy",handler="reverse_proxy"}[5m]))
+            > 0.05
+          )
+          and sum(rate(caddy_http_request_duration_seconds_count{job="caddy",handler="reverse_proxy"}[5m])) > 0.05
+        for: 5m
+        labels: { severity: warning, environment: operations, vm: "5202" }

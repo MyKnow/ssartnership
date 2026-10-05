@@ -45,3 +45,27 @@ tests:
         alertname: PveDiskUnhealthy
         exp_alerts:
           - exp_labels: { environment: operations, vm: host, severity: critical }
+  - interval: 1m
+    input_series:
+      - series: 'caddy_http_request_duration_seconds_count{job="caddy",environment="operations",vm="5202",server="srv0",handler="reverse_proxy",method="GET",code="200"}'
+        values: '0+60x30'
+      - series: 'caddy_http_request_duration_seconds_count{job="caddy",environment="operations",vm="5202",server="srv0",handler="reverse_proxy",method="GET",code="502"}'
+        values: '0+0x10 0+12x20'
+      - series: 'caddy_http_request_duration_seconds_count{job="caddy",environment="operations",vm="5202",server="srv0",handler="static_response",method="GET",code="503"}'
+        values: '0+600x30'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: ServerErrorBurst
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: ServerErrorBurst
+        exp_alerts:
+          - exp_labels: { severity: warning, environment: operations, vm: "5202" }
+  - interval: 1m
+    input_series:
+      - series: 'caddy_http_request_duration_seconds_count{job="caddy",environment="operations",vm="5202",server="srv0",handler="reverse_proxy",method="GET",code="500"}'
+        values: '0+1x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: ServerErrorBurst
+        exp_alerts: []
