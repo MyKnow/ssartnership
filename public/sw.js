@@ -1,8 +1,9 @@
 // Service worker for the installed app: push notifications plus an offline
 // page for failed navigations. Responses are never cached except the
-// self-contained offline page. Bump CACHE_VERSION whenever offline.html changes.
+// self-contained offline page. Bump CACHE_VERSION whenever offline.html changes
+// (tests/service-worker.test.mts records each version's page fingerprint).
 const CACHE_PREFIX = "ssartnership-";
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const OFFLINE_CACHE = `${CACHE_PREFIX}offline-${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline.html";
 // Basic-auth and API navigations go straight to the network.

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
@@ -9,6 +10,16 @@ const workerSource = readFileSync(new URL("../public/sw.js", import.meta.url), "
 const offlinePage = readFileSync(new URL("../public/offline.html", import.meta.url), "utf8");
 const proxySource = readFileSync(new URL("../src/proxy.ts", import.meta.url), "utf8");
 const nextConfigSource = readFileSync(new URL("../next.config.ts", import.meta.url), "utf8");
+const cacheVersion = /const CACHE_VERSION = "([^"]+)";/.exec(workerSource)?.[1] ?? "";
+const offlineCacheName = `ssartnership-offline-${cacheVersion}`;
+
+// Installed apps keep the precached offline page until sw.js itself changes,
+// so an offline.html edit needs a new CACHE_VERSION. When bumping it, append
+// the new version with the page's sha256 (LF line endings).
+const OFFLINE_PAGE_FINGERPRINTS: Readonly<Record<string, string>> = {
+  v1: "be57c731751468b62db546911ba7df117acc05c07c3598cc3fec867205235e58",
+  v2: "82326e79b0ffe2df8d996efe406cfbd801de6164525757c30e66b9cf4571aef3",
+};
 
 type Listener = (event: Record<string, unknown>) => void;
 
@@ -142,7 +153,7 @@ test("install precaches the offline page without cookies and still activates on 
   assert.equal(new URL(worker.fetchCalls[0].url).pathname, OFFLINE_FALLBACK_PATH);
   assert.equal(worker.fetchCalls[0].credentials, "omit");
   assert.equal(worker.fetchCalls[0].cache, "reload");
-  assert.deepEqual([...worker.stores.keys()], ["ssartnership-offline-v1"]);
+  assert.deepEqual([...worker.stores.keys()], [offlineCacheName]);
   assert.equal(worker.counts().skipWaitingCalls, 1);
 
   const offlineInstall = createWorker();
@@ -169,11 +180,16 @@ test("install refuses to cache a redirected or failed offline response", async (
 
 test("activate removes older app caches only and claims clients", async () => {
   const worker = createWorker({
-    initialCaches: ["ssartnership-offline-v0", "ssartnership-offline-v1", "other-library-cache"],
+    initialCaches: [
+      "ssartnership-offline-v0",
+      "ssartnership-offline-v1",
+      offlineCacheName,
+      "other-library-cache",
+    ],
   });
   await worker.activate();
 
-  assert.deepEqual([...worker.stores.keys()].sort(), ["other-library-cache", "ssartnership-offline-v1"]);
+  assert.deepEqual([...worker.stores.keys()].sort(), ["other-library-cache", offlineCacheName]);
   assert.equal(worker.counts().claimCalls, 1);
 });
 
@@ -259,6 +275,20 @@ test("offline page is self-contained and offers a retry", () => {
   assert.match(offlinePage, /<button type="button" id="offline-retry">다시 시도<\/button>/);
   assert.match(offlinePage, /window\.addEventListener\("online", retry\)/);
   assert.match(offlinePage, /<meta name="robots" content="noindex" \/>/);
+});
+
+test("offline page edits ship with a new worker cache version", () => {
+  const versions = Object.keys(OFFLINE_PAGE_FINGERPRINTS);
+  assert.equal(versions.at(-1), cacheVersion, "record the current CACHE_VERSION last");
+  const fingerprint = createHash("sha256")
+    .update(offlinePage.replace(/\r\n/g, "\n"))
+    .digest("hex");
+  assert.equal(
+    OFFLINE_PAGE_FINGERPRINTS[cacheVersion],
+    fingerprint,
+    "public/offline.html changed: bump CACHE_VERSION in public/sw.js and record the new fingerprint",
+  );
+  assert.equal(new Set(Object.values(OFFLINE_PAGE_FINGERPRINTS)).size, versions.length);
 });
 
 test("PWA shell files bypass member gates and the worker script is never cached", () => {
