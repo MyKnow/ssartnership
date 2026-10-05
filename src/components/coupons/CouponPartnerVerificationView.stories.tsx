@@ -62,6 +62,7 @@ const meta = {
       profileImageUrl: null,
     },
     cohortCardThemes: [],
+    partnerReturnHref: "/partners/partner-story",
   },
   render: (args) => (
     <Container className="pb-12 pt-6" size="wide">
