@@ -74,6 +74,17 @@ test("검색 입력은 모바일 엔터 키를 검색으로 표시한다", () =>
   ]) {
     assert.match(read(path), /\{\.\.\.SEARCH_INPUT_ATTRIBUTES\}/, path);
   }
+  // Enter로 검색을 적용하는 관리자 필터 입력(type 변경 없이 엔터 라벨만 지정)
+  for (const [path, label] of [
+    ["src/components/admin/AdminPartnerManager.tsx", "제휴처명 검색"],
+    ["src/components/admin/AdminMemberManager.tsx", "회원 검색"],
+  ] as const) {
+    assert.match(
+      read(path),
+      new RegExp(`aria-label="${label}"\\s+enterKeyHint="search"`),
+      path,
+    );
+  }
   assert.match(read("src/components/PartnerFilters.tsx"), /enterKeyHint=\{isHomeDirectory \? "search" : undefined\}/);
   assert.match(read("src/components/admin/AdminQuickNavigator.tsx"), /enterKeyHint="go"/);
 });
