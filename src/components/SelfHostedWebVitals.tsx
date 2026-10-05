@@ -2,14 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useReportWebVitals } from "next/web-vitals";
-import { classifyVitalRoute, parseVitalSample } from "@/lib/web-vitals-contract";
+import { sendWebVital } from "@/lib/web-vitals-client";
 
 function report(metric: { name: string; value: number }) {
-  const sample = parseVitalSample({ name: metric.name, value: metric.value, route: classifyVitalRoute(window.location.pathname) });
-  if (!sample) return;
-  const body = JSON.stringify(sample);
-  // Never send metric.id, entries, URL, referrer, member/session identifiers.
-  navigator.sendBeacon("/api/web-vitals", new Blob([body], { type: "application/json" }));
+  void sendWebVital(metric, window.location.pathname);
 }
 
 function Reporter() {
