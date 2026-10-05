@@ -66,6 +66,9 @@ export const MAX_GRADUATE_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024;
 export const MAX_GRADUATE_PROFILE_IMAGE_PIXELS = 25_000_000;
 export const MIN_GRADUATE_PROFILE_IMAGE_DIMENSION = 320;
 export const GRADUATE_PROFILE_IMAGE_SIZE = 640;
+// The review RPCs set certificate_delete_after = now() + interval '30 days'.
+export const GRADUATE_CERTIFICATE_RETENTION_DAYS = 30;
+export const GRADUATE_FILE_RETENTION_NOTICE = `교육이수증은 검토가 끝난 날부터 ${GRADUATE_CERTIFICATE_RETENTION_DAYS}일 뒤 삭제하고, 승인된 사진은 탈퇴할 때까지 인증 카드에 사용합니다.`;
 export const GRADUATE_CAMPUS_OPTIONS = CAMPUS_DIRECTORY.map(
   (campus) => campus.label,
 );

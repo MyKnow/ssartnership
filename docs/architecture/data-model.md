@@ -76,7 +76,7 @@ authority: descriptive
 | `mattermost_verification_codes` | direct DM 가입·재설정 코드 hash와 delivery 상태 |
 | `member_email_challenges` | 이메일 변경·MM 장애 복구 코드 hash |
 | `password_reset_attempts` | 비밀번호 재설정 시도 |
-| `policy_documents` | 약관/개인정보/마케팅 문서 버전 |
+| `policy_documents` | 약관/개인정보/마케팅 문서 버전. 개인정보 처리방침 고지 기준은 [데이터 수명주기](../security/data-lifecycle.md#공개-고지) |
 | `member_policy_consents` | 회원별 정책 동의 기록 |
 | `ssafy_cycle_settings` | 기준 기수/연도/월 설정 |
 | `ssafy_cohort_card_themes` | 기수 인증 카드 테마 |
