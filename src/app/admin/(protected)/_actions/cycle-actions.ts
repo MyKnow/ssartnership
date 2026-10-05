@@ -25,7 +25,9 @@ import { parseMattermostSenderCredentialInput } from "@/lib/mattermost-senders/v
 import {
   clearSsafyCycleOverride,
   getConfiguredCurrentSsafyYear,
+  getSsafyCycleEarlyStartTargetYear,
   getSsafyCycleSettings,
+  isSsafyCycleEarlyStartApplied,
   setSsafyCycleEarlyStart,
   upsertSsafyCycleSettings,
 } from "@/lib/ssafy-cycle-settings";
@@ -116,14 +118,19 @@ export async function updateSsafyCycleSettingsAction(formData: FormData) {
 export async function earlyStartSsafyCycleAction() {
   await requireAdminPermission("cycles", "update", { path: "/admin/cycle" });
   const settings = await getSsafyCycleSettings();
-  const currentYear = getConfiguredCurrentSsafyYear(settings);
-  const targetYear = currentYear + 1;
+  const now = new Date();
+  const currentYear = getConfiguredCurrentSsafyYear(settings, now);
+  const targetYear = getSsafyCycleEarlyStartTargetYear(settings, now);
+  if (isSsafyCycleEarlyStartApplied(settings, now)) {
+    redirect("/admin/cycle?status=early-start-already");
+  }
   await setSsafyCycleEarlyStart(targetYear);
   await logAdminAction("cycle_settings_early_start", {
     targetType: "cycle_settings",
     targetId: "singleton",
     properties: {
       currentYear,
+      calendarYear: targetYear - 1,
       targetYear,
       anchorYear: settings.anchorYear,
       anchorCalendarYear: settings.anchorCalendarYear,
