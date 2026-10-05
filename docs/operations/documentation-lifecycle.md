@@ -90,7 +90,7 @@ Issue에서 문제·범위 승인
 
 ## 검증과 리뷰
 
-`npm run check:docs`는 frontmatter, 경로·상태 규칙, 저장소 상대 링크, 개인 컴퓨터 절대 경로, 대체 관계, top map에서 current/active normative 문서의 도달 가능성을 검사한다. 문서 전용 변경도 `npm run verify:change`에서 이 검사를 통과해야 한다.
+`npm run check:docs`는 frontmatter, 경로·상태 규칙, 저장소 상대 링크, 개인 컴퓨터 절대 경로, 대체 관계, top map에서 current/active normative 문서의 도달 가능성을 검사한다. 루트 예외 파일(`README.md`, `AGENTS.md`, `.agents/skills/*/SKILL.md`)은 frontmatter 없이 링크와 개인 절대 경로만 검사한다. 문서 전용 변경도 `npm run verify:change`에서 이 검사를 통과해야 한다.
 
 리뷰에서는 다음을 확인한다.
 

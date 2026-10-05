@@ -1,8 +1,8 @@
 ---
 title: 문서·테스트 정비 실행 계획
 type: implementation-plan
-status: active
-authority: descriptive
+status: completed
+authority: evidence
 ---
 
 # 문서·테스트 정비 실행 계획

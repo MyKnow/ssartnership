@@ -1,8 +1,8 @@
 ---
 title: Issue 432 수료생 기수 전환 롤아웃
 type: implementation-plan
-status: current
-authority: normative
+status: completed
+authority: evidence
 related_issue: "#432"
 ---
 

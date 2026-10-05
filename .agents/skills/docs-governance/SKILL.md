@@ -78,6 +78,6 @@ Run:
 npm run check:docs
 ```
 
-The validator fails on invalid metadata, path/status mismatches, broken or repository-external local links, personal-machine absolute paths, missing replacement targets, and current/active normative documents that cannot be reached from `docs/index.md`.
+The validator fails on invalid metadata, path/status mismatches, broken or repository-external local links, personal-machine absolute paths, missing replacement targets, and current/active normative documents that cannot be reached from `docs/index.md`. The root exceptions (`README.md`, `AGENTS.md`, `.agents/skills/*/SKILL.md`) have no frontmatter contract, but their local links and personal-path checks run too.
 
 `npm run verify:change` always runs `check:docs`, including the docs-only tier. When documentation is moved, also search the full repository for stale paths and review the final rename detection and diff.

@@ -21,7 +21,7 @@ authority: normative
 - 모바일 우선 반응형이며, 큰 화면에서도 centered shell을 유지한다.
 - surface hierarchy는 page background -> panel -> elevated card -> inset block -> control 순서를 따른다.
 - 카드 내부에 또 카드를 중첩하기보다 `Surface level="inset"`을 사용한다.
-- 모션은 Framer Motion 기반의 조용한 reveal/transition이며 reduced motion을 고려한다.
+- 모션은 CSS transition 중심의 짧고 조용한 피드백이며 reduced motion을 존중한다. 기준은 [Layout And Motion](./layout-and-motion.md#motion)이다.
 
 ## Shared UI primitives
 
@@ -67,7 +67,7 @@ public header는 브랜드와 계정·알림·쿠폰·테마·전체 메뉴처�
 - push/notifications: `AdminPushManager`, push composer/log sections, notification center, operational settings panel.
 - reviews: `AdminReviewManager`, review card/filter/image gallery.
 - events/ads/promotions: event registration form, ad package manager, promotion carousel editor.
-- style guide/demo: `AdminStyleGuideTabsDemo`, shared page state stories.
+- 시각 기준 확인: 별도 인앱 style guide route는 없다. Storybook 개요(`.storybook/overview.stories.tsx`)와 page state stories를 사용한다.
 
 관리자 UI는 정보 밀도가 높은 operational tool이다. 마케팅 landing처럼 큰 hero나 과도한 장식보다 스캔 가능한 필터, 표, dense card, 빠른 액션을 우선한다. shell과 page가 제목을 중복하지 않고 목록은 기본 20행을 기준으로 한다.
 

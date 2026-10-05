@@ -16,8 +16,10 @@ Run focused checks after changes:
 ```bash
 npx tsc --noEmit --pretty false
 npx eslint <changed-files>
-node --test tests/<focused-test>.test.mts
+node --import ./tests/alias-register.mjs --test tests/<focused-test>.test.mts
 ```
+
+Keep the alias loader; tests that reach `@/` imports fail at module loading without it.
 
 Use `next build` only for broad runtime/build changes or when requested.
 
