@@ -101,3 +101,12 @@ test("테스트 추첨 미리보기는 같은 Seed로 확정 추첨과 같은 �
     plan.winners.map((winner) => winner.memberId),
   );
 });
+
+test("테스트 추첨 미리보기는 후보 수를 넘는 당첨 인원을 렌더 오류 대신 안내로 돌려준다", async () => {
+  const { getEventRewardDrawPreview } = await drawPreviewModulePromise;
+  const overview = await buildOverview();
+
+  const result = getEventRewardDrawPreview({ overview, winnerCount: "5", seed: "seed" });
+  assert.equal(result.plan, null);
+  assert.equal(result.error, "당첨 인원은 추첨 가능한 후보 수를 초과할 수 없습니다.");
+});

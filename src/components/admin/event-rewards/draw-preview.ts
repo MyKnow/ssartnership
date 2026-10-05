@@ -1,5 +1,6 @@
 import {
   createEventRewardDrawPlan,
+  EventRewardSafeError,
   parseEventRewardDrawPreviewRequest,
   type EventRewardAdminOverview,
   type EventRewardDrawPlan,
@@ -26,11 +27,23 @@ export function getEventRewardDrawPreview(params: {
       error: request.message,
     };
   }
-  return {
-    plan: createEventRewardDrawPlan(params.overview, {
-      winnerCount: request.value.winnerCount,
-      seed: request.value.seed,
-    }),
-    error: null,
-  };
+  // The preview inputs come from the URL, so a winner count above the current
+  // candidate count must become an inline message instead of a render error.
+  try {
+    return {
+      plan: createEventRewardDrawPlan(params.overview, {
+        winnerCount: request.value.winnerCount,
+        seed: request.value.seed,
+      }),
+      error: null,
+    };
+  } catch (error) {
+    return {
+      plan: null,
+      error:
+        error instanceof EventRewardSafeError
+          ? error.message
+          : "테스트 추첨을 계산하지 못했습니다. 입력값을 확인해 주세요.",
+    };
+  }
 }

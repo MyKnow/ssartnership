@@ -616,13 +616,13 @@ export function createEventRewardDrawPlan(
     .map((member) => ({ ...member }));
 
   if (candidates.length === 0) {
-    throw new Error("추첨 가능한 후보가 없습니다.");
+    throw new EventRewardSafeError("추첨 가능한 후보가 없습니다.");
   }
   if (!Number.isInteger(input.winnerCount) || input.winnerCount <= 0) {
-    throw new Error("당첨 인원은 1명 이상이어야 합니다.");
+    throw new EventRewardSafeError("당첨 인원은 1명 이상이어야 합니다.");
   }
   if (input.winnerCount > candidates.length) {
-    throw new Error("당첨 인원은 추첨 가능한 후보 수를 초과할 수 없습니다.");
+    throw new EventRewardSafeError("당첨 인원은 추첨 가능한 후보 수를 초과할 수 없습니다.");
   }
 
   const totalTickets = candidates.reduce((sum, member) => sum + member.totalTickets, 0);
