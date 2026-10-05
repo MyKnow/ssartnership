@@ -43,7 +43,9 @@ function sanitizeLogValue(
   if (value === undefined) {
     return undefined;
   }
-  if (key && shouldRedactKey(key)) {
+  // A boolean cannot carry credential material. Keep aggregate flags such as
+  // `assignedCode: true` or `hasPassword: false` instead of redacting them.
+  if (key && shouldRedactKey(key) && typeof value !== "boolean") {
     return REDACTED_VALUE;
   }
   if (depth > MAX_LOG_PROPERTY_DEPTH) {
