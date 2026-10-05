@@ -5,6 +5,7 @@ import AdminStatePanel from "@/components/admin/AdminStatePanel";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { PHONE_INPUT_ATTRIBUTES } from "@/components/ui/input-attributes";
 import SubmitButton from "@/components/ui/SubmitButton";
 import Surface from "@/components/ui/Surface";
 import Textarea from "@/components/ui/Textarea";
@@ -524,7 +525,7 @@ export default function AdminPartnerRegistrationsView({
               : "public";
             return (
               <details className="group min-w-0 rounded-card border border-border bg-surface-elevated shadow-flat" key={row.id}>
-                <summary className="flex min-w-0 cursor-pointer list-none items-start justify-between gap-4 p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
+                <summary className="flex min-w-0 cursor-pointer list-none items-start justify-between gap-4 rounded-card p-5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
                   <div className="flex min-w-0 flex-col gap-3">
                   <div className="min-w-0">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -748,7 +749,7 @@ export default function AdminPartnerRegistrationsView({
                         </label>
                         <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
                           제휴처 전화
-                          <Input name="brandPhone" defaultValue={row.brand_phone ?? ""} />
+                          <Input {...PHONE_INPUT_ATTRIBUTES} name="brandPhone" defaultValue={row.brand_phone ?? ""} />
                         </label>
                         <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
                           문의 링크 또는 연락처
@@ -772,6 +773,7 @@ export default function AdminPartnerRegistrationsView({
                         <label className="grid min-w-0 gap-2 text-sm font-semibold text-foreground">
                           담당자 전화
                           <Input
+                            {...PHONE_INPUT_ATTRIBUTES}
                             name="contactPhone"
                             defaultValue={row.contact_phone ?? ""}
                           />

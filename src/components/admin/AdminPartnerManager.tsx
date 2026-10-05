@@ -222,6 +222,7 @@ export default function AdminPartnerManager({
               <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                 <Input
                   aria-label="제휴처명 검색"
+                  enterKeyHint="search"
                   value={searchInputValue}
                   onChange={(event) => {
                     setSearchInputDraft({

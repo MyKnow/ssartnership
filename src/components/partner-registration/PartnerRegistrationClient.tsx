@@ -32,6 +32,7 @@ import {
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FormMessage from "@/components/ui/FormMessage";
+import { PHONE_INPUT_ATTRIBUTES } from "@/components/ui/input-attributes";
 import SectionHeading from "@/components/ui/SectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
 import ImageUploadSubmissionProvider, {
@@ -418,6 +419,7 @@ export default function PartnerRegistrationClient({
                     error={fieldErrors.brandPhone}
                   >
                     <FormInput
+                      {...PHONE_INPUT_ATTRIBUTES}
                       name="brandPhone"
                       fieldErrors={fieldErrors}
                       inputRef={registerFieldRef("brandPhone")}

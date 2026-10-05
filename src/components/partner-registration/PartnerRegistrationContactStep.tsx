@@ -3,6 +3,7 @@ import {
   PartnerRegistrationInput as FormInput,
   PartnerRegistrationTextarea as FormTextarea,
 } from "./PartnerRegistrationFields";
+import { OWN_PHONE_INPUT_ATTRIBUTES } from "@/components/ui/input-attributes";
 import type {
   PartnerRegistrationFieldErrors,
   PartnerRegistrationFieldName,
@@ -96,6 +97,7 @@ export default function PartnerRegistrationContactStep({
           error={fieldErrors.contactPhone}
         >
           <FormInput
+            {...OWN_PHONE_INPUT_ATTRIBUTES}
             name="contactPhone"
             fieldErrors={fieldErrors}
             inputRef={registerFieldRef("contactPhone")}

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, userEvent, within } from "storybook/test";
 import type { PromotionSlide } from "@/lib/promotions/catalog";
 import PromotionCarousel from "./PromotionCarousel";
 
@@ -53,3 +54,15 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const PauseControl: Story = {
+  play: async ({ canvasElement }) => {
+    const pause = within(canvasElement).getByRole("button", {
+      name: "광고 자동 재생 일시정지",
+    });
+    await expect(pause).toBeVisible();
+    await expect(pause).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(pause);
+    await expect(pause).toHaveAttribute("aria-pressed", "true");
+  },
+};

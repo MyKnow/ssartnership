@@ -206,14 +206,8 @@ export function usePushSettingsController({
     }
   }
 
-  async function handleUnsubscribeAll(options: { confirm?: boolean } = {}) {
-    if (options.confirm && typeof window !== "undefined") {
-      const ok = window.confirm("모든 기기에서 알림을 끄시겠습니까?");
-      if (!ok) {
-        return;
-      }
-    }
-
+  // 전체 기기 푸시 끄기는 다시 켤 수 있는 설정 변경이라 확인 단계를 두지 않는다.
+  async function handleUnsubscribeAll() {
     setPendingAction("all-off");
     try {
       const registration = await getServiceWorkerRegistration();
@@ -285,7 +279,7 @@ export function usePushSettingsController({
     }
 
     if (key === "enabled" && !nextValue) {
-      await handleUnsubscribeAll({ confirm: false });
+      await handleUnsubscribeAll();
       return;
     }
 

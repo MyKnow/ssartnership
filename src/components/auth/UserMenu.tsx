@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { LogIn, LogOut, UserPlus } from "lucide-react";
 import Button from "@/components/ui/Button";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import type { HeaderSession } from "@/lib/header-session";
 import { cn } from "@/lib/cn";
@@ -28,6 +29,7 @@ export default function UserMenu({
 }) {
   const [session, setSession] = useState<HeaderSession | null>(initialSession);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutConfirmationOpen, setLogoutConfirmationOpen] = useState(false);
   const { notify } = useToast();
   const router = useRouter();
   const safeGuestAuthReturnTo = guestAuthReturnTo
@@ -40,19 +42,20 @@ export default function UserMenu({
     ? `/auth/signup?returnTo=${encodeURIComponent(safeGuestAuthReturnTo)}`
     : "/auth/signup";
 
+  const openLogoutConfirmation = () => {
+    if (!loggingOut) {
+      setLogoutConfirmationOpen(true);
+    }
+  };
+
   const handleLogout = async () => {
     if (loggingOut) {
       return;
     }
-    if (typeof window !== "undefined") {
-      const ok = window.confirm("모든 기기에서 로그아웃하시겠습니까?");
-      if (!ok) {
-        return;
-      }
-    }
     setLoggingOut(true);
     try {
       await fetch("/api/mm/logout", { method: "POST" });
+      setLogoutConfirmationOpen(false);
       setSession(null);
       notify("로그아웃되었습니다.");
       router.replace("/");
@@ -60,6 +63,19 @@ export default function UserMenu({
       setLoggingOut(false);
     }
   };
+
+  const logoutConfirmation = (
+    <ConfirmDialog
+      open={logoutConfirmationOpen}
+      title="로그아웃하시겠습니까?"
+      description="현재 계정의 로그인 세션을 종료합니다."
+      confirmLabel="로그아웃"
+      pendingLabel="로그아웃 중"
+      pending={loggingOut}
+      onClose={() => setLogoutConfirmationOpen(false)}
+      onConfirm={() => void handleLogout()}
+    />
+  );
 
   if (!session) {
     return (
@@ -112,7 +128,7 @@ export default function UserMenu({
         <Button
           variant="danger"
           size="icon"
-          onClick={handleLogout}
+          onClick={openLogoutConfirmation}
           loading={loggingOut}
           className={buttonClassName}
           ariaLabel="로그아웃"
@@ -123,7 +139,7 @@ export default function UserMenu({
       ) : (
         <Button
           variant="danger"
-          onClick={handleLogout}
+          onClick={openLogoutConfirmation}
           loading={loggingOut}
           loadingText="로그아웃 중"
           className={buttonClassName}
@@ -132,6 +148,7 @@ export default function UserMenu({
           로그아웃
         </Button>
       )}
+      {logoutConfirmation}
     </div>
   );
 }

@@ -22,6 +22,7 @@
   --primary-emphasis: #172d53;
   --primary-soft: #e6edf8;
   --primary-foreground: #f7fbff;
+  --focus-ring: #213b68;
   --accent: #1ea6d7;
   --success: #0b665f;
   --warning: #92400e;
@@ -85,6 +86,7 @@ html.dark {
   --primary-emphasis: #f2f7ff;
   --primary-soft: rgba(44, 67, 106, 0.42);
   --primary-foreground: #07101d;
+  --focus-ring: #d7e4ff;
   --accent: #6fd3ff;
   --success: #34d399;
   --warning: #fbbf24;
@@ -138,6 +140,7 @@ html.dark {
   --color-primary-emphasis: var(--primary-emphasis);
   --color-primary-soft: var(--primary-soft);
   --color-primary-foreground: var(--primary-foreground);
+  --color-ring: var(--focus-ring);
   --color-accent: var(--accent);
   --color-success: var(--success);
   --color-warning: var(--warning);

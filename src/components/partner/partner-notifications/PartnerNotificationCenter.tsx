@@ -4,9 +4,11 @@ import { useMemo, useRef, useState } from "react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import EmptyState from "@/components/ui/EmptyState";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
+import { SEARCH_INPUT_ATTRIBUTES } from "@/components/ui/input-attributes";
 import PartnerPendingButtonLink from "@/components/partner/PartnerPendingButtonLink";
 import Select from "@/components/ui/Select";
 import StatsRow from "@/components/ui/StatsRow";
@@ -394,6 +396,8 @@ export default function PartnerNotificationCenter({
   // 읽음·삭제 응답으로 미확인 수를 맞출 때마다 올린다. '더 보기' 응답이 그보다
   // 오래된 미확인 수로 덮어쓰지 않게 비교한다.
   const unreadCountSyncVersionRef = useRef(0);
+
+  const [deleteActionConfirmOpen, setDeleteActionConfirmOpen] = useState(false);
   const [filters, setFilters] = useState<PartnerNotificationUiFilters>({
     category: "all",
     type: "all",
@@ -678,10 +682,6 @@ export default function PartnerNotificationCenter({
       return;
     }
 
-    if (!window.confirm("표시된 처리 필요 알림을 삭제할까요?")) {
-      return;
-    }
-
     const snapshot = items;
     const deletedStoredCount =
       snapshot.length - removeNotifications(snapshot, visibleActionNotificationIds).length;
@@ -795,7 +795,7 @@ export default function PartnerNotificationCenter({
           <label className="grid min-w-0 gap-1.5">
             <span className="text-xs font-semibold text-muted-foreground">검색</span>
             <Input
-              type="search"
+              {...SEARCH_INPUT_ATTRIBUTES}
               value={filters.searchQuery}
               onChange={(event) => updateFilter("searchQuery", event.target.value)}
               placeholder="제휴처, 상태, 알림 내용 검색"
@@ -952,9 +952,7 @@ export default function PartnerNotificationCenter({
                 isMutationPending ||
                 loadingMore
               }
-              onClick={() => {
-                void deleteVisibleActionNotifications();
-              }}
+              onClick={() => setDeleteActionConfirmOpen(true)}
             >
               처리 필요 알림 삭제
             </Button>
@@ -1075,6 +1073,18 @@ export default function PartnerNotificationCenter({
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={deleteActionConfirmOpen}
+        title="표시된 처리 필요 알림을 삭제할까요?"
+        description={`현재 필터에 표시된 처리 필요 알림 ${visibleActionNotificationIds.length.toLocaleString("ko-KR")}건을 삭제합니다. 삭제 후에는 알림 센터에서 다시 확인할 수 없습니다.`}
+        confirmLabel="알림 삭제"
+        danger
+        onClose={() => setDeleteActionConfirmOpen(false)}
+        onConfirm={() => {
+          setDeleteActionConfirmOpen(false);
+          void deleteVisibleActionNotifications();
+        }}
+      />
     </div>
   );
 }

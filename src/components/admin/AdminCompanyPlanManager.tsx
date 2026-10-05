@@ -247,7 +247,7 @@ export default function AdminCompanyPlanManager({
                   <div className="grid gap-3 lg:grid-cols-3">
                     <form action={confirmPartnerPlanBankTransferPayment} className="grid gap-3">
                       <input type="hidden" name="requestId" value={request.id} />
-                      <Select name="taxDocumentStatus" defaultValue="pending_issue" disabled={isPaid}>
+                      <Select name="taxDocumentStatus" defaultValue="pending_issue" disabled={isPaid} aria-label="세금계산서 발급 상태">
                         <option value="pending_issue">입금 확인 · 세금계산서 발급 대기</option>
                         <option value="issued">입금 확인 · 세금계산서 발급 완료</option>
                       </Select>

@@ -1,11 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { CERTIFICATION_QR_TTL_SECONDS } from "@/lib/certification-constants";
 import { trackProductEvent } from "@/lib/product-events";
 
@@ -52,23 +54,11 @@ export default function CertificationQrButton({
     ? Math.max(0, Math.ceil((expiresAtMs - now) / 1000))
     : CERTIFICATION_QR_TTL_SECONDS;
 
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-    const originalOverflow = document.body.style.overflow;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        updateOpen(false);
-      }
-    };
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [isOpen, updateOpen]);
+  const dialogRef = useRef<HTMLElement>(null);
+  const dialogTitleId = useId();
+  const closeDialog = useCallback(() => updateOpen(false), [updateOpen]);
+  useBodyScrollLock(isOpen);
+  useDialogFocus({ open: isOpen, containerRef: dialogRef, onClose: closeDialog });
 
   useEffect(() => {
     if (!isOpen) {
@@ -186,13 +176,17 @@ export default function CertificationQrButton({
                 type="button"
                 className="absolute inset-0"
                 aria-label="QR 닫기"
-                onClick={() => updateOpen(false)}
+                tabIndex={-1}
+                onClick={closeDialog}
               />
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4 sm:p-6">
                 <section
+                  ref={dialogRef}
                   role="dialog"
                   aria-modal="true"
-                  className="pointer-events-auto relative w-full max-w-[22rem] overflow-hidden rounded-[32px] border border-white/15 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(15,23,42,0.9))] px-4 pb-safe-bottom-4 pt-3 text-white shadow-[0_24px_80px_rgba(15,23,42,0.45)] max-h-[86dvh] overflow-y-auto sm:max-w-[28rem] sm:px-5 sm:pb-5 sm:pt-5"
+                  aria-labelledby={dialogTitleId}
+                  tabIndex={-1}
+                  className="pointer-events-auto relative w-full max-w-[22rem] overflow-hidden rounded-[32px] border border-white/15 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(15,23,42,0.9))] px-4 pb-safe-bottom-4 pt-3 text-white shadow-[0_24px_80px_rgba(15,23,42,0.45)] max-h-[86dvh] overflow-y-auto overscroll-contain focus:outline-hidden sm:max-w-[28rem] sm:px-5 sm:pb-5 sm:pt-5"
                 >
                   <div className="pointer-events-none absolute inset-0">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.12),transparent_35%),radial-gradient(circle_at_80%_20%,rgba(196,181,253,0.08),transparent_30%)]" />
@@ -203,8 +197,8 @@ export default function CertificationQrButton({
                     <div className="flex-1" />
                     <button
                       type="button"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/15"
-                      onClick={() => updateOpen(false)}
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/15 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white"
+                      onClick={closeDialog}
                       aria-label="닫기"
                     >
                       ✕
@@ -216,7 +210,7 @@ export default function CertificationQrButton({
                       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/55">
                         Live QR
                       </p>
-                      <h2 className="mt-2 text-xl font-semibold">{roleLabel} QR</h2>
+                      <h2 id={dialogTitleId} className="mt-2 text-xl font-semibold">{roleLabel} QR</h2>
                       <p className="mt-2 text-sm leading-6 text-white/68">
                         누구나 스캔해 현재 인증 상태를 검증할 수 있습니다.
                       </p>

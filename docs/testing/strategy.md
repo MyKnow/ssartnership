@@ -15,6 +15,7 @@ authority: normative
 | 데이터·쿠폰·결제·업로드 | 검증·원자성·중복·실패 복구 테스트, 관련 SQL 계약 | SQL 문자열 검사만으로 운영 migration 적용을 증명하지 않음 |
 | 탐색·제출·복귀 | 행동 E2E 및 상태 helper 테스트 | 문구 존재만으로 과업 완료를 증명하지 않음 |
 | 시각·배치·반응형 | 해당 UI 변경 시 수동 렌더 확인, 필요 시 Storybook/Visual | CSS 클래스 존재는 화면 품질 증거가 아님 |
+| 키보드·스크린리더 기본기 | `tests/e2e/a11y-smoke.spec.ts`(axe, 360px 라이트·다크, critical·serious 실패), 포커스·스크롤 잠금 helper 테스트 | 자동 규칙 통과만으로 스크린리더 과업 완료나 대비 품질 전체를 증명하지 않음 |
 | 운영·배포·백업 | manifest/권한/rollback/inventory 검증과 실제 환경 절차 | health 응답만으로 인증·복구·전달 성공을 증명하지 않음 |
 | 문서 | check:docs 및 내용·출처 리뷰 | 링크 존재만으로 의미나 승인 상태를 증명하지 않음 |
 
@@ -40,6 +41,10 @@ authority: normative
 - 파일을 옮기거나 이름·문자열을 바꾸기 전에 `grep -rl "<경로|식별자|문자열>" tests`로 참조 테스트를 찾고, 같은 커밋에서 새 경로·문자열로 갱신한다.
 - 큰 모듈을 분해하는 PR은 첫 커밋에서 분해 대상 순수 함수의 현재 동작을 import 기반 특성화 테스트로 고정한다.
 - 공용 읽기 헬퍼 `tests/support/read-source.mts`가 생기면 새 소스 계약 테스트는 그 헬퍼를 사용한다.
+
+## 접근성 스모크
+
+`a11y-smoke.spec.ts`는 홈·로그인·인증 카드·iOS 설치 안내를 360px 라이트·다크로 axe(WCAG 2.0~2.2 A/AA) 검사한다. 판정 규칙은 `tests/e2e/a11y-policy.ts`가 정본이며 critical·serious 위반만 실패로 본다. 기존 위반은 경로·규칙·색 모드 단위 allowlist에만 사유와 담당을 남겨 허용하고, 규칙 전역 비활성화나 요소 제외로 통과시키지 않는다. 해소된 항목은 실행 annotation(`a11y-allowlist-stale`)으로 드러나며 바로 삭제한다.
 
 ## 유지·삭제 판단
 

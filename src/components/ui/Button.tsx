@@ -1,15 +1,21 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import Spinner from "@/components/ui/Spinner";
+import { FOCUS_RING_ON_BACKGROUND_CLASS_NAME } from "@/components/ui/focus-ring";
+import { TOUCH_TARGET_HIT_AREA_CLASS_NAME } from "@/components/ui/touch-target";
 
-const base =
-  "group inline-flex min-h-11 min-w-11 items-center justify-center gap-2 whitespace-nowrap border font-semibold leading-none transition-interactive duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+const base = cn(
+  "group inline-flex items-center justify-center gap-2 whitespace-nowrap border font-semibold leading-none transition-interactive duration-200 ease-out",
+  FOCUS_RING_ON_BACKGROUND_CLASS_NAME,
+);
 
 const sizes = {
-  sm: "h-10 rounded-[0.95rem] px-4 text-sm",
-  md: "h-11 rounded-[1rem] px-[1.125rem] text-sm",
-  lg: "h-12 rounded-[1.05rem] px-5 text-base",
-  icon: "h-11 w-11 rounded-[1rem] p-0 text-sm",
+  sm: "h-10 min-h-11 min-w-11 rounded-[0.95rem] px-4 text-sm",
+  md: "h-11 min-h-11 min-w-11 rounded-[1rem] px-[1.125rem] text-sm",
+  lg: "h-12 min-h-11 min-w-11 rounded-[1.05rem] px-5 text-base",
+  icon: "h-11 min-h-11 w-11 min-w-11 rounded-[1rem] p-0 text-sm",
+  /** 밀집 툴바용: 시각 32px, 터치 히트 영역 44px. */
+  compact: cn("h-8 rounded-full px-3 text-xs", TOUCH_TARGET_HIT_AREA_CLASS_NAME),
 };
 
 const variants = {

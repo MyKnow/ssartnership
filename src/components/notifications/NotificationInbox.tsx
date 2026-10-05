@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import IconActionButton, { IconActionGroup } from "@/components/ui/IconActionButton";
 import { useToast } from "@/components/ui/Toast";
 import {
@@ -58,6 +59,7 @@ export default function NotificationInbox({
   const [loadingMore, setLoadingMore] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<"read-all" | "delete-all" | null>(null);
+  const [deleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false);
 
   const unreadLabel = useMemo(
     () => (state.unreadCount > 99 ? "99+" : String(state.unreadCount)),
@@ -257,11 +259,8 @@ export default function NotificationInbox({
       return;
     }
 
-    if (!window.confirm("수신함의 모든 알림을 삭제할까요?")) {
-      return;
-    }
-
     const snapshot = state;
+    setDeleteAllConfirmOpen(false);
     setPendingAction("delete-all");
     setState((current) => ({
       ...current,
@@ -334,8 +333,8 @@ export default function NotificationInbox({
           <div className="flex items-center gap-2">
             <Button
               variant="secondary"
-              size="sm"
-              className="!h-8 !min-h-8 !min-w-0 rounded-full border-success/20 bg-success/10 px-3 text-xs font-semibold text-success shadow-raised hover:border-success/30 hover:bg-success/15"
+              size="compact"
+              className="border-success/20 bg-success/10 text-success shadow-raised hover:border-success/30 hover:bg-success/15"
               onClick={() => {
                 void markAllAsRead();
               }}
@@ -345,11 +344,9 @@ export default function NotificationInbox({
             </Button>
             <Button
               variant="danger"
-              size="sm"
-              className="!h-8 !min-h-8 !min-w-0 rounded-full px-3 text-xs font-semibold shadow-raised"
-              onClick={() => {
-                void deleteAllNotifications();
-              }}
+              size="compact"
+              className="shadow-raised"
+              onClick={() => setDeleteAllConfirmOpen(true)}
               disabled={state.items.length === 0 || isBulkActionPending || Boolean(pendingId)}
             >
               전체 삭제
@@ -504,6 +501,18 @@ export default function NotificationInbox({
           </div>
         </div>
       ) : null}
+      <ConfirmDialog
+        open={deleteAllConfirmOpen}
+        title="수신함의 모든 알림을 삭제할까요?"
+        description="삭제한 알림은 수신함에서 다시 확인할 수 없습니다."
+        confirmLabel="전체 삭제"
+        danger
+        pending={pendingAction === "delete-all"}
+        onClose={() => setDeleteAllConfirmOpen(false)}
+        onConfirm={() => {
+          void deleteAllNotifications();
+        }}
+      />
     </Card>
   );
 }
