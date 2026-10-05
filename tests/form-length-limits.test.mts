@@ -129,6 +129,7 @@ test("길이 상한이 있는 폼은 서버 상수를 maxLength로 참조한다"
     ["src/components/partner/PartnerAccountInfoView.tsx", /maxLength=\{(?:12|80|120|254|300)\}/],
     ["src/components/partner/PartnerPlanUpgradeForm.tsx", /maxLength=\{1000\}/],
     ["src/components/admin/AdminNotificationTemplateManager.tsx", /maxLength=\{(?:2000|20000)\}/],
+    ["src/components/admin/AdminGraduateVerificationQueue.tsx", /maxLength=\{160\}/],
   ];
   for (const [path, literal] of cases) {
     assert.doesNotMatch(readSource(path), literal, path);
@@ -166,5 +167,21 @@ test("리뷰·관리자 검색·MM 가입 승인 이름 상한도 화면과 서�
   assert.match(
     readSource("src/components/admin/AdminMemberSignupApprovalDetail.tsx"),
     /maxLength=\{MM_SIGNUP_DISPLAY_NAME_MAX_LENGTH\}/,
+  );
+});
+
+test("수료증 문서 번호 상한은 승인 입력과 서버 검증이 같은 상수를 쓴다", async () => {
+  const { GRADUATE_DOCUMENT_NUMBER_MAX_LENGTH, validateGraduateDocumentNumber } = await import(
+    "@/lib/graduate-verification"
+  );
+
+  assert.equal(GRADUATE_DOCUMENT_NUMBER_MAX_LENGTH, 160);
+  assert.equal(validateGraduateDocumentNumber("A".repeat(160)), "A".repeat(160));
+  assert.equal(validateGraduateDocumentNumber("A".repeat(161)), null);
+  assert.equal(validateGraduateDocumentNumber("AB"), null);
+  assert.equal(validateGraduateDocumentNumber("ssafy-15-2026-0001"), "SSAFY1520260001");
+  assert.match(
+    readSource("src/components/admin/AdminGraduateVerificationQueue.tsx"),
+    /maxLength=\{GRADUATE_DOCUMENT_NUMBER_MAX_LENGTH\}/,
   );
 });

@@ -15,6 +15,7 @@ import {
   ADMIN_REVIEW_NOTE_MAX_LENGTH,
   type AdminReviewQueueFeedback,
 } from "@/lib/admin-review-queue";
+import { GRADUATE_DOCUMENT_NUMBER_MAX_LENGTH } from "@/lib/graduate-verification";
 
 export type AdminGraduateVerificationRequest = {
   id: string;
@@ -275,7 +276,7 @@ function GraduateVerificationDecisionCard({
                     id={documentNumberInputId}
                     name="documentNumber"
                     required
-                    maxLength={160}
+                    maxLength={GRADUATE_DOCUMENT_NUMBER_MAX_LENGTH}
                     aria-describedby={documentNumberHelpId}
                     placeholder="예: SSAFY-15-2026-0001"
                   />

@@ -146,9 +146,16 @@ export function normalizeGraduateDocumentNumber(value: string) {
     .replace(/[\s-]+/g, "");
 }
 
+/** 수료증 문서 번호 길이 상한. 관리자 승인 입력 `maxLength`와 서버 검증이 함께 참조한다. */
+export const GRADUATE_DOCUMENT_NUMBER_MAX_LENGTH = 160;
+const GRADUATE_DOCUMENT_NUMBER_PATTERN = new RegExp(
+  `^[\\p{L}\\p{N}._/]{3,${GRADUATE_DOCUMENT_NUMBER_MAX_LENGTH}}$`,
+  "u",
+);
+
 export function validateGraduateDocumentNumber(value: string) {
   const normalized = normalizeGraduateDocumentNumber(value);
-  if (!/^[\p{L}\p{N}._/]{3,160}$/u.test(normalized)) {
+  if (!GRADUATE_DOCUMENT_NUMBER_PATTERN.test(normalized)) {
     return null;
   }
   return normalized;
