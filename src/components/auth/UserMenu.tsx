@@ -67,8 +67,8 @@ export default function UserMenu({
   const logoutConfirmation = (
     <ConfirmDialog
       open={logoutConfirmationOpen}
-      title="로그아웃하시겠습니까?"
-      description="현재 계정의 로그인 세션을 종료합니다."
+      title="모든 기기에서 로그아웃하시겠습니까?"
+      description="모든 기기의 로그인 세션을 종료합니다."
       confirmLabel="로그아웃"
       pendingLabel="로그아웃 중"
       pending={loggingOut}

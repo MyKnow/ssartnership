@@ -113,7 +113,8 @@ authority: normative
 ## Loading/error surfaces
 
 - Root loading/error: `src/app/loading.tsx`, `error.tsx`, `global-error.tsx`, `not-found.tsx`.
-- Site loading: `(site)/loading.tsx` and route-specific loading under campus, certification, notifications, partners, suggest, support, verify.
+- Group error/not-found: `(site)/error.tsx`, `partner/error.tsx`(embedded `AppErrorScreen`, 그룹 셸 유지), `(site)/partners/[id]/not-found.tsx`, `admin/(protected)/not-found.tsx`, `partner/not-found.tsx`.
+- Site loading: `(site)/loading.tsx` and route-specific loading under campus, certification, coupons, notifications, partners(benefit-use 포함), suggest, support, verify.
 - Admin loading: `admin/loading.tsx`, protected loading, companies/cycle/logs/members/partners/push/reviews loading.
 - Partner loading: `partner/loading.tsx`, setup/reset/login/change-password/support/services loading.
-- Shared skeletons: `src/components/loading/AdminPageSkeletons.tsx`, `RoutePageSkeletons.tsx`, `SitePageSkeletons.tsx`.
+- Shared skeletons: `src/components/loading/AdminPageSkeletons.tsx`, `RoutePageSkeletons.tsx`, `SitePageSkeletons.tsx`. 모든 `loading.tsx`는 `RouteLoadingStatus`를 한 번 렌더한다.

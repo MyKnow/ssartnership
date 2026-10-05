@@ -115,6 +115,29 @@ function AdminListSkeletonContent({
   );
 }
 
+/**
+ * Route-level admin skeleton. Pages render `AdminShell` themselves, so a
+ * `loading.tsx` must render the shell too; otherwise the sidebar, mobile
+ * header, and bottom navigation disappear while the next route streams.
+ */
+export function AdminRouteSkeleton({
+  title,
+  backHref,
+  backLabel,
+  children,
+}: {
+  title: string;
+  backHref?: string;
+  backLabel?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <AdminShell title={title} backHref={backHref} backLabel={backLabel}>
+      {children}
+    </AdminShell>
+  );
+}
+
 function AdminListSkeleton({
   title,
   actionCount = 2,
@@ -127,13 +150,13 @@ function AdminListSkeleton({
   rows?: number;
 }) {
   return (
-    <AdminShell title={title} backHref="/admin" backLabel="관리 홈">
+    <AdminRouteSkeleton title={title} backHref="/admin" backLabel="관리 홈">
       <AdminListSkeletonContent
         actionCount={actionCount}
         filterFields={filterFields}
         rows={rows}
       />
-    </AdminShell>
+    </AdminRouteSkeleton>
   );
 }
 

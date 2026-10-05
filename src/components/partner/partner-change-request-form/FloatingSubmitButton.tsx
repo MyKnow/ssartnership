@@ -13,7 +13,10 @@ export default function FloatingSubmitButton({
   className?: string;
 }) {
   return (
-    <div className="pointer-events-none fixed bottom-safe-bottom-5 left-1/2 z-[45] flex -translate-x-1/2 px-4 md:left-auto md:right-[max(1.5rem,calc((100vw-72rem)/4+1.5rem))] md:translate-x-0 md:px-0">
+    <div
+      data-floating-submit-button="base"
+      className="pointer-events-none fixed bottom-safe-bottom-5 left-1/2 z-[45] flex -translate-x-1/2 px-4 md:left-auto md:right-[max(1.5rem,calc((100vw-72rem)/4+1.5rem))] md:translate-x-0 md:px-0"
+    >
       <SubmitButton
         pendingText={pendingText}
         disabled={disabled}

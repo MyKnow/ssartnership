@@ -1,7 +1,9 @@
 import Button from "@/components/ui/Button";
 import FilterBar from "@/components/ui/FilterBar";
 import Input from "@/components/ui/Input";
+import NavigationForm from "@/components/ui/NavigationForm";
 import Select from "@/components/ui/Select";
+import SubmitButton from "@/components/ui/SubmitButton";
 import {
   getAdminReviewRatingOptions,
   getAdminReviewSortOptions,
@@ -21,7 +23,7 @@ export default function AdminReviewFilters({
   partners: AdminReviewPartnerOption[];
 }) {
   return (
-    <form action="/admin/reviews" method="get">
+    <NavigationForm action="/admin/reviews">
       <FilterBar
         title="리뷰 필터"
         description="필요한 조건만 선택하세요."
@@ -119,9 +121,9 @@ export default function AdminReviewFilters({
         </label>
 
         <div className="flex items-end">
-          <Button type="submit">적용</Button>
+          <SubmitButton pendingText="적용 중">적용</SubmitButton>
         </div>
       </FilterBar>
-    </form>
+    </NavigationForm>
   );
 }

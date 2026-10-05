@@ -5,6 +5,7 @@ import ShowcaseEventSettingsForm from "@/components/admin/ShowcaseEventSettingsF
 import ShowcaseProjectReviewForm from "@/components/admin/ShowcaseProjectReviewForm";
 import ShowcaseAdminProjectDeleteButton from "@/components/admin/ShowcaseAdminProjectDeleteButton";
 import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { canAdmin } from "@/lib/admin-permissions";
 import { getShowcasePhase, projectShowcaseRepository } from "@/lib/project-showcase";
@@ -91,9 +92,10 @@ export default async function AdminProjectShowcasePage({
           </nav>
 
           {projects.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-surface p-8 text-center text-sm text-muted-foreground">
-              {SHOWCASE_ADMIN_STATUS_LABELS[status]} 상태의 출품작이 없어요.
-            </div>
+            <EmptyState
+              title={`${SHOWCASE_ADMIN_STATUS_LABELS[status]} 상태의 출품작이 없어요.`}
+              description="다른 상태 탭을 선택해 출품작을 확인해 주세요."
+            />
           ) : projects.map((project) => (
             <article key={project.id} className="grid gap-5 rounded-2xl border border-border bg-surface p-4 sm:p-6">
               <div className="flex flex-wrap items-center gap-2">

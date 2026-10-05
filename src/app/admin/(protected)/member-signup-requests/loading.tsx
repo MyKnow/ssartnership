@@ -1,5 +1,16 @@
-import { AdminMemberSignupRequestsSkeletonContent } from "@/components/loading/AdminPageSkeletons";
+import {
+  AdminRouteSkeleton,
+  AdminMemberSignupRequestsSkeletonContent,
+} from "@/components/loading/AdminPageSkeletons";
+import RouteLoadingStatus from "@/components/loading/RouteLoadingStatus";
 
 export default function Loading() {
-  return <AdminMemberSignupRequestsSkeletonContent />;
+  return (
+    <>
+      <RouteLoadingStatus />
+      <AdminRouteSkeleton title="가입 승인">
+        <AdminMemberSignupRequestsSkeletonContent />
+      </AdminRouteSkeleton>
+    </>
+  );
 }

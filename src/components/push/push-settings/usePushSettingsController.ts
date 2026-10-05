@@ -135,11 +135,11 @@ export function usePushSettingsController({
 
   async function handleSubscribe() {
     if (!configured) {
-      notify("서버 알림 설정이 완료된 뒤 사용할 수 있습니다.");
+      notify("서버 알림 설정이 완료된 뒤 사용할 수 있습니다.", { tone: "error" });
       return;
     }
     if (!deviceState.supported) {
-      notify("현재 브라우저는 Web Push를 지원하지 않습니다.");
+      notify("현재 브라우저는 Web Push를 지원하지 않습니다.", { tone: "error" });
       return;
     }
     if (deviceState.iosNeedsInstall) {
@@ -149,7 +149,7 @@ export function usePushSettingsController({
       return;
     }
     if (!vapidPublicKey) {
-      notify("알림 공개키가 설정되지 않았습니다.");
+      notify("알림 공개키가 설정되지 않았습니다.", { tone: "error" });
       return;
     }
 
@@ -176,7 +176,7 @@ export function usePushSettingsController({
       await refreshDevices(subscription.endpoint);
       notify("기기 알림을 켰습니다.");
     } catch (error) {
-      notify(getPushSettingsClientError(error, "알림 구독").message);
+      notify(getPushSettingsClientError(error, "알림 구독").message, { tone: "error" });
     } finally {
       setPendingAction(null);
     }
@@ -200,7 +200,7 @@ export function usePushSettingsController({
         `이 기기 알림 수신을 철회했습니다. (${formatKoreanDateTimeToMinute(new Date())})`,
       );
     } catch (error) {
-      notify(getPushSettingsClientError(error, "알림 해제").message);
+      notify(getPushSettingsClientError(error, "알림 해제").message, { tone: "error" });
     } finally {
       setPendingAction(null);
     }
@@ -229,7 +229,7 @@ export function usePushSettingsController({
         `모든 기기 알림 수신을 철회했습니다. (${formatKoreanDateTimeToMinute(new Date())})`,
       );
     } catch (error) {
-      notify(getPushSettingsClientError(error, "전체 알림 해제").message);
+      notify(getPushSettingsClientError(error, "전체 알림 해제").message, { tone: "error" });
     } finally {
       setPendingAction(null);
     }
@@ -263,7 +263,7 @@ export function usePushSettingsController({
         notify("알림 설정을 저장했습니다.");
       }
     } catch (error) {
-      notify(getPushSettingsClientError(error, "알림 설정 저장").message);
+      notify(getPushSettingsClientError(error, "알림 설정 저장").message, { tone: "error" });
     } finally {
       setPendingAction(null);
     }
@@ -298,7 +298,7 @@ export function usePushSettingsController({
       }
       notify("알림 설정을 저장했습니다.");
     } catch (error) {
-      notify(getPushSettingsClientError(error, "알림 설정 저장").message);
+      notify(getPushSettingsClientError(error, "알림 설정 저장").message, { tone: "error" });
     } finally {
       setPendingAction(null);
     }
@@ -320,7 +320,7 @@ export function usePushSettingsController({
       await refreshDevices();
       notify("기기 연결을 해제했습니다.");
     } catch (error) {
-      notify(getPushSettingsClientError(error, "기기 연결 해제").message);
+      notify(getPushSettingsClientError(error, "기기 연결 해제").message, { tone: "error" });
     } finally {
       setPendingAction(null);
     }

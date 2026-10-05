@@ -5,12 +5,25 @@ import Button from "@/components/ui/Button";
 import ErrorDigest from "@/components/errors/ErrorDigest";
 import { BUG_REPORT_HREF, TECH_SUPPORT_HREF } from "@/lib/support-mail";
 
+/**
+ * `page` replaces the whole viewport (root and global error boundaries).
+ * `embedded` renders inside a route-group layout so that its navigation shell
+ * (MobileNav, Footer, partner portal shell) stays usable after an exception.
+ */
+export type AppErrorScreenLayout = "page" | "embedded";
+
 type AppErrorScreenProps = {
   code: string;
   title: string;
   description: string;
   digest?: string;
   onRetry?: () => void;
+  layout?: AppErrorScreenLayout;
+};
+
+const LAYOUT_CLASS_NAMES: Record<AppErrorScreenLayout, string> = {
+  page: "flex min-h-screen items-center justify-center bg-background px-4 py-8",
+  embedded: "flex min-h-[60vh] items-center justify-center px-4 py-10",
 };
 
 export default function AppErrorScreen({
@@ -19,6 +32,7 @@ export default function AppErrorScreen({
   description,
   digest,
   onRetry,
+  layout = "page",
 }: AppErrorScreenProps) {
   const pathname = usePathname();
   const isAdminRoute = pathname.startsWith("/admin");
@@ -48,8 +62,10 @@ export default function AppErrorScreen({
       ? { href: "/partner", label: "파트너 홈" }
       : { href: "/", label: "홈으로 이동" };
 
+  const Root = layout === "page" ? "main" : "div";
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
+    <Root data-app-error-layout={layout} className={LAYOUT_CLASS_NAMES[layout]}>
       <section className="w-full max-w-xl rounded-[2rem] border border-border bg-surface-elevated p-6 shadow-raised sm:p-8">
         <div className="grid gap-5">
           <div className="grid gap-2 text-center sm:text-left">
@@ -81,6 +97,6 @@ export default function AppErrorScreen({
           </div>
         </div>
       </section>
-    </main>
+    </Root>
   );
 }

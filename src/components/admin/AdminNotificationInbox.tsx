@@ -12,6 +12,7 @@ import IconActionButton, {
 } from "@/components/ui/IconActionButton";
 import { useToast } from "@/components/ui/Toast";
 import {
+  ADMIN_NOTIFICATION_PAGE_SIZE,
   getAdminNotificationTypeLabel,
   type AdminNotificationInboxItem,
   type AdminNotificationListResult,
@@ -119,7 +120,7 @@ export default function AdminNotificationInbox({
             : row,
         ),
       }));
-      notify(getSafeAdminMessage(error, "읽음 처리에 실패했습니다."));
+      notify(getSafeAdminMessage(error, "읽음 처리에 실패했습니다."), { tone: "error" });
     } finally {
       setPendingId(null);
     }
@@ -155,7 +156,7 @@ export default function AdminNotificationInbox({
       }
       router.push(item.targetUrl);
     } catch (error) {
-      notify(getSafeAdminMessage(error, "알림을 열지 못했습니다."));
+      notify(getSafeAdminMessage(error, "알림을 열지 못했습니다."), { tone: "error" });
     } finally {
       setPendingId(null);
     }
@@ -193,7 +194,7 @@ export default function AdminNotificationInbox({
         unreadCount: wasUnread ? current.unreadCount + 1 : current.unreadCount,
         items: [item, ...current.items],
       }));
-      notify(getSafeAdminMessage(error, "알림을 삭제하지 못했습니다."));
+      notify(getSafeAdminMessage(error, "알림을 삭제하지 못했습니다."), { tone: "error" });
     } finally {
       setPendingId(null);
     }
@@ -236,7 +237,7 @@ export default function AdminNotificationInbox({
       notify("관리자 알림을 모두 읽음 처리했습니다.");
     } catch (error) {
       setState(snapshot);
-      notify(getSafeAdminMessage(error, "전체 읽음 처리에 실패했습니다."));
+      notify(getSafeAdminMessage(error, "전체 읽음 처리에 실패했습니다."), { tone: "error" });
     } finally {
       setPendingAction(null);
     }
@@ -272,7 +273,7 @@ export default function AdminNotificationInbox({
       notify("관리자 알림을 모두 삭제했습니다.");
     } catch (error) {
       setState(snapshot);
-      notify(getSafeAdminMessage(error, "전체 삭제에 실패했습니다."));
+      notify(getSafeAdminMessage(error, "전체 삭제에 실패했습니다."), { tone: "error" });
     } finally {
       setPendingAction(null);
     }
@@ -286,7 +287,7 @@ export default function AdminNotificationInbox({
     setLoadingMore(true);
     try {
       const response = await fetch(
-        `/api/admin/notifications?offset=${state.nextOffset}&limit=10&includeSummary=0`,
+        `/api/admin/notifications?offset=${state.nextOffset}&limit=${ADMIN_NOTIFICATION_PAGE_SIZE}&includeSummary=0`,
       );
       const data = await parseAdminNotificationResponse(response);
       setState((current) => ({
@@ -296,7 +297,7 @@ export default function AdminNotificationInbox({
         hasMore: Boolean(data.hasMore),
       }));
     } catch (error) {
-      notify(getSafeAdminMessage(error, "알림을 더 불러오지 못했습니다."));
+      notify(getSafeAdminMessage(error, "알림을 더 불러오지 못했습니다."), { tone: "error" });
     } finally {
       setLoadingMore(false);
     }

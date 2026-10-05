@@ -268,7 +268,10 @@ export default function PromotionCarouselEditor({
         </section>
 
         {canUpdate ? (
-          <div className="fixed bottom-safe-bottom-5 left-5 z-40 md:left-auto md:right-[5.5rem]">
+          <div
+            data-floating-submit-button="raised"
+            className="fixed bottom-safe-bottom-20 left-5 z-[45] md:left-auto md:right-[5.5rem]"
+          >
             <Button
               type="submit"
               variant="primary"

@@ -24,7 +24,10 @@ export default function PartnerFormActions({
       <>
         {formError ? <FormMessage variant="error">{formError}</FormMessage> : null}
 
-        <div className="pointer-events-none fixed bottom-safe-bottom-20 left-1/2 z-[45] flex w-full -translate-x-1/2 justify-center px-4 sm:bottom-safe-bottom-5 sm:w-auto sm:justify-end md:left-auto md:right-[5.5rem] md:translate-x-0">
+        <div
+          data-floating-submit-button="raised"
+          className="pointer-events-none fixed bottom-safe-bottom-20 left-1/2 z-[45] flex w-full -translate-x-1/2 justify-center px-4 sm:w-auto sm:justify-end md:left-auto md:right-[5.5rem] md:translate-x-0"
+        >
           <SubmitButton
             pendingText="저장 중"
             className="order-last pointer-events-auto min-h-12 w-full max-w-sm rounded-full px-5 shadow-floating sm:w-auto"

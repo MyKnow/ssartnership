@@ -242,12 +242,27 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
   body:has([data-partner-detail-mobile-action-bar]) [data-toast-viewport] {
     bottom: calc(env(safe-area-inset-bottom) + 6rem);
   }
+
+  /* 관리자 모바일 하단 탐색(높이 3.5rem) 위로 토스트를 띄웁니다. */
+  body:has([data-admin-mobile-navigation]) [data-toast-viewport] {
+    bottom: calc(env(safe-area-inset-bottom) + 4.75rem);
+  }
 }
 
 @media (min-width: 768px) {
   body:has([data-partner-detail-desktop-action-fab]) [data-toast-viewport] {
     bottom: 6rem;
   }
+}
+
+/* 플로팅 제출 버튼과 토스트가 겹치지 않게 합니다. base는 하단 1.25rem + 높이 3.5rem,
+   raised는 관리자 하단 탐색 위(하단 5rem + 높이 3rem)에 뜬 버튼입니다. */
+body:has([data-floating-submit-button]) [data-toast-viewport] {
+  bottom: calc(env(safe-area-inset-bottom) + 6rem);
+}
+
+body:has([data-floating-submit-button="raised"]) [data-toast-viewport] {
+  bottom: calc(env(safe-area-inset-bottom) + 9rem);
 }
 
 * {
@@ -506,6 +521,10 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
     min-height: calc(6.5rem + env(safe-area-inset-top));
   }
 
+  .bottom-safe-toast {
+    bottom: calc(env(safe-area-inset-bottom) + 1rem);
+  }
+
   .bottom-safe-bottom-5 {
     bottom: calc(env(safe-area-inset-bottom) + 1.25rem);
   }
@@ -537,6 +556,11 @@ body:has([data-site-mobile-navigation]) [data-pwa-visit-recommendation] {
     /* Keep the standard declaration last through production optimization. */
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     backdrop-filter: blur(24px) saturate(180%);
+  }
+
+  /* 실패 토스트는 아이콘과 danger 테두리로 성공·안내 토스트와 구분합니다. */
+  .ui-toast-glass[data-toast-tone="error"] {
+    border-color: color-mix(in srgb, var(--danger) 45%, transparent);
   }
 
   .site-mobile-nav-glass {

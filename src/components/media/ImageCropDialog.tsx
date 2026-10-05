@@ -159,7 +159,7 @@ export default function ImageCropDialog({
     if (!croppedAreaPixels) {
       const message = "이미지를 아직 불러오는 중입니다. 잠시 후 다시 시도해 주세요.";
       setError(message);
-      notify(message);
+      notify(message, { tone: "error" });
       return;
     }
     setIsExporting(true);
@@ -179,7 +179,7 @@ export default function ImageCropDialog({
           ? nextError.message
           : "이미지 변환에 실패했습니다.";
       setError(message);
-      notify(message);
+      notify(message, { tone: "error" });
     } finally {
       setIsExporting(false);
     }

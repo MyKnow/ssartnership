@@ -30,3 +30,11 @@ export const Compact: Story = {
     className: "px-4 py-7",
   },
 };
+
+export const SmallInlineList: Story = {
+  args: {
+    size: "sm",
+    title: "조건에 맞는 발송 로그가 없습니다.",
+    description: "기간이나 상태 필터를 넓혀 다시 확인해 주세요.",
+  },
+};

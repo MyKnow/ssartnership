@@ -599,7 +599,7 @@ export default function PartnerNotificationCenter({
       notify("알림을 읽음 처리했습니다.");
     } catch (error) {
       setItems(snapshot);
-      notify(getNotificationClientError(error, "읽음 처리에 실패했습니다.").message);
+      notify(getNotificationClientError(error, "읽음 처리에 실패했습니다.").message, { tone: "error" });
     } finally {
       setPendingNotificationId(null);
     }
@@ -632,7 +632,7 @@ export default function PartnerNotificationCenter({
       notify("처리 필요 알림을 삭제했습니다.");
     } catch (error) {
       setItems(snapshot);
-      notify(getNotificationClientError(error, "알림 삭제에 실패했습니다.").message);
+      notify(getNotificationClientError(error, "알림 삭제에 실패했습니다.").message, { tone: "error" });
     } finally {
       setPendingNotificationId(null);
     }
@@ -666,7 +666,7 @@ export default function PartnerNotificationCenter({
       notify("표시된 미확인 알림을 읽음 처리했습니다.");
     } catch (error) {
       setItems(snapshot);
-      notify(getNotificationClientError(error, "전체 읽음 처리에 실패했습니다.").message);
+      notify(getNotificationClientError(error, "전체 읽음 처리에 실패했습니다.").message, { tone: "error" });
     } finally {
       setPendingBulkAction(null);
     }
@@ -707,6 +707,7 @@ export default function PartnerNotificationCenter({
       setItems(snapshot);
       notify(
         getNotificationClientError(error, "처리 필요 알림 삭제에 실패했습니다.").message,
+        { tone: "error" },
       );
     } finally {
       setPendingBulkAction(null);

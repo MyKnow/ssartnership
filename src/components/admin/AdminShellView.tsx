@@ -13,8 +13,6 @@ import {
   ChevronDoubleRightIcon,
   ChevronRightIcon,
   HomeIcon,
-  QueueListIcon,
-  Squares2X2Icon,
 } from "@heroicons/react/24/outline";
 import ThemeToggle from "@/components/ThemeToggle";
 import Button from "@/components/ui/Button";
@@ -33,6 +31,7 @@ import {
   ADMIN_NAV_ICON_BY_KEY,
   type AdminNavGroup,
   findAdminNavItem,
+  getAdminMobileNavigation,
   isAdminNavActive,
 } from "@/components/admin/admin-navigation";
 import { useHydrated } from "@/hooks/useHydrated";
@@ -70,18 +69,7 @@ export default function AdminShellView({
       .flatMap((group) => group.items)
       .find((item) => isAdminNavActive(pathname, item.href)) ??
     findAdminNavItem(pathname);
-  const taskNavItem = navGroups
-    .flatMap((group) => group.items)
-    .find((item) => item.href === "/admin/tasks");
-  const dataGroup = navGroups.find(
-    (group) => group.label === "데이터",
-  );
-  const memberNavItem = dataGroup?.items.find(
-    (item) => item.href === "/admin/members",
-  );
-  const isMemberDataActive = Boolean(
-    memberNavItem && isAdminNavActive(pathname, memberNavItem.href),
-  );
+  const mobileNavEntries = getAdminMobileNavigation(navGroups);
   const mobileNavItemClassName = (active: boolean) =>
     cn(
       "flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-inset",
@@ -242,77 +230,67 @@ export default function AdminShellView({
 
       <nav
         aria-label="관리자 주요 탐색"
+        data-admin-mobile-navigation
         className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-surface-overlay/95 pb-safe-bottom shadow-floating backdrop-blur-xl md:hidden"
       >
           <Container size="dashboard" className="flex items-stretch">
-            <Link
-              href="/admin"
-              prefetch={false}
-              onPointerEnter={() => prefetchOnIntent("/admin", "hover")}
-              onPointerLeave={() => cancelHoverPrefetch("/admin")}
-              onFocus={() => prefetchOnIntent("/admin", "focus")}
-              aria-current={pathname === "/admin" ? "page" : undefined}
-              className={mobileNavItemClassName(pathname === "/admin")}
-            >
-              <HomeIcon className="h-5 w-5" aria-hidden="true" />
-              <span>홈</span>
-            </Link>
-            {taskNavItem ? (
-              <Link
-                href={taskNavItem.href}
-                prefetch={false}
-                onPointerEnter={() => prefetchOnIntent(taskNavItem.href, "hover")}
-                onPointerLeave={() => cancelHoverPrefetch(taskNavItem.href)}
-                onFocus={() => prefetchOnIntent(taskNavItem.href, "focus")}
-                aria-current={isAdminNavActive(pathname, taskNavItem.href) ? "page" : undefined}
-                className={mobileNavItemClassName(
-                  isAdminNavActive(pathname, taskNavItem.href),
-                )}
-              >
-                <QueueListIcon className="h-5 w-5" aria-hidden="true" />
-                <span>작업함</span>
-              </Link>
-            ) : null}
-            <AdminQuickNavigatorTrigger
-              compact
-              compactLabel="검색"
-              className={cn(
-                mobileNavItemClassName(false),
-                "h-auto w-auto rounded-none border-0 bg-transparent shadow-none",
-              )}
-            />
-            {memberNavItem ? (
-              <Link
-                href={memberNavItem.href}
-                prefetch={false}
-                onPointerEnter={() => prefetchOnIntent(memberNavItem.href, "hover")}
-                onPointerLeave={() => cancelHoverPrefetch(memberNavItem.href)}
-                onFocus={() => prefetchOnIntent(memberNavItem.href, "focus")}
-                title={memberNavItem.label}
-                aria-current={isMemberDataActive ? "page" : undefined}
-                className={mobileNavItemClassName(isMemberDataActive)}
-              >
-                <Squares2X2Icon className="h-5 w-5" aria-hidden="true" />
-                <span>회원</span>
-              </Link>
-            ) : null}
-            <AdminMobileNav
-              title={title}
-              backHref={backHref}
-              backLabel={backLabel}
-              logoutAction={logoutAction}
-              navGroups={navGroups}
-              triggerClassName={cn(
-                mobileNavItemClassName(false),
-                "h-auto w-auto rounded-none border-0 bg-transparent shadow-none",
-              )}
-              triggerContent={
-                <>
-                  <Bars3Icon className="h-5 w-5" aria-hidden="true" />
-                  <span>더보기</span>
-                </>
+            {mobileNavEntries.map((entry) => {
+              if (entry.kind === "search") {
+                return (
+                  <AdminQuickNavigatorTrigger
+                    key={entry.id}
+                    compact
+                    compactLabel={entry.label}
+                    className={cn(
+                      mobileNavItemClassName(false),
+                      "h-auto w-auto rounded-none border-0 bg-transparent shadow-none",
+                    )}
+                  />
+                );
               }
-            />
+
+              if (entry.kind === "more") {
+                return (
+                  <AdminMobileNav
+                    key={entry.id}
+                    title={title}
+                    backHref={backHref}
+                    backLabel={backLabel}
+                    logoutAction={logoutAction}
+                    navGroups={navGroups}
+                    triggerClassName={cn(
+                      mobileNavItemClassName(false),
+                      "h-auto w-auto rounded-none border-0 bg-transparent shadow-none",
+                    )}
+                    triggerContent={
+                      <>
+                        <Bars3Icon className="h-5 w-5" aria-hidden="true" />
+                        <span>{entry.label}</span>
+                      </>
+                    }
+                  />
+                );
+              }
+
+              const Icon = ADMIN_NAV_ICON_BY_KEY[entry.iconKey];
+              const active = isAdminNavActive(pathname, entry.href);
+              return (
+                <Link
+                  key={entry.id}
+                  href={entry.href}
+                  prefetch={false}
+                  onPointerEnter={() => prefetchOnIntent(entry.href, "hover")}
+                  onPointerLeave={() => cancelHoverPrefetch(entry.href)}
+                  onFocus={() => prefetchOnIntent(entry.href, "focus")}
+                  title={entry.fullLabel !== entry.label ? entry.fullLabel : undefined}
+                  aria-current={active ? "page" : undefined}
+                  className={mobileNavItemClassName(active)}
+                >
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                  <span>{entry.label}</span>
+                </Link>
+              );
+            })}
           </Container>
       </nav>
 

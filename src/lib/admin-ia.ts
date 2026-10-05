@@ -1,5 +1,18 @@
 import { normalizeAdminSearchQuery } from "@/lib/admin-search-query";
 
+/**
+ * Default row count for admin row lists (UI/UX baseline: "목록은 기본 20행").
+ * Card grids keep column-aligned sizes (partners 24, review cards 12), and
+ * aggregation windows or search suggestions are not paginated lists.
+ */
+export const ADMIN_LIST_DEFAULT_PAGE_SIZE = 20;
+
+export const ADMIN_LIST_PAGE_SIZE_OPTIONS = [
+  ADMIN_LIST_DEFAULT_PAGE_SIZE,
+  50,
+  100,
+] as const;
+
 export const ADMIN_MEMBER_PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
 
 export type AdminMemberPageSize =

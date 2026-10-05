@@ -121,7 +121,7 @@ export default function NotificationInbox({
             : row,
         ),
       }));
-      notify(getNotificationClientError(error, "읽음 처리에 실패했습니다.").message);
+      notify(getNotificationClientError(error, "읽음 처리에 실패했습니다.").message, { tone: "error" });
     } finally {
       setPendingId(null);
     }
@@ -163,7 +163,7 @@ export default function NotificationInbox({
       }
       router.push(item.targetUrl);
     } catch (error) {
-      notify(getNotificationClientError(error, "알림을 열지 못했습니다.").message);
+      notify(getNotificationClientError(error, "알림을 열지 못했습니다.").message, { tone: "error" });
     } finally {
       setPendingId(null);
     }
@@ -203,7 +203,7 @@ export default function NotificationInbox({
         unreadCount: wasUnread ? current.unreadCount + 1 : current.unreadCount,
         items: [item, ...current.items],
       }));
-      notify(getNotificationClientError(error, "알림을 삭제하지 못했습니다.").message);
+      notify(getNotificationClientError(error, "알림을 삭제하지 못했습니다.").message, { tone: "error" });
     } finally {
       setPendingId(null);
     }
@@ -248,7 +248,7 @@ export default function NotificationInbox({
       notify("모든 알림을 읽음 처리했습니다.");
     } catch (error) {
       setState(snapshot);
-      notify(getNotificationClientError(error, "전체 읽음 처리에 실패했습니다.").message);
+      notify(getNotificationClientError(error, "전체 읽음 처리에 실패했습니다.").message, { tone: "error" });
     } finally {
       setPendingAction(null);
     }
@@ -286,7 +286,7 @@ export default function NotificationInbox({
       notify("모든 알림을 삭제했습니다.");
     } catch (error) {
       setState(snapshot);
-      notify(getNotificationClientError(error, "전체 삭제에 실패했습니다.").message);
+      notify(getNotificationClientError(error, "전체 삭제에 실패했습니다.").message, { tone: "error" });
     } finally {
       setPendingAction(null);
     }
@@ -311,7 +311,7 @@ export default function NotificationInbox({
         hasMore: Boolean(data.hasMore),
       }));
     } catch (error) {
-      notify(getNotificationClientError(error, "알림을 더 불러오지 못했습니다.").message);
+      notify(getNotificationClientError(error, "알림을 더 불러오지 못했습니다.").message, { tone: "error" });
     } finally {
       setLoadingMore(false);
     }

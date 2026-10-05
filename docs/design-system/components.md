@@ -22,6 +22,15 @@ authority: normative
 - `PageSection`은 `section`의 접근 가능한 제목과 선택 설명·보조 액션을 묶는다.
 - shell 제목을 page `h1`으로 다시 반복하지 않는다.
 
+## BackLink / 뒤로 가기
+- 화면 단위 뒤로 가기는 `PageHeader backHref`(관리자는 `AdminShell backHref`)를 기본으로 쓰고, `PageHeader`를 쓰지 않는 이벤트 전용 헤더는 같은 표현의 `BackLink`를 사용한다. `← …로 돌아가기` 같은 인라인 텍스트 링크를 새로 만들지 않는다.
+- 뒤로 가기·폼 취소는 명시적인 상위 목적지 href로 이동한다. 공유 링크·알림에서 바로 들어온 경우 사이트 밖이나 무관한 화면으로 가지 않도록 `router.back()`을 쓰지 않는다.
+- 여러 출처에서 들어오는 공용 화면(약관 등)만 검증된 `returnTo`·같은 출처 referrer를 따르는 `BackButton`을 사용한다. 목록 query 문맥 보존이 필요하면 상위 href에 검증된 `returnTo`를 붙인다.
+
+## EmptyState
+- 목록·패널의 빈 상태는 `EmptyState`를 사용한다. 페이지 단위는 기본 `size="md"`, 카드 안 인라인 목록은 `size="sm"`을 쓴다.
+- 제목은 무엇이 비어 있는지 맥락을 담고(예: "조건에 맞는 발송 로그가 없습니다."), 맥락 없는 "데이터가 없습니다."는 쓰지 않는다. 설명은 사용자가 할 수 있는 다음 행동을 안내한다.
+
 ## AdvancedFilterDisclosure
 - 목록의 기본 필터 3~4개 바깥 조건을 접어 두되 적용 개수와 초기화 액션을 항상 보여준다.
 - 펼침 상태와 무관하게 필터 값은 URL query가 단일 기준이다.

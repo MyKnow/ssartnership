@@ -321,7 +321,13 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
       ) : null}
       {message ? <p className="text-sm text-muted-foreground" role="status">{message}</p> : null}
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <Button type="button" variant="secondary" onClick={() => router.back()} disabled={isPending}>돌아가기</Button>
+        <Button
+          href={project ? `/events/project-showcase/my/projects/${encodeURIComponent(project.id)}` : "/events/project-showcase"}
+          variant="secondary"
+          disabled={isPending}
+        >
+          돌아가기
+        </Button>
         <Button type="submit" disabled={isPending}>
           {isPending ? "제출 중…" : mode === "create" ? "출품하기" : "수정해서 다시 제출"}
         </Button>

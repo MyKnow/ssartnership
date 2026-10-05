@@ -4,6 +4,7 @@ import SiteHeader from "@/components/SiteHeader";
 import ShowcaseGuideSection from "@/components/project-showcase/ShowcaseGuideSection";
 import ShowcaseProjectCard from "@/components/project-showcase/ShowcaseProjectCard";
 import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { getHeaderSession } from "@/lib/header-session";
 import {
@@ -253,10 +254,10 @@ export default async function ProjectShowcasePage({
                 {projects.map((project) => <ShowcaseProjectCard key={project.id} project={project} completed={completed.has(project.id)} previewMode={previewMode} />)}
               </div>
             ) : (
-              <div className="rounded-3xl border border-dashed border-border bg-surface px-5 py-14 text-center">
-                <p className="text-lg font-semibold text-foreground">{query || selectedType ? "조건에 맞는 프로젝트가 없어요" : "공개된 프로젝트가 아직 없어요"}</p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">{query || selectedType ? "검색어나 유형을 바꿔 다시 찾아보세요." : "운영진이 확인을 마친 프로젝트부터 공개돼요."}</p>
-              </div>
+              <EmptyState
+                title={query || selectedType ? "조건에 맞는 프로젝트가 없어요" : "공개된 프로젝트가 아직 없어요"}
+                description={query || selectedType ? "검색어나 유형을 바꿔 다시 찾아보세요." : "운영진이 확인을 마친 프로젝트부터 공개돼요."}
+              />
             )}
           </section>
         ) : null}

@@ -39,7 +39,7 @@ export default function CertificationFooterActions({
     try {
       const response = await fetch("/api/mm/logout", { method: "POST" });
       if (!response.ok) {
-        notify("로그아웃에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+        notify("로그아웃에 실패했습니다. 잠시 후 다시 시도해 주세요.", { tone: "error" });
         return;
       }
       setLogoutConfirmationOpen(false);

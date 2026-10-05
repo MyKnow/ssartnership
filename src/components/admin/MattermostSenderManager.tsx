@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
 import SubmitButton from "@/components/ui/SubmitButton";
@@ -273,11 +274,19 @@ export default function MattermostSenderManager({
           </p>
         </div>
         {visibleSenders.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-surface-muted px-4 py-5 text-sm text-muted-foreground">
-            {generationLabel
-              ? `${generationLabel}에 등록된 Sender가 없습니다. 위에서 후보를 저장해 주세요.`
-              : "등록된 Sender가 없습니다. 기수를 입력해 후보를 먼저 저장해 주세요."}
-          </div>
+          <EmptyState
+            size="sm"
+            title={
+              generationLabel
+                ? `${generationLabel}에 등록된 Sender가 없습니다.`
+                : "등록된 Sender가 없습니다."
+            }
+            description={
+              generationLabel
+                ? "위에서 후보를 저장해 주세요."
+                : "기수를 입력해 후보를 먼저 저장해 주세요."
+            }
+          />
         ) : (
           <div className="grid gap-3">
             {visibleSenders.map((sender) => {

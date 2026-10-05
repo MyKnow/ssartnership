@@ -1,6 +1,7 @@
 import CertificationView from "@/components/certification/CertificationView";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
 import Input from "@/components/ui/Input";
 import SectionHeading from "@/components/ui/SectionHeading";
 import SubmitButton from "@/components/ui/SubmitButton";
@@ -366,9 +367,7 @@ export function AdminCertificationCardPreviewGrid({
           ))}
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-border bg-surface-muted px-4 py-5 text-sm text-muted-foreground">
-          {generationLabel} 카드 목업 데이터가 없습니다.
-        </div>
+        <EmptyState size="sm" title={`${generationLabel} 카드 목업 데이터가 없습니다.`} />
       )}
     </Card>
   );

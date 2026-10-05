@@ -3,6 +3,7 @@ import AdminTimeseriesChart from '@/components/admin/AdminTimeseriesChart';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
+import EmptyState from '@/components/ui/EmptyState';
 import Input from '@/components/ui/Input';
 import SectionHeading from '@/components/ui/SectionHeading';
 import type { LogChartBucket, LogGroup } from '@/lib/log-insights';
@@ -41,9 +42,11 @@ export function InsightListCard({
       <SectionHeading title={title} description={description} />
       <div className="mt-4 grid gap-2">
         {items.length === 0 ? (
-          <div className="rounded-2xl border border-border bg-surface-inset px-4 py-4 text-sm text-muted-foreground">
-            데이터가 없습니다.
-          </div>
+          <EmptyState
+            size="sm"
+            title={`선택한 기간에 집계된 ${title} 항목이 없습니다.`}
+            description="기간이나 로그 범위를 넓혀 다시 확인해 주세요."
+          />
         ) : (
           items.map((item) => (
             <div
