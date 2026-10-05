@@ -63,3 +63,12 @@ export function createDialogStack() {
 }
 
 export const dialogStack = createDialogStack();
+
+/**
+ * 공용 훅으로 관리되는 다이얼로그가 하나라도 열려 있는지.
+ * 네이티브 `<dialog>` 메뉴처럼 자체 키 처리를 가진 상위 오버레이가
+ * 그 위에 겹친 확인 모달의 Escape·Tab을 가로채지 않도록 확인한다.
+ */
+export function hasOpenManagedDialog() {
+  return dialogStack.size > 0;
+}

@@ -30,7 +30,7 @@ authority: normative
 - Layout: `Container`, `ResponsiveGrid`, `PageHeader`, `PageSection`, `ShellHeader`, `SectionHeading`
 - Surface: `Card`, `Surface`, `DataPanel`, `StatsRow`
 - Controls: `Button`, `IconActionButton`, `Input`, `PasswordInput`, `Textarea`, `Select`, `Tabs`, `SubmitButton`
-- Feedback: `Badge`, `CategoryColorBadge`, `Chip`, `FormMessage`, `InlineMessage`, `EmptyState`, `Skeleton`, `Spinner`, `Toast`, `Modal`
+- Feedback: `Badge`, `CategoryColorBadge`, `Chip`, `FormMessage`, `InlineMessage`, `EmptyState`, `Skeleton`, `Spinner`, `Toast`, `Modal`, `ConfirmDialog`
 - Chart: `TimeseriesLineChart`
 - Helpers: `BackButton`, `form-field-state`
 

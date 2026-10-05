@@ -1,12 +1,33 @@
 "use client";
 
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import { useId, useRef } from "react";
+import { useId, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 import { FOCUS_RING_ON_OVERLAY_CLASS_NAME } from "@/components/ui/focus-ring";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
+
+/**
+ * 네이티브 `<dialog>`가 `showModal()`로 열려 있으면 그 바깥은 inert가 되어
+ * body에 붙인 모달을 누를 수 없다. 가장 위의 모달 dialog 안에 붙여 top layer를 공유한다.
+ */
+function resolveModalPortalRoot(open: boolean): HTMLElement | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
+  if (!open) {
+    return document.body;
+  }
+  try {
+    const openNativeModals = Array.from(
+      document.querySelectorAll<HTMLDialogElement>("dialog[open]"),
+    ).filter((dialog) => dialog.matches(":modal"));
+    return openNativeModals.at(-1) ?? document.body;
+  } catch {
+    return document.body;
+  }
+}
 
 export default function Modal({
   open,
@@ -27,7 +48,8 @@ export default function Modal({
   titleClassName?: string;
   bodyClassName?: string;
 }) {
-  const portalRoot = typeof document === "undefined" ? null : document.body;
+  // 열릴 때마다 붙일 위치를 다시 고른다(메뉴 dialog 안에서 연 확인 모달 등).
+  const portalRoot = useMemo(() => resolveModalPortalRoot(open), [open]);
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descriptionId = useId();

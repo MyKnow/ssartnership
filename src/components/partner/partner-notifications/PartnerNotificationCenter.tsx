@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import EmptyState from "@/components/ui/EmptyState";
 import FormMessage from "@/components/ui/FormMessage";
 import Input from "@/components/ui/Input";
@@ -356,6 +357,7 @@ export default function PartnerNotificationCenter({
   const [pendingBulkAction, setPendingBulkAction] = useState<
     "read-visible" | "delete-action" | null
   >(null);
+  const [deleteActionConfirmOpen, setDeleteActionConfirmOpen] = useState(false);
   const [filters, setFilters] = useState<PartnerNotificationUiFilters>({
     category: "all",
     type: "all",
@@ -542,10 +544,6 @@ export default function PartnerNotificationCenter({
       pendingBulkAction ||
       visibleActionNotificationIds.length === 0
     ) {
-      return;
-    }
-
-    if (!window.confirm("표시된 처리 필요 알림을 삭제할까요?")) {
       return;
     }
 
@@ -808,9 +806,7 @@ export default function PartnerNotificationCenter({
               disabled={
                 visibleActionNotificationIds.length === 0 || isMutationPending
               }
-              onClick={() => {
-                void deleteVisibleActionNotifications();
-              }}
+              onClick={() => setDeleteActionConfirmOpen(true)}
             >
               처리 필요 알림 삭제
             </Button>
@@ -869,6 +865,18 @@ export default function PartnerNotificationCenter({
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={deleteActionConfirmOpen}
+        title="표시된 처리 필요 알림을 삭제할까요?"
+        description={`현재 필터에 표시된 처리 필요 알림 ${visibleActionNotificationIds.length.toLocaleString("ko-KR")}건을 삭제합니다. 삭제 후에는 알림 센터에서 다시 확인할 수 없습니다.`}
+        confirmLabel="알림 삭제"
+        danger
+        onClose={() => setDeleteActionConfirmOpen(false)}
+        onConfirm={() => {
+          setDeleteActionConfirmOpen(false);
+          void deleteVisibleActionNotifications();
+        }}
+      />
     </div>
   );
 }

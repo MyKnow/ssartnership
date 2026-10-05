@@ -21,6 +21,7 @@ import type { HeaderSession } from "@/lib/header-session";
 import { buildSettingsHref, isFocusedSiteFlow } from "@/lib/site-navigation";
 import { cn } from "@/lib/cn";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { hasOpenManagedDialog } from "@/lib/dialog-focus";
 
 const BROWSER_NAVIGATION_ITEMS = [
   { label: "홈", href: "/", Icon: HomeIcon, memberOnly: false },
@@ -171,8 +172,16 @@ export default function TabletMenu({
         aria-modal="true"
         data-closing={closing}
         className="site-menu-dialog overflow-clip fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none border-0 bg-transparent p-0 text-foreground backdrop:bg-transparent"
-        onCancel={(event) => { event.preventDefault(); closePanel(); }}
+        onCancel={(event) => {
+          event.preventDefault();
+          // 메뉴 위에 겹친 확인 모달이 열려 있으면 그 모달만 닫는다.
+          if (!hasOpenManagedDialog()) closePanel();
+        }}
         onKeyDown={(event) => {
+          if (hasOpenManagedDialog()) {
+            if (event.key === "Escape") event.preventDefault();
+            return;
+          }
           if (event.key === "Escape") {
             event.preventDefault();
             closePanel();

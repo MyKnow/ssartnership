@@ -385,7 +385,11 @@ test("관리자 민감 작업은 공용 접근성 확인 모달을 사용한다"
     ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
   );
 
-  assert.match(sources[0]!, /<Modal/);
+  assert.match(sources[0]!, /export \{ default \} from "@\/components\/ui\/ConfirmDialog";/);
+  assert.match(
+    await readFile(new URL("../src/components/ui/ConfirmDialog.tsx", import.meta.url), "utf8"),
+    /<Modal/,
+  );
   for (const source of sources.slice(1, 5)) {
     assert.match(source, /AdminConfirmDialog/);
     assert.doesNotMatch(source, /window\.confirm/);
