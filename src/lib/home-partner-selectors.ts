@@ -5,6 +5,7 @@ import { getPartnerAudienceLabel, type PartnerAudienceFilter } from "./partner-a
 import {
   getPartnerLockKind,
   getPartnerVisibilityState,
+  type PartnerLockKind,
   type PartnerVisibilityState,
 } from "./partner-visibility.ts";
 import { compareEndDate } from "./partner-utils.ts";
@@ -18,12 +19,12 @@ export type HomePartnerSortOption = "popular" | "recent" | "endingSoon";
 const LOCK_ORDER = {
   confidential: 0,
   private: 1,
-} as const;
+} as const satisfies Record<PartnerLockKind, number>;
 
 export type HomePartnerViewModel = Partner & {
   _index: number;
   _visibilityState: PartnerVisibilityState;
-  _lockKind: "confidential" | "private" | null;
+  _lockKind: PartnerLockKind | null;
   _isActive: boolean;
   _isExpired: boolean;
   _popularityScore: number;
