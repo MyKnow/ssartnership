@@ -137,8 +137,10 @@ Prefer focused checks:
 ```bash
 npx tsc --noEmit --pretty false
 npx eslint <changed-files>
-node --test tests/<focused-test>.test.mts
+node --import ./tests/alias-register.mjs --test tests/<focused-test>.test.mts
 ```
+
+The alias loader is required: without it, any test that reaches an `@/` import stops at module loading (`ERR_MODULE_NOT_FOUND`), which the failure ledger has recorded twice as a local invocation defect.
 
 Run `next build` only when build/runtime behavior changed broadly or when explicitly requested.
 

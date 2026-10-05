@@ -103,7 +103,7 @@ git diff --check
 ```bash
 npx tsc --noEmit --pretty false
 npx eslint <changed-files>
-node --test tests/<focused-test>.test.mts
+node --import ./tests/alias-register.mjs --test tests/<focused-test>.test.mts
 ```
 
 라우트, auth, public UX가 바뀐 경우:

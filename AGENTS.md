@@ -73,8 +73,10 @@ Prefer focused checks over broad expensive runs:
 ```bash
 npx tsc --noEmit --pretty false
 npx eslint <changed-files>
-node --test tests/<focused-test>.test.mts
+node --import ./tests/alias-register.mjs --test tests/<focused-test>.test.mts
 ```
+
+Keep `--import ./tests/alias-register.mjs` (the same loader `npm run test:node` uses); without it, tests that reach `@/` imports fail with `ERR_MODULE_NOT_FOUND`. Route/action tests under `tests/unit/` run with `npm run test:unit`.
 
 Before pushing, run `npm run verify:change`. It classifies the actual diff and uses the same risk tier as GitHub Actions. Run `npm run verify:release` before promoting `dev` to `main`, or whenever the build, E2E, dependency, migration, authentication/security, or CI policy boundary changes.
 
