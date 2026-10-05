@@ -25,3 +25,7 @@ last_verified: 2026-08-29
 - [2026-07-29 Issue #181 최종 감사](./audits/2026-07-29-issue-181-final.md)
 
 새 개선 주기에서는 변경 전 기준선을 남기고, 배포와 실제 traffic 수집 뒤 측정 결과를 추가한다. 과거 감사의 숫자를 현재 production 수치로 재사용하지 않는다.
+
+## 자체 호스팅 캐시 전제
+
+- edge·relay Caddy에는 공유 HTTP 캐시가 없다. 공개 응답의 `s-maxage`·`stale-while-revalidate`는 소비자가 없으므로 쓰지 않고, 브라우저와 Next 이미지 옵티마이저가 읽는 `max-age`만 정책으로 관리한다(`src/lib/public-cache-control.ts`).
