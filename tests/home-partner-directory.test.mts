@@ -219,6 +219,8 @@ test("loadHomePartnerDirectory strips heavy detail fields for signed-in viewers"
       conditions: ["학생증 제시"],
       benefits: ["PT 10% 할인"],
       benefitItems: [{ id: "benefit-1", title: "PT 10% 할인", maxApplyCount: null }],
+      detailDescription: "상세 페이지에서만 보여 주는 긴 소개",
+      branchScopeNote: "지점별 운영 메모",
     }),
   ];
 
@@ -242,6 +244,9 @@ test("loadHomePartnerDirectory strips heavy detail fields for signed-in viewers"
   assert.deepEqual(partner.conditions, []);
   assert.deepEqual(partner.benefits, ["PT 10% 할인"]);
   assert.match(partner.directorySearchText ?? "", /학생증 제시/);
+  // Same card payload as guests: detail-only text never reaches the client.
+  assert.equal("detailDescription" in partner, false);
+  assert.equal("branchScopeNote" in partner, false);
 });
 
 test("loadHomePartnerDirectory uses the lean public directory loader for logged out viewers", async () => {
