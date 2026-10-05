@@ -96,6 +96,12 @@ const ERROR_MESSAGES: Record<string, AdminReviewQueueFeedback> = {
     description:
       "제휴처 후속 처리를 완료하지 못해 신청 상태를 변경 전으로 되돌렸습니다. 운영 기록과 제휴처 목록을 확인한 뒤 다시 시도해 주세요.",
   },
+  partner_form_conversion_status_unrestored: {
+    tone: "danger",
+    title: "제휴처 생성을 완료하지 못했고 신청 상태도 되돌리지 못했습니다",
+    description:
+      "신청이 등록 완료로 남아 있어 이 화면에서는 바꿀 수 없습니다. 제휴처 목록에서 생성 여부를 확인한 뒤 운영 담당자에게 신청 상태 복구를 요청해 주세요.",
+  },
   partner_form_details_invalid: {
     tone: "danger",
     title: "신청 정보 저장을 확인해 주세요",

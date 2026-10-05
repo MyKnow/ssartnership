@@ -72,3 +72,25 @@ test("상태 저장 action은 갱신 전에 전이를 검사하고 상태 변경
   assert.match(view, /getAllowedPartnerRegistrationStatusTransitions\(rowStatus\)/);
   assert.match(view, /등록 완료 후에는 처리 상태를 되돌릴 수 없습니다/);
 });
+
+test("전환 실패 뒤 상태 복원까지 실패하면 되돌렸다고 안내하지 않고 복원 여부를 감사 기록한다", async () => {
+  // A request left in the terminal state cannot be reverted from the queue,
+  // so the failure feedback must not claim the status was restored.
+  const unrestored = getAdminReviewQueueFeedback({
+    error: "partner_form_conversion_status_unrestored",
+  });
+  assert.equal(unrestored?.tone, "danger");
+  assert.match(unrestored?.title ?? "", /되돌리지 못했습니다/);
+  assert.match(unrestored?.description ?? "", /운영 담당자에게 신청 상태 복구를 요청/);
+  assert.doesNotMatch(unrestored?.description ?? "", /되돌렸습니다/);
+
+  const action = await readFile(
+    new URL("src/app/admin/(protected)/partner-registrations/actions.ts", root),
+    "utf8",
+  );
+  assert.match(
+    action,
+    /rollbackSucceeded\s*\?\s*"partner_form_conversion_failed"\s*:\s*"partner_form_conversion_status_unrestored"/,
+  );
+  assert.match(action, /statusRestored: rollbackSucceeded/);
+});

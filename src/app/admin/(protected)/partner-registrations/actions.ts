@@ -225,7 +225,13 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
         );
       }
       revalidatePath("/admin/partner-registrations");
-      redirectAdminActionError(returnTo, "partner_form_conversion_failed", {
+      // `converted` is terminal, so a request left in it by a failed restore
+      // cannot be reverted from the queue. Say so instead of claiming the
+      // restore succeeded, and keep the outcome in the audit record.
+      const conversionFailureCode = rollbackSucceeded
+        ? "partner_form_conversion_failed"
+        : "partner_form_conversion_status_unrestored";
+      redirectAdminActionError(returnTo, conversionFailureCode, {
         action: "partner_create",
         targetType: "partner_registration_request",
         targetId: registrationRequest.id,
@@ -233,6 +239,7 @@ export async function updatePartnerRegistrationRequestStatus(formData: FormData)
           previousStatus,
           requestedStatus: status,
           stage: "conversion_follow_up",
+          statusRestored: rollbackSucceeded,
         },
       });
     }
