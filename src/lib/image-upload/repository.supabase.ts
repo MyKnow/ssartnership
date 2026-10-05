@@ -3,6 +3,7 @@ import {
   IMAGE_UPLOAD_SESSION_TTL_MS,
   IMAGE_UPLOAD_APPROVAL_SESSION_TTL_MS,
   IMAGE_UPLOAD_STAGING_BUCKET,
+  PRIVATE_IMAGE_OBJECT_CACHE_CONTROL,
   getImageUploadSignedUrlExpiresAt,
   isImageUploadSignedUrlExpired,
   type AttachImageUploadInput,
@@ -15,6 +16,7 @@ import {
   type SignImageUploadInput,
   type SignedImageUpload,
   ImageUploadError,
+  resolveImageDestinationCacheControl,
 } from "@/lib/image-upload/repository";
 import {
   isHashedImageUploadQuotaIdentifier,
@@ -489,7 +491,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
             .from(claimedSession.storage_bucket)
             .upload(processedStoragePath, normalized.buffer, {
               contentType: normalized.contentType,
-              cacheControl: "private, no-store",
+              cacheControl: PRIVATE_IMAGE_OBJECT_CACHE_CONTROL,
               upsert: true,
             });
           if (uploadError) {
@@ -703,7 +705,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
           .from(input.destination.bucket)
           .upload(input.destination.path, stagedBuffer, {
             contentType: "image/webp",
-            cacheControl: input.destination.cacheControl ?? "31536000",
+            cacheControl: resolveImageDestinationCacheControl(input.destination),
             upsert: true,
           });
         if (!uploadError) {
