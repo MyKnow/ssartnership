@@ -7,6 +7,7 @@ import { sanitizeReturnTo } from "@/lib/return-to";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { logAdminAction, revalidateReviewPaths } from "./shared-helpers";
 import { redirectAdminActionError } from "./shared-helpers";
+import { REVIEW_TEXT_LIMITS } from "@/lib/review-validation";
 
 const ADMIN_REVIEWS_PATH = "/admin/reviews";
 
@@ -87,7 +88,16 @@ export async function updatePartnerReviewAction(formData: FormData) {
   const rating = Number.parseInt(String(formData.get("rating") ?? "").trim(), 10);
 
   await requireAdminPermission("reviews", "update", { path: returnTo });
-  if (!reviewId || !title || !body || !Number.isFinite(rating) || rating < 1 || rating > 5) {
+  if (
+    !reviewId
+    || !title
+    || !body
+    || title.length > REVIEW_TEXT_LIMITS.titleMax
+    || body.length > REVIEW_TEXT_LIMITS.bodyMax
+    || !Number.isFinite(rating)
+    || rating < 1
+    || rating > 5
+  ) {
     redirectAdminActionError(returnTo, "review_invalid_request");
   }
 

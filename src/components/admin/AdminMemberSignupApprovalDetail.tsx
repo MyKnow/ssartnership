@@ -17,6 +17,7 @@ import {
   type AdminReviewQueueFeedback,
 } from "@/lib/admin-review-queue";
 import { formatKoreanMediumDateTime } from "@/lib/datetime";
+import { MM_SIGNUP_DISPLAY_NAME_MAX_LENGTH } from "@/lib/mm-signup-approval";
 
 const PARSE_REASON_LABELS: Record<string, string> = {
   campus_ambiguous: "캠퍼스가 여러 개로 감지됨",
@@ -145,7 +146,7 @@ export default function AdminMemberSignupApprovalDetail({
               <input type="hidden" name="returnTo" value={returnTo} />
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 이름
-                <Input name="displayName" required maxLength={128} defaultValue={request.mattermostDisplayName} placeholder="홍길동" />
+                <Input name="displayName" required maxLength={MM_SIGNUP_DISPLAY_NAME_MAX_LENGTH} defaultValue={request.mattermostDisplayName} placeholder="홍길동" />
               </label>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="grid gap-2 text-sm font-medium text-foreground">

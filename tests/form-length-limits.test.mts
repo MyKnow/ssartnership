@@ -134,3 +134,37 @@ test("길이 상한이 있는 폼은 서버 상수를 maxLength로 참조한다"
     assert.doesNotMatch(readSource(path), literal, path);
   }
 });
+
+test("리뷰·관리자 검색·MM 가입 승인 이름 상한도 화면과 서버가 같은 상수를 쓴다", async () => {
+  const { REVIEW_TEXT_LIMITS, validateReviewDraftInput } = await import("@/lib/review-validation");
+  const { ADMIN_SEARCH_QUERY_MAX_LENGTH } = await import("@/lib/admin-search-query");
+  const { MM_SIGNUP_DISPLAY_NAME_MAX_LENGTH } = await import("@/lib/mm-signup-approval");
+
+  assert.deepEqual(REVIEW_TEXT_LIMITS, { titleMax: 80, bodyMin: 10, bodyMax: 2000, imagesMax: 5 });
+  assert.equal(ADMIN_SEARCH_QUERY_MAX_LENGTH, 80);
+  assert.equal(MM_SIGNUP_DISPLAY_NAME_MAX_LENGTH, 128);
+
+  assert.deepEqual(
+    validateReviewDraftInput({ rating: 5, title: "가".repeat(81), body: "가".repeat(2001), imageCount: 6 }),
+    {
+      title: "제목은 80자 이내로 입력해 주세요.",
+      body: "리뷰 내용은 2000자 이내로 입력해 주세요.",
+      images: "리뷰 사진은 최대 5장까지 업로드할 수 있습니다.",
+    },
+  );
+
+  const disclosure = readSource("src/components/admin/review-manager/AdminReviewDetailDisclosure.tsx");
+  assert.match(disclosure, /maxLength=\{REVIEW_TEXT_LIMITS\.titleMax\}/);
+  assert.match(disclosure, /maxLength=\{REVIEW_TEXT_LIMITS\.bodyMax\}/);
+  const reviewAction = readSource("src/app/admin/(protected)/_actions/review-actions.ts");
+  assert.match(reviewAction, /title\.length > REVIEW_TEXT_LIMITS\.titleMax/);
+  assert.match(reviewAction, /body\.length > REVIEW_TEXT_LIMITS\.bodyMax/);
+  assert.match(
+    readSource("src/components/admin/AdminGlobalSearchResultsView.tsx"),
+    /maxLength=\{ADMIN_SEARCH_QUERY_MAX_LENGTH\}/,
+  );
+  assert.match(
+    readSource("src/components/admin/AdminMemberSignupApprovalDetail.tsx"),
+    /maxLength=\{MM_SIGNUP_DISPLAY_NAME_MAX_LENGTH\}/,
+  );
+});

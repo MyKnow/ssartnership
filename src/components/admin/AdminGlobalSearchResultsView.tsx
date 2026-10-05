@@ -17,6 +17,7 @@ import {
   type AdminGlobalSearchMember,
   type AdminGlobalSearchPartner,
 } from "@/lib/admin-global-search";
+import { ADMIN_SEARCH_QUERY_MAX_LENGTH } from "@/lib/admin-search-query";
 
 export type { AdminGlobalSearchMember, AdminGlobalSearchPartner } from "@/lib/admin-global-search";
 
@@ -129,7 +130,7 @@ export default function AdminGlobalSearchResultsView({
                 type="search"
                 defaultValue={query}
                 minLength={2}
-                maxLength={80}
+                maxLength={ADMIN_SEARCH_QUERY_MAX_LENGTH}
                 autoComplete="off"
                 aria-describedby="admin-global-search-query-help"
                 placeholder="이름, ID, 제휴처명을 입력하세요"
