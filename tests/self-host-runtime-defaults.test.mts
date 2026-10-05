@@ -93,7 +93,7 @@ function loadNextConfig(environment: Record<string, string>) {
   return JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", code], { cwd: new URL("..", import.meta.url), env, encoding: "utf8" })) as {
     output: string | null;
     compress: boolean;
-    images: { minimumCacheTTL: number; deviceSizes: number[]; imageSizes: number[] };
+    images: { minimumCacheTTL: number; deviceSizes: number[]; imageSizes: number[]; maximumDiskCacheSize?: number };
     optimize: string[] | null;
   };
 }
@@ -112,6 +112,9 @@ test("the deployable build hands compression to the edge and keeps local servers
 test("image optimizer sizes follow stored source widths and cache across deploys", () => {
   const { images } = loadNextConfig({ SELF_HOST_BUILD: "1" });
   assert.equal(images.minimumCacheTTL, 31 * 24 * 60 * 60);
+  // The persistent cache needs an explicit bound: Next's default is half of
+  // the free VM disk, and every start re-reads the whole cache on first use.
+  assert.equal(images.maximumDiskCacheSize, 512 * 1024 * 1024);
   const largestSource = Math.max(...Object.values(IMAGE_TRANSFORM_POLICIES).map((policy) => policy.width));
   assert.equal(largestSource, 2100);
   assert.ok(Math.max(...images.deviceSizes) <= largestSource, "no device width above the largest stored source");

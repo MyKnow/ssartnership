@@ -65,6 +65,12 @@ const IMAGE_MINIMUM_CACHE_TTL_SECONDS = 31 * 24 * 60 * 60;
 // card, thumbnail and avatar slots at 1x-3x density.
 const IMAGE_DEVICE_SIZES = [640, 750, 828, 1080, 1200, 1920, 2048];
 const IMAGE_SIZES = [64, 96, 128, 256, 384];
+// Without a bound Next lets the optimized-image LRU use half of the free disk
+// measured at startup, and the first image request after every start reads
+// the whole cache to rebuild that LRU. The persistent volume shares the VM
+// disk with the database and Storage, so bound both the disk share and the
+// startup scan; least recently used variants are evicted first.
+const IMAGE_DISK_CACHE_MAX_BYTES = 512 * 1024 * 1024;
 const fixtureBuild = fixtureBuildProfile(process.env);
 if (fixtureBuild) {
   assertNoFixtureDotenv(projectRoot);
@@ -133,6 +139,7 @@ const nextConfig: NextConfig = {
     minimumCacheTTL: IMAGE_MINIMUM_CACHE_TTL_SECONDS,
     deviceSizes: IMAGE_DEVICE_SIZES,
     imageSizes: IMAGE_SIZES,
+    maximumDiskCacheSize: IMAGE_DISK_CACHE_MAX_BYTES,
     remotePatterns: supabaseRemotePattern ? [supabaseRemotePattern] : undefined,
     localPatterns: [
       {
