@@ -12,6 +12,7 @@ const {
   parsePartnerNotificationPageQuery,
 } = await import("../src/lib/partner-notification-contract.ts");
 const {
+  applyPartnerStoredNotificationPageResponse,
   hasUnloadedUnreadPartnerNotifications,
   mergePartnerNotificationEntries,
   shiftPartnerStoredNotificationPageAfterDelete,
@@ -215,6 +216,32 @@ test("불러온 저장 알림을 삭제하면 다음 페이지 offset을 삭제 
   );
 });
 
+test("더 보기 응답은 불러오는 동안 맞춘 미확인 수를 오래된 값으로 되돌리지 않는다", () => {
+  const page = { nextOffset: 20, hasMore: true, unreadCount: 7 };
+  const response = { nextOffset: 40, hasMore: false, unreadCount: 8 };
+
+  assert.deepEqual(
+    applyPartnerStoredNotificationPageResponse(page, response, {
+      unreadCountSyncedDuringLoad: false,
+    }),
+    { nextOffset: 40, hasMore: false, unreadCount: 8 },
+  );
+  // 로딩 중 읽음 처리 응답으로 7건을 맞췄다면, 그 전에 계산됐을 수 있는 8건으로 덮지 않는다.
+  assert.deepEqual(
+    applyPartnerStoredNotificationPageResponse(page, response, {
+      unreadCountSyncedDuringLoad: true,
+    }),
+    { nextOffset: 40, hasMore: false, unreadCount: 7 },
+  );
+  // 응답에 값이 없으면 현재 상태를 유지한다.
+  assert.deepEqual(
+    applyPartnerStoredNotificationPageResponse(page, {}, {
+      unreadCountSyncedDuringLoad: false,
+    }),
+    { nextOffset: 20, hasMore: false, unreadCount: 7 },
+  );
+});
+
 test("첫 페이지 알림을 삭제한 뒤 더 보기는 이전 알림을 건너뛰지 않는다", async () => {
   resetMockPartnerStoredNotificationStore();
   await listPartnerStoredNotifications({ accountId: CAFE_ACCOUNT_ID });
@@ -279,6 +306,12 @@ test("파트너 알림 GET·센터 UI는 같은 페이지 규칙과 더 보기�
   assert.match(
     center,
     /shiftPartnerStoredNotificationPageAfterDelete\(current, deletedStoredCount\)/,
+  );
+  assert.match(center, /applyPartnerStoredNotificationPageResponse\(/);
+  // 이전 알림까지 모두 읽음은 더 보기 응답과 겹치지 않게 로딩 중에는 실행하지 않는다.
+  assert.match(
+    center,
+    /async function markAllStoredNotificationsAsRead\(\) \{[\s\S]{0,200}if \(pendingNotificationId \|\| pendingBulkAction \|\| loadingMore\)/,
   );
 
   const store = readSource("src/lib/partner-notification-store.ts");

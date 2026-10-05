@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -24,6 +24,7 @@ import {
   type PartnerStoredNotificationPage,
 } from "@/lib/partner-notification-contract";
 import {
+  applyPartnerStoredNotificationPageResponse,
   derivePartnerNotificationUiModel,
   filterPartnerNotificationUiModels,
   hasUnloadedUnreadPartnerNotifications,
@@ -390,6 +391,9 @@ export default function PartnerNotificationCenter({
     () => data.storedPage ?? EMPTY_STORED_PAGE,
   );
   const [loadingMore, setLoadingMore] = useState(false);
+  // 읽음·삭제 응답으로 미확인 수를 맞출 때마다 올린다. '더 보기' 응답이 그보다
+  // 오래된 미확인 수로 덮어쓰지 않게 비교한다.
+  const unreadCountSyncVersionRef = useRef(0);
   const [filters, setFilters] = useState<PartnerNotificationUiFilters>({
     category: "all",
     type: "all",
@@ -484,6 +488,7 @@ export default function PartnerNotificationCenter({
   function syncStoredUnreadCount(response: PartnerNotificationMutationResponse) {
     const unreadCount = response.summary?.unreadCount;
     if (typeof unreadCount === "number") {
+      unreadCountSyncVersionRef.current += 1;
       setStoredPage((current) => ({ ...current, unreadCount }));
     }
   }
@@ -494,6 +499,7 @@ export default function PartnerNotificationCenter({
       return;
     }
 
+    const unreadCountSyncVersion = unreadCountSyncVersionRef.current;
     setLoadingMore(true);
     try {
       const response = await requestNotificationJson<PartnerNotificationPageResponse>(
@@ -503,14 +509,22 @@ export default function PartnerNotificationCenter({
         undefined,
         { requestFailureMessage: "이전 알림을 더 불러오지 못했습니다." },
       );
+      const unreadCountSyncedDuringLoad =
+        unreadCountSyncVersionRef.current !== unreadCountSyncVersion;
       setItems((current) =>
         mergePartnerNotificationEntries(current, response.items ?? []),
       );
-      setStoredPage((current) => ({
-        nextOffset: response.nextOffset ?? current.nextOffset,
-        hasMore: Boolean(response.hasMore),
-        unreadCount: response.summary?.unreadCount ?? current.unreadCount,
-      }));
+      setStoredPage((current) =>
+        applyPartnerStoredNotificationPageResponse(
+          current,
+          {
+            nextOffset: response.nextOffset,
+            hasMore: response.hasMore,
+            unreadCount: response.summary?.unreadCount,
+          },
+          { unreadCountSyncedDuringLoad },
+        ),
+      );
     } catch (error) {
       notify(
         getNotificationClientError(error, "이전 알림을 더 불러오지 못했습니다.").message,
@@ -521,7 +535,8 @@ export default function PartnerNotificationCenter({
   }
 
   async function markAllStoredNotificationsAsRead() {
-    if (pendingNotificationId || pendingBulkAction) {
+    // 더 보기 응답이 읽음 처리 전 상태로 미확인 알림을 다시 붙이지 않도록 로딩 중에는 막는다.
+    if (pendingNotificationId || pendingBulkAction || loadingMore) {
       return;
     }
 
@@ -951,7 +966,7 @@ export default function PartnerNotificationCenter({
                 className="w-full"
                 loading={pendingBulkAction === "read-all-stored"}
                 loadingText="읽음 처리 중"
-                disabled={isMutationPending}
+                disabled={isMutationPending || loadingMore}
                 onClick={() => {
                   void markAllStoredNotificationsAsRead();
                 }}

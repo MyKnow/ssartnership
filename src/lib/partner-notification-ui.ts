@@ -610,3 +610,30 @@ export function shiftPartnerStoredNotificationPageAfterDelete(
     nextOffset: Math.max(0, page.nextOffset - Math.trunc(deletedStoredCount)),
   };
 }
+
+/**
+ * '더 보기' 응답을 저장 알림 페이지 상태에 반영한다. 불러오는 동안 읽음 처리
+ * 응답으로 미확인 수를 이미 맞췄다면, 그보다 먼저 계산됐을 수 있는 목록 응답의
+ * 미확인 수로 되돌리지 않는다.
+ */
+export function applyPartnerStoredNotificationPageResponse(
+  page: PartnerStoredNotificationPage,
+  response: {
+    nextOffset?: number;
+    hasMore?: boolean;
+    unreadCount?: number | null;
+  },
+  options: { unreadCountSyncedDuringLoad: boolean },
+): PartnerStoredNotificationPage {
+  return {
+    nextOffset:
+      typeof response.nextOffset === "number" && Number.isFinite(response.nextOffset)
+        ? response.nextOffset
+        : page.nextOffset,
+    hasMore: Boolean(response.hasMore),
+    unreadCount:
+      !options.unreadCountSyncedDuringLoad && typeof response.unreadCount === "number"
+        ? response.unreadCount
+        : page.unreadCount,
+  };
+}
