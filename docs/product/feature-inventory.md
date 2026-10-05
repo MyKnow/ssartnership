@@ -20,7 +20,7 @@ authority: normative
 | 제휴 상세 | `/partners/[id]`, `_page/*` | visibility, benefit visibility, period, contacts, coupons, reviews |
 | 프로모션 | `PromotionCarousel`, `promotions/events.ts` | authenticated/year/campus audience |
 | 공유/연락 | `ShareLinkButton`, `ContactCopyRow`, detail contact section | map/reservation/inquiry/benefit action links |
-| PWA 설치 | `/install`, `PwaProvider`, `PwaInstallButton`, manifest | Android/iOS·iPadOS 판별, 데스크톱 native prompt, 플랫폼별 설치 안내, standalone display |
+| PWA 설치 | `/install`, `PwaProvider`, `PwaInstallButton`, manifest, `public/sw.js`·`offline.html` | Android/iOS·iPadOS 판별, 데스크톱 native prompt, 플랫폼별 설치 안내, standalone display, 연결이 끊긴 내비게이션의 오프라인 안내 |
 
 ## Authentication/member
 
