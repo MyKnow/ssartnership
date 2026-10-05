@@ -13,7 +13,7 @@ authority: descriptive
 
 - 단일 진실은 `supabase/migrations/**`다. 파일명 순서로 적용한 최종 상태가 현재 스키마 계약이며, 적용된 migration은 수정하지 않고 새 forward migration으로만 바꾼다.
 - `supabase/schema.sql`은 migrations에서 파생한 사람이 유지하는 스냅샷이다. replay 순서를 따르는 텍스트라 같은 함수가 여러 번 정의될 수 있고, 마지막 정의가 현재 계약이다. 자체 호스팅 DB 초기화 입력으로 쓰지 않는다([자체 호스팅 데이터 계약](../specs/self-host-database/spec.md)).
-- `npm run validate:migrations`는 파일명 규칙과 함께 스냅샷 드리프트를 막는다. 함수별 최종 시그니처 집합이 migrations와 같아야 하고, 삭제된 컬럼을 가리키는 인덱스 정의와 `)` 앞 끝 쉼표 같은 구문 오류가 없어야 한다. 구현은 `scripts/lib/supabase-schema-snapshot.mjs`, 회귀 테스트는 `tests/supabase-schema-snapshot-guard.test.mts`다.
+- `npm run validate:migrations`는 파일명 규칙과 함께 스냅샷 드리프트를 막는다. 함수별 최종 시그니처 집합이 migrations와 같아야 하고, migrations가 남긴 인덱스는 스냅샷에도 있어야 하며, 삭제된 컬럼을 가리키는 인덱스 정의와 `)` 앞 끝 쉼표 같은 구문 오류가 없어야 한다. 스냅샷에만 있는 초기 인덱스(어느 migration도 만들지 않은 기준선)는 운영 DB 확인 전까지 그대로 둔다. 구현은 `scripts/lib/supabase-schema-snapshot.mjs`, 회귀 테스트는 `tests/supabase-schema-snapshot-guard.test.mts`다.
 - 함수 본문까지 최신 migration과 같은지 비교하거나 `pg_dump`로 스냅샷을 재생성하는 일은 아직 하지 않는다. `schema.sql` 텍스트를 직접 읽는 계약 테스트가 약 40개(2026-10-05 기준)라 재생성은 별도 작업으로 다룬다.
 - 보존·파기 기간과 실행 경로는 [데이터 수명주기](../security/data-lifecycle.md)가 정본이다.
 

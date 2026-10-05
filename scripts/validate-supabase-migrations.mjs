@@ -57,6 +57,8 @@ const snapshotProblems = [
     `function ${name}: migrations [${migrations.join(" | ")}] vs schema.sql [${schema.join(" | ")}]`),
   ...snapshot.droppedColumnIndexes.map(({ index, table, columns }) =>
     `index ${index} on ${table} references dropped column(s) ${columns.join(", ")}`),
+  ...snapshot.missingIndexes.map(({ index, table }) =>
+    `index ${index} on ${table} exists in the migrations but not in schema.sql`),
   ...snapshot.trailingCommaLines.map((line) => `trailing comma before ")" at schema.sql:${line}`),
 ];
 

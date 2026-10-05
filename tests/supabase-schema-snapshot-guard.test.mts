@@ -49,6 +49,31 @@ test("삭제된 컬럼을 가리키는 인덱스와 끝 쉼표를 찾는다", ()
   assert.deepEqual(guard.findTrailingCommaStatements("create table t (\n  id uuid,\n  -- note,\n  name text,\n);"), [4]);
 });
 
+test("migrations가 남긴 인덱스가 schema.sql에 없으면 누락으로 보고한다", () => {
+  const migrations = [
+    "create table public.coupons (id uuid, member_id uuid, legacy text);",
+    "create index if not exists coupons_member_idx\n  on public.coupons(member_id) where member_id is not null;",
+    "create index if not exists coupons_old_idx on public.coupons(member_id);\ndrop index if exists public.coupons_old_idx;",
+    "create index if not exists coupons_tmp_idx on public.coupons(id);\nalter index public.coupons_tmp_idx rename to coupons_id_idx;",
+    "create index if not exists coupons_legacy_idx on public.coupons(legacy);\nalter table public.coupons drop column if exists legacy;",
+    "create table public.scratch (id uuid);\ncreate index scratch_id_idx on public.scratch(id);\ndrop table if exists public.scratch;",
+  ];
+  assert.deepEqual([...guard.collectIndexes(migrations).keys()].sort(), ["coupons_id_idx", "coupons_legacy_idx", "coupons_member_idx"]);
+  assert.deepEqual(
+    guard.findMissingIndexes(migrations, "create index if not exists coupons_id_idx on coupons(id);"),
+    [{ index: "coupons_member_idx", table: "coupons" }],
+  );
+  assert.deepEqual(
+    guard.findMissingIndexes(
+      migrations,
+      "create index if not exists coupons_id_idx on coupons(id);\n"
+        + "create index if not exists coupons_member_idx on coupons(member_id) where member_id is not null;\n"
+        + "create index if not exists baseline_only_idx on coupons(id);",
+    ),
+    [],
+  );
+});
+
 test("저장소의 schema.sql 스냅샷은 migrations 최종 상태와 어긋나지 않는다", async () => {
   const migrationDir = new URL("supabase/migrations/", root);
   const names = (await readdir(migrationDir)).filter((name) => name.endsWith(".sql")).sort();
@@ -59,6 +84,7 @@ test("저장소의 schema.sql 스냅샷은 migrations 최종 상태와 어긋나
   assert.deepEqual(guard.checkSchemaSnapshot(sources, schema), {
     signatureDrift: [],
     droppedColumnIndexes: [],
+    missingIndexes: [],
     trailingCommaLines: [],
   });
 });

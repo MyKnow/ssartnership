@@ -3376,6 +3376,7 @@ create table if not exists public.partner_benefits (
   constraint partner_benefits_partner_title_unique unique (partner_id, title)
 );
 create index if not exists partner_benefits_partner_order_idx on public.partner_benefits(partner_id, display_order, id);
+create unique index if not exists partner_benefits_partner_title_unique_idx on public.partner_benefits(partner_id, title);
 alter table public.partner_benefits enable row level security;
 alter table public.partner_benefit_usages add column if not exists benefit_id uuid references public.partner_benefits(id) on delete set null;
 create index if not exists partner_benefit_usages_benefit_verified_at_idx on public.partner_benefit_usages(benefit_id, verified_at desc);
@@ -5823,6 +5824,16 @@ create unique index if not exists ad_coupon_issues_active_member_idx
   on ad_coupon_issues(coupon_id, member_id) where status = 'issued';
 create index if not exists ad_coupon_issues_member_coupon_issued_idx
   on ad_coupon_issues(coupon_id, member_id, issued_at desc);
+create index if not exists ad_coupon_issues_member_created_idx
+  on ad_coupon_issues(member_id, issued_at desc);
+create index if not exists ad_coupon_issues_coupon_created_idx
+  on ad_coupon_issues(coupon_id, issued_at desc);
+create index if not exists ad_coupon_codes_available_idx
+  on ad_coupon_codes(coupon_id, created_at)
+  where status = 'available';
+create index if not exists ad_coupon_redemptions_issue_idx
+  on ad_coupon_redemptions(issue_id, created_at desc)
+  where issue_id is not null;
 
 create or replace function public.issue_ad_coupon(
   p_coupon_id uuid,
@@ -13207,6 +13218,9 @@ create index if not exists image_upload_sessions_signed_url_expiry_idx
 create index if not exists image_upload_sessions_final_path_idx
   on public.image_upload_sessions(final_bucket, final_path)
   where final_path is not null;
+create index if not exists image_upload_sessions_source_path_idx
+  on public.image_upload_sessions(source_storage_path)
+  where source_storage_path is not null;
 create index if not exists image_upload_sessions_owner_active_quota_idx
   on public.image_upload_sessions(owner_kind, owner_id, expires_at)
   where status in ('signed', 'processing', 'ready', 'attaching');

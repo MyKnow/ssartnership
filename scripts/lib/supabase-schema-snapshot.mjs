@@ -131,6 +131,57 @@ export function findDroppedColumnIndexes(schemaSql, droppedColumns) {
   return findings;
 }
 
+const INDEX_STATEMENT_PATTERN = new RegExp([
+  /create\s+(?:unique\s+)?index\s+(?:concurrently\s+)?(?:if\s+not\s+exists\s+)?([a-z_][a-z0-9_]*)\s+on\s+(?:only\s+)?(?:public\.)?([a-z_][a-z0-9_]*)\s*(?:using\s+\w+\s*)?\(([^;]*)\)[^;]*;/u.source,
+  /drop\s+index\s+(?:concurrently\s+)?(?:if\s+exists\s+)?(?:public\.)?([a-z_][a-z0-9_]*)/u.source,
+  /drop\s+table\s+(?:if\s+exists\s+)?(?:public\.)?([a-z_][a-z0-9_]*)/u.source,
+  /alter\s+index\s+(?:if\s+exists\s+)?(?:public\.)?([a-z_][a-z0-9_]*)\s+rename\s+to\s+([a-z_][a-z0-9_]*)/u.source,
+].join("|"), "giu");
+
+/** Replays create/drop/rename index and drop table statements; returns index name -> { table, definition }. */
+export function collectIndexes(sources) {
+  const indexes = new Map();
+  for (const source of sources) {
+    const sql = stripSqlLineComments(source);
+    for (const match of sql.matchAll(INDEX_STATEMENT_PATTERN)) {
+      if (match[1]) {
+        indexes.set(match[1].toLowerCase(), { table: match[2].toLowerCase(), definition: match[3].toLowerCase() });
+      } else if (match[4]) {
+        indexes.delete(match[4].toLowerCase());
+      } else if (match[5]) {
+        const table = match[5].toLowerCase();
+        for (const [name, index] of indexes) if (index.table === table) indexes.delete(name);
+      } else if (match[6]) {
+        const index = indexes.get(match[6].toLowerCase());
+        if (index) {
+          indexes.delete(match[6].toLowerCase());
+          indexes.set(match[7].toLowerCase(), index);
+        }
+      }
+    }
+  }
+  return indexes;
+}
+
+/**
+ * Indexes the migrations leave in place that schema.sql never creates. Indexes
+ * on a column the migrations dropped are skipped (Postgres drops them with the
+ * column). The reverse direction is not checked: schema.sql still carries
+ * pre-migration baseline indexes that no migration created.
+ */
+export function findMissingIndexes(migrationSources, schemaSql) {
+  const droppedColumns = collectDroppedColumns(migrationSources);
+  const snapshot = collectIndexes([schemaSql]);
+  const missing = [];
+  for (const [name, index] of collectIndexes(migrationSources)) {
+    const dropped = droppedColumns.get(index.table);
+    const identifiers = new Set(index.definition.match(/[a-z_][a-z0-9_]*/gu) ?? []);
+    if (dropped && [...dropped].some((column) => identifiers.has(column))) continue;
+    if (!snapshot.has(name)) missing.push({ index: name, table: index.table });
+  }
+  return missing.sort((left, right) => left.index.localeCompare(right.index));
+}
+
 /** Line numbers of statements that end with a trailing comma before the closing parenthesis. */
 export function findTrailingCommaStatements(schemaSql) {
   const sql = stripSqlLineComments(schemaSql);
@@ -141,6 +192,7 @@ export function checkSchemaSnapshot(migrationSources, schemaSql) {
   return {
     signatureDrift: compareFunctionSignatures(migrationSources, schemaSql),
     droppedColumnIndexes: findDroppedColumnIndexes(schemaSql, collectDroppedColumns(migrationSources)),
+    missingIndexes: findMissingIndexes(migrationSources, schemaSql),
     trailingCommaLines: findTrailingCommaStatements(schemaSql),
   };
 }

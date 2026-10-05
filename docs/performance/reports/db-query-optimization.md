@@ -111,7 +111,7 @@ Then run the same scenario:
 ## Change Impact Summary
 
 - Removing `avatar_base64`, `password_hash`, and `password_salt` from preview `COPY public.members` reduces transferred row width and prevents sensitive password material from being copied into preview through this workflow.
-- `members_year_created_at_idx` targets the observed `where year = any (...) order by year desc, created_at desc` pattern.
+- `members_year_created_at_idx` targets the observed `where year = any (...) order by year desc, created_at desc` pattern. It no longer exists; see the later note under "Indexes Added / Reused".
 - `members_created_at_idx` targets admin list queries ordered by newest members.
 - `event_logs_partner_metric_idx` targets partner metric rollups that filter by partner target, metric event name, and event time.
 - The timezone issue is documented as an observed database statistic without a matching app-level `pg_timezone_names` call in this codebase. If it persists after deployment, inspect database extensions, dashboard tooling, or external clients.
