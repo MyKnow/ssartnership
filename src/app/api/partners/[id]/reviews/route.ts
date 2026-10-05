@@ -116,7 +116,11 @@ export async function POST(
     const summary = await partnerReviewRepository.getPartnerReviewSummary(id);
     return NextResponse.json({ ok: true, review: existingReview, summary, idempotent: true });
   }
-  let uploadedUrls: string[] = [];
+  // Filled as each image attaches. Cleanup waits until the catch below has
+  // checked for a review stored by a duplicate request: both requests attach
+  // to the same deterministic paths, so a partial failure here must not delete
+  // files the winning request's review already references.
+  const uploadedUrls: string[] = [];
 
   try {
     const media = await resolveReviewMediaPayload(
@@ -124,8 +128,9 @@ export async function POST(
       id,
       reviewId,
       session.userId,
+      [],
+      { attachedUrls: uploadedUrls },
     );
-    uploadedUrls = media.uploadedUrls;
     const review = await partnerReviewRepository.createPartnerReview({
       reviewId,
       partnerId: id,
@@ -174,6 +179,11 @@ export async function POST(
       const summary = await partnerReviewRepository.getPartnerReviewSummary(id);
       return NextResponse.json({ ok: true, review: storedReview, summary, idempotent: true });
     }
+    // No review is stored under this id, so everything this request attached
+    // is a leftover, including images attached before a media error.
+    if (uploadedUrls.length > 0) {
+      await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);
+    }
     if (isReviewImageUploadUnavailable(error)) {
       return NextResponse.json(
         {
@@ -191,7 +201,6 @@ export async function POST(
         { status: 400 },
       );
     }
-    await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);
     console.error("[partner-reviews] create failed", error);
     const safeError = getSafePublicRouteError(
       error,

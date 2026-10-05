@@ -64,6 +64,25 @@ function storedReview(images: string[]) {
   };
 }
 
+type ResolveOptions = { attachedUrls?: string[] };
+
+// Mirrors the helper's collector contract: URLs reach `attachedUrls` as each
+// image attaches, before any later image can fail.
+function resolveAttaching(attached: string[], failure?: Error) {
+  resolveReviewMediaPayloadMock.mockImplementation(
+    async (...args: unknown[]) => {
+      const options = args[5] as ResolveOptions | undefined;
+      for (const url of attached) {
+        options?.attachedUrls?.push(url);
+      }
+      if (failure) {
+        throw failure;
+      }
+      return { images: attached, uploadedUrls: options?.attachedUrls ?? attached };
+    },
+  );
+}
+
 async function postReview() {
   const { POST } = await import("../../src/app/api/partners/[id]/reviews/route");
   const response = await POST(
@@ -87,10 +106,7 @@ beforeEach(() => {
 
 describe("POST /api/partners/[id]/reviews idempotency", () => {
   test("PK 충돌로 진 중복 요청은 저장된 리뷰를 돌려주고 참조되지 않는 업로드만 정리한다", async () => {
-    resolveReviewMediaPayloadMock.mockResolvedValue({
-      images: ["https://cdn.test/a.webp", "https://cdn.test/b.webp"],
-      uploadedUrls: ["https://cdn.test/a.webp", "https://cdn.test/b.webp"],
-    });
+    resolveAttaching(["https://cdn.test/a.webp", "https://cdn.test/b.webp"]);
     createPartnerReviewMock.mockRejectedValue(
       new Error("duplicate key value violates unique constraint \"partner_reviews_pkey\""),
     );
@@ -131,10 +147,54 @@ describe("POST /api/partners/[id]/reviews idempotency", () => {
 
     expect(result.status).toBe(400);
     expect(result.body).toEqual({ ok: false, fieldErrors: { images: "다시 업로드해 주세요." } });
+    expect(deleteReviewMediaUrlsMock).not.toHaveBeenCalled();
+  });
+
+  test("이미지 연결 도중 실패해도 먼저 저장된 리뷰가 참조하는 파일은 지우지 않는다", async () => {
+    // A duplicate request attached image a (the same deterministic path the
+    // winner used), then failed on image b after the winner had stored the
+    // review. Deleting a here would break the stored review's first image.
+    resolveAttaching(
+      ["https://cdn.test/a.webp"],
+      new Error("처리된 이미지 파일을 찾을 수 없습니다."),
+    );
+    getPartnerReviewByIdMock
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(
+        storedReview(["https://cdn.test/a.webp", "https://cdn.test/b.webp"]),
+      );
+
+    const result = await postReview();
+
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ ok: true, idempotent: true });
+    expect(resolveReviewMediaPayloadMock).toHaveBeenCalledWith(
+      expect.anything(),
+      "partner-1",
+      reviewId,
+      "member-1",
+      [],
+      { attachedUrls: expect.any(Array) },
+    );
+    expect(createPartnerReviewMock).not.toHaveBeenCalled();
+    expect(deleteReviewMediaUrlsMock).not.toHaveBeenCalled();
+  });
+
+  test("저장된 리뷰가 없으면 이미지 오류 전에 연결한 파일을 정리하고 필드 오류를 돌려준다", async () => {
+    resolveAttaching(["https://cdn.test/a.webp"], new Error("media"));
+    getReviewMediaInputFieldErrorsMock.mockReturnValue({ images: "다시 업로드해 주세요." });
+    getPartnerReviewByIdMock.mockResolvedValue(null);
+
+    const result = await postReview();
+
+    expect(result.status).toBe(400);
+    expect(result.body).toEqual({ ok: false, fieldErrors: { images: "다시 업로드해 주세요." } });
+    expect(deleteReviewMediaUrlsMock).toHaveBeenCalledTimes(1);
+    expect(deleteReviewMediaUrlsMock).toHaveBeenCalledWith(["https://cdn.test/a.webp"]);
   });
 
   test("다른 회원의 리뷰와 충돌하면 저장된 리뷰를 노출하지 않는다", async () => {
-    resolveReviewMediaPayloadMock.mockResolvedValue({ images: [], uploadedUrls: [] });
+    resolveAttaching([]);
     createPartnerReviewMock.mockRejectedValue(new Error("duplicate key"));
     getPartnerReviewByIdMock
       .mockResolvedValueOnce(null)
