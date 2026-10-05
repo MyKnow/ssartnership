@@ -6,6 +6,7 @@ import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
 import Input from '@/components/ui/Input';
+import Modal from '@/components/ui/Modal';
 import SectionHeading from '@/components/ui/SectionHeading';
 import type { LogChartBucket, LogGroup } from '@/lib/log-insights';
 
@@ -295,100 +296,89 @@ export function ExportDialog({
   onChangeCustomEnd: (value: string) => void;
   onSubmit: () => void;
 }) {
-  if (!open) {
-    return null;
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/45 backdrop-blur-sm"
-        aria-label="CSV 다운로드 닫기"
-        onClick={onClose}
-      />
-      <Card className="relative z-10 w-full max-w-xl overflow-hidden bg-surface-overlay shadow-overlay">
-        <SectionHeading
-          title="CSV 다운로드"
-          description="현재 조회 범위 또는 별도 사용자 지정 범위를 골라 로그를 CSV로 내보냅니다."
-        />
-
-        <div className="mt-6 grid gap-5">
-          <div className="grid gap-3">
-            <p className="text-sm font-medium text-foreground">내보낼 범위</p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <RangePresetButton
-                active={exportScope === 'current'}
-                onClick={() => onChangeScope('current')}
-                disabled={loading}
-              >
-                기본값: 현재 조회 범위
-              </RangePresetButton>
-              <RangePresetButton
-                active={exportScope === 'custom'}
-                onClick={() => onChangeScope('custom')}
-                disabled={loading}
-              >
-                커스텀: 사용자 지정 범위
-              </RangePresetButton>
-            </div>
-          </div>
-
-          {exportScope === 'custom' ? (
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="grid gap-2 text-sm font-medium text-foreground">
-                시작 시각
-                <Input
-                  type="datetime-local"
-                  value={exportCustomStart}
-                  onChange={(event) => onChangeCustomStart(event.target.value)}
-                />
-              </label>
-              <label className="grid gap-2 text-sm font-medium text-foreground">
-                종료 시각
-                <Input
-                  type="datetime-local"
-                  value={exportCustomEnd}
-                  onChange={(event) => onChangeCustomEnd(event.target.value)}
-                />
-              </label>
-            </div>
-          ) : null}
-
-          <div className="grid gap-3">
-            <p className="text-sm font-medium text-foreground">내보낼 로그 종류</p>
-            <div className="grid gap-2 sm:grid-cols-3">
-              {([
-                ['product', '사용자 이벤트'],
-                ['audit', '관리자 감사'],
-                ['security', '인증·보안'],
-              ] as Array<[LogGroup, string]>).filter(([group]) => availableGroups.includes(group)).map(([group, label]) => (
-                <label
-                  key={group}
-                  className="flex items-center gap-3 rounded-2xl border border-border bg-surface-inset px-4 py-3 text-sm text-foreground"
-                >
-                  <Checkbox
-                    checked={exportGroups[group]}
-                    onChange={() => onToggleGroup(group)}
-                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                    disabled={loading || !availableGroups.includes(group)}
-                  />
-                  <span>{label}</span>
-                </label>
-              ))}
-            </div>
+    <Modal
+      open={open}
+      title="CSV 다운로드"
+      description="현재 조회 범위 또는 별도 사용자 지정 범위를 골라 로그를 CSV로 내보냅니다."
+      onClose={onClose}
+      panelClassName="max-w-xl"
+    >
+      <div className="mt-2 grid gap-5">
+        <div className="grid gap-3">
+          <p className="text-sm font-medium text-foreground">내보낼 범위</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <RangePresetButton
+              active={exportScope === 'current'}
+              onClick={() => onChangeScope('current')}
+              disabled={loading}
+            >
+              기본값: 현재 조회 범위
+            </RangePresetButton>
+            <RangePresetButton
+              active={exportScope === 'custom'}
+              onClick={() => onChangeScope('custom')}
+              disabled={loading}
+            >
+              커스텀: 사용자 지정 범위
+            </RangePresetButton>
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap justify-end gap-2">
-          <Button variant="ghost" onClick={onClose} disabled={loading}>
-            취소
-          </Button>
-          <Button onClick={onSubmit} loading={loading} loadingText="다운로드 중">
-            CSV 다운로드
-          </Button>
+        {exportScope === 'custom' ? (
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="grid gap-2 text-sm font-medium text-foreground">
+              시작 시각
+              <Input
+                type="datetime-local"
+                value={exportCustomStart}
+                onChange={(event) => onChangeCustomStart(event.target.value)}
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-foreground">
+              종료 시각
+              <Input
+                type="datetime-local"
+                value={exportCustomEnd}
+                onChange={(event) => onChangeCustomEnd(event.target.value)}
+              />
+            </label>
+          </div>
+        ) : null}
+
+        <div className="grid gap-3">
+          <p className="text-sm font-medium text-foreground">내보낼 로그 종류</p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {([
+              ['product', '사용자 이벤트'],
+              ['audit', '관리자 감사'],
+              ['security', '인증·보안'],
+            ] as Array<[LogGroup, string]>).filter(([group]) => availableGroups.includes(group)).map(([group, label]) => (
+              <label
+                key={group}
+                className="flex items-center gap-3 rounded-2xl border border-border bg-surface-inset px-4 py-3 text-sm text-foreground"
+              >
+                <Checkbox
+                  checked={exportGroups[group]}
+                  onChange={() => onToggleGroup(group)}
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  disabled={loading || !availableGroups.includes(group)}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
         </div>
-      </Card>
-    </div>
+      </div>
+
+      <div className="mt-6 flex flex-wrap justify-end gap-2">
+        <Button variant="ghost" onClick={onClose} disabled={loading}>
+          취소
+        </Button>
+        <Button onClick={onSubmit} loading={loading} loadingText="다운로드 중">
+          CSV 다운로드
+        </Button>
+      </div>
+    </Modal>
   );
 }
