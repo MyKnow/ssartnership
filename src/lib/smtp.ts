@@ -199,7 +199,33 @@ export function getSmtpConfig(
   };
 }
 
-export function createSmtpTransport(config = getSmtpConfig()) {
+export type SmtpTimeouts = Readonly<{
+  /** DNS 질의 1회 상한. resolver가 재시도하므로 총 대기는 몇 배가 될 수 있다. */
+  dnsTimeoutMs: number;
+  /** TCP(및 implicit TLS) 연결 수립 상한. */
+  connectionTimeoutMs: number;
+  /** 연결 후 SMTP 220 인사 수신 상한. */
+  greetingTimeoutMs: number;
+  /** 연결된 소켓의 무응답(유휴) 상한. 전송 전체 시간이 아니라 정지 구간을 끊는다. */
+  socketTimeoutMs: number;
+}>;
+
+/**
+ * nodemailer 기본값(DNS 30초·연결 2분·인사 30초·소켓 10분)은 요청 처리와
+ * cron 상한(60~70초)보다 길어, 메일 서버 장애가 사용자 요청을 오래 붙잡는다.
+ * 외부 호출 상한 규약(docs/operations/reliability.md)에 맞춘 고정값이다.
+ */
+export const SMTP_TIMEOUTS: SmtpTimeouts = Object.freeze({
+  dnsTimeoutMs: 5_000,
+  connectionTimeoutMs: 10_000,
+  greetingTimeoutMs: 10_000,
+  socketTimeoutMs: 20_000,
+});
+
+export function buildSmtpTransportOptions(
+  config: SmtpConfig,
+  timeouts: SmtpTimeouts = SMTP_TIMEOUTS,
+) {
   const tls =
     config.tlsMinDhSize || config.tlsCiphers
       ? {
@@ -208,7 +234,7 @@ export function createSmtpTransport(config = getSmtpConfig()) {
         }
       : undefined;
 
-  return nodemailer.createTransport({
+  return {
     host: config.host,
     port: config.port,
     secure: config.secure,
@@ -217,5 +243,16 @@ export function createSmtpTransport(config = getSmtpConfig()) {
       user: config.user,
       pass: config.pass,
     },
-  });
+    dnsTimeout: timeouts.dnsTimeoutMs,
+    connectionTimeout: timeouts.connectionTimeoutMs,
+    greetingTimeout: timeouts.greetingTimeoutMs,
+    socketTimeout: timeouts.socketTimeoutMs,
+  };
+}
+
+export function createSmtpTransport(
+  config = getSmtpConfig(),
+  timeouts: SmtpTimeouts = SMTP_TIMEOUTS,
+) {
+  return nodemailer.createTransport(buildSmtpTransportOptions(config, timeouts));
 }

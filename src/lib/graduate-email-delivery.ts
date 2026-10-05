@@ -47,6 +47,8 @@ const SMTP_CONNECTION_ERROR_CODES = new Set([
   "ENOTFOUND",
   "ESOCKET",
   "ETIMEDOUT",
+  // DNS resolver timeout (nodemailer dnsTimeout). Transient, not a rejection.
+  "ETIMEOUT",
 ]);
 const SMTP_TLS_ERROR_CODES = new Set([
   "CERT_HAS_EXPIRED",
