@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import ShowcaseProjectForm from "@/components/project-showcase/ShowcaseProjectForm";
@@ -7,6 +6,7 @@ import { getHeaderSession } from "@/lib/header-session";
 import { getShowcasePhase, projectShowcaseRepository } from "@/lib/project-showcase";
 import { formatShowcasePeriod } from "@/lib/project-showcase/format";
 import { getSignedUserSession } from "@/lib/user-auth";
+import BackLink from "@/components/ui/BackLink";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +26,7 @@ export default async function NewShowcaseProjectPage() {
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
       <main className="mx-auto w-full max-w-3xl px-4 pb-20 pt-8 sm:px-6 sm:pt-12">
-        <Link href="/events/project-showcase" className="text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">← 이벤트로 돌아가기</Link>
+        <BackLink href="/events/project-showcase">이벤트로 돌아가기</BackLink>
         <div className="mb-7 mt-7">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">PROJECT SUBMISSION</p>
           <h1 className="mt-2 text-3xl font-bold text-foreground">내 프로젝트 출품하기</h1>

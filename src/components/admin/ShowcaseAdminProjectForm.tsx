@@ -339,7 +339,7 @@ export default function ShowcaseAdminProjectForm({ mode, project }: ShowcaseAdmi
       {error ? <div tabIndex={-1} aria-live="assertive"><FormMessage variant="error">{error}</FormMessage></div> : null}
       {message ? <p role="status" className="text-sm text-muted-foreground">{message}</p> : null}
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <Button type="button" variant="secondary" disabled={pending} onClick={() => router.back()}>돌아가기</Button>
+        <Button href={ADMIN_PATH} variant="secondary" disabled={pending}>돌아가기</Button>
         <Button type="submit" disabled={pending}>{pending ? "저장 중…" : mode === "create" ? "출품작 등록" : "수정 사항 저장"}</Button>
       </div>
       <ImageCropDialog

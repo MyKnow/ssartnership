@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import ShowcaseWithdrawButton from "@/components/project-showcase/ShowcaseWithdrawButton";
@@ -12,6 +11,7 @@ import {
   type ShowcaseProjectStatus,
 } from "@/lib/project-showcase/types";
 import { getSignedUserSession } from "@/lib/user-auth";
+import BackLink from "@/components/ui/BackLink";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +55,7 @@ export default async function MyShowcaseProjectPage({
     <div className="min-h-screen bg-background">
       <SiteHeader initialSession={headerSession} />
       <main className="mx-auto w-full max-w-4xl px-4 pb-20 pt-8 sm:px-6 sm:pt-12">
-        <Link href="/events/project-showcase/my" className="text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">← 내 참여로 돌아가기</Link>
+        <BackLink href="/events/project-showcase/my">내 참여로 돌아가기</BackLink>
 
         <section className="mt-7 grid gap-3 rounded-2xl border border-border bg-surface p-5 sm:p-6" aria-labelledby="my-showcase-status-heading">
           <div className="flex flex-wrap items-center gap-2">
