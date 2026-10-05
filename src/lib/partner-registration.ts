@@ -28,7 +28,9 @@ import {
   type PartnerRegistrationMode,
 } from "@/lib/partner-branch-registration";
 import {
-  IMAGE_SOURCE_ACCEPT,
+  RASTER_IMAGE_SOURCE_ACCEPT,
+  SVG_SOURCE_NOT_ALLOWED_MESSAGE,
+  isSvgImageSource,
   validateImageUploadSource,
 } from "@/lib/image-upload/policy";
 import { normalizePartnerBenefitItems } from "@/lib/partner-benefit-items";
@@ -280,7 +282,8 @@ export type PartnerRegistrationQueueSort =
 
 export const PARTNER_REGISTRATION_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const PARTNER_REGISTRATION_GALLERY_MAX_FILES = 5;
-export const PARTNER_REGISTRATION_IMAGE_ACCEPT = IMAGE_SOURCE_ACCEPT;
+// 비로그인 게스트 업로드라 SVG 원본을 받지 않는다(partner-registration 이미지 정책과 같은 규칙).
+export const PARTNER_REGISTRATION_IMAGE_ACCEPT = RASTER_IMAGE_SOURCE_ACCEPT;
 
 export function isPartnerRegistrationRequestStatus(
   value: string,
@@ -366,7 +369,7 @@ export function isPartnerRegistrationImageFile(file: File) {
     name: file.name,
     type: file.type,
     size: file.size,
-  }, { maxSourceBytes: PARTNER_REGISTRATION_IMAGE_MAX_BYTES });
+  }, { maxSourceBytes: PARTNER_REGISTRATION_IMAGE_MAX_BYTES, allowSvgSource: false });
 }
 
 export function validatePartnerRegistrationImageFile(file: File) {
@@ -375,6 +378,9 @@ export function validatePartnerRegistrationImageFile(file: File) {
   }
   if (file.size > PARTNER_REGISTRATION_IMAGE_MAX_BYTES) {
     return "이미지는 파일당 5MB 이하만 업로드할 수 있습니다.";
+  }
+  if (isSvgImageSource(file)) {
+    return SVG_SOURCE_NOT_ALLOWED_MESSAGE;
   }
   if (!isPartnerRegistrationImageFile(file)) {
     return "지원하는 이미지 파일만 업로드할 수 있습니다.";

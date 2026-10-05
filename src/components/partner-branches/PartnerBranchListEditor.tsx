@@ -17,6 +17,10 @@ import {
   getPartnerBranchScopeLabel,
   normalizeBenefitGroupKey,
 } from "@/lib/partner-branch-registration";
+import {
+  readPartnerBranchXlsxRows,
+  type PartnerBranchXlsxWorksheetLike,
+} from "@/lib/partner-branch-xlsx-rows";
 
 export type BranchEditorRow = {
   id: string;
@@ -35,20 +39,6 @@ const branchTypeOptions = [
   { value: "franchise", label: "가맹" },
   { value: "unknown", label: "미정" },
 ] as const satisfies Array<{ value: BranchEditorRow["branchType"]; label: string }>;
-
-type ExcelCellLike = {
-  text?: string;
-  value?: unknown;
-};
-
-type ExcelRowLike = {
-  eachCell: (callback: (cell: ExcelCellLike, columnNumber: number) => void) => void;
-};
-
-type ExcelWorksheetLike = {
-  getRow: (rowNumber: number) => ExcelRowLike;
-  eachRow: (callback: (row: ExcelRowLike, rowNumber: number) => void) => void;
-};
 
 function BranchRowField({
   label,
@@ -92,34 +82,6 @@ function createBranchEditorRowId() {
 
 function normalizeEditorBenefitGroupKey(value?: string | null) {
   return normalizeBenefitGroupKey(value, DEFAULT_PARTNER_BENEFIT_GROUP_KEY);
-}
-
-function normalizeHeader(value: string) {
-  return value.replace(/\s+/g, "").trim();
-}
-
-function getCellText(cell: ExcelCellLike) {
-  const text = cell.text?.trim();
-  if (text) {
-    return text;
-  }
-  const value = cell.value;
-  if (value === null || value === undefined) {
-    return "";
-  }
-  if (typeof value === "object") {
-    const maybeValue = value as { result?: unknown; text?: unknown; hyperlink?: unknown };
-    if (maybeValue.text !== undefined) {
-      return String(maybeValue.text).trim();
-    }
-    if (maybeValue.result !== undefined) {
-      return String(maybeValue.result).trim();
-    }
-    if (maybeValue.hyperlink !== undefined) {
-      return String(maybeValue.hyperlink).trim();
-    }
-  }
-  return String(value).trim();
 }
 
 function normalizeEditorBranchType(value?: string | null): BranchEditorRow["branchType"] {
@@ -266,50 +228,24 @@ async function parseBranchXlsxFile(file: File) {
   await workbook.xlsx.load(
     buffer as unknown as Parameters<typeof workbook.xlsx.load>[0],
   );
-  const worksheet = workbook.worksheets[0] as ExcelWorksheetLike | undefined;
+  const worksheet = workbook.worksheets[0] as PartnerBranchXlsxWorksheetLike | undefined;
   if (!worksheet) {
     throw new Error("지점 목록 시트를 찾지 못했습니다.");
   }
 
-  const headerByColumn = new Map<number, string>();
-  worksheet.getRow(1).eachCell((cell, columnNumber) => {
-    const header = normalizeHeader(getCellText(cell));
-    if (header) {
-      headerByColumn.set(columnNumber, header);
-    }
-  });
-
-  const rows: BranchEditorRow[] = [];
-  worksheet.eachRow((row, rowNumber) => {
-    if (rowNumber === 1) {
-      return;
-    }
-    const rowValues = new Map<string, string>();
-    row.eachCell((cell, columnNumber) => {
-      const header = headerByColumn.get(columnNumber);
-      if (!header) {
-        return;
-      }
-      rowValues.set(header, getCellText(cell));
-    });
-    const hasAnyValue = Array.from(rowValues.values()).some(Boolean);
-    if (!hasAnyValue) {
-      return;
-    }
-    rows.push({
+  const rows = readPartnerBranchXlsxRows(worksheet).map(
+    ({ rowNumber, values }): BranchEditorRow => ({
       id: `xlsx-${rowNumber}-${Math.random().toString(36).slice(2, 8)}`,
-      benefitGroupKey: normalizeEditorBenefitGroupKey(rowValues.get("혜택그룹")),
-      branchName: rowValues.get("지점명") ?? "",
-      address: rowValues.get("주소") ?? "",
-      branchCode: rowValues.get("지점코드") ?? "",
-      branchType: normalizeEditorBranchType(
-        rowValues.get("직영/가맹") ?? rowValues.get("지점유형"),
-      ),
-      mapUrl: rowValues.get("지도URL") ?? "",
-      phone: rowValues.get("전화번호") ?? "",
-      memo: rowValues.get("메모") ?? rowValues.get("운영메모") ?? "",
-    });
-  });
+      benefitGroupKey: normalizeEditorBenefitGroupKey(values.benefitGroupLabel),
+      branchName: values.branchName ?? "",
+      address: values.address ?? "",
+      branchCode: values.branchCode ?? "",
+      branchType: normalizeEditorBranchType(values.branchType),
+      mapUrl: values.mapUrl ?? "",
+      phone: values.phone ?? "",
+      memo: values.memo ?? "",
+    }),
+  );
 
   if (rows.length === 0) {
     throw new Error("불러올 지점 행이 없습니다.");

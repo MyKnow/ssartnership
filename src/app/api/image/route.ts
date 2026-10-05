@@ -9,8 +9,7 @@ import {
   PUBLIC_RASTER_IMAGE_CONTENT_TYPES,
 } from "@/lib/image-proxy";
 import { sanitizeHttpUrl } from "@/lib/validation";
-
-const WEEK_SECONDS = 60 * 60 * 24 * 7;
+import { PUBLIC_IMAGE_PROXY_CACHE_CONTROL } from "@/lib/public-cache-control";
 
 export const runtime = "nodejs";
 
@@ -55,7 +54,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         "content-type": contentType,
-        "cache-control": `public, max-age=${5 * 60}, s-maxage=${WEEK_SECONDS}, stale-while-revalidate=${WEEK_SECONDS}`,
+        "cache-control": PUBLIC_IMAGE_PROXY_CACHE_CONTROL,
         "x-content-type-options": "nosniff",
       },
     });

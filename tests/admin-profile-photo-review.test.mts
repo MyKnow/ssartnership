@@ -72,7 +72,13 @@ test("관리자 사진 미리보기 API는 전용 권한과 private 응답을 �
 
   for (const source of [replacementRoute, currentRoute]) {
     assert.match(source, /ensureAdminApiPermission\(request, "profile_images", "read"\)/);
-    assert.match(source, /"cache-control": "private, no-store"/);
-    assert.match(source, /"x-content-type-options": "nosniff"/);
   }
+  // 검토 대기 교체본은 브라우저에 남기지 않는다.
+  assert.match(replacementRoute, /"cache-control": "private, no-store"/);
+  assert.match(replacementRoute, /"x-content-type-options": "nosniff"/);
+  // 현재 사진은 안정 URL이라 개인 캐시 재검증(private, no-cache + ETag)을 쓰고 열람 감사는 매 요청 남긴다.
+  assert.match(currentRoute, /getMemberProfileImageRevalidation\(request, image\)/);
+  assert.ok(
+    currentRoute.indexOf("logAdminAudit(") < currentRoute.indexOf("revalidation.notModified"),
+  );
 });

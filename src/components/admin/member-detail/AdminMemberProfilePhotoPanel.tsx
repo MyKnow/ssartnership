@@ -20,7 +20,7 @@ import {
 } from "@/lib/image-upload/client-transform";
 import { uploadImagesToStaging } from "@/lib/image-upload/client";
 import {
-  IMAGE_SOURCE_ACCEPT,
+  getImageSourceAccept,
   resolveImageTransformPolicy,
 } from "@/lib/image-upload/policy";
 import type { MemberProfilePhotoReviewStatus } from "@/lib/member-profile-photo";
@@ -220,7 +220,7 @@ export default function AdminMemberProfilePhotoPanel({
             className="sr-only"
             type="file"
             aria-label="새 프로필 사진 파일 선택"
-            accept={IMAGE_SOURCE_ACCEPT}
+            accept={getImageSourceAccept(PROFILE_IMAGE_POLICY)}
             disabled={pending || selecting}
             onChange={(event) => {
               void selectFile(event.target.files?.[0] ?? null);

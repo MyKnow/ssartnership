@@ -14,7 +14,7 @@ import {
 } from "@/lib/image-upload/client-transform";
 import { uploadImagesToStaging } from "@/lib/image-upload/client";
 import {
-  IMAGE_SOURCE_ACCEPT,
+  getImageSourceAccept,
   resolveImageTransformPolicy,
 } from "@/lib/image-upload/policy";
 import { getMemberGateCompletionReturnTo } from "@/lib/member-required-gates";
@@ -185,7 +185,7 @@ export default function GraduateProfilePhotoForm({
         className="sr-only"
         type="file"
         aria-label="본인 사진 파일 선택"
-        accept={IMAGE_SOURCE_ACCEPT}
+        accept={getImageSourceAccept(PROFILE_IMAGE_POLICY)}
         onChange={(event) => {
           void selectFile(event.target.files?.[0] ?? null);
           event.target.value = "";

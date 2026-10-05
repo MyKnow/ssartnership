@@ -9,6 +9,9 @@ const sourcePaths = [
   "../src/components/partner-image-carousel/ThumbStrip.tsx",
   "../src/components/partner-reviews/PartnerReviewCard.tsx",
   "../src/components/partner-reviews/PartnerReviewLightbox.tsx",
+  "../src/components/project-showcase/ShowcaseProjectCard.tsx",
+  "../src/app/(site)/events/project-showcase/projects/[projectId]/page.tsx",
+  "../src/app/(site)/events/project-showcase/my/projects/[projectId]/page.tsx",
 ] as const;
 
 test("공개 제휴 이미지는 화면 크기별 Next 이미지 최적화를 사용한다", async () => {
@@ -49,5 +52,32 @@ test("공개 제휴 이미지는 화면 크기별 Next 이미지 최적화를 �
   assert.match(
     reviewLightbox,
     /const activeImage = getCachedImageUrl\(/,
+  );
+});
+
+test("쇼케이스 대표 이미지는 프록시 URL과 레이아웃 폭 sizes로 Next 이미지 최적화를 쓴다", async () => {
+  const [card, detail, myDetail, sizes] = await Promise.all(
+    [
+      "../src/components/project-showcase/ShowcaseProjectCard.tsx",
+      "../src/app/(site)/events/project-showcase/projects/[projectId]/page.tsx",
+      "../src/app/(site)/events/project-showcase/my/projects/[projectId]/page.tsx",
+      "../src/components/project-showcase/image-sizes.ts",
+    ].map((sourcePath) => readFile(new URL(sourcePath, import.meta.url), "utf8")),
+  );
+
+  for (const source of [card, detail, myDetail]) {
+    assert.match(source, /import Image from "next\/image";/);
+    assert.match(source, /src=\{getCachedImageUrl\(project\.imageUrl\)\}/);
+    assert.match(source, /\bfill\b/);
+    assert.doesNotMatch(source, /<img\b/);
+    assert.doesNotMatch(source, /no-img-element/);
+  }
+  assert.match(card, /sizes=\{SHOWCASE_PROJECT_CARD_IMAGE_SIZES\}/);
+  assert.doesNotMatch(card, /\bpriority\b/);
+  assert.match(detail, /priority\s+sizes=\{SHOWCASE_PROJECT_HERO_IMAGE_SIZES\}/);
+  assert.match(myDetail, /sizes=\{SHOWCASE_PROJECT_HERO_IMAGE_SIZES\}/);
+  assert.match(
+    sizes,
+    /SHOWCASE_PROJECT_CARD_IMAGE_SIZES =\s*"\(max-width: 639px\) 100vw, \(max-width: 1023px\) 50vw, 400px"/,
   );
 });

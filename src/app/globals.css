@@ -1,3 +1,7 @@
+/*! Pretendard Variable (dynamic-subset, self-hosted from the "pretendard" package)
+ * Copyright (c) 2021 Kil Hyung-jin, with Reserved Font Name Pretendard.
+ * Licensed under the SIL Open Font License, Version 1.1: https://openfontlicense.org
+ */
 @import "tailwindcss";
 @import "react-easy-crop/react-easy-crop.css";
 @source "..";

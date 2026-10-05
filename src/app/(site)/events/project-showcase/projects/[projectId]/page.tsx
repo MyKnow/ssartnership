@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import ShowcaseExperiencePanel from "@/components/project-showcase/ShowcaseExperiencePanel";
+import { SHOWCASE_PROJECT_HERO_IMAGE_SIZES } from "@/components/project-showcase/image-sizes";
 import ShowcaseProjectViewRecorder from "@/components/project-showcase/ShowcaseProjectViewRecorder";
 import Button from "@/components/ui/Button";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { getHeaderSession } from "@/lib/header-session";
+import { getCachedImageUrl } from "@/lib/image-cache";
 import { getShowcasePhase, projectShowcaseRepository } from "@/lib/project-showcase";
 import { formatShowcasePeriod } from "@/lib/project-showcase/format";
 import { SHOWCASE_TYPE_LABELS } from "@/lib/project-showcase/labels";
@@ -116,9 +119,15 @@ export default async function ShowcaseProjectDetailPage({
         ) : null}
         <Button href={listHref} variant="secondary" size="sm">프로젝트 목록</Button>
         <article className="mt-5 overflow-hidden rounded-3xl border border-border bg-surface">
-          <div className="aspect-video overflow-hidden bg-surface-muted">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={project.imageUrl} alt={`${project.title} 대표 이미지`} className="h-full w-full object-cover" />
+          <div className="relative aspect-video overflow-hidden bg-surface-muted">
+            <Image
+              src={getCachedImageUrl(project.imageUrl)}
+              alt={`${project.title} 대표 이미지`}
+              fill
+              priority
+              sizes={SHOWCASE_PROJECT_HERO_IMAGE_SIZES}
+              className="object-cover"
+            />
           </div>
           <div className="grid gap-8 p-5 sm:p-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-10">
             <div>

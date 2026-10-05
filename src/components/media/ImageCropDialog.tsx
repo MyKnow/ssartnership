@@ -13,6 +13,7 @@ import FormMessage from "@/components/ui/FormMessage";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { encodeCanvasAsIntermediateWebp } from "@/lib/image-upload/client-webp";
 import { type ImageTransformPolicy } from "@/lib/image-upload/policy";
 
 const Cropper = dynamic(() => import("react-easy-crop"), { ssr: false });
@@ -41,13 +42,16 @@ async function exportCroppedImage({
   outputWidth,
   outputHeight,
   quality,
+  maxBytes,
 }: {
   sourceUrl: string;
   crop: Area;
   outputName: string;
   outputWidth: number;
   outputHeight: number;
+  /** 서버가 적용할 최종 품질(0~1). 중간 파일은 이보다 높은 품질로 만든다. */
   quality: number;
+  maxBytes?: number;
 }) {
   const image = await createImage(sourceUrl);
   const canvas = document.createElement("canvas");
@@ -72,18 +76,10 @@ async function exportCroppedImage({
     outputHeight,
   );
 
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (nextBlob) => {
-        if (!nextBlob) {
-          reject(new Error("이미지 변환에 실패했습니다."));
-          return;
-        }
-        resolve(nextBlob);
-      },
-      "image/webp",
-      quality,
-    );
+  const blob = await encodeCanvasAsIntermediateWebp(canvas, {
+    finalQuality: quality,
+    maxBytes,
+    failureMessage: "이미지 변환에 실패했습니다.",
   });
   return createWebpFile(blob, outputName);
 }
@@ -114,6 +110,7 @@ export default function ImageCropDialog({
   zoomControl?: boolean;
   /** Match the image viewport to the crop ratio for a consistent preview. */
   frameAspectRatio?: number;
+  /** 정책이 없을 때만 쓰는 최종 품질(0~1). 정책이 있으면 정책 품질을 쓴다. */
   quality?: number;
   policy?: ImageTransformPolicy;
   onCancel: () => void;
@@ -171,6 +168,7 @@ export default function ImageCropDialog({
         outputWidth: effectiveOutputWidth,
         outputHeight: effectiveOutputHeight,
         quality: effectiveQuality,
+        maxBytes: policy?.maxSourceBytes,
       });
       onApply(file);
     } catch (nextError) {

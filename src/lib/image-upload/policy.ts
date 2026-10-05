@@ -51,6 +51,23 @@ export const IMAGE_SOURCE_ACCEPT = [
   ...IMAGE_SOURCE_EXTENSIONS,
 ].join(",");
 
+const SVG_SOURCE_MIME_TYPE = "image/svg+xml";
+const SVG_SOURCE_EXTENSION = ".svg";
+
+/** SVG 원본을 받지 않는 용도(게스트·회원 업로드)의 파일 선택 accept. 래스터 형식만 남긴다. */
+export const RASTER_IMAGE_SOURCE_ACCEPT = [
+  ...IMAGE_SOURCE_MIME_TYPES.filter((type) => type !== SVG_SOURCE_MIME_TYPE),
+  ...IMAGE_SOURCE_EXTENSIONS.filter((extension) => extension !== SVG_SOURCE_EXTENSION),
+].join(",");
+
+export const SVG_SOURCE_NOT_ALLOWED_MESSAGE =
+  "이 화면에서는 SVG 이미지를 올릴 수 없습니다. JPG·PNG·WebP·HEIC 파일을 선택해 주세요.";
+
+export function isSvgImageSource(input: { name: string; type?: string | null }) {
+  return input.type?.trim().toLowerCase() === SVG_SOURCE_MIME_TYPE
+    || input.name.trim().toLowerCase().endsWith(SVG_SOURCE_EXTENSION);
+}
+
 export const IMAGE_UPLOAD_PURPOSES = [
   "partner",
   "partner-registration",
@@ -79,6 +96,11 @@ export type ImageTransformPolicy = {
   maxInputPixels: number;
   maxOutputBytes: number;
   fit: ImageUploadFit;
+  /**
+   * SVG 원본 허용 여부. 정규식 필터 뒤 librsvg 래스터라이저로 넘어가는 표면이라 관리자·파트너
+   * 업로드에만 열고, 게스트·회원 업로드(제휴 신청·리뷰·프로필·쇼케이스)는 래스터 형식만 받는다.
+   */
+  allowSvgSource: boolean;
 };
 
 const MEBIBYTE = 1024 * 1024;
@@ -104,6 +126,7 @@ const PARTNER_THUMBNAIL_POLICY = definePolicy({
   maxInputPixels: DEFAULT_MAX_PIXELS,
   maxOutputBytes: 5 * MEBIBYTE,
   fit: "cover",
+  allowSvgSource: true,
 });
 
 const PARTNER_GALLERY_POLICY = definePolicy({
@@ -117,6 +140,7 @@ const PARTNER_GALLERY_POLICY = definePolicy({
   maxInputPixels: DEFAULT_MAX_PIXELS,
   maxOutputBytes: 5 * MEBIBYTE,
   fit: "cover",
+  allowSvgSource: true,
 });
 
 const REVIEW_POLICY = definePolicy({
@@ -130,6 +154,7 @@ const REVIEW_POLICY = definePolicy({
   maxInputPixels: DEFAULT_MAX_PIXELS,
   maxOutputBytes: 2 * MEBIBYTE,
   fit: "cover",
+  allowSvgSource: false,
 });
 
 const PROFILE_POLICY = definePolicy({
@@ -143,6 +168,7 @@ const PROFILE_POLICY = definePolicy({
   maxInputPixels: DEFAULT_MAX_PIXELS,
   maxOutputBytes: 5 * MEBIBYTE,
   fit: "cover",
+  allowSvgSource: false,
 });
 
 const PROMOTION_POLICY = definePolicy({
@@ -156,6 +182,7 @@ const PROMOTION_POLICY = definePolicy({
   maxInputPixels: DEFAULT_MAX_PIXELS,
   maxOutputBytes: 10 * MEBIBYTE,
   fit: "cover",
+  allowSvgSource: true,
 });
 
 const SHOWCASE_PROJECT_POLICY = definePolicy({
@@ -169,6 +196,7 @@ const SHOWCASE_PROJECT_POLICY = definePolicy({
   maxInputPixels: DEFAULT_MAX_PIXELS,
   maxOutputBytes: 5 * MEBIBYTE,
   fit: "cover",
+  allowSvgSource: false,
 });
 
 const policies = [
@@ -178,12 +206,14 @@ const policies = [
   PROFILE_POLICY,
   PROMOTION_POLICY,
   SHOWCASE_PROJECT_POLICY,
-  definePolicy({ ...PARTNER_THUMBNAIL_POLICY, purpose: "partner-registration" }),
-  definePolicy({ ...PARTNER_GALLERY_POLICY, purpose: "partner-registration" }),
+  // 공개 제휴 신청은 비로그인 게스트 업로드라 SVG를 받지 않는다.
+  definePolicy({ ...PARTNER_THUMBNAIL_POLICY, purpose: "partner-registration", allowSvgSource: false }),
+  definePolicy({ ...PARTNER_GALLERY_POLICY, purpose: "partner-registration", allowSvgSource: false }),
   definePolicy({ ...PARTNER_THUMBNAIL_POLICY, purpose: "partner-change-request" }),
   definePolicy({ ...PARTNER_GALLERY_POLICY, purpose: "partner-change-request" }),
   definePolicy({ ...PROFILE_POLICY, purpose: "graduate-verification" }),
-  definePolicy({ ...PROFILE_POLICY, purpose: "manual-member-import" }),
+  // 관리자 수동 회원 등록은 기존처럼 SVG 원본도 받는다(관리자 업로드).
+  definePolicy({ ...PROFILE_POLICY, purpose: "manual-member-import", allowSvgSource: true }),
   definePolicy({ ...PROFILE_POLICY, purpose: "member-signup-profile" }),
 ] satisfies ImageTransformPolicy[];
 
@@ -205,6 +235,23 @@ export function resolveImageTransformPolicy(
     throw new Error("지원하지 않는 이미지 업로드 용도입니다.");
   }
   return policy;
+}
+
+/**
+ * 브라우저 크롭·HEIC 디코드로 만든 중간 WebP는 서버가 정책 품질로 한 번 더 재인코딩한다.
+ * 중간 파일까지 정책 품질로 손실 압축하면 같은 손실이 두 번 쌓이므로 중간 파일은 높은 품질로
+ * 만들고, 그 결과가 원본 용량 상한을 넘을 때만 정책 품질로 다시 인코딩한다.
+ */
+export const CLIENT_INTERMEDIATE_WEBP_QUALITY = 0.92;
+
+/** 중간 WebP 인코딩 품질 후보(0~1, 높은 순). 마지막 후보는 최종 정책 품질이다. */
+export function getClientIntermediateWebpQualities(finalQuality: number) {
+  const normalized = Number.isFinite(finalQuality)
+    ? Math.min(Math.max(finalQuality, 0.01), 1)
+    : CLIENT_INTERMEDIATE_WEBP_QUALITY;
+  return normalized >= CLIENT_INTERMEDIATE_WEBP_QUALITY
+    ? [normalized]
+    : [CLIENT_INTERMEDIATE_WEBP_QUALITY, normalized];
 }
 
 export type ImageUploadSourceDescriptor = {
@@ -235,9 +282,14 @@ export function inferImageSourceContentType(
   return extension ? IMAGE_MIME_BY_EXTENSION[extension] : null;
 }
 
+/** 용도 정책에 맞는 파일 선택 accept. FE 선택 단계와 BE 검증(validateImageUploadSource)이 같은 규칙을 쓴다. */
+export function getImageSourceAccept(policy: Pick<ImageTransformPolicy, "allowSvgSource">) {
+  return policy.allowSvgSource ? IMAGE_SOURCE_ACCEPT : RASTER_IMAGE_SOURCE_ACCEPT;
+}
+
 export function validateImageUploadSource(
   input: ImageUploadSourceDescriptor,
-  policy?: Pick<ImageTransformPolicy, "maxSourceBytes">,
+  policy?: Pick<ImageTransformPolicy, "maxSourceBytes"> & Partial<Pick<ImageTransformPolicy, "allowSvgSource">>,
 ) {
   if (!Number.isFinite(input.size) || input.size <= 0) {
     return "이미지 파일을 다시 선택해 주세요.";
@@ -247,6 +299,9 @@ export function validateImageUploadSource(
   }
   if (!hasSupportedImageMimeType(input.type) && !hasSupportedImageExtension(input.name)) {
     return "지원하는 이미지 파일만 업로드할 수 있습니다.";
+  }
+  if (policy?.allowSvgSource === false && isSvgImageSource(input)) {
+    return SVG_SOURCE_NOT_ALLOWED_MESSAGE;
   }
   return null;
 }

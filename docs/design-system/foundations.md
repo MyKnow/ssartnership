@@ -31,6 +31,7 @@ authority: normative
 - 링 오프셋 색은 컨트롤이 놓인 표면(`ring-offset-background`, `ring-offset-surface-overlay`)에 맞춘다. 칩·테이블 행처럼 밀집한 표면은 `ring-inset`을 쓴다.
 
 ## Typography
+- 글꼴: `pretendard` 패키지의 Pretendard Variable dynamic-subset CSS를 루트 레이아웃과 Storybook에서 같은 경로로 import해 `/_next/static/media`에서 자체 서빙한다. 외부 CDN `<link>`를 추가하지 않고, OFL 고지는 `globals.css` 상단의 보존 주석으로 유지한다.
 - `ui-display`: 메인 히어로/강한 페이지 메시지. 36px~60px 범위와 매우 타이트한 line-height를 사용한다.
 - `ui-page-title`: 페이지 제목. 32px~48px 범위와 tight line-height를 사용한다.
 - `ui-section-title`: 섹션 제목. 22px~32px 범위와 tight line-height를 사용한다.

@@ -1,6 +1,6 @@
 import type { Preview } from "@storybook/nextjs-vite";
 import React, { useEffect } from "react";
-import "pretendard/dist/web/variable/pretendardvariable.css";
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "../src/app/globals.css";
 
 function PreviewTheme({

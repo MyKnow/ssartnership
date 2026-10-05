@@ -148,8 +148,5 @@ test("dynamic sitemap and RSS cache/failure contracts remain intact", () => {
   assert.match(sitemapSource, /export const dynamic = "force-dynamic"/);
   assert.match(sitemapSource, /\[sitemap\] failed to load partner URLs/);
   assert.match(rssRouteSource, /export const dynamic = "force-dynamic"/);
-  assert.match(
-    rssRouteSource,
-    /public, max-age=0, s-maxage=3600, stale-while-revalidate=86400/,
-  );
+  assert.match(rssRouteSource, /"Cache-Control": RSS_FEED_CACHE_CONTROL/);
 });

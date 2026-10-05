@@ -1,14 +1,8 @@
 import { createHash } from "node:crypto";
+import { matchesIfNoneMatch } from "@/lib/http-conditional";
 
 function createEntityTag(body: string) {
   return `"${createHash("sha256").update(body).digest("base64url")}"`;
-}
-
-function matchesEntityTag(request: Request, entityTag: string) {
-  return (request.headers.get("if-none-match") ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .some((value) => value === entityTag || value === "*");
 }
 
 /**
@@ -29,7 +23,7 @@ export function conditionalJsonResponse(
   headers.set("Vary", "Cookie");
   headers.set("ETag", entityTag);
 
-  if (matchesEntityTag(request, entityTag)) {
+  if (matchesIfNoneMatch(request.headers.get("if-none-match"), entityTag)) {
     headers.delete("Content-Type");
     return new Response(null, {
       ...init,

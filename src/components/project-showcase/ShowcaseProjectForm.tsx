@@ -10,7 +10,7 @@ import { submitShowcaseProject, updateShowcaseProject } from "@/app/(site)/event
 import { uploadImagesToStaging } from "@/lib/image-upload/client";
 import { prepareImageUploadSource } from "@/lib/image-upload/client-transform";
 import {
-  IMAGE_SOURCE_ACCEPT,
+  getImageSourceAccept,
   resolveImageTransformPolicy,
   validateImageUploadSource,
 } from "@/lib/image-upload/policy";
@@ -290,7 +290,7 @@ export default function ShowcaseProjectForm({ mode, ownerName, project }: Showca
             ref={imageInputRef}
             id="showcase-project-image"
             type="file"
-            accept={IMAGE_SOURCE_ACCEPT}
+            accept={getImageSourceAccept(IMAGE_POLICY)}
             className="sr-only"
             onChange={(changeEvent) => handleImageSelection(changeEvent.target.files?.[0])}
             aria-label="대표 홍보 이미지 선택"

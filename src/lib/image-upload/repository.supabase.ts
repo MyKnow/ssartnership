@@ -4,6 +4,7 @@ import {
   IMAGE_UPLOAD_SESSION_TTL_MS,
   IMAGE_UPLOAD_APPROVAL_SESSION_TTL_MS,
   IMAGE_UPLOAD_STAGING_BUCKET,
+  PRIVATE_IMAGE_OBJECT_CACHE_CONTROL,
   getImageUploadSignedUrlExpiresAt,
   isImageUploadSignedUrlExpired,
   type AttachImageUploadInput,
@@ -16,6 +17,7 @@ import {
   type SignImageUploadInput,
   type SignedImageUpload,
   ImageUploadError,
+  resolveImageDestinationCacheControl,
 } from "@/lib/image-upload/repository";
 import {
   isHashedImageUploadQuotaIdentifier,
@@ -62,6 +64,47 @@ type ImageUploadSessionRow = {
   attached_resource_id: string | null;
   failure_code: string | null;
 };
+
+/**
+ * 행 타입에 있는 열이 빠지면 타입 오류를 낸다. 매핑에 쓰지 않는 타임스탬프 열
+ * (completed_at·attached_at·created_at·updated_at)은 읽지 않는다.
+ */
+function defineSessionColumns<const T extends ReadonlyArray<keyof ImageUploadSessionRow>>(
+  columns: T
+    & ([Exclude<keyof ImageUploadSessionRow, T[number]>] extends [never]
+      ? unknown
+      : { missingColumns: Exclude<keyof ImageUploadSessionRow, T[number]> }),
+) {
+  return columns;
+}
+
+export const IMAGE_UPLOAD_SESSION_COLUMNS = defineSessionColumns([
+  "id",
+  "owner_kind",
+  "owner_id",
+  "purpose",
+  "role",
+  "storage_bucket",
+  "storage_path",
+  "source_storage_path",
+  "source_content_type",
+  "source_size_bytes",
+  "quota_size_bytes",
+  "content_type",
+  "sha256",
+  "width",
+  "height",
+  "final_bucket",
+  "final_path",
+  "final_url",
+  "status",
+  "signed_url_expires_at",
+  "expires_at",
+  "attached_resource_type",
+  "attached_resource_id",
+  "failure_code",
+]);
+const IMAGE_UPLOAD_SESSION_SELECT = IMAGE_UPLOAD_SESSION_COLUMNS.join(",");
 
 const MAX_SIGNED_UPLOADS_PER_REQUEST = 20;
 const MAX_QUOTA_IDENTIFIERS_PER_REQUEST = 4;
@@ -111,6 +154,99 @@ type SupabaseAdminClient = ReturnType<typeof getSupabaseAdminClient>;
 
 function getPublicUrl(supabase: SupabaseAdminClient, bucket: string, path: string) {
   return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+}
+
+/** 연결된(attached) 세션의 staging 정리가 실패해 expireStale이 다시 지워야 함을 표시한다. */
+export const STAGING_CLEANUP_PENDING_FAILURE_CODE = "staging_cleanup_pending";
+/** 만료·폐기 세션의 Storage 정리가 실패해 failed 상태로 재시도 대기 중임을 표시한다. */
+const DISCARD_CLEANUP_PENDING_FAILURE_CODE = "discard_cleanup_pending";
+
+type SessionCleanupTarget = Pick<
+  ImageUploadSessionRow,
+  "id" | "storage_bucket" | "storage_path" | "source_storage_path" | "final_bucket" | "final_path"
+>;
+
+async function removeStorageObjects(
+  supabase: SupabaseAdminClient,
+  bucket: string,
+  paths: string[],
+) {
+  if (paths.length === 0) {
+    return null;
+  }
+  try {
+    const { error } = await supabase.storage.from(bucket).remove(paths);
+    return error ?? null;
+  } catch (error) {
+    return error ?? new Error("storage_remove_failed");
+  }
+}
+
+/**
+ * 다운로드 전에 Storage 메타데이터(object info)로 객체 크기를 읽는다. 메타데이터를 읽지 못하면
+ * null을 돌려 호출자가 다운로드 뒤 검증으로 넘어가게 한다(Storage 버전에 info가 없어도 업로드는 동작).
+ */
+async function readStorageObjectSize(
+  supabase: SupabaseAdminClient,
+  bucket: string,
+  path: string,
+) {
+  try {
+    const { data, error } = await supabase.storage.from(bucket).info(path);
+    if (error || !data) {
+      return null;
+    }
+    const size: unknown = (data as { size?: unknown }).size;
+    return typeof size === "number" && Number.isSafeInteger(size) && size >= 0 ? size : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 만료된(연결 전) 세션의 staging·최종 객체를 지우고 expired로 바꾼다. 하나라도 지우지 못하면
+ * failed + cleanup_pending으로 남겨 expireStale이 다음 주기에 다시 지운다. 정리 없이 expired로
+ * 바꾸면 expireStale 대상에서 빠져 Storage 객체가 영구 고아가 된다.
+ */
+async function expireSessionWithCleanup(
+  supabase: SupabaseAdminClient,
+  session: SessionCleanupTarget,
+  now: Date,
+  statuses: Array<ImageUploadSessionRow["status"]>,
+): Promise<"expired" | "cleanup_pending"> {
+  const removalErrors = await Promise.all([
+    removeStorageObjects(supabase, session.storage_bucket, getSessionStoragePaths(session)),
+    ...(session.final_bucket && session.final_path
+      ? [removeStorageObjects(supabase, session.final_bucket, [session.final_path])]
+      : []),
+  ]);
+  if (removalErrors.some(Boolean)) {
+    await supabase
+      .from("image_upload_sessions")
+      .update({
+        status: "failed",
+        failure_code: DISCARD_CLEANUP_PENDING_FAILURE_CODE,
+        signed_url_expires_at: now.toISOString(),
+        expires_at: now.toISOString(),
+      })
+      .eq("id", session.id)
+      .in("status", statuses);
+    return "cleanup_pending";
+  }
+  const { error: updateError } = await supabase
+    .from("image_upload_sessions")
+    .update({
+      status: "expired",
+      failure_code: null,
+      signed_url_expires_at: now.toISOString(),
+      expires_at: now.toISOString(),
+    })
+    .eq("id", session.id)
+    .in("status", statuses);
+  if (updateError) {
+    throw new Error("만료된 이미지 업로드 상태를 저장하지 못했습니다.");
+  }
+  return "expired";
 }
 
 function getQuotaIdentifiers(input: SignImageUploadInput) {
@@ -318,7 +454,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
     const supabase = this.supabase;
     const { data, error } = await supabase
       .from("image_upload_sessions")
-      .select("*")
+      .select(IMAGE_UPLOAD_SESSION_SELECT)
       .in("id", uploadIds);
     if (error || (data?.length ?? 0) !== uploadIds.length) {
       throw new Error("이미지 업로드 세션을 찾을 수 없습니다.");
@@ -338,11 +474,9 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         const session = sessionsById.get(id);
         if (!session) throw new Error("이미지 업로드 세션을 찾을 수 없습니다.");
         if (new Date(session.expires_at).getTime() <= now.getTime()) {
-          await supabase
-            .from("image_upload_sessions")
-            .update({ status: "expired" })
-            .eq("id", session.id)
-            .in("status", ["signed", "processing", "ready"]);
+          if (session.status === "signed" || session.status === "processing" || session.status === "ready") {
+            await expireSessionWithCleanup(supabase, session, now, ["signed", "processing", "ready"]);
+          }
           throw new Error("이미지 업로드 시간이 만료되었습니다. 다시 시도해 주세요.");
         }
         if (session.status === "attached" && input.purpose === "member-signup-profile") {
@@ -370,12 +504,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
           throw new Error("이미지 업로드 상태를 확인해 주세요.");
         }
         if (isImageUploadSignedUrlExpired(session.signed_url_expires_at, now)) {
-          await supabase.storage.from(session.storage_bucket).remove([session.storage_path]).catch(() => undefined);
-          await supabase
-            .from("image_upload_sessions")
-            .update({ status: "expired" })
-            .eq("id", session.id)
-            .eq("status", "signed");
+          await expireSessionWithCleanup(supabase, session, now, ["signed"]);
           throw new Error("이미지 업로드 URL이 만료되었습니다. 다시 시도해 주세요.");
         }
 
@@ -384,7 +513,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
           .update({ status: "processing", failure_code: null })
           .eq("id", session.id)
           .eq("status", "signed")
-          .select("*")
+          .select(IMAGE_UPLOAD_SESSION_SELECT)
           .maybeSingle();
         if (claimError) {
           throw new Error("이미지 업로드 처리 상태를 저장하지 못했습니다.");
@@ -392,7 +521,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         if (!claimedData) {
           const { data: latestData, error: latestError } = await supabase
             .from("image_upload_sessions")
-            .select("*")
+            .select(IMAGE_UPLOAD_SESSION_SELECT)
             .eq("id", session.id)
             .maybeSingle();
           const latest = latestData ? asSessionRow(latestData) : null;
@@ -427,6 +556,19 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
 
         try {
           const sourceStoragePath = claimedSession.source_storage_path ?? claimedSession.storage_path;
+          // 서명 URL 업로드는 선언 크기를 강제하지 않아 버킷 한도(10MB)까지 올라올 수 있다.
+          // 메타데이터로 먼저 비교해 선언과 다른 원본을 메모리에 내려받지 않는다.
+          const storedSourceSize = await readStorageObjectSize(
+            supabase,
+            claimedSession.storage_bucket,
+            sourceStoragePath,
+          );
+          if (storedSourceSize !== null && storedSourceSize !== claimedSession.source_size_bytes) {
+            throw new ImageUploadError(
+              "upload_source_size_mismatch",
+              "이미지 원본 크기를 확인해 주세요.",
+            );
+          }
           const { data: blob, error: downloadError } = await supabase.storage
             .from(claimedSession.storage_bucket)
             .download(sourceStoragePath);
@@ -453,7 +595,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
             .from(claimedSession.storage_bucket)
             .upload(processedStoragePath, normalized.buffer, {
               contentType: normalized.contentType,
-              cacheControl: "private, no-store",
+              cacheControl: PRIVATE_IMAGE_OBJECT_CACHE_CONTROL,
               upsert: true,
             });
           if (uploadError) {
@@ -479,10 +621,8 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
             throw new Error("이미지 업로드 상태를 저장하지 못했습니다.");
           }
           if (sourceStoragePath !== processedStoragePath) {
-            await supabase.storage
-              .from(claimedSession.storage_bucket)
-              .remove([sourceStoragePath])
-              .catch(() => undefined);
+            // 실패해도 source_storage_path가 행에 남아 attach·expireStale 정리가 다시 지운다.
+            await removeStorageObjects(supabase, claimedSession.storage_bucket, [sourceStoragePath]);
           }
           return {
             id: claimedSession.id,
@@ -515,7 +655,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
     const supabase = this.supabase;
     const { data, error } = await supabase
       .from("image_upload_sessions")
-      .select("*")
+      .select(IMAGE_UPLOAD_SESSION_SELECT)
       .eq("id", input.uploadId)
       .maybeSingle();
     if (error || !data) {
@@ -527,11 +667,14 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
       throw new Error("이미지 업로드 역할을 확인해 주세요.");
     }
     if (new Date(session.expires_at).getTime() <= now.getTime() && session.status !== "attached") {
-      await supabase
-        .from("image_upload_sessions")
-        .update({ status: "expired" })
-        .eq("id", session.id)
-        .in("status", ["signed", "processing", "ready", "attaching"]);
+      if (
+        session.status === "signed"
+        || session.status === "processing"
+        || session.status === "ready"
+        || session.status === "attaching"
+      ) {
+        await expireSessionWithCleanup(supabase, session, now, ["signed", "processing", "ready", "attaching"]);
+      }
       throw new Error("이미지 업로드 시간이 만료되었습니다. 다시 시도해 주세요.");
     }
     if (session.status === "attached") {
@@ -569,7 +712,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         })
         .eq("id", session.id)
         .eq("status", "ready")
-        .select("*")
+        .select(IMAGE_UPLOAD_SESSION_SELECT)
         .maybeSingle();
       if (claimError) {
         throw new Error("이미지 연결 상태를 저장하지 못했습니다.");
@@ -579,7 +722,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
       } else {
         const { data: latestData, error: latestError } = await supabase
           .from("image_upload_sessions")
-          .select("*")
+          .select(IMAGE_UPLOAD_SESSION_SELECT)
           .eq("id", session.id)
           .maybeSingle();
         const latest = latestData ? asSessionRow(latestData) : null;
@@ -667,7 +810,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
           .from(input.destination.bucket)
           .upload(input.destination.path, stagedBuffer, {
             contentType: "image/webp",
-            cacheControl: input.destination.cacheControl ?? "31536000",
+            cacheControl: resolveImageDestinationCacheControl(input.destination),
             upsert: true,
           });
         if (!uploadError) {
@@ -699,7 +842,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         })
         .eq("id", claimedSession.id)
         .eq("status", "attaching")
-        .select("*")
+        .select(IMAGE_UPLOAD_SESSION_SELECT)
         .maybeSingle();
       if (updateError) {
         throw new ImageUploadError(
@@ -712,7 +855,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
       if (!attachedSession) {
         const { data: latestData, error: latestError } = await supabase
           .from("image_upload_sessions")
-          .select("*")
+          .select(IMAGE_UPLOAD_SESSION_SELECT)
           .eq("id", claimedSession.id)
           .maybeSingle();
         if (latestError || !latestData) {
@@ -727,10 +870,19 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
       ) {
         throw new Error("이미지 연결 상태를 확인하지 못했습니다.");
       }
-      await supabase.storage
-        .from(claimedSession.storage_bucket)
-        .remove(getSessionStoragePaths(claimedSession))
-        .catch(() => undefined);
+      const stagingCleanupError = await removeStorageObjects(
+        supabase,
+        claimedSession.storage_bucket,
+        getSessionStoragePaths(claimedSession),
+      );
+      if (stagingCleanupError) {
+        // 연결은 끝났으므로 실패로 돌리지 않고, expireStale이 staging만 다시 지우도록 표시한다.
+        await supabase
+          .from("image_upload_sessions")
+          .update({ failure_code: STAGING_CLEANUP_PENDING_FAILURE_CODE })
+          .eq("id", claimedSession.id)
+          .eq("status", "attached");
+      }
       return toAttachedImage(attachedSession);
     } catch (error) {
       await markFailed(supabase, claimedSession.id, "attach_failed", ["attaching"]);
@@ -760,7 +912,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
     const supabase = this.supabase;
     const { data, error } = await supabase
       .from("image_upload_sessions")
-      .select("*")
+      .select(IMAGE_UPLOAD_SESSION_SELECT)
       .eq("id", input.uploadId)
       .maybeSingle();
     if (error || !data) {
@@ -796,7 +948,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
     const supabase = this.supabase;
     const { data, error } = await supabase
       .from("image_upload_sessions")
-      .select("*")
+      .select(IMAGE_UPLOAD_SESSION_SELECT)
       .eq("id", input.uploadId)
       .maybeSingle();
     if (error || !data) {
@@ -820,7 +972,7 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
         .from("image_upload_sessions")
         .update({
           status: "failed",
-          failure_code: "discard_cleanup_pending",
+          failure_code: DISCARD_CLEANUP_PENDING_FAILURE_CODE,
           signed_url_expires_at: now.toISOString(),
           expires_at: now.toISOString(),
         })
@@ -846,25 +998,32 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
   async expireStale(now = new Date()): Promise<number> {
     const supabase = this.supabase;
     const quotaCleanupBefore = new Date(now.getTime() - IMAGE_UPLOAD_QUOTA_RETENTION_MS);
-    const [signedResult, sessionResult, quotaCleanupResult] = await Promise.all([
+    const cleanupColumns = "id,status,storage_bucket,storage_path,source_storage_path,final_bucket,final_path,failure_code";
+    const [signedResult, sessionResult, stagingCleanupResult, quotaCleanupResult] = await Promise.all([
       supabase
         .from("image_upload_sessions")
-        .select("id,status,storage_bucket,storage_path,source_storage_path,final_bucket,final_path,failure_code")
+        .select(cleanupColumns)
         .eq("status", "signed")
         .lte("signed_url_expires_at", now.toISOString())
         .limit(100),
       supabase
         .from("image_upload_sessions")
-        .select("id,status,storage_bucket,storage_path,source_storage_path,final_bucket,final_path,failure_code")
+        .select(cleanupColumns)
         .in("status", ["signed", "processing", "ready", "attaching", "failed"])
         .lte("expires_at", now.toISOString())
+        .limit(100),
+      supabase
+        .from("image_upload_sessions")
+        .select(cleanupColumns)
+        .eq("status", "attached")
+        .eq("failure_code", STAGING_CLEANUP_PENDING_FAILURE_CODE)
         .limit(100),
       supabase.rpc("cleanup_image_upload_quota_windows", {
         p_before: quotaCleanupBefore.toISOString(),
         p_limit: IMAGE_UPLOAD_QUOTA_CLEANUP_LIMIT,
       }),
     ]);
-    if (signedResult.error || sessionResult.error) {
+    if (signedResult.error || sessionResult.error || stagingCleanupResult.error) {
       throw new Error("만료된 이미지 업로드를 조회하지 못했습니다.");
     }
     const sessions = Array.from(
@@ -874,47 +1033,36 @@ export class SupabaseImageUploadRepository implements ImageUploadRepository {
           session,
         ]),
       ).values(),
-    ) as Array<Pick<
-      ImageUploadSessionRow,
-      "id" | "status" | "storage_bucket" | "storage_path" | "source_storage_path"
-      | "final_bucket" | "final_path" | "failure_code"
-    >>;
+    ) as Array<SessionCleanupTarget & Pick<ImageUploadSessionRow, "status" | "failure_code">>;
     let expiredCount = 0;
     await forEachWithConcurrency(sessions, EXPIRE_STALE_CONCURRENCY, async (session) => {
-      const removals = await Promise.all([
-        supabase.storage.from(session.storage_bucket).remove(getSessionStoragePaths(session)),
-        ...(session.final_bucket && session.final_path
-          ? [supabase.storage.from(session.final_bucket).remove([session.final_path])]
-          : []),
-      ]);
-      const removalError = removals.find((result) => result.error)?.error;
+      const outcome = await expireSessionWithCleanup(
+        supabase,
+        session,
+        now,
+        ["signed", "processing", "ready", "attaching", "failed"],
+      );
+      if (outcome === "expired") {
+        expiredCount += 1;
+      }
+    });
+    // 연결은 끝났지만 staging 삭제가 실패한 세션: 최종 객체는 두고 staging만 다시 지운다.
+    const attachedPending = (stagingCleanupResult.data ?? []) as Array<SessionCleanupTarget>;
+    await forEachWithConcurrency(attachedPending, EXPIRE_STALE_CONCURRENCY, async (session) => {
+      const removalError = await removeStorageObjects(
+        supabase,
+        session.storage_bucket,
+        getSessionStoragePaths(session),
+      );
       if (removalError) {
-        await supabase
-          .from("image_upload_sessions")
-          .update({
-            status: "failed",
-            failure_code: "discard_cleanup_pending",
-            signed_url_expires_at: now.toISOString(),
-            expires_at: now.toISOString(),
-          })
-          .eq("id", session.id)
-          .in("status", ["signed", "processing", "ready", "attaching", "failed"]);
         return;
       }
-      const { error: updateError } = await supabase
+      await supabase
         .from("image_upload_sessions")
-        .update({
-          status: "expired",
-          failure_code: null,
-          signed_url_expires_at: now.toISOString(),
-          expires_at: now.toISOString(),
-        })
+        .update({ failure_code: null })
         .eq("id", session.id)
-        .in("status", ["signed", "processing", "ready", "attaching", "failed"]);
-      if (updateError) {
-        throw new Error("만료된 이미지 업로드 상태를 저장하지 못했습니다.");
-      }
-      expiredCount += 1;
+        .eq("status", "attached")
+        .eq("failure_code", STAGING_CLEANUP_PENDING_FAILURE_CODE);
     });
     if (quotaCleanupResult.error) {
       throw new Error("만료된 이미지 업로드 사용량 기록을 정리하지 못했습니다.");

@@ -12,7 +12,20 @@ export type ImageNormalizationPolicy = {
   maxInputPixels: number;
   maxOutputBytes: number;
   fit: "cover" | "contain";
+  /** false면 SVG 원본을 래스터라이저에 넘기기 전에 거부한다. 생략하면 허용(관리 스크립트 호환). */
+  allowSvgSource?: boolean;
 };
+
+const SVG_SOURCE_REJECTED_MESSAGE = "지원하지 않는 이미지 형식입니다.";
+
+/**
+ * 래스터 형식은 모두 이진 매직 바이트로 시작하므로, 앞부분이 `<`로 시작하는 텍스트(XML·SVG)면
+ * sharp metadata()가 librsvg로 파싱하기 전에 SVG 후보로 본다.
+ */
+export function looksLikeMarkupImageSource(source: Buffer) {
+  const head = source.subarray(0, 512).toString("utf8").replace(/^\uFEFF/, "").trimStart();
+  return head.startsWith("<");
+}
 
 const SUPPORTED_INPUT_FORMATS = new Set([
   "jpeg",
@@ -197,6 +210,12 @@ export async function normalizeImageBuffer({
   if (!source.length || source.length > policy.maxSourceBytes) {
     throw new Error("이미지 파일 용량을 확인해 주세요.");
   }
+  if (
+    policy.allowSvgSource === false
+    && (declaredContentType?.toLowerCase() === "image/svg+xml" || looksLikeMarkupImageSource(source))
+  ) {
+    throw new Error(SVG_SOURCE_REJECTED_MESSAGE);
+  }
   if (declaredContentType?.toLowerCase() === "image/svg+xml") {
     assertSafeSvg(source);
   }
@@ -213,6 +232,10 @@ export async function normalizeImageBuffer({
       throw new Error("지원하지 않는 이미지 형식입니다.");
     }
     if (format === "svg") {
+      // 선언 MIME을 래스터로 속여도 실제 바이트가 SVG면 같은 규칙을 적용한다.
+      if (policy.allowSvgSource === false) {
+        throw new Error(SVG_SOURCE_REJECTED_MESSAGE);
+      }
       assertSafeSvg(source);
     }
     if (!metadata.width || !metadata.height) {
