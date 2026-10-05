@@ -109,3 +109,17 @@ tests:
         alertname: ProductionCronStale
         exp_alerts:
           - exp_labels: { job: node, environment: production, vm: "5200", cron: rss, severity: warning }
+  - interval: 5m
+    input_series:
+      - series: 'ssartnership_release_receiver_last_success_seconds{job="node",environment="production",vm="5200"}'
+        values: '0+300x6 1800+0x24'
+      - series: 'ssartnership_release_receiver_last_success_seconds{job="node",environment="preview",vm="5201"}'
+        values: '0+300x30'
+    alert_rule_test:
+      - eval_time: 80m
+        alertname: ReleaseReceiverStale
+        exp_alerts: []
+      - eval_time: 110m
+        alertname: ReleaseReceiverStale
+        exp_alerts:
+          - exp_labels: { job: node, environment: production, vm: "5200", severity: warning }

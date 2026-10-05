@@ -44,6 +44,12 @@ groups:
         expr: time() - ssartnership_production_cron_last_success_seconds > 3 * ssartnership_production_cron_interval_seconds
         for: 10m
         labels: { severity: warning }
+      # Release receiver timer (every 5 minutes). Lock conflicts are skipped
+      # polls (exit 75) and do not reset or fail the success timestamp.
+      - alert: ReleaseReceiverStale
+        expr: time() - ssartnership_release_receiver_last_success_seconds > 3600
+        for: 10m
+        labels: { severity: warning }
       - alert: HostDiskLow
         expr: node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes < 0.15
         for: 5m
