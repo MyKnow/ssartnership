@@ -104,7 +104,10 @@ test("validates links and personal paths in root knowledge files outside docs", 
   const result = validateDocumentation({ rootDir: root });
   const errors = result.errors.join("\n");
 
-  assert.deepEqual(result.rootKnowledgeFiles.map((path) => path.slice(root.length + 1)).sort(), [
+  const repositoryPaths = result.rootKnowledgeFiles
+    .map((path) => path.slice(root.length + 1).replaceAll("\\", "/"))
+    .sort();
+  assert.deepEqual(repositoryPaths, [
     ".agents/skills/example/SKILL.md",
     "AGENTS.md",
     "README.md",
