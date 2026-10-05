@@ -62,3 +62,18 @@ test("관리자 route loading은 AdminShell 안에서 스켈레톤을 보여 탐
     }
   }
 });
+
+test("쿠폰함과 혜택 이용 확인은 홈·제휴처 상세 대신 화면 전용 스켈레톤을 쓴다", () => {
+  const expectations = [
+    ["(site)/coupons/loading.tsx", "CouponWalletPageSkeleton"],
+    ["(site)/partners/[id]/benefit-use/loading.tsx", "PartnerBenefitUsePageSkeleton"],
+  ] as const;
+  const skeletons = readFileSync(new URL("SitePageSkeletons.tsx", loadingRoot), "utf8");
+
+  for (const [file, skeleton] of expectations) {
+    const source = readApp(file);
+    assert.match(source, new RegExp(`<${skeleton} />`), file);
+    assert.doesNotMatch(source, /HomePageSkeleton|PublicPartnerDetailSkeleton/, file);
+    assert.match(skeletons, new RegExp(`export function ${skeleton}\\(`));
+  }
+});
