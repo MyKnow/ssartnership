@@ -36,7 +36,7 @@ Updated: 2026-07-05
 - protected admin page와 admin API는 비인가 접근 시 `admin_access` blocked event를 남긴다.
 - 관리자 page view analytics는 query string을 저장하지 않는다.
 - 선택적 edge 보호를 환경 변수로 추가했다.
-  - `ADMIN_ALLOWED_IPS`
+  - `ADMIN_ALLOWED_IPS`: [클라이언트 IP 신뢰 계약](./client-ip-trust.md)으로 판정한 IP와 비교한다.
   - `ADMIN_BASIC_AUTH_USERNAME`
   - `ADMIN_BASIC_AUTH_PASSWORD`
 - 선택적 basic auth 비교는 timing-safe 방식으로 수행한다.
