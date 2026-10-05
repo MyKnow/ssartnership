@@ -32,7 +32,8 @@ import {
   RouteJsonBodyError,
   readRouteJsonBodyWithinLimit,
 } from "@/lib/route-json-body";
-import { getUserSession } from "@/lib/user-auth";
+import { getUserSession, isUserSessionLookupUnavailable } from "@/lib/user-auth";
+import { lookupMemberSession } from "@/lib/member-session-lookup";
 import { logServerError } from "@/lib/server-log";
 
 const INVALID_REVIEW_BODY_MESSAGE = "리뷰 요청 형식을 확인해 주세요.";
@@ -68,19 +69,19 @@ export const REVIEW_SESSION_UNAVAILABLE_MESSAGE =
 type ReviewMemberSession = Awaited<ReturnType<typeof getReviewMemberSession>>;
 
 /**
- * Distinguishes "not signed in" from "session lookup failed". A database or
- * policy-read failure must not look like a logged-out member (401); callers
- * answer 503 for writes or degrade a public read to anonymous.
+ * Distinguishes "not signed in" from "session lookup failed". A failed member
+ * lookup (which the session helper reports as an empty session) or a failed
+ * policy read must not look like a logged-out member (401); callers answer
+ * 503 for writes or degrade a public read to anonymous.
  */
 export async function getReviewMemberSessionLookup(): Promise<
   { ok: true; session: ReviewMemberSession } | { ok: false }
 > {
-  try {
-    return { ok: true, session: await getReviewMemberSession() };
-  } catch (error) {
-    logServerError("[partner-review] member session lookup failed", error);
-    return { ok: false };
-  }
+  return lookupMemberSession(
+    "[partner-review] member session lookup failed",
+    getReviewMemberSession,
+    isUserSessionLookupUnavailable,
+  );
 }
 
 export function reviewSessionUnavailableResponse() {

@@ -195,6 +195,32 @@ export const getSignedUserSession = cache(async () => {
 
 export const getActiveUserSession = getSignedUserSession;
 
+/**
+ * `getSignedUserSession` maps a failed member lookup to a signed-out `null`
+ * on purpose, so page gates never loop during an outage. API routes that must
+ * answer 503 instead of 401 call this only after an empty session: it reports
+ * whether a validly signed cookie exists while the member row cannot be read.
+ */
+export async function isUserSessionLookupUnavailable() {
+  if (isMockMemberAuthEnabled()) {
+    return false;
+  }
+  const session = (await getRawSignedUserSession()) as SignedUserSession | null;
+  if (!session?.userId) {
+    return false;
+  }
+  try {
+    const { error } = await getSupabaseAdminClient()
+      .from("members")
+      .select("id")
+      .eq("id", session.userId)
+      .maybeSingle();
+    return Boolean(error);
+  } catch {
+    return true;
+  }
+}
+
 export async function setUserSession(
   userId: string,
   mustChangePassword = false,
