@@ -111,8 +111,8 @@ export default function PolicyConsentForm({
           : `필수 약관 동의가 ${formatKoreanDateTimeToMinute(data.agreedAt)}에 완료되었습니다.`,
       );
       const nextHref = getMemberGateCompletionReturnTo(returnTo, "consent");
-      router.replace(nextHref);
-      router.refresh();
+      // Read the rewritten session with a fresh document before the next gate.
+      window.location.replace(nextHref);
     } finally {
       setPending(false);
     }
