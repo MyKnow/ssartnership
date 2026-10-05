@@ -5,6 +5,7 @@ import ShowcaseAdminProjectForm from "@/components/admin/ShowcaseAdminProjectFor
 import Button from "@/components/ui/Button";
 import { requireAdminPermission } from "@/lib/admin-access";
 import { projectShowcaseRepository } from "@/lib/project-showcase";
+import { isShowcaseEventSettled, SHOWCASE_SETTLED_LOCK_MESSAGE } from "@/lib/project-showcase/status";
 import { isUuid } from "@/lib/uuid";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,10 @@ export default async function EditAdminShowcaseProjectPage({
   const { projectId } = await params;
   const mockId = process.env.NEXT_PUBLIC_DATA_SOURCE === "mock" && /^[a-z0-9-]{1,128}$/iu.test(projectId);
   if (!isUuid(projectId) && !mockId) notFound();
-  const project = await projectShowcaseRepository.getAdminProject(projectId);
+  const [project, drawState] = await Promise.all([
+    projectShowcaseRepository.getAdminProject(projectId),
+    projectShowcaseRepository.getDrawState(),
+  ]);
   if (!project) notFound();
 
   return (
@@ -30,7 +34,11 @@ export default async function EditAdminShowcaseProjectPage({
           description="출품자 외의 프로젝트 정보, 대표 이미지, 검수 상태와 사유를 수정할 수 있어요."
           actions={<Button href="/admin/events/project-showcase" variant="secondary">목록으로</Button>}
         />
-        <ShowcaseAdminProjectForm mode="edit" project={project} />
+        <ShowcaseAdminProjectForm
+          mode="edit"
+          project={project}
+          lockedReason={isShowcaseEventSettled(drawState) ? SHOWCASE_SETTLED_LOCK_MESSAGE : null}
+        />
       </div>
     </AdminShell>
   );

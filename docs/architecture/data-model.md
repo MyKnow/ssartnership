@@ -11,7 +11,10 @@ last_verified: 2026-10-05
 ## 진실 소재
 
 - `supabase/migrations/**`가 스키마의 단일 진실이다. 운영 Production·Preview는 이 마이그레이션을 운영자가 순서대로 적용하고, 수신기는 적용 승인된 마이그레이션 tree와 다른 배포를 거절한다.
-- `supabase/schema.sql`은 마이그레이션에서 파생된 **스냅샷**이다. 현재 형태를 읽기 쉽게 보여 주지만 마이그레이션과 어긋날 수 있다. 어긋나면 스냅샷을 고치고, 이미 적용된 마이그레이션 파일은 수정하지 않는다([리팩토링 기본 결정 D9](../plans/active/refactor-program-2026-10.md#기본-결정)).
+- `supabase/schema.sql`은 마이그레이션에서 파생된 **스냅샷**이다. 현재 형태를 읽기 쉽게 보여 주지만 마이그레이션과 어긋날 수 있다. 자체 호스팅 DB 초기화 입력으로 쓰지 않는다. 어긋나면 스냅샷을 고치고, 이미 적용된 마이그레이션 파일은 수정하지 않는다([리팩토링 기본 결정 D9](../plans/active/refactor-program-2026-10.md#기본-결정)).
+- `npm run validate:migrations`는 파일명 규칙과 함께 스냅샷 드리프트를 막는다. 함수별 최종 시그니처 집합이 migrations와 같아야 하고, migrations가 남긴 인덱스는 스냅샷에도 있어야 하며, 삭제된 컬럼을 가리키는 인덱스 정의와 `)` 앞 끝 쉼표 같은 구문 오류가 없어야 한다. 스냅샷에만 있는 초기 인덱스(어느 migration도 만들지 않은 기준선)는 운영 DB 확인 전까지 그대로 둔다. 구현은 `scripts/lib/supabase-schema-snapshot.mjs`, 회귀 테스트는 `tests/supabase-schema-snapshot-guard.test.mts`다.
+- 함수 본문까지 최신 migration과 같은지 비교하거나 `pg_dump`로 스냅샷을 재생성하는 일은 아직 하지 않는다. `schema.sql` 텍스트를 직접 읽는 계약 테스트가 약 40개(2026-10-05 기준)라 재생성은 별도 작업으로 다룬다.
+- 보존·파기 기간과 실행 경로는 [데이터 수명주기](../security/data-lifecycle.md)가 정본이다.
 - 이 문서는 테이블·함수를 손으로 나열하지 않는다. 손으로 만든 목록은 금방 빠지고 틀려진다. 목록이 필요하면 아래 명령으로 마이그레이션에서 직접 뽑는다.
 
 ```bash
@@ -31,7 +34,7 @@ cat supabase/migrations/*.sql | sed -E 's/--.*$//' | grep -oiE "create (or repla
 grep -l "<name>" supabase/migrations/*.sql | sort | tail -1
 ```
 
-2026-10-05 `dev` 기준 마이그레이션은 208개, 현재 테이블은 112개, 고유 함수 이름은 176개다. 이 결과와 `supabase/schema.sql`의 `create table` 목록이 다르면 스냅샷 드리프트다(같은 날 기준 스냅샷에는 `20260713204059`에서 삭제한 `member_auth_identities`가 남아 있다).
+스냅샷의 테이블·함수·인덱스는 마지막 forward migration의 상태와 일치해야 한다. RF-02는 삭제된 `member_auth_identities` 잔존을 비롯한 스냅샷 드리프트를 정리하고 검증 가드를 추가했다.
 
 ## 도메인별 테이블 지도
 
@@ -83,8 +86,8 @@ Wallet QR 서명과 Apple `authenticationToken` 원문은 DB에 저장하지 않
 
 ## RLS and indexes
 
-- 주요 application table은 모두 row level security가 enable되어 있다. 테이블별 정책은 해당 테이블을 만든 마이그레이션과 이후 정책 마이그레이션이 정본이다.
-- public read policy가 `categories`, `partners` 등에 정의되어 있다.
+- 모든 `public` 테이블은 row level security가 enable되어 있고 `anon`·`authenticated`·`PUBLIC` 권한이 없다. 과거 `categories`, `partners`의 public read policy는 `20260831090039`에서 제거했다.
+- 함수와 새 객체의 기본 권한도 브라우저 역할에 닫혀 있다. 기준은 [Service Role 접근 경계](../security/service-role-boundary.md#db-권한-기본값)다.
 - 앱 서버는 대부분 service role admin client를 사용하므로 API/server action 경계 검증이 필수 방어선이다.
 - 인덱스를 추가·삭제할 때는 스냅샷이 아니라 마이그레이션과 운영 DB 사용 통계를 근거로 한다. 사용 통계 없이 인덱스를 지우지 않는다([기술 부채 원장](../plans/tech-debt.md#성능ux운영)).
 

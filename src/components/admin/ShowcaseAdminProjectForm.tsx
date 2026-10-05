@@ -23,8 +23,8 @@ import {
   SHOWCASE_TYPE_LABELS,
   SHOWCASE_TYPE_NOTES,
 } from "@/lib/project-showcase/labels";
+import { getShowcaseAdminStatusOptions } from "@/lib/project-showcase/status";
 import {
-  SHOWCASE_PROJECT_STATUSES,
   SHOWCASE_PROJECT_TYPES,
   type ShowcaseProjectType,
 } from "@/lib/project-showcase/types";
@@ -39,11 +39,17 @@ const VALIDATION_IMAGE_ID = "ad6e43a7-962f-4c54-89f3-4d2a13968356";
 const INPUT_CLASS = "min-h-11 min-w-0 rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary";
 const ADMIN_PATH = "/admin/events/project-showcase";
 
-type ShowcaseAdminProjectFormProps =
+type ShowcaseAdminProjectFormProps = (
   | { mode: "create"; project?: undefined }
-  | { mode: "edit"; project: ShowcaseAdminProject };
+  | { mode: "edit"; project: ShowcaseAdminProject }
+) & {
+  /** Set after settlement: the server rejects every project change. */
+  lockedReason?: string | null;
+};
 
-export default function ShowcaseAdminProjectForm({ mode, project }: ShowcaseAdminProjectFormProps) {
+export default function ShowcaseAdminProjectForm({ mode, project, lockedReason = null }: ShowcaseAdminProjectFormProps) {
+  const locked = Boolean(lockedReason);
+  const statusOptions = getShowcaseAdminStatusOptions(project?.status);
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -132,6 +138,7 @@ export default function ShowcaseAdminProjectForm({ mode, project }: ShowcaseAdmi
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (locked) return;
     setError("");
     setErrorField(null);
     setMessage("");
@@ -202,6 +209,8 @@ export default function ShowcaseAdminProjectForm({ mode, project }: ShowcaseAdmi
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} noValidate className="grid gap-7 rounded-2xl border border-border bg-surface p-4 sm:p-6">
+      {lockedReason ? <FormMessage variant="info">{lockedReason}</FormMessage> : null}
+      <fieldset disabled={locked} className="grid min-w-0 gap-7 disabled:opacity-70">
       {mode === "create" ? (
         <section className="grid gap-3" aria-labelledby="showcase-owner-heading">
           <h2 id="showcase-owner-heading" className="text-sm font-semibold text-foreground">출품자 선택</h2>
@@ -286,7 +295,7 @@ export default function ShowcaseAdminProjectForm({ mode, project }: ShowcaseAdmi
       <label className="grid gap-2 text-sm font-semibold text-foreground" htmlFor="showcase-admin-status">
         출품 상태
         <select id="showcase-admin-status" name="status" defaultValue={project?.status ?? "pending"} className={INPUT_CLASS}>
-          {SHOWCASE_PROJECT_STATUSES.map((status) => <option key={status} value={status}>{SHOWCASE_ADMIN_STATUS_LABELS[status]}</option>)}
+          {statusOptions.map((status) => <option key={status} value={status}>{SHOWCASE_ADMIN_STATUS_LABELS[status]}</option>)}
         </select>
       </label>
 
@@ -335,12 +344,13 @@ export default function ShowcaseAdminProjectForm({ mode, project }: ShowcaseAdmi
           <span>출품자가 당첨 시 이름 일부를 가려 공지하는 데 동의한 것을 확인했어요.</span>
         </label>
       ) : null}
+      </fieldset>
 
       {error ? <div tabIndex={-1} aria-live="assertive"><FormMessage variant="error">{error}</FormMessage></div> : null}
       {message ? <p role="status" className="text-sm text-muted-foreground">{message}</p> : null}
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <Button type="button" variant="secondary" disabled={pending} onClick={() => router.back()}>돌아가기</Button>
-        <Button type="submit" disabled={pending}>{pending ? "저장 중…" : mode === "create" ? "출품작 등록" : "수정 사항 저장"}</Button>
+        <Button type="submit" disabled={pending || locked}>{pending ? "저장 중…" : mode === "create" ? "출품작 등록" : "수정 사항 저장"}</Button>
       </div>
       <ImageCropDialog
         open={Boolean(cropSourceFile && cropSourceUrl)}

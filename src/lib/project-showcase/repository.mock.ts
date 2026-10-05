@@ -7,6 +7,7 @@ import {
   type ShowcaseRandomInt,
 } from "./draw";
 import { ShowcaseDomainError } from "./errors";
+import { canTransitionShowcaseProjectStatus, getShowcaseSettlementBlocker } from "./status";
 import type {
   ProjectShowcaseRepository,
   ShowcaseAdminActivityLog,
@@ -252,16 +253,27 @@ function toOwnerProject(store: ShowcaseMockStore, project: StoredProject): Showc
   };
 }
 
+/** Mirrors `showcase_assert_submission_open`: the submission phase of an unsettled event. */
 function assertSubmissionOpen(store: ShowcaseMockStore) {
-  if (getShowcasePhase(store.event) !== "submission") throw new ShowcaseDomainError("submission_closed");
+  if (store.settledAt || getShowcasePhase(store.event) !== "submission") throw new ShowcaseDomainError("submission_closed");
+}
+
+/** Mirrors `showcase_assert_experience_open`: the experience phase of an unsettled event. */
+function assertExperienceOpen(store: ShowcaseMockStore) {
+  if (store.settledAt || getShowcasePhase(store.event) !== "experience") throw new ShowcaseDomainError("experience_closed");
 }
 
 /** Mirrors `showcase_open_project`: an approved project while the experience phase is open. */
 function openProject(store: ShowcaseMockStore, projectId: string) {
   const project = store.projects.find((item) => item.id === projectId && item.status === "approved");
   if (!project) throw new ShowcaseDomainError("project_not_found");
-  if (getShowcasePhase(store.event) !== "experience") throw new ShowcaseDomainError("experience_closed");
+  assertExperienceOpen(store);
   return project;
+}
+
+/** Mirrors the settlement guards: a settled event accepts no schedule, project or review change. */
+function assertNotSettled(store: ShowcaseMockStore) {
+  if (store.settledAt) throw new ShowcaseDomainError("event_settled");
 }
 
 /** Mirrors `showcase_assert_draw_open`: after the experience ends and before settlement. */
@@ -503,7 +515,7 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
 
   async registerParticipant(input: { memberId: string }) {
     const store = getStore();
-    if (getShowcasePhase(store.event) !== "experience") throw new ShowcaseDomainError("experience_closed");
+    assertExperienceOpen(store);
     if (store.registrations.has(input.memberId)) throw new ShowcaseDomainError("registration_exists");
     store.registrations.set(input.memberId, { createdAt: new Date().toISOString() });
   }
@@ -752,8 +764,9 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
 
   async settleEvent(adminId: string) {
     const store = getStore();
-    const announcementStart = store.event.announcementStartAt ? new Date(store.event.announcementStartAt).getTime() : Number.POSITIVE_INFINITY;
-    if (store.settledAt || Date.now() < announcementStart) throw new ShowcaseDomainError("settlement_invalid");
+    const blocker = getShowcaseSettlementBlocker(store.event, await this.getDrawState());
+    if (blocker === "settled" || blocker === "announcement_not_started") throw new ShowcaseDomainError("settlement_invalid");
+    if (blocker) throw new ShowcaseDomainError("settlement_draw_required");
     store.settledAt = new Date().toISOString();
     store.settledBy = adminId;
   }
@@ -864,6 +877,7 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
 
   async createAdminProject(input: ShowcaseAdminProjectWriteInput): Promise<void> {
     const store = getStore();
+    assertNotSettled(store);
     const ownerName = store.memberNames.get(input.ownerMemberId);
     if (input.eventId !== store.event.id || !ownerName || ownerName !== input.ownerName) {
       throw new Error("출품자로 선택한 회원을 찾을 수 없습니다.");
@@ -900,8 +914,12 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
 
   async updateAdminProject(input: ShowcaseAdminProjectUpdateInput): Promise<void> {
     const store = getStore();
+    assertNotSettled(store);
     const project = store.projects.find((item) => item.id === input.projectId && item.eventId === input.eventId);
     if (!project) throw new Error("출품작을 찾을 수 없습니다.");
+    if (!canTransitionShowcaseProjectStatus(project.status, input.status)) {
+      throw new ShowcaseDomainError("status_transition_invalid");
+    }
     Object.assign(project, {
       projectType: input.submission.projectType,
       title: input.submission.title,
@@ -927,6 +945,7 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
 
   async deleteAdminProject(input: { projectId: string; adminId: string }): Promise<ShowcaseDeletedProject> {
     const store = getStore();
+    assertNotSettled(store);
     const projectId = input.projectId;
     const index = store.projects.findIndex((project) => project.id === projectId);
     if (index < 0) throw new Error("삭제할 출품작을 찾을 수 없습니다.");
@@ -948,6 +967,7 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
 
   async updateEventSchedule(input: ShowcaseEventScheduleInput) {
     const store = getStore();
+    assertNotSettled(store);
     Object.assign(store.event, input);
     pushActivity(store, {
       type: "event_settings_updated",
@@ -965,6 +985,7 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
     reviewNote: string;
   }) {
     const store = getStore();
+    assertNotSettled(store);
     const project = store.projects.find((item) => item.id === input.projectId && item.status !== "withdrawn");
     if (!project) throw new ShowcaseDomainError("project_not_found");
     project.status = input.status;
@@ -981,6 +1002,7 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
 
   async setImmediateFeedback(input: { projectId: string; allowed: boolean }) {
     const store = getStore();
+    assertNotSettled(store);
     const project = store.projects.find((item) => item.id === input.projectId && item.status !== "withdrawn");
     if (!project) throw new ShowcaseDomainError("project_not_found");
     project.allowImmediateFeedback = input.allowed;

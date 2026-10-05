@@ -147,10 +147,20 @@ direct Mattermost 흐름은 `auth_security_logs.properties`에 안정적인 상�
 - 기본 조회를 위해 `created_at`, `event_name`, `actor_id`, `target_id` 인덱스 유지
 - 상세 집계는 원본 로그를 기준으로 이후 별도 집계 테이블 또는 뷰로 확장
 
+## 쓰기 비용
+
+2026-10-05 평가다. `event_logs` 1건 insert가 갱신하는 대상은 다음과 같다.
+
+- 인덱스: PK와 migrations가 만든 보조 인덱스 13개다. 이 중 10개는 이벤트 이름·경로 조건이 있는 부분 인덱스라 조건에 맞는 행만 갱신한다. 일반 제품 이벤트는 PK, 전체 인덱스 3개(`created_at, id`, `event_name, created_at`, `actor_type, created_at`)와 조건에 맞는 부분 인덱스(`event_id` 고유 인덱스 등)만 갱신한다. `schema.sql` 스냅샷에는 `event_logs_path_idx`, `event_logs_session_id_idx` 같은 초기 인덱스도 남아 있으므로 운영 DB에 실제로 있는지 확인해야 한다.
+- 트리거 2개: `platform_activity_from_event_logs`가 활동 식별자 원장을, `partner_metric_rollups_from_event_logs`가 파트너 지표 이벤트일 때 합계·기간별 롤업과 방문자 원장(`partner_metric_unique_visitors`)을 갱신한다. 관리자·파트너 actor 이벤트는 롤업 함수가 바로 반환한다.
+
+현재 규모(월 수만 건)에서는 구조를 바꾸지 않는다. 인덱스 삭제는 운영 DB의 `pg_stat_user_indexes.idx_scan`을 2주 간격으로 두 번 수집해 쓰이지 않음을 확인한 뒤에만 하고, 그 전에는 삭제 migration을 만들지 않는다. 삭제 후보는 위 초기 인덱스 두 개다. insert 지연, WAL 증가, 월 insert 급증이 관측되면 다시 평가한다.
+
 ## 보존 및 파기 정책
 
 - `event_logs`, `admin_audit_logs`, `auth_security_logs`, `push_message_logs`, `push_delivery_logs`의 원본은 생성일로부터 1년간 보존한다.
-- `platform_active_identities`, `partner_metric_rollups`, DAU·WAU·MAU 등 집계 데이터는 회원 ID, IP, user-agent, session ID를 포함하지 않는 통계 형태로 장기 보존한다.
+- `partner_metric_rollups`, DAU·WAU·MAU 등 집계 데이터는 회원 ID, IP, user-agent, session ID를 포함하지 않는 통계 형태로 장기 보존한다.
+- `platform_active_identities`와 `partner_metric_unique_visitors`는 해시·방문자 키를 담은 식별자 원장이므로 400일 뒤 파기한다. rate-limit 시도 기록, 알림 발송 결과, 만료된 업로드 세션의 기간도 같은 purge가 [데이터 수명주기 결정표](../security/data-lifecycle.md#보존파기-결정표)에 따라 정리한다.
 - `partner_benefit_usages`는 로그가 아닌 혜택 사용 원장으로 취급하며, 정산·분쟁 대응에 필요한 기간 동안 보존한다. 기본 보존기간은 1년이다.
 - 1년이 지난 원본 로그와 회원 연결형 혜택 사용 원장은 자체 호스팅 운영 Cron이 매일 호출하는 `/api/cron/purge-expired-operational-logs`가 보존 hold가 없는 행만 파기한다.
 - 보안 사고·분쟁·법령상 보존 사유가 발생하면 `log_retention_holds`에 대상 로그 그룹과 기간, 사유, 만료 시각을 등록한 뒤 원본을 예외 보존한다.

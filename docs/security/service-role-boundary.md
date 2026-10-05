@@ -61,6 +61,14 @@ Supabase service role key는 RLS를 우회할 수 있으므로 서버 전용 코
 - 사용자 UX와 직접 관련 없는 로그 기록은 throttle 또는 비동기 처리하고, 실패해도 핵심 요청을 막지 않는다.
 - RLS/revoke 상태는 `tests/security-schema.test.mts`에서 schema snapshot 기준으로 회귀 검사한다.
 
+## DB 권한 기본값
+
+- 앱은 service role로만 DB에 접근한다. `public` 스키마의 테이블·시퀀스·함수는 `anon`, `authenticated`, `PUBLIC`에 권한을 주지 않는다. 확장이 소유한 함수만 예외다.
+- `20261005030746_harden_privileges_retention_and_lifecycle.sql`부터 기본 권한도 닫혀 있다. 이후 migration이 revoke를 빠뜨려도 새 함수는 `service_role`만 실행하고 새 테이블·시퀀스는 브라우저 역할에 열리지 않는다. migration은 끝에서 노출된 함수·RLS 없는 테이블이 하나라도 있으면 실패한다.
+- 기본 권한 변경은 `PUBLIC`의 함수 실행 기본값을 migration 실행 역할 기준으로 바꾼다. 같은 역할이 새 extension을 설치하면 필요한 함수에 `service_role` 실행 권한을 명시적으로 부여한다.
+- 새 테이블은 기본값과 별개로 해당 migration에서 RLS enable과 브라우저 역할 revoke를 선언한다(`tests/public-schema-privilege-defaults.test.mts`).
+- `npm run self-host:database -- smoke`는 anon 키의 테이블 읽기·쓰기·RPC 호출이 거부되는지와, 읽기 전용 질의로 노출된 함수·테이블 수가 0인지 확인한다.
+
 ## 새 service role 사용 체크리스트
 
 - 이 코드가 서버 전용 파일인가?

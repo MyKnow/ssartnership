@@ -328,7 +328,11 @@ export async function deletePartnerCompanyAction(formData: FormData) {
     .eq("id", companyId);
 
   if (deleteError) {
-    redirectAdminActionError("/admin/companies", "company_invalid_request");
+    // Invoices restrict company deletion so billing records are never erased.
+    redirectAdminActionError(
+      "/admin/companies",
+      deleteError.code === "23503" ? "company_has_billing_records" : "company_invalid_request",
+    );
   }
 
   await logAdminAction("partner_company_delete", {

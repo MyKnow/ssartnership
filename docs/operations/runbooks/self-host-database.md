@@ -21,7 +21,7 @@ npm run self-host:database -- status --env-file .tmp/self-host/data.env
 npm run self-host:database -- smoke --env-file .tmp/self-host/data.env
 ```
 
-`up`의 성공, migration 적용 수, smoke의 대표 RPC·권한·파일 결과를 각각 기록한다. `migrate`를 다시 실행했을 때 기존 파일의 checksum을 확인하고 중복 적용하지 않아야 한다. 실패한 파일을 건너뛰거나 과거 migration을 수정하지 않는다. 컨테이너 재시작 후 같은 데이터·파일이 남아 있는지도 확인한다.
+`up`의 성공, migration 적용 수, smoke의 대표 RPC·권한·파일 결과를 각각 기록한다. smoke는 anon 키의 테이블 읽기·쓰기·RPC 호출 거부와, 읽기 전용 transaction에서 센 브라우저 역할 노출 함수·테이블 수 0을 함께 확인한다. `migrate`를 다시 실행했을 때 기존 파일의 checksum을 확인하고 중복 적용하지 않아야 한다. 실패한 파일을 건너뛰거나 과거 migration을 수정하지 않는다. 컨테이너 재시작 후 같은 데이터·파일이 남아 있는지도 확인한다.
 
 이 `up`은 백업 overlay를 아직 도입하지 않은 초기 환경 전용이다. 백업을 활성화한 뒤에는 [운영 overlay의 canonical 시작 명령](./self-host-operations.md)을 사용하여 기본 DB 이미지로 재생성하거나 WAL 설정을 제거하지 않는다.
 
