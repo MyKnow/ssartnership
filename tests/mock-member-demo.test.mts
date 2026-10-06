@@ -139,7 +139,7 @@ test("mock member push preferences do not query UUID-backed storage", async () =
     );
     assert.deepEqual(
       await upsertMemberPushPreferences(MOCK_MEMBER_ID, { enabled: true }),
-      getPushPreferencesOrDefault({ enabled: true }),
+      getPushPreferencesOrDefault({ enabled: false }),
     );
   } finally {
     if (previousDataSource === undefined) {

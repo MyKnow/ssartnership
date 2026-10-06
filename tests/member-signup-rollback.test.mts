@@ -49,3 +49,22 @@ test("회원가입 생성 회원 삭제가 예외를 던져도 정리 실패 코
     },
   );
 });
+
+test("가입 rollback은 회원 참조가 제거된 뒤에만 업로드 정리를 시도한다", async () => {
+  const steps: string[] = [];
+  await rollbackCreatedSignupMember({
+    memberId: "member-4", originalError: new Error("policy_failed"),
+    deleteMember: async () => { steps.push("delete-member"); return { error: null }; },
+    discardUpload: async () => { steps.push("discard-upload"); },
+  });
+  assert.deepEqual(steps, ["delete-member", "discard-upload"]);
+});
+test("회원 rollback 응답이 불확실하면 아직 참조할 수 있는 업로드 정리를 호출하지 않는다", async () => {
+  let discarded = false;
+  await assert.rejects(rollbackCreatedSignupMember({
+    memberId: "member-5", originalError: new Error("policy_failed"),
+    deleteMember: async () => { throw new Error("timeout"); },
+    discardUpload: async () => { discarded = true; },
+  }));
+  assert.equal(discarded, false);
+});

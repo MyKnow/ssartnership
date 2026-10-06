@@ -14,7 +14,6 @@ import {
 } from "@/lib/review-media";
 import {
   buildReviewMediaStoragePath,
-  deleteReviewMediaUrls,
 } from "@/lib/review-media-storage";
 import {
   resolveImageTransformPolicy,
@@ -49,6 +48,11 @@ class ReviewMediaInputError extends Error {
 export function getReviewMediaInputFieldErrors(
   error: unknown,
 ): ReviewFieldErrors | null {
+  if ((error instanceof ImageUploadError && error.code === "review_image_reupload_required")
+    // The session can expire between attach and the actual review INSERT/PATCH.
+    || (error instanceof Error && error.message === "review_image_reference_invalid")) {
+    return { images: "리뷰 사진을 다시 업로드해 주세요." };
+  }
   return error instanceof ReviewMediaInputError
     ? { images: error.message }
     : null;
@@ -189,14 +193,7 @@ export async function readPartnerReviewSubmission(request: Request): Promise<
 }
 
 export type ResolveReviewMediaOptions = {
-  /**
-   * Receives each URL as soon as this call attaches it. Passing it hands
-   * failure cleanup to the caller: the helper then leaves partial attachments
-   * in place. Review creation needs this because a duplicate request with the
-   * same reviewId attaches to the same deterministic paths, so deleting before
-   * checking for an already stored review could remove the winner's images.
-   * Pass an empty array.
-   */
+  /** Collects attached URLs for callers; only the expiry collector may delete them. */
   attachedUrls?: string[];
 };
 
@@ -221,7 +218,6 @@ export async function resolveReviewMediaPayload(
   }
 
   const images: string[] = [];
-  const callerOwnsCleanup = options.attachedUrls !== undefined;
   const uploadedUrls: string[] = options.attachedUrls ?? [];
   const attachUpload = async (uploadId: string, imageIndex: number) => {
     const attached = await getImageUploadRepository().attach({
@@ -243,26 +239,20 @@ export async function resolveReviewMediaPayload(
     return attached.url;
   };
 
-  try {
-    for (const entry of entries) {
-      if (entry.kind === "existing") {
-        images.push(entry.url);
-        continue;
-      }
-      if (!entry.uploadId) {
-        throw new ReviewMediaInputError(
-          "완료된 공통 이미지 업로드를 확인해 주세요.",
-        );
-      }
-      const uploadedUrl = await attachUpload(entry.uploadId, images.length);
-      images.push(uploadedUrl);
-      uploadedUrls.push(uploadedUrl);
+  // Keep partial attachments for retry until the original session expires.
+  for (const entry of entries) {
+    if (entry.kind === "existing") {
+      images.push(entry.url);
+      continue;
     }
-  } catch (error) {
-    if (!callerOwnsCleanup) {
-      await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);
+    if (!entry.uploadId) {
+      throw new ReviewMediaInputError(
+        "완료된 공통 이미지 업로드를 확인해 주세요.",
+      );
     }
-    throw error;
+    const uploadedUrl = await attachUpload(entry.uploadId, images.length);
+    images.push(uploadedUrl);
+    uploadedUrls.push(uploadedUrl);
   }
 
   return {

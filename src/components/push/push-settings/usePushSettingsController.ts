@@ -24,17 +24,15 @@ import type {
   PushSettingsCardProps,
 } from "./types";
 import { usePushDeviceState } from "./usePushDeviceState";
-
-const PUSH_PREFERENCE_KEYS = new Set<PreferenceKey>([
-  "announcementEnabled",
-  "newPartnerEnabled",
-  "expiringPartnerEnabled",
-  "reviewEnabled",
-]);
+import {
+  buildNotificationPreferencePatch,
+  parseNotificationPreferencePatch,
+} from "@/lib/notifications/preference-patch";
 
 export function usePushSettingsController({
   configured,
   initialPreferences,
+  marketingPolicy,
 }: PushSettingsCardProps) {
   const { notify } = useToast();
   const [preferences, setPreferences] = useState(initialPreferences);
@@ -236,17 +234,17 @@ export function usePushSettingsController({
   }
 
   async function updatePreference(key: PreferenceKey, nextValue: boolean) {
-    const nextPreferences = {
-      ...preferences,
-      [key]: nextValue,
-    };
-    if (PUSH_PREFERENCE_KEYS.has(key) && nextValue) {
-      nextPreferences.enabled = true;
+    const parsed = parseNotificationPreferencePatch(
+      buildNotificationPreferencePatch(key, nextValue, marketingPolicy),
+    );
+    if (!parsed.ok) {
+      notify(parsed.message, { tone: "error" });
+      return;
     }
 
     setPendingAction("preference");
     try {
-      const data = await savePushPreferences(nextPreferences);
+      const data = await savePushPreferences(parsed.value);
       if (data?.preferences) {
         setPreferences(data.preferences);
       } else {
@@ -283,14 +281,17 @@ export function usePushSettingsController({
       return;
     }
 
-    const nextPreferences = {
-      ...preferences,
-      [key]: nextValue,
-    };
+    const parsed = parseNotificationPreferencePatch(
+      buildNotificationPreferencePatch(key, nextValue),
+    );
+    if (!parsed.ok) {
+      notify(parsed.message, { tone: "error" });
+      return;
+    }
 
     setPendingAction("preference");
     try {
-      const data = await savePushPreferences(nextPreferences);
+      const data = await savePushPreferences(parsed.value);
       if (data?.preferences) {
         setPreferences(data.preferences);
       } else {

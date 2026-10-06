@@ -138,6 +138,8 @@ export async function runPushDeliveryAttempt(
   input: {
     claim: Parameters<PushDeliveryRepository["claimNotificationDelivery"]>[0];
     send: () => Promise<void>;
+    isDefinitiveFailure?: (error: unknown) => boolean;
+    onSent?: (deliveryId: string) => Promise<void>;
   },
   repository: PushDeliveryRepository = notificationRepository,
 ): Promise<PushDeliveryAttemptResult> {
@@ -207,7 +209,8 @@ export async function runPushDeliveryAttempt(
       const markedFailed =
         await repository.transitionNotificationDelivery({
           deliveryId: claimedDelivery.deliveryId,
-          transition: "failed",
+          transition: input.isDefinitiveFailure && !input.isDefinitiveFailure(providerError)
+            ? "needs_reconciliation" : "failed",
           errorMessage: safeErrorMessage,
         });
       if (!markedFailed) {
@@ -231,6 +234,9 @@ export async function runPushDeliveryAttempt(
     repository,
   );
   if (successResolution === "sent") {
+    try { await input.onSent?.(claimedDelivery.deliveryId); } catch (error) {
+      logServerError("[admin-notification-ops] sent delivery annotation failed", error, { memberId });
+    }
     return { outcome: "sent", providerCalled: true };
   }
   return {
@@ -238,6 +244,35 @@ export async function runPushDeliveryAttempt(
     warning:
       `푸시 발송 성공 여부를 원장에 확정하지 못했습니다. (회원 ${memberId})`,
   };
+}
+
+/** Only an explicit rejecting response proves that the post was not accepted. */
+export function isDefinitiveMattermostFailure(error: unknown) {
+  return error instanceof MattermostApiError && error.status !== null
+    && [400, 401, 403, 404, 413, 422, 429].includes(error.status)
+    && ["unauthorized", "forbidden", "not_found", "rate_limited", "request_rejected"].includes(error.code);
+}
+
+export async function runMattermostDeliveryAttempt(
+  input: { notificationId: string; memberId: string; send: () => Promise<{ id: string }> },
+  repository: PushDeliveryRepository & Pick<typeof notificationRepository, "annotateSentNotificationDelivery"> = notificationRepository,
+) {
+  let providerNotificationId: string | null = null;
+  return runPushDeliveryAttempt({
+    claim: {
+      notificationId: input.notificationId,
+      memberId: input.memberId,
+      channel: "mm", provider: "mattermost",
+      providerCampaignId: input.notificationId,
+      providerIdempotencyKey: `ssartnership:delivery:v2:${input.notificationId}:mm:${input.memberId}`,
+      leaseDurationSeconds: PUSH_DELIVERY_LEASE_SECONDS,
+    },
+    send: async () => { providerNotificationId = (await input.send()).id; },
+    onSent: async (deliveryId) => {
+      if (providerNotificationId) await repository.annotateSentNotificationDelivery(deliveryId, providerNotificationId);
+    },
+    isDefinitiveFailure: isDefinitiveMattermostFailure,
+  }, repository);
 }
 
 function toMattermostDeliveryCode(error: unknown) {
@@ -303,6 +338,7 @@ async function markGroupMattermostFailure(input: {
   notificationId: string;
   members: AudienceMember[];
   error: unknown;
+  knownBeforeSend?: boolean;
   bookkeepingErrors: string[];
 }) {
   const code = toMattermostDeliveryCode(input.error);
@@ -314,7 +350,7 @@ async function markGroupMattermostFailure(input: {
         notificationId: input.notificationId,
         member,
         status: "failed",
-        providerStatus: code,
+        providerStatus: input.knownBeforeSend ? "failed" : code,
         errorMessage: getSafeMattermostDeliveryErrorMessage(code),
         bookkeepingErrors: input.bookkeepingErrors,
       });
@@ -331,6 +367,7 @@ async function sendMattermostCampaignDeliveriesDirect(params: {
   members: AudienceMember[];
   source: AdminNotificationSource;
   templateContext?: NotificationTemplateContext;
+  retrySafe?: boolean;
 }): Promise<ChannelDeliveryResult> {
   const bookkeepingErrors: string[] = [];
   let sent = 0;
@@ -380,15 +417,27 @@ async function sendMattermostCampaignDeliveriesDirect(params: {
   }
 
   for (const [generation, members] of grouped) {
+    let operationStarted = false;
     try {
       const outcome = await withActiveMattermostSenderForGeneration(
         generation,
         async (session) => {
+          operationStarted = true;
           const outcomes: Array<"sent" | "failed"> = Array(members.length);
           await forEachWithConcurrency(
             members,
             MATTERMOST_SEND_CONCURRENCY,
             async (member, index) => {
+              if (params.retrySafe) {
+                const attempt = await runMattermostDeliveryAttempt({
+                  notificationId: params.notificationId, memberId: member.id,
+                  send: () => session.sendDirectMessage(member.mattermostUserId, message),
+                });
+                outcomes[index] = attempt.outcome === "sent" ? "sent" : "failed";
+                if ("warning" in attempt) bookkeepingErrors.push(attempt.warning.replaceAll("푸시", "Mattermost"));
+                if (attempt.outcome === "provider_failed" && attempt.ledgerWarning) bookkeepingErrors.push(attempt.ledgerWarning);
+                return;
+              }
               try {
                 const post = await session.sendDirectMessage(member.mattermostUserId, message);
                 await recordMattermostDelivery({
@@ -425,6 +474,7 @@ async function sendMattermostCampaignDeliveriesDirect(params: {
         notificationId: params.notificationId,
         members,
         error,
+        knownBeforeSend: params.retrySafe && !operationStarted,
         bookkeepingErrors,
       });
     }
@@ -453,6 +503,7 @@ export async function sendPushCampaignDeliveries(params: {
   resolvedAudience: ResolvedPushAudience;
   subscriptions: StoredSubscription[];
   getWebPush: () => Promise<WebPushModule>;
+  retrySafe?: boolean;
 }): Promise<ChannelDeliveryResult> {
   if (!params.subscriptions.length) {
     return { targeted: 0, sent: 0, failed: 0, skipped: 0, bookkeepingErrors: [] };
@@ -506,6 +557,10 @@ export async function sendPushCampaignDeliveries(params: {
           providerIdempotencyKey,
           leaseDurationSeconds: PUSH_DELIVERY_LEASE_SECONDS,
         },
+        isDefinitiveFailure: params.retrySafe
+          ? (error) => typeof error === "object" && error !== null && "statusCode" in error
+            && [400, 401, 403, 404, 410, 413, 429].includes(Number(error.statusCode))
+          : undefined,
         send: async () => {
           await sendWebPush(webpush, subscription, serialized);
         },
@@ -597,6 +652,7 @@ export async function sendMattermostCampaignDeliveries(params: {
   members: AudienceMember[];
   source?: AdminNotificationSource;
   templateContext?: NotificationTemplateContext;
+  retrySafe?: boolean;
 }): Promise<ChannelDeliveryResult> {
   if (!params.members.length) {
     return { targeted: 0, sent: 0, failed: 0, skipped: 0, bookkeepingErrors: [] };

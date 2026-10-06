@@ -116,7 +116,7 @@ describe("POST /api/partners/[id]/reviews idempotency", () => {
     expect(createPartnerReviewMock).not.toHaveBeenCalled();
     expect(deleteReviewMediaUrlsMock).not.toHaveBeenCalled();
   });
-  test("PK 충돌로 진 중복 요청은 저장된 리뷰를 돌려주고 참조되지 않는 업로드만 정리한다", async () => {
+  test("PK 충돌로 진 중복 요청은 저장된 리뷰를 돌려주고 미사용 업로드는 만료 정리에 맡긴다", async () => {
     resolveAttaching(["https://cdn.test/a.webp", "https://cdn.test/b.webp"]);
     createPartnerReviewMock.mockRejectedValue(
       new Error("duplicate key value violates unique constraint \"partner_reviews_pkey\""),
@@ -129,8 +129,7 @@ describe("POST /api/partners/[id]/reviews idempotency", () => {
 
     expect(result.status).toBe(200);
     expect(result.body).toMatchObject({ ok: true, idempotent: true, review: { id: reviewId } });
-    expect(deleteReviewMediaUrlsMock).toHaveBeenCalledTimes(1);
-    expect(deleteReviewMediaUrlsMock).toHaveBeenCalledWith(["https://cdn.test/b.webp"]);
+    expect(deleteReviewMediaUrlsMock).not.toHaveBeenCalled();
   });
 
   test("이미 저장된 리뷰가 있으면 이미지 연결 오류보다 멱등 응답을 우선한다", async () => {
@@ -191,7 +190,7 @@ describe("POST /api/partners/[id]/reviews idempotency", () => {
     expect(deleteReviewMediaUrlsMock).not.toHaveBeenCalled();
   });
 
-  test("저장된 리뷰가 없으면 이미지 오류 전에 연결한 파일을 정리하고 필드 오류를 돌려준다", async () => {
+  test("저장된 리뷰가 없어도 연결한 파일을 보존하고 필드 오류를 돌려준다", async () => {
     resolveAttaching(["https://cdn.test/a.webp"], new Error("media"));
     getReviewMediaInputFieldErrorsMock.mockReturnValue({ images: "다시 업로드해 주세요." });
     getPartnerReviewByIdMock.mockResolvedValue(null);
@@ -200,8 +199,7 @@ describe("POST /api/partners/[id]/reviews idempotency", () => {
 
     expect(result.status).toBe(400);
     expect(result.body).toEqual({ ok: false, fieldErrors: { images: "다시 업로드해 주세요." } });
-    expect(deleteReviewMediaUrlsMock).toHaveBeenCalledTimes(1);
-    expect(deleteReviewMediaUrlsMock).toHaveBeenCalledWith(["https://cdn.test/a.webp"]);
+    expect(deleteReviewMediaUrlsMock).not.toHaveBeenCalled();
   });
 
   test("저장 리뷰 확인이 실패하면 결과를 모르므로 연결한 파일을 지우지 않는다", async () => {
@@ -244,7 +242,7 @@ describe("POST /api/partners/[id]/reviews idempotency", () => {
     }
   });
 
-  test("다른 리뷰가 같은 id를 차지해 저장이 거절되면 이 요청의 파일은 정리한다", async () => {
+  test("다른 리뷰가 같은 id를 차지해도 파일은 원자적 만료 정리에 맡긴다", async () => {
     resolveAttaching(["https://cdn.test/a.webp"]);
     createPartnerReviewMock.mockRejectedValue(new Error("duplicate key"));
     getPartnerReviewByIdMock
@@ -256,8 +254,7 @@ describe("POST /api/partners/[id]/reviews idempotency", () => {
       const result = await postReview();
 
       expect(result.status).toBe(503);
-      expect(deleteReviewMediaUrlsMock).toHaveBeenCalledTimes(1);
-      expect(deleteReviewMediaUrlsMock).toHaveBeenCalledWith(["https://cdn.test/a.webp"]);
+      expect(deleteReviewMediaUrlsMock).not.toHaveBeenCalled();
     } finally {
       consoleError.mockRestore();
     }

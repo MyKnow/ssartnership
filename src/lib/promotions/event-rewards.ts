@@ -25,10 +25,8 @@ import type { EventCampaign, EventConditionKey } from "@/lib/promotions/catalog"
 import {
   getEventRewardNotificationAttemptIds,
   resolveEventRewardDrawDeliveryStatus,
-  selectEventRewardNotificationTargets,
   summarizeEventRewardWinnerDeliveries,
   type EventRewardDeliveryRecord,
-  type EventRewardWinnerDeliveryOutcome,
 } from "@/lib/promotions/event-reward-delivery";
 
 import type {
@@ -1144,6 +1142,7 @@ type EventRewardDeliveryRow = {
   member_id: string | null;
   channel: string | null;
   status: string | null;
+  provider_status: string | null;
 };
 
 /** Returns null when the delivery ledger cannot be read, so callers fail closed. */
@@ -1158,7 +1157,7 @@ async function fetchEventRewardDeliveryRecords(
   const result = await collectPagedRows<EventRewardDeliveryRow>(null, async (from, to) => {
     const { data, error } = await supabase
       .from("notification_deliveries")
-      .select("notification_id,member_id,channel,status")
+      .select("notification_id,member_id,channel,status,provider_status")
       .in("notification_id", [...notificationIds])
       .in("member_id", [...memberIds])
       .order("id", { ascending: true })
@@ -1182,10 +1181,27 @@ async function fetchEventRewardDeliveryRecords(
             memberId: row.member_id,
             channel: row.channel,
             status: row.status,
+            providerStatus: row.provider_status,
           },
         ]
       : [],
   );
+}
+
+function hasDrawWriteReceipt(data: unknown, drawId: string) {
+  return typeof data === "object" && data !== null && !Array.isArray(data)
+    && "id" in data && data.id === drawId;
+}
+
+function readWinnerWriteReceipt(
+  row: unknown,
+  drawId: string,
+  expectedStatus: EventRewardWinnerNotificationStatus,
+) {
+  if (typeof row !== "object" || row === null || Array.isArray(row)) return null;
+  const receipt = row as Record<string, unknown>;
+  return receipt.draw_id === drawId && receipt.notification_status === expectedStatus
+    && typeof receipt.member_id === "string" ? receipt.member_id : null;
 }
 
 async function updateEventRewardWinnerNotificationRows(
@@ -1201,14 +1217,41 @@ async function updateEventRewardWinnerNotificationRows(
   if (memberIds.length === 0) {
     return;
   }
-  const { error } = await supabase
-    .from("event_reward_winners")
-    .update(values)
-    .eq("draw_id", drawId)
-    .in("member_id", [...memberIds]);
-  if (error) {
-    throw new Error(error.message);
+  let update = supabase.from("event_reward_winners").update(values)
+    .eq("draw_id", drawId).in("member_id", [...memberIds]);
+  if (values.notification_status !== "sent") update = update.neq("notification_status", "sent");
+  const { data, error } = await update.select("draw_id,member_id,notification_status");
+  if (error) throw new Error(error.message);
+  const incomplete = () => new EventRewardSafeError(
+    "당첨자별 발송 기록을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  );
+  // PostgREST SDK can normalize a 404 response to error:null with null/[].
+  // Only explicit matching rows establish that this summary was persisted.
+  if (!Array.isArray(data)) throw incomplete();
+  const expected = new Set(memberIds);
+  const recorded = new Set<string>();
+  for (const row of data) {
+    const memberId = readWinnerWriteReceipt(row, drawId, values.notification_status);
+    if (!memberId || !expected.has(memberId) || recorded.has(memberId)) throw incomplete();
+    recorded.add(memberId);
   }
+  const missing = [...expected].filter((memberId) => !recorded.has(memberId));
+  if (missing.length === 0) return;
+  if (values.notification_status === "sent") throw incomplete();
+
+  // A concurrent worker may already have advanced a row to sent. The neq guard
+  // preserves it; absence from the PATCH response alone is not evidence of that.
+  const { data: preserved, error: preservedError } = await supabase
+    .from("event_reward_winners").select("draw_id,member_id,notification_status")
+    .eq("draw_id", drawId).in("member_id", missing).eq("notification_status", "sent");
+  if (preservedError || !Array.isArray(preserved)) throw incomplete();
+  const confirmed = new Set<string>();
+  for (const row of preserved) {
+    const memberId = readWinnerWriteReceipt(row, drawId, "sent");
+    if (!memberId || !missing.includes(memberId) || confirmed.has(memberId)) throw incomplete();
+    confirmed.add(memberId);
+  }
+  if (confirmed.size !== missing.length) throw incomplete();
 }
 
 export async function sendEventRewardWinnerNotifications(
@@ -1245,154 +1288,145 @@ export async function sendEventRewardWinnerNotifications(
     throw new EventRewardSafeError("당첨자가 없습니다.");
   }
 
-  // A resend after a partial failure must not notify winners an earlier
-  // attempt already reached; read the per-member delivery ledger first and
-  // stop instead of resending to everyone when it cannot be read.
   const previousAttemptIds = getEventRewardNotificationAttemptIds(drawRow);
-  let previousOutcomes: Map<string, EventRewardWinnerDeliveryOutcome> | null = null;
-  if (previousAttemptIds.length > 0) {
-    const previousRecords = await fetchEventRewardDeliveryRecords(
-      supabase,
-      previousAttemptIds,
-      memberIds,
+  const stableNotificationId = typeof drawRow.metadata?.notificationCampaignId === "string"
+    ? drawRow.metadata.notificationCampaignId : null;
+  const attemptedAt = new Date().toISOString();
+  const readEvidence = async (ids: string[]) => {
+    const records = await fetchEventRewardDeliveryRecords(supabase, ids, memberIds);
+    if (!records) throw new EventRewardSafeError(
+      "발송 이력을 확인하지 못해 중단했습니다. 발송 결과를 확인한 후 다시 시도해 주세요.",
     );
-    if (!previousRecords) {
-      throw new EventRewardSafeError(
-        "이전 발송 이력을 확인하지 못해 재발송을 중단했습니다. 잠시 후 다시 시도해 주세요.",
+    return records;
+  };
+  const previousRecords = await readEvidence(previousAttemptIds);
+  const previousOutcomes = summarizeEventRewardWinnerDeliveries(memberIds, previousRecords);
+  const legacyIds = previousAttemptIds.filter((id) => id !== stableNotificationId);
+  const legacyOutcomes = summarizeEventRewardWinnerDeliveries(
+    memberIds, previousRecords
+      .filter((record) => legacyIds.includes(record.notificationId))
+      // Old push marked arbitrary provider errors "failed"; that legacy marker
+      // cannot establish definitive rejection under the new retry contract.
+      .map((record) => record.providerStatus === "failed"
+        ? { ...record, providerStatus: null } : record),
+  );
+  // A missing legacy receipt cannot prove that the old, unclaimed sender never posted.
+  const legacyUncertain = (memberId: string) => legacyIds.length > 0 && (
+    !previousRecords.some((record) => record.memberId === memberId && legacyIds.includes(record.notificationId))
+    || ["needs_reconciliation", "pending"].includes(legacyOutcomes.get(memberId) ?? "")
+  );
+  // A newly attached inbox can precede external delivery in a live campaign.
+  // Recover its campaign disposition before treating inbox-only as complete.
+  const stableInboxOnly = (memberId: string) => Boolean(stableNotificationId)
+    && previousRecords.some((record) => record.memberId === memberId
+      && record.notificationId === stableNotificationId && record.channel === "in_app" && record.status === "sent")
+    && !previousRecords.some((record) => record.memberId === memberId && record.channel !== "in_app");
+  const targetMemberIds = memberIds.filter((memberId) =>
+    (previousOutcomes.get(memberId) !== "reached" || stableInboxOnly(memberId))
+    && previousOutcomes.get(memberId) !== "needs_reconciliation"
+    && !legacyUncertain(memberId),
+  );
+  let associationToken: string | null = null;
+  let associationMetadata = { ...(drawRow.metadata ?? {}) };
+  let attemptIds = previousAttemptIds;
+  let targetCount = 0;
+  let outcomes = previousOutcomes;
+
+  const persistOutcome = async (notificationId: string | null, channelResults: unknown, warnings: string[]) => {
+    const status = resolveEventRewardDrawDeliveryStatus(memberIds, outcomes);
+    const sentAt = resolveEventRewardNotificationSentAt(status, attemptedAt);
+    // Keep the terminal draw marker until last so a failed winner summary can
+    // be repaired from delivery evidence without another provider call.
+    for (const outcome of ["reached", "unreached", "pending", "needs_reconciliation"] as const) {
+      await updateEventRewardWinnerNotificationRows(
+        supabase, drawId, memberIds.filter((id) => outcomes.get(id) === outcome), {
+          notification_status: outcome === "reached" ? "sent" : outcome === "unreached" ? "failed" : "pending",
+          notification_sent_at: outcome === "reached" ? attemptedAt : null,
+          notification_error: outcome === "reached" ? null : outcome === "unreached"
+            ? "안내 도달을 확인하지 못했습니다. 알림 설정과 발송 결과를 확인해 주세요."
+            : "발송 결과 확인이 필요하여 자동 재발송을 중단했습니다.",
+        },
       );
     }
-    previousOutcomes = summarizeEventRewardWinnerDeliveries(memberIds, previousRecords);
-  }
-  const targetMemberIds = selectEventRewardNotificationTargets(
-    memberIds,
-    previousOutcomes,
-  );
-  const attemptedAt = new Date().toISOString();
-  const mislabeledReachedMemberIds = previousOutcomes
-    ? winners
-        .filter(
-          (winner) =>
-            previousOutcomes.get(winner.member_id) === "reached"
-            && winner.notification_status !== "sent",
-        )
-        .map((winner) => winner.member_id)
-    : [];
+    let update = supabase.from("event_reward_draws").update({
+      status, sent_at: sentAt, sent_notification_id: notificationId,
+      metadata: {
+        ...associationMetadata, channelResults, warnings,
+        notificationAttemptIds: attemptIds,
+        lastNotificationAttemptedAt: attemptedAt,
+        lastNotificationTargetCount: targetCount,
+      },
+    }).eq("id", drawId);
+    update = associationToken
+      ? update.eq("metadata->>notificationCampaignAttemptToken", associationToken)
+      : update.eq("updated_at", drawRow.updated_at);
+    const { data, error } = await update.select("id").maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!hasDrawWriteReceipt(data, drawId)) throw new EventRewardSafeError("다른 발송 작업이 진행 중입니다. 결과를 새로고침해 주세요.");
+    return status;
+  };
 
   if (targetMemberIds.length === 0) {
-    const { error: completeDrawError } = await supabase
-      .from("event_reward_draws")
-      .update({
-        status: "sent",
-        sent_at: attemptedAt,
-        metadata: {
-          ...(drawRow.metadata ?? {}),
-          notificationAttemptIds: previousAttemptIds,
-          lastNotificationAttemptedAt: attemptedAt,
-          lastNotificationTargetCount: 0,
-        },
-      })
-      .eq("id", drawId);
-    if (completeDrawError) {
-      throw new Error(completeDrawError.message);
+    if (resolveEventRewardDrawDeliveryStatus(memberIds, previousOutcomes) !== "sent") {
+      throw new EventRewardSafeError("발송 중이거나 결과 확인이 필요한 안내가 있어 재발송을 중단했습니다.");
     }
-    await updateEventRewardWinnerNotificationRows(
-      supabase,
-      drawId,
-      mislabeledReachedMemberIds,
-      { notification_status: "sent", notification_error: null },
-    );
-    return {
-      status: "sent" as const,
-      notificationId: drawRow.sent_notification_id,
-      channelResults: null,
-      warnings: ["모든 당첨자에게 이미 안내가 전달되어 추가로 발송하지 않았습니다."],
-    };
+    const warnings = ["모든 당첨자에게 이미 안내가 전달되어 추가로 발송하지 않았습니다."];
+    const status = await persistOutcome(drawRow.sent_notification_id, null, warnings);
+    return { status, notificationId: drawRow.sent_notification_id, channelResults: null, warnings };
   }
 
   const result = await sendAdminNotificationCampaign(
     buildEventRewardWinnerNotificationInput({
-      guidePath: drawRow.guide_path,
-      memberIds: targetMemberIds,
+      guidePath: drawRow.guide_path, memberIds: targetMemberIds,
       confirmationText: request.confirmationText,
     }),
-  );
-
-  const attemptIds = Array.from(new Set([...previousAttemptIds, result.notificationId]));
-  const records = await fetchEventRewardDeliveryRecords(supabase, attemptIds, memberIds);
-  const outcomes = records ? summarizeEventRewardWinnerDeliveries(memberIds, records) : null;
-  const aggregate = Object.values(result.channelResults).reduce(
-    (accumulator, channel) => ({
-      targeted: accumulator.targeted + channel.targeted,
-      sent: accumulator.sent + channel.sent,
-      failed: accumulator.failed + channel.failed,
-    }),
-    { targeted: 0, sent: 0, failed: 0 },
-  );
-  const status = outcomes
-    ? resolveEventRewardDrawDeliveryStatus(memberIds, outcomes)
-    : drawNotificationStatus(aggregate);
-  const sentAt = resolveEventRewardNotificationSentAt(status, attemptedAt);
-  const errorMessage = result.warnings.length > 0 ? result.warnings.join("\n") : null;
-
-  const { error: updateDrawError } = await supabase
-    .from("event_reward_draws")
-    .update({
-      status,
-      sent_notification_id: result.notificationId,
-      sent_at: sentAt,
-      metadata: {
-        ...(drawRow.metadata ?? {}),
-        channelResults: result.channelResults,
-        lastNotificationAttemptedAt: attemptedAt,
-        lastNotificationTargetCount: targetMemberIds.length,
-        notificationAttemptIds: attemptIds,
-        warnings: result.warnings,
+    "manual",
+    {
+      drawId, eventSlug,
+      beforeDelivery: async (claim) => {
+        attemptIds = Array.from(new Set([...previousAttemptIds, claim.notificationId]));
+        const records = await readEvidence(attemptIds);
+        // The claim has just attached inbox receipts. They are not evidence that
+        // the external portion of this pending attempt already ran.
+        const externalOutcomes = summarizeEventRewardWinnerDeliveries(
+          targetMemberIds, records.filter((record) => record.channel !== "in_app"),
+        );
+        const deliveryTargets = targetMemberIds.filter((id) =>
+          ["unreached", "pending"].includes(externalOutcomes.get(id) ?? "unreached"),
+        );
+        associationToken = claim.attemptToken ?? `completed:${claim.notificationId}`;
+        associationMetadata = {
+          ...associationMetadata, notificationAttemptIds: attemptIds,
+          notificationCampaignId: claim.notificationId,
+          notificationCampaignAttemptToken: associationToken,
+        };
+        const { data, error } = await supabase.from("event_reward_draws").update({
+          sent_notification_id: claim.notificationId, metadata: associationMetadata,
+          updated_at: attemptedAt,
+        }).eq("id", drawId).eq("updated_at", drawRow.updated_at).select("id").maybeSingle();
+        if (error) throw new Error(error.message);
+        if (!hasDrawWriteReceipt(data, drawId)) throw new EventRewardSafeError("다른 발송 작업이 진행 중입니다. 결과를 새로고침해 주세요.");
+        targetCount = deliveryTargets.length;
+        return deliveryTargets;
       },
-    })
-    .eq("id", drawId);
-  if (updateDrawError) {
-    throw new Error(updateDrawError.message);
+      resolveDeliveryStatus: async (notificationId) => {
+        outcomes = summarizeEventRewardWinnerDeliveries(memberIds, await readEvidence(
+          Array.from(new Set([...attemptIds, notificationId])),
+        ));
+        return resolveEventRewardDrawDeliveryStatus(memberIds, outcomes);
+      },
+    },
+  );
+  if (result.campaignDisposition === "in_progress") {
+    throw new EventRewardSafeError("같은 당첨 안내 발송이 이미 진행 중입니다. 잠시 후 결과를 확인해 주세요.");
   }
-
-  if (outcomes) {
-    const reachedNow = targetMemberIds.filter(
-      (memberId) => outcomes.get(memberId) === "reached",
-    );
-    const unreachedNow = targetMemberIds.filter(
-      (memberId) => outcomes.get(memberId) !== "reached",
-    );
-    await updateEventRewardWinnerNotificationRows(supabase, drawId, reachedNow, {
-      notification_status: "sent",
-      notification_sent_at: attemptedAt,
-      notification_error: null,
-    });
-    await updateEventRewardWinnerNotificationRows(supabase, drawId, unreachedNow, {
-      notification_status: "failed",
-      notification_sent_at: null,
-      notification_error: errorMessage ?? "외부 알림 채널로 안내하지 못했습니다.",
-    });
-    await updateEventRewardWinnerNotificationRows(
-      supabase,
-      drawId,
-      mislabeledReachedMemberIds,
-      { notification_status: "sent", notification_error: null },
-    );
-  } else {
-    // The ledger could not be read after sending; keep the aggregate status on
-    // the targeted winners so the admin still sees the attempt result.
-    await updateEventRewardWinnerNotificationRows(supabase, drawId, targetMemberIds, {
-      notification_status: status,
-      notification_sent_at: sentAt,
-      notification_error: errorMessage,
-    });
+  outcomes = summarizeEventRewardWinnerDeliveries(memberIds, await readEvidence(attemptIds));
+  const warnings = [...result.warnings];
+  if ([...outcomes.values()].some((outcome) => outcome === "pending" || outcome === "needs_reconciliation")) {
+    warnings.push("발송 결과 확인이 필요한 대상은 자동으로 재발송하지 않습니다.");
   }
-
-  return {
-    status,
-    notificationId: result.notificationId,
-    channelResults: result.channelResults,
-    warnings: result.warnings,
-  };
+  const status = await persistOutcome(result.notificationId, result.channelResults, warnings);
+  return { status, notificationId: result.notificationId, channelResults: result.channelResults, warnings };
 }
 
 export async function sendEventRewardWinnerTestNotification(

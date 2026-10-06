@@ -77,7 +77,7 @@ const mockPolicyDocuments: PolicyDocument[] = [
     updated_at: "2026-01-01T00:00:00.000Z",
   },
   {
-    id: "mock-policy-marketing-v1",
+    id: "70000000-0000-4000-8000-000000000001",
     kind: "marketing",
     version: 1,
     title: "마케팅 정보 수신 동의",
@@ -437,64 +437,28 @@ export async function recordMarketingPolicyConsent(input: {
     return input.agreed ? agreedAt : null;
   }
 
-  const { upsertMemberPushPreferences } = await import("@/lib/push/preferences");
-  const supabase = getSupabaseAdminClient();
-
-  if (!input.agreed) {
-    const pushPreferences = await upsertMemberPushPreferences(input.memberId, {
-      marketingEnabled: false,
-    });
-
-    if (!pushPreferences) {
-      throw new PolicyDocumentError(
-        "db_error",
-        "회원 마케팅 알림 설정을 갱신하지 못했습니다.",
-      );
+  if (input.agreed && !input.activePolicy) {
+    throw new PolicyDocumentError(
+      "not_found", "마케팅 정보 수신 동의의 활성 버전이 없습니다.",
+    );
+  }
+  const { updateMemberNotificationPreferences } = await import("@/lib/notification-preferences");
+  const { NotificationPolicyConflictError } = await import("@/lib/notifications/preference-patch");
+  try {
+    await updateMemberNotificationPreferences(input.memberId, {
+      marketingEnabled: input.agreed,
+      ...(input.agreed && input.activePolicy ? {
+        marketingPolicyId: input.activePolicy.id,
+        marketingPolicyVersion: input.activePolicy.version,
+      } : {}),
+    }, { ipAddress: input.ipAddress, userAgent: input.userAgent });
+  } catch (error) {
+    if (error instanceof NotificationPolicyConflictError) {
+      throw new PolicyDocumentError("invalid_request", error.message);
     }
-
-    return null;
+    throw new PolicyDocumentError("db_error", "회원 마케팅 동의 내역을 저장하지 못했습니다.");
   }
-
-  if (!input.activePolicy) {
-    throw new PolicyDocumentError(
-      "not_found",
-      "마케팅 정보 수신 동의의 활성 버전이 없습니다.",
-    );
-  }
-
-  const [row] = [
-    {
-      member_id: input.memberId,
-      policy_document_id: input.activePolicy.id,
-      kind: input.activePolicy.kind,
-      version: input.activePolicy.version,
-      agreed_at: agreedAt,
-      ip_address: input.ipAddress ?? null,
-      user_agent: input.userAgent ?? null,
-    },
-  ];
-
-  const [{ error: consentError }, pushPreferences] = await Promise.all([
-    supabase.from("member_policy_consents").upsert([row], {
-      onConflict: "member_id,policy_document_id",
-    }),
-    upsertMemberPushPreferences(input.memberId, { marketingEnabled: true }),
-  ]);
-
-  if (consentError) {
-    throw wrapPolicyDocumentDbError(
-      consentError,
-      "회원 마케팅 동의 내역을 저장하지 못했습니다.",
-    );
-  }
-  if (!pushPreferences) {
-    throw new PolicyDocumentError(
-      "db_error",
-      "회원 마케팅 알림 설정을 갱신하지 못했습니다.",
-    );
-  }
-
-  return agreedAt;
+  return input.agreed ? agreedAt : null;
 }
 
 export async function recordRequiredPolicyConsent(input: {

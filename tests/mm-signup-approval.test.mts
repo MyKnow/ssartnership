@@ -180,21 +180,12 @@ test("승인 이후 signup 브라우저가 완료 API로 업로드를 다시 조
   );
 });
 
-test("실패한 업로드 정리는 signed URL 만료 시각도 함께 닫는다", async () => {
-  const repository = await readFile(
-    new URL("../src/lib/image-upload/repository.supabase.ts", import.meta.url),
-    "utf8",
-  );
-
-  assert.match(
-    repository,
-    /failure_code: DISCARD_CLEANUP_PENDING_FAILURE_CODE,\s+signed_url_expires_at: now\.toISOString\(\),\s+expires_at: now\.toISOString\(\)/,
-  );
-  assert.match(repository, /const DISCARD_CLEANUP_PENDING_FAILURE_CODE = "discard_cleanup_pending";/);
-  assert.match(
-    repository,
-    /status: "expired",\s+failure_code: null,\s+signed_url_expires_at: now\.toISOString\(\),\s+expires_at: now\.toISOString\(\)/,
-  );
+test("실패한 업로드 정리는 소유권을 포함한 원자적 claim과 CAS로만 만료한다", async () => {
+  const repository = await readFile(new URL("../src/lib/image-upload/repository.supabase.ts", import.meta.url), "utf8");
+  assert.match(repository, /rpc\("claim_image_upload_cleanup"/);
+  assert.match(repository, /p_owner_kind: session\.owner_kind/);
+  assert.match(repository, /p_purpose: session\.purpose/);
+  assert.match(repository, /\.eq\("updated_at", claim\.claim_updated_at\)/);
   assert.match(repository, /markFailed\(supabase, claimedSession\.id, "attach_failed", \["attaching"\]\)/);
 });
 

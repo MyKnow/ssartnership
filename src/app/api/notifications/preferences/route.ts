@@ -5,6 +5,7 @@ import { updateMemberNotificationPreferences } from "@/lib/notification-preferen
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
   getSafeNotificationRouteError,
+  NotificationRequestError,
   shouldLogNotificationRouteError,
 } from "@/lib/notifications/safe-error";
 import { MAX_STANDARD_JSON_BODY_BYTES } from "@/lib/request-body-limit";
@@ -13,13 +14,11 @@ import {
 } from "@/lib/route-json-body";
 import { logServerError } from "@/lib/server-log";
 
+import { parseNotificationPreferencePatch } from "@/lib/notifications/preference-patch";
+
 export const runtime = "nodejs";
 
-function toOptionalBoolean(value: unknown) {
-  return typeof value === "boolean" ? value : undefined;
-}
-
-export async function POST(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
   const context = getRequestLogContext(request);
   if (
     !isTrustedSameOriginRequest(request, {
@@ -38,7 +37,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const appliedAt = new Date().toISOString();
-    const body = await readRouteJsonBodyWithinLimit<Record<string, unknown>>(
+    const body = await readRouteJsonBodyWithinLimit<unknown>(
       request,
       {
         maximumBytes: MAX_STANDARD_JSON_BODY_BYTES,
@@ -46,17 +45,11 @@ export async function POST(request: NextRequest) {
         tooLargeMessage: "알림 설정 요청이 너무 큽니다.",
       },
     );
+    const parsed = parseNotificationPreferencePatch(body);
+    if (!parsed.ok) throw new NotificationRequestError(parsed.message);
     const preferences = await updateMemberNotificationPreferences(
       session.userId,
-      {
-        enabled: toOptionalBoolean(body.enabled),
-        announcementEnabled: toOptionalBoolean(body.announcementEnabled),
-        newPartnerEnabled: toOptionalBoolean(body.newPartnerEnabled),
-        expiringPartnerEnabled: toOptionalBoolean(body.expiringPartnerEnabled),
-        reviewEnabled: toOptionalBoolean(body.reviewEnabled),
-        mmEnabled: toOptionalBoolean(body.mmEnabled),
-        marketingEnabled: toOptionalBoolean(body.marketingEnabled),
-      },
+      parsed.value,
       {
         ipAddress: context.ipAddress ?? null,
         userAgent: context.userAgent ?? null,
@@ -96,3 +89,6 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+// Existing clients retain the same validated partial-update contract.
+export const POST = PATCH;

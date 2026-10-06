@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { PolicyKind } from "../../src/lib/policy-documents";
 
 const getSupabaseAdminClient = vi.fn();
-const upsertMemberPushPreferences = vi.fn();
+const updateMemberNotificationPreferences = vi.fn();
 
 vi.mock("../../src/lib/supabase/server", () => ({
   getSupabaseAdminClient,
 }));
 
-vi.mock("@/lib/push/preferences", () => ({
-  upsertMemberPushPreferences,
+vi.mock("@/lib/notification-preferences", () => ({
+  updateMemberNotificationPreferences,
 }));
 
 type PolicyRow = {
@@ -619,7 +619,7 @@ describe("policy documents", () => {
   });
 
   test("records marketing policy consent for opt-out and opt-in", async () => {
-    upsertMemberPushPreferences.mockResolvedValue({ marketingEnabled: false });
+    updateMemberNotificationPreferences.mockResolvedValue({ marketingEnabled: false });
     getSupabaseAdminClient.mockReturnValue(createSupabaseMock({}));
 
     let policies = await loadPolicyDocumentsModule({ useMockData: false });
@@ -630,11 +630,11 @@ describe("policy documents", () => {
         agreed: false,
       }),
     ).resolves.toBeNull();
-    expect(upsertMemberPushPreferences).toHaveBeenCalledWith("member-1", {
+    expect(updateMemberNotificationPreferences).toHaveBeenCalledWith("member-1", {
       marketingEnabled: false,
-    });
+    }, { ipAddress: undefined, userAgent: undefined });
 
-    upsertMemberPushPreferences.mockResolvedValue({ marketingEnabled: true });
+    updateMemberNotificationPreferences.mockResolvedValue({ marketingEnabled: true });
     getSupabaseAdminClient.mockReturnValue(createSupabaseMock({}));
     policies = await loadPolicyDocumentsModule({ useMockData: false });
     await expect(
@@ -650,13 +650,13 @@ describe("policy documents", () => {
         userAgent: "Vitest",
       }),
     ).resolves.toBe("2026-04-26T07:00:00.000Z");
-    expect(upsertMemberPushPreferences).toHaveBeenCalledWith("member-1", {
-      marketingEnabled: true,
-    });
+    expect(updateMemberNotificationPreferences).toHaveBeenCalledWith("member-1", {
+      marketingEnabled: true, marketingPolicyId: "marketing-v2", marketingPolicyVersion: 2,
+    }, { ipAddress: "127.0.0.1", userAgent: "Vitest" });
   });
 
   test("surfaces marketing policy consent failures", async () => {
-    upsertMemberPushPreferences.mockResolvedValue(false);
+    updateMemberNotificationPreferences.mockRejectedValue(new Error("private database failure"));
     getSupabaseAdminClient.mockReturnValue(createSupabaseMock({}));
 
     let policies = await loadPolicyDocumentsModule({ useMockData: false });
@@ -684,12 +684,7 @@ describe("policy documents", () => {
       code: "db_error",
     });
 
-    upsertMemberPushPreferences.mockResolvedValue({ marketingEnabled: true });
-    getSupabaseAdminClient.mockReturnValue(
-      createSupabaseMock({
-        policyConsentError: { message: "동의 저장 실패" },
-      }),
-    );
+    updateMemberNotificationPreferences.mockRejectedValue(new Error("private consent failure"));
     policies = await loadPolicyDocumentsModule({ useMockData: false });
     await expect(
       policies.recordMarketingPolicyConsent({
@@ -703,7 +698,7 @@ describe("policy documents", () => {
       }),
     ).rejects.toMatchObject({
       code: "db_error",
-      message: "동의 저장 실패",
+      message: "회원 마케팅 동의 내역을 저장하지 못했습니다.",
     });
 
   });

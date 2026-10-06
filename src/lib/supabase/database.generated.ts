@@ -6572,6 +6572,10 @@ export type Database = {
         }
         Returns: string
       }
+      activate_member_profile_image_atomic: {
+        Args: { input_image_id: string; input_member_id: string }
+        Returns: boolean
+      }
       admin_create_showcase_project: {
         Args: {
           p_admin_id: string
@@ -6755,6 +6759,29 @@ export type Database = {
         Returns: {
           member_id: string
           row_updated_at: string
+        }[]
+      }
+      claim_image_upload_cleanup: {
+        Args: {
+          p_discard?: boolean
+          p_limit?: number
+          p_owner_id?: string
+          p_owner_kind?: string
+          p_purpose?: string
+          p_upload_id?: string
+        }
+        Returns: {
+          claim_updated_at: string
+          cleanup_code: string
+          final_bucket: string
+          final_path: string
+          final_url: string
+          id: string
+          previous_status: string
+          purpose: string
+          source_storage_path: string
+          storage_bucket: string
+          storage_path: string
         }[]
       }
       claim_notification_campaign: {
@@ -7717,6 +7744,31 @@ export type Database = {
       partner_metric_visitor_key: {
         Args: { actor_id: string; actor_type: string; session_id: string }
         Returns: string
+      }
+      patch_member_notification_preferences_atomic: {
+        Args: {
+          input_announcement_enabled: boolean
+          input_enabled: boolean
+          input_expiring_partner_enabled: boolean
+          input_ip_address: string
+          input_marketing_enabled: boolean
+          input_marketing_policy_id: string
+          input_marketing_policy_version: number
+          input_member_id: string
+          input_mm_enabled: boolean
+          input_new_partner_enabled: boolean
+          input_review_enabled: boolean
+          input_user_agent: string
+        }
+        Returns: {
+          announcement_enabled: boolean
+          enabled: boolean
+          expiring_partner_enabled: boolean
+          marketing_enabled: boolean
+          mm_enabled: boolean
+          new_partner_enabled: boolean
+          review_enabled: boolean
+        }[]
       }
       platform_activity_identity_key: {
         Args: {

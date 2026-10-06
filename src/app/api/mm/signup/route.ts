@@ -32,6 +32,7 @@ import { setUserSession, UserSessionIssueError } from "@/lib/user-auth";
 import { attachMattermostSignupProfileImage } from "@/lib/member-signup-profile";
 import { getImageUploadRepository } from "@/lib/image-upload/repository.server";
 import { rollbackCreatedSignupMember } from "@/lib/member-signup-rollback";
+import { logServerError } from "@/lib/server-log";
 
 export const runtime = "nodejs";
 
@@ -80,7 +81,7 @@ async function discardSignupProfileUpload(input: {
     actor: { kind: "signup", id: input.ownerId },
     purpose: "member-signup-profile",
     uploadId: input.uploadId,
-  }).catch(() => undefined);
+  }).catch((error) => logServerError("[mm/signup] image cleanup pending", error));
 }
 
 export async function POST(request: Request) {
@@ -275,15 +276,15 @@ export async function POST(request: Request) {
         freshAuthentication: true,
       });
     } catch (error) {
-      await discardSignupProfileUpload({
-        uploadId: parsed.data.profileImageUploadId,
-        ownerId: verification.signupUploadOwnerId,
-      });
       await rollbackCreatedSignupMember({
         memberId: inserted.id,
         originalError: error,
         deleteMember: (memberId) =>
           supabase.from("members").delete().eq("id", memberId),
+        discardUpload: () => discardSignupProfileUpload({
+          uploadId: parsed.data.profileImageUploadId,
+          ownerId: verification.signupUploadOwnerId,
+        }),
       });
       throw error;
     }

@@ -174,7 +174,7 @@ export function recordMockMarketingPolicyConsent(
     ...getStore().policyStateByMemberId,
     [memberId]: {
       ...current,
-      marketing: agreed ? version : null,
+      marketing: agreed ? version : current.marketing,
       marketingEnabled: agreed,
     },
   };

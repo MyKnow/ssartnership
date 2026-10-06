@@ -8,6 +8,7 @@ export async function rollbackCreatedSignupMember(input: {
   memberId: string;
   originalError: unknown;
   deleteMember: (memberId: string) => PromiseLike<MemberCleanupResult>;
+  discardUpload?: () => Promise<void>;
 }) {
   let cleanupError: { code?: string; message: string } | null;
   try {
@@ -18,6 +19,7 @@ export async function rollbackCreatedSignupMember(input: {
     };
   }
   if (!cleanupError) {
+    await input.discardUpload?.();
     return;
   }
 
