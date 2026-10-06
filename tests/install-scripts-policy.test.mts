@@ -56,6 +56,22 @@ test("Production nanoid 보안 수정 버전을 package와 lock 계약에 함께
   );
 });
 
+test("Production source-map-js 보안 수정 버전을 package와 lock 계약에 함께 고정한다", async () => {
+  const { packageJson, packageLock } = await loadStaticPolicyInput();
+  const sourceMap = packageLock.packages["node_modules/source-map-js"];
+
+  assert.equal(packageJson.overrides["source-map-js"], "1.2.2");
+  assert.equal(sourceMap.version, "1.2.2");
+  assert.equal(
+    sourceMap.resolved,
+    "https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.2.tgz",
+  );
+  assert.equal(
+    sourceMap.integrity,
+    "sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==",
+  );
+});
+
 test("root lifecycle 또는 검토되지 않은 dependency source를 차단한다", async () => {
   const input = await loadStaticPolicyInput();
   const lifecycleInput = structuredClone(input);
