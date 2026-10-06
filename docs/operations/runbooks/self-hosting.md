@@ -154,7 +154,7 @@ sudo systemctl disable --now ssartnership-edge-recovery.timer
 
 ## Cron
 
-PVE 자체 호스팅이 유일한 운영 정본이다. Vercel 배포·Cron과 `vercel.json`은 RF-04(#537)에서 저장소에서 제거했고 Vercel 경로는 복구용으로도 유지하지 않는다. Vercel 프로젝트 자체의 정리는 저장소 밖 운영자 조치다. 새 서버가 쓰기를 받은 뒤에는 데이터 차이 확인 없이 이전 서비스와 DNS를 재개하지 않는다.
+PVE 자체 호스팅이 유일한 운영 정본이다. Vercel 런타임·Cron은 RF-04(#537)에서 제거했고 Vercel 경로는 복구용으로도 유지하지 않는다. `vercel.json`은 외부 Git 연동이 남아 있어도 모든 브랜치의 자동 배포를 막도록 `$schema`와 `git.deploymentEnabled=false`만 가진 최소 배포 중단 설정으로 유지한다. 이 파일에 런타임·Cron 설정을 추가하지 않는다. Vercel 프로젝트 자체의 정리는 저장소 밖 운영자 조치다. 새 서버가 쓰기를 받은 뒤에는 데이터 차이 확인 없이 이전 서비스와 DNS를 재개하지 않는다.
 
 운영 이미지 준비 입력의 `refs/heads/main`은 앱 origin `https://ssartnership.myknow.xyz`, API origin `https://ssartnership-api.myknow.xyz`, `linux/amd64`, 유효한 공개 VAPID 키를 모두 요구한다. 기존 SHA·소스 archive hash·만료·root 소유 파일·전체 Release 검증을 유지하며, 실제 운영 키와 빌드/실행 값의 일치도 별도로 확인한다. 일반 main 입력이나 Preview 주소를 섞은 main 입력은 거절한다. `main` push는 Production 전용 GitHub workflow에서 이미지를 발행하고, 서버 수신기는 첫 성공 attempt와 현재 main SHA·schema approval·immutable digest를 다시 확인한 뒤 app만 자동 적용한다. 설치·중지·복구 절차는 [격리 CI·배포·유지보수](./self-host-ci-maintenance.md)를 따른다.
 

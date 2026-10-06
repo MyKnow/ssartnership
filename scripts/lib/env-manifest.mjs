@@ -137,7 +137,6 @@ export const ENVIRONMENT_VARIABLES = Object.freeze([
   { name: "NAVER_SMTP_USER", tier: "legacy", secret: false, group: "email", replacement: "SMTP_HOST·SMTP_USER" },
   { name: "NAVER_SMTP_PASS", tier: "legacy", secret: true, group: "email", replacement: "SMTP_PASS" },
   { name: "DATA_GO_KR_SERVICE_KEY", tier: "legacy", secret: true, group: "billing", replacement: "NTS_BUSINESS_STATUS_SERVICE_KEY" },
-  { name: "VERCEL", tier: "legacy", secret: false, group: "platform", note: "Vercel 플랫폼 변수. 클라이언트 IP의 Vercel 분기 제거(신뢰 프록시 계약) 뒤 삭제" },
 
   // Mock and E2E switches
   { name: "MOCK_MEMBER_AUTH", tier: "development", secret: false, group: "development" },
