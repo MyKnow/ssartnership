@@ -219,31 +219,31 @@ test("외부 채널로 한 번이라도 전달된 당첨자는 재발송 대상�
     summarizeEventRewardWinnerDeliveries,
   } = await deliveryModulePromise;
 
-  assert.equal(resolveEventRewardWinnerDeliveryOutcome([]), "reached");
+  assert.equal(resolveEventRewardWinnerDeliveryOutcome([]), "unreached");
   assert.equal(
     resolveEventRewardWinnerDeliveryOutcome([
-      { channel: "mm", status: "failed" },
+      { channel: "mm", status: "failed", providerStatus: "failed" },
       { channel: "push", status: "sent" },
     ]),
     "reached",
   );
   assert.equal(
     resolveEventRewardWinnerDeliveryOutcome([
-      { channel: "mm", status: "failed" },
-      { channel: "push", status: "failed" },
+      { channel: "mm", status: "failed", providerStatus: "failed" },
+      { channel: "push", status: "failed", providerStatus: "failed" },
     ]),
     "unreached",
   );
   assert.equal(
     resolveEventRewardWinnerDeliveryOutcome([{ channel: "in_app", status: "failed" }]),
-    "reached",
+    "unreached",
   );
 
   const memberIds = ["member-a", "member-b", "member-c"];
   const outcomes = summarizeEventRewardWinnerDeliveries(memberIds, [
     { notificationId: "n1", memberId: "member-a", channel: "mm", status: "sent" },
-    { notificationId: "n1", memberId: "member-b", channel: "mm", status: "failed" },
-    { notificationId: "n1", memberId: "member-c", channel: "push", status: "failed" },
+    { notificationId: "n1", memberId: "member-b", channel: "mm", status: "failed", providerStatus: "failed" },
+    { notificationId: "n1", memberId: "member-c", channel: "push", status: "failed", providerStatus: "failed" },
     { notificationId: "n2", memberId: "member-c", channel: "mm", status: "sent" },
   ]);
 

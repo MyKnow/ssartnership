@@ -94,6 +94,7 @@ export type AdminNotificationSendResult = {
   >;
   warnings: string[];
   alreadyExists?: boolean;
+  campaignDisposition?: "claimed" | "resumed" | "in_progress" | "completed";
 };
 
 export type AdminNotificationOperationLog = {

@@ -8,6 +8,13 @@ import {
   getMemberPushPreferences,
 } from "@/lib/push";
 import { hasEffectiveMarketingConsent } from "@/lib/notifications/marketing-consent";
+import { PushError } from "@/lib/push/types";
+import {
+  NotificationPolicyConflictError,
+  parseNotificationPreferencePatch,
+  type NotificationPreferencePatch,
+} from "@/lib/notifications/preference-patch";
+import { getMockMemberPolicyState, recordMockMarketingPolicyConsent } from "@/lib/mock/member";
 import { wrapPushDbError } from "@/lib/push/config";
 import { getPushDeviceLabel } from "@/lib/push/device-label";
 import type { PushPreferenceState, PushSubscriptionDevice } from "@/lib/push";
@@ -34,10 +41,11 @@ const mockPushDeviceStore = new Map<string, PushSubscriptionDevice[]>();
 
 function getMockPreferences(memberId: string) {
   const current = mockPreferenceStore.get(memberId);
+  const policyState = getMockMemberPolicyState(memberId);
   if (current) {
-    return current;
+    return { ...current, marketingEnabled: policyState?.marketingEnabled ?? current.marketingEnabled };
   }
-  const initial = { ...DEFAULT_PUSH_PREFERENCES };
+  const initial = { ...DEFAULT_PUSH_PREFERENCES, marketingEnabled: policyState?.marketingEnabled ?? false };
   mockPreferenceStore.set(memberId, initial);
   return initial;
 }
@@ -143,42 +151,59 @@ export async function getMemberNotificationPreferences(memberId: string) {
 
 export async function updateMemberNotificationPreferences(
   memberId: string,
-  value: Partial<PushPreferenceState>,
+  value: NotificationPreferencePatch,
   context?: {
     ipAddress?: string | null;
     userAgent?: string | null;
   },
 ) {
   assertNotificationPreferenceDataAccessAvailable();
+  const parsed = parseNotificationPreferencePatch(value);
+  if (!parsed.ok) throw new PushError("invalid_request", parsed.message);
+  const { marketingPolicyId, marketingPolicyVersion, ...patch } = parsed.value;
   if (useMockPreferences) {
+    if (patch.marketingEnabled === true) {
+      const activePolicy = await getPolicyDocumentByKind("marketing");
+      if (!activePolicy || activePolicy.id !== marketingPolicyId || activePolicy.version !== marketingPolicyVersion) {
+        throw new NotificationPolicyConflictError();
+      }
+    }
     const current = getMockPreferences(memberId);
     const hasPushDevice = (mockPushDeviceStore.get(memberId) ?? []).length > 0;
     const next = {
       ...current,
-      ...value,
-      enabled: (value.enabled ?? current.enabled) && hasPushDevice,
+      ...patch,
+      enabled: (patch.enabled ?? current.enabled) && hasPushDevice,
     };
+    if (patch.marketingEnabled !== undefined) {
+      recordMockMarketingPolicyConsent(memberId, marketingPolicyVersion ?? null, patch.marketingEnabled);
+    }
     mockPreferenceStore.set(memberId, next);
     return next;
   }
 
   const { data, error } = await getSupabaseAdminClient().rpc(
-    "update_member_push_preferences_atomic",
+    "patch_member_notification_preferences_atomic",
     {
       input_member_id: memberId,
-      input_enabled: value.enabled ?? null,
-      input_announcement_enabled: value.announcementEnabled ?? null,
-      input_new_partner_enabled: value.newPartnerEnabled ?? null,
-      input_expiring_partner_enabled: value.expiringPartnerEnabled ?? null,
-      input_review_enabled: value.reviewEnabled ?? null,
-      input_mm_enabled: value.mmEnabled ?? null,
-      input_marketing_enabled: value.marketingEnabled ?? null,
+      input_enabled: patch.enabled ?? null,
+      input_announcement_enabled: patch.announcementEnabled ?? null,
+      input_new_partner_enabled: patch.newPartnerEnabled ?? null,
+      input_expiring_partner_enabled: patch.expiringPartnerEnabled ?? null,
+      input_review_enabled: patch.reviewEnabled ?? null,
+      input_mm_enabled: patch.mmEnabled ?? null,
+      input_marketing_enabled: patch.marketingEnabled ?? null,
+      input_marketing_policy_id: marketingPolicyId ?? null,
+      input_marketing_policy_version: marketingPolicyVersion ?? null,
       input_ip_address: context?.ipAddress ?? null,
       input_user_agent: context?.userAgent ?? null,
     },
   );
 
   if (error) {
+    if (error.code === "P0001" && error.message === "marketing_policy_changed") {
+      throw new NotificationPolicyConflictError();
+    }
     throw wrapPushDbError(error, "알림 설정을 저장하지 못했습니다.");
   }
 

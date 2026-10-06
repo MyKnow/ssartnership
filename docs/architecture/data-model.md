@@ -80,6 +80,10 @@ grep -l "<name>" supabase/migrations/*.sql | sort | tail -1
 - 외부 프로필 사진은 원본이나 data URL로 보관하지 않는다. 서버에서 정규화한 WebP를 private `member-profile-images` 버킷과 `member_profile_images` 원장에 저장하고, 권한을 확인하는 이미지 API로만 읽는다. 과거의 `members.avatar_base64` 열은 삭제됐다.
 - `deleted_at`이 있는 회원은 즉시 로그인·권한·혜택 접근이 막힌다. 정해진 기간 뒤 익명화하지만 HMAC 식별자 예약과 필요한 감사 이력은 남긴다.
 
+사진 자동 활성화는 service role 전용 `activate_member_profile_image_atomic`에서 활성 회원 행 → 대상 사진 행 순서로 잠근다. 대상은 해당 회원 소유의 미삭제 `legacy`·`mattermost` 사진이며 `pending` 또는 `approved` 상태이고 수료생 인증 요청에 연결되지 않아야 한다. 기존 승인 사진의 보존 상태 전환, 대상 승인, 회원 변경 시각 갱신은 한 트랜잭션이다. 어느 단계든 실패하면 기존 승인 사진을 보존하고, 이미 승인된 같은 대상의 재호출은 변경하지 않는다.
+
+관리자 교체 승인·반려도 회원 → 사진 순서로 잠근 뒤 대상의 `pending` 상태를 다시 확인한다. 활성 관리자 프로필, 기존 심사 대상·상태 전이, 반려 사유 검증을 유지하며 자동 활성화 RPC로 회원 업로드나 수료생 심사를 우회할 수 없다. 자동 동기화와 관리자 심사 사이에 새 우선순위를 부여하지 않고 같은 회원의 변경을 직렬화한다. 근거는 `20261006010931_fence_consent_profile_delivery_and_upload_transitions.sql`과 `tests/integration/consent-profile-transactions.test.mts`다.
+
 ```mermaid
 erDiagram
     MEMBERS ||--o| MM_USER_DIRECTORY : "nullable mattermost_account_id"
@@ -99,6 +103,10 @@ Wallet QR 서명과 Apple `authenticationToken` 원문은 DB에 저장하지 않
 ## 마케팅 수신 자격
 
 광고성(마케팅) 알림 수신 자격은 활성 마케팅 정책에 대한 `member_policy_consents` 행과 `push_preferences.marketing_enabled = true`를 함께 만족해야 한다. 철회는 `marketing_enabled`만 끄고 동의 행은 감사 증적으로 남기므로, 동의 행 존재만으로 판정하지 않는다. 판정 규칙은 `src/lib/notifications/marketing-consent.ts` 한 곳에 두고 관리자 캠페인 발송·회원 목록·이벤트 조건·회원 설정 화면이 같이 쓴다.
+
+설정 UI와 API는 바뀐 항목만 PATCH하며 `marketingEnabled: true`는 사용자가 확인한 정책 ID·버전을 함께 요구한다. 공통 입력 검증 이후 service role 전용 `patch_member_notification_preferences_atomic`이 회원·설정 행과 해당 활성 정책 행을 잠그고 설정·동의 증거를 원자적으로 기록한다. 확인한 정책이 교체됐으면 충돌로 거부하고 재확인을 안내한다. 마케팅 항목 생략이나 `false`는 새 동의를 만들거나 기존 증거를 덮어쓰지 않으며, 현재 정책의 동의를 유지한 채 같은 `true`를 재시도해도 증거를 다시 쓰지 않는다. 철회 뒤 명시적으로 다시 동의한 경우에는 새 수락 시각을 기록한다.
+
+`recordMarketingPolicyConsent`와 푸시 기기 등록·마지막 기기 해제·전체 해제도 같은 변경 항목 기반 쓰기를 사용한다. 기기 작업은 마케팅·Mattermost 설정의 오래된 전체 행을 읽어 다시 저장하지 않으므로, 동시에 완료된 마케팅 철회를 되살리지 않는다. 구 `update_member_push_preferences_atomic` 시그니처는 생략·철회를 지원하지만 정책 확인 증거 없는 `true`는 실패하도록 닫혀 있다. 새 RPC를 사용할 수 없을 때 구 RPC나 직접 upsert로 우회하지 않는다.
 
 ## RLS and indexes
 

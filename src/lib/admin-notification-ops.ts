@@ -139,6 +139,8 @@ type NotificationCampaignMetadata = {
     channels: AdminNotificationChannelPreview[];
   };
   adminOperationIdempotencyKey?: string;
+  eventRewardDrawId?: string;
+  eventSlug?: string;
   campaignAttemptToken?: string;
   campaignClaimedAt?: string;
   campaignLeaseExpiresAt?: string | null;
@@ -575,12 +577,25 @@ export async function previewAdminNotificationCampaign(
   return context.preview;
 }
 
+// Trusted event service capability; never part of the public composer input.
+export type EventRewardCampaignDelivery = {
+  drawId: string;
+  eventSlug: string;
+  resolveDeliveryStatus: (notificationId: string) => Promise<"sent" | "partial_failed" | "failed">;
+  beforeDelivery: (claim: {
+    notificationId: string;
+    attemptToken: string | null;
+    disposition: "claimed" | "resumed" | "completed";
+  }) => Promise<string[]>;
+};
+
 export async function sendAdminNotificationCampaign(
   input: AdminNotificationComposerInput,
   source: AdminNotificationSource = "manual",
+  eventRewardDelivery?: EventRewardCampaignDelivery,
 ): Promise<AdminNotificationSendResult> {
   const context = await buildAudienceContext(input);
-  if (!context.preview.canSend) {
+  if (!context.preview.canSend && !(eventRewardDelivery && !context.preview.validationMessage && context.members.length > 0)) {
     throw new Error(context.preview.validationMessage ?? "발송 가능한 대상이 없습니다.");
   }
   if (
@@ -609,6 +624,10 @@ export async function sendAdminNotificationCampaign(
       channels: context.preview.channels,
     },
   };
+  if (eventRewardDelivery) {
+    metadata.eventRewardDrawId = eventRewardDelivery.drawId;
+    metadata.eventSlug = eventRewardDelivery.eventSlug;
+  }
   if (input.idempotencyKey) {
     metadata.adminOperationIdempotencyKey = input.idempotencyKey;
   }
@@ -643,13 +662,15 @@ export async function sendAdminNotificationCampaign(
   const campaignRecipients = context.selectedChannels.includes("in_app")
     ? context.eligibleMemberIds.in_app
     : [];
-  const retrySafeIdempotencyKey =
-    source === "automatic" &&
+  const retrySafeIdempotencyKey = eventRewardDelivery
+    ? `event-reward:${eventRewardDelivery.drawId}:winner-notice:v1`
+    : source === "automatic" &&
     input.notificationType === "expiring_partner" &&
     context.selectedChannels.includes("push") &&
     !context.selectedChannels.includes("mm")
       ? input.idempotencyKey?.trim() || null
       : null;
+  if (retrySafeIdempotencyKey) metadata.adminOperationIdempotencyKey = retrySafeIdempotencyKey;
   const claimedCampaign = retrySafeIdempotencyKey
     ? await notificationRepository.claimNotificationCampaign({
         type: input.notificationType,
@@ -675,12 +696,29 @@ export async function sendAdminNotificationCampaign(
         recipientMemberIds: campaignRecipients,
       });
 
+  if (eventRewardDelivery && claimedCampaign && (
+    claimedCampaign.notification.targetUrl !== context.destinationUrl
+    || claimedCampaign.notification.metadata?.eventRewardDrawId !== eventRewardDelivery.drawId
+    || claimedCampaign.notification.metadata?.eventSlug !== eventRewardDelivery.eventSlug
+  )) {
+    throw new Error("당첨 안내 캠페인 정보가 일치하지 않아 발송을 중단했습니다.");
+  }
+  let deliveryMemberIds: Set<string> | null = null;
+  if (eventRewardDelivery && claimedCampaign && claimedCampaign.disposition !== "in_progress") {
+    deliveryMemberIds = new Set(await eventRewardDelivery.beforeDelivery({
+      notificationId: claimedCampaign.notification.id,
+      attemptToken: claimedCampaign.attemptToken,
+      disposition: claimedCampaign.disposition,
+    }));
+  }
+
   if (
     claimedCampaign?.disposition === "completed" ||
     claimedCampaign?.disposition === "in_progress"
   ) {
     return {
       notificationId: claimedCampaign.notification.id,
+      campaignDisposition: claimedCampaign.disposition,
       preview: context.preview,
       channelResults: structuredClone(EMPTY_CHANNEL_RESULTS),
       warnings: ["같은 발송 요청이 이미 처리 중이거나 완료되었습니다."],
@@ -721,7 +759,8 @@ export async function sendAdminNotificationCampaign(
       source,
       templateContext: input.templateContext,
       resolvedAudience: context.resolvedAudience,
-      subscriptions: context.pushSubscriptions,
+      subscriptions: context.pushSubscriptions.filter((subscription) => !deliveryMemberIds || deliveryMemberIds.has(subscription.member_id)),
+      retrySafe: Boolean(eventRewardDelivery),
       getWebPush,
     });
     channelResults.push = {
@@ -739,6 +778,7 @@ export async function sendAdminNotificationCampaign(
     const mattermostMembers = context.members.filter(
       (member): member is AudienceMember & { mattermostUserId: string } =>
         context.eligibleMemberIds.mm.includes(member.id)
+        && (!deliveryMemberIds || deliveryMemberIds.has(member.id))
         && Boolean(member.mattermostUserId),
     );
     const mmResult = await sendMattermostCampaignDeliveries({
@@ -748,6 +788,7 @@ export async function sendAdminNotificationCampaign(
       body: input.body,
       url: input.url?.trim() ? normalizeNotificationTargetUrl(input.url) : null,
       members: mattermostMembers,
+      retrySafe: Boolean(eventRewardDelivery),
       source,
       templateContext: input.templateContext,
     });
@@ -766,7 +807,9 @@ export async function sendAdminNotificationCampaign(
     ...metadata,
     warnings,
     channelResults,
-    campaignStatus: computeOperationStatus(channelResults),
+    campaignStatus: eventRewardDelivery
+      ? await eventRewardDelivery.resolveDeliveryStatus(notification.id)
+      : computeOperationStatus(channelResults),
     completedAt: new Date().toISOString(),
   } satisfies NotificationCampaignMetadata;
   try {
@@ -795,6 +838,7 @@ export async function sendAdminNotificationCampaign(
 
   return {
     notificationId: notification.id,
+    campaignDisposition: claimedCampaign?.disposition,
     preview: context.preview,
     channelResults,
     warnings,

@@ -42,7 +42,7 @@ beforeEach(() => {
 });
 
 describe("resolveReviewMediaPayload failure cleanup", () => {
-  test("수집 배열이 없으면 앞서 연결한 이미지를 직접 정리한다", async () => {
+  test("수집 배열이 없어도 앞서 연결한 이미지를 만료까지 보존한다", async () => {
     const { resolveReviewMediaPayload } = await import(
       "../../src/app/api/partners/[id]/reviews/_shared"
     );
@@ -51,7 +51,7 @@ describe("resolveReviewMediaPayload failure cleanup", () => {
       resolveReviewMediaPayload(manifest, "partner-1", reviewId, "member-1"),
     ).rejects.toThrow("처리된 이미지 파일을 찾을 수 없습니다.");
 
-    expect(deleteReviewMediaUrlsMock).toHaveBeenCalledWith(["https://cdn.test/a.webp"]);
+    expect(deleteReviewMediaUrlsMock).not.toHaveBeenCalled();
   });
 
   test("수집 배열을 넘기면 연결한 이미지를 남기고 정리를 호출자에게 맡긴다", async () => {
@@ -79,4 +79,12 @@ describe("resolveReviewMediaPayload failure cleanup", () => {
       }),
     );
   });
+});
+
+test("리뷰 객체가 없는 경우만 이미지 필드의 재업로드 오류로 안내한다", async () => {
+  const { ImageUploadError } = await import("@/lib/image-upload/repository");
+  const { getReviewMediaInputFieldErrors } = await import("../../src/app/api/partners/[id]/reviews/_shared");
+  expect(getReviewMediaInputFieldErrors(new ImageUploadError("review_image_reupload_required", "missing")))
+    .toEqual({ images: "리뷰 사진을 다시 업로드해 주세요." });
+  expect(getReviewMediaInputFieldErrors(new ImageUploadError("review_image_lookup_unavailable", "timeout"))).toBeNull();
 });

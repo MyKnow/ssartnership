@@ -2,6 +2,17 @@ import "server-only";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 export const PROFILE_IMAGE_RETENTION_DAYS = 30;
 
+export async function activateMemberProfileImageRecord(memberId: string, imageId: string) {
+  const { data, error } = await getSupabaseAdminClient().rpc(
+    "activate_member_profile_image_atomic",
+    { input_member_id: memberId, input_image_id: imageId },
+  );
+  if (error || data !== true) {
+    throw new Error("현재 프로필 사진을 반영하지 못했습니다.");
+  }
+  return true;
+}
+
 export async function findActiveProfileImageMember(memberId: string) {
   const { data, error } = await getSupabaseAdminClient().from("members")
     .select("id").eq("id", memberId).is("deleted_at", null).maybeSingle();

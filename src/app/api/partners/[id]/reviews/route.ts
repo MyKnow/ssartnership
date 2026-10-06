@@ -5,9 +5,6 @@ import { getSafePublicRouteError } from "@/lib/public-route-safe-errors";
 import { partnerReviewRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
-  deleteReviewMediaUrls,
-} from "@/lib/review-media-storage";
-import {
   ensurePartnerReviewModerationAccess,
   ensureVisibleReviewPartner,
   getReviewMediaInputFieldErrors,
@@ -132,15 +129,9 @@ export async function POST(
     const summary = await partnerReviewRepository.getPartnerReviewSummary(id);
     return NextResponse.json({ ok: true, review: existingReview, summary, idempotent: true });
   }
-  // Filled as each image attaches. Cleanup waits until the catch below has
-  // checked for a review stored by a duplicate request: both requests attach
-  // to the same deterministic paths, so a partial failure here must not delete
-  // files the winning request's review already references.
+  // A failed/duplicate writer must not delete another writer's attachments.
+  // Session expiry and the DB reference guard own final-object cleanup.
   const uploadedUrls: string[] = [];
-  // Once the insert is sent, a failure no longer proves the review was not
-  // stored: after the Supabase deadline (TimeoutError) the statement may still
-  // commit in the database.
-  let reviewInsertSent = false;
 
   try {
     const media = await resolveReviewMediaPayload(
@@ -151,7 +142,6 @@ export async function POST(
       [],
       { attachedUrls: uploadedUrls },
     );
-    reviewInsertSent = true;
     const review = await partnerReviewRepository.createPartnerReview({
       reviewId,
       partnerId: id,
@@ -193,27 +183,8 @@ export async function POST(
       && storedReview.partnerId === id
       && storedReview.memberId === session.userId
     ) {
-      // Attachments resolve to deterministic per-review paths, so only files
-      // the stored review does not reference are this request's leftovers.
-      const leftoverUrls = uploadedUrls.filter(
-        (url) => !storedReview.images.includes(url),
-      );
-      if (leftoverUrls.length > 0) {
-        await deleteReviewMediaUrls(leftoverUrls).catch(() => undefined);
-      }
       const summary = await partnerReviewRepository.getPartnerReviewSummary(id);
       return NextResponse.json({ ok: true, review: storedReview, summary, idempotent: true });
-    }
-    // Everything this request attached, including images attached before a
-    // media error, is a leftover only once no review can still reference it:
-    // the lookup answered, and either the insert was never sent or another
-    // review holds this id. A failed lookup, or a sent insert with no visible
-    // review, keeps the files; an orphan costs less than a stored review
-    // pointing at deleted images.
-    const leftoversConfirmed =
-      storedLookup.answered && (!reviewInsertSent || storedReview !== null);
-    if (leftoversConfirmed && uploadedUrls.length > 0) {
-      await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);
     }
     if (isReviewImageUploadUnavailable(error)) {
       return NextResponse.json(

@@ -131,10 +131,9 @@ test("회원 리뷰 생성·수정은 인증 뒤 16KiB bounded JSON 계약을 �
     /const uploadedUrls: string\[\] = options\.attachedUrls \?\? \[\]/,
   );
   assert.match(shared, /uploadedUrls\.push\(uploadedUrl\)/);
-  assert.match(shared, /deleteReviewMediaUrls\(uploadedUrls\)/);
-  // Review creation collects attachments and cleans up only after checking
-  // for a review stored by a duplicate request.
-  assert.match(shared, /if \(!callerOwnsCleanup\)/);
+  assert.doesNotMatch(shared, /deleteReviewMediaUrls\(/);
+  // Final files are retired only after the DB grants cleanup authority.
+  assert.doesNotMatch(createRoute, /deleteReviewMediaUrls\(/);
   assert.match(createRoute, /\{ attachedUrls: uploadedUrls \}/);
   assert.match(shared, /uploadedUrls,\s*\n\s*\};/);
 

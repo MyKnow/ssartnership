@@ -51,6 +51,20 @@ Cron 실행 일정의 정본은 `deploy/self-host-operations/production-cron/sch
 - Production→Preview 사본은 `scripts/self-host-environments/cli.mjs prepare-copy`가 격리 복원본에서 비밀번호·자격증명을 정제한 뒤 만든다. `member_profile_images`와 private `member-profile-images` 객체는 유지해 Preview에서도 실제 프로필 사진을 표시한다.
 - Apple Wallet pass와 device registration은 `member_wallet_passes`, `member_wallet_pass_revisions`, `apple_wallet_device_registrations`, `member_wallet_pass_operations` 및 service-role 전용 RPC(`issue_member_wallet_pass`, `revoke_member_wallet_pass`, `register_apple_wallet_device`, `unregister_apple_wallet_device`, `list_updated_apple_wallet_passes`)로 관리한다.
 
+### 리뷰와 가입 이미지의 재시도·정리
+
+2026-10-06 업로드 정합성 변경은 `image-upload/repository.supabase.ts`와 리뷰 API가 공용 업로드 세션을 통해 파일의 수명을 관리하도록 한다.
+
+- 리뷰 생성·수정 요청은 일부 연결 실패, 중복 요청, 저장 응답 유실, 수정 뒤 요약 조회 실패에도 최종 파일을 직접 삭제하지 않는다. 같은 작성자·제휴처·리뷰 ID의 생성 재요청은 이미지 목록이 달라도 최초 저장 리뷰를 반환한다.
+- 미사용 리뷰 첨부는 업로드 서명 때 정한 2시간 만료를 유지하며, 매시간 실행하는 `cleanup-image-uploads`가 정리한다. 참조 중인 리뷰는 숨김·논리 삭제 상태도 포함해 파일을 보존한다. 기존 리뷰의 레거시 URL은 그대로 유지할 수 있지만 새 URL은 소유자·리소스·만료·연결 상태를 확인한 업로드여야 한다.
+- DB의 리뷰 참조 검증과 `claim_image_upload_cleanup`은 같은 업로드 세션 행을 잠근다. 정리 작업이 먼저 비연결 상태를 확정하면 뒤늦은 리뷰 저장은 거절된다. DB 정리 권한을 받은 객체만 삭제하고, 실제 claim 시각·상태·실패 코드가 일치할 때만 만료를 확정한다.
+- 파일 삭제나 상태 저장 실패는 다음 주기에 재시도하며 Cron은 실패 건수를 기록하고 5xx를 반환한다. 정리가 확정된 모든 업로드의 삭제 표식은 늦게 완료된 Storage 쓰기를 회전식으로 다시 정리한다. 비리뷰 `attached` 세션의 보존 기간은 바꾸지 않으며, 명시적 폐기 또는 연결 전 만료로 정리 권한을 얻은 세션만 대상이다. 처리 중 정규화 파일 경로도 함께 정리한다. Storage와 DB는 별도 트랜잭션이므로 외부 장애·작업 적체 중 절대적인 삭제 완료 시간을 보장하지 않는다.
+- 정리 RPC는 한 번에 최대 100행을 잠근다. 일반 만료·미사용 리뷰 첨부·삭제 표식 재점검에 처리량을 나누고 `updated_at, id` 순서로 순환한다. 삭제 표식은 최소 1시간 간격으로 다시 검사하며, 원장이 남아 있는 동안 제한된 정리 부하가 계속 발생한다. 대상이 누적되면 재점검 간격도 길어질 수 있으므로 매회 전체 원장을 순회하거나 영구 실패 항목만 반복하지 않는다.
+- 이미 연결된 리뷰 파일의 확실한 부재는 이미지 필드의 재업로드 안내로 반환한다. Storage SDK의 `statusCode=NoSuchKey`도 HTTP 상태와 함께 확인하며, 권한 거절·제공자 장애·시간 초과·불명확한 응답은 503으로 유지한다. 만료된 첨부는 같은 작성자의 같은 리뷰가 이미 참조할 때만 재사용한다. 아직 참조되지 않은 만료 첨부나 연결 확인 후 저장 시점에 만료된 첨부는 재업로드 필드 오류로 복구한다. 이 조회는 삭제 권한을 부여하지 않으며 최종 참조 허용 여부는 DB가 다시 확인한다.
+- 가입 승인 신청은 기존 승인 대기 만료 기간을 유지한다. 중복 또는 결과를 모르는 INSERT 뒤 업로드를 임의로 폐기하지 않으며, 승인 신청이나 회원 사진 원장이 참조하는 업로드는 정리할 수 없다. 직접 가입을 되돌릴 때는 회원 참조 삭제가 확인된 다음에 업로드 폐기를 요청한다.
+
+이 변경의 최초 배포는 리뷰 쓰기 중단과 구버전 요청 종료를 확인한 뒤 migration·새 앱·정리 작업을 함께 적용해야 한다. 구버전 앱에는 Storage 직접 삭제 경로가 있으므로 새 버전과 쓰기 요청을 동시에 처리하면 안 된다. 구버전으로 되돌릴 때도 리뷰 쓰기를 중단한다. Preview 사본 교체는 기존 앱 중지 구간에서 이 순서를 적용한다.
+
 ### Mattermost
 
 - `MattermostClient`는 로그인, 사용자·채널 조회, DM 생성·발송, avatar 조회, logout을 서버에서만 수행한다.
@@ -77,6 +91,14 @@ Cron 실행 일정의 정본은 `deploy/self-host-operations/production-cron/sch
 - 관리자·협력사 운영 알림 푸시는 `sendOperationalPushDeliveries` 하나를 대상별 설정(구독 테이블·소유자 컬럼·템플릿 키·delivery 테이블)으로 공유한다.
 - 브라우저 구독은 회원·관리자·협력사 설정 화면이 같은 헬퍼로 기존 구독을 재사용하고 VAPID 공개키가 바뀐 경우에만 교체한다.
 - 푸시 구독 이벤트 로그(`event_logs.target_id`)에는 endpoint URL을 남기지 않고 구독 UUID만 기록한다.
+
+### 이벤트 당첨 안내 재시도
+
+- 추첨별 `event-reward:<draw-id>:winner-notice:v1` 키로 기존 캠페인 claim/finalize RPC를 사용한다. 발송 전에 캠페인 ID와 attempt token을 추첨에 연결하고 `updated_at` 비교로 선점한다. 결과 저장은 같은 token으로 제한하여 이전 실행이 최신 결과를 덮어쓰지 못하게 한다.
+- 추첨 선점·완료 저장은 일치하는 추첨 ID의 반환 행으로 확인한다. 당첨자별 상태 저장도 모든 대상의 추첨 ID·회원 ID·상태를 확인한 뒤 추첨을 완료하며, 이미 `sent`인 행은 되돌리지 않는다. 빈 성공 응답은 저장 증거가 아니며 후속 기록 실패는 같은 원장으로 복구하여 외부 발송을 반복하지 않는다.
+- Mattermost 수신자별 v2 delivery claim은 `claimed → sending → sent` 순서를 지킨다. 서버의 명시적인 거절과 게시 요청 전 실패만 재시도할 수 있다. timeout, 네트워크 유실, 모호한 응답, provider 성공 후 원장 저장 실패는 확인 대기로 남겨 재발송하지 않는다. 성공 게시물 ID는 같은 sent 행에 부가 기록하며 실패해도 sent를 되돌리지 않는다.
+- 도달 판정은 수신자별 원장으로 한다. 외부 채널 시도가 있으면 외부 `sent`가 필요하고, 외부 시도가 없으면 `in_app/sent` 영수증이 필요하다. 빈 원장과 조회 실패를 발송 완료로 간주하지 않는다. 채널이 모두 제외된 미도달 대상은 이후 명시적인 재시도가 가능하다.
+- 기존 당첨 안내 ID와 영수증은 보존한다. 이전 외부 발송의 결과를 확정할 수 없거나 영수증이 없으면 운영자가 결과를 확인하기 전까지 재발송하지 않는다. 새 MM 선점 RPC와 unique index 적용 후 기존 앱의 발송 작업을 중지·종료한 다음 새 앱으로 교체해야 한다. SQL 적용 및 운영자 확인은 로컬 테스트와 별도 검증이다.
 
 ### Apple Wallet / APNs
 

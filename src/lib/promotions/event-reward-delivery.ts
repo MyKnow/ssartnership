@@ -14,9 +14,10 @@ export type EventRewardDeliveryRecord = {
   memberId: string;
   channel: string;
   status: string;
+  providerStatus?: string | null;
 };
 
-export type EventRewardWinnerDeliveryOutcome = "reached" | "unreached";
+export type EventRewardWinnerDeliveryOutcome = "reached" | "unreached" | "pending" | "needs_reconciliation";
 
 function isExternalChannel(channel: string) {
   return EVENT_REWARD_EXTERNAL_DELIVERY_CHANNELS.some(
@@ -24,25 +25,23 @@ function isExternalChannel(channel: string) {
   );
 }
 
-/**
- * A winner is reached once any external channel (Mattermost DM or web push)
- * delivered. A winner without any external attempt only had the in-app inbox,
- * which the campaign already wrote, so resending would only duplicate it.
- */
+/** External attempts require external success; inbox-only needs a positive receipt. */
 export function resolveEventRewardWinnerDeliveryOutcome(
-  records: readonly Pick<EventRewardDeliveryRecord, "channel" | "status">[],
+  records: readonly Pick<EventRewardDeliveryRecord, "channel" | "status" | "providerStatus">[],
 ): EventRewardWinnerDeliveryOutcome {
   const external = records.filter((record) => isExternalChannel(record.channel));
   if (external.length === 0) {
-    return "reached";
+    return records.some((record) => record.channel === "in_app" && record.status === "sent")
+      ? "reached" : "unreached";
   }
-  if (external.some((record) => record.status === "sent")) {
-    return "reached";
-  }
-  if (external.some((record) => record.status === "failed")) {
-    return "unreached";
-  }
-  return "reached";
+  if (external.some((record) => record.status === "sent")) return "reached";
+  const knownFailures = new Set(["failed", "unauthorized", "forbidden", "not_found", "rate_limited", "request_rejected", "sender_not_configured", "configuration_invalid"]);
+  if (external.some((record) =>
+    !(record.status === "failed" && knownFailures.has(record.providerStatus ?? ""))
+    && !(record.status === "pending" && record.providerStatus === "claimed")
+  )) return "needs_reconciliation";
+  if (external.some((record) => record.status === "pending")) return "pending";
+  return "unreached";
 }
 
 export function summarizeEventRewardWinnerDeliveries(
@@ -71,7 +70,7 @@ export function selectEventRewardNotificationTargets(
   if (!previousOutcomes) {
     return [...memberIds];
   }
-  return memberIds.filter((memberId) => previousOutcomes.get(memberId) !== "reached");
+  return memberIds.filter((memberId) => !previousOutcomes.has(memberId) || previousOutcomes.get(memberId) === "unreached");
 }
 
 export function resolveEventRewardDrawDeliveryStatus(

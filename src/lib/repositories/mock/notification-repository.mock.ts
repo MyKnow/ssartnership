@@ -281,6 +281,15 @@ export class MockNotificationRepository implements NotificationRepository {
       throw new Error("알림 발송 요청이 올바르지 않습니다.");
     }
 
+    const reservedWinnerKey = input.idempotencyKey.trim().startsWith("event-reward:");
+    if (reservedWinnerKey && (
+      input.idempotencyKey.trim() !== `event-reward:${input.metadata?.eventRewardDrawId}:winner-notice:v1`
+      || typeof input.metadata?.eventRewardDrawId !== "string" || !input.metadata.eventRewardDrawId.trim()
+      || typeof input.metadata?.eventSlug !== "string" || !input.metadata.eventSlug.trim()
+    )) {
+      throw new Error("알림 발송 요청이 올바르지 않습니다.");
+    }
+
     const now = new Date();
     const nowIso = now.toISOString();
     const store = getStore();
@@ -293,6 +302,13 @@ export class MockNotificationRepository implements NotificationRepository {
     if (notification) {
       if (notification.type !== input.type) {
         throw new Error("알림 캠페인 재시도 키가 다른 유형과 충돌했습니다.");
+      }
+      if (reservedWinnerKey && (
+        notification.metadata?.eventRewardDrawId !== input.metadata?.eventRewardDrawId
+        || notification.metadata?.eventSlug !== input.metadata?.eventSlug
+        || notification.targetUrl !== targetUrl
+      )) {
+        throw new Error("알림 캠페인 재시도 키가 다른 추첨과 충돌했습니다.");
       }
       const status = notification.metadata?.campaignStatus;
       if (status === "sent" || status === "no_target") {
@@ -421,8 +437,10 @@ export class MockNotificationRepository implements NotificationRepository {
     input: NotificationDeliveryClaimInput,
   ): Promise<NotificationDeliveryClaimResult> {
     if (
-      input.channel !== "push" ||
-      input.provider !== "web_push" ||
+      !((input.channel === "push" && input.provider === "web_push") ||
+        (input.channel === "mm" && input.provider === "mattermost")) ||
+      (input.provider === "mattermost" && input.providerIdempotencyKey !==
+        `ssartnership:delivery:v2:${input.notificationId}:mm:${input.memberId}`) ||
       !input.memberId ||
       !input.providerIdempotencyKey.trim() ||
       input.leaseDurationSeconds < 30 ||
@@ -513,8 +531,9 @@ export class MockNotificationRepository implements NotificationRepository {
     );
     if (
       !delivery ||
-      delivery.channel !== "push" ||
-      delivery.provider !== "web_push" ||
+      !((delivery.channel === "push" && delivery.provider === "web_push") ||
+        (delivery.channel === "mm" && delivery.provider === "mattermost" &&
+          delivery.providerIdempotencyKey === `ssartnership:delivery:v2:${delivery.notificationId}:mm:${delivery.memberId}`)) ||
       delivery.status !== "pending"
     ) {
       return false;
@@ -550,6 +569,11 @@ export class MockNotificationRepository implements NotificationRepository {
     }
     delivery.updatedAt = now;
     return true;
+  }
+
+  async annotateSentNotificationDelivery(deliveryId: string, providerNotificationId: string) {
+    const delivery = getStore().deliveries.find((item) => item.id === deliveryId && item.status === "sent");
+    if (delivery) delivery.providerNotificationId = providerNotificationId;
   }
 
   async recordNotificationDelivery(input: NotificationDeliveryInput) {

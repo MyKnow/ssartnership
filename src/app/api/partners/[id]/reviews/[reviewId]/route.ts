@@ -4,9 +4,6 @@ import { getSafePublicRouteError } from "@/lib/public-route-safe-errors";
 import { partnerReviewRepository } from "@/lib/repositories";
 import { isTrustedSameOriginRequest } from "@/lib/request-guards";
 import {
-  deleteReviewMediaUrls,
-} from "@/lib/review-media-storage";
-import {
   ensureVisibleReviewPartner,
   getReviewMediaInputFieldErrors,
   getReviewMemberSessionLookup,
@@ -88,8 +85,6 @@ export async function PATCH(
   }
   const payload = submission.values;
 
-  let uploadedUrls: string[] = [];
-
   try {
     const media = await resolveReviewMediaPayload(
       payload.imagesManifest,
@@ -98,7 +93,6 @@ export async function PATCH(
       session.userId,
       ownedReview.images,
     );
-    uploadedUrls = media.uploadedUrls;
     const review = await partnerReviewRepository.updatePartnerReview({
       reviewId,
       memberId: session.userId,
@@ -107,8 +101,6 @@ export async function PATCH(
       body: payload.body,
       images: media.images,
     });
-    const removedUrls = ownedReview.images.filter((url) => !media.images.includes(url));
-    await deleteReviewMediaUrls(removedUrls).catch(() => undefined);
     const summary = await partnerReviewRepository.getPartnerReviewSummary(id);
     scheduleProductEventLog({
       ...getRequestLogContext(request),
@@ -125,7 +117,6 @@ export async function PATCH(
     });
     return NextResponse.json({ ok: true, review, summary });
   } catch (error) {
-    await deleteReviewMediaUrls(uploadedUrls).catch(() => undefined);
     if (isReviewImageUploadUnavailable(error)) {
       return NextResponse.json(
         {

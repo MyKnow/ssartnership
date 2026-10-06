@@ -61,12 +61,10 @@ export type NotificationDeliveryClaimDisposition =
 export type NotificationDeliveryClaimInput = {
   notificationId: string;
   memberId: string;
-  channel: "push";
-  provider: "web_push";
   providerCampaignId: string;
   providerIdempotencyKey: string;
   leaseDurationSeconds: number;
-};
+} & ({ channel: "push"; provider: "web_push" } | { channel: "mm"; provider: "mattermost" });
 
 export type NotificationDeliveryClaimResult = {
   deliveryId: string;
@@ -109,6 +107,7 @@ export interface NotificationRepository {
   transitionNotificationDelivery(
     input: TransitionNotificationDeliveryInput,
   ): Promise<boolean>;
+  annotateSentNotificationDelivery(deliveryId: string, providerNotificationId: string): Promise<void>;
   updateNotificationMetadata(
     notificationId: string,
     metadata: Record<string, unknown>,
