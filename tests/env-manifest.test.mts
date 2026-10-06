@@ -100,6 +100,7 @@ test("required tier는 자체 호스팅 real 모드 필수 목록과 같다", ()
 test("코드는 Vercel 계정 라우팅·Cloud Preview 동기화 env를 더 이상 읽지 않는다", () => {
   const reads = collectApplicationEnvironmentReads();
   for (const retired of [
+    "VERCEL",
     "SSARTNERSHIP_VERCEL_TOKEN",
     "SUPABASE_PREVIEW_URL",
     "SUPABASE_PREVIEW_SERVICE_ROLE_KEY",
