@@ -68,3 +68,13 @@ DB 단계는 공유 마이그레이션 소유자를 지정하고 호환성·권�
 6. 전달: 수정·PR·테스트·Preview 증거를 기록하며 남은 Production/운영자 경계를 명시한다.
 
 독립 구현·검토 후 최종 검증과 순차 전달 중이다. 제휴 전환의 실제 SDK 실패 주입 59건과 action 10건, 화면 상태 회귀 9건, 격리 Chrome의 캐시 갱신 실패·복구 검증이 통과했다. 이 수치는 각각의 집중 검증이며 전체 Release나 라이브 수용의 대체가 아니다. 새 수정의 dev 병합·첫 원격 CI·라이브 적용·최종 화면 검증은 미완료다.
+
+## 의존성 보안 후속 #573
+
+2026-10-06 통합 후보의 첫 Release 검사는 `source-map-js@1.2.1`의 높은 심각도 권고 [GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q)로 중단됐다. Node 2,792건과 unit 269건은 통과했고, 기존 macOS skip 9건이 있었으며 build와 E2E는 시작되지 않았다. 이전 성공과 동일한 lockfile에서도 새 권고가 검증을 차단할 수 있으므로 기존 결과로 현재 dependency audit를 대신하지 않는다. 이 결과는 실제 서비스가 공격받았다는 증거가 아니다.
+
+[#573](https://github.com/MyKnow/ssartnership/issues/573)은 공식 수정 버전 1.2.2의 보안 경계와 lockfile을 별도 PR로 dev에 먼저 반영한다. 원래 통합 후보 72개 파일과 실패 기록을 보존하고 격리된 trusted install, 정책 회귀, 전체 Release, 첫 CI와 실제 Preview를 검증한다. 보안 감사 예외는 추가하지 않으며 transaction·마이그레이션 작업은 별도 PR로 유지한다. 해당 교정의 검증·전달이 끝나기 전 새 DB 적용과 배포를 진행하지 않는다.
+
+제한적 소스 검토에서 외부 앱 입력을 해당 Consumer에 직접 전달하는 경로는 확인하지 못했다. `magicast`의 배포 번들에는 이전 Consumer 코드가 내장돼 있으며 최상위 override로 그 바이트까지 교체되지는 않는다. 확인된 사용은 Vitest coverage의 로컬 설정 처리 경로다. 이 검토는 전체 비노출 보장이나 감사 예외의 근거가 아니며, 수정의 수용 범위는 잠금 의존성의 공식 패치와 실제 빌드·검증 결과다.
+
+교정 후보의 첫 전체 Release는 로컬에서 통과했다: Node 2,759건과 기존 skip 9건, unit 203건, 두 Production 방식 빌드, E2E 106건 각각 1회 성공·재시도 0. 집중 정책 6건과 격리 trusted install·canonical lockfile·보안 감사도 통과했다. 전체 로그 독립 검토와 문서 124개·루트 지식 7개 검사를 마쳤으며, 원격 첫 CI와 실제 Preview 수용은 이후 별도 증거로 확정한다.
