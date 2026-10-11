@@ -637,7 +637,7 @@ describe("추첨 알고리즘", () => {
     ]);
     assert.match(text, /^\[내 프로젝트를 소개합니다!\] 당첨자 안내/u);
     assert.match(text, /■ 출품 경품 · 배달의민족 상품권 1만 원 \(1명\)\n1\. 싸트너십 · 정\*\*/u);
-    assert.match(text, /■ 체험 경품 · 메가커피 아이스 아메리카노 교환권 \(1명\)\n1\. 천\*\*/u);
+    assert.match(text, /■ 체험 경품 · 스타벅스 아이스 카페 아메리카노 Tall 교환권 \(1명\)\n1\. 천\*\*/u);
     assert.doesNotMatch(text, /1512343|1512344|정민호/u);
     assert.match(draw.buildShowcaseAnnouncement("E", []), /당첨자 없음/u);
   });
@@ -786,6 +786,11 @@ describe("mock Repository 추첨·정산 규칙", () => {
     assert.equal(publicWinners.length, 2);
     assert.ok(publicWinners.every((winner) => !("memberId" in winner)));
     assert.equal((await repository.getMemberWinnings(OWNER))[0]?.projectTitle, "Green Route");
+    await repository.updateEventSchedule({ ...store.event, isActive: false });
+    assert.equal((await repository.getMemberWinnings(OWNER))[0]?.projectTitle, "Green Route");
+    assert.deepEqual(await repository.getMemberWinnings("unrelated-member"), []);
+    assert.deepEqual(await repository.getMemberWinnings(""), []);
+    await repository.updateEventSchedule({ ...store.event, isActive: true });
 
     const winner = (await repository.listAdminWinners())[0];
     assert.ok(winner);

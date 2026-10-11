@@ -26,6 +26,8 @@ const eslintConfig = defineConfig([
     "test-results/**",
     "playwright-results.xml",
   ]),
+  // Vendored upstream CommonJS syntax is part of its pinned package contract.
+  { files: ["vendor/braces-depth-guard/**/*.js"], rules: { "@typescript-eslint/no-require-imports": "off" } },
   ...storybook.configs["flat/recommended"]
 ]);
 

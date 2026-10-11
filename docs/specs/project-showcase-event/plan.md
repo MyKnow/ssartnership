@@ -7,6 +7,16 @@ authority: descriptive
 
 # SSAFY 프로젝트 쇼케이스 구현 계획
 
+## Issue #576 종료 결과 안내
+
+- 배포 선행 보안 수정: [sharp 공식 권고](https://github.com/advisories/GHSA-wq5f-xc86-pv6w)에 따라 0.35.5 이상을 설치하고, [source-map-js 공식 패치](https://github.com/advisories/GHSA-68fv-2mgg-jv7q) 1.2.2를 고정한다. [braces 미수정 권고](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)는 이미 dev에서 검토한 depth guard 패키지와 byte 검증·회귀 검사만 가져와 해결한다. 다른 dev 변경은 포함하지 않는다.
+
+- 결과 조회 가능 조건과 참여 쓰기 조건을 분리한다. 서버 세션과 회원 범위 Repository로 본인 리뷰·당첨을 조회하며 기존 스키마를 유지한다.
+- 화면은 수령 마감 안내 → 본인 당첨 카드 → 내 출품작 리뷰 순이며 기존 토큰·버튼을 사용한다. 비로그인은 복귀 경로가 포함된 로그인으로 안내한다.
+- 긴급 운영 일정과 dev의 미승격 변경 규모를 고려해 `main → hotfix/project-showcase-results → main/Production` 후 같은 변경을 dev에 통합한다.
+- 비활성 읽기, 마감 전·정각·후, 분야별 폼, 본인 범위, 숨김 리뷰 제외, 미당첨·발송 완료를 검증한다. 320/360/390/820/1366px 렌더, release gate, 정확한 배포 SHA를 확인한다.
+- 기존 배너만 감사 로그와 함께 활성화하고 이벤트 참여 비활성과 기존 당첨 기록을 보존한다. 결과·수령 기한 SVG는 캐러셀 표시 점과 문구가 겹치지 않도록 검증한다. 직접 운영 갱신 뒤에는 앱의 배너 캐시를 갱신하고 실제 첫 번째 배너를 확인한다.
+
 기준: [기능 명세](./spec.md). 운영 일정에 맞춰 PR 3개로 나눠 각 단계 시작 전에 Production에 반영한다.
 
 ## 경계

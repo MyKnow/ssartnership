@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="514" viewBox="0 0 1200 514" fill="none">
+  <title>프로젝트 쇼케이스 종료 · 내 출품작 리뷰와 당첨 결과 확인 · 수령 폼 10월 14일 18시까지</title>
+  <rect width="1200" height="514" fill="#172D50"/>
+  <path d="M1000 0H1200V514H1050L920 257Z" fill="#233F69"/>
+  <path d="M1030 0H1200V514H1110L980 257Z" fill="#2C4C78" fill-opacity=".55"/>
+  <g font-family="Pretendard, 'Noto Sans KR', 'Apple SD Gothic Neo', Arial, sans-serif">
+    <text x="64" y="65" fill="#9DDCF2" font-size="34" font-weight="700">프로젝트 쇼케이스 · 이벤트 종료</text>
+    <text x="60" y="145" fill="#FFFFFF" font-size="72" font-weight="800">내 출품작 리뷰와</text>
+    <text x="60" y="225" fill="#FFFFFF" font-size="72" font-weight="800">당첨 결과를 확인하세요</text>
+    <rect x="60" y="255" width="812" height="60" rx="18" fill="#FFFFFF" fill-opacity=".10"/>
+    <text x="85" y="297" fill="#C7EAF7" font-size="42" font-weight="700">수령 폼 작성 · 10월 14일 18시까지</text>
+  </g>
+  <circle cx="1044" cy="229" r="77" stroke="#91D8ED" stroke-width="5"/>
+  <path d="M1008 230L1033 255L1080 207" stroke="#91D8ED" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,3 +1,5 @@
+import { canReadShowcaseResults } from "@/lib/project-showcase/results";
+import { promoteShowcaseResultsSlide } from "./showcase-results";
 import {
   DEFAULT_PROMOTION_AUDIENCES,
   EVENT_CAMPAIGNS,
@@ -502,9 +504,10 @@ const SHOWCASE_PROMOTED_PHASES: ReadonlySet<ShowcasePhase> = new Set([
 async function getExternalEventVisibility(now: Date) {
   try {
     const event = await projectShowcaseRepository.getEvent();
-    return new Map([[PROJECT_SHOWCASE_SLUG, SHOWCASE_PROMOTED_PHASES.has(getShowcasePhase(event, now))]]);
+    const resultsAvailable = canReadShowcaseResults(event, now);
+    return { visibility: new Map([[PROJECT_SHOWCASE_SLUG, resultsAvailable || SHOWCASE_PROMOTED_PHASES.has(getShowcasePhase(event, now))]]), resultsAvailable };
   } catch {
-    return new Map([[PROJECT_SHOWCASE_SLUG, false]]);
+    return { visibility: new Map([[PROJECT_SHOWCASE_SLUG, false]]), resultsAvailable: false };
   }
 }
 
@@ -571,8 +574,8 @@ export async function getHomePromotionSlides(
     getExternalEventVisibility(now),
   ]);
   const campaignsBySlug = new Map(campaigns.map((campaign) => [campaign.slug, campaign]));
-  return slides
-    .filter((slide) => canDisplayHomePromotionSlide(slide, viewer, campaignsBySlug, now, externalEventVisibility))
+  const visibleSlides = slides
+    .filter((slide) => canDisplayHomePromotionSlide(slide, viewer, campaignsBySlug, now, externalEventVisibility.visibility))
     .map((slide) => ({
       id: slide.id,
       title: slide.title,
@@ -585,4 +588,5 @@ export async function getHomePromotionSlides(
       adCampaignId: slide.adCampaignId,
       sponsorLabel: slide.sponsorLabel,
     }));
+  return promoteShowcaseResultsSlide(visibleSlides, externalEventVisibility.resultsAvailable);
 }
