@@ -56,6 +56,14 @@ test("Production nanoid 보안 수정 버전을 package와 lock 계약에 함께
   );
 });
 
+
+test("Production sharp가 librsvg 수정 버전부터 설치된다", async () => {
+  const { packageJson, packageLock } = await loadStaticPolicyInput();
+  assert.equal(packageJson.dependencies.sharp, "^0.35.5");
+  assert.equal(packageLock.packages["node_modules/sharp"].version, "0.35.5");
+  assert.equal(packageLock.packages["node_modules/@img/sharp-libvips-linux-x64"].version, "1.3.4");
+});
+
 test("Production source-map-js 보안 수정 버전을 package와 lock 계약에 함께 고정한다", async () => {
   const { packageJson, packageLock } = await loadStaticPolicyInput();
   const sourceMap = packageLock.packages["node_modules/source-map-js"];

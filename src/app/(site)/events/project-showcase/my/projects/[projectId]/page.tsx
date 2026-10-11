@@ -106,7 +106,7 @@ export default async function MyShowcaseProjectPage({
                   ))}
                 </ul>
               ) : (
-                <p className="mt-2 text-sm text-muted-foreground">{phase === "experience" ? "아직 받은 피드백이 없어요." : "체험 기간이 시작되면 피드백이 이곳에 모여요."}</p>
+                <p className="mt-2 text-sm text-muted-foreground">아직 표시할 피드백이 없어요.</p>
               )}
             </div>
           </section>
