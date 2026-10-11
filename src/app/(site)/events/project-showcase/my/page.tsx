@@ -2,14 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
+import ShowcasePrizeClaimSection from "@/components/project-showcase/ShowcasePrizeClaimSection";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import { getHeaderSession } from "@/lib/header-session";
 import { getShowcasePhase, projectShowcaseRepository } from "@/lib/project-showcase";
 import { formatShowcasePeriod } from "@/lib/project-showcase/format";
-import { SHOWCASE_OWNER_STATUS_LABELS, SHOWCASE_PRIZES, SHOWCASE_TYPE_LABELS } from "@/lib/project-showcase/labels";
+import { SHOWCASE_OWNER_STATUS_LABELS, SHOWCASE_TYPE_LABELS } from "@/lib/project-showcase/labels";
 import { getSignedUserSession } from "@/lib/user-auth";
 import BackLink from "@/components/ui/BackLink";
+
+import { canReadShowcaseResults } from "@/lib/project-showcase/results";
 
 export const dynamic = "force-dynamic";
 
@@ -21,12 +24,13 @@ export const metadata: Metadata = {
 export default async function MyShowcaseParticipationPage() {
   const session = await getSignedUserSession();
   if (!session?.userId) redirect("/auth/login?returnTo=%2Fevents%2Fproject-showcase%2Fmy");
-  const [event, projects, participation, winnings, headerSession] = await Promise.all([
+  const [event, projects, participation, winnings, headerSession, drawState] = await Promise.all([
     projectShowcaseRepository.getEvent(),
     projectShowcaseRepository.listOwnerProjects(session.userId),
     projectShowcaseRepository.getMemberParticipation(session.userId),
     projectShowcaseRepository.getMemberWinnings(session.userId),
     getHeaderSession(session.userId),
+    projectShowcaseRepository.getDrawState(),
   ]);
   const phase = getShowcasePhase(event);
 
@@ -94,23 +98,10 @@ export default async function MyShowcaseParticipationPage() {
           )}
         </section>
 
-        {phase === "announcement" || phase === "closed" ? (
-          <section className="mt-8 grid gap-3" aria-labelledby="my-showcase-result-heading">
-            <h2 id="my-showcase-result-heading" className="text-xl font-bold text-foreground">당첨 결과</h2>
-            {winnings.length > 0 ? winnings.map((winning) => (
-              <div key={winning.candidateGroup} className="rounded-2xl border border-success/30 bg-success/10 px-5 py-4">
-                <p className="font-bold text-foreground">축하해요! {SHOWCASE_PRIZES[winning.candidateGroup].title}에 당첨됐어요.</p>
-                <p className="mt-1 text-sm text-foreground">
-                  {SHOWCASE_PRIZES[winning.candidateGroup].prize}{winning.projectTitle ? ` · ${winning.projectTitle}` : ""}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">{winning.deliveredAt ? "경품 발송을 완료했어요." : "등록된 MM 또는 이메일로 구글폼 작성 안내를 보내 드려요. 학번은 해당 폼에서 확인해요."}</p>
-              </div>
-            )) : (
-              <div className="rounded-2xl border border-border bg-surface px-5 py-4 text-sm text-muted-foreground">
-                이번에는 당첨되지 않았어요. 참여해 주셔서 감사해요.
-              </div>
-            )}
-          </section>
+        {canReadShowcaseResults(event) ? (
+          <div className="mt-8">
+            <ShowcasePrizeClaimSection winnings={winnings} drawn={drawState.submitterDrawn && drawState.experiencerDrawn} />
+          </div>
         ) : null}
 
         <section className="mt-10 grid gap-4" aria-labelledby="my-showcase-experience-heading">

@@ -1,3 +1,4 @@
+import { canReadShowcaseResults } from "./results";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import {
   buildShowcaseExperiencerDrawAudit,
@@ -788,8 +789,7 @@ export class SupabaseProjectShowcaseRepository implements ProjectShowcaseReposit
 
   async getMemberWinnings(memberId: string) {
     const event = await this.getEvent();
-    const phase = getShowcasePhase(event);
-    if (!event || !memberId || (phase !== "announcement" && phase !== "closed")) return [];
+    if (!event || !memberId || !canReadShowcaseResults(event)) return [];
     const { data, error } = await this.client()
       .from("showcase_winners")
       .select("candidate_group,project_title,delivered_at")

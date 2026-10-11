@@ -1,3 +1,4 @@
+import { canReadShowcaseResults } from "./results";
 import { randomUUID } from "node:crypto";
 import { MOCK_MEMBER_ID } from "@/lib/mock/member";
 import {
@@ -760,8 +761,7 @@ export class MockProjectShowcaseRepository implements ProjectShowcaseRepository 
 
   async getMemberWinnings(memberId: string) {
     const store = getStore();
-    const phase = getShowcasePhase(store.event);
-    if (phase !== "announcement" && phase !== "closed") return [];
+    if (!memberId || !canReadShowcaseResults(store.event)) return [];
     return store.winners
       .filter((winner) => winner.status === "active" && winner.memberId === memberId)
       .map((winner) => ({ candidateGroup: winner.candidateGroup, projectTitle: winner.projectTitle, deliveredAt: winner.deliveredAt }));
