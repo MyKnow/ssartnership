@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { SHOWCASE_CLAIM_DEADLINE_AT } from "../../src/lib/project-showcase/results";
+import { HOME_PROMOTIONS } from "../../src/lib/promotions/catalog";
 
 const path = "/events/project-showcase";
 // Mock login redirects to localhost, so keep the fixture and destination on that same origin.
@@ -34,8 +35,13 @@ for (const winner of ["submitter", "experiencer", "none"] as const) {
       await expect(page.getByTestId("partner-filter-interaction-root")).toHaveAttribute("data-hydrated", "true", { timeout: 15_000 });
       const firstBanner = page.locator('[aria-roledescription="carousel"] a').first();
       await expect(firstBanner).toHaveAttribute("href", path);
-      await expect(firstBanner).toHaveAttribute("aria-label", "프로젝트 리뷰·당첨 결과 확인");
-      await expect(firstBanner.locator("img")).toHaveAttribute("src", /project-showcase-results\.svg/);
+      const configuredSlide = HOME_PROMOTIONS.find((slide) => slide.href === path)!;
+      await expect(firstBanner).toHaveAttribute("aria-label", configuredSlide.title);
+      await expect(firstBanner.locator("img")).toHaveAttribute("alt", configuredSlide.imageAlt);
+      const renderedSrc = await firstBanner.locator("img").getAttribute("src");
+      expect(renderedSrc).not.toBeNull();
+      const renderedUrl = new URL(renderedSrc!, page.url());
+      expect(renderedUrl.searchParams.get("url") ?? renderedUrl.pathname).toBe(configuredSlide.imageSrc);
       for (const width of [360, 820, 1366]) {
         await page.setViewportSize({ width, height: 900 });
         await page.locator('[data-promotion-carousel-media]').first().screenshot({ path: `.tmp/ui-qa/showcase-results/banner-${width}.png`, animations: "disabled" });
