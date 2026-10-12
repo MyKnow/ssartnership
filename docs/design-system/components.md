@@ -7,6 +7,10 @@ authority: normative
 
 # Components
 
+## Promotion Carousel
+- 768px 미만에서는 슬라이드 선택 컨트롤을 배너 이미지 아래 독립 행에 배치한다. 운영자가 넣은 이미지의 문구 위치를 가정해 컨트롤을 겹쳐 놓지 않는다.
+- 320/360/390px에서 이미지와 컨트롤의 비겹침, 가로 overflow 없음, 슬라이드 선택 동작을 실제 브라우저로 검증한다.
+
 ## Card / Surface
 - `Card tone="default"`는 독립 섹션/패널, `muted`는 내부 inset, `elevated`는 주요 카드/CTA, `hero`는 강한 강조 표면으로 사용한다.
 - 카드 내부의 보조 행, 입력 그룹, 세부 정보 박스는 `Surface level="inset"`을 우선 사용한다.

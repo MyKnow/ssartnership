@@ -174,8 +174,8 @@ export default function PromotionCarousel({
       </div>
 
       {slideCount > 1 ? (
-        <div className="absolute inset-x-0 bottom-3 z-10 flex items-center justify-center px-4">
-          <div className="flex items-center gap-3 rounded-full border border-white/25 bg-black/35 px-3 py-2 shadow-flat backdrop-blur-md">
+        <div className="relative z-10 flex items-center justify-center px-4 py-3 md:absolute md:inset-x-0 md:bottom-3 md:py-0">
+          <div className="flex items-center gap-3 rounded-full border border-white/25 bg-[var(--hero-from)] px-3 py-2 shadow-flat backdrop-blur-md md:bg-black/35">
             <button
               type="button"
               className="hidden h-8 w-8 items-center justify-center rounded-full text-white transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 md:inline-flex"
