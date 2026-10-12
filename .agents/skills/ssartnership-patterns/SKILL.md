@@ -75,6 +75,8 @@ For a new user-facing or admin-facing feature:
 
 ## UI Patterns
 
+- 관리자에서 편집 가능한 이미지·문구·링크는 저장값을 공개 화면의 기준으로 사용한다. 이벤트 단계나 정렬 helper가 저장값을 고정 상수로 덮어쓰지 않게 한다. 회귀 검증은 서로 다른 운영자 설정값이 조회 경로를 통과해 그대로 렌더링되는지 검사하고, 구현의 고정 파일명을 정답으로 복제하지 않는다. 운영 변경 완료는 관리자 저장 성공에 더해 실제 사용자 화면의 이미지와 연결 목적지를 확인한 뒤 보고한다.
+
 - For any UI creation, revision, or review, use `ssartnership-ui-ux` with the relevant Codex-local frontend and Korean responsive skills.
 - Preserve the hierarchy: page background -> panel -> elevated card -> inset block -> control, and use shared primitives before local one-off styling.
 - Keep admin and partner portals information-dense but calm. Use route-specific skeletons and keep large form controllers/helpers separate.

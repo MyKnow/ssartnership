@@ -43,11 +43,20 @@ test("종료 결과 배너를 첫 번째로 배치하고 입력 배열·다른 �
   const before = structuredClone(slides);
   const ordered = promotions.promoteShowcaseResultsSlide(slides, true);
   assert.deepEqual(ordered.map((slide) => slide.id), ["showcase", "other"]);
-  assert.match(ordered[0].title, /당첨/);
-  assert.match(ordered[0].description, /리뷰/);
-  assert.equal(ordered[0].imageSrc, "/ads/project-showcase-results.svg");
+  assert.deepEqual(ordered[0], slides[1]);
   assert.deepEqual(ordered[1], slides[0]);
   assert.deepEqual(slides, before);
   assert.deepEqual(promotions.promoteShowcaseResultsSlide(slides, false), slides);
   assert.deepEqual(promotions.promoteShowcaseResultsSlide([], true), []);
+});
+
+test("관리자가 이미지를 다시 교체해도 종료 결과 처리는 모든 편집 값을 보존한다", () => {
+  for (const imageSrc of ["https://cdn.example.com/first.webp", "https://cdn.example.com/replacement.webp", "/custom-banner.svg"]) {
+    const saved = Object.freeze({
+      href: "/events/project-showcase", title: "운영자가 저장한 제목", description: "운영자가 저장한 설명",
+      imageAlt: "운영자가 저장한 대체 텍스트", imageSrc,
+      audiences: ["guest"], allowedCampuses: ["seoul"], sponsorLabel: "운영자 설정",
+    });
+    assert.deepEqual(promotions.promoteShowcaseResultsSlide(Object.freeze([saved]), true), [saved]);
+  }
 });
