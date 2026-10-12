@@ -42,9 +42,23 @@ for (const winner of ["submitter", "experiencer", "none"] as const) {
       expect(renderedSrc).not.toBeNull();
       const renderedUrl = new URL(renderedSrc!, page.url());
       expect(renderedUrl.searchParams.get("url") ?? renderedUrl.pathname).toBe(configuredSlide.imageSrc);
-      for (const width of [360, 820, 1366]) {
+      await page.getByRole("button", { name: "광고 자동 재생 일시정지" }).click();
+      const indicators = page.getByRole("group", { name: "슬라이드 선택", exact: true });
+      for (const width of [320, 360, 390, 768, 820, 1366]) {
         await page.setViewportSize({ width, height: 900 });
-        await page.locator('[data-promotion-carousel-media]').first().screenshot({ path: `.tmp/ui-qa/showcase-results/banner-${width}.png`, animations: "disabled" });
+        if (width < 768) {
+          const mediaBounds = await firstBanner.boundingBox();
+          const controlsBounds = await indicators.boundingBox();
+          expect(mediaBounds).not.toBeNull();
+          expect(controlsBounds).not.toBeNull();
+          expect(controlsBounds!.y).toBeGreaterThanOrEqual(mediaBounds!.y + mediaBounds!.height);
+          await indicators.getByRole("button").nth(1).click();
+          await expect(indicators.getByRole("button").nth(1)).toHaveAttribute("aria-pressed", "true");
+          await indicators.getByRole("button").first().click();
+          await expect(indicators.getByRole("button").first()).toHaveAttribute("aria-pressed", "true");
+        }
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+        await page.locator('[aria-roledescription="carousel"]').screenshot({ path: `.tmp/ui-qa/showcase-results/banner-${width}.png`, animations: "disabled" });
       }
     }
     // A supplied member ID must not replace the signed server identity.
