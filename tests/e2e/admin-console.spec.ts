@@ -80,6 +80,12 @@ test.describe("authenticated administrator console", () => {
     await expect(detailLink).toBeVisible();
     await captureResponsivePage(page, "listing", page.locator("#showcase-gallery"));
 
+    // Compile and verify the cold detail route before measuring the UI navigation.
+    // Keep the existing navigation assertion deadline and zero-retry policy.
+    const detailHref = await detailLink.getAttribute("href");
+    expect(detailHref).toMatch(/^\/events\/project-showcase\/projects\/[^?]+\?preview=experience$/);
+    const detailResponse = await page.request.get(detailHref!);
+    expect(detailResponse.ok()).toBe(true);
     await detailLink.click();
     await expect(page).toHaveURL(/\/events\/project-showcase\/projects\/[^?]+\?preview=experience/);
     await expect(page.getByText("관리자 미리보기 · 체험 상세")).toBeVisible();
