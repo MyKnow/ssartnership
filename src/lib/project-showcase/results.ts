@@ -1,7 +1,7 @@
 import type { ShowcaseCandidateGroup, ShowcaseEvent } from "./types";
 
-export const SHOWCASE_CLAIM_DEADLINE_AT = "2026-10-14T18:00:00+09:00";
-export const SHOWCASE_CLAIM_DEADLINE_LABEL = "10월 14일(수) 18:00";
+export const SHOWCASE_CLAIM_DEADLINE_AT = "2026-10-15T11:30:00+09:00";
+export const SHOWCASE_CLAIM_DEADLINE_LABEL = "10월 15일(목) 11:30";
 
 const CLAIM_FORMS: Record<ShowcaseCandidateGroup, string> = {
   submitter: "https://forms.gle/wx6z6fqeNyQ4B8JWA",
