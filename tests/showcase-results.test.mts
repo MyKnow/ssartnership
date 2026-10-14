@@ -24,11 +24,14 @@ test("비활성 이벤트도 발표 이후에는 읽기 전용 결과를 제공�
 });
 
 test("당첨 분야별 수령 폼을 연결하고 마감 정각부터 링크를 제거한다", () => {
-  const before = new Date("2026-10-14T17:59:59.999+09:00");
+  const before = new Date("2026-10-15T11:29:59.999+09:00");
   assert.deepEqual(results.getShowcasePrizeClaim("submitter", null, before), { status: "open", formUrl: "https://forms.gle/wx6z6fqeNyQ4B8JWA" });
   assert.deepEqual(results.getShowcasePrizeClaim("experiencer", null, before), { status: "open", formUrl: "https://forms.gle/PuhroAvV6Apw51C68" });
-  for (const now of ["2026-10-14T18:00:00+09:00", "2026-10-15T00:00:00+09:00"]) {
-    assert.deepEqual(results.getShowcasePrizeClaim("submitter", null, new Date(now)), { status: "closed", formUrl: null });
+  for (const group of ["submitter", "experiencer"] as const) {
+    assert.equal(results.getShowcasePrizeClaim(group, null, new Date("2026-10-14T18:00:00+09:00")).status, "open");
+    for (const now of ["2026-10-15T11:30:00+09:00", "2026-10-15T11:30:00.001+09:00"]) {
+      assert.deepEqual(results.getShowcasePrizeClaim(group, null, new Date(now)), { status: "closed", formUrl: null });
+    }
   }
   assert.deepEqual(results.getShowcasePrizeClaim("submitter", "2026-10-12T10:00:00+09:00", before), { status: "delivered", formUrl: null });
   assert.deepEqual(results.getShowcasePrizeClaim("invalid" as never, null, before), { status: "closed", formUrl: null });
