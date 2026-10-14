@@ -69,10 +69,18 @@ describe("종료 후 본인 결과 화면", () => {
     expect(pending).not.toContain("이번에는 당첨되지 않았어요");
   });
 
+  it("기존 마감 이후에도 연장된 기한과 수령 링크를 보여 준다", async () => {
+    mocks.winnings.mockResolvedValue([{ candidateGroup: "submitter", projectTitle: null, deliveredAt: null }]);
+    const html = renderToStaticMarkup(await ShowcaseResultsPage({ userId: "signed-member", now: new Date("2026-10-14T18:00:00+09:00") }));
+    expect(html).toContain("10월 15일(목) 11:30");
+    expect(html).toContain("https://forms.gle/wx6z6fqeNyQ4B8JWA");
+    expect(html).not.toContain("수령 폼 접수 마감");
+  });
+
   it("마감 정각 이후에도 리뷰·당첨을 보여 주고 수령 링크만 제거한다", async () => {
     mocks.projects.mockResolvedValue([owned]);
     mocks.winnings.mockResolvedValue([{ candidateGroup: "submitter", projectTitle: owned.title, deliveredAt: null }]);
-    const html = renderToStaticMarkup(await ShowcaseResultsPage({ userId: "signed-member", now: new Date("2026-10-14T18:00:00+09:00") }));
+    const html = renderToStaticMarkup(await ShowcaseResultsPage({ userId: "signed-member", now: new Date("2026-10-15T11:30:00+09:00") }));
     expect(html).toContain("내 작품에 남겨진 리뷰");
     expect(html).toContain("출품 경품 당첨");
     expect(html).toContain("수령 폼 접수 마감");
