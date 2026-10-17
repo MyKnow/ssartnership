@@ -5,10 +5,10 @@ import test from "node:test";
 const root = new URL("..", import.meta.url);
 
 test("발급 쿠폰 지갑 조회는 active unused issue와 coupon을 한 번에 조인한다", async () => {
-  const source = await readFile(
-    new URL("src/lib/repositories/supabase/ad-package-repository.supabase.ts", root),
-    "utf8",
-  );
+  const source = (await Promise.all([
+    "ad-package-coupon-issues.supabase.ts",
+    "ad-package-mapping.supabase.ts",
+  ].map((name) => readFile(new URL(`src/lib/repositories/supabase/${name}`, root), "utf8")))).join("\n");
   const start = source.indexOf("async listIssuedCouponsForMember(");
   const end = source.indexOf("async addCouponCodes(", start);
   assert.ok(start >= 0 && end > start);

@@ -106,7 +106,7 @@ test("redeem_ad_coupon_issue errors are classified by whole tokens", () => {
 });
 
 test("coupon repository no longer branches on bare RPC message fragments", () => {
-  const repository = read("src/lib/repositories/supabase/ad-package-repository.supabase.ts");
+  const repository = read("src/lib/repositories/supabase/ad-package-coupon-issues.supabase.ts");
   assert.doesNotMatch(
     repository,
     /error\.message\.includes\("(?:not_found|inactive|expired|not_downloadable|member_limit|usage_limit|code_unavailable|onsite_password)"\)/u,
