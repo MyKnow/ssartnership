@@ -44,7 +44,7 @@ test("개인 수신자 검색은 권한 검증된 제한 API와 안전한 입력
   const [route, searchService, composer] = await Promise.all([
     read("src/app/api/admin/push/recipients/route.ts"),
     read("src/lib/admin-push-recipient-search.server.ts"),
-    read("src/components/admin/push-manager/PushComposerSection.tsx"),
+    read("src/components/admin/push-manager/MemberPickerModal.tsx"),
   ]);
   const { normalizeAdminPushRecipientSearch } = await import(
     new URL("../src/lib/admin-push-recipient-search.server.ts", import.meta.url).href,

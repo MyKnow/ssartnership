@@ -403,6 +403,9 @@ test("푸시 관리 화면은 가로 overflow를 숨겨 결함을 가리지 않�
       "../src/components/admin/AdminPushManager.tsx",
       "../src/components/admin/push-manager/PushComposerSection.tsx",
       "../src/components/admin/push-manager/PushLogsSection.tsx",
+      "../src/components/admin/push-manager/MemberPickerModal.tsx",
+      "../src/components/admin/push-manager/PushAudienceReview.tsx",
+      "../src/components/admin/push-manager/SendConfirmModal.tsx",
     ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
   );
 
