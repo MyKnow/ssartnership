@@ -9,7 +9,9 @@ function readSource(path: string) {
 test("push and operational notification senders use the bounded concurrency helper", () => {
   const pushSend = readSource("src/lib/push/send.ts");
   const adminOps = readSource("src/lib/admin-notification-ops-delivery.ts");
-  const operational = readSource("src/lib/operational-notifications.ts");
+  const operational = ["delivery", "admin", "partner"]
+    .map((name) => readSource(`src/lib/operational-notifications/${name}.ts`))
+    .join("\n");
   const pushOps = readSource("src/lib/push/ops.ts");
   const newPartnerNotifications = readSource("src/lib/new-partner-notifications.ts");
 

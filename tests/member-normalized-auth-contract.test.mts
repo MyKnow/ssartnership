@@ -310,9 +310,10 @@ test("관리자 캠페인 발송은 policy ledger와 MM 디렉터리만 사용�
 });
 
 test("운영 알림 수신자는 활성 상태와 알림 조회 권한으로 결정한다", () => {
-  const operationalNotifications = readRepoFile(
-    "src/lib/operational-notifications.ts",
-  );
+  const operationalNotifications = [
+    "src/lib/operational-notifications/admin.ts",
+    "src/lib/operational-notifications/repository.supabase.ts",
+  ].map(readRepoFile).join("\n");
 
   assert.match(operationalNotifications, /listAdminAccounts\(\)/);
   assert.match(operationalNotifications, /account\.isActive/);

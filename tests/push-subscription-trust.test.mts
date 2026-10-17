@@ -316,7 +316,9 @@ test("등록·전송 경계와 subscribe route가 shared trust helper를 사용�
     webPushClientSource,
   ] = await Promise.all([
     readFile(new URL("../src/lib/push/subscriptions.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/lib/operational-notifications.ts", import.meta.url), "utf8"),
+    Promise.all(["subscriptions", "delivery"].map((name) =>
+      readFile(new URL(`../src/lib/operational-notifications/${name}.ts`, import.meta.url), "utf8"),
+    )).then((sources) => sources.join("\n")),
     readFile(new URL("../src/lib/push/send.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/admin-notification-ops-delivery.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/app/api/push/subscribe/route.ts", import.meta.url), "utf8"),

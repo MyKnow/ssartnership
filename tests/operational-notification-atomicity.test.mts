@@ -588,3 +588,150 @@ test("알림 생성 실패 후 dedupe 해제도 실패하면 두 원인을 Aggre
     },
   );
 });
+
+for (const audience of ["admin", "partner"] as const) {
+  test(`${audience} 환경 설정 수정은 기존 채널 설정을 유지하고 소유자 키에 저장한다`, async () => {
+    const calls: QueryCall[] = [];
+    installSupabase((call) => {
+      calls.push(call);
+      return {
+        data: call.operation === "select"
+          ? { enabled: true, portal_enabled: false, push_enabled: true, email_enabled: false }
+          : null,
+        error: null,
+      };
+    });
+    const api = await operationalNotificationsModulePromise;
+    const next = audience === "admin"
+      ? await api.upsertAdminOperationalNotificationPreferences("owner-1", { pushEnabled: false })
+      : await api.upsertPartnerOperationalNotificationPreferences("owner-1", { pushEnabled: false });
+    assert.equal(next.enabled, true);
+    assert.equal(next.portalEnabled, false);
+    assert.equal(next.pushEnabled, false);
+    const save = calls.find((call) => call.operation === "upsert");
+    assert.equal(save?.table, `${audience}_notification_preferences`);
+    assert.equal((save?.payload as Record<string, unknown>)[audience === "admin" ? "admin_id" : "account_id"], "owner-1");
+    assert.equal((save?.payload as Record<string, unknown>).portal_enabled, false);
+    assert.equal((save?.payload as Record<string, unknown>).push_enabled, false);
+  });
+
+  test(`${audience} 구독 장치 조회·개수·해제는 해당 계정 소유권을 유지한다`, async () => {
+    const calls: QueryCall[] = [];
+    installSupabase((call) => {
+      calls.push(call);
+      return {
+        data: call.operation === "select" ? [{
+          id: "device-1", endpoint: "https://push.example/device-1", user_agent: "Firefox",
+          created_at: "2026-01-01", updated_at: "2026-02-01", last_success_at: null,
+        }] : null,
+        count: 1,
+        error: null,
+      };
+    });
+    const api = await operationalNotificationsModulePromise;
+    const input = { ownerType: audience, ownerId: "owner-1" };
+    const devices = await api.listOperationalPushSubscriptionDevices({
+      ...input, currentEndpoint: "https://push.example/device-1",
+    });
+    assert.equal(devices[0].id, "device-1");
+    assert.equal(devices[0].isCurrent, true);
+    assert.equal(devices[0].lastSuccessAt, null);
+    assert.equal(await api.countOperationalPushSubscriptionDevices(input), 1);
+    await api.deactivateOperationalPushSubscription({ ...input, subscriptionId: "device-1" });
+    await api.deactivateOperationalPushSubscription({ ...input, endpoint: "https://push.example/device-1" });
+    await api.deactivateOperationalPushSubscription({ ...input, all: true, subscriptionId: "ignored" });
+    for (const call of calls) {
+      assert.equal(call.table, `${audience}_push_subscriptions`);
+      assert.ok(call.filters.some((filter) => filter.column === (audience === "admin" ? "admin_id" : "account_id") && filter.value === "owner-1"));
+    }
+    const updates = calls.filter((call) => call.operation === "update");
+    assert.deepEqual(updates.map((call) => call.filters.slice(1)), [
+      [{ operator: "eq", column: "id", value: "device-1" }],
+      [{ operator: "eq", column: "endpoint", value: "https://push.example/device-1" }],
+      [],
+    ]);
+    assert.ok(updates.every((call) => (call.payload as Record<string, unknown>).is_active === false));
+  });
+
+  test(`${audience} 푸시 미설정은 전송 조회 없이 skipped를 기록하고 알림을 유지한다`, async () => {
+    const calls: QueryCall[] = [];
+    installSupabase((call) => {
+      calls.push(call);
+      const inserted = notificationInsertResult(call, audience);
+      if (inserted) return inserted;
+      if (call.table === "admin_notification_preferences") return { data: [], error: null };
+      if (call.table === "partner_accounts") return { data: [{ id: "account-1", preferences: null }], error: null };
+      return { data: null, error: null };
+    });
+    setPushConfigured(false);
+    const api = await operationalNotificationsModulePromise;
+    const result = audience === "admin"
+      ? await api.createAdminOperationalNotification({ type: "security_alert", title: "제목", body: "본문", requestedChannels: ["push"] })
+      : await api.createPartnerOperationalNotification({ type: "plan_changed", companyId: "company-1", title: "제목", body: "본문", requestedChannels: ["push"] });
+    assert.equal(result.recipientCount, 0);
+    assert.equal(calls.some((call) => call.table === `${audience}_push_subscriptions`), false);
+    assert.equal(calls.some((call) => call.operation === "delete"), false);
+    const delivery = calls.find((call) => call.table === `${audience}_notification_deliveries`);
+    assert.equal((delivery?.payload as Record<string, unknown>).status, "skipped");
+    assert.equal((delivery?.payload as Record<string, unknown>).error_message, "Web Push 환경 변수가 설정되지 않았습니다.");
+  });
+}
+
+for (const accountIds of [undefined, ["account-1"]]) {
+  test(`파트너 수신자 조회는 ${accountIds ? "명시 계정" : "활성 회사 연결"} 범위를 유지한다`, async () => {
+    const calls: QueryCall[] = [];
+    installSupabase((call) => {
+      calls.push(call);
+      return notificationInsertResult(call, "partner") ?? { data: [], error: null };
+    });
+    const api = await operationalNotificationsModulePromise;
+    await api.createPartnerOperationalNotification({
+      type: "plan_changed", companyId: "company-1", accountIds,
+      title: "제목", body: "본문", requestedChannels: ["portal"],
+    });
+    const query = calls.find((call) => call.table === "partner_accounts");
+    assert.deepEqual(query?.filters, [
+      { operator: "eq", column: "is_active", value: true },
+      ...(accountIds
+        ? [{ operator: "in", column: "id", value: accountIds }]
+        : [
+          { operator: "eq", column: "links.company_id", value: "company-1" },
+          { operator: "eq", column: "links.is_active", value: true },
+        ]),
+    ]);
+    const notification = calls.find((call) => call.table === "partner_notifications");
+    assert.equal((notification?.payload as Record<string, unknown>).company_id, "company-1");
+  });
+}
+
+test("환경 설정 행이 없으면 기본값을 사용하고 불완전한 행의 관리자·파트너 opt-in 차이를 보존한다", async () => {
+  const api = await operationalNotificationsModulePromise;
+  installSupabase(() => ({ data: null, error: null }));
+  assert.equal((await api.getAdminOperationalNotificationPreferences("admin-1")).enabled, true);
+  assert.equal((await api.getPartnerOperationalNotificationPreferences("account-1")).enabled, true);
+  installSupabase(() => ({ data: {}, error: null }));
+  assert.equal((await api.getAdminOperationalNotificationPreferences("admin-1")).enabled, false);
+  assert.equal((await api.getPartnerOperationalNotificationPreferences("account-1")).enabled, true);
+});
+
+test("dedupe 저장은 유일키 충돌만 중복으로 처리하고 해제는 예약 전체 식별자로 제한한다", async () => {
+  const api = await operationalNotificationsModulePromise;
+  const dedupe = { dedupeKey: "dedupe-1", audience: "admin" as const, notificationType: "security_alert", targetId: "target-1" };
+  const calls: QueryCall[] = [];
+  installSupabase((call) => { calls.push(call); return { error: null }; });
+  assert.equal(await api.claimOperationalNotificationDedupe(dedupe), true);
+  await api.releaseOperationalNotificationDedupe(dedupe);
+  assert.deepEqual(calls[0].payload, {
+    dedupe_key: "dedupe-1", audience: "admin", notification_type: "security_alert", target_id: "target-1",
+  });
+  assert.deepEqual(calls[1].filters, [
+    { operator: "eq", column: "dedupe_key", value: "dedupe-1" },
+    { operator: "eq", column: "audience", value: "admin" },
+    { operator: "eq", column: "notification_type", value: "security_alert" },
+    { operator: "eq", column: "target_id", value: "target-1" },
+  ]);
+  installSupabase(() => ({ error: { code: "23505", message: "duplicate" } }));
+  assert.equal(await api.claimOperationalNotificationDedupe(dedupe), false);
+  installSupabase(() => ({ error: { code: "08006", message: "storage unavailable" } }));
+  await assert.rejects(api.claimOperationalNotificationDedupe(dedupe), /storage unavailable/);
+});
