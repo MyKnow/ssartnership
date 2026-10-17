@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { act, useCallback, useState } from "react";
 import type { FormEvent } from "react";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, fn, userEvent, waitFor, within } from "storybook/test";
@@ -13,6 +13,8 @@ import type {
   AdminPushManagerProps,
   MemberOption,
 } from "./types";
+
+const STORYBOOK_FETCH = globalThis.fetch;
 
 const partners: AdminPushManagerProps["partners"] = [
   { id: "partner-1", name: "분식랩" },
@@ -113,6 +115,8 @@ function StatefulPushComposerSection({
   initialReviewState = null,
   onReview = async () => {},
   onConfirmSubmit = async () => {},
+  remoteSearch = false,
+  onRecipientOptionsLoaded,
 }: {
   pushConfigured?: boolean;
   mattermostConfigured?: boolean;
@@ -121,8 +125,16 @@ function StatefulPushComposerSection({
   initialReviewState?: { preview: AdminNotificationPreview } | null;
   onReview?: () => Promise<void>;
   onConfirmSubmit?: () => Promise<void>;
+  remoteSearch?: boolean;
+  onRecipientOptionsLoaded?: (members: MemberOption[]) => void;
 }) {
   const [composer, setComposer] = useState(initialComposer);
+  const [recipientOptions, setRecipientOptions] = useState(members);
+  const [pending, setPending] = useState(false);
+  const handleRecipientOptionsLoaded = useCallback((loaded: MemberOption[]) => {
+    setRecipientOptions((current) => [...new Map([...current, ...loaded].map((member) => [member.id, member])).values()]);
+    onRecipientOptionsLoaded?.(loaded);
+  }, [onRecipientOptionsLoaded]);
   const [reviewState, setReviewState] = useState<{ preview: AdminNotificationPreview } | null>(
     initialReviewState,
   );
@@ -140,7 +152,7 @@ function StatefulPushComposerSection({
       pushConfigured={pushConfigured}
       mattermostConfigured={mattermostConfigured}
       errorMessage={errorMessage}
-      pending={false}
+      pending={pending}
       previewPending={false}
       reviewState={reviewState}
       audienceYearOptions={[15, 14]}
@@ -151,12 +163,18 @@ function StatefulPushComposerSection({
       sendConfirmOpen={sendConfirmOpen}
       composer={composer}
       partners={partners}
-      members={members}
+      members={recipientOptions}
+      onRecipientOptionsLoaded={remoteSearch ? handleRecipientOptionsLoaded : undefined}
       getMemberLabel={getMemberLabel}
       onSubmit={handleSubmit}
       onConfirmSubmit={async () => {
-        await onConfirmSubmit();
-        setSendConfirmOpen(false);
+        setPending(true);
+        try {
+          await onConfirmSubmit();
+          setSendConfirmOpen(false);
+        } finally {
+          setPending(false);
+        }
       }}
       onReview={async () => {
         await onReview();
@@ -230,6 +248,10 @@ function StatefulPushComposerSection({
 const meta = {
   title: "Domains/Admin/PushComposerSection",
   component: StatefulPushComposerSection,
+  beforeEach: () => {
+    window.fetch = STORYBOOK_FETCH;
+    return () => { window.fetch = STORYBOOK_FETCH; };
+  },
   args: {
     pushConfigured: false,
     mattermostConfigured: true,
@@ -298,7 +320,9 @@ export const InteractiveComposer: Story = {
     await expect(
       await recipientDialog.findByText("현재 표시 1명", {}, { timeout: 4000 }),
     ).toBeInTheDocument();
-    await userEvent.click(recipientCloseButton);
+    await act(async () => {
+      await userEvent.keyboard("{Escape}");
+    });
 
     await waitFor(
       () => {
@@ -306,6 +330,8 @@ export const InteractiveComposer: Story = {
       },
       { timeout: 4000 },
     );
+
+    await expect(canvas.getByRole("button", { name: /발송 가능 대상/ })).toHaveFocus();
 
     await userEvent.selectOptions(canvas.getByLabelText("연결 페이지 선택(선택)"), "partner-2");
     await userEvent.clear(canvas.getByLabelText("이동 URL(선택)"));
@@ -321,6 +347,9 @@ export const InteractiveComposer: Story = {
     const confirmInput = body.getByPlaceholderText("2명 발송");
     const sendButton = body.getByRole("button", { name: "메시지 보내기" });
     await expect(sendButton).toBeDisabled();
+    await userEvent.type(confirmInput, "다른 확인 문구");
+    await expect(sendButton).toBeDisabled();
+    await userEvent.clear(confirmInput);
     await userEvent.type(confirmInput, "2명 발송");
     await expect(sendButton).toBeEnabled();
     await userEvent.click(sendButton);
@@ -351,6 +380,101 @@ export const YearScopeWithoutWarning: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.queryByText("일부 채널을 현재 사용할 수 없습니다.")).not.toBeInTheDocument();
     await expect(canvas.getByLabelText("기수")).toHaveValue("15");
+    await expect(canvas.getByText("현재 발송 가능 회원 2명")).toBeInTheDocument();
+  },
+};
+
+export const RecipientSearchFailureAndRecovery: Story = {
+  args: { remoteSearch: true, errorMessage: null, onRecipientOptionsLoaded: fn() },
+  beforeEach: () => {
+    window.fetch = async (input) => {
+      const url = new URL(String(input), window.location.origin);
+      return url.searchParams.get("query") === "ops"
+        ? Response.json({ recipients: [members[1]] })
+        : Response.json({ message: "알 수 없는 내부 오류" }, { status: 500 });
+    };
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    await userEvent.click(canvas.getByRole("button", { name: "개인 선택" }));
+    const dialog = within(await body.findByRole("dialog", { name: "개인 대상 선택" }));
+    await waitFor(() => expect(dialog.getByRole("button", { name: "모달 닫기" })).toHaveFocus());
+    await expect(await dialog.findByText("개인 발송 대상을 불러오지 못했습니다.")).toBeInTheDocument();
+    await userEvent.click(dialog.getAllByRole("checkbox")[0]);
+    await userEvent.type(dialog.getByPlaceholderText("이름, Mattermost 아이디, 기수, 캠퍼스"), "ops");
+    await waitFor(() => expect(args.onRecipientOptionsLoaded).toHaveBeenCalledWith([members[1]]));
+    await expect(dialog.queryByText("개인 발송 대상을 불러오지 못했습니다.")).not.toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("button", { name: "현재 결과 전체 선택" }));
+    await expect(dialog.getByText("현재 선택 2명")).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("button", { name: "완료" }));
+    await waitFor(() => expect(canvas.getByRole("button", { name: /김싸피.*외 1명/ })).toHaveFocus());
+  },
+};
+
+export const RecipientSearchCancellation: Story = {
+  args: { remoteSearch: true, errorMessage: null, onRecipientOptionsLoaded: fn() },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    const requests: Array<{ signal: AbortSignal | null | undefined; resolve: (value: Response) => void }> = [];
+    window.fetch = (_input, init) => new Promise<Response>((resolve) => {
+      requests.push({ signal: init?.signal, resolve });
+    });
+    await userEvent.click(canvas.getByRole("button", { name: "개인 선택" }));
+    const dialog = within(await body.findByRole("dialog", { name: "개인 대상 선택" }));
+    await waitFor(() => expect(dialog.getByRole("button", { name: "모달 닫기" })).toHaveFocus());
+    await expect(await dialog.findByText("대상자 검색 중")).toBeInTheDocument();
+    await userEvent.type(dialog.getByPlaceholderText("이름, Mattermost 아이디, 기수, 캠퍼스"), "ops");
+    await waitFor(() => expect(requests.length).toBeGreaterThan(1));
+    await expect(requests[0].signal?.aborted).toBe(true);
+    const currentRequest = requests.at(-1)!;
+    await act(async () => {
+      await userEvent.keyboard("{Escape}");
+    });
+    await waitFor(() => expect(currentRequest.signal?.aborted).toBe(true));
+    const parseResponse = fn(async () => ({ recipients: [members[1]] }));
+    for (const request of requests) {
+      const response = Response.json({ recipients: [members[1]] });
+      response.json = parseResponse;
+      request.resolve(response);
+    }
+    await waitFor(() => expect(parseResponse).toHaveBeenCalledTimes(requests.length));
+    await expect(args.onRecipientOptionsLoaded).not.toHaveBeenCalled();
+    await waitFor(() => expect(canvas.getByRole("button", { name: "개인 선택" })).toHaveFocus());
+  },
+};
+
+export const PendingSendPreventsRepeatedSubmit: Story = {
+  args: {
+    errorMessage: null,
+    initialReviewState: { preview },
+    initialComposer: { ...baseComposer, selectedMemberIds: ["member-1", "member-2"], confirmationText: "2명 발송" },
+    onConfirmSubmit: fn(() => new Promise<void>(() => {})),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    await userEvent.click(canvas.getByRole("button", { name: "마지막 확인" }));
+    const dialog = within(await body.findByRole("dialog", { name: "2명에게 발송" }));
+    await waitFor(() => expect(dialog.getByRole("button", { name: "모달 닫기" })).toHaveFocus());
+    await userEvent.click(dialog.getByRole("button", { name: "메시지 보내기" }));
+    const pendingButton = await dialog.findByRole("button", { name: "발송 중" });
+    await expect(pendingButton).toBeDisabled();
+    await expect(dialog.getByRole("button", { name: "취소" })).toBeDisabled();
+    await userEvent.click(pendingButton);
+    await expect(args.onConfirmSubmit).toHaveBeenCalledTimes(1);
+  },
+};
+
+export const UnsendableReviewDisablesFinalConfirmation: Story = {
+  args: {
+    errorMessage: null,
+    initialReviewState: { preview: { ...preview, canSend: false } },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("button", { name: "마지막 확인" })).toBeDisabled();
     await expect(canvas.getByText("현재 발송 가능 회원 2명")).toBeInTheDocument();
   },
 };
