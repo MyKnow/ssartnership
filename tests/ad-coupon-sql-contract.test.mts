@@ -83,9 +83,11 @@ describe("issue_ad_coupon SQL contract", () => {
 });
 
 describe("ad coupon deletion and campaign status writes", () => {
-  const repositorySource = readFileSync(
-    new URL("../src/lib/repositories/supabase/ad-package-repository.supabase.ts", import.meta.url),
-    "utf8",
+  const couponRepositorySource = readFileSync(
+    new URL("../src/lib/repositories/supabase/ad-package-coupon-catalog.supabase.ts", import.meta.url), "utf8",
+  );
+  const campaignRepositorySource = readFileSync(
+    new URL("../src/lib/repositories/supabase/ad-package-campaigns.supabase.ts", import.meta.url), "utf8",
   );
   const issueRpc = readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8");
 
@@ -111,9 +113,8 @@ describe("ad coupon deletion and campaign status writes", () => {
   });
 
   it("deletes only an unchanged non-active coupon without history", () => {
-    const deleteSource = repositorySource.slice(
-      repositorySource.indexOf("async deleteCoupon("),
-      repositorySource.indexOf("async issueCoupon("),
+    const deleteSource = couponRepositorySource.slice(
+      couponRepositorySource.indexOf("async deleteCoupon("),
     );
     const versionRead = deleteSource.indexOf('.select("status,updated_at")');
     const historyCount = deleteSource.indexOf('.from("ad_coupon_issues")');
@@ -127,9 +128,9 @@ describe("ad coupon deletion and campaign status writes", () => {
   });
 
   it("re-checks the coupon status transition and updates with a compare-and-set", () => {
-    const updateSource = repositorySource.slice(
-      repositorySource.indexOf("async updateCoupon("),
-      repositorySource.indexOf("async duplicateCoupon("),
+    const updateSource = couponRepositorySource.slice(
+      couponRepositorySource.indexOf("async updateCoupon("),
+      couponRepositorySource.indexOf("async duplicateCoupon("),
     );
     assert.match(updateSource, /canTransitionAdCouponStatus\(currentStatus, nextStatus\)/);
     assert.match(updateSource, /throw new AdStatusTransitionError\("coupon", currentStatus, nextStatus\)/);
@@ -142,9 +143,8 @@ describe("ad coupon deletion and campaign status writes", () => {
   });
 
   it("updates campaign status with a validated compare-and-set", () => {
-    const updateSource = repositorySource.slice(
-      repositorySource.indexOf("async updateCampaignStatus("),
-      repositorySource.indexOf("async createCoupon("),
+    const updateSource = campaignRepositorySource.slice(
+      campaignRepositorySource.indexOf("async updateCampaignStatus("),
     );
     assert.match(updateSource, /canTransitionAdCampaignStatus\(from, input\.status\)/);
     assert.match(

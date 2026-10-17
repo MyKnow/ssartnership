@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 
 const repositorySource = readFileSync(
   new URL(
-    "../src/lib/repositories/supabase/ad-package-repository.supabase.ts",
+    "../src/lib/repositories/supabase/ad-package-coupon-issues.supabase.ts",
     import.meta.url,
   ),
   "utf8",
