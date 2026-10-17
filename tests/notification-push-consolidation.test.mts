@@ -84,7 +84,7 @@ test("알림·이벤트 회원 순회는 탈퇴 회원을 제외하고 PK 순서
   );
 
   // 추첨 후보 순서 계약 때문에 이벤트 보상 후보는 기존 정렬을 유지한다.
-  const eventRewards = readSource("src/lib/promotions/event-rewards.ts");
+  const eventRewards = readSource("src/lib/promotions/event-rewards-repository.ts");
   assert.match(
     eventRewards,
     /\.select\(MEMBER_EVENT_CANDIDATE_SELECT\)\s*\.is\("deleted_at", null\)[\s\S]{0,200}\.order\("generation", \{ ascending: false \}\)\s*\.order\("display_name", \{ ascending: true \}\)\s*\.order\("id", \{ ascending: true \}\)/,

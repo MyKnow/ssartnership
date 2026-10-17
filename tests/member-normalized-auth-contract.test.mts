@@ -331,7 +331,7 @@ test("운영 알림 수신자는 활성 상태와 알림 조회 권한으로 결
 });
 
 test("이벤트 보상 후보는 세대·MM 디렉터리·정책 consent ledger로 구성한다", () => {
-  const eventRewards = readRepoFile("src/lib/promotions/event-rewards.ts");
+  const eventRewards = readRepoFile("src/lib/promotions/event-rewards-repository.ts");
 
   assert.match(eventRewards, /getMmUserDirectoryEntriesByAccountIds/);
   assert.match(eventRewards, /\.from\("member_policy_consents"\)/);
