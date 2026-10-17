@@ -12,7 +12,7 @@ import { getHeaderSession } from "@/lib/header-session";
 import { getPartnerViewerContext } from "@/lib/partner-view-context";
 import { getSignedUserSession } from "@/lib/user-auth";
 import {
-  buildHomePartnerMemberState,
+  buildHomePartnerDirectoryMemberState,
   getHomeMemberFavoritePartnerIds,
   getHomePartnerPopularityById,
 } from "@/lib/home-partner-state";
@@ -124,10 +124,9 @@ export default async function CampusLandingPage({
     ? getHeaderSession(userId)
     : Promise.resolve(null);
   const categoriesPromise = getCampusCategoriesCached();
-  const favoritePartnerIdsPromise = getHomeMemberFavoritePartnerIds(userId);
   const viewerContext = await getPartnerViewerContext(userId);
 
-  const [headerSession, categories, partners] = await Promise.all([
+  const [headerSession, categories, partners, favoritePartnerIds] = await Promise.all([
     headerSessionPromise,
     categoriesPromise,
     viewerContext.authenticated
@@ -137,6 +136,7 @@ export default async function CampusLandingPage({
           viewerContext.viewerAudience,
         )
       : getCampusPublicDirectoryPartnersCached(campus.slug),
+    getHomeMemberFavoritePartnerIds(userId, { failOnError: true }),
   ]);
 
   const campusPartners = partners.map((partner) => {
@@ -157,16 +157,13 @@ export default async function CampusLandingPage({
     viewerAuthenticated: viewerContext.authenticated,
     popularityByPartnerId: {},
   });
-  const [partnerPopularityById, favoritePartnerIds] = await Promise.all([
-    getHomePartnerPopularityById(popularityCandidates.displayPartnerIds),
-    favoritePartnerIdsPromise,
-  ]);
+  const partnerPopularityById = await getHomePartnerPopularityById(popularityCandidates.displayPartnerIds);
   const rankedDirectory = buildHomePartnerDirectory({
     partners: campusPartners,
     viewerAuthenticated: viewerContext.authenticated,
     popularityByPartnerId: partnerPopularityById,
   });
-  const memberState = buildHomePartnerMemberState(
+  const memberState = buildHomePartnerDirectoryMemberState(
     rankedDirectory.displayPartnerIds,
     favoritePartnerIds,
   );

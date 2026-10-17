@@ -127,3 +127,53 @@ export const Loading: Story = {
 export const Error: Story = {
   render: () => <HomeDirectoryError />,
 };
+
+
+export const SavedPartners: Story = {
+  parameters: { nextjs: { appDirectory: true, navigation: { pathname: "/", query: { saved: "1" } } } },
+  render: ({ partners }) => (
+    <ToastProvider>
+      <HomeView categories={categories} partners={partners} viewerAuthenticated currentUserId="story-member-1"
+        partnerFavoriteStateById={{ [partners[0].id]: true }} loadedFavoritePartnerIds={partners.map((partner) => partner.id)} />
+    </ToastProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("button", { name: "즐겨찾기" })).toHaveAttribute("aria-pressed", "true");
+    await expect(canvas.getAllByTestId("partner-card")).toHaveLength(1);
+    await expect(canvas.getByRole("link", { name: /바디라인 역삼점 상세 보기/ })).toBeVisible();
+  },
+};
+
+export const EmptySavedPartners: Story = {
+  parameters: { nextjs: { appDirectory: true, navigation: { pathname: "/", query: { saved: "1" } } } },
+  render: ({ partners }) => (
+    <ToastProvider>
+      <HomeView categories={categories} partners={partners} viewerAuthenticated currentUserId="story-member-1"
+        partnerFavoriteStateById={{}} loadedFavoritePartnerIds={partners.map((partner) => partner.id)} />
+    </ToastProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("조건에 맞는 즐겨찾기가 없어요")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "전체 제휴처 보기" })).toBeVisible();
+  },
+};
+
+export const GuestSavedPartners: Story = {
+  parameters: { nextjs: { appDirectory: true, navigation: { pathname: "/", query: { saved: "1", category: "food" } } } },
+  render: ({ partners }) => (
+    <ToastProvider>
+      <HomeView categories={categories} partners={partners} viewerAuthenticated={false} currentUserId={null} />
+    </ToastProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const login = canvas.getByRole("link", { name: "로그인하기" });
+    await expect(login).toBeVisible();
+    const href = new URL(login.getAttribute("href")!, "https://example.com");
+    const returnTo = new URL(href.searchParams.get("returnTo")!, "https://example.com");
+    await expect(returnTo.searchParams.get("saved")).toBe("1");
+    await expect(returnTo.searchParams.get("category")).toBe("food");
+  },
+};

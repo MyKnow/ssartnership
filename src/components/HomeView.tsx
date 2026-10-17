@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import Button from "@/components/ui/Button";
+import { FOCUS_RING_ON_BACKGROUND_CLASS_NAME } from "@/components/ui/focus-ring";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   useCallback,
@@ -76,6 +79,8 @@ export default function HomeView({
   const sortValue = directoryState.sort;
   const searchValue = directoryState.q;
   const viewMode = directoryState.view;
+  const favoritesOnly = directoryState.favoritesOnly === true;
+  const savedLoginHref = `/auth/login?${new URLSearchParams({ returnTo: `${pathname}?${serializeHomeDirectoryState({ ...directoryState, favoritesOnly: true }, searchParams)}#benefits` })}`;
   const [visibleCardState, setVisibleCardState] = useState({
     key: "",
     limit: INITIAL_PARTNER_CARD_COUNT,
@@ -153,7 +158,9 @@ export default function HomeView({
 
   const filteredPartners = useMemo(() => {
     return filterHomePartners({
-      partners: normalizedPartners,
+      partners: favoritesOnly
+        ? normalizedPartners.filter((partner) => Boolean(currentUserId && localFavoriteStateById[partner.id]))
+        : normalizedPartners,
       activeCategory,
       campusFilter,
       appliesToFilter,
@@ -164,6 +171,9 @@ export default function HomeView({
     activeCategory,
     campusFilter,
     appliesToFilter,
+    currentUserId,
+    favoritesOnly,
+    localFavoriteStateById,
     deferredSearchValue,
     normalizedPartners,
     sortValue,
@@ -435,6 +445,20 @@ export default function HomeView({
               onAppliesToFilterChange={handleAppliesToFilterChange}
               onSortChange={handleSortChange}
             />
+            <div className="flex min-w-0 flex-wrap gap-2" role="group" aria-label="제휴처 모아보기">
+              <Button type="button" variant={favoritesOnly ? "secondary" : "primary"} ariaPressed={!favoritesOnly} onClick={() => updateDirectoryState({ favoritesOnly: false }, "push")}>
+                전체 제휴처
+              </Button>
+              {currentUserId ? (
+                <Button type="button" variant={favoritesOnly ? "primary" : "secondary"} ariaPressed={favoritesOnly} onClick={() => updateDirectoryState({ favoritesOnly: true }, "push")}>
+                  즐겨찾기
+                </Button>
+              ) : (
+                <Link href={savedLoginHref} className={cn("inline-flex min-h-11 items-center rounded-control border border-border bg-surface-control px-4 text-sm font-semibold text-foreground", FOCUS_RING_ON_BACKGROUND_CLASS_NAME)}>
+                  즐겨찾기
+                </Link>
+              )}
+            </div>
             <PartnerDirectoryToolbar
               resultCount={directoryResultCount}
               viewMode={viewMode}
@@ -445,13 +469,18 @@ export default function HomeView({
           {displayPartners.length === 0 ? (
             <div data-testid="partner-no-results">
               <EmptyState
+                action={favoritesOnly ? currentUserId ? <Button type="button" variant="secondary" onClick={() => updateDirectoryState({ favoritesOnly: false }, "push")}>전체 제휴처 보기</Button> : <Link href={savedLoginHref} className={cn("inline-flex min-h-11 items-center text-primary underline", FOCUS_RING_ON_BACKGROUND_CLASS_NAME)}>로그인하기</Link> : undefined}
                 title={
-                  partners.length === 0
+                  favoritesOnly
+                    ? currentUserId ? "조건에 맞는 즐겨찾기가 없어요" : "로그인하면 저장한 제휴처를 볼 수 있어요"
+                    : partners.length === 0
                     ? HOME_COPY.emptyTitle
                     : HOME_COPY.noResultsTitle
                 }
                 description={
-                  partners.length === 0
+                  favoritesOnly
+                    ? "필터를 바꾸거나 전체 목록에서 즐겨찾기를 눌러 저장해 보세요."
+                    : partners.length === 0
                     ? HOME_COPY.emptyDescription
                     : HOME_COPY.noResultsDescription
                 }

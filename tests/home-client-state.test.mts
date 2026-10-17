@@ -111,3 +111,16 @@ test("full-document Back restores scroll when popstate preceded hydration, while
   assert.equal(isHomeHistoryReturn("1", "navigate"), true);
   for (const type of [undefined, "navigate", "reload"]) assert.equal(isHomeHistoryReturn(null, type), false);
 });
+
+
+test("saved directory URL is canonical, preserves other filters and changes restoration identity", async () => {
+  const { parseHomeDirectoryState, serializeHomeDirectoryState } = await import("../src/lib/home-directory-state.ts");
+  const all = parseHomeDirectoryState(new URLSearchParams("category=cafe&q=커피&campaign=test"));
+  const saved = parseHomeDirectoryState(new URLSearchParams("category=cafe&q=커피&saved=1"));
+  assert.equal(saved.favoritesOnly, true);
+  assert.notEqual(homeDirectoryKey(all), homeDirectoryKey(saved));
+  assert.equal(parseHomeDirectoryState(new URLSearchParams("saved=true")).favoritesOnly, undefined);
+  const params = serializeHomeDirectoryState(saved, new URLSearchParams("campaign=test"));
+  assert.equal(params.get("saved"), "1"); assert.equal(params.get("category"), "cafe"); assert.equal(params.get("campaign"), "test");
+  assert.equal(serializeHomeDirectoryState({ ...saved, favoritesOnly: false }, params).has("saved"), false);
+});

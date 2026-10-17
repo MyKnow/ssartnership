@@ -7,7 +7,7 @@ import { unstable_rethrow } from "next/navigation";
 import { describeServerError, logServerError } from "@/lib/server-log";
 import type { PartnerAudienceFilter, PartnerAudienceKey } from "@/lib/partner-audience";
 import {
-  buildHomePartnerMemberState,
+  buildHomePartnerDirectoryMemberState,
   getHomeMemberFavoritePartnerIds,
   getHomePartnerPopularityById,
   type HomePartnerState,
@@ -92,7 +92,7 @@ const homePartnerDirectoryDependencies: HomePartnerDirectoryDependencies = {
   getPartners: (context) => partnerRepository.getPartners(context),
   getPublicDirectoryPartners: (context) => partnerRepository.getPublicDirectoryPartners(context),
   getPopularityByPartnerId: getHomePartnerPopularityById,
-  getMemberFavoritePartnerIds: getHomeMemberFavoritePartnerIds,
+  getMemberFavoritePartnerIds: (currentUserId) => getHomeMemberFavoritePartnerIds(currentUserId, { failOnError: true }),
 };
 
 function getHomeDirectoryErrorCause(error: unknown) {
@@ -198,6 +198,8 @@ dependencies: HomePartnerDirectoryDependencies = homePartnerDirectoryDependencie
   const favoritePartnerIdsPromise = dependencies.getMemberFavoritePartnerIds(
     currentUserId,
   );
+  // This only prevents an early unhandled rejection; the original promise is
+  // awaited below and any failure reaches the recoverable directory error.
   favoritePartnerIdsPromise.catch(() => undefined);
   const [categories, partners] = await Promise.all([
     dependencies.getCategories(),
@@ -234,7 +236,7 @@ dependencies: HomePartnerDirectoryDependencies = homePartnerDirectoryDependencie
     query: resolvedQuery,
   });
   const partnerState: HomePartnerState = {
-    ...buildHomePartnerMemberState(
+    ...buildHomePartnerDirectoryMemberState(
       directory.displayPartnerIds,
       favoritePartnerIds,
     ),
