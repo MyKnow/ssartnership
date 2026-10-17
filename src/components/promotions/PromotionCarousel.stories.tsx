@@ -60,9 +60,12 @@ export const PauseControl: Story = {
     const pause = within(canvasElement).getByRole("button", {
       name: "광고 자동 재생 일시정지",
     });
+    const initialPaused = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     await expect(pause).toBeVisible();
-    await expect(pause).toHaveAttribute("aria-pressed", "false");
+    await expect(pause).toHaveAttribute("aria-pressed", String(initialPaused));
     await userEvent.click(pause);
-    await expect(pause).toHaveAttribute("aria-pressed", "true");
+    await expect(pause).toHaveAttribute("aria-pressed", String(!initialPaused));
+    await userEvent.click(pause);
+    await expect(pause).toHaveAttribute("aria-pressed", String(initialPaused));
   },
 };
