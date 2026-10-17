@@ -16,20 +16,28 @@ last_verified: 2026-10-06
 
 리뷰·가입 이미지의 재시도/중복 정리 경합은 승인된 [회귀 계획](./active/refactor-regression-2026-10.md#확인된-수정-단위)의 TX 작업으로 옮겼다. 로컬 SQL·SDK·독립 검토 증거가 있으나 dev·Preview 적용은 해당 전달 영수증 확인 전까지 미완료다. 아래 기존 결함 행을 제거한 것은 승인되지 않은 부채에서 active 작업으로 옮긴 것이며, 배포 완료 선언이 아니다. RUM 행은 이미 확인한 공용 관측 적용·실화면 검증과 남은 운영 결정을 구분해 갱신했다. 다른 행의 전체 freshness나 이 문서의 기준 시점을 새로 인증하지 않는다.
 
+## 2026-10-17 부분 갱신 범위
+
+[#591](https://github.com/MyKnow/ssartnership/issues/591)의 문서 작업(R8)에서 `2e29183854d5f6d71a928a1317a951be4d03a45f`를 직접 재측정했다. 아래 직접 테이블 호출 집계, 프로모션 편집기 분리, 서버 전용 표식, Database 타입 적용 범위만 현재 코드와 대조했다. 다른 행과 기존 운영·전달 기록은 재검증하지 않았으므로 문서 전체의 `last_verified`와 원래 기준 시점은 유지한다.
+
+사용자는 책임 분리·테스트·타입 파일럿·문서 정리 8개 단위(R1~R8)의 실행을 명시적으로 승인했다. 승인 범위와 완료 조건은 [책임 분리 후속 실행 계획](./active/refactor-responsibility-wave-2026-10.md)이 정본이다. 해당 범위는 장래 기능 변경을 기다리지 않고 진행하며, 이 승인이 아래 보류·제외 항목 전체나 운영자 조치를 재개하는 것은 아니다.
+
 ## 증가 금지 기준
 
 수치가 늘어나는 변경은 리뷰에서 거절하고, 줄어들면 같은 PR에서 기준값을 낮춘다.
 
 | 기준 | 기준값 | 규칙 | Issue |
 | --- | --- | --- | --- |
-| `src/lib/repositories` 밖에서 테이블에 직접 `.from("<table>")`을 호출하는 파일 | 124개(`src/app/api` 21, `src/app/admin` 19) | 새 파일 추가 금지. 0건 목표는 두지 않는다([결정 D5](./active/refactor-program-2026-10.md#기본-결정)). | #530 |
+| `src/lib/repositories` 밖에서 테이블에 직접 `.from("<table>")`을 호출하는 파일 | 122개(`src/app/api` 20, `src/app/admin` 18), 2026-10-17 위 커밋 기준 | 새 파일 추가 금지. 0건 목표는 두지 않는다([결정 D5](./active/refactor-program-2026-10.md#기본-결정)). | #530 |
+
+이 수치는 아래 정규식에 일치하는 파일 수다. D4가 허용한 `src/lib/image-upload/repository.supabase.ts`, `src/lib/project-showcase/repository.supabase.ts` 같은 도메인 Repository도 포함하므로 122개 전체를 경계 위반으로 해석하지 않는다. 호출 횟수, 동적 테이블명, RPC, Storage 접근을 집계한 값도 아니다.
 
 측정 명령:
 
 ```bash
-grep -rlE "\.from\([\"'][a-z_]+[\"']\)" src | grep -v "^src/lib/repositories/" | wc -l
-grep -rlE "\.from\([\"'][a-z_]+[\"']\)" src | grep -v "^src/lib/repositories/" | grep -c "^src/app/api/"
-grep -rlE "\.from\([\"'][a-z_]+[\"']\)" src | grep -v "^src/lib/repositories/" | grep -c "^src/app/admin/"
+rg -l '\.from\(["\x27][a-z_]+["\x27]\)' src -g '!src/lib/repositories/**' | wc -l
+rg -l '\.from\(["\x27][a-z_]+["\x27]\)' src/app/api | wc -l
+rg -l '\.from\(["\x27][a-z_]+["\x27]\)' src/app/admin | wc -l
 ```
 
 ## 핫스팟 후보
@@ -39,7 +47,6 @@ grep -rlE "\.from\([\"'][a-z_]+[\"']\)" src | grep -v "^src/lib/repositories/" |
 | 대상 | 현재 근거 | 재개 조건 | Issue |
 | --- | --- | --- | --- |
 | `src/components/admin/push-manager/PushComposerSection.tsx` | 970줄 단일 컴포넌트에 대상 선택·미리보기·발송 상태가 모여 있다. | 관리자 푸시 작성 기능 변경이 예정될 때 | — |
-| `src/components/admin/promotion-carousel-editor/PromotionCarouselEditor.tsx` | 1,204줄이며 default 컴포넌트 하나가 대부분을 차지한다. | 프로모션 편집기 기능 변경이 예정될 때 | — |
 | `src/lib/project-showcase/repository.supabase.ts`·`repository.mock.ts` | 1,079줄·989줄, 공개·소유자·관리자 지표·추첨·정산·파기가 한 인터페이스에 있다. | 다음 쇼케이스 운영을 위한 기능 변경 때(한시 기능이라 그 전에는 분해하지 않는다) | — |
 
 ## webpack 고정
@@ -67,8 +74,8 @@ Next가 webpack 지원 축소를 예고하면 위 조건과 무관하게 이 항
 
 | 항목 | 지금 허용하는 범위 | 전면 적용 재개 조건 | Issue |
 | --- | --- | --- | --- |
-| `src/lib` 평면 파일 디렉터리 재편(partner, admin, 알림, member, Mattermost, 텔레메트리, graduate 접두사) | partner portal 관련 6파일만 `src/lib/partner-auth/`로 이동(바깥 평면 파일에 의존하는 유일한 경계) | 배치 규칙([결정 D4](./active/refactor-program-2026-10.md#기본-결정))이 정착하고, 해당 도메인 기능 변경이 예정되며, 그 경로를 읽는 소스 계약 테스트를 먼저 재지정했을 때. 재개 전에 서버 전용 표식(`.server.ts` 접미사와 `server-only` import 중 무엇을 경계로 삼을지)을 먼저 정한다. 기준 시점에 `src`의 `.server.ts` 35개 중 `server-only`를 import하는 파일은 4개뿐이라 어느 쪽도 일관된 경계가 아니다. | — |
-| `supabase gen types` 기반 Database 타입 | 수동 생성 스크립트와 생성 파일 커밋, 저장소 1개 파일럿 typed accessor | 운영 DB와 같은 마이그레이션 적용 결과를 CI 밖에서 재현할 수 있을 때. 전역 적용은 기존 `as XxxRow` 단언이 타입 오류로 깨질 수 있어 단계적으로 한다. | — |
+| `src/lib` 평면 파일 디렉터리 재편(partner, admin, 알림, member, Mattermost, 텔레메트리, graduate 접두사) | partner portal 관련 6파일만 `src/lib/partner-auth/`로 이동(바깥 평면 파일에 의존하는 유일한 경계) | 배치 규칙([결정 D4](./active/refactor-program-2026-10.md#기본-결정))이 정착하고, 해당 도메인 기능 변경이 예정되며, 그 경로를 읽는 소스 계약 테스트를 먼저 재지정했을 때. 재개 전에 서버 전용 표식(`.server.ts` 접미사와 `server-only` import 중 무엇을 경계로 삼을지)을 먼저 정한다. 2026-10-17 위 커밋에서 `src`의 `.server.ts` 42개 중 side-effect `server-only` import가 있는 파일은 7개다. 이 두 표식만으로 일관된 전체 서버 경계를 판단하지 않는다. | — |
+| `supabase gen types` 기반 Database 타입의 전면 적용 | 수동 생성과 categories typed accessor는 이미 존재한다. `src/lib/supabase/database.generated.ts`는 8,506줄이고, 공용 `server.ts`의 `adminClient`와 `createClient`에는 `Database` generic이 없다(2026-10-17 위 커밋 확인). | 전역 적용은 기존 `as XxxRow` 단언이 타입 오류로 깨질 수 있어 단계적으로 한다. #591 R6의 광고·쿠폰 typed pilot은 [별도 승인 범위](./active/refactor-responsibility-wave-2026-10.md)이며, 생성 파일 존재만으로 공용 클라이언트·전체 Repository의 타입 적용 완료를 뜻하지 않는다. | #591(R6 한정, 전면 적용 미승인) |
 | route handler 공용 래퍼·API 응답 봉투 통일 | 새 라우트에만 `unauthorized()`·`forbidden()`·`payloadTooLarge()` 같은 상수 응답 적용 | 보안 경계 하드닝이 안착하고 가드 순서를 검사하는 소스 정규식 테스트를 동작 테스트로 바꾼 뒤 | — |
 | 공용 fake Supabase·mock/Supabase 계약 스위트 | 새 테스트에만 쓰는 작은 env·HTTP 테스트 헬퍼 | mock 지원 범위([결정 D6](./active/refactor-program-2026-10.md#기본-결정))가 바뀔 때 | — |
 | 소규모 정리 | 사건명 테스트 파일 리네임, 관리자 read model timeout 상수 3단계 통합, 파트너 플랜 RPC 에러 매퍼 추출과 허용 목록 패리티 테스트 | 해당 파일을 다른 이유로 수정할 때 | — |
@@ -142,4 +149,5 @@ Next가 webpack 지원 축소를 예고하면 위 조건과 무관하게 이 항
 
 ## 정리 기록
 
+- 2026-10-17: 프로모션 편집기의 오래된 1,204줄 후보 행을 제거했다. 위 커밋에서 `PromotionCarouselEditor.tsx`는 301줄이며 `usePromotionSlides.ts`(195줄)와 `usePromotionCarouselDraft.ts`(125줄)를 사용한다. 이미 존재하던 분리의 문서 정정이며 #591에서 새로 구현한 결과나 편집기 전체 품질 검증을 뜻하지 않는다. `PushComposerSection` 전체 후보는 유지하고 #591 R7의 수신자 모달 분리만 승인된 계획에서 추적한다.
 - 2026-10-05: 이전 원장의 "Push service와 관리자 UI 분해"는 `src/lib/push/*` 모듈 분리와 `AdminPushManager`·`PushSettingsCard` 축소로 끝나 삭제했다. 남은 큰 화면은 위 `PushComposerSection` 후보로 옮겼다. 범위가 정의되지 않은 "DB Schema-Service wave 11"도 삭제했다.
