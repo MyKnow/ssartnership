@@ -114,7 +114,7 @@ test("요청 로그 문맥과 푸시 구독 저장은 user agent 정규화 helpe
     [
       "../src/lib/activity-logs.ts",
       "../src/lib/push/subscriptions.ts",
-      "../src/lib/operational-notifications.ts",
+      "../src/lib/operational-notifications/subscriptions.ts",
     ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
   );
 
@@ -123,7 +123,7 @@ test("요청 로그 문맥과 푸시 구독 저장은 user agent 정규화 helpe
     2,
   );
   assert.match(memberPush, /user_agent: normalizeUserAgentHeader\(userAgent\)/);
-  assert.match(operationalPush, /user_agent: normalizeUserAgentHeader\(input\.userAgent\)/);
+  assert.match(operationalPush, /userAgent: normalizeUserAgentHeader\(input\.userAgent\)/);
 });
 
 test("동적 라우트 파라미터는 다시 decode하지 않고 비정상 값만 빈 문자열로 바꾼다", () => {

@@ -92,7 +92,7 @@ test("알림·이벤트 회원 순회는 탈퇴 회원을 제외하고 PK 순서
 });
 
 test("관리자·파트너 운영 푸시 팬아웃은 한 함수를 config로 공유한다", () => {
-  const operational = readSource("src/lib/operational-notifications.ts");
+  const operational = readSource("src/lib/operational-notifications/delivery.ts");
   assert.equal((operational.match(/async function sendOperationalPushDeliveries\(/g) ?? []).length, 1);
   assert.match(operational, /sendOperationalPushDeliveries\(ADMIN_OPERATIONAL_PUSH,/);
   assert.match(operational, /sendOperationalPushDeliveries\(PARTNER_OPERATIONAL_PUSH,/);
