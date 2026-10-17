@@ -11,6 +11,7 @@ import {
   DocumentPlusIcon,
   DocumentTextIcon,
   HomeIcon,
+  LinkIcon,
   MegaphoneIcon,
   PhotoIcon,
   QueueListIcon,
@@ -41,6 +42,7 @@ export type AdminNavIconKey =
   | "documentPlus"
   | "documentText"
   | "home"
+  | "link"
   | "megaphone"
   | "photo"
   | "queue"
@@ -83,6 +85,7 @@ export const ADMIN_NAV_ICON_BY_KEY: Record<AdminNavIconKey, AdminNavIcon> = {
   documentPlus: DocumentPlusIcon,
   documentText: DocumentTextIcon,
   home: HomeIcon,
+  link: LinkIcon,
   megaphone: MegaphoneIcon,
   photo: PhotoIcon,
   queue: QueueListIcon,
@@ -290,6 +293,15 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         keywords: ["기수", "SSAFY", "인증 카드"],
         iconKey: "userGroup",
         permission: { resource: "cycles" },
+      },
+      {
+        href: "/admin/mcp",
+        label: "AI 연결 관리",
+        description: "AI 앱 연결과 운영 승인·철회",
+        keywords: ["MCP", "OAuth", "연결", "인공지능"],
+        iconKey: "link",
+        permission: { resource: "brands" },
+        alwaysVisible: true,
       },
       {
         href: "/admin/admins",

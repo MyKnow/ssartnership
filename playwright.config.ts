@@ -83,6 +83,7 @@ export default defineConfig({
         reuseExistingServer: false,
         timeout: 120_000,
         env: {
+          NEXT_PUBLIC_SITE_URL: `http://localhost:${e2ePort}`,
           E2E_MOCK_MUTATIONS: "1",
           NEXT_DIST_DIR: ".next-e2e",
           NEXT_PUBLIC_DATA_SOURCE: "mock",
