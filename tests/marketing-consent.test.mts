@@ -151,7 +151,7 @@ test("마케팅 수신 판정 경로는 공용 predicate를 사용한다", () =>
     /import \{ getEffectiveMarketingConsentMemberIds \} from "@\/lib\/notifications\/marketing-consent"/,
   );
 
-  const eventRewards = readSource("src/lib/promotions/event-rewards.ts");
+  const eventRewards = readSource("src/lib/promotions/event-rewards-repository.ts");
   assert.match(eventRewards, /\.select\("member_id,enabled,mm_enabled,marketing_enabled"\)/);
   assert.match(eventRewards, /hasEffectiveMarketingConsent\(/);
 

@@ -63,6 +63,64 @@ const campaign = {
   rules: [],
 };
 
+test("event reward draw preserves tied candidate order, exact seeded winners and audit snapshot", async () => {
+  const { buildEventRewardAdminOverview, createEventRewardDrawPlan, buildEventRewardDrawAudit } =
+    await eventRewardsModulePromise;
+  const members = [
+    { id: "tie-b", displayName: "동명", reviewCount: 0 },
+    { id: "heavy", displayName: "가중", reviewCount: 2 },
+    { id: "tie-a", displayName: "동명", reviewCount: 0 },
+    { id: "zero", displayName: "미가입", reviewCount: 0 },
+  ].map((member) => ({
+    ...member,
+    mmUsername: member.id,
+    year: 15,
+    campus: "서울",
+    createdAt: member.id === "zero" ? "2026-05-13T00:00:00+09:00" : campaign.startsAt,
+    preferences: null,
+  }));
+  const originalMembers = structuredClone(members);
+  const overview = buildEventRewardAdminOverview(campaign, members);
+  const originalOverview = structuredClone(overview);
+  assert.deepEqual(overview.members.map((member) => member.id), ["heavy", "tie-b", "tie-a", "zero"]);
+
+  const plan = createEventRewardDrawPlan(overview, { winnerCount: 3, seed: " ordering-fixture " });
+  assert.equal(plan.seed, "ordering-fixture");
+  assert.equal(plan.candidateCount, 3);
+  assert.equal(plan.totalTickets, 5);
+  assert.deepEqual(plan.winners.map((winner) => [winner.rank, winner.memberId, winner.ticketCount]), [
+    [1, "tie-a", 1], [2, "heavy", 3], [3, "tie-b", 1],
+  ]);
+  assert.deepEqual(buildEventRewardDrawAudit(overview, "admin"), {
+    contractVersion: 1,
+    algorithm: "sha256-seeded-weighted-v1",
+    seedSource: "admin",
+    candidateCount: 3,
+    ticketCount: 5,
+    candidateSnapshotSha256: "8947e5865edd05f2a42eab1b4b88edff638ef56a9af8c901f7a72e223b008a0c",
+  });
+  assert.deepEqual(members, originalMembers);
+  assert.deepEqual(overview, originalOverview);
+});
+
+test("event reward comparison treats campaign start as before and campaign end as eligible", async () => {
+  const { buildEventRewardComparisonOverview } = await eventRewardsModulePromise;
+  const overview = buildEventRewardComparisonOverview(campaign, [
+    campaign.startsAt, "2026-04-19T15:00:00.001Z", campaign.endsAt,
+    "2026-05-12T15:00:00.000Z", "invalid-date",
+  ].map((createdAt, index) => ({
+    id: String(index), displayName: String(index), mmUsername: String(index),
+    year: 15, campus: "서울", createdAt, preferences: null, reviewCount: 0,
+  })));
+  const byId = new Map(overview.members.map((member) => [member.id, member]));
+  assert.deepEqual([...byId.values()].map((member) => [
+    member.id, member.existedBeforeEvent, member.joinedDuringEvent, member.beforeKnownTickets, member.afterTickets,
+  ]), [
+    ["0", true, false, 1, 1], ["1", false, true, 0, 1], ["2", false, true, 0, 1],
+    ["3", false, false, 0, 0], ["4", false, false, 0, 0],
+  ]);
+});
+
 test("event reward admin overview aggregates member rows and condition counts", async () => {
   const { buildEventRewardAdminOverview } = await eventRewardsModulePromise;
 
@@ -547,7 +605,7 @@ test("event reward admin surfaces derive the slug instead of defaulting to signu
     readFile(new URL(`../${path}`, import.meta.url), "utf8");
   const [actions, rewards, page, section, exportRoute] = await Promise.all([
     read("src/app/admin/(protected)/_actions/promotion-actions.ts"),
-    read("src/lib/promotions/event-rewards.ts"),
+    read("src/lib/promotions/event-rewards-draw.ts"),
     read("src/app/admin/(protected)/event/[slug]/page.tsx"),
     read("src/components/admin/event-rewards/SignupRewardOverviewSection.tsx"),
     read("src/app/admin/(protected)/event/[slug]/rewards/export/route.ts"),

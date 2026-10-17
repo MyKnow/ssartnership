@@ -143,7 +143,7 @@ test("두 추첨 액션은 같은 감사 로그 키를 남기고 이벤트 추�
     await Promise.all([
       read("src/app/admin/(protected)/_actions/promotion-actions.ts"),
       read("src/app/admin/(protected)/events/project-showcase/actions.ts"),
-      read("src/lib/promotions/event-rewards.ts"),
+      read("src/lib/promotions/event-rewards-repository.ts"),
       read("src/lib/project-showcase/repository.supabase.ts"),
       read("src/lib/project-showcase/repository.mock.ts"),
     ]);
