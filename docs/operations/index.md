@@ -25,6 +25,7 @@ last_verified: 2026-08-29
 
 ## Audits
 
+- [2026-10-17 제휴처 확대 운영 검토안·접수 경로 확인](./audits/2026-10-17-partner-expansion.md)
 - [2026-06-24 유지보수 감사](./audits/2026-06-24-maintenance.md)
 - [2026-06-24 프로젝트 완성도 감사](./audits/2026-06-24-project-completeness.md)
 
