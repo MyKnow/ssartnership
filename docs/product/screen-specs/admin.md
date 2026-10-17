@@ -236,3 +236,30 @@ authority: normative
 - 경계·상태: global category 관리 권한을 요구한다. 기본, 빈 상태, validation error, 중복, 사용 중 삭제 제한, 저장 중을 제공한다.
 - 반응형·분석: 모바일 compact row와 edit drawer, 데스크톱 list/detail을 쓴다. 생성·변경·삭제를 audit한다.
 - 수용 기준: 지역 관리자에게 전역 변경 UI를 숨기고 연결 제휴처 수를 표시한다. 현재 UI와 server action 모두 삭제를 거부하며, 후속 migration에서 FK 보호와 대체 카테고리 절차를 갖추기 전에는 빈 카테고리도 삭제하지 않는다. `/admin/partners?tab=categories`는 이곳으로 보낸다.
+
+<!-- screen-contract: admin.mcp.connections -->
+## `/admin/mcp` — AI 연결 관리
+
+- 목표·위계: 서버 주소 → 내 연결·권한·철회 → 최고 관리자 클라이언트 등록 → 등록 ID·정확 콜백 순이다.
+- 액션·흐름: primary는 클라이언트 등록이며 연결은 AI 앱에서 시작한다. 연결 철회는 본인 연결만 가능하고 즉시 이후 요청을 차단한다.
+- 경계·상태: 활성 관리자·비밀번호 gate·현재 권한 버전을 재검사한다. 등록은 최고 관리자와 admin_management.create 모두 필요하다. 빈 목록, 긴 URL, 검증 오류·첫 필드 focus, 제출 중, 조회 실패를 제공한다. FE·BE는 같은 등록 schema를 쓴다.
+- 반응형·분석: 360/820/1366px에서 한 열과 줄바꿈을 유지하고 44px 조작 영역을 제공한다. 토큰 원문은 화면·URL·로그에 표시하지 않는다.
+- 수용 기준: 본인 연결만 표시·철회하며 잘못된 콜백은 등록되지 않는다. 운영은 durable Repository, 개발 합성 fixture만 mock을 사용한다.
+
+<!-- screen-contract: admin.mcp.authorize -->
+## `/admin/mcp/authorize` — AI 연결 동의
+
+- 목표·위계: 등록된 클라이언트 이름 → 정확한 사이트 환경 → 요청 권한 → 허용·거절 순이다.
+- 액션·흐름: 로그인과 별도로 사람이 허용해야 code를 발급한다. 거절은 검증된 exact callback으로 access_denied를 돌려준다.
+- 경계·상태: 등록·resource·S256·scope·현재 관리자 권한을 검증한다. 서명된 CSRF는 actor·요청·만료에 묶인다. 미등록/잘못된/만료 요청은 로컬 복구 링크만 제공한다.
+- 반응형·분석: 360/820/1366px에서 긴 이름·origin은 줄바꿈하고 CTA는 감싸며 의미 있는 제목·목록을 제공한다. 쿼리·code·리뷰 본문을 분석 이벤트로 보내지 않는다.
+- 수용 기준: GET은 연결을 허용하지 않으며 code 교환은 exact callback/client/resource/PKCE와 일회성 트랜잭션을 검사한다.
+
+<!-- screen-contract: admin.mcp.review -->
+## `/admin/mcp/reviews/[reviewId]` — 리뷰 변경 검토
+
+- 목표·위계: 출품명 → 익명 본문 → 변경 전후·만료 → 이 변경 승인 순이다.
+- 액션·흐름: primary는 이 변경 승인이다. 승인 후 AI 앱으로 돌아가 명시 실행하고, 만료/상태 변경은 새 검토를 요청한다.
+- 경계·상태: 본인 연결·전역 리뷰 운영 권한·scope·현재 grant와 관리자 상태를 재검증한다. 검토는 5분이며 actor/client/grant/대상/본문 hash/상태/제안 값에 묶인다. 승인 전·승인 후·실행 완료·만료·상태 충돌을 구분한다.
+- 반응형·분석: 360/820/1366px에서 긴 본문을 줄바꿈하고 44px 승인 target을 제공한다. 작성자·작성 시각·인증 값은 표시하지 않는다.
+- 수용 기준: 승인만으로 변경하지 않으며 실행 시 기존 업무 RPC·감사·receipt를 원자 처리한다. 동시 재시도는 한 번만 변경한다.

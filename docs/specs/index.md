@@ -31,6 +31,8 @@ last_verified: 2026-10-05
 
 ## 진행 중
 
+- [원격 운영 MCP](./remote-operations-mcp/spec.md) — Issue #602, 설계·조회 서비스 구현 중
+
 - [Apple Wallet 회원 인증 패스](./301-apple-wallet-member-pass/spec.md) — Issue #301, active. 기능 플래그와 조정 timer는 비활성이다.
 
 ## 완료 기록

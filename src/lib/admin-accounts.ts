@@ -238,7 +238,7 @@ function logAdminAccountReadFailure(
  * PostgREST reads, so permission or connectivity problems are not hidden.
  * `getAdminSession()` converts the throw into "no admin session".
  */
-async function getAdminAccountByIdUncached(memberId: string) {
+export async function getAdminAccountByIdUncached(memberId: string) {
   if (!memberId) {
     return null;
   }
