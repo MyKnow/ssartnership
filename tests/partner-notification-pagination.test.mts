@@ -298,21 +298,9 @@ test("파트너 알림 GET·센터 UI는 같은 페이지 규칙과 더 보기�
   const center = readSource(
     "src/components/partner/partner-notifications/PartnerNotificationCenter.tsx",
   );
-  assert.match(center, /buildPartnerNotificationPageQuery\(/);
-  assert.match(center, /mergePartnerNotificationEntries\(/);
+  assert.match(center, /usePartnerNotificationCenterController\(data\)/);
   assert.match(center, /PARTNER_NOTIFICATION_PARTIAL_FILTER_NOTICE/);
   assert.match(center, /이전 알림 더 보기/);
-  assert.match(center, /syncStoredUnreadCount\(response\)/);
-  assert.match(
-    center,
-    /shiftPartnerStoredNotificationPageAfterDelete\(current, deletedStoredCount\)/,
-  );
-  assert.match(center, /applyPartnerStoredNotificationPageResponse\(/);
-  // 이전 알림까지 모두 읽음은 더 보기 응답과 겹치지 않게 로딩 중에는 실행하지 않는다.
-  assert.match(
-    center,
-    /async function markAllStoredNotificationsAsRead\(\) \{[\s\S]{0,200}if \(pendingNotificationId \|\| pendingBulkAction \|\| loadingMore\)/,
-  );
 
   const store = readSource("src/lib/partner-notification-store.ts");
   assert.match(

@@ -132,7 +132,7 @@ test("회원과 파트너 알림 센터는 공통 안전 요청 경계를 사용
     ),
     readFile(
       new URL(
-        "../src/components/partner/partner-notifications/PartnerNotificationCenter.tsx",
+        "../src/components/partner/partner-notifications/partner-notification-center-commands.ts",
         import.meta.url,
       ),
       "utf8",
