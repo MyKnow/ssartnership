@@ -133,22 +133,25 @@ for (const width of [360, 820, 1366]) {
       await expect(marketing).not.toBeChecked();
       await toggleWithKeyboard(page, "마케팅/이벤트");
       await expect(marketing).toBeChecked();
-      expect(requests).toEqual([{ marketingEnabled: true, ...reviewedMarketingPolicy }]);
+      await expect.poll(() => requests).toEqual([{ marketingEnabled: true, ...reviewedMarketingPolicy }]);
+      await expect(marketing).toBeEnabled();
       await dismissToasts(page);
 
       // Existing consent must not be resubmitted by an unrelated ordinary edit.
       const review = await toggleWithKeyboard(page, "리뷰");
       await expect(review).not.toBeChecked();
-      expect(requests[1]).toEqual({ reviewEnabled: false });
+      await expect.poll(() => requests[1]).toEqual({ reviewEnabled: false });
+      await expect(review).toBeEnabled();
       await expect(marketing).toBeChecked();
       await dismissToasts(page);
       await toggleWithKeyboard(page, "마케팅/이벤트");
       await expect(marketing).not.toBeChecked();
-      expect(requests).toEqual([
+      await expect.poll(() => requests).toEqual([
         { marketingEnabled: true, ...reviewedMarketingPolicy },
         { reviewEnabled: false },
         { marketingEnabled: false },
       ]);
+      await expect(marketing).toBeEnabled();
     });
 
     test("policy conflict and network failure preserve state and allow a safe retry", async ({ page, baseURL }) => {
