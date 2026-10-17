@@ -30,8 +30,8 @@ export default function PartnerCardMedia({
           fill
           sizes={
             compact
-              ? "(max-width: 389px) 64px, (max-width: 640px) 80px, 96px"
-              : "(max-width: 640px) 128px, 144px"
+              ? "(max-width: 389px) 80px, 96px"
+              : "(max-width: 639px) 128px, 144px"
           }
           className="object-cover"
           placeholder="blur"
