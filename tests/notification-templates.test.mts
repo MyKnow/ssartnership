@@ -252,7 +252,7 @@ test("반려와 계정 전달 경로는 알림 템플릿을 사용한다", async
         "utf8",
       ),
       readFile(
-        new URL("../src/lib/member-manual-import/service.server.ts", import.meta.url),
+        new URL("../src/lib/member-manual-import/delivery.server.ts", import.meta.url),
         "utf8",
       ),
       readFile(

@@ -51,7 +51,7 @@ test("만료 프로모션 정리는 한 번에 100건만 조회하고 내부 오
 
 test("이미지 정규화와 수동 회원 사진 준비는 공용 제한 동시성 매퍼를 사용한다", () => {
   const imageRepository = read("../src/lib/image-upload/repository.supabase.ts");
-  const manualImport = read("../src/lib/member-manual-import/service.server.ts");
+  const manualImport = read("../src/lib/member-manual-import/photo.server.ts") + read("../src/lib/member-manual-import/constants.ts");
 
   assert.match(imageRepository, /const COMPLETE_UPLOAD_CONCURRENCY = 4;/);
   assert.match(
@@ -64,11 +64,11 @@ test("이미지 정규화와 수동 회원 사진 준비는 공용 제한 동시
   );
   assert.match(
     manualImport,
-    /mapWithConcurrency\(\s*rowsResult\.acceptedRows,\s*MANUAL_IMPORT_IMAGE_PREPARE_CONCURRENCY,/,
+    /mapWithConcurrency\(\s*input\.rows,\s*MANUAL_IMPORT_IMAGE_PREPARE_CONCURRENCY,/,
   );
   assert.doesNotMatch(
     manualImport,
-    /Promise\.all\(rowsResult\.acceptedRows\.map/,
+    /Promise\.all\(input\.rows\.map/,
   );
 });
 

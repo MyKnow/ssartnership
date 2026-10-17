@@ -207,7 +207,7 @@ test("모든 비수료생 이메일 발송 경계가 기본 디자인과 관리�
     "../src/lib/member-email.ts",
     "../src/lib/member-email-login-transition.ts",
     "../src/lib/member-password-action-email.ts",
-    "../src/lib/member-manual-import/service.server.ts",
+    "../src/lib/member-manual-import/delivery.server.ts",
     "../src/app/api/suggest/route.ts",
     "../src/lib/partner-email.ts",
   ];

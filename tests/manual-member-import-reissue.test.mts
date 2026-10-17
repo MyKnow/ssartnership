@@ -5,11 +5,28 @@ import test from "node:test";
 const root = new URL("..", import.meta.url);
 const read = (path: string) => readFile(new URL(path, root), "utf8");
 
+const readImportService = () => Promise.all([
+  read("src/lib/member-manual-import/service.server.ts"),
+  read("src/lib/member-manual-import/repository.supabase.ts"),
+  read("src/lib/member-manual-import/row.server.ts"),
+  read("src/lib/member-manual-import/photo.server.ts"),
+  read("src/lib/member-manual-import/delivery.server.ts"),
+  read("src/lib/member-manual-import/recipients.server.ts"),
+  read("src/lib/member-manual-import/reissue.server.ts"),
+  read("src/lib/member-manual-import/errors.ts"),
+  read("src/lib/member-manual-import/constants.ts"),
+]).then((sources) => sources.join("\n"));
+const readImportPanel = () => Promise.all([
+  read("src/components/admin/AdminMemberManualAddPanel.tsx"),
+  read("src/components/admin/useAdminMemberManualImport.ts"),
+  read("src/components/admin/manual-member-import-photos.ts"),
+]).then((sources) => sources.join("\n"));
+
 test("전송 결과 미확인 행은 관리자 확인 뒤에만 새 초기 설정 링크를 발급한다", async () => {
   const [service, route, panel, catalog, logLabels, reissueMigration, completionMigration] = await Promise.all([
-    Promise.all([read("src/lib/member-manual-import/service.server.ts"), read("src/lib/member-manual-import/password-actions.server.ts")]).then((sources) => sources.join("\n")),
+    Promise.all([readImportService(), read("src/lib/member-manual-import/password-actions.server.ts")]).then((sources) => sources.join("\n")),
     read("src/app/api/admin/member-imports/[batchId]/rows/[rowNumber]/reissue-setup/route.ts"),
-    read("src/components/admin/AdminMemberManualAddPanel.tsx"),
+    readImportPanel(),
     read("src/lib/event-catalog.ts"),
     read("src/lib/event-labels.ts"),
     read("supabase/migrations/20260715004318_add_manual_member_reissue_setup_guard.sql"),

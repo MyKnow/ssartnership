@@ -120,7 +120,7 @@ test("관리자 알림 발송 요약은 실패 건이 있으면 error 톤으로 
 
 test("회원 가져오기 완료 안내는 실패 행이 있으면 error 톤으로 알린다", async () => {
   const source = await readFile(
-    new URL("../src/components/admin/AdminMemberManualAddPanel.tsx", import.meta.url),
+    new URL("../src/components/admin/useAdminMemberManualImport.ts", import.meta.url),
     "utf8",
   );
   const summary = collectNotifyCalls(source).find((call) =>

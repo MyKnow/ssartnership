@@ -448,7 +448,7 @@ test("회원 mock도 canonical 뷰 모델을 사용한다", () => {
 
 test("활성 회원 가져오기는 디렉터리 FK·세대 필드로 원자적 생성을 요청한다", () => {
   const lookup = readRepoFile("src/lib/member-manual-add/lookup.ts");
-  const manualImport = readRepoFile("src/lib/member-manual-import/service.server.ts");
+  const manualImport = ["repository.supabase", "recipients.server", "delivery.server"].map((name) => readRepoFile(`src/lib/member-manual-import/${name}.ts`)).join("\n");
 
   assert.match(lookup, /findMmUserDirectoryEntryByUserId/);
   assert.match(lookup, /\.eq\("mattermost_account_id", directory\.id\)/);
