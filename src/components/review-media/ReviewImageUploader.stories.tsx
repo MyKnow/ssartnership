@@ -104,16 +104,12 @@ export const UploadAndCancelCrop: Story = {
   play: async ({ canvasElement, args }) => {
     const fileInput = canvasElement.querySelector<HTMLInputElement>('input[type="file"]');
     await expect(fileInput).not.toBeNull();
+    const response = await fetch("/icon-512.png");
+    await expect(response.ok).toBe(true);
 
     await userEvent.upload(
       fileInput!,
-      new File(
-        [
-          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect width="120" height="120" fill="#bae6fd"/></svg>`,
-        ],
-        "photo.svg",
-        { type: "image/svg+xml" },
-      ),
+      new File([await response.blob()], "photo.png", { type: "image/png" }),
     );
 
     const body = within(document.body);
@@ -134,16 +130,12 @@ export const UploadAndApplyCrop: Story = {
     try {
       const fileInput = canvasElement.querySelector<HTMLInputElement>('input[type="file"]');
       await expect(fileInput).not.toBeNull();
+      const response = await fetch("/icon-512.png");
+      await expect(response.ok).toBe(true);
 
       await userEvent.upload(
         fileInput!,
-        new File(
-          [
-            `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><circle cx="60" cy="60" r="48" fill="#38bdf8"/></svg>`,
-          ],
-          "apply.svg",
-          { type: "image/svg+xml" },
-        ),
+        new File([await response.blob()], "apply.png", { type: "image/png" }),
       );
 
       const body = within(document.body);
@@ -153,7 +145,9 @@ export const UploadAndApplyCrop: Story = {
         expect(cropImage).not.toBeNull();
         expect(cropImage!.clientWidth).toBeGreaterThan(0);
       });
-      await userEvent.click(body.getByRole("button", { name: "적용" }));
+      const applyButton = body.getByRole("button", { name: "적용" });
+      await waitFor(() => expect(applyButton).toBeEnabled());
+      await userEvent.click(applyButton);
       await waitFor(async () => {
         await expect(args.onChange).toHaveBeenCalled();
       });
