@@ -171,6 +171,21 @@ function logFavoriteStateFailure(error: unknown) {
   return new Set<string>();
 }
 
+/** Keep saved entries discoverable while limiting per-card hydration work. */
+export function buildHomePartnerDirectoryMemberState(
+  partnerIds: string[],
+  favoritePartnerIds: ReadonlySet<string>,
+): HomePartnerMemberState {
+  return {
+    ...buildHomePartnerMemberState(partnerIds, favoritePartnerIds),
+    partnerFavoriteStateById: Object.fromEntries(
+      normalizeHomePartnerStateIds(partnerIds, partnerIds.length)
+        .filter((id) => favoritePartnerIds.has(id))
+        .map((id) => [id, true]),
+    ),
+  };
+}
+
 /**
  * Every favorite of the member, independent of display order. A member keeps
  * few favorites, so this read can run in parallel with popularity ranking
@@ -178,13 +193,17 @@ function logFavoriteStateFailure(error: unknown) {
  */
 export async function getHomeMemberFavoritePartnerIds(
   currentUserId?: string | null,
+  options?: { failOnError?: boolean },
 ): Promise<Set<string>> {
   if (!currentUserId) {
     return new Set<string>();
   }
   return partnerFavoriteRepository
     .getMemberFavoritePartnerIds(currentUserId)
-    .catch(logFavoriteStateFailure);
+    .catch((error) => {
+      if (options?.failOnError) throw error;
+      return logFavoriteStateFailure(error);
+    });
 }
 
 export async function getHomePartnerMemberState(input: {

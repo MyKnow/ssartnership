@@ -343,3 +343,42 @@ test.describe("public partner discovery", () => {
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
 });
+
+test.describe("saved partner rediscovery", () => {
+  // Secure local member cookies use the same localhost host as the existing
+  // authenticated client-state regression suite, rather than 127.0.0.1.
+  test.use({ baseURL: process.env.BASE_URL ?? `http://localhost:${process.env.E2E_PORT ?? "3100"}` });
+  test("saved partners can be revisited with filters, history and unsaving", async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.goto("/auth/mock?returnTo=%2F%3Fcampaign%3Dreview605");
+  await waitForDirectoryControls(page);
+  const first = page.getByTestId("partner-card").first();
+  const title = (await first.locator('a[aria-label$=" 상세 보기"]').first().textContent())!.trim();
+  const favorite = first.getByRole("button", { name: "즐겨찾기", exact: true });
+  await favorite.click();
+  await expect(first.getByRole("button", { name: "즐겨찾기 해제" })).toBeEnabled();
+
+  const saved = page.getByRole("group", { name: "제휴처 모아보기" }).getByRole("button", { name: "즐겨찾기", exact: true });
+  await saved.click();
+  await expect(saved).toHaveAttribute("aria-pressed", "true");
+  await expect(page).toHaveURL(/saved=1/);
+  await expect(page.getByTestId("partner-card")).toHaveCount(1);
+  await typeSearch(page, title);
+  await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe(title);
+  expect(new URL(page.url()).searchParams.get("campaign")).toBe("review605");
+  await page.goBack();
+  await expect(saved).toHaveAttribute("aria-pressed", "true");
+  await expect(page).not.toHaveURL(/[?&]q=/);
+  await page.goBack();
+  await expect(saved).toHaveAttribute("aria-pressed", "false");
+  await expect.poll(() => page.getByTestId("partner-card").count()).toBeGreaterThan(1);
+  await saved.click();
+  await page.getByTestId("partner-card").getByRole("button", { name: "즐겨찾기 해제" }).click();
+  await expect(page.getByText("조건에 맞는 즐겨찾기가 없어요")).toBeVisible();
+  await page.getByRole("button", { name: "전체 제휴처 보기" }).click();
+  await expect(page).not.toHaveURL(/saved=1/);
+  await expect.poll(() => page.getByTestId("partner-card").count()).toBeGreaterThan(1);
+});
+
+});

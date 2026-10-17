@@ -2,7 +2,7 @@ import type { HomeDirectoryState } from "@/lib/home-directory-state";
 import type { PartnerPopularityMetrics } from "@/lib/partner-popularity";
 
 export function homeDirectoryKey(state: HomeDirectoryState) {
-  return `${state.category}:${state.campus}:${state.audience}:${state.q}:${state.sort}:${state.view}`;
+  return `${state.category}:${state.campus}:${state.audience}:${state.q}:${state.sort}:${state.view}${state.favoritesOnly ? ":saved" : ""}`;
 }
 
 export function isHomeHistoryReturn(marker: string | null, navigationType?: string) {

@@ -173,6 +173,7 @@ test("loadHomePartnerDirectory keeps global popularity ordering while preloading
   assert.deepEqual(directory.partnerState.partnerFavoriteStateById, {
     "partner-30": true,
     "partner-2": true,
+    "partner-24": true,
   });
 });
 
@@ -390,4 +391,27 @@ test("loadHomePartnerDirectoryState preserves a successful directory result", as
   );
 
   assert.deepEqual(result, { status: "ready", directory });
+});
+
+
+test("directory preserves favorites beyond the first hydration batch without leaking absent partner ids", async () => {
+  const { loadHomePartnerDirectory } = await homePartnerDirectoryModulePromise;
+  const partners = Array.from({ length: 30 }, (_, index) => createPartner({ id: `p-${index}`, name: `제휴처 ${index}` }));
+  const directory = await loadHomePartnerDirectory({ viewerAuthenticated: true, currentUserId: "member-1" }, {
+    getCategories: async () => [], getPartners: async () => partners, getPublicDirectoryPartners: async () => partners,
+    getPopularityByPartnerId: async () => ({}), getMemberFavoritePartnerIds: async () => new Set(["p-29", "absent-private-id"]),
+  });
+  assert.equal(directory.partnerState.partnerFavoriteStateById["p-29"], true);
+  assert.equal(directory.partnerState.partnerFavoriteStateById["absent-private-id"], undefined);
+  assert.equal(directory.partnerState.loadedFavoritePartnerIds.length, 24);
+});
+
+
+test("favorite read failure becomes recoverable directory error instead of false empty saved list", async () => {
+  const { loadHomePartnerDirectory, loadHomePartnerDirectoryState } = await homePartnerDirectoryModulePromise;
+  const result = await loadHomePartnerDirectoryState({ viewerAuthenticated: true, currentUserId: "member-1" }, (input) => loadHomePartnerDirectory(input, {
+    getCategories: async () => [], getPartners: async () => [], getPublicDirectoryPartners: async () => [], getPopularityByPartnerId: async () => ({}),
+    getMemberFavoritePartnerIds: async () => { throw new Error("provider failed"); },
+  }));
+  assert.deepEqual(result, { status: "unavailable" });
 });
