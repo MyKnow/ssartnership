@@ -407,3 +407,50 @@ export const WithoutDetailHref: Story = {
     await expect(card).not.toHaveClass("cursor-pointer");
   },
 };
+
+/** #603: benefit comparison remains legible in narrow list rows. */
+export const ReadableCompactBenefits: Story = {
+  args: {
+    variant: "list",
+    partner: {
+      ...basePartner,
+      benefits: ["평일 점심 세트 주문 시 동반인과 함께 전 메뉴 15% 할인", "음료 무료 업그레이드", "추가 적립"],
+      appliesTo: ["student", "staff", "graduate"],
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const benefit = canvas.getByText("평일 점심 세트 주문 시 동반인과 함께 전 메뉴 15% 할인");
+    await expect(benefit).toBeVisible();
+    await expect(parseFloat(getComputedStyle(benefit).fontSize)).toBeGreaterThanOrEqual(16);
+    await expect(canvas.getByText("적용 대상", { exact: true })).toBeVisible();
+    await expect(canvas.getByText("+1", { exact: true })).toBeVisible();
+    await expect(canvas.getByRole("link", { name: /역삼 캠퍼스 샐러드 바 상세 보기/ })).toBeVisible();
+    await expect(canvasElement.scrollWidth).toBeLessThanOrEqual(canvasElement.clientWidth);
+  },
+};
+
+
+/** Use a real list-row width, alongside the deliberately narrow card stories. */
+export const WideBenefitList: Story = {
+  args: {
+    variant: "list",
+    partner: {
+      ...basePartner,
+      benefits: ["평일 점심 세트 주문 시 동반인과 함께 전 메뉴 15% 할인", "음료 무료 업그레이드"],
+    },
+  },
+  render: (args) => <ToastProvider><PartnerCardView {...args} /></ToastProvider>,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const primary = canvasElement.querySelector<HTMLElement>("[data-partner-card-primary-content]")!;
+    const benefits = canvasElement.querySelector<HTMLElement>("[data-partner-card-benefits]")!;
+    await expect(canvas.getByText("평일 점심 세트 주문 시 동반인과 함께 전 메뉴 15% 할인")).toBeVisible();
+    await expect(canvas.getByText("적용 대상", { exact: true })).toBeVisible();
+    const card = canvas.getByTestId("partner-card");
+    await expect(card.scrollWidth).toBeLessThanOrEqual(card.clientWidth);
+    if (card.clientWidth >= 720) {
+      await expect(benefits.getBoundingClientRect().left).toBeGreaterThan(primary.getBoundingClientRect().right);
+    }
+  },
+};

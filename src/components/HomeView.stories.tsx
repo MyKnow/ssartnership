@@ -177,3 +177,28 @@ export const GuestSavedPartners: Story = {
     await expect(returnTo.searchParams.get("category")).toBe("food");
   },
 };
+
+/** #603: inspect comparison in the actual directory grid, not a lone card. */
+export const BenefitComparison: Story = {
+  args: {
+    partners: [
+      createPartner(41, { name: "바디라인 역삼점", category: "health", benefits: ["헬스 1개월 33,000원", "신규 등록 시 운동복 무료 대여"] }),
+      createPartner(42, { name: "오늘의 한 끼", benefits: ["평일 점심 세트 주문 시 동반인과 함께 전 메뉴 15% 할인", "음료 무료 업그레이드", "추가 적립"] }),
+      createPartner(43, { name: "커리어 스튜디오", category: "education", benefits: ["취업 사진 패키지 20% 할인", "예약 시 의상 무료 대여"] }),
+      createPartner(44, { name: "역삼 캠퍼스 샐러드 바", benefits: ["샐러드 전 메뉴 10% 할인", "점심 세트 음료 무료 업그레이드"] }),
+    ],
+  },
+};
+
+export const BenefitComparisonList: Story = {
+  args: BenefitComparison.args,
+  parameters: {
+    nextjs: { appDirectory: true, navigation: { pathname: "/", query: { view: "list" } } },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByTestId("partner-card")).toHaveLength(4);
+    await expect(canvas.getByText("평일 점심 세트 주문 시 동반인과 함께 전 메뉴 15% 할인")).toBeVisible();
+    await expect(canvas.getAllByText("적용 대상", { exact: true }).length).toBeGreaterThanOrEqual(4);
+  },
+};
