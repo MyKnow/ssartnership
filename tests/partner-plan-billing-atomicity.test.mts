@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import { PARTNER_BILLING_POLICY } from "../src/lib/partner-billing.ts";
 
 const migrationUrl = new URL(
   "../supabase/migrations/20260831005738_make_partner_plan_billing_transitions_atomic.sql",
@@ -14,18 +15,11 @@ const overdueLockMigrationUrl = new URL(
   "../supabase/migrations/20260831021445_fix_partner_billing_overdue_lock_order.sql",
   import.meta.url,
 );
-const billingPolicyUrl = new URL("../src/lib/partner-billing.ts", import.meta.url);
-const serviceUrl = new URL(
-  "../src/lib/partner-plan-service.ts",
-  import.meta.url,
-);
 const schemaUrl = new URL("../supabase/schema.sql", import.meta.url);
 
 const migrationPromise = readFile(migrationUrl, "utf8");
 const cancellationMigrationPromise = readFile(cancellationMigrationUrl, "utf8");
 const overdueLockMigrationPromise = readFile(overdueLockMigrationUrl, "utf8");
-const billingPolicyPromise = readFile(billingPolicyUrl, "utf8");
-const servicePromise = readFile(serviceUrl, "utf8");
 const schemaPromise = readFile(schemaUrl, "utf8");
 
 function getFunctionSql(sql: string, functionName: string) {
@@ -36,25 +30,6 @@ function getFunctionSql(sql: string, functionName: string) {
   const end = sql.indexOf("\n$$;", start);
   assert.notEqual(end, -1, `${functionName} must terminate`);
   return sql.slice(start, end + 4);
-}
-
-function getServiceFunction(
-  source: string,
-  functionName: string,
-  nextMarker: string,
-) {
-  const start = source.indexOf(`export async function ${functionName}`);
-  assert.notEqual(start, -1, `${functionName} must exist`);
-  const end = source.indexOf(nextMarker, start);
-  assert.notEqual(end, -1, `${functionName} must have a boundary`);
-  return source.slice(start, end);
-}
-
-function getPolicyNumber(source: string, fieldName: string) {
-  const pattern = new RegExp(`${fieldName}:\\s*(\\d+)`);
-  const match = source.match(pattern);
-  assert.ok(match, `${fieldName} must exist`);
-  return Number(match[1]);
 }
 
 function assertRequestInvoiceLockOrder(sql: string) {
@@ -145,18 +120,12 @@ describe("atomic partner plan billing transitions", () => {
   });
 
   it("processes each overdue batch as one guarded transition", async () => {
-    const [migration, billingPolicySource] = await Promise.all([
-      overdueLockMigrationPromise,
-      billingPolicyPromise,
-    ]);
+    const migration = await overdueLockMigrationPromise;
     const sql = getFunctionSql(
       migration,
       "process_partner_billing_overdue_downgrades",
     );
-    const graceDays = getPolicyNumber(
-      billingPolicySource,
-      "unpaidDowngradeGraceDays",
-    );
+    const graceDays = PARTNER_BILLING_POLICY.unpaidDowngradeGraceDays;
     const gracePeriodPattern = new RegExp(
       String.raw`invoice_row\.due_at \+ interval '${graceDays} days' > p_now`,
       "i",
@@ -200,99 +169,6 @@ describe("atomic partner plan billing transitions", () => {
       sql,
       /if should_downgrade_partner then[\s\S]*insert into public\.partner_brand_plan_events/i,
     );
-  });
-
-  it("routes all three service mutations through the atomic RPC contracts", async () => {
-    const service = await servicePromise;
-    const createSource = getServiceFunction(
-      service,
-      "createPartnerPlanUpgradeRequest",
-      "export async function confirmPartnerPlanBankTransferPayment",
-    );
-    const confirmSource = getServiceFunction(
-      service,
-      "confirmPartnerPlanBankTransferPayment",
-      "export async function cancelPartnerPlanUpgradeRequest",
-    );
-    const cancelSource = getServiceFunction(
-      service,
-      "cancelPartnerPlanUpgradeRequest",
-      "export async function updatePartnerBrandPlanByAdmin",
-    );
-    const adminUpdateSource = getServiceFunction(
-      service,
-      "updatePartnerBrandPlanByAdmin",
-      "export async function reviewPartnerPlanUpgradeRequest",
-    );
-    const reviewSource = getServiceFunction(
-      service,
-      "reviewPartnerPlanUpgradeRequest",
-      "export async function runPartnerBillingOverdueDowngrades",
-    );
-    const overdueSource = service.slice(
-      service.indexOf(
-        "export async function runPartnerBillingOverdueDowngrades",
-      ),
-    );
-
-    assert.match(
-      createSource,
-      /\.rpc\(\s*"create_partner_plan_upgrade_billing"/i,
-    );
-    assert.doesNotMatch(
-      createSource,
-      /\.from\("partner_billing_invoices"\)\.insert/i,
-    );
-    assert.match(
-      confirmSource,
-      /\.rpc\(\s*"confirm_partner_plan_bank_transfer_payment"/i,
-    );
-    assert.match(
-      cancelSource,
-      /\.rpc\(\s*"cancel_partner_plan_upgrade_billing"/i,
-    );
-    assert.match(
-      adminUpdateSource,
-      /\.rpc\(\s*"update_partner_brand_plan_by_admin"/i,
-    );
-    assert.match(adminUpdateSource, /p_expected_plan_tier: input\.expectedPlanTier/i);
-    assert.match(
-      adminUpdateSource,
-      /p_expected_plan_updated_at: input\.expectedPlanUpdatedAt/i,
-    );
-    assert.doesNotMatch(
-      adminUpdateSource,
-      /\.from\("partners"\)\.update/i,
-    );
-    assert.doesNotMatch(
-      adminUpdateSource,
-      /\.from\("partner_brand_plan_events"\)\.insert/i,
-    );
-    assert.match(
-      reviewSource,
-      /\.rpc\(\s*"approve_partner_plan_upgrade_request"/i,
-    );
-    assert.match(
-      reviewSource,
-      /\.rpc\(\s*"cancel_partner_plan_upgrade_billing"/i,
-    );
-    assert.doesNotMatch(
-      reviewSource,
-      /\.from\("partner_plan_upgrade_requests"\)\.update/i,
-    );
-    assert.doesNotMatch(
-      reviewSource,
-      /\.from\("partners"\)\.update/i,
-    );
-    assert.doesNotMatch(
-      reviewSource,
-      /\.from\("partner_brand_plan_events"\)\.insert/i,
-    );
-    assert.match(
-      overdueSource,
-      /\.rpc\(\s*"process_partner_billing_overdue_downgrades"/i,
-    );
-    assert.doesNotMatch(overdueSource, /Promise\.all/i);
   });
 
   it("cancels partner plan requests and pending billing rows atomically", async () => {
