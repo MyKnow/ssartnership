@@ -194,6 +194,8 @@ curl --fail --silent --show-error https://ssartnership-dev.myknow.xyz/api/health
 
 timer는 `OnUnitActiveSec=5min`과 최대 60초 분산 지연으로 동작한다. `pending`은 현재 dev의 첫 승인 이미지 발행이 아직 없는 상태, `unchanged`는 저장된 승인 릴리스와 같은 상태, `deployed`는 새 이미지의 실제 적용·health 검사 후 상태 기록까지 완료한 결과다. timer active만으로 배포 성공을 주장하지 않는다. 수동 즉시 확인이 필요하면 `sudo systemctl start ssartnership-preview-receiver.service`를 사용하며 같은 heavy lock과 schema/first-attempt/digest 검사를 그대로 거친다. 반복 `docker compose up`으로 승인 검사나 실패 복귀를 우회하지 않는다.
 
+오랫동안 중지한 정기 확인을 재개할 때는 먼저 현재 `dev` head·승인 artifact·실행 중 앱·schema 승인과 실제 migration 이력을 대조하고 운영 fence 소유자의 재개 승인을 확인한다. 승인된 범위에서 기존 timer를 `enable --now`하되 fence 조건과 schema 승인 파일은 그대로 유지한다. 이 부팅에서 service 실행 기록이 없고 timer가 `active (elapsed)`·다음 실행 `infinity`로 남으면, 활성화만으로 복구된 것이 아니다. 같은 검증을 거치는 수동 service 확인을 한 번 실행해 기준 시각을 만들고, 필요하면 timer만 재시작하여 `waiting`과 유한한 다음 실행을 확인한다. 이후 서로 다른 예약 실행 두 번의 성공 JSON·실행 시각·증가한 성공 지표와 경보 해소를 확인한다. 수동 첫 확인과 예약 실행은 따로 기록한다. 실패 시 timer를 `disable --now`해 후속 자동 적용만 멈추고, 실행 중인 배포를 강제 종료하거나 state·승인 파일을 덮어쓰지 않는다.
+
 스키마 tree가 달라지면 앱 수신은 차단된다. legacy Cloud Preview writer였던 `preview-migrations.yml`과 `preview-sync.yml`은 [Issue #484](https://github.com/MyKnow/ssartnership/issues/484)에서 삭제했으므로 migration이 포함된 `dev` push는 Cloud Preview에 DDL을 쓰지 않고 Supabase 앱 검사도 기대하지 않는다. 다음 SQL 변경은 백업·새 후보 복구·실제 migration 검증을 거쳐 운영자가 home 승인 baseline을 갱신해야 한다. 승인 JSON의 hash만 바꾸거나 기존 migration 파일을 수정하는 방식은 허용하지 않는다. Preview와 Production의 승인 파일은 서로 대체할 수 없다.
 
 원본 Cloud는 더 이상 복구 경로로 유지하지 않는다. 홈 서버 쓰기 이후 Cloud로 되돌리는 절차는 없으며 CONNECT grant와 DNS만 되돌리는 방식을 rollback으로 사용하지 않는다. 원본의 수동 외부 cold backup/복원 성공은 상시 WAL/PITR·정기 외부 사본·독립 지역 복구의 완료 근거가 아니다. 운영 이미지 정리도 별도 보존 정책이 필요한 단계이며 `docker system prune` 또는 volume 삭제를 자동 수신기에 추가하지 않는다.

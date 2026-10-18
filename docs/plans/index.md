@@ -10,6 +10,7 @@ last_verified: 2026-10-05
 
 ## Active
 
+- [백업 잠금·사본 확인과 Preview 정기 수신 복구](./active/614-ops-backup-reliability.md) — 재현·수정·운영 검증, Issue #614
 - [2026-10 리팩토링·개선 프로그램](./active/refactor-program-2026-10.md) — 기본 결정과 진행 규칙, Issue #530
 - [2026-10 책임 분리 후속 작업](./active/refactor-responsibility-wave-2026-10.md) — 사용자 승인 R1~R8 범위와 통합·전달 조건, Issue #591
 - [SSAFY Verify 레거시 삭제 준비](./active/ssafy-verify-legacy-removal.md) — HOLD(운영자 승인 대기). 감사 Issue #309는 종료됐고, 삭제 실행은 승인 뒤 별도 Issue로 진행한다.
