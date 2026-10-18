@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 import { spawn, execFileSync } from 'node:child_process';
-import { createReadStream, createWriteStream } from 'node:fs';
-import { mkdir, readFile, writeFile, rename, lstat, statfs, rm, realpath } from 'node:fs/promises';
+import { constants, createReadStream, createWriteStream } from 'node:fs';
+import { mkdir, open, readFile, writeFile, rename, lstat, statfs, rm, realpath } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { validateBackupReceipt, selectBackupRetention } from './production-backup-contract.mjs';
+import { verifyAndAcknowledgeBackupCopies, backupFailureDiagnostic } from './production-backup-ack.mjs';
 const ROOT = path.join(os.homedir(), 'Library/Application Support/ssartnership-backups/production');
 // The restricted backup identity stays on this Mac. The separately pinned PVE
 // administrator connection provides transport to the private Production guest.
@@ -16,6 +17,7 @@ const SSH = ['-F', '/dev/null', '-S', 'none', '-o', 'BatchMode=yes', '-o', 'Iden
 const ssh = command => execFileSync('/usr/bin/ssh', [...SSH, command], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 128 * 1024, timeout: 20000 });
 async function hashFile(file) { const hash = createHash('sha256'); for await (const bytes of createReadStream(file)) hash.update(bytes); return hash.digest('hex'); }
 let locked = false;
+let stage = 'initialization';
 try {
   if (process.platform !== 'darwin' || await realpath(ROOT) !== ROOT) throw Error();
   const root = await lstat(ROOT); if (root.uid !== process.getuid() || root.mode & 0o077) throw Error();
@@ -34,16 +36,17 @@ try {
     await mkdir(`${ROOT}/pull.lock`, { mode: 0o700 });
   }
   locked = true; await writeFile(`${ROOT}/pull.lock/owner.json`, JSON.stringify({ pid: process.pid }), { mode: 0o600, flag: 'wx' });
-  const receipts = JSON.parse(ssh('list')).map(validateBackupReceipt);
-  if (receipts.length > 32 || new Set(receipts.map(x => x.id)).size !== receipts.length) throw Error();
-  const completed = [];
-  for (const receipt of receipts) {
+  stage = 'list';
+  const receipts = JSON.parse(ssh('list'));
+  const completed = await verifyAndAcknowledgeBackupCopies(receipts, async receipt => {
+    stage = 'local-verification';
     const destination = `${ROOT}/${receipt.id}`;
-    let exists = false; try { const info = await lstat(destination); if (!info.isDirectory() || info.isSymbolicLink()) throw Error(); exists = true; } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    let exists = false; try { const info = await lstat(destination); if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid() || info.mode & 0o077) throw Error(); exists = true; } catch (error) { if (error.code !== 'ENOENT') throw error; }
     if (!exists) await mkdir(destination, { mode: 0o700 });
     let valid = false;
     try { const info = await lstat(`${destination}/snapshot.tar.age`); valid = info.isFile() && !info.isSymbolicLink() && info.size === receipt.bytes && await hashFile(`${destination}/snapshot.tar.age`) === receipt.sha256; if (!valid) throw Error(); } catch (error) { if (error.code !== 'ENOENT') throw error; }
     if (!valid) {
+      stage = 'download';
       const disk = await statfs(ROOT); if (disk.bavail * disk.bsize < receipt.bytes + 2 * 1024 ** 3) throw Error();
       // A failed partial is retained under a unique name; it never becomes a successful receipt.
       const partial = `${destination}/snapshot-${Date.now()}.partial`;
@@ -57,12 +60,25 @@ try {
       await rename(partial, `${destination}/snapshot.tar.age`);
       await writeFile(`${destination}/receipt.json`, JSON.stringify(receipt), { mode: 0o600, flag: 'wx' });
     }
-    try { await lstat(`${destination}/receipt.json`); } catch (error) { if (error.code !== 'ENOENT') throw error; await writeFile(`${destination}/receipt.json`, JSON.stringify(receipt), { mode: 0o600, flag: 'wx' }); }
-    const saved = validateBackupReceipt(JSON.parse(await readFile(`${destination}/receipt.json`, 'utf8')));
-    if (JSON.stringify(saved) !== JSON.stringify(receipt)) throw Error();
-    if (JSON.parse(ssh(`ack ${receipt.id} ${receipt.sha256}`)).acknowledged !== true) throw Error();
-    completed.push(receipt);
-  }
+    stage = 'receipt-verification';
+    let savedFile;
+    try { savedFile = await open(`${destination}/receipt.json`, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK); }
+    catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+      await writeFile(`${destination}/receipt.json`, JSON.stringify(receipt), { mode: 0o600, flag: 'wx' });
+      savedFile = await open(`${destination}/receipt.json`, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    }
+    try {
+      const info = await savedFile.stat();
+      if (!info.isFile() || info.uid !== process.getuid() || info.mode & 0o077 || info.size > 4096) throw Error();
+      const saved = validateBackupReceipt(JSON.parse(await savedFile.readFile('utf8')));
+      if (JSON.stringify(saved) !== JSON.stringify(receipt)) throw Error();
+    } finally { await savedFile.close(); }
+  }, async latest => {
+    stage = 'acknowledgement';
+    if (JSON.parse(ssh(`ack ${latest.id} ${latest.sha256}`)).acknowledged !== true) throw Error();
+  });
+  stage = 'retention';
   // Keep locally recovered history even after the server's shorter retention expires.
   const { readdir } = await import('node:fs/promises'); const local = [];
   for (const id of await readdir(ROOT)) {
@@ -74,7 +90,13 @@ try {
   const latest = completed.at(-1); if (!latest) throw Error();
   const healthy = Date.now() - Date.parse(latest.createdAt) < 26 * 3600000;
   const state = { version: 1, checkedAt: new Date().toISOString(), healthy, availableSnapshots: local.length, latestId: latest.id, latestCreatedAt: latest.createdAt, plaintextStored: false };
+  stage = 'status';
   await writeFile(`${ROOT}/status.json.new`, JSON.stringify(state), { mode: 0o600 }); await rename(`${ROOT}/status.json.new`, `${ROOT}/status.json`);
   console.log(JSON.stringify(state)); if (!healthy) process.exitCode = 1;
-} catch { console.error('{"error":"PRODUCTION_BACKUP_PULL_FAILED"}'); process.exitCode = 1; }
-finally { if (locked) await rm(`${ROOT}/pull.lock`, { recursive: true }); }
+} catch (error) { console.error(JSON.stringify({ error: 'PRODUCTION_BACKUP_PULL_FAILED', ...backupFailureDiagnostic(error, stage) })); process.exitCode = 1; }
+finally {
+  if (locked) {
+    try { await rm(`${ROOT}/pull.lock`, { recursive: true }); }
+    catch (error) { console.error(JSON.stringify({ error: 'PRODUCTION_BACKUP_PULL_FAILED', ...backupFailureDiagnostic(error, 'lock-cleanup') })); process.exitCode = 1; }
+  }
+}

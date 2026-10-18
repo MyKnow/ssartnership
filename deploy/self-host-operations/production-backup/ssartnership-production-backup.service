@@ -6,7 +6,8 @@ Requires=docker.service
 Type=oneshot
 User=root
 UMask=0077
-ExecStart=/usr/bin/flock --nonblock --conflict-exit-code 75 /var/lib/ssartnership-ci/heavy.lock /opt/ssartnership/node24/node /opt/ssartnership/production-backup-20260909/production-cold-backup.mjs capture
+# Wait through brief receiver activity without dropping the scheduled backup.
+ExecStart=/usr/bin/flock --timeout 300 --conflict-exit-code 75 /var/lib/ssartnership-ci/heavy.lock /opt/ssartnership/node24/node /opt/ssartnership/production-backup-20260909/production-cold-backup.mjs capture
 ExecStopPost=/opt/ssartnership/node24/node /opt/ssartnership/production-backup-20260909/production-cold-backup.mjs resume
 TimeoutStartSec=15min
 TimeoutStopSec=3min

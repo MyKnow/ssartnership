@@ -58,13 +58,17 @@ node -- scripts/self-host-operations/offhost.mjs init \
 
 ### Production 6시간 온라인 암호화 스냅샷
 
-서버의 `ssartnership-production-backup.timer`는 03:00/09:00/15:00/21:00 Asia/Seoul에 실행하고 성공 사본 28개(정상 주기 기준 7일)를 보존한다. CI의 heavy 잠금이 사용 중이면 해당 실행은 실패하며 다음 성공으로 숨기지 않는다. 2026-09-10부터 아래 온라인 drop-in을 적용하여 운영 앱·DB를 중단하지 않는다. 연속 WAL/PITR은 제공하지 않는다. 기존 cold 실행 파일은 복귀용으로 보존한다. cold 방식으로 명시적으로 복귀하면 앱·API·Storage·DB가 잠시 중단되며, 정상·실패 종료 모두 저장된 재개 의도에 따라 원래 실행 중이던 컨테이너만 다시 시작한다.
+서버의 `ssartnership-production-backup.timer`는 03:00/09:00/15:00/21:00 Asia/Seoul에 실행하고 성공 사본 28개(정상 주기 기준 7일)를 보존한다. CI와 같은 heavy 잠금이 사용 중이면 백업은 최대 300초 기다린 뒤 실행한다. 대기는 기존 서비스 전체 시간한도에 포함하며, 300초를 소진하면 exit 75로 실패하고 기존 성공 사본을 갱신하지 않는다. 잠금을 제거하거나 공유 모드로 바꾸지 않으며 다음 성공으로 실패를 숨기지 않는다. 2026-09-10부터 아래 온라인 drop-in을 적용하여 운영 앱·DB를 중단하지 않는다. 연속 WAL/PITR은 제공하지 않는다. 기존 cold 실행 파일은 복귀용으로 보존한다. cold 방식으로 명시적으로 복귀하면 앱·API·Storage·DB가 잠시 중단되며, 정상·실패 종료 모두 저장된 재개 의도에 따라 원래 실행 중이던 컨테이너만 다시 시작한다.
 
 실행 파일은 `scripts/self-host-operations/production-*.mjs`, 전송 파일은 `serve-production-backup.mjs`와 `pull-production-backups.mjs`다. 서버 systemd 템플릿은 `deploy/self-host-operations/production-backup/`에 둔다. 설치 시 템플릿의 버전 경로와 실제 root 소유 실행 파일을 일치시키고, private `backup.json`의 source·DB system identifier·공개 age recipient·전송 그룹을 확인한다. 비밀 설정 자체는 저장소에 넣지 않는다.
 
 Mac의 `dev.myknow.ssartnership-production-backup` LaunchAgent는 로그인 시와 매시간 실행한다. 저장 위치는 `~/Library/Application Support/ssartnership-backups/production`이고 성공 사본 30개를 보존한다. Mac이 잠들거나 꺼져 있으면 복사는 재개 후 실행되므로 실제 복구 가능 시점은 마지막으로 검증된 Mac 사본이다. 운영 서버와 상시 PVE 사본의 목표 복구 지점 간격은 6시간이며 보장 SLA가 아니다. Mac은 30개 사본을 유지하므로 정상 주기 기준 약 7.5일이다. 26시간 이상 된 사본은 실패 상태로 표시한다. 암호문 파일의 크기와 SHA-256이 맞아야 receipt 및 서버 확인 응답을 남긴다. 실패한 부분 파일은 성공 사본으로 승격하거나 복구 입력으로 쓰지 않는다.
 
 전용 SSH 계정은 고정 Mac 주소·고정 호스트 키·전용 키로만 연결하며 `list`, `get <UUID>`, `ack <UUID> <SHA256>`만 허용한다. sudo, Docker 권한, 셸, 포트 전달은 제공하지 않는다. 서버의 공개 recipient로 암호화하고 private 복구 키는 Mac Keychain 기반 envelope로 보관한다. 호스트 키 변경 오류는 관리자 확인 후 핀을 교체하며 검증을 끄지 않는다.
+
+Mac은 받은 목록 전체의 암호문 크기·SHA-256과 receipt를 검증한 뒤 `(createdAt, id)` 순서의 가장 최신 사본에만 최종 ACK를 보낸다. 중간 검증 실패는 과거 사본의 ACK를 남기지 않는다. 서버의 `production-backup-ack.mjs`는 private ACK 디렉터리의 OS 파일 잠금으로 읽기·비교·원자 저장을 직렬화한다. 오래된 ACK는 현재 상태를 바꾸지 않으며, 동일한 최신 사본의 재확인은 `copiedAt`만 갱신하고 원래 `backupCreatedAt`은 유지한다. PVE의 15분 수신 확인은 같은 사본이라도 이 heartbeat를 갱신하므로 40분 수신 중단 경보와 사본 노후 경보를 구분할 수 있다. Mac과 PVE 확인 파일은 계속 분리한다.
+
+서버 handler와 Mac pull을 새 버전으로 설치할 때 `production-backup-ack.mjs`와 기존 `production-backup-contract.mjs`를 같은 디렉터리에 함께 둔다. 서버는 기존 `/usr/bin/flock`을 사용하며 ACK 디렉터리의 기존 소유 계정·0700, 상태와 잠금 파일의 0600을 유지한다. 새 handler는 root 소유 버전 경로에 준비해 검증한 뒤 SSH forced command 경로만 바꾸고 기존 접근 제한과 호스트 핀을 유지한다. 실패 로그는 시각·고정 작업 단계·허용된 오류 분류만 기록하며 원문 예외·명령·경로·비밀을 출력하지 않는다.
 
 PVE 이전 뒤 Mac의 전용 백업 키는 Mac에 남기며 pinned PVE SSH의 `ProxyCommand`를 통해 Production `192.168.1.182`에 접속한다. PVE 자체 전용 백업 키도 호스트에서만 사용한다. 새 서버에서 보이는 전송 source는 PVE LAN 주소로 제한한다. 임시 bootstrap 관리자 키로 정기 백업 전용 키를 대체하지 않는다. 기존 host pin·암호문 이력을 보존하며 새 서버 pin을 확인해 추가한다.
 
