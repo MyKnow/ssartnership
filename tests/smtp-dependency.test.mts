@@ -3,11 +3,11 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import nodemailer from "nodemailer";
 
-test("SMTP dependency pins the reviewed TLS cache security release", () => {
+test("SMTP dependency pins the reviewed addressparser and SMTP AUTH security release", () => {
   const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
   const lock = JSON.parse(readFileSync(new URL("../package-lock.json", import.meta.url), "utf8"));
-  assert.equal(pkg.dependencies.nodemailer, "10.0.12");
-  assert.equal(lock.packages["node_modules/nodemailer"].version, "10.0.12");
+  assert.equal(pkg.dependencies.nodemailer, "10.1.7");
+  assert.equal(lock.packages["node_modules/nodemailer"].version, "10.1.7");
 });
 
 test("updated SMTP transport preserves Korean content without external delivery", async () => {

@@ -132,4 +132,60 @@ test("unknown development advisories fail and duplicate URLs are reported once",
   assert.equal(result.developmentFailures.length, 1);
 });
 
-test("expired development exceptions are removed from the repository policy", () => { assert.equal(ALLOWED_DEVELOPMENT_ADVISORIES.size, 0); });
+test("withdrawn development advisories are allowed only until their exact deadline", () => {
+  const tracked = {
+    packageName: "fixture",
+    url: "https://example.com/withdrawn",
+    reason: "test policy",
+    allowWithdrawnUntil: "2026-12-03T00:00:00.000Z",
+  };
+  const policy = new Map([[`${tracked.packageName}:${tracked.url}`, tracked]]);
+  const evaluate = (fixAvailable: boolean, now: string) =>
+    evaluateAuditPolicy({
+      allowedDevelopmentAdvisories: policy,
+      fullReport: createAuditReport([
+        { fixAvailable, packageName: tracked.packageName, url: tracked.url },
+      ]),
+      productionReport: createAuditReport([]),
+      now: new Date(now),
+    });
+
+  assert.equal(evaluate(true, "2026-11-19T00:00:00.000Z").allowedDevelopment.length, 1);
+  assert.equal(evaluate(false, "2026-11-19T00:00:00.000Z").allowedDevelopment.length, 1);
+  assert.equal(evaluate(true, "2026-12-03T00:00:00.000Z").developmentFailures.length, 1);
+  assert.equal(evaluate(false, "2026-12-03T00:00:00.000Z").developmentFailures.length, 1);
+
+  const production = evaluateAuditPolicy({
+    allowedDevelopmentAdvisories: policy,
+    fullReport: createAuditReport([
+      { fixAvailable: true, packageName: tracked.packageName, url: tracked.url },
+    ]),
+    productionReport: createAuditReport([
+      { fixAvailable: true, packageName: tracked.packageName, url: tracked.url },
+    ]),
+    now: new Date("2026-11-19T00:00:00.000Z"),
+  });
+  assert.equal(production.productionFailures.length, 1);
+  assert.equal(production.allowedDevelopment.length, 0);
+});
+
+test("the repository policy holds only the reviewed, time-boxed withdrawn picomatch advisory", () => {
+  assert.deepEqual(
+    [...ALLOWED_DEVELOPMENT_ADVISORIES.values()].map(
+      ({ packageName, url, allowWithdrawnUntil, allowPatchableUntil }) => ({
+        packageName,
+        url,
+        allowWithdrawnUntil,
+        allowPatchableUntil,
+      }),
+    ),
+    [
+      {
+        packageName: "picomatch",
+        url: "https://github.com/advisories/GHSA-fc5q-39xc-vjpf",
+        allowWithdrawnUntil: "2026-12-03T00:00:00.000Z",
+        allowPatchableUntil: undefined,
+      },
+    ],
+  );
+});
