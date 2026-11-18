@@ -49,7 +49,7 @@ test("security audit uses the repository npm runner on every platform", () => {
 });
 
 test("production advisories always fail even when their URL is tracked for development", () => {
-  const [tracked] = ALLOWED_DEVELOPMENT_ADVISORIES.values();
+  const tracked = { packageName: "fixture", url: "https://example.com/advisory", reason: "test policy", allowPatchableUntil: "2026-09-09T00:00:00.000Z" };
   const advisory = {
     fixAvailable: false,
     packageName: tracked.packageName,
@@ -67,7 +67,7 @@ test("production advisories always fail even when their URL is tracked for devel
 });
 
 test("only exact development advisories under an active policy are allowed", () => {
-  const [tracked] = ALLOWED_DEVELOPMENT_ADVISORIES.values();
+  const tracked = { packageName: "fixture", url: "https://example.com/advisory", reason: "test policy", allowPatchableUntil: "2026-09-09T00:00:00.000Z" };
   const allowedReport = createAuditReport([
     {
       fixAvailable: false,
@@ -84,15 +84,18 @@ test("only exact development advisories under an active policy are allowed", () 
   ]);
 
   const allowed = evaluateAuditPolicy({
+    allowedDevelopmentAdvisories: new Map([[`${tracked.packageName}:${tracked.url}`, tracked]]),
     fullReport: allowedReport,
     productionReport: createAuditReport([]),
   });
   const patchable = evaluateAuditPolicy({
+    allowedDevelopmentAdvisories: new Map([[`${tracked.packageName}:${tracked.url}`, tracked]]),
     fullReport: patchableReport,
     productionReport: createAuditReport([]),
     now: new Date("2026-09-02T14:00:00.000Z"),
   });
   const expiredPatchable = evaluateAuditPolicy({
+    allowedDevelopmentAdvisories: new Map([[`${tracked.packageName}:${tracked.url}`, tracked]]),
     fullReport: patchableReport,
     productionReport: createAuditReport([]),
     now: new Date("2026-09-09T00:00:00.000Z"),
@@ -127,4 +130,62 @@ test("unknown development advisories fail and duplicate URLs are reported once",
     productionReport: createAuditReport([]),
   });
   assert.equal(result.developmentFailures.length, 1);
+});
+
+test("withdrawn development advisories are allowed only until their exact deadline", () => {
+  const tracked = {
+    packageName: "fixture",
+    url: "https://example.com/withdrawn",
+    reason: "test policy",
+    allowWithdrawnUntil: "2026-12-03T00:00:00.000Z",
+  };
+  const policy = new Map([[`${tracked.packageName}:${tracked.url}`, tracked]]);
+  const evaluate = (fixAvailable: boolean, now: string) =>
+    evaluateAuditPolicy({
+      allowedDevelopmentAdvisories: policy,
+      fullReport: createAuditReport([
+        { fixAvailable, packageName: tracked.packageName, url: tracked.url },
+      ]),
+      productionReport: createAuditReport([]),
+      now: new Date(now),
+    });
+
+  assert.equal(evaluate(true, "2026-11-19T00:00:00.000Z").allowedDevelopment.length, 1);
+  assert.equal(evaluate(false, "2026-11-19T00:00:00.000Z").allowedDevelopment.length, 1);
+  assert.equal(evaluate(true, "2026-12-03T00:00:00.000Z").developmentFailures.length, 1);
+  assert.equal(evaluate(false, "2026-12-03T00:00:00.000Z").developmentFailures.length, 1);
+
+  const production = evaluateAuditPolicy({
+    allowedDevelopmentAdvisories: policy,
+    fullReport: createAuditReport([
+      { fixAvailable: true, packageName: tracked.packageName, url: tracked.url },
+    ]),
+    productionReport: createAuditReport([
+      { fixAvailable: true, packageName: tracked.packageName, url: tracked.url },
+    ]),
+    now: new Date("2026-11-19T00:00:00.000Z"),
+  });
+  assert.equal(production.productionFailures.length, 1);
+  assert.equal(production.allowedDevelopment.length, 0);
+});
+
+test("the repository policy holds only the reviewed, time-boxed withdrawn picomatch advisory", () => {
+  assert.deepEqual(
+    [...ALLOWED_DEVELOPMENT_ADVISORIES.values()].map(
+      ({ packageName, url, allowWithdrawnUntil, allowPatchableUntil }) => ({
+        packageName,
+        url,
+        allowWithdrawnUntil,
+        allowPatchableUntil,
+      }),
+    ),
+    [
+      {
+        packageName: "picomatch",
+        url: "https://github.com/advisories/GHSA-fc5q-39xc-vjpf",
+        allowWithdrawnUntil: "2026-12-03T00:00:00.000Z",
+        allowPatchableUntil: undefined,
+      },
+    ],
+  );
 });
