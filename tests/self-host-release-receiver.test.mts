@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import JSZip from "jszip";
 import { createHash, randomBytes } from "node:crypto";
-import { mkdtemp, readFile, writeFile, chmod, rm, symlink } from "node:fs/promises";
+import { mkdtemp, readFile, realpath, writeFile, chmod, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -221,6 +221,67 @@ test("receiver independently verifies GitHub API, manifest, jobs and deploy call
     assert.equal(await readFile(config.stateFile, "utf8"), before, "an existing release must not bypass schema approval");
     await assert.rejects(() => receiveRelease({ ...options, readSchema: async () => { throw new Error("RECEIVER_SCHEMA_APPROVAL_FILE_INVALID"); } }), /RECEIVER_SCHEMA_APPROVAL_FILE_INVALID/);
     assert.equal(dockerCalls.length, dockerCount);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("receiver keeps an applied release unchanged after GitHub deletes its artifact", async () => {
+  // State and retained manifest paths must be canonical, as on the operator host.
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), "ssartnership-receiver-retained-")));
+  const bytes = await artifactBytes();
+  let artifactRetained = true;
+  const calls: string[] = [];
+  const fetcher = async (url: RequestInfo | URL): Promise<Response> => {
+    const value = String(url); calls.push(value);
+    if (value.endsWith("/git/ref/heads/dev")) return new Response(JSON.stringify({ object: { sha } }), { status: 200 });
+    if (value.endsWith(`/git/trees/${sha}`)) return new Response(JSON.stringify({ sha, truncated: false, tree: [{ path: "supabase", mode: "040000", type: "tree", sha: supabaseTree }] }), { status: 200 });
+    if (value.endsWith(`/git/trees/${supabaseTree}`)) return new Response(JSON.stringify({ sha: supabaseTree, truncated: false, tree: [{ path: "migrations", mode: "040000", type: "tree", sha: migrationTree }] }), { status: 200 });
+    if (value.includes("/runs?") && value.includes("head_sha=")) return new Response(JSON.stringify({ workflow_runs: [run] }), { status: 200 });
+    if (value.endsWith("/jobs?per_page=100")) return new Response(JSON.stringify({ jobs }), { status: 200 });
+    if (value.endsWith("/artifacts?per_page=100")) {
+      // GitHub removes expired artifacts from the run listing entirely.
+      const artifacts = artifactRetained ? [{ name: "ssartnership-preview-release", expired: false, workflow_run: { id: 17 }, size_in_bytes: bytes.length, digest: `sha256:${createHash("sha256").update(bytes).digest("hex")}`, archive_download_url: "https://api.github.com/repos/MyKnow/ssartnership/actions/artifacts/1/zip" }] : [];
+      return new Response(JSON.stringify({ artifacts }), { status: 200 });
+    }
+    if (value.endsWith("/zip")) return new Response(bytes, { status: 200 });
+    throw new Error("unexpected fetch");
+  };
+  const dockerCalls: string[][] = [];
+  const pulledId = `sha256:${randomBytes(32).toString("hex")}`;
+  const docker = async (args: string[]): Promise<{ stdout: string }> => {
+    dockerCalls.push(args);
+    if (args[0] === "image") return { stdout: JSON.stringify({ Id: pulledId, Os: "linux", Architecture: "amd64", Config: { Labels: { "org.opencontainers.image.revision": sha } }, RepoDigests: [manifest.images.find((item) => item.reference === args.at(-1))?.reference] }) };
+    return { stdout: "" };
+  };
+  const config = { tokenFile: path.join(root, "token"), schemaApprovalFile: path.join(root, "schema.json"), stateFile: path.join(root, "state.json"), releaseRoot: path.join(root, "releases"), composeFile: path.join(root, "compose.yaml"), composeCwd: root, runtimeEnvFile: path.join(root, "app.env"), composeProject: "test", healthOrigin: "http://127.0.0.1:3108" };
+  let approval = { version: 1, repository: "MyKnow/ssartnership", environment: "original-preview", project: "ssartnership-original-preview-34141078185", migrationTree, verifiedSourceSha: sha, migrationCount: 199, verifiedAt: "2026-09-08T00:00:00.000Z" };
+  const deploys: string[] = [];
+  const options = { profile: RECEIVER_PROFILES.preview, config, fetcher, docker, readToken: async () => "t".repeat(40), readSchema: async () => approval, deploy: async (image: string) => { deploys.push(image); return { deployed: true }; }, operator: true, now: () => "2026-09-08T00:00:00.000Z" };
+  const retainedFile = path.join(root, "releases", sha, "release.json");
+  try {
+    assert.equal((await receiveRelease(options)).status, "deployed");
+    const state = await readFile(config.stateFile, "utf8");
+    const dockerCount = dockerCalls.length;
+
+    artifactRetained = false;
+    calls.length = 0;
+    assert.deepEqual(await receiveRelease(options), { status: "unchanged", sha, image: pulledId });
+    assert.ok(calls.every((value) => !value.includes("/artifacts") && !value.endsWith("/zip")), "an applied release must not re-download its artifact");
+    assert.equal(dockerCalls.length, dockerCount);
+    assert.equal(deploys.length, 1);
+    assert.equal(await readFile(config.stateFile, "utf8"), state);
+
+    approval = { ...approval, migrationTree: "0".repeat(40) };
+    await assert.rejects(() => receiveRelease(options), /RECEIVER_SCHEMA_NOT_APPROVED/, "the retained manifest must not bypass schema approval");
+    approval = { ...approval, migrationTree };
+
+    const retained = await readFile(retainedFile, "utf8");
+    await writeFile(retainedFile, retained.replace(`"tests":103`, `"tests":104`));
+    await assert.rejects(() => receiveRelease(options), /RECEIVER_ARTIFACT_AMBIGUOUS/, "a modified retained manifest must fall back to the expired artifact and fail closed");
+    await writeFile(retainedFile, retained);
+
+    await rm(retainedFile);
+    await assert.rejects(() => receiveRelease(options), /RECEIVER_ARTIFACT_AMBIGUOUS/, "a missing retained manifest must not be treated as unchanged");
+    assert.equal(deploys.length, 1);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
