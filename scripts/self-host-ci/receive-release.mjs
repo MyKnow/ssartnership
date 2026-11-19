@@ -328,13 +328,31 @@ async function writeAtomic(file, value) {
 async function loadState(file) {
   try {
     const metadata = await lstat(file);
-    if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.uid !== 0 || (metadata.mode & 0o077) !== 0 || await realpath(file) !== file) fail("RECEIVER_STATE_INVALID");
+    if (!metadata.isFile() || metadata.isSymbolicLink() || (requiresRootOwnership && metadata.uid !== 0) || (metadata.mode & 0o077) !== 0 || await realpath(file) !== file) fail("RECEIVER_STATE_INVALID");
     return JSON.parse(await readFile(file, "utf8"));
   } catch (error) {
     if (error?.code === "ENOENT") return null;
     if (error?.message?.startsWith("RECEIVER_STATE")) throw error;
     fail("RECEIVER_STATE_INVALID");
   }
+}
+
+// Reads the manifest saveManifest() stored for an already received release.
+// It holds the same ownership and mode contract; absence means "not retained".
+async function loadRetainedManifest(root, sha) {
+  assertAbsolutePath(root);
+  if (!SHA.test(sha)) fail("RECEIVER_SHA_INVALID");
+  let file;
+  try {
+    file = path.join(await realpath(root), sha, "release.json");
+    const metadata = await lstat(file);
+    if (!metadata.isFile() || metadata.isSymbolicLink() || (requiresRootOwnership && metadata.uid !== 0) || (metadata.mode & 0o077) !== 0) fail("RECEIVER_MANIFEST_CONFLICT");
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+  if (await realpath(file) !== file) fail("RECEIVER_MANIFEST_CONFLICT");
+  try { return JSON.parse(await readFile(file, "utf8")); } catch { fail("RECEIVER_MANIFEST_CONFLICT"); }
 }
 
 export function isMainModule(argvPath = process.argv[1], moduleUrl = import.meta.url) {
@@ -433,10 +451,19 @@ export async function receiveRelease(options = {}) {
   const supabaseTree = selectSchemaTree(await fetchApi(`/repos/MyKnow/ssartnership/git/trees/${liveSha}`, token, fetcher), liveSha, "supabase");
   const migrationTree = selectSchemaTree(await fetchApi(`/repos/MyKnow/ssartnership/git/trees/${supabaseTree}`, token, fetcher), supabaseTree, "migrations");
   if (migrationTree !== schema.migrationTree) fail("RECEIVER_SCHEMA_NOT_APPROVED");
+  const previous = await loadState(config.stateFile);
+  // GitHub deletes release artifacts after their retention period. An applied
+  // release stays verifiable from the manifest retained when it was received,
+  // so polling the same release must not depend on re-downloading it.
+  if (previous?.sha === liveSha && previous.runId === run.id) {
+    const retained = await loadRetainedManifest(config.releaseRoot, liveSha);
+    if (retained && isSameApprovedRelease(previous, verifyRemoteRelease(retained, run, liveSha, profile.release), profile.release)) {
+      return { status: "unchanged", sha: liveSha, image: previous.appImage };
+    }
+  }
   const artifact = validateArtifactMetadata(await fetchApi(`/repos/MyKnow/ssartnership/actions/runs/${run.id}/artifacts?per_page=100`, token, fetcher), run.id, profile.artifactName);
   const manifest = verifyRemoteRelease(await parseReleaseArtifact(await fetchArtifact(artifact.archive_download_url, token, fetcher), artifact), run, liveSha, profile.release);
   await saveManifest(config.releaseRoot, liveSha, manifest);
-  const previous = await loadState(config.stateFile);
   const app = manifest.images.find((item) => item.component === "app");
   if (!app) fail("RECEIVER_APP_IMAGE_MISSING");
   if (isSameApprovedRelease(previous, manifest, profile.release)) return { status: "unchanged", sha: liveSha, image: previous.appImage };
