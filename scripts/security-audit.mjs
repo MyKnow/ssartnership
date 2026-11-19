@@ -7,24 +7,35 @@ export function advisoryKey({ packageName, url }) {
   return `${packageName}:${url}`;
 }
 
+// Development-only exceptions must name one exact advisory and expire.
+// `allowWithdrawnUntil` covers an advisory GitHub has already withdrawn while
+// the npm audit feed still reports it; it never applies to Production paths.
+/**
+ * @typedef {{
+ *   packageName: string,
+ *   url: string,
+ *   reason: string,
+ *   allowPatchableUntil?: string,
+ *   allowWithdrawnUntil?: string,
+ * }} DevelopmentAdvisoryPolicy
+ */
+/** @type {Map<string, DevelopmentAdvisoryPolicy>} */
 export const ALLOWED_DEVELOPMENT_ADVISORIES = new Map(
   [
     {
-      packageName: "image-size",
-      url: "https://github.com/advisories/GHSA-w3rx-r6r6-pgpr",
+      packageName: "picomatch",
+      url: "https://github.com/advisories/GHSA-fc5q-39xc-vjpf",
       reason:
-        "Storybook-only dependency; npm's replacement line requires an unpublished stable Storybook peer. Temporary grace expires 2026-09-09.",
-      allowPatchableUntil: "2026-09-09T00:00:00.000Z",
-    },
-    {
-      packageName: "image-size",
-      url: "https://github.com/advisories/GHSA-5p2g-fcmc-qvqq",
-      reason:
-        "Storybook-only dependency; npm's replacement line requires an unpublished stable Storybook peer. Temporary grace expires 2026-09-09.",
-      allowPatchableUntil: "2026-09-09T00:00:00.000Z",
+        "Withdrawn by GitHub on 2026-11-18 with no patched picomatch release; reached only through development tooling (eslint, vite, vitest, storybook). Grace expires 2026-12-03.",
+      allowWithdrawnUntil: "2026-12-03T00:00:00.000Z",
     },
   ].map((advisory) => [advisoryKey(advisory), advisory]),
 );
+
+function graceActive(deadline, now) {
+  const parsed = deadline ? Date.parse(deadline) : Number.NaN;
+  return Number.isFinite(parsed) && now.getTime() < parsed;
+}
 
 export function runNpmAuditJson({ omitDev = false } = {}) {
   const args = ["audit", "--json", "--audit-level=moderate"];
@@ -113,18 +124,16 @@ export function evaluateAuditPolicy({
 
   for (const advisory of developmentAdvisories) {
     const policy = allowedDevelopmentAdvisories.get(advisoryKey(advisory));
-    const patchableGraceDeadline = policy?.allowPatchableUntil
-      ? Date.parse(policy.allowPatchableUntil)
-      : Number.NaN;
     const patchableGraceActive =
       advisory.fixAvailable === true &&
-      Number.isFinite(patchableGraceDeadline) &&
-      now.getTime() < patchableGraceDeadline;
+      graceActive(policy?.allowPatchableUntil, now);
+    // A withdrawn-advisory exception is always time-boxed, even if npm later
+    // reports the advisory as unfixable.
+    const allowed = policy?.allowWithdrawnUntil
+      ? graceActive(policy.allowWithdrawnUntil, now)
+      : advisory.fixAvailable === false || patchableGraceActive;
 
-    if (
-      policy &&
-      (advisory.fixAvailable === false || patchableGraceActive)
-    ) {
+    if (policy && allowed) {
       allowedDevelopment.push({ ...advisory, reason: policy.reason });
       continue;
     }
