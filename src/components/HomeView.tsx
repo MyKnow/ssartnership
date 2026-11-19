@@ -39,6 +39,8 @@ import {
 } from "@/lib/home-partner-selectors";
 import {
   parseHomeDirectoryState,
+  reconcileRouterSearchValue,
+  recordOwnSearchWrite,
   serializeHomeDirectoryState,
   type HomeDirectoryState,
 } from "@/lib/home-directory-state";
@@ -125,22 +127,47 @@ export default function HomeView({
     [categoryKeys, pathname],
   );
 
+  // Pending q values this directory wrote, so their delayed useSearchParams
+  // echo is not mistaken for external navigation (see recordOwnSearchWrite).
+  const [searchSync, setSearchSync] = useState({
+    routerValue: searchValue,
+    pending: [] as string[],
+  });
+  if (searchSync.routerValue !== searchValue) {
+    const { pending, external } = reconcileRouterSearchValue(
+      searchSync.pending,
+      searchValue,
+    );
+    setSearchSync({ routerValue: searchValue, pending });
+    if (external) {
+      setSearchInputValue(searchValue);
+    }
+  }
+
   const commitSearchValue = useCallback(
     (nextValue: string) => {
-      if (nextValue === searchValue) {
+      // Compare against the URL itself: useSearchParams can still hold the
+      // value from before an earlier write that has not been reflected yet.
+      const readCurrentSearch = () =>
+        parseHomeDirectoryState(
+          new URLSearchParams(window.location.search),
+          categoryKeys,
+        ).q;
+      if (nextValue.trim() === readCurrentSearch()) {
         return;
       }
 
       startTransition(() => {
         updateDirectoryState({ q: nextValue }, "push");
       });
+      const writtenValue = readCurrentSearch();
+      setSearchSync((current) => ({
+        ...current,
+        pending: recordOwnSearchWrite(current.pending, writtenValue),
+      }));
     },
-    [searchValue, updateDirectoryState],
+    [categoryKeys, updateDirectoryState],
   );
-
-  useEffect(() => {
-    setSearchInputValue(searchValue);
-  }, [searchValue]);
 
   const categoryMap = useMemo(() => {
     return createHomeCategoryMap(categories);
@@ -196,6 +223,9 @@ export default function HomeView({
     if (restoredDirectoryKeyRef.current === visibleCardKey) return;
     restoredDirectoryKeyRef.current = visibleCardKey;
     pendingReturnScrollRef.current = null;
+    // Restoration is keyed by external state (the live URL and sessionStorage),
+    // which render cannot read, so it has to be synchronized from an effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRestorationReadyKey(visibleCardKey);
     try {
       const saved = parseHomeReturnState(sessionStorage.getItem(`home:directory:${pathname}`), visibleCardKey);
