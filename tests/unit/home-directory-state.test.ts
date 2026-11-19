@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildPartnerDetailHref,
   parseHomeDirectoryState,
+  reconcileRouterSearchValue,
+  recordOwnSearchWrite,
   serializeHomeDirectoryState,
 } from "@/lib/home-directory-state";
 
@@ -98,5 +100,34 @@ describe("home directory URL state", () => {
     expect(buildPartnerDetailHref("partner/one", "/?category=cafe#benefits")).toBe(
       "/partners/partner%2Fone?returnTo=%2F%3Fcategory%3Dcafe%23benefits",
     );
+  });
+});
+
+describe("home directory search echo reconciliation", () => {
+  it("ignores a delayed router echo of the directory's own write", () => {
+    const pending = recordOwnSearchWrite([], "__no_such_partner__");
+    // The user clears the input before Next.js reflects the write.
+    expect(reconcileRouterSearchValue(pending, "__no_such_partner__")).toEqual({
+      pending: [],
+      external: false,
+    });
+  });
+
+  it("consumes skipped intermediate echoes in write order", () => {
+    const pending = recordOwnSearchWrite(recordOwnSearchWrite([], "cafe"), "");
+    expect(reconcileRouterSearchValue(pending, "cafe")).toEqual({ pending: [""], external: false });
+    expect(reconcileRouterSearchValue(pending, "")).toEqual({ pending: [], external: false });
+  });
+
+  it("treats an unknown router value as external navigation", () => {
+    expect(reconcileRouterSearchValue(["cafe"], "gym")).toEqual({ pending: [], external: true });
+    expect(reconcileRouterSearchValue([], "")).toEqual({ pending: [], external: true });
+  });
+
+  it("bounds the pending write history", () => {
+    let pending: string[] = [];
+    for (let index = 0; index < 30; index += 1) pending = recordOwnSearchWrite(pending, String(index));
+    expect(pending).toHaveLength(20);
+    expect(pending[0]).toBe("10");
   });
 });
