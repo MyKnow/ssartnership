@@ -100,7 +100,7 @@ Storage SDK의 signed/public URL과 공개 이미지 프록시는 [데이터 실
 | 이미지 최적화 | `minimumCacheTTL` 31일, `deviceSizes` 최대 2048, `imageSizes` 64~384 | 저장 이미지는 업로드마다 다른 경로이고 가장 넓은 원본은 2100px이다. 3840px 변형은 같은 픽셀을 다시 인코딩할 뿐이다. |
 | 이미지 디스크 캐시 상한 | `maximumDiskCacheSize` 512MiB | 상한이 없으면 Next는 시작 시점 여유 디스크의 절반까지 쓰고, 시작 후 첫 이미지 요청이 캐시 전체를 읽어 LRU를 다시 만든다. 볼륨이 DB·Storage와 같은 VM 디스크를 쓰므로 고정 상한을 두고, 넘치면 가장 오래 쓰지 않은 변형부터 지운다. |
 
-데이터 캐시는 의도적으로 영속하지 않는다. Next 16.3.8의 `revalidateTag` 무효화 기록은 프로세스 메모리에만 있고 `unstable_cache` key에는 빌드 정보가 없다. 이전 프로세스가 쓴 data entry를 다시 읽으면 무효화된 값이나 이전 코드의 모양이 돌아올 수 있으므로 `start.sh`는 매 시작마다 `.next/cache/fetch-cache`만 비운다. ISR 페이지 산출물은 `.next/server`에 쓰이며 이 볼륨과 무관하다.
+데이터 캐시는 의도적으로 영속하지 않는다. Next 16.4.6의 `revalidateTag` 무효화 기록은 프로세스 메모리에만 있고 `unstable_cache` key에는 빌드 정보가 없다. 이전 프로세스가 쓴 data entry를 다시 읽으면 무효화된 값이나 이전 코드의 모양이 돌아올 수 있으므로 `start.sh`는 매 시작마다 `.next/cache/fetch-cache`만 비운다. ISR 페이지 산출물은 `.next/server`에 쓰이며 이 볼륨과 무관하다.
 
 볼륨은 처음 만들어질 때 이미지의 `/app/.next/cache`(uid 1001 소유)를 복사한다. 이 디렉터리가 없는 이전 이미지로 먼저 볼륨이 생기면 root 소유가 되어 캐시가 쓰이지 않고 `start.sh`가 경고를 남긴다. 그때는 app을 멈춘 뒤 해당 볼륨만 지우고 새 이미지로 다시 올린다. `public/` 아래 이미지를 같은 경로로 교체하거나 `/api/image`가 중계하는 외부 이미지가 같은 주소에서 바뀌면 최대 31일 동안 이전 최적화본이 남는다. 파일 이름(주소)을 바꾸거나 app 컨테이너에서 `.next/cache/images`만 비운다. 최적화 이미지 캐시는 512MiB 상한 안에서 유지된다. 배포 직후에도 같은 이미지가 반복해서 재인코딩되면 `du -sh /app/.next/cache/images`로 상한 도달 여부를 보고 `next.config.ts`의 상한을 다시 정한다.
 
