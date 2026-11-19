@@ -125,3 +125,27 @@ export function buildPartnerDetailHref(
   const params = new URLSearchParams({ returnTo });
   return `${pathname}?${params.toString()}`;
 }
+
+const MAX_PENDING_SEARCH_WRITES = 20;
+
+// The home directory writes `q` with history.pushState, and Next.js reflects
+// that write into useSearchParams later, in a transition. Those delayed echoes
+// must not be mistaken for external navigation, or they overwrite what the
+// user typed after the write.
+export function recordOwnSearchWrite(
+  pending: readonly string[],
+  writtenValue: string,
+): string[] {
+  return [...pending, writtenValue].slice(-MAX_PENDING_SEARCH_WRITES);
+}
+
+export function reconcileRouterSearchValue(
+  pending: readonly string[],
+  routerValue: string,
+): { pending: string[]; external: boolean } {
+  const index = pending.indexOf(routerValue);
+  if (index === -1) {
+    return { pending: [], external: true };
+  }
+  return { pending: pending.slice(index + 1), external: false };
+}
