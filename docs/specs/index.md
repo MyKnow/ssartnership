@@ -33,6 +33,8 @@ last_verified: 2026-10-05
 
 - [원격 운영 MCP](./remote-operations-mcp/spec.md) — Issue #602, 설계·조회 서비스 구현 중
 
+- [파트너 포털·어드민 v2 화면 이관](./616-portal-admin-v2/spec.md) — Issue #616, 기반(PR1) 구현 중. [계획](./616-portal-admin-v2/plan.md), [작업 기록](./616-portal-admin-v2/tasks.md)
+
 - [Apple Wallet 회원 인증 패스](./301-apple-wallet-member-pass/spec.md) — Issue #301, active. 기능 플래그와 조정 timer는 비활성이다.
 
 ## 완료 기록
