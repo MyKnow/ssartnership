@@ -24,6 +24,7 @@ SSARTNERSHIP 웹 UI의 공용 기준 문서다. 실제 구현은 이 문서를 �
 - [Layout and motion](./layout-and-motion.md): grid, shell, breakpoints, motion
 - [Elements](./elements.md): button, input, badge, tabs, feedback
 - [Components](./components.md): shell, filter bar, stats, form section, data panel
+- [Portal v2](./portal-v2.md): 파트너 포털·어드민 v2 토큰, 셸, 컴포넌트 (Issue #616 이관 중)
 - [현행 UI/UX 기준선](./ui-ux-baseline.md)
 
 ## Operational Rule

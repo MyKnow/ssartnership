@@ -72,6 +72,38 @@
   --category-preview-dark-border: #3a4c69;
   --category-preview-dark-foreground: #eef5ff;
   --category-preview-dark-muted: #9fb0c9;
+
+  /* Partner·Admin portal v2 (Figma "05 · 파트너 v2 디자인 시스템").
+   * Names match the Figma variables' codeSyntax. v2 is light-only by design,
+   * so html.dark does not override these. */
+  --partner-v2-color-canvas: #f5f7fa;
+  --partner-v2-color-surface: #ffffff;
+  --partner-v2-color-sidebar: #172335;
+  --partner-v2-color-nav-active: #263d65;
+  --partner-v2-color-nav-text: #bbc6d8;
+  --partner-v2-color-on-dark: #f4f7fc;
+  --partner-v2-color-text: #182230;
+  --partner-v2-color-muted: #5c6c82;
+  --partner-v2-color-subtle: #8592a3;
+  --partner-v2-color-border: #e2e7ef;
+  --partner-v2-color-border-strong: #7e8ca0;
+  --partner-v2-color-grid: #edf0f5;
+  --partner-v2-color-previous: #71839d;
+  --partner-v2-color-blue: #2563eb;
+  --partner-v2-color-blue-soft: #eff5ff;
+  --partner-v2-color-hover: #1d4ed8;
+  --partner-v2-color-pressed: #1e40af;
+  --partner-v2-color-success: #147d64;
+  --partner-v2-color-success-soft: #e8f6ef;
+  --partner-v2-color-warning: #8e5a10;
+  --partner-v2-color-warning-soft: #fff5df;
+  --partner-v2-color-danger: #b42318;
+  --partner-v2-color-danger-soft: #fef3f2;
+  --partner-v2-color-disabled-bg: #edf0f5;
+  --partner-v2-color-disabled-text: #8592a3;
+  --partner-v2-radius-badge: 6px;
+  --partner-v2-radius-control: 8px;
+  --partner-v2-radius-panel: 12px;
 }
 
 html.dark {
@@ -130,6 +162,11 @@ html.dark {
 }
 
 @theme inline {
+  /* Portal v2 desktop shell (sidebar 240px) starts at 1200px. A named
+   * breakpoint keeps rem-based sorting with md; `min-[1200px]:` is emitted
+   * before `md:` and loses to it. */
+  --breakpoint-pv2-desktop: 75rem;
+
   --radius-pill: var(--shape-radius-pill);
 
   --radius-overlay: var(--shape-radius-overlay);
@@ -167,6 +204,35 @@ html.dark {
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
+
+  --radius-pv2-badge: var(--partner-v2-radius-badge);
+  --radius-pv2-control: var(--partner-v2-radius-control);
+  --radius-pv2-panel: var(--partner-v2-radius-panel);
+  --color-pv2-canvas: var(--partner-v2-color-canvas);
+  --color-pv2-surface: var(--partner-v2-color-surface);
+  --color-pv2-sidebar: var(--partner-v2-color-sidebar);
+  --color-pv2-nav-active: var(--partner-v2-color-nav-active);
+  --color-pv2-nav-text: var(--partner-v2-color-nav-text);
+  --color-pv2-on-dark: var(--partner-v2-color-on-dark);
+  --color-pv2-text: var(--partner-v2-color-text);
+  --color-pv2-muted: var(--partner-v2-color-muted);
+  --color-pv2-subtle: var(--partner-v2-color-subtle);
+  --color-pv2-border: var(--partner-v2-color-border);
+  --color-pv2-border-strong: var(--partner-v2-color-border-strong);
+  --color-pv2-grid: var(--partner-v2-color-grid);
+  --color-pv2-previous: var(--partner-v2-color-previous);
+  --color-pv2-blue: var(--partner-v2-color-blue);
+  --color-pv2-blue-soft: var(--partner-v2-color-blue-soft);
+  --color-pv2-hover: var(--partner-v2-color-hover);
+  --color-pv2-pressed: var(--partner-v2-color-pressed);
+  --color-pv2-success: var(--partner-v2-color-success);
+  --color-pv2-success-soft: var(--partner-v2-color-success-soft);
+  --color-pv2-warning: var(--partner-v2-color-warning);
+  --color-pv2-warning-soft: var(--partner-v2-color-warning-soft);
+  --color-pv2-danger: var(--partner-v2-color-danger);
+  --color-pv2-danger-soft: var(--partner-v2-color-danger-soft);
+  --color-pv2-disabled-bg: var(--partner-v2-color-disabled-bg);
+  --color-pv2-disabled-text: var(--partner-v2-color-disabled-text);
   --font-sans: "Pretendard Variable", "Pretendard", "Noto Sans KR",
     "Apple SD Gothic Neo", sans-serif;
 }
@@ -348,6 +414,39 @@ body:has([data-floating-submit-button="raised"]) [data-toast-viewport] {
 }
 
 @layer utilities {
+  /* Portal v2 root: light-only canvas with the v2 type scale. */
+  .portal-v2 {
+    color-scheme: light;
+    background-color: var(--partner-v2-color-canvas);
+    color: var(--partner-v2-color-text);
+    letter-spacing: 0;
+  }
+
+  /* Portal v2 type scale (Figma Text Styles "Partner v2 / *"). */
+  .pv2-title {
+    @apply text-[1.375rem] leading-8 font-bold sm:text-[1.625rem] sm:leading-[2.375rem];
+  }
+
+  .pv2-heading {
+    @apply text-lg leading-7 font-bold;
+  }
+
+  .pv2-body {
+    @apply text-sm leading-[1.375rem] font-normal;
+  }
+
+  .pv2-label {
+    @apply text-sm leading-[1.375rem] font-medium;
+  }
+
+  .pv2-caption {
+    @apply text-xs leading-[1.125rem] font-normal;
+  }
+
+  .pv2-metric {
+    @apply text-[1.75rem] leading-10 font-bold tabular-nums;
+  }
+
   .ui-page-shell {
     width: 100%;
     max-width: min(var(--grid-max), calc(100vw - 1.5rem));
