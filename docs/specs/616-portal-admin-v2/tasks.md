@@ -9,10 +9,12 @@ authority: descriptive
 
 [명세](./spec.md)와 [구현 계획](./plan.md)을 실행하는 재개용 체크리스트다. 항목을 끝내면 체크하고 커밋·PR·검증 증거를 한 줄로 남긴다. "Figma"는 파일 `NX6dwapOy7FSyejB0eLXj1`의 Desktop 프레임 노드다. 같은 이름의 Tablet·Mobile 프레임과 `State · …` 프레임도 함께 확인한다.
 
-## 현재 상태 (2026-11-20)
+## 현재 상태 (2026-11-21)
 
-- 브랜치 `feat/616-v2-foundation`(기준 `origin/dev` bce85029)에 PR1 일부가 **커밋 전 상태**로 있다: `globals.css` v2 토큰·타입 스케일, `src/components/portal-v2/` 9개 파일, `tests/portal-v2-foundation.test.mts`, 이 문서 3개.
-- 확인한 검증: 계약 테스트 19개(포털 v2 + 디자인 토큰·포커스·터치 영역), typecheck, 변경 파일 eslint, `check:docs` 통과. Storybook dev 서버를 앱 안 브라우저로 열어 셸(1440·360)·표(1440·360)·폼·탭·확인 대화상자를 직접 확인했다. Storybook 자동 테스트(`vitest --project=storybook`)는 Playwright Chromium이 설치돼 있지 않아 실행하지 못했다(`npx playwright install` 필요).
+- **dev에 머지됨**: PR #624(기반 컴포넌트·토큰·셸·문서), #625(파트너 셸 어댑터와 인증 5개 경로), #626(토큰 브리지·어드민 셸). 세 PR 모두 첫 시도 CI 통과(Node 2,875 통과·실패 0, E2E 121 통과·재시도 0).
+- **적용 범위**: 파트너·어드민 전 경로가 `.portal-v2` 셸 안에서 v2 색·12px radius·그림자 없음·타입 스케일을 따른다(토큰 브리지, [portal-v2.md](../../design-system/portal-v2.md#토큰-브리지-아직-옮기지-않은-화면)). 파트너 로그인·재설정·변경·초기 설정·회사 선택은 v2 컴포넌트로 직접 옮겼다. 어드민 셸은 사이드바·상단 바만 v2로 제자리 교체했다.
+- **남은 일(화면 단위 이관)**: 아래 PR3·PR4~6 표의 경로는 레이아웃·정보 구조가 아직 기존 구현이다. 화면을 옮길 때 `PortalPanel`·`PortalDataTable`·`PortalPageHeader`로 바꾸고 브리지 의존을 줄인다. 어드민 모바일 메뉴·하단 탐색은 브리지 스타일이다.
+- **미검증**: Storybook 자동 테스트(Playwright Chromium 미설치), 820px 태블릿, 실제 Preview 계정 통합 검증(파트너 로그인→회사 선택→대시보드, 어드민 홈→작업함 등), 로컬 `verify:release`(브라우저 미설치; 승격 PR의 CI가 high 계층으로 실행).
 
 ## 작업 순서 규칙
 
