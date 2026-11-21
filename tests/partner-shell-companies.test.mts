@@ -38,5 +38,5 @@ test("the partner shell shows an inline notice in both layouts when summaries fa
   const shell = read("src/components/partner/PartnerPortalShellView.tsx");
   assert.match(shell, /"회사 정보를 잠시 불러오지 못했습니다\. 잠시 후 새로고침해 주세요\."/u);
   assert.match(shell, /session && companiesUnavailable \? <CompaniesUnavailableNotice \/> : null/u);
-  assert.equal(shell.match(/\{companiesNotice\}/gu)?.length, 2);
+  assert.equal(shell.match(/notice=\{companiesNotice\}/gu)?.length, 2);
 });

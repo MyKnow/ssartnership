@@ -36,8 +36,8 @@ authority: descriptive
 
 ## PR2 · 파트너 셸과 인증 (`feat/616-partner-auth`)
 
-- [ ] `PartnerPortalShellView`를 `PortalShell` 어댑터로 교체(`PartnerPendingLink`, 테마 토글 제거)
-- [ ] 아래 경로 이관
+- [x] `PartnerPortalShellView`를 `PortalShell` 어댑터로 교체(`PartnerPendingLink`, 테마 토글 제거)
+- [x] 아래 경로 이관 (로그인·재설정·변경·초기 설정·회사 선택). 추가한 v2 컴포넌트: `PortalAuthLayout`·`PortalPasswordInput`·`PortalSubmitButton`·`PortalFormMessage`, `PortalButton`의 `loading`. 개발 전용 `/partner/setup` 데모 목록은 구 스타일 그대로 둔다.
 
 | 경로 | 화면 | Figma | 주 컴포넌트 |
 | --- | --- | --- | --- |
@@ -124,5 +124,6 @@ authority: descriptive
 
 ## 진행 로그
 
+- 2026-11-20 Claude(Sonnet): PR2 파트너 셸 어댑터·인증 5개 경로 v2 이관(`feat/616-partner-auth`).
 - 2026-11-20 Claude(Sonnet): PR1 폼·표·탭·페이지·필터·확인 대화상자·스토리·`portal-v2.md` 작성. 셸이 데스크톱에서 레일로만 보이는 버그를 찾아 `min-[1200px]:`를 이름 있는 브레이크포인트 `pv2-desktop:`로 교체했다(plan 6절 함정).
 - 2026-11-20 Claude(Opus): `feat/616-v2-foundation` 생성, PR1 토큰·셸·기본 컴포넌트·계약 테스트 작성(미커밋), 명세·계획·작업 기록 작성. 이후 구현은 Sonnet이 이어받는다.
