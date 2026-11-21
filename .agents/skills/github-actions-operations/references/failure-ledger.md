@@ -1,5 +1,9 @@
 # GitHub Actions failure ledger
 
+## 2026-11-21 portal v2 promotion preflight
+
+- `operator_release_gate_detached_head` — Issue #616 promotion preflight ran `npm run verify:release` on a detached `origin/dev` checkout. Quick passed (2,883 Node cases, 2,874 pass, zero failures, nine configured skips, 400 unit), then `npm run build` stopped with `ENV_BRANCH_REQUIRED: use a named branch for local build/start` before the Production build or any browser case ran. This is an operator sequencing defect, not a product or CI failure, and no remote run was created. Preserve the failed log. Run the complete release gate on a named local branch at the exact `origin/dev` SHA and keep the original failed output; do not set an environment override to bypass the branch guard. The named-branch rerun passed Quick (same totals) and then stopped at `ENV_PROFILE_MISSING: .env.preview` because the worktree has no secret profile. Match Public Readiness: run Quick with no forced source preference, then run `verify:release:post-quick` with `NEXT_PUBLIC_DATA_SOURCE=mock` and `NEXT_PUBLIC_PARTNER_PORTAL_DATA_SOURCE=mock` injected only into that stage.
+
 ## 2026-11-20 portal v2 token bridge
 
 - `local_modal_portal_scope_source_contract` — Issue #616 PR3's first `verify:change` stopped at one Node case: `tests/confirm-dialog-ui-contract.test.mts` requires the shared Modal wrapper to keep the literal `className="fixed inset-0 z-50 `. A first attempt wrapped that string in `cn(...)` to add a `portal-v2-scope` class and broke the source-level contract (2,873 of 2,883 passed, one failure, no remote run existed). Preserve the failed local log. Keep the wrapper className literal and carry the v2 scope as a `data-portal-v2-scope` attribute selected from `globals.css`; the contract test, token budget and focus suites passed afterward. Run the complete `verify:change` again before the push; no workflow was triggered by the failed local gate.
