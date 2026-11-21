@@ -422,6 +422,67 @@ body:has([data-floating-submit-button="raised"]) [data-toast-viewport] {
     letter-spacing: 0;
   }
 
+  /* 아직 v2 컴포넌트로 옮기지 않은 화면이 포털 안에서도 v2 색·형태를 따르도록
+   * 기존 의미 토큰을 v2 값으로 다시 매핑한다. 포털 밖(공개 사이트)과 다크 모드는
+   * 건드리지 않는다. `[data-portal-v2-scope]`는 body로 포털된 Modal이 같은 매핑을 받는 용도다. */
+  .portal-v2,
+  [data-portal-v2-scope] {
+    --background: var(--partner-v2-color-canvas);
+    --background-muted: var(--partner-v2-color-grid);
+    --surface: var(--partner-v2-color-surface);
+    --surface-muted: var(--partner-v2-color-grid);
+    --surface-inset: var(--partner-v2-color-grid);
+    --surface-control: var(--partner-v2-color-surface);
+    --surface-elevated: var(--partner-v2-color-surface);
+    --surface-overlay: var(--partner-v2-color-surface);
+    --border: var(--partner-v2-color-border);
+    --border-strong: var(--partner-v2-color-border-strong);
+    --foreground: var(--partner-v2-color-text);
+    --foreground-soft: var(--partner-v2-color-text);
+    --muted-foreground: var(--partner-v2-color-muted);
+    --primary: var(--partner-v2-color-blue);
+    --primary-emphasis: var(--partner-v2-color-hover);
+    --primary-soft: var(--partner-v2-color-blue-soft);
+    --primary-foreground: var(--partner-v2-color-surface);
+    --focus-ring: var(--partner-v2-color-blue);
+    --accent: var(--partner-v2-color-blue);
+    --info: var(--partner-v2-color-blue);
+    --info-soft: var(--partner-v2-color-blue-soft);
+    --success: var(--partner-v2-color-success);
+    --warning: var(--partner-v2-color-warning);
+    --danger: var(--partner-v2-color-danger);
+    --shape-radius-control: var(--partner-v2-radius-control);
+    --shape-radius-input: var(--partner-v2-radius-control);
+    --shape-radius-card: var(--partner-v2-radius-panel);
+    --shape-radius-panel: var(--partner-v2-radius-panel);
+    --shape-radius-overlay: var(--partner-v2-radius-panel);
+    --shadow-flat: none;
+    --shadow-raised: none;
+    --shadow-floating: none;
+  }
+
+  /* 포털 안의 기존 텍스트 클래스를 v2 타입 스케일에 맞춘다(대문자·넓은 자간 제거). */
+  .portal-v2 .ui-kicker {
+    @apply text-xs leading-[1.125rem] font-medium normal-case tracking-normal;
+  }
+
+  .portal-v2 .ui-display,
+  .portal-v2 .ui-page-title {
+    @apply text-[1.375rem] leading-8 font-bold tracking-normal sm:text-[1.625rem] sm:leading-[2.375rem];
+  }
+
+  .portal-v2 .ui-section-title {
+    @apply text-lg leading-7 font-semibold tracking-normal;
+  }
+
+  .portal-v2 .ui-body {
+    @apply text-sm leading-[1.375rem];
+  }
+
+  .portal-v2 .ui-caption {
+    @apply text-xs leading-[1.125rem] tracking-normal sm:text-xs;
+  }
+
   /* Portal v2 type scale (Figma Text Styles "Partner v2 / *"). */
   .pv2-title {
     @apply text-[1.375rem] leading-8 font-bold sm:text-[1.625rem] sm:leading-[2.375rem];

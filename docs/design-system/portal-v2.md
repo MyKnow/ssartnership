@@ -40,3 +40,11 @@ authority: normative
 - `PortalPagination`: 안내 + 이전/다음 링크. URL query가 단일 기준이다.
 - `PortalFilterBar`·`PortalSearchField`: 검색·정렬·상태 필터를 한 줄(모바일 세로)로 둔다. 기본은 GET 폼이고 기본 필터가 4개를 넘으면 `AdvancedFilterDisclosure`로 접는다.
 - `PortalConfirmDialog`: 공용 `Modal`의 포커스·Escape 계약을 쓰는 확인 단계. 처리 중에는 닫히지 않는다.
+
+## 토큰 브리지 (아직 옮기지 않은 화면)
+
+`.portal-v2` 루트(파트너 셸·어드민 셸·인증 프레임)는 기존 의미 토큰(`--background`, `--surface*`, `--border*`, `--foreground`, `--muted-foreground`, `--primary*`, `--success/--warning/--danger`, `--shape-radius-*`, `--shadow-*`)을 v2 값으로 다시 매핑하고, `ui-kicker`·`ui-page-title`·`ui-section-title`·`ui-body`·`ui-caption`을 v2 타입 스케일로 바꾼다. 그래서 `Card`·`Surface`·`ui/Button` 등 기존 컴포넌트를 쓰는 파트너·어드민 화면도 v2 색·12px radius·그림자 없음·타입 스케일을 따른다. 규칙:
+
+- 매핑은 포털 안에서만 적용된다. 공개 사이트와 다크 모드 토큰은 그대로다. body로 포털되는 공용 `Modal`은 `.portal-v2` 안에서 열렸을 때 `data-portal-v2-scope` 속성을 붙여 같은 매핑을 받는다.
+- 브리지는 색·형태만 맞춘다. 레이아웃·정보 구조는 Figma와 같은 화면 단위 이관(`PortalPanel`·`PortalDataTable` 등)이 필요하며, 화면을 옮길 때 브리지 의존을 줄인다.
+- 새 화면은 브리지가 아니라 `portal-v2` 컴포넌트를 직접 쓴다.
