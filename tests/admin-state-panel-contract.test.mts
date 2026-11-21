@@ -2,27 +2,34 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("관리자 forbidden 상태는 빈 상태와 구분되는 경고 표면을 사용한다", async () => {
+async function readPortalStatePanel() {
+  return readFile(
+    new URL("../src/components/portal-v2/PortalStatePanel.tsx", import.meta.url),
+    "utf8",
+  );
+}
+
+test("관리자 상태 패널은 종류를 그대로 v2 상태 패널에 위임한다", async () => {
   const source = await readFile(
     new URL("../src/components/admin/AdminStatePanel.tsx", import.meta.url),
     "utf8",
   );
 
-  assert.match(source, /kind === "forbidden"/);
-  assert.match(source, /tone="warning"/);
-  assert.match(source, /role="status"/);
-  assert.match(source, /aria-live="polite"/);
+  assert.match(source, /<PortalStatePanel\s+kind=\{kind\}/);
+});
+
+test("관리자 forbidden 상태는 빈 상태와 구분되는 경고 표면을 사용한다", async () => {
+  const source = await readPortalStatePanel();
+
+  assert.match(source, /forbidden: "border-pv2-warning\/30 bg-pv2-warning-soft"/);
+  assert.match(source, /role=\{isAlert \? "alert" : "status"\}/);
 });
 
 test("관리자 오류 상태는 스크린리더에 즉시 전달되는 alert live region을 사용한다", async () => {
-  const source = await readFile(
-    new URL("../src/components/admin/AdminStatePanel.tsx", import.meta.url),
-    "utf8",
-  );
+  const source = await readPortalStatePanel();
 
-  assert.match(source, /kind === "error"/);
-  assert.match(source, /role="alert"/);
-  assert.match(source, /aria-live="assertive"/);
+  assert.match(source, /const isAlert = kind === "error"/);
+  assert.match(source, /role=\{isAlert \? "alert" : "status"\}/);
 });
 
 test("공통 InlineMessage는 danger 톤을 기본 alert로 승격할 수 있다", async () => {
