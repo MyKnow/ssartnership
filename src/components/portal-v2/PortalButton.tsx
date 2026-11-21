@@ -54,7 +54,11 @@ type CommonProps = {
 };
 
 export type PortalButtonProps = CommonProps &
-  Omit<ComponentPropsWithoutRef<"button">, "children">;
+  Omit<ComponentPropsWithoutRef<"button">, "children"> & {
+    /** 처리 중: 비활성화하고 `aria-busy`를 달아 중복 제출을 막는다. */
+    loading?: boolean;
+    loadingText?: string;
+  };
 
 export default function PortalButton({
   variant,
@@ -63,16 +67,21 @@ export default function PortalButton({
   className,
   children,
   type = "button",
+  loading = false,
+  loadingText,
+  disabled,
   ...props
 }: PortalButtonProps) {
   return (
     <button
       {...props}
       type={type}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
       className={portalButtonClassName({ variant, fullWidth, className })}
     >
       {icon ? <span aria-hidden="true" className="inline-flex size-5 shrink-0 items-center justify-center">{icon}</span> : null}
-      <span className="min-w-0 truncate">{children}</span>
+      <span className="min-w-0 truncate">{loading && loadingText ? loadingText : children}</span>
     </button>
   );
 }
